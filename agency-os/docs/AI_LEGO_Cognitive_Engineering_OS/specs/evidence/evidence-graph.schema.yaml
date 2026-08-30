@@ -1,0 +1,563 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/evidence/evidence-graph.schema.yaml"
+title: Evidence Graph
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Evidence Graph — the node/edge
+  topology overlay that ties Source/Evidence/Claim/Assumption/Decision/Entity
+  records together into one traceable knowledge graph. Grounded in Master Plan
+  §13.3 "Evidence Graph" (L1099-1112), which gives an EXACT directory
+  structure and nothing else:
+
+    /modules/knowledge/
+        /sources/
+        /evidence/
+        /claims/
+        /entities/
+        /relations/
+        /provenance/
+        /graph/
+
+  Unlike this file's `evidence.schema.yaml`/`claim.schema.yaml`/
+  `assumption.schema.yaml` siblings, this file is NOT one of Atlas Appendix
+  A's promised filenames — grepped Atlas Appendix A (L4574-4590) full text
+  for "evidence-graph"/"evidence_graph": zero hits. Its sole textual mandate
+  is (1) Master Plan §13.3's directory listing above, and (2) its own
+  explicit citation as a required Phase-3 spec in
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 (L107: "`/specs/evidence/`：
+  `evidence-graph.schema.yaml`（MP §13.3）、`sentence-provenance.schema.yaml`
+  （MP §13.1）"), itself required to satisfy that plan's Acceptance Criterion
+  5 (§5 L135: reverse-traceability from any Artifact sentence back through
+  `Sentence → Claim → Evidence → Source → 逐字稿時間戳`).
+
+  Master Plan §13's own core relation chain (L1046-1057) —
+  `SOURCE → EVIDENCE → CLAIM → INFERENCE → ASSUMPTION → DECISION` — and its
+  worked example (L1061-1073: `PDF p.32 → Evidence E912 → Claim C117 →
+  Inference I72 → Recommendation R61 → Strategy S91`) additionally ground
+  this file's SOURCE/EVIDENCE/CLAIM/ASSUMPTION/DECISION node types and the
+  directionality of the edges between them. `INFERENCE` is deliberately NOT
+  added as an eighth node type here — see `open_questions.OQ-EGRAPH-3`.
+
+  Master Plan §60 "Data Architecture" (L2610-2633), Graph Store row
+  (L2622-2623: "Graph Store → Evidence / Claim / Entity Relationships") is
+  the decisive citation for this file's single most consequential structural
+  decision — see `compilation_decisions` for why Entity-to-Entity relations
+  and Evidence/Claim cross-type relations are modeled as ONE generic `edge`
+  concept, not two separate schemas, even though the task briefing this file
+  was built from suggested an Entity-only minimal shape for "Relation." That
+  one line names Evidence, Claim, AND Entity relationships as living in the
+  SAME graph store — direct textual evidence against splitting them.
+
+  `Entity` and `Relation` have ZERO existing schema anywhere in this repo
+  (grepped `specs/` for "entity.schema"/"relation.schema": zero hits) prior
+  to this file. Per this task's own explicit instruction to prefer defining
+  a minimal shape over silence when the mother document gives enough to work
+  with: MP §13.3's directory listing (`/entities/`, `/relations/` as their
+  own top-level subdirectories, siblings to `/evidence/` and `/claims/`) and
+  MP §60's Graph Store line together are enough to grant Entity and Relation
+  first-class existence and a coarse shape, but NOT enough to grant either
+  concept any domain-specific internal structure beyond
+  id/label/type-of-relationship — see `compilation_decisions` for the exact
+  minimal shape chosen and why it is honestly flagged NEW_DESIGN rather than
+  presented as mother-document content.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §13.3 Evidence Graph directory structure (L1099-1112)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §13 core relation chain (L1039-1057) and worked example (L1059-1073)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §60 Data Architecture, Graph Store row (L2610-2633, row at L2622-2623)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 Required Phase-3 Specs (L101-123, this file's row at L107)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §5 Acceptance Criterion 5 (L127-136, criterion at L135)"
+  - "specs/evidence/evidence.schema.yaml (EVIDENCE node payload, real $ref, Wave 4 sibling)"
+  - "specs/evidence/claim.schema.yaml (CLAIM node payload, real $ref, Wave 4 sibling); Atlas §11.20 Supporting/Contradicting columns (L1663) ground this file's edge `relation_type` common values"
+  - "specs/evidence/assumption.schema.yaml (ASSUMPTION node payload, real $ref, Wave 4 sibling)"
+  - "specs/decision/decision.schema.yaml (DECISION node payload, real $ref, Wave 6 sibling)"
+  - "specs/governance/epistemic-label.schema.yaml (root-level $ref convention precedent; optional provenance on NEW_DESIGN node/edge shapes)"
+
+decided_by: >
+  No ADR governs this file (grepped `docs/adr/ADR-001~016` full text for
+  "Evidence Graph"/"evidence-graph": zero hits). This file is also NOT
+  tracked by `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` (grepped
+  full text: zero hits for "evidence-graph") — unlike every Wave 1-8 file
+  that plan's own §2.4/§3 tables assign a Finding ID or Build Order slot to,
+  this file's sole mandate comes from `MVP_VERTICAL_SLICE_PLAN.md` §4's own
+  Required Phase-3 Specs list (L107), a Phase-2 planning document, not the
+  Wave plan. Field shape is therefore a direct Phase-3 compilation off
+  Master Plan §13.3/§13/§60 text, the same "no ADR, direct compilation off
+  mother-document prose" class `evidence.schema.yaml` and
+  `status-codes.schema.yaml` already established as precedent — not a
+  multi-shape conflict requiring ADR-level adjudication (no second competing
+  Evidence Graph definition was found anywhere in the three mother
+  documents, ADRs, or `.ai/research/phase-0/*.yaml` registers).
+
+compilation_decisions:
+  - question: >
+      Should Entity and Relation — named only as bare directory entries in
+      MP §13.3 (L1108-1109), with zero field-level content anywhere in the
+      three mother documents (verified: grepped both Atlas and Execution
+      Contract full text for "Entity"/"Relation" outside prose uses like
+      "International Relations"/"Legal Entity" — zero structural hits in
+      either) — be given a minimal concrete shape here, or deferred entirely
+      to `open_questions`?
+    decision: >
+      Given a minimal shape: `entity_node` (`entity_id`, `label`, `type`) and
+      a generic `edge` concept (see next decision) that subsumes
+      Entity-to-Entity "Relation."
+    reasoning: >
+      Per this task's own explicit instruction, silence is only the right
+      call when the mother document gives NOTHING to work with. Here it
+      gives: (1) both concepts a real, load-bearing directory slot
+      (`/entities/`, `/relations/`) inside a structure (§13.3) this file
+      exists specifically to compile; (2) MP §60's Graph Store row naming
+      "Entity Relationships" as a first-class citizen of the same graph
+      store that also holds Evidence/Claim relationships. That is enough to
+      justify EXISTENCE and a coarse id/label/type-of-relationship shape
+      (the shape every other node type in this file already needs anyway:
+      an addressable id + enough data to be useful), but not enough to
+      justify any domain-specific internal structure (e.g., a fixed
+      taxonomy of entity `type` values, or a fixed enum of `relation_type`
+      values) — those would be presenting a guess as a compiled fact, the
+      exact failure mode this suite's `decided_by` sections repeatedly flag
+      as out of bounds (same restraint `decision.schema.yaml` applied to its
+      own unconstrained `options`/`criteria`/`analyses` fields).
+  - question: >
+      The task briefing this file was built from suggested Entity/Relation
+      as two SEPARATE minimal shapes — `{id, label, type}` for Entity and
+      `{from_entity_id, to_entity_id, relation_type}` for Relation (implying
+      Relation connects ONLY two Entities) — while ALSO asking this file to
+      model "Edges connect nodes (e.g. Evidence→supports/contradicts→Claim;
+      Entity→relation_type→Entity)," which needs edges between node types
+      OTHER than Entity. Build two separate edge concepts (an
+      Entity-only `relation` plus a separate cross-type `evidence_link`), or
+      one generic edge that covers both?
+    decision: >
+      ONE generic `edge` definition, with typed `from`/`to` endpoints
+      (`node_ref`: `{node_type, node_id}`, `node_type` one of
+      SOURCE/EVIDENCE/CLAIM/ASSUMPTION/DECISION/ENTITY) and a free-form
+      `relation_type` string. An Entity-to-Entity "Relation" is simply the
+      special case where both endpoints have `node_type: ENTITY`; it is not
+      a structurally different object.
+    reasoning: >
+      MP §60's Graph Store row (L2622-2623) is direct, decisive textual
+      evidence against splitting these into two schemas: it names "Evidence
+      / Claim / Entity Relationships" together, on ONE line, as the content
+      of ONE graph store — not as two competing relationship concepts living
+      in two stores. A single generic edge losslessly SUBSUMES the task
+      briefing's suggested Entity-only shape (its `from_entity_id`/
+      `to_entity_id`/`relation_type` fields map 1:1 onto
+      `from.node_id`/`to.node_id`/`relation_type` once `node_type: ENTITY`
+      is fixed on both ends) while also satisfying the task's own explicit
+      cross-type example (`Evidence→supports/contradicts→Claim`), which the
+      Entity-only shape structurally cannot express. Choosing the more
+      general of two shapes where one strictly subsumes the other, backed by
+      a real citation naming both cases as one concept, is the same class of
+      Low-risk generalization `reversal.schema.yaml`'s `oneOf`-of-two-forms
+      decision used (there: two mother-document shapes preserved without
+      forcing either into the other; here: one shape that already covers
+      both without losing precision).
+  - question: >
+      For node types that already have a governed schema
+      (EVIDENCE/CLAIM/ASSUMPTION/DECISION), should the graph node embed the
+      FULL record inline, or only a lightweight id reference, given MP
+      §13.3's directory structure gives `/evidence/`, `/claims/` etc. their
+      OWN top-level directories, separate from `/graph/` — implying the
+      full, canonical records already live elsewhere and a graph overlay
+      duplicating them risks drift?
+    decision: >
+      Real `$ref` to the full schema (`evidence.schema.yaml`,
+      `claim.schema.yaml`, `assumption.schema.yaml`,
+      `decision.schema.yaml`), per this task's own explicit instruction —
+      but this does NOT force full-record duplication in practice, because
+      three of those four schemas require only a small id+provenance core
+      (`evidence.schema.yaml`: `evidence_id`+`provenance`;
+      `assumption.schema.yaml`: `id`+`statement`+`status`+`provenance`;
+      `claim.schema.yaml`: `claim_id`+`statement`+`provenance`;
+      `decision.schema.yaml`: the larger `id`+`version`+`question`+
+      `options`+`human_judgment_pending`+`provenance` set). A caller MAY
+      supply a minimal id+required-fields stub (drift-safe: the canonical
+      full record stays in its own `/evidence/`, `/claims/` etc. directory)
+      or a fully fleshed inline record, exactly the same "real $ref, minimal
+      stub allowed" flexibility `claim.schema.yaml`'s own
+      `supporting_evidence`/`contradicting_evidence` arrays already
+      established against `evidence.schema.yaml` this same effort.
+    reasoning: >
+      This task's instruction is explicit and unambiguous ("Node types: ...
+      Evidence (ref `specs/evidence/evidence.schema.yaml`) ...") — a soft
+      placeholder would contradict a direct instruction with no
+      countervailing textual conflict to justify overriding it. The
+      drift risk identified above is real but already mitigated by the
+      referenced schemas' own permissive required-field sets, not by
+      refusing the $ref. See `open_questions.OQ-EGRAPH-1` for the residual
+      concern this does not fully resolve.
+  - question: >
+      Source and Entity have no existing ID grammar anywhere in this repo.
+      What pattern should `source_id`/`entity_id` use?
+    decision: >
+      `^SRC-[0-9]+$` and `^ENT-[0-9]+$` respectively — new patterns, but
+      following the SAME hyphen-prefix-plus-sequential-number grammar
+      already used by 3 of this corpus's 4 existing evidence/decision ID
+      fields (`evidence_id: ^E-[0-9]+$`, `claim_id: ^C-[0-9]+$`,
+      `id: ^ASM-[0-9]+$`; `decision.schema.yaml`'s `id: ^DEC-` is the one
+      outlier, a prefix-only pattern matching its own composite
+      timestamp-based example ID).
+    reasoning: >
+      No mother document gives either ID grammar directly (MP §13's own
+      worked example uses "PDF p.32" as a free-text SOURCE LOCATOR, not a
+      source ID), so this is honestly NEW_DESIGN, not transcription — but
+      inventing a structurally novel grammar when 3-of-4 sibling ID fields
+      already agree on one convention would introduce inconsistency with no
+      textual basis for the deviation. Matching the majority convention
+      keeps this corpus's ID grammars learnable as one pattern rather than
+      four independent ones.
+  - question: >
+      Should this file's root validate directly, or delegate via a
+      root-level `$ref` the way `governance/epistemic-label.schema.yaml`
+      does?
+    decision: >
+      Root-level `$ref: "#/evidence_graph"`, mirroring
+      `epistemic-label.schema.yaml`'s Codex-confirmed fix (that file's own
+      comment, L27-32: "without this, a validator pointed at this file's
+      ROOT ... has no type constraint and would accept any value").
+    reasoning: >
+      This file needs a `definitions:` block that other files may want to
+      reference by fragment in the future (e.g. `#/definitions/node_ref` or
+      `#/definitions/entity_node`), the same reason
+      `epistemic-label.schema.yaml` named its primary type
+      (`provenance_record`) as a sibling key rather than embedding it
+      anonymously at the true document root. Naming the primary type
+      `evidence_graph` and `$ref`-ing it from root keeps both entry points
+      (bare `$id` and `#/evidence_graph`) equivalent, and — the concrete
+      failure this pattern exists to prevent — ensures a validator pointed
+      at the bare file (as `tests/contracts/specs/evidence/
+      evidence-graph.fixtures.yaml`'s `target_ref: ""` fixtures do) actually
+      rejects malformed instances instead of silently accepting anything.
+  - question: >
+      Should NEW_DESIGN node/edge shapes (`source_node`, `entity_node`,
+      `edge`) require a `provenance` field, matching
+      `evidence.schema.yaml`/`claim.schema.yaml`/`assumption.schema.yaml`/
+      `decision.schema.yaml`'s own required `provenance`?
+    decision: "Optional, not required, on all three."
+    reasoning: >
+      `governance/epistemic-label.schema.yaml` states its own scope as
+      "every content/claim object in the system must carry" a
+      provenance_record — a genuinely open question for structural,
+      NEW_DESIGN shapes this file introduces (is a bare graph edge itself a
+      'content/claim object,' or a structural relationship inheriting its
+      endpoints' own provenance?). `decision/reversal.schema.yaml` (this
+      corpus's closest precedent for an embedded structural sub-object) does
+      NOT carry its own `provenance` field, treating itself as inheriting
+      governance from its parent. Requiring `provenance` here without a
+      clearer textual mandate would be inventing a new governance
+      obligation, not compiling an existing one — kept optional and flagged
+      as `open_questions.OQ-EGRAPH-2` rather than silently decided either
+      way.
+
+# ---------------------------------------------------------------------------
+# Root $ref (mirrors governance/epistemic-label.schema.yaml's convention):
+# without this, a validator pointed at this file's ROOT (not `#/evidence_graph`)
+# has no type constraint and would accept any value. `evidence_graph` is the
+# one composite type this file exists to define.
+# ---------------------------------------------------------------------------
+$ref: "#/evidence_graph"
+
+definitions:
+
+  node_type:
+    type: string
+    enum: [SOURCE, EVIDENCE, CLAIM, ASSUMPTION, DECISION, ENTITY]
+    description: >
+      The six node kinds this file recognizes. Mirrors MP §13.3's directory
+      listing (`/sources/`, `/evidence/`, `/claims/`, `/entities/`) plus this
+      file's own EVIDENCE/CLAIM sibling schemas' `assumption.schema.yaml`/
+      `decision.schema.yaml` dependents (both real $refs elsewhere in this
+      corpus already). Deliberately excludes INFERENCE — see
+      `open_questions.OQ-EGRAPH-3`.
+
+  source_node:
+    type: object
+    required: [node_type, source_id]
+    description: >
+      NEW_DESIGN — no source.schema.yaml exists anywhere in this repo
+      (grepped, zero hits). `specs/artifact/portable-uri.schema.yaml` was
+      built 2026-08-30 (same day) and could resolve `source_id` to a real
+      artifact:// URI, but is not hard-$ref'd here since a Source node in
+      this graph may predate ingestion (e.g. a cited external paper with no
+      artifact:// URI of its own) — kept minimal and honestly flagged, same
+      class as `content`/`source` on `evidence.schema.yaml`.
+    properties:
+      node_type: { const: SOURCE }
+      source_id:
+        type: string
+        pattern: "^SRC-[0-9]+$"
+      locator_hint:
+        type: string
+        description: >
+          Free-text description of the source itself (not the fine-grained
+          span within it — that is `sentence-provenance.schema.yaml`'s job).
+          MP §13's own worked example uses "PDF p.32" in exactly this
+          free-text style (L1062) — transcribed as the model for this
+          field's intended use, not a literal field name from any mother
+          document.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        description: "Optional — see compilation_decisions."
+
+  evidence_node:
+    type: object
+    required: [node_type, data]
+    properties:
+      node_type: { const: EVIDENCE }
+      data:
+        $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+
+  claim_node:
+    type: object
+    required: [node_type, data]
+    properties:
+      node_type: { const: CLAIM }
+      data:
+        $ref: "ai-lego://specs/evidence/claim.schema.yaml"
+
+  assumption_node:
+    type: object
+    required: [node_type, data]
+    properties:
+      node_type: { const: ASSUMPTION }
+      data:
+        $ref: "ai-lego://specs/evidence/assumption.schema.yaml"
+
+  decision_node:
+    type: object
+    required: [node_type, data]
+    properties:
+      node_type: { const: DECISION }
+      data:
+        $ref: "ai-lego://specs/decision/decision.schema.yaml"
+
+  entity_node:
+    type: object
+    required: [node_type, entity_id]
+    description: >
+      NEW_DESIGN minimal shape — see top-level description and
+      compilation_decisions for why Entity is given first-class existence
+      here despite zero mother-document field-level content.
+    properties:
+      node_type: { const: ENTITY }
+      entity_id:
+        type: string
+        pattern: "^ENT-[0-9]+$"
+      label:
+        type: string
+        description: "Human-readable name of the entity, e.g. a person, organization, or place name."
+      type:
+        type: string
+        description: >
+          Domain-specific entity classification (e.g. Person/Organization/
+          Location). Left as a free string, no enum — same "domain-specific,
+          don't force a universal vocabulary" posture
+          `evidence.schema.yaml`'s `hierarchy_tier` and
+          `assumption.schema.yaml`'s `type` field already established.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        description: "Optional — see compilation_decisions."
+
+  node:
+    oneOf:
+      - $ref: "#/definitions/source_node"
+      - $ref: "#/definitions/evidence_node"
+      - $ref: "#/definitions/claim_node"
+      - $ref: "#/definitions/assumption_node"
+      - $ref: "#/definitions/decision_node"
+      - $ref: "#/definitions/entity_node"
+
+  node_ref:
+    type: object
+    required: [node_type, node_id]
+    description: >
+      A lightweight, typed pointer to a node ELSEWHERE in this graph's own
+      `nodes` array (or, in principle, a node governed by its own external
+      registry) — used by `edge` below so an edge does not have to re-embed
+      a full node body just to say what it connects. Cross-checks
+      `node_id`'s pattern against the ID grammar each real node type already
+      uses, the same style `governance/epistemic-label.schema.yaml`'s
+      `provenance_record` cross-checks `locked` against `epistemic_type`.
+    properties:
+      node_type:
+        $ref: "#/definitions/node_type"
+      node_id:
+        type: string
+    allOf:
+      - if: { properties: { node_type: { const: SOURCE } } }
+        then: { properties: { node_id: { pattern: "^SRC-[0-9]+$" } } }
+      - if: { properties: { node_type: { const: EVIDENCE } } }
+        then: { properties: { node_id: { pattern: "^E-[0-9]+$" } } }
+      - if: { properties: { node_type: { const: CLAIM } } }
+        then: { properties: { node_id: { pattern: "^C-[0-9]+$" } } }
+      - if: { properties: { node_type: { const: ASSUMPTION } } }
+        then: { properties: { node_id: { pattern: "^ASM-[0-9]+$" } } }
+      - if: { properties: { node_type: { const: DECISION } } }
+        then: { properties: { node_id: { pattern: "^DEC-" } } }
+      - if: { properties: { node_type: { const: ENTITY } } }
+        then: { properties: { node_id: { pattern: "^ENT-[0-9]+$" } } }
+
+  edge:
+    type: object
+    required: [from, to, relation_type]
+    description: >
+      One generic, directed, labeled edge — see top-level description and
+      compilation_decisions for why this single shape covers both
+      Entity-to-Entity "Relation" (MP §13.3's `/relations/` directory) and
+      cross-type evidentiary links (MP §60's "Evidence / Claim / Entity
+      Relationships," L2622-2623) rather than two separate schemas.
+    properties:
+      from:
+        $ref: "#/definitions/node_ref"
+      to:
+        $ref: "#/definitions/node_ref"
+      relation_type:
+        type: string
+        description: >
+          Free-form — no universal enum is given by any mother document.
+          Two values are directly textually grounded when `from`/`to` are
+          EVIDENCE/CLAIM nodes: `SUPPORTS`/`CONTRADICTS`, transcribed from
+          Atlas §11.20's Evidence Matrix worked example Supporting/
+          Contradicting columns (L1663), already realized as real fields on
+          `claim.schema.yaml` (`supporting_evidence`/`contradicting_evidence`)
+          — an edge of this `relation_type` is this file's graph-native
+          rendering of that same relationship, not a new one. Entity-to-Entity
+          relation labels (e.g. "works_for", "located_in") are inherently
+          domain-specific; no mother document enumerates them, so none is
+          forced here — same open-vocabulary posture as `entity_node.type`
+          above.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        description: "Optional — see compilation_decisions."
+
+evidence_graph:
+  type: object
+  required: [nodes, edges]
+  description: >
+    The graph itself: an addressable collection of typed nodes plus the
+    directed, labeled edges connecting them. Deliberately does NOT require
+    `nodes`/`edges` to be non-empty — an evidence graph under construction
+    (e.g. a Source just ingested, not yet linked to any Claim) is still a
+    valid, if minimal, instance.
+  properties:
+    graph_id:
+      type: [string, "null"]
+      default: null
+      description: >
+        NEW_DESIGN, optional. No mother document names a graph-instance
+        identifier (MP §13.3 gives only the directory structure a graph's
+        constituent files would live under, not a graph-snapshot ID scheme).
+        Left nullable/optional rather than invented as required.
+    nodes:
+      type: array
+      items:
+        $ref: "#/definitions/node"
+    edges:
+      type: array
+      items:
+        $ref: "#/definitions/edge"
+
+examples:
+  - description: >
+      Minimal graph transcribing MP §13's own worked example
+      (`PDF p.32 → Evidence E912 → Claim C117`, L1061-1067), plus one
+      Entity-to-Entity relation and one Evidence-supports-Claim edge
+      realizing `claim.schema.yaml`'s own supporting_evidence membership as
+      a graph edge.
+    value:
+      graph_id: null
+      nodes:
+        - node_type: SOURCE
+          source_id: "SRC-1"
+          locator_hint: "PDF p.32"
+        - node_type: EVIDENCE
+          data: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+        - node_type: CLAIM
+          data: { claim_id: "C-117", statement: "市場對此類產品的採用率正在上升", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+        - node_type: ENTITY
+          entity_id: "ENT-1"
+          label: "Acme University"
+          type: "Organization"
+        - node_type: ENTITY
+          entity_id: "ENT-2"
+          label: "Beta University"
+          type: "Organization"
+      edges:
+        - from: { node_type: EVIDENCE, node_id: "E-912" }
+          to: { node_type: CLAIM, node_id: "C-117" }
+          relation_type: SUPPORTS
+        - from: { node_type: ENTITY, node_id: "ENT-1" }
+          to: { node_type: ENTITY, node_id: "ENT-2" }
+          relation_type: "partners_with"
+
+open_questions:
+  - id: "OQ-EGRAPH-1"
+    question: >
+      MP §13.3 gives `/graph/` its own top-level directory, separate from
+      `/evidence/`, `/claims/`, `/entities/`, `/relations/` — suggesting the
+      canonical records for each node type live in their OWN directory, and
+      `/graph/` holds something else (a materialized/denormalized topology
+      view? graph snapshots? this file's own instances?). This file's
+      `node` definitions accept either a full inline record or a minimal
+      id+required-fields stub (see compilation_decisions), which mitigates
+      but does not fully resolve the drift risk of two copies of the same
+      Evidence/Claim/etc. record existing (one canonical, one embedded in a
+      graph snapshot). Should a future revision tighten graph-instance nodes
+      to ID-ONLY references (no inline `data`), forcing all node detail
+      lookups through the canonical per-type directories?
+    owner: "operator / future Wave revisiting this file once /modules/knowledge/ has a real implementation"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-EGRAPH-2"
+    question: >
+      Should `provenance` become REQUIRED on `source_node`/`entity_node`/
+      `edge` once this project has real usage data showing whether AI vs.
+      human authorship of a graph edge (e.g. an AI-suggested vs.
+      human-confirmed Entity relation) is something callers actually need to
+      distinguish? Left optional — see compilation_decisions.
+    owner: "operator"
+    blocks: "nothing in this schema"
+  - id: "OQ-EGRAPH-3"
+    question: >
+      MP §13's own core relation chain (L1046-1057) names `INFERENCE`
+      between CLAIM and ASSUMPTION, but no `typed-objects/inference.schema.yaml`
+      or any Inference record shape exists anywhere in this repo (grepped).
+      This file's node-type list was scoped by explicit task instruction to
+      Source/Evidence/Claim/Assumption/Decision/Entity/Relation, which does
+      not include Inference. Should a future Wave add an Inference node type
+      once (or if) a base Inference schema is compiled, closing this gap in
+      the chain this file otherwise fully covers?
+    owner: "operator / future Wave"
+    blocks: "nothing in this schema — INFERENCE is simply absent from `node_type`'s enum today"
+
+verification:
+  method: >
+    Read against MP §13 full (L1039-1112: core chain, worked example,
+    §13.1-13.3), MP §60 Data Architecture (L2610-2633, Graph Store row at
+    L2622-2623), MVP_VERTICAL_SLICE_PLAN.md §4 (L101-123, row at L107) and
+    §5 (L127-136, Acceptance Criterion 5 at L135) full. Grepped Atlas
+    Appendix A (L4574-4590) for "evidence-graph": zero hits (confirmed NOT
+    an Appendix-A-promised file, unlike its evidence/claim/assumption
+    siblings). Grepped `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+    full text for "evidence-graph": zero hits (confirmed not tracked by the
+    Wave 1-8 plan either). Grepped `docs/adr/ADR-001~016` full text for
+    "Evidence Graph": zero hits. Grepped Atlas and Execution Contract full
+    text for "Entity"/"Relation" outside prose uses ("International
+    Relations", "Legal Entity", "Entity Relationship Diagram", etc.): zero
+    structural (field-shape-defining) hits for either concept anywhere
+    beyond MP §13.3's directory listing and MP §60's Graph Store row.
+  note: >
+    This file's grounding is thinner than most of this corpus's schemas —
+    honestly acknowledged, not papered over: the mother documents promise
+    Evidence Graph only as a directory structure and a bare relation chain,
+    never a field-level shape. `node_type`'s six values, the
+    `evidence_node`/`claim_node`/`assumption_node`/`decision_node` real
+    $refs, and the unified `edge` concept are all directly traceable to
+    specific cited lines; `source_node`, `entity_node`, `node_ref`'s ID
+    cross-validation, and the `graph_id`/`provenance` optional fields are
+    honestly flagged NEW_DESIGN or structurally-necessary rather than
+    presented as mother-document content. No mother document or ADR was
+    modified to produce this file.

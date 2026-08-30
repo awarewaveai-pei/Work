@@ -3,33 +3,52 @@
 AI-LEGO Cognitive Engineering OS -- Phase 3 Wave 8 golden test runner.
 
 Resolves MACHINE_READABLE_SPEC_PLAN.md section 3 Build Order: "Wave 8
-tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs five
+tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs six
 independent check families against the built (status: ACTIVE/PROVISIONAL)
-Wave 1-7+ output:
+Wave 1-7+ output (plus the Phase 5 Research Mode MVP slice deliverables
+added 2026-08-30: research.qualitative_coding method contract,
+run_statistics/Cohen's Kappa capability contract, research-qualitative-v1
+recipe instance):
 
   1. Schema conformance  -- tests/contracts/**/*.fixtures.yaml drives
      positive (must validate) and negative (must fail validation) instance
      checks against every specs/ and policies/ai-execution/ (and, as of the
      Tier 0 method-contract backfill, policies/privacy/) file that declares
      a $schema (see tests/README.md for the fixture contract).
-  2. Recipe instance conformance -- the 3 recipes/validated/*.recipe.yaml
+  2. Recipe instance conformance -- the 4 recipes/validated/*.recipe.yaml
      files (which are DATA instances, not schemas themselves) validate
-     against specs/cognitive/recipe.schema.yaml.
+     against specs/cognitive/recipe.schema.yaml. (Was 3 through Wave 7;
+     research-qualitative-v1.recipe.yaml added 2026-08-30, Phase 5 Research
+     Mode MVP slice deliverable per MVP_VERTICAL_SLICE_PLAN.md section 4.)
   2b. Method/Lens contract instance conformance -- methods/contracts/*.contract.yaml
       (Tier 0 method/lens contract backfill, docs/architecture/
       MACHINE_READABLE_SPEC_PLAN.md section 4) validate against
       specs/cognitive/method.schema.yaml or specs/cognitive/lens.schema.yaml#/lens,
       dispatched by which schema-specific required key is present.
+  2c. Capability contract instance conformance -- capabilities/contracts/*.capability.yaml
+      (new 2026-08-30, Phase 5 Research Mode MVP slice: run_statistics /
+      Cohen's Kappa inter-rater reliability, docs/architecture/
+      MVP_VERTICAL_SLICE_PLAN.md section 4) validate against
+      specs/domain/capability-contract.schema.yaml. No separate INSTANCE-
+      driving fixtures file (the schema itself is already fixture-tested by
+      check 1, tests/contracts/specs/domain/capability-contract.fixtures.yaml)
+      -- same precedent as 2b's method/lens contracts; see
+      capabilities/contracts/run_statistics.capability.yaml's own
+      description for why this file is not instead under methods/contracts/.
   3. Registry invariants -- methods/registry/method-inventory.yaml and
      contract-backlog.yaml are not governed by an external JSON Schema
      (they are Phase-0-migrated free-form registries); this file instead
      checks the specific structural invariants those two files' own
      headers claim about themselves (counts, has_contract<->contract_status
-     consistency).
+     consistency). method-inventory.yaml's `phase_3_additions` block (new
+     2026-08-30 -- GROUNDED ORIGINAL DESIGN entries with no mother-document
+     source, kept separate from `by_document` so the 289-count invariant
+     stays a pure Phase-0-migration fact) gets its own, separate
+     has_contract<->contract_status consistency check.
   4. Cross-file $ref resolution smoke test -- every "ai-lego://..." URI
-     found anywhere under specs/, policies/, methods/, and recipes/validated/
-     resolves to a real file and (if it carries a "#/..." JSON-pointer
-     fragment) a real node within that file.
+     found anywhere under specs/, policies/, methods/, recipes/validated/,
+     and capabilities/contracts/ resolves to a real file and (if it carries
+     a "#/..." JSON-pointer fragment) a real node within that file.
 
 No mother document, ADR, or existing spec/policy file's normative content
 is modified by this file or by running it. Exit code 0 = all checks
@@ -45,6 +64,19 @@ import yaml
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.exceptions import Unresolvable
+
+# 2026-08-30 critic finding (mutation-tested, real CP950 crash reproduced on
+# a Windows console with no PYTHONIOENCODING set): this corpus's own
+# `verification`/description text already contains non-Big5 characters
+# (e.g. U+2705 in specs/domain/capability-contract.schema.yaml:27). A
+# type-error value containing one would raise UnicodeEncodeError mid-print
+# in the failure-reporting loop below, silently truncating the remaining
+# failure list while still exiting 1 (fail-closed, but not fail-LOUD as the
+# module's own docstring promises -- "each printed with enough context").
+# Reconfigure stdout to UTF-8 unconditionally rather than special-casing
+# the one character found today; more will land as the corpus grows.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -176,7 +208,12 @@ def run_recipe_instance_conformance():
     reg = registry.with_resource(recipe_schema_id, Resource.from_contents(schema_doc))
     validator = Draft202012Validator(schema_doc, registry=reg)
     recipe_files = sorted(glob.glob(os.path.join(ROOT, "recipes", "validated", "*.recipe.yaml")))
-    check(len(recipe_files) == 3, f"expected exactly 3 recipes/validated/*.recipe.yaml files (Wave 7), found {len(recipe_files)}")
+    check(len(recipe_files) == 4, f"expected exactly 4 recipes/validated/*.recipe.yaml files (Wave 7's 3 + research-qualitative-v1 added 2026-08-30), found {len(recipe_files)}")
+    # 2026-08-30 critic finding: a bare count check does not pin WHICH file is
+    # present -- deleting research-qualitative-v1.recipe.yaml and adding any
+    # other well-formed decoy recipe would still pass len()==4 silently.
+    recipe_basenames = {os.path.basename(p)[: -len(".recipe.yaml")] for p in recipe_files}
+    check("research-qualitative-v1" in recipe_basenames, f"expected recipes/validated/research-qualitative-v1.recipe.yaml specifically (Phase 5 Research Mode slice deliverable) among the 4, found {sorted(recipe_basenames)}")
     for p in recipe_files:
         rel_p = os.path.relpath(p, ROOT)
         inst = load(p)
@@ -222,9 +259,53 @@ def run_method_contract_conformance():
 
 
 # ---------------------------------------------------------------------------
+# 2c. Capability contract instance conformance -- capabilities/contracts/*.yaml
+#     against domain/capability-contract.schema.yaml. Same direct-instance-
+#     check pattern as 2b (no separate fixtures file -- see that check's own
+#     docstring/2c comment above for why method/lens contracts already
+#     established this precedent).
+# ---------------------------------------------------------------------------
+def run_capability_contract_conformance():
+    cap_schema_id = "ai-lego://specs/domain/capability-contract.schema.yaml"
+    cap_schema = retrieve(cap_schema_id).contents
+    reg_c = registry.with_resource(cap_schema_id, Resource.from_contents(cap_schema))
+    cap_validator = Draft202012Validator(cap_schema, registry=reg_c)
+
+    cap_files = sorted(glob.glob(os.path.join(ROOT, "capabilities", "contracts", "*.capability.yaml")))
+    check(len(cap_files) >= 1, f"expected at least 1 capabilities/contracts/*.capability.yaml file (run_statistics, Phase 5 Research Mode slice), found {len(cap_files)}")
+    # 2026-08-30 critic finding: a bare >=1 count does not pin WHICH file is
+    # present -- deleting run_statistics.capability.yaml and adding any other
+    # well-formed decoy capability would still pass silently.
+    cap_basenames = {os.path.basename(p)[: -len(".capability.yaml")] for p in cap_files}
+    check("run_statistics" in cap_basenames, f"expected capabilities/contracts/run_statistics.capability.yaml specifically (Cohen's Kappa inter-rater reliability, Phase 5 Research Mode slice) among the {len(cap_files)} found, found {sorted(cap_basenames)}")
+    for p in cap_files:
+        rel_p = os.path.relpath(p, ROOT)
+        inst = load(p)
+        errors = list(cap_validator.iter_errors(inst))
+        check(not errors, f"capability contract {rel_p} fails capability-contract.schema.yaml: {[e.message for e in errors]}")
+        expected_slug = os.path.basename(p)[: -len(".capability.yaml")]
+        check(inst.get("id") == expected_slug, f"capability contract {rel_p}: id field {inst.get('id')!r} does not match filename slug {expected_slug!r}")
+
+
+# ---------------------------------------------------------------------------
 # 3. Registry invariants -- method-inventory.yaml / contract-backlog.yaml
 #    (no external schema governs these; check their own stated claims)
 # ---------------------------------------------------------------------------
+def _has_contract_status_mismatch(entry):
+    # 2026-08-30 critic finding: the original by_document form
+    # (`expected = "complete" if has_contract else "pending"`, exact
+    # equality) is strictly stronger than a bare
+    # `(status == "complete") != bool(has_contract)` XOR check -- the XOR
+    # form silently accepts ANY non-"complete" string (a typo like
+    # "pendng", or "in_progress", or None) whenever has_contract is falsy.
+    # Shared here so by_document/phase_3_additions/tier_0 all enforce the
+    # one strong invariant instead of three independently-drifting copies.
+    has_contract = entry.get("has_contract")
+    contract_status = entry.get("contract_status")
+    expected = "complete" if has_contract else "pending"
+    return contract_status != expected
+
+
 def run_registry_invariants():
     mi_path = os.path.join(ROOT, "methods", "registry", "method-inventory.yaml")
     mi = load(mi_path)
@@ -233,23 +314,46 @@ def run_registry_invariants():
     for doc_name, doc_val in mi.get("by_document", {}).items():
         for entry in doc_val.get("methods", []):
             total += 1
-            has_contract = entry.get("has_contract")
-            contract_status = entry.get("contract_status")
-            expected = "complete" if has_contract else "pending"
-            if contract_status != expected:
-                bad_consistency.append((doc_name, entry.get("name"), has_contract, contract_status))
-    check(total == 289, f"method-inventory.yaml: expected 289 total method entries (per its own header claim), found {total}")
+            if _has_contract_status_mismatch(entry):
+                bad_consistency.append((doc_name, entry.get("name"), entry.get("has_contract"), entry.get("contract_status")))
+    check(total == 289, f"method-inventory.yaml: expected 289 total method entries in by_document (per its own header claim; phase_3_additions is a separate, additive block not counted here), found {total}")
     check(not bad_consistency, f"method-inventory.yaml: {len(bad_consistency)} entries have has_contract/contract_status mismatch: {bad_consistency[:5]}{'...' if len(bad_consistency) > 5 else ''}")
+
+    # 2026-08-30 critic finding: the original check had no existence/identity
+    # assertion at all -- deleting this whole block, renaming it, or emptying
+    # it to [] all passed silently (no numeric signal moves either, since
+    # `total` above only counts by_document). This block is the sole carrier
+    # of the one GROUNDED ORIGINAL DESIGN method entry (research.qualitative_coding,
+    # no mother-document source -- see that method contract's own
+    # compilation_decisions), so losing it silently is exactly the
+    # "detector goes silent" failure mode this project's own R0 discipline
+    # singles out as the worst outcome.
+    phase3 = mi.get("phase_3_additions", [])
+    check(len(phase3) >= 1, f"method-inventory.yaml: expected phase_3_additions to be present and non-empty (research.qualitative_coding, added 2026-08-30), found {len(phase3)} entries")
+    check(any(e.get("name") == "research.qualitative_coding" for e in phase3), f"method-inventory.yaml phase_3_additions: expected an entry named research.qualitative_coding, found names {[e.get('name') for e in phase3]}")
+    phase3_bad = [e.get("name") for e in phase3 if _has_contract_status_mismatch(e)]
+    check(not phase3_bad, f"method-inventory.yaml phase_3_additions: has_contract/contract_status mismatch for {phase3_bad}")
 
     cb_path = os.path.join(ROOT, "methods", "registry", "contract-backlog.yaml")
     cb = load(cb_path)
     tier0 = cb.get("tier_0", [])
     check(len(tier0) == 4, f"contract-backlog.yaml tier_0: expected 4 entries (per its own header claim -- root_cause.fishbone, stakeholder.regulator, strategy.swot, evidence.triangulation), found {len(tier0)}")
-    tier0_bad = [e["method_id"] for e in tier0 if (e.get("contract_status") == "complete") != bool(e.get("has_contract"))]
+    tier0_bad = [e["method_id"] for e in tier0 if _has_contract_status_mismatch(e)]
     check(not tier0_bad, f"contract-backlog.yaml tier_0: has_contract/contract_status mismatch for {tier0_bad}")
 
     tier1 = cb.get("tier_1", {})
-    check(tier1.get("no_method_ids_listed") is True, "contract-backlog.yaml tier_1: expected no_method_ids_listed: true (Tier 1 is an explicit TODO, not populated, per plan section 4)")
+    check(tier1.get("no_method_ids_listed") is True, "contract-backlog.yaml tier_1: expected no_method_ids_listed: true (Tier 1's general 15-25-method list is an explicit TODO, not populated, per plan section 4 -- unaffected by tier_1.first_concrete_entry, an individually-mandated addition, not a derived list entry)")
+    first_entry = tier1.get("first_concrete_entry")
+    # 2026-08-30 critic finding: `bool(first_entry) and first_entry.get(...)`
+    # only guards against a falsy value -- a truthy non-dict (e.g. a bare
+    # string, a plausible YAML authoring slip) makes `.get()` raise an
+    # uncaught AttributeError that aborts the whole suite before any
+    # PASSED/FAILED summary prints. isinstance() guards the type, not just
+    # truthiness.
+    check(
+        isinstance(first_entry, dict) and first_entry.get("method_id") == "research.qualitative_coding" and first_entry.get("contract_status") == "complete",
+        f"contract-backlog.yaml tier_1.first_concrete_entry: expected a mapping with method_id: research.qualitative_coding, contract_status: complete, found {first_entry!r}",
+    )
 
     tier2 = cb.get("tier_2", {})
     explicit_entries = tier2.get("explicit_entries", [])
@@ -290,7 +394,7 @@ def _walk_refs(node):
 
 
 def run_ref_resolution_smoke():
-    roots = ["specs", "policies", "methods", "recipes/validated"]
+    roots = ["specs", "policies", "methods", "recipes/validated", "capabilities/contracts"]
     checked = 0
     for root in roots:
         for p in glob.glob(os.path.join(ROOT, root, "**", "*.yaml"), recursive=True):
@@ -327,6 +431,7 @@ if __name__ == "__main__":
     run_schema_conformance()
     run_recipe_instance_conformance()
     run_method_contract_conformance()
+    run_capability_contract_conformance()
     run_registry_invariants()
     run_ref_resolution_smoke()
 

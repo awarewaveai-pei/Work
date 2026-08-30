@@ -131,6 +131,8 @@ properties:
 # ---------------------------------------------------------------------------
 referenced_by:
   - "specs/evidence/assumption.schema.yaml (MACHINE_READABLE_SPEC_PLAN.md §2.4 lists assumption.schema.yaml's dependency column as this file — see that file's compilation_decisions for how the two relate: Assumption is treated as narrowing this record's provenance to a fixed epistemic_type, the same pattern evidence.schema.yaml uses)"
+  - "specs/evidence/evidence-graph.schema.yaml (claim_node.data, real $ref, added 2026-08-30 — MP §13.3 Evidence Graph)"
+  - "specs/evidence/sentence-provenance.schema.yaml (claim field, real $ref, added 2026-08-30 — MP §13.1 Sentence-level Provenance)"
 
 # ---------------------------------------------------------------------------
 # Genuinely open questions — NOT decided by this file

@@ -1,0 +1,365 @@
+schema_id: "ai-lego://policies/privacy/data-deletion.policy.yaml"
+target_ref: ""
+description: >
+  Exercises the policy-layer content on top of the embedded EC §31 pipeline
+  ($ref into specs/execution/data-deletion.schema.yaml#/deletion_request):
+  the allOf/if/then branch-conditional requirement/prohibition of
+  key_destruction_evidence ($ref into specs/security/
+  key-vault-lifecycle.schema.yaml#/definitions/key_destruction_record), the
+  const-enforced A4 authority_level_required, and the DEFINED/OPEN_QUESTION
+  gating of sla.default_response_window_days.
+valid:
+  - name: crypto_shred_with_key_destruction_evidence
+    instance:
+      trigger:
+        authorization_pathway:
+          flow: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source: >-
+            Master Plan §65 Agent ≠ Authority (L2744-2769); already
+            formalized for agent_action DELETE by
+            policies/ai-execution/forbidden-actions.yaml#/seed_content,
+            which itself soft-references this suite's
+            data-deletion.schema.yaml Authorization step as the
+            DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden: true
+        authority_level_required: "A4"
+        initiating_role:
+          status: SKELETON_ONLY
+          gap_description: >-
+            WHICH concrete human role/request-type may exercise or grant
+            the A4 authority this pipeline requires is not decided by any
+            mother document, ADR, or this file — it is the same open
+            question specs/execution/authority.schema.yaml's
+            role_to_authority_mapping already records as SKELETON_ONLY
+            (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+            deliberately does not fork that gap into a second,
+            deletion-specific copy.
+          entries: []
+      sla:
+        status: OPEN_QUESTION
+        default_response_window_days: null
+        jurisdiction_dependent: true
+        operational_incident_remediation_window_example:
+          applies_to: >-
+            rollback.scenarios.operational_key_vault_incident remediation
+            target ONLY (specs/execution/data-deletion.schema.yaml#/rollback
+            and specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+            — NOT this policy's general per-request SLA.
+          citation: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+      deletion_pipeline:
+        request_id: "DEL-2026-000001"
+        deletion_type: "personal_data_crypto_shred"
+        subject_id: "subj-abc123"
+        requested_at: "2026-08-29T10:00:00Z"
+        steps:
+          - { step: "Authorization", status: "passed" }
+          - { step: "Legal Hold Check", status: "passed" }
+          - { step: "Retention Check", status: "passed" }
+          - { step: "Dependency Check", status: "passed", evidence_ref: "dep-scan-001" }
+          - { step: "Dry Run", status: "passed" }
+          - { step: "Count / Scope Preview", status: "passed" }
+          - { step: "Approval", status: "passed", evidence_ref: "approver-jane" }
+          - { step: "Deletion", status: "passed", evidence_ref: "key-destruction-record-77" }
+          - { step: "Verification", status: "passed", evidence_ref: "decrypt-attempt-log-77" }
+          - { step: "Deletion Evidence", status: "passed", evidence_ref: "personal-data-redacted-event-77" }
+      key_destruction_evidence:
+        key_id: "dek-subj-abc123"
+        key_use: "DEK"
+        subject_id: "subj-abc123"
+        destroyed_at: "2026-08-29T10:05:00Z"
+        authorization_ref: "approver-jane"
+        destruction_scope:
+          - { copy_location: "live-vault", destroyed: true, destroyed_at: "2026-08-29T10:05:00Z" }
+          - { copy_location: "backup-snapshot-2026-08-01", destroyed: true, destroyed_at: "2026-08-29T10:06:00Z" }
+        verification:
+          attempted_decrypt_refs: ["event-1", "projection-2"]
+          all_decrypts_failed: true
+        independent_audit_log_ref: "audit-log-entry-77"
+  - name: production_row_no_key_destruction_evidence
+    instance:
+      trigger:
+        authorization_pathway:
+          flow: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source: >-
+            Master Plan §65 Agent ≠ Authority (L2744-2769); already
+            formalized for agent_action DELETE by
+            policies/ai-execution/forbidden-actions.yaml#/seed_content,
+            which itself soft-references this suite's
+            data-deletion.schema.yaml Authorization step as the
+            DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden: true
+        authority_level_required: "A4"
+        initiating_role:
+          status: SKELETON_ONLY
+          gap_description: >-
+            WHICH concrete human role/request-type may exercise or grant
+            the A4 authority this pipeline requires is not decided by any
+            mother document, ADR, or this file — it is the same open
+            question specs/execution/authority.schema.yaml's
+            role_to_authority_mapping already records as SKELETON_ONLY
+            (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+            deliberately does not fork that gap into a second,
+            deletion-specific copy.
+          entries: []
+      sla:
+        status: DEFINED
+        default_response_window_days: 30
+        jurisdiction_dependent: true
+        operational_incident_remediation_window_example:
+          applies_to: >-
+            rollback.scenarios.operational_key_vault_incident remediation
+            target ONLY (specs/execution/data-deletion.schema.yaml#/rollback
+            and specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+            — NOT this policy's general per-request SLA.
+          citation: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+      deletion_pipeline:
+        request_id: "DEL-2026-000002"
+        deletion_type: "production_row"
+        target_refs: ["orders:12345", "orders:12346"]
+        requested_at: "2026-08-29T11:00:00Z"
+        steps:
+          - { step: "Authorization", status: "passed" }
+          - { step: "Legal Hold Check", status: "passed" }
+          - { step: "Retention Check", status: "passed" }
+          - { step: "Dependency Check", status: "passed" }
+          - { step: "Dry Run", status: "passed" }
+          - { step: "Count / Scope Preview", status: "passed" }
+          - { step: "Approval", status: "passed" }
+          - { step: "Deletion", status: "passed" }
+          - { step: "Verification", status: "passed", evidence_ref: "post-delete-count-query-0" }
+          - { step: "Deletion Evidence", status: "passed" }
+invalid:
+  - name: crypto_shred_missing_key_destruction_evidence
+    instance:
+      trigger:
+        authorization_pathway:
+          flow: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source: >-
+            Master Plan §65 Agent ≠ Authority (L2744-2769); already
+            formalized for agent_action DELETE by
+            policies/ai-execution/forbidden-actions.yaml#/seed_content,
+            which itself soft-references this suite's
+            data-deletion.schema.yaml Authorization step as the
+            DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden: true
+        authority_level_required: "A4"
+        initiating_role:
+          status: SKELETON_ONLY
+          gap_description: >-
+            WHICH concrete human role/request-type may exercise or grant
+            the A4 authority this pipeline requires is not decided by any
+            mother document, ADR, or this file — it is the same open
+            question specs/execution/authority.schema.yaml's
+            role_to_authority_mapping already records as SKELETON_ONLY
+            (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+            deliberately does not fork that gap into a second,
+            deletion-specific copy.
+          entries: []
+      sla:
+        status: OPEN_QUESTION
+        default_response_window_days: null
+        jurisdiction_dependent: true
+        operational_incident_remediation_window_example:
+          applies_to: >-
+            rollback.scenarios.operational_key_vault_incident remediation
+            target ONLY (specs/execution/data-deletion.schema.yaml#/rollback
+            and specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+            — NOT this policy's general per-request SLA.
+          citation: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+      deletion_pipeline:
+        request_id: "DEL-2026-000003"
+        deletion_type: "personal_data_crypto_shred"
+        subject_id: "subj-def456"
+        requested_at: "2026-08-29T12:00:00Z"
+        steps:
+          - { step: "Authorization", status: "passed" }
+          - { step: "Legal Hold Check", status: "passed" }
+          - { step: "Retention Check", status: "passed" }
+          - { step: "Dependency Check", status: "passed" }
+          - { step: "Dry Run", status: "passed" }
+          - { step: "Count / Scope Preview", status: "passed" }
+          - { step: "Approval", status: "passed" }
+          - { step: "Deletion", status: "passed" }
+          - { step: "Verification", status: "passed" }
+          - { step: "Deletion Evidence", status: "passed" }
+    reason: "deletion_pipeline.deletion_type is personal_data_crypto_shred -- the allOf/if/then rule requires key_destruction_evidence in that case, and this instance omits it entirely"
+  - name: production_row_with_key_destruction_evidence_forbidden
+    instance:
+      trigger:
+        authorization_pathway:
+          flow: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source: >-
+            Master Plan §65 Agent ≠ Authority (L2744-2769); already
+            formalized for agent_action DELETE by
+            policies/ai-execution/forbidden-actions.yaml#/seed_content,
+            which itself soft-references this suite's
+            data-deletion.schema.yaml Authorization step as the
+            DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden: true
+        authority_level_required: "A4"
+        initiating_role:
+          status: SKELETON_ONLY
+          gap_description: >-
+            WHICH concrete human role/request-type may exercise or grant
+            the A4 authority this pipeline requires is not decided by any
+            mother document, ADR, or this file — it is the same open
+            question specs/execution/authority.schema.yaml's
+            role_to_authority_mapping already records as SKELETON_ONLY
+            (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+            deliberately does not fork that gap into a second,
+            deletion-specific copy.
+          entries: []
+      sla:
+        status: OPEN_QUESTION
+        default_response_window_days: null
+        jurisdiction_dependent: true
+        operational_incident_remediation_window_example:
+          applies_to: >-
+            rollback.scenarios.operational_key_vault_incident remediation
+            target ONLY (specs/execution/data-deletion.schema.yaml#/rollback
+            and specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+            — NOT this policy's general per-request SLA.
+          citation: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+      deletion_pipeline:
+        request_id: "DEL-2026-000004"
+        deletion_type: "production_row"
+        target_refs: ["orders:1"]
+        requested_at: "2026-08-29T13:00:00Z"
+        steps:
+          - { step: "Authorization", status: "passed" }
+          - { step: "Legal Hold Check", status: "passed" }
+          - { step: "Retention Check", status: "passed" }
+          - { step: "Dependency Check", status: "passed" }
+          - { step: "Dry Run", status: "passed" }
+          - { step: "Count / Scope Preview", status: "passed" }
+          - { step: "Approval", status: "passed" }
+          - { step: "Deletion", status: "passed" }
+          - { step: "Verification", status: "passed" }
+          - { step: "Deletion Evidence", status: "passed" }
+      key_destruction_evidence:
+        key_id: "dek-subj-should-not-exist"
+        key_use: "DEK"
+        subject_id: "subj-def456"
+        destroyed_at: "2026-08-29T13:05:00Z"
+        authorization_ref: "approver-jane"
+        destruction_scope:
+          - { copy_location: "live-vault", destroyed: true, destroyed_at: "2026-08-29T13:05:00Z" }
+        verification:
+          attempted_decrypt_refs: ["event-1"]
+          all_decrypts_failed: true
+        independent_audit_log_ref: "audit-log-entry-78"
+    reason: "deletion_pipeline.deletion_type is production_row -- the allOf/if/then rule explicitly FORBIDS key_destruction_evidence in that case (a crypto-shred-only artifact must not be attached to an ordinary row-deletion request), and this instance attaches one anyway"
+  - name: authority_level_required_wrong_value
+    instance:
+      trigger:
+        authorization_pathway:
+          flow: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source: >-
+            Master Plan §65 Agent ≠ Authority (L2744-2769); already
+            formalized for agent_action DELETE by
+            policies/ai-execution/forbidden-actions.yaml#/seed_content,
+            which itself soft-references this suite's
+            data-deletion.schema.yaml Authorization step as the
+            DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden: true
+        authority_level_required: "A2"
+        initiating_role:
+          status: SKELETON_ONLY
+          gap_description: >-
+            WHICH concrete human role/request-type may exercise or grant
+            the A4 authority this pipeline requires is not decided by any
+            mother document, ADR, or this file — it is the same open
+            question specs/execution/authority.schema.yaml's
+            role_to_authority_mapping already records as SKELETON_ONLY
+            (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+            deliberately does not fork that gap into a second,
+            deletion-specific copy.
+          entries: []
+      sla:
+        status: OPEN_QUESTION
+        default_response_window_days: null
+        jurisdiction_dependent: true
+        operational_incident_remediation_window_example:
+          applies_to: >-
+            rollback.scenarios.operational_key_vault_incident remediation
+            target ONLY (specs/execution/data-deletion.schema.yaml#/rollback
+            and specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+            — NOT this policy's general per-request SLA.
+          citation: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+      deletion_pipeline:
+        request_id: "DEL-2026-000005"
+        deletion_type: "production_row"
+        target_refs: ["orders:1"]
+        requested_at: "2026-08-29T14:00:00Z"
+        steps:
+          - { step: "Authorization", status: "passed" }
+          - { step: "Legal Hold Check", status: "passed" }
+          - { step: "Retention Check", status: "passed" }
+          - { step: "Dependency Check", status: "passed" }
+          - { step: "Dry Run", status: "passed" }
+          - { step: "Count / Scope Preview", status: "passed" }
+          - { step: "Approval", status: "passed" }
+          - { step: "Deletion", status: "passed" }
+          - { step: "Verification", status: "passed" }
+          - { step: "Deletion Evidence", status: "passed" }
+    reason: "trigger.authority_level_required is const A4 (EC §9's 'delete production data' worked example) -- 'A2' is a member of the shared authority_level enum but fails this file's own additional const constraint"
+  - name: sla_defined_but_window_left_null
+    instance:
+      trigger:
+        authorization_pathway:
+          flow: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source: >-
+            Master Plan §65 Agent ≠ Authority (L2744-2769); already
+            formalized for agent_action DELETE by
+            policies/ai-execution/forbidden-actions.yaml#/seed_content,
+            which itself soft-references this suite's
+            data-deletion.schema.yaml Authorization step as the
+            DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden: true
+        authority_level_required: "A4"
+        initiating_role:
+          status: SKELETON_ONLY
+          gap_description: >-
+            WHICH concrete human role/request-type may exercise or grant
+            the A4 authority this pipeline requires is not decided by any
+            mother document, ADR, or this file — it is the same open
+            question specs/execution/authority.schema.yaml's
+            role_to_authority_mapping already records as SKELETON_ONLY
+            (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+            deliberately does not fork that gap into a second,
+            deletion-specific copy.
+          entries: []
+      sla:
+        status: DEFINED
+        default_response_window_days: null
+        jurisdiction_dependent: true
+        operational_incident_remediation_window_example:
+          applies_to: >-
+            rollback.scenarios.operational_key_vault_incident remediation
+            target ONLY (specs/execution/data-deletion.schema.yaml#/rollback
+            and specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+            — NOT this policy's general per-request SLA.
+          citation: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+      deletion_pipeline:
+        request_id: "DEL-2026-000006"
+        deletion_type: "production_row"
+        target_refs: ["orders:1"]
+        requested_at: "2026-08-29T15:00:00Z"
+        steps:
+          - { step: "Authorization", status: "passed" }
+          - { step: "Legal Hold Check", status: "passed" }
+          - { step: "Retention Check", status: "passed" }
+          - { step: "Dependency Check", status: "passed" }
+          - { step: "Dry Run", status: "passed" }
+          - { step: "Count / Scope Preview", status: "passed" }
+          - { step: "Approval", status: "passed" }
+          - { step: "Deletion", status: "passed" }
+          - { step: "Verification", status: "passed" }
+          - { step: "Deletion Evidence", status: "passed" }
+    reason: "sla.status DEFINED requires sla.default_response_window_days to be a real integer per the allOf/if/then gate -- null is only legal while status is OPEN_QUESTION"

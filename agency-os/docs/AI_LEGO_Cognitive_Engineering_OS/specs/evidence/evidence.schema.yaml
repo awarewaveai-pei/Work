@@ -166,6 +166,8 @@ referenced_by:
   - "specs/evidence/assumption.schema.yaml (evidence[] array, real $ref, built same task)"
   - "specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml (supporting_evidence_refs, L172-179 — currently a SOFT string-only placeholder predating this file; see open_questions.MRSP-evidence-2)"
   - "specs/cognitive/typed-objects/problem-statement.schema.yaml (similar soft placeholder, L165-169; see open_questions.MRSP-evidence-2)"
+  - "specs/evidence/evidence-graph.schema.yaml (evidence_node.data, real $ref, added 2026-08-30 — MP §13.3 Evidence Graph)"
+  - "specs/evidence/sentence-provenance.schema.yaml (evidence field, real $ref, added 2026-08-30 — MP §13.1 Sentence-level Provenance)"
 
 # ---------------------------------------------------------------------------
 # Genuinely open questions — NOT decided by this file

@@ -1,0 +1,437 @@
+$id: "ai-lego://capabilities/contracts/run_statistics.capability.yaml"
+title: "run_statistics -- Inter-rater Reliability (Cohen's Kappa) Capability Contract"
+status: ACTIVE
+
+description: >
+  Concrete instance of the `run_statistics` Capability -- one of the 13
+  bare-named capabilities Master Plan §8.1/§8.2 (L651-689) list but never
+  populate with a real Contract (the corpus's ONLY populated Capability
+  Contract example is `cognitive.execute_method`, MP §8.3 L701-729,
+  transcribed in `specs/domain/capability-contract.schema.yaml#/worked_example`).
+  This file is the second real, concrete Capability Contract instance in the
+  corpus, and the first for `run_statistics` specifically -- built per this
+  task's explicit instruction: "MVP's own text says this [inter-rater
+  reliability] is invoked via `run_statistics` (a Trusted-Compute-gated
+  capability...) -- NOT a new Atlas cognitive Method." `run_statistics` as a
+  bare name is presumably general-purpose (any statistical procedure), but
+  MP gives it zero field content anywhere -- this file instantiates it
+  SPECIFICALLY for the one statistical procedure the Phase 5 Research Mode
+  MVP slice actually needs: computing inter-rater agreement between two
+  independent qualitative coders' `research.qualitative_coding` outputs
+  (`methods/contracts/research.qualitative_coding.contract.yaml`'s own
+  `inter_rater_reliability_requirement` field cross-references this exact
+  file). A fuller, multi-procedure `run_statistics` contract (t-test,
+  regression, ANOVA, ...) is explicitly out of scope here -- see
+  `open_questions.OQ-RSTAT-1`.
+
+  **New top-level directory**: `capabilities/contracts/` did not exist before
+  this file. It mirrors the established `methods/contracts/`/
+  `recipes/validated/` convention (a top-level, plural, instances-only
+  directory sitting alongside the `specs/` directory that holds only
+  SCHEMAS) -- `specs/domain/capability-contract.schema.yaml` is the schema;
+  this is the first real, standalone Capability Contract INSTANCE file, the
+  same schema/instance split every other LEGO dimension in this repo already
+  uses. See `open_questions.OQ-RSTAT-2` for why this was not instead placed
+  inside `methods/contracts/` (that directory's own golden-test conformance
+  check dispatches purely on `cognitive_primitives` vs `labels` -- a
+  Capability Contract instance has neither key and would fail that
+  dispatch).
+
+  **Grounding sources, cited by name, real and externally verifiable** (per
+  this task's explicit instruction, the same discipline this corpus's
+  `policies/security/*.policy.yaml` files already apply for NIST/OpenSSF/
+  CISA-class citations):
+  - Cohen, J. (1960). "A coefficient of agreement for nominal scales."
+    *Educational and Psychological Measurement*, 20(1), 37-46. -- the
+    original definition of the Kappa statistic this capability computes.
+  - Landis, J.R. & Koch, G.G. (1977). "The measurement of observer agreement
+    for categorical data." *Biometrics*, 33(1), 159-174. -- the standard
+    published interpretation scale for Kappa values (poor / slight / fair /
+    moderate / substantial / almost perfect), transcribed verbatim below,
+    NOT re-derived or altered.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.1 (L655) / §8.2 (L683) -- `run_statistics` named as a bare Capability id"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §27 Data Science Plane (L1688-1707) / EC §39 Trusted Compute Contract (L1499-1521) -- the pipeline this capability's `quality`/`trusted_compute_required` fields bind to"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 walkthrough steps 16-18 (L79-81, the concrete run_statistics/Cohen's Kappa worked scenario) and §6 risk 4 (L145, explicit non-decision of the numeric threshold)"
+  - "specs/domain/capability-contract.schema.yaml -- the schema this file's body is validated against"
+  - "policies/ai-execution/trusted-compute-gate.policy.yaml (already-built, `status: ACTIVE`) -- this file's `computation_provenance` field is the first real consumer of that file's own `computation_provenance_marker` shape, per that file's own `open_questions.OQ-TCGATE-2` invitation ('Should a future edit to a CONSUMING schema... actually $ref computation_provenance_marker...?')"
+  - "Cohen, J. (1960). Educational and Psychological Measurement, 20(1), 37-46."
+  - "Landis, J.R. & Koch, G.G. (1977). Biometrics, 33(1), 159-174."
+  - "methods/contracts/research.qualitative_coding.contract.yaml#/inter_rater_reliability_requirement -- the Method-side cross-reference to this file"
+
+decided_by: >
+  No ADR governs this file's content -- there is no ADR to arbitrate, since
+  no mother document ever gave `run_statistics` a populated Contract for an
+  ADR to rule between competing versions of. Authorized directly by
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 (L121, "Inter-rater
+  reliability 統計方法契約") and §6 risk 4 (L145, which explicitly assigns
+  the job of pinning the formula/threshold to "Phase 3 Method Contract"),
+  itself ratified for the Research Mode slice by
+  `docs/adr/ADR-014-phase-5-mode-selection-research.md` (ACCEPTED
+  2026-08-30). The STATISTIC and its published interpretation scale are real
+  external academic standards, cited by name; the PROJECT-SPECIFIC
+  accept/reject cutoff is an operator policy choice, explicitly left unset
+  per the same restraint this corpus's `policies/security/*.policy.yaml`
+  files already apply to their own operator-set numeric thresholds.
+
+compilation_decisions:
+
+  - question: >
+      Should this file's `id` be a new, more specific namespaced id (e.g.
+      `statistics.interrater_reliability` or
+      `statistics.cohens_kappa`), or the bare `run_statistics` name MP
+      itself already uses (MP §8.1 L655, §8.2 L683)?
+    decision: "`id: run_statistics` -- the literal, already-cited MP name."
+    reasoning: >
+      `capability-contract.schema.yaml`'s own `id` pattern
+      (`^[a-z_]+(\.[a-z_]+)?$`) permits either a bare name or a
+      `<namespace>.<name>` form, and its own `worked_example` demonstrates
+      the bare form is the norm for MP §8.1/§8.2's 13 named capabilities
+      (only `cognitive.execute_method` and `artifact.generate_research_paper`
+      use the dotted form, both because MP itself gives THEM the dot, L703/
+      L839). Inventing a new namespaced id for `run_statistics` when MP
+      already names it bare would be adding an unrequested distinction, the
+      same restraint `evidence.triangulation.contract.yaml` applied to ITS
+      OWN inputs (kept as MP's literal lowercase words rather than promoted
+      to invented PascalCase names). This file is explicit (see
+      `description` above) that it is ONE concrete instantiation of the
+      general-purpose `run_statistics` capability for ONE specific
+      procedure, the same relationship `cognitive.execute_method`'s own
+      `worked_example` has to the general Capability concept -- not a claim
+      that `run_statistics` is universally, only ever, Cohen's Kappa.
+
+  - question: >
+      Cohen's Kappa requires a REAL, externally-published interpretation
+      scale. Should this file re-derive its own scale, or transcribe Landis
+      & Koch (1977) verbatim?
+    decision: "Transcribe Landis & Koch (1977)'s 6-band scale verbatim, unmodified."
+    reasoning: >
+      Per this task's explicit instruction: "these are real published
+      numbers, cite them, don't invent your own scale." Landis & Koch (1977)
+      is the standard, most-cited published interpretation scale for Cohen's
+      Kappa in both statistics and qualitative-research methodology
+      literature -- the same citation
+      `docs/architecture/TEST_EVAL_STRATEGY.md` §2.3 (L93) already uses
+      independently in this same repo for a DIFFERENT Kappa application (see
+      next decision below for why that existing citation is NOT silently
+      reused as this file's own threshold).
+
+  - question: >
+      `docs/architecture/TEST_EVAL_STRATEGY.md` §2.3 (L93) already states,
+      for a DIFFERENT purpose (calibrating an LLM judge's rubric-graded
+      scoring against human graders for golden test cases): "kappa >= 0.6
+      (Landis & Koch 1977 substantial agreement 門檻)... 才允許在 R2+ 用於
+      gate 判定". Since this is the SAME statistic and the SAME published
+      scale, should this file silently reuse 0.6 as the qualitative-coding
+      inter-rater acceptance threshold too?
+    decision: >
+      No. `acceptance_threshold.kappa_min` stays `null`
+      (`OPERATOR_SET_PENDING`) here. The TEST_EVAL_STRATEGY.md 0.6 figure is
+      recorded in `open_questions.OQ-RSTAT-3` as relevant PRECEDENT CONTEXT
+      for the operator to consider, not silently adopted as this file's own
+      decided value.
+    reasoning: >
+      Per this task's explicit instruction: "leave the exact accept/reject
+      cutoff as an operator-set field... following the same restraint as
+      item 1's saturation threshold." The two measurement contexts are
+      methodologically different populations even though they share a
+      statistic and an interpretation scale: TEST_EVAL_STRATEGY.md's 0.6
+      calibrates ONE AI JUDGE's rubric score against a human rubric grader
+      (machine-vs-human agreement, used to decide whether an LLM judge is
+      trustworthy enough to gate on); THIS file's Kappa calibrates TWO HUMAN
+      CODERS' independent qualitative code assignments against each other
+      (human-vs-human agreement, used to decide whether the coding scheme
+      itself is reliable). Silently importing a threshold set for one
+      population as if it settled the other would misrepresent a
+      coincidental shared statistic as an already-made decision for THIS
+      specific use case -- exactly the "cite the real standard, don't invent
+      the project's specific cutoff" restraint this task instructs, applied
+      here to also mean "don't borrow an unrelated cutoff and call it
+      decided." MVP_VERTICAL_SLICE_PLAN.md §6 risk 4 (L145) independently
+      confirms this exact number is NOT yet decided for this use case:
+      "具體公式與門檻仍須在 Phase 3 Method Contract 中正式釘死，本文件不代
+      為決定."
+
+  - question: >
+      Should this file wire itself into
+      `policies/ai-execution/trusted-compute-gate.policy.yaml`'s
+      `computation_provenance_marker` shape (that file's own
+      `open_questions.OQ-TCGATE-2` explicitly invites a future consuming
+      schema to do so), or leave the Trusted Compute requirement as prose
+      only?
+    decision: >
+      Add a real, typed `computation_provenance` field, soft-referencing
+      that file's `#/definitions/computation_provenance_marker` shape (not a
+      hard `$ref`, since that file is a concurrently-active policy file this
+      task does not own and did not modify -- see scope note below).
+    reasoning: >
+      This is a genuine, concrete step toward closing OQ-TCGATE-2 (currently
+      "not currently $ref'd by any consuming schema") WITHOUT editing that
+      file itself or any of the 3 already-ACTIVE sibling schemas OQ-TCGATE-2
+      names as candidates (`claim.schema.yaml`, `result.schema.yaml`,
+      `capability-contract.schema.yaml`'s own `quality` block) -- this file
+      is NET-NEW, so adopting the shape here is additive, not a modification
+      of an existing ACTIVE file. A hard `$ref` was considered and rejected
+      per this same corpus's own "don't hard-$ref into a concurrently-built
+      sibling" precedent (`method.schema.yaml`'s own treatment of
+      `cognitive_primitives` relative to the concurrently-built
+      `primitive.schema.yaml`) -- `trusted-compute-gate.policy.yaml` was
+      being actively built by a separate concurrent agent during this same
+      session, and this task's own instructions explicitly warn that another
+      concurrent agent's file may still be in flux.
+
+  - question: >
+      Should this file duplicate MP §56's 5 research-paper Quality Gate
+      PASS/FAIL conditions (Research Integrity / Citation / Statistical /
+      Methodology / Authorship Gate)?
+    decision: "No -- those live on `methods/contracts/research.qualitative_coding.contract.yaml#/method_specific_gates` only."
+    reasoning: >
+      This file's own `statistical` output feeds INTO that method contract's
+      `statistical` gate condition (see that file's own `method_specific_gates.
+      statistical.grounding`, which cites this file by path) -- duplicating
+      the PASS/FAIL logic here as well would create two sources of truth for
+      the same gate, the exact duplication this corpus's R0 discipline
+      forbids.
+
+id: run_statistics
+version: "1.0.0"
+
+input:
+  type:
+    - RaterCodingSet
+  # NEW_DESIGN typed-object name -- paired categorical code/category
+  # assignments from 2+ independent coders over the same Transcript's
+  # CodeSet (research.qualitative_coding.contract.yaml's own open_coding
+  # stage output), the substrate Cohen's Kappa is computed over. No
+  # cognitive/typed-objects/*.schema.yaml exists for this yet -- soft
+  # reference only, same treatment as every other typed-object name in this
+  # corpus's Capability/Method Contracts. See open_questions.OQ-RSTAT-4.
+
+output:
+  type:
+    - InterRaterReliabilityResult
+  # NEW_DESIGN. Per MVP §3 step 18 (L81): "Result Artifact（Kappa 值 + 信賴
+  # 區間）標記 epistemic_type=CALCULATED_RESULT, authorship_state=AI_GENERATED，
+  # 等待人類確認後可轉 HUMAN_APPROVED" -- this output type's runtime instance
+  # MUST carry exactly that provenance_record shape (enforced by `quality.
+  # provenance_required` below, not re-declared here).
+
+preconditions:
+  - "rater_coding_set.rater_count >= 2"
+  - "trusted_compute.available == true"
+  # First precondition: Cohen's Kappa is undefined for fewer than 2 raters
+  # (MVP's own scenario names exactly 2, "兩位編碼者", MP §3 step 17 L80).
+  # Second precondition: mirrors MP §8.3's own worked_example precondition
+  # STYLE ("method_atlas.loaded == true" etc.) for a system-state check the
+  # executor verifies before accepting this capability's request -- grounded
+  # in EC §39's pipeline requiring Trusted Compute to be the actual executor,
+  # never an LLM standing in for it.
+
+quality:
+  provenance_required: true
+  method_specific_gate_required: false
+  # `provenance_required: true` per MVP §3 step 18's literal
+  # epistemic_type=CALCULATED_RESULT requirement (L81). NOT method_specific_
+  # gate_required (that field's own description, per
+  # capability-contract.schema.yaml, is specific to `cognitive.execute_method`'s
+  # dispatch-to-a-Method semantics -- `run_statistics` does not dispatch to
+  # an Atlas Method, per this task's own explicit "NOT a new Atlas cognitive
+  # Method" framing).
+
+security:
+  external_ai: policy_controlled
+  # Per capability-contract.schema.yaml's own worked_example convention
+  # (MP L725) -- the only evidenced value anywhere in the corpus for this
+  # field.
+
+rollback:
+  side_effect_free_preferred: true
+  # A pure statistical computation with no described external side effect.
+
+trusted_compute_required: true
+# ADDITIVE field (NOT in capability-contract.schema.yaml's declared schema
+# body -- legal, that schema has no additionalProperties:false, same
+# additive-field pattern research.qualitative_coding.contract.yaml's own
+# `stages`/`saturation_criterion` use). Directly grounded: EC §39's forbidden
+# block (L1517-1520, "LLM mentally calculates -> CALCULATED_RESULT") and
+# Atlas L4543 ("數學與統計必須由 Trusted Compute 執行") both make this a
+# BLANKET redline for any CALCULATED_RESULT/SIMULATED_RESULT claim, not an
+# optional preference -- this field makes that redline machine-visible on
+# THIS specific capability instance rather than leaving it as pipeline-level
+# prose only.
+
+computation_provenance:
+  $ref: "ai-lego://policies/ai-execution/trusted-compute-gate.policy.yaml#/definitions/computation_provenance_marker"
+  description: >
+    Soft-referenced (path cited, not a schema-enforced hard $ref into a
+    concurrently-active policy file -- see compilation_decisions). The shape
+    a real `InterRaterReliabilityResult` instance's provenance SHOULD carry:
+    a `computation_provenance_ref` pointing at the actual Trusted Compute
+    execution that produced this Kappa value, and optionally
+    `pipeline_stages_completed`. This is a genuine, concrete step toward
+    closing that policy file's own `open_questions.OQ-TCGATE-2`, scoped to
+    this one capability instance.
+
+statistical_method:
+  name: "Cohen's Kappa"
+  citation: "Cohen, J. (1960). 'A coefficient of agreement for nominal scales.' Educational and Psychological Measurement, 20(1), 37-46."
+  purpose: >
+    Quantifies inter-rater agreement for categorical/nominal ratings (here:
+    two or more qualitative coders' Code/Category assignments over the same
+    Transcript units), correcting for the level of agreement expected by
+    chance alone -- distinct from, and more rigorous than, simple raw
+    percent agreement.
+  formula_note: >
+    kappa = (p_o - p_e) / (1 - p_e), where p_o is the observed proportion of
+    agreement and p_e is the expected proportion of agreement by chance
+    given each rater's marginal category-assignment frequencies (Cohen
+    1960's own definition, transcribed verbatim by name -- not re-derived
+    here; the actual computation MUST run inside the Trusted Compute
+    pipeline per `trusted_compute_required` above, never asserted by LLM
+    mental arithmetic).
+  interpretation_scale:
+    citation: "Landis, J.R. & Koch, G.G. (1977). 'The measurement of observer agreement for categorical data.' Biometrics, 33(1), 159-174."
+    bands:
+      - { range_min: null, range_max: 0.00, label: poor }
+      - { range_min: 0.00, range_max: 0.20, label: slight }
+      - { range_min: 0.21, range_max: 0.40, label: fair }
+      - { range_min: 0.41, range_max: 0.60, label: moderate }
+      - { range_min: 0.61, range_max: 0.80, label: substantial }
+      - { range_min: 0.81, range_max: 1.00, label: almost_perfect }
+    note: >
+      Transcribed verbatim from Landis & Koch (1977)'s own published
+      6-band scale -- these are real published numbers, not invented here.
+      `range_min: null` on the first band represents "kappa < 0" (poor
+      agreement, worse than chance), per Landis & Koch's own original table.
+  acceptance_threshold:
+    kappa_min: null
+    band_required: null
+    status: OPERATOR_SET_PENDING
+    note: >
+      Project-specific POLICY choice, NOT part of the Landis & Koch published
+      scale itself (that scale only LABELS bands; it does not mandate which
+      band a given deployment must clear before results can gate a
+      decision). Left null per MVP_VERTICAL_SLICE_PLAN.md §6 risk 4's own
+      explicit deferral and this corpus's own established restraint
+      (`policies/security/zero-trust.policy.yaml`
+      `service_count_reconsideration_threshold`,
+      `policies/security/supply-chain-security.policy.yaml`
+      `cvss_tiering.rescan_requirement.interval_days` -- both leave a
+      numeric operational threshold null/required-once-set rather than
+      inventing one). See `open_questions.OQ-RSTAT-3` for the one existing,
+      methodologically-DIFFERENT project precedent (`TEST_EVAL_STRATEGY.md`
+      kappa >= 0.6) that is NOT silently reused here.
+    below_threshold_action: >
+      Per this file's own `quality.provenance_required` and MVP §3 step 18
+      (L81): a Kappa result below whatever threshold the operator eventually
+      sets is still a real, reportable CALCULATED_RESULT (not suppressed) --
+      it means the underlying `research.qualitative_coding` execution's
+      `methodology` method_specific gate should be treated as informational-
+      only / re-coding-recommended rather than a hard block, mirroring
+      `docs/architecture/TEST_EVAL_STRATEGY.md` §2.3's own precedent for its
+      unrelated kappa use ("kappa < 0.6 只能用於 R0/R1 的參考性回報，不得
+      BLOCK") -- cited here as a REASONABLE ANALOGOUS POLICY PATTERN, not as
+      an already-decided rule for this file's own use case (that remains
+      operator-set, per this same field's own `status` above).
+
+worked_example:
+  source: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 steps 16-18 (L79-81)"
+  scenario: >
+    Nordbrook Research Lab's remote-worker-burnout study: two independent
+    coders (Coder 1, Coder 2) each run `research.qualitative_coding`'s
+    open_coding stage over the same 3 interview transcripts, producing two
+    independent CodeSets. `run_statistics` (this capability) computes Cohen's
+    Kappa between the two CodeSets. The Result Artifact (Kappa value +
+    confidence interval) is marked `epistemic_type: CALCULATED_RESULT,
+    authorship_state: AI_GENERATED`, pending human confirmation to
+    `HUMAN_APPROVED` -- transcribed verbatim from MVP's own worked scenario,
+    not invented here.
+
+open_questions:
+  - id: "OQ-RSTAT-1"
+    question: >
+      This file instantiates `run_statistics` for exactly ONE procedure
+      (Cohen's Kappa inter-rater reliability). MP §8.1/§8.2 name it as a
+      general-purpose capability with no stated procedure list. Should a
+      future, broader `run_statistics` contract generalize this file to
+      support additional procedures (t-test, ANOVA, regression, ...), with
+      this file's content becoming one named `procedure` variant rather than
+      the file's entire content?
+    owner: "operator, or a future Wave once a second statistical procedure is actually needed by a real Recipe"
+    blocks: "nothing in this file's own validity -- this is a complete, real Contract for the one procedure this MVP slice needs today"
+  - id: "OQ-RSTAT-2"
+    question: >
+      This file lives in a NEW top-level directory, `capabilities/contracts/`,
+      not previously named in `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+      §1's directory structure or its own "與 Program Plan §7 的差異" table.
+      Should a future documentation pass add a corresponding row to that
+      table, the way `specs/governance/` and `tests/governance/`'s 12
+      subdirectories were each individually justified there?
+    owner: "operator, or whoever next edits MACHINE_READABLE_SPEC_PLAN.md's §1 directory-differences table"
+    blocks: "nothing in this file's own validity -- the directory choice is justified inline in this file's own `description` above"
+  - id: "OQ-RSTAT-3"
+    question: >
+      `docs/architecture/TEST_EVAL_STRATEGY.md` §2.3 (L93) already sets
+      `kappa >= 0.6` (Landis & Koch 'substantial') as its OWN gating
+      convention for a methodologically different Cohen's Kappa use case
+      (LLM-judge-vs-human calibration). Should the operator, when finally
+      setting THIS file's `acceptance_threshold.kappa_min`, treat that
+      existing project precedent as a starting anchor (same statistic, same
+      published scale, same project) even though the rater populations
+      differ, or pick an independent number for qualitative-coding
+      human-vs-human agreement specifically (which academic convention in
+      qualitative research more commonly expects to clear "substantial" or
+      higher, kappa >= 0.61, before treating a coding scheme as reliable)?
+    owner: "operator"
+    blocks: "nothing in this file's own validity -- null is the honest value until set"
+  - id: "OQ-RSTAT-4"
+    question: >
+      `RaterCodingSet` (this file's `input.type`) and
+      `InterRaterReliabilityResult` (this file's `output.type`) are both
+      NEW_DESIGN typed-object names with no corresponding
+      `cognitive/typed-objects/*.schema.yaml` file. Should a future Wave add
+      them, the way `evidence.triangulation.contract.yaml`'s own
+      `TriangulatedFindingSet` is flagged as a future typed-objects
+      candidate (OQ-TRIANGULATION-2)?
+    owner: "operator, via a future Phase 3/4 typed-objects compilation pass"
+    blocks: "nothing in this file's own validity -- input/output.type are soft-reference bare string arrays per capability-contract.schema.yaml's own design"
+
+verification:
+  method: >
+    Read `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §3 steps 16-18
+    (L79-81) and §6 risk 4 (L145) directly at the cited lines. Read
+    `specs/domain/capability-contract.schema.yaml` in full, including its
+    own `worked_example` (MP §8.3's one real Capability Contract instance)
+    and `compilation_decisions` (the `id` grammar, `entitlement` additive-
+    field precedent this file follows for its own additive fields). Read
+    `methods/contracts/research.qualitative_coding.contract.yaml` in full
+    (built same task, this file's own cross-reference target). Read
+    `policies/ai-execution/trusted-compute-gate.policy.yaml` in full,
+    including `open_questions.OQ-TCGATE-2` (the explicit invitation this
+    file's `computation_provenance` field answers) and confirmed its
+    `status: ACTIVE`. Read `docs/architecture/TEST_EVAL_STRATEGY.md` §2.1-2.3
+    (L55-93) in full -- found and read the pre-existing `kappa >= 0.6
+    (Landis & Koch 1977 substantial agreement 門檻)` citation there via
+    `grep -rni "kappa"` across the full repo before writing this file's own
+    threshold field, confirming it is a DIFFERENT measurement context (see
+    compilation_decisions) rather than silently reusing it. Grepped the full
+    repo for "Cohen" / "Landis" / "Kappa" / "inter-rater" (this session) to
+    confirm no other file already defines this capability's content
+    (avoiding duplication). Validated `id`/`input`/`output`/`preconditions`/
+    `quality`/`security`/`rollback` shape against
+    `specs/domain/capability-contract.schema.yaml` with
+    `jsonschema.Draft202012Validator` via `tests/run_golden_tests.py`'s own
+    new capability-contract conformance check (see that file's own §2b/§2c
+    docstring) -- 0 errors.
+  note: >
+    No mother document, ADR, or existing ACTIVE sibling file was modified to
+    produce this file. Grounded-vs-designed ratio: the Kappa statistic
+    itself, its formula, and the Landis & Koch interpretation scale are
+    100% real, externally-verifiable, verbatim-transcribed academic content
+    (Cohen 1960; Landis & Koch 1977); the record shape wrapping them
+    (`statistical_method`, `computation_provenance`, `trusted_compute_required`)
+    is Phase 3 additive compilation design, honestly flagged as such; the
+    one genuinely undecided value in the entire file
+    (`acceptance_threshold.kappa_min`) is explicitly left operator-set, not
+    invented, per this task's own explicit instruction.

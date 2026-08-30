@@ -168,10 +168,10 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 | 0 | 文件完整性 + Current State | **COMPLETE**（2026-08-29；71 verified findings） | 11 outputs + 報告 ✅ |
 | CR | Claude/Codex Cross-Review | **COMPLETE**（2026-08-29；9/9 交集 0 DISAGREE，Codex 補 3 組新證據＋3 個新決策點） | 三件套 + 分類矩陣 ✅ |
 | 1 | Gap Analysis | **COMPLETE**（2026-08-29；98 條，含 4 CONFLICT + 5 DUPLICATION） | 6 registers ✅ |
-| 2 | Architecture Convergence | **COMPLETE**（2026-08-29；15/15 deliverables + 3 新增 ADR；9 份 ADR 全數 `ACCEPTED`） | 15 deliverables ✅ → HUMAN REVIEW 已審閱裁決 → **等待 Phase 3 明確 go-ahead** |
-| 3 | Machine-readable Foundation | **IN_PROGRESS**（Wave 0-1 ✅，2026-08-29；4/約 50+ schema 已建） | specs/policies/tests 樹 + schema 驗證 |
-| 4 | Repository Architecture | NOT_STARTED | bounded contexts 驗證 + repo 決策 |
-| 5 | MVP Vertical Slice | NOT_STARTED | 全鏈 e2e + replay/rollback 實證 |
+| 2 | Architecture Convergence | **COMPLETE**（2026-08-30 更新；16 份 ADR 全數 `ACCEPTED`，見 `docs/adr/ADR_INDEX.md`） | 15+ deliverables ✅ → HUMAN REVIEW 已審閱裁決 → **Phase 3 已開工（見下列）** |
+| 3 | Machine-readable Foundation | **IN_PROGRESS**（2026-08-30 更新，此列此前停留在 2026-08-29 的「4/約50+」已過期未跟進——`specs/` 59 檔 + `policies/` 15 檔 = 74 個 schema/policy 檔案已建，`tests/run_golden_tests.py` 835/835 全過；`.ai/proposals/` 機制本身也已由 NOT_STARTED 變為運作中：39 個提案涵蓋 10 份 ADR 的母文件編輯，全數 `status: DRAFT`，尚無一筆 `APPROVED`——ADR 決策定案≠母文件已編輯，此區分見 `ADR_INDEX.md` 檔頭） | specs/policies/tests 樹 + schema 驗證 |
+| 4 | Repository Architecture | **IN_PROGRESS**（`docs/architecture/REPOSITORY_ARCHITECTURE.md` 已存在，`Status: PROPOSED`——bounded context 分析已完成初稿，尚未 ACCEPTED；多個 2026-08-30 提案已標註依賴此文件定案，見該文件本身） | bounded contexts 驗證 + repo 決策 |
+| 5 | MVP Vertical Slice | **MODE SELECTED, PREREQUISITES IN_PROGRESS**（2026-08-30：Mode 選定 Research，`docs/adr/ADR-014-phase-5-mode-selection-research.md`；`MVP_VERTICAL_SLICE_PLAN.md` §4 列出的切片前置 schema 中，9 個原本缺失的已建成（knowledge-canvas/portable-uri/evidence-graph/sentence-provenance/workflow-ir/execution-state-machine/audit/event-ledger/trusted-compute-gate），另補 `research.qualitative_coding` method contract + recipe 實例——但這些仍是 Phase 3 機讀規格編譯，**不是** Phase 5 本身的執行；實際切片啟動仍待 Phase 3/4 完全收尾 + 操作者 Phase 2 STOP-FOR-HUMAN-REVIEW 批准，Program Plan §10 Phase 0-2 禁寫 production code/UI/DB schema 的規定依然有效） | 全鏈 e2e + replay/rollback 實證 |
 
 ---
 

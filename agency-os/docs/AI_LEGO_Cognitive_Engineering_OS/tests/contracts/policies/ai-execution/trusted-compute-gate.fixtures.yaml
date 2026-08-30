@@ -1,0 +1,134 @@
+schema_id: "ai-lego://policies/ai-execution/trusted-compute-gate.policy.yaml"
+target_ref: ""
+description: >
+  trusted-compute-gate.policy.yaml is `status: ACTIVE` — no ADR blocks its
+  content (unlike mandatory-gates.yaml's pre-ADR-011 history); it is a
+  direct transcription of EC §39/MP §27's pipeline plus a Phase 3 additive
+  rule shape. Root $refs `#/trusted_compute_gate_rules`: an open-ended array
+  (minItems: 1 only) — 1 grounded rule as of this file's creation. This
+  fixture validates the parts of `trusted_compute_gate_rule` that ARE
+  decided: `rule_id` pattern (`^TCGATE-`), `action` enum (5 values, with
+  `REQUIRE_TRUSTED_COMPUTE_PIPELINE` as the file's one additive value),
+  `triggering_epistemic_types` items via the $ref'd epistemic_type enum
+  (11 values, only 2 of which this file's own grounded rule actually uses),
+  and `required_pipeline_stages`' exactly-5-of-5 closed-set enforcement
+  (minItems/maxItems/uniqueItems against a 5-value enum — see the schema
+  file's own compilation_decisions for why this mechanically guarantees
+  full coverage without needing `prefixItems` for order).
+
+valid:
+  - name: real_grounded_rule_calculated_simulated_result
+    instance:
+      - rule_id: "TCGATE-CALCULATED-SIMULATED-RESULT"
+        condition: "epistemic_type IN ['CALCULATED_RESULT', 'SIMULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [CALCULATED_RESULT, SIMULATED_RESULT]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        worked_example:
+          capability_id: run_statistics
+          source: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md L79-80 -- Cohen's Kappa via run_statistics must be Trusted-Compute-executed, not LLM mentally calculated."
+        source: "Execution Contract §39 (L1499-1521); Master Plan §27 (L1688-1707); Execution Contract §40 (L1524-1536)."
+        mother_doc_text: |
+          LLM mentally calculates
+          → CALCULATED_RESULT
+  - name: minimal_rule_without_optional_fields
+    instance:
+      - rule_id: "TCGATE-TEST-MINIMAL"
+        condition: "epistemic_type IN ['CALCULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [CALCULATED_RESULT]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture -- structural validity only, proving computation_provenance_requirement, worked_example, and mother_doc_text are genuinely optional (no default surfacing as a required-field error)."
+  - name: pipeline_stages_out_of_diagram_order_still_valid
+    instance:
+      - rule_id: "TCGATE-TEST-ORDER"
+        condition: "epistemic_type IN ['SIMULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [SIMULATED_RESULT]
+        required_pipeline_stages: [AI_INTERPRETS, RESULT_ARTIFACT, VALIDATOR_VERIFIES, TRUSTED_COMPUTE_EXECUTES, AI_PLANS]
+        source: "test fixture -- confirms the schema's compilation_decisions claim precisely: order is a documentation-level MUST (EC §39's literal diagram order), NOT schema-enforced -- the same 5 stages listed in reverse order still validates because no `prefixItems` tuple constraint exists."
+  - name: action_base_vocabulary_value_still_valid
+    instance:
+      - rule_id: "TCGATE-TEST-BASE-ACTION"
+        condition: "epistemic_type IN ['UNKNOWN']"
+        action: REQUIRE_HUMAN_REVIEW
+        triggering_epistemic_types: [UNKNOWN]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture -- confirms the base Master Plan §64 action vocabulary (REQUIRE_HUMAN_REVIEW, reused verbatim from mandatory-gates.yaml/tool-permissions.yaml) remains legal on this file's own action enum even though no CURRENT grounded rule here uses it."
+
+invalid:
+  - name: rule_id_pattern_violation
+    instance:
+      - rule_id: "TC-GATE-001"
+        condition: "epistemic_type IN ['CALCULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [CALCULATED_RESULT]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture"
+    reason: >
+      `rule_id` requires `pattern: "^TCGATE-"` -- "TC-GATE-001" does not
+      start with that exact prefix.
+  - name: triggering_epistemic_types_invalid_enum_value
+    instance:
+      - rule_id: "TCGATE-TEST-BAD-TYPE"
+        condition: "epistemic_type IN ['GUESSED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [GUESSED_RESULT]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture"
+    reason: >
+      `triggering_epistemic_types` items $ref
+      `governance/epistemic-label.schema.yaml#/definitions/epistemic_type`,
+      a closed 11-value enum -- "GUESSED_RESULT" is not a member.
+  - name: required_pipeline_stages_missing_one_stage
+    instance:
+      - rule_id: "TCGATE-TEST-INCOMPLETE-PIPELINE"
+        condition: "epistemic_type IN ['CALCULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [CALCULATED_RESULT]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT]
+        source: "test fixture"
+    reason: >
+      `required_pipeline_stages` requires `minItems: 5, maxItems: 5` -- only
+      4 stages given (missing AI_INTERPRETS). Proves the exactly-5-of-5
+      closed-set coverage this schema's compilation_decisions describes is
+      really enforced, not just documented.
+  - name: required_pipeline_stages_duplicate_stage
+    instance:
+      - rule_id: "TCGATE-TEST-DUPLICATE-STAGE"
+        condition: "epistemic_type IN ['CALCULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        triggering_epistemic_types: [CALCULATED_RESULT]
+        required_pipeline_stages: [AI_PLANS, AI_PLANS, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture"
+    reason: >
+      `required_pipeline_stages` requires `uniqueItems: true` -- AI_PLANS
+      appears twice (and TRUSTED_COMPUTE_EXECUTES is consequently missing),
+      violating both uniqueness and full coverage.
+  - name: action_invented_value_not_in_local_enum
+    instance:
+      - rule_id: "TCGATE-TEST-BAD-ACTION"
+        condition: "epistemic_type IN ['CALCULATED_RESULT']"
+        action: REQUIRE_COMPUTE_REVIEW
+        triggering_epistemic_types: [CALCULATED_RESULT]
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture"
+    reason: >
+      `action` $refs `#/definitions/trusted_compute_action_id`, a closed
+      5-value enum ([DENY, ALLOW, SCOPE_TO, REQUIRE_HUMAN_REVIEW,
+      REQUIRE_TRUSTED_COMPUTE_PIPELINE]) -- "REQUIRE_COMPUTE_REVIEW" is not
+      a member (a plausible-looking but never-declared value, the same
+      invented-second-taxonomy trap mandatory-gates.fixtures.yaml's own
+      "gate_concept_invented_second_taxonomy_value" case tests).
+  - name: missing_required_triggering_epistemic_types_field
+    instance:
+      - rule_id: "TCGATE-TEST-NO-TRIGGER"
+        condition: "epistemic_type IN ['CALCULATED_RESULT']"
+        action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+        required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+        source: "test fixture"
+    reason: >
+      `trusted_compute_gate_rule` requires
+      `[rule_id, condition, action, triggering_epistemic_types,
+      required_pipeline_stages, source]` -- `triggering_epistemic_types` is
+      omitted entirely.

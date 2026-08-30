@@ -71,6 +71,7 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 | **新增 `/specs/governance/`** | Program Plan §7 列的 10 個 specs 子目錄（domain/cognitive/evidence/artifact/workflow/execution/decision/jurisdiction/security/analytics）**不含 governance**，但 ADR-004 明確指定 `epistemic-label.schema.yaml` 的路徑是 `/specs/governance/`。這不是本計畫發明新目錄，是把 ADR-004 已寫死的路徑物理接上。 | ADR-004 Recommendation 段；`AI_LEGO_OS_Program_Plan_v1.md` §7 |
 | **`/tests/governance/` 內嵌 EC §94 的 12 個子目錄** | Program Plan §7 只給 3 個粗桶（architecture/contracts/governance），EC §94 已有更細的 12 項清單（document-resolution/state-machine/authority/risk/gate-injection/rollback/scope/prompt-injection/secrets/jurisdiction/replay/handoff）。兩者不衝突，細清單是粗桶下的實作細節，不需要一份新 ADR，僅在此處記錄採納。 | EC L2805-2819；`DOC-execution_contract-8` |
 | **補回 `golden/` 子目錄** | EC §141 要求 `/tests/governance/ai-execution/golden/`，但 §94 的清單漏列它。Phase 3 建置時一併補上，屬 R0 Low-risk 修正（純新增，不刪除任何既有項）。 | `DOC-execution_contract-8`（EC L849） |
+| **新增頂層 `/capabilities/contracts/`（2026-08-30）** | Program Plan §7 未列此目錄；`specs/domain/capability-contract.schema.yaml` 一直只有 schema，全庫零一份真實 Capability Contract 實例檔（唯一具體內容是內嵌在該 schema檔自身的 `worked_example`）。比照既有 `methods/contracts/`／`recipes/validated/`（schema 放 `specs/`，實例放頂層複數目錄）同一慣例，為 `run_statistics`（Cohen's Kappa inter-rater reliability，Phase 5 Research Mode 切片所需）建第一份真實 Capability Contract 實例。`tests/run_golden_tests.py` 同步新增對應 conformance check（見該檔 §2c）。 | `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4（L121）；`capabilities/contracts/run_statistics.capability.yaml#/description`（新目錄理由完整說明） |
 
 ---
 
@@ -190,6 +191,25 @@ PROJECT_ROOT/                                  ← D:\Work\agency-os\docs\AI_LEG
 ### 2.10 `/specs/analytics/`（低優先，Wave 8+）
 
 僅列存在理由，不展開個別檔案：P1-GAP-PROD-7（成本追蹤無 tenant_id 歸屬）需要 `cost-record.schema.yaml` 補 `tenant_id/org_id`；因為與 MVP 垂直切片證明架構的目標關聯度低，建議排在 Phase 5 之後再做，本計畫僅登記不展開。
+
+### 2.11 Phase 5 垂直切片前置規格（2026-08-30 新增，直接任務指定，非既有 Wave 排程產物）
+
+`docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 列出的 Research Mode 切片前置需求，經逐項盤點後：6 項已存在（`tenant`/`risk-tier`/`epistemic-label`/`key-vault-lifecycle`/`cas-path`/`evidence.triangulation` contract）、4 項為命名/路徑誤判實為既有檔案（`execution-manifest`≡`manifest.schema.yaml`、`rollback-plan`≡`rollback.schema.yaml`、`execution/capability-contract`≡`domain/capability-contract.schema.yaml`、`execution/personal-data-redacted-event`≡`domain/personal-data-redacted-event.schema.yaml`），其餘真正缺失者當日建成：
+
+| 檔案 | 狀態 |
+|---|---|
+| `specs/domain/knowledge-canvas.schema.yaml` | **BUILT** — MP §11/§11.1/§11.2，AI/Human 互動規則以 `allOf`/`if`/`then` 結構性強制（非僅文字） |
+| `specs/artifact/portable-uri.schema.yaml` | **BUILT**（原誤建於 `specs/domain/artifact-uri.schema.yaml`，當日依 `cas-path.schema.yaml`/本表 L37 既有目錄慣例更正路徑）——MP §59 Portable Artifact URI |
+| `specs/evidence/evidence-graph.schema.yaml` + `sentence-provenance.schema.yaml` | **BUILT** — MP §13.1/13.2/13.3，Entity/Relation 為此任務首次定義的最小形狀（此前全庫零 schema） |
+| `specs/workflow/workflow-ir.schema.yaml` | **BUILT** — MP §9；同時解決 `recipe.schema.yaml` 既有 open question「Recipe 與 Workflow IR 是否同一物件」：Recipe=作者宣告意圖，Workflow IR=編譯後可執行節點圖 |
+| `specs/execution/execution-state-machine.schema.yaml` | **BUILT** — EC §10 十四狀態序列 + 7 個既有 side-state（`$ref` `status-codes.schema.yaml`，非重複定義） |
+| `specs/execution/audit.schema.yaml` | **BUILT** — 調和 MP §82（capability-run 指標）與 EC §66（決策敘事）兩種不同形狀為 `record_type` 判別聯集，非二選一 |
+| `specs/execution/event-ledger.schema.yaml` | **BUILT** — MP §57 Event-native Architecture，`event_id` 不得重用（EC §27）獨立驗證屬實 |
+| `policies/ai-execution/trusted-compute-gate.policy.yaml` | **BUILT** — 解 P1-GAP-AI-2；誠實揭露：無法偵測自由文字宣稱計算結果，僅結構性要求 `computation_provenance_marker` |
+| `policies/privacy/data-deletion.policy.yaml` | **BUILT** — 薄封裝層，`$ref` 既有 `data-deletion.schema.yaml`/`key-vault-lifecycle.schema.yaml`；SLA 天數刻意留 `null`（母文件無具體數字，不發明） |
+| `methods/contracts/research.qualitative_coding.contract.yaml` + `capabilities/contracts/run_statistics.capability.yaml` + `recipes/validated/research-qualitative-v1.recipe.yaml` | **BUILT** — 解 P1-GAP-AI-9/P1-GAP-AI-3；母文件無內容可轉錄，改為引用真實外部學術/統計標準（Strauss & Corbin 1990/1998 開放/主軸/選擇性編碼；Cohen 1960 Kappa 統計量；Landis & Koch 1977 判讀量表），專案專屬數值門檻（飽和度資料量、Kappa 接受門檻）留待操作者設定，不發明 |
+
+全數已通過 `tests/run_golden_tests.py`（835/835），對應 `tests/contracts/` fixture 已建。詳細決策依據見各檔案自身 `compilation_decisions`/`open_questions`。
 
 ---
 
@@ -331,7 +351,7 @@ Wave 8 ── ✅ 完成（2026-08-29，55/55 schema + 3/3 recipe instance + 2/2
 | MRSP-3（2026-08-29 訂正：ADR 已定案，此列原文過期） | ~~P1-DUP-2...P1-DUP-5...尚無 ADR~~ → **兩者已由 ADR-009 定案**（三層命名各自維持正本 + 12×6×22 跨層對照表；Localization 正本 = `/platform/trust-fabric/localization/`） | `docs/architecture/` 敘事文件；`REPOSITORY_ARCHITECTURE.md`（`Status: PROPOSED`，ADR-009 的目錄配置依附此文件，該文件本身尚未 ACCEPTED） | ADR 裁決本身已完成；實際生效還多依賴一層——`REPOSITORY_ARCHITECTURE.md` 自己尚未走完 ACCEPTED 流程（ADR_INDEX.md 決策依賴關係第 23 行已註記此依賴） |
 | MRSP-4 | `workflow/branch.schema.yaml`（Branch 完整 state machine）明列為 ADR-003 的 out-of-scope follow-up | `specs/workflow/` 一檔 | **已解決（2026-08-30）**：`docs/adr/ADR-012-branch-merge-state-machine.md` 裁決 6 狀態機 + merge 授權（>= A2）+ R3/R4 gate 要求（引用 ADR-011）+ 衝突一律人工裁決；`specs/workflow/branch.schema.yaml` 已建成 `status: ACTIVE`，19 個 fixture case 全過 |
 | MRSP-5（2026-08-29 訂正：已建成，此列原文過期） | ~~`security/tenant-isolation-controls.schema.yaml`...非本輪已裁決範圍~~ → **已由 `DATA_ARCHITECTURE_PLAN.md` §6 裁決並建成**（shared-schema+RLS 預設、共用元件強制 tenant_id 過濾+RLS/fail-closed） | `specs/security/tenant-isolation-controls.schema.yaml` 已建 | 設計層級已完成；正式 ADR 批准仍待後續（見該檔 `OQ-TENANTISO-1`） |
-| MRSP-6 | Tier 1 Method Contract 清單依賴 Phase 5 MVP 切片選擇，但 Phase 5 `Status: NOT_STARTED` | `methods/contracts/` 15-25 個檔案的具體名單 | 見 §4 建議：Phase 3 末期由 Claude/Codex 各自列候選切片常用方法交集，作為顯式待辦而非本計畫產出的清單 |
+| MRSP-6（2026-08-30 訂正：切片已選定，狀態部分解除）| ~~Tier 1 Method Contract 清單依賴 Phase 5 MVP 切片選擇，但 Phase 5 `Status: NOT_STARTED`~~ → **切片選擇本身已解除**：`docs/adr/ADR-014-phase-5-mode-selection-research.md`（ACCEPTED 2026-08-30）已批准 Research Mode 為 Phase 5 第一條垂直切片。**但一般性 15-25 個方法清單本身仍未產出**——Claude/Codex 候選切片常用方法交集比對這個動作本身尚未執行，`methods/registry/contract-backlog.yaml` 的 `tier_1.no_method_ids_listed: true` 因此維持不變，不因切片選定而自動視為已完成。**已具體交付的是該切片自己點名的第一個方法**：`docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4（L105）明確要求的 `research.qualitative_coding` Method Contract，已建成 `methods/contracts/research.qualitative_coding.contract.yaml`（GROUNDED ORIGINAL DESIGN，解 P1-GAP-AI-9，Strauss & Corbin 1990/1998 開放/主軸/選擇性編碼 + Glaser & Strauss 1967 理論飽和度為外部學術依據），並登記為 `contract-backlog.yaml` 的 `tier_1.first_concrete_entry`（非一般性 15-25 清單的一部分，是該清單定案前，切片文件自己點名的個別項目，同一類「非依政策衍生、依明文要求登記」的機制，比照該檔案自身 `tier_2.explicit_entries` 的 `finance.financial_assumptions` 先例）。同任務並建成該方法的 Trusted-Compute-gated 統計能力契約 `capabilities/contracts/run_statistics.capability.yaml`（Cohen's Kappa + Landis & Koch 1977 判讀量表）與具體 Recipe 實例 `recipes/validated/research-qualitative-v1.recipe.yaml` | `methods/contracts/` 其餘 15-25 個檔案的具體名單（仍未產出，非本次任務範圍） | 一般性清單仍見 §4 建議：Phase 3 末期由 Claude/Codex 各自列候選切片常用方法交集，作為顯式待辦而非本計畫產出的清單；`research.qualitative_coding` 一項已具體完成，不等待該一般性交集比對流程 |
 | MRSP-7 | 6 份 Round 1 ADR 全部 `Status: PROPOSED`，尚未經 Codex 獨立驗證，建議至少對 ADR-001/002 安排 Codex oracle 覆審 | 本計畫全部依賴 ADR 內容的項目（幾乎所有 Wave） | **已處理（2026-08-29）**：ADR-001/002 已完成 Codex 覆審並修正；9 份 ADR 全數 ACCEPTED（操作者授權）。ADR-003/005/006/009 仍未逐份覆審，風險相對低 |
 | MRSP-8（2026-08-29 新增） | `rigor-level.schema.yaml` 的 `deep_intelligence` 該不該是 Atlas `required_rigor` 的原生第 5 值，或永遠只能是 `board_grade` + 附加維度層——這是真正的 enum 基數變更，比照 ADR-004 判準不應由 Phase 3 單方定案 | `specs/cognitive/rigor-level.schema.yaml`、未來任何依 `required_rigor` 觸發的 gate/policy 檔案 | 該 schema 已內建 `PROVISIONAL_PENDING_OPERATOR_SIGNOFF` 預設值（採 board_grade+附加層，與本計畫 §2.3 原始草稿方向一致）並在 `open_questions` 明確標註未定案；建議操作者決定是否併入 Round 2 ADR |
 | MRSP-9（2026-08-29 新增） | `recipe.schema.yaml` 的 `id` 文法用 kebab-case slug，與 MP:812 既有的版本內嵌點號形式不一致，目前無 ADR 裁決 Recipe ID 文法（與 ADR-005b 已裁決的 Method ID 文法是兩件事） | `specs/cognitive/recipe.schema.yaml`、未來 `recipes/validated/` 目錄下的實際檔名 | 低風險，可與 MRSP-3（DUP-2/DUP-5 命名收斂）併入同一輪處理，或操作者另行裁決 |

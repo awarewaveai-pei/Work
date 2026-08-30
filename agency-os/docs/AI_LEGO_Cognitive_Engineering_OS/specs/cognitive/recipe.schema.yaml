@@ -377,27 +377,51 @@ properties:
 open_questions:
   - id: "OQ-recipe-1"
     question: >
-      Is Atlas §13's "Recipe" (an informal, human-curated library entry with
-      `suited_for`/`not_for`/`mandatory_elements` narrative metadata) the
-      SAME object, at a different abstraction level, as Master Plan §9's
-      "Workflow IR" (a compiled, typed node graph) — or are they two
-      genuinely different objects (a Recipe as source, compiling DOWN INTO a
-      Workflow IR instance) that happen to share vocabulary? No mother
-      document states this explicitly. `MACHINE_READABLE_SPEC_PLAN.md`'s
-      directory layout (§1) puts `/specs/workflow/` (Workflow IR node,
-      Branch/Merge) and `/specs/cognitive/recipe.schema.yaml` in DIFFERENT
-      top-level directories and its Spec Inventory (§2) currently defines no
+      RESOLVED (compilation decision, not an ADR — see
+      `specs/workflow/workflow-ir.schema.yaml#/decided_by` for why no ADR
+      governs this) 2026-08-30 by `specs/workflow/workflow-ir.schema.yaml`,
+      the `workflow/workflow-ir.schema.yaml` file this question's own text
+      (below) noted did not yet exist: Recipe and Workflow IR are two
+      related-but-distinct objects, not the same object under two names.
+      Recipe (this file) is the AUTHOR-FACING declarative artifact; Workflow
+      IR is the COMPILED, EXECUTABLE node-graph a Recipe (or, more weakly, a
+      Method's own `cognitive_primitives` orchestration) resolves into at
+      execution time — confirmed by three independent mother-document
+      citations naming a compiler/"Recipe Compiler"/"Workflow compiler" step
+      standing between Method/Recipe and Workflow (see that file's
+      `compilation_decisions` for the full evidence: MP §9's own
+      `/workflows/{ir,compiler,...}/` path list naming `ir` and `compiler` as
+      SIBLING directories; MP L3506-3512's Phase 1 pipeline "Method Atlas →
+      specs/cognitive/*.schema.yaml → methods/contracts/* → Recipe Compiler";
+      and Atlas L4411's "Workflow compiler 接受合法組合"). This file's own
+      `steps[]` grammar (borrowed from MP §9's node shape, per this file's
+      own `compilation_decisions` above) remains valid and unchanged by this
+      resolution — it is not modified by `workflow-ir.schema.yaml`, which
+      instead formalizes the COMPILED-OUTPUT side of the same relationship,
+      including a `compiled_from` field that structurally records when a
+      Workflow IR instance was compiled from a Recipe with this exact `id`.
+      Original question (preserved): "Is Atlas §13's 'Recipe' (an informal,
+      human-curated library entry with `suited_for`/`not_for`/
+      `mandatory_elements` narrative metadata) the SAME object, at a
+      different abstraction level, as Master Plan §9's 'Workflow IR' (a
+      compiled, typed node graph) — or are they two genuinely different
+      objects (a Recipe as source, compiling DOWN INTO a Workflow IR
+      instance) that happen to share vocabulary? No mother document states
+      this explicitly. `MACHINE_READABLE_SPEC_PLAN.md`'s directory layout
+      (§1) puts `/specs/workflow/` (Workflow IR node, Branch/Merge) and
+      `/specs/cognitive/recipe.schema.yaml` in DIFFERENT top-level
+      directories and its Spec Inventory (§2) currently defines no
       `workflow/workflow-ir.schema.yaml` or `workflow/node.schema.yaml` file
       at all — only `workflow/branch.schema.yaml` (L145, `BUILT` 2026-08-30
       by docs/adr/ADR-012-branch-merge-state-machine.md; that resolution
       covers Branch's own state machine only, not the broader Recipe-vs-
       Workflow-IR identity question this open item asks). This schema
-      assumes the Recipe-to-Workflow-IR relationship is "compiles to" and
+      assumes the Recipe-to-Workflow-IR relationship is 'compiles to' and
       borrows MP §9's node grammar directly into `steps[]` rather than
       waiting for a not-yet-planned `workflow/*.schema.yaml`, but that
-      assumption is this file's own inference, not a mother-document fact.
-    owner: "operator, via a future ADR or a documentation PROPOSAL clarifying MP §9 vs Atlas §13's relationship"
-    blocks: "nothing in this schema; flagged for completeness per R4"
+      assumption is this file's own inference, not a mother-document fact."
+    owner: "closed"
+    blocks: "nothing — resolved by specs/workflow/workflow-ir.schema.yaml's compilation_decisions"
   - id: "OQ-recipe-2"
     question: >
       Recipe `id` grammar (kebab-case slug, this file's own compilation

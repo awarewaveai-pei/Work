@@ -1514,9 +1514,46 @@ by_document:
         machine_id: "validation.experiment"
 
 # ---------------------------------------------------------------------------
+# phase_3_additions -- Phase 3 GROUNDED ORIGINAL DESIGN entries, kept SEPARATE
+# from `by_document` above rather than appended into it.
+#
+# This file's own header states its scope precisely: "a MIGRATION of the
+# Phase 0 mechanical catalog... NOT a re-cataloging" -- every entry under
+# `by_document` traces to a specific line in one of the three mother
+# documents. `research.qualitative_coding` (built this task, resolving
+# `.ai/research/phase-1/GAP_REGISTER.yaml` P1-GAP-AI-9) has NO such line: no
+# mother document defines this method anywhere (confirmed by
+# `methods/contracts/research.qualitative_coding.contract.yaml`'s own
+# exhaustive grep). Appending it into `by_document` would misrepresent it as
+# migrated content and would silently perturb this file's own verified
+# `verification.entry_count: 289` invariant (itself independently re-checked
+# by `tests/run_golden_tests.py`'s `run_registry_invariants`, which sums only
+# `by_document`'s own entries and asserts `total == 289` -- a hardcoded Phase
+# 0 migration fact this addition must not disturb). Same class of "kept
+# separate, not silently folded into a count-locked block" design as
+# `methods/registry/contract-backlog.yaml`'s own `tier_2.explicit_entries`
+# mechanism (built for the identical reason: `finance.financial_assumptions`,
+# an ADR-008-mandated method that also does not appear in `by_document`).
+# ---------------------------------------------------------------------------
+phase_3_additions:
+  - name: "research.qualitative_coding"
+    category: "method (GROUNDED ORIGINAL DESIGN -- no mother-document line exists, see header comment above and the contract file's own compilation_decisions for why)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "research.qualitative_coding"
+    source: "methods/contracts/research.qualitative_coding.contract.yaml"
+    mandated_by: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 (L105), §3 walkthrough step 12-13 (L72-73); slice selection ratified by docs/adr/ADR-014-phase-5-mode-selection-research.md (ACCEPTED 2026-08-30)"
+# ---------------------------------------------------------------------------
 verification:
   method: "Read (full file, 1182 lines) + Grep against the Phase 0 source before migrating; Read-back of this file after writing"
   entry_count: 289
+  entry_count_scope: >
+    Counts ONLY `by_document`'s Phase-0-migrated entries (the invariant
+    `tests/run_golden_tests.py`'s `run_registry_invariants` independently
+    re-checks) -- unchanged by this task. `phase_3_additions` above is a
+    SEPARATE, additive block of 1 entry (`research.qualitative_coding`),
+    bringing this file's true total to 290 -- deliberately not folded into
+    the 289 figure, per that block's own header comment.
   has_contract_true_count: 2
   has_contract_true_entries:
     - "Fishbone / Ishikawa (F05 root_cause, machine_id root_cause.fishbone, Atlas L433)"
@@ -1527,5 +1564,11 @@ verification:
     this migration task rather than trusted from prior session claims (per
     AGENTS.md R4 Verify Before Conclude) -- matches
     MACHINE_READABLE_SPEC_PLAN.md §4's own stated figure. No mother document
-    and no Phase 0 file was modified to produce this file
+    and no Phase 0 file was modified to produce this file. **2026-08-30
+    addition (separate task)**: `phase_3_additions.research.qualitative_coding`
+    is the one entry in this file with `has_contract: true` that is NOT one
+    of the 2 Phase-0-migrated entries above -- 3 has_contract:true entries
+    now exist in this file in total, across two structurally distinct blocks
+    (`by_document`: 2, `phase_3_additions`: 1), a distinction preserved
+    rather than collapsed into a single stale count.
     (.ai/research/phase-0/method-inventory.yaml remains untouched, read-only source).

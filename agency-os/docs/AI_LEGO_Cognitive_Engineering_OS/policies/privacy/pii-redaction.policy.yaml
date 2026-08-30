@@ -251,16 +251,19 @@ open_questions:
     blocks: "nothing in this file's own validity"
   - id: "OQ-PII-2"
     question: >
-      ADR-007 Recommendation points 3 and 4 (PII definition text in EC
-      §101/§102; MP §149 split) both require the ADR-006 `.ai/proposals/`
-      flow to actually reach the mother documents, and that flow's
-      `status: APPROVED` step is operator-only. This file's
-      `mp_149_reclassification` block is offered as the ready-to-promote
-      content for that proposal, but the proposal itself has not been
+      UPDATED 2026-08-30: `.ai/proposals/` now exists with 39 entries across
+      10 ADRs, including `029-pseudonymization-v1-baseline-split-mp` (MP
+      §149 split, transcribing this file's own `mp_149_reclassification`
+      block verbatim) and `030-pii-formal-definition-ec` (EC §101/§102 PII
+      definition) -- both `status: DRAFT`, ready for operator review but not
+      yet `APPROVED`. Original question (preserved): "ADR-007 Recommendation
+      points 3 and 4 both require the ADR-006 `.ai/proposals/` flow to
+      actually reach the mother documents, and that flow's `status:
+      APPROVED` step is operator-only... the proposal itself has not been
       created (`.ai/proposals/` does not exist in this repo yet for ANY
-      ADR, not just this one).
-    owner: "operator, or a future session with explicit scope to draft `.ai/proposals/` entries"
-    blocks: "nothing in this file's own validity -- MP §149's mother-doc text stays unedited either way; this file is deliberately the interim authoritative source"
+      ADR, not just this one)."
+    owner: "operator -- to review and advance proposals 029/030 to APPROVED"
+    blocks: "nothing in this file's own validity -- MP §149's mother-doc text stays unedited until the operator approves 029/030; this file remains the interim authoritative source until then"
 
 verification:
   method: >

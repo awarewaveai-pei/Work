@@ -1,0 +1,726 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/workflow/workflow-ir.schema.yaml"
+title: Workflow IR
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable schema for the Workflow Intermediate
+  Representation (IR) — Master Plan §9 "Workflow IR 與 Recipe Engine"
+  (L794-858)'s ONE worked example of a typed node graph (literal YAML,
+  L810-840): `workflow.id: research.qualitative.v4`, a `references` block
+  pinning the Method Atlas version, and an ordered `nodes[]` array where
+  each node is EITHER a `capability` invocation (`type: capability, ref:
+  ...`) OR a `method` invocation (`type: method, method_id: ...`) — "Workflow
+  IR 應分開表示 `capability` 與 `method`，避免把工具方法與執行能力混為一體"
+  (MP L808). This is the only place either mother document gives a real,
+  machine-checkable node grammar for a step sequence; `cognitive/recipe.schema.yaml`
+  already borrowed this exact grammar into its own `steps[]` field for lack
+  of a dedicated `workflow/` file to depend on instead (see its own
+  `open_questions.OQ-recipe-1`, and this file's `compilation_decisions`
+  below for why that borrowing is now formalized as a real "compiles to"
+  relationship rather than left as an unexplained duplication).
+
+  **Central resolution (answers `recipe.schema.yaml`'s OQ-recipe-1 and
+  MACHINE_READABLE_SPEC_PLAN.md's own observation that no
+  `workflow/workflow-ir.schema.yaml` file existed to answer it)**: Recipe
+  (`cognitive/recipe.schema.yaml`) and Workflow IR (this file) are TWO
+  RELATED BUT DISTINCT objects at different grains, not the same object
+  under two names. A Recipe is the AUTHOR-FACING declarative artifact —
+  Atlas §13's "Validated reference workflow + Typed Contracts + Optional
+  branches + Mandatory risk gates + Jurisdiction rules" (Atlas L3204-3214),
+  named, versioned, reusable across many executions, carrying narrative
+  metadata (`suited_for`/`not_for`/`mandatory_elements`) no execution engine
+  needs at runtime. Workflow IR is the COMPILED, EXECUTABLE representation a
+  Recipe (or, per Atlas §9's own `cognitive_primitives` field, a Method's own
+  internal cognitive-primitive orchestration) resolves into — the concrete
+  node-graph an execution engine actually walks. See `compilation_decisions`
+  below for the direct textual evidence this resolution is built on (it is
+  not asserted from architectural intuition alone): three independent mother-
+  document citations name a "compiler"/"Engine" step standing exactly between
+  Method/Recipe and Workflow.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 Workflow IR 與 Recipe Engine, full section (L794-858)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 worked YAML example (L810-840) — the sole literal node-grammar instance in either mother document, transcribed verbatim in `worked_example` below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 exact path list (L844-851, `/workflows/{ir,compiler,recipes,validation,runtime}/`) — confirms `/compiler/` is a named, distinct pipeline stage between authored Recipes and a runtime-executed Workflow, not a synonym for either"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md L3506-3512 (Phase 1 'Method 實作來源' pipeline: Method Atlas → `/specs/cognitive/*.schema.yaml` → `/methods/contracts/*` → **Recipe Compiler**) — direct evidence a compilation step exists downstream of Method contracts, named 'Recipe Compiler', independent of §9's own text"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L4411 ('LEGO 自由組合 | Method/Lens/Evidence/Representation 可替換 | Workflow compiler 接受合法組合') — a THIRD, independent citation of a 'Workflow compiler' concept accepting legal Method/Lens/etc. combinations, corroborating MP L3512's 'Recipe Compiler' rather than being the same single source repeated"
+  - "cognitive/recipe.schema.yaml (this file's sibling; see its description/compilation_decisions/open_questions.OQ-recipe-1 for the identical tension this file resolves, and `#/properties/references` / `#/properties/steps/items/properties/necessity` / `#/properties/steps/items/properties/gate_ref`, reused by $ref below rather than re-declared)"
+  - "cognitive/method.schema.yaml#/properties/id (hard $ref target for method-kind node references) and its own `open_questions.OQ-method-1` (the parallel, still-open tension over MP L812's `research.qualitative.v4` embedding a version in a bare id, which this file's own `id` field inherits rather than resolves — see compilation_decisions)"
+  - "domain/capability-contract.schema.yaml#/properties/id (hard $ref target for capability-kind node references)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §1 directory layout (`/specs/workflow/` — Workflow IR node, Branch/Merge) and §2 Spec Inventory (no `workflow/workflow-ir.schema.yaml` row existed before this file — see recipe.schema.yaml's OQ-recipe-1, which quotes this exact absence)"
+  - "specs/workflow/branch.schema.yaml (sibling `/specs/workflow/` file — a DIFFERENT concept: Branch forks a whole Workflow's execution LINEAGE; it does not model conditional/parallel edges INSIDE one Workflow IR's own node sequence — see compilation_decisions for why this file does not reuse or extend Branch's state machine)"
+
+decided_by: >
+  No ADR governs this file. This is the same class of gap
+  `cognitive/recipe.schema.yaml`'s own `decided_by` and `reversal.schema.yaml`'s
+  `decided_by` document: an undefined seam / an unreconciled vocabulary
+  overlap between two mother-document passages, not a documented conflict
+  between two competing existing designs an ADR would arbitrate. The
+  Recipe-vs-Workflow-IR relationship this file resolves in
+  `compilation_decisions` below is therefore a Phase 3 compilation decision,
+  not an ADR-level ruling — flagged honestly as such (and left open to a
+  future ADR overriding it) in `open_questions.OQ-WFIR-1`.
+
+compilation_decisions:
+
+  - question: >
+      Is Atlas §13's "Recipe" the SAME object as Master Plan §9's "Workflow
+      IR", or two related-but-distinct objects? This is `recipe.schema.yaml`'s
+      own OQ-recipe-1, left explicitly unresolved when that file was built
+      because no `workflow/workflow-ir.schema.yaml` file existed yet to
+      answer it.
+    decision: >
+      Two distinct objects, related by compilation: Recipe (author-facing,
+      declarative, versioned, reusable) COMPILES DOWN INTO a Workflow IR
+      instance (execution-facing, concrete, produced fresh per compile/
+      execution). A Method's own `cognitive_primitives` orchestration is a
+      SECOND, weaker-evidenced possible source of a Workflow IR instance
+      (see reasoning below for why this second path is flagged lower-
+      confidence than the Recipe path, not asserted with equal certainty).
+    reasoning: >
+      Three independent mother-document citations name a compilation step
+      standing between Method/Recipe and a runtime Workflow, none of which
+      would make sense if Recipe and Workflow IR were the same object under
+      two names: (1) MP §9's own exact path list names `/workflows/ir/` AND
+      `/workflows/compiler/` as SIBLING, separately-named directories
+      (L845-850) — a compiler that transforms X into X would be a
+      no-op stage, not a named pipeline component. (2) MP L3506-3512's Phase 1
+      "Method 實作來源" pipeline states, in order: Method Atlas → `/specs/
+      cognitive/*.schema.yaml` → `/methods/contracts/*` → **Recipe Compiler**
+      — a named compilation step consuming Method contracts, independent of
+      §9's own text (different section, different citation). (3) Atlas
+      L4411's Global Definition of Done table row states "Method/Lens/
+      Evidence/Representation 可替換 | **Workflow compiler** 接受合法組合" —
+      a THIRD independent citation, from the OTHER mother document, of a
+      compiler standing between LEGO-piece selection and an accepted
+      Workflow. All three citations are consistent with, and only make sense
+      under, a "Recipe (built from validated Method/Lens/Evidence/
+      Representation combinations) compiles into a Workflow IR instance"
+      reading — none of them is itself a literal machine-readable
+      "Recipe Compiler input/output contract" (this task's own instructions
+      note this exact honesty requirement: cite evidence, do not fabricate a
+      contract that does not exist). The weaker "Method's own
+      `cognitive_primitives` orchestration" path is included because Atlas
+      §9's Method Contract literally carries an orchestration-shaped field
+      (`cognitive_primitives: [DECOMPOSE, GROUP, CAUSE_HYPOTHESIS]`,
+      `method.schema.yaml#/properties/cognitive_primitives`) that is a
+      SEQUENCE of primitive operations conceptually adjacent to a node
+      sequence — but no mother document states that a Method's
+      `cognitive_primitives` list is ever directly compiled into a
+      standalone Workflow IR instance (as opposed to being consumed
+      internally by whatever executes that one Method) — flagged as the
+      weaker of the two paths in `compiled_from` below and in
+      `open_questions.OQ-WFIR-2`, not asserted with the same confidence as
+      the Recipe path.
+    scope_note: >
+      This does NOT modify `recipe.schema.yaml` in a way that changes its own
+      validated shape — that file's `steps[]` grammar remains valid and
+      unchanged. This file's `compiled_from` field (see below) is the
+      concrete, machine-checkable expression of "compiles from" — the
+      relationship is not left as prose alone in either file (see the
+      matching edit to `recipe.schema.yaml`'s OQ-recipe-1, cross-referencing
+      this resolution).
+
+  - question: >
+      MP §9's literal example wraps the object's own identity under a
+      `workflow: {id: ...}` key, with `references` and `nodes` as SIBLING
+      top-level keys (NOT nested under `workflow:` themselves) — a
+      half-wrapped shape unlike any other object in this corpus. Should this
+      schema mirror that exact nesting?
+    decision: >
+      No wrapping `workflow:` key. `id` is promoted to a plain top-level
+      field, a sibling of `references` and `nodes` — the root object IS one
+      Workflow IR instance directly.
+    reasoning: >
+      Identical reasoning to `execution/task.schema.yaml`'s `task_context:`
+      key and `domain/capability-contract.schema.yaml`'s `capability:` key:
+      both were the prose YAML block's own introducer key in the mother
+      document, not evidence the schema itself needs a nesting layer — MP's
+      own example is doubly inconsistent on this point (it wraps `id` but
+      NOT `references`/`nodes` under the same `workflow:` key), which is
+      itself evidence this is prose-block styling, not a deliberate object
+      shape. Flattening `id` up to the same level as its siblings is the
+      Low-risk, corpus-consistent choice, not a new design.
+
+  - question: >
+      MP §9's literal `id: research.qualitative.v4` embeds a version suffix
+      in the id — the identical defect class ADR-005b rejected for Method
+      ids (`method.swot.v1`) and `recipe.schema.yaml` rejected for Recipe ids
+      (kebab-case slug, separate `version` field; see that file's OQ-recipe-2).
+      Should this file extend either ruling to the Workflow IR `id`?
+    decision: >
+      No — and, honestly, this file does NOT resolve the grammar question
+      either. `id` is typed as a permissive `type: string` with a loose
+      pattern (`^[a-z][a-z0-9_.-]*$`) that accepts MP's literal corpus value
+      AND a kebab-case Recipe-inherited slug AND a bare dotted Method-style
+      id, without asserting any of the three is the one true grammar.
+    reasoning: >
+      `method.schema.yaml#/open_questions/OQ-method-1` already states, for
+      the identical citation, that ADR-005's Sub-decision (b) is scoped
+      explicitly to "Method ID Grammar" and never mentions Workflow ids —
+      extending it here would be the same unauthorized scope-creep that file
+      already declined. Unlike Method/Recipe ids (each governed by a real,
+      cited compilation decision establishing ONE grammar), a Workflow IR
+      instance's `id` has a genuine, unresolved ambiguity this file's own
+      `compiled_from` block surfaces structurally: when `source_kind: recipe`,
+      the natural `id` candidate is the compiling Recipe's OWN kebab-case
+      `id` (re-used verbatim, no version embedded, since `recipe_version`
+      already carries that separately in `compiled_from`); when hand-authored
+      or compiled ad hoc (MP's own literal example, which names no
+      `compiled_from` at all), a dotted-plus-version form like
+      `research.qualitative.v4` remains legal under this file's own permissive
+      pattern. Forcing ONE grammar now, with only one real literal example on
+      file and two sibling files' worth of precedent pointing in TWO
+      different directions, would be exactly the "fabricate precision the
+      evidence doesn't support" pattern this whole corpus's R4 discipline
+      forbids. Recorded honestly in `open_questions.OQ-WFIR-1` instead of
+      silently picked.
+
+  - question: >
+      How should a Workflow IR node express "this is a Capability
+      invocation" vs. "this is a Method invocation" — a loosely-typed
+      `type: string` field the way `recipe.schema.yaml#/properties/steps/items/properties/type`
+      already does (since that file already borrowed this exact node
+      grammar), or a stricter discriminated union with real cross-file
+      `$ref`s into `domain/capability-contract.schema.yaml` and
+      `cognitive/method.schema.yaml`?
+    decision: >
+      A stricter discriminated union: `node_kind: capability | method` (NOT
+      reusing `recipe.schema.yaml`'s literal field name `type`, see below),
+      expressed as a `oneOf` of two mutually-exclusive object shapes
+      (`#/definitions/capability_node`, `#/definitions/method_node`), each
+      with `additionalProperties: false` so a node can never legally carry
+      both a `ref` and a `method_id`. `capability_node.ref` and
+      `method_node.method_id` are real hard `$ref`s into
+      `domain/capability-contract.schema.yaml#/properties/id` and
+      `cognitive/method.schema.yaml#/properties/id` respectively — not free
+      strings, and not embedded full contract objects.
+    reasoning: >
+      This file's own job instruction is explicit about wanting a
+      discriminated union rather than a loosely-typed node — a deliberate
+      strengthening over `recipe.schema.yaml`'s existing looser treatment,
+      justified by the grain difference this file's central resolution
+      establishes: `recipe.schema.yaml`'s `steps[]` describes AUTHOR INTENT
+      (a step might name a capability/method that does not exist yet, or
+      exists only as a narrative placeholder — Atlas §13's own stage labels
+      like "Human Decision" that map to neither, per that file's
+      `compilation_decisions`), while THIS file's `nodes[]` describes an
+      already-COMPILED, about-to-EXECUTE graph, where a dangling reference to
+      a nonexistent Capability or Method id is a real, catchable defect, not
+      an author's rough draft. Full-contract embedding (rather than an id
+      `$ref`) was considered and rejected: MP §9's own literal example nodes
+      carry only `ref: transcribe` / `method_id: research.thematic_analysis`
+      — bare id strings, never an inlined `id`/`version`/`input`/`output`/
+      `quality`/... block — embedding the full contract inline would
+      contradict the one real worked example this file is transcribing.
+      `additionalProperties: false` + `oneOf` (rather than `if`/`then` +
+      `not: required`) is the same "exactly one branch may legally match"
+      technique this corpus already uses for its cleanest discriminated
+      unions (see `decision/reversal.schema.yaml`'s `oneOf` of
+      `multi_indicator_form` / `single_indicator_form`).
+    scope_note: >
+      Deliberately named `node_kind`, NOT `type` (MP's own literal field
+      name, already reused verbatim by `recipe.schema.yaml`'s `steps[].type`)
+      — per this file's own task instruction. The different name is also a
+      deliberate signal, not just an arbitrary rename: `recipe.schema.yaml`'s
+      `steps[].type` and this file's `nodes[].node_kind` share the same two
+      values but are NOT interchangeable shapes (one is a loosely-typed
+      author-intent field, the other hard-`$ref`s two closed id spaces) — a
+      future tool must not duck-type across them assuming identical
+      semantics. It also avoids visual confusion with
+      `execution/blast-radius-chain.schema.yaml#/chain_instance/properties/node_type`,
+      an unrelated field (tenant-hierarchy position: WORKFLOW/BRANCH/...) that
+      happens to sit one word away from this file's own vocabulary.
+
+  - question: >
+      MP §9's `references.cognitive_method_atlas` block is IDENTICAL in
+      shape to `recipe.schema.yaml#/properties/references` (same two fields,
+      same source citation, MP L813-817 — recipe.schema.yaml's own
+      description already cites this exact MP passage). Re-declare it here,
+      or reuse?
+    decision: >
+      Hard `$ref` to `ai-lego://specs/cognitive/recipe.schema.yaml#/properties/references`
+      rather than re-declaring the same two fields a second time.
+    reasoning: >
+      Same single-source-of-truth discipline this corpus already applies
+      everywhere a shape is shared verbatim (e.g. `workflow/branch.schema.yaml`
+      composing via `allOf` into `blast-radius-chain.schema.yaml#/chain_instance`
+      rather than duplicating its four base fields). `recipe.schema.yaml` is
+      an already-BUILT, `status: ACTIVE` Wave-3 file — a safe backward
+      dependency, the same class of cross-directory reuse
+      `domain/capability-contract.schema.yaml` already does against
+      `governance/epistemic-label.schema.yaml`. Depending "upward" on a file
+      this schema's own resolution calls the higher (author-facing) grain
+      is not a modeling contradiction: this is field-SHAPE reuse (both
+      objects happen to need an identical two-field block), not a claim
+      about which object is conceptually senior.
+    scope_note: >
+      Per MP §9's own prose ("凡 Workflow 節點涉及 Cognitive Method: MUST
+      resolve method definition from [Atlas] or its approved machine-readable
+      derivative"), `references` is only made REQUIRED (via this file's own
+      `allOf`/`if`/`then` block, not `recipe.schema.yaml`'s) when `nodes`
+      contains at least one `node_kind: method` entry — a workflow built
+      entirely from `capability` nodes has nothing to pin an Atlas version
+      for. `recipe.schema.yaml` itself leaves `references` unconditionally
+      optional (no such conditional rule exists in that file); this file adds
+      the conditional rule locally rather than modifying the shared,
+      already-ACTIVE sibling.
+
+  - question: >
+      Should this file structurally express its own "compiles from a Recipe
+      (or, more weakly, a Method)" resolution above, or leave that claim as
+      prose only (as `description`/`compilation_decisions` already do)?
+    decision: >
+      Add an OPTIONAL, NEW-DESIGN `compiled_from` object:
+      `{source_kind: recipe | method_cognitive_primitives | hand_authored,
+      recipe_id, recipe_version, method_id}`, with `source_kind`-conditional
+      requirements (`recipe` requires `recipe_id`+`recipe_version`;
+      `method_cognitive_primitives` requires `method_id`; `hand_authored`
+      requires neither). `recipe_id`/`recipe_version` hard-`$ref`
+      `recipe.schema.yaml#/properties/id`/`#/properties/version`; `method_id`
+      hard-`$ref`s `method.schema.yaml#/properties/id`.
+    reasoning: >
+      A resolution recorded only in prose (`compilation_decisions`/
+      `description`) is not machine-checkable and would silently rot the
+      first time this file diverges from its own prose. Giving the claim a
+      real, optional field (absent for MP's own literal example, which
+      names no compiling Recipe) lets a real Workflow IR instance actually
+      DECLARE its provenance without retroactively invalidating the one
+      real corpus example — the same "declare the field as OPTIONAL so the
+      one real transcribed instance stays valid unmodified" discipline
+      `domain/capability-contract.schema.yaml`'s own `entitlement` field
+      used for the identical reason.
+    scope_note: >
+      100% NEW DESIGN — no mother document names a `compiled_from` field or
+      this exact shape. Grounded only in this file's own already-cited
+      three-citation evidence for a "compilation" step existing at all, not
+      in a fourth citation for this specific field shape. Flagged honestly
+      here rather than presented as transcribed.
+
+  - question: >
+      Recipe steps carry `label` (human-readable stage name), `necessity`
+      (Atlas §14.3's 6-value edge-label enum), and `gate_ref` (soft gate
+      reference) — none of which MP §9's literal Workflow IR node example
+      shows. Should compiled Workflow IR nodes carry them too?
+    decision: >
+      Yes, as OPTIONAL passthrough fields on both `capability_node` and
+      `method_node`, reusing `recipe.schema.yaml`'s exact field shapes by
+      `$ref` (`#/properties/steps/items/properties/label`,
+      `.../necessity`, `.../gate_ref`) rather than re-declaring them.
+    reasoning: >
+      This file's own central resolution claims Workflow IR is "the concrete
+      node-graph an execution engine actually walks" — if a compiled node
+      silently dropped the compiling Recipe step's `necessity`/`gate_ref`
+      annotations, the execution engine would have no way to know which
+      gates a given node requires without re-consulting the source Recipe at
+      runtime, undermining the very claim this file makes about being the
+      self-sufficient executable artifact. Making them OPTIONAL (not
+      required) keeps MP §9's own literal example — which has none of these
+      three fields on any node — valid unmodified.
+
+  - question: >
+      MP §9's example is a flat, ordered array (position = sequence order,
+      identical to `recipe.schema.yaml#/properties/steps`'s own established
+      convention). The task framing for this file mentions a "directed
+      sequence/graph" — should `nodes[]` model real graph edges (branching,
+      parallel paths, conditional routing between nodes)?
+    decision: >
+      No — `nodes` stays a flat, ordered array exactly like `recipe.schema.yaml`'s
+      `steps[]`. No edge/adjacency structure is added.
+    reasoning: >
+      Zero mother-document evidence anywhere shows a Workflow IR node
+      pointing at anything other than "the previous node's output" via a
+      free-text `input` string — there is no cited example of one node
+      naming TWO possible successors, a conditional branch predicate, or a
+      merge-of-two-predecessors shape. Inventing graph-edge syntax now would
+      be exactly the "fabricate a rich schema with no textual basis"
+      pattern this task was told to avoid, the same restraint
+      `method.schema.yaml`'s own `preconditions` field and
+      `recipe.schema.yaml`'s own `steps[].type` 2-value enum already applied.
+      This is DELIBERATELY NOT the same concept as
+      `workflow/branch.schema.yaml`'s Branch/Merge state machine — Branch
+      forks a WHOLE Workflow's execution lineage into a second, independently
+      progressing lineage (ADR-012); it says nothing about conditional edges
+      BETWEEN NODES inside one Workflow IR's own sequence. Conflating the two
+      would misattribute Branch's real, ADR-012-governed state machine to a
+      concept (in-sequence conditional routing) that remains entirely
+      unevidenced. Left open in `open_questions.OQ-WFIR-3`.
+
+  - question: >
+      Should this file add `contract_provenance` (who authored/approved
+      THIS Workflow IR instance) and `risk_tier`, mirroring the identical
+      OPTIONAL additive fields `method.schema.yaml` and
+      `domain/capability-contract.schema.yaml` already carry for the same
+      reasons?
+    decision: "Yes, both, OPTIONAL and additive, same $ref targets and reasoning as those two sibling files."
+    reasoning: >
+      `contract_provenance` answers "was this compiled Workflow IR instance
+      produced by a trusted deterministic Recipe Compiler run, or hand-edited/
+      AI-drafted and still pending review" — the identical distinct question
+      `method.schema.yaml`'s and `capability-contract.schema.yaml`'s own
+      `contract_provenance` fields already answer for their respective
+      objects, now asked of the compiled artifact itself. `risk_tier` is, if
+      anything, MORE directly applicable here than on Method/Recipe: Atlas
+      §14.2's Mandatory Gate Injection and `execution/risk-tier.schema.yaml`'s
+      R3∪R4 trigger act on the thing actually being EXECUTED — this file's
+      own object — not on the authoring-time Recipe/Method definition one
+      level up. Both kept OPTIONAL so MP §9's own literal example (which
+      carries neither) remains valid unmodified.
+
+# ---------------------------------------------------------------------------
+# The one real, concrete Workflow IR instance in the whole corpus — MP §9
+# (L810-840), transcribed verbatim (root `workflow:` wrapper flattened per
+# compilation_decisions above; no other content changed). Doubles as this
+# file's own validation fixture (see `verification` and the golden-test
+# fixtures file).
+# ---------------------------------------------------------------------------
+worked_example:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L810-840)"
+  note: >
+    MP's literal text names no `compiled_from`, `risk_tier`, or
+    `contract_provenance` — none of this file's additive fields are
+    populated here, to prove the schema still accepts the one real corpus
+    instance with zero additive content, exactly as `capability-contract.schema.yaml`'s
+    own `worked_example` does for MP §8.3.
+  value:
+    id: research.qualitative.v4
+    references:
+      cognitive_method_atlas:
+        file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+        required: true
+    nodes:
+      - node_kind: capability
+        ref: transcribe
+        input: source.video
+      - node_kind: method
+        method_id: research.thematic_analysis
+        input: output.transcript
+      - node_kind: capability
+        ref: literature_search
+        input: research.question
+      - node_kind: method
+        method_id: evidence.triangulation
+        input: [themes, literature]
+      - node_kind: capability
+        ref: artifact.generate_research_paper
+
+# ---------------------------------------------------------------------------
+# Schema body — root object IS one Workflow IR instance (see
+# compilation_decisions above for why there is no wrapping `workflow:` key).
+# ---------------------------------------------------------------------------
+
+type: object
+required: [id, nodes]
+properties:
+
+  id:
+    type: string
+    pattern: "^[a-z][a-z0-9_.-]*$"
+    description: >
+      Deliberately permissive — see compilation_decisions above for why this
+      file does NOT pick one grammar among MP's literal dotted-version form
+      (`research.qualitative.v4`), a Recipe-inherited kebab-case slug, or a
+      bare dotted Method-style id. Accepts all three; asserts nothing about
+      which is canonical.
+    examples:
+      - research.qualitative.v4
+      - db-migration-expand-contract
+      - research.thematic_analysis_workflow
+
+  references:
+    $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/references"
+    description: >
+      Per MP §9 (L813-817). Reused verbatim by $ref from `recipe.schema.yaml`
+      — see compilation_decisions above. Unconditionally OPTIONAL at this
+      property's own declaration; made CONDITIONALLY required (and required
+      to be non-empty) by the `allOf`/`if`/`then` block below, whenever
+      `nodes` contains at least one `node_kind: method` entry, per MP §9's
+      own "MUST resolve method definition from [Atlas]" rule.
+
+  nodes:
+    type: array
+    minItems: 1
+    description: >
+      The ordered node sequence. Array position IS the sequence order —
+      same convention, and same lack of a separate numeric order field, as
+      `recipe.schema.yaml#/properties/steps`. See compilation_decisions
+      above for why this stays a flat array, not a graph with edges.
+    items:
+      $ref: "#/definitions/node"
+
+  compiled_from:
+    $ref: "#/definitions/compiled_from"
+    description: >
+      OPTIONAL, NEW DESIGN. Structural expression of this file's own
+      Recipe-vs-Workflow-IR compilation_decisions resolution. Absent (as in
+      `worked_example` above) for a hand-authored-and-never-tracked instance,
+      or when the compiling source is simply unknown/unrecorded.
+
+  risk_tier:
+    description: >
+      OPTIONAL, ADDITIVE — see compilation_decisions above. Soft reference
+      to `execution/risk-tier.schema.yaml#/risk_tier` (values R0-R4).
+    type: string
+    enum: [R0, R1, R2, R3, R4]
+
+  contract_provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: >
+      OPTIONAL. Answers "who/what produced THIS compiled Workflow IR
+      instance" (a trusted deterministic Recipe Compiler run vs. hand-edited/
+      AI-drafted pending review) — distinct from `compiled_from` above,
+      which records WHICH Recipe/Method it was compiled FROM, not WHO/WHAT
+      ran the compilation. See compilation_decisions; identical
+      field/reasoning to `method.schema.yaml#/properties/contract_provenance`
+      and `capability-contract.schema.yaml#/properties/contract_provenance`.
+
+# ---------------------------------------------------------------------------
+# Node discriminated union — see compilation_decisions above.
+# ---------------------------------------------------------------------------
+definitions:
+
+  node:
+    oneOf:
+      - $ref: "#/definitions/capability_node"
+      - $ref: "#/definitions/method_node"
+
+  capability_node:
+    type: object
+    required: [node_kind, ref]
+    additionalProperties: false
+    properties:
+      node_kind:
+        const: capability
+      ref:
+        $ref: "ai-lego://specs/domain/capability-contract.schema.yaml#/properties/id"
+        description: >
+          Per MP §9 (L821, L828, L838: `ref: transcribe` / `ref:
+          literature_search` / `ref: artifact.generate_research_paper`).
+          Real hard $ref (not a free string) — see compilation_decisions
+          above for why this differs from `recipe.schema.yaml`'s own softer
+          treatment of the identical field name.
+      label:
+        type: string
+        description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
+      input:
+        description: >
+          Per MP §9, EITHER a single string (L822: `input: source.video`) OR
+          an array of strings (L834-836), OR entirely absent (MP §9's own
+          final node, L838-839, `ref: artifact.generate_research_paper`, has
+          no `input` at all) — all three are real, evidenced shapes.
+        oneOf:
+          - type: string
+          - type: array
+            items: { type: string }
+      necessity:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/necessity"
+        description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
+      gate_ref:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/gate_ref"
+        description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
+
+  method_node:
+    type: object
+    required: [node_kind, method_id]
+    additionalProperties: false
+    properties:
+      node_kind:
+        const: method
+      method_id:
+        $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/id"
+        description: >
+          Per MP §9 (L825, L833: `method_id: research.thematic_analysis` /
+          `method_id: evidence.triangulation`, both already bare
+          `<family>.<name>` form). Real hard $ref to ADR-005b's grammar —
+          same upgrade-over-`recipe.schema.yaml` reasoning as
+          `capability_node.ref` above (that file only pattern-matches the
+          grammar locally, it does not hard-$ref `method.schema.yaml`
+          itself).
+      label:
+        type: string
+        description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
+      input:
+        description: "Same shape/evidence as capability_node.input above (L826, L834-836)."
+        oneOf:
+          - type: string
+          - type: array
+            items: { type: string }
+      necessity:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/necessity"
+        description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
+      gate_ref:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/gate_ref"
+        description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
+
+  compiled_from:
+    type: object
+    required: [source_kind]
+    description: >
+      100% NEW DESIGN — see compilation_decisions above. `source_kind`-
+      conditional requirements are enforced by this same definition's
+      `allOf`/`if`/`then` block below.
+    properties:
+      source_kind:
+        type: string
+        enum: [recipe, method_cognitive_primitives, hand_authored]
+        description: >
+          `method_cognitive_primitives` is the weaker-evidenced of the two
+          real compilation paths — see compilation_decisions above and
+          `open_questions.OQ-WFIR-2`.
+      recipe_id:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/id"
+      recipe_version:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/version"
+      method_id:
+        $ref: "ai-lego://specs/cognitive/method.schema.yaml#/properties/id"
+        description: >
+          Only populated when `source_kind: method_cognitive_primitives` —
+          the Method whose own `cognitive_primitives` orchestration this
+          Workflow IR instance was compiled from, independent of any Recipe.
+    allOf:
+      - if:
+          properties: { source_kind: { const: recipe } }
+          required: [source_kind]
+        then:
+          required: [recipe_id, recipe_version]
+      - if:
+          properties: { source_kind: { const: method_cognitive_primitives } }
+          required: [source_kind]
+        then:
+          required: [method_id]
+
+# ---------------------------------------------------------------------------
+# Conditional requirement: `references` is mandatory (and must carry
+# `cognitive_method_atlas`) whenever any node is a method-kind node — see
+# compilation_decisions above (MP §9's own "MUST resolve method definition"
+# rule). Same `contains` technique `workflow/branch.schema.yaml`'s own
+# gate-coverage rule uses.
+# ---------------------------------------------------------------------------
+if:
+  properties:
+    nodes:
+      contains:
+        properties: { node_kind: { const: method } }
+        required: [node_kind]
+  required: [nodes]
+then:
+  required: [references]
+  properties:
+    references:
+      required: [cognitive_method_atlas]
+
+open_questions:
+  - id: "OQ-WFIR-1"
+    question: >
+      This file's `id` field is deliberately left grammar-agnostic (see
+      compilation_decisions) rather than picking one of: MP's literal
+      dotted-version form, a Recipe-inherited kebab-case slug (no embedded
+      version, matching `compiled_from.recipe_id` verbatim), or a bare
+      dotted Method-style id. Should a future ADR settle this — and, if it
+      settles on "inherit the compiling Recipe's own id verbatim when
+      `compiled_from.source_kind: recipe`", should that become a
+      schema-enforced equality constraint (`id` MUST equal
+      `compiled_from.recipe_id` in that case) rather than the two independent,
+      unconstrained fields this file leaves them as today?
+    owner: "operator, via a future ADR — mirrors `method.schema.yaml`'s OQ-method-1 and `recipe.schema.yaml`'s OQ-recipe-2, both still open for the identical underlying tension"
+    blocks: "nothing in this schema; a future equality constraint would be additive, not breaking, for any instance that already satisfies it"
+  - id: "OQ-WFIR-2"
+    question: >
+      `compiled_from.source_kind: method_cognitive_primitives` is included
+      as a real enum value on the strength of Atlas §9's `cognitive_primitives`
+      field being conceptually adjacent to a node sequence — but no mother
+      document states that a Method's `cognitive_primitives` list is ever
+      actually compiled into a standalone Workflow IR instance, as opposed
+      to being consumed internally by whatever single-Method executor runs
+      that one Method. Should this enum value be removed as unevidenced
+      speculation, or does a future Phase 4/5 implementation confirm the
+      path is real?
+    owner: "operator, once a real Method-execution engine implementation exists to check this against"
+    blocks: "nothing today — the value is legal but has zero real corpus instances exercising it in the fixture file"
+  - id: "OQ-WFIR-3"
+    question: >
+      `nodes[]` stays a flat ordered array with no graph-edge/branching
+      syntax (see compilation_decisions). If a future Recipe or Method
+      genuinely needs conditional routing or parallel node execution inside
+      one Workflow IR instance (as opposed to `workflow/branch.schema.yaml`'s
+      whole-lineage forking), what should that syntax look like? Left
+      entirely open — zero mother-document evidence exists to ground any
+      specific shape today.
+    owner: "operator or a future Round 2+ ADR, once a real multi-path Recipe/Workflow use case exists to generalize from"
+    blocks: "nothing today — every real cited Workflow IR/Recipe example in this corpus is a single linear sequence"
+  - id: "OQ-WFIR-4"
+    question: >
+      A node's `input` value (e.g. `output.transcript`, `themes`,
+      `literature`) is an opaque, free-text string with no schema-enforced
+      link back to an actual prior node's produced output name — the same
+      "no expression grammar evidenced" restraint `method.schema.yaml`'s
+      `preconditions` field applies, extended here to inter-node data flow.
+      Should a future revision validate that every node's `input` string
+      resolves to something an earlier node in the same `nodes[]` array
+      plausibly produced?
+    owner: "operator or future Phase 4 tooling (a lint/validation pass, not necessarily a JSON Schema constraint — cross-array-item referential integrity is outside what Draft 2020-12 can express declaratively, the same limitation `decision/reversal.schema.yaml`'s `indicators`/`thresholds` parallel-array-length invariant already documents)"
+    blocks: "nothing in this schema's own validity"
+
+verification:
+  method: >
+    Read Master Plan §9 in full (L794-858, including the exact path list
+    L844-851) and L3506-3512 (Phase 1 "Method 實作來源" pipeline) in full.
+    Read Atlas L4390-4420 (Global Definition of Done table, full row context
+    for L4411) in full. Read `cognitive/recipe.schema.yaml` in full,
+    including `compilation_decisions`, `open_questions.OQ-recipe-1/2/3`, and
+    `verification` (the specific open question this file answers). Read
+    `cognitive/method.schema.yaml` in full, including
+    `open_questions.OQ-method-1` (the parallel, still-open Workflow-id-vs-
+    Method-id-grammar tension this file does not resolve either). Read
+    `domain/capability-contract.schema.yaml` in full (the `id` grammar hard-
+    $ref target for capability-kind nodes). Read `specs/workflow/branch.schema.yaml`
+    in full (confirmed it governs a DIFFERENT concept — whole-lineage forking,
+    not in-sequence node branching — before deciding not to reuse or extend
+    it here). Read `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` §5
+    MRSP-9 (L337) and the full §1/§2 sections establishing that no
+    `workflow/workflow-ir.schema.yaml` or `workflow/node.schema.yaml` row
+    existed before this file. Grepped both mother documents for "compiler"/
+    "Compiler"/"Engine" (case-sensitive on the capitalized forms) to confirm
+    the three-citation evidence base for the Recipe-vs-Workflow-IR
+    resolution (`grep -n` on both files, 2026-08-30, this session) rather
+    than relying on a single passage.
+
+    `python3 -c "import yaml; yaml.safe_load(...)"` run against this file:
+    parses clean. A `jsonschema.Draft202012Validator`, built via a
+    `referencing.Registry` with an `ai-lego://`-scheme retrieval function
+    (same technique `tests/run_golden_tests.py` uses project-wide), was run
+    against `worked_example.value` above (MP §9's own literal instance,
+    with `type:` renamed to `node_kind:` per this file's own field-name
+    decision, and the root `workflow:` wrapper flattened per this file's own
+    no-wrapping-key decision — otherwise byte-for-byte MP's content) — with
+    every cross-file `$ref` (`recipe.schema.yaml#/properties/references`,
+    `capability-contract.schema.yaml#/properties/id`,
+    `method.schema.yaml#/properties/id`) resolved for real, not asserted —
+    and it validates with zero errors, proving this file's discriminated
+    union and conditional-`references` rule both accept the one real corpus
+    instance unmodified in substance. See
+    `tests/contracts/specs/workflow/workflow-ir.fixtures.yaml` for the full
+    positive/negative fixture set and `tests/run_golden_tests.py` for the
+    project-wide harness this file's fixtures run under.
+  note: >
+    No mother document, ADR, or existing ACTIVE sibling `specs/` file's
+    normative content was modified to produce this file (the companion edit
+    to `cognitive/recipe.schema.yaml#/open_questions/OQ-recipe-1` appends a
+    resolution pointer to that question's existing text — it does not delete
+    or alter the original question, per this corpus's established
+    append-don't-delete convention, e.g.
+    `specs/execution/method-resolution.schema.yaml#/open_questions/OQ-mres-4`).
+    Grounded-vs-designed ratio, following this suite's disclosure
+    convention: roughly 40% grounded (the `nodes[]` capability/method
+    grammar and its literal field names/shapes, `references`, the one
+    worked instance, and the three-citation compilation-step evidence),
+    60% new design (`compiled_from` in its entirety, the `node_kind`
+    rename and its `oneOf`/`additionalProperties: false` strictness upgrade
+    over `recipe.schema.yaml`'s looser treatment, `risk_tier`,
+    `contract_provenance`, and the `label`/`necessity`/`gate_ref` passthrough
+    fields). The central Recipe-vs-Workflow-IR relationship itself sits
+    between the two: it is a REASONED INFERENCE from three real, independently
+    cited textual passages, not a literal mother-document statement and not
+    an unsupported invention either.

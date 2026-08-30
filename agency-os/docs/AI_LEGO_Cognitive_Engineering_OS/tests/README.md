@@ -96,6 +96,7 @@ sub-schema (see `specs/execution/risk-tier.schema.yaml`'s
 | `specs/execution/blast-radius-chain.schema.yaml` | `#/chain_instance` |
 | `specs/execution/data-deletion.schema.yaml` | `#/deletion_request` |
 | `specs/execution/deprecation-pipeline.schema.yaml` | `#/deprecation_record` |
+| `specs/execution/execution-state-machine.schema.yaml` | `#/state_transition_event` (added 2026-08-30; `audit.schema.yaml`, added the same day, validates at its own document root and is intentionally NOT listed here — see the "Files not listed" note above) |
 | `specs/execution/gate.schema.yaml` | `#/gate_result` |
 | `specs/execution/method-resolution.schema.yaml` | TWO fixtures needed: `#/method_resolution_request` and `#/method_resolution_result` |
 | `specs/execution/status-codes.schema.yaml` | TWO fixtures needed: `#/reference_vocabulary/legal_side_states/schema` and `#/reference_vocabulary/final_status/schema` |

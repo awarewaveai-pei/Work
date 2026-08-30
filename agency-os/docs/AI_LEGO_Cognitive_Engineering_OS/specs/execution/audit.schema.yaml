@@ -1,0 +1,455 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/audit.schema.yaml"
+title: Audit Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of an Audit Record, reconciling TWO
+  genuinely different, both-real shapes the mother documents give for
+  "audit" content, rather than silently discarding one:
+
+  1. Master Plan §82 "Execution Audit" (L3354-3376, verified by direct
+     read this session) -- a per-Capability-Run counters/metrics record.
+     MP's own words: "每次 Capability Run 必留" (every Capability Run MUST
+     retain [the following 17 fields]): run_id / block_id /
+     capability_version / model / model_version / prompt_version /
+     input_hash / output_hash / timestamp / user / latency / token_usage /
+     cost / validation_score / status / policy_version / knowledge_snapshot.
+
+  2. Execution Contract §66 "Audit Event" (L2200-2216, verified by direct
+     read this session) -- a generic decision-narrative record. EC's own
+     words: "至少記錄" (at least record [the following 9 fields]): who /
+     what / when / where / why / input / decision / policy / result --
+     plus the explicit rule "Audit 不記 secret" (L2216, Audit MUST NOT
+     record secrets).
+
+  Neither document cross-references the other; neither states that one
+  shape supersedes or subsumes the other; grep confirms `capability_version`
+  never appears near EC §66 and `who`/`what`/`when` never appear near MP
+  §82. They serve genuinely different purposes -- capability_run is a
+  machine-metrics telemetry row for one LLM/tool invocation (cost, latency,
+  hashes); decision_narrative is a human-readable-first decision trail
+  ("who decided what and why", the Five-Ws shape) -- and this file models
+  BOTH as two variants of one `record_type` discriminated union, per this
+  corpus's established convention of reconciling genuinely-different-but-
+  both-real shapes rather than picking one (see e.g.
+  `manifest.schema.yaml`'s 4-shape Execution Manifest reconciliation,
+  `rollback.schema.yaml`'s EC-strategy-classes-vs-MP-target-layers
+  reconciliation, and `decision/reversal.schema.yaml`'s 3-shape-to-2-form
+  `oneOf` reconciliation -- the identical class of judgment call, not a new
+  house style invented for this file).
+
+  This file is NOT named in EC §92's 13-file `/specs/execution/` list
+  (L2766-2783), and grep confirms it has no row in
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` and no entry in
+  `.ai/research/phase-1/GAP_REGISTER.yaml` or `DUPLICATION_REGISTER.yaml`
+  (checked 2026-08-30) -- no ADR-track document rules on this file's
+  content. It IS, however, named by one PROPOSED (non-ADR-track) planning
+  document: `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 "Required
+  Phase-3 Specs" (L111) lists "`audit.schema.yaml`（MP §82）" verbatim, at
+  the same line that also names
+  `execution/execution-state-machine.schema.yaml` (built alongside this
+  file, same session, see that file's own `decided_by` for the identical
+  correction). That plan's own scope-boundary note states it "不修改三母
+  文件" and gates actual Vertical Slice EXECUTION (not the writing of
+  individual Phase-3 spec files) behind Phase 3/4 completion and a separate
+  operator approval -- it does not itself authorize or govern this file's
+  content; this task's own instruction is the actual authorization. This
+  file is therefore a genuinely new schema build, anticipated by one
+  PROPOSED planning document but not yet governed by any ADR or registered
+  finding.
+
+source_of_truth_for:
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 Required Phase-3 Specs (L111, Status: PROPOSED) -- names this exact filename against MP §82; NOT an ADR or registered finding, does not itself govern this file's content"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §82 Execution Audit (L3354-3376) -- capability_run variant, verbatim 17-field list"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §66 Audit Event (L2200-2216) -- decision_narrative variant, verbatim 9-field list, plus 'Audit 不記 secret' (L2216)"
+  - "specs/execution/manifest.schema.yaml properties/execution/properties/execution_id, properties/execution/properties/run_id (the ^EX-/^RUN- pattern namespace this file's execution_id/run_id fields reuse verbatim, not hard-$ref -- see compilation_decisions)"
+  - "specs/execution/manifest.schema.yaml properties/method_execution_log items (block_id/capability_version/prompt_version/knowledge_snapshot/latency/cost/validation.score -- the exact per-invocation field names and [number,\"null\"] typing this file's capability_run variant reuses verbatim where the concept already has a precedent)"
+  - "specs/execution/result.schema.yaml properties/status and specs/execution/status-codes.schema.yaml reference_vocabulary/final_status (read and verified for compatibility per this task's own instruction -- see compilation_decisions for why capability_run.status is deliberately NOT hard-$ref'd to this vocabulary)"
+  - "specs/artifact/cas-path.schema.yaml definitions/sha256_hash (real hard $ref for input_hash/output_hash -- file already exists on disk)"
+  - "specs/governance/epistemic-label.schema.yaml provenance_record (real hard $ref, additive optional field on both variants -- see compilation_decisions)"
+  - "specs/execution/data-deletion.schema.yaml source_of_truth_for's own citation of EC §66 (its L30: 'the generic evidence shape the production_row branch's Deletion Evidence step reuses') -- precedent confirming this corpus already relies on EC §66's shape elsewhere, not a first-time reading of that section"
+  - "specs/execution/gate.schema.yaml#/gate_result and specs/jurisdiction/conflict-of-laws-output.schema.yaml (the two most recent precedents in this corpus for allOf/if/then field-value-gated required-field enforcement, the mechanism this file's record_type dispatch reuses)"
+
+decided_by: >
+  No ADR governs this file. `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+  §4 (L111, Status: PROPOSED) names this exact filename against MP §82, but
+  a PROPOSED planning document is not an ADR and does not itself decide
+  this file's content or its reconciliation with EC §66 -- see this file's
+  `description` for the full correction of this session's own earlier,
+  narrower claim that no planning document names this gap at all.
+  Grep-confirmed 2026-08-30 against
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`, `.ai/research/phase-1/
+  GAP_REGISTER.yaml`, `.ai/research/phase-0/verified-findings.yaml`, and
+  `DUPLICATION_REGISTER.yaml`: none names a missing audit-record schema as
+  a tracked gap or finding -- no ADR-track document rules on this file's
+  content. This file is built directly per this session's task instruction
+  as a Low-risk compilation reconciling two already-written mother-document
+  sections -- the same class of decision
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`'s own precedent
+  describes for naming/structure/reconciliation choices ("命名裁決屬
+  Low-risk，可在 Phase 3 內部直接定案，不需要 ADR"), not a new architecture
+  decision.
+
+compilation_decisions:
+  - question: >
+      Given the two source shapes have almost entirely disjoint field sets
+      and serve different purposes, should this file define two separate
+      schema files (one per shape), one schema with every field optional,
+      or one discriminated union enforcing each variant's own full
+      required-field list?
+    decision: >
+      One file, one `audit_record` object (placed at this file's document
+      root, matching `manifest.schema.yaml`/`result.schema.yaml`/
+      `data-deletion.schema.yaml`'s convention of putting a file's single
+      real instance schema at its own root when that IS the file's entire
+      purpose), with a `record_type: capability_run | decision_narrative`
+      discriminator and an `allOf` of two `if`/`then` blocks (each keyed on
+      `record_type`'s `const` value) enforcing that variant's own full
+      required-field list.
+    reasoning: >
+      Two separate files would sever the explicit "these are the two real
+      shapes of the same concept, reconciled not duplicated" finding this
+      task exists to record -- exactly the failure mode this corpus's own
+      `compilation_decisions` sections repeatedly warn against (see
+      `manifest.schema.yaml`'s own 4-shape reconciliation reasoning). All
+      fields optional (no enforcement) would under-deliver on MP §82's
+      "必留" (must retain) and EC §66's "至少" (at least) -- both are
+      MANDATORY-field language, not suggestions. The `allOf`/`if`/`then`
+      mechanism directly reuses `specs/jurisdiction/conflict-of-laws-output.schema.yaml`'s
+      2026-08-30 pattern (its L120-155, the most recent precedent in this
+      corpus for exactly this "field value determines which other fields
+      are required" situation) and `specs/execution/gate.schema.yaml`'s
+      earlier single-condition version of the same mechanism -- this file
+      needs two mutually exclusive conditions instead of one optional
+      add-on, a direct scale-up of an already-established pattern, not a
+      new validation-style convention.
+  - question: >
+      MP §82's `status` field is a bare, unstructured name in a text
+      block -- no enum given at that citation. This project's task
+      instructions ask to "$ref specs/execution/result.schema.yaml (for the
+      status enum, if compatible -- verify by reading that file's status
+      enum first)". Having read `result.schema.yaml` in full: its `status`
+      field is itself a real `$ref` into `status-codes.schema.yaml`'s
+      `reference_vocabulary/final_status/schema`, a 7-value enum (PASS /
+      PASS_WITH_APPROVED_RISK / BLOCKED / FAILED / NEEDS_HUMAN_REVIEW /
+      ROLLED_BACK / PARTIAL_SUCCESS, EC §70). Is that vocabulary compatible
+      with MP §82's `status` field?
+    decision: "Leave capability_run.status as `type: string`, untyped -- do NOT $ref final_status."
+    reasoning: >
+      Verified per the task's own instruction, and found NOT compatible on
+      grain grounds: EC §70's final_status vocabulary describes a WHOLE
+      EXECUTION's terminal disposition (an `EX-*` run, which may invoke
+      many capabilities/methods across a workflow -- see
+      `manifest.schema.yaml`'s `method_execution_log[]`). MP §82's `status`
+      describes ONE Capability Run's own completion status -- a finer
+      grain, analogous to a single line inside that same
+      `method_execution_log[]`, not to the run as a whole.
+      `manifest.schema.yaml` already faced this identical grain question
+      for its own per-invocation `method_execution_log[].validation.status`
+      field and left it `{ type: string }`, untyped, rather than $ref-ing
+      final_status there (manifest.schema.yaml, `validation.status`
+      property) -- the same precedent, same reasoning, reused here rather
+      than silently overridden or re-litigated. Flagged as
+      `open_questions.OQ-AUDIT-3` in case a dedicated capability-run-status
+      enum is ever warranted.
+  - question: >
+      EC §66's explicit rule "Audit 不記 secret" (L2216, Audit MUST NOT
+      record secrets) -- should this be enforced as a JSON Schema
+      `not`/`pattern` rejection on the untyped fields (`input`, `decision`,
+      `result`, `token_usage`) where a raw secret could plausibly be
+      embedded, or documented as a prose constraint only?
+    decision: "Prose constraint only (see `constraints` below) -- no schema-level regex/pattern rejection."
+    reasoning: >
+      A regex "does this look like a secret" check would be simultaneously
+      over- and under-inclusive (false positives on legitimate high-entropy
+      strings such as content hashes; false negatives on secrets in
+      arbitrary formats a pattern can't anticipate), and this is not how
+      EC §5's identically-worded invariant ("NO SECRET IN SOURCE / LOG /
+      PROMPT / COMMAND HISTORY", L304) is enforced anywhere else in this
+      corpus -- grep-confirmed: zero existing `specs/` schema file
+      implements a structural secret-detection check for this invariant.
+      This corpus instead treats it as a prevention-at-the-source /
+      operational-tooling concern (e.g. `security/log-redaction-token.schema.yaml`'s
+      entire purpose is generating SAFE correlatable tokens precisely so a
+      raw secret never needs to appear in a log/audit field in the first
+      place), and states cross-field invariants it cannot mechanically
+      check as a plain-English `constraints` list elsewhere in this suite
+      (e.g. `governance/epistemic-label.schema.yaml`'s `locked.constraints`,
+      `execution/data-deletion.schema.yaml`'s own `constraints`). This file
+      follows the same established convention rather than inventing a new,
+      unreliable enforcement mechanism.
+  - question: >
+      Should `provenance` (epistemic-label.schema.yaml's `provenance_record`)
+      be a required field on either variant, given `result.schema.yaml`
+      requires it on the grounds that "an Execution Result is itself a
+      claim... in scope for [the] universal mandate" every content/claim
+      object must carry it?
+    decision: "Optional, additive, on BOTH variants -- not required by either."
+    reasoning: >
+      Neither MP §82 nor EC §66 lists `provenance` among their required
+      fields, and this file's task boundary is to transcribe those two
+      literal lists as the REQUIRED sets, not to expand them. The
+      `decision_narrative` variant's `decision`/`result`/`why` fields ARE
+      plausibly "claims" in the epistemic-label sense (matching
+      `result.schema.yaml`'s reasoning), which is why the field is offered
+      at all rather than omitted -- but making it REQUIRED here would
+      silently add a mandate neither source section states, the same
+      failure mode `manifest.schema.yaml`'s own `file`/`loaded` fields
+      carefully avoided by being explicitly labeled "ADDITIVE" rather than
+      silently folded into a `required` list.
+  - question: >
+      Should the two variants be mutually exclusive at the schema level
+      (e.g. `additionalProperties: false` per branch, forbidding a
+      `capability_run` instance from also carrying `who`/`what`/etc.)?
+    decision: "Not schema-enforced -- documented as a SHOULD NOT in `constraints` below."
+    reasoning: >
+      Matches `data-deletion.schema.yaml`'s own identical-strength
+      precedent for its `subject_id`/`target_refs` mutual exclusivity (a
+      prose `constraints` entry, not `oneOf`/`not`/`additionalProperties`
+      enforcement) -- this suite's established convention for a
+      cross-field invariant it chooses to document rather than hard-enforce,
+      not a gap unique to this file.
+
+# ---------------------------------------------------------------------------
+# Schema body -- audit_record sits at this file's document root (this file's
+# entire purpose is this one reconciled instance type, matching
+# manifest.schema.yaml/result.schema.yaml's convention, not
+# gate.schema.yaml's named-sub-key convention). Fixture target_ref: "".
+# ---------------------------------------------------------------------------
+type: object
+required: [record_type]
+properties:
+
+  record_type:
+    type: string
+    enum: [capability_run, decision_narrative]
+    description: "Discriminator. capability_run = MP §82 Execution Audit; decision_narrative = EC §66 Audit Event."
+
+  # -- shared/additive fields, not in either mother-doc list --
+  execution_id:
+    type: string
+    pattern: "^EX-"
+    description: >
+      ADDITIVE join key, not in either mother-doc list. Same pattern as
+      manifest.schema.yaml's `properties/execution/properties/execution_id`
+      -- reused verbatim (soft convention, not a hard $ref, matching
+      result.schema.yaml's identical reasoning for its own `execution_id`
+      field) so an audit record can be tied back to its owning Execution.
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: "OPTIONAL additive field on both variants -- see compilation_decisions."
+
+  # -- capability_run (MP §82) fields, verbatim names, all optional at the
+  # property level; enforced as a full required-set via allOf/if/then below --
+  run_id:
+    type: string
+    pattern: "^RUN-"
+    description: "MP §82 field. Pattern reused verbatim from manifest.schema.yaml/result.schema.yaml's run_id convention."
+  block_id:
+    type: string
+    description: "MP §82 field. Matches manifest.schema.yaml method_execution_log[].block_id verbatim (type, no further structure)."
+  capability_version:
+    type: string
+    description: "MP §82 field. Matches manifest.schema.yaml method_execution_log[].capability_version verbatim."
+  model:
+    type: string
+    description: >
+      MP §82 field, verbatim name. NOTE: manifest.schema.yaml's `ai{}` block
+      uses a differently-named sibling field (`model_identifier`) for a
+      related concept -- not reconciled here (out of this file's scope,
+      naming a pre-existing near-duplicate rather than silently ignoring
+      it -- see `open_questions.OQ-AUDIT-2`).
+  model_version:
+    type: string
+    description: "MP §82 field."
+  prompt_version:
+    type: string
+    description: "MP §82 field. Matches manifest.schema.yaml ai.prompt_version / method_execution_log[].prompt_version verbatim -- no naming drift."
+  input_hash:
+    $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+    description: "MP §82 field. Real hard $ref (cas-path.schema.yaml already exists on disk, matching result.schema.yaml's own established hard-ref convention for an existing target)."
+  output_hash:
+    $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/sha256_hash"
+    description: "MP §82 field. Same reasoning as input_hash."
+  timestamp:
+    type: string
+    format: date-time
+    description: "MP §82 field."
+  user:
+    type: string
+    description: "MP §82 field -- actor identity (human or service) who ran/owns this Capability Run."
+  latency:
+    type: [number, "null"]
+    description: "MP §82 field. Type matches manifest.schema.yaml method_execution_log[].latency verbatim."
+  token_usage:
+    description: >
+      MP §82 field. Left UNTYPED ({} accepts any JSON value, matching this
+      corpus's own precedent for a bare property with no further structure
+      given anywhere, e.g. cognitive/profile.schema.yaml's `accessibility`
+      field) -- MP §82 gives no internal structure (no prompt/completion
+      split stated) and no sibling schema in this corpus types an
+      equivalent field (unlike latency/cost, which have a
+      manifest.schema.yaml precedent to reuse verbatim).
+  cost:
+    type: [number, "null"]
+    description: "MP §82 field. Type matches manifest.schema.yaml method_execution_log[].cost verbatim."
+  validation_score:
+    type: [number, "null"]
+    description: "MP §82 field. Type matches manifest.schema.yaml method_execution_log[].validation.score verbatim."
+  status:
+    type: string
+    description: >
+      MP §82 field. Deliberately NOT $ref'd to status-codes.schema.yaml's
+      final_status vocabulary -- see compilation_decisions (grain mismatch;
+      same precedent as manifest.schema.yaml's own
+      method_execution_log[].validation.status).
+  policy_version:
+    type: string
+    description: "MP §82 field. Matches manifest.schema.yaml policy.versions[] item type verbatim (singular scalar here vs. a plural array there -- one Capability Run pins exactly one policy version; a whole Execution may accumulate several across its method_execution_log)."
+  knowledge_snapshot:
+    type: string
+    description: "MP §82 field. Matches manifest.schema.yaml method_execution_log[].knowledge_snapshot verbatim -- no naming drift."
+
+  # -- decision_narrative (EC §66) fields, verbatim names --
+  who:
+    type: string
+    description: "EC §66 field -- actor identity (human or AI) who made the decision."
+  what:
+    type: string
+    description: "EC §66 field -- what action/decision this record narrates."
+  when:
+    type: string
+    format: date-time
+    description: "EC §66 field."
+  where:
+    type: string
+    description: "EC §66 field -- system/component/scope this occurred in."
+  why:
+    type: string
+    description: "EC §66 field -- stated justification/reasoning."
+  input:
+    description: "EC §66 field. Left UNTYPED ({} accepts any JSON value) -- EC §66 gives no shape, matching gate.schema.yaml's gate_result.evidence and this corpus's general precedent of leaving an unspecified 'what data fed this' field untyped rather than inventing structure."
+  decision:
+    description: "EC §66 field. Left UNTYPED, same reasoning as `input` above."
+  policy:
+    type: string
+    description: "EC §66 field -- which policy/rule this decision applied. Typed as a plain string (a policy id/name/version), matching manifest.schema.yaml policy.versions[] item type."
+  result:
+    description: "EC §66 field. Left UNTYPED, same reasoning as `input`/`decision` above -- the OUTCOME of the decision; EC gives no shape."
+
+allOf:
+  - if:
+      properties: { record_type: { const: capability_run } }
+      required: [record_type]
+    then:
+      required:
+        - run_id
+        - block_id
+        - capability_version
+        - model
+        - model_version
+        - prompt_version
+        - input_hash
+        - output_hash
+        - timestamp
+        - user
+        - latency
+        - token_usage
+        - cost
+        - validation_score
+        - status
+        - policy_version
+        - knowledge_snapshot
+  - if:
+      properties: { record_type: { const: decision_narrative } }
+      required: [record_type]
+    then:
+      required: [who, what, when, where, why, input, decision, policy, result]
+
+constraints:
+  - "'Audit 不記 secret' (EC §66, L2216) -- an audit_record instance of EITHER record_type MUST NOT contain secret/credential/API-key/password/private-key values in any field (this rule is not scoped to decision_narrative alone just because EC §66 states it in that section -- capability_run's `input_hash`/`output_hash` fields are deliberately CONTENT-ADDRESSED HASHES rather than raw payloads for exactly this reason, so this rule is already structurally satisfied for those two fields by their own typing; `token_usage`/`input`/`decision`/`result` are the untyped fields where a naive implementation COULD accidentally embed a raw secret and are the ones a producer must actively redact before writing). Not schema-enforced (see compilation_decisions) -- producers MUST redact before persisting."
+  - "A `capability_run` record SHOULD NOT populate decision_narrative-only fields (who/what/when/where/why/decision/result), and a `decision_narrative` record SHOULD NOT populate capability_run-only fields (run_id/block_id/capability_version/model/model_version/input_hash/output_hash/user/latency/token_usage/cost/validation_score/status/policy_version/knowledge_snapshot). Not schema-enforced (see compilation_decisions) -- matches data-deletion.schema.yaml's identical-strength convention for its own subject_id/target_refs mutual exclusivity."
+
+open_questions:
+  - id: "OQ-AUDIT-1"
+    question: >
+      Should the two variants eventually be linked structurally (e.g. a
+      `decision_narrative` record referencing the `capability_run` records
+      whose outcome it is narrating, or vice versa), since a real workflow
+      likely produces both kinds of record for the same underlying action
+      (a capability ran, AND a human/AI decided something about its
+      result)? Neither MP §82 nor EC §66 states such a link exists; this
+      file does not invent one.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this schema's own validity -- execution_id (additive) already provides a weak, execution-grain join key usable by a consumer that wants to correlate records itself"
+  - id: "OQ-AUDIT-2"
+    question: >
+      capability_run's `model` field (MP §82, verbatim) and
+      manifest.schema.yaml's `ai.model_identifier` field name a closely
+      related concept (which AI model was used) with two different names,
+      in two different files, neither cross-referencing the other. Should
+      these be reconciled/renamed to match, the way this suite's other
+      naming-drift findings (e.g. `status-codes.schema.yaml`'s
+      METHOD_RESOLUTION_BLOCKED/PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED
+      duplicate) were resolved? This file surfaces the drift rather than
+      silently reconciling it, since reconciling would require editing
+      `manifest.schema.yaml` (out of this task's scope: build two NEW
+      files, do not edit existing ones).
+    owner: "operator or future session"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-AUDIT-3"
+    question: >
+      MP §82 gives `status` no enum, and this file deliberately leaves it
+      `type: string` rather than $ref-ing status-codes.schema.yaml's
+      final_status vocabulary (grain mismatch -- see compilation_decisions).
+      Should a NEW, separate "capability-run status" enum eventually be
+      defined (e.g. success/error/timeout/rate_limited), given
+      `manifest.schema.yaml`'s analogous `method_execution_log[].validation.status`
+      field has the identical open gap? Left open -- inventing an enum
+      neither MP §82 nor any sibling schema specifies would be guessing.
+    owner: "operator or future session"
+    blocks: "nothing in this schema's own validity"
+
+verification:
+  method: >
+    Read MP §82 (L3354-3378, including the section boundaries immediately
+    before/after) and EC §66 (L2195-2220, including the section boundaries
+    immediately before/after) in full at the cited lines. Grepped both
+    mother documents in full for "capability_version", "who/what/when",
+    and "Audit" to confirm the two sections never cross-reference each
+    other and no third audit shape exists elsewhere. Grepped
+    `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`,
+    `.ai/research/phase-1/GAP_REGISTER.yaml`,
+    `.ai/research/phase-0/verified-findings.yaml`, and
+    `DUPLICATION_REGISTER.yaml` for any prior ADR-track finding or planned
+    row naming this gap -- none found; a SEPARATE, broader repo-wide grep
+    for this filename found `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+    §4 (L111, a PROPOSED planning document, not an ADR-track artifact) does
+    name it -- see `decided_by` for the full correction of this session's
+    own earlier, narrower claim. Read `specs/execution/manifest.schema.yaml`,
+    `specs/execution/result.schema.yaml`,
+    `specs/execution/status-codes.schema.yaml`,
+    `specs/artifact/cas-path.schema.yaml`,
+    `specs/governance/epistemic-label.schema.yaml`,
+    `specs/execution/data-deletion.schema.yaml`,
+    `specs/execution/gate.schema.yaml`, and
+    `specs/jurisdiction/conflict-of-laws-output.schema.yaml` in full before
+    writing any `$ref`, type reuse, or structural pattern (`allOf`/`if`/`then`)
+    based on them.
+  note: >
+    No mother document, ADR, or existing sibling `specs/execution/` file
+    was modified to produce this file. Both variants' required-field lists
+    are transcribed verbatim from MP §82 and EC §66 respectively. Field
+    types are either transcribed as given (none -- both mother-doc sections
+    give field NAMES only, no types) or reused verbatim from an existing
+    sibling schema's precedent for the identical concept where one exists
+    (cited per-field above), or left deliberately untyped where no
+    precedent exists and the mother document gives no structure --
+    inventing a shape in that last case would be guessing, which R0 and
+    AGENTS.md's 補丁判準 both forbid. The record_type discriminated union,
+    the grain-mismatch reasoning for NOT $ref-ing final_status, the
+    prose-only 'Audit 不記 secret' constraint, and the optional (not
+    required) `provenance` field are Phase-3-style compilation decisions
+    recorded above, not new architecture decisions.

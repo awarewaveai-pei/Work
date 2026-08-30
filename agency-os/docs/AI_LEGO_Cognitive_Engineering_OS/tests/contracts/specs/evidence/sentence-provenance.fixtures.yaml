@@ -1,0 +1,85 @@
+schema_id: "ai-lego://specs/evidence/sentence-provenance.schema.yaml"
+target_ref: ""
+description: >
+  Exercises all three locator_type variants (text_page/audio_timestamp/
+  image_region) of the locator oneOf discriminator, the root-level
+  allOf/if/then that requires sentence_text except when locator_type ==
+  image_region, and required-field enforcement on the claim/evidence real
+  $refs and the provenance $ref.
+valid:
+  - name: text_page_variant
+    instance:
+      id: "SP-1"
+      sentence_text: "採用率在過去兩年成長了三倍。"
+      claim: { claim_id: "C-117", statement: "市場對此類產品的採用率正在上升", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-1"
+      locator: { locator_type: text_page, page_number: 32 }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+  - name: audio_timestamp_variant_exact_seconds
+    instance:
+      id: "SP-2"
+      sentence_text: "我覺得遠距工作讓我沒辦法真正下班。"
+      claim: { claim_id: "C-201", statement: "遠距工作者回報下班界線模糊", provenance: { epistemic_type: SOURCE_FACT, authorship_state: SOURCE_QUOTATION } }
+      evidence: { evidence_id: "E-1001", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-2"
+      locator: { locator_type: audio_timestamp, start_seconds: 754.2, end_seconds: 758.9, media_type: audio }
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+  - name: image_region_variant_no_sentence_text
+    instance:
+      id: "SP-3"
+      region_description: "圖表右上角顯示 2026 Q2 採用率曲線的峰值標記"
+      claim: { claim_id: "C-305", statement: "採用率在 2026 Q2 達到高峰", provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-1102", provenance: { epistemic_type: EVIDENCE, authorship_state: AI_GENERATED } }
+      source_id: "SRC-3"
+      locator: { locator_type: image_region, bounding_box: { x: 0.62, y: 0.08, width: 0.15, height: 0.1, unit: fraction } }
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+  - name: image_region_variant_pixel_unit_with_sentence_text_too
+    instance:
+      id: "SP-4"
+      sentence_text: "optional even on the image_region branch"
+      region_description: "close-up of the legend box"
+      claim: { claim_id: "C-306", statement: "圖例顯示三種產品線", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL } }
+      evidence: { evidence_id: "E-1103", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-4"
+      locator: { locator_type: image_region, bounding_box: { x: 100, y: 50, width: 200, height: 80, unit: pixel } }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+invalid:
+  - name: text_page_missing_sentence_text
+    instance:
+      id: "SP-5"
+      claim: { claim_id: "C-117", statement: "x", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-1"
+      locator: { locator_type: text_page, page_number: 32 }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+    reason: "root-level allOf/if/then requires sentence_text unless locator_type == image_region -- this is text_page and sentence_text is omitted"
+  - name: audio_timestamp_missing_start_seconds
+    instance:
+      id: "SP-6"
+      sentence_text: "x"
+      claim: { claim_id: "C-201", statement: "x", provenance: { epistemic_type: SOURCE_FACT, authorship_state: SOURCE_QUOTATION } }
+      evidence: { evidence_id: "E-1001", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-2"
+      locator: { locator_type: audio_timestamp, end_seconds: 758.9 }
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED }
+    reason: "audio_timestamp_locator requires [locator_type, start_seconds] -- start_seconds (the AC5-mandated exact-second field) is missing, so no locator oneOf branch validates"
+  - name: missing_provenance
+    instance:
+      id: "SP-7"
+      sentence_text: "x"
+      claim: { claim_id: "C-117", statement: "x", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-1"
+      locator: { locator_type: text_page, page_number: 32 }
+    reason: "top-level required list includes 'provenance' -- omitted here"
+  - name: image_region_bounding_box_missing_height
+    instance:
+      id: "SP-8"
+      region_description: "x"
+      claim: { claim_id: "C-305", statement: "x", provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-1102", provenance: { epistemic_type: EVIDENCE, authorship_state: AI_GENERATED } }
+      source_id: "SRC-3"
+      locator: { locator_type: image_region, bounding_box: { x: 0.1, y: 0.1, width: 0.2 } }
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+    reason: "bounding_box requires [x, y, width, height] -- height is omitted"

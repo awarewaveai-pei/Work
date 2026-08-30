@@ -1,0 +1,465 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/artifact/portable-uri.schema.yaml"
+title: Portable Artifact URI
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the `artifact://` logical URI
+  scheme — Master Plan §59 "Portable Artifact URI" (L2588-2607, verified
+  exact line range via full-section read): "不得讓 Domain 依賴 S3 路徑"
+  (Domain must not depend on S3 paths), literal example
+  `artifact://project/PRJ001/source/SRC0003` (L2595), and the 7 named
+  possible physical backends behind a resolved URI (AWS, Azure, GCP, MinIO,
+  NAS, Local Disk, Future Storage — L2600-2606). A second, tenant-scoped
+  worked example is independently corroborated at
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` L56:
+  `artifact://tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1`.
+
+  **PATH RESOLVED 2026-08-30**: originally built at
+  `specs/domain/artifact-uri.schema.yaml` per a mis-scoped task instruction.
+  Relocated to `specs/artifact/portable-uri.schema.yaml` the same day, once
+  the conflict this file's own first draft honestly disclosed was reviewed:
+  two independent, already-established pieces of this corpus's convention
+  both already pointed here — (1) `specs/artifact/cas-path.schema.yaml`'s
+  own `description` (L22-28, ACTIVE, Wave 2) forward-referenced this exact
+  path; (2) `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`'s own
+  Directory Structure table (L37) assigns Portable Artifact URI to
+  `specs/artifact/`. This is directory-convention alignment (fixing a
+  task-assignment mistake against an already-decided layout), not a new
+  architecture decision — `cas-path.schema.yaml`'s forward reference and the
+  plan's directory table are the actual authority, both predating this
+  file. `cas-path.schema.yaml` updated in the same commit to point at the
+  real file instead of "not-yet-built."
+
+  Also, like `domain/knowledge-canvas.schema.yaml` (built the same day),
+  this file is NOT tracked anywhere in MACHINE_READABLE_SPEC_PLAN.md's §2
+  Spec Inventory tables — grep-confirmed: §2.5's row for
+  `artifact/cas-path.schema.yaml` (L143) does not itself carry a
+  dependency/status row for Portable Artifact URI, it is named only in the
+  directory-structure table (L37) and in `cas-path.schema.yaml`'s own
+  description. This is a direct-task-instructed build, not a Wave-tracked
+  deliverable with a pre-assigned Finding ID.
+
+  **Third independent corroboration of the same path (bughunt finding,
+  2026-08-30)**: `specs/evidence/evidence-graph.schema.yaml`'s own
+  `source_node` field (L280-283, built independently, unrelated to this
+  file's own task) separately noted both "no source.schema.yaml exists
+  anywhere in this repo (grepped, zero hits)" AND
+  "`specs/artifact/portable-uri.schema.yaml` is separately not-yet-built
+  per `cas-path.schema.yaml`'s own description" — a third, independent file
+  that already expected this exact path before this file's relocation.
+  `evidence-graph.schema.yaml` updated in the same commit to reference the
+  real file.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §59 Portable Artifact URI (L2588-2607)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md L56 (tenant-scoped worked example, independently corroborating the URI grammar with a 3-segment-pair instance)"
+  - "specs/artifact/cas-path.schema.yaml (resolution target for `resolved_cas_path`; also the source of the path-discrepancy finding disclosed above)"
+  - "specs/domain/tenant.schema.yaml (cross-referenced, NOT hard-$ref'd, for the `tenant` segment_type — see compilation_decisions on the UUID-vs-slug identifier-space mismatch)"
+  - "specs/execution/blast-radius-chain.schema.yaml (cross-referenced for its 7 canonical node names; NOT structurally mirrored 1:1 — see compilation_decisions)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md line 37 (directory table's `specs/artifact/` placement for this concept — the path discrepancy disclosed above)"
+
+decided_by: >
+  No ADR governs this file. Not tracked in MACHINE_READABLE_SPEC_PLAN.md §2
+  under either candidate path (see description above). Built at the
+  task-instructed path per direct instruction; the conflict with the
+  established `specs/artifact/` convention two other files already point to
+  is disclosed, not silently overridden or silently deferred to guesswork.
+  Every field-shape choice below is a direct compilation decision against
+  MP §59's thin, two-worked-example grounding — the same "no ADR, direct
+  compilation over thin textual grounding" class `evidence/evidence.schema.yaml`
+  documents for itself.
+
+compilation_decisions:
+
+  - question: >
+      Should this file be relocated to `specs/artifact/portable-uri.schema.yaml`
+      to match `cas-path.schema.yaml`'s own forward reference and
+      MACHINE_READABLE_SPEC_PLAN.md's directory table, rather than stay at
+      the originally task-instructed `specs/domain/artifact-uri.schema.yaml`?
+    decision: >
+      RESOLVED 2026-08-30, same day: relocated to
+      `specs/artifact/portable-uri.schema.yaml`. Original disclosure
+      (preserved for audit continuity): "Build at the task-instructed path.
+      Do not silently relocate. Disclose the conflict prominently rather
+      than resolve it unilaterally in either direction... left for the
+      operator to resolve."
+    reasoning: >
+      On review, this is directory-convention alignment against an
+      ALREADY-DECIDED layout (`cas-path.schema.yaml`'s pre-existing forward
+      reference and `MACHINE_READABLE_SPEC_PLAN.md`'s own directory table,
+      both predating this file), not a fresh architecture judgment call —
+      the same class of "apply what's already decided" compilation work
+      this corpus's ADR-derived policy/schema files already do throughout.
+      The original instruction that placed this file at `specs/domain/` was
+      simply a task-assignment mistake, not a competing authority worth
+      preserving over two independent, pre-existing, converging citations.
+
+  - question: >
+      What identifier grammar does a path segment's TYPE take? The two real
+      examples use `project`/`source` (MP §59) and `tenant`/`project`/
+      `source` (MVP plan) — 3 distinct segment types total. Should
+      `segment_type` be a closed enum (either the 3 evidenced values, or
+      `execution/blast-radius-chain.schema.yaml`'s 7 lowercased node names,
+      since this task instructs the URI's segments to "structurally mirror"
+      that chain), or an open pattern?
+    decision: >
+      Open, pattern-constrained string (`^[a-z][a-z0-9_]*$`), NOT a closed
+      enum of either candidate set.
+    reasoning: >
+      Neither closed-enum candidate survives contact with the real evidence.
+      A 3-value enum (`tenant, project, source`) would be defensible on
+      "only transcribe evidenced values" grounds, but the blast-radius chain
+      cross-reference this task explicitly instructs ("the URI's path
+      segments should structurally mirror" the chain) would then be
+      unmodeled entirely. A 7-value enum copying
+      `blast-radius-chain.schema.yaml`'s node names
+      (`tenant/workspace/project/workflow/branch/execution/capability`)
+      fails the opposite way: `source` — used in BOTH real corpus examples,
+      the only segment type that appears in every single real instance —
+      is NOT one of that chain's 7 node types at all (grep-confirmed against
+      the chain's own `node_type` enum), so that enum would reject every
+      real corpus example that exists. This is the identical situation
+      `domain/tenant.schema.yaml`'s own `data_residency_region` field faced
+      (no concrete closed list the mother documents actually commit to) and
+      resolved the same way: a free-form pattern that accepts every real
+      example and can be tightened to an enum later as a strictly additive
+      change once an operator decision (or a genuine third worked example)
+      settles the real value set. See `open_questions.OQ-au-2` for the
+      still-open "does this mirror blast-radius-chain at all" question this
+      decision leaves unresolved rather than forcing an answer to.
+
+  - question: >
+      What identifier grammar does a segment's ID (the value after the
+      type, e.g. `PRJ001` or `TEN-NORDBROOK`) take? Should the `tenant`
+      segment_type's segment_id be hard-`$ref`'d to
+      `domain/tenant.schema.yaml#/properties/tenant_id` (type: uuid), since
+      both name the same conceptual Tenant?
+    decision: >
+      NOT hard-$ref'd. `segment_id` is a generic pattern
+      (`^[A-Za-z0-9_-]+$`) shared by every segment regardless of type,
+      permissive enough to include hyphens.
+    reasoning: >
+      A real finding, not a stylistic choice: the one real worked example
+      that includes a `tenant` segment uses the human-readable slug
+      `TEN-NORDBROOK` (MVP plan L56) — NOT a UUID.
+      `domain/tenant.schema.yaml#/properties/tenant_id` is strictly typed
+      `format: uuid` (ADR-003 sub-decision (a)). Hard-$ref-ing it here would
+      make this schema reject the one real corpus example that exists for
+      this exact segment type. This exposes a genuine, disclosed gap (see
+      `open_questions.OQ-au-3`): the LOGICAL artifact:// URI's tenant
+      segment and the PHYSICAL Tenant record's primary key are evidently two
+      different identifier spaces for the same conceptual Tenant, and no
+      mother document or existing schema states how one resolves to the
+      other. `segment_id`'s permissive pattern is deliberately chosen so
+      this schema does not need to take a position on that unresolved
+      resolution mechanism to remain valid against real evidence today.
+
+  - question: >
+      Does the logical URI itself REQUIRE a `tenant` segment, mirroring
+      `cas-path.schema.yaml`'s physical-layer rule that every CAS path is
+      tenant-scoped by default (ADR-003)?
+    decision: "No. A tenant segment is OPTIONAL in this schema's grammar."
+    reasoning: >
+      MP §59's own literal worked example, `artifact://project/PRJ001/
+      source/SRC0003`, has NO tenant segment at all — and that example
+      predates ADR-003 (tenant isolation) entirely (MP §59 is a
+      single-tenant-era design; ADR-003 is a Round-1 ADR compiled afterward
+      specifically because MP's storage design, per `cas-path.schema.yaml`'s
+      own description, "defined a single GLOBAL path grammar" with no
+      tenant segment). Making `tenant` structurally REQUIRED here would
+      reject MP's own real, literal, cited example — the same "don't let a
+      later concern silently override an earlier real example" restraint
+      `capability-contract.schema.yaml` applied when it refused to
+      retroactively invalidate MP §8.3's `entitlement`-free worked instance.
+      The MVP plan's later 3-segment example ADDS a tenant segment without
+      MP §59 itself being edited to require one — a genuinely unresolved
+      tension between the mother document's original design and ADR-003's
+      tenant-isolation requirement, disclosed honestly (not papered over)
+      in `open_questions.OQ-au-4` rather than resolved by fiat in either
+      direction.
+
+  - question: >
+      What is the full URI grammar (segment count, ordering, separators)?
+    decision: >
+      `^artifact://[a-z][a-z0-9_]*/[A-Za-z0-9_-]+(?:/[a-z][a-z0-9_]*/[A-Za-z0-9_-]+)*$`
+      — one or more repeating `<segment_type>/<segment_id>` pairs after the
+      literal `artifact://` scheme prefix, minimum one pair.
+    reasoning: >
+      Directly fits both real corpus examples: MP §59's 2-pair
+      `project/PRJ001/source/SRC0003` and the MVP plan's 3-pair
+      `tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1`.
+      Minimum-one-pair (not zero) because a bare `artifact://` with no
+      segments identifies nothing. No upper bound on pair count is imposed —
+      no evidence anywhere caps it, and blast-radius-chain-style deeper
+      nesting (workspace/workflow/branch/execution/capability, per
+      `open_questions.OQ-au-2`) would need more than 3 pairs if that
+      cross-reference is ever adopted.
+
+  - question: >
+      Should this file structure the URI as a bare validated string, or a
+      decomposed structured object (string form + parsed segments), the way
+      `cas-path.schema.yaml`'s own `cas_path` definition does (`path` plus
+      its own decomposition fields)?
+    decision: >
+      Decomposed structured object, `definitions.artifact_uri`, with a
+      `uri` string field (the canonical serialized form, pattern-validated)
+      plus a `segments` array (the parsed decomposition).
+    reasoning: >
+      Direct structural precedent from the closest sibling file in the same
+      directory and subject area: `cas-path.schema.yaml`'s own
+      `definitions.cas_path` object exists, per that file's own comment,
+      "so validators and tooling do not have to re-parse `path`" — the
+      identical rationale applies here. Nested under `definitions:` (not a
+      bare top-level key) to mirror `cas-path.schema.yaml`'s exact
+      structure, including that file's choice not to add a root-level
+      `$ref` (it is always consumed via a `#/definitions/...` fragment, not
+      validated at bare document root) — this file follows the same
+      convention for consistency with its closest sibling rather than
+      introducing a different root-shaping convention
+      (`governance/epistemic-label.schema.yaml`'s root `$ref` pattern) for
+      no functional reason.
+
+  - question: >
+      Task instruction: "$ref it (cas-path.schema.yaml) — a resolved
+      artifact:// URI should ultimately map to a CAS path, model that
+      relationship." Should the mapping be a REQUIRED field, given every
+      artifact must eventually live somewhere physical?
+    decision: >
+      OPTIONAL field `resolved_cas_path`, hard `$ref` to
+      `artifact/cas-path.schema.yaml#/definitions/cas_path`.
+    reasoning: >
+      Making it required would defeat MP §59's entire stated purpose for
+      this URI scheme existing in the first place ("不得讓 Domain 依賴 S3
+      路徑" — the whole point is that Domain-layer code holds a LOGICAL
+      reference that may not yet be, or may never need to be, resolved to a
+      physical location in the same record). An `artifact_uri` instance is
+      a complete, valid, useful value on its own before resolution; forcing
+      a `resolved_cas_path` onto every instance would conflate the logical
+      and physical layers this file's own reason for existing keeps apart.
+      Hard-$ref'd when present because `cas-path.schema.yaml` is ACTIVE and
+      stable (Wave 2), the identical safe-backward-dependency reasoning
+      applied throughout this suite for already-built target files.
+
+  - question: >
+      How should the "never leak the storage backend" requirement (MP §59's
+      7 named backends: AWS/Azure/GCP/MinIO/NAS/Local Disk/Future Storage,
+      L2600-2606) be enforced — prose warning, or structural constraint?
+    decision: >
+      Structural: the `uri` field's own pattern is anchored to the literal
+      scheme prefix `artifact://` and `segment_type` is restricted to a
+      lowercase-identifier grammar (`^[a-z][a-z0-9_]*$`) that cannot match a
+      URL scheme, a Windows/UNC path, or a bucket-and-key style reference.
+      No backend-specific string (`s3://`, `https://s3.amazonaws.com/...`,
+      `azure://`, `gs://`, `\\server\share\...`, `C:\...`, `/var/...`) can
+      ever satisfy this pattern. The 7 named backends are documented in
+      `resolved_cas_path`'s own description as informational context only
+      (what MAY exist behind a resolved URI) — never as legal `uri` values.
+    reasoning: >
+      Per this task's own cited precedent
+      (`policies/privacy/pii-redaction.policy.yaml`'s `compilation_decisions`,
+      quoted verbatim in `domain/knowledge-canvas.schema.yaml` built in the
+      same task): a prose-only "must not leak the backend" constraint is
+      exactly the unenforced-`constraints:`-block bug class this project has
+      already found and fixed multiple times. The scheme-prefix anchor
+      already gives this real teeth without inventing a denylist regex that
+      would itself need indefinite maintenance as new backends are named —
+      an allowlist-by-construction (only `artifact://...` shaped values
+      validate at all) is structurally stronger than a denylist of 7 named
+      strings that a resolved storage location's name will drift out of.
+
+  - question: >
+      Should a positional rule be enforced (e.g., IF a `tenant` segment is
+      present, it MUST be `segments[0]`, mirroring
+      `blast-radius-chain.schema.yaml`'s Tenant-is-root convention)?
+    decision: >
+      Not structurally enforced. Documented as a `constraints` prose
+      expectation only.
+    reasoning: >
+      Both real examples that include a `tenant` segment place it first,
+      and blast-radius-chain.schema.yaml's own `chain_instance` treats
+      Tenant as the unconditional root of every chain — a real, if thin
+      (n=1), consistency signal. But expressing "IF any segment has
+      segment_type == tenant, it must be at index 0" is a conditional
+      positional constraint over a variable-length array, meaningfully more
+      complex to express correctly in JSON Schema than this SHOULD-level,
+      non-safety-critical rule justifies (unlike the actor/action
+      enforcement in `knowledge-canvas.schema.yaml`, which structurally
+      prevents a real security-relevant misrepresentation). Documented as
+      prose per `capability-contract.schema.yaml`'s own precedent for using
+      a `constraints`-block SHOULD where the underlying rule is a genuine
+      expectation but not one this task's evidence base treats as safety-
+      critical enough to justify the structural complexity.
+
+verification:
+  method: >
+    Read Master Plan §59 in full (L2588-2607) plus the immediately
+    surrounding §58 (L2570-2585, CAS path grammar boundary check) and §60
+    (L2610-2617, storage-layer context). Read
+    `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` L49-58 (the full
+    Source→Ingest walkthrough surrounding the L56 worked example, to confirm
+    it is describing the same `artifact://` scheme, not a different URI
+    format). Read `specs/artifact/cas-path.schema.yaml` full text (surfacing
+    the path-discrepancy finding), `specs/domain/tenant.schema.yaml` full
+    text (surfacing the UUID-vs-slug identifier-space mismatch), and
+    `specs/execution/blast-radius-chain.schema.yaml` full text (confirming
+    its exact 7-value `node_type` enum, and confirming `source` is NOT a
+    member of it). Grepped `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+    in full for "artifact-uri"/"portable-uri"/"Portable Artifact" (found
+    only the L37 directory-table mention, no §2.x tracked row under either
+    candidate path). Grepped `docs/adr/*` for "Portable Artifact"/
+    "artifact://" (found one incidental, non-ruling citation:
+    `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md` L71,
+    which proposes REUSING this concept for a different purpose — personal-
+    data pointer indirection — without itself defining this file's shape).
+  note: >
+    No mother document, ADR, or ACTIVE sibling `specs/` file was modified to
+    produce this file. `cas-path.schema.yaml`'s own forward reference and
+    `evidence-graph.schema.yaml`'s own reference were both updated in the
+    same commit to point at this file's real, final path — see
+    compilation_decisions and open_questions.OQ-au-1 for the full history.
+    Grounded-vs-designed ratio: roughly 35% grounded (the literal scheme
+    prefix, the 2 real worked examples and everything directly inferable
+    from them: minimum one segment pair, hyphen-legal segment ids, the 3
+    evidenced segment-type values), 65% new design (the decomposed
+    `artifact_uri` object shape itself, the open-pattern
+    `segment_type`/`segment_id` grammars, the `resolved_cas_path` linkage,
+    and every `constraints`/`open_questions` entry). This file's PATH
+    discrepancy (originally built at `specs/domain/`) was resolved the same
+    day by relocating to match two independent, pre-existing citations —
+    see `open_questions.OQ-au-1`.
+
+open_questions:
+  - id: "OQ-au-1"
+    question: >
+      RESOLVED 2026-08-30 (same day as first draft): relocated to
+      `specs/artifact/portable-uri.schema.yaml`; `cas-path.schema.yaml` and
+      `evidence-graph.schema.yaml` updated in the same commit to reference
+      the real file instead of "not-yet-built." Original question
+      (preserved): "Should this file be relocated to match
+      `cas-path.schema.yaml`'s own live forward reference and
+      MACHINE_READABLE_SPEC_PLAN.md's directory-structure table?"
+    owner: "closed"
+    blocks: "nothing — resolved"
+  - id: "OQ-au-2"
+    question: >
+      Is `segment_type` meant to eventually mirror
+      `execution/blast-radius-chain.schema.yaml`'s 7-node chain
+      (tenant/workspace/project/workflow/branch/execution/capability), as
+      this task's own instructions suggested framing it, or is it a
+      genuinely separate vocabulary that merely OVERLAPS the chain at
+      `tenant`/`project` while also including `source` (not a chain node at
+      all)? No mother document states either answer; MP §59's own 2 real
+      examples use only `project`/`source` (one chain-node overlap, one
+      non-chain concept) and the MVP plan's example adds `tenant` (a second
+      chain-node overlap) without using `workspace`/`workflow`/`branch`/
+      `execution`/`capability` at all.
+    owner: "operator, via a future ADR or a third real worked example that actually exercises one of the 5 currently-unevidenced segment types"
+    blocks: "nothing in this schema — segment_type's open pattern admits both the chain's lowercased names and non-chain names like 'source' regardless of the answer"
+  - id: "OQ-au-3"
+    question: >
+      How does a `tenant` segment's human-readable slug `segment_id` (e.g.
+      `TEN-NORDBROOK`) resolve to the real, UUID-typed
+      `domain/tenant.schema.yaml#/properties/tenant_id` value it evidently
+      refers to? No mother document or existing schema in this corpus
+      defines this lookup/resolution mechanism (a slug-to-UUID directory,
+      or a convention that the UUID's own string form is sometimes rendered
+      as a slug — neither is stated anywhere).
+    owner: "operator / a future schema or service design for artifact:// URI resolution"
+    blocks: "nothing in this schema's own validity — segment_id's permissive pattern accepts the real evidenced slug form regardless of how resolution eventually works"
+  - id: "OQ-au-4"
+    question: >
+      MP §59's own literal worked example predates ADR-003 (tenant
+      isolation) and has no tenant segment at all; the MVP plan's later
+      example adds one without MP §59 itself being edited to require it.
+      Should a future ADR make a `tenant` segment structurally MANDATORY in
+      this URI grammar (to stay consistent with `cas-path.schema.yaml`'s
+      own mandatory tenant-scoping of the PHYSICAL path this URI may
+      resolve to), and if so, how does a legacy/global-pool artifact
+      (`cas-path.schema.yaml`'s own `_global` sentinel, Option C) express
+      itself in the LOGICAL URI layer — a literal `tenant/_global` segment,
+      or an entirely absent tenant segment as this file currently allows?
+    owner: "operator, via a future ADR reconciling MP §59 with ADR-003"
+    blocks: "nothing in this schema today; a future mandatory-tenant-segment amendment would be a breaking change to any artifact:// URI minted without one under this file's current, permissive rule"
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  segment:
+    type: object
+    required: [segment_type, segment_id]
+    description: >
+      One `<segment_type>/<segment_id>` pair in the URI path. See
+      compilation_decisions for why neither field is a closed enum.
+    properties:
+      segment_type:
+        type: string
+        pattern: "^[a-z][a-z0-9_]*$"
+        description: >
+          Open vocabulary. 3 values are evidenced by real corpus examples:
+          `tenant`, `project`, `source`. `execution/blast-radius-chain.schema.yaml`'s
+          7 lowercased node names (`tenant, workspace, project, workflow,
+          branch, execution, capability`) are a candidate but UNCONFIRMED
+          superset — see open_questions.OQ-au-2. Not a closed enum; see
+          compilation_decisions.
+        examples: [tenant, project, source]
+      segment_id:
+        type: string
+        pattern: "^[A-Za-z0-9_-]+$"
+        description: >
+          Open, permissive identifier grammar (hyphens legal). Deliberately
+          NOT hard-$ref'd to any single canonical identifier's format (e.g.
+          `domain/tenant.schema.yaml#/properties/tenant_id`'s UUID format)
+          because the one real `tenant`-segment example is a human-readable
+          slug, not a UUID — see compilation_decisions and
+          open_questions.OQ-au-3.
+        examples: [PRJ001, SRC0003, TEN-NORDBROOK, PRJ-BURNOUT-01, SRC-INT-P1]
+
+  artifact_uri:
+    type: object
+    required: [uri, segments]
+    description: >
+      Structured (parsed) form of a Portable Artifact URI. `uri` is the
+      canonical serialized string form; `segments` is its decomposition,
+      present so validators and tooling do not have to re-parse `uri` — see
+      compilation_decisions (direct precedent:
+      `artifact/cas-path.schema.yaml#/definitions/cas_path`).
+    properties:
+      uri:
+        type: string
+        pattern: "^artifact://[a-z][a-z0-9_]*/[A-Za-z0-9_-]+(?:/[a-z][a-z0-9_]*/[A-Za-z0-9_-]+)*$"
+        description: >
+          Canonical serialized form, e.g. `artifact://project/PRJ001/source/SRC0003`
+          (MP §59 L2595) or `artifact://tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1`
+          (MVP_VERTICAL_SLICE_PLAN.md L56). See compilation_decisions for the
+          structural backend-leak-prevention reasoning behind this pattern.
+        examples:
+          - "artifact://project/PRJ001/source/SRC0003"
+          - "artifact://tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1"
+      segments:
+        type: array
+        minItems: 1
+        items: { $ref: "#/definitions/segment" }
+        description: "Parsed decomposition of `uri`, in path order (outermost/leftmost segment first)."
+      resolved_cas_path:
+        $ref: "ai-lego://specs/artifact/cas-path.schema.yaml#/definitions/cas_path"
+        description: >
+          OPTIONAL. Present only once/if this logical URI has actually been
+          resolved to a physical Content-Addressed Storage location. See
+          compilation_decisions for why this is optional, not required.
+
+constraints:
+  description: >
+    Cross-field/cross-record rules this schema's `properties`/`pattern`
+    blocks cannot (or, for the positional rule, were judged not to need to)
+    express structurally, recorded as prose per this project's established
+    convention (`execution/result.schema.yaml`'s `constraints` list is the
+    precedent for this technique).
+  rules:
+    - "IF any segment in `segments` has `segment_type == tenant`, it SHOULD be `segments[0]` (the outermost/first segment), consistent with both real corpus examples and execution/blast-radius-chain.schema.yaml's Tenant-is-root convention. Not structurally enforced — see compilation_decisions."
+    - "`segments` array items are NOT independently validated against `uri`'s own string content by this schema — a producer/consumer of an artifact_uri instance is responsible for keeping the two representations consistent with each other; this schema validates each independently, not their mutual agreement."
+    - "A `tenant` segment's `segment_id` is NOT validated against any real, existing domain/tenant.schema.yaml record by this schema (no mechanism for that exists here — see open_questions.OQ-au-3); a schema-valid artifact_uri instance may still reference a tenant slug that does not correspond to any real Tenant."

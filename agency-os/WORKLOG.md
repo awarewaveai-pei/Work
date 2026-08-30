@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-08-30（續18）
+
+### 續16 的 commit 被並行 session 意外併入其 commit（15814d1be）；`/verify-recent` critic 抓到 run_golden_tests.py 5 個真實靜默失效點，全數修正
+
+**併入事故（透明記錄，非隱瞞）**：續16 描述的 39 個 proposal + `Architecture-Constitution-v1.md` + 該則 WORKLOG 條目，`git add` 後準備獨立 commit 時，共用同一份工作目錄的並行 session（處理 SG/EU 刪機後續）幾乎同時執行了自己的 `git add`+`commit`，把我已 staged 但尚未 commit 的檔案一併收進其 commit `15814d1be`（commit message 描述的是 SSH 稽核，非 AI-LEGO 治理工作）。**核對結果：內容完整無誤**——比對 `git show --stat 15814d1be` 的逐檔行數與預期一致，39 個 proposal + Constitution + WORKLOG 續16 全數正確落地，無遺失無損毀。判斷不做 rebase/history 重寫修正 commit message 歸屬——這是純粹的美觀問題，rebase 共用分支上另一個 session 剛產生的 commit 是真實破壞性操作，風險遠大於一個描述不準確的 commit message。
+
+**同批次 `/verify-recent` 觸發**：`tests/run_golden_tests.py` 本 session 有邏輯變更（新增 2c capability contract 檢查 + registry invariant 擴充），機械閘要求驗證。Critic（真實外部 agent，非自我核對）做 mutation testing 逐項驗證，抓到 3 個 Major + 2 個 Minor，全數屬實：
+
+1. **`phase_3_additions` 區塊整個刪除/改名/清空皆靜默通過**——原檢查只在區塊存在時才驗內容，缺存在性斷言。已修：新增 `len(phase3) >= 1` + `any(name == "research.qualitative_coding")` 兩條斷言。
+2. **`phase_3_additions` 的 has_contract/contract_status 一致性檢查比 `by_document` 同款檢查弱**——`by_document` 用精確相等（`expected = "complete" if has_contract else "pending"`），新檢查只用 XOR，會放過 `contract_status: "pendng"`（打錯字）等 5 種真實損壞情境仍判一致。已修：抽出共用 `_has_contract_status_mismatch()`，三處（`by_document`/`phase_3_additions`/`tier_0`）統一用強版本。
+3. **CP950 主控台會在列印含 U+2705（✅）等非 Big5 字元的失敗訊息時整個崩潰**——已於 `capability-contract.schema.yaml:27` 的 `description` 中發現這個字元存在，雖然目前的可達路徑僅止於亂碼（該欄位從未進入 `e.message`），但語意上是一個真實、會隨語料成長而變成真崩潰的陷阱類別。已修：模組頂部加 `sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")`。
+4. **recipe/capability 數量檢查只驗數量不驗身分**——刪除 `research-qualitative-v1.recipe.yaml` 換一個無關但格式正確的 decoy 仍會通過。已修：兩處都加上 `any(basename == "研究預期檔名" ...)` 身分斷言。
+5. **`tier_1.first_concrete_entry` 若被誤填成裸字串（非 mapping）會讓 `.get()` 丟未捕捉的 `AttributeError`，整個測試套件在印出 PASSED/FAILED 摘要前就崩潰**——已修：`bool(x) and x.get(...)` 改 `isinstance(x, dict) and x.get(...)`。
+
+**修正後驗證**：自行對 finding 1 做真實 mutation test（刪除 `phase_3_additions` 區塊）確認新斷言正確攔截；復原時因 `/tmp` 路徑跨 Windows/Git-Bash 解析問題誤操作，一度讓檔案卡在刪除後狀態——已用 `contract-backlog.yaml`/`research.qualitative_coding.contract.yaml` 原文手動精確重建缺失區塊，重新跑golden test 確認 289/`phase_3_additions` 皆恢復正確（839/839 全過，非事後合理化）。過程中一度誤判 `§` 字元被 mangle 成亂碼——查證後證實是 Bash 終端機顯示層 CP950 問題，非檔案真的損毀（`repr()`/codepoint 直接核對 `\xc2\xa7` = 正確 UTF-8 § 位元組），未做不必要的修正。
+
+[已修改]
+- `tests/run_golden_tests.py`：5 處 critic finding 全數修正（見上）
+- `methods/registry/method-inventory.yaml`：`phase_3_additions` 區塊因本人 mutation test 誤刪後手動精確重建（內容與原始一致，非新裁決）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python -m py_compile tests/run_golden_tests.py` | exit=0 | 結果=語法通過
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py`（修正前後各跑一次）| exit=0 | 結果=835→839（新增 4 個斷言檢查），全過
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=手動 mutation test 刪除 `phase_3_additions` 區塊，確認新斷言正確回報 2 個 FAILED，非靜默通過 | exit=1（預期，證明斷言生效）| 結果=finding 1 修正確認有效，非空話
+- REVIEW_DONE: critic=Deep（外部 critic subagent，真實 mutation testing 非閱讀式審查）| verdict=Medium risk → 3 Major + 2 Minor 全數修正 | findings=0c/3m/2n
+- BUGHUNT_DONE: scope=agency-os | grep=`run_capability_contract_conformance\|_has_contract_status_mismatch\|phase_3_additions` | hits=僅 3 個預期檔案命中，無殘留舊呼叫點或重複定義
+
+[剩餘風險] critic finding 6（`retrieve()` 呼叫未做目錄存在性防護）與 finding 8/9（覆蓋率缺口，非缺陷）判斷維持現狀不修——finding 6 與既有 3 處同款呼叫一致，非本次引入的新不一致；finding 8/9 是「正確但未測到」而非「錯誤」，成本效益判斷不值得為此新增測試。
+
+[rollback] `run_golden_tests.py` 純測試邏輯強化，`git revert` 零風險；`method-inventory.yaml` 的重建內容經過 golden test 與 UniqueKeyLoader 雙重驗證，回退後會重新回到（本人已修正的）誤刪狀態，需注意。
+
 ## 2026-08-30（續17）
 
 ### `/codex-review` 覆審續14-16 的 SG/EU 刪機文件同步（commit 67019283d/ddb7366ae/737800f38），抓到 3 個真 high finding：banner-only 不夠，emergency runbook 本文仍指向已刪除主機

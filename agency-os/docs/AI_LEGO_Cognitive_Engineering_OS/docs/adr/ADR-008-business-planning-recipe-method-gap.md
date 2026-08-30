@@ -123,7 +123,7 @@ Phase 1 對抗式驗證（`CONFLICT_REGISTER.yaml` P1-CONFLICT-4，severity: med
 - `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md:242-252`（§4，明確排除一次性補齊全部 289 方法 contract 的方案）、`:277`（MRSP-2 原文）
 - `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md:15`（訂正證據 ID 為 P1-CONFLICT-4，獨立重跑 Grep 驗證）、`:27-28`（Recipe Selection Matrix，Business Mode 因本缺口被評 High 阻塞）、`:36`（最終選定 Research Mode 為 Phase 5 MVP 切片）
 - `docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md`（Method ID Grammar Option B 先例，供未來 `finance.financial_assumptions` 命名依循）
-- `docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md`（`.ai/proposals/` 流程定義，本 ADR Migration 段依賴此機制；經 Glob 確認 `.ai/proposals/` 目錄截至本次任務尚未建立）
+- `docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md`（`.ai/proposals/` 流程定義，本 ADR Migration 段依賴此機制；經 Glob 確認 `.ai/proposals/` 目錄截至本次任務尚未建立——**UPDATED 2026-08-30**：`.ai/proposals/` 已建立，本 ADR 對應的 MP §43 callout 提案為 `031-financial-assumptions-blocked-callout-mp`，`status: DRAFT`）
 - Grep 全文獨立核對（本次任務執行，非沿用任務摘要）：`finance` 在 Atlas 全文僅命中一次（L3901）；`Financial Assumptions` 在專案內僅出現於 Master Plan 本體與三份下游分析文件（MVP_VERTICAL_SLICE_PLAN.md / MACHINE_READABLE_SPEC_PLAN.md / CONFLICT_REGISTER.yaml），Atlas 本體零命中；Atlas 全文對「documentation debt / self-consistency / spec-impl gap」等詞（含中文對應）零命中，確認無現成方法可套用。
 
 **邊界確認**：本次任務全程僅執行 Read/Grep（唯讀），未對三母文件或任何既有檔案做任何修改，僅新建本檔案 `ADR-008-business-planning-recipe-method-gap.md`。

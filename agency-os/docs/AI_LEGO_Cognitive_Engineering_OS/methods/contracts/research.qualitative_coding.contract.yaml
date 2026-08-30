@@ -1,0 +1,702 @@
+$id: "ai-lego://methods/contracts/research.qualitative_coding.contract.yaml"
+title: "Qualitative Coding (Open / Axial / Selective) Method Contract"
+status: ACTIVE
+
+description: >
+  GROUNDED ORIGINAL DESIGN, not transcription -- unlike every sibling file in
+  methods/contracts/ (root_cause.fishbone, stakeholder.regulator,
+  strategy.swot, evidence.triangulation), this method has ZERO mother-document
+  content to transcribe. `.ai/research/phase-1/GAP_REGISTER.yaml` P1-GAP-AI-9
+  (L340-347, severity medium, role Research Methodologist) documents this
+  exhaustively: grepping "diarization"/"transcription"/"grounded theory"/
+  "content analysis" across both Atlas and the Execution Contract returns ZERO
+  hits; Master Plan §40 "Qualitative Research" (L2033-2062) names a bare
+  pipeline-stage sequence (Interview Audio/Video -> Transcription -> Speaker
+  Diarization -> Coding -> Theme Analysis -> Evidence Quotes -> Triangulation
+  -> Discussion, and a retained-object chain Original Transcript -> Code ->
+  Theme -> Claim) but supplies NO coding scheme, NO inter-rater reliability
+  threshold, and NO saturation criterion for the "Coding" stage. This file
+  closes that gap the way `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4
+  (L105) and §3 walkthrough step 12-13 (L72-73) both require it be closed: by
+  grounding the coding methodology itself in a REAL, established, external,
+  citable academic standard -- not inventing one -- the same discipline this
+  corpus's `policies/security/zero-trust.policy.yaml` (Cedar/SPIFFE) and
+  `policies/security/supply-chain-security.policy.yaml` (Grype/CISA KEV/
+  Landis & Koch-class published scales) already applied for external
+  technical/security standards.
+
+  **Grounding source**: Strauss, A. & Corbin, J. (1990). *Basics of
+  Qualitative Research: Grounded Theory Procedures and Techniques*. Newbury
+  Park, CA: Sage Publications. (2nd ed. 1998, Thousand Oaks, CA: Sage.) This
+  is the canonical, widely-cited methodological source for the three-stage
+  OPEN -> AXIAL -> SELECTIVE coding procedure this contract's `stages` field
+  below models: open coding (Ch. 5 -- breaking data apart, naming/labeling
+  discrete concepts), axial coding (Ch. 7 -- the "paradigm model" relating
+  categories to subcategories via conditions/context/action-interaction/
+  consequences), and selective coding (Ch. 8 -- identifying and validating the
+  CORE category that integrates the emerging theory). "Theoretical
+  saturation" (this contract's `saturation_criterion` field) traces to the
+  earlier, foundational grounded-theory text: Glaser, B.G. & Strauss, A.L.
+  (1967). *The Discovery of Grounded Theory: Strategies for Qualitative
+  Research*. Chicago: Aldine Publishing Co. -- both citations are real,
+  external, independently verifiable academic standards, cited by name per
+  standard academic practice, exactly as this task's own instructions
+  require.
+
+  **What MVP_VERTICAL_SLICE_PLAN.md ALREADY DECIDED, honored verbatim here**
+  (these are pre-existing constraints on this file, not this file's own
+  choices): (1) the method MUST model open/axial/selective coding as distinct
+  stages (§3 step 13, §4 L105); (2) it MUST carry an inter-rater reliability
+  THRESHOLD requirement (§3 step 13, §4 L105, §6 risk 4 L145); (3) it MUST
+  carry a SATURATION criterion (§3 step 13, §4 L105). This file satisfies all
+  three. What MVP's own text explicitly does NOT decide (§6 risk 4, L145:
+  "具體公式與門檻仍須在 Phase 3 Method Contract 中正式釘死，本文件不代為決
+  定" -- "the exact formula and threshold must be pinned down formally in the
+  Phase 3 Method Contract; this document does not decide it") is the numeric
+  threshold values themselves -- left as operator-set fields below, per
+  `compilation_decisions`.
+
+  **Scope note on the inter-rater reliability STATISTIC itself**: per this
+  task's explicit instruction, the Cohen's Kappa computation/interpretation-
+  scale content lives in a SEPARATE file,
+  `capabilities/contracts/run_statistics.capability.yaml` (a Capability
+  Contract, not an Atlas cognitive Method -- MVP's own text names it "此為
+  run_statistics（一個 Trusted-Compute-gated capability）...非新的 Atlas
+  cognitive Method", MVP §3 step 16-17). This file's own
+  `inter_rater_reliability_requirement` field below is a CROSS-REFERENCE to
+  that capability contract, not a restatement of its content -- avoiding the
+  duplication this corpus's own R0 discipline forbids.
+
+source_of_truth_for:
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-AI-9 (L340-347, severity medium) -- the gap this file closes"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §40 Qualitative Research (L2033-2062) -- the bare pipeline-stage sequence and Original Transcript->Code->Theme->Claim retained-object chain this file's `inputs`/`outputs`/`stages` are grounded against"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11.1-11.3 Human Contribution / Locked Fact (L936-980) -- AI Suggest/Diff/Comment/Challenge vs. Human Accept/Reject/Edit/Lock, and LOCKED FACT -- grounds this file's `quality` flags, `method_specific_gates.authorship` condition, and the MVP walkthrough's own literal Coder-1 LOCKED_FACT example (MVP §3 step 15, L75)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 walkthrough steps 10-15 (L70-75, the Coder-1/AI_SUGGESTION/LOCKED_FACT worked scenario), §4 Required Phase-3 Specs (L105, L121, this file's own two named deliverables), §5 Acceptance Criterion 3 (L133, Human Lock Fact not overwritten), §6 risk 4 (L145, explicit non-decision of the numeric threshold)"
+  - "Strauss, A. & Corbin, J. (1990/1998). Basics of Qualitative Research. Sage. -- real external academic standard, open/axial/selective coding"
+  - "Glaser, B.G. & Strauss, A.L. (1967). The Discovery of Grounded Theory. Aldine. -- real external academic standard, theoretical saturation"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "specs/execution/gate.schema.yaml#/gate_catalog.method_specific -- the mechanism this file's `method_specific_gates` field uses (that file's own note: 'owner: Method Atlas §22.3, per-method contract')"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-AI-3 (L292-299, severity high) -- the 5 named-but-undefined research-paper Quality Gates (MP §56, L2523-2531) this file's `method_specific_gates` gives real PASS/FAIL conditions to, for this method specifically"
+  - "specs/evidence/{claim,evidence,sentence-provenance}.schema.yaml, specs/governance/epistemic-label.schema.yaml, policies/ai-execution/trusted-compute-gate.policy.yaml -- already-built, real mechanisms this file's `method_specific_gates` conditions are tied to rather than invented in the abstract (see compilation_decisions)"
+
+decided_by: >
+  No ADR governs this file's content -- there is no ADR to govern, since no
+  mother document ever defined this methodology for an ADR to arbitrate
+  between competing versions of (contrast ADR-005b's Method-ID-grammar
+  arbitration, or ADR-011's Global-Gate-list arbitration). This is Phase 3
+  GROUNDED ORIGINAL DESIGN, explicitly authorized by
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 (a document itself
+  ratified for the Research Mode slice choice by
+  `docs/adr/ADR-014-phase-5-mode-selection-research.md`, ACCEPTED
+  2026-08-30) -- the grounding discipline is: every methodological CHOICE
+  (3-stage structure, saturation concept) cites a real external academic
+  source by name; every numeric THRESHOLD is left operator-set rather than
+  invented, per the same restraint `policies/security/zero-trust.policy.yaml`
+  (`service_count_reconsideration_threshold`) and
+  `policies/security/supply-chain-security.policy.yaml`
+  (`cvss_tiering.rescan_requirement.interval_days`) already established for
+  exactly this class of "cite the real standard, don't invent the project's
+  specific cutoff" judgment call.
+
+compilation_decisions:
+
+  - question: >
+      Should this contract's `cognitive_primitives` field invent a bespoke
+      primitive composition for "grounded theory coding", the way
+      evidence.triangulation.contract.yaml honestly flagged its own
+      [COMPARE, VALIDATE] as an inference (no cited Atlas formula exists for
+      that method either)?
+    decision: >
+      Map each of the 3 stages to primitives already present in
+      `specs/cognitive/primitive.schema.yaml`'s 24-member CANONICAL_KERNEL or
+      5-member OBSERVED_EXTENSION vocabulary, not invent new primitive names:
+      open coding = DECOMPOSE + CLASSIFY; axial coding = GROUP + RELATE;
+      selective coding = INFER + DECIDE. Top-level `cognitive_primitives` is
+      the union across all 3 stages, in stage order:
+      [DECOMPOSE, CLASSIFY, GROUP, RELATE, INFER, DECIDE].
+    reasoning: >
+      Open coding (Strauss & Corbin Ch. 5) breaks the transcript into
+      discrete incidents (DECOMPOSE, canonical kernel) and assigns each a
+      provisional concept label (CLASSIFY, OBSERVED_EXTENSION, already
+      catalogued via Atlas L189's "SWOT = CLASSIFY + COMPARE +
+      CONTEXTUALIZE" -- the identical primitive `strategy.swot.contract.yaml`
+      already uses, not a new extension). Axial coding (Ch. 7) clusters
+      related codes into categories (GROUP, canonical kernel, already used by
+      `root_cause.fishbone.contract.yaml`) and establishes relationships
+      between them via the paradigm model (RELATE, canonical kernel).
+      Selective coding (Ch. 8) infers which category is the theory's central,
+      integrating phenomenon (INFER, canonical kernel) and selects it among
+      candidates (DECIDE, canonical kernel, already used in Atlas's own AHP
+      composition example, L191: "AHP = COMPARE + WEIGHT + PRIORITIZE +
+      DECIDE"). This is a Phase 3 INFERENCE (no Atlas formula exists for THIS
+      method, since Atlas never catalogues it at all), but every individual
+      primitive token used is already real, already-vocabularied, and
+      already load-bearing elsewhere in this corpus -- not a new invention,
+      unlike evidence.triangulation's case where the primitives themselves
+      were the inference. See `open_questions.OQ-QCODE-1`.
+
+  - question: >
+      What should this method's `outputs` be named, given Strauss & Corbin's
+      own vocabulary is CODE -> CATEGORY -> CORE CATEGORY, but Master Plan
+      §40's own retained-object chain is CODE -> THEME -> CLAIM, and this
+      corpus's already-built `evidence.triangulation.contract.yaml` declares
+      `inputs.required: [themes, literature]` (MP's literal lowercase term,
+      L834) as the exact input this method's final output must feed under
+      the MVP walkthrough's real chain (research.qualitative_coding ->
+      evidence.triangulation, MVP §3 step 16, L79)?
+    decision: >
+      Three stage outputs, mixing accurate Strauss & Corbin terminology for
+      the two INTERMEDIATE stages with MP's own downstream vocabulary for the
+      FINAL, externally-visible stage: open coding -> `CodeSet` (S&C term,
+      accurate); axial coding -> `CategorySet` (S&C term, accurate); selective
+      coding -> `ThemeSet` (NOT `CoreCategorySet`, which would be the more
+      academically precise S&C name for this stage's own concept).
+    reasoning: >
+      This is a genuine, disclosed naming compromise, not a silent pick.
+      Renaming Strauss & Corbin's "core category" to `ThemeSet` at the
+      method's OUTER boundary (not its internal stages) is done specifically
+      so this method's real output can satisfy
+      `evidence.triangulation.contract.yaml`'s existing, already-built,
+      literal `inputs.required: [themes, literature]` field WITHOUT requiring
+      that already-ACTIVE sibling file to be rewritten -- MP §40 itself
+      already uses generic "Theme Analysis" as its own post-Coding pipeline
+      stage name (L2046), so this is not fabricating vocabulary MP never
+      used, it is choosing MP's OWN downstream name over the stricter
+      academic one at the one seam where two already-built contracts must
+      interoperate. This mirrors evidence.triangulation.contract.yaml's own
+      `open_questions.OQ-TRIANGULATION-3` (literal-lowercase inputs vs.
+      invented-PascalCase outputs) -- both files independently arrived at
+      "keep the seam consistent with the ALREADY-REAL neighboring contract,
+      flag the terminology tension honestly" rather than silently diverging.
+      A methodologically pure grounded-theory implementation would rename
+      `evidence.triangulation.contract.yaml`'s `themes` to `core_category` --
+      out of scope for this task (that file is not this task's to rewrite).
+      See `open_questions.OQ-QCODE-2`.
+
+  - question: >
+      MVP §3 step 13/§4 both require "saturation 判準" (a saturation
+      criterion). What is the real, standard methodological concept, and
+      what is its operational threshold?
+    decision: >
+      Model the REAL, standard concept -- "theoretical saturation" (Glaser &
+      Strauss 1967; further discussed by Strauss & Corbin 1990/1998 Ch. 12):
+      the point at which analyzing additional data units yields zero new
+      codes/categories/properties. The NUMBER of consecutive additional data
+      units required to declare saturation reached is left as an
+      operator-set field (`saturation_criterion.operational_rule.
+      threshold_data_units: null`), NOT invented by Claude.
+    reasoning: >
+      MVP_VERTICAL_SLICE_PLAN.md §6 risk 4 (L145) explicitly states the
+      numeric threshold is NOT decided by that document and must be "pinned
+      down formally in the Phase 3 Method Contract" -- but "pinned down"
+      does not mean "a specific number must be invented here"; it means the
+      FIELD must exist and be real (checkable), not that Claude gets to pick
+      the number absent any source. Exhaustive grep (`grep -rni saturation`
+      across the full repo, this session) confirms the word "saturation"
+      appears in exactly 2 places in the whole corpus: GAP_REGISTER.yaml's
+      own naming of the gap, and MVP_VERTICAL_SLICE_PLAN.md's own naming of
+      the requirement -- NEITHER gives a number. Inventing one (e.g. "3
+      consecutive transcripts with zero new codes") would be exactly the
+      fabrication this task's instructions explicitly forbid, and would
+      misrepresent an operator/methodologist judgment call (how many
+      additional data units are enough depends on the study's own sample
+      size, domain, and coding granularity -- there is no universal N) as if
+      it were an academic fact. This is the same restraint
+      `policies/security/supply-chain-security.policy.yaml`'s
+      `cvss_tiering.rescan_requirement.interval_days` and
+      `policies/security/zero-trust.policy.yaml`'s
+      `service_count_reconsideration_threshold` already established:
+      REQUIRED field, real type (`integer, minimum: 1`), `null` until an
+      operator sets it, with the real published concept as documented
+      context.
+
+  - question: >
+      What is the real, standard interpretation scale and accept/reject
+      threshold for the inter-rater reliability statistic this method
+      requires (cross-referenced from `capabilities/contracts/
+      run_statistics.capability.yaml`)?
+    decision: >
+      Not decided HERE at all -- deliberately kept as a pure cross-reference
+      (`inter_rater_reliability_requirement.invoked_via`) to that sibling
+      capability contract file, which is where the real Cohen (1960)
+      statistic and Landis & Koch (1977) interpretation scale are grounded
+      and where the operator-set accept/reject threshold field lives. See
+      that file's own `compilation_decisions` for the full reasoning.
+    reasoning: >
+      Per this task's own explicit instruction: the statistic itself is a
+      Capability, not a Method -- duplicating its grounding/threshold content
+      into BOTH files would create two sources of truth for the same numeric
+      policy decision, exactly the class of duplication this corpus's R0
+      discipline (and `contract-backlog.yaml`'s own explicit refusal to
+      re-enumerate method-inventory.yaml's contract_status field a second
+      time) already treats as a design smell to avoid.
+
+  - question: >
+      Should this contract declare a `risk_tier`, given the underlying data
+      (real interview transcripts, potentially containing PII/GDPR-scoped
+      personal data per the MVP scenario) is high-sensitivity?
+    decision: "Omit risk_tier (leave unset)."
+    reasoning: >
+      Consistent with all 4 existing Tier 0 contracts in this directory
+      (none sets risk_tier). The PII/consent/crypto-shred risk in the MVP
+      scenario attaches to the SURROUNDING data-handling pipeline (ingest,
+      encryption envelope, tenant isolation, GDPR deletion -- ADR-002,
+      `security/personal-data-envelope.schema.yaml`,
+      `security/key-vault-lifecycle.schema.yaml`), not to the cognitive
+      coding OPERATION itself, which acts on already-classified,
+      already-encrypted-at-rest fields regardless of which method analyzes
+      them. Atlas's own risk-tier examples (DB migration, identity/auth
+      changes) are all about IRREVERSIBLE STRUCTURAL operations, a different
+      axis than "this analysis method processes sensitive input" -- setting
+      risk_tier here on that basis would conflate two orthogonal concerns
+      method.schema.yaml's own `compilation_decisions` already distinguishes
+      (risk_tier as method-vs-task-level compatibility, not as a proxy for
+      "the data is sensitive").
+
+  - question: >
+      `method.schema.yaml`'s schema body has no `stages`, `saturation_criterion`,
+      `inter_rater_reliability_requirement`, or `method_specific_gates`
+      field. Is adding them to this instance legal, and how should they be
+      understood relative to the schema?
+    decision: >
+      All four are ADDITIVE fields, legal because `method.schema.yaml` (like
+      every schema file in this suite -- verified by grep, zero
+      `additionalProperties: false` hits across method.schema.yaml,
+      capability-contract.schema.yaml, gate.schema.yaml) never closes its
+      object with `additionalProperties: false`. They do not change or
+      relax any of method.schema.yaml's own required-field/pattern rules.
+    reasoning: >
+      This mirrors the exact pattern `domain/capability-contract.schema.yaml`
+      itself used for its own ADDITIVE `entitlement` field (not in MP §8.3's
+      literal example, added anyway, documented as additive) and
+      `specs/workflow/workflow-ir.schema.yaml`'s ADDITIVE `compiled_from`
+      field (100% new design, per that file's own disclosure). The
+      alternative -- proposing a method.schema.yaml SCHEMA EDIT to formally
+      declare a `stages` property -- was considered and rejected: this
+      task's own scope is to author ONE grounded method contract INSTANCE,
+      not to re-open method.schema.yaml (a file another Wave-3 pass already
+      completed and hardened through multiple critic rounds, per its own
+      `open_questions` MRSP history) for a schema-level change serving only
+      this one instance. If a future 2nd/3rd multi-stage method contract is
+      written, promoting `stages` to a formal method.schema.yaml property
+      would become the more defensible move -- flagged in
+      `open_questions.OQ-QCODE-3`.
+
+id: research.qualitative_coding
+version: "1.0.0"
+family: research
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY, GROUP, RELATE, INFER, DECIDE]
+
+purpose:
+  - perform_open_axial_selective_coding
+  - assess_theoretical_saturation
+
+inputs:
+  required:
+    - Transcript
+  optional:
+    - EvidenceSet
+
+outputs:
+  - CodeSet
+  - CategorySet
+  - ThemeSet
+
+preconditions:
+  - "transcript.status == normalized"
+  # Grounded in MP §40's own pipeline order (L2037-2044): Interview
+  # Audio/Video -> Transcription -> Speaker Diarization -> Coding. Coding
+  # cannot begin before transcription+diarization have already produced a
+  # normalized Transcript object -- the identical "precondition = prior
+  # pipeline stage completed" pattern root_cause.fishbone.contract.yaml's own
+  # `problem_statement.status == validated` uses.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Directly grounded (stronger than the by-analogy reasoning
+  # root_cause.fishbone/evidence.triangulation used for the identical
+  # flags): MVP §3 step 14 (L74, "AI 提出候選 Code（AI_SUGGESTION）") and step
+  # 15 (L75, "Coder 1...標記 LOCKED_FACT (epistemic_type=SOURCE_FACT,
+  # authorship_state=HUMAN_APPROVED, locked=LOCKED_FACT)") are a literal
+  # worked example of exactly what these two flags require: every Code
+  # output MUST carry a governance/epistemic-label.schema.yaml
+  # provenance_record from the moment it is AI-suggested through human
+  # Accept/Edit/Lock.
+
+forbidden_transition:
+  - "CodeSet -> ThemeSet"
+  # Grounded in Strauss & Corbin's own methodological sequencing requirement
+  # (1990/1998): selective coding (producing the core category / ThemeSet)
+  # REQUIRES axial coding (producing CategorySet) to have already related the
+  # open-coded concepts into categories first -- selective coding operates ON
+  # categories, not on raw open codes directly. Jumping CodeSet -> ThemeSet
+  # skips the axial-coding stage this method's own `stages` field below
+  # requires, the same "skip-a-mandatory-intermediate-stage" defect class
+  # strategy.swot.contract.yaml's own forbidden_transition
+  # (SWOTAnalysis -> AutomaticProductionDeployment) and Atlas §14.1 model.
+
+recommended_next:
+  - evidence.triangulation
+  # Literal, directly-cited (not inferred): MVP §3 step 16 (L79) Workflow IR
+  # chain: `research.qualitative_coding`(method) -> `evidence.triangulation`
+  # (method) -> `run_statistics`(capability). See
+  # recipes/validated/research-qualitative-v1.recipe.yaml for the full
+  # compiled chain and its reconciliation against Master Plan §9's separate
+  # teaching-example chain.
+
+rollback:
+  side_effect_free: true
+  # Same class of low-risk inference as the other 3 Tier 0 method contracts:
+  # a pure analysis/knowledge-object production method (Code/Category/Theme
+  # records) with no described external side effect in any mother document
+  # or in MVP_VERTICAL_SLICE_PLAN.md.
+
+# =============================================================================
+# ADDITIVE fields -- not part of method.schema.yaml's own declared schema
+# body, legal because that schema does not set additionalProperties:false.
+# See compilation_decisions above for why each exists and how it relates to
+# the base schema.
+# =============================================================================
+
+stages:
+  description: >
+    The 3-stage grounded-theory coding procedure MVP_VERTICAL_SLICE_PLAN.md
+    §4 (L105) explicitly requires this contract to model. Each stage's own
+    inputs/outputs are modeled per the sibling Tier-0 contract files' shape
+    (a typed-object name list), nested one level under this array entry
+    rather than as separate top-level method.schema.yaml instances, since
+    all 3 stages execute within ONE method invocation (one `id`+`version`),
+    not as 3 independently-selectable methods.
+  items:
+    - stage_id: open_coding
+      name: "Open Coding"
+      grounding: "Strauss & Corbin (1990/1998), Ch. 5 -- breaking data apart, naming/labeling discrete concepts from raw incidents."
+      cognitive_primitives: [DECOMPOSE, CLASSIFY]
+      purpose: [label_raw_data_into_initial_concepts]
+      inputs:
+        required: [Transcript]
+      outputs: [CodeSet]
+    - stage_id: axial_coding
+      name: "Axial Coding"
+      grounding: "Strauss & Corbin (1990/1998), Ch. 7 -- the 'paradigm model' (conditions / context / action-interaction strategies / consequences) relating categories to subcategories."
+      cognitive_primitives: [GROUP, RELATE]
+      purpose: [relate_categories_to_subcategories]
+      inputs:
+        required: [CodeSet]
+      outputs: [CategorySet]
+    - stage_id: selective_coding
+      name: "Selective Coding"
+      grounding: "Strauss & Corbin (1990/1998), Ch. 8 -- selecting and validating the CORE category that integrates the emerging theory. Exposed downstream as `ThemeSet`, not `CoreCategorySet` -- see compilation_decisions for the disclosed naming compromise."
+      cognitive_primitives: [INFER, DECIDE]
+      purpose: [identify_core_category]
+      inputs:
+        required: [CategorySet]
+      outputs: [ThemeSet]
+
+saturation_criterion:
+  concept: theoretical_saturation
+  citation: >
+    Glaser, B.G. & Strauss, A.L. (1967). The Discovery of Grounded Theory:
+    Strategies for Qualitative Research. Chicago: Aldine Publishing Co.
+    (originating source); further operationalized in Strauss, A. & Corbin, J.
+    (1990/1998), Basics of Qualitative Research, Ch. 12.
+  definition: >
+    The point in ongoing coding at which analyzing additional data units
+    (transcripts, or transcript segments) yields no new codes, no new
+    categories, and no new properties/dimensions of already-identified
+    categories -- i.e. the emerging theory has stopped changing in response
+    to new data.
+  operational_rule:
+    unit: "consecutive additional Transcript units coded with zero new CodeSet/CategorySet entries emerging"
+    threshold_data_units: null
+    status: OPERATOR_SET_PENDING
+    note: >
+      REQUIRED field, real integer type, deliberately left `null` rather than
+      populated with an invented number -- see compilation_decisions above
+      for the full R4 grounding (exhaustive repo-wide grep confirms no
+      mother document, GAP_REGISTER, or MVP plan text ever states a specific
+      N). This is the same "operator-set threshold, not invented by Claude"
+      restraint as `policies/security/supply-chain-security.policy.yaml`
+      `cvss_tiering.rescan_requirement.interval_days` and
+      `policies/security/zero-trust.policy.yaml`
+      `service_count_reconsideration_threshold`.
+  assessment_output_type: SaturationAssessment
+  # NEW_DESIGN typed-object name, no existing schema file -- see
+  # open_questions.OQ-QCODE-4 (same "candidate for a future
+  # cognitive/typed-objects/*.schema.yaml" disclosure pattern
+  # evidence.triangulation.contract.yaml's own OQ-TRIANGULATION-2 uses for
+  # `TriangulatedFindingSet`).
+
+inter_rater_reliability_requirement:
+  description: >
+    MVP_VERTICAL_SLICE_PLAN.md §3 step 13 (L73) / §4 (L105, L121) requires
+    this contract to carry an inter-rater reliability THRESHOLD requirement.
+    Per this task's own explicit instruction, the statistic itself (Cohen's
+    Kappa, its computation, and the Landis & Koch interpretation scale) is
+    modeled in a SEPARATE Capability Contract, not duplicated here -- this
+    field is the cross-reference from the qualitative-coding Method side.
+  invoked_via: "capabilities/contracts/run_statistics.capability.yaml (id: run_statistics -- MP §8.1/§8.2's own named, bare capability, this task's concrete Cohen's Kappa instantiation of it)"
+  applies_when: "2 or more independent coders each execute this method's open_coding stage over the same Transcript set (MVP §3 step 17, L80: '兩位編碼者的編碼結果')"
+  triggering_method_specific_gate: statistical
+  # See method_specific_gates.statistical below -- this is the gate whose
+  # PASS/FAIL condition actually checks that this requirement was honored.
+
+method_specific_gates:
+  description: >
+    Per `specs/execution/gate.schema.yaml#/gate_catalog.method_specific`'s
+    own documented mechanism ("NOT enumerated [in the global/high_risk
+    catalog] -- Atlas §22.3's own open-ended, per-method namespace... owner:
+    Method Atlas §22.3, per-method contract"). Master Plan §56 (L2503-2531,
+    verified: `grep -n "^# 56\."` this session) names 5 gates for research
+    papers -- "研究論文：Research Integrity Gate / Citation Gate / Statistical
+    Gate / Methodology Gate / Authorship Gate" -- with ZERO PASS/FAIL
+    conditions anywhere in either mother document (independently flagged as
+    `.ai/research/phase-1/GAP_REGISTER.yaml` P1-GAP-AI-3, L292-299, severity
+    high). Verified (this session, `grep -n` against
+    `specs/execution/gate.schema.yaml`'s `gate_catalog`): none of these 5
+    names appears among the resolved 20-item Global (14) + High-risk (6)
+    catalog (ADR-011) -- confirming P1-GAP-AI-3's own claim of zero overlap.
+    Declared here as this method's own method_specific gates, since this
+    method (research.qualitative_coding) is the concrete method the MVP
+    Research Mode slice's Quality Gate step actually runs against (MVP §3
+    step 22, L88: "Quality Gate 檢查：Research Integrity Gate / Citation Gate
+    / Statistical Gate / Methodology Gate / Authorship Gate 逐項跑過"). Each
+    PASS/FAIL condition below is tied to a concrete, ALREADY-BUILT mechanism
+    in this corpus (not a vague criterion) -- see the `grounding` field on
+    each gate. This also directly answers
+    `policies/ai-execution/trusted-compute-gate.policy.yaml`'s own
+    `open_questions.OQ-TCGATE-3` ("Should a future
+    policies/ai-execution/research-integrity-gate.policy.yaml be built...?")
+    from the per-method-contract side rather than a standalone global policy
+    file -- see `open_questions.OQ-QCODE-5` for why that file was NOT also
+    built by this task (avoiding a same-session edit to a concurrently-active
+    file, and because gate.schema.yaml's own mechanism already scopes these 5
+    gates as METHOD-specific, not platform-global).
+  gates:
+    - id: research_integrity
+      display_name: "Research Integrity Gate"
+      pass_condition: >
+        ALL of {citation, statistical, methodology, authorship} (below) PASS
+        for this execution, AND every Transcript/Dataset object this
+        execution consumed carries a resolvable
+        governance/epistemic-label.schema.yaml#/provenance_record (dataset
+        lineage).
+      fail_condition: "Any of the 4 component gates FAILs, or a consumed Transcript/Dataset lacks a provenance_record."
+      grounding: >
+        MP §56 (L2526, names this gate first in the list of 5, gives it no
+        independent content); EC §40 Research Integrity Execution
+        (L1524-1536), whose 8-bullet checklist this composite gate
+        implements in full (bullet "Dataset 有 lineage" is the one bullet
+        none of the 4 component gates below individually covers).
+    - id: citation
+      display_name: "Citation Gate"
+      pass_condition: >
+        Every Claim (specs/evidence/claim.schema.yaml) produced by this
+        method resolves, via a specs/evidence/sentence-provenance.schema.yaml
+        record, through Evidence to a Source with a non-empty `locator`
+        (text_page / audio_timestamp / image_region) -- i.e. the full
+        Sentence -> Claim -> Evidence -> Source -> Page/Timestamp/Region
+        chain (MP §13.1, L1075-1085) has zero dangling links for that Claim.
+      fail_condition: >
+        Any output Claim has no resolvable sentence-provenance record, or its
+        linked Evidence has no `source_id`/`locator` -- an uncited assertion.
+      grounding: >
+        EC §40 bullets 1-3 (L1528-1530: "Literature source 必須可驗證" /
+        "不得捏造 citation" / "DOI / metadata 需要 primary verification");
+        MP §13.1 Sentence-level Provenance chain; the concrete already-built
+        mechanism is specs/evidence/{claim,evidence,sentence-provenance}.schema.yaml
+        (all `status: ACTIVE` as of this file's own verification pass) --
+        not an abstract criterion.
+    - id: statistical
+      display_name: "Statistical Gate"
+      pass_condition: >
+        Every numeric/statistical result this method's execution depends on
+        (specifically: the inter-rater reliability Kappa figure from
+        `inter_rater_reliability_requirement` above) carries
+        `epistemic_type: CALCULATED_RESULT` per
+        governance/epistemic-label.schema.yaml AND satisfies
+        `policies/ai-execution/trusted-compute-gate.policy.yaml`'s grounded
+        rule `TCGATE-CALCULATED-SIMULATED-RESULT` (i.e. was produced via the
+        5-stage Trusted Compute pipeline -- AI_PLANS -> TRUSTED_COMPUTE_EXECUTES
+        -> VALIDATOR_VERIFIES -> RESULT_ARTIFACT -> AI_INTERPRETS -- not
+        asserted by LLM mental calculation).
+      fail_condition: >
+        A statistical result is asserted with no resolvable
+        `computation_provenance_ref`, or its `epistemic_type`/`authorship_state`
+        is inconsistent with a genuine Trusted Compute execution.
+      grounding: >
+        EC §39 Trusted Compute Contract (L1499-1521, the literal forbidden
+        anti-pattern "LLM mentally calculates -> CALCULATED_RESULT"); EC §40
+        bullet "Statistical assumption 有檢查"; the concrete already-built
+        mechanism is `policies/ai-execution/trusted-compute-gate.policy.yaml`
+        (closes P1-GAP-AI-2, `status: ACTIVE`) -- this gate is the
+        method-specific application point of that platform-level rule, for
+        this method's own inter-rater reliability computation specifically.
+    - id: methodology
+      display_name: "Methodology Gate"
+      pass_condition: >
+        All 3 stages this contract's own `stages` field defines (open,
+        axial, selective) produced their required outputs (CodeSet,
+        CategorySet, ThemeSet respectively) in order (no
+        `forbidden_transition` violation), AND a `SaturationAssessment`
+        record exists documenting the `saturation_criterion` evaluation for
+        this execution.
+      fail_condition: >
+        Any stage's output is missing, the `CodeSet -> ThemeSet` forbidden
+        transition occurred, or no SaturationAssessment record was produced
+        for this execution.
+      grounding: >
+        EC §40 bullets "Method 與 analysis 版本化" / "AnalysisRun 可
+        reproduce" (this contract's own `id`+`version`, per
+        method.schema.yaml's Atlas §24.1 "Method 不可就地覆寫" discipline,
+        ARE that versioning); this contract's own `stages`/
+        `saturation_criterion` fields (first-party grounding -- the only one
+        of the 5 gates whose primary grounding is this same file's own
+        content rather than an external mechanism).
+    - id: authorship
+      display_name: "Authorship Gate"
+      pass_condition: >
+        Every Code/Category/Theme/Claim output object carries a valid
+        governance/epistemic-label.schema.yaml#/provenance_record; any code
+        that began as `authorship_state: AI_SUGGESTED` and was subsequently
+        accepted/edited/locked by a human correctly reflects
+        `HUMAN_APPROVED`/`HUMAN_EDITED`, and, if locked, carries
+        `locked: LOCKED_FACT`, per MP §11.2-11.3.
+      fail_condition: >
+        An output object has no `provenance_record`, or an AI-suggested code
+        is silently presented as `HUMAN_ORIGINAL`/`HUMAN_APPROVED` with no
+        recorded human Accept/Edit action.
+      grounding: >
+        EC §40 bullet "Human edits / authorship 可追"; MP §11.2 (AI:
+        Suggest/Diff/Comment/Challenge; Human: Accept/Reject/Edit/Lock) and
+        §11.3 LOCKED FACT; the MVP walkthrough's own literal worked example
+        (MVP §3 step 14-15, L74-75: Coder 1's AI_SUGGESTION -> LOCKED_FACT
+        transition); this contract's own `quality.provenance_required`/
+        `evidence_labeling_required` flags above.
+
+open_questions:
+  - id: "OQ-QCODE-1"
+    question: >
+      `cognitive_primitives` per-stage mapping (open=[DECOMPOSE,CLASSIFY],
+      axial=[GROUP,RELATE], selective=[INFER,DECIDE]) is this file's own
+      Phase 3 inference -- no Atlas composition formula exists for grounded-
+      theory coding specifically (Atlas never catalogues this method at
+      all). Should a future Atlas content pass (if one is ever written for
+      this method) supersede this inference with real cited content, the
+      same way OQ-TRIANGULATION-1 asks for evidence.triangulation?
+    owner: "operator, or whoever adds a dedicated Atlas protocol section for grounded-theory coding, if one is ever written"
+    blocks: "nothing in this file's own validity -- method.schema.yaml only requires cognitive_primitives be non-empty"
+  - id: "OQ-QCODE-2"
+    question: >
+      The selective-coding stage's output is named `ThemeSet`, not the more
+      academically precise `CoreCategorySet`, specifically to interoperate
+      with `evidence.triangulation.contract.yaml`'s existing literal
+      `inputs.required: [themes, literature]`. Should a future typed-objects
+      pass instead rename evidence.triangulation's input to `core_category`
+      (methodologically purer) rather than have THIS file bend to match IT?
+    owner: "operator, or a future review pass specifically on the
+      research.qualitative_coding <-> evidence.triangulation naming seam"
+    blocks: "nothing in this file's own validity -- outputs is a soft-reference bare string array"
+  - id: "OQ-QCODE-3"
+    question: >
+      `stages`, `saturation_criterion`, `inter_rater_reliability_requirement`,
+      and `method_specific_gates` are all ADDITIVE fields not present in
+      `method.schema.yaml`'s own declared schema body. Should a future Wave
+      formally promote one or more of them (most plausibly `stages`, if a
+      2nd/3rd multi-stage method contract is ever written) into
+      `method.schema.yaml`'s own properties block, rather than leaving them
+      as this one instance's own additive content?
+    owner: "operator, or a future Phase 3/4 compilation pass once a second multi-stage method contract exists to generalize from"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-QCODE-4"
+    question: >
+      `SaturationAssessment` (referenced by `saturation_criterion.
+      assessment_output_type`) has no corresponding
+      `cognitive/typed-objects/*.schema.yaml` file and no mother-document
+      citation -- same class of gap as evidence.triangulation.contract.yaml's
+      own `OQ-TRIANGULATION-2` for `TriangulatedFindingSet`. Should a future
+      Wave add `cognitive/typed-objects/saturation-assessment.schema.yaml`?
+    owner: "operator, via a future Phase 3/4 typed-objects compilation pass"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-QCODE-5"
+    question: >
+      `policies/ai-execution/trusted-compute-gate.policy.yaml`'s own
+      `open_questions.OQ-TCGATE-3` asks whether a standalone
+      `policies/ai-execution/research-integrity-gate.policy.yaml` should be
+      built as a sibling policy file mapping MP §56's 5 research gates onto
+      the EC Global Gates enum, PLATFORM-WIDE (not scoped to one method).
+      This file answers the question from the METHOD side (per
+      gate.schema.yaml's own method_specific mechanism) for
+      research.qualitative_coding specifically, per this task's explicit
+      instruction -- but if a future Research Recipe ever uses a DIFFERENT
+      primary method (not research.qualitative_coding) and still needs these
+      5 gates, should the PASS/FAIL logic be lifted out of this file into a
+      shared, method-independent policy file instead of being redeclared
+      per-method?
+    owner: "operator, or whoever builds the next Research-mode method contract that also needs MP §56's 5 gates"
+    blocks: "nothing in this file's own validity -- gate.schema.yaml's method_specific namespace explicitly allows (does not forbid) per-method redeclaration"
+  - id: "OQ-QCODE-6"
+    question: >
+      Is `research.qualitative_coding` correctly registered as a Phase 3,
+      non-mother-document-sourced addition to `methods/registry/
+      method-inventory.yaml` (kept in a separate `phase_3_additions` block
+      rather than `by_document`, to avoid silently implying it was migrated
+      from a mother document, which it was not, and to avoid perturbing that
+      file's own verified `entry_count: 289` invariant)? Flagged here for
+      cross-reference; the substantive reasoning lives in that file's own
+      `phase_3_additions` block.
+    owner: "operator, or a future review pass on Phase-3-original (non-transcribed) registry additions generally"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read `.ai/research/phase-1/GAP_REGISTER.yaml` P1-GAP-AI-9 (L340-347) and
+    P1-GAP-AI-3 (L292-299) directly at the cited lines. Read Master Plan §40
+    (L2033-2062), §11.1-11.3 (L936-980), and §56 (L2503-2542, verified via
+    `grep -n "^# 56\."`) directly at the cited lines. Read
+    `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` in full (151 lines),
+    specifically §0 (the P1-GAP-AI-9 confirmation), §3 steps 10-22
+    (L70-88), §4 (L101-123), §5 Acceptance Criterion 3 (L127-136), and §6
+    risk 4 (L140-147). Read `docs/adr/ADR-014-phase-5-mode-selection-research.md`
+    in full, confirming the Research Mode slice choice (and therefore this
+    file's authorization) is ACCEPTED, not merely PROPOSED. Read
+    `specs/cognitive/method.schema.yaml`, `specs/cognitive/primitive.schema.yaml`,
+    and all 4 existing `methods/contracts/*.contract.yaml` files in full as
+    the shape/style template. Read `specs/execution/gate.schema.yaml`'s
+    `gate_catalog` in full and grep-confirmed (this session) zero overlap
+    between its 20 resolved ids and MP §56's 5 research-paper gate names.
+    Read `specs/evidence/{claim,evidence,sentence-provenance}.schema.yaml`,
+    `specs/governance/epistemic-label.schema.yaml`, and
+    `policies/ai-execution/trusted-compute-gate.policy.yaml` in full,
+    confirming each is `status: ACTIVE` and already passes
+    `tests/run_golden_tests.py` before citing them as this file's
+    `method_specific_gates` grounding. Grep-confirmed (this session,
+    `grep -rni saturation`, `grep -rni "kappa\|inter-rater"`) that no mother
+    document, GAP_REGISTER, or MVP plan text anywhere states a specific
+    numeric saturation threshold -- confirming `saturation_criterion.
+    operational_rule.threshold_data_units: null` is an honest gap, not an
+    oversight. Validated against `specs/cognitive/method.schema.yaml` with
+    `jsonschema.Draft202012Validator` via `tests/run_golden_tests.py`'s own
+    method-contract conformance check (dispatches on presence of
+    `cognitive_primitives`) -- 0 errors.
+  note: >
+    No mother document was modified. This file is explicitly, honestly
+    GROUNDED ORIGINAL DESIGN, not transcription -- unlike its 4 siblings in
+    this directory. Every methodological CHOICE (3-stage open/axial/selective
+    structure; theoretical saturation as the stopping concept) is cited to a
+    real, external, independently-verifiable academic source by name
+    (Strauss & Corbin 1990/1998; Glaser & Strauss 1967) -- the same
+    real-external-standard discipline this corpus's Zero Trust / Supply
+    Chain security policies already applied for NIST/OpenSSF/CISA/Cedar/
+    Landis & Koch-class citations, per this task's own explicit instruction.
+    Every numeric THRESHOLD (`saturation_criterion.operational_rule.
+    threshold_data_units`) is left null/operator-set rather than invented,
+    per the identical restraint this corpus's own `policies/security/*`
+    files already established for `service_count_reconsideration_threshold`
+    and `cvss_tiering.rescan_requirement.interval_days`. The 5
+    `method_specific_gates` PASS/FAIL conditions are each tied to a
+    concrete, already-built, `status: ACTIVE` mechanism in this corpus
+    (claim/evidence/sentence-provenance schemas, epistemic-label schema,
+    trusted-compute-gate policy) rather than left as vague criteria.

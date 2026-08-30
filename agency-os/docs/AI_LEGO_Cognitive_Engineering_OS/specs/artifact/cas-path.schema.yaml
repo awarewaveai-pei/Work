@@ -21,11 +21,13 @@ description: >
 
   This file defines the STORAGE-LAYER path grammar only. It is distinct from,
   and does not replace, the logical `artifact://project/<id>/source/<id>`
-  Portable Artifact URI (Master Plan §59, L2588-2596) — that is a separate,
-  not-yet-built spec file (`specs/artifact/portable-uri.schema.yaml`, not in
-  scope for this task) that may resolve TO a cas-path at read time. The two
-  layers are not in conflict; conflating them was not a finding raised by
-  Phase 0/1 and is not addressed here.
+  Portable Artifact URI (Master Plan §59, L2588-2596) — that is a separate
+  spec file, **BUILT 2026-08-30**: `specs/artifact/portable-uri.schema.yaml`
+  (`definitions.artifact_uri.resolved_cas_path` hard-`$ref`s this file's own
+  `#/definitions/cas_path` for the resolve-at-read-time relationship this
+  comment originally forward-referenced). The two layers are not in
+  conflict; conflating them was not a finding raised by Phase 0/1 and is not
+  addressed here.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §58 Immutable-first, global path grammar — SUPERSEDED (L2570-2584, literal grammar at L2583)"

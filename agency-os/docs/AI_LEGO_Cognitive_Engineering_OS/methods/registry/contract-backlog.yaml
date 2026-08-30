@@ -186,6 +186,35 @@ tier_1:
     contracts for the intersection. That comparison has not happened; this
     file records the TODO rather than inventing a list to fill it.
   no_method_ids_listed: true
+  first_concrete_entry:
+    # NEW (2026-08-30, this task): the Phase 5 slice choice is no longer
+    # NOT_STARTED -- docs/adr/ADR-014-phase-5-mode-selection-research.md
+    # (ACCEPTED) selected Research Mode. This does NOT retroactively populate
+    # the general 15-25-method Tier 1 list above -- the Claude/Codex
+    # candidate-method-intersection exercise `note` describes has still not
+    # run, so `no_method_ids_listed: true` above stays accurate for that
+    # general list. What HAS changed: `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+    # §4 (L105) individually NAMES one specific method contract as a required
+    # Phase-3 deliverable of the now-selected slice, independent of the
+    # general intersection exercise -- same class of individually-mandated
+    # (not derived-by-policy) addition as this file's own
+    # `tier_2.explicit_entries.finance.financial_assumptions` entry below.
+    method_id: "research.qualitative_coding"
+    contract_status: complete
+    tier: 1
+    mandated_by: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 (L105), §3 walkthrough step 12-13 (L72-73); slice selection ratified by docs/adr/ADR-014-phase-5-mode-selection-research.md (ACCEPTED 2026-08-30)"
+    source: "methods/contracts/research.qualitative_coding.contract.yaml (built this task, GROUNDED ORIGINAL DESIGN per P1-GAP-AI-9 -- no mother-document source exists for this method, unlike every Tier 0 entry above)"
+    note: >
+      Not placed under `tier_0` above: §4 Tier 0's own group (b) definition
+      is scoped to "Atlas 與 Master Plan 全文反覆拿來當『這是怎麼用的』範例
+      的方法" (methods the mother documents themselves repeatedly cite as
+      teaching examples) -- `research.qualitative_coding` is the opposite
+      case, a method NO mother document defines at all. Recorded here as
+      Tier 1's first concrete entry instead, since Tier 1's own scope (methods
+      the SELECTED MVP slice's Method Selection/Workflow steps will actually
+      invoke) is the correct category once ADR-014 made a slice selection
+      real. The general 15-25-entry Tier 1 backfill (Claude/Codex
+      intersection exercise) remains a SEPARATE, still-open action item.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

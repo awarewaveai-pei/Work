@@ -178,9 +178,9 @@ reversal:
 ## Migration / Rollback
 
 **若採納 Option A（含 Codex 覆審後修正版）**：
-1. 新建 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/Architecture-Constitution-v1.md`（路徑待操作者確認，建議與三母文件同層）。
-2. MP §0.0.2（L60-84）與 §90 item 1（L3785 一行）改為指標行；EC §2 / §2.1（L90-137）改為指標行。
-3. **（Codex 覆審後新增）** EC §3.1（L169-185）Required Document Resolution 清單新增第 8 步；EC §4（L218-253）Document Registry 範例新增 `ai-lego.architecture-constitution` entry，`required: true`。
+1. ~~新建 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/Architecture-Constitution-v1.md`（路徑待操作者確認，建議與三母文件同層）~~ ——**已完成（2026-08-30）**：檔案已建於建議路徑，內容三塊（統一裁決鏈、統一文件職責表、No Legal Hallucination Rule）逐字轉錄自本 ADR 已批准的 Option A 描述，非新設計。這是新增檔案，非編輯既有母文件，不受 ADR-006 proposal 流程約束。
+2. MP §0.0.2（L60-84）與 §90 item 1（L3785 一行）改為指標行；EC §2 / §2.1（L90-137）改為指標行——**這是編輯既有母文件，仍待 `.ai/proposals/` 流程操作者核准**，見 `.ai/proposals/001-architecture-constitution-mp-pointer/` 等對應提案（2026-08-30 建立，`status: DRAFT`）。
+3. **（Codex 覆審後新增）** EC §3.1（L169-185）Required Document Resolution 清單新增第 8 步；EC §4（L218-253）Document Registry 範例新增 `ai-lego.architecture-constitution` entry，`required: true`——**同上，待操作者核准的獨立提案**。
 4. 因 repo 禁建 branch（settings deny），全部編輯直接在 `main` 完成，比照 CLAUDE.md「Git 分支」規則。
 5. `open-questions.yaml` OQ-9 標記 `RESOLVED`，加註本 ADR 檔名。
 

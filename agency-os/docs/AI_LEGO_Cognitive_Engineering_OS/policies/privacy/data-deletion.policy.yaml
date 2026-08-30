@@ -1,0 +1,477 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/privacy/data-deletion.policy.yaml"
+title: Data Deletion Trigger & SLA Policy (EC §31 policy layer)
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Thin policy-layer wrapper. `specs/execution/data-deletion.schema.yaml`
+  already fully specifies EC §31's 10-step Data Deletion Contract pipeline,
+  including the ADR-002 `personal_data_crypto_shred` vs. `production_row`
+  branch split — that pipeline is embedded below by hard `$ref`
+  (`deletion_pipeline`), NOT re-derived or restated. This file adds only
+  the POLICY-LEVEL content EC §31's own prose and ADR-002 never state:
+
+  (1) WHEN/under what pathway may a deletion pipeline run be triggered at
+  all. EC §31's own "Authorization" step name (L1230) carries zero further
+  definition — no request-type or role vocabulary appears anywhere in EC
+  §31 or ADR-002. The one piece of this question the mother-document corpus
+  DOES pin down is the authority NUMERAL: EC §9's A4 tier ("Irreversible /
+  External High-impact", L515-528) lists "delete production data" as a
+  worked example requiring `explicit_human_authority`, and Master Plan §65
+  "Agent ≠ Authority" (L2744-2769) already establishes the mediated
+  `Policy Engine -> Permission Check -> Human Approval / Auto Rule`
+  pathway — formalized for `agent_action: DELETE` by
+  `policies/ai-execution/forbidden-actions.yaml`, which itself soft-
+  references this suite's `data-deletion.schema.yaml` Authorization step as
+  that pathway's DSAR-specific instantiation. What remains genuinely
+  undefined is WHICH concrete human role satisfies "explicit_human_authority"
+  for a deletion request — and that is NOT a deletion-specific gap this
+  file invents a second copy of: it is the exact, already-disclosed,
+  corpus-wide gap `specs/execution/authority.schema.yaml`'s
+  `role_to_authority_mapping` records as `SKELETON_ONLY` (P1-GAP-SEC-6,
+  `open_questions.OQ-AUTH-1`). This file reuses that gap by reference
+  rather than forking it.
+
+  (2) What SLA/timing applies to a deletion request. EC §31 (L1225-1251)
+  states NO number of any kind — the section is the 10-step diagram plus
+  one sentence, "Soft delete 不等於合規刪除," and nothing else (re-read in
+  full for this file; confirmed zero timing language). ADR-002's
+  Migration/Rollback section cites "GDPR Art. 12(3) 一個月，可延長一次"
+  (L139), but ONLY as an illustrative example of "監理機關允許的回覆窗口"
+  bounding the `operational_key_vault_incident` rollback scenario's
+  remediation target (Key Vault outage recovery) — NOT as EC §31's general
+  per-request deadline. Separately, Master Plan §100 (L4280-4287)
+  explicitly assigns "法定期限" (statutory deadline) determination to
+  "每個 Jurisdiction Pack" — the mother-document architecture's own design
+  is that this number varies by jurisdiction, not a single constant this
+  file could safely guess (even one as plausible-looking as GDPR's). Both
+  gaps are recorded honestly below as required-but-unpopulated fields plus
+  `open_questions` entries, following this suite's own
+  `policies/ai-execution/exception-policy.yaml#/definitions/expiry_policy`
+  and `specs/execution/authority.schema.yaml#/role_to_authority_mapping`
+  precedent for representing a genuinely undecided value — not invented.
+
+  This file also gives the `personal_data_crypto_shred` branch's Key
+  Destruction Record evidence a concrete shape via hard `$ref` into
+  `specs/security/key-vault-lifecycle.schema.yaml#/definitions/
+  key_destruction_record` — closing, at the policy layer, the exact gap
+  `data-deletion.schema.yaml`'s own `verification.note` names as
+  intentionally left open at the mechanism layer ("does not read or
+  hard-depend on specs/security/key-vault-lifecycle.schema.yaml ...
+  referenced by name only (soft reference, no `$ref`)").
+
+  This file does NOT edit the mother documents, ADR-002, or either
+  `$ref`-ed mechanism schema.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1225-1251) — re-read in full for this file: confirms zero trigger-role and zero timing/SLA language anywhere in the section, beyond the 10-step diagram and 'Soft delete 不等於合規刪除' (L1251)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L515-528) — A4 tier's 'delete production data' worked example, requiring explicit_human_authority; the only mother-document text that pins any part of the trigger question"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Migration/Rollback, Codex-revised (L137-140) — the GDPR Art. 12(3) citation's actual, narrower scope (operational_key_vault_incident remediation target only, not a general per-request SLA)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §100 Global Privacy Engine (L4259-4287) — 'Deletion' as one of 11 abstract Rights (L4268), and '法定期限'/'身分驗證要求' as two of six things '每個 Jurisdiction Pack 決定' (L4280-4287) — the mother-document basis for why this file does not hardcode a single SLA number or role"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §65 Agent ≠ Authority (L2744-2769) — the Policy Engine -> Permission Check -> Human Approval / Auto Rule mediated path, already formalized for agent_action DELETE by policies/ai-execution/forbidden-actions.yaml"
+  - "policies/ai-execution/forbidden-actions.yaml#/seed_content (DELETE rule, `mediated_path` + `mechanism_ref`) — the existing soft cross-reference this file's `trigger.authorization_pathway` transcribes verbatim rather than restates independently"
+  - "specs/execution/authority.schema.yaml#/authority_level and #/role_to_authority_mapping — the A0-A4 enum this file's `trigger.authority_level_required` binds by hard $ref, and the pre-existing, corpus-wide 'which human role' gap (SKELETON_ONLY, P1-GAP-SEC-6, OQ-AUTH-1) this file's `trigger.initiating_role` reuses rather than duplicates"
+  - "specs/execution/data-deletion.schema.yaml#/deletion_request — the 10-step pipeline mechanism this file embeds by hard $ref (`deletion_pipeline`), not restated"
+  - "specs/security/key-vault-lifecycle.schema.yaml#/definitions/key_destruction_record — the crypto-shred branch's evidence shape this file binds by hard $ref (`key_destruction_evidence`), closing data-deletion.schema.yaml's own declared soft-reference-only gap to this file"
+  - "specs/jurisdiction/pack.schema.yaml — soft reference only (no $ref): this file's own `freshness`/`sla_table` covers Legal Source review cadence, a DIFFERENT concept from MP §100's per-Right statutory response deadline; that field does not yet exist in pack.schema.yaml either, a second, real gap this file surfaces but does not fix (out of this task's boundary, same disclosure style as data-deletion.schema.yaml's own MRSP-dd-1 entry)"
+
+decided_by: >
+  No new ADR. This file transcribes EC §31 (confirmed absence of
+  trigger/SLA language), EC §9 (the A4 authority-level worked example),
+  ADR-002's Migration/Rollback section (the GDPR citation's actual, narrow
+  scope), and MP §100 (the jurisdiction-pack deferral) as-is. The
+  `deletion_pipeline`/`key_destruction_evidence` $ref bindings and the
+  `OPEN_QUESTION`/`SKELETON_ONLY` field shapes are Phase 3 Low-risk
+  compilation decisions (see `compilation_decisions`), following this
+  suite's own `exception-policy.yaml#/definitions/expiry_policy` and
+  `authority.schema.yaml#/role_to_authority_mapping` precedent for
+  representing a genuinely undecided value — not a new architecture
+  decision.
+
+compilation_decisions:
+  - question: >
+      Should this file restate or re-type any part of EC §31's 10-step
+      sequence or the branch-specific step overrides already fully
+      specified by `specs/execution/data-deletion.schema.yaml`?
+    decision: >
+      No. `deletion_pipeline` is a hard `$ref` to
+      `specs/execution/data-deletion.schema.yaml#/deletion_request` — the
+      entire pipeline instance shape, embedded whole, zero fields
+      re-declared.
+    reasoning: >
+      Matches this suite's established embedded-`$ref` convention
+      (`policies/ai-execution/exception-policy.yaml`'s
+      `approval_requirement.risk_tier` $ref into `risk-tier.schema.yaml`,
+      `authority.yaml`'s `$ref` into `authority.schema.yaml#/authority_level`)
+      and this task's own explicit boundary: do not re-derive or duplicate
+      the pipeline data-deletion.schema.yaml already covers. Duplicating
+      any of its 10 steps here would create exactly the two-copies-of-the-
+      same-text drift risk `data-deletion.schema.yaml`'s own first
+      `compilation_decisions` entry was written to avoid.
+  - question: >
+      `data-deletion.schema.yaml`'s own `verification.note` states it
+      deliberately does NOT hard-`$ref` `specs/security/
+      key-vault-lifecycle.schema.yaml` ("referenced by name only (soft
+      reference, no `$ref`)"), because that file was being authored
+      concurrently by a sibling agent in the same session. That
+      concurrency constraint no longer applies — both files are now BUILT
+      and ACTIVE. Should THIS file bind the two mechanisms together with a
+      real `$ref`, or preserve the same soft-reference-only stance?
+    decision: >
+      Hard `$ref`. `key_destruction_evidence` (required only for the
+      `personal_data_crypto_shred` branch, see `allOf` below) is typed as
+      `ai-lego://specs/security/key-vault-lifecycle.schema.yaml#/definitions/
+      key_destruction_record`.
+    reasoning: >
+      This task's own instructions ask this policy file to close exactly
+      this gap. Doing the binding HERE (a new, additive policy file)
+      rather than retroactively editing `data-deletion.schema.yaml`'s
+      already-reviewed, already-tested body keeps that file's content
+      untouched — the concrete Key Destruction Record shape becomes real
+      at the layer whose entire job is to add what the mechanism layer
+      left as a named-but-unbound gap, not by re-opening a file this
+      task's boundary does not include.
+  - question: >
+      Should `key_destruction_evidence` be unconditionally required (since
+      every instance of this policy file's shape presumably concerns a
+      deletion request), or conditioned on `deletion_pipeline.deletion_type`?
+    decision: >
+      Conditioned via `allOf`/`if`/`then`: required when
+      `deletion_pipeline.deletion_type == personal_data_crypto_shred`,
+      and explicitly FORBIDDEN (via `not: {required: [...]}`) when
+      `deletion_pipeline.deletion_type == production_row`.
+    reasoning: >
+      Mirrors this exact sibling directory's own established style —
+      `pii-redaction.policy.yaml`'s `allOf`/`if`/`then` deriving
+      `redaction_required` from other fields — and directly implements
+      `data-deletion.schema.yaml`'s own `constraints` entry 3 ("A
+      personal_data_crypto_shred request's Deletion Evidence step MUST
+      reference both a PersonalDataRedacted event AND a Key Destruction
+      Record"), which that file left as an opaque `evidence_ref` string
+      with no schema-enforced counterpart object. The `production_row`
+      forbid-branch mirrors `data-deletion.schema.yaml`'s own
+      `subject_id`/`target_refs` mutual-exclusivity pattern (never allow a
+      crypto-shred-only artifact on the other branch's instance).
+  - question: >
+      Should `trigger.initiating_role` define a NEW, deletion-specific
+      role/request-type enum (e.g. `[data_subject, legal_team, support_agent]`),
+      since ADR-002 and EC §31 name no such vocabulary at all?
+    decision: >
+      No new registry. `trigger.initiating_role` is a typed placeholder
+      (`status: SKELETON_ONLY | DEFINED`, `gap_description`, `entries: []`)
+      that names `specs/execution/authority.schema.yaml#/role_to_authority_mapping`
+      as the SAME gap, not a second one. Separately, `trigger.authority_level_required`
+      pins the one thing the corpus DOES decide: `A4` (hard `$ref` +
+      `const`), per EC §9's "delete production data" worked example.
+    reasoning: >
+      EC §9 A4's "Irreversible / External High-impact" category covers
+      both branches — the `production_row` branch matches A4's worked
+      example verbatim, and the `personal_data_crypto_shred` branch's DEK
+      destruction is irreversible-by-design (ADR-002 Options Considered
+      table's Reversibility row: "銷毀前完全可逆；銷毀後依設計不可逆") —
+      but naming WHICH human role may exercise or grant A4 is exactly
+      `authority.schema.yaml`'s own disclosed, corpus-wide P1-GAP-SEC-6
+      (`OQ-AUTH-1`). Inventing a second, deletion-specific role registry
+      here would fork that one open question into two independently-
+      drifting copies — the exact duplicate-definition risk this suite's
+      established practice (see `data-deletion.schema.yaml`'s and
+      `pii-redaction.policy.yaml`'s own compilation_decisions) exists to
+      avoid.
+  - question: >
+      ADR-002 does cite a real, verifiable number — GDPR Art. 12(3), one
+      month, extendable once. Should `sla.default_response_window_days`
+      default to that number (e.g. 30) as a reasonable placeholder, since
+      SOME real value beats `null`?
+    decision: >
+      No. `sla.default_response_window_days` stays `null` while
+      `sla.status == OPEN_QUESTION`. The GDPR citation is preserved
+      verbatim, but scoped explicitly to
+      `sla.operational_incident_remediation_window_example` (the ADR-002
+      Rollback Scenario 1 remediation target only) — never generalized
+      into this file's own default SLA field.
+    reasoning: >
+      ADR-002's own text introduces that number with "如" (e.g./such as),
+      framing GDPR Art. 12(3) as ONE illustrative regulatory window, not a
+      chosen universal constant — and MP §100 (L4284) explicitly assigns
+      "法定期限" determination to "每個 Jurisdiction Pack", meaning the
+      mother-document architecture's own design intent is per-jurisdiction
+      variance, not a single hardcoded value. Silently promoting a
+      narrowly-scoped rollback-remediation citation into this file's
+      general per-request SLA default would misrepresent a scoped ADR
+      citation as a decided general policy — the same class of
+      claim-before-verify violation R4 (`AGENTS.md`) forbids, and the
+      "leave a genuinely undecided value null with a documented reason"
+      technique this suite already uses in
+      `exception-policy.yaml#/definitions/expiry_policy` (no horizon
+      number exists in the corpus) and `zero-trust.policy.yaml`'s
+      pre-resolution `idp_provider` shape.
+  - question: >
+      Should `sla.status` be a single fixed placeholder value (`const:
+      OPEN_QUESTION`), or a 2-value enum (`[DEFINED, OPEN_QUESTION]`) that
+      stays valid once a real number is eventually set?
+    decision: >
+      2-value enum, gated by `allOf`/`if`/`then`
+      (`OPEN_QUESTION` -> `default_response_window_days` must be `null`;
+      `DEFINED` -> it must be a real integer).
+    reasoning: >
+      Directly mirrors `exception-policy.yaml#/definitions/expiry_policy`'s
+      own `status: enum [DEFINED, OPEN_QUESTION]` shape for the identical
+      situation (a nullable numeric value pending an operator/ADR
+      decision) — reusing an established shape convention for a
+      structurally identical gap, rather than inventing a third naming
+      scheme (`authority.schema.yaml` uses `SKELETON_ONLY` for a role
+      MAPPING gap specifically; this is a single SCALAR gap, closer to
+      `expiry_policy`'s shape than to `role_to_authority_mapping`'s).
+
+# ---------------------------------------------------------------------------
+# Schema body — one deletion request's trigger-authorization + SLA record,
+# wrapping the full EC §31 pipeline (embedded by $ref, not restated).
+# ---------------------------------------------------------------------------
+type: object
+required: [trigger, sla, deletion_pipeline]
+properties:
+
+  trigger:
+    type: object
+    description: >
+      WHEN/under what pathway this deletion pipeline run may be triggered
+      at all — the policy-level content missing from EC §31's own prose
+      (see file `description` above).
+    required: [authorization_pathway, authority_level_required, initiating_role]
+    properties:
+      authorization_pathway:
+        type: object
+        required: [flow, source, direct_agent_execution_forbidden]
+        properties:
+          flow:
+            type: string
+            const: "Agent -> Intent -> Policy Engine -> Permission Check -> Human Approval / Auto Rule -> Execution"
+          source:
+            type: string
+            const: >-
+              Master Plan §65 Agent ≠ Authority (L2744-2769); already
+              formalized for agent_action DELETE by
+              policies/ai-execution/forbidden-actions.yaml#/seed_content,
+              which itself soft-references this suite's
+              data-deletion.schema.yaml Authorization step as the
+              DSAR-specific instantiation of this same mediated path.
+          direct_agent_execution_forbidden:
+            type: boolean
+            const: true
+            description: >
+              An AI agent MUST NOT execute this pipeline's Deletion step
+              directly, bypassing the mediated path above — same rule as
+              `forbidden-actions.yaml`'s `agent_action: DELETE` entry,
+              restated here because it is this file's own trigger gate,
+              not merely an adjacent policy.
+      authority_level_required:
+        allOf:
+          - $ref: "ai-lego://specs/execution/authority.schema.yaml#/authority_level"
+          - const: A4
+        description: >
+          EC §9 A4 ("Irreversible / External High-impact", L515-528) lists
+          "delete production data" as a worked example requiring
+          `explicit_human_authority` — directly matching the
+          `production_row` branch, and covering the
+          `personal_data_crypto_shred` branch under the same category's
+          general framing (ADR-002's own Reversibility note: destruction
+          is irreversible by design). This is the one piece of "who/what
+          may trigger this pipeline" the mother-document corpus DOES pin
+          down — the authority NUMERAL, not the human role NAME (see
+          `initiating_role` below).
+      initiating_role:
+        type: object
+        description: >
+          Deliberately NOT a new, deletion-specific role/request-type
+          registry — see compilation_decisions. Reuses
+          `specs/execution/authority.schema.yaml#/role_to_authority_mapping`'s
+          pre-existing, corpus-wide gap (P1-GAP-SEC-6) by reference.
+        required: [status, gap_description, entries]
+        properties:
+          status:
+            type: string
+            enum: [SKELETON_ONLY, DEFINED]
+          gap_description:
+            type: string
+            const: >-
+              WHICH concrete human role/request-type may exercise or grant
+              the A4 authority this pipeline requires is not decided by
+              any mother document, ADR, or this file — it is the same
+              open question specs/execution/authority.schema.yaml's
+              role_to_authority_mapping already records as SKELETON_ONLY
+              (P1-GAP-SEC-6, open_questions.OQ-AUTH-1). This file
+              deliberately does not fork that gap into a second,
+              deletion-specific copy.
+          entries:
+            type: array
+            default: []
+            description: >
+              Mirrors role_to_authority_mapping.entries — stays empty
+              until the SAME operator answer that resolves OQ-AUTH-1
+              populates both.
+
+  sla:
+    type: object
+    description: >
+      What timing/SLA applies to a deletion request — the policy-level
+      content EC §31 never states (see file `description` above).
+    required: [status, default_response_window_days, jurisdiction_dependent, operational_incident_remediation_window_example]
+    properties:
+      status:
+        type: string
+        enum: [DEFINED, OPEN_QUESTION]
+      default_response_window_days:
+        type: [integer, "null"]
+        description: >
+          `null` while `status == OPEN_QUESTION` (see `allOf` below and
+          compilation_decisions — no universal number exists anywhere in
+          the corpus; MP §100 assigns this to per-Jurisdiction-Pack
+          determination instead).
+      jurisdiction_dependent:
+        type: boolean
+        const: true
+        description: >
+          Per MP §100 (L4280-4287): "法定期限" is one of six things "每個
+          Jurisdiction Pack 決定" — this policy asserts the number varies
+          by jurisdiction rather than pretending a single constant exists.
+          Soft reference only (no $ref): specs/jurisdiction/pack.schema.yaml
+          does not yet carry a dedicated field for this specific per-Right
+          statutory deadline either (its own `freshness`/`sla_table`
+          covers Legal Source review cadence, a different concept) — a
+          second, real gap this file surfaces but does not fix.
+      operational_incident_remediation_window_example:
+        type: object
+        description: >
+          The one real, verifiable timing number the corpus does contain
+          — preserved here with its ACTUAL, narrow scope, never
+          generalized into `default_response_window_days` above (see
+          compilation_decisions).
+        required: [applies_to, citation, source]
+        properties:
+          applies_to:
+            type: string
+            const: >-
+              rollback.scenarios.operational_key_vault_incident
+              remediation target ONLY
+              (specs/execution/data-deletion.schema.yaml#/rollback and
+              specs/security/key-vault-lifecycle.schema.yaml#/definitions/rollback_scenario)
+              — NOT this policy's general per-request SLA.
+          citation:
+            type: string
+            const: "GDPR Art. 12(3): one month, extendable once (cited as an illustrative example, not a chosen universal constant)."
+          source:
+            type: string
+            const: "ADR-002 Migration/Rollback, Codex-revised, L139: \"如 GDPR Art. 12(3) 一個月，可延長一次\"."
+    allOf:
+      - if:
+          properties: { status: { const: OPEN_QUESTION } }
+          required: [status]
+        then:
+          properties: { default_response_window_days: { const: null } }
+      - if:
+          properties: { status: { const: DEFINED } }
+          required: [status]
+        then:
+          required: [default_response_window_days]
+          properties: { default_response_window_days: { type: integer } }
+
+  deletion_pipeline:
+    $ref: "ai-lego://specs/execution/data-deletion.schema.yaml#/deletion_request"
+
+  key_destruction_evidence:
+    $ref: "ai-lego://specs/security/key-vault-lifecycle.schema.yaml#/definitions/key_destruction_record"
+    description: >
+      REQUIRED when `deletion_pipeline.deletion_type ==
+      personal_data_crypto_shred`; FORBIDDEN when
+      `deletion_pipeline.deletion_type == production_row` (see `allOf`
+      below). Gives `data-deletion.schema.yaml`'s Deletion/Deletion
+      Evidence step_overrides for the crypto-shred branch a concrete,
+      schema-checkable object instead of an opaque `evidence_ref` string.
+
+allOf:
+  - if:
+      properties:
+        deletion_pipeline: { properties: { deletion_type: { const: personal_data_crypto_shred } } }
+      required: [deletion_pipeline]
+    then:
+      required: [key_destruction_evidence]
+  - if:
+      properties:
+        deletion_pipeline: { properties: { deletion_type: { const: production_row } } }
+      required: [deletion_pipeline]
+    then:
+      not:
+        required: [key_destruction_evidence]
+
+constraints:
+  - "key_destruction_evidence.subject_id, when present, MUST equal deletion_pipeline.subject_id — both identify the same data subject; a mismatch means the wrong key's destruction record was attached to this request. Not JSON-Schema-enforced across these two independently-$ref'd sibling objects (same plain-English-constraints convention as data-deletion.schema.yaml's and pii-redaction.policy.yaml's own `constraints` blocks)."
+  - "trigger.authority_level_required (A4) pins the MINIMUM authority level per EC §9's 'delete production data' worked example; it does NOT by itself say WHICH human role satisfies A4's explicit_human_authority requirement for a specific request — see trigger.initiating_role and open_questions.OQ-DD-1."
+  - "sla.default_response_window_days is intentionally null while sla.status == OPEN_QUESTION; jurisdiction_dependent: true means any real number MUST eventually be resolved per the applicable Jurisdiction Pack for the specific request's jurisdiction, not asserted as one universal constant by this file."
+
+open_questions:
+  - id: "OQ-DD-1"
+    question: >
+      Same question as specs/execution/authority.schema.yaml's OQ-AUTH-1,
+      restated in this file's own context: what is the real, complete list
+      of organizational roles/titles authorized to initiate or approve a
+      data deletion request (EC §31's Authorization/Approval steps), and
+      for each, does it satisfy the A4 `explicit_human_authority`
+      requirement this file's `trigger.authority_level_required` pins?
+      This is a business/organizational fact, not a technical compilation
+      question — no mother document, ADR, or Phase 0-2 research artifact
+      names it.
+    owner: "operator (the same answer that resolves OQ-AUTH-1 resolves this)"
+    blocks: "nothing in this file's own validity — trigger.initiating_role.status: SKELETON_ONLY is a valid, honest value until answered"
+  - id: "OQ-DD-2"
+    question: >
+      What is the actual per-request SLA/response-deadline for a data
+      deletion request? EC §31 states none; ADR-002 cites GDPR Art. 12(3)
+      only for the operational-incident rollback scenario; MP §100 assigns
+      "法定期限" determination to each Jurisdiction Pack, but
+      specs/jurisdiction/pack.schema.yaml does not yet carry a field for
+      this specific per-Right statutory deadline (its `freshness`/
+      `sla_table` covers a different concept, Legal Source review
+      cadence). Resolving this requires either (a) a Round 2 ADR/operator
+      decision naming a default response window for jurisdictions with no
+      applicable pack yet, or (b) extending pack.schema.yaml with a real
+      field for MP §100's "法定期限" and wiring this policy's `sla` to
+      resolve against it per-request.
+    owner: "operator, or a future Round 2 ADR / pack.schema.yaml revision"
+    blocks: "nothing in this file's own validity — sla.status: OPEN_QUESTION / default_response_window_days: null is a valid, honest value until answered; blocks a future per-jurisdiction SLA enforcement mechanism, not this schema"
+
+verification:
+  method: >
+    Read specs/execution/data-deletion.schema.yaml in full (518 lines) and
+    specs/security/key-vault-lifecycle.schema.yaml in full (558 lines)
+    before drafting this file, to confirm the exact node paths
+    (`#/deletion_request`, `#/definitions/key_destruction_record`) this
+    file's `$ref`s target. Re-read
+    docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md in
+    full (154 lines), grepped AI_LEGO_Cognitive_Engineering_Os_Global_
+    Execution_Contract_v1.md §31 (L1225-1251) directly at the source lines
+    to confirm zero trigger/SLA language, and EC §9 (L478-529) for the A4
+    worked example. Read AI_LEGO_Cognitive_Engineering_Os_Global_Master_
+    Plan_v1.md §100 (L4259-4287) directly to confirm the
+    per-Jurisdiction-Pack deferral of "法定期限"/"身分驗證要求". Read
+    policies/ai-execution/forbidden-actions.yaml's DELETE rule and
+    specs/execution/authority.schema.yaml's `role_to_authority_mapping`/
+    `OQ-AUTH-1` in full to confirm this file reuses, rather than
+    duplicates, the existing role gap. Read
+    policies/privacy/pii-redaction.policy.yaml in full as this directory's
+    closest sibling for header/compilation_decisions/open_questions style.
+    Read specs/jurisdiction/pack.schema.yaml's `freshness`/`sla_table`
+    section directly to confirm it does NOT already cover MP §100's
+    per-Right statutory-deadline concept (a distinct concept from Legal
+    Source review cadence), before citing it only as a soft, non-`$ref`
+    reference.
+  note: >
+    No mother document, ADR, or either $ref-ed mechanism schema
+    (data-deletion.schema.yaml, key-vault-lifecycle.schema.yaml) was
+    modified to produce this file. The two hard `$ref` bindings, the
+    `allOf`/`if`/`then` conditional requirement/prohibition of
+    `key_destruction_evidence` by branch, and the `OPEN_QUESTION`/
+    `SKELETON_ONLY` placeholder shapes for `sla` and `trigger.initiating_role`
+    are this file's own additive Phase 3 compilation decisions, individually
+    justified above — no SLA number or role name was invented for either
+    genuinely undecided field.

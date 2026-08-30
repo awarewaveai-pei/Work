@@ -1,0 +1,106 @@
+schema_id: "ai-lego://specs/domain/knowledge-canvas.schema.yaml"
+target_ref: ""
+description: >
+  Exercises knowledge-canvas.schema.yaml's core enforced rule (MP §11.2): a
+  canvas_annotation's actor/action allOf/if/then must reject an AI actor
+  claiming a Human-only verb and a Human actor claiming an AI-only verb, in
+  BOTH directions. Also exercises the Evidence contribution_type's required
+  evidence_ref (hard $ref into evidence.schema.yaml), the Task
+  contribution_type's soft/optional task_ref, the content_type/
+  contribution_type closed enums, and the attachment -> artifact_uri hard
+  $ref into domain/artifact-uri.schema.yaml (built the same task).
+valid:
+  - name: full_canvas_with_all_five_collections
+    instance:
+      canvas_id: "CANVAS-001"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      nodes:
+        - node_id: "NODE-1"
+          content_type: text
+          text_content: "Remote workers report burnout after 6 months."
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
+        - node_id: "NODE-2"
+          content_type: pdf
+          attachment_id: "ATT-1"
+          provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null }
+      edges:
+        - edge_id: "EDGE-1"
+          source_node_id: "NODE-1"
+          target_node_id: "NODE-2"
+          edge_type: supports
+      annotations:
+        - annotation_id: "ANN-1"
+          target_node_id: "NODE-1"
+          actor: AI
+          action: suggest
+          content: "Consider tagging this as a candidate theme."
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+        - annotation_id: "ANN-2"
+          target_node_id: "NODE-1"
+          actor: Human
+          action: lock
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_APPROVED, locked: null }
+      attachments:
+        - attachment_id: "ATT-1"
+          content_type: pdf
+          artifact_uri:
+            uri: "artifact://tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1"
+            segments:
+              - { segment_type: tenant, segment_id: TEN-NORDBROOK }
+              - { segment_type: project, segment_id: PRJ-BURNOUT-01 }
+              - { segment_type: source, segment_id: SRC-INT-P1 }
+          filename: "interview-p1.pdf"
+      human_contributions:
+        - contribution_id: "HC-1"
+          contribution_type: opinion
+          target_node_id: "NODE-1"
+          content: "This looks like a recurring theme across interviews."
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
+        - contribution_id: "HC-2"
+          contribution_type: evidence
+          evidence_ref:
+            evidence_id: "E-1"
+            content: "P1 direct quote: 'I stopped sleeping properly after month 4.'"
+            provenance: { epistemic_type: EVIDENCE, authorship_state: SOURCE_QUOTATION }
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+        - contribution_id: "HC-3"
+          contribution_type: task
+          task_ref: "TASK-followup-with-p2"
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
+invalid:
+  - name: ai_actor_claims_human_only_action
+    instance:
+      canvas_id: "CANVAS-002"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      annotations:
+        - annotation_id: "ANN-BAD-1"
+          target_node_id: "NODE-1"
+          actor: AI
+          action: merge
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+    reason: "actor: AI may only take {suggest,diff,comment,challenge} per MP §11.2 -- 'merge' is a Human-only verb; the allOf/if/then on canvas_annotation must reject this."
+  - name: human_actor_claims_ai_only_action
+    instance:
+      canvas_id: "CANVAS-003"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      annotations:
+        - annotation_id: "ANN-BAD-2"
+          target_node_id: "NODE-1"
+          actor: Human
+          action: suggest
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
+    reason: "actor: Human may only take {accept,reject,edit,lock,branch,merge} per MP §11.2 -- 'suggest' is an AI-only verb; the allOf/if/then must reject this in the reverse direction too."
+  - name: evidence_contribution_missing_evidence_ref
+    instance:
+      canvas_id: "CANVAS-004"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      human_contributions:
+        - contribution_id: "HC-BAD-1"
+          contribution_type: evidence
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+    reason: "contribution_type: evidence requires evidence_ref per this schema's allOf rule -- an Evidence-typed contribution with no evidence content is a contradiction; omitting it must fail."
+  - name: canvas_missing_tenant_id
+    instance:
+      canvas_id: "CANVAS-005"
+      nodes: []
+    reason: "tenant_id is required at the Canvas root (hard $ref to domain/tenant.schema.yaml#/properties/tenant_id) -- every Canvas must be tenant-scoped."

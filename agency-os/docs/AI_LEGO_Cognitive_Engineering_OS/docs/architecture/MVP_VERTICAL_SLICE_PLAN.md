@@ -108,7 +108,7 @@ Date: 2026-08-29
 
 **`/specs/workflow/`**：`workflow-ir.schema.yaml`（MP §9）
 
-**`/specs/execution/`**：`risk-tier.schema.yaml`（ADR-004）、`execution-manifest.schema.yaml`（MP §69 + ADR-001 Architecture Constitution 欄位）、`execution-state-machine.schema.yaml`（EC §10，含 `BLOCKED`／`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`）、`capability-contract.schema.yaml`（含 `transcribe/run_statistics/execute_method/validate_artifact`）、`audit.schema.yaml`（MP §82）、`rollback-plan.schema.yaml`、`event-ledger.schema.yaml`（依 ADR-002 擴充加密 envelope 欄位）、`personal-data-redacted-event.schema.yaml`（ADR-002 Option C）
+**`/specs/execution/`**：`risk-tier.schema.yaml`（ADR-004）、`execution-manifest.schema.yaml`（MP §69 + ADR-001 Architecture Constitution 欄位）、`execution-state-machine.schema.yaml`（EC §10，含 `BLOCKED`／`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`——**已建成 2026-08-30**，`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED` 依 status-codes.schema.yaml 既有裁決作為 METHOD_RESOLUTION_BLOCKED 的 deprecated alias 處理，非另立新碼）、`capability-contract.schema.yaml`（含 `transcribe/run_statistics/execute_method/validate_artifact`）、`audit.schema.yaml`（MP §82——**已建成 2026-08-30**，同時收斂 EC §66 Audit Event 的 who/what/when/where/why 決策敘事型形狀，見該檔 `compilation_decisions`）、`rollback-plan.schema.yaml`、`event-ledger.schema.yaml`（依 ADR-002 擴充加密 envelope 欄位）、`personal-data-redacted-event.schema.yaml`（ADR-002 Option C）
 
 **`/specs/governance/`**：`epistemic-label.schema.yaml`（ADR-004）
 

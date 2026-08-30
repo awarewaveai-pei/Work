@@ -1,0 +1,363 @@
+$id: "ai-lego://recipes/validated/research-qualitative-v1.recipe.yaml"
+title: "Qualitative Research Recipe (Coding + Triangulation + Inter-rater Reliability), v1"
+status: ACTIVE
+
+description: >
+  Real Recipe instance for the Phase 5 Research Mode MVP vertical slice
+  (`docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`, slice choice ratified by
+  `docs/adr/ADR-014-phase-5-mode-selection-research.md`, ACCEPTED
+  2026-08-30). This file's job required reconciling TWO DIFFERENT node lists
+  the source documents give for "a qualitative research workflow" -- they are
+  NOT the same list, and this file does not silently pick one over the
+  other. Both are read in full below before stating the reconciliation.
+
+  **List A -- Master Plan §9's Workflow IR teaching example**
+  (`id: research.qualitative.v4`, L810-840, also transcribed verbatim in
+  `specs/workflow/workflow-ir.schema.yaml#/worked_example`):
+  `transcribe` (capability) -> `research.thematic_analysis` (method) ->
+  `literature_search` (capability) -> `evidence.triangulation` (method) ->
+  `artifact.generate_research_paper` (capability). 5 nodes.
+
+  **List B -- MVP_VERTICAL_SLICE_PLAN.md's own real walkthrough**
+  (§3 step 16, L79): `transcribe` (capability) -> `research.qualitative_coding`
+  (method) -> `evidence.triangulation` (method) -> `run_statistics`
+  (capability, computing inter-rater reliability). 4 nodes (named in prose;
+  MVP itself never writes this as a formal `nodes:` YAML block the way MP §9
+  does).
+
+  **Reconciliation (this file's own compilation decision, not a silent
+  pick)**: this Recipe's `steps[]` is the UNION of the two lists, not a
+  replacement of one by the other, for two independent, individually-
+  necessary reasons:
+
+  1. **`research.thematic_analysis` -> `research.qualitative_coding`
+     substitution is deliberate, not an omission.** MVP §3 step 12 (L72)
+     explicitly names `research.qualitative_coding` as the method this
+     Research Mode slice resolves (closing P1-GAP-AI-9) -- it does NOT use
+     `research.thematic_analysis` (a different, still-`contract_status:
+     pending` method that remains List A's own teaching-example content,
+     untouched, still cataloged in `method-inventory.yaml`). This file
+     follows MVP's real, ADR-014-ratified choice, not List A's teaching
+     example, for the coding step.
+
+  2. **`literature_search` is KEPT from List A, not dropped, even though
+     MVP's own one-line walkthrough prose (§3 step 16) does not name it.**
+     `evidence.triangulation.contract.yaml` (already built, `status:
+     ACTIVE`) declares `inputs.required: [themes, literature]` -- BOTH
+     required, not optional, transcribed verbatim from List A's own
+     `input: [themes, literature]` (MP L834-836). If this Recipe's
+     `evidence.triangulation` step only supplied `themes` (from
+     `research.qualitative_coding`'s output) with no `literature_search`
+     step feeding the `literature` half, the resulting step would violate
+     that already-built method contract's own required inputs. Dropping
+     `literature_search` to match List B's shorter prose would silently
+     break List A's already-real contract; this file instead keeps it,
+     satisfying BOTH sources rather than forcing a choice between them. A
+     literature-comparison step is also substantively reasonable for the
+     MVP scenario's own remote-worker-burnout study (real qualitative
+     research routinely triangulates interview findings against published
+     literature).
+
+  3. **`run_statistics` is APPENDED after `evidence.triangulation`, per List
+     B's own literal order (MVP §3 step 16-17, L79-80)**, to close
+     P1-GAP-AI-2 (Trusted Compute) for the inter-rater reliability
+     computation. List A has no equivalent step (its final node is
+     `artifact.generate_research_paper` directly after triangulation) --
+     this is a genuine List-B-only addition, not present in List A at all.
+
+  4. **`research.qualitative_coding` is modeled as TWO separate steps (Coder
+     1, Coder 2), not one**, because MVP's own scenario (§3 step 17, L80:
+     "兩位編碼者的編碼結果交給 `run_statistics`") requires TWO INDEPENDENT
+     coders' outputs to exist before `run_statistics` can compute Kappa
+     between them -- a single shared method invocation cannot itself produce
+     two independently-authored CodeSets. `recipe.schema.yaml`'s `steps[]`
+     has no fan-out/parallel-execution construct (confirmed by reading that
+     file's own `open_questions.OQ-recipe-3`/`OQ-WFIR-3`, and
+     `workflow-ir.schema.yaml`'s own `compilation_decisions` on why `nodes[]`
+     stays a flat array with no graph-edge syntax) -- two explicit,
+     distinctly-labeled sequential steps is the correct expression within
+     this schema's existing, deliberately-flat-array design, not a schema
+     gap this file needs to invent new syntax to work around.
+
+  Net result: **8 steps**, not 4 or 5 -- an honest superset that satisfies
+  every constraint both source lists actually impose (List A's
+  `evidence.triangulation` required-inputs contract; List B's real method/
+  capability choices and statistical step), rather than silently discarding
+  either.
+
+  **`specs/workflow/workflow-ir.schema.yaml` cross-check (built by a
+  separate concurrent session during this same task, confirmed to exist
+  before this file was finalized)**: that file's own central resolution
+  states Recipe (this schema) and Workflow IR are "two related but distinct
+  objects... a Recipe compiles down into a Workflow IR instance." This
+  Recipe instance is consistent with that resolution: it is the
+  AUTHOR-FACING, `suited_for`/`mandatory_elements`-bearing declarative
+  artifact; a real execution engine would compile THIS file's `steps[]`
+  (via `workflow-ir.schema.yaml`'s own `compiled_from: {source_kind: recipe,
+  recipe_id: research-qualitative-v1, recipe_version: "1.0.0"}` mechanism)
+  into a concrete Workflow IR instance carrying the same node sequence under
+  that file's stricter `node_kind`/hard-`$ref` discriminated-union shape.
+  This file does not itself produce that compiled instance (out of this
+  task's scope) but is structurally ready to be `compiled_from`'s
+  `recipe_id`/`recipe_version` source.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 Workflow IR worked example (L810-840) -- List A, reconciled above, NOT silently replaced"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 walkthrough steps 5-22 (L62-88) -- List B, and every step's own MP/EC citation reused here"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 (L105, `recipe.schema.yaml` 具體實例 `research.qualitative.v1` named as a required Phase-3 deliverable)"
+  - "docs/adr/ADR-014-phase-5-mode-selection-research.md -- ratifies the Research Mode slice choice this Recipe implements"
+  - "methods/contracts/{research.qualitative_coding,evidence.triangulation}.contract.yaml -- the two Method steps' own required-input contracts, both honored by this file's step ordering"
+  - "capabilities/contracts/run_statistics.capability.yaml -- the Statistical step's own contract, built same task"
+  - "specs/cognitive/recipe.schema.yaml -- the schema this file's body is validated against"
+  - "specs/workflow/workflow-ir.schema.yaml -- confirmed consistent with (built concurrently during this task; see description above)"
+
+decided_by: >
+  No ADR governs this file's content -- same class of gap as this corpus's
+  other 3 `recipes/validated/*.recipe.yaml` files (none is ADR-governed
+  either). Authorized directly by `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+  §4 (L105), itself ratified for the Research Mode slice by
+  `docs/adr/ADR-014-phase-5-mode-selection-research.md` (ACCEPTED
+  2026-08-30). The List-A-vs-List-B reconciliation above is this file's own
+  Phase 3 compilation decision, individually justified, not an ADR-level
+  ruling.
+
+compilation_decisions:
+
+  - question: >
+      `specs/cognitive/recipe.schema.yaml`'s own `id` field is a kebab-case
+      slug (`^[a-z][a-z0-9-]*$`, no dots) -- an ALREADY-DECIDED sibling-schema
+      constraint (that file's own `compilation_decisions`, resolving the
+      identical MP-L812-dotted-form-vs-kebab-case tension this file's own
+      naming cue echoes). This task's own deliverable name is
+      "research.qualitative.v1" (dotted, deliberately echoing MP L812's
+      teaching-example id `research.qualitative.v4`). Which form does this
+      file actually use?
+    decision: >
+      `id: research-qualitative-v1` (kebab-case) -- filename
+      `research-qualitative-v1.recipe.yaml`. The dotted form
+      "research.qualitative.v1" is NOT used as the literal `id` value; it is
+      preserved only in this file's own `title` and prose description as the
+      human-readable lineage cue linking it to MP's teaching example.
+    reasoning: >
+      Honoring `recipe.schema.yaml`'s own ALREADY-DECIDED `id` pattern (a
+      real, cited compilation decision with 3 existing precedent filenames:
+      `db-migration-expand-contract`, `method-deprecation-retirement`,
+      `champion-challenger` -- none dotted, none version-embedded) over an
+      informal task-description naming cue is the more disciplined choice: a
+      literal dotted `id` would fail `recipe.schema.yaml`'s own `pattern`
+      validation outright, and `recipe.schema.yaml`'s own
+      `open_questions.OQ-recipe-2` already flags this exact
+      MP-dotted-form-vs-kebab-case tension as UNRESOLVED-BY-ADR, not
+      silently decidable per-instance by whichever file happens to be
+      written next. Picking kebab-case here is the SAME low-risk pick that
+      file's own `compilation_decisions` already made project-wide, applied
+      consistently rather than re-litigated per file.
+
+  - question: >
+      Should `research.thematic_analysis` (List A's coding-adjacent method)
+      still appear anywhere in this Recipe, given List B replaces it with
+      `research.qualitative_coding`?
+    decision: "No. This Recipe uses `research.qualitative_coding` only for its coding step; `research.thematic_analysis` does not appear."
+    reasoning: >
+      See `description` above, reconciliation point 1. MVP §3 step 12
+      (L72) is explicit that `research.qualitative_coding` is the method
+      this slice resolves -- Master Plan's own teaching example remains
+      valid and unmodified as ITS OWN separate illustration (still
+      transcribed verbatim in `workflow-ir.schema.yaml#/worked_example`),
+      but this REAL Recipe instance follows the real, ADR-014-ratified
+      method choice, not the teaching example's method choice.
+
+  - question: >
+      Should `research.qualitative_coding` appear as ONE step (shared
+      between both coders) or TWO (one per coder)?
+    decision: "Two separate, distinctly-labeled sequential steps."
+    reasoning: >
+      See `description` above, reconciliation point 4. Cohen's Kappa (the
+      downstream `run_statistics` step) is UNDEFINED without two independent
+      coders' outputs to compare -- MVP's own scenario names exactly 2
+      ("兩位編碼者", MP §3 step 17, L80). `recipe.schema.yaml`'s `steps[]`
+      has no parallel/fan-out construct (confirmed before deciding this,
+      not assumed), so two sequential, clearly-labeled invocations of the
+      same `method_id` is the correct, schema-legal expression of
+      "independently repeat this method twice", not a workaround for a
+      missing feature.
+
+  - question: >
+      Should `gate_ref` values reference `execution/gate.schema.yaml`'s
+      Global/High-risk catalog (ADR-011-resolved, 20 items) or
+      `research.qualitative_coding.contract.yaml`'s own
+      `method_specific_gates` (5 research-paper gates, built same task)?
+    decision: >
+      `method_specific_gates` ids (`statistical`, `research_integrity`) for
+      the 2 steps where a method-specific gate concretely applies; no
+      `gate_ref` on steps where neither catalog has a matching concept.
+    reasoning: >
+      Per `recipe.schema.yaml`'s own field description, `gate_ref` is a
+      soft reference to "a gate id in `execution/gate.schema.yaml#/
+      gate_catalog`" OR, per that same file's own `gate_catalog.
+      method_specific` note, a per-method contract's own namespace -- both
+      are legal untyped strings, this file simply picks whichever concept
+      actually applies per step rather than forcing every step to carry one.
+      `run_statistics` (Statistical Gate) and the final artifact-generation
+      step (Research Integrity Gate, the composite of all 4 others) are the
+      two steps where `research.qualitative_coding.contract.yaml`'s own
+      newly-built method_specific_gates genuinely apply; none of the 20
+      Global/High-risk catalog ids fit any step here either (confirmed by
+      the same grep sweep `policies/ai-execution/trusted-compute-gate.
+      policy.yaml` already ran against that catalog, reused rather than
+      re-run).
+
+id: research-qualitative-v1
+version: "1.0.0"
+name: "Qualitative Research Recipe (Coding + Triangulation + Inter-rater Reliability)"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+  # Real, on-disk filename (confirmed via `find`, this session) -- NOT MP
+  # L804/L816's own literal `..._v1_2_zhTW.md` citation, which is already an
+  # independently-flagged dangling reference (P1-GAP-PROD-5's own evidence:
+  # "Item 21 自我引用一個已確認磁碟上不存在的檔名(v1_2_zhTW)"). This Recipe
+  # is a REAL, functioning instance meant to actually resolve against a real
+  # Atlas file, not a re-transcription of an already-known-broken citation --
+  # fixing forward to the real filename here, same "don't perpetuate a
+  # known-broken reference into new real content" choice this corpus's other
+  # Wave 2+ files already applied when a literal MP citation was independently
+  # flagged elsewhere as broken.
+
+suited_for:
+  - "Qualitative research studies requiring coded interview/transcript data, cross-validated against literature and confirmed via a real inter-rater reliability statistic (MVP_VERTICAL_SLICE_PLAN.md §3, the Nordbrook Research Lab remote-worker-burnout scenario)"
+  - "Any Research Mode task where 2+ independent human coders must demonstrate coding-scheme reliability before a research memo/paper artifact is generated"
+
+not_for:
+  - "Single-coder studies with no inter-rater comparison need (run_statistics/Cohen's Kappa step is meaningless with only 1 coder -- see this method's own precondition rater_coding_set.rater_count >= 2)"
+  - "High-stakes formal decisions, medical/legal/safety advice, or major investment decisions made directly from this Recipe's output without independent Human Review (same class of caution Atlas §13.1's own 'not_for' list states for a different Recipe, applied here by the same general-purpose restraint)"
+
+mandatory_elements:
+  - "Provenance (governance/epistemic-label.schema.yaml#/provenance_record) on every CodeSet/CategorySet/ThemeSet/Claim output -- research.qualitative_coding.contract.yaml's own quality.provenance_required/evidence_labeling_required"
+  - "Citation verification -- this Recipe's citation gate is research.qualitative_coding.contract.yaml#/method_specific_gates.citation"
+  - "Trusted Compute execution (not LLM mental calculation) for the run_statistics step -- EC §39, policies/ai-execution/trusted-compute-gate.policy.yaml"
+  - "Statistical guardrails -- research.qualitative_coding.contract.yaml#/method_specific_gates.statistical"
+  - "Research integrity -- research.qualitative_coding.contract.yaml#/method_specific_gates.research_integrity (composite of the other 4 method_specific_gates)"
+
+forbidden_actions:
+  - "Asserting the inter-rater reliability Kappa value without routing it through the Trusted Compute pipeline (EC §39's own literal forbidden pattern: 'LLM mentally calculates -> CALCULATED_RESULT')"
+  - "Silently overwriting a human-authored LOCKED_FACT code with a later AI re-analysis (MP §11.2-11.3; MVP Acceptance Criterion 3, L133) -- a later prompt/model upgrade's re-analysis MUST surface as an independent AI_SUGGESTION, never overwrite the locked record"
+
+steps:
+  - label: "Transcription"
+    type: capability
+    ref: transcribe
+    input: source.video
+    necessity: RECOMMENDED
+  - label: "Qualitative Coding -- Coder 1 (Open / Axial / Selective)"
+    type: method
+    method_id: research.qualitative_coding
+    input: output.transcript
+    necessity: RECOMMENDED
+  - label: "Qualitative Coding -- Coder 2 (Open / Axial / Selective, independent)"
+    type: method
+    method_id: research.qualitative_coding
+    input: output.transcript
+    necessity: RECOMMENDED
+  - label: "Literature Search"
+    type: capability
+    ref: literature_search
+    input: research.question
+    necessity: RECOMMENDED
+  - label: "Inter-rater Reliability (Cohen's Kappa)"
+    type: capability
+    ref: run_statistics
+    input: [coder_1.codes, coder_2.codes]
+    necessity: REQUIRED_BY_RISK
+    gate_ref: statistical
+  - label: "Evidence Triangulation"
+    type: method
+    method_id: evidence.triangulation
+    input: [themes, literature]
+    necessity: RECOMMENDED
+  - label: "Research Memo Artifact Generation"
+    type: capability
+    ref: artifact.generate_research_paper
+    input: [triangulated_findings, interrater_reliability_result]
+    necessity: REQUIRED_BY_RISK
+    gate_ref: research_integrity
+
+outputs:
+  - "CodeSet (x2, one per coder -- research.qualitative_coding.contract.yaml#/outputs)"
+  - "CategorySet (x2, one per coder)"
+  - "ThemeSet (x2, one per coder, pre-triangulation)"
+  - "InterRaterReliabilityResult (capabilities/contracts/run_statistics.capability.yaml#/output)"
+  - "TriangulatedFindingSet (evidence.triangulation.contract.yaml#/outputs)"
+  - "ResearchMemoArtifact -- NEW_DESIGN, no existing typed-object schema; MVP §3 step 20 (L86) names its expected content ('Theme Summary + Evidence Quotes + Triangulation 結果 + Kappa 統計') but no formal record shape exists anywhere in the corpus -- same class of honestly-flagged gap as champion-challenger.recipe.yaml's own promotion_decision output"
+
+open_questions:
+  - id: "OQ-RQV1-1"
+    question: >
+      This Recipe's 8-step union of List A and List B is this file's own
+      reconciliation choice, not a mother-document-stated design. Should a
+      future review confirm this is the CORRECT reconciliation (as opposed
+      to, e.g., dropping `literature_search` entirely and instead relaxing
+      `evidence.triangulation.contract.yaml`'s own `literature` input to
+      OPTIONAL for research contexts that only need coder-to-coder
+      triangulation, not literature triangulation)?
+    owner: "operator, or a future review pass specifically on this Recipe's List-A/List-B union design"
+    blocks: "nothing in this file's own validity -- both source constraints (List A's evidence.triangulation contract, List B's real method/capability choices) are satisfied as written"
+  - id: "OQ-RQV1-2"
+    question: >
+      MVP's own literal walkthrough order (§3 step 16, L79) places
+      `run_statistics` AFTER `evidence.triangulation`, which this file
+      follows literally -- but standard qualitative-research practice
+      typically checks inter-rater reliability on RAW open-coding output
+      BEFORE further axial/selective synthesis and before triangulating
+      with literature (so a low-reliability coding scheme is caught early,
+      before downstream synthesis work is wasted on it). Should a future
+      revision of this Recipe (or of MVP_VERTICAL_SLICE_PLAN.md's own
+      walkthrough) reorder these two steps to match standard methodological
+      practice, given MVP's own text never states a rationale for this
+      specific ordering?
+    owner: "operator, or a future review pass once a real coding session exposes whether the literal MVP order causes wasted downstream work"
+    blocks: "nothing in this file's own validity -- this Recipe faithfully implements MVP's own stated order, not a silently 'corrected' one"
+  - id: "OQ-RQV1-3"
+    question: >
+      `ResearchMemoArtifact` (final step's conceptual output) has no
+      corresponding `cognitive/typed-objects/*.schema.yaml` file. Should a
+      future Wave add one, mirroring `board-decision-pack.schema.yaml`'s own
+      already-named-as-candidate status for a different rich Recipe output
+      (recipe.schema.yaml's own `outputs` field description, §13.4)?
+    owner: "operator, via a future Phase 3/4 typed-objects compilation pass"
+    blocks: "nothing in this file's own validity -- outputs stays a flat, soft-referenced string list either way"
+
+verification:
+  method: >
+    Read Master Plan §9 (L794-858, including the full worked example
+    L810-840) directly at the cited lines. Read
+    `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` in full (151 lines),
+    specifically §3 steps 5-22 (L62-88) and §4 (L101-123). Read
+    `specs/cognitive/recipe.schema.yaml` in full, including
+    `compilation_decisions` (the kebab-case `id` decision this file honors)
+    and `open_questions.OQ-recipe-2/3` (the two tensions this file's own
+    reconciliation directly engages). Read `specs/workflow/workflow-ir.schema.yaml`
+    in full (confirmed to exist as of this file's finalization, built by a
+    separate concurrent session during this same task -- per this task's own
+    explicit instruction to check) and confirmed this Recipe's
+    Recipe-compiles-to-Workflow-IR relationship is consistent with that
+    file's own central resolution. Read
+    `methods/contracts/{research.qualitative_coding,evidence.triangulation}.contract.yaml`
+    and `capabilities/contracts/run_statistics.capability.yaml` in full (all
+    3 built same task) to confirm each step's `method_id`/`ref` and
+    `input`/`gate_ref` values match those files' own declared `id`s,
+    required inputs, and gate ids exactly. Read all 3 existing
+    `recipes/validated/*.recipe.yaml` files in full as the shape/style
+    template. Validated against `specs/cognitive/recipe.schema.yaml` with
+    `jsonschema.Draft202012Validator` via `tests/run_golden_tests.py`'s own
+    recipe-instance conformance check -- 0 errors; `id` field confirmed to
+    equal the filename slug.
+  note: >
+    No mother document, ADR, or existing ACTIVE sibling file was modified to
+    produce this file. The List-A-vs-List-B reconciliation is this file's
+    own, explicitly disclosed Phase 3 compilation decision (see
+    `description` and `compilation_decisions` above) -- not a silent pick of
+    one source over the other, and not presented as if the two source
+    documents already agreed.

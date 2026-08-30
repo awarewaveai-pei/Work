@@ -1,0 +1,714 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/knowledge-canvas.schema.yaml"
+title: Multimodal Knowledge Canvas
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Multimodal Knowledge Canvas —
+  Master Plan §11 (L902-934, the multimodal content-type taxonomy and the
+  `/modules/canvas/{nodes,edges,annotations,attachments,realtime}/` directory
+  structure, verified exact line range via full-section read), §11.1
+  (L936-950, the `HumanContribution` taxonomy tree), and §11.2 (L952-968, the
+  "人類內容不能被 AI 靜默覆蓋" / human content must not be silently overwritten
+  by AI rule and its two disjoint action verb lists).
+
+  **Not tracked in MACHINE_READABLE_SPEC_PLAN.md's §2 Spec Inventory** — grep
+  of that entire document (2026-08-30) for "Canvas"/"canvas" returns zero
+  hits in any §2.x table row (only an incidental, unrelated `canvas_` table-
+  prefix decision in `docs/adr/ADR-010-database-platform-and-table-naming.md`
+  uses the word). This file is therefore a direct-task-instructed build, not
+  a Wave-tracked deliverable with a pre-assigned dependency/status row the
+  way every other file in `specs/domain/` is — disclosed here rather than
+  presented as though an MRSP row exists, per this project's R4 claim-
+  before-verify discipline.
+
+  **Cross-reference tension, disclosed not resolved**: two later-stage
+  planning artifacts model part of this same territory differently.
+  `docs/architecture/REPOSITORY_ARCHITECTURE.md` (L38-40, a Bounded Context
+  Analysis table, no `Status:` header found on the file) lists
+  `HumanContribution`, `Annotation`, and `Idea` as THREE separate top-level
+  Domain Model objects (`/core/domain/human-contribution`,
+  `/core/domain/annotation`, `/core/domain/idea`), and
+  `docs/adr/ADR-010-database-platform-and-table-naming.md` (ACCEPTED, but
+  its own status note says the 23-object table itself is "Claude 本次首次
+  形式化產出，操作者尚未逐條過目確認" — not yet line-item-reviewed by the
+  operator) inherits that split into three separate future tables
+  (`canvas_human_contributions` L88, `canvas_annotations` L89,
+  `canvas_ideas` L90). THIS file instead follows Master Plan §11.1's own
+  literal tree diagram, which nests `Idea` as ONE of ten values on
+  `HumanContribution.contribution_type` (L939-950) rather than as a sibling
+  top-level object, because that is the higher-authority, exact-line-cited
+  mother-document text this task instructs this file to model, and because
+  REPOSITORY_ARCHITECTURE.md's one-line, undefined "Idea"/"Annotation" table
+  rows give no field shape to adopt in place of it. Not silently reconciled
+  — see `open_questions.OQ-kc-1`.
+
+  Master Plan §60 Data Architecture (L2610-2617, `PostgreSQL → Structured
+  Metadata` / `Object Storage → Video/Audio/PDF/Artifact`) explains why this
+  is not a real contradiction at the storage layer even though it looks like
+  one at the file-directory layer: MP §11's `/modules/canvas/{nodes,edges,
+  annotations,attachments,realtime}/` listing is a MODULE/artifact-storage
+  layout (blobs and per-type content), not a relational-table enumeration —
+  `HumanContribution` having no dedicated subdirectory in that list does not
+  contradict it also being a first-class, separately-queried Postgres object
+  per ADR-010's `canvas_human_contributions` row.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11 Multimodal Knowledge Canvas, content-type list + directory structure (L902-934)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11.1 Human Contribution taxonomy (L936-950)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11.2 人類內容不能被 AI 靜默覆蓋 (L952-968)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §60 Data Architecture (L2610-2617) — why the module directory list and the Postgres table list are two different storage layers, not one contradicting the other"
+  - "specs/governance/epistemic-label.schema.yaml (hard $ref target for provenance_record/locked — every node, annotation, and human_contribution carries these)"
+  - "specs/evidence/evidence.schema.yaml (hard $ref target for the Evidence contribution_type)"
+  - "specs/execution/task.schema.yaml (SOFT reference only for the Task contribution_type — see compilation_decisions for the shape-mismatch finding)"
+  - "specs/domain/tenant.schema.yaml (hard $ref target for tenant scoping; ACTIVE, Wave 2, stable — see compilation_decisions)"
+  - "specs/artifact/portable-uri.schema.yaml (hard $ref target for attachment resolution; built the same day as this file, relocated from specs/domain/ to specs/artifact/ shortly after to match established directory convention)"
+  - "docs/architecture/REPOSITORY_ARCHITECTURE.md (L38-40) — disclosed cross-reference tension, not adopted, see description above and open_questions.OQ-kc-1"
+  - "docs/adr/ADR-010-database-platform-and-table-naming.md (L88-90) — same tension, table-naming only, does not rule on field shape"
+  - "specs/workflow/branch.schema.yaml — disclosed naming collision with the Human action verb 'Branch', see open_questions.OQ-kc-2"
+
+decided_by: >
+  No ADR governs this file's field shape, and no MACHINE_READABLE_SPEC_PLAN.md
+  §2 row tracks it (see description above). Every field-shape choice below is
+  a direct compilation decision made against Master Plan §11/§11.1/§11.2's
+  literal text, the same "no ADR, direct Phase 3-style compilation" class
+  `evidence.schema.yaml`'s own `decided_by` documents for a file with
+  similarly thin, single-source grounding.
+
+compilation_decisions:
+
+  - question: >
+      Should the schema root be structured to mirror MP §11's literal
+      5-subdirectory module layout (`nodes/edges/annotations/attachments/
+      realtime`) exactly, or diverge from it?
+    decision: >
+      Root Canvas object has FOUR persisted collections (`nodes`, `edges`,
+      `annotations`, `attachments`) plus a FIFTH, `human_contributions`, that
+      is NOT one of MP's five subdirectory names. `realtime` is excluded
+      entirely (see next decision).
+    reasoning: >
+      MP §11.1/§11.2 make clear that `HumanContribution` is a first-class,
+      independently-typed object (its own taxonomy, its own AI/Human
+      interaction rule) that this task explicitly instructs be modeled as
+      such — collapsing it into being merely a property of `nodes` would
+      silently subordinate a concept MP itself gives independent structure
+      to. Per the description above, this is not a contradiction of MP §11's
+      directory list once the module-layout-vs-Postgres-table distinction
+      (MP §60) is applied.
+
+  - question: >
+      MP §11's directory list includes a fifth subdirectory, `/realtime/`,
+      with no further description anywhere in §11/§11.1/§11.2.
+    decision: "Excluded from this schema's scope entirely — not modeled as a collection or field."
+    reasoning: >
+      Every other subdirectory (`nodes/edges/annotations/attachments`) names
+      a class of PERSISTED, individually-addressable content object this
+      file can give a record shape to. `realtime` names a live-synchronization
+      CHANNEL/mechanism (the conventional meaning of the word in a
+      multi-user canvas UI, and the only reading consistent with it having
+      no corresponding content-type or taxonomy anywhere in §11/§11.1), not
+      a class of stored object — there is nothing here for a JSON Schema
+      record shape to describe. Silently inventing a `realtime` collection
+      with fabricated fields would be exactly the "fabricate a rich schema
+      with no textual basis" pattern this suite's own
+      `cognitive/method.schema.yaml` and `evidence/evidence.schema.yaml`
+      explicitly flagged and avoided.
+
+  - question: >
+      MP §11 lists exactly 18 content types a human must be able to add
+      (L906-923: 文字/Sticky Note/圖片/PDF/Word/PPT/Excel/CSV/Audio/Video/
+      URL/手寫/Diagram/Equation/Table/Chart/Code/Voice Note). Closed enum or
+      open string?
+    decision: >
+      Closed enum, all 18 values, normalized to lowercase snake_case
+      (`text, sticky_note, image, pdf, word, ppt, excel, csv, audio, video,
+      url, handwriting, diagram, equation, table, chart, code, voice_note`).
+    reasoning: >
+      All 18 are real, individually named, not illustrative ellipsis —
+      the same "transcribe the exhaustive named list verbatim" treatment
+      `governance/epistemic-label.schema.yaml`'s enums received. Casing
+      normalization follows the direct precedent
+      `jurisdiction/availability.schema.yaml` set (Title-Case-in-prose to
+      lowercase snake_case) and `capability-contract.schema.yaml`'s
+      `entitlement.editions_allowed` explicitly cites as "the identical...
+      treatment". MP's own introductory phrase "人類必須能直接加入自己的："
+      (humans MUST be able to directly add their own: [list]) reads as a
+      minimum-support requirement, not a provably EXHAUSTIVE universe of all
+      legal future content types — that open-endedness question is left
+      genuinely undecided in `open_questions.OQ-kc-3` rather than silently
+      resolved either way (closed now, extensible later without a breaking
+      change, matches this suite's general enum-extension posture, e.g.
+      `cas-path.schema.yaml`'s `content_class` enum).
+
+  - question: >
+      MP §11.1's `HumanContribution` tree lists exactly 10 values (Opinion/
+      Idea/Question/Assumption/Objection/Correction/Decision/Approval/
+      Evidence/Task, L939-950). Closed enum or open string, and what casing?
+    decision: >
+      Closed enum, all 10 values, lowercase snake_case (`opinion, idea,
+      question, assumption, objection, correction, decision, approval,
+      evidence, task`).
+    reasoning: "Same reasoning and precedent as the content_type decision above — an exhaustively named, not illustrative, list."
+
+  - question: >
+      MP §11.2 states two DISJOINT verb lists: AI may only
+      {Suggest, Diff, Comment, Challenge}; the human decides
+      {Accept, Reject, Edit, Lock, Branch, Merge} (L954-968). Should this be
+      documented as prose only, or structurally enforced?
+    decision: >
+      Structurally enforced via `allOf`/`if`/`then` on a new
+      `canvas_annotation` object's `actor`/`action` fields (see schema body):
+      `actor: AI` legally admits only the 4 AI-side verbs; `actor: Human`
+      legally admits only the 6 human-side verbs. No instance can claim an
+      AI actor performed a Human-only verb (or vice versa).
+    reasoning: >
+      This project's own established discipline (cited directly in this
+      task's instructions): `policies/privacy/pii-redaction.policy.yaml`'s
+      own `compilation_decisions` names a prose-only "must use keyed HMAC,
+      not bare hash" constraint as "exactly the kind of unenforced
+      `constraints:` block this session already found and fixed twice this
+      Wave (gate.schema.yaml, epistemic-label.schema.yaml)" — a documented,
+      recurring bug class this file does not reproduce a third/fourth time.
+      The identical `allOf`/`if`/`then` cross-sibling-property technique is
+      already established precedent in this exact corpus:
+      `governance/epistemic-label.schema.yaml#/provenance_record`'s
+      `locked`/`epistemic_type` cross-constraint and
+      `jurisdiction/conflict-of-laws-output.schema.yaml`'s `status`/
+      `conflicts_detected` cross-constraint (the latter added specifically
+      because a 2026-08-30 `/codex-review` HIGH finding proved the
+      prose-only version of that exact rule was unenforced).
+    scope_note: >
+      What this CANNOT structurally enforce (disclosed, not silently
+      claimed as solved): (1) that a REAL AI process never directly mutates
+      a human's existing node/contribution content in place — JSON Schema
+      validates one instance's shape, not a sequence of writes over time,
+      the identical "application-layer invariant" limitation
+      `domain/tenant.schema.yaml` already discloses for `tenant_id`
+      immutability. What this file DOES give real teeth to is that any
+      record of an AI actor's action can never legally claim to BE one of
+      the six human-only verbs — an AI-authored annotation cannot itself
+      assert `action: Merge`, for instance. (2) `locked` (see next decision)
+      is a narrower, additional, ALREADY-ENFORCED layer for a specific
+      subset of content (SOURCE_FACT/DECISION), not a substitute for this
+      broader actor/action rule, which MP §11.2 states applies to ALL human
+      content on the canvas regardless of `locked` state.
+
+  - question: >
+      `governance/epistemic-label.schema.yaml#/definitions/locked`'s own
+      constraint text says "content with locked != null MUST NOT be
+      modified by AI (EC §57)" — is this the same mechanism as MP §11.2's
+      canvas-specific AI/Human action rule, and should this file merge them?
+    decision: >
+      Kept as two DISTINCT, complementary layers, not merged. Every
+      `canvas_node`/`canvas_annotation`/`human_contribution` carries a
+      `provenance` field (hard $ref to `#/provenance_record`, whose
+      `locked` sub-field is the narrower protection), AND separately carries
+      the `canvas_annotation.actor`/`action` structural constraint above (the
+      broader protection).
+    reasoning: >
+      `locked`'s own constraints restrict it to being legal ONLY when
+      `epistemic_type == SOURCE_FACT` or `DECISION` — a real subset of all
+      possible canvas content, not all human content. MP §11.2's rule states
+      no such epistemic_type precondition ("人類內容不能被 AI 靜默覆蓋" reads
+      as an unqualified rule over ALL human content). Merging them would
+      either wrongly widen `locked`'s own ADR-004-decided scope, or wrongly
+      narrow MP §11.2's rule to only locked content — neither is textually
+      supported. Both layers active simultaneously is the reading that
+      contradicts neither source.
+
+  - question: >
+      MP §11.1 lists `Evidence` as one of the 10 `HumanContribution` values.
+      `specs/evidence/evidence.schema.yaml` already exists (ACTIVE) and
+      defines an Evidence record's own shape. Hard $ref or soft reference,
+      and required or optional?
+    decision: >
+      Hard `$ref` to `evidence/evidence.schema.yaml` for the
+      `evidence_ref` property; REQUIRED on a `human_contribution` instance
+      if and only if `contribution_type == evidence` (via `allOf`/`if`/
+      `then`, the identical cross-field technique used for the actor/action
+      rule above).
+    reasoning: >
+      `evidence.schema.yaml` is ACTIVE and stable (built earlier in this
+      same overall Phase 3 effort, not concurrently with this file) — a safe
+      backward hard-$ref dependency, the same reasoning
+      `evidence/claim.schema.yaml` and `evidence/assumption.schema.yaml`
+      already used for their own real $refs into it (per that file's own
+      `referenced_by` list). Requiring it exactly when
+      `contribution_type == evidence` follows this suite's established
+      "an Evidence-typed record with no evidence content is a contradiction"
+      logic (parallel to `evidence.schema.yaml`'s own `provenance.
+      epistemic_type: const EVIDENCE` treatment for the identical reason).
+
+  - question: >
+      MP §11.1 also lists `Task` as one of the 10 `HumanContribution` values.
+      `specs/execution/task.schema.yaml` exists (ACTIVE) — but its root
+      object is EC §7's `task_context`, which REQUIRES 12 fields including
+      `environment` (enum: local/dev/staging/production), `risk_tier`, and
+      `data_impact`. Should `human_contribution`'s Task payload hard-$ref it
+      the same way `Evidence` above does?
+    decision: >
+      NO hard $ref. `task_ref` is an OPTIONAL, free-string SOFT reference
+      (by convention/name only, not `$ref`-bound), and NOT required even
+      when `contribution_type == task`.
+    reasoning: >
+      A genuine shape mismatch, not a stylistic preference: MP §11's own
+      framing is a human dropping a lightweight action-item note onto a
+      collaborative canvas ("Sticky Note"-adjacent, alongside Opinion/Idea/
+      Question in the same flat taxonomy) — nothing in §11/§11.1 states or
+      implies that adding a canvas Task requires simultaneously classifying
+      it with an `environment`, a `risk_tier`, and a `data_impact` the way
+      an Execution Contract task_context does. Forcing every canvas
+      sticky-note-level Task to satisfy `task.schema.yaml`'s full
+      12-required-field shape would either make trivial canvas usage
+      artificially heavyweight, or silently pressure a future implementation
+      to populate those 12 fields with meaningless placeholder values just
+      to pass validation — worse than leaving the reference soft. Per this
+      task's own explicit instruction ("if it doesn't exist, note that as an
+      open_question rather than inventing Task's shape here"), the analogous
+      honest move when the file DOES exist but does not obviously fit is to
+      flag the fit itself as unresolved rather than force it — see
+      `open_questions.OQ-kc-4`.
+
+  - question: >
+      MP §11.2's human-only verb list includes `Branch` and `Merge`
+      (L967-968) — literal English words `specs/workflow/branch.schema.yaml`
+      (ACTIVE, ADR-012) also uses for an entirely different, heavyweight
+      concept (a forked Workflow execution lineage with a 6-state machine
+      and >= A2 merge authority). Is a canvas "Branch" action the same
+      operation as creating a `workflow/branch.schema.yaml` Branch object?
+    decision: >
+      NOT merged or cross-referenced. `canvas_annotation.action: branch`
+      is typed as an opaque enum value only — no `$ref` into
+      `workflow/branch.schema.yaml`, and no claim that invoking it creates
+      or affects a real blast-radius-chain Branch node.
+    reasoning: >
+      No mother-document line anywhere states these are the same mechanism.
+      `blast-radius-chain.schema.yaml`'s own `branch_node.lifecycle_
+      transcribed_from_adr.created_by` field already independently traces
+      ITS OWN Branch concept back to "the existing `Branch` action (Master
+      Plan §11.2, ... L961-968)" — i.e. an earlier sibling file already
+      flagged awareness of this exact word overlap without asserting
+      identity between the two objects. This file preserves that same
+      un-merged posture rather than resolving it one way or the other,
+      consistent with `capability-contract.schema.yaml`'s documented
+      discipline of never silently unifying two mother-document concepts
+      that merely happen to share a name. Left open in
+      `open_questions.OQ-kc-2`.
+
+  - question: >
+      How should a Canvas be scoped to a tenant, and to what type?
+    decision: >
+      Required `tenant_id`, hard `$ref` to
+      `domain/tenant.schema.yaml#/properties/tenant_id`.
+    reasoning: >
+      `domain/tenant.schema.yaml` is ACTIVE, Wave 2, and long-stable by the
+      time this file is built (not a concurrent-build load-order risk the
+      way some Wave 2 files' own soft-reference choices were, at the time
+      THEY were built, forced to guard against) — a safe backward hard-$ref
+      dependency, the same upgrade-from-soft-to-hard reasoning
+      `execution/task.schema.yaml` applied to its own `risk_tier` field once
+      its target was confirmed ACTIVE. Note this is DELIBERATELY NOT the
+      same identifier space as `artifact-uri.schema.yaml`'s own `tenant`
+      URI-segment `segment_id` (a human-readable slug like `TEN-NORDBROOK`
+      in the one real corpus example, not a UUID) — see that file's own
+      compilation_decisions for why THAT field is not hard-$ref'd the same
+      way. This field, by contrast, IS the real system tenant_id (UUID),
+      used for actual tenant-scoping/RLS purposes, not a URI path segment.
+
+  - question: >
+      How should a Canvas attachment (PDF/Word/PPT/Excel/CSV/Audio/Video/
+      image content types) reference its underlying stored bytes without
+      the Canvas layer depending on a storage backend directly?
+    decision: >
+      `canvas_attachment.artifact_uri`, hard `$ref` to this task's OWN
+      sibling deliverable, `domain/artifact-uri.schema.yaml`.
+    reasoning: >
+      Directly resolves MP §59's own stated purpose ("不得讓 Domain 依賴 S3
+      路徑" — Domain must not depend on S3 paths) for exactly this kind of
+      consumer. Hard-$ref'd (not soft) because both files are authored
+      together, sequentially, by the same task in the same commit — the
+      concurrent-different-agent load-order race that justifies soft
+      references elsewhere in this corpus (e.g. `tenant.schema.yaml` vs.
+      `security/key-vault-lifecycle.schema.yaml`, built by a different
+      sibling agent in the same session) does not apply here.
+
+  - question: >
+      Should `canvas_node`'s own content payload (the actual text/bytes/
+      structured data for each of the 18 content_types) be given a rich,
+      per-type structured shape?
+    decision: >
+      Minimal, NEW_DESIGN, explicitly flagged: an OPTIONAL free-text
+      `text_content` (for text-like types) and an OPTIONAL `attachment_id`
+      cross-reference into the same Canvas's `attachments[]` (for file-like
+      types). No per-content-type structured sub-schema (e.g. no distinct
+      `DiagramContent`/`ChartContent`/`EquationContent` shapes).
+    reasoning: >
+      MP §11 names the 18 content types exhaustively but gives zero
+      structural detail for any single one of them beyond its name — the
+      same "the mother documents promise the concept but never define the
+      record's own shape" situation `evidence/evidence.schema.yaml`'s
+      `decided_by` explicitly names and responds to with restraint rather
+      than invention. Fabricating 18 distinct rich payload shapes here would
+      be exactly the pattern this suite's own `method.schema.yaml`
+      `preconditions` and `evidence.schema.yaml` `content`/`source`
+      decisions already identified and avoided.
+
+verification:
+  method: >
+    Read Master Plan §11/§11.1/§11.2 in full (L902-968) plus the immediately
+    surrounding §10 (L895-901, confirming §11's section boundary) and §60
+    Data Architecture (L2610-2617, for the module-directory-vs-Postgres-table
+    distinction). Read `specs/governance/epistemic-label.schema.yaml`,
+    `specs/evidence/evidence.schema.yaml`, `specs/execution/task.schema.yaml`,
+    `specs/domain/tenant.schema.yaml`, and
+    `specs/execution/blast-radius-chain.schema.yaml` full text. Grep-swept
+    (2026-08-30) `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` for
+    "Canvas"/"canvas" (zero §2.x row hits) and `docs/adr/*` +
+    `docs/architecture/REPOSITORY_ARCHITECTURE.md` for "Canvas"/
+    "HumanContribution" (surfaced the ADR-010/REPOSITORY_ARCHITECTURE.md
+    three-separate-objects tension disclosed above and in
+    `open_questions.OQ-kc-1`). Grep-confirmed `specs/execution/task.schema.yaml`
+    exists (it does; the file's `required` list of 12 fields, read in full,
+    is what grounds this file's Task shape-mismatch finding, not an
+    assumption). Grep-confirmed no `specs/domain/source.schema.yaml` or
+    equivalent exists anywhere in `specs/` (relevant to
+    `domain/artifact-uri.schema.yaml`'s `source` segment_type, not directly
+    to this file, but checked while both sibling files were being built in
+    the same task).
+  note: >
+    No mother document, ADR, or ACTIVE sibling `specs/` file was modified to
+    produce this file. Grounded-vs-designed ratio, following this suite's
+    established disclosure convention: roughly 40% grounded (the 18
+    content_type values, the 10 contribution_type values, the two disjoint
+    action-verb lists, and the module directory structure are all verbatim
+    transcriptions of MP §11/§11.1/§11.2), 60% new design (the `canvas_node`/
+    `canvas_edge`/`canvas_annotation`/`canvas_attachment`/`human_contribution`
+    object shapes themselves, the `allOf`/`if`/`then` structural enforcement
+    of the actor/action rule, and every field not itself one of the named
+    enum values — none of these have a mother-document line giving them a
+    field-level shape, only a name and a taxonomy position). This file is
+    also NOT tracked by any MACHINE_READABLE_SPEC_PLAN.md §2 row, disclosed
+    prominently above rather than presented as if a Wave/dependency/Finding
+    tracking row exists for it.
+
+open_questions:
+  - id: "OQ-kc-1"
+    question: >
+      `docs/architecture/REPOSITORY_ARCHITECTURE.md` (L38-40) and
+      `docs/adr/ADR-010-database-platform-and-table-naming.md` (L88-90,
+      ACCEPTED but self-flagged as not yet operator-line-item-reviewed)
+      model `HumanContribution`, `Annotation`, and `Idea` as THREE separate
+      top-level Domain Model objects/future Postgres tables. This file
+      instead follows MP §11.1's literal tree and nests `Idea` as one
+      `contribution_type` enum value inside `HumanContribution`, and models
+      `Annotation` as the AI/Human actor/action log object (a different
+      concept than whatever REPOSITORY_ARCHITECTURE.md's undefined one-line
+      "Annotation" row means). Which architecture should a future
+      relational-schema pass (if any) actually build against?
+    owner: "operator / a future ADR reconciling REPOSITORY_ARCHITECTURE.md's Bounded Context Analysis against this file"
+    blocks: "nothing in this schema's own validity; flagged so a future DB-schema pass does not silently pick one side without noticing the other exists"
+  - id: "OQ-kc-2"
+    question: >
+      Is the human action verb `Branch` (MP §11.2, canvas-level) the same
+      operation as creating a `specs/workflow/branch.schema.yaml` Branch
+      object (a forked Workflow execution lineage), a canvas-scoped analog
+      with the same English name and no formal relationship, or something
+      else entirely? No mother document states a relationship either way.
+    owner: "operator, if/when Canvas-level branching is actually implemented"
+    blocks: "nothing in this schema — canvas_annotation.action: branch is typed as an opaque enum value regardless of the answer"
+  - id: "OQ-kc-3"
+    question: >
+      Is MP §11's 18-value content_type list meant to be a closed,
+      exhaustive universe, or a minimum-support floor that a future revision
+      may extend (e.g. a 3D model, a spreadsheet formula object, a live
+      whiteboard stroke format)? MP's own phrasing ("人類必須能直接加入自己
+      的：") reads as a MUST-support floor, not an explicit closure
+      statement either way.
+    owner: "operator, if a 19th content type is ever proposed"
+    blocks: "nothing today; this schema would need a strictly additive enum-value amendment (non-breaking) if/when a real 19th type is proposed"
+  - id: "OQ-kc-4"
+    question: >
+      Does MP §11.1's lightweight canvas "Task" concept and EC §7's
+      heavyweight `task_context` object (12 required fields, `risk_tier`,
+      `environment`, `data_impact`) actually denote the same kind of object
+      at two different levels of formality, or are they genuinely two
+      different concepts that happen to share the English word "Task"? No
+      mother document states a relationship. This file's `task_ref` is kept
+      soft and optional specifically because this question is open — see
+      compilation_decisions.
+    owner: "operator, via a future ADR or `.ai/proposals/` PROPOSAL if canvas Tasks are meant to promote into real task_context instances"
+    blocks: "nothing in this schema — human_contribution instances with contribution_type: task remain valid with or without a populated task_ref"
+
+# ---------------------------------------------------------------------------
+# Schema body — root object IS one Canvas instance.
+# ---------------------------------------------------------------------------
+
+definitions:
+
+  content_type:
+    description: >
+      The 18 content types Master Plan §11 requires humans be able to
+      directly add (L906-923), verbatim, normalized to lowercase snake_case
+      per this suite's established casing convention — see
+      compilation_decisions.
+    type: string
+    enum:
+      - text
+      - sticky_note
+      - image
+      - pdf
+      - word
+      - ppt
+      - excel
+      - csv
+      - audio
+      - video
+      - url
+      - handwriting
+      - diagram
+      - equation
+      - table
+      - chart
+      - code
+      - voice_note
+
+  contribution_type:
+    description: >
+      The 10 `HumanContribution` values from Master Plan §11.1's literal
+      tree diagram (L939-950), verbatim, lowercase snake_case.
+    type: string
+    enum:
+      - opinion
+      - idea
+      - question
+      - assumption
+      - objection
+      - correction
+      - decision
+      - approval
+      - evidence
+      - task
+
+  ai_action:
+    description: "AI-legal verbs only, per MP §11.2 (L954-959)."
+    type: string
+    enum: [suggest, diff, comment, challenge]
+
+  human_action:
+    description: "Human-legal verbs only, per MP §11.2 (L961-968)."
+    type: string
+    enum: [accept, reject, edit, lock, branch, merge]
+
+  human_contribution:
+    description: >
+      One instance of MP §11.1's `HumanContribution` taxonomy. See
+      compilation_decisions for why `Evidence` hard-$refs
+      `evidence.schema.yaml` (required when applicable) while `Task`
+      soft-references `execution/task.schema.yaml` (optional, unresolved
+      shape fit).
+    type: object
+    required: [contribution_id, contribution_type, provenance]
+    properties:
+      contribution_id:
+        type: string
+        description: "Identifier of this contribution instance. No mother-document ID grammar exists for it; left as an opaque string."
+      contribution_type:
+        $ref: "#/definitions/contribution_type"
+      target_node_id:
+        type: [string, "null"]
+        default: null
+        description: >
+          OPTIONAL. The `canvas_node` this contribution concerns, when
+          applicable. Null/absent for a free-floating contribution not yet
+          attached to any specific node (e.g. a general Idea dropped onto
+          the canvas before it becomes its own node) — MP §11.1 does not
+          state that every contribution must target an existing node.
+      content:
+        type: string
+        description: >
+          NEW_DESIGN — free-text body of the contribution (the opinion
+          text, the question text, etc.). No mother-document line names
+          this field; kept optional and minimal per the same restraint
+          `evidence.schema.yaml`'s own `content` field applies. Not
+          populated for `contribution_type: evidence` (use `evidence_ref`
+          instead) or `contribution_type: task` (use `task_ref`).
+      evidence_ref:
+        $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+        description: >
+          REQUIRED if and only if `contribution_type == evidence` (see
+          `allOf` below). Hard $ref — see compilation_decisions.
+      task_ref:
+        type: [string, "null"]
+        default: null
+        description: >
+          OPTIONAL, NEVER required. SOFT reference (opaque identifier, no
+          `$ref`) to a `specs/execution/task.schema.yaml` `task_id`, when
+          and only when a genuine promotion from a lightweight canvas Task
+          to a full EC task_context has actually happened. See
+          compilation_decisions and open_questions.OQ-kc-4 for why this is
+          NOT a hard $ref and NOT required even when
+          `contribution_type == task`.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        description: >
+          REQUIRED — every HumanContribution carries the standard
+          epistemic_type/authorship_state/locked provenance record.
+    allOf:
+      - if:
+          properties: { contribution_type: { const: evidence } }
+          required: [contribution_type]
+        then:
+          required: [evidence_ref]
+
+  canvas_node:
+    type: object
+    required: [node_id, content_type, provenance]
+    properties:
+      node_id: { type: string }
+      content_type: { $ref: "#/definitions/content_type" }
+      text_content:
+        type: string
+        description: "OPTIONAL. NEW_DESIGN — see compilation_decisions on node content payload minimalism."
+      attachment_id:
+        type: [string, "null"]
+        default: null
+        description: >
+          OPTIONAL. Cross-reference into this same Canvas's `attachments[]`
+          for file-like content_types (pdf/word/ppt/excel/csv/audio/video/
+          image). NEW_DESIGN.
+      human_contribution:
+        $ref: "#/definitions/human_contribution"
+        description: >
+          OPTIONAL. Present when this node itself directly embodies a
+          HumanContribution (e.g. a sticky note that IS an Opinion). A node
+          may also exist with no embedded contribution at all (e.g. an
+          imported source document with content_type: pdf).
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      created_at:
+        type: string
+        format: date-time
+
+  canvas_edge:
+    description: >
+      NEW_DESIGN — MP §11 names the `/edges/` module directory but gives no
+      edge semantics anywhere. Kept minimal (a directed connection between
+      two nodes) per the same restraint applied throughout this file.
+    type: object
+    required: [edge_id, source_node_id, target_node_id]
+    properties:
+      edge_id: { type: string }
+      source_node_id: { type: string }
+      target_node_id: { type: string }
+      edge_type:
+        type: string
+        description: "OPTIONAL, free-form. No mother-document grounding for a closed edge-type vocabulary."
+
+  canvas_annotation:
+    description: >
+      The structural home of MP §11.2's AI/Human actor/action rule — see
+      compilation_decisions. Also the natural fit for the `/annotations/`
+      module directory MP §11 names.
+    type: object
+    required: [annotation_id, target_node_id, actor, action, provenance]
+    properties:
+      annotation_id: { type: string }
+      target_node_id:
+        type: string
+        description: "The canvas_node (or, informally, human_contribution) this annotation concerns."
+      actor:
+        type: string
+        enum: [AI, Human]
+      action:
+        type: string
+        description: >
+          Legal values are constrained by `actor` — see the `allOf` block
+          below. The full union of both action vocabularies is listed here
+          only so a validator without the `allOf` context still sees a
+          bounded value set.
+        enum: [suggest, diff, comment, challenge, accept, reject, edit, lock, branch, merge]
+      content:
+        type: string
+        description: "OPTIONAL. The diff payload, comment text, or challenge rationale, as applicable to the action."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      created_at:
+        type: string
+        format: date-time
+    allOf:
+      - if:
+          properties: { actor: { const: AI } }
+          required: [actor]
+        then:
+          properties: { action: { $ref: "#/definitions/ai_action" } }
+      - if:
+          properties: { actor: { const: Human } }
+          required: [actor]
+        then:
+          properties: { action: { $ref: "#/definitions/human_action" } }
+
+  canvas_attachment:
+    type: object
+    required: [attachment_id, content_type, artifact_uri]
+    properties:
+      attachment_id: { type: string }
+      content_type: { $ref: "#/definitions/content_type" }
+      artifact_uri:
+        $ref: "ai-lego://specs/artifact/portable-uri.schema.yaml#/definitions/artifact_uri"
+        description: "Hard $ref — see compilation_decisions on why the Canvas layer never depends on a storage backend directly."
+      filename:
+        type: string
+        description: "OPTIONAL, human-readable original filename."
+
+type: object
+required: [canvas_id, tenant_id]
+properties:
+
+  canvas_id:
+    type: string
+    description: "Identifier of this Canvas instance. No mother-document ID grammar exists for it; left as an opaque string."
+
+  tenant_id:
+    $ref: "ai-lego://specs/domain/tenant.schema.yaml#/properties/tenant_id"
+    description: "Hard $ref — see compilation_decisions."
+
+  nodes:
+    type: array
+    default: []
+    items: { $ref: "#/definitions/canvas_node" }
+
+  edges:
+    type: array
+    default: []
+    items: { $ref: "#/definitions/canvas_edge" }
+
+  annotations:
+    type: array
+    default: []
+    items: { $ref: "#/definitions/canvas_annotation" }
+
+  attachments:
+    type: array
+    default: []
+    items: { $ref: "#/definitions/canvas_attachment" }
+
+  human_contributions:
+    type: array
+    default: []
+    items: { $ref: "#/definitions/human_contribution" }
+    description: >
+      A first-class collection distinct from `nodes` — see
+      compilation_decisions on why this diverges from MP §11's literal
+      5-subdirectory list (`realtime` excluded, `human_contributions` added).
+
+constraints:
+  description: >
+    Cross-field/cross-record rules this schema's `properties`/`allOf` blocks
+    cannot express structurally, recorded as prose per this project's
+    established convention (`execution/result.schema.yaml`'s `constraints`
+    list is the precedent for this technique).
+  rules:
+    - "MP §11.2's rule is broader than what JSON Schema can enforce over a single instance: this schema guarantees an AI-attributed canvas_annotation can never structurally claim a Human-only verb, but it cannot itself prevent a real implementation from applying an out-of-band, non-annotation-recorded mutation directly to a canvas_node's content fields — that guarantee is an application-layer invariant this schema's actor/action enforcement exists to make auditable, not a runtime write-blocking mechanism (same class of limitation domain/tenant.schema.yaml discloses for tenant_id immutability)."
+    - "A canvas_node whose provenance.locked is non-null carries the narrower, ALREADY-ENFORCED (by governance/epistemic-label.schema.yaml's own allOf) SOURCE_FACT/DECISION protection; this is in ADDITION TO, not a replacement for, the broader actor/action rule above, which MP §11.2 states applies to all human content regardless of locked state."
+    - "human_contribution.task_ref, when populated, is not validated against specs/execution/task.schema.yaml by this schema (soft reference only) — a real implementation resolving task_ref to a task_context instance is responsible for that validation itself, if and when it does so."

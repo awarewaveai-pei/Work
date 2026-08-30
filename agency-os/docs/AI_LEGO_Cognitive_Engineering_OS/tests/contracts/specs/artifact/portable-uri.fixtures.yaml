@@ -1,0 +1,54 @@
+schema_id: "ai-lego://specs/artifact/portable-uri.schema.yaml"
+target_ref: "#/definitions/artifact_uri"
+description: >
+  Exercises both real corpus worked examples (MP §59 L2595's 2-pair
+  `project/source` form and MVP_VERTICAL_SLICE_PLAN.md L56's 3-pair
+  tenant-scoped form, the latter with `resolved_cas_path` populated via the
+  hard $ref into artifact/cas-path.schema.yaml), the structural
+  backend-leak-prevention pattern (an `s3://` value must never validate),
+  the lowercase-only `segment_type` grammar, the `segments` minItems: 1
+  floor, and the illegal-character rejection on `segment_id`.
+valid:
+  - name: mp_59_literal_two_pair_example
+    instance:
+      uri: "artifact://project/PRJ001/source/SRC0003"
+      segments:
+        - { segment_type: project, segment_id: PRJ001 }
+        - { segment_type: source, segment_id: SRC0003 }
+  - name: mvp_plan_tenant_scoped_three_pair_example_with_resolved_cas_path
+    instance:
+      uri: "artifact://tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1"
+      segments:
+        - { segment_type: tenant, segment_id: TEN-NORDBROOK }
+        - { segment_type: project, segment_id: PRJ-BURNOUT-01 }
+        - { segment_type: source, segment_id: SRC-INT-P1 }
+      resolved_cas_path:
+        path: "/objects/3fa85f64-5717-4562-b3fc-2c963f66afa6/sha256/a1/92/a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+        tenant_segment: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        hash: "a19225a6d8e6c4751a850398f7a782f1831c0b81ae7de82b8ee5f53d9ce2cfa4"
+        shard_1: "a1"
+        shard_2: "92"
+invalid:
+  - name: backend_leaking_s3_uri
+    instance:
+      uri: "s3://my-bucket/objects/tenant/aa/bb/hash"
+      segments:
+        - { segment_type: tenant, segment_id: "TEN-1" }
+    reason: "uri must be anchored to the literal artifact:// scheme prefix -- an s3:// value must never validate, per MP §59's 'Domain must not depend on S3 paths' requirement and this schema's structural backend-leak-prevention design."
+  - name: uppercase_segment_type_rejected
+    instance:
+      uri: "artifact://Project/PRJ001"
+      segments:
+        - { segment_type: Project, segment_id: PRJ001 }
+    reason: "segment_type must match ^[a-z][a-z0-9_]*$ (lowercase) -- 'Project' with a capital P fails both the segment definition's own pattern and the uri field's own regex."
+  - name: zero_segments_rejected
+    instance:
+      uri: "artifact://"
+      segments: []
+    reason: "segments has minItems: 1 -- a bare artifact:// URI with no segments identifies nothing and must fail; the uri field's own pattern (which requires at least one full segment pair) fails independently too."
+  - name: segment_id_with_illegal_character
+    instance:
+      uri: "artifact://project/PRJ 001"
+      segments:
+        - { segment_type: project, segment_id: "PRJ 001" }
+    reason: "segment_id must match ^[A-Za-z0-9_-]+$ -- a literal space is not a legal identifier character, in either the segments array item or the uri string's own pattern."

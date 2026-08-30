@@ -1,0 +1,641 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/execution-state-machine.schema.yaml"
+title: Execution State Machine
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of Execution Contract §10 "Execution
+  State Machine" (L531-577, range verified by direct read this session): the
+  14-state primary sequence RECEIVED -> DOCUMENTS_RESOLVED ->
+  CURRENT_STATE_ESTABLISHED -> RISK_CLASSIFIED -> METHODS_RESOLVED ->
+  PLAN_COMPILED -> ROLLBACK_VALIDATED -> APPROVED -> EXECUTING -> VERIFYING
+  -> READY_FOR_RELEASE -> RELEASING -> POST_VERIFY -> CLOSED (L534-560,
+  verbatim names/order), plus the transition-legality rule EC states in its
+  own voice immediately after the diagram -- "禁止跳過必要 state" (L575,
+  skipping a necessary state is forbidden) -- and the per-state entry
+  preconditions the mother documents specify elsewhere for specific states.
+
+  This file is the gap `status-codes.schema.yaml` explicitly named but did
+  not fill: that file's own block comment (its L68-71) states its "only job
+  is mapping named signals onto these existing values" and that the 7 legal
+  side-states are "cited verbatim from EC §10/§70" -- it deliberately does
+  NOT define the full state-transition graph. EC §92's own 13-file
+  `/specs/execution/` list (L2766-2783) does not name a state-machine file
+  either. **Correction (found and fixed in this same compilation pass, not
+  a later session)**: an earlier draft of this paragraph additionally
+  claimed no planning document names this gap at all -- that claim was
+  FALSE and is corrected here rather than silently rewritten out of
+  existence. `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 "Required
+  Phase-3 Specs" (Status: PROPOSED, L111) DOES name this exact file:
+  "`execution-state-machine.schema.yaml`（EC §10，含
+  `BLOCKED`／`PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`）" -- found via a
+  broader grep sweep for this filename across the whole repo AFTER the
+  narrower grep against `MACHINE_READABLE_SPEC_PLAN.md`/`GAP_REGISTER.yaml`/
+  `DUPLICATION_REGISTER.yaml`/`verified-findings.yaml` had already come back
+  empty; that narrower sweep's "no ADR/finding governs this" conclusion
+  still holds (MVP_VERTICAL_SLICE_PLAN.md is a PROPOSED planning document,
+  not an ADR or a registered finding, and its own scope-boundary note says
+  it "不修改三母文件" and gates actual slice execution behind Phase 3/4
+  completion + a separate operator approval -- it does not itself authorize
+  or block building this schema file, which this task's own instruction
+  already separately authorized). The plan's parenthetical
+  "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED" mention is consistent with, not
+  in tension with, `status-codes.schema.yaml`'s own prior resolution of
+  that exact name as a deprecated alias of the canonical
+  METHOD_RESOLUTION_BLOCKED (see this file's `preconditions.METHODS_RESOLVED`
+  below, which already cites METHOD_RESOLUTION_BLOCKED) -- no schema content
+  changed as a result of finding this citation, only the provenance claim
+  above. This file is therefore a genuinely NEW schema build, anticipated by
+  one PROPOSED planning document but not yet governed by any ADR or
+  registered finding -- the same situation `audit.schema.yaml` (built
+  alongside this file, same session, also named at the same
+  MVP_VERTICAL_SLICE_PLAN.md §4 line) documents about itself.
+
+  The 7 legal side states (BLOCKED / NEEDS_HUMAN_REVIEW / FAILED /
+  CANCELLED / ROLLED_BACK / COMPENSATED / PARTIAL_SUCCESS, EC §10 L563-573)
+  are `$ref`'d from `status-codes.schema.yaml`'s own
+  `reference_vocabulary/legal_side_states/schema` node, NOT redeclared here
+  -- that file is already the single source of truth for that enum and for
+  the per-signal mapping of named blocking codes onto it. This file is the
+  single source of truth for legal PRIMARY-state ordering, the enforced
+  no-skip rule, and the per-state preconditions cited below; EC §10's own
+  prose remains the source of truth for the state NAMES and the two
+  verbatim rules, unchanged.
+
+source_of_truth_for:
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 Required Phase-3 Specs (L111, Status: PROPOSED) -- names this exact filename against EC §10, with a parenthetical BLOCKED/PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED note consistent with status-codes.schema.yaml's own prior alias resolution; NOT an ADR or registered finding, does not itself govern this file's content"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 Execution State Machine (L531-577) -- 14-state sequence (L534-560), 7 side states (L563-573), '禁止跳過必要 state' (L575), all verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §3 AI Boot Contract (L141-167) -- the 11-step boot flow this state sequence parallels in places (see compilation_decisions for how much correspondence is actually asserted)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §3.1 Required Document Resolution (L169-185) -- DOCUMENT_RESOLUTION_BLOCKED, the precondition-failure signal for DOCUMENTS_RESOLVED"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §11 Current-state Reconstruction (L579-638) -- CURRENT_STATE_DRIFT_DETECTED, the precondition-failure signal for CURRENT_STATE_ESTABLISHED"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §14 Method Resolution (L700-728) -- METHOD_RESOLUTION_BLOCKED, the precondition-failure signal for METHODS_RESOLVED"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §19 Rollback-first Rule (L853-880) and §20 rollback-plan.yaml (L882-923) -- the literal reason ROLLBACK_VALIDATED exists as its own state before APPROVED"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §5 Execution Invariants (L277-311), specifically 'NO FORWARD PLAN BEFORE A VALID ROLLBACK / RECOVERY PLAN...' (L287-288)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L478-529) -- the A3/A4 requirement chains this file's APPROVED precondition cites"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §67 Definition of Done Compiler (L2220-2242) and §68 Global Gates (L2246-2280) -- why gate firing is NOT bound to one specific primary_state by this file"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §129 Release Closure (L3538-3556) -- the 4-part AND precondition for CLOSED, verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §130 Failed Change Closure (L3560-3577) -- the FAILED side-state's own internal sub-sequence, verbatim"
+  - "specs/execution/status-codes.schema.yaml reference_vocabulary/legal_side_states/schema (7 side states, $ref'd here, not redeclared) and its per-signal side_state_mapping registry (METHOD_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED entries specifically)"
+  - "specs/execution/current-state.schema.yaml (the record whose comparison determines whether CURRENT_STATE_ESTABLISHED is reached or CURRENT_STATE_DRIFT_DETECTED fires instead -- that file's own description already states this relationship)"
+  - "specs/execution/method-resolution.schema.yaml (the field-mapping record that determines whether METHODS_RESOLVED is reached)"
+  - "specs/execution/rollback.schema.yaml (the record that satisfies ROLLBACK_VALIDATED's precondition)"
+  - "specs/execution/gate.schema.yaml#/gate_result and #/trigger_context (gates possibly associated with a transition; soft-bound, see cross_cutting_controls)"
+  - "specs/execution/authority.schema.yaml#/authority_level (the A0-A4 enum APPROVED's precondition cites)"
+
+decided_by: >
+  No ADR governs this file. `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+  §4 (L111, Status: PROPOSED) names this exact filename against EC §10, but
+  a PROPOSED planning document is not an ADR and does not itself decide
+  this file's content -- its own scope-boundary note explicitly says it
+  "不修改三母文件" and gates the Vertical Slice's actual EXECUTION (not the
+  writing of individual Phase-3 spec files) behind Phase 3/4 completion and
+  a separate operator STOP-FOR-HUMAN-REVIEW approval. Grep-confirmed
+  2026-08-30 against `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` (no
+  row for `execution-state-machine.schema.yaml` or any "state machine" file
+  under its `execution/` directory entry, which itself only says "EC §92
+  的 13 個檔案 + 本計畫新增的缺口" without naming this specific gap),
+  `.ai/research/phase-1/GAP_REGISTER.yaml` (the only "state machine" hits
+  are EC §55 Incident Mode, a different state machine, and an Audit-Event
+  identity gap unrelated to this file), and `.ai/research/phase-0/
+  verified-findings.yaml` / `DUPLICATION_REGISTER.yaml` (no hits at all) --
+  no ADR-track document rules on this file's content. This file is built
+  directly per this session's task instruction as a Low-risk compilation
+  of EC §10's already-written prose -- the same class of decision
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`'s own precedent
+  describes for naming/structure choices ("命名裁決屬 Low-risk，可在
+  Phase 3 內部直接定案，不需要 ADR") -- not a new architecture decision,
+  and consistent with `status-codes.schema.yaml`'s own explicit
+  acknowledgment that this exact gap existed and was left unfilled by that
+  file on purpose.
+
+compilation_decisions:
+  - question: >
+      How should EC §10's own transition-legality rule -- "禁止跳過必要
+      state" (L575), stated as one bare sentence immediately after the
+      14-state diagram and the 7-side-state list, with no further
+      elaboration -- be operationalized into a JSON Schema constraint on a
+      transition-event instance?
+    decision: >
+      Enforce strict adjacent-pair-only transitions between PRIMARY states:
+      `state_transition_event`'s `allOf` below encodes exactly the 13
+      forward edges of the 14-state sequence (`legal_primary_transitions.edges`)
+      as individual `if`/`then` blocks keyed on `from_state`'s `const`
+      value, each requiring `to_state` to be the literal next state in the
+      sequence whenever `to_state` is asserted to be a primary state at
+      all (i.e. the `if` condition checks `to_state` against the full
+      `primary_state` enum, not just "not equal to `from_state`" --
+      this uniformly rejects both same-state loops and multi-step skips
+      without needing separate rules for each). Transitions where `to_state`
+      is one of the 7 side-states are NOT constrained by this rule at all
+      (see next decision).
+    reasoning: >
+      This is the only transition-legality sentence EC §10 states in its
+      own voice, and it is stated immediately below the PRIMARY sequence,
+      not the side-state list -- reading it as governing primary-to-primary
+      movement only (not side-state entry/exit) is the narrowest faithful
+      reading, not an expansion. `jurisdiction/conflict-of-laws-output.schema.yaml`'s
+      2026-08-30 `allOf`/`if`/`then` block (its L120-155, the most recent
+      precedent in this corpus for "a field's value determines which other
+      field values are legal") is the direct structural model reused here,
+      scaled from single-condition dispatch to a 13-edge adjacency chain.
+  - question: >
+      Which primary states may legally transition into which of the 7 side
+      states, and can a side state ever transition back into the primary
+      sequence (e.g. a resumed/recovered flow)?
+    decision: >
+      Leave BOTH directions structurally unconstrained (no `if`/`then` rule
+      references a side-state value as either the `from_state` or a
+      restricted-target `to_state`) and record the gap explicitly in
+      `open_questions.OQ-ESM-1`/`OQ-ESM-2` rather than inventing a
+      source-state x side-state eligibility matrix.
+    reasoning: >
+      EC §10 lists the 7 side states as a flat set with zero stated
+      eligibility rule ("合法 side states", L563, no "from which primary
+      state" qualifier). `status-codes.schema.yaml`'s own per-signal
+      `side_state_mapping` registry assigns SPECIFIC named signals
+      (METHOD_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED,
+      CURRENT_STATE_DRIFT_DETECTED, etc.) to side-state VALUES with
+      signal-specific trigger conditions -- but that is a SIGNAL -> SIDE-STATE
+      mapping, not a general PRIMARY-STATE -> SIDE-STATE eligibility
+      statement (e.g. neither file says "RECEIVED cannot enter FAILED" or
+      the reverse). Asserting a full matrix here would silently manufacture
+      content neither document gives, exactly the class of guess R0's 補丁
+      判準 and R4 forbid.
+  - question: >
+      Is CLOSED a genuinely terminal state (no legal outgoing transition at
+      all), given EC §10 never uses the word "terminal" and gives CLOSED no
+      dedicated section of its own comparable to §129/§130's treatment of
+      the states around it?
+    decision: >
+      Model CLOSED as terminal: `state_transition_event`'s `allOf` includes
+      an explicit rule that any instance with `from_state: CLOSED` fails
+      validation (`then: false`), for BOTH primary and side `to_state`
+      targets.
+    reasoning: >
+      This is an INFERENCE, not a verbatim quote -- flagged as such rather
+      than silently presented as EC's own words. The inference rests on:
+      (1) CLOSED is the last item in the 14-state diagram with nothing
+      drawn after it (L560-561, no further arrow); (2) EC §129 Release
+      Closure (L3538-3556) frames reaching CLOSED as the outcome of a
+      4-part completion proof ("才：CLOSED"), language consistent with a
+      final disposition, not an intermediate checkpoint; (3) no mother
+      document anywhere describes reopening a CLOSED execution -- EC §130's
+      own Failed Change Closure sub-sequence ends in "Root Cause /
+      Follow-up" (L3573), which this file reads as spawning a NEW
+      execution/task for the follow-up work, not reopening the old one
+      (see `open_questions.OQ-ESM-5` for the honest acknowledgment that EC
+      does not confirm this reading either way).
+  - question: >
+      EC §3's Boot Contract (L141-167) lists 11 steps (BOOT -> Resolve
+      Documents -> Verify Versions/Hashes -> Resolve Current State ->
+      Classify Task -> Resolve Jurisdiction/Data/Security Context -> Select
+      Applicable Methods -> Compile Mandatory Gates -> Plan Rollback -> Plan
+      Forward Change -> Execute); EC §10's state machine has 14 primary
+      states. Should this file assert a full 1:1 correspondence between the
+      two lists?
+    decision: >
+      No. Only the THREE correspondences already established by sibling
+      schema files elsewhere in this corpus are reused/cited here:
+      DOCUMENTS_RESOLVED <-> "Resolve Documents" (status-codes.schema.yaml's
+      own METHOD_RESOLUTION_BLOCKED entry, L131-132 of that file, and this
+      file's own DOCUMENTS_RESOLVED precondition below cite the same boot
+      step); METHODS_RESOLVED <-> "Select Applicable Methods"
+      (status-codes.schema.yaml L130-132 and gate.schema.yaml's own
+      description both already assert this pairing); CURRENT_STATE_ESTABLISHED
+      <-> "Resolve Current State" (current-state.schema.yaml's own
+      description already asserts this pairing). The remaining 8 boot steps
+      against the remaining 11 primary states are NOT mapped 1:1 here --
+      the two lists have different cardinality (11 vs. 14) and no mother
+      document states a full correspondence; flagged as `open_questions.OQ-ESM-3`.
+    reasoning: >
+      Reusing three ALREADY-ESTABLISHED, ALREADY-CITED pairings (each made
+      independently by a different file, for a different reason, before
+      this file existed) is compilation, not invention. Extending that
+      pattern to the remaining 8-vs-11 mismatch would require guessing
+      which boot step (if any) each of RISK_CLASSIFIED / PLAN_COMPILED /
+      ROLLBACK_VALIDATED / APPROVED / EXECUTING / VERIFYING /
+      READY_FOR_RELEASE / RELEASING / POST_VERIFY corresponds to, with no
+      textual anchor comparable to the three reused cases (each of which
+      has an EC section, e.g. §3.1/§11/§14, that names the SAME real-world
+      activity as both a boot step AND cites the resulting/blocking state
+      or the record schema that fills it).
+
+# ---------------------------------------------------------------------------
+# The 14 primary states, EC §10 verbatim order (L534-560).
+# ---------------------------------------------------------------------------
+primary_state:
+  type: string
+  description: >
+    EC §10's 14-state primary sequence, in canonical order (L534-560).
+    ORDER MATTERS -- see `legal_primary_transitions` and
+    `state_transition_event.allOf` below, both of which depend on this
+    exact sequence.
+  enum:
+    - RECEIVED
+    - DOCUMENTS_RESOLVED
+    - CURRENT_STATE_ESTABLISHED
+    - RISK_CLASSIFIED
+    - METHODS_RESOLVED
+    - PLAN_COMPILED
+    - ROLLBACK_VALIDATED
+    - APPROVED
+    - EXECUTING
+    - VERIFYING
+    - READY_FOR_RELEASE
+    - RELEASING
+    - POST_VERIFY
+    - CLOSED
+
+# ---------------------------------------------------------------------------
+# The 7 legal side states -- real hard $ref, NOT redeclared.
+# status-codes.schema.yaml already exists on disk and already owns this enum.
+# ---------------------------------------------------------------------------
+side_state:
+  $ref: "ai-lego://specs/execution/status-codes.schema.yaml#/reference_vocabulary/legal_side_states/schema"
+
+# ---------------------------------------------------------------------------
+# Legal primary-state -> primary-state edges. This is BOTH the documented
+# registry (for human readers) AND the exact edge set
+# `state_transition_event`'s `allOf` below enforces structurally -- unlike
+# gate.schema.yaml's intentionally-non-enforced gate_catalog, this registry
+# is not merely descriptive (see compilation_decisions).
+# ---------------------------------------------------------------------------
+legal_primary_transitions:
+  description: >
+    Every legal primary-state -> primary-state edge, per EC §10's
+    "禁止跳過必要 state" (L575) applied to the 14-state sequence
+    (L534-560). Exactly 13 edges for 14 states -- the strictly adjacent
+    pairs, no skips.
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 (L534-560, L575)"
+  edges:
+    - { from: RECEIVED, to: DOCUMENTS_RESOLVED }
+    - { from: DOCUMENTS_RESOLVED, to: CURRENT_STATE_ESTABLISHED }
+    - { from: CURRENT_STATE_ESTABLISHED, to: RISK_CLASSIFIED }
+    - { from: RISK_CLASSIFIED, to: METHODS_RESOLVED }
+    - { from: METHODS_RESOLVED, to: PLAN_COMPILED }
+    - { from: PLAN_COMPILED, to: ROLLBACK_VALIDATED }
+    - { from: ROLLBACK_VALIDATED, to: APPROVED }
+    - { from: APPROVED, to: EXECUTING }
+    - { from: EXECUTING, to: VERIFYING }
+    - { from: VERIFYING, to: READY_FOR_RELEASE }
+    - { from: READY_FOR_RELEASE, to: RELEASING }
+    - { from: RELEASING, to: POST_VERIFY }
+    - { from: POST_VERIFY, to: CLOSED }
+
+# ---------------------------------------------------------------------------
+# Per-state preconditions -- ONLY where a mother document specifies a
+# concrete trigger/gate for entering that state. States not listed here
+# (RISK_CLASSIFIED, PLAN_COMPILED, EXECUTING, VERIFYING, READY_FOR_RELEASE,
+# RELEASING, POST_VERIFY) have no additional mother-document-specified
+# precondition beyond "the previous state in the sequence was reached" --
+# not populated, not guessed.
+# ---------------------------------------------------------------------------
+preconditions:
+  DOCUMENTS_RESOLVED:
+    condition: "All 7 boot-mandatory documents/artifacts found (EC §3.1, L169-179: Master Plan, Method Atlas, this Execution Contract, machine-readable specs, applicable policies, accepted ADR, current code/schema/infra/deployment evidence)."
+    failure_signal: "DOCUMENT_RESOLUTION_BLOCKED -> BLOCKED (status-codes.schema.yaml) fires instead of reaching this state."
+    source: "EC §3.1 (L169-185)"
+  CURRENT_STATE_ESTABLISHED:
+    condition: "A current-state.schema.yaml record is produced, and no unresolved conflict exists between documentation and observed reality."
+    failure_signal: "CURRENT_STATE_DRIFT_DETECTED -> NEEDS_HUMAN_REVIEW (status-codes.schema.yaml) fires instead of reaching this state when '文件與 reality 衝突' (EC §11, L632)."
+    source: "EC §11 (L579-638); specs/execution/current-state.schema.yaml"
+  METHODS_RESOLVED:
+    condition: "Method Atlas is readable/versioned/complete, and specs/execution/method-resolution.schema.yaml's field mapping succeeds for the task's Selection Context."
+    failure_signal: "METHOD_RESOLUTION_BLOCKED -> BLOCKED (status-codes.schema.yaml) fires instead of reaching this state."
+    source: "EC §14 (L700-728); EC §3 boot-flow step 'Select Applicable Methods' (L158); specs/execution/method-resolution.schema.yaml"
+  ROLLBACK_VALIDATED:
+    condition: >
+      A specs/execution/rollback.schema.yaml record exists and is
+      validated, per EC §19's Rollback-first Rule (L855-861): "對
+      persistent state / production / external side effect：Rollback /
+      Recovery Plan MUST BE VALIDATED BEFORE FORWARD EXECUTION" -- this is
+      the literal reason this state exists as its own step between
+      PLAN_COMPILED and APPROVED, not merely an arbitrary ordering choice.
+    source: "EC §19 (L853-880), §20 (L882-923); EC §5 Invariant (L287-288); specs/execution/rollback.schema.yaml"
+  APPROVED:
+    condition: >
+      When the operation's authority_level (specs/execution/authority.schema.yaml)
+      is A3 or A4, EC §9's own requirement chain for that level gates entry
+      here: A3 needs `policy allow` + `required gates pass` +
+      `authorized approval` together (L508-512, an AND chain, not any-of);
+      A4 needs `explicit_human_authority` (L525), with the explicit rule
+      "AI 不得自行把自己的建議當 approval" (L527, AI MUST NOT treat its own
+      recommendation as approval). This file does NOT assert which
+      authority_level a given task requires, nor any fixed risk_tier <->
+      authority_level numeral correspondence -- authority.schema.yaml
+      itself already declined that question in its own compilation_decisions
+      -- only that whatever level applies, its own EC §9 requirements are
+      what this state's name cites.
+    source: "EC §9 (L478-529); specs/execution/authority.schema.yaml"
+  CLOSED:
+    condition: >
+      EC §129 Release Closure's 4-part AND condition, verbatim (L3540-3550):
+      Post Verify PASS + Required Observation Window satisfied + No
+      Critical Open Issue + Rollback Window decision recorded. All four
+      required together.
+    source: "EC §129 (L3538-3556)"
+
+# ---------------------------------------------------------------------------
+# What happens INSIDE a side-state once entered. Descriptive only -- these
+# are the side-state's own internal recipe steps, not further primary/side
+# state values, and are NOT modeled as edges in state_transition_event.
+# ---------------------------------------------------------------------------
+side_state_followups:
+  FAILED:
+    sequence: ["Rollback / Compensation", "Verify Recovery", "Record Evidence", "Root Cause / Follow-up"]
+    invariant: "'不得留下 unknown half-state' (EC §130, L3576) -- MUST NOT leave an unknown half-state."
+    source: "EC §130 Failed Change Closure (L3560-3577)"
+  note: >
+    No mother-document text was found specifying an analogous internal
+    recipe for the other 6 side states (BLOCKED, NEEDS_HUMAN_REVIEW,
+    CANCELLED, ROLLED_BACK, COMPENSATED, PARTIAL_SUCCESS) -- grep-confirmed
+    against both mother documents' full text. Not populated, not guessed.
+    See `open_questions.OQ-ESM-4`.
+
+# ---------------------------------------------------------------------------
+# Cross-cutting controls this state machine interacts with without owning.
+# ---------------------------------------------------------------------------
+cross_cutting_controls:
+  gates:
+    description: >
+      EC §67 Definition of Done Compiler compiles Required Gates from Task
+      Type + Risk Tier + Domain + Data Impact + Jurisdiction + Method +
+      Release Mode (L2224-2242) -- NOT from `primary_state` alone. EC never
+      names a specific primary_state as "where gates fire";
+      gate.schema.yaml's own `trigger_context` instead binds gate injection
+      to `risk_tier IN [R3, R4]` (execution/risk-tier.schema.yaml), a
+      cross-cutting condition that can hold throughout EXECUTING/VERIFYING/
+      RELEASING alike. This file therefore does not bind `gate_result`
+      records to one specific state; `state_transition_event.gate_results`
+      below is an OPTIONAL, per-transition record of whichever gates
+      actually ran around that transition, not a claim that gates fire only
+      at one named state.
+    source: "EC §67 (L2220-2242); specs/execution/gate.schema.yaml#/trigger_context"
+  authority:
+    description: "See preconditions.APPROVED above."
+    source: "specs/execution/authority.schema.yaml"
+
+# ---------------------------------------------------------------------------
+# Instance schema -- one transition attempt/event. This is the fixture
+# target (tests/contracts/specs/execution/execution-state-machine.fixtures.yaml
+# validates against #/state_transition_event).
+# ---------------------------------------------------------------------------
+state_transition_event:
+  type: object
+  description: >
+    One recorded attempt to move the Execution State Machine from one state
+    to another (or the initial entry into RECEIVED, `from_state: null`).
+    Not itself named by any single mother-document worked example -- EC §10
+    gives the state graph, not a wire format for one transition record;
+    this shape is this file's own compilation, kept minimal enough to make
+    the "no skip" rule and the cited preconditions machine-checkable.
+  required: [from_state, to_state, transitioned_at]
+  # 2026-08-30 (self-review before running golden tests): from_state MUST be
+  # in `required` even though it is nullable -- every allOf/if/then rule
+  # below is keyed on `from_state`'s value and additionally requires
+  # `from_state` to be PRESENT inside its own `if.required`. If the
+  # top-level schema allowed `from_state` to be omitted entirely (as
+  # opposed to explicitly `null`), an instance could set to_state: CLOSED
+  # with no from_state key at all and satisfy every if/then vacuously (none
+  # of them would match, since their own `required: [from_state, ...]`
+  # condition fails to find the key) -- a coverage-guard bypass of the
+  # exact class tests/README.md warns this suite has twice found for real
+  # (uniqueItems-alone-insufficient in authority.yaml/deprecation-pipeline.schema.yaml).
+  # Requiring the key (present, but oneOf-typed to allow null) closes it.
+  properties:
+    from_state:
+      description: "Null only for the very first transition (entry into RECEIVED, which has no prior state)."
+      oneOf:
+        - $ref: "#/primary_state"
+        - $ref: "#/side_state"
+        - type: "null"
+    to_state:
+      oneOf:
+        - $ref: "#/primary_state"
+        - $ref: "#/side_state"
+    transitioned_at:
+      type: string
+      format: date-time
+    execution_id:
+      type: string
+      pattern: "^EX-"
+      description: >
+        ADDITIVE join key, not in EC §10's own text. Same pattern as
+        manifest.schema.yaml's `properties/execution/properties/execution_id`
+        -- reused verbatim (soft convention, not a hard $ref -- see
+        result.schema.yaml's identical reasoning for its own `execution_id`
+        field: "a plain pattern string, not a schema-object reference") so a
+        transition event can be tied back to its owning Execution.
+    trigger_signal:
+      type: [string, "null"]
+      description: >
+        The named status-codes.schema.yaml signal (if any) that caused a
+        side-state `to_state` (e.g. "METHOD_RESOLUTION_BLOCKED"). Null for
+        an ordinary forward primary-to-primary transition. Deliberately a
+        bare string, not a hard $ref/enum into status-codes.schema.yaml's
+        `status_codes` registry, since that registry is a list of objects
+        (not a name-only enum) and new signals may be added there over
+        time -- matching this corpus's own convention (e.g.
+        `manifest.schema.yaml`'s `results.gates` field) of leaving a
+        cross-referenced-by-name-only field untyped when the target isn't
+        itself a flat enum.
+    gate_results:
+      type: array
+      items: { $ref: "ai-lego://specs/execution/gate.schema.yaml#/gate_result" }
+      description: >
+        OPTIONAL. Gate outcomes associated with this transition, if any
+        fired -- see `cross_cutting_controls.gates` above for why this is
+        not mandatory on every transition.
+    authority_level:
+      $ref: "ai-lego://specs/execution/authority.schema.yaml#/authority_level"
+      description: >
+        OPTIONAL. Present when this transition (typically into APPROVED or
+        EXECUTING) was gated by an explicit authority_level check -- see
+        `preconditions.APPROVED` above.
+  allOf:
+    # Initial entry: the very first transition has no prior state and must
+    # land on RECEIVED.
+    - if:
+        properties: { from_state: { type: "null" } }
+        required: [from_state]
+      then:
+        properties: { to_state: { const: RECEIVED } }
+    # CLOSED is terminal -- see compilation_decisions. No legal outgoing
+    # transition of any kind (primary or side) from CLOSED.
+    - if:
+        properties: { from_state: { const: CLOSED } }
+        required: [from_state]
+      then: false
+    # 13 forward-adjacency rules (no-skip enforcement, EC §10 L575). Each
+    # only constrains the case where to_state is ITSELF asserted to be a
+    # primary state -- a transition from a primary state into one of the 7
+    # side states is left unconstrained by design (see compilation_decisions).
+    - if:
+        properties: { from_state: { const: RECEIVED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: DOCUMENTS_RESOLVED } }
+    - if:
+        properties: { from_state: { const: DOCUMENTS_RESOLVED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: CURRENT_STATE_ESTABLISHED } }
+    - if:
+        properties: { from_state: { const: CURRENT_STATE_ESTABLISHED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: RISK_CLASSIFIED } }
+    - if:
+        properties: { from_state: { const: RISK_CLASSIFIED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: METHODS_RESOLVED } }
+    - if:
+        properties: { from_state: { const: METHODS_RESOLVED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: PLAN_COMPILED } }
+    - if:
+        properties: { from_state: { const: PLAN_COMPILED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: ROLLBACK_VALIDATED } }
+    - if:
+        properties: { from_state: { const: ROLLBACK_VALIDATED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: APPROVED } }
+    - if:
+        properties: { from_state: { const: APPROVED }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: EXECUTING } }
+    - if:
+        properties: { from_state: { const: EXECUTING }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: VERIFYING } }
+    - if:
+        properties: { from_state: { const: VERIFYING }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: READY_FOR_RELEASE } }
+    - if:
+        properties: { from_state: { const: READY_FOR_RELEASE }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: RELEASING } }
+    - if:
+        properties: { from_state: { const: RELEASING }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: POST_VERIFY } }
+    - if:
+        properties: { from_state: { const: POST_VERIFY }, to_state: { $ref: "#/primary_state" } }
+        required: [from_state, to_state]
+      then:
+        properties: { to_state: { const: CLOSED } }
+
+open_questions:
+  - id: "OQ-ESM-1"
+    question: >
+      Which primary states may legally enter which of the 7 side states?
+      EC §10 gives the side-state list no source-state qualifier at all.
+      Left fully unconstrained (any primary state may transition to any
+      side state) rather than guessed narrower.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this schema's own validity -- the permissive default is a conservative (non-blocking) choice, not a silent gap"
+  - id: "OQ-ESM-2"
+    question: >
+      Can a side state transition back into the primary sequence (a
+      resumed/recovered flow), and if so, to which primary state -- the one
+      it was blocked from reaching, an earlier one, or a fresh RECEIVED?
+      EC §10 does not address recovery/resumption at all; EC §130's FAILED
+      sub-sequence (L3560-3577) describes what happens INSIDE the FAILED
+      side state but never states whether/how control returns to the
+      primary sequence afterward. Left fully unconstrained.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-ESM-3"
+    question: >
+      Full correspondence between EC §3's 11-step Boot Contract and the
+      remaining 11 primary states beyond the 3 already-established pairings
+      (DOCUMENTS_RESOLVED, METHODS_RESOLVED, CURRENT_STATE_ESTABLISHED --
+      see compilation_decisions) is unconfirmed. In particular: does
+      "Compile Mandatory Gates" (§3, L160) correspond to PLAN_COMPILED, to
+      part of METHODS_RESOLVED's exit condition, or to no single state at
+      all (matching this file's own `cross_cutting_controls.gates` position
+      that gate compilation is cross-cutting, not state-bound)? Left
+      unresolved rather than guessed.
+    owner: "operator or Round 2 ADR"
+    blocks: "nothing in this schema's own validity -- preconditions are only populated where a citation already exists"
+  - id: "OQ-ESM-4"
+    question: >
+      EC §130 gives FAILED an explicit 4-step internal sub-sequence. No
+      equivalent text was found (grep-confirmed against both mother
+      documents in full) for the other 6 side states (BLOCKED,
+      NEEDS_HUMAN_REVIEW, CANCELLED, ROLLED_BACK, COMPENSATED,
+      PARTIAL_SUCCESS). Is this a genuine gap in EC's own coverage, or is
+      FAILED simply the only side state EC considered complex enough to
+      need one? Left open.
+    owner: "operator"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-ESM-5"
+    question: >
+      This file infers CLOSED is terminal (see compilation_decisions) partly
+      on the reading that EC §130's "Root Cause / Follow-up" step (L3573)
+      spawns a NEW execution for follow-up work rather than reopening a
+      CLOSED one. EC does not confirm this reading -- if a future revision
+      intends a genuine "reopen" mechanism, this file's `then: false` rule
+      for `from_state: CLOSED` would need to be relaxed.
+    owner: "operator or Round 2 ADR"
+    blocks: >
+      Nothing today. Would require a schema change (not just a
+      documentation update) if reopening is later confirmed as intended.
+
+verification:
+  method: >
+    Read EC §10 (L531-577) in full at the cited lines, twice (once for the
+    14-state diagram and side-state list, once specifically re-reading
+    L575's "禁止跳過必要 state" sentence in isolation to confirm it carries
+    no further qualifier). Read EC §3 (L141-216) in full for the Boot
+    Contract comparison. Read EC §3.1 (L169-185), §11 (L579-638), §14
+    (L700-728, via status-codes.schema.yaml's own prior citation, re-verified
+    here), §9 (L478-529), §19-20 (L853-923, via rollback.schema.yaml's own
+    prior citation, re-verified here), §67-68 (L2220-2280), §129-130
+    (L3538-3577) at the cited lines. Grepped both mother documents in full
+    for every one of the 14 primary-state names plus RECEIVED/CLOSED, to
+    confirm none appears elsewhere with additional, un-cited meaning (see
+    the grep results discussed in this session -- only RECEIVED appears
+    once more, in EC §16's `task.manifest.yaml` worked example status field,
+    L759, consistent with this file's own enum; CLOSED appears once more,
+    in EC §129's own text, already cited above). Grepped
+    `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`,
+    `.ai/research/phase-1/GAP_REGISTER.yaml`,
+    `.ai/research/phase-0/verified-findings.yaml` for any prior ADR-track
+    finding or planned row naming this gap -- none found; a SEPARATE,
+    broader repo-wide grep for this filename found
+    `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 (L111, a PROPOSED
+    planning document, not an ADR-track artifact) does name it -- see
+    `decided_by` for the full correction of this session's own earlier,
+    narrower claim. Read
+    `specs/execution/status-codes.schema.yaml`,
+    `specs/execution/gate.schema.yaml`, `specs/execution/authority.schema.yaml`,
+    `specs/execution/current-state.schema.yaml`,
+    `specs/execution/method-resolution.schema.yaml`,
+    `specs/execution/rollback.schema.yaml`, and
+    `specs/execution/manifest.schema.yaml` in full before writing any `$ref`
+    or cross-reference into them.
+  note: >
+    No mother document, ADR, or existing sibling `specs/execution/` file was
+    modified to produce this file. The 14-state sequence, the 7 side
+    states (via $ref), the "no skip" rule, and every cited precondition
+    (DOCUMENTS_RESOLVED/CURRENT_STATE_ESTABLISHED/METHODS_RESOLVED/
+    ROLLBACK_VALIDATED/APPROVED/CLOSED) are transcribed verbatim or
+    near-verbatim from the cited lines. The strict-adjacency `allOf`
+    enforcement mechanism, the permissive side-state entry/exit design, and
+    the CLOSED-is-terminal inference are Phase-3-style compilation
+    decisions recorded above, explicitly flagged where they go beyond a
+    literal quote, not new architecture decisions and not silently asserted
+    as mother-document fact.

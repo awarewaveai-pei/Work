@@ -1,0 +1,88 @@
+schema_id: "ai-lego://specs/evidence/evidence-graph.schema.yaml"
+target_ref: ""
+description: >
+  Exercises evidence-graph.schema.yaml's root-level $ref (bare-root
+  validation must actually constrain, not accept anything -- the
+  governance/epistemic-label.schema.yaml precedent this file's own
+  compilation_decisions cites), the six-way node oneOf discriminator, and
+  the generic edge's node_type<->node_id ID-pattern cross-validation
+  (node_ref's allOf/if/then).
+valid:
+  - name: full_graph_worked_example
+    instance:
+      graph_id: null
+      nodes:
+        - node_type: SOURCE
+          source_id: "SRC-1"
+          locator_hint: "PDF p.32"
+        - node_type: EVIDENCE
+          data: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+        - node_type: CLAIM
+          data: { claim_id: "C-117", statement: "市場對此類產品的採用率正在上升", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+        - node_type: ENTITY
+          entity_id: "ENT-1"
+          label: "Acme University"
+          type: "Organization"
+        - node_type: ENTITY
+          entity_id: "ENT-2"
+          label: "Beta University"
+          type: "Organization"
+      edges:
+        - from: { node_type: EVIDENCE, node_id: "E-912" }
+          to: { node_type: CLAIM, node_id: "C-117" }
+          relation_type: SUPPORTS
+        - from: { node_type: ENTITY, node_id: "ENT-1" }
+          to: { node_type: ENTITY, node_id: "ENT-2" }
+          relation_type: "partners_with"
+  - name: empty_graph_under_construction
+    instance:
+      nodes: []
+      edges: []
+  - name: assumption_and_decision_nodes_with_stub_refs
+    instance:
+      nodes:
+        - node_type: ASSUMPTION
+          data: { id: "ASM-1", statement: "客戶數量未來 12 個月成長 <20%", status: "Unverified", provenance: { epistemic_type: ASSUMPTION, authorship_state: HUMAN_ORIGINAL } }
+        - node_type: DECISION
+          data: { id: "DEC-2026-08-30-001", version: "1.0.0", question: "是否採用此方案？", options: ["採用", "不採用"], human_judgment_pending: true, provenance: { epistemic_type: DECISION, authorship_state: AI_GENERATED } }
+      edges:
+        - from: { node_type: ASSUMPTION, node_id: "ASM-1" }
+          to: { node_type: DECISION, node_id: "DEC-2026-08-30-001" }
+          relation_type: "informs"
+invalid:
+  - name: edge_node_id_pattern_mismatch
+    instance:
+      nodes:
+        - node_type: EVIDENCE
+          data: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+        - node_type: CLAIM
+          data: { claim_id: "C-117", statement: "x", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+      edges:
+        - from: { node_type: EVIDENCE, node_id: "C-117" }
+          to: { node_type: CLAIM, node_id: "C-117" }
+          relation_type: SUPPORTS
+    reason: "node_ref's allOf/if/then requires an EVIDENCE-typed node_id to match ^E-[0-9]+$ -- 'C-117' is a Claim-grammar ID, not an Evidence one"
+  - name: missing_required_edges_array
+    instance:
+      nodes: []
+    reason: "evidence_graph requires both 'nodes' and 'edges' -- 'edges' is omitted entirely"
+  - name: node_matches_no_oneof_branch
+    instance:
+      nodes:
+        - node_type: ENTITY
+          label: "orphan entity missing its required entity_id"
+      edges: []
+    reason: "entity_node requires [node_type, entity_id] -- entity_id is missing, and no other node oneOf branch (source/evidence/claim/assumption/decision) matches node_type: ENTITY either, so the node fails all six oneOf branches"
+  - name: edge_missing_relation_type
+    instance:
+      nodes:
+        - node_type: ENTITY
+          entity_id: "ENT-1"
+          label: "A"
+        - node_type: ENTITY
+          entity_id: "ENT-2"
+          label: "B"
+      edges:
+        - from: { node_type: ENTITY, node_id: "ENT-1" }
+          to: { node_type: ENTITY, node_id: "ENT-2" }
+    reason: "edge requires [from, to, relation_type] -- relation_type is omitted"

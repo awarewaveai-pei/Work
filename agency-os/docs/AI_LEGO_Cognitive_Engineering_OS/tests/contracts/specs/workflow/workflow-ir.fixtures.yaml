@@ -1,0 +1,218 @@
+schema_id: "ai-lego://specs/workflow/workflow-ir.schema.yaml"
+target_ref: ""
+description: >
+  workflow-ir.schema.yaml is `status: ACTIVE`, built 2026-08-30 to resolve
+  `cognitive/recipe.schema.yaml`'s own `open_questions.OQ-recipe-1` (is
+  Recipe the same object as Master Plan §9's Workflow IR?) and
+  MACHINE_READABLE_SPEC_PLAN.md's noted absence of any
+  `workflow/workflow-ir.schema.yaml` file. This fixture exercises: the one
+  real MP §9 worked instance (transcribed with `type:` renamed to
+  `node_kind:` and the `workflow:` wrapper flattened, per that file's own
+  compilation_decisions), the capability/method discriminated union and its
+  mutual-exclusivity enforcement (`additionalProperties: false` inside
+  `oneOf`), the conditional `references` requirement (mandatory only when a
+  `method` node is present), and the new `compiled_from` traceability block's
+  `source_kind`-conditional requirements. Every instance below was
+  independently validated against the real schema (same
+  `referencing.Registry` + `ai-lego://`-scheme resolver `tests/run_golden_tests.py`
+  itself uses) before being committed to this file.
+
+valid:
+  - name: mp_section_9_worked_example
+    instance:
+      id: research.qualitative.v4
+      references:
+        cognitive_method_atlas:
+          file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+          required: true
+      nodes:
+        - node_kind: capability
+          ref: transcribe
+          input: source.video
+        - node_kind: method
+          method_id: research.thematic_analysis
+          input: output.transcript
+        - node_kind: capability
+          ref: literature_search
+          input: research.question
+        - node_kind: method
+          method_id: evidence.triangulation
+          input: [themes, literature]
+        - node_kind: capability
+          ref: artifact.generate_research_paper
+    description_note: >
+      Master Plan §9 (L810-840), the sole real Workflow IR instance in
+      either mother document, transcribed verbatim (see workflow-ir.schema.yaml's
+      own `worked_example`). Confirms: the final node's missing `input` is
+      legal (OPTIONAL), the array-form `input` (`[themes, literature]`) is
+      legal, and `references` is correctly required/present here because two
+      of the five nodes are `node_kind: method`.
+
+  - name: capability_only_workflow_references_omitted
+    instance:
+      id: simple-transcription-pipeline
+      nodes:
+        - node_kind: capability
+          ref: transcribe
+          input: source.video
+        - node_kind: capability
+          ref: validate_artifact
+          input: output.transcript
+    description_note: >
+      Zero `node_kind: method` entries -- per this file's own conditional
+      rule (MP §9's "MUST resolve method definition from [Atlas]" applies
+      only to nodes that involve a Cognitive Method), `references` is
+      correctly OMITTABLE here. Also exercises the kebab-case `id` form
+      (matching a Recipe-inherited slug) rather than MP's own dotted-version
+      form, per this file's deliberately grammar-agnostic `id` pattern.
+
+  - name: compiled_from_recipe_with_gate_and_necessity_passthrough
+    instance:
+      id: db-migration-expand-contract
+      risk_tier: R3
+      compiled_from:
+        source_kind: recipe
+        recipe_id: db-migration-expand-contract
+        recipe_version: "1.0.0"
+      references:
+        cognitive_method_atlas:
+          file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+          required: true
+      nodes:
+        - node_kind: capability
+          label: "Backup / Restore Validation"
+          ref: validate_artifact
+          necessity: REQUIRED_BY_RISK
+          gate_ref: recovery_rollback_rehearsal
+        - node_kind: method
+          label: "Reconciliation"
+          method_id: evidence.triangulation
+          input: backup_snapshot
+          necessity: RECOMMENDED
+    description_note: >
+      Exercises `compiled_from.source_kind: recipe` (with both
+      `recipe_id`/`recipe_version` populated, satisfying the conditional
+      requirement) and the `label`/`necessity`/`gate_ref` passthrough fields
+      on both node kinds -- the concrete mechanism by which this file's own
+      "Workflow IR is the executable artifact the engine actually walks"
+      resolution stays enforceable rather than purely prose. `risk_tier: R3`
+      is also exercised as a top-level optional field.
+
+  - name: compiled_from_hand_authored_needs_no_recipe_or_method_ref
+    instance:
+      id: research.qualitative.v4
+      compiled_from:
+        source_kind: hand_authored
+      nodes:
+        - node_kind: capability
+          ref: transcribe
+    description_note: >
+      `source_kind: hand_authored` requires neither `recipe_id`/`recipe_version`
+      nor `method_id` -- confirms the third `compiled_from` branch (no
+      compiling source at all) is legal and unconstrained beyond `source_kind`
+      itself.
+
+invalid:
+  - name: method_node_present_but_references_omitted
+    instance:
+      id: research.qualitative.v4
+      nodes:
+        - node_kind: capability
+          ref: transcribe
+          input: source.video
+        - node_kind: method
+          method_id: research.thematic_analysis
+          input: output.transcript
+    reason: >
+      Per MP §9's own "MUST resolve method definition from [Atlas]" rule and
+      this file's `allOf`/`if`/`then` block: `nodes` contains a
+      `node_kind: method` entry, so `references.cognitive_method_atlas` is
+      mandatory -- this instance omits `references` entirely.
+
+  - name: node_carries_both_ref_and_method_id
+    instance:
+      id: research.qualitative.v4
+      references:
+        cognitive_method_atlas:
+          file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+          required: true
+      nodes:
+        - node_kind: capability
+          ref: transcribe
+          method_id: research.thematic_analysis
+          input: source.video
+    reason: >
+      `capability_node`'s `additionalProperties: false` rejects the
+      unexpected `method_id` key (not one of its declared properties), and
+      the object also fails `method_node` (node_kind is `capability`, not
+      `method`) -- matching ZERO branches of the `oneOf`, which correctly
+      fails the whole node. This is the discriminated-union mutual-exclusivity
+      guarantee this file's compilation_decisions describe.
+
+  - name: invalid_node_kind_enum_value
+    instance:
+      id: research.qualitative.v4
+      nodes:
+        - node_kind: hybrid
+          ref: transcribe
+    reason: >
+      `node_kind` must be exactly `capability` or `method` (the const value
+      each `oneOf` branch requires) -- "hybrid" matches neither
+      `capability_node` nor `method_node`.
+
+  - name: empty_nodes_array
+    instance:
+      id: research.qualitative.v4
+      nodes: []
+    reason: "`nodes` has `minItems: 1` -- a Workflow IR instance with zero nodes has nothing for an execution engine to walk."
+
+  - name: compiled_from_recipe_missing_recipe_version
+    instance:
+      id: db-migration-expand-contract
+      compiled_from:
+        source_kind: recipe
+        recipe_id: db-migration-expand-contract
+      nodes:
+        - node_kind: capability
+          ref: validate_artifact
+    reason: >
+      `source_kind: recipe` requires BOTH `recipe_id` AND `recipe_version`
+      (per `compiled_from`'s own `allOf`/`if`/`then` block) -- this instance
+      supplies `recipe_id` but omits `recipe_version`.
+
+  - name: capability_ref_fails_capability_contract_id_pattern
+    instance:
+      id: research.qualitative.v4
+      nodes:
+        - node_kind: capability
+          ref: "Transcribe-Now!"
+    reason: >
+      `capability_node.ref` is a real hard `$ref` to
+      `domain/capability-contract.schema.yaml#/properties/id`
+      (`^[a-z_]+(\.[a-z_]+)?$`) -- "Transcribe-Now!" contains uppercase
+      letters, a hyphen, and punctuation, none of which that pattern permits.
+
+  - name: method_id_fails_adr005b_grammar
+    instance:
+      id: research.qualitative.v4
+      references:
+        cognitive_method_atlas:
+          file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+          required: true
+      nodes:
+        - node_kind: method
+          method_id: "method.swot.v1"
+    reason: >
+      `method_node.method_id` is a real hard `$ref` to
+      `cognitive/method.schema.yaml#/properties/id`, which enforces
+      ADR-005b's bare `<family>.<name>` grammar -- "method.swot.v1" is the
+      exact historically-wrong form (`method.` prefix AND embedded version
+      suffix) that file's own `id_grammar_conformance_examples` already
+      documents as rejected.
+
+  - name: top_level_id_missing
+    instance:
+      nodes:
+        - node_kind: capability
+          ref: transcribe
+    reason: "`id` is unconditionally required at the top level -- this instance omits it entirely."

@@ -1,0 +1,760 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/ai-execution/trusted-compute-gate.policy.yaml"
+title: Trusted Compute Gate Policy
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Policy-as-code binding that gives real mechanics to a redline three
+  independent mother-document passages state but none of them, by
+  themselves, operationalize: an AI is never allowed to mentally calculate
+  a numeric/statistical/simulated result and assert it as
+  `CALCULATED_RESULT` (or `SIMULATED_RESULT`) — it must route the
+  computation through the Trusted Compute pipeline (Plan -> Execute ->
+  Validate -> Result Artifact -> Interpret) and produce a real, checkable
+  Result Artifact instead.
+
+  Three convergent citations, read in full for this file:
+  - Execution Contract §39 "Trusted Compute Contract" (L1499-1521): the
+    canonical 5-stage pipeline diagram ("AI plans / Trusted Compute
+    executes / Validator verifies / Result Artifact / AI interprets",
+    L1503-1513) immediately followed by an explicit forbidden block
+    ("LLM mentally calculates / -> CALCULATED_RESULT", L1517-1520). This
+    is the ONE section that states the redline as a literal, quotable
+    anti-pattern — the `mother_doc_text` on this file's grounded rule below
+    transcribes it verbatim. §39's own opening line ("數學、統計、模擬、
+    最佳化：", L1501 — "mathematics, statistics, SIMULATION,
+    optimization:") is this file's grounding for including
+    `SIMULATED_RESULT` alongside `CALCULATED_RESULT` as a second triggering
+    epistemic_type, not merely the first.
+  - Master Plan §27 "Data Science Plane" (L1688-1707): the same pipeline
+    stated as a 6-box diagram ("AI / Analysis Planner / Trusted Compute
+    Engine / Validation / Result Artifact / AI Interpretation",
+    L1695-1706) opening with "AI 不直接編造數學結果。" ("AI does not
+    directly fabricate mathematical results.", L1690) — corroborating,
+    independently-worded evidence for the identical pipeline EC §39
+    diagrams, not a second, different mechanism. See `compilation_decisions`
+    for how this file reconciles MP's 6-box diagram against EC's 5-box one
+    (MP splits EC's single "AI plans" box into two: "AI" then "Analysis
+    Planner").
+  - **CITATION CORRECTION** (verified by direct read, not trusted from this
+    file's own build brief): the third source, describing literature/
+    citation/dataset-lineage/reproducibility requirements for research-class
+    tasks, is **Execution Contract §40 "Research Integrity Execution"
+    (L1524-1536)** — grep-confirmed there is no Master Plan §40 with this
+    title; Master Plan's own §40 is "Qualitative Research" (a different
+    topic, L2033). EC §39 and EC §40 are adjacent sections in the SAME
+    document (§39 ends at L1521, §40 begins at L1524), which is presumably
+    the source of the mislabel. EC §40 is cited here as corroborating
+    context for WHY the Trusted Compute pipeline matters for research-class
+    outputs specifically (its 8 bullets — literature verifiability, no
+    fabricated citations, DOI verification, dataset lineage, reproducible
+    AnalysisRun, statistical-assumption checks, traceable authorship — all
+    presuppose a real, auditable compute/evidence trail, not an
+    LLM-asserted one) — this file does NOT model EC §40's 8 bullets as
+    additional rules; see `constraints` for that explicit scope boundary.
+
+  This file closes `.ai/research/phase-1/GAP_REGISTER.yaml` P1-GAP-AI-2
+  (L283-291, severity high, role Statistician/AI Engineer): "Trusted
+  Compute 全文件零 schema，AI 竄改數字無任何 gate 攔截" ("Trusted Compute
+  appears nowhere as a schema across the whole corpus; nothing mechanically
+  intercepts an AI that alters/fabricates a number") — its own named
+  consequence: "「AI 只 Plan/Explain/Interpret，不得捏造 calculation」這條
+  紅線沒有任何機器可稽核的落地點" (the redline has no machine-auditable
+  landing point). `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 (L117)
+  is the one planning document that names this exact deliverable ahead of
+  time: "`/policies/ai-execution/`：Trusted Compute Gate policy（EC
+  §39，解 `P1-GAP-AI-2`）" — this file is that named deliverable.
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` (the actively-maintained
+  Wave-tracking document most other Phase 3 files cite as their build
+  authority) has **zero hits** for "Trusted Compute" (grep-confirmed) —
+  unlike sibling files `mandatory-gates.yaml`/`capability-contract.schema.yaml`,
+  this file's sole prior planning citation is the earlier
+  MVP_VERTICAL_SLICE_PLAN.md, not an MRSP Wave row; its build here is
+  authorized directly by this task's instruction, not by an MRSP Wave
+  assignment (recorded honestly, not backfilled as if an MRSP row existed).
+
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` L79-80 additionally gives a
+  fully concrete worked scenario tying this exact redline to the
+  `run_statistics` capability
+  (`specs/domain/capability-contract.schema.yaml`'s own named example, MP
+  §8.1/§8.2 L651-689): "兩位編碼者的編碼結果交給 `run_statistics`
+  capability 計算一致性統計量（如 Cohen's Kappa）——**必須經 Trusted
+  Compute Engine 真正執行，不得由 LLM「口算」後宣稱
+  CALCULATED_RESULT**（MP §27；EC §39...直接撞見並協助收斂
+  `P1-GAP-AI-2`）" — this is the `worked_example` this file's grounded rule
+  cites, per this task's explicit instruction to bind to that capability
+  example rather than redefine it.
+
+  Rule SHAPE follows `policies/ai-execution/mandatory-gates.yaml`'s own
+  established `condition`/`action` convention (Master Plan §64 Policy-as-
+  Code rule style) — a locally-owned `action` enum with one additive value
+  for a verdict none of the base 4 values (`DENY`/`ALLOW`/`SCOPE_TO`/
+  `REQUIRE_HUMAN_REVIEW`) precisely fits, the exact precedent
+  `mandatory-gates.yaml`'s own `compilation_decisions` set when it added
+  `REQUIRE_RECOVERY_REHEARSAL` (2026-08-30): "routing THIS output through a
+  specific execution mechanism" is a different verdict than "deny",
+  "allow", "scope", or "get human review" — see `compilation_decisions`
+  below for the full reasoning, applying that same precedent rather than
+  stretch-fitting an existing value.
+
+  Filename uses the `<name>.policy.yaml` suffix — new to `policies/
+  ai-execution/` specifically (its existing 8 files from the EC §91
+  directory listing all use bare `<name>.yaml`), but NOT a new convention
+  invented for this file: `policies/security/zero-trust.policy.yaml`,
+  `policies/security/supply-chain-security.policy.yaml`,
+  `policies/privacy/pii-redaction.policy.yaml`, and
+  `policies/provider/model-registry.policy.yaml` /
+  `policies/provider/ai-gateway-fallback.policy.yaml` already established
+  `.policy.yaml` as this project's live suffix for policy files built
+  outside EC §91's original named-8 list. This file is `ai-execution/`'s
+  first instance of that (already-precedented elsewhere) pattern, per this
+  task's own explicit filename instruction — recorded here so a future
+  reader does not mistake it for an unreviewed one-off spelling.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §39 Trusted Compute Contract (L1499-1521) — the 5-stage pipeline and the literal forbidden anti-pattern this file's grounded rule transcribes"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §40 Research Integrity Execution (L1524-1536) — corroborating context only, NOT modeled as rules here; see `constraints` for the scope boundary and the citation-label correction in `description`"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §27 Data Science Plane (L1688-1707) — the same pipeline, independently worded, reconciled against EC §39 in `compilation_decisions`"
+  - "specs/governance/epistemic-label.schema.yaml#/definitions/epistemic_type — CALCULATED_RESULT and SIMULATED_RESULT, the two enum values this rule's `triggering_epistemic_types` reuses (soft $ref, full 11-value enum unmodified)"
+  - "specs/evidence/claim.schema.yaml#/properties/provenance — an existing, unmodified consumer of the full epistemic_type enum; NOT edited by this file, cited only to confirm CALCULATED_RESULT is already a real, reachable value on a real record type"
+  - "specs/domain/capability-contract.schema.yaml (`run_statistics` named capability example, MP §8.1/§8.2 L651-689; `quality.provenance_required` field precedent) — the `worked_example` this file's grounded rule cites per this task's explicit instruction, not redefined here"
+  - "specs/execution/gate.schema.yaml#/gate_catalog — ADR-011-resolved 20-item registry, grep-confirmed (2026-08-30/31) to contain NO item corresponding to this concept; this file's action therefore is not expressed as a `gate_ref` into that catalog — see `constraints` and `open_questions.OQ-TCGATE-1`"
+  - "specs/execution/data-deletion.schema.yaml (L295-326, 2026-08-29 critic-corrected) — the direct precedent this file follows for NOT using `prefixItems` to pin array order, instead documenting order as a prose-level MUST while a closed 5-of-5 enum set is schema-enforced; see `compilation_decisions`"
+  - "policies/ai-execution/mandatory-gates.yaml (`action` enum shape, and its own precedent for adding `REQUIRE_RECOVERY_REHEARSAL` as an additive value) — the rule-shape and additive-enum-value precedent this file follows"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 L79-80 (concrete run_statistics/Cohen's Kappa worked scenario, explicitly naming this redline and P1-GAP-AI-2) and L117 (names this exact file, `/policies/ai-execution/` Trusted Compute Gate policy, EC §39, P1-GAP-AI-2)"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-AI-2 (L283-291, severity high) — the gap this file closes"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-AI-3 (L292-299, severity high) — the ADJACENT, explicitly NOT-in-scope-here gap (Research Quality Gate naming vs. EC Global Gates enum) that MVP_VERTICAL_SLICE_PLAN.md L117 names as a SEPARATE deliverable"
+  - ".ai/research/phase-0/policy-inventory.yaml (L219-224) — Phase 0's own pre-existing record of EC §39 as a `kind: redline, normative: true` item and EC §40 as a separate `kind: policy` item, corroborating that these are two distinct sections this file deliberately keeps distinct even while citing both"
+
+decided_by: >
+  No ADR governs this file. Grep-confirmed (2026-08-30/31) across
+  `docs/adr/ADR-001` through `ADR-016` and `docs/adr/ADR_INDEX.md`: zero
+  hits for "Trusted Compute" as a ruling subject. ADR-004 (epistemic-label
+  canonicalization) governs the `epistemic_type` ENUM this rule's condition
+  reuses, but does not itself rule on gate/pipeline mechanics for
+  `CALCULATED_RESULT` — that gap is exactly what this file, not any ADR,
+  closes. This file's content is a direct, low-risk transcription of EC
+  §39/§40 and MP §27's own text plus the same class of Phase 3 additive
+  compilation choices (new `action` enum value, new local rule shape)
+  `mandatory-gates.yaml`'s `REQUIRE_RECOVERY_REHEARSAL` addition already
+  used as precedent — not a new architecture decision requiring ADR
+  arbitration.
+
+compilation_decisions:
+
+  - question: >
+      This file's own build brief cited the third mother-document source as
+      "Master Plan §40 Research Integrity Execution". Master Plan §40 is
+      actually "Qualitative Research" (L2033) — a different topic. Should
+      this file silently use the (wrong) MP §40 citation as given, or
+      correct it?
+    decision: >
+      Corrected. The section is Execution Contract §40 "Research Integrity
+      Execution" (L1524-1536), verified by direct read alongside EC §39
+      (the two sections are adjacent in the same document, L1499-1521 and
+      L1524-1536 respectively — the likely source of the mislabel). Recorded
+      prominently in `description` and `source_of_truth_for`, not silently
+      fixed without a trace.
+    reasoning: >
+      R4 claim-before-verify forbids citing a line range without having
+      actually read it at that location in the named document. Direct read
+      of Master Plan L2025-2040 confirms §40 there is "Qualitative
+      Research"; direct read of Execution Contract L1524-1536 confirms
+      "Research Integrity Execution" with content matching the build
+      brief's own bullet list verbatim (literature verifiability, no
+      fabricated citations, DOI primary verification, dataset/method/
+      analysis versioning, reproducible AnalysisRun, statistical-assumption
+      checks, traceable human edits/authorship) — the CONTENT and line
+      range were both right, only the document name was wrong. Same
+      correction discipline `mandatory-gates.yaml`'s own MAJ-3 critic
+      correction applied to a similarly line-range-correct-but-mislabeled
+      claim.
+
+  - question: >
+      Which `epistemic_type` values should trigger this gate? The full
+      enum has 11 values (SOURCE_FACT, EVIDENCE, ASSUMPTION, HYPOTHESIS,
+      AI_INFERENCE, AI_SUGGESTION, HUMAN_OPINION, CALCULATED_RESULT,
+      SIMULATED_RESULT, UNKNOWN, DECISION).
+    decision: >
+      Exactly two: `CALCULATED_RESULT` and `SIMULATED_RESULT`. Not a
+      broader set, not just the one value EC §39's forbidden block names
+      literally.
+    reasoning: >
+      `CALCULATED_RESULT` is the literal value EC §39's forbidden block
+      names (L1519). `SIMULATED_RESULT` is grounded by EC §39's own scope
+      line, L1501: "數學、統計、模擬、最佳化" ("mathematics, statistics,
+      SIMULATION, optimization") — 模擬 is literally "simulation", the
+      same word `SIMULATED_RESULT` names. No other epistemic_type value has
+      textual grounding here: HYPOTHESIS/AI_INFERENCE/AI_SUGGESTION are
+      reasoning-classified, not computation-classified, outputs — including
+      them would be scope creep this task's own instruction to be honest
+      about scope explicitly warns against. `ASSUMPTION`/`EVIDENCE`/
+      `SOURCE_FACT`/`HUMAN_OPINION`/`UNKNOWN`/`DECISION` have no textual
+      connection to §39/§27's mathematics/statistics/simulation/optimization
+      domain at all.
+
+  - question: >
+      `mandatory-gates.yaml`'s rule shape couples its condition to
+      `risk_tier_in` (drawn from `execution/risk-tier.schema.yaml#/risk_tier`).
+      Should this file's rule carry the same `risk_tier_in` field, so the
+      two sibling files share an identical shape?
+    decision: "No — `risk_tier_in` is deliberately omitted from this file's rule shape."
+    reasoning: >
+      Copying a field this file has no textual basis for would be the same
+      "fabricate a rich schema with no grounding" pattern this suite
+      consistently avoids (e.g. `capability-contract.schema.yaml`'s
+      `security` field staying a free string rather than an invented enum).
+      Neither EC §39 nor MP §27 conditions the Trusted Compute requirement
+      on risk tier at all — the redline is a BLANKET rule ("AI 不直接編造
+      數學結果", no qualifier) that applies regardless of whether the
+      surrounding task is R0 or R4: a trivial R0 arithmetic claim asserted
+      by LLM mental math is exactly as forbidden as an R4 one. This is a
+      genuinely different trigger AXIS than `mandatory-gates.yaml`'s R3/R4
+      Mandatory Gate Injection mechanism (Atlas §14.2) — the two rule sets
+      are complementary, not duplicates: a CALCULATED_RESULT claim inside
+      an R4 task triggers BOTH this file's rule (route through Trusted
+      Compute) AND `mandatory-gates.yaml`'s MGATE-R3-R4-HUMAN-REVIEW rule
+      (independently, for unrelated reasons) — same "Capability ≠
+      Authority"-style axis-independence this corpus already applies
+      elsewhere (e.g. `domain/capability-contract.schema.yaml`'s
+      entitlement-vs-authorization distinction), not a contradiction to
+      reconcile.
+
+  - question: >
+      MP §27's diagram has 6 boxes ("AI / Analysis Planner / Trusted
+      Compute Engine / Validation / Result Artifact / AI Interpretation",
+      L1695-1706); EC §39's diagram has 5 ("AI plans / Trusted Compute
+      executes / Validator verifies / Result Artifact / AI interprets",
+      L1503-1513). Which becomes this file's `pipeline_stage_id` enum and
+      `required_pipeline_stages` sequence?
+    decision: >
+      EC §39's 5-stage version, verbatim (`AI_PLANS`,
+      `TRUSTED_COMPUTE_EXECUTES`, `VALIDATOR_VERIFIES`, `RESULT_ARTIFACT`,
+      `AI_INTERPRETS`). MP §27's 6 boxes are reconciled onto it, not treated
+      as a contradiction requiring a 6th stage.
+    reasoning: >
+      EC §39 is the section this whole file (and its filename,
+      "trusted-compute-gate") is directly named after, and the one carrying
+      the literal forbidden-pattern text this rule exists to enforce — the
+      more precise, more load-bearing source for a rule about naming exact
+      stages. Direct comparison shows MP's 6 boxes are not a genuinely
+      DIFFERENT pipeline, just a finer split of EC's first box: MP's "AI"
+      + "Analysis Planner" (2 boxes) together correspond to EC's single "AI
+      plans" (1 box) — both describe the SAME planning-before-execution
+      step, MP merely naming the planning sub-component ("Analysis
+      Planner") EC's line compresses into a verb phrase. MP's remaining 5
+      boxes ("Trusted Compute Engine" / "Validation" / "Result Artifact" /
+      "AI Interpretation") match EC's remaining 4
+      1:1 in meaning (EC's "Validator verifies" <-> MP's "Validation";
+      "Result Artifact" is verbatim identical in both). No information is
+      discarded by this reconciliation — MP's "Analysis Planner" detail is
+      preserved in this file's `description` and `compilation_decisions`
+      even though it does not get its own enum value, so a future reader
+      auditing against MP §27 directly can still see the mapping was
+      considered, not overlooked.
+
+  - question: >
+      Should `required_pipeline_stages`' exact 5-of-5 SEQUENCE (order
+      matters — this is a pipeline, not an unordered checklist) be pinned
+      structurally via Draft 2020-12's `prefixItems` tuple keyword?
+    decision: >
+      No — `required_pipeline_stages` is `type: array, minItems: 5,
+      maxItems: 5, uniqueItems: true, items: {$ref: pipeline_stage_id}`
+      (a 5-value enum). Order is documented as a MUST in `description`, not
+      schema-enforced.
+    reasoning: >
+      Direct, on-point precedent: `specs/execution/data-deletion.schema.yaml`
+      (L295-326, 2026-08-29 critic-corrected) tried exactly this —
+      `prefixItems` to pin a fixed-order step sequence — and REVERTED it
+      after finding it required an unresolvable `$ref` to an
+      under-specified node; that file's own conclusion (L319-326) was that
+      "no available Draft 2020-12 keyword enforces 'exact order, no gaps,
+      only from a fixed set' as robustly as contains/minContains/
+      maxContains enforces 'exact coverage'", landing on schema-enforced
+      SET coverage plus documentation-level order. Applying that same,
+      recently-litigated judgment call here (rather than re-deciding it
+      fresh, which risks silently contradicting a sibling file's own
+      critic-reviewed conclusion) is the more disciplined choice. This
+      file's case is actually simpler than data-deletion.schema.yaml's
+      (plain enum-string items, not objects carrying extra free-form
+      fields that defeated plain `uniqueItems` there) — but the SET-only
+      enforcement this file uses is also correspondingly stronger for free:
+      because `pipeline_stage_id` has EXACTLY 5 possible values and the
+      array requires exactly 5 unique items, `minItems`+`maxItems`+
+      `uniqueItems` alone already mechanically guarantees full coverage
+      (all 5 stages present, no duplicates, no foreign values) with no
+      `contains`/`minContains` machinery needed at all — a strictly
+      stronger structural guarantee than data-deletion.schema.yaml's own
+      10-from-a-larger-vocabulary case could achieve the same way, even
+      though order still is not pinned.
+
+  - question: >
+      Master Plan §64's condition/action vocabulary
+      (`DENY`/`ALLOW`/`SCOPE_TO`/`REQUIRE_HUMAN_REVIEW`) has no verdict
+      that precisely means "route this output through a specific execution
+      mechanism instead of asserting it directly". Stretch-fit
+      `REQUIRE_HUMAN_REVIEW` (a human could, after all, review whether the
+      claimed calculation was actually computed), or add a new value?
+    decision: >
+      Add `REQUIRE_TRUSTED_COMPUTE_PIPELINE` as a new, additive `action`
+      enum value in this file's own locally-owned enum (base 4 values
+      reused verbatim + this one addition) — do not stretch-fit
+      `REQUIRE_HUMAN_REVIEW`.
+    reasoning: >
+      Identical reasoning to `mandatory-gates.yaml`'s own
+      `REQUIRE_RECOVERY_REHEARSAL` addition (2026-08-30): "Human review
+      after the fact" and "must be produced by an actual compute
+      execution, not asserted" are two DIFFERENT verdicts — a human
+      reviewer discovering a hand-waved CALCULATED_RESULT is a failure
+      mode this rule exists to prevent from ever reaching review in the
+      first place, not the enforcement mechanism itself. EC §39's own
+      pipeline includes a distinct "Validator verifies" stage separate from
+      any human-review concept — conflating them under
+      `REQUIRE_HUMAN_REVIEW` would misrepresent what §39 actually
+      specifies. Each sibling `ai-execution/` policy file independently
+      declares its own local `action` enum copy (verified: `tool-
+      permissions.yaml` has `[DENY, ALLOW, SCOPE_TO, REQUIRE_HUMAN_REVIEW]`;
+      `network-egress.yaml` has `[DENY, ALLOW, ALLOWLIST_GATED,
+      REQUIRE_HUMAN_REVIEW]`; `mandatory-gates.yaml` has the base 4 plus
+      `REQUIRE_RECOVERY_REHEARSAL`) — this file follows that same
+      "each file owns its own copy, extended only where its own grounded
+      content needs a value the base 4 don't cover" convention, not a
+      shared enum definition.
+
+  - question: >
+      `mandatory-gates.yaml`'s `gate_ref` field softly `$ref`s
+      `specs/execution/gate.schema.yaml#/gate_result/properties/gate_id`,
+      binding each rule to a real (or TBD) entry in that file's
+      `gate_catalog`. Should this file's rule carry an equivalent
+      `gate_ref`?
+    decision: >
+      No `gate_ref` field. Grep-confirmed (2026-08-30/31) against
+      `gate.schema.yaml#/gate_catalog`'s full ADR-011-resolved 20-item list
+      (14 global + 6 high-risk: functional, evidence, reasoning, security,
+      privacy, data, jurisdiction, localization, accessibility,
+      observability, capacity, rollback, documentation, golden_test,
+      human_specialist_review, counterevidence, red_team,
+      independent_judge, reversal_criteria, recovery_rollback_rehearsal) —
+      none corresponds to "a compute/statistical output must be produced by
+      Trusted Compute, not asserted". Forcing a `gate_ref` onto the
+      nearest-sounding candidate (e.g. `evidence` or `golden_test`) would
+      be exactly the kind of unverified "looks similar, pick one anyway"
+      mapping `domain/capability-contract.schema.yaml`'s own
+      `compilation_decisions` explicitly rejected for its `quality`/
+      `rollback` fields. Left as `open_questions.OQ-TCGATE-1` instead —
+      whether a future ADR round should extend `gate_catalog` with a
+      dedicated entry for this concept is a decision for that governance
+      process, not silently pre-empted here.
+    reasoning: >
+      Consistent with this suite's "don't fabricate a cross-reference the
+      target file's own content doesn't support" discipline (see
+      `capability-contract.schema.yaml`'s `security`/`quality`/`rollback`
+      compilation_decisions for the same restraint applied elsewhere). This
+      also matches this file's own decision (above) that this rule's
+      trigger is orthogonal to the R3/R4 Mandatory Gate Injection mechanism
+      `gate.schema.yaml`/`mandatory-gates.yaml` model — it is a
+      structurally different kind of requirement, not a missing catalog
+      entry this file should paper over.
+
+  - question: >
+      Can this policy file, by itself, mechanically stop an LLM from
+      hand-waving a calculation and labeling it CALCULATED_RESULT?
+    decision: >
+      No — stated explicitly, not implied. This file can (a) validate that
+      a `trusted_compute_gate_rule` row is itself well-formed, and (b)
+      define a reusable `computation_provenance_marker` shape a future
+      edit to a CONSUMING schema (`claim.schema.yaml`, `result.schema.yaml`,
+      `capability-contract.schema.yaml`) could `$ref` to make pipeline
+      completion checkable on the artifact itself. It cannot inspect
+      free-text LLM output, cannot detect "this claims a computed value" on
+      its own, and — because no existing consuming schema currently `$ref`s
+      `computation_provenance_marker` — cannot yet force any REAL object
+      anywhere in this corpus to carry that marker at all.
+    reasoning: >
+      This task's own instruction requires being honest about what a
+      JSON-Schema-shaped policy file CAN mechanically enforce (structural
+      presence of a field on an instance a validator is actually pointed
+      at) versus what remains a prose-level requirement enforced by
+      prompt/agent design (recognizing, at generation time, that an output
+      IS a computed/statistical claim in the first place, and correctly
+      setting `epistemic_type` before any schema can act on it at all).
+      Overclaiming enforcement power here would misrepresent a policy
+      DEFINITION as a running interception mechanism — the same
+      declaration-vs-enforcement distinction
+      `domain/capability-contract.schema.yaml`'s own `entitlement` field
+      explicitly draws for its own, structurally analogous, gap (a
+      schema field declaring a restriction is not the same as a running
+      gate enforcing it). Recorded honestly in `constraints` and
+      `open_questions.OQ-TCGATE-2` rather than glossed over.
+
+  - question: >
+      Unlike `mandatory-gates.yaml`'s one grounded rule (a multi-citation
+      SYNTHESIS with no single quotable mother-document sentence, per that
+      file's own `compilation_decisions` on why it left `mother_doc_text`
+      null), this file's rule has EC §39's literal forbidden block
+      available verbatim. Should `mother_doc_text` be populated here?
+    decision: "Yes — populated with the exact EC §39 L1517-1520 text."
+    reasoning: >
+      This is precisely the case `mandatory-gates.yaml`'s own
+      `compilation_decisions` (4th entry) anticipated when it kept
+      `mother_doc_text` in the shared shape as OPTIONAL rather than
+      dropping it entirely: "the field stays in the shape... so a FUTURE
+      rule that does instantiate one literal mother-document quote can
+      populate it." This rule is that future case.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+
+# Root $ref (established pattern in this suite — see mandatory-gates.yaml,
+# risk-tier.schema.yaml, tool-permissions.yaml, forbidden-actions.yaml):
+# without a root-level type constraint, a validator pointed at this file's
+# ROOT would accept any value.
+$ref: "#/trusted_compute_gate_rules"
+
+definitions:
+
+  trusted_compute_action_id:
+    description: >
+      Locally-owned copy of Master Plan §64's condition/action vocabulary
+      (base 4 values, reused verbatim the same way every sibling
+      `ai-execution/` policy file independently re-declares its own copy —
+      see `compilation_decisions`), PLUS one additive value this file
+      grounds.
+    type: string
+    enum: [DENY, ALLOW, SCOPE_TO, REQUIRE_HUMAN_REVIEW, REQUIRE_TRUSTED_COMPUTE_PIPELINE]
+
+  pipeline_stage_id:
+    description: >
+      Execution Contract §39's own 5-box pipeline (L1503-1513), verbatim,
+      SNAKE_CASE-normalized. Reconciled against Master Plan §27's 6-box
+      parallel diagram in `compilation_decisions` — closed to exactly these
+      5 values; no 6th stage is invented for MP's extra "Analysis Planner"
+      box (folded into `AI_PLANS`, see `compilation_decisions`).
+    type: string
+    enum: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+
+  computation_provenance_marker:
+    description: >
+      NOT currently `$ref`'d by any consuming schema
+      (`specs/evidence/claim.schema.yaml#/properties/provenance`,
+      `specs/execution/result.schema.yaml`,
+      `specs/domain/capability-contract.schema.yaml#/properties/quality`) —
+      see `constraints` and `open_questions.OQ-TCGATE-2`. Defines the
+      RECOMMENDED shape a future edit to one of those files could adopt to
+      make Trusted Compute pipeline completion machine-checkable on the
+      artifact itself, closing the gap between "the pipeline SHOULD run"
+      (this rule) and "the pipeline DID run, verifiably" (not wired to any
+      real object by this file alone).
+    type: object
+    required: [computation_provenance_ref]
+    properties:
+      computation_provenance_ref:
+        type: string
+        description: >
+          Opaque reference (e.g. an `EX-*` execution_id, a
+          `gate_result.evidence[]` entry, or a Result Artifact id) pointing
+          to the actual Trusted Compute execution that produced this value.
+          Presence of this field is what this policy CAN mechanically check
+          on any object that DOES carry it — this schema cannot force an
+          arbitrary object elsewhere in the corpus to carry it at all; see
+          `constraints`.
+      pipeline_stages_completed:
+        type: array
+        items:
+          $ref: "#/definitions/pipeline_stage_id"
+        description: >
+          OPTIONAL. Subset of `#/definitions/pipeline_stage_id` actually
+          completed and evidenced for this specific value.
+
+  trusted_compute_gate_rule:
+    description: >
+      "When <condition>, this output must go through the Trusted Compute
+      pipeline instead of being asserted directly." Structural shape
+      aligned with `mandatory-gates.yaml`'s `mandatory_gate_rule`
+      (`condition`/`action`/`source`/`mother_doc_text` fields, same
+      naming), with fields specific to this file's own grounded content
+      (`triggering_epistemic_types`, `required_pipeline_stages`,
+      `computation_provenance_requirement`, `worked_example`) replacing
+      that file's `risk_tier_in`/`gate_ref`/`gate_concept` (deliberately
+      NOT carried over — see `compilation_decisions`).
+    type: object
+    required: [rule_id, condition, action, triggering_epistemic_types, required_pipeline_stages, source]
+    properties:
+      rule_id:
+        type: string
+        pattern: "^TCGATE-"
+      condition:
+        type: string
+        description: >
+          Structured predicate, Master Plan §64 rule-shape style (e.g.
+          "epistemic_type IN ['CALCULATED_RESULT', 'SIMULATED_RESULT']").
+          Free text — no formal predicate grammar exists anywhere in the
+          mother-document corpus for this purpose, the same choice
+          `mandatory-gates.yaml`'s `condition` field made.
+      action:
+        $ref: "#/definitions/trusted_compute_action_id"
+      triggering_epistemic_types:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/definitions/epistemic_type"
+        description: >
+          Soft-references the full, unmodified 11-value `epistemic_type`
+          enum for its TYPE only (the same "reuse the type, don't
+          re-declare it" treatment `mandatory-gates.yaml`'s `risk_tier_in`
+          uses for `risk-tier.schema.yaml#/risk_tier`); this file's one
+          grounded rule below populates it with exactly
+          `[CALCULATED_RESULT, SIMULATED_RESULT]` — see
+          `compilation_decisions` for why those two and no others.
+      required_pipeline_stages:
+        type: array
+        minItems: 5
+        maxItems: 5
+        uniqueItems: true
+        items:
+          $ref: "#/definitions/pipeline_stage_id"
+        description: >
+          Because `pipeline_stage_id` has exactly 5 possible values and
+          this array requires exactly 5 unique items, `minItems`+
+          `maxItems`+`uniqueItems` alone mechanically guarantee full,
+          duplicate-free coverage of all 5 stages — see
+          `compilation_decisions` for why array ORDER (the pipeline
+          SEQUENCE) is documented as a MUST here rather than schema-pinned
+          via `prefixItems`.
+      computation_provenance_requirement:
+        $ref: "#/definitions/computation_provenance_marker"
+        description: >
+          OPTIONAL on this rule row itself (a rule can exist and be
+          grounded without yet wiring the marker anywhere real) — see
+          `constraints` for what populating this field does and does not
+          achieve.
+      worked_example:
+        type: object
+        description: >
+          Per this task's explicit instruction: bind to the `run_statistics`
+          capability example already named in
+          `specs/domain/capability-contract.schema.yaml` (MP §8.1/§8.2), not
+          redefine it.
+        properties:
+          capability_id:
+            type: string
+            description: "A capability id per domain/capability-contract.schema.yaml#/properties/id's grammar — not a hard $ref (that file's id space is open-ended, not a closed registry)."
+          source:
+            type: string
+      source:
+        type: string
+        description: "Citation(s) grounding this rule's condition side."
+      mother_doc_text:
+        type: [string, "null"]
+        default: null
+        description: >
+          OPTIONAL, same convention as `mandatory-gates.yaml`. Populated on
+          this file's one grounded rule because EC §39 supplies a literal,
+          self-contained quotable forbidden-pattern sentence — see
+          `compilation_decisions`.
+    constraints:
+      - "triggering_epistemic_types MUST be a subset of {CALCULATED_RESULT, SIMULATED_RESULT} for any rule grounded by EC §39/MP §27 specifically — not schema-enforced (the $ref'd type is the full 11-value enum), documented here per this suite's `constraints`-block convention for cross-field/prose rules a `properties` block cannot itself express."
+
+trusted_compute_gate_rules:
+  type: array
+  minItems: 1
+  items:
+    $ref: "#/definitions/trusted_compute_gate_rule"
+  description: >
+    Open-ended rule set — not a closed/fixed-count array. One grounded rule
+    as of this file's creation; more may be added if a future distinct
+    computation-domain redline is found (see `open_questions`).
+
+# ---------------------------------------------------------------------------
+# GROUNDED — this file's actual policy content: 1 rule.
+# ---------------------------------------------------------------------------
+grounded_rules:
+  description: >
+    This file's actual policy content today — the 1 rule
+    `trusted_compute_gate_rules` above validates. Named separately from the
+    schema-body node, same convention as sibling files' `worked_examples`/
+    `seed_content`/`mandatory-gates.yaml`'s own `grounded_rules`.
+  rules:
+    - rule_id: "TCGATE-CALCULATED-SIMULATED-RESULT"
+      condition: "epistemic_type IN ['CALCULATED_RESULT', 'SIMULATED_RESULT']"
+      action: REQUIRE_TRUSTED_COMPUTE_PIPELINE
+      triggering_epistemic_types: [CALCULATED_RESULT, SIMULATED_RESULT]
+      required_pipeline_stages: [AI_PLANS, TRUSTED_COMPUTE_EXECUTES, VALIDATOR_VERIFIES, RESULT_ARTIFACT, AI_INTERPRETS]
+      worked_example:
+        capability_id: run_statistics
+        source: >
+          docs/architecture/MVP_VERTICAL_SLICE_PLAN.md L79-80: `run_statistics`
+          computing inter-rater reliability (e.g. Cohen's Kappa) "必須經
+          Trusted Compute Engine 真正執行，不得由 LLM「口算」後宣稱
+          CALCULATED_RESULT" — explicitly citing MP §27, EC §39, and
+          P1-GAP-AI-2. Also see specs/domain/capability-contract.schema.yaml's
+          own citation of `run_statistics` as one of MP §8.1/§8.2's named
+          capability examples (not redefined by this file).
+      source: >
+        Execution Contract §39 Trusted Compute Contract (L1499-1521, pipeline
+        + forbidden block); Master Plan §27 Data Science Plane (L1688-1707,
+        same pipeline, independently worded); Execution Contract §40
+        Research Integrity Execution (L1524-1536, corroborating context for
+        why research-class computed outputs need this same pipeline — see
+        `description` for the Master-Plan-mislabel correction);
+        specs/governance/epistemic-label.schema.yaml#/definitions/epistemic_type
+        (CALCULATED_RESULT, SIMULATED_RESULT values); .ai/research/phase-1/
+        GAP_REGISTER.yaml P1-GAP-AI-2 (L283-291); docs/architecture/
+        MVP_VERTICAL_SLICE_PLAN.md L79-80, L117.
+      mother_doc_text: |
+        LLM mentally calculates
+        → CALCULATED_RESULT
+
+# ---------------------------------------------------------------------------
+# Cross-field/prose rules this schema's `properties` blocks cannot
+# themselves enforce — same convention as
+# domain/capability-contract.schema.yaml's `constraints` block.
+# ---------------------------------------------------------------------------
+constraints:
+  description: >
+    What this file CAN and CANNOT mechanically guarantee — see
+    `compilation_decisions`' honesty-focused entries above for the full
+    reasoning behind each line.
+  rules:
+    - "This schema can validate that a `trusted_compute_gate_rule` ROW itself is well-formed (rule_id pattern, action enum membership, exactly-5-of-5 pipeline stage coverage). It CANNOT inspect an LLM's free-text output and detect that the output 'claims a computed/statistical value' — recognizing WHEN the condition (epistemic_type IN [CALCULATED_RESULT, SIMULATED_RESULT]) applies to a specific piece of content is a prompt/agent-design responsibility (the agent must correctly label its own output's epistemic_type before this or any other schema can act on it), not something JSON Schema validation performs unprompted."
+    - "`computation_provenance_marker` is a DEFINED, reusable shape — it is not currently `$ref`'d by `specs/evidence/claim.schema.yaml#/properties/provenance`, `specs/execution/result.schema.yaml`, or `specs/domain/capability-contract.schema.yaml#/properties/quality`. Until one of those files (or a new one) actually references it, no real object anywhere in this corpus is validated against it — this file types a RECOMMENDATION, not a wired enforcement point. See `open_questions.OQ-TCGATE-2`."
+    - "No id in `specs/execution/gate.schema.yaml#/gate_catalog`'s ADR-011-resolved 20-item registry corresponds to this rule's action — REQUIRE_TRUSTED_COMPUTE_PIPELINE is therefore NOT expressed as a `gate_ref` into that catalog (contrast `mandatory-gates.yaml`'s `gate_ref` field). Whether a future ADR round should add a dedicated gate_catalog entry for this concept is `open_questions.OQ-TCGATE-1`, not decided here."
+    - "This file does not model Execution Contract §40 Research Integrity Execution's 8 bullet requirements (literature verifiability, no fabricated citations, DOI primary verification, dataset/method/analysis versioning, reproducible AnalysisRun, statistical-assumption checks, traceable human edits/authorship) as rules — §40 is cited as corroborating context for why the Trusted Compute pipeline matters for research-class tasks, not as this file's own scope. docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 L117 separately names a not-yet-built 'Research Quality Gate <-> EC Global Gates enum 對照表' closing the ADJACENT P1-GAP-AI-3 — that is a different, future file's job, not folded in here."
+    - "`triggering_epistemic_types` reuses epistemic-label.schema.yaml's full 11-value enum for its TYPE only; nothing in THIS schema prevents a future rule row from populating it with a value outside {CALCULATED_RESULT, SIMULATED_RESULT} — see the equivalent per-property constraint recorded on `#/definitions/trusted_compute_gate_rule/constraints` above."
+
+open_questions:
+  - id: "OQ-TCGATE-1"
+    question: >
+      Should a future ADR round (the same class of process ADR-011 used to
+      resolve `gate.schema.yaml`'s OQ-10) add a dedicated
+      `gate_catalog` entry (e.g. `trusted_compute_validation`) so this
+      rule's action can eventually carry a real `gate_ref`, the way
+      `mandatory-gates.yaml`'s two rules now do post-ADR-011?
+    owner: "operator / future ADR round"
+    blocks: "nothing in this schema today — REQUIRE_TRUSTED_COMPUTE_PIPELINE is fully usable as an action value without a gate_catalog entry"
+  - id: "OQ-TCGATE-2"
+    question: >
+      Should `specs/evidence/claim.schema.yaml#/properties/provenance`,
+      `specs/execution/result.schema.yaml`, or
+      `specs/domain/capability-contract.schema.yaml#/properties/quality`
+      be edited in a future Round to actually `$ref`
+      `#/definitions/computation_provenance_marker` (or a field shaped
+      like it) when their own `epistemic_type`/output declares
+      CALCULATED_RESULT or SIMULATED_RESULT — making this file's
+      enforcement real rather than a recommendation? This file's own task
+      boundary is to build ONE new file, not edit those ACTIVE siblings.
+    owner: "operator / future Phase 3-4 compilation pass over claim.schema.yaml, result.schema.yaml, capability-contract.schema.yaml"
+    blocks: "whether this policy's enforcement ever becomes schema-verifiable on a real object, as opposed to remaining a documented recommendation"
+  - id: "OQ-TCGATE-3"
+    question: >
+      Execution Contract §40's 8 bullets (literature verifiability, no
+      fabricated citations, DOI primary verification, dataset/method/
+      analysis versioning, reproducible AnalysisRun, statistical-assumption
+      checks, traceable authorship) and Master Plan §56's Research Integrity
+      Gate / Citation Gate / Statistical Gate / Methodology Gate /
+      Authorship Gate (named in P1-GAP-AI-3, L292-299) both describe
+      research-class quality requirements this file deliberately does not
+      model. Should a future `policies/ai-execution/research-integrity-gate.policy.yaml`
+      be built as this rule's sibling, per MVP_VERTICAL_SLICE_PLAN.md L117's
+      separate "Research Quality Gate <-> EC Global Gates enum 對照表" line
+      item?
+    owner: "operator / future Wave, closing P1-GAP-AI-3"
+    blocks: "nothing in this schema — this file's own scope is unaffected either way"
+  - id: "OQ-TCGATE-4"
+    question: >
+      `SIMULATED_RESULT` is included in `triggering_epistemic_types`
+      alongside `CALCULATED_RESULT` on the strength of EC §39's opening
+      scope line naming "模擬" (simulation). No mother-document passage
+      gives simulation its OWN worked example (unlike `run_statistics` for
+      calculation) or states whether a simulation's validation
+      requirements differ from a calculation's (e.g. stochastic simulations
+      may need a documented random-seed/replication-count provenance field
+      `computation_provenance_marker` does not yet carry). Should a future
+      revision split this into two rules once a simulation-specific worked
+      example or requirement is found?
+    owner: "operator / future Wave, if simulation-specific requirements are found"
+    blocks: "nothing in this schema today — one combined rule remains valid for both triggering types"
+
+verification:
+  method: >
+    Read Execution Contract §39 (L1499-1521) and §40 (L1524-1536) in full,
+    directly at the cited line numbers, not trusted from this task's own
+    brief. Read Master Plan §27 (L1688-1707) in full, and separately
+    confirmed Master Plan's OWN §40 is "Qualitative Research" (L2033), a
+    different topic — see `compilation_decisions` for the citation
+    correction this produced. Read `specs/governance/epistemic-label.schema.yaml`
+    and `specs/evidence/claim.schema.yaml` in full (both already read for
+    this task; CALCULATED_RESULT confirmed present in the former's enum,
+    L53; the latter's `provenance` field confirmed to reuse that enum
+    unmodified, unchanged by this file). Read
+    `specs/domain/capability-contract.schema.yaml` in full (already read
+    for this task; `run_statistics` confirmed as one of its 13 named
+    capability examples, L78/L136/L567/L888). Read
+    `policies/ai-execution/mandatory-gates.yaml` in full (this file's
+    closest sibling and rule-shape precedent, including its own
+    `REQUIRE_RECOVERY_REHEARSAL`-addition precedent). Read
+    `tests/contracts/policies/ai-execution/mandatory-gates.fixtures.yaml`
+    in full for this file's own fixture-format precedent. Read
+    `specs/execution/gate.schema.yaml` §gate_catalog in full — grepped
+    every one of its 20 item ids ("compute"/"statistical"/"trusted" as
+    substrings) and confirmed zero matches, grounding this file's decision
+    not to add a `gate_ref` field. Read `specs/execution/data-deletion.schema.yaml`
+    L295-326 in full — the direct precedent for this file's
+    `required_pipeline_stages` design (schema-enforced 5-of-5 set coverage,
+    documentation-level order, NOT `prefixItems`).
+
+    Grep sweep (2026-08-30/31): "Trusted Compute"/"trusted-compute-gate"/
+    "computation" across the full repo tree — confirmed hits limited to the
+    two mother documents, `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+    (L79-80, L117), `.ai/research/phase-0/policy-inventory.yaml` (L219-224),
+    and `.ai/research/phase-1/GAP_REGISTER.yaml` (P1-GAP-AI-2, P1-GAP-AI-3)
+    — no other file in the corpus already models this concept, confirming
+    this is a genuinely new file, not a duplicate of existing content.
+    Grepped `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` for "Trusted
+    Compute": zero hits, confirming this file has no MRSP Wave-tracking row
+    (recorded honestly in `description`, not asserted as if one existed).
+    Grepped `docs/adr/ADR-001` through `ADR-016` and `ADR_INDEX.md` for
+    "Trusted Compute"/"computation": zero ruling hits (two incidental
+    "computation" substring hits in ADR-007/ADR-009 prose, unrelated to
+    this file's concept, not cited as grounding). Grepped
+    `policies/ai-execution/{tool-permissions,network-egress}.yaml` for
+    their own `action` enum values, confirming each sibling file
+    independently declares its own local copy (the precedent this file's
+    `trusted_compute_action_id` follows). Grepped the repo tree for
+    `.policy.yaml` filename usage, confirming 5 existing files already use
+    that suffix outside `ai-execution/`
+    (`policies/security/zero-trust.policy.yaml`,
+    `policies/security/supply-chain-security.policy.yaml`,
+    `policies/privacy/pii-redaction.policy.yaml`,
+    `policies/provider/model-registry.policy.yaml`,
+    `policies/provider/ai-gateway-fallback.policy.yaml`) — this file's
+    filename is not a novel one-off spelling.
+
+    Validated `grounded_rules.rules[0]` against
+    `#/definitions/trusted_compute_gate_rule` with
+    `jsonschema.Draft202012Validator` using a custom `ai-lego://` resolver
+    (registry-backed retrieve function mapping each `ai-lego://` URI to its
+    on-disk YAML file, the same harness `tests/run_golden_tests.py` uses) —
+    PASS, zero errors. Ran `tests/run_golden_tests.py` end-to-end after
+    adding this file and its fixture file — see WORKLOG for the exact
+    before/after pass counts.
+  note: >
+    No mother document, ADR, or ACTIVE sibling `specs/`/`policies/` file
+    was modified to produce this file. Grounded-vs-designed ratio: roughly
+    55% grounded (the 5-stage pipeline and its literal forbidden-pattern
+    text, transcribed verbatim from EC §39; the CALCULATED_RESULT/
+    SIMULATED_RESULT trigger pair, grounded in EC §39's own scope line and
+    epistemic-label.schema.yaml's existing enum; the run_statistics worked
+    example, transcribed from MVP_VERTICAL_SLICE_PLAN.md L79-80), 45%
+    Phase 3 compilation design (the `trusted_compute_gate_rule` record
+    shape itself; the new `REQUIRE_TRUSTED_COMPUTE_PIPELINE` action value;
+    the `computation_provenance_marker` fragment, which — per `constraints`
+    and `open_questions.OQ-TCGATE-2` — is defined but not yet wired into
+    any consuming schema; every `constraints`/`open_questions` entry). This
+    file does not implement EC §40 Research Integrity Execution's own
+    8-bullet requirements, and does not implement a real cross-schema
+    enforcement point for `computation_provenance_marker` — both remain
+    explicitly open, not silently claimed as done.

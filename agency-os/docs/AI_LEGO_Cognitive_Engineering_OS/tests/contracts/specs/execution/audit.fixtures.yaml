@@ -1,0 +1,154 @@
+schema_id: "ai-lego://specs/execution/audit.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the record_type discriminated union (MP §82 capability_run vs.
+  EC §66 decision_narrative) and the allOf/if/then required-field
+  enforcement per variant -- each variant's full mother-doc-verbatim
+  required-field list must be present, and the fields specific to the
+  OTHER variant do not satisfy either branch's own required list.
+valid:
+  - name: capability_run_full_mp82_fields
+    instance:
+      record_type: "capability_run"
+      run_id: "RUN-2026-08-30-0001"
+      block_id: "root_cause.fishbone"
+      capability_version: "1.0.0"
+      model: "claude-sonnet-5"
+      model_version: "2026-08"
+      prompt_version: "1.2.0"
+      input_hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      output_hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      timestamp: "2026-08-30T00:00:00Z"
+      user: "operator@example.com"
+      latency: 1234.5
+      token_usage: { prompt_tokens: 500, completion_tokens: 200 }
+      cost: 0.0123
+      validation_score: 0.95
+      status: "success"
+      policy_version: "1.0.0"
+      knowledge_snapshot: "snapshot-2026-08-30"
+  - name: decision_narrative_full_ec66_fields
+    instance:
+      record_type: "decision_narrative"
+      who: "operator@example.com"
+      what: "Approved production deployment of sg-deploy.sh v2.3"
+      when: "2026-08-30T00:05:00Z"
+      where: "ks-aw-01 production"
+      why: "All R3 gates passed; rollback plan validated"
+      input: { deploy_plan_hash: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
+      decision: "APPROVE"
+      policy: "policies/ai-execution/release-policy.yaml@1.0.0"
+      result: "deployment proceeded"
+  - name: capability_run_with_optional_additive_fields
+    instance:
+      record_type: "capability_run"
+      execution_id: "EX-2026-000001"
+      run_id: "RUN-2026-08-30-0002"
+      block_id: "strategy.swot"
+      capability_version: "1.0.0"
+      model: "claude-sonnet-5"
+      model_version: "2026-08"
+      prompt_version: "1.2.0"
+      input_hash: "1111111111111111111111111111111111111111111111111111111111111111"
+      output_hash: "2222222222222222222222222222222222222222222222222222222222222222"
+      timestamp: "2026-08-30T00:10:00Z"
+      user: "system"
+      latency: null
+      token_usage: null
+      cost: null
+      validation_score: null
+      status: "pending"
+      policy_version: "1.0.0"
+      knowledge_snapshot: "snapshot-2026-08-30"
+invalid:
+  - name: capability_run_missing_mandatory_field
+    instance:
+      record_type: "capability_run"
+      run_id: "RUN-2026-08-30-0003"
+      block_id: "root_cause.fishbone"
+      capability_version: "1.0.0"
+      model: "claude-sonnet-5"
+      model_version: "2026-08"
+      prompt_version: "1.2.0"
+      input_hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      output_hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      timestamp: "2026-08-30T00:00:00Z"
+      user: "operator@example.com"
+      latency: 1234.5
+      token_usage: { prompt_tokens: 500 }
+      cost: 0.0123
+      validation_score: 0.95
+      # status omitted
+      policy_version: "1.0.0"
+      knowledge_snapshot: "snapshot-2026-08-30"
+    reason: "MP §82 'status' is one of the 17 fields a capability_run 必留 (must retain) -- the allOf/if/then rule for record_type:capability_run requires it; omitting it violates that then.required list."
+  - name: decision_narrative_missing_mandatory_field
+    instance:
+      record_type: "decision_narrative"
+      who: "operator@example.com"
+      what: "Approved production deployment"
+      when: "2026-08-30T00:05:00Z"
+      where: "ks-aw-01 production"
+      # why omitted
+      input: {}
+      decision: "APPROVE"
+      policy: "policies/ai-execution/release-policy.yaml@1.0.0"
+      result: "deployment proceeded"
+    reason: "EC §66 'why' is one of the 9 fields an Audit Event must 至少記錄 (at least record) -- the allOf/if/then rule for record_type:decision_narrative requires it; omitting it violates that then.required list."
+  - name: capability_run_fields_do_not_satisfy_decision_narrative_branch
+    instance:
+      record_type: "decision_narrative"
+      run_id: "RUN-2026-08-30-0004"
+      block_id: "root_cause.fishbone"
+      capability_version: "1.0.0"
+      model: "claude-sonnet-5"
+      model_version: "2026-08"
+      prompt_version: "1.2.0"
+      input_hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      output_hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      timestamp: "2026-08-30T00:00:00Z"
+      user: "operator@example.com"
+      latency: 1234.5
+      token_usage: {}
+      cost: 0.0123
+      validation_score: 0.95
+      status: "success"
+      policy_version: "1.0.0"
+      knowledge_snapshot: "snapshot-2026-08-30"
+    reason: "record_type is decision_narrative, so the allOf/if/then rule requires who/what/when/where/why/input/decision/policy/result -- populating every capability_run field instead does not satisfy the decision_narrative branch's own required list (the two variants' required sets are disjoint by design)."
+  - name: missing_record_type_discriminator
+    instance:
+      who: "operator@example.com"
+      what: "Approved production deployment"
+      when: "2026-08-30T00:05:00Z"
+      where: "ks-aw-01 production"
+      why: "All gates passed"
+      input: {}
+      decision: "APPROVE"
+      policy: "policies/ai-execution/release-policy.yaml@1.0.0"
+      result: "deployment proceeded"
+    reason: "record_type is in the top-level required: [record_type] -- omitting it violates required, regardless of which variant's fields are otherwise present."
+  - name: bad_record_type_enum_value
+    instance: { record_type: "something_else" }
+    reason: "record_type enum is exactly [capability_run, decision_narrative] -- 'something_else' is not a legal discriminator value."
+  - name: bad_input_hash_pattern
+    instance:
+      record_type: "capability_run"
+      run_id: "RUN-2026-08-30-0005"
+      block_id: "root_cause.fishbone"
+      capability_version: "1.0.0"
+      model: "claude-sonnet-5"
+      model_version: "2026-08"
+      prompt_version: "1.2.0"
+      input_hash: "not-a-real-sha256-hash"
+      output_hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      timestamp: "2026-08-30T00:00:00Z"
+      user: "operator@example.com"
+      latency: 1234.5
+      token_usage: {}
+      cost: 0.0123
+      validation_score: 0.95
+      status: "success"
+      policy_version: "1.0.0"
+      knowledge_snapshot: "snapshot-2026-08-30"
+    reason: "input_hash is a real $ref into cas-path.schema.yaml#/definitions/sha256_hash, pattern ^[a-f0-9]{64}$ -- 'not-a-real-sha256-hash' does not match."

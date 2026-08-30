@@ -1,0 +1,690 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/event-ledger.schema.yaml"
+title: Event Ledger Envelope
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the Event Ledger envelope — Master
+  Plan §57 "Event-native Architecture" (L2546-2567): "核心狀態用 Event Ledger，
+  而非只靠 CRUD" (core state lives in an Event Ledger, not plain CRUD),
+  "Current State = Events 的 Projection" (L2564, Current State is a
+  Projection of Events, never stored directly), and "可以 Replay 到任意歷史
+  狀態" (L2566, the system MUST support replaying to an arbitrary historical
+  point in time). MP §57 gives a 9-item example event-type list (verbatim,
+  L2552-2562): `DocumentUploaded / TranscriptGenerated / TranscriptCorrected
+  / ClaimCreated / ClaimVerified / ClaimRejected / StrategyGenerated /
+  StrategyApproved / ArtifactPublished` — but never gives the envelope a
+  field-level shape. Execution Contract §27 "Event / Messaging Contract"
+  (L1099-1125) adds the cross-cutting invariants every event must satisfy
+  (At-least-once + Idempotent Consumer + Idempotency Key + Replay-safe +
+  Versioned Event Schema; Outbox/Inbox/Deduplication/Sequence-Causality/
+  Compensation; and, load-bearing for this file, "Event ID 不得重用" at
+  L1125 — an event_id, once used, MUST NEVER be reused). Neither mother
+  document, nor any existing spec file, gives this envelope a schema — this
+  file fills that gap. It is a genuinely new file: it does NOT appear in EC
+  §92's 13-file `/specs/execution/` list (L2766-2783), the ONLY existing
+  reference to it anywhere in this corpus (grep-confirmed, 2026-08-30) is
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md:111`, which names
+  `event-ledger.schema.yaml`（依 ADR-002 擴充加密 envelope 欄位）as a
+  Required Phase-3 Spec for the Research-mode vertical slice.
+
+  This file does NOT redefine four things that already have their own
+  schemas — it references them:
+  1. `specs/security/personal-data-envelope.schema.yaml` — the encryption
+     envelope (`cipher_alg/kek_ref/dek_key_id/dek_wrapped/iv/ciphertext/
+     classification_tag`) that a Confidential/Restricted payload field is
+     replaced by before being written to the Ledger (ADR-002 Option A).
+  2. `specs/domain/personal-data-redacted-event.schema.yaml` — the
+     `PersonalDataRedacted` event (ADR-002 Option C), MP §57's 10th event
+     type, treated here as ONE concrete example of an event TYPE that flows
+     through this Ledger, not re-specified.
+  3. `specs/governance/epistemic-label.schema.yaml#/provenance_record` — the
+     epistemic_type/authorship_state axes, for events whose emission is
+     itself worth labeling AI-generated vs. human-asserted.
+  4. `specs/domain/tenant.schema.yaml#/properties/tenant_id` — the Tenant
+     identity every event is scoped under (ADR-003 blast-radius boundary).
+
+  The MVP vertical-slice walkthrough (`docs/architecture/
+  MVP_VERTICAL_SLICE_PLAN.md`, Status: PROPOSED) gives the only concrete,
+  field-level worked examples of this envelope anywhere in the corpus:
+  step 4 ("Event Ledger 寫入 `DocumentUploaded`（×4）（MP §57；`event_id`
+  不得重用，EC §27）"), step 8 ("Event 寫入 `TranscriptGenerated`，payload
+  含 envelope 欄位 cipher_alg/kek_ref/dek_wrapped/iv/ciphertext/
+  classification_tag"), step 25 ("寫一筆 `PersonalDataRedacted{subject_id,
+  redacted_fields[], redacted_at, authorization_ref}` 稽核事件"), and step 27
+  / Acceptance Criterion 1 (L131) — replaying the Projection to three
+  historical points T0 (before deletion) / T1 (after deletion) / T2 (after a
+  prompt_version upgrade), each anchored by a moment in TIME, never by a
+  sequence number.
+
+compilation_decisions:
+  - question: >
+      Should `event_type` be a closed enum (MP §57's 9 names, plus
+      `PersonalDataRedacted` as the ADR-002-added 10th) or an open string?
+    decision: >
+      Open `type: string` with a documented PascalCase convention
+      (`pattern: "^[A-Z][A-Za-z0-9]*$"`) and a non-normative
+      `known_event_types` catalog below — NOT a closed enum.
+    reasoning: >
+      MP §57 introduces its 9-item list with "例如" (for example) — the
+      mother document itself signals non-exhaustiveness. Real precedent for
+      growth beyond MP §57's own list already exists in this corpus:
+      ADR-002 Option C adds `PersonalDataRedacted` as an explicit 10th entry
+      (Consequences item 5), and `docs/architecture/DATA_ARCHITECTURE_PLAN.md`
+      §5 (L109-119) adds `ResultPromotedToEvidence`, explicitly stating its
+      naming "沿用 MP §57 既有 XCreated/XVerified 事件命名慣例" (follows MP
+      §57's existing naming CONVENTION) — proof that new event types are
+      added over time by following a naming pattern, not by extending a
+      closed list. This is the same shape of problem `execution/
+      gate.schema.yaml` already solved for `gate_id` via its
+      `gate_catalog.method_specific` block ("intentionally open-ended, not
+      enumerated here" for Atlas §22.3's per-method gate namespace) — a
+      documented catalog for tooling/lint, not a schema-level enum that
+      would reject every future addition.
+  - question: >
+      What should the two fields be named that identify "which aggregate
+      this event belongs to" and "this event's position within that
+      aggregate's stream" — the task brief suggested `stream_id`/
+      `aggregate_id` and `sequence_number`?
+    decision: "`aggregate_id` + `sequence` (bare, not `sequence_number`)."
+    reasoning: >
+      `docs/architecture/DATA_ARCHITECTURE_PLAN.md` §3 (L64-72, Status:
+      PROPOSED) gives the ONLY concrete mechanism anywhere in this corpus
+      for these two fields: "每個 Domain Model aggregate root（Claim/
+      Evidence/Decision 等）的「版本」= 該 aggregate 已套用的 event 數。寫入
+      時 `INSERT INTO events (aggregate_id, sequence, ...) ... ON CONFLICT
+      (aggregate_id, sequence) DO NOTHING`" (L68) — and this EXACT mechanism,
+      with these EXACT field names, was independently re-verified faithful
+      and folded into `specs/domain/repository-contract.schema.yaml`'s
+      `consistency_concurrency_strategy.aggregate_optimistic_concurrency`
+      by `docs/adr/ADR-013-batch-ratification-of-proposed-document-
+      transcriptions.md` Sub-decision 1 (ACCEPTED 2026-08-30, covering
+      DATA_ARCHITECTURE_PLAN.md §1-5 verbatim, §3 explicitly named at
+      L64-72). Inventing a second name (`stream_id`/`sequence_number`) for
+      the identical two fields a sibling schema already names would create
+      exactly the kind of "same concept, two vocabularies" drift this whole
+      corpus exists to eliminate (see epistemic-label.schema.yaml's own
+      four-vocabulary story). See `decided_by` below for the precise scope
+      of what ADR-013 does and does NOT authorize about reusing this naming
+      here.
+  - question: "Is `sequence` monotonic per-aggregate (a stream) or globally across the whole Ledger?"
+    decision: "Per-aggregate (per-stream)."
+    reasoning: >
+      DATA_ARCHITECTURE_PLAN.md:68's own UNIQUE constraint is the COMPOSITE
+      key `(aggregate_id, sequence)`, not `sequence` alone — this is only a
+      meaningful concurrency guard if `sequence` restarts (or is at least
+      independently scoped) per aggregate; a single global counter would
+      make the composite key redundant with `sequence` by itself. This
+      directly answers the task brief's own explicit open question
+      ("whether sequence_number is per-stream or global") from grounded
+      source material rather than leaving it a coin flip.
+  - question: >
+      How should `payload` (the event-type-specific data) relate to
+      `specs/domain/personal-data-redacted-event.schema.yaml`, given the
+      task instruction to "$ref it as a possible event payload shape"
+      without redefining it or inventing a full discriminated union across
+      all 12 known event types (only one of which — PersonalDataRedacted —
+      has a field-level schema anywhere in this corpus)?
+    decision: >
+      `payload` stays a fully open `type: object` for every event_type,
+      EXCEPT one mechanically-enforced `if`/`then` override: when
+      `event_type == PersonalDataRedacted`, `payload` MUST validate against
+      `specs/domain/personal-data-redacted-event.schema.yaml` in full
+      (a hard `$ref`, no fields re-declared here).
+    reasoning: >
+      This makes the "$ref it as a payload shape" instruction real and
+      testable for the one case where real grounding exists, while being
+      honest that DocumentUploaded/TranscriptGenerated/ClaimCreated/etc.
+      have NO field-level schema anywhere in the mother documents or this
+      corpus to enforce against — inventing one here would be scope creep
+      disguised as thoroughness (the same trap `gate.schema.yaml`'s own
+      compilation_decisions explicitly named and avoided for `evidence[]`).
+      One accepted side effect: `personal-data-redacted-event.schema.yaml`
+      was authored as a self-sufficient event record with its OWN
+      `event_type` const baked in (it has no `event_id`/`occurred_at`/
+      `tenant_id` of its own — it was designed as payload-shaped content,
+      not as a full top-level envelope instance), so nesting it under
+      `payload` means `payload.event_type` redundantly re-states the outer
+      `event.event_type` value. Both consts agree (`PersonalDataRedacted`)
+      by construction of the `if` condition, so this is harmless
+      duplication, not a conflict — fixing the redundancy would mean
+      editing that sibling file, which is out of this file's scope (it must
+      not be redefined, per task instruction).
+  - question: >
+      Should `tenant_id` (→ `domain/tenant.schema.yaml`) and the optional
+      authorship-labeling field (→ `governance/epistemic-label.schema.yaml
+      #/provenance_record`) be hard `$ref`s or soft references-by-name?
+      `specs/domain/personal-data-redacted-event.schema.yaml` — the most
+      recent sibling to face this identical choice for these SAME two
+      target files — chose soft references for both.
+    decision: >
+      Hard `$ref` for both: `tenant_id` → `ai-lego://specs/domain/
+      tenant.schema.yaml#/properties/tenant_id`; the optional `provenance`
+      field → `ai-lego://specs/governance/epistemic-label.schema.yaml
+      #/provenance_record`.
+    reasoning: >
+      Both target files are fully BUILT and `status: ACTIVE` by the time
+      this file is authored (they are not concurrent same-session siblings
+      the way `personal-data-redacted-event.schema.yaml` and
+      `key-vault-lifecycle.schema.yaml` were to each other) — matching
+      `specs/jurisdiction/context.schema.yaml`'s own precedent and stated
+      reasoning for hard-referencing `tenant.schema.yaml#/properties/
+      home_jurisdiction` ("already BUILT on disk... a safe backward
+      reference"), and matching the task brief's own explicit instruction
+      to "$ref" (not "soft-reference") both concepts. This is a reasoned,
+      documented DIVERGENCE from `personal-data-redacted-event.schema.yaml`'s
+      choice for the identical two target files, not an oversight — that
+      file's own reasoning ("same soft-reference convention tenant.schema.
+      yaml and manifest.schema.yaml both use") is a general style
+      preference, not a load-bearing constraint; this corpus has real
+      precedent for EITHER choice depending on build-order safety
+      (soft: `security/personal-data-envelope.schema.yaml`'s `kek_ref`;
+      hard: `context.schema.yaml`'s `tenant_home_jurisdiction_ref`), and
+      build-order safety favors hard here.
+  - question: >
+      Should the optional authorship-labeling field (`provenance`) be
+      `required` on every Event, given the task brief frames it as
+      answering "was this event AI-generated or human-asserted?"
+    decision: "OPTIONAL, not required."
+    reasoning: >
+      No ADR or mother-document text mandates that every Event Ledger
+      record carry epistemic/authorship labeling — MP §11.3/EC §57 apply
+      that labeling to content/claim objects, and an Event is a narrower,
+      more mechanical concept (a fact of occurrence) than a claim. The one
+      sibling file that already added this exact concept to an event type
+      (`personal-data-redacted-event.schema.yaml`'s own `provenance` field)
+      made the identical optional/additive choice, for the identical reason
+      (a plan-declared dependency relationship, not a literal per-field ADR
+      mandate) — reused verbatim, including the field NAME `provenance`,
+      for cross-corpus consistency of the same concept.
+  - question: >
+      MVP_VERTICAL_SLICE_PLAN.md step 8 shows a Confidential/Restricted
+      payload FIELD being replaced by `personal-data-envelope.schema.yaml`'s
+      6 envelope fields (embedded inside that payload field's own value,
+      not as a sibling of `event_id`/`occurred_at` at the envelope's own
+      top level). How should this file model that, given `payload` is
+      generically `type: object` with no per-event-type field list to hang
+      a per-field encryption requirement off of?
+    decision: >
+      Add a documentation-only top-level block, `encrypted_payload_field`,
+      whose sole content is `$ref: "ai-lego://specs/security/
+      personal-data-envelope.schema.yaml"` — NOT wired into
+      `event.properties.payload` as an enforced constraint.
+    reasoning: >
+      ADR-002 Consequences item 4 itself acknowledges there is no closed
+      vocabulary anywhere of which event_type's payload fields carry
+      Confidential/Restricted content ("MP §57 event 清單旁需標註哪些既有
+      event type 含 Confidential/Restricted 分級欄位——現況零標註") — a gap
+      `personal-data-redacted-event.schema.yaml`'s own `open_questions.
+      MRSP-pdr-2` already surfaces. Without that vocabulary, this file
+      cannot mechanically require encryption on any specific payload key
+      for any specific event_type — attempting to would either be a no-op
+      (validating nothing) or would silently invent the missing vocabulary,
+      which is the same kind of scope creep the `payload` decision above
+      already ruled out. This block instead gives a concrete, real `$ref`
+      TARGET that a future per-event-type payload schema (once ADR-002
+      Consequences item 4's gap is closed) can point at, instead of
+      re-declaring `personal-data-envelope.schema.yaml`'s 6 fields itself —
+      satisfying the task's "reference them, do NOT redefine" instruction
+      even though this file has no single fixed property to hang the $ref
+      off of.
+  - question: >
+      How far should `replay_query` (a request shape for "replay to point
+      in time") be modeled, given MP §57 states the CAPABILITY in one bare
+      sentence and no mother document specifies a request/response shape?
+    decision: >
+      Model only what `MVP_VERTICAL_SLICE_PLAN.md` step 27 / Acceptance
+      Criterion 1 (L131) actually demonstrates: a REQUIRED `as_of_timestamp`
+      plus OPTIONAL `tenant_id`/`aggregate_id` scope-narrowing. Do NOT model
+      an `as_of_sequence_number` sibling, a response/output (Projection)
+      shape, or a replay-engine mechanism.
+    reasoning: >
+      Every one of the walkthrough's three worked replay points (T0 = before
+      deletion, T1 = after deletion, T2 = after a prompt_version upgrade) is
+      anchored by a moment in TIME, never by a sequence number — there is no
+      grounded worked example anywhere in this corpus of a
+      sequence-number-anchored replay to justify adding that variant
+      speculatively. The walkthrough also never narrows its own replay to a
+      single `aggregate_id` (it replays "the Projection" as a whole each
+      time) — scope granularity beyond that is therefore left to
+      `open_questions` per the task brief's own explicit permission ("if
+      the source material doesn't give you enough concrete detail... leave
+      it as a documented open_questions entry... rather than inventing
+      detailed replay-engine semantics that no mother document actually
+      specifies").
+  - question: >
+      `event_id` must be "globally unique, never reused" (EC §27, L1125) —
+      what type/format should it carry, and how should the never-reuse
+      invariant be recorded given JSON Schema cannot check uniqueness
+      across separate validated instances?
+    decision: >
+      Opaque `type: string, minLength: 1`, no assumed UUID/prefix format;
+      the never-reuse invariant is recorded as a `constraints` entry
+      describing exactly what this file can and cannot mechanically check.
+    reasoning: >
+      Same "no mother document commits to a concrete identity scheme"
+      reasoning `personal-data-redacted-event.schema.yaml` used for
+      `subject_id` — EC §27 states the INVARIANT (never reused) but no
+      concrete format (unlike `manifest.schema.yaml`'s execution_id, which
+      Atlas/EC's own machine blocks concretely prefix `EX-`). Global
+      uniqueness across every event ever emitted is a write-path/database
+      invariant (the same class of thing DATA_ARCHITECTURE_PLAN.md:68's
+      `(aggregate_id, sequence)` UNIQUE constraint enforces for a DIFFERENT,
+      narrower pair of fields) — this schema states the rule honestly as
+      unenforceable-here rather than gesturing at a `pattern` that would
+      falsely imply structural enforcement.
+  - question: >
+      This file defines multiple named top-level blocks (`event`,
+      `replay_query`, `encrypted_payload_field`, `known_event_types`) rather
+      than putting the Event envelope's own `type: object`/`properties`
+      directly at file root (the pattern `tenant.schema.yaml`/`manifest.
+      schema.yaml`/`personal-data-envelope.schema.yaml`/`personal-data-
+      redacted-event.schema.yaml` all use). Per this corpus's own
+      established convention (`epistemic-label.schema.yaml`'s Codex-review
+      fix, finding #1: "a validator pointed at this file's ROOT... has no
+      type constraint and would accept any value"), what should this file's
+      bare root look like?
+    decision: >
+      Add an explicit root `$ref: "#/event"`, mirroring `epistemic-label.
+      schema.yaml`'s own fix exactly.
+    reasoning: >
+      `execution/gate.schema.yaml` faces the identical multi-block shape
+      (`gate_result`/`trigger_context`/`gate_catalog`) and does NOT carry
+      this fix — its own fixture deliberately targets `#/gate_result`
+      rather than bare root, sidestepping rather than closing the gap. This
+      file instead follows the corpus's more recent, explicitly
+      Codex-reviewed precedent (`epistemic-label.schema.yaml`) rather than
+      repeating gate.schema.yaml's unfixed shape, since the task brief
+      itself calls out root-level validity as "this corpus's established
+      pattern" to honor.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §57 Event-native Architecture (L2546-2567) — the 9-item example event-type list, 'Current State = Events 的 Projection', '可以 Replay 到任意歷史狀態'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §27 Event / Messaging Contract (L1099-1125) — At-least-once/Idempotent Consumer/Idempotency Key/Replay-safe/Versioned Event Schema; Outbox/Inbox/Deduplication/Sequence-Causality/Compensation; 'Event ID 不得重用' (L1125)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Option A (per-subject DEK envelope) + Option C (PersonalDataRedacted) + Consequences items 4-5 (10th MP §57 event type)"
+  - "specs/security/personal-data-envelope.schema.yaml (encryption envelope fields, referenced via $ref, not redefined)"
+  - "specs/domain/personal-data-redacted-event.schema.yaml (PersonalDataRedacted event shape, referenced via $ref, not redefined)"
+  - "specs/governance/epistemic-label.schema.yaml#/provenance_record (referenced via $ref, not redefined)"
+  - "specs/domain/tenant.schema.yaml#/properties/tenant_id (referenced via $ref, not redefined)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md (Status: PROPOSED) §3 steps 4/8/25/27 (L58/65/94/96) — the only field-level worked examples of this envelope anywhere in the corpus; §4 (L111) names this file as a Required Phase-3 Spec; §5 Acceptance Criterion 1 (L131) — T0/T1/T2 replay, timestamp-anchored"
+  - "docs/architecture/DATA_ARCHITECTURE_PLAN.md (Status: PROPOSED) §3 Consistency & Concurrency Strategy (L64-72) — the (aggregate_id, sequence) UNIQUE-constraint mechanism this file's field naming reuses"
+  - "specs/domain/repository-contract.schema.yaml#/consistency_concurrency_strategy (the sibling schema already carrying the ADR-013-ratified transcription of the same mechanism; field names reused verbatim here for cross-file consistency)"
+  - "docs/adr/ADR-013-batch-ratification-of-proposed-document-transcriptions.md Sub-decision 1 (ACCEPTED 2026-08-30) — ratifies repository-contract.schema.yaml's transcription of DATA_ARCHITECTURE_PLAN.md §1-5; see decided_by for the precise scope of what this does and does not authorize for THIS file"
+
+decided_by: >
+  No single ADR governs this file's overall existence or shape. Like
+  `execution/current-state.schema.yaml`, the core Event envelope
+  (event_id/event_type/occurred_at/tenant_id/aggregate_id/sequence/payload)
+  is a direct Phase 3 compilation of already-written mother-document prose
+  (MP §57 L2546-2567, EC §27 L1099-1125) — not a Phase 0/1 finding
+  resolution or a new architecture decision requiring ADR review. Two
+  narrower pieces of this file's content ARE ADR-governed: (1) the
+  encryption-envelope integration and PersonalDataRedacted's status as MP
+  §57's 10th event type are `docs/adr/ADR-002-personal-data-erasure-vs-
+  event-immutability.md` Option A / Option C / Consequences items 4-5
+  (ACCEPTED); (2) this file's field-naming choice (`aggregate_id` +
+  `sequence`, not `stream_id`/`sequence_number`) is honestly NOT itself
+  ADR-authorized for THIS file — it is a Phase 3 compilation decision that
+  reuses naming `docs/adr/ADR-013-batch-ratification-of-proposed-document-
+  transcriptions.md` Sub-decision 1 (ACCEPTED 2026-08-30) already ratified
+  when it confirmed `repository-contract.schema.yaml`'s faithful
+  transcription of `DATA_ARCHITECTURE_PLAN.md` §3's mechanism.
+  `DATA_ARCHITECTURE_PLAN.md` itself remains its own `Status: PROPOSED`,
+  and ADR-013's ratification is explicitly scoped to
+  `repository-contract.schema.yaml`/`tenant-isolation-controls.schema.yaml`'s
+  OWN field transcriptions (ADR-013 Decision Driver 4: "本 ADR 批准的範圍嚴格
+  限定在...這 5 個機讀 schema/policy 檔案"), not to any later file (this one
+  included) that merely reuses the same field NAMES for cross-file naming
+  consistency — recorded here honestly rather than claimed as
+  ADR-authorized. All other field-level type/format/reference choices below
+  are Phase 3 compilation decisions, recorded in `compilation_decisions`
+  above, not new architecture decisions.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+# Root $ref: see compilation_decisions above (mirrors epistemic-label.schema.yaml's
+# own Codex-reviewed fix) — without this, a validator pointed at this file's bare
+# root would have no type constraint and would accept any value.
+$ref: "#/event"
+
+event:
+  type: object
+  description: >
+    One Event Ledger record. MP §57 + EC §27, compiled — see top-level
+    description and compilation_decisions for full grounding.
+  required: [event_id, event_type, occurred_at, tenant_id, aggregate_id, sequence, payload]
+  properties:
+
+    event_id:
+      type: string
+      minLength: 1
+      description: >
+        Opaque identifier, no assumed format (see compilation_decisions).
+        This is EC §27's "Idempotency Key" concept for this event — the
+        value a consumer uses to detect and discard a duplicate delivery
+        under EC §27's "At-least-once + Idempotent Consumer" principle.
+
+    event_type:
+      type: string
+      pattern: "^[A-Z][A-Za-z0-9]*$"
+      description: >
+        Open string, NOT a closed enum — see compilation_decisions. The
+        pattern documents the PascalCase NAMING CONVENTION every known
+        event_type value in this corpus follows (MP §57's 9 examples,
+        ADR-002's PersonalDataRedacted, DATA_ARCHITECTURE_PLAN.md's
+        ResultPromotedToEvidence/DeleteDerivedProjections — see
+        `known_event_types` below); it does not constrain WHICH names are
+        legal, only their FORMAT.
+
+    occurred_at:
+      type: string
+      format: date-time
+      description: >
+        When this event occurred. No mother document names this field
+        explicitly (MP §57/EC §27 are prose-only); this follows this
+        corpus's own established `<verb>_at` timestamp-naming pattern
+        (`created_at`/`started_at`/`redacted_at`/`deleted_at`), generalized
+        since — unlike `personal-data-redacted-event.schema.yaml`'s
+        domain-specific `redacted_at` — this envelope's event_type varies.
+
+    tenant_id:
+      $ref: "ai-lego://specs/domain/tenant.schema.yaml#/properties/tenant_id"
+      description: >
+        Hard $ref — see compilation_decisions for why this diverges from
+        `personal-data-redacted-event.schema.yaml`'s soft-reference choice
+        for the same target. Every event is scoped to exactly one Tenant
+        (ADR-003 blast-radius boundary) — there is no cross-tenant event.
+
+    aggregate_id:
+      type: string
+      minLength: 1
+      description: >
+        Which Domain Model aggregate root this event is "about" (e.g. a
+        specific Claim/Evidence/Decision/Document — DATA_ARCHITECTURE_PLAN.md
+        :68's own examples). Field name reused verbatim from
+        `repository-contract.schema.yaml#/consistency_concurrency_strategy`
+        — see compilation_decisions for why this is `aggregate_id`, not the
+        task brief's suggested `stream_id`.
+
+    sequence:
+      type: integer
+      minimum: 0
+      description: >
+        Monotonic position of this event WITHIN `aggregate_id`'s own stream
+        — per-aggregate, NOT globally monotonic across the whole Ledger
+        (see compilation_decisions). Forms the composite optimistic-
+        concurrency key `(aggregate_id, sequence)` per
+        DATA_ARCHITECTURE_PLAN.md:68 / repository-contract.schema.yaml
+        #/consistency_concurrency_strategy/aggregate_optimistic_concurrency.
+        This IS the ordering key MP §57's "Replay 到任意歷史狀態" replays
+        along for a single aggregate; `replay_query` below additionally
+        supports timestamp-anchored replay across aggregates.
+
+    payload:
+      type: object
+      description: >
+        Event-type-specific data. Open object for every event_type EXCEPT
+        one enforced override below (see `allOf`) — see compilation_decisions
+        for why a full discriminated union across every known event_type is
+        NOT attempted here. A Confidential/Restricted field WITHIN this
+        object (MP §61) is expected to be replaced by an instance of
+        `encrypted_payload_field` below rather than storing plaintext (per
+        ADR-002 Option A and MVP_VERTICAL_SLICE_PLAN.md step 8's worked
+        example) — descriptive only, not mechanically enforced here (see
+        compilation_decisions and open_questions.OQ-EL-4).
+
+    provenance:
+      $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      description: >
+        OPTIONAL. Hard $ref to the epistemic_type/authorship_state axes —
+        see compilation_decisions for why this is optional and why this
+        file hard-$refs rather than soft-references (a documented
+        divergence from `personal-data-redacted-event.schema.yaml`'s own
+        `provenance` field, which uses the identical field NAME for the
+        identical concept). Absent when a producer does not populate it;
+        downstream consumers MUST NOT treat its absence as an error.
+
+  allOf:
+    - if:
+        properties: { event_type: { const: PersonalDataRedacted } }
+        required: [event_type]
+      then:
+        properties:
+          payload:
+            $ref: "ai-lego://specs/domain/personal-data-redacted-event.schema.yaml"
+
+  constraints:
+    - "event_id MUST NEVER be reused across the Event Ledger's entire lifetime (EC §27, L1125: 'Event ID 不得重用'). JSON Schema can only validate one instance at a time and CANNOT check global uniqueness across every event ever emitted -- that invariant MUST be enforced by the write path (e.g. a database-level UNIQUE constraint on event_id), the same honest limitation this file records for the separate (aggregate_id, sequence) pair below."
+    - "(aggregate_id, sequence) MUST be unique across the Ledger (DATA_ARCHITECTURE_PLAN.md:68's UNIQUE constraint, ratified via ADR-013 Sub-decision 1 into repository-contract.schema.yaml) -- again a write-path invariant this schema cannot itself check across separate instances."
+    - "Once emitted, an event's payload is immutable (MP §58 Immutable-first, L2570-2586) -- a correction is a NEW event (a higher `sequence` on the same `aggregate_id`), never a mutation of this one. Mirrors personal-data-redacted-event.schema.yaml's identical constraint for its own event type."
+    - "When event_type == PersonalDataRedacted, payload MUST validate against specs/domain/personal-data-redacted-event.schema.yaml -- mechanically enforced above via allOf/if/then, not prose-only."
+
+# ---------------------------------------------------------------------------
+# Documentation-only $ref target for a Confidential/Restricted payload field's
+# replacement shape -- NOT wired into event.properties.payload. See
+# compilation_decisions above for why this cannot be mechanically enforced.
+# ---------------------------------------------------------------------------
+encrypted_payload_field:
+  description: >
+    The shape any `payload` field MUST take once its plaintext value is
+    classified Confidential/Restricted (MP §61) and has been replaced by an
+    encrypted envelope before being written to the Ledger — per ADR-002
+    Option A and MVP_VERTICAL_SLICE_PLAN.md step 8's worked example
+    (`TranscriptGenerated`'s payload embeds exactly these 6 fields for each
+    Confidential/Restricted field it carries). Referenced, not redefined.
+  $ref: "ai-lego://specs/security/personal-data-envelope.schema.yaml"
+
+# ---------------------------------------------------------------------------
+# Provisional, deliberately partial "replay to point in time" request shape.
+# See compilation_decisions above for exactly what is and is not modeled.
+# ---------------------------------------------------------------------------
+replay_query:
+  description: >
+    Models only what MVP_VERTICAL_SLICE_PLAN.md step 27 / Acceptance
+    Criterion 1 (L131) actually demonstrates — three timestamp-anchored
+    historical points (T0 before a deletion, T1 after it, T2 after a
+    prompt_version upgrade), each replaying the whole Projection, never
+    narrowed to one aggregate_id in the worked example. Does NOT model a
+    response/output (Projection) shape or a replay-engine mechanism — see
+    open_questions.OQ-EL-2.
+  type: object
+  required: [as_of_timestamp]
+  properties:
+    tenant_id:
+      $ref: "ai-lego://specs/domain/tenant.schema.yaml#/properties/tenant_id"
+      description: >
+        OPTIONAL scope narrowing. Every worked example in
+        MVP_VERTICAL_SLICE_PLAN.md replays within one Tenant's Projection,
+        but no mother document states whether a replay query must always
+        be tenant-scoped — left optional rather than required.
+    aggregate_id:
+      type: string
+      minLength: 1
+      description: >
+        OPTIONAL scope narrowing to a single aggregate's own stream. When
+        omitted, interpreted as "replay the full Projection" per MP §57 and
+        MVP step 27's own usage (neither ever narrows to one aggregate_id).
+    as_of_timestamp:
+      type: string
+      format: date-time
+      description: >
+        REQUIRED — every worked T0/T1/T2 example is anchored purely by a
+        moment in time ("刪除前" / "刪除完成後" / "一次 prompt_version 升級
+        後"), never by a sequence number. See compilation_decisions for why
+        an `as_of_sequence_number` sibling variant is NOT added despite the
+        task brief's own suggestion — no worked example anywhere in this
+        corpus anchors a real replay to one instead of a timestamp.
+
+# ---------------------------------------------------------------------------
+# Non-normative catalog — event_type stays an open string (see
+# compilation_decisions); this documents every value with a real source in
+# this corpus today, for tooling/lint convenience only.
+# ---------------------------------------------------------------------------
+known_event_types:
+  description: >
+    NOT a closed enum. New values are expected over time, following the
+    PascalCase convention `event_type`'s own `pattern` documents, per
+    DATA_ARCHITECTURE_PLAN.md §5's own explicit statement that its new
+    event name "沿用 MP §57 既有...事件命名慣例" (follows MP §57's existing
+    naming CONVENTION, not a closed list).
+  mp_57_example_list:
+    status: "Mother-document verbatim, non-exhaustive by MP's own '例如' framing"
+    source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §57 (L2552-2562)"
+    items: [DocumentUploaded, TranscriptGenerated, TranscriptCorrected, ClaimCreated, ClaimVerified, ClaimRejected, StrategyGenerated, StrategyApproved, ArtifactPublished]
+  adr_002_option_c:
+    status: "ADR-ACCEPTED, own field-level schema exists (specs/domain/personal-data-redacted-event.schema.yaml), mechanically enforced above via allOf/if/then"
+    source: "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Option C + Consequences item 5"
+    items: [PersonalDataRedacted]
+  data_architecture_plan_examples:
+    status: >
+      Status: PROPOSED source document (DATA_ARCHITECTURE_PLAN.md itself is
+      NOT an Accepted ADR). ResultPromotedToEvidence's own defining section
+      (§5, L102-128) WAS independently re-verified faithful and folded into
+      repository-contract.schema.yaml by ADR-013 Sub-decision 1.
+      DeleteDerivedProjections's defining bullet (§6, L136, the ADR-002
+      integration sub-section) sits inside the L132-147 span ADR-013
+      Sub-decision 2 cites for tenant-isolation-controls.schema.yaml, but
+      that sub-decision's own ratification prose names only 3 specific
+      fields (default_isolation_model/shared_component_controls/
+      object_storage_path_reuse) -- none of which is this event -- so this
+      specific name has NOT itself been independently re-verified/ratified
+      the way ResultPromotedToEvidence's was. Both are listed here only as
+      real-world evidence the naming convention keeps extending, not as
+      ADR-confirmed legal values.
+    source: "docs/architecture/DATA_ARCHITECTURE_PLAN.md §5 (L109-119), §6 (L136)"
+    items: [ResultPromotedToEvidence, DeleteDerivedProjections]
+
+examples:
+  - description: >
+      A DocumentUploaded event (MVP_VERTICAL_SLICE_PLAN.md step 4's worked
+      example — one of the ×4 uploads). tenant_id uses a real UUID per
+      `tenant.schema.yaml#/properties/tenant_id`'s own format, NOT the
+      walkthrough's informal narrative shorthand ("TEN-NORDBROOK") — see
+      open_questions.OQ-EL-5.
+    value:
+      event_id: "EVT-3fa85f64-0001"
+      event_type: DocumentUploaded
+      occurred_at: "2026-08-29T09:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P1"
+      sequence: 0
+      payload:
+        artifact_uri: "artifact://tenant/3fa85f64-5717-4562-b3fc-2c963f66afa6/project/PRJ-BURNOUT-01/source/SRC-INT-P1"
+        cas_path: "/objects/3fa85f64-5717-4562-b3fc-2c963f66afa6/sha256/aa/bb/<hash-P1>"
+  - description: >
+      A PersonalDataRedacted event (MVP_VERTICAL_SLICE_PLAN.md step 25's
+      worked example) — payload validates against
+      personal-data-redacted-event.schema.yaml in full, per the allOf/if/then
+      override above.
+    value:
+      event_id: "EVT-3fa85f64-0099"
+      event_type: PersonalDataRedacted
+      occurred_at: "2026-08-29T12:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P2"
+      sequence: 7
+      payload:
+        event_type: PersonalDataRedacted
+        subject_id: "subject-4f8a2b1c"
+        redacted_fields: ["TranscriptGenerated.claimant_ssn", "TranscriptGenerated.claimant_dob"]
+        redacted_at: "2026-08-29T12:00:00Z"
+        authorization_ref: "DEL-3fa85f64-authz"
+
+open_questions:
+  - id: "OQ-EL-1"
+    question: >
+      EC §27's "Event ID 不得重用" (L1125) is a global-uniqueness invariant
+      this schema can only document, never mechanically check (JSON Schema
+      validates one instance in isolation). Non-blocking — the same honest
+      limitation applies to the (aggregate_id, sequence) pair (see
+      `constraints`).
+    owner: "implementation team, at write-path/database-constraint design time"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-EL-2"
+    question: >
+      `replay_query`'s scope granularity (single-aggregate vs. whole-tenant
+      vs. whole-Ledger) and its response/output shape (a "Projection" — MP
+      §57's own term, never itself given a schema anywhere in this corpus)
+      are both left undecided — no mother document specifies either, and
+      MVP_VERTICAL_SLICE_PLAN.md's own worked example never narrows scope.
+      Per the task brief's own explicit permission, left open rather than
+      inventing replay-engine semantics no source material grounds.
+    owner: "operator or a future Wave, once a Projection schema exists"
+    blocks: "nothing in this file's own validity; blocks building a real replay ENGINE against this request shape"
+  - id: "OQ-EL-3"
+    question: >
+      `sequence`'s starting index (0 or 1) is unspecified by
+      DATA_ARCHITECTURE_PLAN.md:68 — its own worked example only shows the
+      UNIQUE-constraint mechanism, not a concrete starting value.
+    owner: "operator, non-blocking"
+    blocks: "nothing"
+  - id: "OQ-EL-4"
+    question: >
+      Which specific payload KEYS of which specific event_type require the
+      `encrypted_payload_field` treatment remains undocumented corpus-wide
+      — ADR-002 Consequences item 4's own acknowledged gap ("MP §57 event
+      清單旁需標註哪些既有 event type 含 Confidential/Restricted 分級欄位—
+      —現況零標註"), already separately flagged by
+      `personal-data-redacted-event.schema.yaml`'s own
+      `open_questions.MRSP-pdr-2`. This file inherits and surfaces the same
+      pre-existing gap; it does not introduce a new one.
+    owner: "operator, via a future documentation PROPOSAL against MP §57 (ADR-006 process) that annotates each event type's PII-bearing fields"
+    blocks: "mechanical enforcement of per-field encryption on payload; does not block this schema's own structural validity"
+  - id: "OQ-EL-5"
+    question: >
+      MVP_VERTICAL_SLICE_PLAN.md's own walkthrough uses informal narrative
+      tenant identifiers ("TEN-NORDBROOK", "TEN-CASCADIA") that do NOT
+      conform to `tenant.schema.yaml#/properties/tenant_id`'s `format: uuid`
+      constraint. This file's own `examples` above use real UUIDs instead,
+      treating the walkthrough's identifiers as narrative shorthand, not
+      literal field values — flagged here so a future reader does not
+      mistake the walkthrough's prose IDs for this schema's expected format.
+    owner: "operator, non-blocking (a documentation-only discrepancy in a Status: PROPOSED planning document, not a schema defect)"
+    blocks: "nothing in this schema"
+
+verification:
+  method: >
+    Read MP §57 (L2540-2568) and EC §27 (L1095-1129) in full at the cited
+    lines, confirming both the 9-item event-type list and the "Event ID 不得
+    重用" citation independently (the latter specifically because the task
+    that commissioned this file flagged it as NOT independently re-verified
+    when `MVP_VERTICAL_SLICE_PLAN.md:58` first cited it — confirmed CORRECT:
+    EC §27 spans L1099-1125, "Event ID 不得重用" is the section's own closing
+    line at L1125, verbatim). Read
+    `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md` Option
+    A/C sections and Consequences items 4-5 in full. Read
+    `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §0-§5 in full (walkthrough
+    steps 1-28, Required Phase-3 Specs list at L101-123, Acceptance Criteria
+    at L127-136), confirming step numbers 4/8/25/27 and the L111 citation of
+    this exact filename. Read `docs/architecture/DATA_ARCHITECTURE_PLAN.md`
+    §3 (L62-72) and the ADR-002/003/005 integration section (§6, L130-147)
+    in full. Read `docs/adr/ADR-013-batch-ratification-of-proposed-document-
+    transcriptions.md` in full (Decision Drivers, Sub-decisions 1-2) to
+    determine the precise scope of what it does and does not authorize about
+    reusing DATA_ARCHITECTURE_PLAN.md-sourced field names in a file ADR-013
+    itself never names. Read `specs/domain/repository-contract.schema.yaml`
+    #/consistency_concurrency_strategy and #/storage_engine_assignment in
+    full to confirm the exact field names (`aggregate_id`, `sequence`)
+    already ratified there. Read `specs/security/personal-data-envelope.
+    schema.yaml`, `specs/domain/personal-data-redacted-event.schema.yaml`,
+    `specs/governance/epistemic-label.schema.yaml`, and `specs/domain/
+    tenant.schema.yaml` in full — all four $ref targets, confirmed their
+    exact `$id`/fragment paths by direct read rather than by assumption.
+    Grep-confirmed (2026-08-30) that "event-ledger" appears in exactly one
+    place anywhere in this corpus outside this file itself:
+    `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md:111`.
+  note: >
+    No mother document, ADR, or existing spec/policy file's normative
+    content was modified to produce this file. MP §57's 9-item list and EC
+    §27's invariants are transcribed verbatim. The `aggregate_id`/`sequence`
+    field names are reused verbatim from `repository-contract.schema.yaml`
+    (itself an ADR-013-ratified transcription of a Status: PROPOSED
+    document) rather than re-derived independently — see `decided_by` for
+    the honest scope limit on what that reuse is and is not authorized by.
+    All four cross-file `$ref` targets (`personal-data-envelope.schema.yaml`,
+    `personal-data-redacted-event.schema.yaml`, `epistemic-label.schema.yaml
+    #/provenance_record`, `tenant.schema.yaml#/properties/tenant_id`) point
+    at already-built, `status: ACTIVE` files — none of their content is
+    redefined here.

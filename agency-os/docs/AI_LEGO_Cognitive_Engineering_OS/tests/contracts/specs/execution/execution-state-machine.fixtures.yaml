@@ -1,0 +1,59 @@
+schema_id: "ai-lego://specs/execution/execution-state-machine.schema.yaml"
+target_ref: "#/state_transition_event"
+description: >
+  Exercises EC §10's "禁止跳過必要 state" (no-skip) rule as enforced by
+  state_transition_event's allOf/if/then adjacency chain (L575), the
+  initial from_state:null -> RECEIVED entry rule, the CLOSED-is-terminal
+  inference, and the permissive-by-design side-state entry path (any
+  primary state -> any of the 7 status-codes.schema.yaml side states is
+  legal, since EC §10 gives no source-state qualifier for the side states).
+valid:
+  - name: initial_entry_into_received
+    instance: { from_state: null, to_state: "RECEIVED", transitioned_at: "2026-08-30T00:00:00Z" }
+  - name: adjacent_forward_step_documents_resolved
+    instance: { from_state: "RECEIVED", to_state: "DOCUMENTS_RESOLVED", transitioned_at: "2026-08-30T00:01:00Z" }
+  - name: adjacent_forward_step_last_pair_to_closed
+    instance: { from_state: "POST_VERIFY", to_state: "CLOSED", transitioned_at: "2026-08-30T01:00:00Z" }
+  - name: primary_state_into_side_state_is_permissive
+    instance:
+      from_state: "METHODS_RESOLVED"
+      to_state: "BLOCKED"
+      transitioned_at: "2026-08-30T00:05:00Z"
+      trigger_signal: "METHOD_RESOLUTION_BLOCKED"
+    # Any primary state may enter any side state per this file's own
+    # compilation_decisions (EC §10 gives no source-state qualifier for the
+    # 7 side states) -- this is the permissive design working as intended,
+    # not an oversight.
+  - name: transition_with_optional_gate_and_authority_fields
+    instance:
+      from_state: "ROLLBACK_VALIDATED"
+      to_state: "APPROVED"
+      transitioned_at: "2026-08-30T00:10:00Z"
+      execution_id: "EX-2026-000001"
+      authority_level: "A3"
+      gate_results: [{ gate_id: "rollback", status: "PASS" }]
+invalid:
+  - name: skip_received_directly_to_closed
+    instance: { from_state: "RECEIVED", to_state: "CLOSED", transitioned_at: "2026-08-30T00:01:00Z" }
+    reason: "EC §10 L575 '禁止跳過必要 state' -- RECEIVED's only legal next primary state is DOCUMENTS_RESOLVED (legal_primary_transitions edge 1 of 13); skipping 12 states to CLOSED violates the adjacency allOf/if/then rule."
+  - name: skip_two_states_ahead
+    instance: { from_state: "CURRENT_STATE_ESTABLISHED", to_state: "METHODS_RESOLVED", transitioned_at: "2026-08-30T00:02:00Z" }
+    reason: "CURRENT_STATE_ESTABLISHED's only legal next primary state is RISK_CLASSIFIED -- jumping over RISK_CLASSIFIED to METHODS_RESOLVED is exactly the one-state skip EC §10 L575 forbids."
+  - name: self_loop_not_a_legal_transition
+    instance: { from_state: "EXECUTING", to_state: "EXECUTING", transitioned_at: "2026-08-30T00:20:00Z" }
+    reason: "EXECUTING's only legal next primary state is VERIFYING per legal_primary_transitions -- a same-state loop is rejected by the identical if/then rule that rejects skips (to_state must be the const next-state, not merely 'not equal to from_state')."
+  - name: outgoing_transition_from_closed_is_illegal
+    instance: { from_state: "CLOSED", to_state: "RECEIVED", transitioned_at: "2026-08-30T02:00:00Z" }
+    reason: "CLOSED is modeled as terminal (compilation_decisions: CLOSED-is-terminal inference) -- the allOf rule keyed on from_state:CLOSED uses then:false, rejecting any outgoing transition, primary or side, from CLOSED."
+  - name: initial_entry_must_land_on_received
+    instance: { from_state: null, to_state: "DOCUMENTS_RESOLVED", transitioned_at: "2026-08-30T00:00:00Z" }
+    reason: "The if/then rule for from_state:null requires to_state to be the const RECEIVED (the very first transition has no prior state and must start the sequence at its first member) -- landing anywhere else on the first transition is rejected."
+  - name: missing_required_to_state
+    instance: { from_state: "RECEIVED", transitioned_at: "2026-08-30T00:01:00Z" }
+    reason: "to_state is in required: [from_state, to_state, transitioned_at] -- omitting it violates required."
+  - name: omitting_from_state_entirely_must_not_bypass_adjacency_check
+    instance: { to_state: "CLOSED", transitioned_at: "2026-08-30T00:01:00Z" }
+    reason: "from_state is in required: [from_state, to_state, transitioned_at] specifically to close a coverage-guard bypass: every allOf/if/then adjacency rule is keyed on from_state's value and also requires from_state to be present inside its own if.required, so an instance that omits from_state entirely (rather than setting it explicitly to null) would satisfy every rule vacuously and let to_state jump straight to CLOSED unchecked -- requiring the key present (even though nullable) closes this."
+  - name: bad_primary_state_enum_value
+    instance: { from_state: "RECEIVED", to_state: "NOT_A_REAL_STATE", transitioned_at: "2026-08-30T00:01:00Z" }
+    reason: "to_state must be one of the 14 primary_state enum values or one of the 7 side_state enum values -- 'NOT_A_REAL_STATE' is neither."

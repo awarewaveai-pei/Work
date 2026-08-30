@@ -1,0 +1,125 @@
+schema_id: "ai-lego://specs/execution/event-ledger.schema.yaml"
+target_ref: ""
+description: >
+  Exercises the root $ref into `event` (mirroring epistemic-label.schema.yaml's
+  own root-$ref fix), the required 7-field envelope, the open `payload` object
+  for an ordinary event_type (DocumentUploaded), the allOf/if/then override
+  that forces `payload` to validate against
+  specs/domain/personal-data-redacted-event.schema.yaml when
+  event_type == PersonalDataRedacted, the hard $ref on `provenance` into
+  epistemic-label.schema.yaml's authorship_state enum, the `sequence`
+  minimum, and the `event_type` PascalCase pattern. NOTE (honesty, same
+  posture as gate.fixtures.yaml's own note for this schema suite):
+  `tenant_id` hard-$refs tenant.schema.yaml#/properties/tenant_id, which
+  carries `format: uuid`, but tests/run_golden_tests.py builds its
+  Draft202012Validator WITHOUT a format_checker, so `format` is
+  annotation-only here and NOT enforced -- empirically confirmed (a
+  'TEN-NORDBROOK'-style non-UUID tenant_id validates with zero errors). This
+  is a suite-wide behavior affecting every `format:` keyword in every schema
+  in this corpus, not specific to this file, so no invalid case below relies
+  on `format` enforcement.
+
+valid:
+  - name: document_uploaded_open_payload
+    instance:
+      event_id: "EVT-3fa85f64-0001"
+      event_type: DocumentUploaded
+      occurred_at: "2026-08-29T09:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P1"
+      sequence: 0
+      payload:
+        artifact_uri: "artifact://tenant/3fa85f64-5717-4562-b3fc-2c963f66afa6/project/PRJ-BURNOUT-01/source/SRC-INT-P1"
+        cas_path: "/objects/3fa85f64-5717-4562-b3fc-2c963f66afa6/sha256/aa/bb/<hash-P1>"
+  - name: personal_data_redacted_conforming_payload
+    instance:
+      event_id: "EVT-3fa85f64-0099"
+      event_type: PersonalDataRedacted
+      occurred_at: "2026-08-29T12:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P2"
+      sequence: 7
+      payload:
+        event_type: PersonalDataRedacted
+        subject_id: "subject-4f8a2b1c"
+        redacted_fields: ["TranscriptGenerated.claimant_ssn", "TranscriptGenerated.claimant_dob"]
+        redacted_at: "2026-08-29T12:00:00Z"
+        authorization_ref: "DEL-3fa85f64-authz"
+  - name: event_with_optional_provenance
+    instance:
+      event_id: "EVT-3fa85f64-0100"
+      event_type: StrategyApproved
+      occurred_at: "2026-08-29T13:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "STRAT-0007"
+      sequence: 3
+      payload:
+        strategy_id: "STRAT-0007"
+        approved_by: "coder-1"
+      provenance:
+        epistemic_type: DECISION
+        authorship_state: HUMAN_APPROVED
+
+invalid:
+  - name: missing_required_event_id
+    instance:
+      event_type: DocumentUploaded
+      occurred_at: "2026-08-29T09:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P1"
+      sequence: 0
+      payload: {}
+    reason: "event_id is in required: [event_id, event_type, occurred_at, tenant_id, aggregate_id, sequence, payload] -- omitting it violates required."
+  - name: negative_sequence
+    instance:
+      event_id: "EVT-neg-0001"
+      event_type: DocumentUploaded
+      occurred_at: "2026-08-29T09:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P1"
+      sequence: -1
+      payload: {}
+    reason: "sequence has minimum: 0 (per-aggregate monotonic position cannot be negative) -- -1 fails."
+  - name: event_type_not_pascal_case
+    instance:
+      event_id: "EVT-badtype-0001"
+      event_type: "document_uploaded"
+      occurred_at: "2026-08-29T09:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P1"
+      sequence: 0
+      payload: {}
+    reason: "event_type pattern is ^[A-Z][A-Za-z0-9]*$ (documented PascalCase convention) -- snake_case 'document_uploaded' fails."
+  - name: provenance_bad_authorship_state_enum
+    instance:
+      event_id: "EVT-badprov-0001"
+      event_type: StrategyApproved
+      occurred_at: "2026-08-29T13:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "STRAT-0007"
+      sequence: 4
+      payload: {}
+      provenance:
+        epistemic_type: DECISION
+        authorship_state: CALCULATED_RESULT
+    reason: >
+      provenance hard-$refs epistemic-label.schema.yaml#/provenance_record,
+      whose authorship_state enum is the 6-value HUMAN_ORIGINAL/AI_GENERATED/
+      AI_SUGGESTED/HUMAN_EDITED/HUMAN_APPROVED/SOURCE_QUOTATION list --
+      CALCULATED_RESULT was ADR-004-removed from that axis (it is only a
+      legal epistemic_type value, per that schema's own migration_crosswalk)
+      -- fails.
+  - name: personal_data_redacted_payload_missing_subject_id
+    instance:
+      event_id: "EVT-baddel-0001"
+      event_type: PersonalDataRedacted
+      occurred_at: "2026-08-29T12:00:00Z"
+      tenant_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      aggregate_id: "SRC-INT-P2"
+      sequence: 8
+      payload:
+        event_type: PersonalDataRedacted
+        redacted_fields: ["TranscriptGenerated.claimant_ssn"]
+        redacted_at: "2026-08-29T12:00:00Z"
+        authorization_ref: "DEL-3fa85f64-authz"
+    reason: "the allOf/if/then override forces payload to validate against personal-data-redacted-event.schema.yaml in full when event_type == PersonalDataRedacted; that schema requires subject_id, which is missing here."

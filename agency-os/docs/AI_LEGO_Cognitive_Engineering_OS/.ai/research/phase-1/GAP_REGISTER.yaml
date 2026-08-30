@@ -289,6 +289,19 @@ clusters:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 1690, quote: "AI↓Analysis Planner↓Trusted Compute Engine↓Validation↓Result Artifact↓AI Interpretation"}
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md, line: 1508, quote: "Validator verifies"}
         consequence: "「AI 只 Plan/Explain/Interpret，不得捏造 calculation」這條紅線沒有任何機器可稽核的落地點——AI 在最後一步把數字寫錯或竄改，系統無任何 gate 會攔截。"
+        resolution: >
+          PARTIALLY RESOLVED 2026-08-30 by policies/ai-execution/trusted-compute-gate.policy.yaml
+          (Phase 5 Research Mode vertical-slice prerequisite build). Adds a condition/action gate
+          rule requiring the Trusted Compute pipeline (Plan -> Execute -> Validate -> Result
+          Artifact) whenever a capability output claims a CALCULATED_RESULT/SIMULATED_RESULT
+          epistemic_type. Honestly disclosed limitation (see that file's own open_questions):
+          this schema cannot inspect free-text AI output to detect "an LLM is asserting a
+          computed value" -- it enforces the pipeline requirement structurally (a
+          computation_provenance_marker fragment) but full enforcement still depends on
+          prompt/agent design actually invoking the gate, not a closed loop this schema alone
+          guarantees. No EC 14-state execution-machine COMPUTE/STATISTICAL state was added --
+          out of scope for this gap, see specs/execution/execution-state-machine.schema.yaml
+          (built same day) for that separate concern.
       - id: P1-GAP-AI-3
         severity: high
         role: Statistician / Research Methodologist
@@ -297,6 +310,16 @@ clusters:
         evidence:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2523, quote: "研究論文：Research Integrity Gate / Citation Gate / Statistical Gate / Methodology Gate / Authorship Gate"}
         consequence: "研究論文流程在執行層沒有對應 gate_id 可以掛，唯一命名的機制是一份從未被執行引擎讀取的名單。"
+        resolution: >
+          RESOLVED 2026-08-30 by methods/contracts/research.qualitative_coding.contract.yaml's
+          method_specific_gates block (Phase 5 Research Mode vertical-slice prerequisite build).
+          Declared as gate.schema.yaml#/gate_catalog/method_specific items (that catalog's own
+          intentionally-open-ended, per-method-contract mechanism -- not a new parallel gate
+          taxonomy), with concrete PASS/FAIL conditions tied to already-modeled corpus mechanisms
+          (e.g. Citation Gate = every Claim node resolves to a real Source via the
+          evidence-graph/sentence-provenance chain, both built the same day). Resolves the
+          specific gap for the research.qualitative_coding method; a general MP-§56-to-EC-§68
+          cross-reference for ALL research recipes beyond this one method remains unaddressed.
       - id: P1-GAP-AI-4
         severity: medium
         role: Statistician
@@ -345,7 +368,18 @@ clusters:
         evidence:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2033, quote: "§40 Qualitative Research"}
         consequence: "研究誠信機制對質性研究這一半完全空白——Coding 步驟做得好不好無法被任何 gate 檢驗。"
-    risks_ref: "見 RISK_REGISTER.yaml P1-RISK-AI-1/2/3/4/5"
+        resolution: >
+          RESOLVED 2026-08-30 by methods/contracts/research.qualitative_coding.contract.yaml
+          (Phase 5 Research Mode vertical-slice prerequisite build, MVP_VERTICAL_SLICE_PLAN.md
+          §4). Grounded design (no mother-document content existed to transcribe, confirmed by
+          this gap): 3-stage open/axial/selective coding per Strauss & Corbin (1990/1998,
+          real cited academic methodology, not invented); saturation_criterion grounded in
+          Glaser & Strauss (1967) theoretical saturation; inter-rater reliability via Cohen's
+          Kappa (Cohen 1960) with the real published Landis & Koch (1977) interpretation scale.
+          Project-specific numeric thresholds (saturation data-unit count, Kappa acceptance
+          cutoff) deliberately left null/operator-set rather than invented -- same restraint
+          this corpus already applied to other undecided operational values (see
+          policies/security/*.policy.yaml's own compilation_decisions for the precedent).
   product_business_ops:
     roles: [Product Manager, Program Manager, UX Architect, Accessibility Specialist, Business, Finance, Trade, Education, Operations, Support/Incident Response, Long-term Maintainer]
     gaps:

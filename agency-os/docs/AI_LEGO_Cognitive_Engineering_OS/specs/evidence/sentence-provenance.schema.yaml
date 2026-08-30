@@ -1,0 +1,491 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/evidence/sentence-provenance.schema.yaml"
+title: Sentence-level Provenance
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of a fine-grained provenance LINK
+  record — the missing piece between one specific locatable span (a sentence
+  on a page, a sentence at an audio/video timestamp, or a region of an image)
+  and the already-governed `Claim`/`Evidence` chain it grounds. This file
+  does not redefine or replace `evidence.schema.yaml`/`claim.schema.yaml`; it
+  IS the link schema Master Plan §13.1 promises and neither of those two
+  files attempts to be (confirmed by direct grep before writing this file:
+  neither `evidence.schema.yaml` nor `claim.schema.yaml` has any
+  timestamp/page/region/sentence-level field today).
+
+  Primary grounding — Master Plan §13.1 "Sentence-level Provenance"
+  (L1075-1085): "每個重要句子可追" (every important sentence must be
+  traceable), giving the exact chain:
+
+    Sentence
+    → Claim
+    → Evidence
+    → Source
+    → Page / Region / Timestamp
+
+  That last line (L1084) is the direct textual source for this file's
+  three-way `locator` union (`text_page`/`audio_timestamp`/`image_region`
+  below) — Page, Region, and Timestamp are given together, as three
+  alternative terminal forms of the SAME chain, not three separate chains.
+
+  Secondary grounding — Master Plan §13.2 "圖片區域證據" (L1087-1097)
+  elaborates the "Region" alternative into its own concrete sub-chain:
+
+    Image
+    ↓
+    RegionAnnotation
+    ↓
+    Evidence
+    ↓
+    Claim
+
+  This sub-chain has NO separate "Source" step of its own — `Image` sits in
+  exactly the structural position `Source` occupies in §13.1's chain (the
+  node immediately preceding the locator/`RegionAnnotation`). See
+  `compilation_decisions` for why this file therefore treats `Image` and
+  `Source` as the SAME top-level `source_id` field, not two fields.
+
+  Tertiary grounding, and the source of this file's single most load-bearing
+  concrete requirement — `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+  Acceptance Criterion 5 (§5, L135): "任取最終 Artifact 中一句話，成功逆向
+  追溯 `Sentence → Claim → Evidence → Source → 逐字稿時間戳`，落地到原始
+  音檔的精確秒數" (take any sentence in the final Artifact, successfully
+  trace backward Sentence → Claim → Evidence → Source → transcript
+  timestamp, landing on the EXACT SECOND of the original audio file). This is
+  a materially stronger, more specific requirement than MP §13.1's own bare
+  word "Timestamp" alone gives — it is why `audio_timestamp` below uses a
+  numeric SECONDS field, not a formatted duration string or a page-style
+  free-text locator. The same plan's own walkthrough step 19 (§3, L85)
+  quotes MP §13.1's chain verbatim in the context of an actual audio/video
+  transcript scenario (step 5, L62: `transcribe` capability, `AudioVideo →
+  Transcript`), confirming "Timestamp" in this project's real applied use
+  means an audio/video transcript timestamp specifically, not an abstract
+  placeholder.
+
+  This file's own citation as a required Phase-3 spec:
+  `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §4 (L107: "`/specs/evidence/`：
+  `evidence-graph.schema.yaml`（MP §13.3）、`sentence-provenance.schema.yaml`
+  （MP §13.1）"). Like its `evidence-graph.schema.yaml` sibling (built same
+  task), this file is NOT one of Atlas Appendix A's promised filenames
+  (grepped Appendix A, L4574-4590, full text: zero hits for
+  "sentence-provenance") and is NOT tracked by
+  `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` (grepped full text: zero
+  hits) — its sole textual mandate is MP §13.1/§13.2 plus the MVP Vertical
+  Slice Plan's explicit requirement.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §13.1 Sentence-level Provenance (L1075-1085, chain at L1079-1085)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §13.2 圖片區域證據 (L1087-1097)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §13 worked example, 'PDF p.32' locator style (L1059-1067)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 walkthrough step 5 (L62, AudioVideo → Transcript) and step 19 (L85, quotes MP §13.1's chain in the transcript-timestamp context)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 Required Phase-3 Specs (L101-123, this file's row at L107)"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §5 Acceptance Criterion 5 (L127-136, criterion at L135) — audio-timestamp-in-exact-seconds requirement"
+  - "specs/evidence/evidence.schema.yaml (real $ref; confirmed by grep to carry no timestamp/page/region field of its own)"
+  - "specs/evidence/claim.schema.yaml (real $ref; confirmed by grep to carry no timestamp/page/region field of its own)"
+  - "specs/evidence/evidence-graph.schema.yaml (sibling file, built same task; MP §13.3's `/provenance/` directory, sibling to `/graph/`, is where this file's own instances are read as living)"
+  - "specs/governance/epistemic-label.schema.yaml (required provenance — see compilation_decisions)"
+
+decided_by: >
+  No ADR governs this file (grepped `docs/adr/ADR-001~016` full text for
+  "Sentence-level Provenance"/"sentence-provenance"/"RegionAnnotation": zero
+  hits). Not tracked by `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`
+  (grepped full text: zero hits) — same class of gap as this file's
+  `evidence-graph.schema.yaml` sibling, both mandated solely by
+  `MVP_VERTICAL_SLICE_PLAN.md` §4, a Phase-2 planning document, not the
+  Wave 1-8 plan. Field shape is a direct Phase-3 compilation off Master Plan
+  §13.1/§13.2 text plus the MVP plan's own Acceptance Criterion 5 — no
+  competing shape for this concept was found anywhere in the three mother
+  documents, ADRs, or `.ai/research/phase-0/*.yaml` registers, so this is
+  the same "no ADR, direct compilation, no multi-shape conflict to
+  adjudicate" class `evidence.schema.yaml` itself already established as
+  precedent.
+
+compilation_decisions:
+  - question: >
+      MP §13.1's chain (L1079-1085) ends in "Source" then "Page / Region /
+      Timestamp"; MP §13.2's chain (L1089-1097) starts directly at "Image"
+      with no separate "Source" step. Model `source_id` and an `image_id`
+      as two separate top-level fields, or unify them into one?
+    decision: "Unified into one top-level `source_id` field."
+    reasoning: >
+      `Image` in §13.2 sits in exactly the structural position `Source`
+      occupies in §13.1 — the node immediately preceding the
+      locator/RegionAnnotation, and the thing everything in the chain
+      ultimately traces back to. No mother document treats "Image" as a
+      concept distinct from "Source" (an image IS a kind of source
+      document); inventing two parallel fields for what both cited chains
+      treat as the same structural slot would be adding an unrequested
+      distinction, not compiling one that exists. `source_id`'s own
+      description below notes it may address either kind.
+  - question: >
+      MP §13.1's own last chain step (L1084) lists three alternatives in one
+      line: "Page / Region / Timestamp". Model these as three independent
+      optional top-level fields (any subset settable at once), or as a
+      mutually-exclusive discriminated union?
+    decision: >
+      A discriminated `oneOf` union (`locator`, with `locator_type`:
+      `text_page` | `audio_timestamp` | `image_region`), each branch
+      requiring its own type-specific fields.
+    reasoning: >
+      A single provenance record traces ONE specific span in ONE specific
+      source — a sentence on a page and a sentence at a timestamp are two
+      different findings about two different (or the same, differently
+      accessed) sources, not two simultaneously-true facts about one
+      record. Three independent optional fields would silently allow
+      nonsensical instances (e.g. both a `page_number` AND a
+      `start_seconds` with no stated relationship between them) and would
+      not let each branch require its own genuinely different fields
+      (a page number is meaningless for a video; a bounding box is
+      meaningless for a text sentence). This mirrors
+      `decision/reversal.schema.yaml`'s own `oneOf`-of-named-forms decision
+      for an analogous situation: one concept ("reversal criterion" there,
+      "locator" here), several textually-distinct forms, forcing them into
+      one flat object would either lose information or admit invalid
+      combinations.
+  - question: >
+      MVP Acceptance Criterion 5 (L135) requires landing on the "精確秒數"
+      (exact/precise second count) of the original audio file. Should
+      `audio_timestamp`'s trigger field be a formatted duration string (e.g.
+      `"00:12:34"`) or a plain number of seconds?
+    decision: "A plain `number` field, `start_seconds`, minimum 0."
+    reasoning: >
+      The acceptance criterion's own wording ("精確秒數" — precise/exact
+      SECOND count) is a materially more specific instruction than MP
+      §13.1's bare word "Timestamp" alone would justify on its own. A
+      formatted string would require every consumer to re-parse it back
+      into a number before it is usable for anything (seeking playback,
+      comparing durations, computing overlap) — the acceptance criterion is
+      explicitly testing that the system can compute and compare EXACT
+      second values, which a numeric field satisfies directly and a
+      formatted string only satisfies after an extra, unspecified parsing
+      step. `end_seconds` is added as an optional (not required) companion
+      for a sentence spanning a duration — AC5 only demands landing on A
+      precise second, not that every instance carry a span.
+  - question: >
+      MP §13.2 gives the "RegionAnnotation" concept only as a bare arrow in
+      a 4-node diagram (L1090-1097) — no field names, no coordinate system,
+      no units. This file must nonetheless support the image-region variant
+      per explicit instruction. What shape and units for `bounding_box`?
+    decision: >
+      `bounding_box: {x, y, width, height}` (all numbers, minimum 0), plus a
+      `unit` field (`pixel` | `fraction`, default `fraction`).
+    reasoning: >
+      NEW_DESIGN, honestly flagged — same class of structural necessity as
+      `evidence.schema.yaml`'s `content`/`source` fields (a record with a
+      `locator_type: image_region` but no way to say WHERE in the image is
+      not usable image-region provenance). `{x, y, width, height}` is the
+      minimal, most common bounding-box shape in image-annotation practice
+      generally (not itself mother-document-derived); `fraction` (0-1,
+      resolution-independent) is chosen as the DEFAULT over `pixel` because
+      a fractional box remains valid if the same image is later
+      re-encoded/re-scaled, while a pixel box silently goes stale — but
+      `pixel` remains a legal, explicit alternative since no mother document
+      rules it out. See `open_questions.OQ-SPROV-2`.
+  - question: >
+      Should `sentence_text` (the literal quoted span) be required
+      unconditionally, given the image-region variant has no literal
+      "sentence" at all (§13.2's chain has no Sentence node — it starts at
+      Image/RegionAnnotation)?
+    decision: >
+      `sentence_text` is required when `locator.locator_type` is
+      `text_page` or `audio_timestamp`, and optional (typically replaced by
+      `region_description`) when it is `image_region`. Enforced via a
+      sibling-property `if`/`then` at this file's own root, the same
+      cross-property conditional-validation pattern
+      `governance/epistemic-label.schema.yaml`'s `provenance_record` uses
+      for its own `locked`/`epistemic_type` constraint (scoped at the
+      shared parent object, not nested inside either sibling property,
+      per that file's own documented fix for exactly this class of
+      mis-scoping bug).
+    reasoning: >
+      This file's own title and MP §13.1's own section name are
+      "Sentence-level Provenance" — the sentence is the primary case this
+      file exists to serve, so `sentence_text` stays the literal field name
+      (not a generic "content" field) rather than diluting the file's own
+      clearest textual anchor. But forcing it unconditionally required
+      would make every valid image-region instance fail validation, which
+      contradicts this task's explicit instruction that the image-region
+      variant must be supported, not merely tolerated.
+  - question: >
+      Should this record require its own `provenance`
+      (epistemic_type/authorship_state), matching
+      `evidence.schema.yaml`/`claim.schema.yaml`/`assumption.schema.yaml`/
+      `decision.schema.yaml`, or omit it like `decision/reversal.schema.yaml`
+      (this corpus's closest precedent for an embedded structural link
+      record) does?
+    decision: "Required."
+    reasoning: >
+      Unlike `reversal.schema.yaml` (which states a pre-committed POLICY,
+      not an evidentiary claim about the world), this file's entire content
+      IS an evidentiary assertion — "this exact span, at this exact
+      page/timestamp/region, is what grounds this Claim/Evidence" — exactly
+      the kind of claim `governance/epistemic-label.schema.yaml` states its
+      own scope as covering ("every content/claim object in the system must
+      carry" a provenance_record). It also matters concretely for this
+      file's own reason for existing: an AI pipeline may auto-extract a
+      candidate sentence-to-citation mapping (`authorship_state:
+      AI_GENERATED`) that a human later verifies or corrects
+      (`HUMAN_APPROVED`/`HUMAN_EDITED`) — MVP Acceptance Criterion 5's
+      "successfully trace backward" requirement presupposes exactly this
+      kind of verifiability, which the provenance axis exists to record.
+  - question: "What ID pattern should this file's own `id` field use?"
+    decision: "`^SP-[0-9]+$`."
+    reasoning: >
+      NEW_DESIGN — no mother document names an ID grammar for this concept.
+      Follows the same hyphen-prefix-plus-sequential-number convention
+      already used by 3 of the 4 existing evidence/decision ID fields
+      (`E-`, `C-`, `ASM-`) and by this file's own `evidence-graph.schema.yaml`
+      sibling's new `SRC-`/`ENT-` inventions (built same task), for the same
+      consistency reasoning recorded there.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [id, source_id, claim, evidence, locator, provenance]
+allOf:
+  - if:
+      properties:
+        locator: { properties: { locator_type: { const: image_region } } }
+      required: [locator]
+    then: {}
+    else:
+      required: [sentence_text]
+properties:
+
+  id:
+    type: string
+    pattern: "^SP-[0-9]+$"
+    description: "NEW_DESIGN — see compilation_decisions."
+
+  sentence_text:
+    type: string
+    description: >
+      MP §13.1's own "Sentence" chain node (L1080). The literal quoted span
+      of text this record traces provenance for. Required for
+      `text_page`/`audio_timestamp` locators; optional (typically replaced
+      by `region_description` below) for `image_region` — see
+      compilation_decisions.
+
+  region_description:
+    type: string
+    description: >
+      NEW_DESIGN. Free-text caption/description of what the cited image
+      region shows, filling the role `sentence_text` fills for the text/
+      audio variants. Optional on every variant; most useful when
+      `locator.locator_type == image_region` and `sentence_text` is absent.
+
+  claim:
+    $ref: "ai-lego://specs/evidence/claim.schema.yaml"
+    description: >
+      MP §13.1's "Claim" chain node (L1081). Real $ref — accepts either a
+      minimal `{claim_id, statement, provenance}` stub or a fully fleshed
+      Claim record, per that schema's own required-field set.
+
+  evidence:
+    $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+    description: >
+      MP §13.1's "Evidence" chain node (L1082). Real $ref — accepts either a
+      minimal `{evidence_id, provenance}` stub or a fully fleshed Evidence
+      record. Kept SINGULAR (one Evidence per provenance link), matching the
+      chain's own one-arrow-per-step reading — see
+      `open_questions.OQ-SPROV-1` for whether a future revision should widen
+      this to an array.
+
+  source_id:
+    type: string
+    pattern: "^SRC-[0-9]+$"
+    description: >
+      MP §13.1's "Source" chain node (L1083), unified with MP §13.2's
+      "Image" chain node (L1090) — see compilation_decisions. Soft-reference
+      pattern only (matches `evidence-graph.schema.yaml`'s own new
+      `source_node.source_id` grammar, built same task) — no
+      `source.schema.yaml` exists yet for this to hard-$ref against
+      (grepped, zero hits; same gap that file's own `source_node` flags).
+
+  locator:
+    description: >
+      MP §13.1's own final chain step, "Page / Region / Timestamp"
+      (L1084) — modeled as a discriminated union of three named forms. See
+      compilation_decisions.
+    oneOf:
+      - $ref: "#/definitions/text_page_locator"
+      - $ref: "#/definitions/audio_timestamp_locator"
+      - $ref: "#/definitions/image_region_locator"
+
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    description: "Required — see compilation_decisions."
+
+definitions:
+
+  text_page_locator:
+    title: "Text/page form — MP §13.1 'Page' (L1084), worked example 'PDF p.32' (L1062)"
+    type: object
+    required: [locator_type, page_number]
+    properties:
+      locator_type: { const: text_page }
+      page_number:
+        type: integer
+        minimum: 1
+        description: "MP §13's own worked example: 'PDF p.32' (L1062) — the page number within the source document."
+      quote_offset:
+        type: [integer, "null"]
+        default: null
+        description: >
+          NEW_DESIGN, optional. Character or sentence-index offset within
+          the page, for sources where multiple sentences share one page
+          number and finer disambiguation is useful. No mother document
+          names this field; left optional and untyped beyond a bare integer
+          rather than inventing a fuller addressing scheme no line supports.
+
+  audio_timestamp_locator:
+    title: "Audio/video timestamp form — MP §13.1 'Timestamp' (L1084), MVP Acceptance Criterion 5 (L135)"
+    type: object
+    required: [locator_type, start_seconds]
+    properties:
+      locator_type: { const: audio_timestamp }
+      start_seconds:
+        type: number
+        minimum: 0
+        description: >
+          MVP_VERTICAL_SLICE_PLAN.md Acceptance Criterion 5 (L135):
+          "落地到原始音檔的精確秒數" (land on the original audio file's exact
+          second). A plain number, not a formatted duration string — see
+          compilation_decisions.
+      end_seconds:
+        type: [number, "null"]
+        minimum: 0
+        default: null
+        description: >
+          NEW_DESIGN, optional. End of the span, for a sentence covering a
+          duration rather than a single instant. AC5 only requires landing
+          on a precise start second, not that every instance carry a span —
+          see open_questions.OQ-SPROV-3.
+      media_type:
+        type: [string, "null"]
+        enum: [null, audio, video]
+        default: null
+        description: >
+          NEW_DESIGN, optional. MP §8.4 / MVP plan step 5 (L62) both name
+          the ingest capability `transcribe: AudioVideo → Transcript` —
+          covering both media kinds under one capability — so this locator
+          form is named `audio_timestamp` (matching MP §13.1's own literal
+          word "Timestamp" in its transcript-timestamp sense) but is not
+          restricted to audio-only sources.
+
+  image_region_locator:
+    title: "Image region form — MP §13.2 圖片區域證據, RegionAnnotation (L1087-1097)"
+    type: object
+    required: [locator_type, bounding_box]
+    properties:
+      locator_type: { const: image_region }
+      bounding_box:
+        type: object
+        required: [x, y, width, height]
+        description: "NEW_DESIGN — see compilation_decisions for shape/unit rationale."
+        properties:
+          x: { type: number, minimum: 0 }
+          y: { type: number, minimum: 0 }
+          width: { type: number, minimum: 0 }
+          height: { type: number, minimum: 0 }
+          unit:
+            type: string
+            enum: [fraction, pixel]
+            default: fraction
+            description: >
+              `fraction`: x/y/width/height are 0-1 fractions of the image's
+              own dimensions (resolution-independent, DEFAULT). `pixel`:
+              absolute pixel coordinates. See compilation_decisions.
+
+examples:
+  - description: >
+      Text/page variant — a sentence on page 32 of a PDF, transcribing MP
+      §13's own worked example locator style ("PDF p.32", L1062).
+    value:
+      id: "SP-1"
+      sentence_text: "採用率在過去兩年成長了三倍。"
+      claim: { claim_id: "C-117", statement: "市場對此類產品的採用率正在上升", provenance: { epistemic_type: HUMAN_OPINION, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-912", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-1"
+      locator: { locator_type: text_page, page_number: 32 }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+  - description: >
+      Audio-timestamp variant — MVP Acceptance Criterion 5's own scenario:
+      a sentence from an interview transcript, traced to the exact second
+      of the original audio file.
+    value:
+      id: "SP-2"
+      sentence_text: "我覺得遠距工作讓我沒辦法真正下班。"
+      claim: { claim_id: "C-201", statement: "遠距工作者回報下班界線模糊", provenance: { epistemic_type: SOURCE_FACT, authorship_state: SOURCE_QUOTATION } }
+      evidence: { evidence_id: "E-1001", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL } }
+      source_id: "SRC-2"
+      locator: { locator_type: audio_timestamp, start_seconds: 754.2, end_seconds: 758.9, media_type: audio }
+      provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT }
+  - description: >
+      Image-region variant — MP §13.2's Image → RegionAnnotation → Evidence
+      → Claim chain, no literal sentence, `region_description` used instead.
+    value:
+      id: "SP-3"
+      region_description: "圖表右上角顯示 2026 Q2 採用率曲線的峰值標記"
+      claim: { claim_id: "C-305", statement: "採用率在 2026 Q2 達到高峰", provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED } }
+      evidence: { evidence_id: "E-1102", provenance: { epistemic_type: EVIDENCE, authorship_state: AI_GENERATED } }
+      source_id: "SRC-3"
+      locator: { locator_type: image_region, bounding_box: { x: 0.62, y: 0.08, width: 0.15, height: 0.1, unit: fraction } }
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+
+open_questions:
+  - id: "OQ-SPROV-1"
+    question: >
+      `evidence` is kept singular, matching the chain's own one-arrow-per-
+      step reading. Should a future revision widen it to an array, for a
+      sentence that simultaneously instantiates more than one Evidence
+      record?
+    owner: "operator"
+    blocks: "nothing in this schema"
+  - id: "OQ-SPROV-2"
+    question: >
+      `bounding_box`'s field names/units are NEW_DESIGN with no mother-
+      document basis. Should a future revision instead adopt a named
+      external convention (e.g. COCO-style `[x, y, width, height]` array, or
+      a two-corner `{x_min, y_min, x_max, y_max}` form) for interoperability
+      with existing image-annotation tooling, rather than this file's own
+      invented object shape?
+    owner: "operator / whichever team builds the first real image-region ingestion pipeline"
+    blocks: "nothing in this schema's own validity"
+  - id: "OQ-SPROV-3"
+    question: >
+      Should `end_seconds` become REQUIRED (forcing every audio/video
+      locator to carry a span, not just a point), given real transcripts are
+      typically sentence-aligned with both a start and end time?
+    owner: "operator"
+    blocks: "nothing in this schema; AC5 itself only requires a precise start second"
+
+verification:
+  method: >
+    Read against MP §13.1 full (L1075-1085), MP §13.2 full (L1087-1097), MP
+    §13's worked example (L1059-1067), MVP_VERTICAL_SLICE_PLAN.md §3 step 5
+    (L62) and step 19 (L85), §4 (L101-123, row at L107), §5 full
+    (L127-136, Acceptance Criterion 5 at L135). Grepped
+    `specs/evidence/evidence.schema.yaml` and `specs/evidence/claim.schema.yaml`
+    full text for "timestamp"/"page"/"region"/"sentence"/"bounding"/"locator":
+    zero hits in either (confirmed this is a genuine gap, not a duplicate of
+    existing content) — the one incidental hit ("3 regions", a geographic
+    coverage example value on `claim.schema.yaml`'s unrelated `coverage`
+    field) was inspected and confirmed unrelated. Grepped Atlas Appendix A
+    (L4574-4590) for "sentence-provenance": zero hits. Grepped
+    `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md` full text for
+    "sentence-provenance": zero hits. Grepped `docs/adr/ADR-001~016` full
+    text for "Sentence-level Provenance"/"RegionAnnotation": zero hits.
+  note: >
+    `sentence_text`/`claim`/`evidence`/`source_id` and the three-way
+    `locator` split are directly traceable to MP §13.1/§13.2's cited lines;
+    `audio_timestamp_locator.start_seconds`'s numeric-seconds requirement is
+    directly traceable to MVP Acceptance Criterion 5's own more specific
+    wording. `id`'s pattern, `region_description`, `quote_offset`,
+    `end_seconds`, `media_type`, and `bounding_box`'s entire internal shape
+    are honestly flagged NEW_DESIGN or structurally-necessary rather than
+    presented as mother-document content. No mother document or ADR was
+    modified to produce this file.
