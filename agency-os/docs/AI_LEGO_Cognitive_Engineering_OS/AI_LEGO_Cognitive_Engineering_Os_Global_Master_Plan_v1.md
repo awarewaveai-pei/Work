@@ -5927,13 +5927,16 @@ Expiry / Revisit Date
 
 ```text
 Functional PASS
+Evidence PASS
+Reasoning PASS
 Security PASS
 Privacy PASS
+Data PASS
 Jurisdiction PASS
 Localization PASS
 Accessibility PASS
-Data PASS
 Observability PASS
+Capacity PASS
 Rollback PASS
 Documentation PASS
 Golden Test PASS
@@ -5943,6 +5946,11 @@ Golden Test PASS
 
 ```text
 Human Specialist Review PASS
+Counterevidence PASS
+Red Team PASS
+Independent Judge PASS
+Reversal Criteria PASS
+Recovery / Rollback Rehearsal PASS
 ```
 
 ---
