@@ -1085,6 +1085,22 @@ Versioned Event Schema
 
 Event ID 不得重用。
 
+## 27.1 Encrypted Field Envelope
+
+依 §101 分級為 Confidential/Restricted 的欄位，寫入 Event Ledger 前必須以下列 envelope 格式加密（機器可讀正本：`specs/security/personal-data-envelope.schema.yaml`）：
+
+```text
+cipher_alg          — 固定 "AES-256-GCM"
+kek_ref             — 該欄位所屬 tenant 的 KEK 識別碼
+dek_key_id          — 該欄位所屬 data subject 的 DEK 識別碼
+dek_wrapped         — 以 KEK 包裹（wrap）後的 DEK 密文
+iv                  — AES-256-GCM 加密使用的 initialization vector
+ciphertext          — 原始欄位值以 DEK 加密後的密文
+classification_tag  — Public / Internal / Confidential / Restricted（此 envelope 僅用於 Confidential/Restricted 兩值）
+```
+
+Envelope 實例本身不可變——刪除個資 = 銷毀 `dek_key_id` 對應的 DEK（見 §148.1 Per-Subject DEK Lifecycle），不編輯或刪除 envelope 本身。DEK 銷毀後 decrypt 失敗，projection 填入 `REDACTED` sentinel，不中斷 Replay。
+
 ---
 
 # 28. Database Change Contract
