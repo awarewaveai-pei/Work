@@ -3141,6 +3141,8 @@ Outcome Feedback
 
 # 80. 程式碼目錄
 
+程式碼層現行正本見 `docs/architecture/REPOSITORY_ARCHITECTURE.md`；本清單為 v1 歷史快照。
+
 ```text
 /apps
     /web
