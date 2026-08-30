@@ -11,13 +11,27 @@ their own front-matter.** Verify with:
 `grep -c "^status: APPLIED$" .ai/proposals/*/PROPOSAL.md | grep -v ':0' | wc -l`
 — should print `39`.
 
-**The only real remaining work is §7 below: drafting 4 ADRs (OQ-1, OQ-4,
-OQ-13, OQ-14).** Everything in §1-§6 is left in place only so you can see
-the exact process/quality-bar Claude used (including 4 real defects Claude
-caught mid-apply: 2 bare cross-document section references, 1 self-inflicted
-line duplication, 1 fabricated detail not grounded in any real source) —
-read it for calibration on how careful to be when you draft the ADRs, not as
-a task list.
+**§7's 4 ADRs are also DONE now** — you (Codex) drafted ADR-017/018/019/020
+correctly (all citations verified real by Claude, all correctly left as
+`PROPOSED`, none self-accepted), the operator approved all 4 in chat
+("核准並 codex-review") 2026-08-30, Claude flipped them to `ACCEPTED` and a
+genuine external `/codex-review` (not a self-review) returned zero findings.
+Verify with: `grep -c "^Status: ACCEPTED" docs/adr/ADR-01{7,8,9}*.md
+docs/adr/ADR-020*.md` — should be 4/4.
+
+**The only real remaining work is §9 below (new section, added after ADR
+approval): implement what ADR-017 and ADR-019 actually decided.** ADR-018
+needs no further action (it's a governance-model decision about who writes
+where, not mother-document content). ADR-020 needs no immediate action
+either — it directs that future *changed or new* sections get a
+NORMATIVE/EXAMPLE/VISION marker; it does not require retrofitting existing
+untouched sections. §1-§7 are left in place only so you can see the exact
+process/quality-bar Claude used on the earlier rounds (including 4 real
+defects Claude caught mid-apply: 2 bare cross-document section references,
+1 self-inflicted line duplication, 1 fabricated detail not grounded in any
+real source, plus 4 more defects a genuine external `/codex-review` caught
+in Claude's own earlier work — see WORKLOG 2026-08-30 續24 for that list)
+— read it for calibration, not as a task list.
 
 ## 0. What this repo is, in one paragraph
 
@@ -282,3 +296,131 @@ what's written — stop, write down exactly what's ambiguous and why, and
 let the operator or Claude decide in the next session. That's the same
 stop condition every other agent in this repo already follows (see
 `AGENTS.md` R0 "遇到以下情況立即停止並回報").
+
+## 9. NEW (2026-08-30, post-approval) — Implement what ADR-017 and ADR-019 decided
+
+The operator's instruction for this section, verbatim, was: "what do I tell
+Codex so this comes out perfect — better than what Claude did?" The honest
+answer isn't a magic phrase. It's: do everything Claude did in §0-§7 (real
+citation checks, real test runs, one-commit-per-unit, honest stop-and-ask),
+and go further in the three specific places listed in §9.4 below where
+Claude's own process this session was demonstrably incomplete — a real
+external `/codex-review` caught 4 things Claude missed in its own work
+(WORKLOG 2026-08-30 續24: contradictory pre/post-answer text left in the
+same file after an edit). That is the concrete, provable bar to beat.
+
+### 9.1 ADR-017 (OQ-1) — Master Plan / Atlas identity headers
+
+ADR-017 (`docs/adr/ADR-017-mother-document-identity-headers.md`, ACCEPTED)
+deliberately did NOT specify exact header wording or placement — it says
+that must happen as separate `missing_contract` proposals under ADR-006.
+That's your job now:
+
+1. Read the CURRENT top of both mother documents (line numbers may have
+   shifted since ADR-017 was drafted — proposals 001-039 touched hundreds
+   of lines in both files. Do not trust any line number cited in ADR-017
+   itself; re-locate by content).
+2. Design a minimal identity header block for each: a stable Document ID
+   (e.g. `ai-lego.master-plan`, matching the existing `id:` convention
+   already used in Execution Contract §4's document registry — read that
+   registry first, at EC §4, to reuse its exact ID scheme rather than
+   inventing a new one) and SemVer `1.0.0` (per ADR-017's Recommendation:
+   "the execution-time content hash remains an Execution Manifest value...
+   it must not be hard-coded into a mutable document header" — do NOT put
+   a hash in the header itself).
+3. Write TWO separate `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` files (one
+   per mother document — do not merge them into one proposal, ADR-017's own
+   Migration section says "two independent ADR-006 proposals"). Use
+   `040`/`041` as the next available proposal IDs (verify with
+   `ls .ai/proposals/ | sort | tail -3` first — do not assume 040 is free
+   if another session added proposals in the meantime).
+   Follow the EXACT template every other proposal in `.ai/proposals/` uses
+   (read `.ai/proposals/001-architecture-constitution-mp-pointer/PROPOSAL.md`
+   as your template — front-matter fields, section headings, Diff
+   Original/Proposed/Reason structure, all of it).
+   `change_class: "missing_contract"` (ADR-017's own Context section calls
+   this a missing-contract gap, and ADR-006 requires this field to be one of
+   the 7 allowed values).
+4. Do NOT set `status: APPROVED` yourself and do NOT apply the diff to the
+   mother documents yet. Leave both at `status: DRAFT`. The operator has not
+   given a blanket "approve" for these two specific proposals the way she
+   did for the original 39 — that approval was scoped to a specific,
+   already-drafted batch. Wait for an explicit go-ahead on these two before
+   advancing status or applying content, exactly as ADR-006's own approval
+   mechanism requires (see §7's ADR-018 boundary: Codex writing without an
+   explicit, bounded, per-task exception is the thing that ADR-018 says NOT
+   to do by default).
+
+### 9.2 ADR-019 (OQ-13) — `reason_code` schema field
+
+ADR-019 (`docs/adr/ADR-019-status-code-taxonomy-and-reason-codes.md`,
+ACCEPTED) decided a schema change, NOT a mother-document proposal — no
+ADR-006 gate applies here, this is ordinary Phase-3 machine-spec
+compilation work (same category as the 9 Phase-5 schema files Claude built
+earlier today).
+
+1. Read `specs/execution/result.schema.yaml` (708 lines) AND
+   `specs/execution/execution-state-machine.schema.yaml` (641 lines) AND
+   `specs/execution/status-codes.schema.yaml` (455 lines) in full before
+   deciding anything — Claude has NOT pre-decided which file the
+   `reason_code` field belongs on; ADR-019 only says "at the
+   execution-result / transition-record boundary." Figure out from the
+   actual schemas which one models a "transition record" or "execution
+   result" and justify your placement choice in writing, the same way every
+   other schema file in this suite documents a `compilation_decisions`
+   block.
+2. Add `reason_code` as specified in ADR-019 §Recommendation: optional
+   field, validated against `status-codes.schema.yaml`'s registry, required
+   only for newly-emitted `BLOCKED`/`NEEDS_HUMAN_REVIEW` records per the
+   Migration section — do not make it required for ALL records (ADR-019 is
+   explicit that this is additive/incremental, not a breaking change).
+3. Add fixtures for every one of the 9 registered signal codes in
+   `status-codes.schema.yaml` — ADR-019's Recommendation explicitly requires
+   "fixtures for every currently registered signal," not a sample.
+4. Run `python tests/run_golden_tests.py` — must stay at 839/839 or higher
+   (adding fixtures may raise the count; it must never drop).
+
+### 9.3 Commit discipline (same as §3, restated because it matters most here)
+
+One commit for the schema change (9.2), separate commits for each of the
+two proposal drafts (9.1) if you reach the point of applying them (you
+won't, per 9.1 step 4 — drafting alone doesn't need a commit at all if you
+want, but if you do commit the DRAFT proposals, that's fine as one commit
+covering both new files, since neither is being applied to a mother
+document yet).
+
+### 9.4 The three specific gaps to close that Claude did NOT close well enough
+
+These are not hypothetical — they are the exact shape of the 4 findings a
+real external review caught in Claude's own work today (WORKLOG 續24):
+
+1. **After every edit, re-read the WHOLE file's top-level description /
+   summary / overview block**, not just the section you changed. Claude's
+   own bug: edited `role_to_authority_mapping`'s content but left the same
+   file's `description:` field at the top saying "this is deliberately left
+   empty" — two truths in one file. Before you consider any task in §9.1 or
+   §9.2 done, grep the ENTIRE file you touched for words like "empty",
+   "skeleton", "not yet", "未填", "尚未", "blocked", "TBD" and check every
+   hit is still accurate after your edit — not just the hit nearest your
+   change.
+2. **Grep every other file in the repo for the OLD value/state you just
+   changed**, not just the file you edited. Claude changed one file's
+   status but missed that TWO other files (`ADR_INDEX.md`,
+   `AI_LEGO_OS_Program_Plan_v1.md`) had their own independent copy of the
+   stale claim. Before declaring 9.1 or 9.2 done, `grep -rn` the exact
+   phrase/status/count you changed across the whole
+   `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/` tree.
+3. **Don't trust a tool's "success" verdict without checking it actually
+   read the content.** Claude's own codex-review attempt today returned
+   "approve" once from a sandboxed process that admitted in its own log it
+   never actually opened the diff file (path was outside the accessible
+   directory). Claude caught this only by reading the raw tool log line by
+   line instead of trusting the one-line verdict. If you invoke any
+   external tool or subprocess as part of this task, read its full raw
+   output for evidence it actually inspected real content — not just its
+   summary verdict.
+
+If you genuinely find zero issues after doing all of the above, say so
+directly with the specific checks you ran — don't manufacture a finding to
+look thorough. That itself is the standard this repo holds Claude to
+(`AGENTS.md`: "如果無法支撐真實 finding，直接回報 no findings").
