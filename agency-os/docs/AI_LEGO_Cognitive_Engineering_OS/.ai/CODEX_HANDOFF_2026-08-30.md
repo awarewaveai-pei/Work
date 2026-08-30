@@ -1,10 +1,23 @@
-# Codex Handoff — Apply remaining AI-LEGO proposals + draft 4 ADRs
+# Codex Handoff — draft 4 ADRs (proposal-apply work is now DONE, do not redo)
 
-Written by Claude 2026-08-30, for Codex (paid $20 plan) to pick up remaining
-work the operator approved but Claude did not have budget to finish in one
-sitting. Read this whole file before touching anything — it contains 3 real
-bugs Claude made and caught while doing the first 8 of 39 proposals; you will
-make the same classes of mistake if you skip straight to editing.
+Written by Claude 2026-08-30. **Update, same day**: after this file was
+first written, the operator asked Claude to keep going instead of handing
+off the proposal-apply work — Claude finished applying all remaining 009-039
+proposals directly (commits `a911d1d6`..`eda01829`5, see `git log --oneline
+a911d1d6..eda018295` for the full list). **§1-§6 below (the proposal-apply
+sections) are now historical — do not re-run them, do not re-apply anything,
+all 39 proposals show `status: APPLIED` with real `applied_commit` hashes in
+their own front-matter.** Verify with:
+`grep -c "^status: APPLIED$" .ai/proposals/*/PROPOSAL.md | grep -v ':0' | wc -l`
+— should print `39`.
+
+**The only real remaining work is §7 below: drafting 4 ADRs (OQ-1, OQ-4,
+OQ-13, OQ-14).** Everything in §1-§6 is left in place only so you can see
+the exact process/quality-bar Claude used (including 4 real defects Claude
+caught mid-apply: 2 bare cross-document section references, 1 self-inflicted
+line duplication, 1 fabricated detail not grounded in any real source) —
+read it for calibration on how careful to be when you draft the ADRs, not as
+a task list.
 
 ## 0. What this repo is, in one paragraph
 
