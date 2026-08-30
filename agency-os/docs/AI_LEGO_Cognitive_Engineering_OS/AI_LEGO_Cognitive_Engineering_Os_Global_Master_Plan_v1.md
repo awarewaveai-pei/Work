@@ -59,28 +59,7 @@
 
 ## 0.0.2 Scoped Authority / 衝突處理
 
-不得用單一「哪份文件永遠優先」粗暴處理所有衝突，採 **Scoped Authority**：
-
-```text
-Applicable Law / Regulatory Hard Constraint
-        ↓
-Architecture Constitution / Security / Privacy Hard Policy
-        ↓
-Approved Machine-readable Contract / Schema
-        ↓
-Accepted ADR
-        ↓
-┌───────────────────────────────┬──────────────────────────────────┐
-│ Architecture / Platform Scope │ Cognitive Method / Tool Scope    │
-│ → Master Plan authoritative   │ → Method Atlas authoritative     │
-└───────────────────────────────┴──────────────────────────────────┘
-        ↓
-Recipe / Runbook / Example
-```
-
-若跨 Scope 仍無法消解：
-
-`CONFLICT_REQUIRES_HUMAN_REVIEW`
+Scoped Authority 裁決鏈的唯一正本見 `Architecture-Constitution-v1.md` §1，禁止在本文件重複定義。
 
 ## 0.0.3 Execution Manifest 必須記錄 Atlas 版本
 
@@ -3782,7 +3761,7 @@ Artifact
 
 正式進入開發前，不應立刻寫大量功能，而是先建立以下不可隨意破壞的核心規格：
 
-1. `Architecture-Constitution-v1.md`
+1. `Architecture-Constitution-v1.md`（已建立，見同層目錄，內容為 Scoped Authority 裁決鏈與文件職責表的單一正本）
 2. `Domain-Model-v1.md`
 3. `Capability-Contract-v1.md`
 4. `Artifact-Provenance-Spec-v1.md`
