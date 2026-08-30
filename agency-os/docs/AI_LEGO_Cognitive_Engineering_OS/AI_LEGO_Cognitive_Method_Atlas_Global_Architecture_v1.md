@@ -47,7 +47,7 @@ Human-facing display:
 心智圖（Mind Map）
 
 Machine-facing identifier:
-method.association.mind_map
+association.mind_map
 
 Human-facing display:
 決策反轉條件（Reversal Criteria）
