@@ -1,6 +1,33 @@
 # Worklog
 
-## 2026-08-30（續29）
+## 2026-08-30（續30）
+
+### Phase 3 Machine-readable Foundation 正式收尾：document-registry.schema.yaml 建成 + 10 個 typed-objects 誠實 DEFERRED
+
+**觸發**：操作者「繼續做」——Phase 3 剩的最後 2 項。
+
+**document-registry.schema.yaml**：EC §4 靜態登記表逐字轉譯（4 文件 id/filename/major/required(_for) + 9 值任務類型清單）。過程發現 `execution/manifest.schema.yaml` 已獨立硬編同一組 4 值 `document_id` enum——判斷不擅自重構這份已 ACTIVE、已被 critic 覆審過的既有檔案，記錄為 `OQ-DOCREG-1` 誠實揭露潛在漂移風險，不默默合併也不默默複製。順手發現 `Architecture-Constitution-v1.md` 自己的 header 過期（仍寫「DRAFT 待核准」+ 引用一個不存在的 proposal 名稱），已修正。用 `jsonschema.Draft202012Validator` 做兩組對抗測試（缺必要文件、`required`/`required_for` 同時出現）皆正確擋下。
+
+**10 個 typed-objects schema**：套用「先查是否真的需要」再動手——grep 全文 `MVP_VERTICAL_SLICE_PLAN.md`（Research Mode 已選定切片 Mode）確認這 10 個物件名稱零命中，全部屬於 Business/Decision Mode 產出。誠實結論：現在一個都不建，DEFERRED 不是遺漏，避免無需求的投機規格。
+
+**Phase 3 正式改列 COMPLETE**（`AI_LEGO_OS_Program_Plan_v1.md`）。851/851 golden test 全過。
+
+[已修改]
+- `specs/governance/document-registry.schema.yaml`（新建）
+- `Architecture-Constitution-v1.md`（header 過期修正）
+- `MACHINE_READABLE_SPEC_PLAN.md`（2 列狀態更新）
+- `AI_LEGO_OS_Program_Plan_v1.md`（Phase 3 → COMPLETE）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | ms=N/A（851/851）；另跑 `jsonschema.Draft202012Validator` 對抗測試 2 組違規案例皆正確擋下
+- REVIEW_DONE: critic=Deep（Claude 本人建置前查證 manifest.schema.yaml 既有 enum、MVP 切片計畫實際需求）| verdict=pass | findings=1（Architecture-Constitution-v1.md header 過期，已修正）
+- BUGHUNT_DONE: scope=agency-os | grep=10 個 typed-objects 名稱跨 `MVP_VERTICAL_SLICE_PLAN.md` 全文搜尋 | hits=0（確認零依賴，DEFERRED 判斷有據）
+
+[剩餘風險]
+- `OQ-DOCREG-1`：`document-registry.schema.yaml` 與 `manifest.schema.yaml` 兩份文件 id enum 未合併，未來新增第 5 份母文件時需同步兩處，非立即風險
+- Phase 3 COMPLETE 後，Phase 5 垂直切片開工仍需操作者 STOP-FOR-HUMAN-REVIEW 批准（Program Plan §10 既有規定）
+
+
 
 ### P1-GAP-LEGAL-1 解決：Legal Freshness SLA 4 級表核准並落地，含一次真實 VBC 疏漏更正
 
