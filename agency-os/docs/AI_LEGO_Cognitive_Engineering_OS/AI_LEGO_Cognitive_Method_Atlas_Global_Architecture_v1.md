@@ -590,16 +590,18 @@ quadrantChart
 
 ### Epistemic Type 必須分離
 
+canonical enum 定義見 `specs/governance/epistemic-label.schema.yaml#/definitions/epistemic_type`（ADR-004 Sub-decision b）。以下為顯示用途，schema 為唯一正本：
+
 ```text
-SOURCE FACT
+SOURCE_FACT
 EVIDENCE
 ASSUMPTION
 HYPOTHESIS
-AI INFERENCE
-AI SUGGESTION
-HUMAN OPINION
-CALCULATED RESULT
-SIMULATED RESULT
+AI_INFERENCE
+AI_SUGGESTION
+HUMAN_OPINION
+CALCULATED_RESULT
+SIMULATED_RESULT
 UNKNOWN
 DECISION
 ```
