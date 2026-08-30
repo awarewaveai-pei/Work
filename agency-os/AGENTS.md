@@ -183,13 +183,13 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 
 ## AwareWave Stack 伺服器邊界（**不可混用**）
 
-**單機現況（2026-08-28 起）**：SG + EU 已全數整併至 `ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）。舊 `5.223.93.113`（SG）/ `204.168.175.41`（EU）**容器已全部停止**（2026-08-29 實測：兩機本機直連目標 vhost 皆回 502），只當回滾備援保留，**部署/維運一律對 ks-aw-01 操作**。容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本，頂部有橫幅）。  
+**單機現況（2026-08-30 起）**：SG + EU 已全數整併至 `ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）。舊 `5.223.93.113`（SG）/ `204.168.175.41`（EU）**主機已於 Hetzner Cloud console 刪除退租**（操作者執行，不可逆，無回滾路徑）——**部署/維運一律對 ks-aw-01 操作**。容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本，頂部有橫幅）。  
 **搬機 / 上 dedicated / EU→大機·SG→EU 遷移唯一正本**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（備份/RAID/還原/遷移；動機器前必讀 §7 checklist）。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
 Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1`（各機由 `mcp/user-env.template.ps1` 生成，不進 git）/ env）；key names 在 `mcp/user-env.template.ps1`；**禁止硬編**。
 
 **部署規則（強制）**：
-- ⚠️ **2026-08-28 起「SG」= `ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）,不是 `5.223.93.113`**——舊 SG/EU 主機容器已於整併日全部停止（2026-08-29 實測本機直連皆 502），保留僅為回滾備援，**任何部署操作 SSH 過去都是白做工不會報錯，務必先確認連的是 `149.202.64.114`**。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md) 頂部橫幅。
+- ⚠️ **「SG」= `ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）,不是 `5.223.93.113`**——舊 SG/EU 主機已於 2026-08-30 刪除退租，**SSH 過去會直接連線失敗（機器不存在），務必先確認連的是 `149.202.64.114`**。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md) 頂部橫幅。
 - 部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull；本腳本在目標機本機執行，不含 SSH 邏輯，SSH 到哪台機純看操作者/代理自己下的指令）
 - `sg-deploy.sh` 內建：npm test gate → docker healthcheck → HTTP smoke check → 失敗自動 rollback
 - npm test 失敗時先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查原因

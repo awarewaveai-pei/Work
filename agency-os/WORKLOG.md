@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-08-30（續14）
+
+### 操作者告知：舊 SG `5.223.93.113` / EU `204.168.175.41` 兩台 Hetzner 主機已於 console 刪除退租
+
+**觸發**：操作者於對話中直接陳述「hetzner 的主機 EU和SG已刪除」。對應 `TASKS.md` 原列「⏳ 待操作者點頭：刪除兩台 Hetzner 伺服器」項（前置檢查清單：① ks 備份 cron 產出+R2 上傳 ② Uptime Kuma 全綠 ③ Telegram 告警通道活著）——操作者已自行執行，Claude 未參與、未於刪除前重新驗證前置條件。
+
+**性質**：純文件同步（doc-only），無 code 改動；四動作驗證中 REALTEST/BUGHUNT 走 WAIVED（見下），Review 為自我核對（VBC + Grep 確認舊 IP 全部引用點）。
+
+[已修改]
+- `agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md`：拓樸唯一正本頂部橫幅，「保留當回滾路徑，等操作者點頭後刪除退租」→「已於 console 刪除退租，無回滾路徑，Netdata Cloud 舊節點待手動移除」
+- `agency-os/AGENTS.md`：§AwareWave Stack 伺服器邊界段（兩處）「只當回滾備援保留」→「已刪除退租，無回滾路徑」
+- `CLAUDE.md`：§伺服器邊界鏡像段同步
+- `agency-os/TASKS.md`：原「⏳ 待點頭刪除」項改標 `✅ 完成 2026-08-30`；Netdata Cloud claim 項下追加「舊節點移除」待辦（機器已刪，dashboard 會顯示永久 offline）
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文件同步反映操作者告知的既成事實，無可執行的程式碼路徑
+- REVIEW_DONE: critic=Quick（自查）| verdict=pass | findings=0c/0m/0n —— 逐一讀回四份修改後文件確認措辭一致、無殘留「保留當回滾備援」字樣
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`5\.223\.93\.113\|204\.168\.175\.41.*回滾備援\|保留當回滾` | hits=0（治理文件層級已清；`scripts/check-capacity-health.ps1`、`DEPLOY_ROLLBACK_RUNBOOK.md`、`sg-deploy.sh` 等仍含舊 IP 字面值，但屬「三台→單機」腳本重構範圍，非本次治理文件同步範圍，已列入 TASKS.md §整併後續清單①②，待操作者決定是否現在處理）
+
+[剩餘風險]
+- 舊機刪除前的前置檢查（備份/監控/告警）Claude 未驗證，若備份鏈實際有缺口，現在已無法回頭查證舊機狀態，只能靠 ks-aw-01 自身資料鏈與既有 `check-backup-health.ps1` 結果佐證
+- `scripts/check-capacity-health.ps1` 等仍讀三台，舊機消失後這些檢查會對不存在的機器永久 WARN/FAIL，需盡快改單機（TASKS.md §155 ①）
+- Netdata Cloud 舊節點會顯示永久 offline，非自動處理，需操作者手動到 UI 移除
+- `DEPLOY_ROLLBACK_RUNBOOK.md`、`sg-deploy.sh` 等仍指舊 SG IP 的部署文件/腳本尚未同步改指 ks-aw-01（TASKS.md §155 ②）
+
+[rollback] 純文件用字修改，`git revert` 即可；不影響任何執行邏輯
+
 ## 2026-08-30（續13）
 
 ### `/codex-review` 真實跑續12（commit 0a37e4c5a），抓到 2 個真實 finding（1 HIGH + 1 MEDIUM），全數驗真並修正

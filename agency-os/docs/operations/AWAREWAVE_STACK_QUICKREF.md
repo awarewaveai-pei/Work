@@ -12,8 +12,7 @@
 > - aware-wave.com LE 憑證已在 ks 重簽（SG 上的那張 8/23 已過期無人察覺——CF Flexible 走 80 所以沒炸）
 > - 排程全數移植：endpoint-alert timer、eu-backup cron（`/etc/cron.d/ks-stack-backup`）、
 >   mainwp wp-cron、supabase weekly restart、auto-deploy、watchdog、certbot renew
-> - **舊機 SG `5.223.93.113` / EU `204.168.175.41`：容器已停、排程已靜音（crontab 備份在
->   `/root/crontab.bak`），保留當回滾路徑，等操作者點頭後刪除退租**
+> - **🔴 2026-08-30：舊機 SG `5.223.93.113` / EU `204.168.175.41` 已於 Hetzner Cloud console 刪除退租（操作者執行）——無回滾路徑，crontab 備份 `/root/crontab.bak` 已隨機器消失，Netdata Cloud 舊節點待手動移除**
 > - 下方 SG/EU 兩節保留當容器/端口明細參考（內容在 ks 上依然成立），機器歸屬已失效
 
 > 所有伺服器、容器、路徑、端口的事實參考。
