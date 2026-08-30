@@ -1,6 +1,26 @@
 # Worklog
 
-## 2026-08-30（續27）
+## 2026-08-30（續28）
+
+### 操作者核准 proposal 040/041，套進 Master Plan / Atlas 母文件（ADR-017/OQ-1 完整收尾）
+
+**觸發**：操作者「核准」。套用前重新 Read 現況確認 Original 區塊仍逐字相符（MP 曾顯示磁碟已變動警告，實際 diff 只有本次要改的那 3 行，非其他 session 的內容衝突）。
+
+**執行**：MP 標題區加 `Document ID: ai-lego.master-plan` + `Version: 1.0.0`（commit `51743215`）；Atlas `**版本**：1.0` 換成 `Document ID: ai-lego.method-atlas` + `Version: 1.0.0`（commit `f3466264`，保留既有 trailing 雙空白換行慣例）。兩次套用後都跑 golden test 確認 851/851，且用 `git diff --stat` 確認改動範圍精確（無意外多改）。proposal 040/041 front-matter 補 `approved_by/approved_at/approval_note` + `applied_commit` 真實 hash，`status: DRAFT -> APPLIED`。
+
+[已修改]
+- Master Plan / Atlas 標題區（各 +2/+1 行）
+- proposal 040/041 front-matter（APPLIED + 核准證據）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（兩次套用各跑一次）| exit=0 | ms=N/A（851/851）
+- REVIEW_DONE: critic=Deep（Claude 本人套用前後逐次核對 diff scope）| verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os | grep=套用後 `git diff --stat` 確認每次改動行數與預期精確相符 | hits=0（無意外改動）
+
+[剩餘風險]
+- 無——ADR-017/OQ-1 從決策到母文件落地全部完成，OQ-1 已在 open-questions.yaml 標記 RESOLVED_BY_HUMAN
+
+
 
 ### Codex 額度用完中斷，Claude 驗真其半成品後落地：ADR-019 reason_code 完整實作 + ADR-017 兩份 proposal 草稿
 
