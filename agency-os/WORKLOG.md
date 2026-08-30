@@ -1,6 +1,27 @@
 # Worklog
 
-## 2026-08-30（續25）
+## 2026-08-30（續26）
+
+### 操作者核准 ADR-017~020（OQ-1/4/13/14），跑 codex-review 驗證核准一致性
+
+**觸發**：操作者「核准並 codex-review」——4 份 Codex 草擬、Claude 已驗真的 ADR 正式核准。
+
+**執行**：4 份 ADR 的 `Status:` 從 `PROPOSED — awaiting operator go-ahead` 改 `ACCEPTED（2026-08-30，操作者於對話中明示核准：「核准並 codex-review」）`；`ADR_INDEX.md` 頂部狀態句改為「全部 20 份 ADR 皆 ACCEPTED」+ 4 列 Status 同步；`open-questions.yaml` 的 OQ-1/4/13/14 比照 OQ-6~12 既有格式改 `RESOLVED_BY_HUMAN` + `proposed_adr` 指標。839/839 golden test 全過，commit `ccf1515a6` 已 push。
+
+**codex-review 兩次嘗試**：第一次用 `write-oracle-artifact.ps1` 標準流程擷取 diff 到 session scratchpad（`D--Work` temp 目錄外部路徑），Codex 回報「approve」但 log 明講「direct inspection of the scratchpad diff itself was blocked by local command policy」——即 sandbox 讀不到 repo 外的檔案，這個「approve」是沒讀到內容的空轉，不是真審查。**沒有直接採信**，改把 diff 複製進 repo 內部（`D:\Work\.tmp-oracle-capture-adr-approve.diff`，審完即刪，未進 git）重跑，第二次 Codex 才真的讀到內容，verdict `approve`，逐項確認：① ADR 檔案/ADR_INDEX.md/open-questions.yaml 三處狀態互相一致 ② ADR_INDEX.md 頂部敘述的 Codex 起草/Claude 驗真/操作者核准鏈沒有誇大 ③ ACCEPTED 沒有暗示母文件已被編輯（ADR-006 的 `.ai/proposals/` 閘仍然生效，本次 commit 未建任何 proposal）。無 finding。
+
+[已修改]
+- ADR-017/018/019/020.md（Status 欄位）、`ADR_INDEX.md`、`open-questions.yaml`（詳見 commit `ccf1515a6`）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | ms=N/A（839/839）
+- REVIEW_DONE: critic=Deep | verdict=approve | findings=0 — external oracle = `/codex:adversarial-review`，artifact `agency-os/reports/oracle/2026-08-30-review-ef635da3.md`（第一次因 sandbox 讀檔失敗的空轉結果未採信，已在 artifact 內註記，第二次重跑才是實際採信的結果）
+- BUGHUNT_DONE: scope=agency-os | grep=ADR-017/018/019/020 在 ADR_INDEX.md 與 open-questions.yaml 的三方狀態互相核對 | hits=0（三處一致，無矛盾）
+
+[剩餘風險]
+- 無——這批只是狀態欄位定案，未涉及母文件文字本身；後續若要把這 4 份 ADR 的決策落地到 MP/EC/Atlas，需另外走 `.ai/proposals/` 流程
+
+
 
 ### Codex 完成 4 個 ADR 草案（OQ-1/4/13/14），Claude 逐條驗真後 push
 
