@@ -1,5 +1,45 @@
 # Worklog
 
+## 2026-08-30（續11）
+
+### `/codex-review` 真實跑 ADR-014/015/016 批次（commit 06183d100），抓到 3 個真實 finding（2 HIGH + 1 MEDIUM），全數驗真並修正
+
+**觸發**：續10 commit `06183d100` 完成後，依操作者明示要求跑 `/codex-review`。用 `write-oracle-artifact.ps1 -Mode capture -DiffRef "7b532056b..HEAD"` 擷取（`-DiffRef` 模式跳過未追蹤檔案內聯，避開另一並行 session 233 個未追蹤檔案的雜訊——純用預設 `git diff` 會把那些不相干檔案也塞進 review 輸入，違反 Session 衛生原則）。`codex-companion.mjs adversarial-review --base 7b532056b` 背景執行完成，`verdict: needs-attention`。
+
+**逐條驗真（非照單全收）**：
+
+1. **[high] SPIFFE 延後觸發條件形同虛設**（`zero-trust.policy.yaml:132-136`）——直讀原始 schema 確認 `spiffe_reconsideration_triggers.items: {type: string}`，純自由文字陣列，任何佔位字串（如「以後再說」）都會通過驗證，跟 compilation_decisions 自己聲稱的「具體、可檢查」完全不符；且觸發門檻「N」從未在 repo 中定義成真實欄位。**屬實。**
+2. **[high] EPSS 重掃要求只是文字，非可執行排程**（`supply-chain-security.policy.yaml:176-181`）——直讀確認 `rescan_requirement` 原本只有 `cadence`/`reason` 兩個 `const` 文字欄位，無任何 interval/cron/owner，真實實作可以「文字上符合政策」卻從未真的排程重掃。**屬實。**
+3. **[medium] CI 簽章身分被錯誤綁定到不相干的 IdP 決策**（`RISK_REGISTER.yaml:30-38`）——直讀確認自己在續10寫的 resolution 文字確實宣稱 keyless 簽章信任根「與 ADR-016 IdP 選型形成依賴」，但 ADR-015 選定的即時機制是 GitHub Artifact Attestations（GitHub Actions 自己的 OIDC token issuer 簽給 Fulcio），跟本專案要選的 `idp_provider`（WorkOS/Zitadel/Keycloak）是完全不同的信任域——**確實是我自己這批 commit 混淆了兩個信任域，屬實**。
+
+**修正（不發明數值，只補結構性強制）**：
+- `zero-trust.policy.yaml`：`spiffe_reconsideration_triggers.items` 改封閉 2 值 enum；新增 `service_count_reconsideration_threshold`（nullable integer）+ `allOf`/`if`/`contains`/`then` 規則，觸發條件含 `service_count_exceeds_threshold` 時強制給真實整數（門檻數值本身仍不發明，新增 `OQ-ZEROTRUST-2` 誠實揭露）
+- `supply-chain-security.policy.yaml`：`rescan_requirement` 新增必填 `interval_days`（integer ≥1）+ `owner`（非空字串），實際數值不發明（新增 `OQ-SUPPLYCHAIN-2`）
+- `RISK_REGISTER.yaml` P1-RISK-SEC-4 + `SECURITY_THREAT_MODEL.md` T1 列：訂正信任域混淆，改為「乾淨解決，非部分解決」
+- `ADR-015`/`ADR-016` Consequences 各補一段記錄此次發現與修正
+
+[已修改]
+- `policies/security/zero-trust.policy.yaml`：SPIFFE 觸發器 enum 化 + 新欄位 + allOf 規則 + compilation_decisions + open_questions
+- `policies/security/supply-chain-security.policy.yaml`：rescan_requirement 新增必填欄位 + compilation_decisions + open_questions
+- `.ai/research/phase-1/RISK_REGISTER.yaml`：P1-RISK-SEC-4 resolution 訂正信任域混淆
+- `docs/architecture/SECURITY_THREAT_MODEL.md`：T1 列 Residual Risk 訂正同一混淆
+- `docs/adr/ADR-015-supply-chain-security-tooling-selection.md`、`ADR-016-zero-trust-workload-identity-and-pdp-selection.md`：Consequences 各補一段
+- `tests/contracts/policies/security/zero-trust.fixtures.yaml`、`supply-chain-security.fixtures.yaml`：改用新 schema 形狀，各補 1-2 個新 invalid case 對應新規則
+- 新增 `agency-os/reports/oracle/2026-08-30-review-d8360451.md`（本次真實覆審 artifact）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`node codex-companion.mjs adversarial-review --background --base 7b532056b "<兩段標準 focus text>"` | exit=0 | 結果=真實背景執行，verdict=needs-attention，3 個 finding，非模擬
+- REALTEST_EVIDENCE: tool=Read | cmd=直讀 3 個 finding 對應的實際檔案內容逐一核對 | 結果=3 個全部屬實，非幻覺，含 1 個是我自己續10 commit 引入的真實信任域混淆錯誤
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=685 個檢查全過（682→685，新增 3 個 invalid case）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對 5 個修改的 YAML 檔逐一掃描 | exit=0 | 結果=全數 OK，無重複 key
+- REVIEW_DONE: critic=Deep（外部 oracle，`/codex-review`，審 06183d100）| verdict=needs-attention → 3 個 finding 全數驗真為真實缺陷（2 HIGH schema 執行力不足 + 1 MEDIUM 信任域混淆）| findings=0c/2m(HIGH)/1n(MEDIUM)
+- BUGHUNT_DONE: scope=agency-os | grep=`spiffe_reconsideration_triggers\|rescan_requirement\|idp_provider.*keyless\|keyless.*idp_provider` | hits=僅本次修正涉及的位置命中，無其他檔案殘留舊形狀或同一信任域混淆
+
+[剩餘風險] `service_count_reconsideration_threshold`（N 的實際數值）與 `rescan_requirement.interval_days`/`owner`（實際排程與負責人）兩者刻意留為 null/待補——都是操作性/容量規劃判斷，非本次任務可自行裁決，已誠實記錄為 `OQ-ZEROTRUST-2`/`OQ-SUPPLYCHAIN-2`。
+
+[rollback] 純 schema 緊縮（enum 化 + 新增必填欄位）+ 2 處文件訂正，`git revert` 可完整回退；回退後 SPIFFE 觸發器與 EPSS 重掃要求會重新變回不可執行的文字宣稱，RISK_REGISTER.yaml 的信任域混淆會重新出現，需注意。
+
 ## 2026-08-30（續10）
 
 ### ADR-014/015/016：拍板最後兩個懸而未決項（Phase 5 Mode 選擇、Zero Trust/Supply Chain 選型），逐項套用「供應商支出判準」區分可拍板 vs 保留給操作者

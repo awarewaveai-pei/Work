@@ -4,7 +4,9 @@ description: >
   Exercises the 2-of-3 partial ratification (ADR-016): workload_identity and
   pdp_engine are const-enforced ratified values; idp_provider is a required
   object whose ONLY required sub-field is the blocked-status marker, not a
-  real vendor decision.
+  real vendor decision. 2026-08-30 /codex-review HIGH finding fix: the
+  spiffe_reconsideration_triggers enum + service_count_reconsideration_threshold
+  cross-field rule (a free-text array previously let any placeholder validate).
 valid:
   - name: full_policy_two_of_three_ratified
     instance:
@@ -18,36 +20,38 @@ valid:
         strategy: "cloud-native workload identity + short-lived-credential mTLS"
         spiffe_deferred: true
         spiffe_deferral_rationale: "SPIFFE/SPIRE is CNCF-graduated and production-proven at scale (Uber ~4,500 services, Netflix, Pinterest, Bloomberg, Square, GitHub), but its control-plane build cost (attestation nodes, registration server, dedicated CA) is disproportionate to this project's current team size -- multiple 2026 sources note most teams cannot afford to do SPIFFE right. Cloud-native mTLS satisfies the same Mutual-Authentication + Short-lived-Credentials stages of the mother-document flow without that infrastructure."
-        spiffe_reconsideration_triggers:
-          - "service count exceeds an operationally-set threshold N"
-          - "first cross-tenant agent-to-agent delegation scenario occurs"
+        spiffe_reconsideration_triggers: [service_count_exceeds_threshold, first_cross_tenant_agent_delegation_scenario]
+        service_count_reconsideration_threshold: 50
       pdp_engine:
         engine: Cedar
         rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have."
         scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it."
-  - name: minimal_valid_idp_still_blocked
+  - name: minimal_valid_idp_still_blocked_only_first_cross_tenant_trigger
     instance:
       idp_provider:
         status: "TBD_PENDING_OPERATOR_VENDOR_DECISION"
       workload_identity:
         strategy: "cloud-native workload identity + short-lived-credential mTLS"
         spiffe_deferred: true
-        spiffe_reconsideration_triggers: ["service count exceeds an operationally-set threshold N"]
+        spiffe_reconsideration_triggers: [first_cross_tenant_agent_delegation_scenario]
       pdp_engine:
         engine: Cedar
         rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have."
         scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it."
+    # Note: service_count_reconsideration_threshold correctly omitted -- the
+    # allOf rule only requires it when service_count_exceeds_threshold is
+    # actually present in the triggers array, which it is not here.
 invalid:
   - name: idp_silently_decided_without_adr
     instance:
       idp_provider: { status: WorkOS }
-      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: ["service count exceeds an operationally-set threshold N"] }
+      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [first_cross_tenant_agent_delegation_scenario] }
       pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "idp_provider.status is const 'TBD_PENDING_OPERATOR_VENDOR_DECISION' -- ADR-016 explicitly does NOT ratify a real idp_provider value; setting it to a real vendor name here would silently manufacture the vendor decision this schema exists to keep visibly open"
   - name: wrong_pdp_engine
     instance:
       idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
-      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: ["service count exceeds an operationally-set threshold N"] }
+      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [first_cross_tenant_agent_delegation_scenario] }
       pdp_engine: { engine: "OPA/Rego", rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "engine is const Cedar -- ADR-016 Sub-decision (c) ratified Cedar over OPA/Rego for readability/auditability by non-engineering roles, not the reverse"
   - name: spiffe_deferred_with_no_reconsideration_triggers
@@ -56,3 +60,15 @@ invalid:
       workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [] }
       pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "spiffe_reconsideration_triggers has minItems 1 -- an empty array turns a temporary, checkable deferral into an open-ended one, exactly the unenforced-policy pattern §4 risk 2 warns against"
+  - name: spiffe_trigger_is_free_text_not_enum
+    instance:
+      idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
+      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: ["revisit later"] }
+      pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
+    reason: "2026-08-30 /codex-review HIGH finding fix: spiffe_reconsideration_triggers.items is now a closed 2-value enum, not free text -- a placeholder string like 'revisit later' must now fail validation instead of silently passing as a 'concrete, checkable' trigger"
+  - name: service_count_trigger_present_but_threshold_missing
+    instance:
+      idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
+      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [service_count_exceeds_threshold] }
+      pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
+    reason: "the allOf/if/contains/then rule requires service_count_reconsideration_threshold whenever service_count_exceeds_threshold appears in the triggers array -- omitting it leaves the 'N' undefined, the second half of the same 2026-08-30 finding"

@@ -57,6 +57,7 @@ Related: `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（Status 
 - **Positive**：`P1-GAP-SEC-2` 完整關閉，機讀 policy 檔案首次存在；2026-03-19 Trivy 事件與 §4 risk 6/7/8 三個執行風險都獲得具體、可稽核的處理規則，不是停留在文字警示層級。
 - **Negative**：無——本次任務仍在 Phase 0-2（Program Plan §10 禁止 production code/CI 建置），這份 policy 檔案目前無 runtime 依賴，零 blast radius。
 - **尚未解決的 follow-up（本 ADR 明確不處理）**：SLSA L3 遷移的實際執行（等 Phase 4 CI/CD 建置啟動時）；`policies/security/zero-trust.policy.yaml`（同一來源文件的 Gap 1）由姊妹 ADR-016 處理，本 ADR 不涉及。
+- **本 ADR 這批 commit 事後被真實 `/codex-review` 抓到並修正的 2 個獨立缺口**：(i) `cvss_tiering.rescan_requirement`（Sub-decision e）原本只有 2 句 `const` 文字，無任何機器可讀的間隔/owner，實際實作可以在文字上「符合政策」卻從未真的排程重掃——已修正為 `interval_days`/`owner` 必填欄位（數值本身不發明，同 `l3_migration_trigger` 的克制）；(ii) `.ai/research/phase-1/RISK_REGISTER.yaml` P1-RISK-SEC-4 的 resolution 原文誤稱 keyless 簽章信任根「與 ADR-016 IdP 選型形成依賴」——已訂正：GitHub Artifact Attestations 的 OIDC 憑證由 GitHub Actions 自己簽發，與本專案的 `idp_provider` 選型是不相干的信任域，此風險應為乾淨解決，非部分解決（`SECURITY_THREAT_MODEL.md` T1 列同步訂正）。
 
 ## Migration / Rollback
 

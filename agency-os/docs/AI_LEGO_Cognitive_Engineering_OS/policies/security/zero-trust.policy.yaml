@@ -84,6 +84,38 @@ compilation_decisions:
       triggers the source plan itself already proposed (service-count
       threshold, first cross-tenant agent-delegation scenario) makes this
       checkable rather than aspirational.
+  - question: >
+      2026-08-30 `/codex-review` HIGH finding (real, independently
+      verified): the first version of `spiffe_reconsideration_triggers`
+      was `items: {type: string}` -- a free-text array. Any placeholder
+      string (e.g. "revisit later") would validate, silently defeating the
+      "concrete, checkable" guarantee this field's own description already
+      claimed. Separately, the fixture's own trigger text referenced a
+      threshold "N" that was never defined anywhere in the repo as an
+      actual field.
+    decision: >
+      Tightened `spiffe_reconsideration_triggers.items` to a CLOSED 2-value
+      enum (`service_count_exceeds_threshold`,
+      `first_cross_tenant_agent_delegation_scenario`) matching the exact 2
+      triggers ADR-016/source plan §4 risk 2 named -- no free text. Added a
+      new sibling field `service_count_reconsideration_threshold` (nullable
+      integer, operator-set) and an `allOf`/`if`/`contains`/`then` rule
+      requiring it be a real integer whenever
+      `service_count_exceeds_threshold` is present in the triggers array.
+    reasoning: >
+      This is the same "enum + allOf/if/then cross-field enforcement"
+      pattern already established across this corpus (e.g.
+      `gate.schema.yaml`'s NOT_APPLICABLE->rationale rule,
+      `branch.schema.yaml`'s per-state required blocks) -- a free-text
+      array masquerading as an enforced guarantee is exactly the
+      unenforced-`constraints:`-block bug class this session already fixed
+      twice before (see `pii-redaction.policy.yaml`'s own
+      compilation_decisions citing the same lesson). The threshold value
+      itself is still NOT invented here (same restraint as `idp_provider`
+      and `l3_migration_trigger`) -- `null` is valid until
+      `service_count_exceeds_threshold` is actually asserted, at which
+      point the schema now forces a real number instead of leaving it
+      dangling as undefined prose.
 
 # ---------------------------------------------------------------------------
 # Schema body -- one singleton policy document (same shape convention as
@@ -132,8 +164,39 @@ properties:
       spiffe_reconsideration_triggers:
         type: array
         minItems: 1
-        items: { type: string }
-        description: "Concrete, checkable conditions -- not an open-ended 'revisit later' (see compilation_decisions)."
+        uniqueItems: true
+        items:
+          type: string
+          enum: [service_count_exceeds_threshold, first_cross_tenant_agent_delegation_scenario]
+        description: >
+          CLOSED enum, not free text (2026-08-30 /codex-review HIGH finding: a
+          free-text array lets any placeholder string validate, silently
+          defeating the 'concrete, checkable' guarantee this field exists to
+          make -- see compilation_decisions). The 2 values are the only
+          reconsideration triggers ADR-016/source plan §4 risk 2 actually
+          named; a 3rd trigger requires a real ADR update to this enum, not a
+          free-text addition.
+      service_count_reconsideration_threshold:
+        type: [integer, "null"]
+        minimum: 1
+        description: >
+          The 'N' in service_count_exceeds_threshold -- operator-set, `null`
+          until set (same TBD-placeholder discipline as `idp_provider.status`
+          below). REQUIRED to be a real integer once
+          `service_count_exceeds_threshold` appears in
+          spiffe_reconsideration_triggers (see `allOf` below) -- prevents the
+          threshold from staying an undefined "N" referenced only in prose,
+          the other half of the same 2026-08-30 finding.
+    allOf:
+      - if:
+          properties:
+            spiffe_reconsideration_triggers:
+              contains: { const: service_count_exceeds_threshold }
+          required: [spiffe_reconsideration_triggers]
+        then:
+          required: [service_count_reconsideration_threshold]
+          properties:
+            service_count_reconsideration_threshold: { type: integer }
 
   pdp_engine:
     type: object
@@ -163,6 +226,20 @@ open_questions:
       ratified in the same ADR because neither carries new vendor spend).
     owner: "operator"
     blocks: "idp_provider.status only -- workload_identity and pdp_engine are independently ACCEPTED (ADR-016 Sub-decisions b/c) and do not depend on resolving this"
+  - id: "OQ-ZEROTRUST-2"
+    question: >
+      `service_count_reconsideration_threshold` (the 'N' in
+      service_count_exceeds_threshold) is `null` by design -- no source
+      document names an actual number. Who sets N, and when? This is an
+      operational capacity-planning judgment (how many services is "too
+      many for cloud-native mTLS"), not an architecture-internal question
+      with a derivable correct answer.
+    owner: "operator, or a future DevOps/capacity-planning pass once real
+      service count telemetry exists to ground a number in"
+    blocks: "nothing in this file's own validity -- null is a valid, honest
+      value until set; the allOf rule only fires once
+      service_count_exceeds_threshold is actually asserted as a live
+      trigger, which has not happened yet"
 
 verification:
   method: >

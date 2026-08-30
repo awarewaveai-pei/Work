@@ -86,6 +86,33 @@ compilation_decisions:
       reasoning. The reconciliation_rule is this file's own additive
       compilation decision closing the ambiguity risk #7 flagged, not a
       re-litigation of the dual-tool choice itself.
+  - question: >
+      2026-08-30 `/codex-review` HIGH finding (real, independently
+      verified): `cvss_tiering.rescan_requirement` was originally 2 `const`
+      prose sentences (cadence + reason) with no machine-readable interval,
+      cron schedule, or owner anywhere in the repo. A real implementation
+      could satisfy the policy's literal text while never actually running
+      a re-scan -- exactly the risk #8 failure mode ("passed once" is not
+      "passed forever") this object exists to prevent, left unenforced by
+      its own first draft.
+    decision: >
+      Added `interval_days` (required integer >= 1, NOT a `const`) and
+      `owner` (required non-empty string) alongside the existing prose
+      fields. Did NOT invent a specific interval value.
+    reasoning: >
+      Same restraint already applied to `slsa.l3_migration_trigger` and
+      `zero-trust.policy.yaml`'s `idp_provider`/
+      `service_count_reconsideration_threshold`: no source document names
+      an actual re-scan cadence, so inventing one (e.g. "every 30 days")
+      would be fabricating an operational commitment nobody has actually
+      made, the same mistake explicitly avoided for `OQ-mres-6`
+      (regulatory_exposure derivation) and the IdP vendor decision. Making
+      the fields REQUIRED (rather than optional or `const`) is the actual
+      fix: it forces any real instance of this policy to supply a concrete
+      number and a concrete owner, closing the "policy exists in prose but
+      nothing enforces it" gap risk #8 and risk #6 both warn is this
+      organization's own documented recurring failure mode -- without
+      Claude unilaterally deciding what that number should be.
 
 # ---------------------------------------------------------------------------
 # Schema body -- one singleton policy document (same "whole-document-is-the-
@@ -175,10 +202,32 @@ properties:
         properties: { threshold: { type: string, const: "CVSS < 7.0" }, action: { type: string, const: "track only (no SLA)" } }
       rescan_requirement:
         type: object
-        description: "§4 risk 8: EPSS scores drift over time -- a pass today is not permanent."
+        description: >
+          §4 risk 8: EPSS scores drift over time -- a pass today is not
+          permanent. `interval_days`/`owner` REQUIRED (2026-08-30
+          /codex-review HIGH finding: the first version of this object was
+          two `const` prose sentences with no machine-readable interval,
+          cron, or owner anywhere -- a real implementation could satisfy the
+          policy's TEXT without ever actually scheduling a re-scan. See
+          compilation_decisions.).
+        required: [cadence, reason, interval_days, owner]
         properties:
           cadence: { type: string, const: "scheduled re-scan of already-approved artifacts, not just at build time" }
           reason: { type: string, const: "a CVE's EPSS score can rise from low to high probability with no code change on this project's side -- 'passed once' is not 'passed forever'" }
+          interval_days:
+            type: integer
+            minimum: 1
+            description: >
+              Real re-scan interval in days. NOT a `const` -- no source
+              document names an actual number, and inventing one here would
+              be fabricating an operational commitment (same restraint as
+              `slsa.l3_migration_trigger`). REQUIRED so a real instance
+              cannot omit it; the actual value is Phase 4 CI/CD build-out's
+              job to set (see open_questions.OQ-SUPPLYCHAIN-2).
+          owner:
+            type: string
+            minLength: 1
+            description: "Who/what runs the re-scan (a role, team, or automation name) -- REQUIRED so this cannot stay an ownerless aspiration."
 
 open_questions:
   - id: "OQ-SUPPLYCHAIN-1"
@@ -194,6 +243,13 @@ open_questions:
       concern generalizes from)?
     owner: "operator, or whichever future session plans Phase 4 CI/CD build-out"
     blocks: "nothing in this file's own validity -- the event-based trigger is a complete, checkable answer today"
+  - id: "OQ-SUPPLYCHAIN-2"
+    question: >
+      `cvss_tiering.rescan_requirement.interval_days`/`owner` are now
+      REQUIRED fields with no default -- what real interval and owner
+      should populate them? No source document names a specific cadence.
+    owner: "operator, or whichever future session plans Phase 4 CI/CD build-out (same owner as OQ-SUPPLYCHAIN-1 -- both are Phase 4 scheduling questions)"
+    blocks: "nothing in this file's own validity as a SCHEMA -- but any real instance of this policy is now invalid until it supplies real values, which is the point"
 
 verification:
   method: >

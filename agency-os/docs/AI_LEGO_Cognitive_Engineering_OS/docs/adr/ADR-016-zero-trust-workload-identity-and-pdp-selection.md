@@ -46,6 +46,7 @@ Related: `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（Status 
 - **Positive**：`P1-GAP-SEC-1` 的 3 個子缺口中 2 個獲得機讀 policy 落實；唯一保留給操作者的一項（IdP）有清楚、可稽核的保留理由與待辦，不是靜默省略也不是被隨手拍板。
 - **Negative**：無——`idp_provider` 保持阻塞不影響 `workload_identity`/`pdp_engine` 的獨立生效（schema 層面兩者互不依賴）。
 - **尚未解決的 follow-up（本 ADR 明確不處理，且不應由 Claude 處理）**：`idp_provider` 的最終選型，需操作者本人取得真實報價並做 build-vs-buy 決策。
+- **本 ADR 這批 commit 事後被真實 `/codex-review` 抓到並修正的獨立缺口**：`workload_identity.spiffe_reconsideration_triggers`（Sub-decision b）原本是 `items: {type: string}` 的自由文字陣列——任何佔位字串（如「以後再說」）都能通過驗證，本欄位描述聲稱的「具體、可檢查」保證形同虛設；來源文件的觸發門檻「N」也從未在 repo 中被定義成真實欄位。已修正：`spiffe_reconsideration_triggers.items` 改為封閉 2 值 enum（僅 `service_count_exceeds_threshold`/`first_cross_tenant_agent_delegation_scenario` 兩個值，對應來源文件實際指名的兩個觸發條件），新增 `service_count_reconsideration_threshold`（可為 null，操作者設定）+ `allOf`/`if`/`contains`/`then` 規則，強制「一旦觸發條件含 `service_count_exceeds_threshold` 就必須給出真實整數」，門檻數值本身仍不由 Claude 發明。
 
 ## Migration / Rollback
 
