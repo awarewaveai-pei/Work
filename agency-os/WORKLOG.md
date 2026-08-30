@@ -1,6 +1,36 @@
 # Worklog
 
-## 2026-08-30（續23）
+## 2026-08-30（續24）
+
+### AI-LEGO mega-batch 真正 /codex-review 補跑（額度恢復後），4 個真實 finding 全數驗真修正
+
+**觸發**：操作者直接問「你做了 codex-review 了嗎?」——誠實回答沒有（額度恢復後被要求繼續套用 39 個 proposal，沒有回頭補跑），16:45 額度視窗已過，立即補跑。
+
+**執行**：`write-oracle-artifact.ps1 -Mode capture -DiffRef "f20e6b298..HEAD" -Path "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS"` 擷取範圍 diff（997869 bytes，涵蓋 39 個已套用 proposal + 9 個 Phase 5 schema/policy + 3 個 operator-answered gap），`codex-companion.mjs adversarial-review --background` 帶兩段強制 focus text 執行。verdict: `needs-attention`，4 個 finding，全數逐一 grep/Read 驗真（非照抄）：
+
+- 🔴 **[high] `authority.schema.yaml`**：`description`/`decided_by`/`verification` 三處仍寫「role_to_authority_mapping 是空骨架、待操作者定義」，與更下方今天稍早已改成 `DEFINED` 的真實 entries 同檔矛盾——根因是我只改了欄位本體，沒回頭掃同檔的敘述性前言。補「RESOLVED 2026-08-30」段落三處 + `OQ-AUTH-1` 標記 `RESOLVED_BY_HUMAN`。
+- 🟠 **[medium] `network-egress.yaml`**：同款問題，`description`/`compilation_decisions`/`verification` 仍稱 allowlist「刻意不發明」「status: PROVISIONAL」，與已填入真實網域清單、status 已是 `PARTIALLY_DEFINED` 矛盾。舊文字保留為歷史脈絡，加註「已被取代」。
+- 🟠 **[medium] Master Plan §0.0.1**：文件職責表仍列 OQ-2（2026-08-29 已判定 stale reference）點名的兩個不存在檔名。修表 + bughunt 掃出全文另外 9 處同款 Atlas 舊檔名（`v1_2_zhTW.md`），同批修正。
+- 🟠 **[medium] `AI_LEGO_OS_Program_Plan_v1.md`**：Program Status Tracker Phase 3/4 列仍寫「39 個提案全數 DRAFT」「REPOSITORY_ARCHITECTURE.md 仍 PROPOSED」，皆已是過期敘述。
+
+**根因共通點**：這次 4 個 finding 全部同一種形狀——編輯了「真相欄位」本身，沒有回頭掃同檔案的敘述性前言/追蹤表是否還在講舊真相。這是「改深不改淺」的系統性遺漏，非單一失誤；已在對應 commit 訊息記下具體修法供未來比對。
+
+[已修改]
+- `specs/execution/authority.schema.yaml`（3 處 RESOLVED 段落 + OQ-AUTH-1 狀態）
+- `policies/ai-execution/network-egress.yaml`（3 處 superseded 註記）
+- `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md`（§0.0.1 表 + 全文 9 處舊檔名）
+- `AI_LEGO_OS_Program_Plan_v1.md`（Phase 3/4 tracker 列）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（4 次，每次修改後各跑一次）| exit=0 | ms=N/A（839/839 全過）
+- REVIEW_DONE: critic=Deep | verdict=needs-attention（修正前）→ 4 findings 全部驗真並修正 | findings=1c(→fixed)/3m(→fixed)/0n — external oracle = `/codex:adversarial-review`，artifact `agency-os/reports/oracle/2026-08-30-review-156bbf07.md`
+- BUGHUNT_DONE: scope=agency-os | grep=`v1_2_zhTW\|v2_1\.md\|SKELETON_ONLY\|status: PROVISIONAL` | hits=9 additional stale-filename instances found and fixed in Master Plan (全部同批修正，非遺漏)
+
+[剩餘風險]
+- 39 個 proposal 本身的「Diff 是否忠實套用」已由本次 review 的 focus text 明確要求檢查，未回報額外的套用不忠實案例，視為通過
+- authority.schema.yaml/network-egress.yaml 的歷史段落（`decided_by`/`compilation_decisions`/`verification`）用「保留原文 + 加註已取代」處理，未整段重寫——若未來再有類似 post-approval 遺漏，同一模式（改深不改淺）值得寫進 R0 checklist 常駐檢查項
+
+
 
 ### 新增機械閘 `git-add-scope-tracker` + `git-commit-scope-guard`：治本今天親身撞見兩次的 commit 交叉污染（含 critic 抓到 2C+5M 的完整修正紀錄）
 
