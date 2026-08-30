@@ -3331,13 +3331,15 @@ Outcome Feedback
         sector-packs.yaml
         market-entry.yaml
 
-    localization/
+    localization/          # v1 歷史快照，現行正本見下方說明
         locale.yaml
         currencies.yaml
         timezones.yaml
         units.yaml
         accessibility.yaml
 ```
+
+**Localization 目錄正本化**（ADR-009 Sub-decision (b)，2026-08-29 ACCEPTED）：上方 `localization:` 區塊（5 個扁平檔案）為 v1 歷史快照，不再是程式碼層唯一依據。程式碼層現行正本見 `docs/architecture/REPOSITORY_ARCHITECTURE.md` 的 `/platform/trust-fabric/localization/`（粒度採 Atlas 版本，實質檢查項目見 Atlas §12.43 在地化審查清單）；`accessibility` 已移為 `/platform/trust-fabric/accessibility/` 同層兄弟，不再是 localization 子項（概念錯置已修正：無障礙的驗收標準與負責團隊與語言/地區在地化不同）。
 
 ---
 
