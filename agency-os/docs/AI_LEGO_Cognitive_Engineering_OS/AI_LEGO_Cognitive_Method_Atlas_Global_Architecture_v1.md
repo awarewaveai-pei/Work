@@ -899,26 +899,14 @@ flowchart LR
 | Normalization | 降低重複與更新異常 | 1NF→2NF→3NF/BCNF；必要時有意識 denormalize | 提高一致性 |
 | Data Lineage | 追蹤資料流向與轉換 | source→ingest→transform→dataset→model→artifact | 數字可追溯 |
 | Data Contract | 定義 producer/consumer 承諾 | schema→semantics→quality/SLO→ownership→compatibility | 防無聲 schema break |
-| Schema Compatibility Analysis | 檢查 schema migration 相容性 | expand→dual read/write→backfill→verify→contract | 支援零停機 migration |
+| Schema Compatibility Analysis | 檢查 schema migration 相容性 | 精確步驟序列見 Execution Contract §28（唯一正本），本節僅說明概念與適用場景。 | 支援零停機 migration |
 | Data Quality Dimensions | 檢查完整/準確/一致/唯一/時效/有效 | rules→profiling→threshold→quarantine→owner | 防垃圾資料造成高信心結論 |
 | Backup/Restore Drill | 驗證備份真的能還原 | backup→isolated restore→integrity→RTO/RPO | 避免「有備份但不能用」 |
 | Retention / Deletion Model | 保存、刪除、legal hold | data class→purpose→retention→deletion→exception→proof | 降合規與暴露風險 |
 | Expand–Contract Migration | 無破壞演進 schema | expand compatible schema→migrate traffic/data→contract old | 降部署耦合 |
 | Reconciliation | 驗證新舊資料一致 | counts/checksums/business invariants→diff→resolve | migration 後可證明完整性 |
 
-```mermaid
-flowchart LR
-    A[Schema Baseline] --> B[Data Contract]
-    B --> C[Compatibility Analysis]
-    C --> D[Backup + Restore Test]
-    D --> E[Expand]
-    E --> F[Dual Read / Write]
-    F --> G[Backfill]
-    G --> H[Reconciliation]
-    H --> I[Canary]
-    I --> J[Contract]
-    J --> K[Rollback Window Close]
-```
+精確步驟序列見 Execution Contract §28（唯一正本），本節僅說明概念與適用場景。
 
 ---
 
@@ -2366,16 +2354,7 @@ Deprecation
 
 **台灣常用名稱**：擴張－收縮資料庫遷移／相容性資料庫遷移
 
-```mermaid
-flowchart LR
-    A[Old Schema] --> B[Expand Compatible Schema]
-    B --> C[Deploy Compatible App]
-    C --> D[Backfill]
-    D --> E[Dual Read / Write]
-    E --> F[Verify]
-    F --> G[Switch]
-    G --> H[Contract Old Schema]
-```
+精確步驟序列見 Execution Contract §28（唯一正本），本節僅說明概念與適用場景。
 
 **效益**
 
@@ -3485,21 +3464,7 @@ Current-state Reconstruction
 
 ## 13.10 Database Migration Recipe
 
-```mermaid
-flowchart LR
-    A[Schema Baseline] --> B[Data Contract]
-    B --> C[Compatibility Analysis]
-    C --> D[Backup + Restore Drill]
-    D --> E[Expand]
-    E --> F[Compatible App]
-    F --> G[Backfill]
-    G --> H[Reconciliation]
-    H --> I[Dual Read / Write]
-    I --> J[Canary]
-    J --> K[Switch]
-    K --> L[Contract]
-    L --> M[Rollback Window Close]
-```
+精確步驟序列見 Execution Contract §28（唯一正本），本節僅說明概念與適用場景。
 
 ---
 
