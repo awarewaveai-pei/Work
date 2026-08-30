@@ -3596,7 +3596,7 @@ User workflow:
 Idea → MCDA → Decision
 ```
 
-如果 `risk_tier = critical`：
+如果 `risk_tier IN {R3, R4}`：
 
 ```text
 Compiler result:
