@@ -1110,21 +1110,29 @@ DB Migration 是高風險工程，不是 SQL patch。
 標準：
 
 ```text
-Baseline
+Schema Baseline
 ↓
-Backup / Restore Validation
+Data Contract
 ↓
 Compatibility Analysis
+↓
+Backup / Restore Validation
 ↓
 Expand
 ↓
 Deploy Compatible Code
 ↓
-Backfill
+Enable Dual Write（新舊 schema 同時寫，此刻啟動，持續到 Contract 之前）
 ↓
-Reconciliation
+Backfill（resumable / idempotent / checkpointed / throttled / observable —— EC §29 既有要求原樣保留）
 ↓
-Traffic Migration
+Reconciliation（counts / checksums / business invariants —— EC §30 既有要求原樣保留）
+↓
+Dual Read Verification（新 schema 影子讀取，比對舊 schema 結果，尚未對外服務）
+↓
+Canary（真實流量小比例改為由新 schema 服務讀取）
+↓
+Traffic Migration / Switch（讀寫權威全面切至新 schema）
 ↓
 Observe
 ↓

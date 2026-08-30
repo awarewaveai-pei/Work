@@ -169,8 +169,8 @@
   - **切換動作本身**：Cloudflare apex A 記錄 `191.101.230.176` → 新 IP（proxy 維持 🟠）。**回滾 = 改回去**，幾秒生效。屬 High risk，需操作者明示 go-ahead。
   - **操作者待辦（與買機平行）**：~17 個付費外掛的 5–6 組授權續約狀態盤點（清單 `core/SITE_CODE_MANIFEST.md`）。
 
-- [ ] **🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）**
-  - **【進行中】** Hostinger `Premium Web Hosting` $215.76/年，**自動續約已關閉**，**2026-11-12 到期**。什麼都不做 = 客戶網站當天下線。
+- [ ] **【🔴 硬死線 2026-11-12｜②主體搬遷已完成 2026-08-28，③④收尾未做｜2026-08-30 稽核】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）** — **狀態更新（不要照下方 KS-6/買機日期等舊細節行動，那是原計畫，實際發生的不一樣）**：④步驟執行順序中的②「網站搬新購二手 dedicated 機」**已完成**——實際買的是 OVH SYS-GAME-2（不是原計畫的 KS-6/auction 機），2026-08-28 完成真流量切換到 `ks-aw-01`（見 WORKLOG「🎉 Soulful 正式切換完成」+ `AUTO_TASK_DONE: soulful-cutover-executed`）。**還沒做的只剩**：③ 網域轉 CF Registrar（原文自己就寫「建議搬站穩定後再做」，尚未執行）④ 讓 Hostinger hosting 自然到期於 2026-11-12（未到期，不用管）。舊站維持凍結當回滾路徑，觀察期滿（2026-09-04 起）才進入收尾，見本檔「⏭️ Soulful 搬站」大項 §157。
+  - **【進行中，原計畫細節，部分已過期】** Hostinger `Premium Web Hosting` $215.76/年，**自動續約已關閉**，**2026-11-12 到期**。什麼都不做 = 客戶網站當天下線。
   - **三筆訂閱現況**（2026-08-15 帳單截圖確認，推翻先前「$80/年」的假設）：Hosting $215.76 → **2026-11-12**（不續約）／`.ORG` Domain $53.97 → 2028-06-03（付到 2028）／Starter Business Email $76.32 → 2029-06-03（**預付近 3 年，保留**）
   - **信箱不受影響**（2026-08-15 查官方文件三項獨立證據）：① Hostinger 支援文原句「Since emails are stored on a separate infrastructure, they are not included in hosting plan reactivations or file backups」② Business Email 是可獨立購買產品、不需 hosting ③ DNS 管理綁網域不綁 hosting（網域付到 2028）。**故不需開 support ticket**。搬 DNS 到 CF 後三個依賴全部脫鉤
   - **📅 日曆提醒已建立（2026-08-16，`peijingartstudio@gmail.com`）** —— **勿重複建立**：① `2026-09-30` 買二手 Hetzner 機（前 1 天彈窗 + 前 7 天 email）② `2026-10-15` 搬站進度檢查 ③ `2026-11-05` 到期前 7 天最後確認 ④ `2026-11-12` hosting 到期（紅色標記，前 1 天彈窗 + 前 14 天 email）。每則描述內含當下該做什麼、文件路徑、以及「別取消 Hostinger 帳號」警告。**註**：操作者的 AwareWaveAI Google 帳號（`awarewaveai@gmail.com`）未連到 Claude connector，故寫入主日曆
@@ -242,10 +242,7 @@
 
 - [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】** `app.aware-wave.com/ops/clients/[slug]` → 社群頻道 tab → 點「連結」→ 選 Bluesky integration（soulfulexpression.bsky.social）→ 儲存。完成後 ContentStudio 才能看到 channel selector 顯示帳號。
 
-- [ ] **既有站接手 Day 1（Soulful Expression）**
-  - **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。
-  - **仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
-  - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節產出：§1.2 ✅ §1.3 DB dump ✅ §1.1 待操作者 §restore drill 待 Day 2
+- [x] **【✅ 由實際搬站取代並完成，2026-08-28｜2026-08-30 稽核：與 §747 重複，一併結案】既有站接手 Day 1（Soulful Expression）** — §1.2 機讀基線 ✅（commit `b5cef4c`）、§1.3 DB dump ✅（`soulful_db_20260508_160734.sql.gz`）皆已完成，這兩項本來就沒有爭議。唯一懸而未決的 §1.1「帳號層級權限確認」（Hostinger panel/DNS panel/WP admin 登入）沒有獨立勾選紀錄，**但 2026-08-28 的真實搬站切換必然要用到這些權限才能執行 DNS PATCH＋新機部署**（見 WORKLOG cutover 記錄），功能上已被完整行使過，只是沒有單獨留一筆「§1.1 完成」的證據。Day 2 staging 演練已於 2026-08-16 決議 abandon（見下方訂正）。與線 747「既有站接手（Soulful Expression Art Therapy）」是同一件事的兩份重複紀錄，一併在此結案，不再分別追蹤。
 
 - [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**：操作者回報 mockup 有問題未提供細節（2026-06-13）。MockupStudio.tsx 實走 `/api/tools/studio/generate`（nano-banana-2 + referenceImages）。
   - **本輪已排除（步驟
@@ -309,21 +306,15 @@
 
 > 不是你不做，是還沒輪到你。**買機一解，這區有三條直接轉可做**。
 
-- [ ] **【已知限制｜2026-08-25 開｜2026-08-31 自動解除】Codex 額度耗盡，跨模型 oracle 路徑不可用** — `codex exec` 直測回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。影響：
+- [ ] **【已知限制｜時程已過期，2026-08-30 稽核訂正】Codex 額度耗盡，跨模型 oracle 路徑不可用** — 原文寫「2026-08-25 開｜2026-08-31 自動解除」已不成立：本檔額度當天（2026-08-30）**已循環兩輪**——先於當日稍早恢復並成功真跑 `/codex-review`（3 個真 finding，見 WORKLOG 續17），隨後**當天再度耗盡**，這次回報的解除時間是同日 16:36（非原訂 8/31）。即時查證：`codex-companion.mjs setup --status --json` → `reviewGateEnabled: false`，DoD（重新啟用 gate）尚未執行。**下一步**：用 oracle 前先查當下額度狀態，不要沿用這條寫的舊時間表。原「`codex exec` 直測回...try again at Aug 31st」是本項最初開出當下的證據，現在只是歷史記錄，不代表目前狀態。影響：
   - ① AGENTS.md §跨模型 oracle 把 R0 [驗證計畫] 的 Review 動作路由給 Codex該路徑至 8/31 不可用，期間 Review 改走 `critic` subagent
     - ② codex plugin 的 **stop-time review gate 每次收工都會失敗並擋住 session 結束**，且它顯示的錯誤是誤導的（`DEP0190 DeprecationWarning` 只是 stderr 上唯一的文字，真正的額度錯誤在空的 stdout 裡）。若擋住工作流程，用 `/codex:setup` 暫時關掉 stop-time review gate，8/31 後再開。
   - **根因不在本 repo**（vendor plugin + 訂閱額度），不要去改 `~/.claude/plugins/cache/` 底下的 vendor code。⚠️ 額度是本 session 五次 oracle 覆審燒掉的之後 oracle 用量要節制：prompt 只放 Decision/Constraints/Acceptance（AGENTS.md 已有此規則，本 session 第一次呼叫因塞了整段推理而 timeout），且避免對同一份大 diff 反覆重跑。
 
-- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】** — 軟體層(cs-engine U0–U5 + widget U4)已上 prod 並 live 驗；只剩裝 Chatwoot + 接線（建 `app/api/cs/chatwoot-webhook` 呼叫 `handleInbound`、MockTransport 換 ChatwootTransport）。
+- [ ] **【⏳ 閘門已解除，2026-08-30 稽核確認｜非 gated，只是還沒做】customer service U6 Chatwoot 安裝** — 軟體層(cs-engine U0–U5 + widget U4)已上 prod 並 live 驗；只剩裝 Chatwoot + 接線（建 `app/api/cs/chatwoot-webhook` 呼叫 `handleInbound`、MockTransport 換 ChatwootTransport）。**原本卡的「等買二手機」閘門已滿足**——ks-aw-01（OVH SYS-GAME-2）已於 2026-08-27 買好、2026-08-28 上線，8c/16t/64GB 空間遠超 Chatwoot 所需的 ~8GB。現在是「可以直接動工但還沒排」，不是「還卡著等外部條件」。
   - **買機=操作者刷卡(High risk)，7月出國→8月回來辦**。完整冷啟動步驟序、接線 file:line、8 通道現實全在接手包 → handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md
 
-- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**
-  - **動機**：上 Chatwoot（CS U6）需 ~8GB，EU 8GB(已吃 3G swap)/SG 4GB 都塞不下。
-  - **決策**（runbook §0b，2026-06-27）：買**二手 dedicated**（FSN i7-7700/64GB/2×512SSD/~€48.70）當主力，Chatwoot greenfield 先上 → EU 服務照 §5 逐台搬（Supabase/Trigger/n8n/Postiz/MainWP/Uptime）→ 退 SG+EU 兩台雲端。單台+RAID 1+R2 夠用，HA 第二台延後。
-  - **搬家/RAID/還原 SSOT**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（§0b 決策/§3 RAID/§5 遷移/§7 checklist）。
-  - **§7 gate（5 項，現卡）**：❌ 買機（**操作者刷卡，High risk**）❌ auction 機 RAID 1+SMART+mdadm 告警 ❌ Chatwoot greenfield+接線 ✅ 每容器 `mem_limit`（2026-08-15 實測：EU 29 個執行中容器有 **27 個已設限**，僅 `buildx_buildkit_trigger0` / `trigger-registry` 兩個 build 用容器未設；此項實質已完成）❌ 第二異地取代 SG-offsite。
-  - **已綠**：備份補漏全補 / `.env` 加密 / 還原演練過(2026-06-26) / R2 真 3-2-1 / 救援鑰 off-machine / DNS 9 record 清單 / §4 端到端驗。
-  - **時程**：7月出國→8月回來辦。冷啟動接手包：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)。
+- [x] **【✅ 以不同做法完成，2026-08-28｜2026-08-30 稽核確認為重複項】~~EU→Dedicated 搬機 + 整併退雲端~~** — 本項描述的計畫（買二手 auction 機、7月出國後8月辦）**沒有照原計畫執行**，實際發生的是：操作者改買 **OVH SYS-GAME-2**（非二手 auction 機），2026-08-28 當天直接把 SG（10 容器）+ EU（29 容器）+ Soulful 一次性全部整併到 `ks-aw-01`，不等原排的 11/20，兩台舊 Hetzner Cloud VPS 已於 2026-08-30 在 console 刪除退租（不可逆，已執行）。**唯一還沒做的子項——Chatwoot（CS U6）**——現獨立追蹤於本檔「gated｜等買二手機才繼續建 customer service U6 Chatwoot」項，且該項的「等買機」閘門現已滿足（機器已在，只是 Chatwoot 本身還沒裝）。這條的完整過程記錄於 `WORKLOG.md` 2026-08-27～2026-08-30 各條，及本檔「⏭️ Soulful 搬站」大項。
 
 - [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合
   - **【未開始】** 現場開機 checklist 與 Cloudways 方案已備（`handoffs/2026-07-05-mongolia-client-onsite-checklist.md`；網域在 Namecheap 買，Cloudways 不賣網域）。
@@ -361,7 +352,8 @@
   - **建議的治本方向（擇一或組合，未拍板）**：① `check-smoke-tests.ps1` 加一條 proacl 斷言，定期查所有 `prosecdef=true` 的 public 函式，anon/authenticated 出現在非白名單函式上就 WARN ② migration 樣板／checklist 明文要求「改 SECURITY DEFINER 函式簽名前，先讀是否用 CREATE OR REPLACE；用 DROP+CREATE 者必須在同一 migration 內重新 revoke」。
   - **完成定義**：選定方案並落地（機械閘或至少寫進 migration checklist SOP），下次任何人改 SECURITY DEFINER 函式簽名時會被提醒或自動擋下。
 
-- [ ] **🟠 EU origin 仍未鎖 Cloudflare（步驟 A 已完成，B 待做）**
+- [x] **【✅ MOOT，2026-08-30 稽核確認】~~EU origin 仍未鎖 Cloudflare~~** — 本項針對的 EU 主機（`204.168.175.41`）已於 2026-08-28 整併進 ks-aw-01、2026-08-30 刪除退租，步驟 A/B 的技術前提（該台機器的 nginx/UFW）已不存在。**功能已由 ks-aw-01 的新機制取代並實測生效**：real-IP 還原改由 `nginx/cloudflare-real-ip.conf` 在 http 層套用到全部 vhost；origin lockdown 改用 nginx geo map（`refresh-cf-edge-geo.sh`），2026-08-28 直連測試 403/403 active（見 WORKLOG 續11/12）。**唯一真正存活的子項是步驟 C**（`awmainwp` 帳號名已外洩，改名/加 2FA）——這件事跟機器無關，獨立列一條新待辦，不要跟著這條一起關掉：
+  - [ ] **【從舊 EU-origin 項拆出，仍待辦】`awmainwp` 帳號名已外洩（320 次針對性嘗試），改名或加 2FA** — 需操作者在 MainWP 後台執行，與主機拓樸無關。
   - `🟠 部分完成` · `2026-08-26` · `剩餘部分屬 High risk，需 go-ahead`
   - **✅ 步驟 A 已完成並驗證（2026-08-26 10:04 UTC）**：host nginx 新增 `/etc/nginx/conf.d/cloudflare-realip.conf`（22 條 `set_real_ip_from` = CF 官方 15 IPv4 + 7 IPv6，`real_ip_header CF-Connecting-IP`）。
     - **端到端實測**：host nginx 與容器 Apache 日誌皆記到真實 IPv6 `2001:b400:…`（原為 `172.6x` CF 位址）；PHP `REMOTE_ADDR` 亦為真實 IP —— **LLAR 讀的就是它**。
@@ -390,11 +382,11 @@
 
 - [x] **【✅ 2026-08-26 完成】R2 影片桶清理（操作者指示）** — 刪除 9 個物件：8 個 `remotion/*`（~200MB，從未被任何對帳或清理涵蓋）+ `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4`（23MB 真孤兒）。**刪前引用檢查**：`media_assets` 0 命中、`content_drafts` 0 列、5 個 wp_sites 逐一搜 `remotion` / `蒙古旅遊` 全部 0 命中（3 個 staging 站已是 404 死站）。刪後剩 2 個物件（`三個習慣_...` 的 16x9 + 9x16，即畫廊裡那唯一一列）。**reconcile 隨即自動轉綠**：`orphanUnattributable=0` → `NOTIFIED state=ok`，告警 baseline 歸零。
 
-- [ ] **【2026-08-26 開出｜小】R2 裡 8 個 `remotion/` 物件（~200MB）從未被任何對帳涵蓋** — `reconcile.ts` 的 `FORMAT_SUFFIX_RE = /^video\/(.+)\/([^/]+)\.mp4$/` 只收 `video/` 前綴，而 remotion-service 寫的是 `remotion/YYYY-MM-DD/<uuid>.mp4`（`apps/remotion-service/src/server.ts:293`）。實測 R2 有 8 個此類物件（2026-06-24 五個、2026-07-02 三個，最大 113MB），**全部不在 media_assets、也不在任何清理排程**（`video/cleanup` 也只刪 media_assets 有列的）。等於一個持續長大且無人看管的儲存桶分區。**先決定要不要留**：remotion 產出目前有無使用者可見的入口？沒有的話直接刪比補對帳便宜。
+~~- [ ] R2 裡 8 個 `remotion/` 物件（~200MB）從未被任何對帳涵蓋~~ **✅ 2026-08-30 稽核發現：已於上方 2026-08-26 R2 清理項一併刪除**（同一 commit 新增「待辦」與「已完成」兩則，完成後忘記刪掉這條重複的待辦；`orphanUnattributable=0` 已確認轉綠）。
 
-- [ ] **【2026-08-26 開出｜等一個決定】R2 `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4` 是真孤兒（23MB）** — 無 media_assets 列、目錄名無 org 前綴（2026-08-25 之前的格式）→ reconcile 一律 fail-closed 不猜擁有者。**告警上線後會持續報 `orphanUnattributable=1` 直到處理掉**（這是正確行為，它確實是孤兒）。選項：① 補記到某個 org（`organizations` 有 `d6d1e845 mongolia-03` 這個測試租戶，名稱吻合但**不可據此推定**）② 直接刪除物件。**需操作者判斷這支影片還要不要**。
+~~- [ ] R2 `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4` 是真孤兒（23MB）~~ **✅ 2026-08-30 稽核發現：已於上方 2026-08-26 R2 清理項一併刪除**（同上，重複待辦漏刪）。
 
-- [ ] **🔴 EU 的保留政策把「還原演練證明過的備份」刪掉了**
+- [x] **【✅ 2026-08-27 修復並驗證｜2026-08-30 稽核確認】EU 的保留政策把「還原演練證明過的備份」刪掉了** — 三支備份腳本統一改用快照命名 glob 過濾（`_snap_glob='20[0-9][0-9][01][0-9][0-3][0-9]-...'`），確認現存於 `lobster-factory/infra/eu-backup/backup-eu-stack.sh:200` 與 `lobster-factory/infra/ks-aw-01-backup/backup-ks-aw-01.sh:200`（EU 主機已於整併前修好，隨後 2026-08-30 隨 EU 主機一併刪除退租，ks-aw-01 版本現行生效）。完成定義四項全驗證：①②造假非快照目錄跑一次確認未被誤刪（`WORKLOG.md` 2026-08-27）③ Soulful 三份備份已從 live 站重建並存入 R2 WORM-lock prefix ④ `BACKUP_RESTORE_PROOF.md` 已加訂正橫幅（:255-264）。
   - `🔴 現行` · `2026-08-26 發現` · `可直接做`
   - **一句話**：2026-08-16 演練 PASS 的那三份 Soulful 備份，被每晚的保留清理當成過期快照 `rm -rf` 掉了。
   - **實測**：`ssh EU` → `/root/backups/clients/` **不存在**；限定範圍 find 只找到 repo checkout，找不到 `code-20260816*` / `db-20260815*` 任何一份。
@@ -434,7 +426,7 @@
   - **操作者裁決（2026-08-26）**：「我沒有要重新授權」→ **不執行撤銷**。若日後改變決定：`https://myaccount.google.com/permissions` 移除 WPvivid 存取權後於外掛內重新授權。
   - **這是同日第三次同款疏失**（另兩次：Dropbox token、本條）。**已具體化的紀律**：查 `wp_options` / `wpvividmeta` 這類設定表時，**只 `SELECT`／只印明確指名的純量欄位，絕不遍歷陣列或整欄輸出** —— 前兩次的教訓寫成「排除敏感欄位名」，本次證明那個寫法不夠，因為憑證可以巢狀在任意鍵底下。
 
-- [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
+- [x] **【✅ 2026-08-28 解決｜2026-08-30 稽核確認】`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者** — origin lockdown 機制隨整併遷到 ks-aw-01 nginx geo map（`refresh-cf-edge-geo.sh`），現況：`agency-os/reports/status/cf-iprefresh-LATEST.json` = `status=ok, v4_ranges=15, v6_ranges=7, generated=2026-08-28 16:44:57`。完成定義兩項皆達成：① `status=ok` 且 ranges>0 ② 已接上讀者——`scripts/ao-resume.ps1:888-890` 呼叫 `refresh-cf-origin-ips.ps1` 納入月度巡檢。
   - `🔴 現行` · `2026-08-26 開出` · `可直接做`
   - **一句話**：守 SG 80/443 只開放給 Cloudflare IP 的 origin lockdown，其狀態檔壞了兩週沒人知道。
   - **證據**：`agency-os/reports/status/cf-iprefresh-LATEST.json` → `status=error`、`v4_ranges=0`、`v6_ranges=0`、`generated=2026-08-12 17:35:11`，訊息 `[cf-lockdown] ERROR: ipsets not found. Run --apply first.`
@@ -448,7 +440,7 @@
   - **一次關掉整類**，並可移除 32-bit 前綴命名空間與 public URL 上的租戶指紋。
   - **警告**：逐點修這三個實例會再被打回（critic 明講）。目前三個危險實例已各自修掉，所以這是「改善」不是「救火」。
 
-- [ ] **【2026-08-25 開出｜critic Minor 7 條｜2026-08-26 部分結案】影片管線租戶邊界收尾** — 原 7 條逐條重驗結果如下（重驗而非沿用）：
+- [x] **【✅ 2026-08-25 開出｜critic Minor 7 條｜2026-08-26 結案｜2026-08-30 稽核確認：實際已 7/7 全數關閉，非「部分」】影片管線租戶邊界收尾** — 原 7 條逐條重驗結果如下（重驗而非沿用）：
   - **✅ ① `/api/video/status` 補租戶閘（2026-08-26 完成）** — **原 finding 的位置是錯的**：它寫「`route.ts:87`（recordVideoAsset）之前應補」，但 `status="done"` 的 job 在更早的 `:79` 就 `return job.video`（該次 render 全部格式的 R2 URL）+ `title`，**根本走不到 :87** —— 照原文補出來會是一道對已完成 job 完全無效的假閘。實際修法：`migration 0060` 給 `video_jobs` 加 `organization_id`（0047 建表時無 owner 欄位），`createJob(orgId)` 在**建立列的當下**寫定，`status/route.ts:77` 在第一個回傳資料的分支之前 assert。**不可**改用 `recordParams.organizationId`：prepare 失敗路徑（`generate/route.ts:142`、`:168`）不寫 recordParams，那種寫法會讓 client 對自己失敗的 render 永久 403、連錯誤訊息都看不到。附帶關掉 `createJob` insert 失敗只 `console.warn` 的消音（會導致之後每次 /status 回 `job_not_found`）。7 個 vitest + **突變測試證明有效**（把閘改回上述兩種錯誤寫法，各有 2 條測試轉紅）。
   - **✅ ⑤ `buildVideoOutName` 註解字數（2026-08-26 完成）** — `noorg_` 分支是 17 字元（6+10+1）不是 20；org 分支 20 字元（8+1+10+1）。註解已改為兩分支分列。
   - **✅ ⑦ inventory 漏收（2026-08-26 完成）** — 不只原述的 4 條：`/api/video/*` **共 14 條，12 條從未收錄**。已在 `MULTI_TENANT_ISOLATION_AUDIT_AND_PLAN.md` 新增 §2.3.1 全量盤點（14 條逐檔實讀 + 機器核對角色閘/租戶閘）與 §2.3.2（⑥ 的決策記錄）。原 `:61,62` 漂移行號一併訂正。
@@ -518,7 +510,7 @@
   - **完成定義**：塞一份 `measured=0/overall=PASS` 的假 artifact 必須 FAIL（證明不是永遠綠）；`smoke-LATEST.json` 必須 PASS（證明不是永遠紅）；現況掃描必須點名 `cf-iprefresh`。
   - **Phase 2（另計）**：8 支補 `measured` 並改 fail-closed，由上面那道閘逼出來，一次一支。
 
-- [ ] **Phase 4 雲端 routine 仍在解析已退役的 `restore_drill_due_after`**
+- [x] **【✅ 2026-08-26 完成｜2026-08-30 稽核確認】Phase 4 雲端 routine 仍在解析已退役的 `restore_drill_due_after`** — `phase4-weekly.md:21` 現已明寫「Prompt 內含邏輯：無（2026-08-26 起）。所有檢查在 `scripts/phase4-checks.py`；prompt 只負責 pull → 跑 → commit」，即完成定義選項二（改成呼叫 py，不再維護第二套邏輯）。殘留的 5 處 `restore_drill_due_after` 引用經確認是**刻意保留的 rollback 正本區塊**（`:37-46` 明寫「已退役的 routine prompt...不要刪、不要『順手更新』它」），非未修完的活邏輯。
   - `🟡 現行` · `2026-08-26 開出`
   - **一句話**：本機那套已經修好了，雲端那套沒有 —— 而雲端那套才是每週真正在跑的。
   - **今日已被平行 session 修掉的部分**：`scripts/phase4-weekly-check.ps1` 已無 `restore_drill_due_after` 參照（grep = 0）；`scripts/phase4-checks.py` 已進版控；2026-08-26 14:28 那輪 Check 3 正確回報 `3A 還原演練: PASS — 最近 PASS 2026-08-16，下次到期 2026-11-14`。
@@ -526,7 +518,7 @@
   - **完成定義**：該 md 改為讀 `restore_drills` + `restore_drill_interval_days`（對齊 `scripts/phase4-checks.py:329-353`），或直接改成呼叫該 py，不再維護第二套邏輯。
   - **注意**：這條原本寫「三套實作」，2026-08-26 訂正為只剩雲端一套。
 
-- [ ] **`check-backup-health.ps1` 把「無法證明可還原」當成健康**
+- [ ] **【🟡 邏輯已修，僅剩字面措辭未達完成定義｜2026-08-30 稽核確認】`check-backup-health.ps1` 把「無法證明可還原」當成健康** — 平行 session 已完成邏輯修正：`:264-269` 新增 `$sgVerifyDead/$euVerifyDead/$ksVerifyDead`（UNKNOWN 且 backup_age_days≥1 才判定），`:277` 折入 `$overall` 計算，UNKNOWN 已能正確升級 WARN（新鮮的 UNKNOWN 仍安靜，不會 false-alarm）。**未達成的只剩完成定義字面要求**：WARN 訊息目前只標 `(unknown)`，未寫出「無法證明可還原」這句話本身（`:312-313`）。不打勾，留給補一行文字。
   - `🟡 潛伏` · `2026-08-26 開出` · `⚠️ 平行 session 正在改這支`
   - **一句話**：備份跑了、也夠新，但驗證結果不明時，它報 PASS。
   - **證據**：`scripts/check-backup-health.ps1:165-167` —— `verify_result="UNKNOWN"` 刻意不升級，註解寫 `Only FAILED escalates to WARN; UNKNOWN ... does NOT false-alarm`。
@@ -551,15 +543,15 @@
   - **修法方向**（需先設計，勿直接改）：AO-CLOSE 改為只 add 本 session 觸碰過的路徑清單（hook 已有 `code-change-tracker.js` 在追蹤修改，可作為來源），或在 `add -A` 前偵測「非本 session 修改的檔案」並中止要求人工裁決。
   - **注意**：不可只加一個警告就了事
   - `7251d14d` 已示範正確做法是把能力拿掉，不是加提示。
+  - **【第 5、6 個實例，2026-08-30】仍未建閘，同款問題本 session 親身撞見兩次**：① 我自己用 `git commit`（未指定 pathspec）把另一個並行 session 已 `git add` 但未 commit 的 39 個 ADR proposal 檔案，跟著我的 SG/EU 基礎設施 commit 一起送出（見 `WORKLOG.md` 2026-08-30）② 並行 session 的 續16 WORKLOG entry 被夾帶進本 session 稍早的 commit `15814d1be`。**兩次都不是 `git add -A`**——第一次是 `git commit` 提交整個 staging index（不只自己 `git add` 的檔案），第二次是共享檔案（WORKLOG.md）本身被多 session 同時寫入的正常結果。**這代表不變量比原文描述得更廣**：不只是「AO-CLOSE 的 `git add -A`」，是「任何 `git commit` 呼叫都會捲入 index 裡當下的全部內容，不管是誰放進去的」——修法方向的「只 add 本 session 觸碰過的路徑清單」仍然對，但要同時管住 `git commit` 本身（先 `git status` 確認 staged 內容只有自己預期的檔案，或用 pathspec 明確指定要 commit 的檔案，不能只防堵 `add -A` 這一個入口）。
 
-
-- [ ] **【2026-08-26 開出｜營運｜搬站前必處理】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — `agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json`：`last_failure` = **2026-08-24 Failed**（最新一次）；`backup_history_since_last_sync` 近 10 次為 F/S/F/F/S/S/S/F/S/F = **5 敗**。
+- [ ] **【2026-08-26 開出｜營運｜搬站前必處理｜⚠️ 2026-08-30 稽核：疑似 MOOT，需操作者確認】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — 現況查證：`BACKUP_AUTO_STATUS.json` 最新 3 筆已全部 `Succeeded`（2026-08-26 起），`last_failure`（2026-08-24）已不是最新事件，本項描述的即時狀態已經過期。**更根本的是**：這條追的是 Hostinger 時代 WPvivid→Google Drive 那條備份鏈；Soulful 已於 2026-08-28 正式切換 Hostinger→ks-aw-01（`WORKLOG.md` "🎉 Soulful 正式切換完成"），現行備份走全新的 `ks-aw-01-backup` 管線（已實測 PASS，見 WORKLOG 2026-08-27）。舊 WPvivid 鏈的失敗模式**很可能隨舊主機一起結束**，但 WPvivid 外掛在新機上是否還在跑、是否該完全停用，本次稽核未查證，故列 MOOT 疑似而非直接關閉——需操作者確認新機上是否還留著這條舊備份路徑。
   - **這不是偵測器問題**Phase 4 Check 3 今天已經在正確地叫（3B「距上次成功 9 天」+ 3C「最新一次失敗」），是備份本身壞了。
   - **為何現在才浮出**：2026-08-07 起 Check 3 被一個已知假警報（restore drill overdue）綁在同一行，真訊號連續四週被略過（根因與修法見 WORKLOG 2026-08-26）。
   - **要查什麼**：WPvivid → Google Drive 的 OAuth token / 配額；歷史上 `wpvivid-c9f8ea1a50284`（2026-05-25）是 Drive API 403 rateLimitExceeded 自行恢復，但這次是**間歇性反覆**不是單次。`reason` 欄多半只有 `"Failed,"` 空字串 → 需上 EU MainWP DB 或 WPvivid 端看完整錯誤。
   - **為何是死線項**：hosting 2026-11-12 到期，搬站的還原點就靠這條鏈。
 
-- [ ] **【2026-08-26 開出｜治理｜機械閘誤判】`verify-gate-commit.js` 對 Bash 指令做純文字比對，heredoc 內容含 `git commit` 就被 BLOCK** — 本 session 撰寫 routine prompt（內文本身就含 `git commit -m ...` 這一行指令範例）時，`python3 - <<'EOF'` 的 heredoc **內容**被當成「要執行 git commit」而 exit-2 擋下。閘沒有區分「要執行的指令」與「被當作資料寫入檔案的內容」。
+- [x] **【✅ 已修復｜2026-08-30 稽核確認】`verify-gate-commit.js` 對 Bash 指令做純文字比對，heredoc 內容含 `git commit` 就被 BLOCK** — 本 session 撰寫 routine prompt（內文本身就含 `git commit -m ...` 這一行指令範例）時，`python3 - <<'EOF'` 的 heredoc **內容**被當成「要執行 git commit」而 exit-2 擋下。閘沒有區分「要執行的指令」與「被當作資料寫入檔案的內容」。**修法已落地**：`mcp/claude-userlevel/hooks/rules/verify-gate-commit.js:1-11` 改用 `ctx.commandSegments` 錨定偵測（只比對真正要執行的指令片段，不再對整段文字做 regex），檔頭註解明確記載此修正。
   - **影響**：任何要把 git 指令寫進文件/prompt/runbook 的工作都會被誤擋，代理只能繞路（改用 Write tool 落檔再 splice），繞路本身沒被記錄 → 閘的實際攔截率與帳面不符。
   - **修法方向**：比對前先剝除 heredoc 區塊與引號字串，或只看指令的第一個 token。
   - **不要**用「加白名單」了事那是逐點消音。SSOT：`mcp/claude-userlevel/hooks/rules/verify-gate-commit.js`。
@@ -620,7 +612,7 @@
 
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
 
-- [ ] **smoke 04-onboard spec 補 app session 登入**：`95e80904` login hard-nav 後未登入導登入頁，spec 只帶 nginx basic-auth → 永久 fail。修法＝spec 加 app 登入步驟（Email/密碼從 env），或改用 `x-ops-sync-key` header。佐證 WORKLOG 2026-06-11 部署段。
+- [x] **【✅ 解決（不同做法）｜2026-08-30 稽核確認】smoke 04-onboard spec 補 app session 登入**：`95e80904` login hard-nav 後未登入導登入頁，spec 只帶 nginx basic-auth → 永久 fail。**未照原方向補 app 登入**，改為重新設計斷言：`lobster-factory/infra/hetzner-phase1-core/tests/e2e/smoke/04-onboard-page.spec.ts:1-27` 檔頭記載——nginx+登入閘的畫面本來就是真實未登入 production 的正確行為，改讓斷言接受這個畫面為 PASS；深層已驗證的 wizard 內容測試改標 `test.fixme` 保留（非刪除），待未來有 seeded E2E 帳號再補。最新一輪 `agency-os/reports/e2e/2026-08-26/smoke/results.json` 顯示 `"ok": true`，含 fixme 項在內全部不再永久 fail。
 
 #### F. ▶️ 可直接做 — 產品線
 
@@ -749,11 +741,7 @@
   - ✅ **Stage 2 n8n 橋接完成 2026-07-03**（workflow `RbrHNu3BUEmpNWeT` active，e2e 驗過；剩 WP 端裝 Fluent Forms+建表單+webhook feed+FluentCRM）。✅ Stage 3 程式+migration 0055 均已套（剩前端報價頁）。
   - 🟡 **Stage 4 程式完成、idle 已驗（2026-07-03）**：開閘 = SG .env 三 flag + `HETZNER_STAGING_TOKEN`（vault 現無，需決定專用 token vs 主 token）+ 重啟 next-admin（High/billable，需明示 go-ahead）→ Stage 5 串接監控。
 
-- [ ] **既有站接手（Soulful Expression Art Therapy）**
-  - **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。
-  - **下一步**：****Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。 **【下一步訂正 2026-08-25】原「下一步：Day 1 §1.1–1.3 + Day 2 實機驗收」已部分作廢**Day 2 staging 於 2026-08-16 決議 **abandon**（hosting 2026-11-12 到期，不在退場主機上建 staging；`ENVIRONMENT_REGISTRY.md` 該列已加刪除線）。
-  - **現行主線＝搬站**：見本檔「Soulful 網站搬離 Hostinger」與「機器買到後的接手點」兩條；本條僅剩 Day 1 §1.1 帳號層級權限確認（操作者必做）。
-  - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
+- [x] **【✅ 與上方 §245 重複，已一併結案，2026-08-30 稽核】~~既有站接手（Soulful Expression Art Therapy）~~** — 與「既有站接手 Day 1（Soulful Expression）」是同一件事的重複紀錄，結案說明見該條。M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）目標已由實際搬站取代：現行主機/備份策略見「⏭️ Soulful 搬站」大項與 `ks-aw-01-backup` 管線，不再需要獨立台帳。
 
 - [ ] `lobster-factory` A10-2 商業閉環實跑
   - **【未開始】**流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
@@ -764,7 +752,7 @@
   - **完成定義**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。
   - **證據**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
 
-- [ ] **【2026-08-15 開出】SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）**
+- [x] **【✅ MOOT，2026-08-30 稽核確認】~~SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）~~** — 從未查出輪詢來源（完成定義未達成），但這台 2 核 SG 機器本身已於 2026-08-28 整併進 ks-aw-01（8c/16t）、2026-08-30 刪除退租——「2 核資源被 docker 執行層開銷壓縮」這個前提已不存在。若 ks-aw-01 上出現類似的 containerd/dockerd 異常高 CPU，屬新現象，需另開新項目重新調查，不能直接沿用這條的診斷（核心數、負載特徵都不同）。
   - **【未查】** `top` 顯示 `containerd` 66.7%／`dockerd` 58.3%（生命週期平均），但**所有容器都 <1%**；context switch 約 1.6 萬/秒。vmstat 瞬時 idle 72%、IO wait 0、blocked 0，**無使用者影響**（Kuma 近 1 小時 0 DOWN、服務全 healthy）。
   - **同樣數字在 2026-08-15 07**:**29 session 開始時就存在**（當時追磁碟問題漏掉），故為長期狀態非新事件。
   - **推測**：有東西在密集輪詢 Docker API（netdata docker collector 或 promtail service discovery 最可能）。
@@ -804,7 +792,7 @@
 - **owner doc 參考**：[`docs/awarewave-auto-repair-plan-v3.2-final.md`](../docs/awarewave-auto-repair-plan-v3.2-final.md) + [`docs/awarewave-repair-center-app-architecture.md`](../docs/awarewave-repair-center-app-architecture.md) + [`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`](../docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md)
 - **跨機**：所有檔案 repo 內，git pull 同步；harness 跑在筆電 / 桌機任一台都可
 
-- [ ] **【2026-08-29 開出，同日更正】nginx system-sites 三檔 drift（🟢 小，SG 那半已作廢，只剩 EU 兩檔待抄）**
+- [x] **【✅ MOOT，2026-08-30 稽核確認】~~nginx system-sites 三檔 drift（🟢 小，SG 那半已作廢，只剩 EU 兩檔待抄）~~** — SG 那半本來就已作廢；現在 **EU（`204.168.175.41`）也已於 2026-08-30 隨 SG 一併刪除退租**，「EU 兩檔待抄」的前提（有一台活的 EU 可以去抄現場最新文字）不再成立，沒有現場可回填了。依本項自己的完成定義「若決定純存查則此項關閉，不需動作」——現在連「決定要不要抄」都不用問了，直接存查關閉：`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` 這兩份 repo 檔案就是 2026-08-28 遷移前的最後快照，標註即可。
   - **一句話**：覆審「25 處疑似死檔」時發現 3 個 vhost SSOT 檔的 repo 版本跟現行部署對不上；當時誤判 SG 是「現行 production」，已於 WORKLOG 2026-08-29（續5）更正——**SG（5.223.93.113）容器全滅、host nginx 本機實測 502，是搬家後的廢棄機，不是現行服務**。
   - **現在到哪**：~~`aware-wave-app-api-subdomains.conf` repo 領先 SG live，缺部署三項改善~~ → **作廢，不部署**（SG 已停用，任何改善應直接做在 ks-aw-01 現役的 `lobster-phase1/nginx/default.conf`，該檔今日已因 X-Forwarded-Proto bug 大改過）；`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` repo 落後 **EU** live 這半仍成立（EU 204.168.175.41 同樣容器全滅但 repo↔live 文字 drift 本身跟死活無關，純粹是歷史快照該不該回填的問題）。
   - **下一步**：SG 那三項改善**不執行**；EU 兩份文件視保存價值決定要不要把現場最新文字抄回 repo（純文件動作，無風險），或直接標註「反映 2026-08-28 遷移前最後狀態」存查即可，不強制同步。

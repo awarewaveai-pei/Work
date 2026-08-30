@@ -1,5 +1,51 @@
 # Worklog
 
+## 2026-08-30（續22）
+
+### 「整份 TASKS.md 全部掃一遍，看還有哪些其實已經做完但沒打勾」——7 個並行 agent VBC 稽核 ~90 項，13 個打勾 + 6 個文字訂正
+
+**觸發**：操作者要求全庫稽核 TASKS.md（1392 行）找出已完成但未打勾的項目。範圍太大（~90 個未勾選項，橫跨資安/POD/影片管線/治理/客戶站等完全不相干領域）不可能一人逐條讀完 WORKLOG 交叉比對，故拆 7 批並行派出 general-purpose agent，每個 agent 被要求遵守 VBC 協議（先讀 WORKLOG 找證據，再查 repo/git 實際狀態，不能只憑item自己的文字下結論），逐項回報 DONE/STILL_OPEN/PARTIAL/MOOT/UNCLEAR 四態 + 證據。
+
+**7 個 agent 全部跑完後逐一驗證其結論並落地**（不是照抄 agent 輸出，是核對後才動手）：
+
+**✅ 打勾（DONE，13 項）**：
+- 393/395：R2 remotion/蒙古孤兒物件——與已完成的清理項（:391）是同一次刪除的重複待辦，忘記刪掉
+- 397：EU 備份保留政策誤刪演練證明——2026-08-27 已修復（快照命名 glob 過濾），完成定義 4 項全驗證
+- 451：影片管線租戶邊界收尾 7 條——實地讀程式碼逐條核對，7/7 全部真的關閉（原文誤寫「部分結案」）
+- 521：Phase 4 雲端 routine 退役欄位——prompt 已全零邏輯，委派 py，殘留引用是刻意保留的 rollback 正本
+- 562：verify-gate-commit.js heredoc 誤判——已改用 commandSegments 錨定，檔頭註解證實
+- 623：smoke 04-onboard 登入——用不同設計解決（讓斷言接受登入閘畫面為正確行為，非加 app 登入）
+- 320：EU→Dedicated 搬機計畫——實際執行方式完全不同（OVH SYS-GAME-2 非 auction 機、一天內做完非等到 8月），但目標達成，與 §146 大項重複
+- 245/747：Soulful「既有站接手」重複兩份——實際搬站已完成，M1 台帳目標由真實搬站取代
+- 358：EU origin CF lock——EU 主機已刪除，功能由 ks-aw-01 新機制取代並實測 403 active；唯一存活子項（`awmainwp` 改名/2FA）拆成獨立新項
+- 762：SG dockerd/containerd CPU——調查從未完成，但機器已刪除，前提不存在
+- 802：nginx system-sites 三檔 drift——SG 早已作廢，EU 現在也刪除了，「兩檔待抄」的抄寫對象不存在
+
+**📝 文字訂正（PARTIAL，還開放但描述已過期，6 項）**：
+- 172：Soulful Hostinger 搬遷——主體遷移已完成 2026-08-28（比原訂 11/12 死線早很多，且用的機器/流程跟原計畫寫的不一樣），只剩網域轉 registrar + 等 hosting 到期
+- 314（原317）：Chatwoot U6——「等買機」閘門已解除（ks-aw-01 已上線），改標「可直接做但還沒排」
+- 309（原312）：Codex 額度——原時間表（8/31 解除）已過期作廢，額度今天實際循環了兩輪，補上即時查證結果
+- 529：check-backup-health.ps1——邏輯已修好，只剩 WARN 訊息字面沒寫出「無法證明可還原」
+- 544：git add -A 交叉污染——補上本 session 親身撞到的第 5、6 個實例（含我自己剛才把另一 session 的 39 個檔案帶進 commit 的事），並訂正不變量：問題不只在 `add -A`，`git commit` 本身就會提交整個 staging index
+- 556：Soulful 週備份失敗——現況已全部 Succeeded 且新機已換全新備份管線，標記疑似 MOOT 但物件層級（WPvivid 外掛新機上是否還在跑）未查證，留給操作者確認而非直接關閉
+
+**刻意沒動的（agent 有找到但判斷不該由我單方面關閉）**：430（WPvivid token，操作者已決定不處理，只是可能該搬到「已知風險」區塊——純分類問題，不影響正確性，跳過）；466/468（兩個項目的 markdown 本身損毀——466 是斷尾殘缺無 body，468 的標題被拆成 3 行夾雜孤立列點符號——這是文字重建工作，不是完成度判斷，留給下次專門處理）。
+
+[已修改]
+- `agency-os/TASKS.md`：13 項打勾 + 6 項文字訂正 + 1 項拆分新增（`awmainwp` 改名/2FA）
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純 TASKS.md 文字狀態訂正，無程式碼/腳本邏輯改動
+- REVIEW_DONE: critic=Deep（7 個獨立 general-purpose agent 各自 VBC 驗證，非自查）| verdict=pass | findings=0c/0m/0n——每項打勾前逐一核對 agent 引用的 file:line/WORKLOG 日期是否真實存在，未盲從 agent 輸出
+- BUGHUNT_DONE: scope=agency-os | grep=打勾後的 13 個項目關鍵字（如 `remotion`/`verify-gate-commit`/`cf-iprefresh`）| hits=符合預期，逐項見上方個別驗證引用
+
+[剩餘風險]
+- 全部 ~90 個未勾選項目中仍有 ~70 項未經這輪稽核觸碰（本次只覆蓋 agent 回報有異常的子集，其餘經 agent 驗證後確認「證據不足以推翻仍開放」，維持原狀，非疏漏）
+- 466/468 兩項的 markdown 損毀未修復，下次編輯這兩處附近時應該一併重建
+- 430 是否該搬到「已知風險」章節（純分類，非正確性問題）留待下次整理
+
+[rollback] 純文件用字新增/訂正，`git revert` 即可
+
 ## 2026-08-30（續21）
 
 ### 「做最完美的安排」：ks-aw-01 auto-reboot 復活 + boot 健康通知 + `/sg-reboot`+`/eu-reboot` 合併 + Let's Encrypt 孤兒帳號清理，全部真機驗證
