@@ -80,6 +80,18 @@ export function writeTracker(sid, entries) {
   fs.writeFileSync(trackerPathFor(sid), entries.join('\n') + '\n', 'utf8');
 }
 
+// Sibling tracker for git-add-scope-tracker / git-commit-scope-guard
+// (2026-08-30). Mirrors trackerPathFor/writeTracker exactly, separate file —
+// see lib/shared.js getGitStageTrackerPath for why these are not the same tracker.
+export function gitStagePathFor(sid) {
+  const sanitized = String(sid).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  return path.join(os.tmpdir(), `claude-git-staged-${sanitized}.txt`);
+}
+
+export function writeGitStageTracker(sid, entries) {
+  fs.writeFileSync(gitStagePathFor(sid), entries.join('\n') + '\n', 'utf8');
+}
+
 export function readFileSafe(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
 }

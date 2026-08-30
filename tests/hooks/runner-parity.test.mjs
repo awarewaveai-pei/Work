@@ -14,10 +14,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 import {
   runNode, freshSid, makeGitRepo, makeTmpHome,
   trackerPathFor, writeTracker, readFileSafe, REPO_ROOT, HOOKS_DIR,
+  gitStagePathFor, writeGitStageTracker,
 } from './helpers.mjs';
 
 const RUNNER = path.join(HOOKS_DIR, 'runner.js');
@@ -422,4 +424,251 @@ test('ID-4: log-error works on a fresh HOME (legacy sh silently failed)', () => 
   }, { home });
   assert.equal(r.status, 0);
   assert.match(readFileSafe(path.join(home, '.claude', 'error-log.md')) || '', /fatal: not a git repository/);
+});
+
+// ---------------------------------------------------------------- git-add-scope-tracker / git-commit-scope-guard (2026-08-30, v2 after critic round 1)
+
+test('git-add-scope-tracker: enumerable broad add flags (without ACK) all BLOCK', () => {
+  for (const cmd of ['git add -A', 'git add --all', 'git add .', 'git add -u', 'git add --update']) {
+    const r = run('PreToolUse', { session_id: freshSid('gast'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assert.equal(r.status, 2, `should block: ${cmd}`);
+    assert.match(r.stderr, /broad `git add`/);
+  }
+});
+
+test('git-add-scope-tracker: -p/-i are HARD BLOCKED with NO ack override (no non-interactive listing exists)', () => {
+  for (const cmd of ['git add -p', 'git add --patch', 'git add -i', 'git add --interactive']) {
+    const without = run('PreToolUse', { session_id: freshSid('gastni'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assert.equal(without.status, 2, `should block: ${cmd}`);
+    const withAck = run('PreToolUse', { session_id: freshSid('gastni'), tool_name: 'Bash', tool_input: { command: `# CONFIRMED-HIGH-RISK: t\n${cmd}` } });
+    assert.equal(withAck.status, 2, `should STILL block even with ACK: ${cmd}`);
+    assert.match(withAck.stderr, /no non-interactive way/);
+  }
+});
+
+test('git-add-scope-tracker M5 fix: broad add WITH the # CONFIRMED-HIGH-RISK ack unlocks and records the real dry-run listing (not blind trust)', () => {
+  const sid = freshSid('gastack');
+  const repo = makeGitRepo({ branch: 'main' });
+  fs.writeFileSync(path.join(repo, 'newfile.md'), 'n');
+  const r = run('PreToolUse', {
+    session_id: sid, tool_name: 'Bash',
+    tool_input: { command: '# CONFIRMED-HIGH-RISK: deliberate broad add, reviewed\ngit add -A' },
+  }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+  const recorded = fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.ok(recorded.includes('newfile.md'), `expected newfile.md in ${JSON.stringify(recorded)}`);
+});
+
+test('git-add-scope-tracker: explicit file list passes and is recorded in the tracker', () => {
+  const sid = freshSid('gast');
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git add fileA.md fileB.md' } });
+  assert.equal(r.status, 0);
+  const recorded = fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded, ['fileA.md', 'fileB.md']);
+  fs.rmSync(gitStagePathFor(sid), { force: true });
+});
+
+test('git-add-scope-tracker M2 fix: a chained `git add fileA && git add -A` still blocks on the SECOND segment (not just-the-first-segment scan)', () => {
+  const r = run('PreToolUse', { session_id: freshSid('gastm2'), tool_name: 'Bash', tool_input: { command: 'git add fileA.md && git add -A' } });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /broad `git add`/);
+});
+
+test('git-add-scope-tracker: backslash-continued multi-line `git add \\` records every real file (live dogfooding incident, 2026-08-30)', () => {
+  // runner.js's commandSegments() splits per LINE first, so each continuation
+  // line of a real `git add \` / file / file style command used to become its
+  // OWN segment that never matched RE_GIT_ADD -- the real paths were silently
+  // dropped and only the literal "\" got recorded as a tracked "file". Found
+  // live on the first real commit attempt using this gate (WORKLOG 2026-08-30).
+  const sid = freshSid('gastbs');
+  const cmd = 'git add \\\n  fileA.md \\\n  fileB.md';
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd } });
+  assert.equal(r.status, 0, r.stderr);
+  const recorded = fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded, ['fileA.md', 'fileB.md']);
+  fs.rmSync(gitStagePathFor(sid), { force: true });
+});
+
+test('git-commit-scope-guard: backslash-continued multi-line `git commit ... -- \\` pathspec tail is still detected', () => {
+  const sid = freshSid('gcsgbs');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  const cmd = 'git commit -m x -- \\\n  fileA.md';
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-add-scope-tracker M4 fix: git rm and git mv targets are recorded like git add', () => {
+  const sid = freshSid('gastrmmv');
+  const r1 = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git rm old.md' } });
+  assert.equal(r1.status, 0);
+  const r2 = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git mv from.md to.md' } });
+  assert.equal(r2.status, 0);
+  const recorded = fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded, ['old.md', 'from.md', 'to.md']);
+  fs.rmSync(gitStagePathFor(sid), { force: true });
+});
+
+test('git-commit-scope-guard: bare commit with ONLY this session\'s own staged file → allow', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } }); // auto-staged
+  writeGitStageTracker(sid, ['fileA.md']);
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-commit-scope-guard: bare commit with ANOTHER session\'s staged file → BLOCK, names the file', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } }); // this session's file, auto-staged
+  writeGitStageTracker(sid, ['fileA.md']);
+  // a DIFFERENT session stages fileB.md in the SAME repo/index — the real-world
+  // shape of the 2026-08-30 incidents this gate exists for.
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /would include files this session never/);
+  assert.match(r.stderr, /fileB\.md/);
+});
+
+test('git-commit-scope-guard C2 fix: a commit MESSAGE containing literal " -- " text is NOT trusted as a real pathspec (must still catch the foreign file)', () => {
+  const sid = freshSid('gcsgc2');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  // real commit-message style found 53/400 times in this repo's own history —
+  // must NOT be mistaken for a `-- <pathspec>` tail.
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m "fix(oracle): crash -- StrictMode Count"' } }, { cwd: repo });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /would include files this session never/);
+});
+
+test('git-commit-scope-guard: explicit pathspec tail (git-verified) allows even with another session\'s file staged', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x -- fileA.md' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-commit-scope-guard: pathspec on the LAST LINE of a heredoc-style commit is still detected (the exact shape this gate was built for)', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  const heredoc = [
+    'git commit -m "$(cat <<\'EOF\'',
+    'Multi-line commit message.',
+    '',
+    'Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>',
+    'EOF',
+    ')" -- fileA.md',
+  ].join('\n');
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: heredoc } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-commit-scope-guard: empty tracker + staged content → WARN, not BLOCK', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  // no writeGitStageTracker call — this session never recorded a git add
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /with staged files, but this session never recorded/);
+});
+
+test('git-commit-scope-guard: --amend is skipped entirely (documented carve-out)', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, []); // deliberately empty + unrelated file staged — would WARN if not skipped
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit --amend --no-edit' } }, { cwd: repo });
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stderr, /with staged files, but this session never recorded/);
+});
+
+test('git-commit-scope-guard: prose mention of "git commit" in a heredoc does NOT trip the gate (same false-positive class as ID-5)', () => {
+  const sid = freshSid('gcsg');
+  const heredoc = [
+    'python3 - <<\'PY\'',
+    's = "run git commit -m x when ready"',
+    'print(s)',
+    'PY',
+  ].join('\n');
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: heredoc } });
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stderr, /would include files this session never|with staged files, but this session never recorded/);
+});
+
+test('git-commit-scope-guard M3 fix: `git commit -a`/`--all`/`-am` (auto-stage bypass) is BLOCKED', () => {
+  for (const cmd of ['git commit -a -m x', 'git commit --all -m x', 'git commit -am x']) {
+    const repo = makeGitRepo({ branch: 'main' });
+    const r = run('PreToolUse', { session_id: freshSid('gcsga'), tool_name: 'Bash', tool_input: { command: cmd } }, { cwd: repo });
+    assert.equal(r.status, 2, `should block: ${cmd}`);
+    assert.match(r.stderr, /git commit -a.*auto-stages/);
+  }
+  // plain -m (no 'a' cluster) must NOT trip the broad-commit check
+  const repo = makeGitRepo({ branch: 'main' });
+  const ok = run('PreToolUse', { session_id: freshSid('gcsga'), tool_name: 'Bash', tool_input: { command: 'git commit -m "add a feature"' } }, { cwd: repo });
+  assert.equal(ok.status, 0, ok.stderr);
+});
+
+test('git-commit-scope-guard cwd-guard: `-C <dir>` on the commit itself skips the check (fail open, documented)', () => {
+  const sid = freshSid('gcsgc');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, []); // empty tracker — would normally WARN if the check ran
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: `git -C ${repo} commit -m x` } }, { cwd: repo });
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stderr, /with staged files, but this session never recorded/);
+});
+
+test('git-commit-scope-guard cwd-guard: a leading `cd <dir> &&` in the same command skips the check (fail open, documented)', () => {
+  const sid = freshSid('gcsgcd');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, []);
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'cd /somewhere-else && git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0);
+});
+
+// ---------------------------------------------------------------- git-commit-scope-guard PostToolUse pruning (C1 fix)
+
+test('git-commit-scope-guard C1 fix: a commit that never actually ran (e.g. blocked by a sibling rule) leaves the tracker UNTOUCHED', () => {
+  const sid = freshSid('gcsgpost1');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  // Deliberately do NOT run `git commit` for real — fileA.md is still staged,
+  // simulating a sibling PreToolUse rule (verify-gate-commit, dangerous-bash,
+  // ...) having blocked the same Bash call before it executed.
+  const r = run('PostToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean), ['fileA.md']);
+});
+
+test('git-commit-scope-guard C1 fix: a commit that FULLY succeeded clears the tracker', () => {
+  const sid = freshSid('gcsgpost2');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  const commitResult = spawnSync('git', ['commit', '-m', 'x'], { cwd: repo, encoding: 'utf8' });
+  assert.equal(commitResult.status, 0, commitResult.stderr);
+  const r = run('PostToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean), []);
+});
+
+test('git-commit-scope-guard C1 fix: a pathspec-scoped PARTIAL commit shrinks the tracker to the remaining staged file', () => {
+  const sid = freshSid('gcsgpost3');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a', 'fileC.md': 'c' } });
+  writeGitStageTracker(sid, ['fileA.md', 'fileC.md']);
+  const commitResult = spawnSync('git', ['commit', '-m', 'x', '--', 'fileA.md'], { cwd: repo, encoding: 'utf8' });
+  assert.equal(commitResult.status, 0, commitResult.stderr);
+  const r = run('PostToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x -- fileA.md' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(fs.readFileSync(gitStagePathFor(sid), 'utf8').split('\n').filter(Boolean), ['fileC.md']);
 });

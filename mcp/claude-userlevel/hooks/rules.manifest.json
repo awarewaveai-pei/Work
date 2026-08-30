@@ -9,7 +9,9 @@
           "branch-protection",
           "commit-quality",
           "verify-gate-commit",
-          "high-risk-bash-warn"
+          "high-risk-bash-warn",
+          "git-add-scope-tracker",
+          "git-commit-scope-guard"
         ]
       },
       {
@@ -45,7 +47,8 @@
       {
         "matcher": "Bash",
         "rules": [
-          "audit-log"
+          "audit-log",
+          "git-commit-scope-guard"
         ]
       },
       {

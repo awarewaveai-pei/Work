@@ -64,6 +64,54 @@ function getTrackerPath(sid) {
   return path.join(os.tmpdir(), `claude-unverified-code-${sid}.txt`);
 }
 
+// Sibling tracker for git-commit-scope-guard / git-add-scope-tracker (2026-08-30):
+// records which files THIS session has explicitly `git add`-ed, so a bare
+// `git commit` can be checked against real `git diff --cached` output instead
+// of parsing commit-message text (which the heredoc convention makes unreliable
+// — see rules/git-commit-scope-guard.js header for the incident history).
+// Deliberately a SEPARATE file from getTrackerPath's unverified-code tracker:
+// different lifecycle (cleared on successful commit, not on /verify-recent),
+// different consumers — sharing one file would let either gate's read/write
+// timing corrupt the other's state.
+function getGitStageTrackerPath(sid) {
+  return path.join(os.tmpdir(), `claude-git-staged-${sid}.txt`);
+}
+
+// Backslash line-continuation join, for git-add-scope-tracker / git-commit-scope-guard
+// (2026-08-30, discovered live while dogfooding this exact gate — see WORKLOG). Neither
+// runner.js's commandExpanded/commandSegments NOR these two rules originally accounted
+// for a real multi-line shell command like:
+//   git add \
+//     fileA.md \
+//     fileB.md
+// commandSegments() splits per LINE first (runner.js:84-93), so each continuation line
+// becomes its OWN segment that does not start with "git add" -- the verb regex never
+// sees the file paths on those lines, and they were silently dropped from the tracker
+// (a live incident: the very first real commit attempt using this gate recorded the
+// literal string "\" as a tracked "file" instead of the 16 real paths). Deliberately
+// NOT fixed inside runner.js's own commandSegments(): that function backs 20 other
+// rules with their own established, tested line-anchoring assumptions (e.g. the
+// heredoc/rm-rf false-positive fixes) -- joining there is a much bigger blast radius
+// than these two rules need to close their own gap.
+function joinBackslashContinuations(text) {
+  return String(text).replace(/\\\r?\n[ \t]*/g, ' ');
+}
+
+// Same segmentation runner.js's commandSegments() does (split per line, then by shell
+// chain operators), but on backslash-joined text first. Kept here (not duplicated in
+// both rule files) because it is real behavior, not just a regex literal.
+function commandSegmentsBackslashJoined(commandExpanded) {
+  const joined = joinBackslashContinuations(commandExpanded);
+  const segs = [];
+  for (const line of joined.split('\n')) {
+    for (const part of line.split(/&&|\|\||;|\|/)) {
+      const t = part.trim();
+      if (t) segs.push(t);
+    }
+  }
+  return segs;
+}
+
 // Normalize path for dedup: lowercase on Windows (case-insensitive FS), as-is elsewhere.
 // Fixes M4 (phantom dedup entries when path casing differs).
 function normalizePath(p) {
@@ -203,6 +251,9 @@ module.exports = {
   STDERR_MAX_LINES,
   getSessionId,
   getTrackerPath,
+  getGitStageTrackerPath,
+  joinBackslashContinuations,
+  commandSegmentsBackslashJoined,
   normalizePath,
   readTracker,
   writeTracker,

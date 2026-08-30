@@ -1,5 +1,85 @@
 # Worklog
 
+## 2026-08-30（續23）
+
+### 新增機械閘 `git-add-scope-tracker` + `git-commit-scope-guard`：治本今天親身撞見兩次的 commit 交叉污染（含 critic 抓到 2C+5M 的完整修正紀錄）
+
+**觸發**：操作者問「commit 被搶走怎麼處理」，討論後選定治本方案（對照 git 真實 staged 狀態，不解析 commit 指令文字），操作者明示「你再做最嚴謹的研究」+ R0 架構師模式，要求先研究後實作。
+
+**研究先行（避免重工/避免踩到既有機制）**：先派 agent 通讀 `runner.js`/`verify-gate-commit.js`/`lib/shared.js`/`rules.manifest.json`/`tests/hooks/*` 全套，抓到一個會決定設計方向的關鍵事實：hook 的 `commandSegments` 是**逐行**切的（`runner.js:84-93`），而本 repo 強制規範的 commit 訊息是 heredoc 多行寫法——這代表任何「檢查 commit 指令文字裡有沒有帶 pathspec」的方案，heredoc 收尾與 pathspec 大機率跟 `git commit` 本身落在不同行/segment，系統性地會漏檢。因此方案從「解析指令文字」（方案 A）改為「對照 git 真實 staged 狀態」（方案 B）——這個轉向本身就是研究階段的產出，不是憑空選的。
+
+**研究過程中額外發現**（原方案沒預期到）：讀 `rules.manifest.json` 才發現 Bash matcher 底下**還有 `branch-protection.js` 跟 `commit-quality.js` 兩個既有 git 相關 rule**（先前只查過 `verify-gate-commit.js`），其中 `commit-quality.js:33` 早就用 `spawnSync('git', ['diff','--cached','--name-only'])` 做真實 git 狀態查詢——**證實方案 B 的技術路線在這個 repo 裡已經有先例**，不是引入新技術，是延用既有 pattern。
+
+**v1 實作**：`lib/shared.js` 新增 `getGitStageTrackerPath(sid)`；`rules/git-add-scope-tracker.js`（擋廣域 add）+ `rules/git-commit-scope-guard.js`（bare commit 前比對真實 staged 狀態）；掛上 `rules.manifest.json`；`tests/hooks/runner-parity.test.mjs` 補 9 個測試。
+
+**critic 覆審（依 R0/`/verify-recent` 強制流程，commit 前必經）——抓到 2 個 Critical + 5 個 Major，全部在真實 runner 上覆現，非臆測**：
+- 🔴 **C1**：`git-commit-scope-guard.js` 在 **PreToolUse 階段**、commit 真的送出**之前**就清空 tracker（pathspec 分支與「已完全覆蓋」分支各清一次）。但 `runner.js` 的設計是**同一個 matcher group 裡的每條規則一定會全部跑完**、聚合完所有 verdict 才決定要不要 exit 2（沒有「一個 block 就短路」）——所以就算「同一次呼叫」被別的規則（`verify-gate-commit`、`dangerous-bash`……）擋下，我這條規則自己的 side effect（清空 tracker）早就已經發生。等於閘會**永久退化成 warn-only**，一次誤判就報廢剩下整個 session。
+- 🔴 **C2**：pathspec 偵測是純文字形狀判斷（`/\s--\s+\S/` 比對最後一行），沒有驗證那真的是路徑。**本 repo 自己歷史 commit 訊息裡 53/400 次用了字面 " -- "**（例如 "fix(oracle): crash -- StrictMode Count"）——這種訊息會被誤判成「有 pathspec」，直接放行並清空 tracker，**正是這道閘存在的目的要擋的那個漏洞本身，靜默發生**。
+- 🟠 M1：`git diff --cached --name-only` 用原始換行切字串比對，本 repo 632 個追蹤檔案帶空白，會誤判；也沒有對 tracker 裡的目錄/glob 做 git 原生 pathspec 展開。
+- 🟠 M2：只掃第一個符合的 `git add` segment，`git add fileA && git add -A` 這種鏈式指令的第二段直接漏檢。
+- 🟠 M3：完全沒處理 `git commit -a`/`--all`/`-am`——這個旗標會自動 stage 所有已追蹤檔案的修改，整條閘直接繞過。
+- 🟠 M4：沒追蹤 `git rm`/`git mv`，這兩個指令一樣會改動 index，卻不會被記進「本 session 添加過的檔案」。
+- 🟠 M5：沒有 ACK 豁免——**而這正是 TASKS.md:568 這一項自己寫的完成定義**（「豁免需在命令首行寫明理由，比照 `high-risk-bash-warn.js` 的 `# CONFIRMED-HIGH-RISK:` 形式」），我自己讀過這段卻在 v1 漏做了；用 `Read` 重新核對 TASKS.md:565-570 逐字確認 critic 引用無誤，不是憑空指控。
+
+**v2 修正（逐條對應上面 7 個 finding）**：
+1. **C1 修法**：不再嘗試在 PreToolUse 判斷「這次會不會成功」。改成新增 `git-commit-scope-guard` 的 **PostToolUse** 分支（掛進 `rules.manifest.json` PostToolUse→Bash matcher，`audit-log` 旁邊），指令真的跑完後直接問 git 本身「tracker 裡的檔案現在還有幾個仍然 staged」——被擋下/失敗的 commit 全部仍 staged（tracker 不動）；完全成功的 commit 全部不再 staged（tracker 清空）；pathspec 部分提交的 commit 只剩沒被提交的那些（tracker 縮小到剩餘部分）。不依賴猜測 `tool_response` 的欄位形狀，直接用同一套「問 git 真相」的哲學自我驗證。
+2. **C2 修法**：抽出的 pathspec token 改用 `git ls-files --error-unmatch --  <tokens>` 真實驗證是不是 git 認得的路徑，不是文字形狀比對。訊息文字裡的 " -- " 因為後面接的字不是真實檔名，驗證失敗，正常走回真實 staged 比對邏輯。
+3. **M1 修法**：`git diff --cached --name-only -z`（NUL 分隔），且用第二次 `git diff --cached --name-only -z -- <tracker entries>` 讓 git 自己的 pathspec 引擎算「tracker 覆蓋了哪些 staged 檔案」，不再自己手刻字串比對。
+4. **M2 修法**：`segments.filter(...)` 取代 `segments.find(...)`，逐一處理每個符合的 add/rm/mv segment。
+5. **M3 修法**：偵測 commit segment 上的 `-a`/`--all`/`-am` 旗標叢集，直接 BLOCK 要求先具名 `git add`（跟廣域 add 同一套「拿掉能力」哲學，因為要正確列舉 `-a` 會 stage 什麼需要跟 `-A` 一樣的 dry-run 機制，這條路徑太少見不值得做）。
+6. **M4 修法**：`git-add-scope-tracker.js` 新增 `RE_GIT_RM`/`RE_GIT_MV`，比照 `git add` 一樣記錄目標路徑進 tracker。
+7. **M5 修法**：`-A`/`--all`/`-u`/`--update`/裸 `.` 允許用首行 `# CONFIRMED-HIGH-RISK: <理由>` 解鎖——解鎖後**不是無條件信任全部**，而是先跑 `git add -n <同樣旗標>`（dry-run）拿到真實會被加入的檔案清單再記進 tracker，讓解鎖後的下一次 bare commit 仍然有意義的 tracker 可查。`-p`/`--patch`/`-i`/`--interactive` **沒有 ACK 例外**（Claude 沒有 TTY，這兩個模式本來就不該被下達，也沒有非互動式的方式能列舉它們會做什麼）。
+8. 順手加：`-C <dir>` 出現在 add/commit segment 上、或指令裡任何位置出現 `cd <dir>`，兩條規則都直接 fail open（return null）——因為這代表指令實際操作的 repo 目錄跟 `ctx.cwd`（Node 進程本身的 cwd）可能對不上，寧可不查也不要對錯的 repo 下判斷。
+
+**額外核對（不是 critic 提的，自己重讀 TASKS.md:565-570 時發現一致）**：TASKS.md 570「具名 add 也擋不住」描述的是**不同的失效模式**（同一檔案內容 commingle，不是檔案清單歸屬），跟這次修的 7 個 finding 無關，維持完全不動——確認過不是漏改。
+
+**測試**：`tests/hooks/runner-parity.test.mjs` 從 9 個擴充到 22 個（每個 critical/major finding 至少一個直接對應的回歸測試，包含 3 個 PostToolUse pruning 測試：未執行不清空／完全成功清空／pathspec 部分成功縮小）。
+
+**誠實邊界（避免 R4/VBC 違規，v1 起就成立，v2 未變）**：TASKS.md 544「AO-CLOSE 的 git add -A」**仍不能整條打勾**——`ao-close.ps1:652` 現在還是 `git add -A`，但那是 PowerShell 腳本**內部**呼叫 git，Claude 的 Bash 工具指令文字只看得到 `powershell ao-close.ps1`，新閘完全看不見那個內部呼叫，擋不到，需要另一個 R0 任務處理 `ao-close.ps1` 本體。
+
+[已修改]
+- `mcp/claude-userlevel/hooks/lib/shared.js`：新增 `getGitStageTrackerPath`
+- `mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js`（新增，v2：ACK 豁免＋dry-run 記錄＋rm/mv 追蹤＋全 segment 掃描＋`-C`/`cd` 防護）
+- `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js`（新增，v2：PostToolUse 修剪＋`git ls-files` 驗真 pathspec＋`-z` NUL 分隔比對＋`-a`/`--all`/`-am` 攔截＋`-C`/`cd` 防護）
+- `mcp/claude-userlevel/hooks/rules.manifest.json`：PreToolUse 掛兩個新規則；PostToolUse→Bash matcher 加掛 `git-commit-scope-guard`（修剪分支）
+- `mcp/claude-userlevel/hooks/README.md` + `README.zh-TW.md`：規則清單補充說明（含 v2 行為）
+- `.codex/hooks/{lib/shared.js,rules.manifest.json,rules/git-add-scope-tracker.js,rules/git-commit-scope-guard.js,README.md,README.zh-TW.md}`：鏡射同步，逐一 `diff` 確認位元級相同
+- `tests/hooks/runner-parity.test.mjs`：9→22 個測試案例（新增：ACK 解鎖、rm/mv 追蹤、`-a`/`--all` 攔截、C2 文字陷阱回歸、`-C`/`cd` 防護、3 個 PostToolUse 修剪案例）
+- `agency-os/TASKS.md`：544 更新為 v2 完整修正記錄（不打勾，邊界不變）；570 核對後確認不動
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=1（80 個測試，79 過 1 敗）| 結果=唯一失敗案例（`accumulator (PostToolUse)`）跟本次改動的檔案（`accumulator.js`/`batch-format.js`）零 diff（`git status --porcelain` 確認未改動），且該測試邏輯本身也在本次未改動的行號範圍——與 v1 那次一致，是既有環境缺陷不是新引入的迴歸；新增/修訂的 22 個 git-scope-guard 測試全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check` 對 2 個 rule 檔 + `python -c "import json; json.load(...)"` 驗 manifest JSON | exit=0（全部）
+- REVIEW_DONE: critic=Deep（真實 critic subagent，非自查）| verdict=fail→已修正 | findings=2c/5m/0n（全部 7 條逐一修正，見上方「v2 修正」對應清單；C1/C2 兩條 critical 各自有專門的回歸測試鎖住修正不會被之後的改動退回）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests | grep=`hasPathspecTail`（v1 舊函式名，確認 v2 沒有殘留引用）+ `getGitStageTrackerPath`（確認所有呼叫點都指向同一份定義，Pre/Post 兩個 rule 檔跟鏡射版一致）+ `git-add-scope-tracker\|git-commit-scope-guard`（確認 TASKS.md/README 雙語版都同步更新，沒有只改一邊） | hits=0（`hasPathspecTail`，確認乾淨移除）+ 9 處（`getGitStageTrackerPath`，全部是預期中的定義/呼叫/鏡射/測試 helper，逐一核對過路徑無誤）
+
+[剩餘風險]
+- ao-close.ps1 內部的 `git add -A`（TASKS.md 544）仍是真實風險，新閘管不到，需要另外的 R0 任務處理
+- TASKS.md 570 描述的「同檔案內容 commingle」問題完全沒有解法，新閘不觸及
+- `commandSegments` 是逐空白切字串、不解析引號的既有限制（`runner.js` 全部規則共用）：commit 訊息裡剛好有 `-am`/`-a` 形狀的字串且緊接在非 `-m`/`--message` 等已知值旗標後面，理論上仍可能誤判成 `-a` 叢集旗標而多擋一次——已在 code comment 標註為「已知限制、跟其他規則共享同一個限制」，方向是多擋不會少擋（安全側），不是靜默放行
+
+[rollback] `rules.manifest.json` 拿掉三行（Pre 兩條 + Post 一條）= 完全復原，不影響 runner 本體或其他 rule；`git revert` 即可
+
+### 加碼：dogfood 這道閘時親手撞見第 3 個真實 bug（backslash 續行）——修正 + 回歸測試
+
+**怎麼發現的**：v2 修完 critic 的 2C+5M 後，照 R0 精神親自拿這道閘來 commit 自己這批改動（`git add <16 個具名檔案>` + `git commit -m "..." -- <同 16 檔>`），用多行 `git add \`（每個檔案一行、行尾 `\` 續行）的寫法送出。閘**如預期擋下**，但列出的「本 session 的 add 紀錄」只有一個字元：`\`。
+
+**根因**：`runner.js:84-93` 的 `commandSegments()` 是**先按行切**，再按 `&&`/`;`/`|` 切。一個真實的多行 `git add \` 指令，續行（`  fileA.md \`）本身**不是**以 `git add` 開頭，所以永遠不會命中 `RE_GIT_ADD`——續行上的檔名對這條規則完全隱形，只有第一行「git add \」被當成一個 segment，尾巴的 `\` 被誤當成一個檔名記錄下來。指令本身在 bash 層是正確執行的（git 真的有 stage 到全部 16 個檔案），壞的只是這道閘自己內部的文字解析。
+
+**修法**：在 `lib/shared.js` 新增 `joinBackslashContinuations()`（把 `\<換行>` 接回同一行）+ `commandSegmentsBackslashJoined()`（用同一套 join-then-split 邏輯重做一次 `commandSegments()` 的行為，但作用在 join 過的文字上）。兩個新 rule 檔改用這個新函式取代 `ctx.commandSegments`；`extractPathspecTail` 的輸入也先 join 過。**刻意不改 `runner.js` 本體的 `commandSegments()`**——那個函式背後有 20 條其他規則依賴既有的逐行錨定假設（含先前修過的 heredoc/rm-rf 誤判），現在為了這兩條新規則去動共用核心，爆炸半徑遠大於這次要修的範圍；這個 join 邏辑只在這兩條新規則內部生效。
+
+[已修改（加碼）]
+- `mcp/claude-userlevel/hooks/lib/shared.js`：新增 `joinBackslashContinuations`/`commandSegmentsBackslashJoined`
+- `mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js`：改用新函式取代 `ctx.commandSegments`
+- `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js`：同上，`extractPathspecTail` 輸入也先 join
+- `.codex/hooks/{lib/shared.js,rules/git-add-scope-tracker.js,rules/git-commit-scope-guard.js}`：鏡射同步，位元級 diff 確認
+- `tests/hooks/runner-parity.test.mjs`：新增 2 個回歸測試（backslash 續行的 `git add` 與 `git commit -- pathspec` 各一）
+
+[驗證結果（加碼）]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=1（82 個測試，81 過 1 敗，唯一失敗仍是同一個跟本次改動零關聯的既有 `accumulator` 缺陷）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git add <16 個具名檔案>` 改成單行寫法 + `git commit -m "..." -- <同 16 檔>` | 結果見下方本次 commit 本身（用這道閘保護自己這次 commit，是最直接的真實驗證）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests | grep=`joinBackslashContinuations\|commandSegmentsBackslashJoined` | hits=11（全部是預期中的定義×2、匯出×2、呼叫點×3、鏡射×3、comment 引用×1，逐一核對路徑無誤，無殘留舊呼叫）
+
 ## 2026-08-30（續22）
 
 ### 「整份 TASKS.md 全部掃一遍，看還有哪些其實已經做完但沒打勾」——7 個並行 agent VBC 稽核 ~90 項，13 個打勾 + 6 個文字訂正
