@@ -1,0 +1,199 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/governance/document-registry.schema.yaml"
+title: Document Registry
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of Execution Contract §4's
+  `documents[]` static registry (EC:174-210) — the fixed catalog of every
+  mother document plus the Architecture Constitution, each with a stable
+  `id`, its on-disk `filename`, and whether it is unconditionally required
+  or required only for specific task types. EC §92 promised this file by
+  name; MACHINE_READABLE_SPEC_PLAN.md tracked it as `READY` pending OQ-1
+  (identity headers), now resolved 2026-08-30 by ADR-017/proposals 040-041
+  — all four registry entries now have a real `Document ID`/`Version`
+  header in their own file, so this registry's `id` values are no longer
+  registry-only claims with nothing on the other end.
+
+  This file is NOT the per-execution runtime record. EC §4's second block
+  (`normative_documents[]`, EC:212-230 — version/sha256/loaded_sections
+  actually loaded for one Execution) is already fully covered by
+  `execution/manifest.schema.yaml`'s existing `normative_documents`
+  property (see that file's own L25, L121 citations of EC:257-273). This
+  file supplies only the static catalog EC §4's FIRST block defines — the
+  fixed list of what documents exist and their requiredness rule, not what
+  any one execution actually loaded.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §4 Document Registry, first block (L180-210, the `documents:` example) — this file is that example promoted to a real, validated schema"
+  - "docs/adr/ADR-017-mother-document-identity-headers.md (ACCEPTED 2026-08-30) — the identity-header decision this registry's four `id` values now correspond to real per-document headers for"
+  - ".ai/proposals/040-master-plan-identity-header/PROPOSAL.md, .ai/proposals/041-method-atlas-identity-header/PROPOSAL.md (both APPLIED 2026-08-30) — the two mother-document edits that gave `ai-lego.master-plan` and `ai-lego.method-atlas` their real headers"
+  - "Architecture-Constitution-v1.md:3 — `ai-lego.architecture-constitution`'s own Document ID/Version header"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:182-209 — the exact `id`/`filename`/`major`/`required`/`required_for` field shapes this schema validates, transcribed verbatim"
+
+decided_by: >
+  No ADR. EC §4 (L180-210) is the sole, uncontested definition of this
+  registry's shape and its four current entries — a direct, Low-risk
+  transcription per MACHINE_READABLE_SPEC_PLAN.md's own precedent for
+  uncontested single-source compilation ("命名裁決屬 Low-risk，可在
+  Phase 3 內部直接定案，不需要 ADR"). The `required_for` task-type values
+  (nontrivial_analysis / architecture_change / incident / security_review
+  / db_migration / policy / research / strategy / decision) are likewise
+  transcribed verbatim from EC:190-199 — this is the first machine-readable
+  home for that 9-value list; grep-confirmed it exists nowhere else in
+  `specs/`, so this file is that list's single source of truth going
+  forward, not a second copy of an existing enum.
+
+compilation_decisions:
+  - question: >
+      `execution/manifest.schema.yaml`'s `normative_documents` property
+      already hard-codes its own closed 4-value `document_id` enum
+      (`ai-lego.master-plan` / `ai-lego.method-atlas` /
+      `ai-lego.execution-contract` / `ai-lego.architecture-constitution`,
+      manifest.schema.yaml L289-293), independently of this file. Should
+      this file's `documents[].id` enum be merged into manifest.schema.yaml
+      via a hard `$ref`, so there is exactly one place the 4 ids are
+      spelled out?
+    decision: >
+      Not in this file's own scope. `manifest.schema.yaml` is an existing
+      ACTIVE, critic-reviewed file (2026-08-29, with a documented MINOR
+      finding correction already on record for this exact field). Silently
+      refactoring its enum to `$ref` this new file would touch stable,
+      already-verified content beyond what "build the missing
+      document-registry.schema.yaml" asked for — a separate, deliberate
+      decision, not a side effect of filling this gap. Recorded as
+      `OQ-DOCREG-1` below instead of resolved by assumption.
+    reasoning: >
+      Two independent lists of the same 4 literal strings is a real,
+      acknowledged duplication risk (the exact class of bug this session
+      caught twice today in mother-document prose — see WORKLOG 續24). The
+      honest response to finding it is disclosure, not silent duplication
+      and not an unrequested refactor of someone else's already-reviewed
+      file in the same commit.
+
+# ---------------------------------------------------------------------------
+# Schema body
+# ---------------------------------------------------------------------------
+type: object
+required: [documents]
+properties:
+
+  documents:
+    type: array
+    description: "EC §4's static registry (L180-210). Exactly the 4 entries that exist today; a 5th mother document would need both a new entry here and a coordinated manifest.schema.yaml update (see OQ-DOCREG-1)."
+    minItems: 4
+    items:
+      $ref: "#/definitions/document_registry_entry"
+    allOf:
+      - contains: { properties: { id: { const: "ai-lego.master-plan" } } }
+      - contains: { properties: { id: { const: "ai-lego.method-atlas" } } }
+      - contains: { properties: { id: { const: "ai-lego.execution-contract" } } }
+      - contains: { properties: { id: { const: "ai-lego.architecture-constitution" } } }
+    default:
+      - id: "ai-lego.master-plan"
+        filename: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md"
+        major: 1
+        required: true
+      - id: "ai-lego.method-atlas"
+        filename: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+        major: 1
+        required_for:
+          - nontrivial_analysis
+          - architecture_change
+          - incident
+          - security_review
+          - db_migration
+          - policy
+          - research
+          - strategy
+          - decision
+      - id: "ai-lego.execution-contract"
+        filename: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
+        major: 1
+        required: true
+      - id: "ai-lego.architecture-constitution"
+        filename: "Architecture-Constitution-v1.md"
+        major: 1
+        required: true
+
+definitions:
+  document_registry_entry:
+    type: object
+    required: [id, filename, major]
+    oneOf:
+      - required: [required]
+      - required: [required_for]
+    properties:
+      id:
+        type: string
+        description: "Stable Document ID, matching the document's own in-file 'Document ID' header (EC §1, L78-86 identity rule) — this registry and each document's own header must agree; a mismatch is a real defect, not a style choice."
+        enum:
+          - "ai-lego.master-plan"
+          - "ai-lego.method-atlas"
+          - "ai-lego.execution-contract"
+          - "ai-lego.architecture-constitution"
+      filename:
+        type: string
+        description: "On-disk filename, PROJECT_ROOT-relative (OQ-3's path convention, .ai/research/phase-0/open-questions.yaml)."
+      major:
+        type: integer
+        minimum: 1
+        description: "EC §1's major-version lineage number (L80-81, 'v1 代表 major lineage; breaking normative change 才升 _v2'). NOT the same as the document's own internal SemVer (e.g. 1.0.0) — major here tracks filename-lineage breaks only."
+      required:
+        type: boolean
+        const: true
+        description: "Unconditionally required for every non-trivial task, regardless of task type. Mutually exclusive with required_for (a document is either always required or conditionally required, never both, matching EC's own 3-always-required + 1-conditional split)."
+      required_for:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: "Task types for which this document is mandatory reading (EC §3 Required Document Resolution). Only ai-lego.method-atlas uses this today — the other 3 are unconditionally required."
+        items:
+          $ref: "#/definitions/required_for_task_type"
+
+  required_for_task_type:
+    type: string
+    description: "The 9-value task-type vocabulary EC §4's own worked example uses (L190-199) to scope ai-lego.method-atlas's required-reading condition. First machine-readable home for this list -- see decided_by above."
+    enum:
+      - nontrivial_analysis
+      - architecture_change
+      - incident
+      - security_review
+      - db_migration
+      - policy
+      - research
+      - strategy
+      - decision
+
+open_questions:
+  - id: "OQ-DOCREG-1"
+    question: >
+      Should `execution/manifest.schema.yaml`'s independently-declared
+      `document_id` enum (4 values, manifest.schema.yaml L289-293) be
+      refactored to `$ref` this file's `documents[].id` enum, eliminating
+      the current 2-copies-of-4-strings duplication?
+    owner: "operator or a future Phase 3 consolidation pass"
+    blocks: "nothing in either file's own validity today -- both enums currently agree on the same 4 values; this is a latent drift risk (if a 5th document is ever added, someone must remember to update both places), not a present defect"
+
+verification:
+  method: >
+    Read Execution Contract §4 (L174-232) in full, both the `documents:`
+    static block and the `normative_documents:` runtime block. Read
+    `execution/manifest.schema.yaml`'s `normative_documents` property
+    (L180-294) in full to confirm the runtime-record half is already
+    covered there, not duplicated here. Read each of the 4 real documents'
+    own identity headers (Master Plan L1-9, Method Atlas L1-11,
+    Execution Contract's own EC §4 self-registration, Architecture-
+    Constitution-v1.md L1-3) to confirm every `id` value here has a real,
+    matching header on the other end -- not true before 2026-08-30 (OQ-1
+    was unresolved), true now.
+  note: >
+    No mother document was modified to produce this file. The `required`/
+    `required_for` mutual-exclusivity constraint and the closed 4-value
+    `id` enum are both direct transcriptions of EC §4's own worked example,
+    not new Phase 3 design. The one real compilation decision -- whether to
+    merge this file's id list with manifest.schema.yaml's independent copy
+    -- is recorded as OQ-DOCREG-1 rather than resolved by assumption,
+    matching this suite's established restraint on touching other already-
+    ACTIVE files' stable content without an explicit request to do so.

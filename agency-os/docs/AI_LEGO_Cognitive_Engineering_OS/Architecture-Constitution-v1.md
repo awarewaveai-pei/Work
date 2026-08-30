@@ -1,6 +1,6 @@
 # Architecture-Constitution-v1
 
-Document ID: `ai-lego.architecture-constitution` | Major: 1 | Status: DRAFT（本文件本身已可被讀取與引用；使其成為母文件正式必讀項目的 EC §3.1/§4 編輯，以及 MP §0.0.2/§90、EC §2/§2.1 改為指標行的編輯，走 `docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md` 定義的 `.ai/proposals/` 流程，尚待操作者核准，見 `.ai/proposals/001-architecture-constitution-ec-registration/PROPOSAL.md` 等對應提案）
+Document ID: `ai-lego.architecture-constitution` | Version: `1.0.0` | Status: ACTIVE（2026-08-30 更新：使其成為母文件正式必讀項目的全部 4 個 proposal——`001-architecture-constitution-mp-pointer`、`002-architecture-constitution-ec-pointer`、`003-architecture-constitution-ec-required-doc-resolution`、`004-architecture-constitution-ec-document-registry`——皆已 `status: APPLIED`（commit `f7f5359a1`/`a58b308ae`/`b54a43aeb`/`d1ba4d6b3`）。MP §0.0.2/§90 已指向本文件，EC §2/§3.1/§4 已將本文件登記為必讀項目，非仍待核准）
 
 > 本文件由 `docs/adr/ADR-001-scoped-authority-precedence-unification.md`（ACCEPTED 2026-08-29）Recommendation Option A 建立，內容為該 ADR 逐條指定的 3 個區塊，逐字/逐概念轉錄自 Global Master Plan、Execution Contract 現有內容，不新增未經 ADR 批准的規範。本文件刻意極小（≈1 頁），僅承載「裁決鏈本身」與「極少數必須跨文件生效的硬規則」，不承載具體產品/方法內容——那些仍分別屬於 Master Plan 與 Method Atlas 的權責範圍（見下方 §2）。
 
