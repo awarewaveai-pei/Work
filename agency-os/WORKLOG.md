@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-08-31（續2）
+
+### ALERT_REQUIRED.txt 查明：非新事故，是 2026-08-24 舊 archive 引用一個已完成任務的過期 tag，已修正並確認 100% 健康
+
+**觸發**：操作者發現 working tree 有未追蹤的 `agency-os/ALERT_REQUIRED.txt`，要求查明是否嚴重。
+
+**查證**：`system-guard-and-notification.md` 確認此檔僅在 daily guard（`system-guard.ps1`）健康分數 < 100% 時產生。讀 `reports/guard/guard-20260831-020636.md`／`reports/health/health-20260831-020635.md`：2026-08-31 02:06:36 排程跑健檢，99.7%（312/313），Critical Gate FAIL，唯一失敗項是 `verify-archive-tasks-lift.ps1`——舊 `reports/ao-close/2026-08-24-2014.md` 的 7 個 bullet 中，1 個帶 `<!-- tasks-ref: EU→Dedicated 搬機 -->` 卻在目前 `TASKS.md` 找不到對應的 **OPEN**（`- [ ]`）行。
+
+**VBC**：沒有直接當成「有東西沒追蹤」，先查 `TASKS.md` 現況——`TASKS.md:317` 該任務確實存在，但已是 `- [x]`（「EU→Dedicated 搬機」已於 2026-08-28 以不同做法完成：操作者改買 OVH SYS-GAME-2，一次性把 SG/EU/Soulful 全部整併到 `ks-aw-01`，2026-08-30 舊兩台 Hetzner Cloud VPS 已在 console 刪除退租，2026-08-30 稽核確認為重複項）。舊 archive 寫於 2026-08-24（任務當時確實仍開放），checker 的 `tasks-ref` 語意是「必須對應到一個仍開放的任務」，任務關閉後這個 tag 自然找不到匹配——**不是遺漏，是任務已經做完，舊紀錄的 tag 語意過期了**。非新事故、非資安、非資料遺失，純屬治理紀錄的過期參照。
+
+**修正**：依本檔既有慣例（同一份 archive 已有一則「2026-08-24 訂正」的先例，見同檔另一 bullet），把該 bullet 的 `tasks-ref` 換成 `archive-only`，加刪除線 + 訂正說明並引用 `TASKS.md:317` 佐證，不回頭假裝任務當初就沒卡住。
+
+[已修改]
+- `agency-os/reports/ao-close/2026-08-24-2014.md`：1 個 bullet 由 `tasks-ref` 改標 `archive-only`，附訂正說明與 `TASKS.md:317` 引用
+- `agency-os/LAST_SYSTEM_STATUS.md`：`system-guard.ps1 -Mode manual -HideUi` 重跑後自動更新為 100% PASS
+- `agency-os/ALERT_REQUIRED.txt`：`system-guard.ps1` 偵測到 PASS 後自動刪除（腳本既有邏輯，非手動 rm）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`scripts/verify-archive-tasks-lift.ps1`（修正後重跑）| exit=0 | 結果=Missing 從 1 降為 0，Archive-only 從 3 增為 4，verdict=pass
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`scripts/system-health-check.ps1`（修正後重跑）| exit=0 | 結果=100%（317/317），Critical Gate PASS
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`scripts/system-guard.ps1 -Mode manual -HideUi`（修正後重跑）| exit=0 | 結果=`ALERT_REQUIRED.txt` 自動刪除，`LAST_SYSTEM_STATUS.md` 更新為 100% PASS
+- REVIEW_DONE: critic=Quick（自我核對：`TASKS.md:317` 實際文字與 archive 訂正說明逐字比對，確認任務真的已完成而非誤讀狀態符號）| verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`EU→Dedicated 搬機`（排除本次修改的 archive 檔自身）| hits=`TASKS.md:317`（已確認為 `[x]` 完成狀態，一致，無其他過期 tasks-ref 複本）
+
+[剩餘風險]
+- 無新增風險；純治理紀錄修正，`git status` 中其餘大批既有未提交改動（`HCI30_RESEARCH_REVIEW/`、`HCI_AI_LEGO_Blueprint_v1/v2` 等）與本條無關，未觸碰
+
+[rollback]
+- `git revert <本次 commit>` 還原 archive 檔文字；`ALERT_REQUIRED.txt`／`LAST_SYSTEM_STATUS.md` 為衍生狀態檔，下次 `system-guard.ps1` 執行會依當下健康狀態重新產生
+
 ## 2026-08-31（續1）
 
 ### VBC 更正：稍早 SOP 收尾條目宣稱「WORKLOG 缺少續1、續23–29」是錯的——它們存在，只是日期跨天漏搜
