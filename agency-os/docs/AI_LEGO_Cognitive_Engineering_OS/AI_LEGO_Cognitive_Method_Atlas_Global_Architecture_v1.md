@@ -4156,7 +4156,7 @@ Branch 是 Workflow 的一條分叉、隔離的執行血系（forked, isolated e
 ## 強制規則
 
 1. AI-generated idea 預設 `DRAFT`。
-2. `UNKNOWN` 不得提升為 `FACT`。
+2. `UNKNOWN` 不得直接提升為 `SOURCE_FACT`；合法路徑僅有：經 Compute 產生證據 → `EVIDENCE`，或經 Human Validation 確認 → `SOURCE_FACT`，兩者皆須寫入 authorship_state 與 execution manifest。
 3. 一個 Method execution failure 不得污染 Project Knowledge。
 4. 高風險新 Method 先 shadow / preview。
 5. `publish / deploy / delete / send / irreversible` 需要 authority gate。
