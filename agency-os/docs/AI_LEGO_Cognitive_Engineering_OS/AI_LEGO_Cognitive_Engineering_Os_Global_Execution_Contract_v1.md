@@ -2856,6 +2856,8 @@ Confidential
 Restricted
 ```
 
+PII（Personally Identifiable Information，個人識別資訊）定義：分級為 Confidential 或 Restricted，且其值本身或與常一併出現的其他欄位組合後可識別特定自然人的欄位，即為 PII。v1 去識別化機制見 `policies/privacy/pii-redaction.policy.yaml`。
+
 Restricted：
 
 - external provider routing must be policy-approved
@@ -2889,7 +2891,7 @@ event
 status
 ```
 
-禁止敏感 payload 全量 dump。
+禁止敏感 payload 全量 dump。redacted 之判定依 §101 PII 定義；凡屬 PII 之欄位，一律經 `policies/privacy/pii-redaction.policy.yaml` 之機制去識別化後始得寫入 log，不得另立判準。
 
 ---
 
