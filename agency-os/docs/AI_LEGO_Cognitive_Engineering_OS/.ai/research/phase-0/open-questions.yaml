@@ -2,7 +2,8 @@
 # Status values: REQUIRES_HUMAN_DECISION | REQUIRES_EVIDENCE | PROVISIONAL_DECISION_TAKEN
 questions:
   - id: OQ-1
-    status: REQUIRES_HUMAN_DECISION
+    status: RESOLVED_BY_HUMAN
+    proposed_adr: "docs/adr/ADR-017-mother-document-identity-headers.md (ACCEPTED 2026-08-30) — Option A: add minimal Document ID + SemVer header to both mother documents"
     title: "Master Plan / Atlas missing identity headers"
     context: "EC §1 (line 86): identity = Document ID + Version + Hash. Master Plan has neither ID nor version; Atlas has 版本 1.0 but no ID and non-semver."
     options:
@@ -22,7 +23,8 @@ questions:
     rationale: "minimum blast radius — keeps monorepo root and agency-os governance untouched"
     revisit_at: "Phase 4"
   - id: OQ-4
-    status: REQUIRES_HUMAN_DECISION
+    status: RESOLVED_BY_HUMAN
+    proposed_adr: "docs/adr/ADR-018-codex-write-authority-and-delegation-exceptions.md (ACCEPTED 2026-08-30) — Option A as default model; the same-day proposal-apply delegation to Codex is recorded as an explicit, bounded, one-time exception, not a policy reversal"
     title: "Codex write authority: directive §XIV vs repo governance"
     context: "Directive assigns Codex schema implementation / tests / migrations. Repo governance (AGENTS.md §跨模型 oracle): Claude is sole writer in D:/Work because all mechanical gates are Claude Code hooks; codex-oracle.ps1 is hardwired read-only."
     options:
@@ -87,13 +89,15 @@ questions:
     options: ["A: method.<family>.<name> with versioning via separate field (not in the ID)", "B: <family>.<name> bare form", "C: other"]
     deadline: "Phase 2 (ADR)"
   - id: OQ-13
-    status: REQUIRES_HUMAN_DECISION
+    status: RESOLVED_BY_HUMAN
+    proposed_adr: "docs/adr/ADR-019-status-code-taxonomy-and-reason-codes.md (ACCEPTED 2026-08-30) — Option A: closed side-state enum stays; a separate reason_code field carries the semantic signal, consistent with what execution-state-machine.schema.yaml already shipped"
     title: "Status-code taxonomy: are semantic blocking codes top-level statuses or reasons under BLOCKED?"
     context: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED / DOCUMENT_RESOLUTION_BLOCKED / METHOD_RESOLUTION_BLOCKED etc. (9 codes) are mandated but none maps into the EC state machine's legal side states (findings CROSS-T-5, CROSS-R-4, DOC-execution_contract-9, CDX-6, Codex PART C-5)."
     options: ["A: state machine keeps small closed enum (BLOCKED/...) + reason_code field carries the semantic codes", "B: expand the state enum to include every semantic code", "C: other"]
     deadline: "Phase 2 (ADR)"
   - id: OQ-14
-    status: REQUIRES_HUMAN_DECISION
+    status: RESOLVED_BY_HUMAN
+    proposed_adr: "docs/adr/ADR-020-normative-strength-marking-for-mother-documents.md (ACCEPTED 2026-08-30) — Option A: NORMATIVE/EXAMPLE/VISION markers added incrementally to changed/new sections; untouched legacy sections stay UNCLASSIFIED_LEGACY, not retroactively assumed"
     title: "Normative-strength marking for mother-doc content (norm vs example vs vision)"
     context: "MP mixes narrative vision, examples, and MUST-rules with no way to tell them apart — root cause of examples-masquerading-as-requirements (MP L43 forbids treating its snippets as method truth, yet L742-746 reads as a contract; Codex PART C-7; Claude PART C candidate; edition/packaging content MP L527-562 same question)."
     options: ["A: introduce explicit markers (NORMATIVE / EXAMPLE / VISION) per section during Phase 2 revision", "B: move all normative content to machine specs, mother docs become narrative-only", "C: other"]

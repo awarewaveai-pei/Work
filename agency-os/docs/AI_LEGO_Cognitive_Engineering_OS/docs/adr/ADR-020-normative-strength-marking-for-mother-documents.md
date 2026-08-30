@@ -1,6 +1,6 @@
 # ADR-020: Normative-strength Marking for Mother Documents (OQ-14)
 
-Status: PROPOSED — awaiting operator go-ahead
+Status: ACCEPTED（2026-08-30，操作者於對話中明示核准：「核准並 codex-review」）
 Date: 2026-08-30
 Related: OQ-14 (`.ai/research/phase-0/open-questions.yaml:95-100`), ADR-006, Master Plan §0.0
 

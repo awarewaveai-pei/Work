@@ -1,6 +1,6 @@
 # ADR Index — AI LEGO Cognitive Engineering OS
 
-**狀態（2026-08-30 更新）**：ADR-001~016 均為 `ACCEPTED`；ADR-017~020 是待操作者核准的 `PROPOSED` 草案。ADR-001~009 由操作者明示授權 Claude 行使架構師裁決權（2026-08-29 對話，「你決定」）；ADR-010 的授權路徑略有不同，見該 ADR 檔頭——Sub-decision (a) 原則操作者已明示接納，Sub-decision (b) 的完整命名對照表是本次首次形式化產出，操作者尚未逐條過目；ADR-011~014 同 ADR-001~009 授權模式（2026-08-30 對話，「繼續！你決定！」）；ADR-015/016 授權路徑另有差異，見兩者檔頭的「供應商支出判準」說明——不是單純沿用一般委任，而是逐項檢視是否涉及新增供應商付費承諾，只有無此風險的項目才在本次委任下拍板（ADR-015 全數符合；ADR-016 首次批准時唯一不符合的一項——IdP provider——依判準明確排除，保留給操作者，同日稍晚操作者本人在對話中直接明示決定自架 Zitadel 後，該 Sub-decision 才 UPDATED 為 ACCEPTED，非 Claude 事後追認自己的判斷，是操作者本人真實裁決，見該 ADR 檔頭完整記錄）。**這不等於三母文件已被編輯**——`ACCEPTED` 代表架構決策本身定案，實際套用仍須依 ADR-006 定義的 `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` 流程逐項產生提案，該流程的 `status: APPROVED` 依 directive §XV 絕對句規定**只能由操作者本人**推進，Claude 永遠不能自我核准母文件編輯本身。兩個欄位（ADR Status / Proposal Status）是兩條獨立規則，見每份 ADR 檔頭的範圍聲明。
+**狀態（2026-08-30 更新）**：全部 20 份 ADR 狀態皆為 `ACCEPTED`。ADR-017~020（OQ-1/4/13/14）由 Codex 依 `.ai/CODEX_HANDOFF_2026-08-30.md` 草擬、Claude 逐條核對引用真實存在後，操作者於對話中明示核准（「核准並 codex-review」）。ADR-001~009 由操作者明示授權 Claude 行使架構師裁決權（2026-08-29 對話，「你決定」）；ADR-010 的授權路徑略有不同，見該 ADR 檔頭——Sub-decision (a) 原則操作者已明示接納，Sub-decision (b) 的完整命名對照表是本次首次形式化產出，操作者尚未逐條過目；ADR-011~014 同 ADR-001~009 授權模式（2026-08-30 對話，「繼續！你決定！」）；ADR-015/016 授權路徑另有差異，見兩者檔頭的「供應商支出判準」說明——不是單純沿用一般委任，而是逐項檢視是否涉及新增供應商付費承諾，只有無此風險的項目才在本次委任下拍板（ADR-015 全數符合；ADR-016 首次批准時唯一不符合的一項——IdP provider——依判準明確排除，保留給操作者，同日稍晚操作者本人在對話中直接明示決定自架 Zitadel 後，該 Sub-decision 才 UPDATED 為 ACCEPTED，非 Claude 事後追認自己的判斷，是操作者本人真實裁決，見該 ADR 檔頭完整記錄）。**這不等於三母文件已被編輯**——`ACCEPTED` 代表架構決策本身定案，實際套用仍須依 ADR-006 定義的 `.ai/proposals/<NNN>-<slug>/PROPOSAL.md` 流程逐項產生提案，該流程的 `status: APPROVED` 依 directive §XV 絕對句規定**只能由操作者本人**推進，Claude 永遠不能自我核准母文件編輯本身。兩個欄位（ADR Status / Proposal Status）是兩條獨立規則，見每份 ADR 檔頭的範圍聲明。
 
 | # | 標題 | 解決的 findings | 建議方案（一句話） | Status |
 |---|---|---|---|---|
@@ -20,10 +20,10 @@
 | [ADR-014](ADR-014-phase-5-mode-selection-research.md) | Phase 5 第一條垂直切片 Mode 選擇正式批准 | Program Plan §9 三選一要求（誰拍板已收斂的選擇） | Claude 與 Codex 兩次獨立論證真收斂於 Research Mode，操作者當下在場即時審閱後委任 Claude 拍板；本 ADR 僅批准「哪個 Mode」，不豁免 Phase 3/4 完成前提或 Phase 0-2 禁令 | ACCEPTED |
 | [ADR-015](ADR-015-supply-chain-security-tooling-selection.md) | Supply Chain Security 工具鏈選型（P1-GAP-SEC-2） | P1-GAP-SEC-2 | 逐項套用供應商支出判準，SBOM/簽章/SLSA/漏洞掃描/CVSS 分層 5 項全數為開放標準或既有免費 GitHub 功能，無新增供應商成本，全數批准並建置 `policies/security/supply-chain-security.policy.yaml` | ACCEPTED |
 | [ADR-016](ADR-016-zero-trust-workload-identity-and-pdp-selection.md) | Zero Trust Workload Identity + PDP + IdP Provider 選型（P1-GAP-SEC-1，全數） | P1-GAP-SEC-1 | Workload identity（延後 SPIFFE，雲端原生 mTLS）+ PDP（Cedar）由 Claude 依供應商支出判準批准；IdP/OIDC provider 因涉及新增供應商付費承諾，依 R0「取捨影響產品方向」正確保留給操作者後，操作者同日於對話中直接明示決定自架 **Zitadel**（優於 Keycloak），非 Claude 拍板 | ACCEPTED（全部 3 個 Sub-decision） |
-| [ADR-017](ADR-017-mother-document-identity-headers.md) | Master Plan / Atlas identity headers | OQ-1 | 兩份母文件各加最小 Document ID + SemVer header；content hash 繼續由 Execution Manifest 記錄 | PROPOSED — awaiting operator go-ahead |
-| [ADR-018](ADR-018-codex-write-authority-and-delegation-exceptions.md) | Codex write authority | OQ-4 | 預設 Codex 提案、Claude 驗真與寫入；Codex 寫入僅限有範圍、驗證與期限的操作者明示例外 | PROPOSED — awaiting operator go-ahead |
-| [ADR-019](ADR-019-status-code-taxonomy-and-reason-codes.md) | Status code taxonomy | OQ-13 | 小型 closed side-state enum 加可驗證 `reason_code`，不讓每個語意原因膨脹為 top-level state | PROPOSED — awaiting operator go-ahead |
-| [ADR-020](ADR-020-normative-strength-marking-for-mother-documents.md) | Mother-document normative strength | OQ-14 | Phase 2 以 `NORMATIVE` / `EXAMPLE` / `VISION` 標示被改動或新增章節；legacy 內容不假裝已分類 | PROPOSED — awaiting operator go-ahead |
+| [ADR-017](ADR-017-mother-document-identity-headers.md) | Master Plan / Atlas identity headers | OQ-1 | 兩份母文件各加最小 Document ID + SemVer header；content hash 繼續由 Execution Manifest 記錄 | ACCEPTED（Codex 草擬，Claude 驗真，操作者核准） |
+| [ADR-018](ADR-018-codex-write-authority-and-delegation-exceptions.md) | Codex write authority | OQ-4 | 預設 Codex 提案、Claude 驗真與寫入；Codex 寫入僅限有範圍、驗證與期限的操作者明示例外 | ACCEPTED（Codex 草擬，Claude 驗真，操作者核准） |
+| [ADR-019](ADR-019-status-code-taxonomy-and-reason-codes.md) | Status code taxonomy | OQ-13 | 小型 closed side-state enum 加可驗證 `reason_code`，不讓每個語意原因膨脹為 top-level state | ACCEPTED（Codex 草擬，Claude 驗真，操作者核准） |
+| [ADR-020](ADR-020-normative-strength-marking-for-mother-documents.md) | Mother-document normative strength | OQ-14 | Phase 2 以 `NORMATIVE` / `EXAMPLE` / `VISION` 標示被改動或新增章節；legacy 內容不假裝已分類 | ACCEPTED（Codex 草擬，Claude 驗真，操作者核准） |
 
 ## 決策依賴關係
 

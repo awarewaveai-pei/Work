@@ -1,6 +1,6 @@
 # ADR-017: Mother-document Identity Headers (OQ-1)
 
-Status: PROPOSED — awaiting operator go-ahead
+Status: ACCEPTED（2026-08-30，操作者於對話中明示核准：「核准並 codex-review」）
 Date: 2026-08-30
 Related: OQ-1 (`.ai/research/phase-0/open-questions.yaml:4-11`), ADR-006 (mother-document revision flow), AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §1
 

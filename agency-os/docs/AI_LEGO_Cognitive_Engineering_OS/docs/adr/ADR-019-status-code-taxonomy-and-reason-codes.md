@@ -1,6 +1,6 @@
 # ADR-019: Status-code Taxonomy and Reason Codes (OQ-13)
 
-Status: PROPOSED — awaiting operator go-ahead
+Status: ACCEPTED（2026-08-30，操作者於對話中明示核准：「核准並 codex-review」）
 Date: 2026-08-30
 Related: OQ-13 (`.ai/research/phase-0/open-questions.yaml:89-94`), `specs/execution/execution-state-machine.schema.yaml`, `specs/execution/status-codes.schema.yaml`
 
