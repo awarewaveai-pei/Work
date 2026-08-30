@@ -1,5 +1,39 @@
 # Worklog
 
+## 2026-08-30（續12）
+
+### 操作者在對話中直接決定 IdP：自架 Zitadel（優於 Keycloak）——ADR-016 Sub-decision (a) 從「明確不批准」UPDATED 為「操作者本人裁決 ACCEPTED」
+
+**觸發**：續11 收尾回報「idp_provider 仍保留給操作者」後，操作者直接在對話中回答「偏好自架」。這正是 ADR-016 首次批准時 R0「取捨影響產品方向」停止條件想要的結果——不是 Claude 自己拍板，而是真的停下讓操作者決定。用 `AskUserQuestion` 呈現 Zitadel vs Keycloak 的具體取捨（多租戶原生模型 vs AGPL-3.0 授權；操作者選 Zitadel）。
+
+**這不是 Claude 重新裁決，是忠實轉錄操作者的真實決定**：
+
+1. `policies/security/zero-trust.policy.yaml`：`idp_provider` 從阻塞佔位符（`{status: TBD_PENDING_OPERATOR_VENDOR_DECISION}`）改為真實值（`{provider: Zitadel, deployment_model: self-hosted, rationale, licensing_acknowledgment, workos_rejected_reason, keycloak_rejected_reason}`），`status` 從 `PROVISIONAL` 升級 `ACTIVE`（P1-GAP-SEC-1 全數 3/3 子項關閉）。WorkOS 推薦與拒絕理由保留而非刪除（同 ADR_INDEX.md 既有的「保留原文+UPDATED 註記」稽核慣例）。
+2. `docs/adr/ADR-016-...md`：標題移除「(Partial)」；Status 改全數 ACCEPTED；Sub-decision (a) 原文保留（標記「原始裁決」）+ 新增操作者更新記錄；Recommendation/Consequences/Evidence 逐項更新為「已完成」。
+3. 連動更新：`ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（裁決狀態表 8/8、§7 無剩餘待辦）、`GAP_REGISTER.yaml`（P1-GAP-SEC-1 全數 RESOLVED）、`MACHINE_READABLE_SPEC_PLAN.md`（§2.9 security/ 列 8/8）、`ADR_INDEX.md`（ADR-016 列改 ACCEPTED、全域「16 份 ADR 皆 ACCEPTED」）、`SECURITY_THREAT_MODEL.md`（S1 列更新為 3/3 定案）。
+4. Fixtures：`zero-trust.fixtures.yaml` 全面改用新 `idp_provider` 形狀，新增 `idp_provider_wrong_vendor`（非 Zitadel 應失敗）+ `idp_provider_stale_blocked_placeholder_no_longer_valid`（舊阻塞形狀應失敗，迴歸測試）兩個 invalid case。
+
+[已修改]
+- `policies/security/zero-trust.policy.yaml`：`idp_provider` 改真實值、`status`→`ACTIVE`、compilation_decisions 補記錄、`OQ-ZEROTRUST-1` 結案
+- `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`：標題/Status/Sub-decision(a)/Recommendation/Consequences/Migration/Evidence 全面更新，原始裁決文字保留供稽核
+- `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`：裁決狀態表、§7 更新為 8/8
+- `.ai/research/phase-1/GAP_REGISTER.yaml`：P1-GAP-SEC-1 → RESOLVED（全數）
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：§2.9 security/ 列 + ASCII 目錄圖列更新
+- `docs/adr/ADR_INDEX.md`：ADR-016 列、全域授權模式說明、誠實聲明段更新
+- `docs/architecture/SECURITY_THREAT_MODEL.md`：S1 列更新為 3/3 定案
+- `tests/contracts/policies/security/zero-trust.fixtures.yaml`：全面改用新 idp_provider 形狀 + 2 個新 invalid case
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=686 個檢查全過（685→686，淨增 1 個 fixture case）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對 3 個修改的 YAML 檔逐一掃描 | exit=0 | 結果=全數 OK
+- BUGHUNT_DONE: scope=agency-os | grep=`TBD_PENDING_OPERATOR_VENDOR_DECISION\|IdP.*保留給操作者\|部分.*ACCEPTED.*ADR-016\|ADR-016.*部分` | hits=9 處命中，其中 1 處（`SECURITY_THREAT_MODEL.md` S1 列）為真實過期宣稱已修正，其餘為 WORKLOG/ADR-016 自身保留的稽核歷史文字（正確不應刪除）
+- REVIEW_DONE: 見本 WORKLOG 下一條（`/codex-review` 對本次 IdP 決定落地的真實覆審結果）
+
+[剩餘風險] Zitadel 自架的實際基礎設施部署（安裝/patch/scale/on-call）是獨立於本次文件層級決定的未來實作任務，尚未開始；AGPL-3.0 授權約束已明文記錄於 `licensing_acknowledgment`，供未來若考慮 fork 修改時參照。
+
+[rollback] 純文件/schema 層級變更（idp_provider 從佔位符改真實值 + 連動文件更新），`git revert` 可完整回退；回退後 P1-GAP-SEC-1 會重新回到「2/3 已解決」狀態，需注意此為倒退而非當前真實狀態。
+
 ## 2026-08-30（續11）
 
 ### `/codex-review` 真實跑 ADR-014/015/016 批次（commit 06183d100），抓到 3 個真實 finding（2 HIGH + 1 MEDIUM），全數驗真並修正

@@ -196,12 +196,13 @@ clusters:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2668, quote: "Identity ↓ Workload Identity ↓ Mutual Authentication ↓ Short-lived Credentials ↓ Policy Decision ↓ Resource Access"}
         consequence: "實作團隊各自選 IdP/token 格式，30 年後不同 cell 用不同身分協定，跨 cell 身分聯邦時無共同標準可比對。"
         resolution: >
-          PARTIALLY RESOLVED 2026-08-30 by docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md.
-          2 of 3 sub-gaps closed: workload identity standard = cloud-native mTLS (SPIFFE deferred with named
-          reconsideration triggers); PDP engine = Cedar. Machine-readable: policies/security/zero-trust.policy.yaml.
-          1 of 3 sub-gaps (IdP/OIDC provider) deliberately left open -- genuine new vendor spend/lock-in decision,
-          reserved for the operator per AGENTS.md R0 "取捨影響產品方向" (see zero-trust.policy.yaml idp_provider,
-          status TBD_PENDING_OPERATOR_VENDOR_DECISION).
+          RESOLVED 2026-08-30 by docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md. All 3
+          sub-gaps closed: workload identity standard = cloud-native mTLS (SPIFFE deferred with named
+          reconsideration triggers); PDP engine = Cedar; IdP/OIDC provider = Zitadel (self-hosted). The IdP
+          sub-gap was correctly held open at first ratification (genuine new vendor spend/lock-in decision,
+          AGENTS.md R0 "取捨影響產品方向" stop condition) and closed the same day by the operator's own
+          explicit real-time decision in conversation ("偏好自架", then Zitadel over Keycloak) -- not derived
+          by Claude. Machine-readable: policies/security/zero-trust.policy.yaml (status: ACTIVE).
       - id: P1-GAP-SEC-2
         severity: high
         role: Security Architect

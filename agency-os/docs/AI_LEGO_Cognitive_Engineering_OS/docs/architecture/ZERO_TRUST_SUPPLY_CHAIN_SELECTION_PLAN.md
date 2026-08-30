@@ -1,12 +1,12 @@
 # ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN
-Status: PROPOSED（本文件本身不是 ADR；**2026-08-30 部分批准**——見下方裁決狀態表。研究完成後逐項套用供應商支出判準：無新增供應商成本/鎖定的 7 項已由 ADR-015/016 批准，唯一涉及新增供應商付費承諾的 1 項（IdP）明確保留給操作者，未被 Claude 自行批准）
+Status: PROPOSED（本文件本身不是 ADR；**2026-08-30 全數 8 項已批准**——見下方裁決狀態表。前 7 項無新增供應商成本/鎖定，由 Claude 依供應商支出判準批准；第 1 項（IdP）依判準保留給操作者後，操作者同日在對話中直接明示決定：自架 Zitadel，非 Claude 拍板）
 Date: 2026-08-30
 
 ## 裁決狀態（2026-08-30 更新，置頂速覽）
 
 | # | 決策 | 狀態 | 批准依據 |
 |---|---|---|---|
-| 1 | IdP/OIDC = WorkOS | **PROPOSED，保留給操作者** | 新增供應商付費承諾+多年期鎖定，見 ADR-016 Sub-decision (a) |
+| 1 | IdP/OIDC = **Zitadel（自架）**~~WorkOS~~ | **ACCEPTED（操作者本人決定）** | 操作者對話中明示「偏好自架」+ 於 Zitadel/Keycloak 二選一中選 Zitadel，見 ADR-016 Sub-decision (a) UPDATED |
 | 2 | Workload identity = 雲端原生 mTLS 先行 | ACCEPTED | ADR-016 Sub-decision (b) |
 | 3 | PDP 引擎 = Cedar | ACCEPTED | ADR-016 Sub-decision (c) |
 | 4 | SBOM 格式 = CycloneDX 為主 | ACCEPTED | ADR-015 Sub-decision (a) |
@@ -15,7 +15,9 @@ Date: 2026-08-30
 | 7 | 漏洞掃描 = Grype+Dependabot | ACCEPTED | ADR-015 Sub-decision (d) |
 | 8 | CVSS/EPSS/KEV 分層門檻 | ACCEPTED | ADR-015 Sub-decision (e) |
 
-機讀落實：`policies/security/zero-trust.policy.yaml`（items 1-3，item 1 明確阻塞）、`policies/security/supply-chain-security.policy.yaml`（items 4-8，全數落實）。
+機讀落實：`policies/security/zero-trust.policy.yaml`（items 1-3，全數 `status: ACTIVE`）、`policies/security/supply-chain-security.policy.yaml`（items 4-8，全數落實）。
+
+**注意**：本文件 §3 表格原文推薦 IdP=WorkOS（研究當下的具體推薦，理由詳見該節）——操作者最終選擇自架 Zitadel，非採納此推薦；原文保留不改動，實際定案以上方裁決狀態表與 `ADR-016`/`zero-trust.policy.yaml` 為準。
 
 ## 0. Scope & Boundary（範圍聲明）
 
@@ -132,13 +134,13 @@ Trivy 覆蓋面最廣（vuln+secret+IaC+license+K8s）；Grype 更聚焦、SBOM-
 - Clerk 的 SCIM directory sync 至 2026-04 才 GA，企業級 SSO/SCIM 成熟度相對 WorkOS/Auth0 仍新。
 - Trivy 事件（2026-03-19 至 2026-03-23）為近期且已排除，但建議正式採用前再次確認 Trivy 目前的安全狀態。
 
-## 7. 下一步（2026-08-30 更新：7/8 已完成，見置頂裁決狀態表）
+## 7. 下一步（2026-08-30 更新：8/8 全數完成，見置頂裁決狀態表）
 
-1. ~~**操作者裁決**：本文件 §3 的 8 項子決策需要操作者逐項確認或調整~~ ——**已完成 7/8**：items 2-8 逐項套用供應商支出判準後，由 Claude 於 ADR-015/016 批准（無新增供應商成本/鎖定，屬可拍板類別）。**item 1（IdP=WorkOS）仍待操作者本人**取得多年期真實報價 + 做 build-vs-buy 決策（見 ADR-016 Sub-decision (a)）。
-2. ~~**裁決後轉正式 ADR**~~ ——**已完成**：`docs/adr/ADR-015-supply-chain-security-tooling-selection.md`（Gap 2 全數批准）+ `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`（Gap 1 部分批准，IdP 除外）。
-3. ~~**建置 `policies/security/`**~~ ——**已完成**：`policies/security/zero-trust.policy.yaml`（items 1-3，item 1 明確阻塞佔位符）+ `policies/security/supply-chain-security.policy.yaml`（items 4-8 全數落實）；`MACHINE_READABLE_SPEC_PLAN.md` §2.9 該列已同步更新。
-4. **剩餘唯一待辦**：操作者對 IdP/OIDC provider 做最終裁決後，`zero-trust.policy.yaml` 的 `idp_provider.status` 由 `TBD_PENDING_OPERATOR_VENDOR_DECISION` 更新為真實值，該檔 `status` 同步由 `PROVISIONAL` 升級為 `ACTIVE`。
+1. ~~**操作者裁決**：本文件 §3 的 8 項子決策需要操作者逐項確認或調整~~ ——**已全數完成 8/8**：items 2-8 逐項套用供應商支出判準後，由 Claude 於 ADR-015/016 批准；item 1（IdP）依判準保留給操作者後，操作者同日於對話中直接明示決定（自架，選 Zitadel 優於 Keycloak，跳過取得 WorkOS 報價這一步）。
+2. ~~**裁決後轉正式 ADR**~~ ——**已完成**：`docs/adr/ADR-015-supply-chain-security-tooling-selection.md`（Gap 2 全數批准）+ `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`（Gap 1 全數批准，含操作者本人決定的 IdP）。
+3. ~~**建置 `policies/security/`**~~ ——**已完成**：`policies/security/zero-trust.policy.yaml`（items 1-3 全數落實，`status: ACTIVE`）+ `policies/security/supply-chain-security.policy.yaml`（items 4-8 全數落實）；`MACHINE_READABLE_SPEC_PLAN.md` §2.9 該列已同步更新。
+4. **無剩餘待辦**——8 項子決策全數定案。實際自架 Zitadel 的基礎設施部署（安裝/設定/整合）是獨立於本文件與 ADR-016 的未來實作任務。
 
 ---
 
-**邊界確認**：本文件由外部 `web-researcher` agent 唯讀 WebSearch 完成比較研究，未對三母文件、任何既有 schema/policy 檔案做任何修改；`GAP_REGISTER.yaml`/`MACHINE_READABLE_SPEC_PLAN.md` 之連動更新見另外的最小編輯（僅新增本文件的參照，不改動既有內容語意）。本文件本身不具 ADR 效力，Status 維持 `PROPOSED` 直到操作者裁決。
+**邊界確認**：本文件由外部 `web-researcher` agent 唯讀 WebSearch 完成比較研究，未對三母文件、任何既有 schema/policy 檔案做任何修改；`GAP_REGISTER.yaml`/`MACHINE_READABLE_SPEC_PLAN.md` 之連動更新見另外的最小編輯（僅新增本文件的參照，不改動既有內容語意）。本文件本身不具 ADR 效力，Status 維持 `PROPOSED`——8 項子決策的實際定案內容以 `ADR-015`/`ADR-016` 與對應 `policies/security/*.policy.yaml` 為準，本文件保留原始研究與推薦內容供稽核對照。

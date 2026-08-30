@@ -2,50 +2,45 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://policies/security/zero-trust.policy.yaml"
 title: Zero Trust Identity, Workload Identity & Policy Decision Point Policy
 version: "1.0.0"
-status: PROVISIONAL
+status: ACTIVE
 
 description: >
   Closes P1-GAP-SEC-1 (severity: high, `.ai/research/phase-1/GAP_REGISTER.yaml:190-197`)
-  PARTIALLY -- Master Plan's `Identity → Workload Identity → Mutual
+  IN FULL -- Master Plan's `Identity → Workload Identity → Mutual
   Authentication → Short-lived Credentials → Policy Decision → Resource
   Access` stage flow (AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:2668)
-  named no protocol/engine anywhere. 2 of the 3 sub-gaps are resolved here;
-  the 3rd (`idp_provider`) is deliberately left blocked -- see
+  named no protocol/engine anywhere; all 3 sub-gaps are now resolved -- see
   `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`
-  (ACCEPTED 2026-08-30 for Sub-decisions b/c ONLY; Sub-decision a explicitly
-  NOT ratified).
+  (ACCEPTED 2026-08-30 for Sub-decisions b/c at first ratification;
+  Sub-decision a UPDATED same day to ACCEPTED once the operator made the
+  real vendor decision in a live conversation -- see `decided_by` below).
 
-  `status: PROVISIONAL` (not `ACTIVE`) reflects that one required field
-  (`idp_provider`) is a genuine open blocker, not a placeholder awaiting
-  routine compilation -- same convention `policies/ai-execution/
-  mandatory-gates.yaml` used while its own `gate_ref` fields were blocked
-  pending OQ-10 (upgraded to `ACTIVE` only once ADR-011 resolved that gap).
-  This file should be upgraded to `ACTIVE` once `idp_provider.status` moves
-  from `TBD_PENDING_OPERATOR_VENDOR_DECISION` to a real value.
-
-  **Why this file is only PARTIALLY ratified, unlike its fully-ratified
-  sibling `supply-chain-security.policy.yaml`**: `idp_provider` (WorkOS vs.
-  self-hosted Zitadel/Keycloak) is a genuine new managed-SaaS spend
-  commitment with multi-year lock-in risk -- the source plan's own risk
-  analysis (§4 risk 1) explicitly recommends getting a real multi-year quote
-  before finalizing. This is the exact "取捨影響產品方向" class
-  `agency-os/AGENTS.md` R0 requires stopping on and reporting rather than
-  deciding unilaterally, even under general delegated authority --
-  `workload_identity` and `pdp_engine` do not carry that same risk (no new
-  vendor, OSS/cloud-native choices only) and are ratified in full. See
-  ADR-016 Decision Drivers for the litmus test.
+  **HISTORY (preserved for audit continuity)**: at first ratification this
+  file shipped with `status: PROVISIONAL` because `idp_provider` was a
+  genuine open vendor/spend decision (WorkOS managed vs. self-hosted
+  Zitadel/Keycloak) that AGENTS.md R0's "取捨影響產品方向" stop condition
+  correctly kept out of Claude's unilateral authority -- see ADR-016's own
+  Decision Drivers for the litmus test that drew this line, still valid
+  reasoning for why Claude did not pick a vendor on its own initiative. The
+  operator has since made that decision directly (self-hosted, Zitadel over
+  Keycloak) -- `status` is now `ACTIVE` and `idp_provider` carries the real
+  value below.
 
 source_of_truth_for:
   - "docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md §1.1-1.3 (Gap 1 -- Zero Trust), §3 rows 1-3, §4 risks 1/2/3, §5 citations"
-  - "docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md Recommendation -- this file IS that Recommendation's ratified 2/3, plus the explicit non-ratification of the 3rd"
+  - "docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md Recommendation -- this file IS that Recommendation, now fully ratified"
   - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-1 (L190-197)"
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/security/ (SKELETON_ONLY prior to this file)"
 
 decided_by: >
   docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md
-  (ACCEPTED 2026-08-30, Sub-decisions b and c only). Sub-decision (a)
-  (idp_provider) is explicitly NOT decided by that ADR or this file --
-  reserved for the operator, see `open_questions.OQ-ZEROTRUST-1`.
+  (ACCEPTED 2026-08-30, Sub-decisions b and c at first ratification;
+  Sub-decision a (`idp_provider`) UPDATED same day, ACCEPTED by the
+  operator's own explicit real-time decision -- not derived by Claude from
+  re-reading mother documents, and not chosen from the plan's own
+  recommendation (WorkOS) -- the operator chose the self-hosted path
+  instead, then chose Zitadel over Keycloak when asked. See
+  `open_questions.OQ-ZEROTRUST-1` for the closure record.
 
 compilation_decisions:
   - question: >
@@ -116,6 +111,37 @@ compilation_decisions:
       `service_count_exceeds_threshold` is actually asserted, at which
       point the schema now forces a real number instead of leaving it
       dangling as undefined prose.
+  - question: >
+      `idp_provider` was originally a required-but-blocked placeholder
+      (`status: TBD_PENDING_OPERATOR_VENDOR_DECISION`) because this is a
+      genuine vendor/spend decision AGENTS.md R0 requires Claude to stop on
+      and report rather than decide unilaterally. Same day, the operator
+      directly answered the question in conversation: "偏好自架" (prefer
+      self-hosting), then chose Zitadel over Keycloak when the two
+      self-hosted candidates' trade-off (native multi-tenant hierarchy vs.
+      AGPL-3.0 license) was surfaced. Should this file now assert a real
+      `provider` value?
+    decision: >
+      Yes -- `idp_provider` restructured from the blocked placeholder shape
+      to `{provider: const Zitadel, deployment_model: const self-hosted,
+      rationale, licensing_acknowledgment, workos_rejected_reason,
+      keycloak_rejected_reason}`. `status` upgraded ACTIVE (from
+      PROVISIONAL). `open_questions.OQ-ZEROTRUST-1` closed.
+    reasoning: >
+      This is NOT Claude deciding unilaterally -- it is transcribing an
+      explicit operator decision made directly in conversation, the exact
+      mechanism R0's stop condition exists to require (stop, report, let
+      the operator decide) rather than a workaround of it. The WorkOS
+      recommendation and its rejection reason are preserved as
+      `workos_rejected_reason` rather than deleted, matching this corpus's
+      own established audit-continuity convention (e.g. ADR_INDEX.md's
+      preserved-original-text pattern for superseded findings) -- a future
+      reader should be able to see what was recommended and why it was not
+      chosen, not just the final answer. The AGPL-3.0 licensing point is
+      kept as an explicit `licensing_acknowledgment` (not silently dropped
+      now that a decision exists) because it is a live operational
+      constraint, not a decision-blocking concern that resolves itself once
+      Zitadel is chosen.
 
 # ---------------------------------------------------------------------------
 # Schema body -- one singleton policy document (same shape convention as
@@ -128,26 +154,30 @@ properties:
   idp_provider:
     type: object
     description: >
-      ADR-016 Sub-decision (a) -- NOT RATIFIED. Source plan §1.1, §3 row 1,
-      §4 risk 1. This is the one sub-gap of P1-GAP-SEC-1 this file does NOT
-      close -- see open_questions.OQ-ZEROTRUST-1.
-    required: [status]
+      ADR-016 Sub-decision (a) -- ACCEPTED 2026-08-30, operator explicit
+      real-time decision (self-hosted, Zitadel over Keycloak; WorkOS
+      managed was the plan's own original recommendation but was not
+      chosen). Source plan §1.1, §3 row 1, §4 risk 1.
+    required: [provider, deployment_model, rationale]
     properties:
-      status:
+      provider:
         type: string
-        const: "TBD_PENDING_OPERATOR_VENDOR_DECISION"
-      recommended_candidate:
+        const: Zitadel
+      deployment_model:
         type: string
-        const: "WorkOS (managed) -- recommendation only, not a decision"
-      recommended_candidate_rationale:
+        const: self-hosted
+      rationale:
         type: string
-        const: "Native multi-tenant model (organizations as the primary unit) + built-in Agent Registration functionality distinct from human OAuth flows, the closest available fit found for this project's A0-A4 AI-agent authority-tier model. Not itself sufficient grounds for a vendor commitment -- see blocking_reason."
-      blocking_reason:
+        const: "Operator 2026-08-30 explicit decision: prefer self-hosting over WorkOS (managed) -- avoids the multi-year per-connection/SCIM-directory billing lock-in the source plan's own risk analysis flagged (§4 risk 1), in exchange for owning IdP operations (patching/scaling/on-call) for the project's full lifetime. Zitadel chosen over the other self-hosted candidate, Keycloak, because Zitadel's native Instance→Org→Project→App hierarchy matches this project's multi-tenant architecture directly, where Keycloak's realm-per-tenant model does not scale as cleanly as tenant count grows."
+      licensing_acknowledgment:
         type: string
-        const: "Multi-year per-connection/SCIM-directory billing model creates real vendor lock-in once tenants are onboarded against it; source plan §4 risk 1 explicitly recommends obtaining a real multi-year quote before finalizing. This is a genuine new recurring spend commitment, not an open-standard/OSS choice -- reserved for the operator per AGENTS.md R0's 取捨影響產品方向 stop condition."
-      self_hosted_alternative:
+        const: "Zitadel's core license changed to AGPL-3.0 as of v3 (~2025-03). Running it unmodified as an internal backend service does not itself trigger AGPL's network-use disclosure clause -- that clause activates only if a MODIFIED fork of Zitadel's own source is offered as a network service to users. Flagged as an ongoing operational constraint (re-check before ever forking+modifying+redistributing Zitadel itself as a service), not a blocker to this decision."
+      workos_rejected_reason:
         type: string
-        const: "Zitadel or Keycloak (self-hosted) -- avoids vendor lock-in entirely at the cost of owning IdP operations (patching/scaling/on-call) for the project's full lifetime. Zitadel's core license changed to AGPL-3.0 as of v3 (~2025-03), a separate licensing consideration the operator should weigh alongside the ops-burden tradeoff."
+        const: "Would have avoided the self-hosted ops burden entirely, but the multi-year per-connection/SCIM-directory billing model creates real vendor lock-in once tenants are onboarded against it -- operator chose to avoid this recurring spend commitment rather than get a quote."
+      keycloak_rejected_reason:
+        type: string
+        const: "Apache 2.0 (more permissive than Zitadel's AGPL-3.0) and a longer enterprise track record, but its realm-per-tenant model does not scale as cleanly with this project's growing multi-tenant count as Zitadel's native Instance→Org→Project→App hierarchy."
 
   workload_identity:
     type: object
@@ -214,18 +244,21 @@ properties:
 open_questions:
   - id: "OQ-ZEROTRUST-1"
     question: >
-      idp_provider selection (WorkOS managed vs. self-hosted Zitadel/Keycloak)
-      requires (1) a real multi-year WorkOS quote, and (2) an explicit
-      build-vs-buy call weighing recurring SaaS spend + lock-in against
-      perpetual self-hosted IdP ops burden. This is a genuine business/vendor
-      trade-off, not an architecture-internal question with a derivable
-      correct answer from re-reading the mother documents -- squarely the
-      class of decision AGENTS.md R0 requires stopping on and reporting,
-      not one Claude decides unilaterally even under general "你決定"
-      delegation (contrast `workload_identity`/`pdp_engine` above, both
-      ratified in the same ADR because neither carries new vendor spend).
-    owner: "operator"
-    blocks: "idp_provider.status only -- workload_identity and pdp_engine are independently ACCEPTED (ADR-016 Sub-decisions b/c) and do not depend on resolving this"
+      RESOLVED 2026-08-30 by the operator's own explicit real-time decision
+      (self-hosted, Zitadel over Keycloak). Original question (preserved):
+      "idp_provider selection (WorkOS managed vs. self-hosted
+      Zitadel/Keycloak) requires (1) a real multi-year WorkOS quote, and
+      (2) an explicit build-vs-buy call weighing recurring SaaS spend +
+      lock-in against perpetual self-hosted IdP ops burden. This is a
+      genuine business/vendor trade-off, not an architecture-internal
+      question with a derivable correct answer from re-reading the mother
+      documents -- squarely the class of decision AGENTS.md R0 requires
+      stopping on and reporting, not one Claude decides unilaterally even
+      under general '你決定' delegation." The operator answered directly
+      rather than requesting a formal WorkOS quote -- self-hosting was
+      chosen precisely to avoid that vendor-spend question entirely.
+    owner: "closed"
+    blocks: "nothing -- resolved"
   - id: "OQ-ZEROTRUST-2"
     question: >
       `service_count_reconsideration_threshold` (the 'N' in
@@ -250,8 +283,10 @@ verification:
     §1's supporting paragraphs. Cross-checked
     .ai/research/phase-1/GAP_REGISTER.yaml:190-197 (P1-GAP-SEC-1) to confirm
     this file's scope matches all 3 named sub-gaps (IdP/OIDC provider /
-    workload identity standard / PDP engine) -- 2 closed here, 1 (IdP)
-    explicitly left open, not silently dropped.
+    workload identity standard / PDP engine) -- all 3 now closed, none
+    silently dropped. `idp_provider`'s `provider`/`deployment_model` values
+    transcribed directly from the operator's own explicit answers in
+    conversation (2026-08-30), not derived from any document.
   note: >
     No mother document was modified. This file does not include SBOM
     format, signing mechanism, SLSA target, or vulnerability-scan tooling --

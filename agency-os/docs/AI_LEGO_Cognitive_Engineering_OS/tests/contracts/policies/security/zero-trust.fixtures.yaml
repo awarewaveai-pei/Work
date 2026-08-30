@@ -1,21 +1,23 @@
 schema_id: "ai-lego://policies/security/zero-trust.policy.yaml"
 target_ref: ""
 description: >
-  Exercises the 2-of-3 partial ratification (ADR-016): workload_identity and
-  pdp_engine are const-enforced ratified values; idp_provider is a required
-  object whose ONLY required sub-field is the blocked-status marker, not a
-  real vendor decision. 2026-08-30 /codex-review HIGH finding fix: the
+  Exercises the fully-ratified policy (ADR-016, all 3 sub-decisions ACCEPTED
+  2026-08-30): idp_provider is const-enforced Zitadel/self-hosted (operator's
+  own real-time decision, updated from the original blocked placeholder);
+  workload_identity and pdp_engine are const-enforced ratified values.
+  2026-08-30 /codex-review HIGH finding fix carried forward: the
   spiffe_reconsideration_triggers enum + service_count_reconsideration_threshold
   cross-field rule (a free-text array previously let any placeholder validate).
 valid:
-  - name: full_policy_two_of_three_ratified
+  - name: full_policy_fully_ratified
     instance:
       idp_provider:
-        status: "TBD_PENDING_OPERATOR_VENDOR_DECISION"
-        recommended_candidate: "WorkOS (managed) -- recommendation only, not a decision"
-        recommended_candidate_rationale: "Native multi-tenant model (organizations as the primary unit) + built-in Agent Registration functionality distinct from human OAuth flows, the closest available fit found for this project's A0-A4 AI-agent authority-tier model. Not itself sufficient grounds for a vendor commitment -- see blocking_reason."
-        blocking_reason: "Multi-year per-connection/SCIM-directory billing model creates real vendor lock-in once tenants are onboarded against it; source plan §4 risk 1 explicitly recommends obtaining a real multi-year quote before finalizing. This is a genuine new recurring spend commitment, not an open-standard/OSS choice -- reserved for the operator per AGENTS.md R0's 取捨影響產品方向 stop condition."
-        self_hosted_alternative: "Zitadel or Keycloak (self-hosted) -- avoids vendor lock-in entirely at the cost of owning IdP operations (patching/scaling/on-call) for the project's full lifetime. Zitadel's core license changed to AGPL-3.0 as of v3 (~2025-03), a separate licensing consideration the operator should weigh alongside the ops-burden tradeoff."
+        provider: Zitadel
+        deployment_model: self-hosted
+        rationale: "Operator 2026-08-30 explicit decision: prefer self-hosting over WorkOS (managed) -- avoids the multi-year per-connection/SCIM-directory billing lock-in the source plan's own risk analysis flagged (§4 risk 1), in exchange for owning IdP operations (patching/scaling/on-call) for the project's full lifetime. Zitadel chosen over the other self-hosted candidate, Keycloak, because Zitadel's native Instance→Org→Project→App hierarchy matches this project's multi-tenant architecture directly, where Keycloak's realm-per-tenant model does not scale as cleanly as tenant count grows."
+        licensing_acknowledgment: "Zitadel's core license changed to AGPL-3.0 as of v3 (~2025-03). Running it unmodified as an internal backend service does not itself trigger AGPL's network-use disclosure clause -- that clause activates only if a MODIFIED fork of Zitadel's own source is offered as a network service to users. Flagged as an ongoing operational constraint (re-check before ever forking+modifying+redistributing Zitadel itself as a service), not a blocker to this decision."
+        workos_rejected_reason: "Would have avoided the self-hosted ops burden entirely, but the multi-year per-connection/SCIM-directory billing model creates real vendor lock-in once tenants are onboarded against it -- operator chose to avoid this recurring spend commitment rather than get a quote."
+        keycloak_rejected_reason: "Apache 2.0 (more permissive than Zitadel's AGPL-3.0) and a longer enterprise track record, but its realm-per-tenant model does not scale as cleanly with this project's growing multi-tenant count as Zitadel's native Instance→Org→Project→App hierarchy."
       workload_identity:
         strategy: "cloud-native workload identity + short-lived-credential mTLS"
         spiffe_deferred: true
@@ -26,10 +28,12 @@ valid:
         engine: Cedar
         rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have."
         scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it."
-  - name: minimal_valid_idp_still_blocked_only_first_cross_tenant_trigger
+  - name: minimal_valid_idp_and_single_trigger
     instance:
       idp_provider:
-        status: "TBD_PENDING_OPERATOR_VENDOR_DECISION"
+        provider: Zitadel
+        deployment_model: self-hosted
+        rationale: "Operator 2026-08-30 explicit decision: prefer self-hosting over WorkOS (managed) -- avoids the multi-year per-connection/SCIM-directory billing lock-in the source plan's own risk analysis flagged (§4 risk 1), in exchange for owning IdP operations (patching/scaling/on-call) for the project's full lifetime. Zitadel chosen over the other self-hosted candidate, Keycloak, because Zitadel's native Instance→Org→Project→App hierarchy matches this project's multi-tenant architecture directly, where Keycloak's realm-per-tenant model does not scale as cleanly as tenant count grows."
       workload_identity:
         strategy: "cloud-native workload identity + short-lived-credential mTLS"
         spiffe_deferred: true
@@ -40,35 +44,44 @@ valid:
         scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it."
     # Note: service_count_reconsideration_threshold correctly omitted -- the
     # allOf rule only requires it when service_count_exceeds_threshold is
-    # actually present in the triggers array, which it is not here.
+    # actually present in the triggers array, which it is not here. Also
+    # note idp_provider's optional fields (licensing_acknowledgment/
+    # workos_rejected_reason/keycloak_rejected_reason) correctly omitted --
+    # only provider/deployment_model/rationale are required.
 invalid:
-  - name: idp_silently_decided_without_adr
+  - name: idp_provider_wrong_vendor
     instance:
-      idp_provider: { status: WorkOS }
+      idp_provider: { provider: WorkOS, deployment_model: managed, rationale: "x" }
       workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [first_cross_tenant_agent_delegation_scenario] }
       pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
-    reason: "idp_provider.status is const 'TBD_PENDING_OPERATOR_VENDOR_DECISION' -- ADR-016 explicitly does NOT ratify a real idp_provider value; setting it to a real vendor name here would silently manufacture the vendor decision this schema exists to keep visibly open"
-  - name: wrong_pdp_engine
+    reason: "provider is const Zitadel and deployment_model is const self-hosted -- the operator explicitly chose self-hosted Zitadel over managed WorkOS on 2026-08-30; reverting to WorkOS here would silently overturn that real decision"
+  - name: idp_provider_stale_blocked_placeholder_no_longer_valid
     instance:
       idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
+      workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [first_cross_tenant_agent_delegation_scenario] }
+      pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
+    reason: "regression check: the pre-2026-08-30 blocked-placeholder shape ({status: ...}, no provider/deployment_model/rationale) must now FAIL -- idp_provider is a real decision, not a placeholder, and required now demands provider/deployment_model/rationale"
+  - name: wrong_pdp_engine
+    instance:
+      idp_provider: { provider: Zitadel, deployment_model: self-hosted, rationale: "x" }
       workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [first_cross_tenant_agent_delegation_scenario] }
       pdp_engine: { engine: "OPA/Rego", rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "engine is const Cedar -- ADR-016 Sub-decision (c) ratified Cedar over OPA/Rego for readability/auditability by non-engineering roles, not the reverse"
   - name: spiffe_deferred_with_no_reconsideration_triggers
     instance:
-      idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
+      idp_provider: { provider: Zitadel, deployment_model: self-hosted, rationale: "x" }
       workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [] }
       pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "spiffe_reconsideration_triggers has minItems 1 -- an empty array turns a temporary, checkable deferral into an open-ended one, exactly the unenforced-policy pattern §4 risk 2 warns against"
   - name: spiffe_trigger_is_free_text_not_enum
     instance:
-      idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
+      idp_provider: { provider: Zitadel, deployment_model: self-hosted, rationale: "x" }
       workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: ["revisit later"] }
       pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "2026-08-30 /codex-review HIGH finding fix: spiffe_reconsideration_triggers.items is now a closed 2-value enum, not free text -- a placeholder string like 'revisit later' must now fail validation instead of silently passing as a 'concrete, checkable' trigger"
   - name: service_count_trigger_present_but_threshold_missing
     instance:
-      idp_provider: { status: "TBD_PENDING_OPERATOR_VENDOR_DECISION" }
+      idp_provider: { provider: Zitadel, deployment_model: self-hosted, rationale: "x" }
       workload_identity: { strategy: "cloud-native workload identity + short-lived-credential mTLS", spiffe_deferred: true, spiffe_reconsideration_triggers: [service_count_exceeds_threshold] }
       pdp_engine: { engine: Cedar, rationale: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have.", scope_limitation: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it." }
     reason: "the allOf/if/contains/then rule requires service_count_reconsideration_threshold whenever service_count_exceeds_threshold appears in the triggers array -- omitting it leaves the 'N' undefined, the second half of the same 2026-08-30 finding"
