@@ -5619,10 +5619,15 @@ Destroy DEK 的所有物理副本（live + 備援／災復快照）
 
 # 149. Privacy-preserving Computation
 
-未來高階能力可支援：
+隱私保護運算技術依成熟度分為兩層（ADR-007 裁決，2026-08-29 ACCEPTED）：
+
+v1_baseline（Must，本次即可用，已是法規承認的基準安全措施）：
 
 - Pseudonymization
 - Tokenization
+
+future_advanced（Won't，需個案通過成本、維護、威脅模型驗證後才排入 roadmap）：
+
 - Differential Privacy
 - Secure Enclaves
 - Federated Analysis
@@ -5630,7 +5635,7 @@ Destroy DEK 的所有物理副本（live + 備援／災復快照）
 - Secure Multi-party Computation
 - Homomorphic Encryption（只在適用成本與成熟度下）
 
-不得為了「先進」而無條件採用高複雜技術；需通過成本、維護、威脅模型驗證。
+不得為了「先進」而無條件採用 future_advanced 清單中的高複雜技術；需通過成本、維護、威脅模型驗證後才可排入 roadmap。v1_baseline 兩項為現行可用之基準安全措施，其 v1 去識別化機制見 `policies/privacy/pii-redaction.policy.yaml`。
 
 ---
 
