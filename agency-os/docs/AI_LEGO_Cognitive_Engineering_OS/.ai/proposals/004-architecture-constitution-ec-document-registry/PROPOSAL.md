@@ -1,7 +1,7 @@
 ---
 proposal_id: "004"
 slug: "architecture-constitution-ec-document-registry"
-status: APPROVED
+status: APPLIED
 target_document: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md"
 target_baseline_hash: "2ad2a179944b917fe390119b6340ba9019344d7d15fcc9b77fdda3677937fc1e"
 affected_line_ranges: ["L218-253"]
@@ -11,7 +11,7 @@ authored_by: "Claude"
 approved_by: "操作者"
 approved_at: "2026-08-30"
 approval_note: "39 個都核准"
-applied_commit: null
+applied_commit: "d1ba4d6b3"
 ---
 
 ## PROPOSED_CHANGE
