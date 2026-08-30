@@ -1486,10 +1486,10 @@ DECISION
 禁止：
 
 ```text
-UNKNOWN → FACT
+UNKNOWN → SOURCE_FACT（直接跳轉）
 ```
 
-沒有 Evidence / Compute / Human Validation 不得偷偷升級。
+合法路徑僅有：經 Compute 產生證據 → `EVIDENCE`，或經 Human Validation 確認 → `SOURCE_FACT`，兩者皆須寫入 authorship_state 與 execution manifest。
 
 ---
 
