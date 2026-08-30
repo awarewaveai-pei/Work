@@ -1612,7 +1612,9 @@ Country
 
 ---
 
-# 27. Data Science Plane
+# 27. Data Science 執行流程（對應 §4 COMPUTATION PLANE）
+
+本節為 §4 COMPUTATION PLANE 的執行流程說明，非獨立 Plane；跨層命名對照見 §80.1。
 
 AI 不直接編造數學結果。
 
