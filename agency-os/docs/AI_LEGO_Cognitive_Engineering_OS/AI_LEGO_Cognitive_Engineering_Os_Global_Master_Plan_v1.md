@@ -333,7 +333,10 @@ AnalysisRun
 Simulation
 Experiment
 Outcome
+Tenant
 ```
+
+`Tenant 1:N Workspace`：一個 Workspace 恰屬於一個 Tenant，不存在跨 Tenant 共用的 Workspace（ADR-003 Sub-decision (a)）。完整欄位定義見 `specs/domain/tenant.schema.yaml`。
 
 ---
 
