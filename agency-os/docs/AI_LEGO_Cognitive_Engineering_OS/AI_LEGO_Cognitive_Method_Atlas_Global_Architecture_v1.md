@@ -4145,6 +4145,12 @@ flowchart TB
     EX --> C[Capability]
 ```
 
+## Branch 定義
+
+Branch 是 Workflow 的一條分叉、隔離的執行血系（forked, isolated execution lineage of a Workflow）：由既有的 `Branch` action（Master Plan §11.2）建立，產生自己的 Execution；僅能透過既有的 `Merge` action 併回父 Workflow 的已提交歷史。未併入（unmerged）的 Branch Execution 不影響 Project Knowledge，與本節強制規則 3 一致。
+
+完整行為規格（狀態機、Merge 授權門檻、衝突處理）不在此定義範圍內，見 `specs/workflow/branch.schema.yaml`（`docs/adr/ADR-012-branch-merge-state-machine.md` 建立）。
+
 ## 強制規則
 
 1. AI-generated idea 預設 `DRAFT`。
