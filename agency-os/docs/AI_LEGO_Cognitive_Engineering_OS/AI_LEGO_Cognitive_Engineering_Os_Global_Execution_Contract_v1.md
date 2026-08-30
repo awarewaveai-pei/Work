@@ -1984,7 +1984,7 @@ Accept / Reject / Edit
 
 `LOCKED_FACT` / `LOCKED_DECISION`：
 
-不得由 AI 修改。
+不得由 AI 修改。`LOCKED_FACT` 鎖定對象為 epistemic_type=SOURCE_FACT 的內容；`LOCKED_DECISION` 語意同 `LOCKED_FACT`，鎖定對象為 epistemic_type=DECISION 的內容。完整定義見 `specs/governance/epistemic-label.schema.yaml#/definitions/locked`。
 
 ---
 
