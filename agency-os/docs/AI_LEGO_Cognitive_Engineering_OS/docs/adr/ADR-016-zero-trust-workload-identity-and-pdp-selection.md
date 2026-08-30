@@ -8,11 +8,11 @@ Related: `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（Status 
 
 `.ai/research/phase-1/GAP_REGISTER.yaml` `P1-GAP-SEC-1`（severity: high，L190-197）：Master Plan 的 `Identity → Workload Identity → Mutual Authentication → Short-lived Credentials → Policy Decision → Resource Access` 流程圖（`AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:2668`）只有階段名稱，無 IdP/OIDC provider、無 workload identity 標準、無 Policy Decision Point 引擎名稱。
 
-`ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md` §1/§3 rows 1-3 已完成 3 項推薦：IdP=WorkOS、workload identity=雲端原生 mTLS 先行（延後 SPIFFE）、PDP=Cedar。**本 ADR 逐項檢視後，只批准後兩項**——見 Decision Driver 1 的判準。
+`ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md` §1/§3 rows 1-3 已完成 3 項推薦：IdP=WorkOS、workload identity=雲端原生 mTLS 先行（延後 SPIFFE）、PDP=Cedar。**首次批准時（2026-08-30 稍早）本 ADR 逐項檢視後只批准後兩項**——見 Decision Driver 1 的判準。**這個「只批准 2/3」的狀態已於同日稍晚由操作者本人裁決 IdP 後結束**——見 Sub-decision (a) 的完整更新記錄；本節與 Decision Driver 1、Method Used 描述的是首次批准當下的判斷過程與理由，不是本 ADR 現在的最終狀態（現在是全數 3/3 ACCEPTED，見上方 Status）。
 
-## Decision Drivers
+## Decision Drivers（首次批准時，2026-08-30 稍早——見 Sub-decision (a) 了解 IdP 項目同日稍晚如何被操作者本人裁決）
 
-1. **與姊妹 ADR-015 相同的供應商支出判準，但此處產生相反結論的一項**：IdP/OIDC provider（row 1）是本次任務唯一真正涉及新增供應商付費承諾的選型——WorkOS 是新的 managed SaaS，依 SSO connection/SCIM directory 數計費，來源文件自己的風險分析（§4 risk 1）明確建議「先拿多年期真實報價再定案」。這正是 `agency-os/AGENTS.md` R0 明文列出的停止條件之一：「取捨影響產品方向」——即使在一般性「你決定」委任下，這類決策仍應停止並回報，不應單方面拍板。Workload identity（row 2）與 PDP engine（row 3）性質不同：row 2 的建議是**不**採用任何新供應商（延後 SPIFFE，改用雲端原生機制），row 3 的 Cedar 是 Apache-2.0 免費 OSS——兩者都沒有新增供應商鎖定或持續帳單，落在 ADR-015 已確立的可拍板類別。
+1. **與姊妹 ADR-015 相同的供應商支出判準，首次批准時此處產生相反結論的一項**：IdP/OIDC provider（row 1）是本次任務唯一真正涉及新增供應商付費承諾的選型——WorkOS 是新的 managed SaaS，依 SSO connection/SCIM directory 數計費，來源文件自己的風險分析（§4 risk 1）明確建議「先拿多年期真實報價再定案」。這正是 `agency-os/AGENTS.md` R0 明文列出的停止條件之一：「取捨影響產品方向」——即使在一般性「你決定」委任下，這類決策仍應停止並回報，不應單方面拍板。Workload identity（row 2）與 PDP engine（row 3）性質不同：row 2 的建議是**不**採用任何新供應商（延後 SPIFFE，改用雲端原生機制），row 3 的 Cedar 是 Apache-2.0 免費 OSS——兩者都沒有新增供應商鎖定或持續帳單，落在 ADR-015 已確立的可拍板類別。
 2. **延後 SPIFFE 的決策本身必須附具體、可檢查的重新評估條件，而非開放式「以後」**——同 ADR-015 Decision Driver 4 對 SLSA L3 的處理邏輯；來源文件 §4 risk 2 已自行提出兩個具體觸發條件（服務數門檻、首個跨租戶 agent 委派情境），本 ADR 直接沿用，不發明新條件也不放任其停留在文字警示層級。
 3. **Cedar 的 principal/action/resource/context 模型與本專案已批准的 R0-R4/A0-A4 詞彙（ADR-004）高度吻合**，且形式驗證+可讀性對本專案「需要被法遵、操作者本人稽核」這個真實需求是精確對應，非過度延伸。
 
@@ -40,7 +40,7 @@ Related: `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（Status 
 
 ## Method Used
 
-同姊妹 ADR-015 的供應商支出判準，應用於同一來源文件的 Gap 1，產生相反結論的一項（row 1 不批准）——這正說明該判準不是一刀切的「本次任務可以拍板廠商選型」或「一律不行」，而是逐項依實際財務/鎖定風險判斷，方法本身在兩份 ADR 間保持一致，只是輸入條件不同導致結論不同。
+**首次批准時**：同姊妹 ADR-015 的供應商支出判準，應用於同一來源文件的 Gap 1，產生相反結論的一項（row 1 首次批准時不批准）——這正說明該判準不是一刀切的「本次任務可以拍板廠商選型」或「一律不行」，而是逐項依實際財務/鎖定風險判斷，方法本身在兩份 ADR 間保持一致，只是輸入條件不同導致結論不同。**Row 1 後續更新**：判準本身沒有失效——它正確地把決策導向操作者，操作者隨後在同日對話中直接做出決定，方法論的產出（「這件事該由操作者決定」）與實際發生的事（操作者決定了）完全一致，不是判準被推翻。
 
 ## Recommendation
 

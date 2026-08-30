@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-08-30（續13）
+
+### `/codex-review` 真實跑續12（commit 0a37e4c5a），抓到 2 個真實 finding（1 HIGH + 1 MEDIUM），全數驗真並修正
+
+**觸發**：續12 commit `0a37e4c5a`（IdP=Zitadel 落地）完成後，操作者再次明示要求跑 `/codex-review`。`write-oracle-artifact.ps1 -Mode capture -DiffRef "79bafc14f..HEAD"` 擷取，`codex-companion.mjs adversarial-review --base 79bafc14f` 背景執行完成，`verdict: needs-attention`。
+
+**逐條驗真**：
+
+1. **[high] idp_provider 遷移未封殺舊佔位符欄位共存**（`zero-trust.policy.yaml:150-180`）——直讀確認 `idp_provider` 物件只有 `required: [provider, deployment_model, rationale]`，沒有任何機制禁止同時帶有舊阻塞形狀的欄位（`status`/`recommended_candidate`/`blocking_reason`/`self_hosted_alternative`）——依 Draft 2020-12，一個同時帶新舊欄位的實例仍會通過驗證，等於「驗證說已全數批准，但仍留著舊阻塞狀態」這個隱性版本混淆缺口；當時的 fixture 只測了純舊形狀，沒測混合形狀。**屬實。**
+2. **[medium] ADR-016 本文仍自相矛盾**（`ADR-016-...md:9-43`）——直讀確認 Context（L11）、Decision Driver 1（L15）、Method Used（L43）三處仍用現在式描述「只批准後兩項」/「row 1 不批准」，雖然 Status 表頭與 Sub-decision (a) 已正確更新，但這三段沒有加註「這是首次批准時的描述」，未來任何人只讀這幾段會誤以為 IdP 仍未批准。**屬實**——這正是我自己更新 ADR 時的疏漏，只更新了 Sub-decision (a)/Recommendation/Consequences，漏了 Context/Decision Drivers/Method Used 三處現在式敘述。
+
+**修正**：
+- `zero-trust.policy.yaml`：`idp_provider` 新增物件層級 `not`/`anyOf` 規則，禁止 4 個舊佔位符欄位與新欄位共存。**未採用**`additionalProperties: false`（先 grep 確認整個 corpus 的 `specs/`/`policies/` 零處使用該關鍵字，貿然對單一物件加上會是與全庫慣例不一致的孤例，改用精準禁止 4 個危險欄位的窄規則）
+- `ADR-016`：Context/Decision Driver 1/Method Used 三處補上「首次批准時」/「見 Sub-decision (a) 了解後續更新」的時序註記，消除現在式造成的自相矛盾
+- 新增 fixture case `idp_provider_mixed_new_and_stale_placeholder_keys`，直接驗證混合形狀確實被拒絕
+
+[已修改]
+- `policies/security/zero-trust.policy.yaml`：`idp_provider` 新增 `not` 規則 + compilation_decisions 記錄
+- `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`：Context/Decision Drivers/Method Used 補時序註記
+- `tests/contracts/policies/security/zero-trust.fixtures.yaml`：新增 1 個 invalid case
+- 新增 `agency-os/reports/oracle/2026-08-30-review-5ac08578.md`（本次真實覆審 artifact）
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`node codex-companion.mjs adversarial-review --background --base 79bafc14f "<兩段標準 focus text>"` | exit=0 | 結果=真實背景執行，verdict=needs-attention，2 個 finding，非模擬
+- REALTEST_EVIDENCE: tool=Read | cmd=直讀 2 個 finding 對應的實際檔案內容逐一核對 | 結果=2 個全部屬實
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=687 個檢查全過（686→687，新增 1 個 invalid case）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`UniqueKeyLoader` 對 2 個修改的 YAML/fixture 檔逐一掃描 | exit=0 | 結果=全數 OK
+- REVIEW_DONE: critic=Deep（外部 oracle，`/codex-review`，審 0a37e4c5a）| verdict=needs-attention → 2 個 finding 全數驗真（1 HIGH schema 缺口 + 1 MEDIUM 文件自相矛盾）| findings=0c/1m(HIGH)/1n(MEDIUM)
+- BUGHUNT_DONE: scope=agency-os | grep=`idp_provider\.status\|TBD_PENDING_OPERATOR_VENDOR_DECISION` | hits=5 處，全數為本檔/ADR/WORKLOG 自身保留的稽核歷史文字，無其他 consumer 引用舊形狀（Phase 0-3 尚無 runtime 消費此 policy 檔案）
+
+[剩餘風險] 無新增——本輪修正純粹關閉 schema 執行力缺口與文件自相矛盾，未引入新的懸而未決項。
+
+[rollback] 純 schema 緊縮（`not` 規則）+ 3 段文件時序註記，`git revert` 可完整回退；回退後 `idp_provider` 會重新允許新舊欄位混合共存，ADR-016 三段敘述會重新失去時序註記，需注意。
+
 ## 2026-08-30（續12）
 
 ### 操作者在對話中直接決定 IdP：自架 Zitadel（優於 Keycloak）——ADR-016 Sub-decision (a) 從「明確不批准」UPDATED 為「操作者本人裁決 ACCEPTED」

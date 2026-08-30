@@ -142,6 +142,32 @@ compilation_decisions:
       now that a decision exists) because it is a live operational
       constraint, not a decision-blocking concern that resolves itself once
       Zitadel is chosen.
+  - question: >
+      2026-08-30 `/codex-review` HIGH finding (real, independently
+      verified): the migrated `idp_provider` shape required the new keys
+      but never forbade the 4 retired blocked-placeholder keys
+      (`status`/`recommended_candidate`/`blocking_reason`/
+      `self_hosted_alternative`). An instance carrying BOTH the new
+      required keys AND the stale keys would still validate under Draft
+      2020-12 -- validation would say "fully ratified" while a consumer
+      still branching on `idp_provider.status` could keep treating it as
+      blocked. The fixtures at the time only tested the pure old shape, not
+      this mixed shape.
+    decision: >
+      Added an object-level `not: {anyOf: [{required: [status]}, ...]}`
+      block banning the 4 retired keys outright, rather than
+      `additionalProperties: false`.
+    reasoning: >
+      A blanket `additionalProperties: false` would close this object to
+      ALL future extension, which is inconsistent with this corpus's own
+      established convention (grepped `additionalProperties` across
+      `specs/` and `policies/` before choosing -- zero hits anywhere;
+      closing exactly one object here would be a divergent, un-reviewed
+      pattern rather than alignment with the rest of the suite). The
+      narrower `not`/`anyOf` targets precisely the 4 keys that are actually
+      dangerous (leftover state from the retired shape), while still
+      allowing genuinely new, unrelated fields to be added later without
+      tripping this rule.
 
 # ---------------------------------------------------------------------------
 # Schema body -- one singleton policy document (same shape convention as
@@ -178,6 +204,25 @@ properties:
       keycloak_rejected_reason:
         type: string
         const: "Apache 2.0 (more permissive than Zitadel's AGPL-3.0) and a longer enterprise track record, but its realm-per-tenant model does not scale as cleanly with this project's growing multi-tenant count as Zitadel's native Instance→Org→Project→App hierarchy."
+    not:
+      description: >
+        2026-08-30 /codex-review HIGH finding: without this, an instance
+        could carry the NEW required keys (provider/deployment_model/
+        rationale) alongside STALE keys from the retired blocked-placeholder
+        shape (status/recommended_candidate/blocking_reason/
+        self_hosted_alternative) and still validate -- a hidden
+        version-skew hazard for any consumer still branching on
+        `idp_provider.status`. This bans the 4 retired keys outright, not a
+        blanket `additionalProperties: false` (which would break this
+        corpus's own established open-extension convention -- grepped
+        `additionalProperties` across specs/ and policies/, zero hits
+        anywhere in the corpus, so closing this one object would be a
+        divergent, one-off pattern, not alignment with it).
+      anyOf:
+        - required: [status]
+        - required: [recommended_candidate]
+        - required: [blocking_reason]
+        - required: [self_hosted_alternative]
 
   workload_identity:
     type: object
