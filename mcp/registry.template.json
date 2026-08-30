@@ -19,7 +19,8 @@
                                                                 "exclude":  true
                                                             }
                                               },
-                                  "enabled":  true,
+                                  "enabled":  false,
+                                  "note":  "DISABLED: Canva OAuth opened unsolicited login windows in Codex desktop. Re-enable only when Canva work is explicitly requested, then restart the MCP host and complete OAuth once.",
                                   "transport":  "stdio",
                                   "command":  "cmd",
                                   "args":  [

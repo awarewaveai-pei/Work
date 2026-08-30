@@ -8399,6 +8399,23 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 
 **Rollback**: reinstall Canva in Codex only when it is needed; a fresh explicit OAuth authorization will then be required.
 
+### fix(codex): disable the workspace Canva MCP source missed by plugin removal
+
+**Correction to the preceding entry**: uninstalling the Codex desktop plugin did not stop the popup. That result isolated one activation path but was not a complete fix.
+
+**Root cause**: `mcp/registry.template.json` still declared `servers.canva.enabled: true`. Its `clients.codex.exclude` only prevented generation of the user-level Codex config; the sync script still generated Canva into the shared workspace `D:\Work\.mcp.json`. Codex desktop reads that workspace file, so it launched `mcp-remote` and opened OAuth even after its desktop plugin was removed.
+
+**Change**: set `servers.canva.enabled: false` in the registry SSOT and ran `scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work`. The registry retains the Canva declaration and a re-enable note, so recovery is an explicit, reversible decision rather than an untracked manual deletion.
+
+**Verification**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work` | exit=0 | result=`MCP sync complete` for workspace, Codex, Copilot, and Gemini configs.
+- REALTEST_EVIDENCE: tool=Bash | cmd=parsed generated `.mcp.json` plus grep of `.mcp.json`, `%USERPROFILE%\.codex\config.toml`, `%USERPROFILE%\.copilot\mcp-config.json`, and `%USERPROFILE%\.gemini\settings.json` | exit=0 | result=workspace `canva` entry absent; 0 Canva/Canva MCP URL hits in all four host configs; registry `canva.enabled` is false.
+- REVIEW_DONE: source and generator reviewed at `mcp/registry.template.json:16-31` and `scripts/sync-mcp-config.ps1:254-255,538-548`; the previous `clients.codex.exclude` did not govern the workspace client.
+- BUGHUNT_DONE: scope=all generated MCP host configs | grep=`mcp.canva.com|mcp-remote@0.1.49|\\bcanva\\b` | hits=0.
+
+**Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
+
+**Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
 
 
 
