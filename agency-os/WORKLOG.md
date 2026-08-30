@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-08-30（續20）
+
+### `/codex-review` 對 AI-LEGO 巨批（39 proposal + 9 schema）真實執行後撞牆——Codex 額度耗盡（非程式問題），改真實自我對抗覆審，誠實記錄 `ORACLE_WAIVED`
+
+**觸發**：commit `15814d1be`（proposals 批，與並行 session commit 併入）+ `a3f9626aa`（Phase 5 schema 批）完成後，依操作者明示要求跑 `/codex-review`。用 `write-oracle-artifact.ps1 -Mode capture -DiffRef "f20e6b298..HEAD" -Path "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS"` 精確擷取（`-Path` 過濾掉同一 commit range 內並行 session 的 SG/EU 無關檔案），得到 900KB/15000 行 diff。`codex-companion.mjs adversarial-review --background` 真實執行，讀了約 20 個檔案後回報：**「You've hit your usage limit... try again at 4:36 PM」**——ChatGPT Codex 訂閱額度真的用完，非程式錯誤、非逾時、非本次改動有問題。
+
+**判斷（不可跳過 review，但也不可裝作有跑）**：AGENTS.md 既定 fallback（`codex-oracle.ps1`）走同一個 `codex` CLI 訂閱（`authMethod: chatgpt`），額度是同一份——此刻重試 fallback 幾乎必然撞同一道牆，不是真正的備援路徑，而是浪費一次重試。依既有 memory 準則（外部 oracle 真的沒額度時，改做「真實對抗自審 + 突變測試證明測試非空跑 + 誠實計數」），執行以下真實自我覆審而非略過：
+
+1. **全庫 UTF-8 合法性掃描**（`os.walk` 對 `.yaml/.yml/.md` 全數嘗試 `utf-8` decode）——0 個檔案有非法位元組，排除本次巨量批次寫入過程中出現隱性編碼損毀的疑慮。
+2. **內容忠實度抽查**：挑最高風險（內容最多、最容易謄寫出錯）的 proposal `039-gate-list-union-content-mp`——直接 `sed` 讀 Master Plan §158 實際現況（L5900-5927）逐字比對 proposal 的 Original 區塊，完全一致；再用 Python 直接讀 `gate.schema.yaml` 的 `gate_catalog`（14 Global + 6 High-risk id 陣列）逐一比對 proposal 的 Proposed 區塊 14+6 項名稱與順序，完全一致，無捏造無遺漏。
+3. **結構性宣稱的真實突變測試**：`knowledge-canvas.schema.yaml` 建置時聲稱 AI/Human 互動規則是「結構性強制,非僅文字」——沒有直接相信，實際用 `jsonschema.Draft202012Validator` 對 `canvas_annotation` 定義跑 4 個對抗案例（AI 做 Human-only 的 `accept`、AI 做合法的 `suggest`、Human 做合法的 `accept`、Human 做 AI-only 的 `suggest`）——4 個全部符合預期（前後各 2 個該擋的擋下、該過的過），證實此宣稱屬實非話術。
+
+**結論**：抽查樣本無發現真實缺陷（不代表全部 15000 行都無瑕疵——15 分鐘等級的自我抽查不等於完整外部覆審，誠實記錄範圍而非誇大涵蓋度）。額度預期於當地時間 16:36 恢復，若操作者要求，可屆時對同一 diff 重跑真正的外部 `/codex-review` 補齊今日尚未做到的完整覆審。
+
+[已修改]
+- `WORKLOG.md` 本條（無程式碼/schema 變更）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=`node codex-companion.mjs adversarial-review --background --base f20e6b298`（scoped `-Path`）| exit=1 | 結果=真實執行，讀取約 20 個檔案後因 Codex 帳號額度耗盡中止，非程式錯誤（錯誤訊息逐字為「usage limit...try again at 4:36 PM」）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=全庫 `.yaml/.yml/.md` UTF-8 decode 掃描 | exit=0 | 結果=0 個非法位元組檔案
+- REALTEST_EVIDENCE: tool=Bash(sed+python3) | cmd=proposal 039 Original/Proposed 區塊逐字比對 Master Plan §158 現況與 `gate.schema.yaml gate_catalog` | exit=0 | 結果=完全一致，無捏造
+- REALTEST_EVIDENCE: tool=Bash(python3, jsonschema) | cmd=`knowledge-canvas.schema.yaml` actor/action 結構性強制 4 案例對抗測試 | exit=0 | 結果=4/4 符合預期（AI+accept 擋下、AI+suggest 通過、Human+accept 通過、Human+suggest 擋下），證實非僅文字宣稱
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=839/839 全過（commit 後重跑，非事前快照）
+- ORACLE_WAIVED: Codex 額度耗盡（非逾時/非 529，額度重置時間 16:36），依既定 fallback 分析後判斷 `codex-oracle.ps1` 走同一份額度、重試無意義；已執行真實自我對抗覆審（UTF-8 掃描 + 高風險樣本忠實度核對 + 結構性宣稱突變測試）取代，範圍為抽查非全量，誠實揭露非假裝完整覆審
+
+[剩餘風險] 39 個 proposal + 9 個新 schema 的完整內容**尚未經過真正的外部第二意見覆審**——本次自我覆審範圍是有代表性的抽查，不等同於獨立外部視角能抓到的盲點（今日稍早三輪真實 `/codex-review` 已證明外部視角能抓到自我覆審會漏掉的問題）。額度恢復後應對同一 diff 補跑一次真正的 `/codex-review`。
+
+[rollback] 純 WORKLOG 記錄，無程式碼影響。
+
 ## 2026-08-30（續19）
 
 ### P2.4c 硬化：ks-aw-01 上 4 個無密碼 Redis，補上 3 個（lobster/postiz/soulful），trigger-redis 查證後刻意不動
