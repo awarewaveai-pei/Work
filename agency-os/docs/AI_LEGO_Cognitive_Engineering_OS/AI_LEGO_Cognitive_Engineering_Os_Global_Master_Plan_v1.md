@@ -5633,6 +5633,28 @@ Customer controls key
 Provider cannot decrypt independently
 ```
 
+## 148.1 Per-Subject DEK Lifecycle
+
+個資欄位（依 §61 分級為 Confidential/Restricted 者）寫入 Event Ledger 前，以該 data subject 專屬的 Data Encryption Key（DEK, AES-256-GCM）加密；DEK 本身用 tenant 級 Key-Encryption-Key（KEK）包住（envelope encryption，格式見 §27.1），KEK 依本節既有主權模型存放於獨立 Key Vault，不進 Event Ledger（key record 機器可讀結構見 `specs/security/key-vault-lifecycle.schema.yaml`）。
+
+```text
+Issue per-subject DEK
+↓
+Wrap DEK by tenant KEK
+↓
+Encrypt Confidential/Restricted field with DEK
+↓
+[DEK Active — 可解密]
+↓（資料主體提出刪除請求）
+Destroy DEK 的所有物理副本（live + 備援／災復快照）
+↓
+寫入 Key Destruction Record 至獨立稽核日誌
+↓
+[DEK Destroyed — 不可逆]
+```
+
+刪除請求 = 銷毀該 subject 的 DEK 記錄；Event 結構本身不動。projection 讀到已銷毀 DEK 的欄位時 decrypt 失敗，依 policy 填入 `REDACTED` sentinel，不中斷 Replay（§112）。
+
 ---
 
 # 149. Privacy-preserving Computation
