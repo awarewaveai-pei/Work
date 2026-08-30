@@ -3047,6 +3047,24 @@ restore drill evidence
 
 或至少確認最近可接受 restore test 符合 policy。
 
+## 105.1 Key Vault Restore Gate：Key Destruction Record Replay
+
+任何從 Key Vault 備份還原（disaster recovery restore）的操作，在還原後的 Vault 被允許服務任何 decrypt 請求之前，必須先重放所有時間戳晚於該備份快照的 Key Destruction Record，對其中每一筆記錄的 DEK 執行等效銷毀，才能將還原後的 Vault 標記為 live（機器可驗證定義：`specs/security/key-vault-lifecycle.schema.yaml` 的 `vault_restore_event`／`replay_gate`）。
+
+```text
+Vault Restored From Backup
+↓
+decrypt_serviceable = false（強制預設）
+↓
+從獨立稽核日誌（非還原中的 Vault 本身）查出所有 destroyed_at 晚於備份快照時間 的 Key Destruction Record
+↓
+逐筆對還原後 Vault 重放銷毀（re-destroy）
+↓
+全部重放完成且驗證通過 → decrypt_serviceable = true
+```
+
+此關卡為強制步驟，非選配清理作業——與既有 WORM 35 天 immutability window（`docs/architecture/DEVOPS_SRE_PLAN.md` §3.2）交互：備份本身在該窗口內不可手動刪改，「備份含已銷毀 DEK」的風險視窗至少與 WORM 窗口等長，故此步驟必須是還原流程的強制關卡，否則整個 WORM 保護期都是潛在的假刪除視窗。
+
 ---
 
 # 106. DR Change Awareness
