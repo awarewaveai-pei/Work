@@ -2,6 +2,9 @@
 ## 30 年級 Human–AI 多專業、多利害關係人、研究、商業、學習與決策作業系統
 ### Global Master Architecture / Product / Engineering / Security / Research / Analytics / Legal / Compliance / Governance Plan
 
+**Document ID**: `ai-lego.master-plan`
+**Version**: `1.0.0`
+
 > **定位一句話**  
 > 建立一套以人類為最終決策者、AI 為可替換能力引擎、證據為真實核心、計算為可重現依據、工作流為可組裝 LEGO、所有成果皆可追溯、可驗證、可回滾、可離線、可上雲、可持續演化 30 年的「認知工程作業系統」。
 
