@@ -1,0 +1,62 @@
+schema_id: "ai-lego://policies/security/supply-chain-security.policy.yaml"
+target_ref: ""
+description: >
+  Exercises the const-enforced tooling selections ratified by ADR-015
+  (SBOM/signing/SLSA/vuln-scan/CVSS tiering), and the reconciliation_rule
+  that resolves the Grype/Dependabot dual-tool noise risk.
+valid:
+  - name: full_policy_as_ratified
+    instance:
+      sbom:
+        primary_format: CycloneDX
+        secondary_format_on_demand: SPDX
+        recommended_minimum_version: "1.5 or later"
+        rationale: "CI/CD-native default (GitHub/GitLab/Azure DevOps all default to it; Trivy/Grype/Snyk/Anchore all support it natively). SPDX kept as an on-demand secondary output for law/customer-specific SPDX mandates -- neither US NTIA nor EU CRA sources found mandate a single format."
+      signing:
+        mechanism: "Sigstore/cosign"
+        keyless: true
+        rationale: "OpenSSF-graduated (2024-03); eliminates long-lived private-key management, the root cause multiple sources cite for 'most projects never actually adopt GPG signing'; directly compatible with GitHub's own native Artifact Attestations tooling."
+        offline_verification_exception_acknowledged: "GPG remains preferable ONLY for fully-offline, multi-year-later-verified, no-transparency-log-access scenarios (e.g. firmware/bootloader) -- not applicable to this project (online SaaS, verifiers always reachable)."
+      slsa:
+        immediate_target: "L2"
+        immediate_mechanism: "GitHub Artifact Attestations on GitHub-hosted runners -- reaches Build L2 by default, zero additional infrastructure"
+        future_target: "L3"
+        l3_migration_mechanism: "convert to a reusable workflow -- GitHub's own documented mechanism for reaching Build L3 without a self-hosted, hardened build platform"
+        l3_migration_trigger: "start of Phase 4 CI/CD build-out (the first point a real GitHub Actions workflow exists to convert) -- a concrete event, not an open-ended 'later'; see compilation_decisions for why no calendar date is invented here"
+      vulnerability_scanning:
+        primary_tool: Grype
+        primary_tool_scoring: "EPSS/KEV-aware, SBOM-first"
+        auto_fix_tool: Dependabot
+        reconciliation_rule: "Grype is the CI-merge-blocking authority per cvss_tiering below. Dependabot is PR-level-only -- it proposes dependency-bump PRs but never blocks a merge by itself. This is this file's own additive answer to the dual-tool noise risk (§4 risk 7), not a re-litigation of the dual-tool choice."
+        tool_diversity_rationale: "2026-03-19 Trivy release-infrastructure supply-chain compromise (Aqua official security advisory, GHSA-69fq-xp46-6x23; compromised tag-based releases for 3-12 hours before detection) -- do not single-source vulnerability scanning on one tool's own supply chain."
+      cvss_tiering:
+        kev_listed: { action: "BLOCK immediately", basis: "CISA Known Exploited Vulnerabilities catalog listing" }
+        critical_and_exploitable: { threshold: "CVSS >= 9.0 AND EPSS > 0.1", action: "BLOCK + 7-day SLA" }
+        high: { threshold: "CVSS 7.0-8.9", action: "WARN + 30-day SLA" }
+        below_high: { threshold: "CVSS < 7.0", action: "track only (no SLA)" }
+        rescan_requirement: { cadence: "scheduled re-scan of already-approved artifacts, not just at build time", reason: "a CVE's EPSS score can rise from low to high probability with no code change on this project's side -- 'passed once' is not 'passed forever'" }
+invalid:
+  - name: wrong_primary_sbom_format
+    instance:
+      sbom: { primary_format: SPDX, secondary_format_on_demand: SPDX }
+      signing: { mechanism: "Sigstore/cosign", keyless: true }
+      slsa: { immediate_target: "L2", immediate_mechanism: "GitHub Artifact Attestations on GitHub-hosted runners -- reaches Build L2 by default, zero additional infrastructure", future_target: "L3", l3_migration_mechanism: "convert to a reusable workflow -- GitHub's own documented mechanism for reaching Build L3 without a self-hosted, hardened build platform", l3_migration_trigger: "start of Phase 4 CI/CD build-out (the first point a real GitHub Actions workflow exists to convert) -- a concrete event, not an open-ended 'later'; see compilation_decisions for why no calendar date is invented here" }
+      vulnerability_scanning: { primary_tool: Grype, primary_tool_scoring: "EPSS/KEV-aware, SBOM-first", auto_fix_tool: Dependabot, reconciliation_rule: "Grype is the CI-merge-blocking authority per cvss_tiering below. Dependabot is PR-level-only -- it proposes dependency-bump PRs but never blocks a merge by itself. This is this file's own additive answer to the dual-tool noise risk (§4 risk 7), not a re-litigation of the dual-tool choice.", tool_diversity_rationale: "2026-03-19 Trivy release-infrastructure supply-chain compromise (Aqua official security advisory, GHSA-69fq-xp46-6x23; compromised tag-based releases for 3-12 hours before detection) -- do not single-source vulnerability scanning on one tool's own supply chain." }
+      cvss_tiering: { kev_listed: { action: "BLOCK immediately", basis: "CISA Known Exploited Vulnerabilities catalog listing" }, critical_and_exploitable: { threshold: "CVSS >= 9.0 AND EPSS > 0.1", action: "BLOCK + 7-day SLA" }, high: { threshold: "CVSS 7.0-8.9", action: "WARN + 30-day SLA" }, below_high: { threshold: "CVSS < 7.0", action: "track only (no SLA)" }, rescan_requirement: { cadence: "scheduled re-scan of already-approved artifacts, not just at build time", reason: "a CVE's EPSS score can rise from low to high probability with no code change on this project's side -- 'passed once' is not 'passed forever'" } }
+    reason: "primary_format is const CycloneDX -- ADR-015 ratified CycloneDX as primary with SPDX as an on-demand secondary, not the reverse"
+  - name: single_sourced_vulnerability_scanning
+    instance:
+      sbom: { primary_format: CycloneDX, secondary_format_on_demand: SPDX }
+      signing: { mechanism: "Sigstore/cosign", keyless: true }
+      slsa: { immediate_target: "L2", immediate_mechanism: "GitHub Artifact Attestations on GitHub-hosted runners -- reaches Build L2 by default, zero additional infrastructure", future_target: "L3", l3_migration_mechanism: "convert to a reusable workflow -- GitHub's own documented mechanism for reaching Build L3 without a self-hosted, hardened build platform", l3_migration_trigger: "start of Phase 4 CI/CD build-out (the first point a real GitHub Actions workflow exists to convert) -- a concrete event, not an open-ended 'later'; see compilation_decisions for why no calendar date is invented here" }
+      vulnerability_scanning: { primary_tool: Trivy, primary_tool_scoring: "EPSS/KEV-aware, SBOM-first", auto_fix_tool: Dependabot, reconciliation_rule: "Grype is the CI-merge-blocking authority per cvss_tiering below. Dependabot is PR-level-only -- it proposes dependency-bump PRs but never blocks a merge by itself. This is this file's own additive answer to the dual-tool noise risk (§4 risk 7), not a re-litigation of the dual-tool choice.", tool_diversity_rationale: "2026-03-19 Trivy release-infrastructure supply-chain compromise (Aqua official security advisory, GHSA-69fq-xp46-6x23; compromised tag-based releases for 3-12 hours before detection) -- do not single-source vulnerability scanning on one tool's own supply chain." }
+      cvss_tiering: { kev_listed: { action: "BLOCK immediately", basis: "CISA Known Exploited Vulnerabilities catalog listing" }, critical_and_exploitable: { threshold: "CVSS >= 9.0 AND EPSS > 0.1", action: "BLOCK + 7-day SLA" }, high: { threshold: "CVSS 7.0-8.9", action: "WARN + 30-day SLA" }, below_high: { threshold: "CVSS < 7.0", action: "track only (no SLA)" }, rescan_requirement: { cadence: "scheduled re-scan of already-approved artifacts, not just at build time", reason: "a CVE's EPSS score can rise from low to high probability with no code change on this project's side -- 'passed once' is not 'passed forever'" } }
+    reason: "primary_tool is const Grype -- Trivy was explicitly excluded as the sole scanner after its own 2026-03-19 release-infrastructure supply-chain compromise; single-sourcing on the compromised tool's successor defeats the tool-diversity rationale this policy exists to enforce"
+  - name: missing_reconciliation_rule
+    instance:
+      sbom: { primary_format: CycloneDX, secondary_format_on_demand: SPDX }
+      signing: { mechanism: "Sigstore/cosign", keyless: true }
+      slsa: { immediate_target: "L2", immediate_mechanism: "GitHub Artifact Attestations on GitHub-hosted runners -- reaches Build L2 by default, zero additional infrastructure", future_target: "L3", l3_migration_mechanism: "convert to a reusable workflow -- GitHub's own documented mechanism for reaching Build L3 without a self-hosted, hardened build platform", l3_migration_trigger: "start of Phase 4 CI/CD build-out (the first point a real GitHub Actions workflow exists to convert) -- a concrete event, not an open-ended 'later'; see compilation_decisions for why no calendar date is invented here" }
+      vulnerability_scanning: { primary_tool: Grype, primary_tool_scoring: "EPSS/KEV-aware, SBOM-first", auto_fix_tool: Dependabot, tool_diversity_rationale: "2026-03-19 Trivy release-infrastructure supply-chain compromise (Aqua official security advisory, GHSA-69fq-xp46-6x23; compromised tag-based releases for 3-12 hours before detection) -- do not single-source vulnerability scanning on one tool's own supply chain." }
+      cvss_tiering: { kev_listed: { action: "BLOCK immediately", basis: "CISA Known Exploited Vulnerabilities catalog listing" }, critical_and_exploitable: { threshold: "CVSS >= 9.0 AND EPSS > 0.1", action: "BLOCK + 7-day SLA" }, high: { threshold: "CVSS 7.0-8.9", action: "WARN + 30-day SLA" }, below_high: { threshold: "CVSS < 7.0", action: "track only (no SLA)" }, rescan_requirement: { cadence: "scheduled re-scan of already-approved artifacts, not just at build time", reason: "a CVE's EPSS score can rise from low to high probability with no code change on this project's side -- 'passed once' is not 'passed forever'" } }
+    reason: "reconciliation_rule is required -- omitting it reintroduces the dual-tool alert-noise ambiguity §4 risk 7 explicitly warned about (which tool's verdict wins when Grype and Dependabot disagree)"

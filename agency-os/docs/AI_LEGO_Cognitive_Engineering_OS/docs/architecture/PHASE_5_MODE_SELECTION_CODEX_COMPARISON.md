@@ -1,5 +1,5 @@
 # PHASE_5_MODE_SELECTION_CODEX_COMPARISON
-Status: PROPOSED（比較完成，最終 Phase 5 啟動仍待操作者 Phase 2 STOP-FOR-HUMAN-REVIEW 批准——本文件不改變那個既有閘門）
+Status: PROPOSED（比較完成；**2026-08-30 Mode 選擇本身已由 `docs/adr/ADR-014-phase-5-mode-selection-research.md` 批准（Research Mode）**——但該 ADR 刻意只批准這一個決策點，不豁免 Phase 3/4 完成前提，最終切片實際啟動仍待操作者 Phase 2 STOP-FOR-HUMAN-REVIEW 批准，本文件與該 ADR 皆不改變那個既有閘門）
 Date: 2026-08-30
 
 ## 0. Scope & Boundary（範圍聲明）

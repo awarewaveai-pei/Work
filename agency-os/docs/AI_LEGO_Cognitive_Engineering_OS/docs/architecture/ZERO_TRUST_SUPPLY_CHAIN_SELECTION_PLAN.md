@@ -1,6 +1,21 @@
 # ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN
-Status: PROPOSED（研究完成，選型待操作者裁決——本文件本身不是 ADR，不能被 Claude 自行批准）
+Status: PROPOSED（本文件本身不是 ADR；**2026-08-30 部分批准**——見下方裁決狀態表。研究完成後逐項套用供應商支出判準：無新增供應商成本/鎖定的 7 項已由 ADR-015/016 批准，唯一涉及新增供應商付費承諾的 1 項（IdP）明確保留給操作者，未被 Claude 自行批准）
 Date: 2026-08-30
+
+## 裁決狀態（2026-08-30 更新，置頂速覽）
+
+| # | 決策 | 狀態 | 批准依據 |
+|---|---|---|---|
+| 1 | IdP/OIDC = WorkOS | **PROPOSED，保留給操作者** | 新增供應商付費承諾+多年期鎖定，見 ADR-016 Sub-decision (a) |
+| 2 | Workload identity = 雲端原生 mTLS 先行 | ACCEPTED | ADR-016 Sub-decision (b) |
+| 3 | PDP 引擎 = Cedar | ACCEPTED | ADR-016 Sub-decision (c) |
+| 4 | SBOM 格式 = CycloneDX 為主 | ACCEPTED | ADR-015 Sub-decision (a) |
+| 5 | 簽章機制 = Sigstore/cosign | ACCEPTED | ADR-015 Sub-decision (b) |
+| 6 | SLSA 目標 = L2 立即/L3 Phase 4 CI/CD 建置時 | ACCEPTED | ADR-015 Sub-decision (c) |
+| 7 | 漏洞掃描 = Grype+Dependabot | ACCEPTED | ADR-015 Sub-decision (d) |
+| 8 | CVSS/EPSS/KEV 分層門檻 | ACCEPTED | ADR-015 Sub-decision (e) |
+
+機讀落實：`policies/security/zero-trust.policy.yaml`（items 1-3，item 1 明確阻塞）、`policies/security/supply-chain-security.policy.yaml`（items 4-8，全數落實）。
 
 ## 0. Scope & Boundary（範圍聲明）
 
@@ -117,11 +132,12 @@ Trivy 覆蓋面最廣（vuln+secret+IaC+license+K8s）；Grype 更聚焦、SBOM-
 - Clerk 的 SCIM directory sync 至 2026-04 才 GA，企業級 SSO/SCIM 成熟度相對 WorkOS/Auth0 仍新。
 - Trivy 事件（2026-03-19 至 2026-03-23）為近期且已排除，但建議正式採用前再次確認 Trivy 目前的安全狀態。
 
-## 7. 下一步
+## 7. 下一步（2026-08-30 更新：7/8 已完成，見置頂裁決狀態表）
 
-1. **操作者裁決**：本文件 §3 的 8 項子決策需要操作者逐項確認或調整（尤其 #1 WorkOS 的多年期報價、#2 是否接受「先不上 SPIFFE」的技術債）。
-2. **裁決後轉正式 ADR**：比照 ADR-010（DB 主機選型）的模式，操作者裁決後由 Claude 寫一份正式 ADR（草案編號 ADR-013 或依當時序號），採納本文件 §3 的最終版本（可能與推薦不同，以操作者實際裁決為準）。
-3. **建置 `policies/security/`**：ADR 確定後才建 `zero-trust.policy.yaml` / `supply-chain-security.policy.yaml`，`MACHINE_READABLE_SPEC_PLAN.md` §2.9 該列狀態同步更新（目前仍應維持 SKELETON_ONLY，直到 ADR 定案）。
+1. ~~**操作者裁決**：本文件 §3 的 8 項子決策需要操作者逐項確認或調整~~ ——**已完成 7/8**：items 2-8 逐項套用供應商支出判準後，由 Claude 於 ADR-015/016 批准（無新增供應商成本/鎖定，屬可拍板類別）。**item 1（IdP=WorkOS）仍待操作者本人**取得多年期真實報價 + 做 build-vs-buy 決策（見 ADR-016 Sub-decision (a)）。
+2. ~~**裁決後轉正式 ADR**~~ ——**已完成**：`docs/adr/ADR-015-supply-chain-security-tooling-selection.md`（Gap 2 全數批准）+ `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`（Gap 1 部分批准，IdP 除外）。
+3. ~~**建置 `policies/security/`**~~ ——**已完成**：`policies/security/zero-trust.policy.yaml`（items 1-3，item 1 明確阻塞佔位符）+ `policies/security/supply-chain-security.policy.yaml`（items 4-8 全數落實）；`MACHINE_READABLE_SPEC_PLAN.md` §2.9 該列已同步更新。
+4. **剩餘唯一待辦**：操作者對 IdP/OIDC provider 做最終裁決後，`zero-trust.policy.yaml` 的 `idp_provider.status` 由 `TBD_PENDING_OPERATOR_VENDOR_DECISION` 更新為真實值，該檔 `status` 同步由 `PROVISIONAL` 升級為 `ACTIVE`。
 
 ---
 

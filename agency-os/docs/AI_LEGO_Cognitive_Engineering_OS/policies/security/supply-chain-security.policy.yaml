@@ -1,0 +1,213 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/security/supply-chain-security.policy.yaml"
+title: Supply Chain Security Tooling Policy
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Closes P1-GAP-SEC-2 (severity: high, `.ai/research/phase-1/GAP_REGISTER.yaml:198-205`)
+  -- Master Plan's `Source → Signed Commit → CI → SBOM → Dependency Scan →
+  Artifact Signing → Verified Deployment` stage flow
+  (AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:2772) had zero
+  hits for SLSA/cosign/sigstore/SPDX/CycloneDX/CVSS/CVE anywhere in the
+  mother-document corpus. This file is the concrete tooling policy that flow
+  was missing, ratified by
+  `docs/adr/ADR-015-supply-chain-security-tooling-selection.md` (ACCEPTED
+  2026-08-30). Source research:
+  `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md` §2 (external
+  WebSearch via `web-researcher` agent, read-only, citations + confidence
+  levels disclosed per-claim), §3 rows 4-8, §4 risks 4/6/7/8.
+
+  Every value below is an open-standard, OSS, or already-included
+  GitHub-platform choice -- none commits a new recurring vendor bill or
+  multi-year contract, which is why ADR-015 could ratify this file in full
+  while its sibling `zero-trust.policy.yaml` could not fully ratify the
+  IdP/OIDC sub-decision (a genuine new managed-SaaS spend commitment). See
+  ADR-015 Decision Drivers for the litmus test that draws this line.
+
+source_of_truth_for:
+  - "docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md §2.1-2.4 (Gap 2 -- Supply Chain Security), §3 rows 4-8, §4 risks 4/6/7/8, §5 citations"
+  - "docs/adr/ADR-015-supply-chain-security-tooling-selection.md Recommendation -- this file IS that Recommendation made machine-readable"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-2 (L198-205)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/security/ (SKELETON_ONLY prior to this file)"
+
+decided_by: >
+  docs/adr/ADR-015-supply-chain-security-tooling-selection.md (ACCEPTED
+  2026-08-30). Field values transcribed verbatim from that ADR's
+  Sub-decisions (a)-(e), which in turn adopt
+  ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md §3's recommendation table rows
+  4-8 unchanged -- this file does not re-derive the choice, it operationalizes
+  an already-decided one.
+
+compilation_decisions:
+  - question: >
+      The source plan's §2.1 SBOM discussion gives CycloneDX version hints
+      as "1.4/1.5+" (a range, not a single pinned version) and explicitly
+      flags the underlying EU CRA citation as unverified
+      (§5 Low-confidence disclosure). Should `sbom.minimum_cyclonedx_version`
+      be a `const` pinned value?
+    decision: "Left as a free-text `recommended_minimum_version` field ('1.5 or later'), not a `const`."
+    reasoning: >
+      Pinning an exact version the source material itself only cites as a
+      range, on an unverified-provenance legal claim, would misrepresent an
+      honestly-disclosed medium/low-confidence recommendation as a firm
+      requirement. A `const` here would be exactly the kind of overclaimed
+      precision R4 (聲稱即驗證) exists to prevent.
+  - question: >
+      Should the SLSA L2→L3 migration carry an invented calendar date, given
+      the source plan's own risk #6 explicitly warns that an open-ended
+      "later" for this exact transition tends to never happen in this
+      organization (its own stated pattern: "政策存在但沒東西真的強制執行")?
+    decision: >
+      `slsa.l3_migration_trigger` names a concrete, checkable EVENT
+      (start of Phase 4 CI/CD build-out, per Atlas's own dev-priority
+      ordering) rather than an invented calendar date this file has no
+      authority to schedule.
+    reasoning: >
+      Inventing a specific date (e.g. "2026-12-01") this policy file cannot
+      itself enforce would be fabricating a commitment, not recording one --
+      no Phase 4 schedule exists yet anywhere in this corpus to cite. Tying
+      the trigger to an already-real corpus concept (Phase 4 CI/CD
+      build-out, the first point at which a real GitHub Actions workflow
+      exists to convert) gives risk #6's concern a genuine, checkable hook
+      without inventing a date nobody has committed to.
+  - question: >
+      Should this file pick a single vulnerability-scanning tool, given
+      the source plan's own risk #7 warns that running Grype AND Dependabot
+      together creates duplicate-alert noise if "who wins" isn't decided?
+    decision: >
+      Both tools kept, with an explicit `reconciliation_rule`: Grype is the
+      CI-merge-blocking authority; Dependabot is PR-level-only and never
+      blocks a merge by itself.
+    reasoning: >
+      The source plan's own recommendation (§3 row 7) is deliberately
+      dual-tool for defense-in-depth after the 2026-03-19 Trivy supply-chain
+      compromise (§2.4) -- collapsing to one tool would discard that
+      reasoning. The reconciliation_rule is this file's own additive
+      compilation decision closing the ambiguity risk #7 flagged, not a
+      re-litigation of the dual-tool choice itself.
+
+# ---------------------------------------------------------------------------
+# Schema body -- one singleton policy document (same "whole-document-is-the-
+# instance" shape as sibling policies/provider/ai-gateway-fallback.policy.yaml,
+# not a per-entry registry like policies/provider/model-registry.policy.yaml).
+# ---------------------------------------------------------------------------
+type: object
+required: [sbom, signing, slsa, vulnerability_scanning, cvss_tiering]
+properties:
+
+  sbom:
+    type: object
+    description: "ADR-015 Sub-decision (a). Source plan §2.1, §3 row 4."
+    required: [primary_format, secondary_format_on_demand]
+    properties:
+      primary_format: { type: string, const: CycloneDX }
+      secondary_format_on_demand: { type: string, const: SPDX }
+      recommended_minimum_version:
+        type: string
+        description: "Not a `const` -- see compilation_decisions for why this stays a recommendation, not a pinned requirement."
+      rationale:
+        type: string
+        const: "CI/CD-native default (GitHub/GitLab/Azure DevOps all default to it; Trivy/Grype/Snyk/Anchore all support it natively). SPDX kept as an on-demand secondary output for law/customer-specific SPDX mandates -- neither US NTIA nor EU CRA sources found mandate a single format."
+
+  signing:
+    type: object
+    description: "ADR-015 Sub-decision (b). Source plan §2.2, §3 row 5."
+    required: [mechanism, keyless]
+    properties:
+      mechanism: { type: string, const: "Sigstore/cosign" }
+      keyless: { type: boolean, const: true }
+      rationale:
+        type: string
+        const: "OpenSSF-graduated (2024-03); eliminates long-lived private-key management, the root cause multiple sources cite for 'most projects never actually adopt GPG signing'; directly compatible with GitHub's own native Artifact Attestations tooling."
+      offline_verification_exception_acknowledged:
+        type: string
+        const: "GPG remains preferable ONLY for fully-offline, multi-year-later-verified, no-transparency-log-access scenarios (e.g. firmware/bootloader) -- not applicable to this project (online SaaS, verifiers always reachable)."
+
+  slsa:
+    type: object
+    description: "ADR-015 Sub-decision (c). Source plan §2.3, §3 row 6, §4 risk 6."
+    required: [immediate_target, immediate_mechanism, future_target, l3_migration_mechanism, l3_migration_trigger]
+    properties:
+      immediate_target: { type: string, const: "L2" }
+      immediate_mechanism:
+        type: string
+        const: "GitHub Artifact Attestations on GitHub-hosted runners -- reaches Build L2 by default, zero additional infrastructure"
+      future_target: { type: string, const: "L3" }
+      l3_migration_mechanism:
+        type: string
+        const: "convert to a reusable workflow -- GitHub's own documented mechanism for reaching Build L3 without a self-hosted, hardened build platform"
+      l3_migration_trigger:
+        type: string
+        const: "start of Phase 4 CI/CD build-out (the first point a real GitHub Actions workflow exists to convert) -- a concrete event, not an open-ended 'later'; see compilation_decisions for why no calendar date is invented here"
+
+  vulnerability_scanning:
+    type: object
+    description: "ADR-015 Sub-decision (d). Source plan §2.4, §3 row 7, §4 risk 7."
+    required: [primary_tool, primary_tool_scoring, auto_fix_tool, reconciliation_rule, tool_diversity_rationale]
+    properties:
+      primary_tool: { type: string, const: Grype }
+      primary_tool_scoring: { type: string, const: "EPSS/KEV-aware, SBOM-first" }
+      auto_fix_tool: { type: string, const: Dependabot }
+      reconciliation_rule:
+        type: string
+        const: "Grype is the CI-merge-blocking authority per cvss_tiering below. Dependabot is PR-level-only -- it proposes dependency-bump PRs but never blocks a merge by itself. This is this file's own additive answer to the dual-tool noise risk (§4 risk 7), not a re-litigation of the dual-tool choice."
+      tool_diversity_rationale:
+        type: string
+        const: "2026-03-19 Trivy release-infrastructure supply-chain compromise (Aqua official security advisory, GHSA-69fq-xp46-6x23; compromised tag-based releases for 3-12 hours before detection) -- do not single-source vulnerability scanning on one tool's own supply chain."
+
+  cvss_tiering:
+    type: object
+    description: "ADR-015 Sub-decision (e). Source plan §2.4 tiering paragraph, §3 row 8, §4 risk 8. Layered KEV/EPSS model, not a single CVSS-only threshold (source plan's own stated 2026 industry consensus: 'CVSS alone is too coarse')."
+    required: [kev_listed, critical_and_exploitable, high, below_high, rescan_requirement]
+    properties:
+      kev_listed:
+        type: object
+        properties: { action: { type: string, const: "BLOCK immediately" }, basis: { type: string, const: "CISA Known Exploited Vulnerabilities catalog listing" } }
+      critical_and_exploitable:
+        type: object
+        properties: { threshold: { type: string, const: "CVSS >= 9.0 AND EPSS > 0.1" }, action: { type: string, const: "BLOCK + 7-day SLA" } }
+      high:
+        type: object
+        properties: { threshold: { type: string, const: "CVSS 7.0-8.9" }, action: { type: string, const: "WARN + 30-day SLA" } }
+      below_high:
+        type: object
+        properties: { threshold: { type: string, const: "CVSS < 7.0" }, action: { type: string, const: "track only (no SLA)" } }
+      rescan_requirement:
+        type: object
+        description: "§4 risk 8: EPSS scores drift over time -- a pass today is not permanent."
+        properties:
+          cadence: { type: string, const: "scheduled re-scan of already-approved artifacts, not just at build time" }
+          reason: { type: string, const: "a CVE's EPSS score can rise from low to high probability with no code change on this project's side -- 'passed once' is not 'passed forever'" }
+
+open_questions:
+  - id: "OQ-SUPPLYCHAIN-1"
+    question: >
+      `slsa.l3_migration_trigger` names an EVENT (Phase 4 CI/CD build-out
+      start), not a calendar date. Once Phase 4 planning produces an actual
+      schedule, should this field be tightened to a real date, and should a
+      machine-checkable reminder (not just this policy text) be wired to
+      fire at that point -- given §4 risk 6's own warning that this
+      organization's policies-without-enforcement pattern is a real,
+      previously-observed failure mode (see ClickHouse override.xml
+      recurrence in agency-os/WORKLOG.md for the general pattern this
+      concern generalizes from)?
+    owner: "operator, or whichever future session plans Phase 4 CI/CD build-out"
+    blocks: "nothing in this file's own validity -- the event-based trigger is a complete, checkable answer today"
+
+verification:
+  method: >
+    Read docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md §2 and
+    §3 rows 4-8 and §4 risks 4/6/7/8 and §5 citations in full before drafting
+    this file. Every `const` value transcribed verbatim from that document's
+    §3 recommendation table and §2's supporting paragraphs -- no value
+    invented beyond what that document already researched and cited.
+    Cross-checked .ai/research/phase-1/GAP_REGISTER.yaml:198-205 (P1-GAP-SEC-2)
+    to confirm this file's scope matches the registered gap exactly (SBOM
+    format / signing mechanism / SLSA level / vulnerability scan threshold --
+    all 4 named in the gap's own `detail` field, all 4 covered here).
+  note: >
+    No mother document was modified. This file does not include IdP/OIDC,
+    workload identity, or PDP engine content -- those are Gap 1 (Zero Trust)
+    and live in the sibling policies/security/zero-trust.policy.yaml under a
+    separate ADR (ADR-016) with a different, partial ratification scope.

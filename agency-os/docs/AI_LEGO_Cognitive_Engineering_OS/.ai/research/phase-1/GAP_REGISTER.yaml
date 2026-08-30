@@ -195,6 +195,13 @@ clusters:
         evidence:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2668, quote: "Identity ↓ Workload Identity ↓ Mutual Authentication ↓ Short-lived Credentials ↓ Policy Decision ↓ Resource Access"}
         consequence: "實作團隊各自選 IdP/token 格式，30 年後不同 cell 用不同身分協定，跨 cell 身分聯邦時無共同標準可比對。"
+        resolution: >
+          PARTIALLY RESOLVED 2026-08-30 by docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md.
+          2 of 3 sub-gaps closed: workload identity standard = cloud-native mTLS (SPIFFE deferred with named
+          reconsideration triggers); PDP engine = Cedar. Machine-readable: policies/security/zero-trust.policy.yaml.
+          1 of 3 sub-gaps (IdP/OIDC provider) deliberately left open -- genuine new vendor spend/lock-in decision,
+          reserved for the operator per AGENTS.md R0 "取捨影響產品方向" (see zero-trust.policy.yaml idp_provider,
+          status TBD_PENDING_OPERATOR_VENDOR_DECISION).
       - id: P1-GAP-SEC-2
         severity: high
         role: Security Architect
@@ -203,6 +210,13 @@ clusters:
         evidence:
           - {file: AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, line: 2772, quote: "Source ↓ Signed Commit ↓ CI ↓ SBOM ↓ Dependency Scan ↓ Artifact Signing ↓ Verified Deployment"}
         consequence: "「Verified Deployment」在合規稽核時無可驗證標準對照——SolarWinds 級供應鏈事件事後最常見的稽核缺口類型。"
+        resolution: >
+          RESOLVED 2026-08-30 by docs/adr/ADR-015-supply-chain-security-tooling-selection.md. All 5 sub-decisions
+          ratified: SBOM=CycloneDX primary, signing=Sigstore/cosign keyless, SLSA=L2 immediate/L3 at Phase 4
+          CI/CD build-out, vuln scan=Grype+Dependabot with explicit reconciliation rule, CVSS/EPSS/KEV layered
+          tiering with scheduled re-scan requirement. Machine-readable:
+          policies/security/supply-chain-security.policy.yaml. No new vendor spend/lock-in in any of the 5
+          items -- open standards / OSS tools / already-included GitHub platform features only.
       - id: P1-GAP-SEC-3
         severity: high
         role: IAM Engineer / Security Architect

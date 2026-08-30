@@ -27,6 +27,16 @@ risks:
     cluster: security_privacy_iam
     extends: P1-GAP-SEC-2
     detail: "Supply Chain Security 從未與 Encryption & Key Sovereignty 交叉引用，不清楚哪一種 KMS 模式保護 artifact 簽章私鑰本身；簽章金鑰若無輪替週期與 HSM 強制要求，CI 簽章私鑰一旦外洩，攻擊者可發布通過所有既定關卡的「Verified Deployment」惡意產物。"
+    resolution: >
+      PARTIALLY RESOLVED 2026-08-30 by docs/adr/ADR-015-supply-chain-security-tooling-selection.md
+      Sub-decision (b): Sigstore/cosign KEYLESS signing structurally removes the long-lived CI
+      signing private key this risk's failure_mode assumes -- there is no persistent key for a
+      KMS mode to protect. See docs/architecture/SECURITY_THREAT_MODEL.md row T1 (updated same
+      day) for the honest residual: this trades the original "which KMS protects the key" question
+      for a new dependency on the OIDC identity provider that issues Sigstore's short-lived
+      certificates -- which loops back to the still-unresolved idp_provider decision in
+      policies/security/zero-trust.policy.yaml (ADR-016). Not a new risk, but a real dependency
+      worth tracking, not a clean full resolution.
   - id: P1-RISK-INFRA-1
     failure_mode: cost explosion
     cluster: infra_ops_mlops

@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-08-30（續10）
+
+### ADR-014/015/016：拍板最後兩個懸而未決項（Phase 5 Mode 選擇、Zero Trust/Supply Chain 選型），逐項套用「供應商支出判準」區分可拍板 vs 保留給操作者
+
+**觸發**：操作者第三次「你決定！」全權委任（同今日稍早 ADR-011~013 的授權模式），並要求收尾跑 `/codex-review`。此時剩餘僅有兩個此前明確標記「等操作者輸入」的項目：`ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`（廠商選型，該文件自己 §0 聲明「授權範圍明確排除 Claude 自行拍板」）與 `PHASE_5_MODE_SELECTION_CODEX_COMPARISON.md`（Mode 選擇已雙方收斂，但誰拍板未決）。
+
+**判斷過程**：沒有無條件套用「你決定」直接全數批准——先逐項檢視是否真的落在「一般委任可拍板」的範圍內：
+
+1. **Phase 5 Mode**：內部工程排序決策（哪個 Recipe 先做垂直切片驗證架構），不涉及採購/供應商鎖定，可完全回滾；操作者當下在場即時審閱過雙方收斂分析後才委任——判定可拍板，寫 `ADR-014`，但刻意只批准「哪個 Mode」，不豁免 Phase 3/4 完成前提或 Phase 0-2 禁令。
+2. **Zero Trust/Supply Chain 8 項子決策**：逐項套用「供應商支出判準」——CycloneDX/Sigstore/cosign/SLSA L2/Grype+Dependabot/CVSS 分層/Cedar/延後 SPIFFE 共 7 項是開放標準、OSS、或既有 GitHub 免費功能，無新增供應商成本，判定可拍板（`ADR-015` 全數 5 項 Supply Chain 子決策、`ADR-016` 的 workload identity + PDP 兩項）。**唯一一項不批准**：IdP/OIDC provider（WorkOS）——真實新增 managed SaaS 多年期計費+鎖定承諾，來源文件自己的風險分析明確建議先拿真實報價，屬 `agency-os/AGENTS.md` R0「取捨影響產品方向」的停止條件，即使在通用委任下仍保留給操作者（`ADR-016` Sub-decision a 明確不批准）。
+
+**機讀落實**：新建 `policies/security/supply-chain-security.policy.yaml`（全數 ACTIVE）與 `policies/security/zero-trust.policy.yaml`（`status: PROVISIONAL`，`idp_provider.status` 明確阻塞佔位符，沿用 `mandatory-gates.yaml` 先前 `TBD_PENDING_ROUND2_ADR` 同一技巧）。
+
+**抓蟲附帶發現並修正**（非本次改動引入，既有文件已過期的交叉引用）：
+- `SECURITY_THREAT_MODEL.md` S1/T1 兩列 Mitigation 欄位過期（仍寫「無；需 Phase 3 前選定」），已更新並誠實記錄 T1 的新依賴鏈（keyless 簽章消除長期私鑰竊取風險，但信任根改繫於 IdP——而 IdP 正是 ADR-016 保留未決的那一項）。
+- `.ai/research/phase-1/RISK_REGISTER.yaml` P1-RISK-SEC-4 補上同一發現的機讀 `resolution` 欄位。
+- `tests/governance/ai-execution/secrets-category-fixture.fixtures.yaml` 的 `description`/`OQ-GOLDEN-SECRETS-1` 引用「`policies/security/` SKELETON_ONLY」已過期，訂正並釐清該 fixture 真正關注的是憑證生命週期管理（與本次 Zero Trust/Supply Chain 選型是不同概念，本次改動不影響其核心主張）。
+
+[已修改]
+- 新增 `docs/adr/ADR-014-phase-5-mode-selection-research.md`、`ADR-015-supply-chain-security-tooling-selection.md`、`ADR-016-zero-trust-workload-identity-and-pdp-selection.md`
+- 新增 `policies/security/supply-chain-security.policy.yaml`、`policies/security/zero-trust.policy.yaml`
+- 新增 `tests/contracts/policies/security/supply-chain-security.fixtures.yaml`、`zero-trust.fixtures.yaml`
+- `docs/adr/ADR_INDEX.md`：新增 3 列、更新 ADR 總數（13→16）、授權模式說明、依賴關係段、誠實聲明段
+- `docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md`：置頂裁決狀態表、§7 下一步全數更新
+- `docs/architecture/PHASE_5_MODE_SELECTION_CODEX_COMPARISON.md`、`MVP_VERTICAL_SLICE_PLAN.md`：Status 行補 ADR-014 引用
+- `docs/architecture/IMPLEMENTATION_ROADMAP.md`：§2 類別 D 補 ADR-014 引用
+- `docs/architecture/MACHINE_READABLE_SPEC_PLAN.md`：§2.9 `security/` 列、ASCII 目錄圖 `security/` 列更新
+- `.ai/research/phase-1/GAP_REGISTER.yaml`：P1-GAP-SEC-1（部分解決）/P1-GAP-SEC-2（全數解決）補 `resolution` 欄位
+- `docs/architecture/SECURITY_THREAT_MODEL.md`：S1/T1 兩列 Mitigation/Residual Risk 更新（抓蟲發現的過期宣稱）
+- `.ai/research/phase-1/RISK_REGISTER.yaml`：P1-RISK-SEC-4 補 `resolution` 欄位
+- `tests/governance/ai-execution/secrets-category-fixture.fixtures.yaml`：訂正過期的 SKELETON_ONLY 引用
+- `WORKLOG.md` 本條
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=`python3 tests/run_golden_tests.py` | exit=0 | 結果=682 個檢查全過（含新增 2 個 fixture 檔案 16 個 valid/invalid case）
+- REALTEST_EVIDENCE: tool=Bash(python3) | cmd=自訂 `UniqueKeyLoader` 對 4 個新 YAML 檔逐一掃描重複 key | exit=0 | 結果=全數 OK，無重複
+- BUGHUNT_DONE: scope=agency-os | grep=`P1-GAP-SEC-1\|P1-GAP-SEC-2`（跨全 repo）+ `ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN\|PHASE_5_MODE_SELECTION_CODEX_COMPARISON`（跨全 repo）+ `13 份 ADR` | hits=12+13 處命中，其中 3 處為過期宣稱（`SECURITY_THREAT_MODEL.md` S1/T1、`secrets-category-fixture.fixtures.yaml`）已一併修正，其餘為本次新增檔案自身或既有正確引用
+- REVIEW_DONE: 見本 WORKLOG 下一條（續11，`/codex-review` 對本批次的真實覆審結果）
+
+[剩餘風險] `idp_provider` 選型刻意留為未解決——真實供應商財務/鎖定判斷，非本次任務可自行裁決；`policies/security/zero-trust.policy.yaml` 的 `status: PROVISIONAL` 會持續提醒此缺口直到操作者裁決。
+
+[rollback] 純新增 ADR/policy/fixture 檔案 + 既有文件的 Status/交叉引用更新，`git revert` 可完整回退；回退後 P1-GAP-SEC-1/2 與 `SECURITY_THREAT_MODEL.md` S1/T1 會重新回到過期狀態，需注意。
+
 ## 2026-08-30（續9）
 
 ### `/codex-review` 真實跑 ADR-013+Phase5 comparison 批次，抓到 1 個真實 HIGH finding（`regulatory_exposure` 無推導演算法），誠實揭露而非發明演算法搪塞

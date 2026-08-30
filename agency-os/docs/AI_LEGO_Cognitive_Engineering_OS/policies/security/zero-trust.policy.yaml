@@ -1,0 +1,183 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://policies/security/zero-trust.policy.yaml"
+title: Zero Trust Identity, Workload Identity & Policy Decision Point Policy
+version: "1.0.0"
+status: PROVISIONAL
+
+description: >
+  Closes P1-GAP-SEC-1 (severity: high, `.ai/research/phase-1/GAP_REGISTER.yaml:190-197`)
+  PARTIALLY -- Master Plan's `Identity → Workload Identity → Mutual
+  Authentication → Short-lived Credentials → Policy Decision → Resource
+  Access` stage flow (AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:2668)
+  named no protocol/engine anywhere. 2 of the 3 sub-gaps are resolved here;
+  the 3rd (`idp_provider`) is deliberately left blocked -- see
+  `docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md`
+  (ACCEPTED 2026-08-30 for Sub-decisions b/c ONLY; Sub-decision a explicitly
+  NOT ratified).
+
+  `status: PROVISIONAL` (not `ACTIVE`) reflects that one required field
+  (`idp_provider`) is a genuine open blocker, not a placeholder awaiting
+  routine compilation -- same convention `policies/ai-execution/
+  mandatory-gates.yaml` used while its own `gate_ref` fields were blocked
+  pending OQ-10 (upgraded to `ACTIVE` only once ADR-011 resolved that gap).
+  This file should be upgraded to `ACTIVE` once `idp_provider.status` moves
+  from `TBD_PENDING_OPERATOR_VENDOR_DECISION` to a real value.
+
+  **Why this file is only PARTIALLY ratified, unlike its fully-ratified
+  sibling `supply-chain-security.policy.yaml`**: `idp_provider` (WorkOS vs.
+  self-hosted Zitadel/Keycloak) is a genuine new managed-SaaS spend
+  commitment with multi-year lock-in risk -- the source plan's own risk
+  analysis (§4 risk 1) explicitly recommends getting a real multi-year quote
+  before finalizing. This is the exact "取捨影響產品方向" class
+  `agency-os/AGENTS.md` R0 requires stopping on and reporting rather than
+  deciding unilaterally, even under general delegated authority --
+  `workload_identity` and `pdp_engine` do not carry that same risk (no new
+  vendor, OSS/cloud-native choices only) and are ratified in full. See
+  ADR-016 Decision Drivers for the litmus test.
+
+source_of_truth_for:
+  - "docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md §1.1-1.3 (Gap 1 -- Zero Trust), §3 rows 1-3, §4 risks 1/2/3, §5 citations"
+  - "docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md Recommendation -- this file IS that Recommendation's ratified 2/3, plus the explicit non-ratification of the 3rd"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-1 (L190-197)"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.9 row for policies/security/ (SKELETON_ONLY prior to this file)"
+
+decided_by: >
+  docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md
+  (ACCEPTED 2026-08-30, Sub-decisions b and c only). Sub-decision (a)
+  (idp_provider) is explicitly NOT decided by that ADR or this file --
+  reserved for the operator, see `open_questions.OQ-ZEROTRUST-1`.
+
+compilation_decisions:
+  - question: >
+      Should `idp_provider` be omitted entirely from this file's required
+      shape until the operator decides, the way a genuinely future field
+      might be left out of a schema altogether?
+    decision: >
+      Kept as a REQUIRED field, but its own required sub-field is only
+      `status` (a blocked-placeholder marker), not a real provider name --
+      the recommended candidate and blocking reason are additive, optional
+      context.
+    reasoning: >
+      Omitting the field entirely would understate the gap -- P1-GAP-SEC-1
+      names IdP/OIDC provider as one of 3 explicit missing pieces, and
+      MACHINE_READABLE_SPEC_PLAN.md §2.9's row for this file should not read
+      as fully resolved when 1 of 3 sub-gaps remains open. Keeping the field
+      required with an explicit blocked-status marker is the same technique
+      `policies/ai-execution/mandatory-gates.yaml` used for `gate_ref:
+      TBD_PENDING_ROUND2_ADR` before ADR-011 resolved it -- state the shape
+      fully, mark exactly the blocked value, don't silently drop the field.
+  - question: >
+      Source plan §1.2 recommends deferring SPIFFE/SPIRE rather than ruling
+      it out forever. Should the deferral be open-ended, given §4 risk 2's
+      own warning that retrofitting SPIFFE onto an already-live mTLS system
+      later is real migration work, not a config flip?
+    decision: >
+      `spiffe_reconsideration_triggers` is a required, non-empty array of
+      concrete conditions, not a free-text "revisit later" note.
+    reasoning: >
+      Same discipline as the sibling supply-chain policy's
+      `slsa.l3_migration_trigger` -- an open-ended deferral in an
+      organization with a documented history of "policy exists but nothing
+      enforces it" (§4 risk 6 of the sibling plan; ClickHouse override.xml
+      recurrence pattern in WORKLOG.md) is indistinguishable from a
+      permanent decision dressed as a temporary one. Naming the 2 concrete
+      triggers the source plan itself already proposed (service-count
+      threshold, first cross-tenant agent-delegation scenario) makes this
+      checkable rather than aspirational.
+
+# ---------------------------------------------------------------------------
+# Schema body -- one singleton policy document (same shape convention as
+# sibling policies/security/supply-chain-security.policy.yaml).
+# ---------------------------------------------------------------------------
+type: object
+required: [idp_provider, workload_identity, pdp_engine]
+properties:
+
+  idp_provider:
+    type: object
+    description: >
+      ADR-016 Sub-decision (a) -- NOT RATIFIED. Source plan §1.1, §3 row 1,
+      §4 risk 1. This is the one sub-gap of P1-GAP-SEC-1 this file does NOT
+      close -- see open_questions.OQ-ZEROTRUST-1.
+    required: [status]
+    properties:
+      status:
+        type: string
+        const: "TBD_PENDING_OPERATOR_VENDOR_DECISION"
+      recommended_candidate:
+        type: string
+        const: "WorkOS (managed) -- recommendation only, not a decision"
+      recommended_candidate_rationale:
+        type: string
+        const: "Native multi-tenant model (organizations as the primary unit) + built-in Agent Registration functionality distinct from human OAuth flows, the closest available fit found for this project's A0-A4 AI-agent authority-tier model. Not itself sufficient grounds for a vendor commitment -- see blocking_reason."
+      blocking_reason:
+        type: string
+        const: "Multi-year per-connection/SCIM-directory billing model creates real vendor lock-in once tenants are onboarded against it; source plan §4 risk 1 explicitly recommends obtaining a real multi-year quote before finalizing. This is a genuine new recurring spend commitment, not an open-standard/OSS choice -- reserved for the operator per AGENTS.md R0's 取捨影響產品方向 stop condition."
+      self_hosted_alternative:
+        type: string
+        const: "Zitadel or Keycloak (self-hosted) -- avoids vendor lock-in entirely at the cost of owning IdP operations (patching/scaling/on-call) for the project's full lifetime. Zitadel's core license changed to AGPL-3.0 as of v3 (~2025-03), a separate licensing consideration the operator should weigh alongside the ops-burden tradeoff."
+
+  workload_identity:
+    type: object
+    description: "ADR-016 Sub-decision (b), ACCEPTED. Source plan §1.2, §3 row 2, §4 risk 2."
+    required: [strategy, spiffe_deferred, spiffe_reconsideration_triggers]
+    properties:
+      strategy:
+        type: string
+        const: "cloud-native workload identity + short-lived-credential mTLS"
+      spiffe_deferred: { type: boolean, const: true }
+      spiffe_deferral_rationale:
+        type: string
+        const: "SPIFFE/SPIRE is CNCF-graduated and production-proven at scale (Uber ~4,500 services, Netflix, Pinterest, Bloomberg, Square, GitHub), but its control-plane build cost (attestation nodes, registration server, dedicated CA) is disproportionate to this project's current team size -- multiple 2026 sources note most teams cannot afford to do SPIFFE right. Cloud-native mTLS satisfies the same Mutual-Authentication + Short-lived-Credentials stages of the mother-document flow without that infrastructure."
+      spiffe_reconsideration_triggers:
+        type: array
+        minItems: 1
+        items: { type: string }
+        description: "Concrete, checkable conditions -- not an open-ended 'revisit later' (see compilation_decisions)."
+
+  pdp_engine:
+    type: object
+    description: "ADR-016 Sub-decision (c), ACCEPTED. Source plan §1.3, §3 row 3, §4 risk 3."
+    required: [engine, rationale, scope_limitation]
+    properties:
+      engine: { type: string, const: Cedar }
+      rationale:
+        type: string
+        const: "AWS 2023-05 open source (Apache 2.0), formally verified for safety/correctness, purpose-built for authorization (principal/action/resource/context) -- maps near 1:1 onto this project's already-ACCEPTED R0-R4 risk_tier / A0-A4 authority_level vocabulary (ADR-004), and is readable enough for non-engineering roles (legal, the operator) to audit -- a real requirement here, not a nice-to-have."
+      scope_limitation:
+        type: string
+        const: "Cedar is narrower than OPA/Rego -- pure authorization only, not general policy-as-code. If a future need arises for policy-driven data transformation (not just access decisions), OPA/Rego may be ADDED alongside Cedar, not substituted for it."
+
+open_questions:
+  - id: "OQ-ZEROTRUST-1"
+    question: >
+      idp_provider selection (WorkOS managed vs. self-hosted Zitadel/Keycloak)
+      requires (1) a real multi-year WorkOS quote, and (2) an explicit
+      build-vs-buy call weighing recurring SaaS spend + lock-in against
+      perpetual self-hosted IdP ops burden. This is a genuine business/vendor
+      trade-off, not an architecture-internal question with a derivable
+      correct answer from re-reading the mother documents -- squarely the
+      class of decision AGENTS.md R0 requires stopping on and reporting,
+      not one Claude decides unilaterally even under general "你決定"
+      delegation (contrast `workload_identity`/`pdp_engine` above, both
+      ratified in the same ADR because neither carries new vendor spend).
+    owner: "operator"
+    blocks: "idp_provider.status only -- workload_identity and pdp_engine are independently ACCEPTED (ADR-016 Sub-decisions b/c) and do not depend on resolving this"
+
+verification:
+  method: >
+    Read docs/architecture/ZERO_TRUST_SUPPLY_CHAIN_SELECTION_PLAN.md §1 and
+    §3 rows 1-3 and §4 risks 1/2/3 and §5 citations in full before drafting
+    this file. Every `const` value for workload_identity/pdp_engine
+    transcribed verbatim from that document's §3 recommendation table and
+    §1's supporting paragraphs. Cross-checked
+    .ai/research/phase-1/GAP_REGISTER.yaml:190-197 (P1-GAP-SEC-1) to confirm
+    this file's scope matches all 3 named sub-gaps (IdP/OIDC provider /
+    workload identity standard / PDP engine) -- 2 closed here, 1 (IdP)
+    explicitly left open, not silently dropped.
+  note: >
+    No mother document was modified. This file does not include SBOM
+    format, signing mechanism, SLSA target, or vulnerability-scan tooling --
+    those are Gap 2 (Supply Chain Security) and live in the sibling
+    policies/security/supply-chain-security.policy.yaml under a separate,
+    fully-ratified ADR (ADR-015).
