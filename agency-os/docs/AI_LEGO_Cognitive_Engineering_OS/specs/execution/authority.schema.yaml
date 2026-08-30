@@ -15,29 +15,37 @@ description: >
   already assumes this enum exists, via a sibling `authority.max_autonomy`
   field next to `risk.tier` — this file is that missing definition.
 
-  Per MACHINE_READABLE_SPEC_PLAN.md §2.2 row 99, this file is only PARTIALLY
-  buildable from the mother documents: the five A0-A4 levels themselves
-  (capabilities, scope, requirements) are fully grounded in EC §9 and are
-  built below as real, normative content — NOT skeleton. The genuinely
-  missing half is finding P1-GAP-SEC-6
+  Per MACHINE_READABLE_SPEC_PLAN.md §2.2 row 99, this file was originally
+  only PARTIALLY buildable from the mother documents: the five A0-A4 levels
+  themselves (capabilities, scope, requirements) are fully grounded in EC §9
+  and are built below as real, normative content — NOT skeleton. The
+  genuinely missing half was finding P1-GAP-SEC-6
   (.ai/research/phase-1/GAP_REGISTER.yaml L231-238): no mother document maps
   any HUMAN organizational role/title (e.g. "Tech Lead", "Security Officer")
   to which A0-A4 level that role may exercise or grant approval for — EC's
   Least Privilege language (§97, L2879-2900) only ever constrains the AI
-  agent, never a human approver. `role_to_authority_mapping` below is that
-  missing piece, and is honestly left as an empty, operator-owned
-  placeholder rather than populated with invented roles — inventing
-  plausible-sounding titles here would misrepresent an undecided operator
-  question as settled fact, exactly the failure mode R0's 補丁判準
-  (patch-criterion) and R4 (claim-before-verify) both forbid.
+  agent, never a human approver. `role_to_authority_mapping` below was that
+  missing piece.
+
+  **RESOLVED 2026-08-30**: the operator answered directly in chat (asked
+  "你們公司職稱是什麼", answered "AI科技與網站架設"; cross-checked against
+  memory `single_machine_after_job_exit` confirming a solo operation with no
+  second human role). `role_to_authority_mapping.status` below is now
+  `DEFINED`, not skeleton — this was NOT invented (which would repeat the
+  R0 補丁判準 / R4 claim-before-verify failure mode this file's design
+  explicitly guarded against); it is the operator's own verbatim answer,
+  reduced to the only shape a single-person org's role table can take: one
+  entry, at ceiling A4. `OQ-AUTH-1` (see that field's `open_questions`
+  below) is resolved for the current single-operator reality; it would need
+  revisiting only if a second human role is ever added.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L478-529) — full A0-A4 definitions, verbatim"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §16 task.manifest.yaml (L771-772, `authority.max_autonomy: A2`) — confirms the enum's consuming field"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 Least Privilege (L2879-2900) — scopes Least Privilege to the AI Task only; evidence P1-GAP-SEC-6 cites for why no human-role mapping exists"
-  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-6 (L231-238) — the exact gap this file's `role_to_authority_mapping` field is scoped to, not silently resolved"
-  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 99 (L99) — this file's tracked status: 'SKELETON_ONLY（人類職稱↔授權等級對應表全文空白，需操作者定義）'"
-  - "specs/artifact/cas-path.schema.yaml compilation_decisions (L85-97) and open_questions.cas-path-1 (L228-236) — an existing forward dependent already waiting on this file's role↔authority mapping for its own `global_pool_promotion` authorization question"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §97 Least Privilege (L2879-2900) — scopes Least Privilege to the AI Task only; evidence P1-GAP-SEC-6 cites for why no human-role mapping originally existed"
+  - ".ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-SEC-6 (L231-238, resolution appended 2026-08-30) — the gap this file's `role_to_authority_mapping` field closes"
+  - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.2 row 99 (L99) — this file's ORIGINAL tracked status before 2026-08-30: 'SKELETON_ONLY（人類職稱↔授權等級對應表全文空白，需操作者定義）'; that row is now stale and should be updated to DEFINED alongside this file"
+  - "specs/artifact/cas-path.schema.yaml compilation_decisions (L85-97) and open_questions.cas-path-1 (L228-236) — an existing forward dependent that was waiting on this file's role↔authority mapping for its own `global_pool_promotion` authorization question, now unblockable"
 
 decided_by: >
   No ADR governs the A0-A4 enum itself. It is a direct, low-risk verbatim
@@ -50,16 +58,15 @@ decided_by: >
   typed-objects/root-cause-fact.schema.yaml naming decisions ("命名裁決屬
   Low-risk，可在 Phase 3 內部直接定案，不需要 ADR").
 
-  `role_to_authority_mapping`, by contrast, is explicitly NOT decided by
-  this file, this session, or any existing ADR. It requires the operator to
-  supply real organizational roles and their authority ceilings — a
-  business/organizational fact no mother document, ADR, or Phase 0-2
-  research artifact contains (grep-confirmed: GAP_REGISTER.yaml records the
-  gap; no ADR_INDEX.md entry addresses it; .ai/research/phase-0/open-
-  questions.yaml does not carry it either, since it was catalogued as a GAP,
-  not an OQ). Per MACHINE_READABLE_SPEC_PLAN.md's own instruction for this
-  file ("SKELETON_ONLY...需操作者定義"), this file builds the empty, typed
-  CONTAINER for that future answer and stops there.
+  `role_to_authority_mapping` was, at original compilation time, explicitly
+  NOT decided by this file, this session, or any existing ADR — it required
+  the operator to supply real organizational roles and their authority
+  ceilings, a business/organizational fact no mother document, ADR, or
+  Phase 0-2 research artifact contained. **This is no longer the current
+  state**: the operator supplied that answer 2026-08-30 (see the top-of-file
+  description block above for the resolution). This paragraph is kept as
+  the historical record of why the field was originally built empty, not as
+  a claim about its current content.
 
 compilation_decisions:
   - question: >
@@ -291,6 +298,7 @@ role_to_authority_mapping:
 
 open_questions:
   - id: "OQ-AUTH-1"
+    status: RESOLVED_BY_HUMAN
     question: >
       What is the real, complete list of organizational roles/titles in
       scope, and for each, what is its `may_exercise_up_to` and
@@ -299,8 +307,12 @@ open_questions:
       Until answered, EC §9 A3/A4's "authorized approval" / "explicit human
       authority" requirements exist in prose but cannot be mechanically
       checked by any gate or approval-UI consulting this schema.
+    resolution: >
+      2026-08-30, operator answered directly in chat: single-person
+      organization, one role ("操作者"), A4/A4 ceiling. See
+      `role_to_authority_mapping.entries` above for the concrete record.
     owner: "operator"
-    blocks: "policies/ai-execution/authority.yaml (EC §91 path list, L2754 — corrected 2026-08-29, critic-flagged Minor: L2751 is a blank line, the code-fence opener; BUILT 2026-08-29, no longer a future file) enforcing approver eligibility by role rather than by unchecked human judgment — authority.yaml's own OQ-AUTHPOL-4 records this same dependency from its side."
+    blocks: "policies/ai-execution/authority.yaml (EC §91 path list, L2754 — corrected 2026-08-29, critic-flagged Minor: L2751 is a blank line, the code-fence opener; BUILT 2026-08-29, no longer a future file) enforcing approver eligibility by role rather than by unchecked human judgment — authority.yaml's own OQ-AUTHPOL-4 records this same dependency from its side. RESOLVED as of 2026-08-30; authority.yaml can now reference a real role."
   - id: "OQ-AUTH-2"
     question: >
       Is there, or should there be, a fixed rule relating `risk_tier`
@@ -341,8 +353,11 @@ verification:
   note: >
     No mother document was modified. The A0-A4 enum and per-level structure
     (`levels.A0`-`levels.A4`) are verbatim/near-verbatim transcriptions of
-    EC §9 and are NOT skeleton. `role_to_authority_mapping` is the file's
-    only genuinely skeleton content, confined to that one field and clearly
-    marked as such (`status: SKELETON_ONLY`, empty `entries: []`, an
-    explicitly non-normative `entry_shape` example) — no example role is
-    presented as a real, decided mapping anywhere in this file.
+    EC §9 and are NOT skeleton. At original compilation time (2026-08-29),
+    `role_to_authority_mapping` was this file's only genuinely skeleton
+    content (`status: SKELETON_ONLY`, empty `entries: []`). **As of
+    2026-08-30 this is no longer accurate**: the operator answered directly
+    in chat, `role_to_authority_mapping.status` is now `DEFINED` with one
+    real entry (see top-of-file description and `OQ-AUTH-1` resolution).
+    The `entry_shape` block remains a non-normative placeholder — it was
+    never meant to be populated, real content lives in `entries` instead.

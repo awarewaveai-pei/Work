@@ -19,25 +19,30 @@ description: >
 
   This file builds the RULE SHAPE and the two structural/behavioral rules
   EC §99 actually decides (deny-by-default; watch for document-induced
-  exfiltration) as real, ACTIVE-grade content. It deliberately does NOT
-  invent the one thing EC §99 leaves unstated: which actual domains belong
-  on the allowlist. That content requires operator/organizational input no
-  mother document, ADR, or research artifact supplies — the same class of
-  gap `gate.schema.yaml`'s `gate_id_registry` (renamed `gate_catalog` and
-  resolved 2026-08-30 by ADR-011 — cited here for its historical
-  PROVISIONAL-precedent shape, not its current resolved content) and
-  `rigor-level.schema.yaml`'s
-  `required_rigor_mapping.deep_intelligence` already established a
-  precedent for in this suite (build the skeleton now, mark the blocked
-  value space explicitly, do not guess). Because the allowlist is this
-  file's primary practical payload — unlike `gate.schema.yaml`, where only
-  one field (`gate_id`) of a much larger, otherwise-usable record shape is
-  blocked — this file's overall `status` is set to `PROVISIONAL` rather
-  than `ACTIVE`, honestly reflecting that the file cannot yet do its whole
-  job, not only that one sub-field is undecided. See `compilation_decisions`
-  for why this is a deliberate deviation from every other file in this
-  suite (all of which use top-level `status: ACTIVE`, even when a sub-field
-  is `TBD_PENDING_ROUND2_ADR`).
+  exfiltration) as real, ACTIVE-grade content. At original compilation time
+  it deliberately did NOT invent the one thing EC §99 leaves unstated: which
+  actual domains belong on the allowlist — that content required
+  operator/organizational input no mother document, ADR, or research
+  artifact supplied, the same class of gap `gate.schema.yaml`'s
+  `gate_id_registry` (renamed `gate_catalog` and resolved 2026-08-30 by
+  ADR-011) and `rigor-level.schema.yaml`'s
+  `required_rigor_mapping.deep_intelligence` established a precedent for in
+  this suite (build the skeleton now, mark the blocked value space
+  explicitly, do not guess).
+
+  **RESOLVED 2026-08-30**: the operator provided the real global-default
+  allowlist directly in chat (a full `aware-wave.com` DNS zone export plus
+  4 additional client/product domains), and it is now populated in
+  `seed_content.rules`'s `EGRESS-EC99-2.allowlist` (first-party domains plus
+  known third-party integrations already documented in AGENTS.md — no new
+  guessing). This is why top-level `status` above reads `PARTIALLY_DEFINED`,
+  not the original `PROVISIONAL`: the allowlist — this file's primary
+  practical payload — now has real global-default content, so the file can
+  do its main job. It is `PARTIALLY_DEFINED` rather than `ACTIVE` only
+  because per-tenant/per-project scoping (part of `OQ-EGRESS-1`) and
+  `OQ-EGRESS-2`/`OQ-EGRESS-3` remain genuinely open — see `open_questions`
+  below for exactly what's still undecided. See `compilation_decisions` for
+  the file's original PROVISIONAL rationale, kept as historical record.
 
   Also cross-references EC §101 Data Classification (L2955-2972) — "Restricted：
   external provider routing must be policy-approved" is the same network-
@@ -100,7 +105,13 @@ compilation_decisions:
       Follow this task's explicit instruction: top-level `status:
       PROVISIONAL`. This is a deliberate, disclosed deviation from the
       suite's prior unanimous ACTIVE-at-top-level pattern, not an
-      inconsistency introduced by accident.
+      inconsistency introduced by accident. **Superseded 2026-08-30**: once
+      the operator supplied the real allowlist (see top-of-file description),
+      top-level `status` was promoted from `PROVISIONAL` to
+      `PARTIALLY_DEFINED` — the reasoning below for why file-level (not
+      just field-level) marking matters still holds, it now marks "the
+      global-default case is real, per-tenant/per-project scoping is still
+      open" rather than "the whole allowlist is empty."
     reasoning: >
       The distinguishing factor from `gate.schema.yaml` is WHERE the
       blocked content sits relative to the file's purpose.
@@ -498,8 +509,13 @@ verification:
     in full for adjacency/cross-reference checks. Read MP §64 (L2714-2741)
     in full. Grepped all three mother documents, `docs/adr/ADR-001~009`,
     and every file under `.ai/research/` for any real domain name or
-    egress-allowlist candidate: zero hits, confirming the genuine gap this
-    file's `status: PROVISIONAL` and `allowlist_registry` record. Read
+    egress-allowlist candidate as of 2026-08-29: zero hits at that time,
+    confirming the genuine gap this file's original `status: PROVISIONAL`
+    and `allowlist_registry` record. 2026-08-30 update: the gap for the
+    global-default case is now closed — see top-of-file description for
+    the operator-supplied allowlist and the resulting `PARTIALLY_DEFINED`
+    status; this verification log is kept as-is for its historical
+    accuracy about the 2026-08-29 state. Read
     `specs/security/personal-data-envelope.schema.yaml`'s
     `classification_tag` field and `specs/execution/gate.schema.yaml`'s
     `gate_id_registry` (at this task's write time — since renamed

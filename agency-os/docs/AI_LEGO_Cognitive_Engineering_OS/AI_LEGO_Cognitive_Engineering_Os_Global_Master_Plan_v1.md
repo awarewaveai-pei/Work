@@ -52,8 +52,8 @@
 
 | 文件 | Authoritative Scope | 不負責 |
 |---|---|---|
-| `ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md` | Product / Architecture / Domain / Platform / Security / Data / Global / Deployment / Governance | 完整 Method Catalog 與 Method semantics |
-| `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md` | Cognitive Primitive / Method / Lens / Method Selection / Method Contract / Method-specific Gate / Cognitive Recipe | 整個平台的總體部署與產品主架構 |
+| `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md`（本文件） | Product / Architecture / Domain / Platform / Security / Data / Global / Deployment / Governance | 完整 Method Catalog 與 Method semantics |
+| `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md` | Cognitive Primitive / Method / Lens / Method Selection / Method Contract / Method-specific Gate / Cognitive Recipe | 整個平台的總體部署與產品主架構 |
 | Machine-readable Specs | Schema / Contract / Enum / Validation / Runtime compatibility | 敘事性產品願景 |
 | ADR | 已批准之具體架構決策 | 通用方法論 |
 
@@ -603,7 +603,7 @@ AI Gateway 的實作子模組（Provider Abstraction、Model Routing、Budget、
 本章只定義 **Capability 執行契約** 與其和 Cognitive Method 的邊界。
 
 > Cognitive Method 的完整定義、Method Family、Primitive、Lens、工具選擇、限制、推薦搭配、Method-specific Gate，**以**
-> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`
+> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`
 > **為 authoritative source。**
 
 ## 8.1 Capability ≠ Method
@@ -753,7 +753,7 @@ Recipe 不應直接綁 UI。
 
 ```text
 MUST resolve method definition from
-AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
 or its approved machine-readable derivative.
 ```
 
@@ -765,7 +765,7 @@ workflow:
 
 references:
   cognitive_method_atlas:
-    file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+    file: AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
     required: true
 
 nodes:
@@ -2057,7 +2057,7 @@ reproduction.yaml
 > 下列只表示 Business Planning 的 architecture-level intent flow。  
 > 真正使用哪些 Method、順序、限制、替代方法、全球在地化要求與 Method-specific Gate，必須先讀：
 >
-> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`
+> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`
 >
 > 禁止把本章簡略列表當成完整工具規格。
 
@@ -2144,7 +2144,7 @@ Proposal
 # 45. Learning / Class Notes Mode
 
 > Cognitive Mapping、Concept Map、Summary、Questioning、Learning / Reflection 等方法若需要 Method semantics，統一由
-> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`
+> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`
 > 解析；本章只定義產品輸出流程。
 
 ```text
@@ -2187,7 +2187,7 @@ Presentation
 > **本章不再維護 Brainstorming Tool Catalog。**  
 > Brainstorming / Divergence / Clustering / SCAMPER / Mind Map / Affinity / Challenge / Decision 等正式方法、選擇規則與搭配方式，以：
 >
-> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`
+> `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`
 >
 > 為唯一敘事性 Method Source of Truth；machine-readable specs 為 runtime contract。
 
@@ -3461,7 +3461,7 @@ Document Authority / Scoped Precedence v1
 並將：
 
 ```text
-AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
 ```
 
 註冊為 Cognitive Method 的 mandatory companion specification。
@@ -3498,7 +3498,7 @@ Recipes：
 Method 實作來源：
 
 ```text
-AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md
+AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md
 → /specs/cognitive/*.schema.yaml
 → /methods/contracts/*
 → Recipe Compiler
@@ -3794,7 +3794,7 @@ Artifact
 18. `Localization-Accessibility-v1.md`
 19. `Legal-Change-Management-v1.md`
 20. `Global-Market-Entry-Compiler-v1.md`
-21. `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md`（Mandatory Companion / Cognitive Method Source of Truth）
+21. `AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md`（Mandatory Companion / Cognitive Method Source of Truth）
 22. `Document-Authority-and-Scoped-Precedence-v1.md`
 
 這 20 份規格正確之後，再開始大規模 MVP，才能最大程度符合：
