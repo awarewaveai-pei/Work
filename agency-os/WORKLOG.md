@@ -1,6 +1,31 @@
 # Worklog
 
-## 2026-08-30（續28）
+## 2026-08-30（續29）
+
+### P1-GAP-LEGAL-1 解決：Legal Freshness SLA 4 級表核准並落地，含一次真實 VBC 疏漏更正
+
+**觸發**：操作者問「policies/jurisdiction/ 目錄卡住的那個數字是什麼」，Claude 先給了一組自己編的簡化 3 級數字（90/180/365 天）取得操作者「好」的口頭同意後，**套用前的最後一次全庫檢查**才發現 `docs/architecture/GLOBAL_JURISDICTION_PLAN.md`（2026-08-29，狀態 PROPOSED）早就有一份更完整的 4 級設計（CRITICAL/HIGH/MEDIUM/LOW，30/90/180/365 天週期 + 15/30/60/90 天寬限期 + 自動降級規則），且 `specs/jurisdiction/pack.schema.yaml` 的 `freshness.sla_class` 欄位已經是 4 值 enum，就是在等這份設計核准。
+
+**這是一次 VBC（Verify Before Conclude）疏漏**：在提出自己的簡化方案前，沒有先查「這個 gap 是不是已經有人設計過」——正是 AGENTS.md R4 明文警告的模式。**誠實回報給操作者**（沒有悄悄換掉答案），操作者重新核准既有的 4 級版本。
+
+**落地**：新建 `policies/jurisdiction/legal-freshness-sla.policy.yaml`（ACTIVE），逐條 `$ref` 對齊 `pack.schema.yaml` 既有欄位、不重複定義；`GLOBAL_JURISDICTION_PLAN.md` Status 只標記 §2 核准（§1/§3 仍 PROPOSED，不過度宣稱其餘章節也定案）；`GAP_REGISTER.yaml`/`MACHINE_READABLE_SPEC_PLAN.md`/`AI_LEGO_OS_Program_Plan_v1.md` 三處追蹤文件同步更新。
+
+[已修改]
+- `policies/jurisdiction/legal-freshness-sla.policy.yaml`（新建）
+- `GLOBAL_JURISDICTION_PLAN.md`（Status 行，僅 §2 範圍）
+- `GAP_REGISTER.yaml`（P1-GAP-LEGAL-1 補 resolution）
+- `MACHINE_READABLE_SPEC_PLAN.md`（對應列改 BUILT）
+- `AI_LEGO_OS_Program_Plan_v1.md`（Phase 3 剩餘缺口列表移除此項）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | ms=N/A（851/851，含新 policy 檔的 ref-resolution smoke test）；另跑 `jsonschema.Draft202012Validator` 對真實 instance 做對抗驗證，0 error
+- REVIEW_DONE: critic=Deep（Claude 本人套用前重新全庫查證，發現既有設計並更正自己先前提案）| verdict=pass | findings=1（自己的疏漏，已在同一輪修正，未流入 commit）
+- BUGHUNT_DONE: scope=agency-os | grep=`P1-GAP-LEGAL-1` 跨 GAP_REGISTER/MACHINE_READABLE_SPEC_PLAN/Program_Plan 三處追蹤是否一致 | hits=3（三處皆已同步更新，非遺漏）
+
+[剩餘風險]
+- `GLOBAL_JURISDICTION_PLAN.md` §1（Jurisdiction Pack Schema）與 §3（Unified FAIL CLOSED Signal）仍是 PROPOSED，未核准，本次不涉及
+
+
 
 ### 操作者核准 proposal 040/041，套進 Master Plan / Atlas 母文件（ADR-017/OQ-1 完整收尾）
 
