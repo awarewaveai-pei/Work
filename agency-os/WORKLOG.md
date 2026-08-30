@@ -8352,6 +8352,23 @@ _Last synced: 2026-08-24 19:21:02 UTC_
   - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
   - BUGHUNT_WAIVED: DOC_ONLY -- no code change
 
+## 2026-08-31
+
+### fix(codex): remove desktop Canva plugin to stop unsolicited OAuth windows
+
+**Trigger**: Codex desktop opened Canva's OAuth login page whenever Codex performed work, despite the 2026-08-25 Claude-side `mcp-remote@0.1.49` pin.
+
+**Root cause**: this was a different activation path from the Claude MCP proxy. `codex mcp list` returned no configured CLI MCP servers, while Codex desktop's plugin state still exposed Canva tools and its global state/cache contained the Canva plugin. The desktop plugin therefore initiated OAuth independently of the Claude MCP configuration.
+
+**Change**: removed the installed Codex plugin `canva@openai-curated-remote`. No repository MCP registry, OAuth token, or other connector configuration was edited.
+
+**Verification**:
+- REALTEST_EVIDENCE: tool=Codex app `uninstall_plugin` | input=`Canva` | result=`status: uninstalled`, `id: canva@openai-curated-remote`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex mcp list` | exit=0 | result=`No MCP servers configured yet`; confirms the prior Claude MCP route is not the Codex desktop trigger.
+- REVIEW_DONE: configuration ownership checked against `WORKLOG.md` 2026-08-25 entry; this fix removes the distinct desktop-plugin path instead of changing the previously pinned Claude proxy.
+- BUGHUNT_DONE: searched `D:\Work`, `%USERPROFILE%\.codex`, `%APPDATA%\Codex`, and `%LOCALAPPDATA%\Codex` for Canva configuration references; actionable sources were Codex global/plugin state rather than a second workspace MCP configuration.
+
+**Rollback**: reinstall Canva in Codex only when it is needed; a fresh explicit OAuth authorization will then be required.
 
 
 
