@@ -242,16 +242,7 @@ Input
 
 故障只允許影響最小區域。
 
-隔離層級：
-
-```text
-Tenant Isolation
-→ Workspace Isolation
-→ Project Isolation
-→ Workflow Isolation
-→ Execution Isolation
-→ Capability Isolation
-```
+隔離層級的唯一正本見 Method Atlas §21 最小爆炸半徑（7 層，含 Branch：`Tenant → Workspace → Project → Workflow → Branch → Execution → Capability`），禁止在本文件重複定義以避免節點數漂移（ADR-003 Sub-decision (c)）。機讀正本：`specs/execution/blast-radius-chain.schema.yaml`。
 
 ---
 
