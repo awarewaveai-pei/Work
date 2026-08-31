@@ -1,6 +1,6 @@
 # Worklog
 
-## 2026-08-31（續4）
+## 2026-08-31（續5）
 
 ### Governed System Build SOP：固定六份規劃基線與按任務加讀 owner 補齊
 
@@ -23,6 +23,18 @@
 
 [rollback]
 - `git revert <本次 commit>` 僅還原固定六份與條件式來源路由、三份 metadata 和本條 WORKLOG；不影響其他工作樹中的 §16／Evidence boundary 變更。
+
+## 2026-08-31（續4）
+
+### AUTO_TASK_DONE: remote-weekly-agent 週報生成
+
+- 01:08 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-31.md
+- REALTEST_WAIVED: DOC_ONLY -- auto-generated report, no code change
+- REVIEW_WAIVED: DOC_ONLY -- report content verified from WORKLOG/TASKS sources
+- BUGHUNT_WAIVED: DOC_ONLY -- report only, no symbol changes
+- WORKLOG: this entry
+
+---
 
 ## 2026-08-31（續3）
 
@@ -8525,7 +8537,6 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 **Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
 
 **Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
-
 
 
 
