@@ -72,8 +72,19 @@ For intelligence methods also require: Method contract (including the `inference
 
 **New requirement in V2**: for any feature implementing a "must"/"never" stated elsewhere in this document set, Definition of Done also requires a corresponding CI-blocking test or DB-level constraint — see `01_SYSTEM_CONSTITUTION.md` Invariant 8 and `13_TESTING_REPLAY_ROLLBACK_AND_SRE.md` §Enforcement Discipline. A feature whose safety claim is prose-only is not done.
 
+## Governance and architecture-change closeout
+
+For a non-trivial HCI architecture, contract, policy, or operating-document change, completion also needs a traceable closeout. This closeout does **not** resolve a 🔴 DECISION PENDING item or approve an ADR by itself.
+
+1. **Actual verification** — run the relevant build/test/replay/operational check; for a documentation-only change, explicitly record the `DOC_ONLY` waiver and the path/claim checks performed instead.
+2. **Review** — review the scoped diff against its owner documents and record an independent reviewer when available. If independent review is unavailable, perform an adversarial self-review and label it as that fallback.
+3. **Claim bug hunt** — search for stale paths, contradictory ownership claims, unsupported “must”/“never” statements, and references made false by the change.
+4. **Closeout record** — preserve the evidence in the repository worklog under `D:\Work\agency-os\AGENTS.md`, including scope, verification, residual risk, and rollback/reversal path.
+
+For a decision or a material boundary change, first create/update the register entry in `governance/ADR_INDEX.md` and use `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md`; no downstream work is unlocked by a `DRAFT` or `PROPOSED` recommendation. Handoffs must link the owning document, decision state, verification evidence, and the next explicit human decision where one is required.
+
 ## Stop conditions
 
 Do not continue implementation when: domain ownership is ambiguous, a new feature requires direct cross-system DB access, no rollback path exists, sensitive data purpose is unclear, a high-impact decision has no human review.
 
-**New stop condition in V2**: do not continue implementation of any section marked 🔴 DECISION PENDING in this document set until the operator has explicitly resolved it — see `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md`.
+**New stop condition in V2**: do not continue implementation of any section marked 🔴 DECISION PENDING in this document set until the operator has explicitly resolved it — see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md`.

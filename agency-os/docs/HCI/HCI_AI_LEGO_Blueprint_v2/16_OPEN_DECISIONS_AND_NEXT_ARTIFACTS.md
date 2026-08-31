@@ -2,7 +2,13 @@
 
 ## Status note (new in V2)
 
-**The authoritative, complete list of open decisions is now `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` (24 items)** — every 🔴 DECISION PENDING block throughout this V2 document set is drawn from that file. This chapter keeps V1's original decision list for continuity, marked against what V2 resolved, and folds in the items that list omitted.
+**The authoritative, complete list of open decisions is now `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` (24 items)** — every 🔴 DECISION PENDING block throughout this V2 document set is drawn from that file. This chapter keeps V1's original decision list for continuity, marked against what V2 resolved, and folds in the items that list omitted.
+
+## Governance starter — before the next artifact
+
+Use `governance/ADR_INDEX.md` as the auditable register for the ADRs named by this blueprint, and start a material decision/change with `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md`. The register only records state and evidence links: it does not create an accepted ADR or turn a pending decision into an implementation instruction.
+
+Before artifact #1 or any artifact that would choose a boundary, authority, consent scope, subject type, market scope, or shared-kernel rule, create the corresponding `PLANNED`/`DRAFT` record and obtain the explicitly required human approval before applying the chosen option. The 24 open decisions remain open unless their authoritative record says otherwise.
 
 ## Decisions already made
 
@@ -59,7 +65,7 @@ Known: three mother documents, 289-method atlas, scoped authority chain, replay/
 
 ## New open decisions surfaced by the V2 review (not in V1's original list of 20)
 
-See `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` for the complete set. Headline additions V1's own list missed entirely:
+See `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` for the complete set. Headline additions V1's own list missed entirely:
 
 - Subject-type scope: Person-only vs. Person+Organization (`HD-00`)
 - Data Subject (researched Person) rights channel (`HD-03`)

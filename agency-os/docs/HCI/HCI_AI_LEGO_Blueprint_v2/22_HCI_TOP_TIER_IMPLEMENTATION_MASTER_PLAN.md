@@ -26,13 +26,19 @@ Constitution
 
 # Wave 0 — Freeze invariants + resolve pending ADRs
 
-Path: `D:\Work\agency-os\docs\ADR\`
+Planning register: `D:\Work\agency-os\docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\ADR_INDEX.md`
+
+Proposal template: `D:\Work\agency-os\docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\HCI_CHANGE_PROPOSAL_TEMPLATE.md`
 
 Create/lock ADR-0001 through ADR-0013 (extended list, `17_REPOSITORY_LAYOUT_AND_PATHS.md`).
 
 **New in V2 — these ADRs specifically must resolve before Wave 0 closes**: Tenant/Organization reconciliation (`02` `HD-01`) — cheapest fix in the whole plan today since zero real customers exist on any of the three current definitions. Shared Kernel extraction (`09` §Shared Kernel). Consent scope (`07` `HD-02`). Subject-type scope (`02` `HD-00`). Regulatory market scope (`11` `HD-20`).
 
 Expected result: later teams cannot collapse HCI/Cognitive, app/portal, DB boundaries, trust semantics, or the newly-resolved ADR items above.
+
+### Wave-gate record
+
+Before a Wave or release gate is declared closed, record the gate name, scoped artifacts, prerequisites/evidence, ADR/proposal links and status, independent-review result (or labeled fallback), residual risk, rollback/reversal path, and the approving human authority. Research evidence or a `PROPOSED` recommendation alone never unlocks the next Wave.
 
 # Wave 1 — Domain foundation
 
@@ -151,6 +157,8 @@ Deliver: signed LEGO manifests, sandbox, compatibility, kill switch, export/impo
 Expected result: future tools/models/methods can be swapped without rewriting HCI.
 
 # Release gates
+
+Every Gate A–F closure requires the Wave-gate record above in addition to its listed technical evidence.
 
 ## Gate A — Prototype
 Waves 0–3.

@@ -3,7 +3,7 @@
 > ## 🚨 2026-08-29 SUPERSEDED — do not read this for current truth
 > This document set (V1) was independently re-researched by 9 zero-cross-visibility reviewers,
 > producing 104 findings (24 requiring operator decision). **The current, authoritative
-> specification is `D:\Work\agency-os\docs\HCI_AI_LEGO_Blueprint_v2\00_README.md`.**
+> specification is `D:\Work\agency-os\docs\HCI\HCI_AI_LEGO_Blueprint_v2\00_README.md`.**
 > - V2 keeps everything V1 got right (confirmed by independent re-derivation, not assumed) and
 >   fixes what the review found — missing domain entities, an enforcement layer that was mostly
 >   prose, a handful of unresolved naming/ownership conflicts.
@@ -12,7 +12,7 @@
 >   operator's behalf.
 > - This V1 directory is kept **read-only, unmodified**, as the historical record of what was
 >   proposed before review — useful only if you want to see what changed and why (cross-referenced
->   from V2, and fully evidenced in `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\`).
+>   from V2, and fully evidenced in `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\`).
 > - If you are about to implement anything HCI-30/AI-LEGO related, stop and go to V2 instead.
 >
 > Original V1 content follows below, unmodified except for this banner.

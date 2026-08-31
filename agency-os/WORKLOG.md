@@ -21,6 +21,30 @@
 - REVIEW_DONE: audit=worklog-derived, runtime-evidence-first | verdict=PASS with one external-token blocker
 - BUGHUNT_DONE: runbook §8 增列 TLS listener drift，§1d 補零-warning 驗收；無其他新 migration pitfall
 
+### 完成 HCI v2 治理閉環與 Phase-5 MVP schema 路徑收斂
+
+**觸發與範圍**：承接 Claude 額度中斷的工作；操作者明確要求同時完成 HCI SOP gap report 的可套用建議，以及 `MVP_VERTICAL_SLICE_PLAN.md` 的 R1–R6 reconciliations。本輪不修改任何 🔴 DECISION PENDING 的選項、Cohen's Kappa 門檻或 Research Quality Gate policy 差異。
+
+**根因**：HCI v2 只有「待建 ADR」清單，沒有可稽核的狀態/提案入口、任務導引或 Wave 閘關閉紀錄；`14` 的 DoD 也未把驗證、review、claim bug hunt、closeout 串成可交接流程。另一方面，Phase-5 MVP 計畫已套入 R1–R4，R5–R6 仍把 Portable Artifact/CAS 與 key-vault schema 歸類在過時或過度籠統的位置。
+
+[已修改]
+- `docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`：完成 R5–R6，將 Portable Artifact URI/CAS 指向 `/specs/artifact/` 的具名 schema，並將 key-vault 生命週期收斂為 `/specs/security/key-vault-lifecycle.schema.yaml`。
+- `docs/HCI/HCI_AI_LEGO_Blueprint_v2/{00_README,14_ROADMAP_AND_DEFINITION_OF_DONE,16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS,17_REPOSITORY_LAYOUT_AND_PATHS,22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN}.md`：補 targeted task routing、repo operating-controls 指向、四動作 closeout、ADR 前置與 Wave-gate record，並將 HCI 文件實際根目錄同步為 `docs/HCI/`。
+- `docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/{ADR_INDEX,HCI_CHANGE_PROPOSAL_TEMPLATE}.md`：新增只登錄、不授權的 ADR planning register 與提案範本；ADR-0001–0013 全為 `PLANNED`／未記錄人類批准。
+- 工作區既有的三個 HCI 目錄搬遷（v1、v2、research review）是承接時已存在的未提交變動；逐檔比對 HEAD 後確認 research review 零內容差異、v1 僅 README 路徑修正，v2 的差異限於既有路徑修正與本條列的五份治理文件。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY — 無 runtime/schema/部署變更；實測 `portable-uri.schema.yaml`、`cas-path.schema.yaml`、`key-vault-lifecycle.schema.yaml` 三者均存在，MVP 舊 `domain/artifact-uri.schema.yaml` 引用為零。
+- REVIEW_DONE: adversarial self-review（無獨立 reviewer 可用）— 逐一驗證 ADR index 引用的 11 份 owner documents、兩份 governance 文件與五個被接線的 v2 章節均存在；所有新增文句明示 `PLANNED`/`DRAFT`/`PROPOSED` 不等於批准，未替人類決策補選項。
+- BUGHUNT_DONE: current scope=`docs/HCI/HCI_AI_LEGO_Blueprint_v2` — 掃描舊 `docs\\HCI_AI_LEGO_Blueprint_v*`、`docs\\HCI30_RESEARCH_REVIEW`、`docs\\ADR` 及其絕對路徑，零命中；擴大至整個 `docs/HCI/` 時僅命中刻意保留的 V1／research-review 歷史證據，未改寫。精確範圍的 `git diff --check` 與兩份新增文件的 no-index whitespace check 均通過。
+
+[剩餘風險]
+- ADR-0001–0013 還沒有個別 ADR 文件或人類批准；Wave 0 仍須依新 register/template 完成，且 24 個 🔴 決策仍全部以其權威清單為準。
+- 本輪是文件治理與路徑收斂；未執行 HCI production code、schema 實作或 release-gate 的真實運行驗證。
+
+[rollback]
+- `git revert <本次 commit>` 可還原 MVP R5–R6、HCI v2 governance 入口與文件目錄搬遷；若只需撤除治理補強，可再以後續 commit 保留 `docs/HCI/` 搬遷而移除新增 `governance/` 與五份 v2 文句。
+
 ## 2026-08-31（KS-6 host switch completion）
 
 ### ks-aw-01 已切至 KS-6；補齊 origin guard、備份、reboot、renewal 與同步驗證

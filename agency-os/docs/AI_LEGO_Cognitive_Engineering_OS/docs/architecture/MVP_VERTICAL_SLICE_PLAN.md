@@ -48,14 +48,14 @@ Date: 2026-08-29
 
 ## 3. End-to-End Scenario Walkthrough
 
-**情境**：Nordbrook Research Lab（Tenant A，`home_jurisdiction=EU`）進行一項「遠距工作者過勞」質性研究，訪談 3 位真實受訪者（P1/P2/P3，皆簽署知情同意書，同意錄音用於研究、可隨時撤回）。同時，Cascadia People Ops Consultancy（Tenant B）因使用同一份公開發布的標準訪談同意聲明範本，上傳了一段位元組完全相同的音檔片段——用於驗證 Tenant-scoped CAS 不會跨租戶洩漏。研究進行到一半，P2 依 GDPR 提出資料刪除請求。
+**情境**：Nordbrook Research Lab（Tenant A，`home_jurisdiction=EU`）進行一項「遠距工作者過勞」質性研究，訪談 3 位真實受訪者（P1/P2/P3，皆簽署知情同意書，同意錄音用於研究、可隨時撤回），並上傳一份公開發布的標準訪談同意聲明範本（`SRC-CONSENT-A`）。Cascadia People Ops Consultancy（Tenant B）上傳同一份範本的位元組完全相同副本（`SRC-CONSENT-B`）——用於驗證 Tenant-scoped CAS 不會跨租戶洩漏。研究進行到一半，P2 依 GDPR 提出資料刪除請求。
 
 ### Source → Ingest
 
-1. 研究員在 Tenant A 底下建立 Project「Remote-Worker-Burnout-2026」，上傳 P1/P2/P3 三段訪談音檔（MP §78：`Create Project → Upload Sources`）
+1. 研究員在 Tenant A 底下建立 Project「Remote-Worker-Burnout-2026」，上傳 P1/P2/P3 三段訪談音檔，並上傳公開標準訪談同意聲明範本 `SRC-CONSENT-A`（MP §78：`Create Project → Upload Sources`）
 2. 每個音檔以 Portable Artifact URI 定址：`artifact://tenant/TEN-NORDBROOK/project/PRJ-BURNOUT-01/source/SRC-INT-P1`（MP §59 + ADR-003）
-3. 底層儲存寫入 `/objects/TEN-NORDBROOK/sha256/aa/bb/<hash-P1>`；Tenant B 因不同 tenant_id 命名空間，寫入 `/objects/TEN-CASCADIA/sha256/aa/bb/<hash-consent-script>`（即使 hash 相同，路徑不同，ADR-003 Sub-decision(b) Option A）
-4. Event Ledger 寫入 `DocumentUploaded`（×4）（MP §57；`event_id` 不得重用，EC §27）
+3. 底層儲存將 Tenant A 的訪談音檔寫入 `/objects/TEN-NORDBROOK/sha256/aa/bb/<hash-P1>`，並將 `SRC-CONSENT-A` 寫入 `/objects/TEN-NORDBROOK/sha256/aa/bb/<hash-consent-script>`；Tenant B 的 `SRC-CONSENT-B` 因不同 tenant_id 命名空間，寫入 `/objects/TEN-CASCADIA/sha256/aa/bb/<hash-consent-script>`（consent hash 相同、路徑不同，ADR-003 Sub-decision(b) Option A）
+4. Event Ledger 寫入 `DocumentUploaded`（×5：P1/P2/P3、`SRC-CONSENT-A`、`SRC-CONSENT-B`）（MP §57；`event_id` 不得重用，EC §27）
 
 ### Normalize → Knowledge
 
@@ -100,7 +100,7 @@ Date: 2026-08-29
 
 ## 4. Required Phase-3 Specs
 
-**`/specs/domain/`**：`tenant.schema.yaml`（ADR-003）、`knowledge-canvas.schema.yaml`；Portable Artifact URI 實際路徑為 `/specs/artifact/portable-uri.schema.yaml`（非本行原寫的 `domain/artifact-uri.schema.yaml`，該檔已於本 session 稍早 relocate，此行未同步更新——2026-08-31 由 Codex Phase 5 原型 HANDBACK.md 發現，Claude 核對屬實後訂正）
+**`/specs/domain/`**：`tenant.schema.yaml`（ADR-003）、`knowledge-canvas.schema.yaml`；**`/specs/artifact/`**：`portable-uri.schema.yaml`（Portable Artifact URI）與 `cas-path.schema.yaml`（ADR-003 CAS path grammar）。
 
 **`/specs/cognitive/`**：`method.schema.yaml` 下新增 `research.qualitative_coding`（open/axial/selective coding + inter-rater reliability 門檻 + saturation 判準，解 `P1-GAP-AI-9`）、`evidence.triangulation`；`recipe.schema.yaml` 具體實例 `research.qualitative.v1`
 
@@ -112,7 +112,7 @@ Date: 2026-08-29
 
 **`/specs/governance/`**：`epistemic-label.schema.yaml`（ADR-004）
 
-**`/specs/security/`**：Key Vault / crypto-shred 生命週期 schema（ADR-002）、CAS path grammar（ADR-003）
+**`/specs/security/`**：`key-vault-lifecycle.schema.yaml`（ADR-002 crypto-shred 生命週期）。
 
 **`/policies/ai-execution/`**：Trusted Compute Gate policy（EC §39，解 `P1-GAP-AI-2`）；Research Quality Gate ↔ EC Global Gates enum 對照表（解 `P1-GAP-AI-3`）
 

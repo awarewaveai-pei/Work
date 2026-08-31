@@ -4,7 +4,7 @@
 
 **This is the current, authoritative specification.** `HCI_AI_LEGO_Blueprint_v1\` is superseded and archived — do not read it for current truth; it is kept only as a historical record of what V1 said before independent review. If you find yourself reading a `v1` file, stop and come here instead.
 
-V2 was produced by taking V1, applying 80 findings from a 9-independent-reviewer architecture re-research that did not require operator judgment, and marking the remaining 24 findings that do require operator judgment as explicit, inline **🔴 DECISION PENDING** blocks — not hidden in a separate file, but placed exactly where that content belongs in the spec, so nobody can read past them without noticing. The full evidence and reasoning behind every decision in this document — including the ones already resolved — lives in `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\` and is cited by ID (e.g. `DOM-01`, `HD-05`) throughout. You do not need to read that package to build from V2; you need it only if you want to see *why* a specific line reads the way it does.
+V2 was produced by taking V1, applying 80 findings from a 9-independent-reviewer architecture re-research that did not require operator judgment, and marking the remaining 24 findings that do require operator judgment as explicit, inline **🔴 DECISION PENDING** blocks — not hidden in a separate file, but placed exactly where that content belongs in the spec, so nobody can read past them without noticing. The full evidence and reasoning behind every decision in this document — including the ones already resolved — lives in `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\` and is cited by ID (e.g. `DOM-01`, `HD-05`) throughout. You do not need to read that package to build from V2; you need it only if you want to see *why* a specific line reads the way it does.
 
 ## Purpose
 
@@ -69,6 +69,26 @@ An AI or engineer implementing or reviewing this system should read in this orde
 
 ---
 
+## Targeted task routing and working controls
+
+Read the linear order above for a first baseline. For a scoped implementation or review, read the owning document in full, then only the conditional sources named below; do not treat the research-review package as mandatory implementation reading.
+
+| Task | Owning document(s) | Conditional source(s) |
+|---|---|---|
+| Product boundary, ownership, or subject scope | `02`, `04`, `07`, `21` | `16` for an open decision; `governance/ADR_INDEX.md` for ADR state |
+| Intelligence method, quality, or explanation | `05`, `19`, `21` | `13` for replay/test enforcement |
+| Public intelligence, privacy, or security | `06`, `11`, `13`, `21` | `07` for data ownership; `16` for unresolved scope |
+| Deployment, tenancy, or commercial edition | `03`, `08`, `12`, `20`, `23` | `22` for sequencing/gates |
+| HCI × AI LEGO integration or shared kernel | `09`, `10`, `18` | `16` and `governance/ADR_INDEX.md` before proposing a boundary change |
+| Decision, ADR, or architecture change | `16`, `17`, `governance/ADR_INDEX.md` | `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md` |
+| Implementation sequencing or release readiness | `14`, `22` | `13` for test/replay/rollback evidence |
+
+`HCI30_RESEARCH_REVIEW` is the evidence trail for “why”; open it when an owning document points to an audit finding or when a claim needs source verification. It does not approve a pending decision.
+
+For work in the shared repository, the operating authority for write boundaries, risk classification, handoff, verification, and closeout is `D:\Work\agency-os\AGENTS.md`. This blueprint adds product-specific routing and records; it does not replace those repository controls. A governance record created from this package remains `PLANNED` or `PROPOSED` until the required human approval is recorded.
+
+---
+
 ## Non-negotiable architecture principles
 
 - 30-year maintainability
@@ -94,4 +114,4 @@ An AI or engineer implementing or reviewing this system should read in this orde
 
 24 findings in this document are marked 🔴 **DECISION PENDING** — genuine value trade-offs, legal-risk-tolerance calls, or product-scope questions that only the operator can resolve; no amount of further AI analysis will resolve them. **Do not implement the content of a 🔴 block until the operator has explicitly chosen an option.** Everything else in this document is ready to build against.
 
-For the complete list of what changed and why, see `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\20_V1_TO_V2_CHANGESET.md`. For the complete list of pending decisions in one place (in addition to finding them inline here), see `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md`.
+For the complete list of what changed and why, see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\20_V1_TO_V2_CHANGESET.md`. For the complete list of pending decisions in one place (in addition to finding them inline here), see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md`.

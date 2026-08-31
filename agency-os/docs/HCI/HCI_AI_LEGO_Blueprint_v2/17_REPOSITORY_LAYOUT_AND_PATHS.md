@@ -27,17 +27,18 @@ D:\Work\agency-os\
 │
 ├── docs\
 │   ├── AI_LEGO_Cognitive_Engineering_OS\
-│   ├── HCI30\
-│   ├── HCI_AI_LEGO_Blueprint_v2\      -- this document set (V1 archived, see below)
-│   ├── HCI30_RESEARCH_REVIEW\         -- audit trail / decision evidence, see below
-│   └── ADR\
+│   └── HCI\
+│       ├── HCI_AI_LEGO_Blueprint_v1\  -- superseded historical record
+│       ├── HCI_AI_LEGO_Blueprint_v2\  -- this document set
+│       │   └── governance\             -- ADR register + proposal template; not approvals
+│       └── HCI30_RESEARCH_REVIEW\     -- audit trail / decision evidence, see below
 │
 ├── infra\
 ├── tests\
 └── ops\
 ```
 
-**Existing directories confirmed still current (verified 2026-08-29)**: `docs\AI_LEGO_Cognitive_Engineering_OS\` already exists with real, ADR-governed `specs/*.yaml` files — do not treat this layout as greenfield for the AI LEGO side. `docs\HCI_AI_LEGO_Blueprint_v1\` is superseded; keep it in place, unmodified, as historical record. `docs\HCI30_RESEARCH_REVIEW\` holds the full evidence chain behind every decision in this V2 document — not required reading to build, but the reference of record for "why."
+**Existing directories confirmed current (verified 2026-09-01)**: `docs\AI_LEGO_Cognitive_Engineering_OS\` already exists with real, ADR-governed `specs/*.yaml` files — do not treat this layout as greenfield for the AI LEGO side. `docs\HCI\HCI_AI_LEGO_Blueprint_v1\` is superseded; keep it in place, unmodified, as historical record. `docs\HCI\HCI30_RESEARCH_REVIEW\` holds the full evidence chain behind every decision in this V2 document — not required reading to build, but the reference of record for "why." `docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\` is the current planning register; entries there are not accepted architecture decisions without their recorded approval.
 
 ## HCI-30
 
@@ -225,7 +226,7 @@ These recipes may optionally invoke AI LEGO capabilities.
 
 ## ADRs to create
 
-At minimum, extended in V2:
+At minimum, extended in V2. Until Wave 0 creates an ADR and records its approval, the authoritative planning state is `governance/ADR_INDEX.md`; use `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md` to prepare a change without silently choosing an option.
 
 ```text
 ADR-0001-hci-and-cognitive-os-are-peer-products.md
