@@ -1,13 +1,3 @@
-[mcp_servers.canva]
-command = "cmd"
-args = [
-    "/c",
-    "npx",
-    "-y",
-    "mcp-remote@latest",
-    "https://mcp.canva.com/mcp",
-]
-
 [mcp_servers.hetzner-ssh]
 command = "cmd"
 args = [

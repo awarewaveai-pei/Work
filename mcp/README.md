@@ -97,6 +97,16 @@ Current official config locations this repo aligns with:
 - Codex: `~/.codex/config.toml`
 - Gemini: `~/.gemini/settings.json`
 
+### Project-level Codex configuration guard
+
+Some repositories also contain `.codex/config.toml`. That is an independent
+project-level MCP source; `sync-mcp-config.ps1` intentionally does not rewrite
+it because it may contain project-specific servers. Before enabling or disabling
+a shared server in `registry.template.json`, inspect every active project-level
+Codex config too. A server disabled in the registry must not remain declared in
+an active `.codex/config.toml`, or it can bypass the registry decision and start
+an OAuth flow again.
+
 ## New machine checklist
 
 1. Clone the repo.

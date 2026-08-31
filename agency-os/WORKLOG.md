@@ -8583,6 +8583,18 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 
 **Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
 
+### fix(mcp): remove unmanaged project Canva stanzas that bypassed the registry
 
+**Root cause**: the registry and all generated user-level configs had Canva disabled, but `D:\Work\.codex\config.toml` still had a direct project-level Canva server declaration using `mcp-remote@latest`. Three identical `.codex\config.toml` copies under `C:\Users\user1115\.claude\worktrees\` had the same stale declaration. `sync-mcp-config.ps1` intentionally manages only the generated workspace and user-level outputs, so it did not overwrite these project-level configs. Codex could therefore load Canva from a source outside the registry and open OAuth repeatedly. This was not an enabled Claude user-level MCP server.
+
+**Change**: removed only the Canva server stanza from all four project-level configs. Preflight showed each file also contains `hetzner-ssh`, so deleting the files would have silently broken a legitimate MCP server. Added the project-level configuration guard to `mcp/README.md`: a server disabled in the registry must not remain declared in an active `.codex/config.toml`.
+
+**Verification**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work` | exit=0 | ms=956 | result=managed workspace and user-level MCP outputs regenerated; Canva absent from workspace and Claude user configs.
+- REALTEST_EVIDENCE: tool=Chrome | cmd=read open Canva OAuth login tabs after cleanup | exit=0 | result=0 tabs; no live `mcp-remote` or Canva process remained.
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — all four configs retain only `hetzner-ssh`; README correctly states the distinct ownership boundary.
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.codex | grep=`mcp_servers[.]canva` | hits=0.
+
+**Rollback**: restore the deleted Canva stanza only through `mcp/registry.template.json` by explicitly setting Canva enabled, running the sync, and completing OAuth after restarting the target host. Do not recreate an unmanaged project-level declaration.
 
 
