@@ -15,7 +15,7 @@
 
 param(
     # 2026-08-28 consolidation: trigger stack now on ks-aw-01.
-    [string]$VpsHost = "149.202.64.114",
+    [string]$VpsHost = "145.239.195.47",
     [string]$SshKey  = "$env:USERPROFILE\.ssh\id_ed25519",
     [string]$AoOrgId = "39ad4149-5044-4077-8d9a-b6b916de0e21"
 )

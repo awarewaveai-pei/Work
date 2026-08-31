@@ -42,7 +42,7 @@ const ROUTE_CATEGORIES = [
     id: 'n8n',
     patterns: [/[/\\]n8n[/\\]/i, /infra[/\\]n8n[/\\]/i],
     label: 'N8N WORKFLOW path detected',
-    actions: ['Spawn `n8n-engineer` agent — self-hosted n8n on ks-aw-01 (149.202.64.114; was EU 204.168.175.41 before 2026-08-28 consolidation)'],
+    actions: ['Spawn `n8n-engineer` agent — self-hosted n8n on ks-aw-01 (145.239.195.47; KS-6 host switch on 2026-08-31)'],
   },
   {
     id: 'nginx-docker',

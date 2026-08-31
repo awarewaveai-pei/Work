@@ -1,6 +1,6 @@
 # Backup and Restore Proof — Hetzner Phase 1 (SG VPS)
 
-> ## 🚨 2026-08-28 整併更新：三條備份管線全部住在 ks-aw-01（`149.202.64.114`，SSH 58122/ubuntu/sudo）
+> ## 🚨 2026-08-31 換機更新：三條備份管線全部住在 ks-aw-01（KS-6，`145.239.195.47`，SSH 58122/ubuntu/sudo）
 > SG/EU 機器已退場。**跨機互備（L3）已不存在**——單機拓樸下 R2 是唯一異地，
 > 三支 verifier 都已把「R2 物件實列 + 逐檔對應」設為硬性檢查（缺任一檔即 FAIL）。
 >
@@ -48,7 +48,7 @@
 | L3 | 跨洲 VPS 互備（Hetzner 內） | → EU `/root/backups/from-sg/` | → SG `/root/lobster-phase1/backups/from-eu/` |
 | L4 | Cloudflare R2（跨供應商） | → `lobster-backup/sg/<date>/` | → `lobster-backup/eu/<date>/` |
 
-**第三台：ks-aw-01（OVH SYS-GAME-2，`149.202.64.114`，2026-08-27 起）**
+**現役主機：ks-aw-01（OVH KS-6，`145.239.195.47`，2026-08-31 起）**
 
 | 層 | 機制 | ks-aw-01 |
 |----|------|---------|

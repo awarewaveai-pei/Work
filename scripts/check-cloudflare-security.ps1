@@ -157,8 +157,8 @@ $lockdownAw = ''
 $lockdownSf = ''
 try {
     $ksKey = "$env:USERPROFILE\.ssh\id_ed25519"
-    $probeCmd = "curl -sk -o /dev/null -m 10 -w 'AW=%{http_code};' --resolve trigger.aware-wave.com:443:149.202.64.114 https://trigger.aware-wave.com/login; curl -sk -o /dev/null -m 10 -w 'SF=%{http_code}' --resolve soulfulexpression.org:443:149.202.64.114 https://soulfulexpression.org/"
-    $lockdownOut = & ssh -i $ksKey -p 58122 -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes ubuntu@149.202.64.114 $probeCmd 2>$null
+    $probeCmd = "curl -sk -o /dev/null -m 10 -w 'AW=%{http_code};' --resolve trigger.aware-wave.com:443:145.239.195.47 https://trigger.aware-wave.com/login; curl -sk -o /dev/null -m 10 -w 'SF=%{http_code}' --resolve soulfulexpression.org:443:145.239.195.47 https://soulfulexpression.org/"
+    $lockdownOut = & ssh -i $ksKey -p 58122 -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes ubuntu@145.239.195.47 $probeCmd 2>$null
     if ($lockdownOut -match 'AW=(\d+);SF=(\d+)') {
         $lockdownAw = $Matches[1]
         $lockdownSf = $Matches[2]
@@ -203,7 +203,7 @@ if ($WpLoginProtectedByServerSide) {
     $lines += "- This check verifies CF posture plus Origin Lockdown; WordPress plugin protection is verified separately (client-status / WP plugin checks)."
 }
 $lines += ""
-$lines += "## Origin Lockdown (ks-aw-01 149.202.64.114, since 2026-08-28 consolidation)"
+$lines += "## Origin Lockdown (ks-aw-01 145.239.195.47, since 2026-08-31 KS-6 host switch)"
 $lines += "- Status: **$lockdownStatus**"
 $lines += "- Probe aware-wave direct-origin: $(if ($lockdownAw) { $lockdownAw } else { 'N/A' }) / soulful: $(if ($lockdownSf) { $lockdownSf } else { 'N/A' }) (403 = guarded)"
 $lines += '- Architecture: nginx geo guard (conf.d/cf-edge-geo.conf + snippets/cf-only.conf) returns 403 unless the raw TCP peer is a CF edge or localhost; DNS-only vhosts (remotion-svc/video-svc) deliberately unguarded.'

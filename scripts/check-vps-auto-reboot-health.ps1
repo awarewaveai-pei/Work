@@ -41,7 +41,7 @@ param(
     # ks-aw-01 (2026-08-28 consolidation target; only production host since 2026-08-30
     # deletion of the SG/EU boxes above). $SgHost/$EuHost/$SshUser/$PrivateKey kept for
     # call-site signature compatibility -- never actually probed any more.
-    [string]$KsAw01Host = "149.202.64.114",
+    [string]$KsAw01Host = "145.239.195.47",
     [string]$KsAw01SshUser = "ubuntu",
     [int]$KsAw01SshPort = 58122,
     [string]$KsAw01PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),

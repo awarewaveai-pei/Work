@@ -3,7 +3,7 @@
 param(
     [string]$SgHost = "5.223.93.113",
     [string]$EuHost = "204.168.175.41",
-    [string]$KsAw01Host = "149.202.64.114",
+    [string]$KsAw01Host = "145.239.195.47",
     [string]$SshUser = "root",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
     [string]$KsAw01SshUser = "ubuntu",

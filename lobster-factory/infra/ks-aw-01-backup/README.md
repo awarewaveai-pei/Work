@@ -1,8 +1,7 @@
 # ks-aw-01 backup pipeline
 
-Daily backup for **ks-aw-01** (`149.202.64.114`, OVH SYS-GAME-2) — the host Soulful
-Expression migrates onto before the 2026-11-12 Hostinger deadline, and which will later
-also carry Chatwoot and the EU/SG consolidation.
+Daily backup for **ks-aw-01** (`145.239.195.47`, OVH KS-6) — the consolidated host for
+Soulful Expression, the former EU/SG stack, and future Chatwoot deployment.
 
 Ported from [`../eu-backup/`](../eu-backup/) — same shape, same log-verdict contract,
 read by the same `scripts/check-backup-health.ps1` at every AO-RESUME.
@@ -24,11 +23,12 @@ design exists to prevent, and it was caught in review before any real data lande
 
 **When deploying P5 (Chatwoot) or P7 (Soulful): add the service to `EXPECT_SERVICES` in the
 same change**, and confirm the container/volume names match what Compose actually created.
-Compose v2 names containers `<project>-<service>-<N>` — a `db` service in project `soulful`
-becomes `soulful-db-1`, **not** `soulful-db`. Override the defaults if so:
+The active stack uses `soulful-db`; other Compose configurations may name containers
+`<project>-<service>-<N>`. Override the defaults only when that differs from the active
+container name:
 
 ```sh
-SOULFUL_DB_CONTAINER=soulful-db-1
+SOULFUL_DB_CONTAINER=soulful-db
 SOULFUL_WP_VOLUME=soulful_wordpress_data
 CHATWOOT_DB_CONTAINER=chatwoot-db-1
 CHATWOOT_STORAGE_VOLUME=chatwoot_storage
@@ -49,8 +49,8 @@ sudo /root/scripts/verify-backup-ks-aw-01.sh   # must exit non-zero
 Both scripts are committed mode `644` — **`chmod +x` is required on the host**:
 
 ```sh
-scp -P 58122 backup-ks-aw-01.sh verify-backup-ks-aw-01.sh ubuntu@149.202.64.114:/tmp/
-ssh -p 58122 ubuntu@149.202.64.114
+scp -P 58122 backup-ks-aw-01.sh verify-backup-ks-aw-01.sh ubuntu@145.239.195.47:/tmp/
+ssh -p 58122 ubuntu@145.239.195.47
 sudo mv /tmp/{backup,verify-backup}-ks-aw-01.sh /root/scripts/
 sudo chmod +x /root/scripts/backup-ks-aw-01.sh /root/scripts/verify-backup-ks-aw-01.sh
 ```

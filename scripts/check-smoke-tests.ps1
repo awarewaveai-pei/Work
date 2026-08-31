@@ -218,7 +218,7 @@ try {
 
     switch ($profileName) {
         "ks-aw-01" {
-            $mailHost = $env:SOULFUL_SSH_HOST; if (-not $mailHost) { $mailHost = "149.202.64.114" }
+            $mailHost = $env:SOULFUL_SSH_HOST; if (-not $mailHost) { $mailHost = "145.239.195.47" }
             $mailPort = $env:SOULFUL_SSH_PORT; if (-not $mailPort) { $mailPort = "58122" }
             $mailUser = $env:SOULFUL_SSH_USER; if (-not $mailUser) { $mailUser = "ubuntu" }
             $mailKey  = Join-Path $env:USERPROFILE ".ssh\id_ed25519"

@@ -55,10 +55,10 @@ require_gzip() {
     fail "$1 has ${tbl} CREATE TABLE, below ${mintbl} (${label})"
     return
   fi
-  # mysqldump writes this last; its absence means the dump was cut off mid-stream
+  # mariadb-dump writes this last; its absence means the dump was cut off mid-stream
   trailer=$(zcat "$f" | tail -3 | grep -c "Dump completed" || true)
   if [[ "$trailer" -lt 1 ]]; then
-    fail "$1 has no mysqldump completion trailer — truncated (${label})"
+    fail "$1 has no MariaDB dump completion trailer — truncated (${label})"
     return
   fi
   ok "$1 ($(du -h "$f" | cut -f1), ${tbl} tables, trailer present)"

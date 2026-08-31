@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Compares the deployed commit on the deploy target (2026-08-28 consolidation: ks-aw-01,
-    149.202.64.114 -- default below is already updated; this description previously said the
+    145.239.195.47 -- default below is already updated; this description previously said the
     retired SG box, 5.223.93.113, which stopped serving traffic on migration day) against
     local origin/main.
     Source of truth on the server is /root/lobster-phase1/.deployed-commit, written by sg-deploy.sh.
@@ -18,7 +18,7 @@
         3  ERROR - SSH/git unreachable; emits warning but does not fail unless -Strict
 
 .PARAMETER ServerHost
-    Deploy target IP/hostname. Default: 149.202.64.114 (ks-aw-01, since 2026-08-28 consolidation)
+    Deploy target IP/hostname. Default: 145.239.195.47 (ks-aw-01, since the 2026-08-31 KS-6 host switch)
 
 .PARAMETER ServerUser
     SSH user. Default: ubuntu (ks-aw-01 uses the `ubuntu` working account, not root; this
@@ -56,7 +56,7 @@
 [CmdletBinding()]
 param(
     # 2026-08-28 consolidation: the deploy staging (/root/lobster-phase1) now lives on ks-aw-01.
-    [string]$ServerHost = "149.202.64.114",
+    [string]$ServerHost = "145.239.195.47",
     [string]$ServerUser = "ubuntu",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
     [int]$WarnAt = 1,

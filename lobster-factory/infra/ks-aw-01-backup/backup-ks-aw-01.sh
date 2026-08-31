@@ -16,8 +16,9 @@
 # A service not listed here is simply not deployed yet and is silently ignored.
 # When P5 (Chatwoot) / P7 (Soulful) land, add them to EXPECT_SERVICES in the
 # same change that deploys them, and confirm the container/volume names below
-# match what docker compose actually created (compose v2 names containers
-# <project>-<service>-<N>, e.g. `soulful-db-1`, not `soulful-db`).
+# match what docker compose actually created (the active stack explicitly names
+# its MariaDB container `soulful-db`; other compose projects may use
+# <project>-<service>-<N> instead).
 # ---------------------------------------------------------------------------
 #
 # Environment (from shell or /etc/default/ks-aw-01-backup):
@@ -92,14 +93,16 @@ require_volume() {
 if expects soulful; then
   if require_container "${SOULFUL_DB_CONTAINER:-soulful-db}" "Soulful DB"; then
     log "Dumping Soulful WordPress DB..."
-    if docker exec "${SOULFUL_DB_CONTAINER:-soulful-db}" sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction soulful' 2>/dev/null | gzip > "${OUT}/soulful-db.sql.gz"; then
+    # MariaDB 11.8 publishes its native client names and MARIADB_* variables;
+    # the legacy mysql/mysqldump aliases and MYSQL_ROOT_PASSWORD are absent.
+    if docker exec "${SOULFUL_DB_CONTAINER:-soulful-db}" sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" --single-transaction soulful' 2>/dev/null | gzip > "${OUT}/soulful-db.sql.gz"; then
       if gzip -t "${OUT}/soulful-db.sql.gz" 2>/dev/null && [[ -s "${OUT}/soulful-db.sql.gz" ]]; then
         SIZE=$(du -h "${OUT}/soulful-db.sql.gz" | cut -f1); log "  soulful-db.sql.gz OK (${SIZE})"
       else
         log "  ERROR: soulful-db.sql.gz integrity failed or empty"; ERRORS=$((ERRORS + 1))
       fi
     else
-      log "  ERROR: Soulful mysqldump failed"; ERRORS=$((ERRORS + 1))
+      log "  ERROR: Soulful MariaDB dump failed"; ERRORS=$((ERRORS + 1))
     fi
   fi
 fi

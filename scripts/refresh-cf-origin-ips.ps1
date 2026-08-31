@@ -41,7 +41,7 @@ try {
         $outPath = [System.IO.Path]::GetTempFileName()
         $errPath = [System.IO.Path]::GetTempFileName()
         try {
-            $refreshArgs = @("-i", $sshKey, "-p", "58122", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=30", "ubuntu@149.202.64.114", "sudo bash /root/scripts/refresh-cf-edge-geo.sh 2>&1")
+            $refreshArgs = @("-i", $sshKey, "-p", "58122", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=30", "ubuntu@145.239.195.47", "sudo bash /root/scripts/refresh-cf-edge-geo.sh 2>&1")
             $proc = Start-Process -FilePath "ssh" -ArgumentList $refreshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
             $out  = (Get-Content -LiteralPath $outPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
             $m = [regex]::Match([string]$out, "cf-edge-geo refreshed: v4=(\d+) v6=(\d+)")

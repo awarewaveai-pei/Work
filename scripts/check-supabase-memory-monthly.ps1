@@ -1,7 +1,7 @@
 ﻿param(
     [string]$AgencyOsRoot = "",
     # 2026-08-28 consolidation: supabase on ks-aw-01.
-    [string]$SshHost = "149.202.64.114",
+    [string]$SshHost = "145.239.195.47",
     [string]$SshUser = "ubuntu",
     [string]$PrivateKeyPath = "$env:USERPROFILE\.ssh\id_ed25519",
     [string]$ContainerName = "supabase-studio",

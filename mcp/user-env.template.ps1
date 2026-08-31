@@ -78,7 +78,7 @@ $vars = @{
     #
     # Which back end check-smoke-tests.ps1 queries for the soulful mail check.
     # "hostinger"  = live site on Hostinger shared hosting, via `wp db query`  (pre-cutover)
-    # "ks-aw-01"   = container on 149.202.64.114, via `docker exec soulful-db`  (post-cutover)
+    # "ks-aw-01"   = container on 145.239.195.47, via `docker exec soulful-db`  (post-cutover)
     # Flip this ON CUTOVER DAY. It must live here rather than being a session-scoped
     # $env: assignment, because AO-RESUME spawns check-smoke-tests.ps1 in a child process
     # that would never see one. Any value other than the two above is now a LOUD

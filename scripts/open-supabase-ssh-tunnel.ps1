@@ -36,7 +36,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($SshHost)) {
-    $SshHost = if ($env:SUPABASE_EU_SSH_HOST) { $env:SUPABASE_EU_SSH_HOST } else { "149.202.64.114" }  # 2026-08-28: supabase on ks-aw-01
+    $SshHost = if ($env:SUPABASE_EU_SSH_HOST) { $env:SUPABASE_EU_SSH_HOST } else { "145.239.195.47" }  # 2026-08-31: supabase moved with ks-aw-01 to KS-6
 }
 if ([string]::IsNullOrWhiteSpace($SshUser)) {
     $SshUser = if ($env:SUPABASE_EU_SSH_USER) { $env:SUPABASE_EU_SSH_USER } else { "ubuntu" }

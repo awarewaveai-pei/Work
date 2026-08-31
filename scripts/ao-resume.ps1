@@ -640,11 +640,10 @@ if (Test-Path -LiteralPath $ciHealthScript) {
 }
 
 # --- Capacity health across ks-aw-01 / SG / EU (warn-only) ---
-# Rationale: ks-aw-01 was bought at 64 GB against a plan that specified 128 GB, and the
-# operator chose to keep the full consolidation scope (soulful + Chatwoot + the EU/SG
-# migration) and compensate with monitoring rather than cut services. This check IS that
-# compensation, so it has to run in a flow that happens anyway -- a slash command nobody
-# remembers to type would leave the spec gap simply unmanaged.
+# Rationale: ks-aw-01 is now the 128 GB KS-6 sole production host for soulful + Chatwoot
+# and the EU/SG stacks. This check is the early-warning control for whole-host pressure,
+# so it has to run in a flow that happens anyway -- a slash command nobody remembers to
+# type would leave the single-host risk unmanaged.
 # Measures outcome AND mechanism per runbooks/ADD-PERIODIC-HEALTH-CHECK.md (2026-08-25
 # addendum): MemAvailable and disk %, but also PSI stall time, OOM counters from two
 # independent sources, swap, and container restarts -- because "percent used" alone is a
@@ -657,7 +656,7 @@ if (Test-Path -LiteralPath $capacityHealthScript) {
     # The child exits 0/1/2 for PASS/WARN/FAIL, but an unhandled StrictMode throw ALSO exits
     # 1 -- so "one host unreachable" and "the check died and wrote nothing" were previously
     # the same yellow line. That mattered here more than elsewhere: this check is the agreed
-    # compensating control for a 64 GB box carrying a 128 GB plan, and its stale report reads
+    # capacity control for the sole production host, and its stale report reads
     # green.
     $capReport = Join-Path $WorkRoot ("agency-os" + [IO.Path]::DirectorySeparatorChar + "reports" + [IO.Path]::DirectorySeparatorChar + "status" + [IO.Path]::DirectorySeparatorChar + "capacity-LATEST.json")
     $capBefore = if (Test-Path -LiteralPath $capReport) { (Get-Item -LiteralPath $capReport).LastWriteTimeUtc } else { [datetime]::MinValue }
@@ -1086,9 +1085,9 @@ try {
                     if ($msgText -match 'post_update_reboot|requires reboot|needs reboot|System restart required') {
                         $hitHost = $null
                         if ($msgText -match 'awarewave-eu-hel1|hel1-cpx32|204\.168\.175\.41') {
-                            $hitHost = 'ks-aw-01 (149.202.64.114; ex-EU services since 2026-08-28)'
+                            $hitHost = 'ks-aw-01 (145.239.195.47; KS-6 host switch on 2026-08-31)'
                         } elseif ($msgText -match 'wordpress-ubuntu-4gb-sin|sin-1|5\.223\.93\.113') {
-                            $hitHost = 'ks-aw-01 (149.202.64.114; ex-SG services since 2026-08-28)'
+                            $hitHost = 'ks-aw-01 (145.239.195.47; KS-6 host switch on 2026-08-31)'
                         }
                         if ($hitHost) {
                             $msgDate = if ($m.PSObject.Properties.Name -contains 'date') { [string]$m.date } else { '?' }

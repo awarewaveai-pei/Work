@@ -291,7 +291,7 @@ async function handleSeedMode(body: { websiteSpecId?: string; wpPath?: string; s
     return NextResponse.json({ error: "websiteSpecId and wpPath required for seed mode" }, { status: 422 });
   }
   const keyB64 = process.env.SG_SSH_PRIVATE_KEY_B64?.trim();
-  const sshHost = process.env.SG_SSH_HOST?.trim() || "149.202.64.114";
+  const sshHost = process.env.SG_SSH_HOST?.trim() || "145.239.195.47";
   if (!keyB64) {
     return NextResponse.json({ error: "SG_SSH_PRIVATE_KEY_B64 not configured" }, { status: 503 });
   }
@@ -341,7 +341,7 @@ export async function POST(request: Request) {
   }
 
   const keyB64 = process.env.SG_SSH_PRIVATE_KEY_B64?.trim();
-  const sshHost = process.env.SG_SSH_HOST?.trim() || "149.202.64.114";
+  const sshHost = process.env.SG_SSH_HOST?.trim() || "145.239.195.47";
   const dbUser = process.env.WP_STAGING_DB_USER?.trim() || "wpuser";
   const dbPass = process.env.WP_STAGING_DB_PASS?.trim() || "";
   const dbRootPass = process.env.WP_STAGING_DB_ROOT_PASS?.trim() || "";

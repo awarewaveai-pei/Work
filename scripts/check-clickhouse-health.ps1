@@ -82,7 +82,7 @@ crashes on multi-byte chars without BOM. Emoji are produced at output time only.
 [CmdletBinding()]
 param(
     # 2026-08-28 consolidation: trigger-clickhouse now lives on ks-aw-01.
-    [string]$EuHost = "149.202.64.114",
+    [string]$EuHost = "145.239.195.47",
     [string]$SshUser = "ubuntu",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
     [string]$Container = "trigger-clickhouse",

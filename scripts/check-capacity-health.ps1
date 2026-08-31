@@ -6,13 +6,10 @@
 
     WHY THIS EXISTS
     ---------------
-    ks-aw-01 is a 64 GB box that was bought to absorb soulful + Chatwoot + the whole
-    EU/SG consolidation. The plan modelled 37-58 GB of load; the machine that was
-    actually available is 64 GB, below the 128 GB the plan called for. The operator
-    chose to keep the full scope and compensate with monitoring rather than cut
-    services. This check IS that compensating control. If it is noisy, ignored, or
-    silently broken, the compensation does not exist and the spec gap is simply
-    unmanaged.
+    ks-aw-01 is the KS-6 128 GB production host carrying soulful + Chatwoot + the
+    whole EU/SG consolidation. It meets the 128 GB plan floor, but it is now the sole
+    production host, so its capacity monitor remains a load-bearing control: if it is
+    noisy, ignored, or silently broken, a whole-host exhaustion event is unmanaged.
 
     WHAT IT MEASURES, AND WHY NOT JUST "RAM %"
     ------------------------------------------
@@ -65,7 +62,7 @@
 param(
     [string]$SgHost = "5.223.93.113",
     [string]$EuHost = "204.168.175.41",
-    [string]$KsAw01Host = "149.202.64.114",
+    [string]$KsAw01Host = "145.239.195.47",
     [string]$SshUser = "root",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
     [string]$KsAw01SshUser = "ubuntu",
@@ -83,7 +80,7 @@ Set-StrictMode -Version Latest
 
 # -------------------------------------------------------------------------------------
 # Per-host policy. Calibrated 2026-08-27 from measured readings:
-#   ks-aw-01  mem  5% used  disk  2%   (soulful only; 16 cores, 64 GB, 877 GB RAID)
+#   ks-aw-01  mem  8% used  disk  2%   (all production services; 16 cores, 128 GB, 954 GB RAID)
 #   SG        mem 53% used  disk 70%   (10 containers, 3.7 GB, 2 cores)
 #   EU        mem 62% used  disk 55%   (29 containers, 7.6 GB, 4 cores)
 # SG disk sits at 70% today with ~27 GB reclaimable docker garbage, so its warn line is
@@ -496,7 +493,7 @@ if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue)) {
     # machines themselves were deleted at Hetzner console. Probing them would be a
     # permanent WARN (SSH to a host that no longer exists) - and a permanent warning
     # is an ignored detector. ks-aw-01 (above) is now the ONLY production machine and
-    # carries the deliberately strict 60% thresholds that compensate for the 64GB spec gap.
+    # carries deliberately strict 60% thresholds so whole-host pressure is surfaced early.
     # (Params $SgHost/$EuHost kept for signature compatibility; deliberately unused.)
 }
 
@@ -658,9 +655,9 @@ if ($renderError) {
     [void]$md.AppendLine("render its findings, so absence of a warning here means nothing.")
     [void]$md.AppendLine("")
 }
-[void]$md.AppendLine("> ks-aw-01 runs the strictest thresholds on purpose: it is the consolidation target")
-[void]$md.AppendLine("> bought at 64 GB against a plan that called for 128 GB. This check is the agreed")
-[void]$md.AppendLine("> compensating control for that gap.")
+[void]$md.AppendLine("> ks-aw-01 runs the strictest thresholds on purpose: it is the sole consolidation host")
+[void]$md.AppendLine("> for all production services. Its 128 GB RAM meets the planned floor; these thresholds")
+[void]$md.AppendLine("> preserve early warning for whole-host pressure rather than compensating for a spec gap.")
 [void]$md.AppendLine("")
 [void]$md.Append($body.ToString())
 

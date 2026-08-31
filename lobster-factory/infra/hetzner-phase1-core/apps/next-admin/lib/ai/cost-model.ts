@@ -146,7 +146,7 @@ export const INFRA_MONTHLY: InfraCost[] = [
   // 2026-08-30 -- kept here commented out as a historical price reference, not billed any more.
   // { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, CPX22 2c/4GB, sin)", usdPerMonth: 18.49, estimate: false, note: "真實 $18.49/月 (Hetzner console PRICE；含新加坡加價)" },
   // { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, CPX32 4c/8GB, hel1)", usdPerMonth: 16.49, estimate: false, note: "真實 $16.49/月 (Hetzner console PRICE)；Supabase/n8n/Postiz/Trigger 全自託管於此" },
-  { key: "ovh-ks-aw-01", label: "OVH SYS-GAME-2 (149.202.64.114, Ryzen 7 3800X 8c/16t / 64GB ECC / 2x960GB NVMe RAID1, Gravelines FR)", usdPerMonth: 72, estimate: false, note: "真實 $72/月 (決策文件 reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)；取代上面兩台 Hetzner Cloud VPS，2026-08-28 全部服務(soulful+Chatwoot+SG 10 容器+EU 29 容器)整併於此" },
+  { key: "ovh-ks-aw-01", label: "OVH KS-6 (145.239.195.47, EPYC 7351P 16c/32t / 128GB ECC / 2x1TB NVMe RAID1, Gravelines FR)", usdPerMonth: 59.8, estimate: false, note: "真實 $59.80/月；KS-6 host switch completed 2026-08-31. It replaces the prior SYS-GAME-2 while retaining the consolidated soulful+Chatwoot+SG+EU workload." },
   { key: "cloudflare", label: "Cloudflare (DNS/WAF/R2)", usdPerMonth: 0, estimate: false, note: "真實: 2 zones (aware-wave.com / weartheworld.org) 皆 Free plan $0，CF API；R2 在免費額度內(10GB)，量大再加" },
   // aware-wave.com + weartheworld.org = Cloudflare Registrar (at-cost: .com/.org ~$10.44/yr each,
   // CF doesn't mark up). soulfulexpression.org migrated Hostinger -> ks-aw-01 (OVH) 2026-08-28,

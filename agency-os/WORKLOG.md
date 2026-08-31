@@ -1,5 +1,66 @@
 # Worklog
 
+## 2026-08-31（KS-6 host switch completion）
+
+### ks-aw-01 已切至 KS-6；補齊 origin guard、備份、reboot、renewal 與同步驗證
+
+**範圍**：依 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` 完成 Claude 中斷後的 G5–G7 與全項收尾。現役主機為 `145.239.195.47`（KS-6/128GiB/2×1TB）；前任 `149.202.64.114` 保留為歷史來源，不再是驗收目標。
+
+**根因與修復**：
+- Soulful Nginx 只有 :80 block include `cf-only.conf`，:443 裸露；以 repo vhost 正本覆蓋、`nginx -t` 後 reload。17 個 proxied hostname 的 IPv4 直連皆 403；新機自測 IPv6 也 403。
+- 新主機漏部署 `52awarewave-auto-reboot`、boot health notifier 與 `endpoint-alert.sh`（timer 曾 203/EXEC）；由 infra SSOT 安裝、daemon-reload、enable，`check-vps-auto-reboot-health.ps1` PASS。
+- ks-aw-01 Soulful 備份沿用 MySQL aliases/`MYSQL_ROOT_PASSWORD`，MariaDB 11.8 只提供 `mariadb-dump`/`MARIADB_ROOT_PASSWORD`；修正受版控的 pipeline，正式快照驗到 DB 15MB/288 tables、WordPress 768MB/57,368 entries、R2 marker。
+- 首次手動 EU-stack backup 未帶 cron 的 `BACKUP_DIR=/root/backups-stack`；以正式 cron 環境重跑並把重複快照移入隔離目錄，避免 ks 驗證器日後誤判。三管線 health 最終 PASS。
+- Certbot dry-run 發現 Soulful renewal 缺 `python3-certbot-dns-cloudflare`；安裝後五張憑證 simulated renewal 全成功。
+
+[已修改]
+- `lobster-factory/infra/ks-aw-01-backup/{backup-ks-aw-01.sh,verify-backup-ks-aw-01.sh,README.md}`：MariaDB 11.8 client/環境變數與現役主機資料修正。
+- `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`：補本次實施狀態、video-svc 正確 hostname、443 guard 與無 WP-CLI 的 MainWP 同步路徑。
+- 其他此次切換的活性 IP、容量/備份/Cloudflare 驗證工具、next-admin staging fallback 依本次變更集更新為新主機。
+
+[驗證結果]
+- 公開入口 16/16 符合期望；`api` 回 `node-api`、wp-admin 三次 redirect 正常、Oracle 導向 `/zh-TW`。
+- `remotion-svc` 與 `video-svc` direct `/health` 均 200；PTR = `ks-aw-01.aware-wave.com`；Telegram pending=0/no error。
+- Trigger 最近兩小時 24 個 TaskRun 全為 `COMPLETED_SUCCESSFULLY`；MainWP 兩子站 force-sync 成功且 `sync_errors` 為空。
+- 三管線 real backup + verify + R2 PASS；`check-backup-health.ps1`、`check-vps-auto-reboot-health.ps1`、`check-cloudflare-security.ps1` PASS；Certbot dry-run all succeeded。
+
+[剩餘風險]
+- 單機拓樸仍是 SPOF；R2 異地備份已驗證但完整還原演練不在本次切換窗內。
+- `/root/backups/20260831-134410` 是未上傳的失敗 Soulful 本機診斷快照，會依 7 天 snapshot retention 自動清除；不可把它當可還原備份。
+
+[rollback]
+- Soulful vhost 留有 `/etc/nginx/sites-available/soulfulexpression.org.conf.pre-origin-guard-20260831T130241Z`；備份腳本留有 `*.pre-mariadb-*`。若回退，先還原相應檔案、`nginx -t`／`bash -n`，再 reload 或重跑 verify；已接寫時 DNS 回切必走 runbook §7 的反向 final rsync。
+
+## 2026-08-31（續10）
+
+### G3 capacity FAIL 查明：supabase-kong 一次性 cgroup OOM（2026-08-28 整併日），非持續壓力
+
+**觸發**：操作者計劃啟動 KS-6 換機（`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` §0 G3「capacity-LATEST 非🔴」），`reports/status/capacity-LATEST.md` 2026-08-31 15:42 回報 🔴（journal 7 天累計 15 次 OOM kill），但整機記憶體只 23.3%（14.6G/62.7G）、PSI avg60 0%/0%，不是撐爆型，需查明是否為舊坑複發、要不要擋換機。委派 Codex（讀 log/SSH 診斷，符合 AGENTS.md §跨模型 oracle 分工「大量讀檔/跨檔掃描」歸 Codex）。
+
+**Codex 診斷結果（Claude 逐條 Grep 驗證，全部 CONFIRMED）**：
+- 根因：`supabase-kong` cgroup 記憶體上限 768MiB。整併日（2026-08-28）16:40:33–16:40:38 六秒內，Kong 依 16 執行緒開了 16 個 nginx worker 撞滿 cgroup；當時執行 swapoff，kernel 把該 cgroup 的 swap 頁換回 RAM 時已無空間，連續 kill 15 個 nginx worker（journal `constraint=CONSTRAINT_MEMCG`，`usage 786432kB, limit 786432kB` 逐筆一致）。
+- 15 筆事件時間戳全部集中在整併日 6 秒窗口內，近 7 天無後續事件——是歷史事件仍卡在 7 天滾動視窗，不是進行中的問題。
+- 修復早已到位：`lobster-factory/infra/supabase/docker-compose.yml:115` `KONG_NGINX_WORKER_PROCESSES: "4"`（Claude 已 Grep 確認存在）；`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md:190` §4 群4 早已列為換機驗收項；現機 `supabase-kong` 實查 462.5MiB/768MiB、5 個 nginx 行程（1 master+4 worker）、RestartCount=0，全部容器目前無非零 RestartCount。
+- 附帶查證 `trigger-clickhouse`（EU 舊機曾因同款 `override.xml` 未生效而死亡迴圈）：`lobster-factory/infra/trigger/clickhouse/override.xml:23` `max_server_memory_usage=2684354560`（2.5GiB）確認生效，非同一坑。
+
+**結論**：capacity FAIL 是假警報的過期視窗，非真實風險，**不擋 KS-6 換機**；`KONG_NGINX_WORKER_PROCESSES=4` 已是換機硬性驗收項（runbook 既有）。`reports/status/capacity-LATEST.md` 該筆記錄預期 2026-09-04（8/28+7天）起自動轉綠，屆時無需人工介入。
+
+[已修改]
+- `agency-os/WORKLOG.md`：本則診斷收尾記錄（無 code/config 變更——Kong worker 修復本就已存在於 repo 與現機，本輪純查明+驗證）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "KONG_NGINX_WORKER_PROCESSES" lobster-factory/infra/supabase/docker-compose.yml` | exit=0（命中 :115）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "max_server_memory_usage" lobster-factory/infra/trigger/clickhouse/override.xml` | exit=0（命中 :23）
+- REVIEW_DONE: critic=Quick（Claude 逐條核對 Codex 回報的 3 個 file:line 主張，全部 Grep 命中真實存在；未直接採信「已修復」的宣稱，依 AGENTS.md §Subagent 交接協議驗證要求）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 純診斷查證+文件記錄，無 code/schema/API 變更，無新 symbol 需掃 call site
+
+[剩餘風險]
+- capacity 健康檢查腳本本身未區分「歷史事件卡視窗」vs「進行中壓力」，7 天內任何一次性 OOM 都會讓 FAIL 掛滿整週——這是既有設計（寧可誤報不漏報），非本次新發現的缺陷，不在本輪範圍內處理
+- `trigger-clickhouse`／其餘服務的 mem_limit 是否還有類似「worker 數隨核心數爆 memcg」的坑未逐一排查（僅排除 kong 與 clickhouse 兩個，其餘 42 個容器未逐一核對 mem_limit vs 進程數關係）
+
+[rollback]
+- 無變更可回滾（本則為文件記錄）
+
 ## 2026-08-31（續9）
 
 ### AGENTS.md 補一條觸發規則：規劃新系統治理架構時先讀 GOVERNED_SYSTEM_BUILD_SOP.md
@@ -8654,4 +8715,31 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 
 **Rollback**: restore the deleted Canva stanza only through `mcp/registry.template.json` by explicitly setting Canva enabled, running the sync, and completing OAuth after restarting the target host. Do not recreate an unmanaged project-level declaration.
 
+### fix(governance): clear ALERT_REQUIRED.txt gate block + fix stale HCI30_RESEARCH_REVIEW paths after docs/HCI/ reorg
+
+**根本問題（兩個獨立問題，同一 session 發現）**：
+1. `verify-build-gates` 於 2026-08-31T01:40:28Z 起持續 FAIL（`agency-os/ALERT_REQUIRED.txt` 記錄）。根因：`.claude/settings.json` 因其他變動多插入 1 行，既有 Google app-password 出現位置從 line:12 位移到 line:13；`agency-os/config/scan-local-config-known-suppressed.json` 的 baseline 用 line-number 當 sourceKey，位移後比對失效，變成「baseline-miss」擋下所有 commit。不是新洩漏——同一密碼已有 10 筆治理過的 suppression entry。
+2. 另一 session（Codex，per user）已將 `docs/HCI_AI_LEGO_Blueprint_v1`、`docs/HCI_AI_LEGO_Blueprint_v2`、`docs/HCI30_RESEARCH_REVIEW` 三個目錄搬移整併進 `docs/HCI/` 下，但搬移未同步更新文件內文中的絕對路徑引用，留下 6 處指向不存在的舊路徑 `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\`（缺 `HCI\`）。此發現與同日 Codex `HCI_SOP_GAP_REPORT.md`（`D:\tmp\hci-sop-gap-check\`）§讀取與版本邊界 一致，本次 grep 全庫另抓到報告未列出的第 6 處（`V2/14_ROADMAP...md:79`）。
+
+**已修改**:
+- `agency-os/config/scan-local-config-known-suppressed.json` — `.claude/settings.json` Google app password suppression 的 `sourceKey`: `line:12` → `line:13`（不動密碼值，只更新行號指標）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/00_README.md` — 2 處絕對路徑補回 `HCI\`
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md` — 2 處
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/14_ROADMAP_AND_DEFINITION_OF_DONE.md` — 1 處（Codex 報告未列出的第 6 處）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v1/00_README.md` — 2 處（此檔案為我上個 session 加的 supersession banner，非原始 V1 內容，故可修；V1 正文其餘部分保持凍結不動）
+- `agency-os/ALERT_REQUIRED.txt` — 刪除（gate 已轉綠，依檔案自身指示移除）
+
+**未動、刻意保留**：`HCI30_RESEARCH_REVIEW/*.md` 內同樣的舊路徑字串——那些是稽核證據文件，逐字引用當時發現的缺陷路徑（例如 `08_DEVOPS_SRE_REVIEW.md:26` 明確引用該路徑作為 finding），改寫會破壞證據鏈。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/verify-build-gates.ps1` | exit=0 | result=`verify-build-gates: ALL PASSED`（修前 FAIL at scan-local-config-for-secrets step，含 health-check 100%/317/317）
+- REVIEW_DONE: critic=self（doc-only 路徑修正 + JSON 單欄位數值修正，無邏輯分支，跳過 subagent critic；已用 Read 逐檔讀回確認每處替換內容正確）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`D:\\Work\\agency-os\\docs\\HCI30_RESEARCH_REVIEW`（`\|` 含 `HCI_AI_LEGO_Blueprint`）| hits=0（V1/V2 目錄內清零；RR 稽核證據檔保留原樣，非本次修復範圍）
+- WORKLOG: 本條目
+
+**剩餘風險**：
+- Batched Edit 呼叫中，git-log-injector hook 在同一批次裡對其中一個 Edit 回報 block+re-issue，但另一個屬於**不同檔案**的 Edit 同批次回報「success」卻實際未套用（`V2/00_README.md` line 7）——靠事後全庫 grep 抓到並補修。懷疑是 hook/工具批次執行時的結果排序或吞錯 race，非本次修改內容錯誤；未深入排查該 hook 本身（超出本任務範圍，若之後再現需獨立追蹤）。
+- `docs/HCI/` 重組（誰做的、何時、是否已通知 WORKLOG）與新出現的 `agency-os/docs/System_Foundry_v1.0/`（大型未提交新框架，內部自稱路徑 `docs/SYSTEM_FOUNDRY/` 與實際落點不符）均未在此 WORKLOG 留下起源記錄，留待與操作者確認後續處置，不在本條目範圍內處理。
+
+**Rollback**: `git diff` 未 staged，直接 `git checkout -- <path>` 個別還原；或 revert baseline sourceKey 回 `line:12`（僅在 `.claude/settings.json` 行數真的變回 12 時才需要）。
 

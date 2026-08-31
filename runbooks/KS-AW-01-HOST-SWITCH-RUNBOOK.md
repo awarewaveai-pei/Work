@@ -12,6 +12,13 @@
 > **拓樸事實正本**：[`AWAREWAVE_STACK_QUICKREF.md`](../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
 > 舊時代（EU/SG 分立）遷移正本 [`HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md) 保留為歷史與備份/還原章節引用。
 
+> **最近一次實施（2026-08-31）**：現役 ks-aw-01 已切至 `145.239.195.47`
+> （OVH KS-6，IPv6 `2001:41d0:203:a62f::1`；前任 `149.202.64.114`）。本次驗收發現並修正：
+> Soulful 443 vhost 漏 `cf-only` guard、auto-reboot/endpoint-alert 機器層檔案漏部署、
+> MariaDB 11.8 備份 client 名稱差異、Certbot Cloudflare DNS 外掛缺失。所有三條備份
+> 管線在新機 real-run + verify + R2 後為 PASS。未來換機以本段為歷史實例，不可把前任 IP
+> 當作現役目標。
+
 ---
 
 ## §0 計劃書：什麼時候換、什麼時候不換
@@ -146,9 +153,10 @@ done | grep -E '^[0-9a-f]{64}'
    帳號在**世界區** `ca.ovhcloud.com`（整併日坑：歐洲區登入頁會回「密碼錯誤」，兩套獨立帳號庫）。GAME firewall 刻意不設。
 3. `refresh-cf-edge-geo.sh` 已在 `/root/scripts/`（隨 1d 帶走），nginx geo guard 自動跟機器走。
 
-### 1g. 🔴 repo 裡寫死現役 IP 的活性工具（換機日逐一改；`git grep -n "149.202.64.114"` 重新產清單）
+### 1g. 🔴 repo 裡寫死現役 IP 的活性工具（換機日逐一改；對「當時舊 IP」跑 `git grep -n` 重新產清單）
 
-2026-08-28 實查（`.md` 歷史文件不改）：
+2026-08-31 實查：前任 `149.202.64.114` 的下列活性引用已改為現役
+`145.239.195.47`（`.md` 歷史文件不改）：
 `scripts/check-backup-health.ps1`、`check-capacity-health.ps1`、`check-clickhouse-health.ps1`、`check-cloudflare-security.ps1`（探測 --resolve ×2 + 標題）、`check-deploy-drift.ps1`、`check-smoke-tests.ps1`（ks-aw-01 profile host）、`check-supabase-memory-monthly.ps1`、`lobster-trigger-deploy.ps1`、`open-supabase-ssh-tunnel.ps1`、`refresh-cf-origin-ips.ps1`（ssh 目標）、`ao-resume.ps1`（reboot 訊號標籤 ×2）、`.claude/commands/sg-deploy.md`、`lobster-factory/infra/soulful/docker-compose.yml`（註解）、`mcp/user-env.template.ps1`（註解）。
 另：`AWARE_WAVE_CREDENTIALS.md`（操作者自管）、OVH 舊機防火牆/白名單清理見 §6。
 
@@ -196,14 +204,14 @@ done | grep -E '^[0-9a-f]{64}'
 
 ## §5 Phase 3 — 驗證（全項，缺一不算完成）
 
-1. **15 端點掃描**（期望碼）：soulful/aware-wave/app.../oracle/uptime/mainwp/n8n healthz/trigger login/remotion/video health＝200；www=301；postiz=307；supabase rest・studio=401
+1. **16 端點掃描**（期望碼）：soulful/aware-wave/app.../oracle/uptime/mainwp/n8n healthz/trigger login/remotion-svc/**video-svc** health＝200；www=301；postiz=307；supabase rest・studio=401。**不要探測 `video.aware-wave.com`**：它沒有 DNS record，會正確落入 default origin guard 的 403。
    - **`sg-deploy.sh` smoke 探針補充驗收**（2026-08-29 補，§8 表格同款教訓）：探針本身不寫死 IP、隨 git pull 自動帶到新機，理論上不用重做——但換機後**建議手動跑一次**確認前提沒被打破：`curl -k --resolve aware-wave.com:443:NEW_IP https://aware-wave.com/` 應 200（`remote_ip` 應等於 `NEW_IP`，證實走本機不是繞出去）；`curl -H "Host: api.aware-wave.com" http://NEW_IP/health` 應 200。兩個都過才代表下一次 `sg-deploy.sh next-admin` 不會被這兩個探針的假陽性打成 auto-rollback
    - **`api.aware-wave.com` 內容比對必做，不能只看狀態碼**（2026-08-29 事故：此網域曾從建立起就未接線，錯發到 WordPress 卻同樣回 200，狀態碼騙不出來）：`curl https://api.aware-wave.com/` 回應須含 `"service":"node-api"` 字樣；`curl https://oracle.aware-wave.com/ | grep -i "<title"` 不可出現 `Aware Wave`（那是 WordPress 的 title，代表又錯發了）
    - **wp-admin 無限重導回歸測試**（2026-08-29 真根因：`lobster-phase1/nginx/default.conf` 的 `X-Forwarded-Proto` 若被改回 `$scheme` 或該檔從 `nginx/system-sites/*.conf` 這類舊架構快照重建，此 bug 會複發）：`for i in 1 2 3; do curl -sk -o /dev/null -w "%{http_code} %{redirect_url}\n" https://aware-wave.com/wp-admin/; done` 三次結果必須是 `302` 導向 `wp-login.php?redirect_to=...`，**不可以是導回 `/wp-admin/` 自己**
-2. **Origin guard**：14 個 proxied hostname `--resolve host:443:NEW_IP` 直連全部 **403**（含 IPv6 直連抽測）；remotion/video 直連 200
+2. **Origin guard**：所有 proxied hostname `--resolve host:443:NEW_IP` 直連全部 **403**（含 IPv6 直連抽測）；`remotion-svc`／`video-svc` 的 `/health` 直連 200。對每個 SSL vhost 同時檢查 :80、:443 block 都有 guard；只有 :80 有不算完成。
 3. **備份三管線**在新機 real-run + verify PASS + R2 objects 實列 + 變異測試（錯 prefix → 可見 FAIL exit 1）
 4. **Kuma 看板 23/23 綠**（URL 全公開網域，不需改）＋ endpoint-alert heartbeat OK（journal 兩輪零失敗輸出）
-5. **Telegram**：`getWebhookInfo` pending=0 無 last_error；**Trigger**：30 分鐘內 TaskRun 全 COMPLETED_SUCCESSFULLY；**MainWP**：對每個子站強制同步並確認 sync_errors 清空（`docker exec mainwp-web wp --allow-root --path=/var/www/html eval '''...MainWP_Sync::sync_site(...)'''`）——切換窗內的失敗同步會留下 **stale 斷線旗標**，不主動重同步要等隔日 cron 才自癒（2026-08-28 實例：aware-wave.com 紅叉 9 小時，實際一次手動同步即緑）
+5. **Telegram**：`getWebhookInfo` pending=0 無 last_error；**Trigger**：30 分鐘內 TaskRun 全 COMPLETED_SUCCESSFULLY；**MainWP**：對每個子站強制同步並確認 sync_errors 清空。優先用 `wp eval`；若官方 WordPress image 未附 WP-CLI，載入 `wp-load.php` 後以 `MainWP_DB::get_website_by_id()` 取得**物件**（不是 `get_connected_websites()` 的 array），再傳入 `MainWP_Sync::sync_site()`。切換窗內的失敗同步會留下 **stale 斷線旗標**，不主動重同步要等隔日 cron 才自癒（2026-08-28 實例：aware-wave.com 紅叉 9 小時，實際一次手動同步即緑）
 6. **§1g IP 清單逐檔改** → `check-{backup,capacity,clickhouse,cloudflare-security,deploy-drift}` 全部實跑 PASS
 7. 機上出站：DNS/HTTPS/NTP（edge firewall 規則 0/1/2 的活體證明）；PTR 反查 = ks-aw-01.aware-wave.com
 
