@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-08-31（續8）
+
+### Governed System Build SOP 再補 4 個缺口：無外部覆審 fallback、歧義單問一題、DoD 隨型態而異、把紀律綁上機械檢查
+
+**觸發**：操作者問「保證產出更有效率、正確、完整」還要補什麼——不是重問完整度，是主動要求找剩餘缺口。§10-16（addendum 落地）+ 剛修的日期引用錯誤之後，重新盤點還有哪些本 repo 真實發生過、但 SOP 尚未收錄的模式。
+
+**發現 4 個真實存在但未收錄的模式**（逐一 grep 確認來源存在後才寫入，非先寫後找證據）：
+1. §5 只講「要有外部覆審」，沒講「沒有外部覆審者時怎麼辦」——`WORKLOG.md`〈續22〉ChatGPT Codex 額度用完後改做對抗式自審＋突變測試＋誠實計數的真實案例，之前一直沒被收進 SOP。
+2. §10 的七段規劃閘沒講「讀完現況仍有歧義時怎麼辦」——`AGENTS.md`〈任務到達協議〉步驟 1「問一個具體問題，不問兩個」是既有明文規則，之前遺漏。
+3. §11 四動作驗證預設套用同一份清單，沒講「完成的定義隨任務型態而異」——`AGENTS.md`〈任務完成標準（DoD）〉六型態表存在已久，之前沒被引用進 SOP。
+4. 全篇沒有「把紀律綁上機械檢查」這個主題——本 repo 自己大量依賴 `hooks/rules/*.js` 把 R0/R4 從文件變成寫入前攔阻，且 AGENTS.md 明文承認機械閘 fail-open、需要 `test-hooks.sh` 定期驗證健康——這是本 repo 治理能長期生效的關鍵機制之一，之前完全沒被抽成通用章節。
+
+**新增內容**：§5／§10／§11 各加一段（不開新章節，維持原編號不變）；新開 §16「把關鍵紀律綁上機械檢查，並定期驗證檢查本身還活著」，原 §16 最小啟動清單改為 §17，並在 §17 第 1 階段補一句「工具鏈已支援時同步接機械檢查」。
+
+[已修改]
+- `agency-os/docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`：§5/§10/§11 各加一段落；新增 §16；原 §16 改為 §17 並更新一句引用
+- `agency-os/docs/architecture/decisions/ADR_INDEX.md`、`docs/operations/{end-to-end-linkage-checklist,new-doc-linkage-checklist}.md`：`doc-sync-automation.ps1` 同步 Related Documents metadata
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純治理文件補段落，無 runtime/schema/部署變更
+- REVIEW_DONE: critic=Quick（自我核對：寫入前逐一 grep 確認 5 個新引用存在——`## 已知信任邊界`、`hooks/rules/*.js`、`scripts/test-hooks.sh`、`問一個具體問題，不問兩個`、`### 任務完成標準（DoD）`——全部命中後才動筆；寫完後通讀全檔確認 §1-17 編號連續、無斷章）| verdict=pass | findings=0c/0m/0n
+- DOC_LINKAGE_DONE: `doc-sync-automation.ps1 -ChangedFiles @('docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md')`（路徑需相對 `agency-os/`，直接用 `agency-os/docs/...` 會被路徑守門判成 workspace root 錯誤而報「No changed files detected」，已用正確相對路徑重跑）成功，closeout=`reports/closeout/closeout-20260831-100224.md`
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`§16\|§17`（確認新增與重編號後全文無殘留舊編號引用）| hits=1（僅 §17 第 1 階段那句新引用 §16，其餘無殘留）；另 grep=`GOVERNED_SYSTEM_BUILD_SOP.*§1[0-9]|第一週最小啟動清單` 排除 WORKLOG／weekly report／CODEX_HANDOFF 三類歷史快照後，`scripts/` 與現行治理文件零命中，無 consumer 依賴舊章節數
+
+[剩餘風險]
+- §12/§13/§15 本輪未逐條重新抽查（前一條 續7 已抽查 §10/§11/§14 共 8 處，本次新增的 4 段落引用已在撰寫時逐一驗證，殘餘風險與續7 相同：未做窮舉式覆核）
+- 工作區其餘大批未提交改動（`HCI30_RESEARCH_REVIEW/` 等）與本條無關，未觸碰
+
+[rollback]
+- `git revert <本次 commit>` 還原新增 4 段落與 §16/§17 重編號
+
 ## 2026-08-31（續7）
 
 ### 覆核 §10-16 addendum 落地成果：抓到 1 個真實日期引用錯誤（07-03 應為 07-05），其餘抽查通過

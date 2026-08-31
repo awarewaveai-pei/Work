@@ -33,6 +33,8 @@ AI 起草 ADR 時須維持 `PROPOSED`，不得把自己的建議寫成 `ACCEPTED
 
 還要驗證「覆審真的讀了被審內容」。一次 `approve` 並不等於完成審查：若 reviewer 因 sandbox 或權限讀不到 diff，應視為未覆審、修正輸入位置後重跑，不能採信空白 verdict。**實證出處：** `WORKLOG.md`〈2026-08-30（續30）〉「操作員核准 ADR-017~020」記錄第一次 approve 因讀不到 scratch diff 而作廢，第二次將 diff 放至可讀位置後才採納；`.claude/commands/codex-review.md` L17-23 說明 capture 與實際被審內容脫鉤曾構成 Critical 缺陷。
 
+沒有外部覆審者可用時，不能默默跳過這一步，也不能假裝自己審過自己。改做對抗式自我覆審：主動嘗試推翻剛完成的結論、用突變測試證明測試真的會抓到錯（而非空跑就過），並誠實記錄「這次沒有外部覆審，用了哪種替代」，讓後續讀者知道這批工作的證據強度低於有外部覆審的批次。**實證出處：** `WORKLOG.md`〈2026-08-30（續22）〉ChatGPT Codex 訂閱額度用完（「You've hit your usage limit」）後，判斷 fallback 走同一份訂閱額度、重試無意義，改做真實對抗自審＋突變測試＋誠實計數，而非略過覆審或假裝已審。
+
 ## 6. 改一個事實後，掃完整份檔案與全庫副本
 
 任何狀態、數值、路徑或裁決改動後，先重讀同檔的摘要、description、驗證說明、追蹤表與歷史敘事，確認它們沒有還在用現在式宣稱舊真相；再從 repo 搜尋同一主張的獨立副本。這不是格式清理，而是防止「機器欄位正確、讀者被散文誤導」的控制。**實證出處：** `WORKLOG.md`〈2026-08-30（續30）〉「mega-batch 真正 /codex-review」發現 authority 與 network-egress 的真實欄位已更新、敘述仍稱 skeleton／provisional，並另掃出 Master Plan 9 處舊檔名；`WORKLOG.md`〈2026-08-30（續13）〉亦記錄 ADR-016 只改結論、漏改 Context／Decision Drivers／Method Used 的三處現在式敘述。
@@ -71,11 +73,15 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 規劃輸出要列出「本任務實際讀過的來源」及未讀條件文件的理由，讓下一個 AI 能重放來源選擇，而不是誤以為所有 checklist 都已套用。這是把 R0 的現況／歷史分析與本 SOP 的逐段可追溯性落成可檢查 artifact 的直接推論。**實證出處：** `agency-os/AGENTS.md`〈R0：架構師模式〉的現況分析與 `git log` 要求；`CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §5 的逐節可追溯性要求。
 
+現況分析讀完仍有真正歧義時（而非只是懶得讀），提出剛好一個具體問題，不猜測動手，也不一次丟多個問題——多問會把釐清負擔推回人類，單一具體問題才是把不確定性縮小到可回答的範圍。這條只適用於「讀了仍不知道」，不能被用來取代規劃閘本身要求的現況閱讀。**實證出處：** `agency-os/AGENTS.md`〈任務到達協議〉步驟 1「讀完仍不清楚 → 問一個具體問題，不問兩個」。
+
 ## 11. 驗證是四個獨立動作，不是「看起來沒問題」
 
 每次工作邏輯改動都要留下四種彼此不能替代的證據：實際執行或觀察新行為、讀回產物的 review、跨檔搜尋矛盾或副作用、以及寫入有日期的工作紀錄。讀過程式或說「測試應會通過」不是實測；只有文件或查詢型任務才可明說為何豁免實測，而不能把豁免偽裝成通過。**實證出處：** `agency-os/AGENTS.md`〈R0〉的 `[驗證計畫]` 四動作與 `REALTEST_WAIVED` 規則；`agency-os/AGENTS.md`〈R4：聲稱即驗證〉的四動作落實檢核。
 
 把四項結果寫成能被後人核對的 artifact，而不是一段自我評價。真實紀錄中，對 schema 的 golden test 與對抗驗證、對覆審 finding 的逐條核對、以及跨文件 stale-claim 搜尋各自記錄，才讓「已完成」可被重放與質疑。**實證出處：** `WORKLOG.md`〈2026-08-30（續30）〉的 `REALTEST_EVIDENCE`／`REVIEW_DONE`／`BUGHUNT_DONE` 三項證據；`WORKLOG.md`〈2026-08-30（續22）〉以 SSH、PowerShell 與憑證 dry-run 實測並另記 review／bug hunt 的紀錄。
+
+「完成」的定義隨任務型態而異，四動作驗證的具體內容要先對上型態，而非套用同一份清單：程式改動要真跑＋覆審＋抓蟲＋工作紀錄；純文件或查詢型任務可豁免實測但要明說豁免理由；基礎設施要看到症狀真的消失；技術決策要有記錄與人類確認接受。規劃輸出的驗證計畫段落應先講清楚這次適用哪一種完成定義，再列驗證步驟，避免用程式改動的高標準套用在查詢型任務、或用查詢型任務的低標套用在正在動的程式邏輯上。**實證出處：** `agency-os/AGENTS.md`〈任務完成標準（DoD）〉依 Code change／Infrastructure／Client site／Technical decision／Research／System health 六種型態分列完成條件。
 
 ## 12. 同一缺陷類別再出現時，先找不變量，不要補第三個洞
 
@@ -101,9 +107,15 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 節省 context 不等於片段化理解：準備修改或驗證的檔案必須全文讀，大片日誌或跨二十份以上檔案才先過濾或委派。真實事故曾因只讀 `check-smoke-tests.ps1` 的局部而漏掉檔頭的 `$ErrorActionPreference`，也曾因三次裸跑 CLI 各帶入約 120KB 輸出而永久增加約 366KB session 成本。**實證出處：** `agency-os/AGENTS.md`〈Session 衛生〉的讀取矩陣與 `check-smoke-tests.ps1`／120KB 兩個具名案例。
 
-## 16. 最小啟動清單
+## 16. 把關鍵紀律綁上機械檢查，並定期驗證檢查本身還活著
 
-第 1 階段：建立一份系統敘事正本（目的、邊界、權責與長期不變量）、ADR index、open-questions register，以及母文件修訂用的 proposal template；同日採用本 SOP §10 的任務規劃閘與 §13 的風險分級。先讓每一個未決事項和每一次後續修改都有可追蹤的位置；不必先做一整套 schema。**實證出處：** `ADR-006` L63-118 提供可最小化採用的提案結構；`ADR_INDEX.md` L28-39 展示決策依賴關係需要集中追蹤；`agency-os/AGENTS.md`〈R0〉與〈操作風險分級〉。
+寫在文件裡的規則只能被讀到，機械檢查（pre-commit hook、CI gate、提交前的自動掃描）才能被強制。凡是本 SOP 前述任何一條紀律（提案批准分離、四動作驗證、跨檔 stale-claim 掃描）若已有工具可自動判斷「證據行是否存在」，就應該接一個檢查擋下不合格的提交，不要只靠自覺遵守——尤其在會有無跨 session 記憶的 AI 持續接手時，機械檢查是唯一不會被遺忘的把關者。**實證出處：** `mcp/claude-userlevel/hooks/rules/` 下的 pre-commit／pre-edit 檢查群（`git-log-injector.js`、`verify-gate-commit.js`、`high-risk-bash-warn.js` 等），把 R0／R4 的紀律從文件規則變成寫入前的實際攔阻。
+
+但要誠實記錄機械檢查的已知邊界，不可把「檢查通過」誤當「內容正確」。多數自動檢查只能驗證「證據格式存在」，無法驗證證據內容真實（例如無法重放一段聲稱已執行的指令）；且檢查本身通常設計為 fail-open（檢查邏輯壞掉時預設放行，而非擋下一切），所以檢查的健康度要有獨立、定期的自我測試，而非只信任「至今沒被擋下」。**實證出處：** `agency-os/AGENTS.md`〈已知信任邊界（明文，勿誤當保證）〉明文承認 `verify-closeout-completeness` 只驗格式不驗內容、機械閘 fail-open 且以 `scripts/test-hooks.sh` 驗證閘的健康。
+
+## 17. 最小啟動清單
+
+第 1 階段：建立一份系統敘事正本（目的、邊界、權責與長期不變量）、ADR index、open-questions register，以及母文件修訂用的 proposal template；同日採用本 SOP §10 的任務規劃閘與 §13 的風險分級。先讓每一個未決事項和每一次後續修改都有可追蹤的位置；不必先做一整套 schema。若工具鏈已支援（例如既有 CI 或 pre-commit 機制），同時把 §16 最容易自動判斷的一兩項（提案是否有批准欄位、commit 前是否附驗證證據）接成機械檢查，不必等到規模變大才補。**實證出處：** `ADR-006` L63-118 提供可最小化採用的提案結構；`ADR_INDEX.md` L28-39 展示決策依賴關係需要集中追蹤；`agency-os/AGENTS.md`〈R0〉與〈操作風險分級〉。
 
 第 2 階段：只為已被選定的第一條垂直切片或既有消費端建立機讀契約；每個契約附來源、決策與編譯選擇。對尚無使用證據的物件，登錄為 deferred 並寫下重新檢查條件，避免「規格越多越完整」的錯覺。**實證出處：** `MACHINE_READABLE_SPEC_PLAN.md` L80 對 `READY`／`BLOCKED_PENDING_ROUND2_ADR`／`SKELETON_ONLY` 的區分；`WORKLOG.md`〈2026-08-30（續30）〉對 10 個未被 Research 切片使用的 typed objects 作出 DEFERRED 決定。
 
@@ -118,4 +130,5 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-08-31 01:48:49 UTC_
+_Last synced: 2026-08-31 02:02:23 UTC_
+
