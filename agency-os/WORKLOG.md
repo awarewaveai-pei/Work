@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-08-31（續4）
+
+### AUTO_TASK_DONE: remote-weekly-agent 週報生成
+
+- 01:08 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-08-31.md
+- REALTEST_WAIVED: DOC_ONLY -- auto-generated report, no code change
+- REVIEW_WAIVED: DOC_ONLY -- report content verified from WORKLOG/TASKS sources
+- BUGHUNT_WAIVED: DOC_ONLY -- report only, no symbol changes
+- WORKLOG: this entry
+
+---
+
 ## 2026-08-31（續3）
 
 ### Governed System Build SOP 補齊任務規劃、文件來源路由與交接規則
