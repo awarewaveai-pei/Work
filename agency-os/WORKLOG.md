@@ -2,7 +2,7 @@
 
 ## 2026-09-01（KS-6 post-cutover audit）
 
-### 對照 8/26–8/29 搬機事故全量複核：主體通關；Netdata Cloud claim 缺外部 one-time token
+### 對照 8/26–8/29 搬機事故全量複核：全量通關（含 Netdata Cloud）
 
 **範圍**：逐段閱讀 2026-08-26 至 2026-08-29 的所有搬機相關 WORKLOG（不含 AI-LEGO／meeting-service 等非搬機工作），再以現役 `145.239.195.47` 實測，不採信舊 worklog 的「已完成」敘述。
 
@@ -15,11 +15,11 @@
 - `00-default-placeholder` 為啟用 symlink、`.htpasswd_studio` 為 regular file、Certbot account directory 與 renewal account 均為 1、Kong workers=4、Uptime Kuma 最新 23/23 UP、Trigger 近兩小時 24 個 `COMPLETED_SUCCESSFULLY`。endpoint alert 正確 unit 為 `awarewave-endpoint-alert.timer`，已 enabled 且每分鐘成功完成。
 - API health 200、aware-wave 200、app/oracle/postiz 正確 307、n8n healthz 200、Trigger login 200、Soulful 200；`X-Forwarded-Proto $http_x_forwarded_proto` 現役 14 處，`$scheme` 覆寫 0 處。
 
-**唯一未通關項**：Netdata 服務正常、只綁 `127.0.0.1:19999`，但 `netdatacli aclk-state` 回 `Claimed: No`。8/29 的 claim 身分沒有跟著 KS-6 host switch 建立；這不影響本機 Grafana/Loki/endpoint alert，卻使 Netdata Cloud 看不到新機。重新 claim 需要 Netdata Cloud Space 管理員產生的 one-time claim token（room 可選），不能以既有 Cloud API access token 取代；`C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` 的既有 Netdata API token 也於 2026-09-01 只讀授權探針回 401（已排除 Markdown 包裝／空白格式），視為失效而非 claim 備援。操作者同日提供的第一把 claim token 實跑亦被 agent 明確拒絕為 `expired, not found, or invalid`；已立即刪除新機 `/etc/netdata/claim.conf`、重啟 agent，故不會保留或重試無效 secret。待操作者安全地提供新的 claim token 後立即 claim 並驗 `Claimed: Yes`／Cloud Online。
+**最後缺口已補齊**：Netdata 服務保持只綁 `127.0.0.1:19999`。8/29 的 Cloud claim 身分沒有跟著 KS-6 host switch 建立，故起初 `netdatacli aclk-state` 為 `Claimed: No`；這不影響本機 Grafana/Loki/endpoint alert，卻會使 Netdata Cloud 看不到新機。既有 Cloud API access token 的只讀授權探針回 401，不能取代 one-time claim token；操作者同日提供的第一把 claim token 也被 agent 拒絕為 `expired, not found, or invalid`，已立即清除暫存 claim 設定並重啟 agent。取得新的 claim token 與 room 後，寫入 `/etc/netdata/claim.conf`（`root:netdata`、`0640`）並重新載入既有正式 agent；實測回 `Claimed: Yes`、`Online: Yes`、pending PUBACK=0。沒有為 claim 改裝 nightly channel，避免在服務健康時引入不必要的 agent 升級風險。
 
-- REALTEST_EVIDENCE: tool=SSH+curl+official health scripts | cmd=origin guard 16+IPv6、nginx -t、containers/network/buildx/Kong/Certbot/Netdata/Uptime/Trigger、check-{cloudflare-security,backup-health,capacity-health,vps-auto-reboot-health}.ps1、公開端點回歸 | exit=0（Netdata Cloud claim 狀態為唯一 non-pass）
-- REVIEW_DONE: audit=worklog-derived, runtime-evidence-first | verdict=PASS with one external-token blocker
-- BUGHUNT_DONE: runbook §8 增列 TLS listener drift，§1d 補零-warning 驗收；無其他新 migration pitfall
+- REALTEST_EVIDENCE: tool=SSH+curl+official health scripts | cmd=origin guard 16+IPv6、nginx -t、containers/network/buildx/Kong/Certbot/Netdata/Uptime/Trigger、check-{cloudflare-security,backup-health,capacity-health,vps-auto-reboot-health}.ps1、公開端點回歸、`netdatacli aclk-state` | exit=0
+- REVIEW_DONE: audit=worklog-derived, runtime-evidence-first | verdict=PASS
+- BUGHUNT_DONE: runbook §8 增列 TLS listener drift，§1d 補零-warning 驗收及既有正式 agent 的安全 re-claim 路徑；無其他新 migration pitfall
 
 ### 完成 HCI v2 治理閉環與 Phase-5 MVP schema 路徑收斂
 
