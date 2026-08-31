@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-08-31（續7）
+
+### 覆核 §10-16 addendum 落地成果：抓到 1 個真實日期引用錯誤（07-03 應為 07-05），其餘抽查通過
+
+**觸發**：操作者再次問「GOVERNED_SYSTEM_BUILD_SOP.md 夠完整嗎」——這是重問，先查 git log 發現另一 session 已依 `CODEX_HANDOFF_SOP_ADDENDUM_2026-08-31.md` 落地 §10-16（commit `de98be44f`/`3f85a090d`/`0c099fe5a`），不是重工，是對新狀態重新驗證。
+
+**核對**：沒有直接採信該 session WORKLOG 自報的「15/15 引用路徑存在」，抽查其中 8 處：§10 六份基線提到的 6 個檔案（`TOOLS_DELIVERY_TRACEABILITY.md`／`ARCHITECTURE_SPEC.md`／`TOOL_RESPONSIBILITY_MATRIX.md`／`DEPLOYMENT_BOUNDARY_RULES.md`／`TOOL_TRIGGER_MAP.md`／`OPS_DOCS_INDEX.md`）全部存在；§11 引用的〈續22〉真的含 SSH／PowerShell／`certbot --dry-run` 三種 REALTEST_EVIDENCE；§14 引用的 `CLAUDE_NEXT_TASKS.md` 開頭段落與描述相符。**抓到 1 個真的錯**：§10 引用「2026-07-03 provision hairpin 修復」，`grep` 該 WORKLOG 段落實際日期標頭是 **2026-07-05**（`## 2026-07-05` 在該段之前，`## 2026-07-03` 是另一個不相干的區塊）——內容本身（`[風險清單]`/`[方案比較]`/`[建議方案]`/`[實作計畫]` 四段皆存在）沒錯，只有日期抄錯。
+
+**這正是本 SOP §6/§14 自己教的那類問題**：自信、格式完整的引用不代表內容正確，回傳後仍要重驗。已修正日期並改用可搜尋的 commit 標題（而非日期，減少未來同類錯誤面）。
+
+[已修改]
+- `agency-os/docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md` §10：修正 1 處日期引用（2026-07-03 → 2026-07-05），並改標題為可 grep 的 commit 訊息字串
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文字引用更正，無 runtime/schema/部署變更
+- REVIEW_DONE: critic=Quick（自我核對：`grep -n "^## 2026-07-0" WORKLOG.md` 確認該 fix(trigger-build) 條目前一個日期標頭確實是 2026-07-05；另抽查 §10/§11/§14 共 8 處引用，除此 1 處外全部存在且內容相符）| verdict=pass | findings=0c/0m/1n（本條記錄的日期錯誤）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`2026-07-03 provision hairpin` | hits=1（僅本次修正前的 SOP 該行，`scripts/` 零命中，無其他複本）
+
+[剩餘風險]
+- §12-13/§15/§16 的引用本次未逐條重新抽查（已於 addendum 撰寫階段驗證過路徑存在），僅重點覆核最可能出錯的日期/檔名類引用
+- 工作區其餘大批未提交改動（`HCI30_RESEARCH_REVIEW/` 等）與本條無關，未觸碰
+
+[rollback]
+- `git revert <本次 commit>` 還原此 1 處文字
+
 ## 2026-08-31（續6）
 
 ### Governed System Build SOP：把第一週時程改為可重用的三階段，收斂證據邊界
