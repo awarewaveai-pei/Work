@@ -12,6 +12,7 @@
 - ks-aw-01 Soulful 備份沿用 MySQL aliases/`MYSQL_ROOT_PASSWORD`，MariaDB 11.8 只提供 `mariadb-dump`/`MARIADB_ROOT_PASSWORD`；修正受版控的 pipeline，正式快照驗到 DB 15MB/288 tables、WordPress 768MB/57,368 entries、R2 marker。
 - 首次手動 EU-stack backup 未帶 cron 的 `BACKUP_DIR=/root/backups-stack`；以正式 cron 環境重跑並把重複快照移入隔離目錄，避免 ks 驗證器日後誤判。三管線 health 最終 PASS。
 - Certbot dry-run 發現 Soulful renewal 缺 `python3-certbot-dns-cloudflare`；安裝後五張憑證 simulated renewal 全成功。
+- 首次 `sg-deploy.sh` 被新機缺 GitHub `known_hosts` 擋下（deploy key 本身完整）；以 GitHub 官方 Ed25519 fingerprint 核對後補 key、`git ls-remote` 成功，再部署至 `0776df21b`。
 
 [已修改]
 - `lobster-factory/infra/ks-aw-01-backup/{backup-ks-aw-01.sh,verify-backup-ks-aw-01.sh,README.md}`：MariaDB 11.8 client/環境變數與現役主機資料修正。
@@ -22,7 +23,7 @@
 - 公開入口 16/16 符合期望；`api` 回 `node-api`、wp-admin 三次 redirect 正常、Oracle 導向 `/zh-TW`。
 - `remotion-svc` 與 `video-svc` direct `/health` 均 200；PTR = `ks-aw-01.aware-wave.com`；Telegram pending=0/no error。
 - Trigger 最近兩小時 24 個 TaskRun 全為 `COMPLETED_SUCCESSFULLY`；MainWP 兩子站 force-sync 成功且 `sync_errors` 為空。
-- 三管線 real backup + verify + R2 PASS；`check-backup-health.ps1`、`check-vps-auto-reboot-health.ps1`、`check-cloudflare-security.ps1` PASS；Certbot dry-run all succeeded。
+- Uptime Kuma 23 個 active monitor 的最新 heartbeat 全為 UP；三管線 real backup + verify + R2 PASS；`check-backup-health.ps1`、`check-vps-auto-reboot-health.ps1`、`check-cloudflare-security.ps1`、`check-deploy-drift.ps1` PASS；Certbot dry-run all succeeded；next-admin deploy smoke 四項均 200。
 
 [剩餘風險]
 - 單機拓樸仍是 SPOF；R2 異地備份已驗證但完整還原演練不在本次切換窗內。
@@ -8742,4 +8743,3 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 - `docs/HCI/` 重組（誰做的、何時、是否已通知 WORKLOG）與新出現的 `agency-os/docs/System_Foundry_v1.0/`（大型未提交新框架，內部自稱路徑 `docs/SYSTEM_FOUNDRY/` 與實際落點不符）均未在此 WORKLOG 留下起源記錄，留待與操作者確認後續處置，不在本條目範圍內處理。
 
 **Rollback**: `git diff` 未 staged，直接 `git checkout -- <path>` 個別還原；或 revert baseline sourceKey 回 `line:12`（僅在 `.claude/settings.json` 行數真的變回 12 時才需要）。
-

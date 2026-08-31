@@ -93,7 +93,7 @@ done | grep -E '^[0-9a-f]{64}'
 - `/etc/cron.d/{lobster-backup,ks-stack-backup,ks-aw-01-backup}` ＋ `/etc/default/{eu-backup,**ks-aw-01-backup**,awarewave-endpoint-alert*}`（600；覆審 F2：漏 `ks-aw-01-backup` 則 soulful 管線的 EXPECT_SERVICES/R2/加密設定全沒）
 - systemd `awarewave-endpoint-alert.{service,timer}` 拷入 `/etc/systemd/system/` 後**必跑**（覆審 F5：拷檔不等於註冊）：`systemctl daemon-reload && systemctl enable --now awarewave-endpoint-alert.timer`
 - **Trigger deploy 工具鏈主機層狀態**（覆審 F6，`trigger/README.md` §7a 明寫換機必重做）：`/etc/buildkit/buildkitd.toml`（registry:5000 http+insecure）+ `docker buildx create --name trigger --driver docker-container --driver-opt network=host --config /etc/buildkit/buildkitd.toml --use` + `inspect --bootstrap`（builder metadata 不在任何 volume 裡，2026-08-28 實證：ks 自己就漏了這步，當場補修）
-- `/root/.ssh/`：`soulful_pull`（Hostinger 觀察期內）、`work_deploy`（GitHub deploy key）＋ `config` alias
+- `/root/.ssh/`：`soulful_pull`（Hostinger 觀察期內）、`work_deploy`（GitHub deploy key）＋ `config` alias＋**`known_hosts` 的 GitHub Ed25519 key**。新機第一個 `sg-deploy.sh` 會 `git pull`；只搬 deploy key 不搬或不先驗證 GitHub host key 會安全地以 `Host key verification failed` 中止。從 GitHub 官方 SSH fingerprint 文件核對 Ed25519 指紋後再寫入，接著 `git ls-remote origin HEAD` 實測 deploy key。
 - **所有 `auth_basic_user_file` 密碼檔**（2026-08-29 坑：`.htpasswd_studio` 漏拷 → Docker 幫你自動建成同名**目錄** → nginx 500）：換機前在來源機跑 `sudo grep -rh auth_basic_user_file /etc/nginx/sites-available/` 產出完整路徑清單，逐一 `stat <path>` 確認型別是 `regular file`；拷到新機後**同樣 `stat` 驗一次**，不能只憑 `ls` 有東西就放行（空目錄在 `ls` 底下看起來也像「有東西」）
 - **Netdata Cloud claim**（2026-08-29 坑：Ubuntu `apt install netdata` 編譯時 `--disable-cloud`，`netdata-claim.sh` 直接拒絕 exit=3，kickstart 也拒絕覆蓋系統套件管理的安裝）。換機後要接回 Netdata Cloud 儀表板，正確順序：
   ```
