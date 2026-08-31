@@ -248,6 +248,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 | 使用者提到「搬站」/「換主機」/「機器買好了」/「二手 Hetzner」/「soulful 搬」/「Hostinger 到期」/給一個新主機 IP | **先讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)**（步驟／切換／回滾 SSOT），再依 §0.5 → §3 → §4 → §5 → §6 執行。**硬死線 2026-11-12**（Hostinger hosting 不續約）。**禁止**：不讀 runbook 就開始建機或搬檔；重做已完成項（CF zone 14 筆已建、nameserver 已切、信箱 mail-tester 10/10、EU 三份備份 769 MB、還原演練 Drill #1 PASS）|
 | 使用者提到「一鍵架站」/「自動開站」/「provision」/「租主機」/「Hetzner 開機」/要在 app.aware-wave.com 加建站按鈕 | **先讀 [`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)**：「租 Hetzner 主機+day-1 硬化+DNS」**已寫好且真機驗證通過（2026-06-06）**，核心函式 `packages/workflows/src/provision/provisionClient.ts`。**直接呼叫，禁止重寫**。嵌進 app = 加 API route 呼叫 `provisionClient()`（雙觸發設計）。違反樣態：重新實作租機/cloud-init/secretStore 邏輯（已存在且驗過）。 |
 | 使用者提到「app.aware-wave」/「onboarding」/「建站」/「佈建」/「企業佈建」/「ops-console」/「做 Stage N」/「繼續（上次那個建站的）」 | **先讀 [`docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`](docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md) 的「🚀 開工必讀（按順序）」7 步**（藍圖+最新真相+程式+活資料），讀完即完全掌握狀況再動工。這份是 5 階段總藍圖 SSOT（Stage 0 建站引擎已驗；現況/下一步以該檔 §2/§3 為準）。**禁止**：不讀 plan 就臆測卡點；重寫已存在的站層/機層；碰 Tarot（另一 AI 處理）。 |
+| 使用者要規劃／設計一個新的、需要長期維護的系統或專案治理架構（新產品線、新治理框架、`docs/HCI` 等尚未有既有 governance 的新建置；不含 `D:\Work` 既有子系統的日常任務）| **先讀 [`docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`](docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md)**（通用治理建置 SOP；§1 明定何時適用/何時不划算，不是所有專案都要套；§2-9 文件治理層＋§10-17 單一任務執行層，涵蓋規劃閘／來源路由／四動作驗證／不變量／風險分級／交接協議／機械檢查）。**禁止**：對週末原型或一次性小改動套用全套流程（§1 排除）；把 §10-17 誤當成本 repo 還要另外遵守的新規則——那些內容本就是從這份 `AGENTS.md` 的 R0／R4／風險分級抽出來的通用版，`D:\Work` 直接用這份原版即可 |
 | Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
 | 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **🔧 機械閘**（2026-07-02）：`hooks/rules/vbc-reminder.js` 於 UserPromptSubmit 偵測語境自動注入 VBC 提醒。**VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
@@ -444,5 +445,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-29 18:08:46 UTC_
+_Last synced: 2026-08-31 03:06:02 UTC_
 

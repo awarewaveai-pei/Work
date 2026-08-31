@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-08-31（續9）
+
+### AGENTS.md 補一條觸發規則：規劃新系統治理架構時先讀 GOVERNED_SYSTEM_BUILD_SOP.md
+
+**觸發**：操作者問「是否應該在 CLAUDE.md 或 AGENTS.md 註明什麼情形要去看這份 SOP」——先查證，`grep -n "GOVERNED_SYSTEM_BUILD_SOP" agency-os/AGENTS.md CLAUDE.md README.md` 零命中，確認這份 SOP（§10-17 剛在本 session 補完）目前對未來 session 完全不可見，只能靠操作者每次手動指名才會被讀到。
+
+**判斷放哪份文件**：CLAUDE.md 沒有自己的觸發表，全部「情境→立即執行」規則都集中在 `AGENTS.md`〈代理自動工具使用規則〉表，CLAUDE.md 只在開頭 `@agency-os/AGENTS.md` 整篇引入——比照既有慣例（SITE_MIGRATION_RUNBOOK／EMBED_PROVISION_INTO_APP／APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN 三筆同類「先讀 X 文件再動工」的行），只加進 AGENTS.md，不重複寫進 CLAUDE.md。
+
+**觸發條件的範圍拿捏**：SOP §1 自己就明定「不是所有專案都要套」，所以新增這行的觸發語意刻意收窄為「規劃一個新的、需要長期維護的系統或專案治理架構」，而非任何日常任務；同時加了一句「禁止」提醒——§10-17 是從本 `AGENTS.md` 的 R0／R4／風險分級抽出去的通用版，`D:\Work` 本身直接用這份原版即可，不必回頭套用抽出去的簡化版（避免未來 session 誤把自己已經在遵守的規則，當成還要多讀一份文件才算數）。
+
+[已修改]
+- `agency-os/AGENTS.md`〈代理自動工具使用規則〉表：新增 1 行觸發規則
+- `README.md`、`agency-os/docs/CHANGE_IMPACT_MATRIX.md`、`agency-os/docs/operations/cursor-enterprise-rules-index.md`、`agency-os/docs/operations/new-doc-linkage-checklist.md`：`doc-sync-automation.ps1` 同步 Related Documents／impact metadata
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純新增一行治理觸發規則，無 runtime/schema/部署變更
+- REVIEW_DONE: critic=Quick（自我核對：新行連結路徑 `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md` 與既有同類行格式一致且檔案存在；讀回整段表格確認插入位置未破壞相鄰兩行的 markdown table 結構）| verdict=pass | findings=0c/0m/0n
+- DOC_LINKAGE_DONE: `doc-sync-automation.ps1 -ChangedFiles @('AGENTS.md')` 成功，closeout=`reports/closeout/closeout-20260831-110603.md`
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`GOVERNED_SYSTEM_BUILD_SOP` | hits=本次新增這 1 行 + 既有 SOP 本文自我引用 + 前幾條 WORKLOG／CODEX_HANDOFF 歷史紀錄；`scripts/` 零命中，無程式 consumer
+
+[剩餘風險]
+- 無新增風險；純治理文件觸發表補一行
+
+[rollback]
+- `git revert <本次 commit>` 還原這 1 行與 4 個 metadata 檔
+
 ## 2026-08-31（續8）
 
 ### Governed System Build SOP 再補 4 個缺口：無外部覆審 fallback、歧義單問一題、DoD 隨型態而異、把紀律綁上機械檢查
