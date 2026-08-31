@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-01（KS-6 post-cutover audit）
+
+### 對照 8/26–8/29 搬機事故全量複核：主體通關；Netdata Cloud claim 缺外部 one-time token
+
+**範圍**：逐段閱讀 2026-08-26 至 2026-08-29 的所有搬機相關 WORKLOG（不含 AI-LEGO／meeting-service 等非搬機工作），再以現役 `145.239.195.47` 實測，不採信舊 worklog 的「已完成」敘述。
+
+**本輪抓到並修正**：所有啟用 IPv4 TLS vhost 的 `listen 443` 選項混用 `ssl` 與 `ssl http2`；`nginx -t` 雖然 exit 0，卻持續印出 5 個 `protocol options redefined` 警告。先備份 `/etc/nginx/sites-available` 至 `/root/nginx-sites-available-pre-http2-20260831T153000Z.tgz`，將啟用 vhost 統一為 `listen 443 ssl http2;`，再 `nginx -t`、reload。修後語法檢查零 warning，公開入口回歸正常。
+
+**全量實測通過**：
+- 42 containers、0 unhealthy/restarting；`lobster-net` 與 `lobster-phase1_observability` external network 均存在；Buildx `trigger` running；registry host alias/insecure registry 均存在。
+- 16 個 Cloudflare proxy hostname 直連 IPv4 全為 403，Soulful IPv6 直連 403；刻意 DNS-only 的 Remotion/Video health 直連均 200。Cloudflare security PASS，IPv6 由新機經 CF 正常可達。
+- 三條 backup pipeline 都有當日 snapshot、R2 verify=PASSED、retention=7d；capacity PASS（mem 8.6%、disk 9%、swap 0、42 containers）；auto-reboot PASS。
+- `00-default-placeholder` 為啟用 symlink、`.htpasswd_studio` 為 regular file、Certbot account directory 與 renewal account 均為 1、Kong workers=4、Uptime Kuma 最新 23/23 UP、Trigger 近兩小時 24 個 `COMPLETED_SUCCESSFULLY`。endpoint alert 正確 unit 為 `awarewave-endpoint-alert.timer`，已 enabled 且每分鐘成功完成。
+- API health 200、aware-wave 200、app/oracle/postiz 正確 307、n8n healthz 200、Trigger login 200、Soulful 200；`X-Forwarded-Proto $http_x_forwarded_proto` 現役 14 處，`$scheme` 覆寫 0 處。
+
+**唯一未通關項**：Netdata 服務正常、只綁 `127.0.0.1:19999`，但 `netdatacli aclk-state` 回 `Claimed: No`。8/29 的 claim 身分沒有跟著 KS-6 host switch 建立；這不影響本機 Grafana/Loki/endpoint alert，卻使 Netdata Cloud 看不到新機。重新 claim 需要 Netdata Cloud Space 管理員產生的 one-time claim token（room 可選），不能以既有 Cloud API access token 取代；待操作者安全地提供此 token 後立即 claim 並驗 `Claimed: Yes`／Cloud Online。
+
+- REALTEST_EVIDENCE: tool=SSH+curl+official health scripts | cmd=origin guard 16+IPv6、nginx -t、containers/network/buildx/Kong/Certbot/Netdata/Uptime/Trigger、check-{cloudflare-security,backup-health,capacity-health,vps-auto-reboot-health}.ps1、公開端點回歸 | exit=0（Netdata Cloud claim 狀態為唯一 non-pass）
+- REVIEW_DONE: audit=worklog-derived, runtime-evidence-first | verdict=PASS with one external-token blocker
+- BUGHUNT_DONE: runbook §8 增列 TLS listener drift，§1d 補零-warning 驗收；無其他新 migration pitfall
+
 ## 2026-08-31（KS-6 host switch completion）
 
 ### ks-aw-01 已切至 KS-6；補齊 origin guard、備份、reboot、renewal 與同步驗證
