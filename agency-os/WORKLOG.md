@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-08-31（續6）
+
+### Governed System Build SOP：把第一週時程改為可重用的三階段，收斂證據邊界
+
+**觸發**：操作者確認 §16／Evidence boundary 為其編輯，並要求正式整合進治理 SOP。原本以「第 1 天／第 2 至 3 天／第 4 至 5 天」表示的啟動順序容易被誤讀為固定日曆；Evidence boundary 的 AI-LEGO 特定前言也非維持一般適用性所必需。
+
+[已修改]
+- `agency-os/docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md` §16：保留三個既有步驟與所有實證出處，僅將標籤改為「第 1／2／3 階段」，使採用順序不綁定五日排程。
+- 同文件 Evidence boundary：移除 AI-LEGO 專名的重述句，保留風險、寫入控制與多人接手情境不足時應縮小採用範圍的條件式界線，以及原有實證出處。
+- `ADR_INDEX.md`、兩份 linkage checklist：由 `doc-sync-automation.ps1` 重新同步 Related Documents metadata。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 僅調整既有治理文件的時程標籤與適用範圍文字，無 runtime、schema、部署或資料異動。
+- REVIEW_DONE: diff review=pass；§16 的三個步驟內容與每段 `實證出處` 均仍存在，Evidence boundary 仍保留其條件式採用規則與兩個來源。
+- DOC_LINKAGE_DONE: `doc-sync-automation.ps1 -ChangedFiles @('docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md')` 成功，closeout=`reports/closeout/closeout-20260831-094849.md`。
+- BUGHUNT_DONE: scope=governance-doc | query=`第一週最小啟動清單|第 1 天|第 2 至 3 天|第 4 至 5 天` | SOP active guidance hits=0；不存在仍依賴舊時程標籤的同文件指令。
+
+[rollback]
+- `git revert <本次 commit>` 還原 §16 的三個階段標籤、Evidence boundary 收斂文字、metadata 與本條 WORKLOG；不影響其他工作樹變更。
+
 ## 2026-08-31（續5）
 
 ### Governed System Build SOP：固定六份規劃基線與按任務加讀 owner 補齊
@@ -8537,7 +8557,6 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 **Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
 
 **Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
-
 
 
 

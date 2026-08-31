@@ -1,4 +1,4 @@
-# Architecture decisions（輕量 ADR）
+﻿# Architecture decisions（輕量 ADR）
 
 > **何時寫**：跨系統邊界、**不可逆**或 **高成本迴轉** 的選擇（例如 manifest SSOT、主機遷移、身分方案、資料主庫）。  
 > **何時不寫**：單檔 typo、小重構、明顯 bugfix——`WORKLOG` 一句即可。
@@ -62,4 +62,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-adr-index.ps1
 ## Related Documents (Auto-Synced)
 - `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 
-_Last synced: 2026-08-31 01:37:02 UTC_
+_Last synced: 2026-08-31 01:48:49 UTC_

@@ -1,4 +1,4 @@
-# Governed System Build SOP
+﻿# Governed System Build SOP
 
 > **目的**：把長壽命系統的重大設計、文件、規格與批准，做成可追溯、可驗證、可回滾的工作流程。本文件只收錄在既有實作中有明確證據的模式；沒有實證的好點子不列為規範。**實證出處：** `CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §1、§2、§4。
 > **引用方式**：每個實質主張尾端均列出已實讀的 ADR、WORKLOG 或實際規格檔；這些出處是採用此模式的證據，不是本 SOP 的專案相依前提。**實證出處：** `CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §5 的逐節可追溯性要求；`agency-os/AGENTS.md` R4 的「聲稱即驗證」。
@@ -101,21 +101,21 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 節省 context 不等於片段化理解：準備修改或驗證的檔案必須全文讀，大片日誌或跨二十份以上檔案才先過濾或委派。真實事故曾因只讀 `check-smoke-tests.ps1` 的局部而漏掉檔頭的 `$ErrorActionPreference`，也曾因三次裸跑 CLI 各帶入約 120KB 輸出而永久增加約 366KB session 成本。**實證出處：** `agency-os/AGENTS.md`〈Session 衛生〉的讀取矩陣與 `check-smoke-tests.ps1`／120KB 兩個具名案例。
 
-## 16. 第一週最小啟動清單
+## 16. 最小啟動清單
 
-第 1 天：建立一份系統敘事正本（目的、邊界、權責與長期不變量）、ADR index、open-questions register，以及母文件修訂用的 proposal template；同日採用本 SOP §10 的任務規劃閘與 §13 的風險分級。先讓每一個未決事項和每一次後續修改都有可追蹤的位置；不必先做一整套 schema。**實證出處：** `ADR-006` L63-118 提供可最小化採用的提案結構；`ADR_INDEX.md` L28-39 展示決策依賴關係需要集中追蹤；`agency-os/AGENTS.md`〈R0〉與〈操作風險分級〉。
+第 1 階段：建立一份系統敘事正本（目的、邊界、權責與長期不變量）、ADR index、open-questions register，以及母文件修訂用的 proposal template；同日採用本 SOP §10 的任務規劃閘與 §13 的風險分級。先讓每一個未決事項和每一次後續修改都有可追蹤的位置；不必先做一整套 schema。**實證出處：** `ADR-006` L63-118 提供可最小化採用的提案結構；`ADR_INDEX.md` L28-39 展示決策依賴關係需要集中追蹤；`agency-os/AGENTS.md`〈R0〉與〈操作風險分級〉。
 
-第 2 至 3 天：只為已被選定的第一條垂直切片或既有消費端建立機讀契約；每個契約附來源、決策與編譯選擇。對尚無使用證據的物件，登錄為 deferred 並寫下重新檢查條件，避免「規格越多越完整」的錯覺。**實證出處：** `MACHINE_READABLE_SPEC_PLAN.md` L80 對 `READY`／`BLOCKED_PENDING_ROUND2_ADR`／`SKELETON_ONLY` 的區分；`WORKLOG.md`〈2026-08-30（續30）〉對 10 個未被 Research 切片使用的 typed objects 作出 DEFERRED 決定。
+第 2 階段：只為已被選定的第一條垂直切片或既有消費端建立機讀契約；每個契約附來源、決策與編譯選擇。對尚無使用證據的物件，登錄為 deferred 並寫下重新檢查條件，避免「規格越多越完整」的錯覺。**實證出處：** `MACHINE_READABLE_SPEC_PLAN.md` L80 對 `READY`／`BLOCKED_PENDING_ROUND2_ADR`／`SKELETON_ONLY` 的區分；`WORKLOG.md`〈2026-08-30（續30）〉對 10 個未被 Research 切片使用的 typed objects 作出 DEFERRED 決定。
 
-第 4 至 5 天：對第一個跨文件決策建立 ADR；對第一個權威文件編輯建立 proposal，但不要自行批准；捕捉 diff 後做一次獨立覆審並將 artifact 連同結果落庫。首次有 committed contract change 時，同時執行 §11 的實測、review、跨檔抓蟲與工作紀錄四項驗證；完成後以「同檔全文＋全庫 claim 搜尋」檢查 stale state。**實證出處：** `ADR-006` L107-118；`.claude/commands/codex-review.md` L15-55；`WORKLOG.md`〈2026-08-30（續30）〉的 stale-claim 修正與 artifact 驗證記錄；`agency-os/AGENTS.md`〈R0〉的四動作驗證計畫。
+第 3 階段：對第一個跨文件決策建立 ADR；對第一個權威文件編輯建立 proposal，但不要自行批准；捕捉 diff 後做一次獨立覆審並將 artifact 連同結果落庫。首次有 committed contract change 時，同時執行 §11 的實測、review、跨檔抓蟲與工作紀錄四項驗證；完成後以「同檔全文＋全庫 claim 搜尋」檢查 stale state。**實證出處：** `ADR-006` L107-118；`.claude/commands/codex-review.md` L15-55；`WORKLOG.md`〈2026-08-30（續30）〉的 stale-claim 修正與 artifact 驗證記錄；`agency-os/AGENTS.md`〈R0〉的四動作驗證計畫。
 
 ## Evidence boundary
 
-本 SOP 沒有把 AI-LEGO 的特定文件名、領域名、schema 欄位或產品選型抽成通用必要條件；上述模式只在引用所指向的真實事件與檔案範圍內獲得證明。新系統若缺少相同的風險、寫入控制或多人接手情境，應縮小採用範圍，而不是假稱全套流程已被需要。**實證出處：** `CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §0、§4；`ADR-018` L24-42 的「治理控制面」條件式選擇。
+新系統若缺少相同的風險、寫入控制或多人接手情境，應縮小採用範圍，而不是假稱全套流程已被需要。**實證出處：** `CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §0、§4；`ADR-018` L24-42 的「治理控制面」條件式選擇。
 
 ## Related Documents (Auto-Synced)
 - `docs/architecture/decisions/ADR_INDEX.md`
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-08-31 01:37:02 UTC_
+_Last synced: 2026-08-31 01:48:49 UTC_
