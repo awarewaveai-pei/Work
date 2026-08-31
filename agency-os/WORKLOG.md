@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-09-01（Uptime Kuma 單機化名稱與目標複核）
+
+**觸發**：操作者在 Kuma UI 發現多個 active monitor 名稱仍帶 `(EU)`／`(SG)`，擔心它們是否仍監測已刪除的 Hetzner 主機。
+
+**根因**：2026-08-28 的 retarget 已將 monitor URL 改為現役 public canonical hostname，並把舊 Hetzner IP 直連 monitor 停用；但 9 個 active monitor 的顯示名稱未隨單機拓樸收斂，形成誤導性的歷史標籤。`AwareWave endpoint-alert (SG)` 另是 push monitor，由現役 `awarewave-endpoint-alert.timer` 上報，沒有遠端 URL。
+
+**修復**：先以 live `kuma.db` 唯讀比對 active monitor 的 URL／hostname／headers，舊 Hetzner IP（`5.223.93.113`、`204.168.175.41`）命中 0；再以 SQLite `.backup` 建立 `kuma.db.bak-20260901-monitor-labels`，只改 9 個 active monitor 的 `name` 欄位：移除 EU／SG，將 push monitor 明確標為 `(KS-6)`。URL、headers、通知、monitor ID 與 heartbeat history 均未修改；Kuma restart 後恢復 healthy。
+
+**同步文件**：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 改為 KS-AW-01 單機版，撤除會指向已刪主機的 raw-IP／舊 loopback 操作，並列出 UI 優先、SQLite backup、短 transaction、heartbeat 回歸驗證與 rollback 步驟。
+
+- REALTEST_EVIDENCE: tool=SSH+SQLite | cmd=active/legacy-name/old-IP/latest-heartbeat counters + `docker restart uptime-kuma` + timer state | exit=0 | result=active=23, legacy_named_active=0, old_hetzner_references=0, latest_up=23, Kuma=healthy, timer=active/enabled
+- REVIEW_DONE: runtime config readback + post-restart verification | verdict=PASS | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=runbooks,agency-os | target=obsolete Kuma dual-host repair instructions | result=removed from active repair path; historical reference retained only in WORKLOG
+
 ## 2026-09-01（KS-6 post-cutover audit）
 
 ### 對照 8/26–8/29 搬機事故全量複核：全量通關（含 Netdata Cloud）
