@@ -68,7 +68,29 @@ implementation yet:
   yet applicable (HCI likely has no CI/build pipeline yet), so don't
   invent a gap here; just confirm that's the reason, not an oversight.
 
-## 3. What NOT to do
+## 3. Also check the reverse direction — does HCI have something better than the SOP?
+
+The SOP was extracted from AI-LEGO's evidence only. HCI is a second, unrelated
+system, so it may have independently developed a sharper version of a
+pattern the SOP states only loosely — that's valuable signal, not just
+noise to filter out.
+
+For each SOP section where HCI has an equivalent (from §2's check), also
+ask: **is HCI's version more complete, more concrete, or more rigorous
+than the SOP's current text?** Concretely — does it handle an edge case
+the SOP doesn't mention, state a clearer decision rule, or give a sharper
+worked example? If yes, note it as a candidate addition: cite the exact
+HCI file/section, quote or closely paraphrase the stronger part, and say
+which SOP section it would improve and how. Apply the same discipline as
+everything else here — only propose this if the HCI material is genuinely
+more developed, not merely different in wording. If nothing in HCI clears
+that bar, say so plainly instead of manufacturing a marginal suggestion.
+
+List these separately in the report under "Candidate SOP improvements
+found in HCI" — this is a distinct output from the gap list in §2, don't
+merge them.
+
+## 4. What NOT to do
 
 - Do not edit anything under `agency-os/docs/HCI/`. Read-only.
 - Do not write into `D:\Work` at all for this task — write your report to
@@ -85,12 +107,20 @@ implementation yet:
   is strictly "against the SOP's governance patterns," not a general
   document review.
 
-## 4. Output format
+## 5. Output format
 
-`HCI_SOP_GAP_REPORT.md`: one row per SOP section (§1-17) with
-Present/Partial/Not-yet-applicable/Missing, the citation backing that
-call, and — only for Missing or Partial — a concrete, minimal
-recommendation of what to add and where (which HCI file, roughly what
-content), not a vague "should add governance." End with a short summary:
-of the 17 sections, how many are real gaps worth acting on now versus
-correctly deferred given HCI's current stage.
+`HCI_SOP_GAP_REPORT.md`, two separate sections:
+
+1. **HCI gaps against the SOP** — one row per SOP section (§1-17) with
+   Present/Partial/Not-yet-applicable/Missing, the citation backing that
+   call, and — only for Missing or Partial — a concrete, minimal
+   recommendation of what to add and where (which HCI file, roughly what
+   content), not a vague "should add governance."
+2. **Candidate SOP improvements found in HCI** — per §3 above, each entry:
+   which SOP section, the HCI citation, what HCI does better, and a
+   proposed sharper sentence/example to add to that SOP section. Empty
+   (explicitly say "none found") if nothing clears the bar.
+
+End with a short summary: of the 17 SOP sections, how many are real HCI
+gaps worth acting on now versus correctly deferred given HCI's current
+stage, and how many candidate SOP improvements were found.
