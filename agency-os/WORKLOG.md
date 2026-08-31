@@ -45,6 +45,29 @@
 [rollback]
 - `git revert <本次 commit>` 可還原 MVP R5–R6、HCI v2 governance 入口與文件目錄搬遷；若只需撤除治理補強，可再以後續 commit 保留 `docs/HCI/` 搬遷而移除新增 `governance/` 與五份 v2 文句。
 
+### 補齊跨機 memory BOM，並把 HCI 24 項待決事項收斂為可逐批批准的 Wave 1 決策包
+
+**觸發與範圍**：操作者要求繼續處理前一輪剩餘風險：(1) HCI 的 24 項 human decisions／ADR-0001–0013 尚未有明確人類批准；(2) 21 份跨機 memory `.md` 缺 UTF-8 BOM。本輪不替操作者作 HD-00～23 的商業、法律或產品選擇；只產出 `PROPOSED` 的決策策略與批准包。
+
+**根因**：HCI 的權威清單已清楚區分 Wave 1 前的 Section A（HD-00～10）與可等待觸發的 Section B（HD-11～23），但沒有把這個順序、artifact-to-gate mapping 與人類批准節奏整理成單一可執行包。另一方面，跨機 BOM 稽核的 21 個既有 memory 檔未符合 Drive 同步編碼紀律。
+
+[已修改]
+- `reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md`：新增 architecture-review 決策報告；推薦先逐項批准 HD-00～10、其餘 13 項以明確觸發條件延後。報告與所有 HCI ADR 仍是 `PROPOSED`／`PLANNED`，非批准。
+- `reports/decisions/INDEX.md`：登錄決策報告。
+- `C:\Users\user1115\.claude\projects\d--Work\memory\` 下 21 份檔案：`audit-cross-machine-bom.ps1 -Fix` 以保留 backup 的方式補上 BOM；備份位於 `.bom-backfill-backup-20260901-021636`（檔案不在 Git repo）。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY — 決策包沒有 runtime/schema/部署變更；文件完整性檢查確認 Wave 1 為 11 項、延後為 13 項、HCI ADR index 零 `ACCEPTED` 項、報告索引存在且 `git diff --check` 通過。
+- REVIEW_DONE: decision-intelligence architecture review（Topic Analyzer、3×Advocate、Security／DevOps／Cost／Product／Customer Voice／Legal／Compliance／AI-ML／Scalability、Skeptic、Judge、Pre-mortem、Implementation／Rollout Planner）| verdict=C2 Wave 1 tranche | confidence=0.70；pre-mortem 新增「批准與 machine-enforced control 脫鉤」風險及對應 gate。
+- BUGHUNT_DONE: `audit-cross-machine-bom.ps1` 修復後重跑：80/80 `.md` 有 UTF-8 BOM、missing=0；HCI decision packet 檢查確認沒有將任何 `PLANNED` ADR 誤標為 `ACCEPTED`。
+
+[剩餘風險]
+- HD-00～23 的最終選項仍需操作者明示；在 HD-01／02 未批准前不得 freeze Wave 1 domain schema，在資料主體權利／identity／RLS 相關 HD 未批准前不得處理 RESTRICTED HCI 資料。
+- BOM 修復的備份留在 Claude memory 目錄、未受 Git 保護；若需要回復，應使用該 backup 而非手改編碼。
+
+[rollback]
+- `git revert <本次 commit>` 還原決策報告與 index；不改變任何 HCI pending decision。BOM 回復以 `C:\Users\user1115\.claude\projects\d--Work\memory\.bom-backfill-backup-20260901-021636` 的原始副本為準。
+
 ## 2026-08-31（KS-6 host switch completion）
 
 ### ks-aw-01 已切至 KS-6；補齊 origin guard、備份、reboot、renewal 與同步驗證
