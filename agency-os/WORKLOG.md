@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-08-31（續4）
+
+### Governed System Build SOP：固定六份規劃基線與按任務加讀 owner 補齊
+
+**觸發**：操作者詢問先前「固定六份基線＋依任務加讀」的來源選擇規則是否已寫入 SOP。查證發現 §10 已有五份 operations 文件的情境路由，但尚未明列 `AGENTS`、`TASKS`、關鍵字 WORKLOG、ADR、工具交付追溯表的固定基線，也未列出架構、部署、工具觸發與文件影響矩陣的加讀條件。
+
+[已修改]
+- `agency-os/docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md` §10：新增「可落地計畫先開啟的固定六份」——SOP、`AGENTS.md`、`TASKS.md` 現況／相關 open item、相關最新 `WORKLOG.md`、ADR index／命中的 ADR、`TOOLS_DELIVERY_TRACEABILITY.md`；明確規定大型 TASKS／WORKLOG 只讀會改變判斷的現行區段，不假裝全文都已消化。
+- 同節新增按任務加讀：架構／資料／編排 → architecture spec + responsibility matrix；部署／production → deployment boundary；工具／MCP／skill／hook／runbook → trigger map；文件修改 → change-impact matrix（新／大改治理文件再加 new-doc）；程式／scripts／infra → Bug Hunt + Audit Registry；跨層交付／上線 → end-to-end checklist。
+- `ADR_INDEX.md`、兩份 linkage checklist：由 `doc-sync-automation.ps1` 同步 Related Documents metadata。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 僅補治理文件路由與 metadata，無 runtime、schema、部署或資料異動。
+- REVIEW_DONE: critic=Quick（實讀 `TASKS` 現況／正式隊列、ADR index、工具追溯表、architecture spec、responsibility matrix、deployment boundary、trigger map、change-impact matrix，以及既有五份 operations 來源；15/15 新增引用路徑存在；§10–§16 連續；新增段落均有 `實證出處`）| verdict=pass | findings=0c/0m/0n。
+- DOC_LINKAGE_DONE: `doc-sync-automation.ps1 -ChangedFiles @('docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md')` 成功，closeout=`reports/closeout/closeout-20260831-093703.md`。
+- FORMAT_DONE: 目標與三個 auto-sync 文件無 BOM；`git diff --check` 無 whitespace error；同步腳本帶入的 target／ADR index EOF blank line 已移除。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`## 10\. 第一週最小啟動清單|GOVERNED_SYSTEM_BUILD_SOP.*§10|GOVERNED_SYSTEM_BUILD_SOP.*10\.`（排除本次 handoff 與 WORKLOG 歷史）| hits=0；`scripts/` 無引用，沒有 consumer 仍依賴舊的 §10 編號或標題。
+
+[剩餘風險]
+- 完成途中偵測到其他未提交工作同時修改 SOP §16 與 Evidence boundary；本次只 stage §10 的兩個新 hunk、metadata 與本條 WORKLOG，保留該變更在工作樹，不把它歸屬或混入本次 commit。
+
+[rollback]
+- `git revert <本次 commit>` 僅還原固定六份與條件式來源路由、三份 metadata 和本條 WORKLOG；不影響其他工作樹中的 §16／Evidence boundary 變更。
+
 ## 2026-08-31（續3）
 
 ### Governed System Build SOP 補齊任務規劃、文件來源路由與交接規則
@@ -8501,8 +8525,6 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 **Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
 
 **Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
-
-
 
 
 

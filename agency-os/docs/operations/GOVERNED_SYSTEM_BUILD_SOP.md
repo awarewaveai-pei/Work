@@ -61,9 +61,13 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 非瑣碎任務在碰檔案前，先說清七件事：真正問題、已讀的現況與近期歷史、風險、至少兩個真實選項、建議、具體步驟、驗證計畫。這不是只給 ADR 用的儀式；它把「看起來要改一行」和真正根因分開，並用近期 commit 避免與正在進行的工作重複。Low-risk 可簡短交代並直接做；Medium／High-risk 則把七項明列並等待確認。**實證出處：** `agency-os/AGENTS.md`〈R0：架構師模式〉的開工七段與 `git log` 要求；`WORKLOG.md`〈2026-07-03 provision hairpin 修復〉的 `[風險清單]`、`[方案比較]`、`[建議方案]`、`[實作計畫]` 實例。
 
+凡是準備落地的計畫，先開啟六份固定基線：本 SOP（規劃／驗證／風險規則）、`AGENTS.md`（當前強制操作規則）、`TASKS.md` 的現況快照與相關未完成條目、以任務關鍵字找到的最新 `WORKLOG.md` 條目、`ADR_INDEX.md` 與命中的 ADR 正文、以及 `TOOLS_DELIVERY_TRACEABILITY.md`（能力狀態、單一 owner、建置順序與證據）。這是固定的「看現況、看歷史、看裁決、看能力」最小集合；不是要求把大型 TASKS／WORKLOG 從頭到尾塞入 context，而是要讀會改變此任務判斷的現行區段與正本文字。**實證出處：** `agency-os/AGENTS.md`〈R0：架構師模式〉的現況／歷史／`git log` 要求；`TASKS.md`〈現況快照〉與〈Next — 未完成〉的正式隊列定義；`WORKLOG.md` 的日期序列與可定位歷史紀錄；`ADR_INDEX.md`〈何時寫〉、〈已定案索引〉與〈與其他檔的關係〉；`TOOLS_DELIVERY_TRACEABILITY.md`〈目的〉、〈單一視角〉與〈工具建置順序〉。
+
 來源不是越多越好：先讀本倉庫的操作規則、任務現況、相關歷史紀錄與決策正本，再用文件目錄導向該任務的架構、部署、稽核或交付 owner；目錄只負責找到正本，不可取代正本。將要修改、驗證或據以作結論的檔案要全文讀；只查名稱或做大範圍模式搜尋，才用片段搜尋或委派。文件新增／跨層交付／程式與基礎設施等情境，再各自載入相應的連動、驗證或稽核來源，而非一律塞滿 context。**實證出處：** `agency-os/AGENTS.md`〈Session 衛生〉的「要負責即整檔讀」判準；`docs/operations/OPS_DOCS_INDEX.md`〈依類別〉的目錄導向角色；`new-doc-linkage-checklist.md`〈什麼時候用這份〉與 `end-to-end-linkage-checklist.md`〈Objective〉的適用邊界。
 
 就本 operations 文件集，AI 要依任務型態路由：每次以 `OPS_DOCS_INDEX.md` 找到 owner 文件後讀 owner 正本；新增或大改治理文件時讀 `new-doc-linkage-checklist.md`，處理入口、impact map、連動與 health；策略、操作、交付、自動化或合規同時受影響時讀 `end-to-end-linkage-checklist.md`，逐項確認鏈路與 closeout evidence；只有 code-quality／bug-class audit、真實 incident 或既有 audit tool 報 drift 時，才讀 `BUG_HUNT_PROTOCOL.md` 決定怎麼與何時 hunt，並讀 `AUDIT_REGISTRY.md` 確認已查過、待處理與可重用的 audit class。平常的文件或功能計畫不必把後兩份 audit 文件當成通用前置讀物。**實證出處：** `OPS_DOCS_INDEX.md` 將各文件列為不同操作入口；`new-doc-linkage-checklist.md`〈什麼時候用這份〉與收斂驗證步驟；`end-to-end-linkage-checklist.md` Objective 與 A/F linkage；`BUG_HUNT_PROTOCOL.md` L3-6、L29-60、L235-245；`AUDIT_REGISTRY.md` L3-23 的 read-first、狀態與新增紀錄規則。
+
+再依任務加讀 owner：架構、資料或編排決定讀 `ARCHITECTURE_SPEC.md` 與 `TOOL_RESPONSIBILITY_MATRIX.md`；部署或 production 讀 `DEPLOYMENT_BOUNDARY_RULES.md`；需要觸發既有工具、MCP、skill、hook 或 runbook 時讀 `TOOL_TRIGGER_MAP.md`；任何文件修改讀 `CHANGE_IMPACT_MATRIX.md`，其中新增或大改治理文件再加 `new-doc-linkage-checklist.md`；程式、腳本或 infra 修改加 `BUG_HUNT_PROTOCOL.md` 與 `AUDIT_REGISTRY.md`；跨策略、營運、交付、自動化或合規的交付／上線加 `end-to-end-linkage-checklist.md`。這些是按責任加讀的正本，不是六份固定基線的替代品。**實證出處：** `ARCHITECTURE_SPEC.md`〈適用範圍〉與〈目前硬性邊界〉；`TOOL_RESPONSIBILITY_MATRIX.md` 的責任／護欄表；`DEPLOYMENT_BOUNDARY_RULES.md`〈生產變更政策〉；`TOOL_TRIGGER_MAP.md` 的工具觸發總覽與驗證／部署表；`CHANGE_IMPACT_MATRIX.md`〈使用方式〉；`new-doc-linkage-checklist.md`〈什麼時候用這份〉；`BUG_HUNT_PROTOCOL.md` L3-6、L29-60；`AUDIT_REGISTRY.md` L3-23；`end-to-end-linkage-checklist.md` Objective。
 
 規劃輸出要列出「本任務實際讀過的來源」及未讀條件文件的理由，讓下一個 AI 能重放來源選擇，而不是誤以為所有 checklist 都已套用。這是把 R0 的現況／歷史分析與本 SOP 的逐段可追溯性落成可檢查 artifact 的直接推論。**實證出處：** `agency-os/AGENTS.md`〈R0：架構師模式〉的現況分析與 `git log` 要求；`CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §5 的逐節可追溯性要求。
 
@@ -114,4 +118,4 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-08-30 19:16:58 UTC_
+_Last synced: 2026-08-31 01:37:02 UTC_
