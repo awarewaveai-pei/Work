@@ -27,6 +27,14 @@
 
 **Rollback**：尚無資料。停止本地 compose 後 `docker compose -f agency-os/systems/hci30/compose.test.yml down --volumes`，再以 `git revert` 回復本 commit；不得把這個 local down migration 用於 production。
 
+### HCI complete-system delivery plan
+
+- AUTO_TASK_DONE: documented the operator-delegated full-system delivery sequence in `systems/hci30/docs/feature-hci-complete.md` and `systems/hci30/plan.md`.
+- REALTEST_WAIVED: DOC_ONLY -- plan maps existing runtime evidence and explicit external gates; no runtime or deployment was changed.
+- REVIEW_DONE: critic=Architecture inventory | verdict=pass | findings=0c/0m/1n — reconciled the canonical ADR state and recorded that local skeleton evidence cannot close real-data, isolation, or legal-market gates.
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`HD-06|HD-19|HD-20|HD-21|systems/hci30` | hits=reviewed; each runtime/legal/external gate is explicitly retained rather than hidden by the plan.
+- WORKLOG: this entry.
+
 ## 2026-09-01（Postiz cgroup memory warning 已消除）
 
 **觸發**：Netdata 在 KS-AW-01 對 `postiz` 回報 cgroup RAM `WARNING`；整機仍有 114 GiB 可用記憶體、swap=0，故先區分 container limit 與 host capacity。
