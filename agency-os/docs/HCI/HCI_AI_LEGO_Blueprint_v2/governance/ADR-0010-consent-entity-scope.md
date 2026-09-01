@@ -21,7 +21,7 @@ The three records must not be substituted for one another. In particular, tenant
 
 ## Required implementation gates
 
-The decision is accepted, but its implementation gates are **OPEN**. Before Wave 1 schema freeze or any restricted-subject processing, the following must exist and be reviewed:
+The design artifacts are now specified in `wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`, `wave1/HCI_WAVE1_DOMAIN_ERD.md`, and `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`, but runtime implementation gates are **OPEN**. Before Wave 1 schema freeze or any restricted-subject processing, the following must be implemented and reviewed:
 
 1. A consent/authorization/terms data-model artifact with separate names, scopes, lineage, and retention/deletion treatment.
 2. A lawful-basis policy identifying when a data-subject consent record is required, prohibited from being inferred, or replaced by another documented lawful basis.

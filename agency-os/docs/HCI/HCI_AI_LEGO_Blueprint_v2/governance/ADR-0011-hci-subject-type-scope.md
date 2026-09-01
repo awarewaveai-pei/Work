@@ -17,7 +17,7 @@ An Organization remains an attribute or relationship node unless and until a fut
 
 ## Required implementation gates
 
-The decision is accepted, but its implementation gates are **OPEN**. Before Wave 1 ERD freeze, the following must exist and be reviewed:
+The design artifacts are now specified in `wave1/HCI_WAVE1_DOMAIN_ERD.md` and `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`, but runtime implementation gates are **OPEN**. Before Wave 1 ERD freeze, the following must be implemented and reviewed:
 
 1. An ERD/table matrix covering Evidence, Claim, Assessment, and TrustDomain that shows the Person-only functional scope and the nullable forward-compatible subject fields.
 2. A database-level constraint or equivalent application invariant that defaults `subject_type` to `PERSON` and blocks non-Person assessment semantics in V1.

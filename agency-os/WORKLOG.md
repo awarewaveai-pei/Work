@@ -8785,6 +8785,27 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 
 **Rollback**: before implementation, supersede the individual ADR with a new explicit human approval and restore the affected inline state; after implementation, use the ADR-specific reviewed migration plan rather than relabeling historical data in place.
 
+### docs(hci): specify approved Wave 1 gates without asserting runtime completion
+
+- AUTO_TASK_DONE: docs(hci) — created the approved ADR-0009/0010/0011 Wave 1 adapter, permission-policy, ERD-addendum, and negative-test specifications; runtime gates remain open.
+
+**根本問題**: 已批准的三項 ADR 只有 gate 名稱，尚無可交接的 mapping、policy、constraint 或 test contract；同時 HCI runtime/schema/test directory 尚不存在，不能把文件決定誤報為 schema/migration/test 已完成。
+
+**已修改**:
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/{HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT,HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY,HCI_WAVE1_DOMAIN_ERD,HCI_WAVE1_NEGATIVE_TEST_SPEC}.md` — 建立四份 doc-only implementation contracts，涵蓋 portal adapter seam、三分 permission records、Person-only subject stub、12 個 negative-test IDs；明示無 HCI runtime 實作與無 test pass 結果。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/{ADR_INDEX,ADR-0009-tenant-organization-model-reconciliation,ADR-0010-consent-entity-scope,ADR-0011-hci-subject-type-scope}.md` — gate 狀態改為 `SPECIFIED — RUNTIME OPEN`，並指向每個可交接 artifact；HD-03/10/20/21 仍是 blocker，不被本次決定。
+- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 區分已具體化的 design spec 與仍未建立的 executable HCI adapter/schema/test suite。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- no HCI implementation directory, API, database, role, migration, or test runner exists; four design artifacts are not executable tests.
+- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read all four artifacts, source portal migrations, ADR state, and decision report; verified that the policy makes no jurisdiction/controller determination and every runtime gate says OPEN.
+- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`SPECIFIED — RUNTIME OPEN|HCI_WAVE1_|HD-03|HD-10|HD-20|HD-21` | hits=48, all reviewed: three accepted ADRs are `SPECIFIED — RUNTIME OPEN`; HD-03/10/20/21 remain explicit blockers; scripts has no HCI runtime call site.
+- WORKLOG: 本條目
+
+**剩餘風險**: HD-03～HD-23 未獲人類選項批准；尤其 HD-03/10/20/21 會阻擋資料主體 rights、Case aggregate、法域/市場與 DPA 角色的 production implementation。所有 four artifacts 都是 design input，不能作為任何處理 real-person data 的許可。
+
+**Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。
+
 ## 2026-08-31
 
 ### fix(codex): remove desktop Canva plugin to stop unsolicited OAuth windows

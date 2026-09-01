@@ -26,9 +26,9 @@ Operator explicitly approved: `HD-00=C；HD-01=A；HD-02=C。`
 
 | HD | Approval applied to | Implementation-gate status |
 |---|---|---|
-| HD-00 | `governance/ADR-0011-hci-subject-type-scope.md` | `OPEN` — ERD/table matrix, Person-default constraint, non-Person negative test |
-| HD-01 | `governance/ADR-0009-tenant-organization-model-reconciliation.md` | `OPEN` — mapping, compatibility/migration plan, cross-tenant adapter negative test |
-| HD-02 | `governance/ADR-0010-consent-entity-scope.md` | `OPEN` — separate model, lawful-basis policy, anti-conflation constraint/test |
+| HD-00 | `governance/ADR-0011-hci-subject-type-scope.md` | `SPECIFIED — RUNTIME OPEN` — ERD/constraint and non-Person test specifications exist; no executable HCI schema/test suite exists |
+| HD-01 | `governance/ADR-0009-tenant-organization-model-reconciliation.md` | `SPECIFIED — RUNTIME OPEN` — adapter mapping/migration and cross-tenant test specifications exist; no executable HCI adapter exists |
+| HD-02 | `governance/ADR-0010-consent-entity-scope.md` | `SPECIFIED — RUNTIME OPEN` — three-record policy/model/test specifications exist; jurisdiction-specific legal determination and enforcement remain open |
 
 This records only those three choices. HD-03 through HD-23 remain unapproved and the tranche strategy itself remains a recommendation until separately accepted.
 

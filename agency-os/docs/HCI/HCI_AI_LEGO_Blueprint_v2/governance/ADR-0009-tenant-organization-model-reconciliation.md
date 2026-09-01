@@ -17,7 +17,7 @@ This decision does not authorize direct cross-product database access or an impl
 
 ## Required implementation gates
 
-The decision is accepted, but its implementation gates are **OPEN**. Wave 1 may not freeze a tenant schema until all of the following exist and are reviewed:
+The design artifacts are now specified in `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md` and `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`, but runtime implementation gates are **OPEN**. Wave 1 may not freeze a tenant schema until all of the following are implemented and reviewed:
 
 1. A tenant/organization mapping artifact that specifies the HCI-to-portal adapter mapping, ownership, lifecycle, and the treatment of `external_tenant_id`.
 2. A compatibility and migration plan for any already-shipped portal organization data; no destructive or automatic migration is implied by this ADR.

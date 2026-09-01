@@ -36,9 +36,9 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 
 | ADR | Gate state | Required artifact-to-gate mapping |
 |---|---|---|
-| ADR-0009 | `OPEN` | Tenant/Organization mapping + compatibility/migration plan + cross-tenant adapter negative test |
-| ADR-0010 | `OPEN` | Separate authorization/subject-consent/source-terms model + lawful-basis policy + anti-conflation constraint/test |
-| ADR-0011 | `OPEN` | Wave 1 ERD/table matrix + Person-default subject constraint + non-Person assessment negative test |
+| ADR-0009 | `SPECIFIED — RUNTIME OPEN` | Mapping and compatibility/migration design: `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`; cross-tenant adapter negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
+| ADR-0010 | `SPECIFIED — RUNTIME OPEN` | Three-record policy: `wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`; model/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; anti-conflation tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
+| ADR-0011 | `SPECIFIED — RUNTIME OPEN` | Subject table/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; Person-only negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 
 ## Review record template
 
