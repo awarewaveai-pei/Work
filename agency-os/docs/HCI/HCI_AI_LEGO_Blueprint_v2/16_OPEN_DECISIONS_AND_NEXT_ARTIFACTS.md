@@ -50,10 +50,10 @@ Known: three mother documents, 289-method atlas, scoped authority chain, replay/
 | 6 | Permission model v1 | Still open — `21` P0-01/P0-04 |
 | 7 | HCI Domain Policy machine-readable schema | Still open — `21` P0-05; V2 adds the specific deterministic/probabilistic/LLM-assisted/human-only policy content (`10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md` §Cross-Model Gate) |
 | 8 | Public Intelligence source-quality scoring | Still open — formula itself; the pipeline hardening around it is resolved in V2 (`06`) |
-| 9 | Identity-resolution thresholds | **Partially resolved in V2** — `MATCH_CONFIRMED` for RESTRICTED subjects is now a hard deterministic/human-confirmation gate (`06_HCI30_PUBLIC_INTELLIGENCE.md`); the underlying scoring formula for lower-confidence tiers is still open |
+| 9 | Identity-resolution thresholds | **Resolved for RESTRICTED confirmation by ADR-0015 (`HD-04=A`)** — deterministic/human confirmation is a hard synthetic runtime gate; lower-confidence scoring remains open |
 | 10 | HCI-to-Cognitive integration contract schema | **Resolved in V2** — see `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md` (transport, risk-tier reuse, agreement taxonomy reuse, usage metering) |
 | 11 | Event naming/versioning standard | Still open |
-| 12 | Tenant isolation implementation detail | **Resolved in V2** — RLS mandatory + CI test, Tier A default (`11`, `12`) |
+| 12 | Tenant isolation implementation detail | **Resolved by ADR-0016 (`HD-05=A`)** — mandatory RLS + non-owner cross-tenant test; local synthetic runner exists, Docker evidence remains open |
 | 13 | Data residency region plan | Still open (schema stubs kept, enforcement not built — see `12`) |
 | 14 | Local-first Personal architecture | Still open |
 | 15 | Report format and citation schema | Still open — structure defined (`19`), exact schema not |
@@ -68,7 +68,7 @@ Known: three mother documents, 289-method atlas, scoped authority chain, replay/
 See `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` for the complete set. Headline additions V1's own list missed entirely:
 
 - Subject-type scope: **resolved by ADR-0011** — V1 Person-only with a forward-compatible nullable subject stub (`HD-00=C`)
-- Data Subject (researched Person) rights channel (`HD-03`)
+- Data Subject (researched Person) rights channel: **resolved by ADR-0014** (`HD-03=A`; synthetic DSR runtime gate exists, realtest open)
 - Tenant/Organization model reconciliation across HCI, AI LEGO, and the already-shipped portal code: **resolved by ADR-0009** (`HD-01=A`; mapping/migration/test gate open)
 - Consent entity scope: **resolved by ADR-0010** (`HD-02=C`; model/policy/test gate open)
 - EU AI Act / FCRA regulatory scope (`HD-20`)

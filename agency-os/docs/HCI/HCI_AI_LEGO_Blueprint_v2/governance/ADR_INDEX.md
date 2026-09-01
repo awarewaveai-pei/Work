@@ -29,6 +29,9 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0011 | HCI subject-type scope | `02_PRODUCT_BOUNDARIES.md` (`HD-00`) | `ACCEPTED` | Operator: `HD-00=C`, 2026-09-01; `ADR-0011-hci-subject-type-scope.md` |
 | ADR-0012 | Regulatory market scope | `11_SECURITY_PRIVACY_GOVERNANCE.md` (`HD-20`) | `PLANNED` | Not recorded |
 | ADR-0013 | Shared Foundation-kernel extraction | `09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md` (§Shared Kernel) | `PLANNED` | Not recorded |
+| ADR-0014 | Data-subject rights channel | `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` (`HD-03`) | `ACCEPTED` | Operator: `HD-03=A`, 2026-09-01; `ADR-0014-data-subject-rights-channel.md` |
+| ADR-0015 | Restricted-subject identity confirmation | `06_HCI30_PUBLIC_INTELLIGENCE.md` (`HD-04`) | `ACCEPTED` | Operator: `HD-04=A`, 2026-09-01; `ADR-0015-restricted-subject-identity-confirmation.md` |
+| ADR-0016 | Mandatory tenant RLS | `11_SECURITY_PRIVACY_GOVERNANCE.md` (`HD-05`) | `ACCEPTED` | Operator: `HD-05=A`, 2026-09-01; `ADR-0016-mandatory-tenant-rls.md` |
 
 ## Accepted-decision implementation gates
 
@@ -39,6 +42,9 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0009 | `SPECIFIED — RUNTIME OPEN` | Mapping and compatibility/migration design: `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`; cross-tenant adapter negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0010 | `SPECIFIED — RUNTIME OPEN` | Three-record policy: `wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`; model/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; anti-conflation tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0011 | `SPECIFIED — RUNTIME OPEN` | Subject table/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; Person-only negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
+| ADR-0014 | `SKELETON CREATED — REALTEST OPEN` | Synthetic DSR schema/events/tests: `../../../../systems/hci30/database/`; no real-person processing |
+| ADR-0015 | `SKELETON CREATED — REALTEST OPEN` | Synthetic identity-verification constraint/tests: `../../../../systems/hci30/database/`; no production pipeline |
+| ADR-0016 | `SKELETON CREATED — REALTEST OPEN` | Forced RLS/non-owner test-role runner: `../../../../systems/hci30/`; Docker real test remains required |
 
 ## Review record template
 

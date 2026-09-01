@@ -1,0 +1,3 @@
+DROP SCHEMA IF EXISTS hci CASCADE;
+DROP ROLE IF EXISTS hci_app_test_a;
+DROP ROLE IF EXISTS hci_app_test_b;

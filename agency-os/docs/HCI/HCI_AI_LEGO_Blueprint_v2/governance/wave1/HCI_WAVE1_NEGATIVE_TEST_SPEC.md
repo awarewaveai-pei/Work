@@ -1,8 +1,8 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **TEST DESIGN COMPLETE — no executable test suite exists yet**
+Status: **TEST SKELETON CREATED — Docker-backed execution evidence remains open**
 Date: 2026-09-01
-Authority: ADR-0009, ADR-0010, ADR-0011
+Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
 ## Tenant adapter isolation
@@ -40,4 +40,4 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 
 ## Current state
 
-No HCI implementation directory, schema, API, database role, or test runner exists at the expected Wave 1 paths. These test cases are therefore **not run** and none may be reported as passing.
+An isolated synthetic-only PostgreSQL 15.8 schema, non-owner test role, request validator, and runner now exist at `../../../../../systems/hci30/`. Docker-backed tests remain **not run** until Docker Desktop is available; none may be reported as passing before that execution evidence exists. Portal-adapter tests remain excluded from this local skeleton.

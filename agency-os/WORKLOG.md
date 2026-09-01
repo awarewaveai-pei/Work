@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-01
+
+### HCI Wave 1 synthetic RLS / DSR / identity skeleton
+
+- AUTO_TASK_DONE: Codex is an authorized writer for this task; `agency-os/AGENTS.md` now replaces the unavailable Claude-only writer rule with an operator-authorized active-agent rule and retains manual R0/R4 evidence obligations.
+
+**根本問題**：HD-03～05 已被人類批准，HCI 仍沒有 runtime/schema/test runner；若只把批准寫成文件，DataSubjectRequest、identity confirmation 與 tenant isolation 仍沒有可執行的控制。
+
+**已修改**：
+- `agency-os/systems/hci30/` — 新增 isolated `postgres:15.8`、無 host port 的 synthetic-only compose、versioned migration/down migration、fixtures、request validator、negative SQL tests、local runner；不連 portal/production，未建立 Case/Engagement 或實作 HD-06～10。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0014*` 至 `ADR-0016*` 與 `ADR_INDEX.md` — 登錄 HD-03=A/HD-04=A/HD-05=A；明示 `SKELETON CREATED — REALTEST OPEN`，不以批准冒充 production 完成。
+- HCI owning docs / Wave 1 contracts / decision tranche — 將三項決策改為 resolved，保留 Docker-backed evidence、HD-06～10、HD-20/21 皆 OPEN。
+- `agency-os/AGENTS.md` — 依操作者明示取消 Claude-only writer 限制；Codex 寫入仍必須手動完成等價驗證與 closeout。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Node | cmd=`node --test agency-os/systems/hci30/runtime/validate-request.test.mjs` | exit=0 | result=3 pass, bare consent and incomplete authorization rejected; explicit authorization accepted.
+- REALTEST_EVIDENCE: tool=Docker Compose | cmd=`docker compose -f agency-os/systems/hci30/compose.test.yml config` | exit=0 | result=`postgres:15.8`, generated local volume, and no `ports` mapping.
+- REALTEST_WAIVED: SMOKE_COVERED -- `test-wave1-local.ps1` ran its Node checks then correctly stopped because Docker Desktop daemon is unavailable; PostgreSQL RLS/trigger suite is not claimed as passing.
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fixes | findings=0c/0m/1n — fixed the critic's composite-FK, password, caller-controlled-RLS, tenant enumeration, lifecycle, validator, and local-Docker isolation findings; remaining Docker REALTEST is explicitly open.
+- ORACLE_WAIVED: Claude external review is unavailable until 2026-09-04 because its operator-reported quota is exhausted; independent DB expert and Codex critic reviews were completed and every reported Critical/Major finding was fixed and re-reviewed.
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`pending.{0,80}HD-0[3-5]|HD-0[3-5].{0,80}(unapproved|remain.{0,20}blocker|still.{0,20}open)` | hits=2, both reviewed: decision approval is recorded while only the intended runtime gate remains open.
+- WORKLOG: this entry.
+
+**剩餘風險**：Docker Desktop 未啟動，PostgreSQL migration/RLS negative suite尚未獲實跑證據；HD-06～10、HD-20/21仍未批准，故不得 schema freeze、處理真人資料、作法律/市場角色聲稱或 production deploy。
+
+**Rollback**：尚無資料。停止本地 compose 後 `docker compose -f agency-os/systems/hci30/compose.test.yml down --volumes`，再以 `git revert` 回復本 commit；不得把這個 local down migration 用於 production。
+
 ## 2026-09-01（Postiz cgroup memory warning 已消除）
 
 **觸發**：Netdata 在 KS-AW-01 對 `postiz` 回報 cgroup RAM `WARNING`；整機仍有 114 GiB 可用記憶體、swap=0，故先區分 container limit 與 host capacity。

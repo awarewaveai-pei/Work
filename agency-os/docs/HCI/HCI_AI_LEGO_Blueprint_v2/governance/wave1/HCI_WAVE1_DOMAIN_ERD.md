@@ -1,8 +1,8 @@
 # HCI Wave 1 Subject and Permission ERD Addendum
 
-Status: **DESIGN ARTIFACT COMPLETE — no database schema has been created**
+Status: **DESIGN ARTIFACT COMPLETE — synthetic local schema skeleton created; Docker REALTEST open**
 Date: 2026-09-01
-Authority: ADR-0010 (`HD-02=C`) and ADR-0011 (`HD-00=C`)
+Authority: ADR-0010 (`HD-02=C`), ADR-0011 (`HD-00=C`), ADR-0014 (`HD-03=A`), ADR-0015 (`HD-04=A`), and ADR-0016 (`HD-05=A`)
 Scope: The minimum table/constraint matrix needed for the approved subject and permission decisions. It is not a migration, DDL, or final complete HCI ERD.
 
 ## Subject compatibility matrix
@@ -43,12 +43,12 @@ The eventual migration must implement these as DB constraints, policy-engine rul
 
 ## Out of scope
 
-- Actual PostgreSQL DDL, migration execution, data backfill, RLS policy deployment, or application code.
-- Choice of jurisdiction-specific lawful basis, controller role, data-subject-request workflow, bitemporal scope, or erasure mechanism; those decisions remain under HD-03/06/07/20/21.
+- Production PostgreSQL migration, data backfill, RLS deployment, portal integration, or application API.
+- Choice of jurisdiction-specific lawful basis, controller role, bitemporal scope, or erasure mechanism; those decisions remain under HD-06/07/20/21.
 
 ## Runtime-verification gate
 
-The executable coverage is defined by `HCI_WAVE1_NEGATIVE_TEST_SPEC.md`. This design document is not proof that a database currently enforces its rules.
+The executable coverage is defined by `HCI_WAVE1_NEGATIVE_TEST_SPEC.md` and the isolated synthetic-only runner at `../../../../../systems/hci30/`. Docker-backed execution evidence is still required before any runtime gate may close.
 
 ## Evidence
 

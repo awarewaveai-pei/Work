@@ -106,18 +106,18 @@
 
 **存在理由**：上一節說明機械閘只驗「證據行格式存在」，不驗內容正確。**閘擋的是「忘記做」，不是「做錯」。** 補這個缺口的唯一手段是外部模型——同一個模型審自己，盲點與產出同源。實證：2026-08-17 三輪覆審共 7 條 finding 全為真、0 假陽性，其中 4 條發生在「我自己剛寫完並認為沒問題」的 code 上。
 
-**分工線畫在「讀 vs 寫」，不是「規劃 vs 執行」。** 按規劃/執行切會逼著寫入者換人，治理層就是在那裡失效。
+**分工線畫在「讀 vs 寫」，不是「規劃 vs 執行」。** 寫入者由操作者授權的活躍 agent 擔任；不得把「換一個模型」當作跳過治理、驗證或回滾責任的理由。
 
 | 工作 | 執行者 |
 |------|--------|
-| **任何寫入 `D:\Work`** | **Claude（唯一寫入者，結構性限制非偏好）** |
+| **任何寫入 `D:\Work`** | **操作者授權的活躍 agent（Codex 或 Claude）**；寫入者負責完整 R0/R4 證據鏈 |
 | 大量讀檔 / 跨檔掃描 / R0 抓蟲步驟 / 報告消化 | Codex 優先（操作者 Codex 額度較寬） |
-| 設計、取捨、架構決策 | Claude |
-| 對抗式覆審（R0 [驗證計畫] Review 動作） | Codex 產 findings → **Claude 逐條驗真偽** |
+| 設計、取捨、架構決策 | 人類操作者；agent 提供可驗證的選項與影響 |
+| 對抗式覆審（R0 [驗證計畫] Review 動作） | 與寫入者獨立的可用模型逐條驗真偽；若不可用，記錄原因與可重放的替代檢查 |
 | repo 外拋棄式工作（`D:\tmp` 原型、一次性腳本、demo） | Codex 全包，Claude 不插手 |
-| prod deploy / DB migration / 憑證 | Claude + 操作者明示 go-ahead。**不可委派** |
+| prod deploy / DB migration / 憑證 | 操作者明示 go-ahead + 具備對應能力的授權 agent。**不可委派給未授權者** |
 
-**為什麼寫入不可委派**：`git-log-injector`、`file-path-router`、`high-risk-bash-warn`、`verify-gate-commit`、`audit-cp950-traps` 全部是 **Claude Code hooks**。Codex 是另一個 process，這些閘對它不存在。它寫的 code 零攔截，到 AO-CLOSE 撞上 `verify-closeout-completeness` 才發現證據鏈缺漏。
+**跨工具寫入的控制**：`git-log-injector`、`file-path-router`、`high-risk-bash-warn`、`verify-gate-commit`、`audit-cp950-traps` 是 Claude Code hooks，對 Codex 不會自動執行。使用 Codex 寫入時，寫入者必須手動執行等價的 git log、風險分級、驗證、review、bughunt、WORKLOG、commit 與 push；不可把缺少 hook 當作降低門檻的理由。此規則取代 Claude-only writer 限制（操作者明示，2026-09-01）。
 
 **唯一入口（2026-08-30 起）**：跑 **`/codex-review`**（本 repo 自建 command，`.claude/commands/codex-review.md`）——不要手動拼 `/codex:adversarial-review` 的呼叫。原因：這個工作需要固定附帶 2 段 focus text（隱藏依賴檢查 + NO FINDINGS 許可，官方 adversarial-review 的 attack-surface/calibration/grounding 規則不含這 2 條）+ 跑完手動落地 ORACLE gate artifact（`scripts/write-oracle-artifact.ps1`）——細節寫死在 command 檔裡，不是散文規則靠記憶執行；散文版本容易在 AGENTS.md 這種大檔案裡被漏讀，command 檔案每次呼叫保證完整。
 
@@ -445,5 +445,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-08-31 03:06:02 UTC_
+_Last synced: 2026-09-01 05:45:54 UTC_
 

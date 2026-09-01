@@ -4,7 +4,7 @@
 
 **This is the current, authoritative specification.** `HCI_AI_LEGO_Blueprint_v1\` is superseded and archived — do not read it for current truth; it is kept only as a historical record of what V1 said before independent review. If you find yourself reading a `v1` file, stop and come here instead.
 
-V2 was produced by taking V1 and applying 80 findings from a 9-independent-reviewer architecture re-research that did not require operator judgment. Its remaining 24 human-judgment findings were recorded inline at their owning design boundaries. On 2026-09-01 the operator explicitly resolved `HD-00`, `HD-01`, and `HD-02`; the three accepted ADRs and their still-open implementation gates live in `governance/ADR_INDEX.md`. The remaining 21 decisions stay inline and unresolved, rather than being hidden in a separate file. The full evidence and reasoning behind every decision lives in `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\` and is cited by ID (e.g. `DOM-01`, `HD-05`) throughout. You do not need to read that package to build from V2; you need it only if you want to see *why* a specific line reads the way it does.
+V2 was produced by taking V1 and applying 80 findings from a 9-independent-reviewer architecture re-research that did not require operator judgment. Its 24 human-judgment findings were recorded inline at their owning design boundaries. On 2026-09-01 the operator explicitly resolved `HD-00` through `HD-05`; the six accepted ADRs and their still-open implementation gates live in `governance/ADR_INDEX.md`. The remaining 18 decisions stay inline and unresolved. The full evidence and reasoning behind every decision lives in `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\` and is cited by ID (e.g. `DOM-01`, `HD-05`) throughout.
 
 ## Purpose
 
@@ -111,6 +111,6 @@ For work in the shared repository, the operating authority for write boundaries,
 
 ## How this differs from V1
 
-24 findings originally required human judgment. Three are now resolved by explicit operator approval (`HD-00=C`, `HD-01=A`, `HD-02=C`); their decisions are recorded in ADR-0011, ADR-0009, and ADR-0010 respectively, while their implementation gates remain open. The remaining 21 findings are marked 🔴 **DECISION PENDING** — genuine value trade-offs, legal-risk-tolerance calls, or product-scope questions that only the operator can resolve. **Do not implement the content of a 🔴 block until the operator has explicitly chosen an option.**
+24 findings originally required human judgment. Six are now resolved by explicit operator approval (`HD-00=C`, `HD-01=A`, `HD-02=C`, `HD-03=A`, `HD-04=A`, `HD-05=A`); their decisions are recorded in ADR-0009 through ADR-0011 and ADR-0014 through ADR-0016, while their runtime gates remain limited and explicitly tracked. The remaining 18 findings are marked 🔴 **DECISION PENDING**. **Do not implement the content of a 🔴 block until the operator has explicitly chosen an option.**
 
 For the complete list of what changed and why, see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\20_V1_TO_V2_CHANGESET.md`. For the complete list of pending decisions in one place (in addition to finding them inline here), see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md`.

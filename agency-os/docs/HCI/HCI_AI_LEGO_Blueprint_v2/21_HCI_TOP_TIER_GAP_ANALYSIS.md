@@ -105,7 +105,7 @@ A narrow runbook — not the full BYOK/envelope-encryption architecture, which s
 
 ## P0-12 Data Subject Rights — pending scope decision
 
-> 🔴 **DECISION PENDING** — whether this becomes a P0 item at all, and at what scope, depends on `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` `HD-03`. If the operator chooses Option A (full entity), this becomes P0 before Wave 4/6. If Option B (explicitly out of scope) is chosen, remove this item and document the decision here instead. Do not silently default to either.
+**RESOLVED — ADR-0014 (`HD-03=A`)** makes DataSubjectRequest a P0 entity. The remaining gate is executable synthetic event-lifecycle and tenant-isolation evidence; this does not authorize real-person processing.
 
 # P1 — Enterprise commercial readiness
 

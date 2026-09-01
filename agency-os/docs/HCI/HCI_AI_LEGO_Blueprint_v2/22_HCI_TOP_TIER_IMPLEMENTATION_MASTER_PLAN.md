@@ -32,7 +32,7 @@ Proposal template: `D:\Work\agency-os\docs\HCI\HCI_AI_LEGO_Blueprint_v2\governan
 
 Create/lock the remaining planned ADRs from ADR-0001 through ADR-0013 (extended list, `17_REPOSITORY_LAYOUT_AND_PATHS.md`), and verify the implementation gates of any already accepted ADR.
 
-**New in V2 — these ADRs specifically must resolve before Wave 0 closes**: Tenant/Organization reconciliation (`02` `HD-01`, accepted as ADR-0009; mapping/migration/negative-test gate remains open). Shared Kernel extraction (`09` §Shared Kernel). Consent scope (`07` `HD-02`, accepted as ADR-0010; model/policy/anti-conflation gate remains open). Subject-type scope (`02` `HD-00`, accepted as ADR-0011; ERD/constraint/negative-test gate remains open). Regulatory market scope (`11` `HD-20`).
+**New in V2 — these ADRs specifically must resolve before Wave 0 closes**: Tenant/Organization reconciliation (`02` `HD-01`, ADR-0009). Consent scope (`07` `HD-02`, ADR-0010). Subject-type scope (`02` `HD-00`, ADR-0011). Data-subject rights (`07` `HD-03`, ADR-0014), identity confirmation (`06` `HD-04`, ADR-0015), and tenant RLS (`11` `HD-05`, ADR-0016) now have synthetic skeletons but still require Docker-backed evidence. Shared Kernel extraction and regulatory market scope (`HD-20`) remain open.
 
 Expected result: later teams cannot collapse HCI/Cognitive, app/portal, DB boundaries, trust semantics, or the newly-resolved ADR items above.
 
@@ -78,7 +78,7 @@ Paths: `D:\Work\agency-os\systems\hci30\domain\evidence\`, `claims\`, `assessmen
 
 Acceptance trace: `Decision → Assessment → Method → Claim → Evidence → Source`.
 
-> 🔴 **BLOCKING PRECONDITION (new in V2)**: a rehearsed, cross-box restore drill must pass before this Wave admits any real, non-synthetic tenant data (`13_TESTING_REPLAY_ROLLBACK_AND_SRE.md` §Backups, P0-10). This Wave is also where the pending `HD-03` (Data Subject Rights) decision becomes load-bearing if Option A/B is chosen — resolve before this Wave starts, not during it.
+> 🔴 **BLOCKING PRECONDITION (new in V2)**: a rehearsed, cross-box restore drill must pass before this Wave admits any real, non-synthetic tenant data (`13_TESTING_REPLAY_ROLLBACK_AND_SRE.md` §Backups, P0-10). ADR-0014 resolves `HD-03=A`; its synthetic schema/test gate still needs Docker-backed execution evidence before this Wave starts.
 
 Expected result: explainability is structural.
 

@@ -23,13 +23,13 @@ HCI must represent the following independently; a record in one class never supp
 2. A source cannot be collected or reused without a source-terms record whose restriction is compatible with the requested purpose.
 3. A system must not display or transmit "consent obtained" unless the data-subject record itself contains supporting evidence and an explicitly approved decision state.
 4. An absent or unreviewed lawful-basis record is `UNASSESSED`, not consent, permission, or approval.
-5. No real-person processing is permitted merely because this document or ADR exists. The relevant HD-03, HD-20, and HD-21 human decisions and their later controls remain separate blockers.
+5. No real-person processing is permitted merely because this document or ADR exists. ADR-0014 resolves HD-03 at decision level, but its runtime gate plus HD-20 and HD-21 remain separate blockers.
 
 ## Explicitly deferred legal decisions
 
 - **HD-20** determines the markets/use cases and must precede any jurisdiction-specific applicability statement.
 - **HD-21** determines controller/processor roles and must precede customer DPA language.
-- **HD-03** determines the data-subject rights workflow and cannot be substituted by tenant DSAR procedures.
+- **ADR-0014 / HD-03=A** requires a data-subject rights workflow and cannot be substituted by tenant DSAR procedures; its runtime test gate remains open.
 
 Until those are resolved, this policy defines product behavior only: record uncertainty, fail closed for real-person processing, and escalate for human/legal review. It makes no legal conclusion or compliance certification.
 

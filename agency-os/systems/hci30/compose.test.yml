@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15.8
+    environment:
+      POSTGRES_DB: hci_wave1_synthetic
+      POSTGRES_USER: hci_owner
+      POSTGRES_PASSWORD: ${HCI_WAVE1_DB_PASSWORD:?local runner must provide a generated password}
+    volumes:
+      - hci-wave1-synthetic-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hci_owner -d hci_wave1_synthetic"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+volumes:
+  hci-wave1-synthetic-pgdata:

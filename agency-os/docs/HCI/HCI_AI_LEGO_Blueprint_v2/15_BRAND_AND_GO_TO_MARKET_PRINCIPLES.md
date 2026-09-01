@@ -67,4 +67,4 @@ We preserve uncertainty.
 We disclose method and source provenance.
 ```
 
-**Recommended addition (new in V2, not yet a formal decision)**: consider adding "We provide the Subject of our research a way to be heard" as a public commitment once `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` `HD-03` (Data Subject Rights) is resolved — this would turn the highest-priority finding in the entire V2 review into a market-differentiating brand statement rather than only a compliance requirement.
+**Recommended addition (new in V2, not yet a public commitment)**: ADR-0014 resolves `HD-03=A`; consider adding "We provide the Subject of our research a way to be heard" only after its runtime gate and the relevant legal/market decisions are complete. This must not be marketed from a synthetic skeleton alone.

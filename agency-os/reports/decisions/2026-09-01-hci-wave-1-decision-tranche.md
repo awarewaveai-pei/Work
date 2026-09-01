@@ -1,6 +1,6 @@
 # 決策：HCI Wave 1 的人類決策處理策略
 
-**狀態：** `PARTIALLY APPLIED` — 本文件本身不是批准紀錄；`HD-00=C`、`HD-01=A`、`HD-02=C` 的明示人類批准已記錄到 HCI ADR-0011、ADR-0009、ADR-0010。其餘 HD 與本文件的 tranche 策略仍非已批准。
+**狀態：** `PARTIALLY APPLIED` — 本文件本身不是批准紀錄；`HD-00=C` 至 `HD-05=A` 的明示人類批准已記錄到 HCI ADR-0009～0011、ADR-0014～0016。其餘 HD 與本文件的 tranche 策略仍非已批准。
 **日期：** 2026-09-01
 **模式：** architecture_review
 **信心值：** 0.70 — Wave 1 先處理的範圍有原始研究包 Section A 的直接支持；個別選項仍需要操作者明確選擇，尤其 HD-01 與 HD-02。
@@ -30,7 +30,17 @@ Operator explicitly approved: `HD-00=C；HD-01=A；HD-02=C。`
 | HD-01 | `governance/ADR-0009-tenant-organization-model-reconciliation.md` | `SPECIFIED — RUNTIME OPEN` — adapter mapping/migration and cross-tenant test specifications exist; no executable HCI adapter exists |
 | HD-02 | `governance/ADR-0010-consent-entity-scope.md` | `SPECIFIED — RUNTIME OPEN` — three-record policy/model/test specifications exist; jurisdiction-specific legal determination and enforcement remain open |
 
-This records only those three choices. HD-03 through HD-23 remain unapproved and the tranche strategy itself remains a recommendation until separately accepted.
+## Approval record — 2026-09-01 (second tranche)
+
+Operator explicitly approved: `HD-03=A；HD-04=A；HD-05=A。`
+
+| HD | Approval applied to | Implementation-gate status |
+|---|---|---|
+| HD-03 | `governance/ADR-0014-data-subject-rights-channel.md` | `SKELETON CREATED — REALTEST OPEN` — synthetic DSR schema/events/tests exist; no real-person processing or production readiness claim |
+| HD-04 | `governance/ADR-0015-restricted-subject-identity-confirmation.md` | `SKELETON CREATED — REALTEST OPEN` — deterministic/human confirmation gate exists only in the local synthetic schema |
+| HD-05 | `governance/ADR-0016-mandatory-tenant-rls.md` | `SKELETON CREATED — REALTEST OPEN` — isolated Postgres RLS/non-owner test runner exists; Docker execution evidence remains required |
+
+HD-06 through HD-23 remain unapproved; literal `<A/B/C>` placeholders are not decisions. The tranche strategy itself remains a recommendation until separately accepted.
 
 ---
 
@@ -62,7 +72,7 @@ This records only those three choices. HD-03 through HD-23 remain unapproved and
 
 - [ ] 在 Wave 1 前，HD-01 或 HD-02 沒有明示人類選擇 → 不得 freeze domain schema。
 - [ ] HD-19 isolation prototype 證明既有 Trigger.dev 能符合網路隔離與 DNS-rebind 防護要求 → 可將結果寫入其正式 ADR；否則規劃獨立 runner。
-- [ ] 在處理任一 RESTRICTED 第三方資料前，HD-03、HD-04、HD-05、HD-07、HD-08、HD-15 未獲批准 → 不得收集或處理該資料。
+- [ ] 在處理任一 RESTRICTED 第三方資料前，HD-07、HD-08、HD-15 未獲批准，或 HD-03～05 的 runtime gates 未獲實跑 → 不得收集或處理該資料。
 - [ ] 擬向 EU-linked、US employment-adjacent 或 Enterprise 客戶銷售前，HD-13、HD-14、HD-20、HD-21 未獲批准 → 停止相應市場聲稱與 onboarding。
 
 ## 權衡矩陣
@@ -172,9 +182,7 @@ This records only those three choices. HD-03 through HD-23 remain unapproved and
 
 ## 給操作者的開放問題
 
-1. **HD-03：** 是否建立 `DataSubjectRequest` 及生命週期／evidence-versioning lineage，列為 P0？
-2. **HD-04：** 是否限制 RESTRICTED subject 只能以 deterministic ID match 或明確 human confirmation 成為 confirmed？
-3. **HD-05：** 是否要求每張 tenant-owned table mandatory RLS 並以 CI-blocking cross-tenant read test 驗證？
+1. **HD-03～05：** 已於 2026-09-01 批准；在 Docker-backed synthetic negative tests 實跑前仍不得關閉 runtime gate。
 
 ## ADR 骨架
 
