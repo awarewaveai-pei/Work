@@ -1,6 +1,6 @@
 # Runbook: Trigger.dev Deploy — Cloudflare Bot Fight Mode Bypass
 
-> **🚨 2026-08-30**：下文 `ssh ... 204.168.175.41` 已失效（EU 主機刪除退租）。改連 ks-aw-01：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`。
+> **現役連線（2026-08-31）**：只連 ks-aw-01：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`，需要權限時使用 `sudo`。前任與舊 EU 主機均已退場。
 
 ## 症狀（Symptoms）
 
@@ -62,11 +62,12 @@ sed -i 's|TRIGGER_API_URL=\${apiUrl}|TRIGGER_API_URL=http://127.0.0.1:8030|g' \
 ### 手動修復步驟（若 deploy 在非 VPS 環境執行失敗）
 
 ```bash
-# SSH into EU VPS
-ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41
+# SSH into ks-aw-01
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
+sudo -i
 
 # Navigate to workflows
-cd /root/Work/lobster-factory/packages/workflows
+cd /root/lobster-phase1/Work/lobster-factory/packages/workflows
 
 # npm install (重置 node_modules)
 npm install

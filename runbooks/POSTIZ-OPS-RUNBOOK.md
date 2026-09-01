@@ -4,7 +4,7 @@
 > **SSOT**: `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md`
 > **Content engine SSOT**: `docs/wp-kadence-ai-seo-geo-content-engine.md §49`
 > **Postiz UI**: `https://postiz.aware-wave.com` (admin: `awarewaveai@gmail.com`)
-> **Infra（2026-08-30 更新）**: ks-aw-01 `149.202.64.114`（SSH `-p 58122`，`ubuntu@`）；port `127.0.0.1:4007`，public `https://postiz.aware-wave.com`。舊 EU VPS `204.168.175.41` 已刪除退租，下文所有 `ssh ... 204.168.175.41` 指令改連 ks-aw-01。
+> **Infra（2026-08-31 更新）**: ks-aw-01 `145.239.195.47`（SSH `-p 58122`，`ubuntu@` + `sudo`）；port `127.0.0.1:4007`，public `https://postiz.aware-wave.com`。前任與舊 EU VPS 均已退場。
 > **API key**: SG `/root/lobster-phase1/.env` → `POSTIZ_API_KEY`（64 chars），vault `POSTIZ_API_KEY`
 
 ---
@@ -119,8 +119,9 @@ x-ratelimit-reset: 3600 (秒)
 # 登入 postiz.aware-wave.com → Settings → Developers → API Keys → Regenerate
 # 複製新 key
 
-# 2. 更新 SG .env（SSH 進 SG）
-ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113
+# 2. 更新 ks-aw-01 .env
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
+sudo -i
 nano /root/lobster-phase1/.env
 # 找 POSTIZ_API_KEY= → 貼新 key → 存檔
 
@@ -142,9 +143,10 @@ curl -si "https://postiz.aware-wave.com/api/public/v1/integrations" \
 
 **症狀**：API 回 502 / 503 / 連線逾時。
 
-**診斷（SSH EU）**：
+**診斷（SSH ks-aw-01）**：
 ```bash
-ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
+sudo -i
 
 # 查容器狀態
 cd /root/postiz
@@ -232,8 +234,8 @@ curl -s "https://postiz.aware-wave.com/api/public/v1/integrations" -H "Authoriza
 curl -s "https://supabase.aware-wave.com/rest/v1/social_postiz_connections" \
   -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" | python3 -m json.tool
 
-# SSH EU 查 Postiz container
-ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41 "cd /root/postiz && docker compose ps"
+# SSH ks-aw-01 查 Postiz container
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 "sudo sh -lc 'cd /root/postiz && docker compose ps'"
 
 # 從 vault 取 key（確認存在）
 .\scripts\secrets-vault.ps1 -Action get -Name POSTIZ_API_KEY   # 輸出為遮罩，僅供確認存在；真值在 mcp\user-env.ps1

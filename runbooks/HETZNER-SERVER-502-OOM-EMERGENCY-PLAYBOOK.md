@@ -1,11 +1,11 @@
 ﻿# Hetzner Server 502 / OOM 緊急處理手冊
 
-> **🚨 2026-08-30：IP 已失效**——本頁所有 `ssh ... 204.168.175.41` / `ssh ... 5.223.93.113` 指令要改連 **ks-aw-01**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`。SG+EU 已於 2026-08-28 整併到這台機器，兩台舊機已刪除退租，SSH 過去會直接連線失敗。EU Trigger stack 路徑仍是 `/root/lobster-phase1/trigger/`（或依現行部署路徑），SG phase1 stack 路徑仍是 `/root/lobster-phase1/`——兩條 docker compose 路徑現在都在同一台機器上，用路徑分辨是哪個服務，不再用 IP 分辨是哪台機器。
+> **現役連線（2026-08-31）**：所有診斷只連 **ks-aw-01**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`，需要權限時使用 `sudo`。前任 `149.202.64.114` 與舊 SG/EU 主機都已退場，不得當成回退目標。EU Trigger 與 phase1 stack 同機，以目錄分辨服務，不以 IP 分辨。
 
 > **適用範圍（歷史，機器已整併）**：此手冊針對 **EU Trigger stack**（IP `204.168.175.41`，`trigger.aware-wave.com`）。  
 > SG phase1 stack（IP `5.223.93.113`，`aware-wave.com` / `app.aware-wave.com`）的 docker compose 路徑為 `/root/lobster-phase1/`，其餘步驟相同。
 
-**伺服器（現況）：** ks-aw-01 — IP `149.202.64.114`，SSH port `58122`（trigger.aware-wave.com + aware-wave.com 同機）  
+**伺服器（現況）：** ks-aw-01 — IP `145.239.195.47`，SSH port `58122`（trigger.aware-wave.com + aware-wave.com 同機）
 **伺服器（歷史，已刪除）：** EU Trigger `204.168.175.41` / SG `wordpress-ubuntu-4gb-sin-1` `5.223.93.113`
 
 ---
@@ -22,16 +22,16 @@ Cloudflare ✅ → Hetzner Host ❌
 
 ```powershell
 # Windows PowerShell 連線
-ssh -i "$env:USERPROFILE\.ssh\hetzner_trigger" root@5.223.93.113
+ssh -i "$env:USERPROFILE\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47
 ```
 
 ```bash
 # 伺服器上確認容器狀態
-cd /root/Work/lobster-factory/infra/trigger
-docker compose ps
+cd /root/lobster-phase1/trigger
+sudo docker compose ps
 
 # 看 OOM 記錄
-dmesg -T | grep -i "killed process\|out of memory" | tail -20
+sudo dmesg -T | grep -i "killed process\|out of memory" | tail -20
 
 # 記憶體狀況
 free -h && swapon --show
@@ -44,61 +44,15 @@ free -h && swapon --show
 容器有 `restart: unless-stopped`，通常會自動重啟。如果沒有：
 
 ```bash
-cd /root/Work/lobster-factory/infra/trigger
-docker compose up -d
+cd /root/lobster-phase1/trigger
+sudo docker compose up -d
 ```
 
 ---
 
 ## Step 3 — 如果 SSH 連不進去
 
-### 方法 A：Hetzner VNC Console
-1. 打開 [console.hetzner.cloud](https://console.hetzner.cloud)
-2. Servers → `wordpress-ubuntu-4gb-sin-1` → Console（>_ 圖示）
-3. 登入：`root` / 密碼見下方
-
-### 方法 B：Hetzner API 重設密碼
-```bash
-# 重設 root 密碼
-curl -X POST \
-  -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
-  -H "Content-Type: application/json" \
-  https://api.hetzner.cloud/v1/servers/125887340/actions/reset_password
-# 回傳新密碼，用 VNC 登入
-```
-
-### 方法 C：Rescue Mode（最可靠，authorized_keys 壞掉時用）
-```bash
-# 1. 啟用 rescue mode
-curl -X POST \
-  -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"type":"linux64"}' \
-  https://api.hetzner.cloud/v1/servers/125887340/actions/enable_rescue
-# 記下回傳的 root_password
-
-# 2. 重開機
-curl -X POST \
-  -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
-  https://api.hetzner.cloud/v1/servers/125887340/actions/reboot
-
-# 3. 等 30 秒後用 rescue 密碼 SSH 進去
-ssh root@5.223.93.113  # 輸入 rescue 密碼
-
-# 4. 掛載主系統、修復 authorized_keys
-mount /dev/sda1 /mnt
-mkdir -p /mnt/root/.ssh
-chmod 700 /mnt/root/.ssh
-echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK4ihPieknnd+m8VVWEm9SOvLY1JPXTlgmup1D+aivDP user@DESKTOP-N33595I' > /mnt/root/.ssh/authorized_keys
-chmod 600 /mnt/root/.ssh/authorized_keys
-umount /mnt
-
-# 5. 關 rescue、重開機回正常系統
-curl -X POST -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
-  https://api.hetzner.cloud/v1/servers/125887340/actions/disable_rescue
-curl -X POST -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
-  https://api.hetzner.cloud/v1/servers/125887340/actions/reboot
-```
+**禁止執行本檔舊 Hetzner API、VNC、rescue 指令**：那些只屬於已刪除主機，對 KS-6 無效。依 `/ks-aw-01-reboot` 的 rollback 段改用 **OVH Manager KVM / rescue mode**。這是 High-risk 操作，須先取得操作者明示批准，再按當下 RAID 裝置與 boot 狀態處理；不得套用前任主機的分割區、root 使用者或 key 指令。
 
 ---
 
@@ -106,13 +60,10 @@ curl -X POST -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
 
 | 項目 | 值 |
 |------|-----|
-| IP | `5.223.93.113` |
-| Server ID | `125887340` |
-| SSH Key (private) | `C:\Users\USER\.ssh\hetzner_trigger` |
-| SSH Public Key | `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK4ihPieknnd+m8VVWEm9SOvLY1JPXTlgmup1D+aivDP user@DESKTOP-N33595I` |
-| Root 密碼 | 真值在本機 `mcp\user-env.ps1` 的 `HETZNER_ROOT_PASSWORD`。（`secrets-vault.ps1 -Action get` 只印遮罩，事故當下複製到的會是 `abcd****xy`） |
-| Hetzner API Token | 見 `.env` 或 secrets vault |
-| Repo 路徑（伺服器） | `/root/Work/lobster-factory/infra/trigger/` |
+| IP | `145.239.195.47` |
+| SSH | `ubuntu` / port `58122` / key `~/.ssh/id_ed25519` / use `sudo` |
+| Out-of-band recovery | OVH Manager KVM / rescue mode; follow `/ks-aw-01-reboot` |
+| Trigger stack path | `/root/lobster-phase1/trigger/` |
 
 ---
 
@@ -126,8 +77,8 @@ curl -X POST -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
 
 ```bash
 # 確認設定已套用
-docker inspect trigger-clickhouse | grep -i memory
-cat /root/Work/lobster-factory/infra/trigger/clickhouse/override.xml
+sudo docker inspect trigger-clickhouse | grep -i memory
+sudo cat /root/lobster-phase1/trigger/clickhouse/override.xml
 ```
 
 ---

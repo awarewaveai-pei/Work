@@ -2,7 +2,7 @@
 
 **Zone:** `aware-wave.com`
 
-**Origin 注意**：主站／phase1 常指向 **SG `5.223.93.113`**；**`supabase.aware-wave.com`、`studio.aware-wave.com`** 等 Supabase 相關 hostname 之 **A／proxy 應對 EU**（AwareWave 自架 Supabase 已在 EU），見 **`agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**。
+**Origin 注意（2026-08-31）**：所有 production hostname（含主站、Supabase、Trigger、n8n）皆指向單一 **ks-aw-01 `145.239.195.47`** 並維持 Cloudflare proxy；服務以 host nginx vhost 分流。詳見 **`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`**。
 
 ---
 
@@ -164,7 +164,7 @@ curl -s "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94f
 
 ## §Origin Lockdown SOP（Claude 自動使用）
 
-> **🚨 2026-08-30：本節指令已失效** —— 目標機 SG `5.223.93.113` 已於 Hetzner console 刪除退租，下面所有 `ssh ... root@5.223.93.113` 指令會直接連線失敗（機器不存在）。**ks-aw-01 用不同機制達成同一目的：OVH Edge Network Firewall**（8 條規則 state=ok 已啟用，2026-08-28 上線，見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` 或 `TASKS.md` P2.5c）——經 OVH Manager Cloud Shell `ovhcloud` CLI 操作，不是這裡的 iptables/ipset script。回滾指令：`ovhcloud ip firewall disable 149.202.64.114/32 149.202.64.114`。下方內容保留當 SG 時代的 iptables 作法參考，**遇 origin-bypass 事件時改查上述新機制，不要對 5.223.93.113 下指令**。
+> **🚨 本節下方 iptables/ipset 指令為歷史，禁止執行。** 現役 ks-aw-01 改用 **OVH Edge Network Firewall**（8 條規則 state=ok，見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`）。經 OVH Manager Cloud Shell `ovhcloud` CLI 操作，不使用本節腳本；回滾指令的目標也必須是現役 `145.239.195.47`。遇 origin-bypass 事件請依 Host Switch Runbook 的現役機制處理。
 >
 > **目標**：限制 SG VPS port 80/443 只接受 Cloudflare 出口 IP，攻擊者直打 origin IP 時在 iptables 層被 DROP，nginx 完全看不到，Netdata 不告警。
 > **根因**：2026-06-12 scanner 洪流事件 — 攻擊者繞過 CF 直打 origin，4500 req 打爆 Netdata bad_request %。

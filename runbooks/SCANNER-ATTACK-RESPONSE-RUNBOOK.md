@@ -1,6 +1,6 @@
 # Scanner Attack Response Runbook
 
-> **🚨 2026-08-30: host IP retired.** Every `ssh ... root@5.223.93.113` below fails outright — that machine was deleted at Hetzner console 2026-08-28/30. Connect to **ks-aw-01** instead: `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`. Origin-lockdown mitigation also moved: see `runbooks/CLOUDFLARE-WAF-SETUP.md` §Origin Lockdown SOP banner (OVH Edge Network Firewall replaces the old iptables script on ks-aw-01).
+> **現役主機（2026-08-31）**：只連 **ks-aw-01**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`。Origin lockdown 改由 OVH Edge Network Firewall；見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`。舊 iptables/origin-lockdown 指令不可套用。
 
 **Symptom**: Netdata `infra-alerts` — `bad_request %` spike (> 30%), `successful %` drops, multiple recovery/trigger cycles. Slack #infra-alerts flooding.
 
@@ -12,12 +12,12 @@
 
 ```bash
 # 1. Confirm scanner — check top attacking IPs and paths
-ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 "
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 "sudo sh -lc '
   echo '=== Top bad-request IPs ===' &&
   awk '\$9 ~ /^[45]/ {print \$1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -10
   echo '=== Top bad-request paths ===' &&
   awk '\$9 ~ /^[45]/ {print \$7}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -20
-"
+'"
 ```
 
 **If paths include `/.env`, `/.aws`, `/phpinfo`, `/wp-config`, `/id_rsa`, `/database` → confirmed scanner.**

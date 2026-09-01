@@ -1,4 +1,4 @@
-Reboot ks-aw-01 (`149.202.64.114`, OVH SYS-GAME-2, SSH port `58122`, user `ubuntu`) safely with full pre-flight + post-flight checklists. **Replaces `/sg-reboot` and `/eu-reboot`** — those two commands targeted separate machines that are now the same physical box; running either of the old ones would reboot the *entire* consolidated stack under a name that only describes part of it. Both old commands now redirect here.
+Reboot ks-aw-01 (`145.239.195.47`, OVH KS-6, SSH port `58122`, user `ubuntu`) safely with full pre-flight + post-flight checklists. **Replaces `/sg-reboot` and `/eu-reboot`** — those two commands targeted retired hosts; running either is invalid. Both old commands now redirect here.
 
 > **Why this file exists (2026-08-30)**: `/codex-review` flagged that after the 2026-08-28 SG+EU consolidation, `scripts/ao-resume.ps1`'s reboot-required escalation still computed `/sg-reboot` or `/eu-reboot` as the suggested action, and both of those pointed their SSH `Connection:` at IPs that were deleted 2026-08-30 — a real risk that Claude itself would be instructed to run a command that fails outright. `ao-resume.ps1` now always points here instead.
 
@@ -11,7 +11,7 @@ Use when:
 - Forced/emergency reboot needed (kernel panic, disk corruption, post-incident recovery).
 
 Use the `hetzner-ssh` MCP server. Connection:
-- host: `149.202.64.114`
+- host: `145.239.195.47`
 - port: `58122`
 - user: `ubuntu` (passwordless sudo — **not** `root`; OVH Ubuntu cloud image convention, differs from the old Hetzner boxes which used `root` directly)
 - privateKeyPath: `$env:USERPROFILE\.ssh\id_ed25519`（Claude 須先展開為絕對路徑）

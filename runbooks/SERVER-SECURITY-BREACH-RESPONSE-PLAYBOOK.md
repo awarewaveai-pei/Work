@@ -6,7 +6,7 @@
 >
 > 本手冊根據該事件整理，可直接用於未來任何類似事件。
 
-> **🚨 2026-08-30**：下文範例指令沿用當年案例的 IP `5.223.93.113`（該機已於整併日刪除退租）——套用到未來事件時，把 IP 換成**當時真正受影響的機器**，不是照抄這個數字。現行生產機為 **ks-aw-01**（`149.202.64.114`，SSH `-p 58122`，`ubuntu@`）；SG+EU 已整併於此。
+> **🚨 歷史案例的 `5.223.93.113` 不可照抄。** 現行生產機為 **ks-aw-01**（`145.239.195.47`，SSH `-p 58122`，`ubuntu@` + `sudo`）；前任與 SG/EU 均已退場。套用案例時以現役主機與 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` 為準。
 
 ---
 
@@ -268,8 +268,8 @@ openssl rand -base64 32      # ~44 字元 base64
 ssh-keygen -t ed25519 -C "hetzner-trigger-new" -f ~/.ssh/hetzner_trigger_new
 
 # 2. 用舊 key 登入，把新公鑰加到 authorized_keys
-ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 \
-  "echo '$(cat ~/.ssh/hetzner_trigger_new.pub)' >> ~/.ssh/authorized_keys"
+# Historical Hetzner command removed: ks-aw-01 recovery uses OVH KVM/rescue only
+# after explicit approval; follow `/ks-aw-01-reboot` rather than copying a key here.
 
 # 3. 確認新 key 可以登入後，移除舊 key
 # 編輯 /root/.ssh/authorized_keys，刪除舊的那一行

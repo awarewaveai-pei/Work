@@ -35,8 +35,8 @@ If a specific slug is given, show full detail:
 
 ```powershell
 # Quick check via curl on SG server (for reference)
-ssh -i "$HOME\.ssh\hetzner_trigger" root@5.223.93.113 `
-  "curl -s http://127.0.0.1:3002/api/ops/clients" | ConvertFrom-Json | Select-Object -Expand clients
+ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 `
+  "sudo curl -s http://127.0.0.1:3002/api/ops/clients" | ConvertFrom-Json | Select-Object -Expand clients
 ```
 
 Or call directly if the dashboard is reachable:
