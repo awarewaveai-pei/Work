@@ -1,0 +1,98 @@
+[
+  {
+    "file": "SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md",
+    "lines": 224,
+    "chars": 15146,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md",
+    "lines": 442,
+    "chars": 15685,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_CONTENT_DOMAIN_MODEL.md",
+    "lines": 548,
+    "chars": 16212,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_SOURCE_PROFILE_AND_AUTHORITY_POLICY.md",
+    "lines": 335,
+    "chars": 13019,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_EVIDENCE_RETRIEVAL_SPEC.md",
+    "lines": 357,
+    "chars": 13361,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_INTELLIGENCE_SPEC.md",
+    "lines": 338,
+    "chars": 12260,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "CONTENT_BRIEF_CONTRACT.md",
+    "lines": 326,
+    "chars": 12604,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md",
+    "lines": 410,
+    "chars": 14045,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_CONTENT_QUALITY_GATES.md",
+    "lines": 309,
+    "chars": 12424,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "PUBLISHING_ADAPTER_CONTRACT.md",
+    "lines": 366,
+    "chars": 12395,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "CONTENT_MEASUREMENT_SPEC.md",
+    "lines": 366,
+    "chars": 12615,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  },
+  {
+    "file": "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md",
+    "lines": 424,
+    "chars": 16097,
+    "has_evidence": true,
+    "has_paths": true,
+    "has_validation": true
+  }
+]
