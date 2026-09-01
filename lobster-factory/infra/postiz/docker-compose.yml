@@ -1,8 +1,8 @@
-# Postiz (self-hosted social publishing) — EU VPS (204.168.175.41).
-# DEPLOYED COPY lives at /root/postiz/docker-compose.yml on the EU box (with a sibling .env
-# holding POSTIZ_DB_PASSWORD / POSTIZ_JWT_SECRET — never committed). This repo copy is the SSOT;
-# keep the two in sync. Lightweight v2.11.3 (pre-Temporal/Elasticsearch) to fit the shared box;
-# hard mem_limit caps blast radius so Postiz can never OOM the host's Supabase/n8n/Trigger.
+# Postiz (self-hosted social publishing) — KS-AW-01 single-host deployment.
+# DEPLOYED COPY lives at /root/postiz/docker-compose.yml (with a sibling .env holding
+# POSTIZ_DB_PASSWORD / POSTIZ_JWT_SECRET — never committed). This repo copy is the SSOT;
+# keep the two in sync. Lightweight v2.11.3 (pre-Temporal/Elasticsearch); hard mem_limit caps
+# blast radius so Postiz can never OOM the host's Supabase/n8n/Trigger workloads.
 # Reuses the existing supabase-db Postgres (dedicated `postiz` DB+role). Public via nginx vhost
 # postiz.aware-wave.com → 127.0.0.1:4007. Internal layout: nginx:5000 → backend:3000 (/api) +
 # frontend:4200 (/) — hence NEXT_PUBLIC_BACKEND_URL ends in /api and BACKEND_INTERNAL_URL=:3000.
@@ -33,7 +33,10 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 1400m
+    # Postiz runs backend + cron + workers + Next in one container. KS-AW-01 observed a stable
+    # ~1.27 GiB working set at the prior 1.4 GiB cap; 2 GiB restores headroom while retaining
+    # cgroup isolation and Netdata's per-container warning/critical protection.
+    mem_limit: 2g
     cpus: "1.0"
     ports:
       - '127.0.0.1:4007:5000'

@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-09-01（Postiz cgroup memory warning 已消除）
+
+**觸發**：Netdata 在 KS-AW-01 對 `postiz` 回報 cgroup RAM `WARNING`；整機仍有 114 GiB 可用記憶體、swap=0，故先區分 container limit 與 host capacity。
+
+**根因**：Postiz 將 backend、cron、workers 與 Next 放在同一容器，穩定工作集約 1.27 GiB；原 `mem_limit: 1400m` 僅留約 130 MiB 餘裕，使用率 90.8% 觸發 Netdata warning。`memory.events` 顯示 14 次 max pressure，但 OOM／OOM-kill／restart 都是 0。
+
+**修復**：SSOT 與現役 `/root/postiz/docker-compose.yml` 一併調為 `mem_limit: 2g`。先備份遠端 compose 為 `docker-compose.yml.pre-postiz-2g-20260901`、`docker compose config -q`，再只用 `--no-deps --force-recreate` 重建 `postiz`；Redis、Supabase 與其餘容器不動。
+
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=postiz inspect/stats + Netdata alarm API + public endpoint | exit=0 | result=running, limit=2GiB, 57%, restart=0, oom=false, Netdata=CLEAR, postiz HTTP=307
+- REVIEW_DONE: runtime config readback + public endpoint regression | verdict=PASS | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory/infra/postiz | check=old EU topology comment and 1.4GiB cap | result=removed; per-container cgroup guard retained
+
 ## 2026-09-01（Uptime Kuma 單機化名稱與目標複核）
 
 **觸發**：操作者在 Kuma UI 發現多個 active monitor 名稱仍帶 `(EU)`／`(SG)`，擔心它們是否仍監測已刪除的 Hetzner 主機。
