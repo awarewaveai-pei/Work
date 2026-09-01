@@ -1,5 +1,7 @@
 # Runbook: VPS 套件升級自動 Reboot (B-Minimal)
 
+> **範圍邊界（2026-09-01）**：主機轉移期間的唯一讀本是 [`KS-AW-01-HOST-SWITCH-RUNBOOK.md`](KS-AW-01-HOST-SWITCH-RUNBOOK.md)。該文件已包含本機制的搬遷、IP 綁定入口掃描與驗收；**換機時不要以本文件補流程**。本文件只在新主機已完成切換後，處理日常 auto-reboot 的解讀、維護與停用。
+
 > **🚨 2026-08-30 單機復活**：SG+EU 已於 2026-08-28 整併進 ks-aw-01，舊兩台已刪除退租；本文件下方大部分內容（雙機、53 stagger、`/sg-reboot`/`/eu-reboot`）描述的是**歷史拓樸**，機制本身**已在 ks-aw-01 重新啟用**（同一套 apt 原生機制，非重寫）。現況：
 > - **SSOT** 改為 `lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`（部署到同樣的 `/etc/apt/apt.conf.d/52awarewave-auto-reboot` 路徑，內容邏輯不變，只改敘述與時間——單機不需要 53 錯位檔）
 > - **新增一塊 B-Minimal 原版沒有的東西**：`ks-aw-01-boot-health-notify.sh` + `ks-aw-01-boot-notify.service`（同目錄），**每次開機**（自動或手動）都跑健康檢查並用 Telegram 回報結果。這是單機拓樸特有的風險補強——雙機時代一台壞了另一台還在，沒人需要盯著 reboot 發生；單機現在一次 reboot 壞了就是全站掛，2026-08-30 操作者直接問「會不會壞掉而不知」，這塊就是答案。
@@ -8,9 +10,9 @@
 > - **這不是「daily reboot = daily 全站停機」**：apt 的 `Automatic-Reboot "true"` 只在真的有補丁在等重開機時才觸發（見下方機制圖），沒補丁的日子什麼都不會發生——這件事下方全文一直是對的，只是 TASKS.md 曾經把它誤講成「每天固定停機」，2026-08-30 已訂正
 >
 > **Established**: 2026-05-23（原始雙機設計，機制沿用至今）
-> **SSOT for apt config（歷史，雙機時代）**: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`
-> **Applies to（歷史，雙機時代）**: SG VPS (`5.223.93.113`) + EU VPS (`204.168.175.41`)
-> **Replaces（歷史）**: 手動 `/sg-reboot` / `/eu-reboot`，現由 `/ks-aw-01-reboot` 取代
+> **現役 SSOT**: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`
+> **現役對象**: 單一 ks-aw-01；不使用 53 stagger 檔
+> **現役手動入口**: `/ks-aw-01-reboot`（舊 `/sg-reboot`／`/eu-reboot` 僅為歷史 redirect）
 
 ---
 
@@ -20,7 +22,7 @@
 
 每 1-2 週，Ubuntu `unattended-upgrades` 自動裝 kernel / glibc / openssl / systemd 等安全 patch，這些套件**必須 reboot 才生效**。Linux 寫 `/var/run/reboot-required` marker；netdata 監測；告警鏈一路傳到 Slack `#infra-alerts` + Ops Inbox。
 
-之前的處理鏈是純手動：操作者讀告警 → 跑 `/sg-reboot` 或 `/eu-reboot` runbook。
+之前的處理鏈是純手動：操作者讀告警 → 跑當時對應主機的 reboot runbook；現役單機入口為 `/ks-aw-01-reboot`。
 
 **問題**：
 - 2026-05-21 EU 套件升級 → 操作者逾期 22 小時才處理
@@ -35,8 +37,8 @@
 
 | 場景 | 仍走原路徑 |
 |------|----------|
-| 緊急 reboot（kernel panic、disk corrupt、處理入侵） | `/sg-reboot` / `/eu-reboot` 手動 |
-| Hetzner GRUB 新 kernel 開機失敗 | Hetzner Cloud Console + `apt-mark hold linux-image-X` |
+| 緊急 reboot（kernel panic、disk corrupt、處理入侵） | `/ks-aw-01-reboot` 手動 |
+| OVH GRUB 新 kernel 開機失敗 | OVH KVM / rescue console + `apt-mark hold linux-image-X` |
 | Container 大規模 unhealthy 需重啟 host | 手動 + 先排查根因 |
 | Reboot 前需 staging 演練 | 手動 + 預先準備 |
 
@@ -91,29 +93,27 @@ uptime-kuma 偵測端點 200 OK
 ### 4.2 Deploy
 
 ```bash
-# 從 dev 機 scp 上傳 SSOT
-scp lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf \
-    root@<vps>:/etc/apt/apt.conf.d/52awarewave-auto-reboot
-
-# 或從 git pull 後本機 cp（若 repo 已部署到 VPS）
-ssh root@<vps> 'cp /root/<repo-path>/lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf /etc/apt/apt.conf.d/52awarewave-auto-reboot'
+# 已完成切換後的現役 ks-aw-01：三件套須一起安裝。
+export SSH_TARGET='ubuntu@<NEW_IP>' SSH_PORT='<NEW_SSH_PORT>'
+scp -P "$SSH_PORT" lobster-factory/infra/hetzner-phase1-core/auto-reboot/{ks-aw-01-auto-reboot.conf,ks-aw-01-boot-health-notify.sh,ks-aw-01-boot-notify.service} "$SSH_TARGET:/tmp/"
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'sudo install -o root -g root -m 0644 /tmp/ks-aw-01-auto-reboot.conf /etc/apt/apt.conf.d/52awarewave-auto-reboot && sudo install -o root -g root -m 0755 /tmp/ks-aw-01-boot-health-notify.sh /usr/local/bin/ks-aw-01-boot-health-notify.sh && sudo install -o root -g root -m 0644 /tmp/ks-aw-01-boot-notify.service /etc/systemd/system/ks-aw-01-boot-notify.service && sudo systemctl daemon-reload && sudo systemctl enable ks-aw-01-boot-notify.service'
 ```
 
 ### 4.3 Post-deploy 驗證
 
 ```bash
 # 1. 檔案存在 + 權限正確 (root:root, 0644)
-ssh root@<vps> 'ls -la /etc/apt/apt.conf.d/52awarewave-auto-reboot'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'ls -la /etc/apt/apt.conf.d/52awarewave-auto-reboot /usr/local/bin/ks-aw-01-boot-health-notify.sh /etc/systemd/system/ks-aw-01-boot-notify.service && systemctl is-enabled ks-aw-01-boot-notify.service'
 
 # 2. apt-config 真的讀到設定（這才是 ground truth）
-ssh root@<vps> 'apt-config dump | grep -i "Automatic-Reboot"'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'apt-config dump | grep -i "Automatic-Reboot"'
 # 預期輸出:
 # Unattended-Upgrade::Automatic-Reboot "true";
 # Unattended-Upgrade::Automatic-Reboot-Time "20:00";
 # Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
 
 # 3. dry-run 模擬 unattended-upgrade 行為（不真重啟）
-ssh root@<vps> 'unattended-upgrade --dry-run -d 2>&1 | tail -30'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'unattended-upgrade --dry-run -d 2>&1 | tail -30'
 # 找含 "Will reboot" 或 "No reboot required" 的行
 ```
 
@@ -127,11 +127,11 @@ ssh root@<vps> 'unattended-upgrade --dry-run -d 2>&1 | tail -30'
 # - Uptime Kuma incident notification (brief down)
 # - Slack #infra-alerts: netdata system.post_update_reboot_status flap (1 → 0)
 # - 21:00 UTC 後驗證:
-ssh root@<vps> 'last reboot | head -3'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'last reboot | head -3'
 # 應看到剛剛的 reboot 時間
-ssh root@<vps> 'uname -r'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'uname -r'
 # kernel 是新版
-ssh root@<vps> 'ls /var/run/reboot-required* 2>&1'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'ls /var/run/reboot-required* 2>&1'
 # 應為 "No such file or directory"
 ```
 
@@ -162,15 +162,15 @@ ssh root@<vps> 'ls /var/run/reboot-required* 2>&1'
 powershell -ExecutionPolicy Bypass -File scripts/check-vps-auto-reboot-health.ps1
 ```
 
-兩者都 SSH SG + EU 查同樣項目：apt-config 三鍵 / 52 + 53 SHA256 / daemon / reboot-required / 最近 reboot。Read-only，無風險。
+兩者都只 SSH 現役 ks-aw-01，查 apt-config 三鍵／52 SHA256／daemon／reboot-required／最近 reboot；53 stagger 不應存在。Read-only，無風險。
 
 ## 5. 監控訊號（自動化 ON 後，操作者該怎麼看）
 
 | 訊號 | 含義 | 操作 |
 |------|------|------|
 | netdata `system.post_update_reboot_status` flap 1→0 在 20:00-20:05 UTC | 自動 reboot 成功 | 無 — 預期行為 |
-| netdata flap **未** 在 20:00 UTC 後 16 小時內回 0 | 自動化失敗 | 走 `/sg-reboot` 或 `/eu-reboot` 手動 runbook |
-| Uptime Kuma 多個 monitor 同時 down > 5 分鐘 | reboot 後容器沒回來 | 立即手動處理 — Hetzner Console 或 SSH 登入排查 |
+| netdata flap **未** 在 20:00 UTC 後 16 小時內回 0 | 自動化失敗 | 走 `/ks-aw-01-reboot` 手動 runbook（High risk） |
+| Uptime Kuma 多個 monitor 同時 down > 5 分鐘 | reboot 後容器沒回來 | 立即手動處理 — OVH KVM / rescue console 或 SSH 登入排查 |
 | Slack #infra-alerts 連續 2 週 quiet（無 reboot 告警） | OS 沒有需要 reboot 的 patch；正常 | 無 |
 | backup-health LATEST 顯示 FAIL 且當日 20:00 reboot 仍照常發生 | 風險：reboot 前最近 backup 可能過時 | 評估是否需手動 rollback 或 staging 演練 |
 
@@ -183,17 +183,17 @@ powershell -ExecutionPolicy Bypass -File scripts/check-vps-auto-reboot-health.ps
 ### 6.1 暫時停用一晚（例如：今晚要做 staging 演練不想被打斷）
 
 ```bash
-ssh root@<vps> 'mv /etc/apt/apt.conf.d/52awarewave-auto-reboot /etc/apt/apt.conf.d/52awarewave-auto-reboot.disabled'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'sudo mv /etc/apt/apt.conf.d/52awarewave-auto-reboot /etc/apt/apt.conf.d/52awarewave-auto-reboot.disabled'
 # 第二天恢復:
-ssh root@<vps> 'mv /etc/apt/apt.conf.d/52awarewave-auto-reboot.disabled /etc/apt/apt.conf.d/52awarewave-auto-reboot'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'sudo mv /etc/apt/apt.conf.d/52awarewave-auto-reboot.disabled /etc/apt/apt.conf.d/52awarewave-auto-reboot'
 ```
 
 ### 6.2 永久 rollback
 
 ```bash
-ssh root@<vps> 'rm /etc/apt/apt.conf.d/52awarewave-auto-reboot'
+ssh -p "$SSH_PORT" "$SSH_TARGET" 'sudo rm /etc/apt/apt.conf.d/52awarewave-auto-reboot'
 # 回到「自動裝 patch，不自動 reboot」狀態（= 2026-05-22 之前的行為）
-# 手動 reboot 仍可透過 /sg-reboot 或 /eu-reboot runbook
+# 手動 reboot 仍可透過 /ks-aw-01-reboot runbook
 ```
 
 對應 git 動作：`git revert` 包含此 runbook 與 SSOT conf 檔的 commit。
@@ -202,7 +202,7 @@ ssh root@<vps> 'rm /etc/apt/apt.conf.d/52awarewave-auto-reboot'
 
 ## 7. 已知 caveats
 
-1. **同晨 SG + EU 雙重啟**：Ubuntu CVE 通常週二批次發佈，兩台都接到同 patch 時會在同一個 20:00 UTC 重啟。30-90s 雙服務同步 down，**已接受**（04:00 TPE 影響極小）。若未來需要錯開，可改 EU `Automatic-Reboot-Time "20:30"`（30 分鐘錯位）。
+1. **單機重啟是全站事件**：沒有第二台機器可承接流量，因此 boot-notify 的 Telegram 結果與 Uptime Kuma recovery 都是必要訊號；缺其中一項不得把自動 reboot 視為已驗收。若未來回到多機拓樸，另行設計錯位策略，不得復用舊 53 檔。
 2. **`Automatic-Reboot-WithUsers "true"`**：意思是即使有 SSH session 連著（例如操作者半夜登入排查），仍會 reboot；若要更保守可改 `"false"`，但會導致 SSH 久連時自動化失效。
 3. **不影響容器 image 更新**：apt 只動 OS 層級套件。Docker image（含 ClickHouse `25.7.5` 鎖定）不被觸碰。
 4. **不適用於非 Ubuntu**：未來若加 Debian / Alma / RHEL 系統，需另寫對應方案。
@@ -212,8 +212,9 @@ ssh root@<vps> 'rm /etc/apt/apt.conf.d/52awarewave-auto-reboot'
 
 ## 8. 相關 SSOT / 參考
 
-- apt conf：`lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`
-- 手動 runbook（保留）：`~/.claude/commands/sg-reboot.md` + `~/.claude/commands/eu-reboot.md`
+- 現役 apt conf：`lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`
+- 現役開機回報：同目錄的 `ks-aw-01-boot-health-notify.sh` + `ks-aw-01-boot-notify.service`
+- 手動 runbook：`.claude/commands/ks-aw-01-reboot.md`
 - Trigger rule（AGENTS.md）：`agency-os/AGENTS.md` §代理自動工具使用規則 reboot 訊號分支
 - 維護日曆：`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`
 - 長期 ops 紀律：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`

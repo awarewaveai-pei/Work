@@ -12,6 +12,8 @@
 > **拓樸事實正本**：[`AWAREWAVE_STACK_QUICKREF.md`](../agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
 > 舊時代（EU/SG 分立）遷移正本 [`HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md) 保留為歷史與備份/還原章節引用。
 
+> **換機時只讀本文件。**本文件是主機轉移的唯一執行正本，已內嵌 auto-reboot／boot-notify 的搬遷與驗收 gate。`VPS-AUTO-REBOOT-RUNBOOK.md` 只處理已穩定上線後的日常 apt reboot；切換窗中不要在兩份文件之間拼湊流程。
+
 > **最近一次實施（2026-08-31）**：現役 ks-aw-01 已切至 `145.239.195.47`
 > （OVH KS-6，IPv6 `2001:41d0:203:a62f::1`；前任 `149.202.64.114`）。本次驗收發現並修正：
 > Soulful 443 vhost 漏 `cf-only` guard、auto-reboot/endpoint-alert 機器層檔案漏部署、
@@ -93,6 +95,7 @@ done | grep -E '^[0-9a-f]{64}'
 - **root crontab 不是檔案，不能 rsync**（覆審 F4）：`ssh OLD 'sudo crontab -l' | ssh NEW 'sudo crontab -'`（11 行，需逐行目視確認）
 - `/etc/cron.d/{lobster-backup,ks-stack-backup,ks-aw-01-backup}` ＋ `/etc/default/{eu-backup,**ks-aw-01-backup**,awarewave-endpoint-alert*}`（600；覆審 F2：漏 `ks-aw-01-backup` 則 soulful 管線的 EXPECT_SERVICES/R2/加密設定全沒）
 - systemd `awarewave-endpoint-alert.{service,timer}` 拷入 `/etc/systemd/system/` 後**必跑**（覆審 F5：拷檔不等於註冊）：`systemctl daemon-reload && systemctl enable --now awarewave-endpoint-alert.timer`
+- **Auto-reboot 與開機回報是同一個單機控制面，必須整組搬**：從 repo 的 `lobster-factory/infra/hetzner-phase1-core/auto-reboot/` 安裝 `ks-aw-01-auto-reboot.conf` → `/etc/apt/apt.conf.d/52awarewave-auto-reboot`、`ks-aw-01-boot-health-notify.sh` → `/usr/local/bin/ks-aw-01-boot-health-notify.sh`（0755）、`ks-aw-01-boot-notify.service` → `/etc/systemd/system/`；再 `systemctl daemon-reload && systemctl enable ks-aw-01-boot-notify.service`。此 script 讀既有 `awarewave-endpoint-alert{,.local,.telegram}`，因此前一項的 env 檔漏搬會令「reboot 後 Telegram 回報」靜默失效。**單機只用 52，不得搬舊 `53awarewave-stagger-eu.conf`。**
 - **Trigger deploy 工具鏈主機層狀態**（覆審 F6，`trigger/README.md` §7a 明寫換機必重做）：`/etc/buildkit/buildkitd.toml`（registry:5000 http+insecure）+ `docker buildx create --name trigger --driver docker-container --driver-opt network=host --config /etc/buildkit/buildkitd.toml --use` + `inspect --bootstrap`（builder metadata 不在任何 volume 裡，2026-08-28 實證：ks 自己就漏了這步，當場補修）
 - `/root/.ssh/`：`soulful_pull`（Hostinger 觀察期內）、`work_deploy`（GitHub deploy key）＋ `config` alias＋**`known_hosts` 的 GitHub Ed25519 key**。新機第一個 `sg-deploy.sh` 會 `git pull`；只搬 deploy key 不搬或不先驗證 GitHub host key 會安全地以 `Host key verification failed` 中止。從 GitHub 官方 SSH fingerprint 文件核對 Ed25519 指紋後再寫入，接著 `git ls-remote origin HEAD` 實測 deploy key。
 - **所有 `auth_basic_user_file` 密碼檔**（2026-08-29 坑：`.htpasswd_studio` 漏拷 → Docker 幫你自動建成同名**目錄** → nginx 500）：換機前在來源機跑 `sudo grep -rh auth_basic_user_file /etc/nginx/sites-available/` 產出完整路徑清單，逐一 `stat <path>` 確認型別是 `regular file`；拷到新機後**同樣 `stat` 驗一次**，不能只憑 `ls` 有東西就放行（空目錄在 `ls` 底下看起來也像「有東西」）
@@ -217,8 +220,11 @@ done | grep -E '^[0-9a-f]{64}'
 5. **Telegram**：`getWebhookInfo` pending=0 無 last_error；**Trigger**：30 分鐘內 TaskRun 全 COMPLETED_SUCCESSFULLY；**MainWP**：對每個子站強制同步並確認 sync_errors 清空。優先用 `wp eval`；若官方 WordPress image 未附 WP-CLI，載入 `wp-load.php` 後以 `MainWP_DB::get_website_by_id()` 取得**物件**（不是 `get_connected_websites()` 的 array），再傳入 `MainWP_Sync::sync_site()`。切換窗內的失敗同步會留下 **stale 斷線旗標**，不主動重同步要等隔日 cron 才自癒（2026-08-28 實例：aware-wave.com 紅叉 9 小時，實際一次手動同步即緑）
 6. **§1g IP 清單逐檔改** → `check-{backup,capacity,clickhouse,cloudflare-security,deploy-drift}` 全部實跑 PASS
 7. 機上出站：DNS/HTTPS/NTP（edge firewall 規則 0/1/2 的活體證明）；PTR 反查 = ks-aw-01.aware-wave.com
+8. **Auto-reboot 控制面**（不另讀其他 runbook）：`apt-config dump | grep -E '^Unattended-Upgrade::Automatic-Reboot'` 必須有三個預期值（`true`／`20:00`／`true`）；確認 boot script 可執行、`ks-aw-01-boot-notify.service` 是 `enabled`、`53awarewave-stagger-eu.conf` 不存在，並以 `scripts/check-vps-auto-reboot-health.ps1` 對**新 IP**實跑到 healthy。切換窗內不以真正 reboot 當測試；服務穩定後才依 `/ks-aw-01-reboot` 的 High-risk 流程取得明示批准並驗證一次開機 Telegram 回報。最後用 `git grep` 掃 `scripts/`、`.claude/commands/` 的 `OLD_IP`／舊機名，逐一更新所有仍會連線或生成 reboot 指示的活性入口；歷史文件中的前任 IP 不需要清零。
 
 ## §6 Phase 4 — 舊機退場（驗證後 48h 觀察 → 操作者明示同意）
+
+> **2026-09-01 已完成的歷史實例**：OVH Manager 顯示前任 `149.202.64.114`（`ns3006986.ip-149-202-64.eu`）自 2026-08-31 起為 **Terminated**；它不可作為回滾或下次操作目標。此段是本次證據，不改變未來換機仍須完成下列四步的程序。
 
 1. OVH Manager → 舊機 service → 取消續約（月租到期即止；**確認扣款週年日避免多付一輪**）
 2. CF 兩 zone 移除舊 IP 的 v4/v6 whitelist；`ks-aw-01` A 記錄與 rDNS 已在 §4/§1f 更新
@@ -263,6 +269,7 @@ done | grep -E '^[0-9a-f]{64}'
 | certbot 帳號目錄搬機沒清乾淨 | 換機時所有 renewal `.conf` 的 `account =` 已經統一指向新帳號（§1d 已記「已統一單一帳號 ✓」），但**舊帳號的 ACME 註冊目錄本身**（`/etc/letsencrypt/accounts/.../<舊帳號ID>/`）沒人手動刪，留在磁碟上——`certbot certificates` 看不出來（只列有效憑證），要進 `accounts/.../directory/` 才看得到兩個帳號目錄。不影響現有憑證續期，但下次手動 `certbot certonly` 新網域時，多帳號會讓「用哪個帳號」變模糊 | 2026-08-30 補：換機收尾清單新增一步——`sudo ls /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/` 應該只有一個目錄；`for f in /etc/letsencrypt/renewal/*.conf; do grep account "$f"; done` 全部 grep 出的帳號 ID 必須跟前面那唯一目錄一致；多出來的舊目錄 `cp -r` 備份到 `/root/letsencrypt-orphan-account-backup-<日期>/` 後 `rm -rf` 清掉，清完跑 `certbot renew --dry-run` 全過再收工（AWARE_WAVE_CREDENTIALS.md §32 記錄本次實例） |
 | TLS vhost 的 `listen 443` 協定選項不一致 | `nginx -t` 仍可成功但連續輸出 `protocol options redefined`；警告噪音會遮住真正的設定漂移 | 2026-08-31 KS-6 post-cutover audit：所有啟用 IPv4 TLS vhost 統一為 `listen 443 ssl http2;`，`nginx -t` 零 warning 後才 reload。§1d 已補明確驗收 |
 | 換機後 `/sg-reboot`／`/eu-reboot` 兩支手動 reboot 指令沒有合併 | 兩台機器變同一台後，兩支指令的 pre/post-flight checklist 分別只覆蓋各自舊拓樸的 container/endpoint 清單，且 SSH `Connection:` 各自寫死已刪除的舊 IP——`scripts/ao-resume.ps1` 的 reboot-required 告警仍照舊邏輯建議 `/sg-reboot` 或 `/eu-reboot`，會指示 Claude 執行一個連線必失敗的指令（`/codex-review` 2026-08-30 抓到） | 2026-08-30 治本：新增 `.claude/commands/ks-aw-01-reboot.md`（合併兩份 checklist 為聯集 + 補上 Postiz/Soulful，Rollback 段改指 OVH KVM 而非 Hetzner Console），`sg-reboot.md`/`eu-reboot.md` 改為指向新指令的失效說明，`ao-resume.ps1:1119-1126` 的 slug 邏輯改成常數 `ks-aw-01-reboot`。**換機時的通用教訓**：任何「每台機一份」的手動 runbook/slash command，在多機併一機時都要主動找出來合併，不會自動跟著拓樸文件更新 |
+| 只搬 apt conf、沒搬 boot-notify／health checker／reboot 指令的連線目標 | OS 會在 04:00 重開，但新單機可能沒有 Telegram 開機回報，或人工 escalation 仍連到前任 IP；「自動 reboot 已啟用」變成沒有可觀測性的假象 | §1d 的三件套移轉 + §5.8 的 apt／service／新 IP health-check／活性入口掃描，全部通過才可視為換機完成 |
 
 ---
 

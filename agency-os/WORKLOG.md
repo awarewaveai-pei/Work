@@ -2,6 +2,24 @@
 
 ## 2026-09-01
 
+### docs(host-switch): 換機唯一讀本 + auto-reboot 控制面閉環
+
+**根本問題**：KS 換機文件與 auto-reboot 文件同時包含切換步驟，操作者可能在切換窗來回拼湊兩份流程；而本次 KS-6 切換實際漏過 auto-reboot／boot-notify 機器層檔案。只搬 apt 設定不代表 reboot 後的 Telegram 開機回報、drift health-check 與人工 reboot 入口仍正確，會形成「設定存在、監控卻沉默」的假健康。
+
+**已修改**：
+- `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` — 宣告為換機唯一讀本；把 auto-reboot 三件套（apt conf、boot script、systemd unit）、endpoint-alert env 依賴、不得搬 53 stagger、以新 IP 跑 health-check、活性 reboot 入口掃描，全部納入 Phase 3 必過 gate；記錄本次 OVH 舊機於 2026-08-31 Terminated 的完成證據。
+- `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` — 改為「切換完成後的日常維護」用途並單向導回 KS 文件；現役單機 SSOT／OVH KVM／`/ks-aw-01-reboot`／三件套 deploy 與驗證統一，移除會指向 SG/EU 雙機的現役操作指示。
+
+**驗證結果**：
+- REALTEST_WAIVED: DOC_ONLY -- 本次只變更未來換機與日常 reboot 的操作文件；未對生產主機、服務、排程或通知通道寫入。
+- REVIEW_WAIVED: DOC_ONLY -- 已讀回兩份變更區塊與完整 diff；`git diff --check` exit=0，KS 2 個、auto-reboot 16 個 Markdown code fence 均成對。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude/commands | grep=`149.202.64.114|/sg-reboot|/eu-reboot|53awarewave-stagger-eu` | hits=99；多數為歷史證據，但確認仍有 3 個活性操作來源待下一個獨立修復：`agency-os/AGENTS.md` 的 reboot escalation、`.claude/commands/ks-aw-01-reboot.md` 的前任 IP、`.claude/commands/auto-reboot-status.md` 的雙機指令。KS §5.8 已把這類活性入口掃描升為每次換機的完成 gate，不能再以文件敘述取代實查。
+- WORKLOG: 本條目。
+
+**剩餘風險**：這個 doc-only commit 沒有改動上述三個活性入口，故目前不應以它們執行人工 reboot；待獨立修復後需對新 IP 實跑 `check-vps-auto-reboot-health.ps1`，且真正 reboot/Telegram 回報測試仍屬 High-risk、需操作者明示批准。
+
+**Rollback**：`git revert <本 commit>` 可還原文件路由；不影響主機或資料。
+
 ### HCI Wave 1 synthetic RLS / DSR / identity skeleton
 
 - AUTO_TASK_DONE: Codex is an authorized writer for this task; `agency-os/AGENTS.md` now replaces the unavailable Claude-only writer rule with an operator-authorized active-agent rule and retains manual R0/R4 evidence obligations.
