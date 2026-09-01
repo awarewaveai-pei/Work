@@ -42,7 +42,7 @@ Before a Wave or release gate is declared closed, record the gate name, scoped a
 
 # Wave 1 — Domain foundation
 
-Paths: `D:\Work\agency-os\systems\hci30\docs\domain\`, `database\`, `domain\`
+Paths: `D:\Work\Projects\internal\hci30\docs\domain\`, `database\`, `domain\`
 
 Deliver: ERD (**including all V2 new entities — Case/Engagement, DataSubjectRequest, PersonMergeLog/PersonSplitLog, Control/Mitigation, subject_type stub**), entity dictionary, state machines, bitemporal model (scoped, see `07`), DB schema, constraints/indexes, fixtures.
 
@@ -54,7 +54,7 @@ Expected result: stable core survives UI/AI/provider replacement.
 
 # Wave 2 — Policy + security boundary
 
-Paths: `D:\Work\agency-os\systems\hci30\governance\`, `shared\security\`, `shared\platform\identity\`, `shared\platform\tenants\`
+Paths: `D:\Work\Projects\internal\hci30\governance\`, `security\`, `adapters\auth\`, `packages\contracts\`
 
 Deliver: machine-readable policies, RBAC/ABAC, tenant-context standard, key hierarchy, audit schema, JIT/break-glass, service accounts.
 
@@ -66,7 +66,7 @@ Expected result: blast radius is bounded before sensitive data enters production
 
 # Wave 3 — Contract-first API/events
 
-Paths: `D:\Work\agency-os\systems\hci30\api\`, `shared\contracts\`
+Paths: `D:\Work\Projects\internal\hci30\api\`, `packages\contracts\`
 
 Deliver: OpenAPI, AsyncAPI, error model, idempotency, webhooks, version/deprecation, contract tests, **Shared Kernel thin-reference types built as actual code (new in V2, `09` §Shared Kernel), not left as prose**.
 
@@ -74,7 +74,7 @@ Expected result: frontend/workers/portal/API integrations evolve independently.
 
 # Wave 4 — Evidence/Claim/Assessment core
 
-Paths: `D:\Work\agency-os\systems\hci30\domain\evidence\`, `claims\`, `assessments\`, `security\evidence-integrity\`
+Paths: `D:\Work\Projects\internal\hci30\domain\evidence\`, `claims\`, `assessments\`, `security\evidence-integrity\`
 
 Acceptance trace: `Decision → Assessment → Method → Claim → Evidence → Source`.
 
@@ -84,7 +84,7 @@ Expected result: explainability is structural.
 
 # Wave 5 — Intelligence math v1
 
-Paths: `D:\Work\agency-os\systems\hci30\intelligence\`, `docs\intelligence\`
+Paths: `D:\Work\Projects\internal\hci30\intelligence\`, `docs\intelligence\`
 
 Implement only from formal specs (P0-04). Acceptance: golden datasets, property/invariant tests, counterfactual tests, insufficient-data state, versioned outputs, **qualitative-band confidence display until calibration evidence exists (new in V2, `19` §Confidence Display)**.
 
@@ -92,7 +92,7 @@ Expected result: reproducible analysis, not arbitrary AI scoring.
 
 # Wave 6 — Hardened Public Intelligence
 
-Paths: `D:\Work\agency-os\systems\hci30\public-intelligence\`, `security\threat-models\`
+Paths: `D:\Work\Projects\internal\hci30\public-intelligence\`, `security\threat-models\`
 
 Pipeline: Search → isolated fetch → malware/MIME checks → normalization → untrusted-content label → identity match → source quality → claim extraction → verification → admission gate.
 
@@ -106,7 +106,7 @@ Expected result: the internet never becomes a trusted input channel.
 
 # Wave 7 — HCI customer UI
 
-Path: `D:\Work\agency-os\systems\hci30\apps\web\`. Host: `hci.aware-wave.com` (DNS reservation deferred until this Wave is close to shipping, per `03_AWARE_WAVE_DOMAIN_AND_SUBDOMAIN_MAP.md`).
+Path: `D:\Work\Projects\internal\hci30\apps\web\`. Host: `hci.aware-wave.com` (DNS reservation deferred until this Wave is close to shipping, per `03_AWARE_WAVE_DOMAIN_AND_SUBDOMAIN_MAP.md`).
 
 UI priority: evidence/claims, relationship timeline, trust domains, unknowns, contradictions, why-this-conclusion, permissions, decisions, sources, review.
 
@@ -116,7 +116,7 @@ Expected result: evidence and decision clarity come before chat UX.
 
 Future external: `portal.aware-wave.com` (already live at the identity layer, see `20_VERIFIED_SUBDOMAIN_INVENTORY_AND_BRAND_IA.md`). Existing internal remains: `app.aware-wave.com`.
 
-Paths: `D:\Work\agency-os\shared\platform\entitlements\`, `licensing\`, `billing\`
+Paths: `D:\Work\Projects\internal\hci30\enterprise\entitlements\`, `licensing\`, `billing\`
 
 **New in V2**: implements the AI LEGO usage-metering clause (`10` §Usage Metering) — the *contract clause* should already be written in Wave 0/3; this Wave is where real cross-product billing goes live.
 
@@ -124,7 +124,7 @@ Expected result: HCI can sell Personal→Enterprise without business logic conta
 
 # Wave 9 — Enterprise readiness
 
-Paths: `D:\Work\agency-os\systems\hci30\enterprise\`, `privacy\`, `shared\security\controls\`
+Paths: `D:\Work\Projects\internal\hci30\enterprise\`, `privacy\`, `security\controls\`
 
 Deliver: SSO/SCIM, retention/legal hold, DLP, audit export, residency, dedicated DB, BYOK, support access governance, procurement/trust package.
 
@@ -134,7 +134,7 @@ Expected result: standard enterprise due diligence becomes answerable.
 
 # Wave 10 — Optional AI LEGO integration
 
-Path: `D:\Work\agency-os\systems\hci30\integrations\cognitive-os\`
+Path: `D:\Work\Projects\internal\hci30\integrations\cognitive-os\`
 
 Acceptance: no direct DB, timeout/failure graceful, contract compatibility, AI results cannot self-admit as HCI facts, run references preserved, convergence != evidence confidence.
 
@@ -142,7 +142,7 @@ Expected result: advanced cognition is replaceable LEGO.
 
 # Wave 11 — Scientific calibration
 
-Paths: `D:\Work\agency-os\systems\hci30\governance\methods\`, `tests\calibration\`, `tests\bias\`
+Paths: `D:\Work\Projects\internal\hci30\governance\methods\`, `tests\calibration\`, `tests\bias\`
 
 Deliver: validation lifecycle, benchmark data, outcome labels, calibration, false positive/negative analysis, independent expert review.
 
@@ -150,7 +150,7 @@ Expected result: HCI can measure whether it actually improves decisions.
 
 # Wave 12 — 30-year resilience / ecosystem
 
-Paths: `D:\Work\agency-os\shared\platform\lego-runtime\`, `capability-registry\`, `systems\hci30\data-portability\`
+Paths after cross-product-component admission: `D:\Work\Projects\shared\{lego-runtime,capability-registry}\`, `D:\Work\Projects\internal\hci30\data-portability\`
 
 Deliver: signed LEGO manifests, sandbox, compatibility, kill switch, export/import versioning, private/customer-cloud deployment, region migration, deprecation lifecycle.
 

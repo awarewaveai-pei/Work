@@ -80,7 +80,7 @@ GET  /cognitive/v1/runs/{run_id}
 POST /cognitive/v1/runs/{run_id}/review
 ```
 
-HCI-specific integration layer: `systems/hci30/integrations/cognitive-os/` — contains only adapter, request mapper, result mapper, policy mapper, events, contract tests. Must not contain HCI core logic or Cognitive OS core logic.
+HCI-specific integration layer: `Projects/internal/hci30/integrations/cognitive-os/` — contains only adapter, request mapper, result mapper, policy mapper, events, contract tests. Must not contain HCI core logic or Cognitive OS core logic.
 
 ## Transport — decided in V2
 

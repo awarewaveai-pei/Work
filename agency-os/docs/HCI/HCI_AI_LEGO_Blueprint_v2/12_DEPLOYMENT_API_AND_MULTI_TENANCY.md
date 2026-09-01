@@ -115,8 +115,8 @@ Current infrastructure baseline:
 
 ```text
 OVHcloud Dedicated Server
-ns3006986.ip-149-202-64.eu
-(operationally: ks-aw-01, 149.202.64.114, SSH -p 58122)
+ns31414856.ip-145-239-195.eu
+(operationally: ks-aw-01, 145.239.195.47, SSH -p 58122)
 ```
 
 This is an infrastructure-placement fact, not a data-residency policy.

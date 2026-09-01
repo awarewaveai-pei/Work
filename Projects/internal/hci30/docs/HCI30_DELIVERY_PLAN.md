@@ -49,7 +49,7 @@ Only after an actual HD-19 isolation proof, HD-16 ownership decision, HD-20/21 l
 ## Required repository layout
 
 ```text
-systems/hci30/
+Projects/internal/hci30/
   apps/{api,web,worker}/
   domain/{tenancy,people,permissions,data-subject-requests,case,evidence,claims,assessments,trust,decisions,controls,audit}/
   application/{commands,queries,policies}/
@@ -57,7 +57,9 @@ systems/hci30/
   packages/{kernel,contracts,test-support}/
   database/{migrations,fixtures,tests}/
   tests/{unit,integration,contract,architecture,e2e,security}/
-  docs/
+  infra/local/
+  scripts/
+  docs/{HCI30_DELIVERY_PLAN.md,HCI30_EXECUTION_PLAN.md}
 ```
 
 ## Evidence and stop conditions

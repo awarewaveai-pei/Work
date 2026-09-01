@@ -3,12 +3,12 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$compose = Join-Path $root 'compose.test.yml'
+$compose = Join-Path $root 'infra/local/compose.test.yml'
 $migration = Join-Path $root 'database/migrations/0001_wave1_synthetic_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
 
-node --test (Join-Path $root 'runtime/validate-request.test.mjs')
+node --test (Join-Path $root 'tests/unit/contracts/validate-request.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Request-policy validator tests failed.' }
 
 $dockerEndpoint = docker context inspect --format '{{.Endpoints.docker.Host}}'

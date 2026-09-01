@@ -53,6 +53,27 @@
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`HD-06|HD-19|HD-20|HD-21|systems/hci30` | hits=reviewed; each runtime/legal/external gate is explicitly retained rather than hidden by the plan.
 - WORKLOG: this entry.
 
+### HCI product-root normalization
+
+**根本問題**：HCI runtime 被放在 `agency-os\systems\hci30\`，但既有獨立產品採 `Projects\internal\<product>\`；治理層與 runtime 混放會形成第二套目錄規則，讓未來檔案無法依產品生命週期定位。
+
+**已修改**：
+- `agency-os\systems\hci30\` → `Projects\internal\hci30\` — 11 個 HCI skeleton 檔以 Git rename 搬遷；資料庫、測試、infra、contracts、scripts 與產品文件現在只有一個 runtime root。
+- `Projects\internal\hci30\docs\{HCI30_DELIVERY_PLAN.md,HCI30_EXECUTION_PLAN.md}` — 將泛名計畫文件收進產品 docs；`packages\contracts\`、`tests\unit\contracts\`、`infra\local\` 取代散放的 `runtime\` 與根目錄 compose。
+- `docs\HCI\HCI_AI_LEGO_Blueprint_v2\{10,17,18,21,22}_*.md` 與 Wave 1 ADR/ERD/test records — 所有現行 HCI runtime 路徑改為 `Projects\internal\hci30\`；禁止建立 `agency-os\systems\*` 或 `agency-os\shared\*` runtime。跨產品元件僅在兩個產品、版本契約、ADR ownership/release/rollback 全部成立後，才可建立 `Projects\shared\` package。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Node | cmd=`node --test D:\Work\Projects\internal\hci30\tests\unit\contracts\validate-request.test.mjs` | exit=0 | result=3/3 contract tests pass after relocation.
+- REALTEST_EVIDENCE: tool=Docker Compose | cmd=`$env:HCI_WAVE1_DB_PASSWORD=<generated>; docker compose -f D:\Work\Projects\internal\hci30\infra\local\compose.test.yml config --quiet` | exit=0 | result=compose validates only when its ephemeral runner password is supplied.
+- REALTEST_WAIVED: SMOKE_COVERED -- relocated `test-wave1-local.ps1` executed its Node tests then fail-closed because Docker Desktop daemon is unavailable; PostgreSQL suite remains explicitly OPEN.
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n — verified 11 staged renames, consistent cross-product ownership rule, no stale current roots, clean diff and no secret/exec/eval patterns; the lone minor is an untracked empty `Projects\internal\hci30\runtime\` directory that the execution environment refused to delete.
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`agency-os[/\\]systems[/\\]hci30|agency-os[/\\]shared` | hits=6 historical WORKLOG records only; current V2 and HCI product scopes have zero hits.
+- WORKLOG: this entry.
+
+**剩餘風險**：Docker Desktop 未啟動，故 PostgreSQL migration/RLS negative suite沒有新實跑證據。`Projects\internal\hci30\runtime\` 是零檔案、未追蹤的本機殘留，未進 commit；安全執行環境拒絕刪除命令，沒有使用繞過手段。
+
+**Rollback**：以 `git revert <本次 path-refactor commit>` 一次還原，不能手動複製回兩個 runtime root；歷史 WORKLOG/V1/research 原文不改。
+
 ## 2026-09-01（Postiz cgroup memory warning 已消除）
 
 **觸發**：Netdata 在 KS-AW-01 對 `postiz` 回報 cgroup RAM `WARNING`；整機仍有 114 GiB 可用記憶體、swap=0，故先區分 container limit 與 host capacity。

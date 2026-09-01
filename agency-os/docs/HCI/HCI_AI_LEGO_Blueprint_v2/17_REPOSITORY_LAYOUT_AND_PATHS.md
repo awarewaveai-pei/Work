@@ -2,30 +2,22 @@
 
 ## Purpose
 
-Provide a concrete repository structure for implementation under `D:\Work\agency-os\`. The intent is to preserve product separation while allowing shared platform components and optional integrations.
+Provide a concrete workspace structure for implementation under `D:\Work\`. The intent is to preserve product separation without introducing a parallel `systems\` classification that the workspace does not otherwise use.
 
 ## Recommended top-level layout
 
 ```text
-D:\Work\agency-os\
+D:\Work\
 │
-├── systems\
-│   ├── hci30\
-│   ├── cognitive-engineering-os\
-│   └── future-systems\
+├── Projects\
+│   ├── internal\
+│   │   ├── hci30\
+│   │   ├── ziwei-doushu\
+│   │   └── cognitive-engineering-os\  -- create only when that product has runtime code
+│   └── clients\
 │
-├── shared\
-│   ├── platform\
-│   ├── contracts\
-│   ├── method-packs\
-│   ├── integrations\
-│   └── sdk\
-│
-├── recipes\
-│   ├── hci\
-│   └── cognitive\
-│
-├── docs\
+├── agency-os\
+│   ├── docs\
 │   ├── AI_LEGO_Cognitive_Engineering_OS\
 │   └── HCI\
 │       ├── HCI_AI_LEGO_Blueprint_v1\  -- superseded historical record
@@ -33,9 +25,8 @@ D:\Work\agency-os\
 │       │   └── governance\             -- ADR register, accepted ADRs, and proposal template
 │       └── HCI30_RESEARCH_REVIEW\     -- audit trail / decision evidence, see below
 │
-├── infra\
-├── tests\
-└── ops\
+├── lobster-factory\  -- shared factory workflows and existing infrastructure only
+└── scripts\           -- workspace operational scripts
 ```
 
 **Existing directories confirmed current (verified 2026-09-01)**: `docs\AI_LEGO_Cognitive_Engineering_OS\` already exists with real, ADR-governed `specs/*.yaml` files — do not treat this layout as greenfield for the AI LEGO side. `docs\HCI\HCI_AI_LEGO_Blueprint_v1\` is superseded; keep it in place, unmodified, as historical record. `docs\HCI\HCI30_RESEARCH_REVIEW\` holds the full evidence chain behind every decision in this V2 document — not required reading to build, but the reference of record for "why." `docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\` is the current ADR register, proposal template, and accepted-decision record; only entries explicitly recorded as `ACCEPTED` with human approval are architecture decisions.
@@ -43,7 +34,7 @@ D:\Work\agency-os\
 ## HCI-30
 
 ```text
-D:\Work\agency-os\systems\hci30\
+D:\Work\Projects\internal\hci30\
 │
 ├── apps\
 │   ├── web\
@@ -123,13 +114,18 @@ D:\Work\agency-os\systems\hci30\
 ├── database\
 ├── tests\
 │   └── architecture\             -- CI-blocking gates, see 13 §Enforcement Discipline
+├── packages\
+│   └── contracts\
+├── infra\
+│   └── local\
+├── scripts\
 └── docs\
 ```
 
 ## AI LEGO Cognitive Engineering OS
 
 ```text
-D:\Work\agency-os\systems\cognitive-engineering-os\
+D:\Work\Projects\internal\cognitive-engineering-os\
 │
 ├── method-atlas\
 ├── workflow\
@@ -149,64 +145,16 @@ D:\Work\agency-os\systems\cognitive-engineering-os\
 
 ## Existing mother-document location
 
-Retain: `D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\`. Recommended specification files around the mother documents: `00_LEGO_CONSTITUTION.md`, `01_LEGO_BOUNDARY_AND_DEPENDENCY_STANDARD.md`, `02_DOMAIN_METHOD_PACK_STANDARD.md`, `03_SOLUTION_INTEGRATION_CONTRACT_STANDARD.md`, `04_DATA_OWNERSHIP_AND_EVENT_STANDARD.md`. These are specifications. Runtime implementation belongs under `systems\cognitive-engineering-os\`.
+Retain: `D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\`. Recommended specification files around the mother documents: `00_LEGO_CONSTITUTION.md`, `01_LEGO_BOUNDARY_AND_DEPENDENCY_STANDARD.md`, `02_DOMAIN_METHOD_PACK_STANDARD.md`, `03_SOLUTION_INTEGRATION_CONTRACT_STANDARD.md`, `04_DATA_OWNERSHIP_AND_EVENT_STANDARD.md`. These are specifications. Runtime implementation belongs under `Projects\internal\cognitive-engineering-os\` when that product has runtime code.
 
-## Shared platform
+## Cross-product components
 
-```text
-D:\Work\agency-os\shared\platform\
-│
-├── identity\
-├── tenants\
-├── iam\
-├── policy\
-├── audit\
-├── secrets\
-├── event-bus\               -- staged NOW/NEXT/FUTURE, see 13_TESTING_.../
-│                                HCI30_RESEARCH_REVIEW/13_ARCHITECTURE_OPTIONS_MATRIX.md §4;
-│                                no broker exists in current infra, do not build Day-1
-├── observability\           -- reuse the ALREADY-RUNNING Loki/Promtail/Grafana + Uptime
-│                                Kuma stack (verified 2026-08-29) — do not build a second one
-├── capability-registry\
-├── licensing\
-└── config\
-```
-
-## Shared contracts *(new emphasis in V2)*
-
-```text
-D:\Work\agency-os\shared\contracts\
-│
-├── epistemic\           -- the Shared Kernel, see 09 §Shared Kernel — vendored/pinned by
-│                            both HCI and AI LEGO, not a live shared service
-├── risk-tier\
-├── entity-refs\          -- EntityRef, PersonRef, OrganizationRef, EvidenceRef, TenantContext,
-│                            ActorRef, SourceRef — actually build these thin references, which
-│                            18_LEGO_CONTRACT_AND_COMPONENT_TAXONOMY.md already specified but
-│                            V1 never implemented (see 09 §Shared Kernel for why this matters)
-└── tenant\
-```
-
-## Shared method packs
-
-Only genuinely cross-domain methods belong here.
-
-```text
-D:\Work\agency-os\shared\method-packs\
-│
-├── strategy\
-├── negotiation\
-├── research\
-├── decision\
-└── systems-thinking\
-```
-
-HCI-specific psychology/trust methods should remain HCI-owned unless later proven genuinely reusable.
+Do **not** pre-create a `shared\` tree. A component remains inside its owning product until two independent products require the same versioned contract and an ADR records the ownership, release, and rollback policy. Only then create the component at `D:\Work\Projects\shared\{platform,contracts,method-packs}\`; it is a versioned package source, never a live shared database or an unbounded "god platform". HCI-specific psychology and trust methods remain HCI-owned.
 
 ## HCI recipes
 
 ```text
-D:\Work\agency-os\recipes\hci\
+D:\Work\Projects\internal\hci30\recipes\
 │
 ├── hci.quick-person-research.yaml
 ├── hci.standard-person-research.yaml

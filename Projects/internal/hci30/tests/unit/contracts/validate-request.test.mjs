@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateRequest } from './validate-request.mjs';
+import { validateRequest } from '../../../packages/contracts/validate-request.mjs';
 
 test('rejects bare consent', () => assert.throws(() => validateRequest({ type: 'tenant_authorization', consent: true }), /bare consent/));
 test('rejects incomplete authorization', () => assert.throws(() => validateRequest({ type: 'tenant_authorization' }), /missing or invalid/));

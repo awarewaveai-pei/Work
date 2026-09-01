@@ -62,7 +62,7 @@ maturity: stable
 
 ## Capability registry
 
-Recommended location: `D:\Work\agency-os\shared\platform\capability-registry\`.
+Until the cross-product-component admission rule in `17_REPOSITORY_LAYOUT_AND_PATHS.md` is met, the capability registry is AI LEGO-owned at `D:\Work\Projects\internal\cognitive-engineering-os\capability-registry\`; HCI consumes it only through a versioned integration contract.
 
 Use capability names such as: `research.web.search`, `research.source.verify`, `cognitive.claim.extract`, `cognitive.hypothesis.generate`, `cognitive.ach.evaluate`, `cognitive.contradiction.detect`, `decision.risk.evaluate`, `decision.option.compare`, `hci.person.resolve`, `hci.relationship.assess`, `hci.trust.evaluate`.
 

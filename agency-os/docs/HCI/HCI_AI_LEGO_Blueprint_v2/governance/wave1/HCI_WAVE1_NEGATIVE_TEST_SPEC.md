@@ -40,4 +40,4 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 
 ## Current state
 
-An isolated synthetic-only PostgreSQL 15.8 schema, non-owner test role, request validator, and runner now exist at `../../../../../systems/hci30/`. Docker-backed tests remain **not run** until Docker Desktop is available; none may be reported as passing before that execution evidence exists. Portal-adapter tests remain excluded from this local skeleton.
+An isolated synthetic-only PostgreSQL 15.8 schema, non-owner test role, request validator, and runner now exist at `D:\Work\Projects\internal\hci30\`. Docker-backed tests remain **not run** until Docker Desktop is available; none may be reported as passing before that execution evidence exists. Portal-adapter tests remain excluded from this local skeleton.

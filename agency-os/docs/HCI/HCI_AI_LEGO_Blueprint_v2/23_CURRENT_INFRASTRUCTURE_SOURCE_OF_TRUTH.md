@@ -11,8 +11,8 @@ Historical infrastructure is intentionally excluded.
 ```text
 Provider: OVHcloud
 Type: Dedicated Server
-Server: ns3006986.ip-149-202-64.eu
-Operational alias: ks-aw-01 (149.202.64.114, SSH -p 58122)
+Server: ns31414856.ip-145-239-195.eu
+Operational alias: ks-aw-01 (145.239.195.47, SSH -p 58122)
 ```
 
 Management reference: `https://manager.ca.ovhcloud.com/#/dedicated/server/ns3006986.ip-149-202-64.eu`

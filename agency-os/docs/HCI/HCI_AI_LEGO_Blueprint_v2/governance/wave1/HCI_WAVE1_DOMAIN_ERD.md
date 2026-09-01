@@ -48,7 +48,7 @@ The eventual migration must implement these as DB constraints, policy-engine rul
 
 ## Runtime-verification gate
 
-The executable coverage is defined by `HCI_WAVE1_NEGATIVE_TEST_SPEC.md` and the isolated synthetic-only runner at `../../../../../systems/hci30/`. Docker-backed execution evidence is still required before any runtime gate may close.
+The executable coverage is defined by `HCI_WAVE1_NEGATIVE_TEST_SPEC.md` and the isolated synthetic-only runner at `D:\Work\Projects\internal\hci30\`. Docker-backed execution evidence is still required before any runtime gate may close.
 
 ## Evidence
 
