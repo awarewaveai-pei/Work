@@ -72,4 +72,3 @@ systems/hci30/
 ## First implementation increment
 
 Create TypeScript strict toolchain, CI-quality local test commands, migration manifest, architecture-boundary tests, signed tenant-context contract, and the synthetic Person/DSR API vertical slice. It must not connect to the portal, Cognitive OS, production infrastructure, or any real data source.
-
