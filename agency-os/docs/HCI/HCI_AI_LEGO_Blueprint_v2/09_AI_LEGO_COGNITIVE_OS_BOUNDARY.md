@@ -80,8 +80,9 @@ HCI-30 and AI LEGO remain independent peer products at the domain layer regardle
    rather than the ad hoc LOW/MEDIUM/HIGH/CRITICAL table in 10 §Cross-
    Model Gate.
 4. Tenant / entitlement / billing substrate — explicitly Foundation LEGO
-   per 18's own taxonomy; the real shipped portal code is a starting
-   point, pending 02_PRODUCT_BOUNDARIES.md HD-01.
+   per 18's own taxonomy; ADR-0009 adopts AI LEGO ADR-003 Tenant as the
+   platform primitive, while portal code remains an adapter with an open
+   mapping/migration/negative-test gate.
 ```
 
 **Why "vendored/pinned, not live"**: this preserves "HCI works without AI LEGO" and "AI LEGO works without HCI" (§Independence Requirement, `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md`) by construction — each product depends on a specific version of the kernel's contract, not on the other product's runtime being reachable. This is explicitly **not** a "Shared God Platform": it is the same small, deliberately-scoped reference layer `18_LEGO_CONTRACT_AND_COMPONENT_TAXONOMY.md` already specified, actually built this time, plus three genuinely load-bearing extractions that the independent review found each product had begun independently re-deriving. Everything else — Person/Relationship/TrustDomain domain logic, Method/Workflow/ExecutionRun orchestration logic, the two Evidence *ledgers themselves* (only their shape vocabulary is shared, not their storage or ownership) — stays fully separate.

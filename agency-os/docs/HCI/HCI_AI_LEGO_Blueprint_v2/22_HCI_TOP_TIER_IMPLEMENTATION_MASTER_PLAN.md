@@ -30,9 +30,9 @@ Planning register: `D:\Work\agency-os\docs\HCI\HCI_AI_LEGO_Blueprint_v2\governan
 
 Proposal template: `D:\Work\agency-os\docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\HCI_CHANGE_PROPOSAL_TEMPLATE.md`
 
-Create/lock ADR-0001 through ADR-0013 (extended list, `17_REPOSITORY_LAYOUT_AND_PATHS.md`).
+Create/lock the remaining planned ADRs from ADR-0001 through ADR-0013 (extended list, `17_REPOSITORY_LAYOUT_AND_PATHS.md`), and verify the implementation gates of any already accepted ADR.
 
-**New in V2 — these ADRs specifically must resolve before Wave 0 closes**: Tenant/Organization reconciliation (`02` `HD-01`) — cheapest fix in the whole plan today since zero real customers exist on any of the three current definitions. Shared Kernel extraction (`09` §Shared Kernel). Consent scope (`07` `HD-02`). Subject-type scope (`02` `HD-00`). Regulatory market scope (`11` `HD-20`).
+**New in V2 — these ADRs specifically must resolve before Wave 0 closes**: Tenant/Organization reconciliation (`02` `HD-01`, accepted as ADR-0009; mapping/migration/negative-test gate remains open). Shared Kernel extraction (`09` §Shared Kernel). Consent scope (`07` `HD-02`, accepted as ADR-0010; model/policy/anti-conflation gate remains open). Subject-type scope (`02` `HD-00`, accepted as ADR-0011; ERD/constraint/negative-test gate remains open). Regulatory market scope (`11` `HD-20`).
 
 Expected result: later teams cannot collapse HCI/Cognitive, app/portal, DB boundaries, trust semantics, or the newly-resolved ADR items above.
 

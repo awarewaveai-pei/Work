@@ -4,7 +4,7 @@
 
 **This is the current, authoritative specification.** `HCI_AI_LEGO_Blueprint_v1\` is superseded and archived — do not read it for current truth; it is kept only as a historical record of what V1 said before independent review. If you find yourself reading a `v1` file, stop and come here instead.
 
-V2 was produced by taking V1, applying 80 findings from a 9-independent-reviewer architecture re-research that did not require operator judgment, and marking the remaining 24 findings that do require operator judgment as explicit, inline **🔴 DECISION PENDING** blocks — not hidden in a separate file, but placed exactly where that content belongs in the spec, so nobody can read past them without noticing. The full evidence and reasoning behind every decision in this document — including the ones already resolved — lives in `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\` and is cited by ID (e.g. `DOM-01`, `HD-05`) throughout. You do not need to read that package to build from V2; you need it only if you want to see *why* a specific line reads the way it does.
+V2 was produced by taking V1 and applying 80 findings from a 9-independent-reviewer architecture re-research that did not require operator judgment. Its remaining 24 human-judgment findings were recorded inline at their owning design boundaries. On 2026-09-01 the operator explicitly resolved `HD-00`, `HD-01`, and `HD-02`; the three accepted ADRs and their still-open implementation gates live in `governance/ADR_INDEX.md`. The remaining 21 decisions stay inline and unresolved, rather than being hidden in a separate file. The full evidence and reasoning behind every decision lives in `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\` and is cited by ID (e.g. `DOM-01`, `HD-05`) throughout. You do not need to read that package to build from V2; you need it only if you want to see *why* a specific line reads the way it does.
 
 ## Purpose
 
@@ -23,9 +23,8 @@ The two products are **peer systems** at the domain layer, sharing a small versi
 ```text
 HCI-30
 = 辨人 + 關係情報 + 合作評估 + 是否合作 + 風險控制
-= assessable Subjects: Person (V1 scope) — see 07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md
-  §Subject Model for the 🔴 DECISION PENDING on whether Organization becomes
-  independently assessable
+= assessable Subjects: Person (V1 scope) — ADR-0011 reserves a nullable
+  forward-compatible subject shape but does not authorize Organization assessment
 
 AI LEGO Cognitive Engineering OS
 = 如何系統化思考 + 選方法 + 編排 workflow + AI 執行治理 + replay/rollback
@@ -112,6 +111,6 @@ For work in the shared repository, the operating authority for write boundaries,
 
 ## How this differs from V1
 
-24 findings in this document are marked 🔴 **DECISION PENDING** — genuine value trade-offs, legal-risk-tolerance calls, or product-scope questions that only the operator can resolve; no amount of further AI analysis will resolve them. **Do not implement the content of a 🔴 block until the operator has explicitly chosen an option.** Everything else in this document is ready to build against.
+24 findings originally required human judgment. Three are now resolved by explicit operator approval (`HD-00=C`, `HD-01=A`, `HD-02=C`); their decisions are recorded in ADR-0011, ADR-0009, and ADR-0010 respectively, while their implementation gates remain open. The remaining 21 findings are marked 🔴 **DECISION PENDING** — genuine value trade-offs, legal-risk-tolerance calls, or product-scope questions that only the operator can resolve. **Do not implement the content of a 🔴 block until the operator has explicitly chosen an option.**
 
 For the complete list of what changed and why, see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\20_V1_TO_V2_CHANGESET.md`. For the complete list of pending decisions in one place (in addition to finding them inline here), see `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md`.

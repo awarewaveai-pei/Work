@@ -35,7 +35,7 @@ The target is not "more features." The target is: Correct + measurable + enforce
 
 Path: `D:\Work\agency-os\systems\hci30\docs\domain\{HCI_DOMAIN_ERD.md, HCI_ENTITY_DICTIONARY.md, HCI_INVARIANTS.md, HCI_STATE_MACHINES.md}`. Implementation: `D:\Work\agency-os\systems\hci30\database\{schema, migrations, constraints}\`.
 
-**Must incorporate, new in V2**: `Case`/`Engagement`, `DataSubjectRequest`, `PersonMergeLog`/`PersonSplitLog`, `Control`/`Mitigation` (`07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md`), the `subject_type` forward-compatible column (pending `02` `HD-00`), and the Shared Kernel thin-reference types (`09` §Shared Kernel) rather than full-record duplication.
+**Must incorporate, new in V2**: `Case`/`Engagement`, `DataSubjectRequest`, `PersonMergeLog`/`PersonSplitLog`, `Control`/`Mitigation` (`07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md`), the ADR-0011 `subject_type`/`subject_id` forward-compatible Person-default shape, and the Shared Kernel thin-reference types (`09` §Shared Kernel) rather than full-record duplication.
 
 Expected result: no developer or AI can invent a different meaning for Person, Claim, Evidence, Assessment, Risk, Permission, or Decision.
 
@@ -77,7 +77,7 @@ Expected result: all clients depend on contracts, not implementation internals.
 
 Path: `D:\Work\agency-os\shared\platform\tenants\TENANT_CONTEXT_STANDARD.md`. Define: `tenant_id`, `organization_id`, `workspace_id`, `actor_id`, `service_account_id`, `request_id`, `data_region`, `policy_context`.
 
-**Must resolve `02` `HD-01` (Tenant/Organization reconciliation) before this standard is written** — writing a tenant-context standard against an unresolved Tenant model would need to be redone.
+**ADR-0009 (`HD-01=A`) resolves the Tenant/Organization model before this standard is written** — the standard must implement its AI LEGO ADR-003 Tenant semantic and portal-adapter mapping; do not freeze it until the mapping, compatibility/migration plan, and cross-tenant negative test gates are closed.
 
 Expected result: tenant identity cannot disappear between gateway, worker, DB, event, export, or AI request.
 

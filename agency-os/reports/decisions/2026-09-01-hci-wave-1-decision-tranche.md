@@ -1,6 +1,6 @@
 # 決策：HCI Wave 1 的人類決策處理策略
 
-**狀態：** `PROPOSED` — 本文件不是 24 項 HD 或任何 HCI ADR 的人類批准紀錄。
+**狀態：** `PARTIALLY APPLIED` — 本文件本身不是批准紀錄；`HD-00=C`、`HD-01=A`、`HD-02=C` 的明示人類批准已記錄到 HCI ADR-0011、ADR-0009、ADR-0010。其餘 HD 與本文件的 tranche 策略仍非已批准。
 **日期：** 2026-09-01
 **模式：** architecture_review
 **信心值：** 0.70 — Wave 1 先處理的範圍有原始研究包 Section A 的直接支持；個別選項仍需要操作者明確選擇，尤其 HD-01 與 HD-02。
@@ -19,6 +19,18 @@
 **最重要的切換條件：** 若 Wave 1 尚未開始前，HD-01（平台 Tenant）或 HD-02（Consent 三分語意）無法取得明確批准，停止資料模型／schema freeze，不以 placeholder 冒充裁決。
 
 **首次複審：** 人類批准後 30 天；若未批准，於首次 Wave 1 排程前重新檢視。
+
+## Approval record — 2026-09-01
+
+Operator explicitly approved: `HD-00=C；HD-01=A；HD-02=C。`
+
+| HD | Approval applied to | Implementation-gate status |
+|---|---|---|
+| HD-00 | `governance/ADR-0011-hci-subject-type-scope.md` | `OPEN` — ERD/table matrix, Person-default constraint, non-Person negative test |
+| HD-01 | `governance/ADR-0009-tenant-organization-model-reconciliation.md` | `OPEN` — mapping, compatibility/migration plan, cross-tenant adapter negative test |
+| HD-02 | `governance/ADR-0010-consent-entity-scope.md` | `OPEN` — separate model, lawful-basis policy, anti-conflation constraint/test |
+
+This records only those three choices. HD-03 through HD-23 remain unapproved and the tranche strategy itself remains a recommendation until separately accepted.
 
 ---
 
@@ -75,9 +87,9 @@
 
 | HD | 建議選項／裁決方向 | 必須產生的可驗證 artifact | 不批准時的限制 |
 |---|---|---|---|
-| HD-00 | **C**：V1 功能 Person-only；Wave 1 ERD 加 nullable `subject_type`/`subject_id` forward-compatible stub，預設 `PERSON`。 | ERD + subject-type constraint。 | 不建 Organization assessment。 |
-| HD-01 | **A（建議，須你確認）**：以 AI LEGO ADR-003 Tenant 為平台語意，現有 portal `organizations` 成為 adapter，而非第二個平台 Tenant。 | tenant/organization mapping ADR、migration plan、cross-tenant test。 | 不 freeze tenant schema、不將 `external_tenant_id` 視為已裁決。 |
-| HD-02 | **C（建議）**：將 tenant authorization、data-subject consent、source terms 分為不同欄位／記錄，不使用裸 `Consent`。 | consent model schema + lawful-basis policy。 | 不聲稱取得資料主體同意。 |
+| HD-00 | **C（已批准 2026-09-01）**：V1 功能 Person-only；Wave 1 ERD 加 nullable `subject_type`/`subject_id` forward-compatible stub，預設 `PERSON`。 | ERD + subject-type constraint。 | 不建 Organization assessment。 |
+| HD-01 | **A（已批准 2026-09-01）**：以 AI LEGO ADR-003 Tenant 為平台語意，現有 portal `organizations` 成為 adapter，而非第二個平台 Tenant。 | tenant/organization mapping ADR、migration plan、cross-tenant test。 | 不 freeze tenant schema、不將 `external_tenant_id` 視為已裁決。 |
+| HD-02 | **C（已批准 2026-09-01）**：將 tenant authorization、data-subject consent、source terms 分為不同欄位／記錄，不使用裸 `Consent`。 | consent model schema + lawful-basis policy。 | 不聲稱取得資料主體同意。 |
 | HD-03 | **A**：建立 `DataSubjectRequest` 及生命週期／evidence versioning lineage，列為 P0。 | request state machine、access/correction/erasure audit tests。 | 不收集 RESTRICTED dossier。 |
 | HD-04 | **A**：RESTRICTED subject 僅 deterministic ID match 或明確 human confirmation；LLM confidence 不得單獨確認。 | identity policy、`MATCH_CONFIRMED` gate、negative tests。 | 不將 candidate 升為 confirmed。 |
 | HD-05 | **A**：每張 tenant-owned table mandatory RLS，加 CI-blocking cross-tenant read test。 | RLS matrix + integration test。 | 不上線 tenant-owned 資料表。 |
@@ -160,9 +172,9 @@
 
 ## 給操作者的開放問題
 
-1. **HD-01：** 是否採用「AI LEGO ADR-003 Tenant 為平台語意、portal `organizations` 為 adapter」？這是第一個 schema blocker。
-2. **HD-02：** 是否同意用三個分離的 authorization/consent/terms 記錄，並禁止裸 `Consent`？
-3. **批准節奏：** 是否接受每批最多 3 項、先處理 HD-01／02／03 的節奏？
+1. **HD-03：** 是否建立 `DataSubjectRequest` 及生命週期／evidence-versioning lineage，列為 P0？
+2. **HD-04：** 是否限制 RESTRICTED subject 只能以 deterministic ID match 或明確 human confirmation 成為 confirmed？
+3. **HD-05：** 是否要求每張 tenant-owned table mandatory RLS 並以 CI-blocking cross-tenant read test 驗證？
 
 ## ADR 骨架
 

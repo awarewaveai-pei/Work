@@ -8748,6 +8748,31 @@ _Last synced: 2026-08-24 19:21:02 UTC_
   - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
   - BUGHUNT_WAIVED: DOC_ONLY -- no code change
 
+## 2026-09-01
+
+### docs(hci): record explicit HD-00/01/02 approvals without unlocking implementation
+
+- AUTO_TASK_DONE: docs(hci) — recorded HD-00=C, HD-01=A, and HD-02=C as accepted ADRs with implementation gates left open.
+
+**根本問題**: HCI V2 已有 24 項人類決策與 ADR planning register；其中 `HD-00`、`HD-01`、`HD-02` 已收到操作者明示選項，但若只保留在對話裡，文件仍會錯誤顯示為 pending，並且批准與 schema/policy/test gate 脫鉤。
+
+**已修改**:
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-tenant-organization-model-reconciliation.md` — 記錄 `HD-01=A`；Tenant 模型、portal adapter 邊界及 mapping/migration/negative-test open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0010-consent-entity-scope.md` — 記錄 `HD-02=C`；明定 tenant authorization、data-subject consent/lawful basis、source terms 三分語意及 open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0011-hci-subject-type-scope.md` — 記錄 `HD-00=C`；V1 Person-only 與 nullable forward-compatible subject stub 的 open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{00_README.md,02_PRODUCT_BOUNDARIES.md,07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md,14_ROADMAP_AND_DEFINITION_OF_DONE.md,16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md,17_REPOSITORY_LAYOUT_AND_PATHS.md,22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md,governance/ADR_INDEX.md}` — 將這三項改為 resolved/accepted，且明示所有 implementation gates 仍為 `OPEN`；其餘 21 項不變。
+- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 加入操作者批准紀錄與下個未決三項（HD-03/04/05）。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- only architecture records and cross-document decision state changed; no runnable HCI implementation or schema exists. Static document-gate check passed: 3 accepted ADRs, 10 remaining planned ADRs, 0 stale pending/unresolved HD-00/01/02 references, and 16 changed V2 Markdown files with paired code fences. `audit-cross-machine-bom.ps1 -WorkRoot D:\Work` also passed: 80/80 cross-Drive memory Markdown files have UTF-8 BOM.
+- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read back the ADR metadata, decision authority, required gate lists, index state, owner-document cross-links, report approval table, and tenancy hierarchy. Every accepted ADR says `OPEN` for implementation gates and no document claims schema/policy/test implementation.
+- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`(pending|unresolved).{0,80}HD-0[012]|HD-0[012].{0,80}(pending|unresolved)` | hits=0; approval trace search (`HD-00=C|HD-01=A|HD-02=C|ADR-0009|ADR-0010|ADR-0011`) returned 40 reviewed current-state references. No scripts call site was introduced.
+- WORKLOG: 本條目
+
+**剩餘風險**: ADR acceptance is not Wave-1 readiness. The mapping/migration, lawful-basis policy, ERD constraints, and negative tests are deliberately not invented here; all three gates remain `OPEN`. HD-03 through HD-23 remain human decisions.
+
+**Rollback**: before implementation, supersede the individual ADR with a new explicit human approval and restore the affected inline state; after implementation, use the ADR-specific reviewed migration plan rather than relabeling historical data in place.
+
 ## 2026-08-31
 
 ### fix(codex): remove desktop Canva plugin to stop unsolicited OAuth windows

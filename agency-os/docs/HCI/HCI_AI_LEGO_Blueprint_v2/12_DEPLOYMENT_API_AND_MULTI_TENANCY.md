@@ -31,14 +31,12 @@ Core hierarchy:
 ```text
 Tenant
 ↓
-Organization
-↓
 Workspace
-↓
-Project
+├── Organization (attribute / relationship graph node; not a Tenant boundary)
+└── Project
 ```
 
-See `02_PRODUCT_BOUNDARIES.md` `HD-01` for the pending decision reconciling this hierarchy with AI LEGO's already-accepted Tenant model and the already-shipped `portal.aware-wave.com` `organizations` table.
+ADR-0009 (`HD-01=A`) adopts AI LEGO ADR-003's `Tenant → Workspace → Project` platform hierarchy. An Organization is represented under a Workspace rather than as an intervening platform boundary; the portal `organizations` record is an adapter. Its mapping, compatibility/migration plan, and cross-tenant negative test remain open gates.
 
 ## Tenant Isolation Tiers
 

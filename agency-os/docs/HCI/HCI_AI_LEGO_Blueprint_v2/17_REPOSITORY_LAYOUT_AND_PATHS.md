@@ -30,7 +30,7 @@ D:\Work\agency-os\
 │   └── HCI\
 │       ├── HCI_AI_LEGO_Blueprint_v1\  -- superseded historical record
 │       ├── HCI_AI_LEGO_Blueprint_v2\  -- this document set
-│       │   └── governance\             -- ADR register + proposal template; not approvals
+│       │   └── governance\             -- ADR register, accepted ADRs, and proposal template
 │       └── HCI30_RESEARCH_REVIEW\     -- audit trail / decision evidence, see below
 │
 ├── infra\
@@ -38,7 +38,7 @@ D:\Work\agency-os\
 └── ops\
 ```
 
-**Existing directories confirmed current (verified 2026-09-01)**: `docs\AI_LEGO_Cognitive_Engineering_OS\` already exists with real, ADR-governed `specs/*.yaml` files — do not treat this layout as greenfield for the AI LEGO side. `docs\HCI\HCI_AI_LEGO_Blueprint_v1\` is superseded; keep it in place, unmodified, as historical record. `docs\HCI\HCI30_RESEARCH_REVIEW\` holds the full evidence chain behind every decision in this V2 document — not required reading to build, but the reference of record for "why." `docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\` is the current planning register; entries there are not accepted architecture decisions without their recorded approval.
+**Existing directories confirmed current (verified 2026-09-01)**: `docs\AI_LEGO_Cognitive_Engineering_OS\` already exists with real, ADR-governed `specs/*.yaml` files — do not treat this layout as greenfield for the AI LEGO side. `docs\HCI\HCI_AI_LEGO_Blueprint_v1\` is superseded; keep it in place, unmodified, as historical record. `docs\HCI\HCI30_RESEARCH_REVIEW\` holds the full evidence chain behind every decision in this V2 document — not required reading to build, but the reference of record for "why." `docs\HCI\HCI_AI_LEGO_Blueprint_v2\governance\` is the current ADR register, proposal template, and accepted-decision record; only entries explicitly recorded as `ACCEPTED` with human approval are architecture decisions.
 
 ## HCI-30
 

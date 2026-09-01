@@ -13,7 +13,7 @@ HCI Group
 HCI Private
 ```
 
-**Clarification (new in V2)**: these tiers describe **account size and feature surface** (seats, collaboration, API access). They are a separate axis from the Subject-type / Requester-role question in `02_PRODUCT_BOUNDARIES.md` (pending `HD-00`) — an Enterprise-tier account and a Personal-tier account can both, in principle, want to research either a Person or (pending that decision) an Organization, for different relationship goals. Do not conflate "how big is the paying account" with "what kind of analysis they need."
+**Clarification (new in V2)**: these tiers describe **account size and feature surface** (seats, collaboration, API access). They are a separate axis from subject type: ADR-0011 (`HD-00=C`) keeps V1 assessment Person-only, regardless of account tier, while retaining a forward-compatible subject stub for a future explicit decision. Do not conflate "how big is the paying account" with "what kind of analysis they need."
 
 ## Personal
 

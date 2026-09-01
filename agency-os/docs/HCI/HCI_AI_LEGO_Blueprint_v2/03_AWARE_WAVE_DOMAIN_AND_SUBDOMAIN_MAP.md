@@ -82,7 +82,7 @@ HCI and Cognitive OS are independent peer products at the domain layer (see `02_
 
 Role: Unified external customer control plane. Responsibilities: login, account, tenant membership, organization, subscription, billing, entitlements, product launcher, customer security settings, customer API credentials. Audience: HCI customers, Cognitive OS customers, future Aware Wave product customers.
 
-**Status**: identity/login layer is deployed to production (commit `83277d80`, `WORKLOG.md` 2026-08-29). Signup is deliberately gated off pending `PORTAL_SIGNUP_ENABLED`/`TURNSTILE_SECRET_KEY`. See `HD-01` in `02_PRODUCT_BOUNDARIES.md` for the unresolved Tenant/Organization data-model question this real deployment surfaced.
+**Status**: identity/login layer is deployed to production (commit `83277d80`, `WORKLOG.md` 2026-08-29). Signup is deliberately gated off pending `PORTAL_SIGNUP_ENABLED`/`TURNSTILE_SECRET_KEY`. The Tenant/Organization architecture choice this deployment surfaced is resolved by ADR-0009 (`HD-01=A`); its portal-adapter mapping, compatibility/migration plan, and cross-tenant negative test remain open implementation gates.
 
 ## `docs.aware-wave.com`
 

@@ -8,7 +8,7 @@
 
 Create: system constitution, product boundaries, data ownership, security baseline, domain policies.
 
-**V2 addition**: also resolve the Wave-0 ADRs this document set now requires before Wave 1 — Tenant/Organization reconciliation (`02` `HD-01`), Consent scoping (`07` `HD-02`), Regulatory scope (`11` `HD-20`), Shared Kernel extraction (`09` §Shared Kernel).
+**V2 addition**: also resolve the Wave-0 ADRs this document set now requires before Wave 1 — Tenant/Organization reconciliation (`02` `HD-01`, ADR-0009 accepted but its mapping/migration/test gate remains open), Consent scoping (`07` `HD-02`, ADR-0010 accepted but its model/policy/test gate remains open), Subject-type scope (`02` `HD-00`, ADR-0011 accepted but its ERD/constraint/test gate remains open), Regulatory scope (`11` `HD-20`), Shared Kernel extraction (`09` §Shared Kernel).
 
 Expected result: no developer or AI can silently redefine system boundaries.
 

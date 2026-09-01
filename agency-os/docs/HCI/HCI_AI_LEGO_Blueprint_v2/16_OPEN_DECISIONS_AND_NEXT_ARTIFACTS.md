@@ -2,13 +2,13 @@
 
 ## Status note (new in V2)
 
-**The authoritative, complete list of open decisions is now `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` (24 items)** — every 🔴 DECISION PENDING block throughout this V2 document set is drawn from that file. This chapter keeps V1's original decision list for continuity, marked against what V2 resolved, and folds in the items that list omitted.
+**`D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` is the immutable 24-item research evidence list.** Current state is in `governance/ADR_INDEX.md`: on 2026-09-01, `HD-00=C`, `HD-01=A`, and `HD-02=C` were explicitly approved and recorded as ADR-0011, ADR-0009, and ADR-0010. The other 21 decisions remain open. This chapter keeps V1's original decision list for continuity, marked against what V2 resolved, and folds in the items that list omitted.
 
 ## Governance starter — before the next artifact
 
 Use `governance/ADR_INDEX.md` as the auditable register for the ADRs named by this blueprint, and start a material decision/change with `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md`. The register only records state and evidence links: it does not create an accepted ADR or turn a pending decision into an implementation instruction.
 
-Before artifact #1 or any artifact that would choose a boundary, authority, consent scope, subject type, market scope, or shared-kernel rule, create the corresponding `PLANNED`/`DRAFT` record and obtain the explicitly required human approval before applying the chosen option. The 24 open decisions remain open unless their authoritative record says otherwise.
+Before artifact #1 or any artifact that would choose a boundary, authority, consent scope, subject type, market scope, or shared-kernel rule, create the corresponding `PLANNED`/`DRAFT` record and obtain the explicitly required human approval before applying the chosen option. The three accepted ADRs still require their named implementation gates; the other 21 decisions remain open unless their authoritative record says otherwise.
 
 ## Decisions already made
 
@@ -63,14 +63,14 @@ Known: three mother documents, 289-method atlas, scoped authority chain, replay/
 | 19 | Scientific advisory process | Still open |
 | 20 | HCIS public standard design | Still open |
 
-## New open decisions surfaced by the V2 review (not in V1's original list of 20)
+## New decision records surfaced by the V2 review (not in V1's original list of 20)
 
 See `D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` for the complete set. Headline additions V1's own list missed entirely:
 
-- Subject-type scope: Person-only vs. Person+Organization (`HD-00`)
+- Subject-type scope: **resolved by ADR-0011** — V1 Person-only with a forward-compatible nullable subject stub (`HD-00=C`)
 - Data Subject (researched Person) rights channel (`HD-03`)
-- Tenant/Organization model reconciliation across HCI, AI LEGO, and the already-shipped portal code (`HD-01`)
-- Consent entity scope (`HD-02`)
+- Tenant/Organization model reconciliation across HCI, AI LEGO, and the already-shipped portal code: **resolved by ADR-0009** (`HD-01=A`; mapping/migration/test gate open)
+- Consent entity scope: **resolved by ADR-0010** (`HD-02=C`; model/policy/test gate open)
 - EU AI Act / FCRA regulatory scope (`HD-20`)
 - Controller/processor determination for the profiled Person (`HD-21`)
 - Claim/Source tenant ownership — shared vs. tenant-scoped (`HD-16`)
@@ -82,7 +82,7 @@ Recommended in this order (unchanged from V1's sequencing, with V2's new entitie
 
 ### 1. HCI Domain ERD
 
-Must include: Person, Organization (pending `HD-00`), Relationship, Interaction, Evidence, Claim, Assessment, TrustDomain, Risk, Permission, Decision, Outcome, **Case/Engagement, DataSubjectRequest, PersonMergeLog/PersonSplitLog, Control/Mitigation** (all new in V2, see `07`).
+Must include: Person; Organization as a relationship/attribute node (ADR-0011, not an independently assessable subject); Relationship, Interaction, Evidence, Claim, Assessment, TrustDomain, Risk, Permission, Decision, Outcome, **Case/Engagement, DataSubjectRequest, PersonMergeLog/PersonSplitLog, Control/Mitigation** (all new in V2, see `07`).
 
 ### 2. HCI Trust & Risk Mathematical Specification
 

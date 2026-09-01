@@ -1,6 +1,6 @@
 # HCI ADR Index
 
-Status: **PLANNING REGISTER — no entry below is an accepted decision**
+Status: **MIXED REGISTER — only entries explicitly marked `ACCEPTED` below are approved decisions**
 Owner: HCI AI LEGO Blueprint v2
 Last reviewed: 2026-09-01
 
@@ -24,11 +24,21 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0006 | Domain evidence and execution evidence are distinct | `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md`, `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md` | `PLANNED` | Not recorded |
 | ADR-0007 | Modular monolith first | `17_REPOSITORY_LAYOUT_AND_PATHS.md`, `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md` | `PLANNED` | Not recorded |
 | ADR-0008 | Vendor-neutral domain core | `01_SYSTEM_CONSTITUTION.md`, `09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md` | `PLANNED` | Not recorded |
-| ADR-0009 | Tenant/Organization model reconciliation | `02_PRODUCT_BOUNDARIES.md` (`HD-01`) | `PLANNED` | Not recorded |
-| ADR-0010 | Consent entity scope | `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` (`HD-02`) | `PLANNED` | Not recorded |
-| ADR-0011 | HCI subject-type scope | `02_PRODUCT_BOUNDARIES.md` (`HD-00`) | `PLANNED` | Not recorded |
+| ADR-0009 | Tenant/Organization model reconciliation | `02_PRODUCT_BOUNDARIES.md` (`HD-01`) | `ACCEPTED` | Operator: `HD-01=A`, 2026-09-01; `ADR-0009-tenant-organization-model-reconciliation.md` |
+| ADR-0010 | Consent entity scope | `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` (`HD-02`) | `ACCEPTED` | Operator: `HD-02=C`, 2026-09-01; `ADR-0010-consent-entity-scope.md` |
+| ADR-0011 | HCI subject-type scope | `02_PRODUCT_BOUNDARIES.md` (`HD-00`) | `ACCEPTED` | Operator: `HD-00=C`, 2026-09-01; `ADR-0011-hci-subject-type-scope.md` |
 | ADR-0012 | Regulatory market scope | `11_SECURITY_PRIVACY_GOVERNANCE.md` (`HD-20`) | `PLANNED` | Not recorded |
 | ADR-0013 | Shared Foundation-kernel extraction | `09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md` (§Shared Kernel) | `PLANNED` | Not recorded |
+
+## Accepted-decision implementation gates
+
+`ACCEPTED` records a human architecture choice; it is not an implementation-complete state. The following gates remain open until their named artifacts and verification evidence exist.
+
+| ADR | Gate state | Required artifact-to-gate mapping |
+|---|---|---|
+| ADR-0009 | `OPEN` | Tenant/Organization mapping + compatibility/migration plan + cross-tenant adapter negative test |
+| ADR-0010 | `OPEN` | Separate authorization/subject-consent/source-terms model + lawful-basis policy + anti-conflation constraint/test |
+| ADR-0011 | `OPEN` | Wave 1 ERD/table matrix + Person-default subject constraint + non-Person assessment negative test |
 
 ## Review record template
 
