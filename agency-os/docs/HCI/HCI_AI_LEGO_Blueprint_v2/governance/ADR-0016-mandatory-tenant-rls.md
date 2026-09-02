@@ -1,6 +1,6 @@
 # ADR-0016 — Mandatory Tenant Row-Level Security
 
-Status: **ACCEPTED — RUNTIME SKELETON ONLY**
+Status: **ACCEPTED — SYNTHETIC RUNTIME GATE VERIFIED (mutation-checked); NOT production-authorized**
 Date: 2026-09-01
 Decision authority: Operator explicit approval — `HD-05=A`
 

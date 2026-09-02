@@ -29,7 +29,7 @@ HCI must represent the following independently; a record in one class never supp
 
 - **HD-20** determines the markets/use cases and must precede any jurisdiction-specific applicability statement.
 - **HD-21** determines controller/processor roles and must precede customer DPA language.
-- **ADR-0014 / HD-03=A** requires a data-subject rights workflow and cannot be substituted by tenant DSAR procedures; its runtime test gate remains open.
+- **ADR-0014 / HD-03=A** requires a data-subject rights workflow and cannot be substituted by tenant DSAR procedures; its synthetic runtime test gate is verified and mutation-checked (2026-09-02); the real-data admission gate remains closed pending HD-07/20/21.
 
 Until those are resolved, this policy defines product behavior only: record uncertainty, fail closed for real-person processing, and escalate for human/legal review. It makes no legal conclusion or compliance certification.
 

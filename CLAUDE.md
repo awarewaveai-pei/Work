@@ -71,8 +71,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 
 ### 伺服器邊界（**不可混用**）
 
-**現況（2026-08-30 起）**：SG + EU 已全數整併到單機 **`ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）**。舊 `5.223.93.113`（SG）/ `204.168.175.41`（EU）**主機已刪除退租**（操作者於 Hetzner Cloud console 執行，不可逆，無回滾路徑），**任何部署/操作都不該再 SSH 過去（機器已不存在）**。容器細節見 AGENTS.md §AwareWave Stack、拓樸橫幅見 [`AWAREWAVE_STACK_QUICKREF.md`](agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。  
+**現況（2026-08-31 起）**：SG + EU 已全數整併到單機 **`ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）**。前任 `149.202.64.114` 已在 OVH Manager 顯示 Terminated；更早的 `5.223.93.113`（SG）/ `204.168.175.41`（EU）也已刪除退租。**任何部署/操作都只能 SSH 至 `145.239.195.47`**，不存在回退到前任主機的路徑。容器細節見 AGENTS.md §AwareWave Stack、拓樸橫幅見 [`AWAREWAVE_STACK_QUICKREF.md`](agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
 詳細操作規則（Routing 三件套 / 自動化安全預設 / Auto-Repair 紅線 / Trigger.dev 憑證 / 其他 SSOT）見 AGENTS.md §Lobster Factory 操作規則 及 §Auto-Repair 紅線。
-

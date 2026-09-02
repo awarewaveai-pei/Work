@@ -111,7 +111,7 @@
 | 部署上線 | `/check-drift` → `/verify` → （確認）→ `/sg-deploy` | **高**（需你點頭）|
 | 技術選型 / A vs B / 架構決策 | `/decide` | 安全 |
 | 找 bug / 一直報錯 | 跟 Claude 說「diagnose this」 | 安全 |
-| 重啟 VPS | `/sg-reboot`｜`/eu-reboot` | **高**（需你點頭）|
+| 重啟 VPS | `/ks-aw-01-reboot` | **高**（需你點頭）|
 | 開工（出狀態報告）| 說「AO-RESUME」或打招呼 | 安全 |
 | 收工（寫日誌＋健康閘）| 說「收工／晚安／bye／done」 | 安全 |
 

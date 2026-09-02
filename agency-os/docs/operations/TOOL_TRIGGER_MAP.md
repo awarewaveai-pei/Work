@@ -51,8 +51,7 @@
 | `/check-drift` | SG production deploy drift 檢查 | 🟢 準備 deploy 前自動跑（`/verify` 之前）|
 | `/sg-deploy` | 部署 SG VPS lobster-phase1 | 🟢 `/check-drift` + `/verify` 都 pass 後提議；⚪ High risk — 等明示 go-ahead |
 | `/playwright` | 瀏覽器自動化 QA（smoke/qa/client/screenshot/perf）| 🟢 `sg-deploy` 完成後自動跑 smoke；`wp-maintenance` 完成後跑 client |
-| `/sg-reboot` | SG VPS 安全重啟 | ⚪ High risk — 等明示 go-ahead（reboot 訊號 ≥ 16h 後 escalate）|
-| `/eu-reboot` | EU VPS 安全重啟 | ⚪ High risk — 等明示 go-ahead |
+| `/ks-aw-01-reboot` | ks-aw-01 安全重啟 | ⚪ High risk — 等明示 go-ahead（reboot 訊號 ≥ 16h 後 escalate）|
 | `/auto-reboot-status` | VPS auto-reboot 健康診斷 | 🟢 訊息含 reboot 訊號 + VPS 識別字時 |
 | `/command-plane-verify` | Telegram bot 沉默診斷 | 🟢 Telegram 沉默 > 30 分鐘 / 指令無回應 |
 | `/phase4-check` | Repair Center Phase 4 健康 | 🟢 `/api/ops/repairs/health` 回 503 / `ok: false` |

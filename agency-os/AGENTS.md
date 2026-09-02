@@ -183,13 +183,13 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 
 ## AwareWave Stack 伺服器邊界（**不可混用**）
 
-**單機現況（2026-08-30 起）**：SG + EU 已全數整併至 `ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）。舊 `5.223.93.113`（SG）/ `204.168.175.41`（EU）**主機已於 Hetzner Cloud console 刪除退租**（操作者執行，不可逆，無回滾路徑）——**部署/維運一律對 ks-aw-01 操作**。容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本，頂部有橫幅）。  
-**搬機 / 上 dedicated / EU→大機·SG→EU 遷移唯一正本**：[`runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md`](../runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md)（備份/RAID/還原/遷移；動機器前必讀 §7 checklist）。  
+**單機現況（2026-08-31 起）**：SG + EU 已全數整併至 `ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）。前任 `149.202.64.114` 已於 2026-08-31 在 OVH Manager 終止；更早的 `5.223.93.113`（SG）/ `204.168.175.41`（EU）亦已刪除退租——**部署/維運一律對 `145.239.195.47` 操作**，沒有可用回滾主機。容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本，頂部有橫幅）。
+**搬機 / 上 dedicated / 整機轉移唯一正本**：[`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)（備份、切換、收尾與活性入口掃描；換機時只讀本份）。
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
 Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1`（各機由 `mcp/user-env.template.ps1` 生成，不進 git）/ env）；key names 在 `mcp/user-env.template.ps1`；**禁止硬編**。
 
 **部署規則（強制）**：
-- ⚠️ **「SG」= `ks-aw-01`（`149.202.64.114`，SSH `-p 58122`）,不是 `5.223.93.113`**——舊 SG/EU 主機已於 2026-08-30 刪除退租，**SSH 過去會直接連線失敗（機器不存在），務必先確認連的是 `149.202.64.114`**。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md) 頂部橫幅。
+- ⚠️ **「SG」= `ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）**。前任 `149.202.64.114` 與舊 SG/EU 主機皆已退場，**SSH 過去會直接連線失敗；務必先確認連的是 `145.239.195.47`**。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md) 頂部橫幅。
 - 部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull；本腳本在目標機本機執行，不含 SSH 邏輯，SSH 到哪台機純看操作者/代理自己下的指令）
 - `sg-deploy.sh` 內建：npm test gate → docker healthcheck → HTTP smoke check → 失敗自動 rollback
 - npm test 失敗時先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查原因
@@ -235,7 +235,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 | `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | ① curl inbox/digest 確認 403/401 類型；② `secrets-vault.ps1 -Action import-user-env`；③ 更新 `OPS_INBOX_INGEST_TOKEN` 到 User registry；④ 重跑確認 ok。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config`）且 bad request % > 50 | SSH EU 確認；若持續 → Cloudflare WAF PATCH API 追加 block rule；curl 實測 403。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
-| 訊息含 reboot 訊號（`needs reboot` / `重啟` 等）**且**含 VPS 識別字（EU/SG IP 或主機名）| 先讀 `reports/status/auto-reboot-LATEST.md`（verdict 🟢/🟡/🔴）。< 16h → auto-reboot 自動處理，不主動跑指令。≥ 16h 或非 🟢 → escalate 手動 `/sg-reboot` 或 `/eu-reboot`（High risk，等 go-ahead）。AO-RESUME 時必點名 verdict。詳見 `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
+| 訊息含 reboot 訊號（`needs reboot` / `重啟` 等）且含 `ks-aw-01`／`145.239.195.47` | 先讀 `reports/status/auto-reboot-LATEST.md`（verdict 🟢/🟡/🔴）。< 16h → auto-reboot 自動處理，不主動跑指令。≥ 16h 或非 🟢 → escalate 手動 `/ks-aw-01-reboot`（High risk，等 go-ahead）。AO-RESUME 時必點名 verdict。換機期間流程僅見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`。 |
 | 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| **🔧 機械閘**：`hooks/rules/code-change-tracker.js` 修改 .ps1 時自動提示。立即執行 `/audit-encoding --file <該檔絕對路徑>`（exit 0=放行；exit 1=fix：wrap capture site 或加 AUDIT_REGISTRY 豁免）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
 | 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`hooks/rules/verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。**critic 連續失敗（529/逾時）≥ 2 次 → 改用 `.\scripts\codex-oracle.ps1 -Mode review -Context "<改動說明>"` 當替代 oracle，不再重試同一個失效工具**（2026-08-24：critic 該 session 連續 6 次 529，codex-oracle.ps1 更新至最新版後正常運作；§跨模型 oracle 分工表本就把 Review 動作歸給 Codex，兩者是同一件事的兩條路徑，不是互斥）。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
 | 任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化 / class-by-class 相關問題或情境 | 先讀 [`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)（方法 SSOT，5-tier 觸發 + 9-step playbook + KPI）+ [`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)（狀態 SSOT）再回答，不靠常識 / 不臨機自創流程 |
@@ -445,5 +445,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-01 05:45:54 UTC_
+_Last synced: 2026-09-02 01:11:17 UTC_
 

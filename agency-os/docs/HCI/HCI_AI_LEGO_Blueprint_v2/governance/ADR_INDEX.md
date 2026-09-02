@@ -42,9 +42,9 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0009 | `SPECIFIED — RUNTIME OPEN` | Mapping and compatibility/migration design: `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`; cross-tenant adapter negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0010 | `SPECIFIED — RUNTIME OPEN` | Three-record policy: `wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`; model/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; anti-conflation tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0011 | `SPECIFIED — RUNTIME OPEN` | Subject table/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; Person-only negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
-| ADR-0014 | `SKELETON CREATED — REALTEST OPEN` | Synthetic DSR schema/events/tests: `D:\Work\Projects\internal\hci30\database\`; no real-person processing |
-| ADR-0015 | `SKELETON CREATED — REALTEST OPEN` | Synthetic identity-verification constraint/tests: `D:\Work\Projects\internal\hci30\database\`; no production pipeline |
-| ADR-0016 | `SKELETON CREATED — REALTEST OPEN` | Forced RLS/non-owner test-role runner: `D:\Work\Projects\internal\hci30\`; Docker real test remains required |
+| ADR-0014 | `SYNTHETIC GATE VERIFIED` | Synthetic DSR schema/events/tests: `D:\Work\Projects\internal\hci30\database\`; suite green + mutation-checked 2026-09-02; no real-person processing |
+| ADR-0015 | `SYNTHETIC GATE VERIFIED` | Synthetic identity-verification constraint/tests: `D:\Work\Projects\internal\hci30\database\`; both-sided evidence guard, mutation-checked 2026-09-02; no production pipeline |
+| ADR-0016 | `SYNTHETIC GATE VERIFIED` | Forced RLS/non-owner test-role runner: `D:\Work\Projects\internal\hci30\`; Docker run green 38/38 + mutation-checked 2026-09-02 |
 
 ## Review record template
 

@@ -3,7 +3,7 @@
 > 📍 機器拓樸（誰跑哪台）唯一正本：[`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)。本檔 = Supabase（EU）部署/設定正本；改容器時兩邊一起改。
 
 > Owner: `awarewaveai`  
-> **Supabase stack (EU) — 2026-08-30 update**: now on **ks-aw-01** (`149.202.64.114`, SSH `-p 58122`, `ubuntu@`). The old EU host `204.168.175.41` and SG host `5.223.93.113` were both deleted at Hetzner console 2026-08-28/30 — every `ssh ... 204.168.175.41` below fails outright; connect to ks-aw-01 instead.  
+> **Supabase stack — 2026-08-31 update**: on **ks-aw-01** (`145.239.195.47`, SSH `-p 58122`, `ubuntu@` + `sudo`). The prior host and old EU/SG boxes are retired; connect only to ks-aw-01.
 > Secrets policy: live tokens and passwords stay in vault or machine-local env only; do not commit them into repo-tracked files.
 
 ---
@@ -267,7 +267,8 @@ Do **not** run production DDL from IDE agents without the same gates as human op
 SSH to VPS:
 
 ```bash
-ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
+sudo -i
 ```
 
 List containers:

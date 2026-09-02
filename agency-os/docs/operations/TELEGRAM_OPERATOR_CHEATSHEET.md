@@ -4,7 +4,7 @@
 > **何時用**：出國、在外、半夜不想開電腦、急需控制系統時
 > **owner doc**：本檔
 > **其它技術文件**（架構／policy／schema）：見 §10 Related
-> **🚨 2026-08-30**：下文「Termius 連 EU server」`204.168.175.41` 已失效（主機刪除退租）。緊急時改連 **ks-aw-01**：Hostname `149.202.64.114` / Port `58122` / Username `ubuntu` / key `id_ed25519`。
+> **🚨 現役連線（2026-08-31）**：緊急時只連 **ks-aw-01**：Hostname `145.239.195.47` / Port `58122` / Username `ubuntu` / key `id_ed25519`。前任與舊 EU/SG 主機皆已退場。
 
 ---
 
@@ -148,8 +148,9 @@ Slack #ops-incidents 或 Telegram 推播警報
 只有 web ops console 完全壞掉、Telegram 也下不了指令時，從 Termius SSH 直接打 SQL：
 
 ```bash
-# Termius 連 EU server (Supabase host)
-ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41
+# Termius 連 ks-aw-01（Supabase host）
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
+sudo -i
 
 # 進 Postgres（細節見 CREDENTIALS.md §三 進入方式 C）
 docker exec -it supabase-db psql -U postgres

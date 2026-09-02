@@ -1,8 +1,8 @@
 # AwareWave Stack 快速查詢表
 
-> ## 🚨 2026-08-28 全面整併：SG + EU 已全數搬入 ks-aw-01（`149.202.64.114`）
+> ## 🚨 2026-08-31 現役主機：全部服務在 ks-aw-01（`145.239.195.47`）
 > 操作者指示提前整併（原排 11/20）。**現在所有服務都在一台機器上**：
-> - **SSH**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`（sudo；root 僅緊急）
+> - **SSH**：`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`（sudo；root 僅緊急）
 > - **13 筆 aware-wave.com DNS + soulfulexpression.org 全部指向 ks-aw-01**
 > - 架構：host nginx 統一終結 TLS（sites-enabled 每域一檔）→ 各服務綁 127.0.0.1 端口。
 >   下表的容器名/內部端口**原樣保留**，僅兩處改動：uptime-kuma 改 bridge 網路綁
@@ -12,7 +12,7 @@
 > - aware-wave.com LE 憑證已在 ks 重簽（SG 上的那張 8/23 已過期無人察覺——CF Flexible 走 80 所以沒炸）
 > - 排程全數移植：endpoint-alert timer、eu-backup cron（`/etc/cron.d/ks-stack-backup`）、
 >   mainwp wp-cron、supabase weekly restart、auto-deploy、watchdog、certbot renew
-> - **🔴 2026-08-30：舊機 SG `5.223.93.113` / EU `204.168.175.41` 已於 Hetzner Cloud console 刪除退租（操作者執行）——無回滾路徑，crontab 備份 `/root/crontab.bak` 已隨機器消失，Netdata Cloud 舊節點待手動移除**
+> - **🔴 前任 `149.202.64.114` 已於 2026-08-31 在 OVH Manager 終止；更早 SG/EU 也已刪除。無回滾主機。**
 > - 下方 SG/EU 兩節保留當容器/端口明細參考（內容在 ks 上依然成立），機器歸屬已失效
 
 > 所有伺服器、容器、路徑、端口的事實參考。

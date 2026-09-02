@@ -48,7 +48,7 @@
 ### 2.1 一鍵部署（推薦／預設）
 
 ```bash
-# SSH 到 SG（= ks-aw-01，`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114`；舊 5.223.93.113 已於 2026-08-30 刪除退租）
+# SSH 到 ks-aw-01（`ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`；前任與舊 SG/EU 均已退場）
 # 一鍵：拉 git + 同步源碼到 /root/lobster-phase1 + rebuild + healthcheck + 記錄 commit
 /root/lobster-phase1/scripts/sg-deploy.sh next-admin
 
@@ -273,7 +273,7 @@ docker rmi lobster-phase1-node-api:rollback-20260101-000000
 
 **Owner script**：`scripts/lobster-trigger-deploy.ps1`（本機執行，SSH 到 EU VPS）  
 **部署方式**：CLI deploy（不影響 Docker containers，Worker image 由 Trigger.dev 自管）  
-**Server**：`https://trigger.aware-wave.com`（= ks-aw-01 `149.202.64.114`；舊 EU VPS `204.168.175.41` 已於 2026-08-30 刪除退租）
+**Server**：`https://trigger.aware-wave.com`（= ks-aw-01 `145.239.195.47`；前任與舊 EU VPS 均已退場）
 
 ### 7.1 標準部署
 

@@ -1,6 +1,6 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **TEST SKELETON CREATED — Docker-backed execution evidence remains open**
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only)**
 Date: 2026-09-01
 Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
@@ -40,4 +40,24 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 
 ## Current state
 
-An isolated synthetic-only PostgreSQL 15.8 schema, non-owner test role, request validator, and runner now exist at `D:\Work\Projects\internal\hci30\`. Docker-backed tests remain **not run** until Docker Desktop is available; none may be reported as passing before that execution evidence exists. Portal-adapter tests remain excluded from this local skeleton.
+An isolated synthetic-only PostgreSQL 15.8 schema, non-owner test role, request
+validator, and runner exist at `D:\Work\Projects\internal\hci30\`.
+
+**Execution evidence (2026-09-02).** `scripts/test-wave1-local.ps1` runs green
+against real PostgreSQL 15.8 in Docker: 38 assertions recorded, 0 failed, plus a
+down/up reversibility pass over a populated schema.
+
+**Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
+closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
+requires the suite to go red on the specific assertions covering it; all 9
+mutations are killed. This exists because the first version of this suite could
+not fail: four assertions caught their own failure signal with the same handler
+that caught the control's rejection (both SQLSTATE P0001). That defect was
+demonstrated, not merely argued - the original suite exits 0 with the
+authorization, DSR-lifecycle, append-only, and identity-confirmation triggers
+physically dropped from the schema.
+
+Portal-adapter tests (TENANT-ADAPTER-NEG-01..03) remain excluded from this local
+skeleton. Passing these tests is a statement about the synthetic schema only. It
+is not evidence of legal compliance, production readiness, or permission to
+process a real person.
