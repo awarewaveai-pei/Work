@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-02（續3）
+
+### 併入事故（透明記錄，同續16模式）：續2 的 commit 被並行 session 的廣域 commit 收走
+
+**觸發**：`git add` 續2 的 5 個檔案後、`git commit -F <msg>` 前，共用工作目錄的並行 session 執行了自己的廣域 `git add`+`commit`（`632dd1913`「chore: retention-policy report prune + dispatch/session log rotation」），把已 staged 但尚未 commit 的續2 檔案一併收進其 commit。本次 `git commit` 因此回報「no changes added to commit」。
+
+**核對結果：內容完整無誤**。5 個檔案（`WORKLOG.md` 續2 全文、`ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md` 含 D9、`SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md` 含新 ID、`SEARCH_CONTENT_QUALITY_GATES.md`、`SEARCH_EVIDENCE_RETRIEVAL_SPEC.md`）逐一用 `git show 632dd1913:<path>` 讀回確認內容與預期相符，非遺失或損毀；`632dd1913` 已存在於 `origin/main`。
+
+**判斷不做 rebase/history 重寫修正 commit 歸屬**——與續16同一判例：rebase 共用分支上另一個 session 剛產生的 commit 是真實破壞性操作，風險遠大於一個描述不準確的 commit message。
+
+[已修改]
+- 無（本條純記錄，未動任何檔案）
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純查證記錄
+- REVIEW_DONE: critic=Quick（逐檔 `git show 632dd1913:<path> | grep` 核對關鍵內容存在，非只看 commit --stat 檔名列表）| verdict=pass | findings=0c/0m/0n
+
+[剩餘風險]
+- 無新增風險；純 commit message 美觀問題
+
+[rollback]
+- 不適用（無變更）
+
 ## 2026-09-02（續2）
 
 ### Search & Content pack：操作者明示「你決定」後完成任務 6/7/9 + Phase 5 關係註記；ADR 編號/physical path/source_of_truth_for 全量仍未做
