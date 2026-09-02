@@ -427,12 +427,43 @@ def run_ref_resolution_smoke():
     check(checked > 0, "cross-file $ref smoke test found zero ai-lego:// $ref values to check -- suite is not actually exercising anything")
 
 
+# ---------------------------------------------------------------------------
+# 5. SearchContent architecture pack (ADR-021 SS D10, Gate H) -- imports
+#    tests/architecture/search_content_pack_check.py and folds its rule
+#    functions' pass/fail counts into this suite's totals, rather than
+#    collapsing its ~1480 individual invariant checks into a single
+#    pass/fail line (which would hide a regression's exact cause).
+# ---------------------------------------------------------------------------
+def run_search_content_pack_check():
+    global passed
+    import importlib.util
+    spec_path = os.path.join(ROOT, "tests", "architecture", "search_content_pack_check.py")
+    try:
+        spec = importlib.util.spec_from_file_location("search_content_pack_check", spec_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for rule in mod.RULES + [mod.rule9_manifest]:
+            rule()
+    except Exception as e:  # noqa: BLE001
+        # A crash here must not take down the other 4 check families' already-
+        # accumulated pass counts and failure messages with it (2026-09-03
+        # critic finding: __main__ had no try/except, so an exception in this
+        # family printed a bare traceback and skipped both the final summary
+        # and check family 4, which runs after this one in file order).
+        failures.append(f"search_content_pack_check: CRASHED -- {type(e).__name__}: {e}")
+        return
+    passed += mod.passed
+    for f in mod.failures:
+        failures.append(f"search_content_pack_check.{f}")
+
+
 if __name__ == "__main__":
     run_schema_conformance()
     run_recipe_instance_conformance()
     run_method_contract_conformance()
     run_capability_contract_conformance()
     run_registry_invariants()
+    run_search_content_pack_check()
     run_ref_resolution_smoke()
 
     print(f"PASSED: {passed}")

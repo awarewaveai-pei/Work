@@ -1,0 +1,1016 @@
+# GENERATED 2026-09-02 (generator: WORKLOG 2026-09-02 SearchContent entry). Hand edits allowed; keep every field non-empty.
+$id: ai-lego://docs/architecture/search-content/SEARCH_CONTENT_GATE_RECORDS.yaml
+title: SearchContent Domain Gate Records
+version: 1.1.0
+status: PROPOSED
+description: 'One search_content_gate_definition record (SEARCH_CONTENT_QUALITY_GATES.md §3) per domain gate id. Severity
+  values are MVP defaults — Recipe/Policy may raise them per Quality Gates §10; NOT_APPLICABLE always requires a rationale
+  (EV-GATE). `applies_to_artifact_types` uses the vertical catalog in SEARCH_CONTENT_DOMAIN_MODEL.md §2.17 ("*" = all). `category:
+  DOMAIN_POLICY` marks gates with no Method family (brand/accessibility/evidence/publishing/measurement); they are policy-driven,
+  not method-specific (EV-AUDIT-0902 M12). Thresholds and validator implementations are DEFERRED OQ-SC-6. Five of the six evidence-family
+  gates carry `retired_alias` for their former geo.* ids (EV-AUDIT-0902 M11).'
+source_of_truth_for:
+- SEARCH_CONTENT_QUALITY_GATES.md §4-§9 + §3.5 (catalog sections are the human-readable views; field values live here)
+- PUBLISHING_ADAPTER_CONTRACT.md §9 hard-check ↔ gate mapping (`publish_check` field)
+- every search_content.<domain>.<name> id referenced in docs/architecture/search-content/ (validator rule 4)
+decided_by: docs/adr/ADR-021-search-content-boundary-and-ownership.md §D4 (policy-gate categorization) and §D10; gate lists
+  transcribed from SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34-§37 and §57 (EV-V3-GATES)
+enums:
+  severity:
+  - INFO
+  - WARN
+  - BLOCK
+  category:
+  - DOMAIN_METHOD_SPECIFIC
+  - DOMAIN_POLICY
+counts:
+  total: 59
+  by_family:
+    evidence: 6
+    seo: 12
+    geo: 4
+    aeo: 2
+    llmo: 2
+    brand: 5
+    sxo: 1
+    cro: 4
+    accessibility: 1
+    publishing: 12
+    measurement: 6
+    retrieval: 4
+records:
+- gate_id: search_content.evidence.claim_evidence
+  display_name: Claim Evidence PASS
+  owner: search-content.evidence
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: &id001
+  - '*'
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - artifact has zero factual claims (rationale required)
+  remediation: bind every factual claim to Evidence via content.bind_citations; unbound rule/policy claims block
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270) + §57 (L5147-L5188 flat ids search_content.evidence/source_authority/freshness/citation)
+  retired_alias: search_content.geo.claim_evidence
+- gate_id: search_content.evidence.source_authority
+  display_name: Source Authority PASS
+  owner: search-content.evidence
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id001
+  method_refs:
+  - search.evidence_authority_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no rule/policy-scope claims present
+  remediation: re-run AuthorityAssessment under claim-scope policy; official source required for rule claims
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270) + §57 (L5147-L5188 flat ids search_content.evidence/source_authority/freshness/citation)
+  retired_alias: search_content.geo.source_authority
+- gate_id: search_content.evidence.source_freshness
+  display_name: Source Freshness PASS
+  owner: search-content.evidence
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id001
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - freshness policy marks all sources non-time-sensitive
+  remediation: re-verify STALE/REVIEW_DUE sources or replace evidence
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270) + §57 (L5147-L5188 flat ids search_content.evidence/source_authority/freshness/citation)
+  retired_alias: search_content.geo.source_freshness
+- gate_id: search_content.evidence.citation_binding
+  display_name: Citation Binding PASS
+  owner: search-content.evidence
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id001
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - artifact type CONTENT_STRATEGY / CONTENT_AUDIT with no rendered citations
+  remediation: every rendered citation resolves to a sentence-provenance record (EV-SENTPROV); orphan citations fail
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270) + §57 (L5147-L5188 flat ids search_content.evidence/source_authority/freshness/citation);
+    EV-SENTPROV
+- gate_id: search_content.evidence.contradiction
+  display_name: Contradiction PASS
+  owner: search-content.evidence
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id001
+  method_refs:
+  - search.source_conflict_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: unresolved conflicts must be surfaced in brief/decision, not silently picked
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270) + §57 (L5147-L5188 flat ids search_content.evidence/source_authority/freshness/citation)
+  retired_alias: search_content.geo.contradiction
+- gate_id: search_content.evidence.unsupported_platform_claim
+  display_name: Unsupported Platform Claim PASS
+  owner: search-content.evidence
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id001
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: heuristics may not be written as official ranking rules; require official evidence classification or rewrite
+    as observation
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270) + §57 (L5147-L5188 flat ids search_content.evidence/source_authority/freshness/citation)
+  retired_alias: search_content.geo.unsupported_platform_claim
+- gate_id: search_content.seo.search_intent
+  display_name: Search Intent PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: &id002
+  - ARTICLE
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - FAQ
+  - COMPARISON_PAGE
+  - LOCAL_PAGE
+  method_refs:
+  - seo.search_intent_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.title_meta
+  display_name: Title / Meta PASS
+  owner: search-content.seo
+  category: DOMAIN_POLICY
+  applies_to_artifact_types:
+  - ARTICLE
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - FAQ
+  - COMPARISON_PAGE
+  - LOCAL_PAGE
+  - APP_STORE_LISTING
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.heading_structure
+  display_name: Heading Structure PASS
+  owner: search-content.seo
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id002
+  method_refs: []
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.crawlability
+  display_name: Crawlability PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.crawlability_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - staged/preview-only publication
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.indexability
+  display_name: Indexability PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.indexability_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - intentionally noindex artifact (rationale)
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.canonical
+  display_name: Canonical PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.canonical_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.internal_linking
+  display_name: Internal Linking PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.internal_link_analysis
+  - content.internal_link_planning
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - first page of a new site section
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.structured_data
+  display_name: Structured Data PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.structured_data_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no eligible schema type for artifact
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.entity_coverage
+  display_name: Entity Coverage PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.entity_coverage_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.duplication
+  display_name: Content Duplication PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.duplicate_url_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.cannibalization
+  display_name: Cannibalization PASS
+  owner: search-content.seo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - seo.cannibalization_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no existing URLs in cluster
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.seo.freshness
+  display_name: Freshness PASS
+  owner: search-content.seo
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id002
+  method_refs: []
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - evergreen content per policy
+  remediation: fix per SEOAudit / TechnicalChangePlan output; re-run gate
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §34 (L4228-L4248)
+- gate_id: search_content.geo.direct_answerability
+  display_name: Direct Answerability PASS
+  owner: search-content.geo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - geo.answerability_analysis
+  - aeo.direct_answer_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - artifact has no target questions
+  remediation: add direct answers per DirectAnswerRequirements
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.geo.citation_readiness
+  display_name: Citation Readiness PASS
+  owner: search-content.geo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - geo.citation_readiness_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: make passages self-contained and attributable
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.geo.entity_clarity
+  display_name: Entity Clarity PASS
+  owner: search-content.geo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - geo.entity_clarity_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: disambiguate entities per EntityClarityReport
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.geo.passage_independence
+  display_name: Passage Independence PASS
+  owner: search-content.geo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - geo.passage_independence_analysis
+  severity: INFO
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: restructure dependent passages
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.aeo.question_coverage
+  display_name: Question Coverage PASS
+  owner: search-content.aeo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - geo.question_coverage_analysis
+  - aeo.question_discovery
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no required_questions in brief
+  remediation: cover uncovered required questions
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.aeo.structured_explanation
+  display_name: Structured Explanation PASS
+  owner: search-content.aeo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id002
+  method_refs:
+  - aeo.structured_answer_eligibility_analysis
+  severity: INFO
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: add eligible structured answer formats
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.llmo.sampling_context
+  display_name: LLMO Sampling Context PASS
+  owner: search-content.llmo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types:
+  - SEARCH_INTELLIGENCE_REPORT
+  - CONTENT_AUDIT
+  method_refs:
+  - llmo.prompt_set_design
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - 'non-LLMO content (rationale: not an LLMO measurement artifact)'
+  remediation: declare prompt universe version / run count / denominator / search-enabled mode
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270); CONTENT_MEASUREMENT_SPEC.md §7
+- gate_id: search_content.llmo.entity_representation
+  display_name: LLMO Entity Representation PASS
+  owner: search-content.llmo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types:
+  - SEARCH_INTELLIGENCE_REPORT
+  method_refs:
+  - llmo.entity_representation_analysis
+  severity: INFO
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - non-LLMO content
+  remediation: record representation gaps as observations
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §35 (L4249-L4270)
+- gate_id: search_content.brand.voice
+  display_name: Brand Voice PASS
+  owner: search-content.brand
+  category: DOMAIN_POLICY
+  applies_to_artifact_types:
+  - ARTICLE
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - FAQ
+  - COMPARISON_PAGE
+  - LOCAL_PAGE
+  - APP_STORE_LISTING
+  method_refs: []
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: align to voice_profile_ref; severity per brand policy
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §36 (L4271-L4287)
+- gate_id: search_content.brand.product_fact_consistency
+  display_name: Product Fact Consistency PASS
+  owner: search-content.brand
+  category: DOMAIN_POLICY
+  applies_to_artifact_types:
+  - ARTICLE
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - FAQ
+  - COMPARISON_PAGE
+  - LOCAL_PAGE
+  - APP_STORE_LISTING
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no product facts referenced
+  remediation: reconcile against product_fact_refs (Core brand knowledge)
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §36 (L4271-L4287)
+- gate_id: search_content.brand.pricing_fact_consistency
+  display_name: Pricing Fact Consistency PASS
+  owner: search-content.brand
+  category: DOMAIN_POLICY
+  applies_to_artifact_types:
+  - ARTICLE
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - FAQ
+  - COMPARISON_PAGE
+  - LOCAL_PAGE
+  - APP_STORE_LISTING
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no pricing referenced
+  remediation: reconcile against pricing facts; never infer prices
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §36 (L4271-L4287)
+- gate_id: search_content.brand.prohibited_claim
+  display_name: Prohibited Claim PASS
+  owner: search-content.brand
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id001
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: remove claims listed in brand.prohibited_claims / must_not_claim
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §36 (L4271-L4287)
+- gate_id: search_content.brand.entity_naming
+  display_name: Brand Entity Naming PASS
+  owner: search-content.brand
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id001
+  method_refs:
+  - entity.consistency_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: normalize brand/product entity names
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §36 (L4271-L4287)
+- gate_id: search_content.sxo.message_match
+  display_name: Message Match PASS
+  owner: search-content.sxo
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types:
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - APP_STORE_LISTING
+  method_refs:
+  - sxo.message_match_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - non-conversion artifact
+  remediation: align intent → snippet → landing message
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §37 (L4288-L4306)
+- gate_id: search_content.cro.cta_clarity
+  display_name: CTA Clarity PASS
+  owner: search-content.cro
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types:
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - APP_STORE_LISTING
+  method_refs:
+  - cro.cta_analysis
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no CTA required by brief
+  remediation: apply CTARecommendation
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §37 (L4288-L4306)
+- gate_id: search_content.cro.friction
+  display_name: Friction PASS
+  owner: search-content.cro
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types:
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  method_refs:
+  - cro.friction_analysis
+  severity: INFO
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: address FrictionReport items
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §37 (L4288-L4306)
+- gate_id: search_content.cro.quantitative_claim_evidence
+  display_name: Quantitative Claim Evidence PASS
+  owner: search-content.cro
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id001
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no quantitative claims
+  remediation: every number/percentage claim needs measurable evidence ref
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §37 (L4288-L4306)
+- gate_id: search_content.cro.dark_pattern
+  display_name: Dark Pattern PASS
+  owner: search-content.cro
+  category: DOMAIN_POLICY
+  applies_to_artifact_types:
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: remove manipulative patterns (false urgency, hidden costs, confirmshaming)
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §37 (L4288-L4306)
+- gate_id: search_content.accessibility.minimum
+  display_name: Accessibility Minimum PASS
+  owner: search-content.accessibility
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id002
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: alt text, heading order, contrast, link text; platform Global accessibility gate still applies independently
+    (EV-GATE)
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §37 (L4288-L4306); EV-GATE global.accessibility
+- gate_id: search_content.publishing.required_fields
+  display_name: Publishing Required Fields PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: &id003
+  - ARTICLE
+  - LANDING_PAGE
+  - PRODUCT_PAGE
+  - CATEGORY_PAGE
+  - FAQ
+  - COMPARISON_PAGE
+  - LOCAL_PAGE
+  - APP_STORE_LISTING
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fill provider-required fields per adapter contract
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: required fields
+- gate_id: search_content.publishing.metadata_validation
+  display_name: Publishing Metadata Validation PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: fix metadata per page metadata spec
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: page metadata (title/description/OG) valid
+- gate_id: search_content.publishing.canonical_robots
+  display_name: Canonical / Robots PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: set canonical + robots consistent with indexability decision
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: canonical/robots
+- gate_id: search_content.publishing.hreflang
+  display_name: Hreflang PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - 'single-locale target (rationale: no alternates)'
+  remediation: declare reciprocal alternates
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: hreflang when applicable
+- gate_id: search_content.publishing.structured_data_consistency
+  display_name: Structured Data Consistency PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no structured data emitted
+  remediation: structured data must match visible content
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: structured data syntax + visible-content consistency
+- gate_id: search_content.publishing.link_integrity
+  display_name: Link Integrity PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: resolve broken/redirecting internal links
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: internal links
+- gate_id: search_content.publishing.media_integrity
+  display_name: Media Integrity PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no media
+  remediation: all media refs resolve; alt text present
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: media refs + alt requirements
+- gate_id: search_content.publishing.slug_url
+  display_name: Slug / URL PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: slug follows URL policy; no collision with existing URLs
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: slug/url
+- gate_id: search_content.publishing.redirect_impact
+  display_name: Redirect Impact PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - new URL with no predecessor
+  remediation: declare redirects for replaced URLs
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: redirect implications
+- gate_id: search_content.publishing.remote_diff
+  display_name: Remote Diff Reviewed PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - create_draft on empty remote
+  remediation: review diff vs current remote before write; CONFLICT if remote changed
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: remote diff reviewed (publishing.diff)
+- gate_id: search_content.publishing.approval_binding
+  display_name: Approval Binding PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - staged preview without production intent
+  remediation: approval_ref must bind the exact approved artifact hash
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: approval hash binding
+- gate_id: search_content.publishing.rollback_readiness
+  display_name: Rollback Readiness PASS
+  owner: search-content.publishing
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id003
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: adapter rollback type != unsupported for production ops, else escalate policy
+  source: PUBLISHING_ADAPTER_CONTRACT.md §8-§9; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §38-§39 (L4307-L4412)
+  publish_check: rollback declared
+- gate_id: search_content.measurement.metric_definition
+  display_name: Metric Definition PASS
+  owner: search-content.measurement
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: &id004
+  - SEARCH_INTELLIGENCE_REPORT
+  - CONTENT_AUDIT
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: every reported metric has a MetricDefinition with denominator/unit/timezone
+  source: CONTENT_MEASUREMENT_SPEC.md §10; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.7 (L3862-L3880)
+- gate_id: search_content.measurement.timezone_currency
+  display_name: Timezone / Currency PASS
+  owner: search-content.measurement
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id004
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no monetary metrics (currency part N/A)
+  remediation: explicit timezone; original currency + FX source
+  source: CONTENT_MEASUREMENT_SPEC.md §10; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.7 (L3862-L3880)
+- gate_id: search_content.measurement.source_completeness
+  display_name: Source Completeness PASS
+  owner: search-content.measurement
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id004
+  method_refs: []
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: declare provider sampling/API gaps
+  source: CONTENT_MEASUREMENT_SPEC.md §10; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.7 (L3862-L3880)
+- gate_id: search_content.measurement.data_quality
+  display_name: Data Quality PASS
+  owner: search-content.measurement
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id004
+  method_refs: []
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: quality results stored with the measurement run
+  source: CONTENT_MEASUREMENT_SPEC.md §10; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.7 (L3862-L3880)
+- gate_id: search_content.measurement.attribution_declared
+  display_name: Attribution Declared PASS
+  owner: search-content.measurement
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id004
+  method_refs:
+  - measurement.conversion_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no conversion metrics
+  remediation: attribution_model_ref present; observational not written as causal
+  source: CONTENT_MEASUREMENT_SPEC.md §10; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.7 (L3862-L3880)
+- gate_id: search_content.measurement.llmo_denominator
+  display_name: LLMO Denominator PASS
+  owner: search-content.measurement
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id004
+  method_refs:
+  - measurement.ai_visibility_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - no AI-visibility metrics
+  remediation: prompt universe / run count / denominator declared
+  source: CONTENT_MEASUREMENT_SPEC.md §10; SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.7 (L3862-L3880)
+- gate_id: search_content.retrieval.channel_availability
+  display_name: Retrieval Channel Availability PASS
+  owner: search-content.retrieval
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: &id005
+  - CONTENT_BRIEF
+  - CONTENT_STRATEGY
+  - SEARCH_INTELLIGENCE_REPORT
+  method_refs:
+  - search.plan_retrieval
+  severity: WARN
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: degraded channels recorded; never claim full recall
+  source: SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §9 Failure Modes (finding B7)
+- gate_id: search_content.retrieval.live_freshness_required
+  display_name: Live Freshness Required PASS
+  owner: search-content.retrieval
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id005
+  method_refs:
+  - search.plan_retrieval
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - task does not require current official verification
+  remediation: BLOCK when live provider timed out and task requires current rule verification; no stale cache
+  source: SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §9 Failure Modes (finding B7)
+- gate_id: search_content.retrieval.authority_required
+  display_name: Retrieval Authority Required PASS
+  owner: search-content.retrieval
+  category: DOMAIN_METHOD_SPECIFIC
+  applies_to_artifact_types: *id005
+  method_refs:
+  - search.evidence_authority_analysis
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules:
+  - discovery-only task (mark UNKNOWN)
+  remediation: rule/high-risk claims FAIL_CLOSED without AuthorityAssessment
+  source: SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §9 Failure Modes (finding B7)
+- gate_id: search_content.retrieval.tenant_scope
+  display_name: Retrieval Tenant Scope PASS
+  owner: search-content.retrieval
+  category: DOMAIN_POLICY
+  applies_to_artifact_types: *id001
+  method_refs: []
+  severity: BLOCK
+  evidence_required: true
+  automated_validator_ref: null
+  human_review_policy_ref: null
+  threshold: DEFERRED OQ-SC-6
+  not_applicable_rules: []
+  remediation: hard block on missing/cross-tenant refs
+  source: SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §9 Failure Modes (finding B7)

@@ -1,0 +1,2674 @@
+# GENERATED 2026-09-02 (generator: WORKLOG 2026-09-02 SearchContent entry). Hand edits allowed; keep every field non-empty.
+$id: ai-lego://docs/architecture/search-content/SEARCH_CONTENT_REGISTRY_RECORDS.yaml
+title: SearchContent Method / Capability / Recipe Registry Records (PROPOSED staging set)
+version: 1.1.0
+status: PROPOSED
+description: 'Machine-readable registry_entry records (SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §7) for every Method
+  / Capability / Recipe id the SearchContent pack uses, retires, rejects or requests. This is a STAGING set inside the vertical
+  folder: no SearchContent id exists in the ACTIVE global registry (methods/registry/method-inventory.yaml, 289 entries) yet;
+  promotion happens per-id together with its contract file (OQ-SC-19). It is NOT a second runtime registry (Registry §8) —
+  a derived index only. Two orthogonal axes per record: `status` (contract lifecycle) and `evidence_maturity` (domain efficacy,
+  SEARCH_CONTENT_PACK_COMMON.md §4.3). Regenerate only through the generator recorded in WORKLOG 2026-09-02; hand edits are
+  allowed but must keep every field non-empty (validator rule 3).'
+source_of_truth_for:
+- SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3 Canonical Method Catalog, §4 Retired, §5 Canonical Capability Catalog,
+  §6 Rejected, §9 Recipes — those sections are the human-readable views; field values live here
+- every Method/Capability id referenced by any document in docs/architecture/search-content/ (validator rule 3)
+decided_by: docs/adr/ADR-021-search-content-boundary-and-ownership.md §D4 (Method namespace), §D5 (Capability boundary), §D10
+  (mechanical gate); purposes/IO transcribed from SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22-§32 Outputs lists and §52-§54
+  (EV-V3-DOMAINS, EV-V3-METHODS, EV-V3-RECIPES)
+enums:
+  kind:
+  - METHOD
+  - CAPABILITY
+  - RECIPE
+  - DEPENDENCY_REQUEST
+  status:
+  - PROPOSED
+  - CONTRACTED
+  - VALIDATED
+  - RUNTIME_IMPLEMENTED
+  - DEPRECATED
+  - RETIRED
+  - REJECTED
+  - UNCONFIRMED
+  evidence_maturity:
+  - DOMAIN_PROPOSAL
+  - LITERATURE_SUPPORTED
+  - EMPIRICALLY_VALIDATED
+  - NOT_APPLICABLE
+counts:
+  METHOD: 71
+  METHOD_RETIRED: 4
+  CAPABILITY: 32
+  CAPABILITY_REJECTED: 9
+  DEPENDENCY_REQUEST: 3
+  RECIPE: 3
+  total: 122
+records:
+- id: seo.query_discovery
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Discover candidate queries for a market/locale from snapshots, provider metrics and first-party data
+  input_types:
+  - SearchQuery
+  - SearchSnapshot
+  - SearchObservation
+  output_types:
+  - QuerySet
+  contract_path: methods/contracts/seo.query_discovery.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22 (L1421-L1883)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.search_intent_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Classify search intent per query/cluster from observed surfaces (informational / commercial / transactional / navigational,
+    per surface)
+  input_types:
+  - SearchQuery
+  - SearchSnapshot
+  - RankingObservation
+  output_types:
+  - IntentAnalysis
+  contract_path: methods/contracts/seo.search_intent_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22 (L1421-L1883); ADR-021 §D4 KEEP
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.search_surface_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze which surfaces/features a query renders and what content types occupy them
+  input_types:
+  - SearchSnapshot
+  - SearchObservation
+  output_types:
+  - SearchSurfaceAnalysis
+  contract_path: methods/contracts/seo.search_surface_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.crawlability_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess crawl access (robots, status codes, rendering, link reachability) for target URLs
+  input_types:
+  - SearchSourceProfile
+  - raw fetch observations
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.crawlability_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.indexability_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess index eligibility (noindex, canonical, status, duplicate) for target URLs
+  input_types:
+  - raw fetch observations
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.indexability_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.canonical_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Detect canonical conflicts and self-referencing canonical correctness
+  input_types:
+  - raw fetch observations
+  output_types:
+  - SEOAudit
+  - TechnicalChangePlan
+  contract_path: methods/contracts/seo.canonical_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.redirect_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze redirect chains/loops and their SEO implications
+  input_types:
+  - raw fetch observations
+  output_types:
+  - TechnicalChangePlan
+  contract_path: methods/contracts/seo.redirect_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.sitemap_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Validate sitemap coverage/consistency against known URLs
+  input_types:
+  - raw fetch observations
+  - existing_url_refs
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.sitemap_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.robots_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze robots directives against intended crawl policy
+  input_types:
+  - raw fetch observations
+  - crawl_policy_ref
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.robots_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.hreflang_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Validate hreflang reciprocity and locale/market mapping
+  input_types:
+  - raw fetch observations
+  output_types:
+  - SEOAudit
+  - TechnicalChangePlan
+  contract_path: methods/contracts/seo.hreflang_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.rendering_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Compare rendered vs raw HTML for indexable content parity
+  input_types:
+  - raw fetch observations
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.rendering_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.status_code_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Classify HTTP status behavior across target URLs
+  input_types:
+  - raw fetch observations
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.status_code_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.duplicate_url_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Detect duplicate/near-duplicate URLs and parameter variants
+  input_types:
+  - raw fetch observations
+  - existing_url_refs
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.duplicate_url_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.faceted_navigation_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze faceted navigation index bloat and crawl waste
+  input_types:
+  - raw fetch observations
+  output_types:
+  - TechnicalChangePlan
+  contract_path: methods/contracts/seo.faceted_navigation_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.pagination_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze pagination structure and reachability of deep pages
+  input_types:
+  - raw fetch observations
+  output_types:
+  - TechnicalChangePlan
+  contract_path: methods/contracts/seo.pagination_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.information_architecture_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze site hierarchy vs topic hierarchy alignment
+  input_types:
+  - TopicCluster
+  - existing_url_refs
+  output_types:
+  - URLTopicMap
+  contract_path: methods/contracts/seo.information_architecture_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22 / §15
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.internal_link_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze internal link graph, depth and anchor distribution
+  input_types:
+  - raw fetch observations
+  output_types:
+  - InternalLinkPlan
+  contract_path: methods/contracts/seo.internal_link_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.orphan_page_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Detect pages with no internal inbound links
+  input_types:
+  - raw fetch observations
+  - existing_url_refs
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/seo.orphan_page_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.anchor_context_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze anchor text context and intent consistency of internal links
+  input_types:
+  - raw fetch observations
+  output_types:
+  - InternalLinkPlan
+  contract_path: methods/contracts/seo.anchor_context_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.cannibalization_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Detect multiple own URLs competing for the same query cluster
+  input_types:
+  - RankingObservation
+  - TopicCluster
+  output_types:
+  - CannibalizationAnalysis
+  contract_path: methods/contracts/seo.cannibalization_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.structured_data_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze structured data presence, validity and eligibility
+  input_types:
+  - raw fetch observations
+  output_types:
+  - StructuredDataRecommendation
+  contract_path: methods/contracts/seo.structured_data_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: seo.entity_coverage_analysis
+  kind: METHOD
+  family: seo
+  owner: search-content.seo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze entity coverage of content vs query/topic entities
+  input_types:
+  - TopicCluster
+  - SearchObservation
+  output_types:
+  - EntityCoverageMap
+  contract_path: methods/contracts/seo.entity_coverage_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §22 / §26; ADR-021 §D4 KEEP
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: geo.answerability_analysis
+  kind: METHOD
+  family: geo
+  owner: search-content.geo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess whether content directly answers the target question set for AI surfaces
+  input_types:
+  - ContentBrief
+  - draft Artifact
+  output_types:
+  - AnswerabilityReport
+  contract_path: methods/contracts/geo.answerability_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §23 (L1884-L2153)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: geo.citation_readiness_analysis
+  kind: METHOD
+  family: geo
+  owner: search-content.geo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess whether passages are citable by AI answer engines (self-contained, attributable)
+  input_types:
+  - draft Artifact
+  - EvidencePack
+  output_types:
+  - CitationReadinessReport
+  contract_path: methods/contracts/geo.citation_readiness_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §23
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: geo.passage_independence_analysis
+  kind: METHOD
+  family: geo
+  owner: search-content.geo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess passage-level independence (each passage stands alone)
+  input_types:
+  - draft Artifact
+  output_types:
+  - GEOAnalysis
+  contract_path: methods/contracts/geo.passage_independence_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §23
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: geo.entity_clarity_analysis
+  kind: METHOD
+  family: geo
+  owner: search-content.geo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess entity clarity/disambiguation in content for AI surfaces
+  input_types:
+  - draft Artifact
+  - entity_refs
+  output_types:
+  - EntityClarityReport
+  contract_path: methods/contracts/geo.entity_clarity_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §23
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: geo.question_coverage_analysis
+  kind: METHOD
+  family: geo
+  owner: search-content.geo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Map covered vs uncovered questions for a topic cluster
+  input_types:
+  - ContentBrief
+  - question_refs
+  output_types:
+  - QuestionCoverageMap
+  contract_path: methods/contracts/geo.question_coverage_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §23
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aeo.question_discovery
+  kind: METHOD
+  family: aeo
+  owner: search-content.aeo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Discover question-form queries for a topic
+  input_types:
+  - SearchQuery
+  - SearchSnapshot
+  output_types:
+  - QuestionSet
+  contract_path: methods/contracts/aeo.question_discovery.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §24 (L2154-L2355)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aeo.question_classification
+  kind: METHOD
+  family: aeo
+  owner: search-content.aeo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Classify questions by answer type and intent
+  input_types:
+  - QuestionSet
+  output_types:
+  - QuestionClassification
+  contract_path: methods/contracts/aeo.question_classification.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §24
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aeo.answer_type_selection
+  kind: METHOD
+  family: aeo
+  owner: search-content.aeo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Select the answer format per question class
+  input_types:
+  - QuestionClassification
+  output_types:
+  - AnswerTypePlan
+  contract_path: methods/contracts/aeo.answer_type_selection.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §24
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aeo.direct_answer_analysis
+  kind: METHOD
+  family: aeo
+  owner: search-content.aeo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess direct-answer presence/quality per required question
+  input_types:
+  - draft Artifact
+  - QuestionSet
+  output_types:
+  - DirectAnswerRequirements
+  - AnswerabilityReport
+  contract_path: methods/contracts/aeo.direct_answer_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §24
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aeo.structured_answer_eligibility_analysis
+  kind: METHOD
+  family: aeo
+  owner: search-content.aeo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Assess eligibility for structured answer formats (FAQ/HowTo etc.)
+  input_types:
+  - draft Artifact
+  output_types:
+  - FAQGraph
+  - AEOContentRequirements
+  contract_path: methods/contracts/aeo.structured_answer_eligibility_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §24
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: llmo.prompt_set_design
+  kind: METHOD
+  family: llmo
+  owner: search-content.llmo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Design the versioned prompt universe used for AI-visibility sampling
+  input_types:
+  - TopicCluster
+  - market/locale
+  output_types:
+  - PromptSet
+  contract_path: methods/contracts/llmo.prompt_set_design.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §25 (L2356-L2607)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: llmo.answer_snapshot_analysis
+  kind: METHOD
+  family: llmo
+  owner: search-content.llmo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze sampled AI answers for brand/competitor presence
+  input_types:
+  - AIAnswerObservation
+  output_types:
+  - LLMAnswerSnapshot
+  - LLMVisibilityObservation
+  contract_path: methods/contracts/llmo.answer_snapshot_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §25.4 (L2442)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: llmo.brand_mention_analysis
+  kind: METHOD
+  family: llmo
+  owner: search-content.llmo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze brand mention rate and context across sampled answers
+  input_types:
+  - AIAnswerObservation
+  output_types:
+  - BrandMentionAnalysis
+  contract_path: methods/contracts/llmo.brand_mention_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §25.5 (L2467)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: llmo.citation_analysis
+  kind: METHOD
+  family: llmo
+  owner: search-content.llmo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze which sources AI answers cite and how the brand is cited
+  input_types:
+  - CitationObservation
+  output_types:
+  - CitationAnalysis
+  contract_path: methods/contracts/llmo.citation_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §25.6 (L2490)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: llmo.entity_representation_analysis
+  kind: METHOD
+  family: llmo
+  owner: search-content.llmo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze how the brand/entities are represented in AI answers
+  input_types:
+  - AIAnswerObservation
+  - entity_refs
+  output_types:
+  - EntityRepresentationAnalysis
+  contract_path: methods/contracts/llmo.entity_representation_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §25.7 (L2513)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: entity.resolve_identity
+  kind: METHOD
+  family: entity
+  owner: search-content.entity
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Resolve raw observed entities to canonical entity refs via Core resolver (DEPENDENCY OQ-SC-12)
+  input_types:
+  - raw_observed_entity
+  output_types:
+  - EntityResolution
+  contract_path: methods/contracts/entity.resolve_identity.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - 'DEPENDENCY OQ-SC-12: depends on Core Entity contract'
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §26 (L2608-L2739)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: entity.consistency_analysis
+  kind: METHOD
+  family: entity
+  owner: search-content.entity
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze entity naming/attribute consistency across own content and external observations
+  input_types:
+  - entity_refs
+  - SearchObservation
+  output_types:
+  - EntityConsistencyReport
+  contract_path: methods/contracts/entity.consistency_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §26
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: local.intent_analysis
+  kind: METHOD
+  family: local
+  owner: search-content.local
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze local intent signals for market/locale queries
+  input_types:
+  - SearchQuery
+  - SearchSnapshot
+  output_types:
+  - IntentAnalysis
+  contract_path: methods/contracts/local.intent_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §27 (L2740-L2914)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: local.profile_consistency_analysis
+  kind: METHOD
+  family: local
+  owner: search-content.local
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze business profile consistency across local surfaces
+  input_types:
+  - SearchObservation
+  output_types:
+  - EntityConsistencyReport
+  contract_path: methods/contracts/local.profile_consistency_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §27
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: local.landing_page_analysis
+  kind: METHOD
+  family: local
+  owner: search-content.local
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze local landing page fit for local intent
+  input_types:
+  - draft Artifact
+  - SearchObservation
+  output_types:
+  - SEOAudit
+  contract_path: methods/contracts/local.landing_page_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §27
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: local.reputation_observation
+  kind: METHOD
+  family: local
+  owner: search-content.local
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Observe and summarize review/reputation signals (observation, not recommendation)
+  input_types:
+  - SearchObservation
+  output_types:
+  - CompetitorObservation-derived analysis
+  contract_path: methods/contracts/local.reputation_observation.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §27
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.query_clustering
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Cluster queries across surfaces by shared intent/entities (query-level; see OQ-SC-8)
+  input_types:
+  - SearchQuery
+  - SearchObservation
+  output_types:
+  - QuerySet clusters → TopicCluster candidates
+  contract_path: methods/contracts/search.query_clustering.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from:
+  - content.topic_clustering
+  risk_notes:
+  - OPEN_QUESTION OQ-SC-8
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §53 (L4946-L4993)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.competitor_content_analysis
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze competitor content observed across surfaces for a query set
+  input_types:
+  - CompetitorObservation
+  output_types:
+  - derived comparison (MethodResult)
+  contract_path: methods/contracts/search.competitor_content_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §53
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.source_conflict_analysis
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze contradictions between candidate sources/claims without overwriting Claim truth
+  input_types:
+  - retrieval_candidate
+  - Claim refs
+  output_types:
+  - conflict_analysis
+  contract_path: methods/contracts/search.source_conflict_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §53; SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.evidence_authority_analysis
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Produce claim-scope-aware AuthorityAssessment snapshots per policy
+  input_types:
+  - Evidence refs
+  - authority_policy
+  output_types:
+  - AuthorityAssessment
+  contract_path: methods/contracts/search.evidence_authority_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §53 / §7.3 (L447)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.plan_retrieval
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Plan internal vs external retrieval channels for a request (RetrievalPlanner)
+  input_types:
+  - search_evidence_retrieval_request
+  output_types:
+  - retrieval plan → retrieval_candidate set
+  contract_path: methods/contracts/search.plan_retrieval.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §1 (finding B7)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.topic_discovery
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Discover candidate topics from query/question/entity signals
+  input_types:
+  - QuerySet
+  - QuestionSet
+  - entity_refs
+  output_types:
+  - TopicCluster candidates
+  contract_path: methods/contracts/content.topic_discovery.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §14 (L868-L939)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.topic_clustering
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Cluster topics/content into a topic hierarchy (content-level; ADR-021 §D4 KEEP)
+  input_types:
+  - TopicCluster candidates
+  - existing_url_refs
+  output_types:
+  - TopicCluster
+  contract_path: methods/contracts/content.topic_clustering.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §14.2 (L904)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.topic_hierarchy_analysis
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze parent/child topic structure and pillar/cluster relations
+  input_types:
+  - TopicCluster
+  output_types:
+  - TopicCluster (hierarchy refs)
+  contract_path: methods/contracts/content.topic_hierarchy_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §14
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.content_gap_analysis
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Identify covered vs missing topics/questions vs competitors (ADR-021 §D4 KEEP)
+  input_types:
+  - TopicCluster
+  - CompetitorObservation
+  - existing_url_refs
+  output_types:
+  - content gap MethodResult
+  contract_path: methods/contracts/content.content_gap_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §14 / §28
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.topic_prioritization
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Prioritize topics/opportunities by business goal, evidence and effort (opportunity = this MethodResult; ADR-021
+    §D6)
+  input_types:
+  - TopicCluster
+  - business_goal_refs
+  output_types:
+  - prioritized opportunity list
+  contract_path: methods/contracts/content.topic_prioritization.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §16 (L967-L1019)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.brief_synthesis
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Synthesize ContentBrief requirements from strategy, evidence pack and policies
+  input_types:
+  - TopicCluster
+  - EvidencePack
+  - policies
+  output_types:
+  - ContentBrief (draft)
+  contract_path: methods/contracts/content.brief_synthesis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §17
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.refresh_analysis
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze whether/how a publication should be refreshed given RefreshContext (see OQ-SC-7)
+  input_types:
+  - RefreshContext
+  output_types:
+  - proposed_options for Core Decision
+  contract_path: methods/contracts/content.refresh_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from:
+  - content.refresh_prioritization
+  risk_notes:
+  - OPEN_QUESTION OQ-SC-7
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §45
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.refresh_prioritization
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: master §53 proposed id; relation to content.refresh_analysis unresolved (OQ-SC-7) — registered so the id is not
+    silently dropped
+  input_types:
+  - RefreshContext[]
+  output_types:
+  - ranked refresh list
+  contract_path: methods/contracts/content.refresh_prioritization.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from:
+  - content.refresh_analysis
+  risk_notes:
+  - 'OPEN_QUESTION OQ-SC-7: relation to content.refresh_analysis unresolved; no contract may be written until resolved'
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §53
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.internal_link_planning
+  kind: METHOD
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Plan internal links for new/refreshed content within the topic hierarchy
+  input_types:
+  - TopicCluster
+  - URLTopicMap
+  output_types:
+  - InternalLinkPlan
+  contract_path: methods/contracts/content.internal_link_planning.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §53 / §22
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: sxo.message_match_analysis
+  kind: METHOD
+  family: sxo
+  owner: search-content.sxo
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze message match between search intent, ad/snippet and landing content
+  input_types:
+  - IntentAnalysis
+  - draft Artifact
+  output_types:
+  - MessageMatchAnalysis
+  contract_path: methods/contracts/sxo.message_match_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §29 (L3135-L3305)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: cro.friction_analysis
+  kind: METHOD
+  family: cro
+  owner: search-content.cro
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Identify conversion friction points in the content/journey
+  input_types:
+  - draft Artifact
+  - JourneyAnalysis
+  output_types:
+  - FrictionReport
+  contract_path: methods/contracts/cro.friction_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §29
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: cro.cta_analysis
+  kind: METHOD
+  family: cro
+  owner: search-content.cro
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze CTA clarity/placement vs journey stage
+  input_types:
+  - draft Artifact
+  output_types:
+  - CTARecommendation
+  contract_path: methods/contracts/cro.cta_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §29
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.query_research
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Research app-store queries for a market
+  input_types:
+  - SearchQuery (APP_STORE surface)
+  output_types:
+  - QuerySet
+  contract_path: methods/contracts/aso.query_research.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30 (L3306-L3432)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.metadata_analysis
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze listing metadata vs query coverage
+  input_types:
+  - APP_STORE_LISTING artifact
+  output_types:
+  - metadata analysis
+  contract_path: methods/contracts/aso.metadata_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.competitor_listing_analysis
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze competitor listings observed in store surfaces
+  input_types:
+  - CompetitorObservation
+  output_types:
+  - derived comparison
+  contract_path: methods/contracts/aso.competitor_listing_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.creative_analysis
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze listing creatives (screenshots/video) vs conversion hypotheses
+  input_types:
+  - APP_STORE_LISTING artifact
+  output_types:
+  - creative analysis
+  contract_path: methods/contracts/aso.creative_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.review_theme_analysis
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Extract review themes as observations (not recommendations)
+  input_types:
+  - SearchObservation (reviews)
+  output_types:
+  - review theme analysis
+  contract_path: methods/contracts/aso.review_theme_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.localization_analysis
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze listing localization coverage per market/locale
+  input_types:
+  - APP_STORE_LISTING artifact
+  output_types:
+  - localization analysis
+  contract_path: methods/contracts/aso.localization_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: aso.listing_conversion_analysis
+  kind: METHOD
+  family: aso
+  owner: search-content.aso
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze listing conversion signals vs metadata/creative changes
+  input_types:
+  - ContentPerformance (ASO metrics)
+  output_types:
+  - conversion analysis
+  contract_path: methods/contracts/aso.listing_conversion_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §30
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.content_decay_detection
+  kind: METHOD
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Detect decay signals for a publication and emit DecayObservation (MVP Step 15)
+  input_types:
+  - ContentPerformance
+  - FreshnessAssessment
+  - SearchObservation
+  output_types:
+  - DecayObservation
+  contract_path: methods/contracts/measurement.content_decay_detection.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.6 (L3829-L3861)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.ai_visibility_analysis
+  kind: METHOD
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze longitudinal AI visibility with declared denominators/sampling contract
+  input_types:
+  - MeasurementRun (LLMO)
+  output_types:
+  - LLMOMeasurementReport
+  contract_path: methods/contracts/measurement.ai_visibility_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.3 (L3762)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.search_performance_analysis
+  kind: METHOD
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze search performance vs baselines per metric definition
+  input_types:
+  - ContentPerformance
+  output_types:
+  - MeasurementReport
+  contract_path: methods/contracts/measurement.search_performance_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.4 (L3791)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.conversion_analysis
+  kind: METHOD
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: DOMAIN_PROPOSAL
+  purpose: Analyze conversion metrics under a declared attribution model
+  input_types:
+  - ContentPerformance
+  - attribution_model
+  output_types:
+  - MeasurementReport
+  contract_path: methods/contracts/measurement.conversion_analysis.contract.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §32.5 (L3810)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.intent_analysis
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: RETIRED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: RETIRED / never create — alias of seo.search_intent_analysis
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - retirement follows EV-DEPRECATION 7 steps if any usage is ever found
+  source: ADR-021 §D4; Registry §4
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: seo.search_intent_analysis
+- id: search.content_gap_analysis
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: RETIRED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: RETIRED / never create — alias of content.content_gap_analysis
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - retirement follows EV-DEPRECATION 7 steps if any usage is ever found
+  source: ADR-021 §D4; Registry §4
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: content.content_gap_analysis
+- id: search.topic_clustering
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: RETIRED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: RETIRED / never create — alias of content.topic_clustering
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - retirement follows EV-DEPRECATION 7 steps if any usage is ever found
+  source: ADR-021 §D4; Registry §4
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: content.topic_clustering
+- id: search.entity_gap_analysis
+  kind: METHOD
+  family: search
+  owner: search-content.search
+  status: RETIRED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: RETIRED / never create — alias of seo.entity_coverage_analysis
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - retirement follows EV-DEPRECATION 7 steps if any usage is ever found
+  source: ADR-021 §D4; Registry §4
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: seo.entity_coverage_analysis
+- id: search.collect_snapshot
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Capture a provider search-surface snapshot (raw artifact + hash + fingerprint); emits SearchSnapshotCaptured
+  input_types:
+  - capture_request
+  output_types:
+  - SearchSnapshot
+  - capture_result
+  contract_path: capabilities/contracts/search.collect_snapshot.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52 (L4893-L4945); MVP Step 2
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.fetch_page
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Fetch a URL under SSRF/size/redirect policy and store raw payload to CAS
+  input_types:
+  - url
+  - crawl_policy_ref
+  output_types:
+  - raw artifact ref
+  - content hash
+  contract_path: capabilities/contracts/search.fetch_page.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52 / §48
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.fetch_site_crawl
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Bounded site crawl under crawl policy; stores raw pages
+  input_types:
+  - SearchSourceProfile
+  - crawl_policy_ref
+  output_types:
+  - raw artifact refs
+  contract_path: capabilities/contracts/search.fetch_site_crawl.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §48
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.collect_query_metrics
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Collect provider query metrics (impressions/clicks) as raw measurement facts
+  input_types:
+  - provider adapter
+  - period
+  output_types:
+  - raw_snapshot_refs
+  contract_path: capabilities/contracts/search.collect_query_metrics.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §41-42
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.collect_ai_answer_snapshot
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Sample an AI answer surface for a prompt and store raw answer artifact
+  input_types:
+  - capture_request (AI_ANSWER surface)
+  output_types:
+  - AIAnswerObservation (raw)
+  contract_path: capabilities/contracts/search.collect_ai_answer_snapshot.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §25.3 (L2420)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.normalize_snapshot
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: 'Versioned normalizer: raw snapshot → SearchObservation records; emits SearchObservationCreated'
+  input_types:
+  - SearchSnapshot
+  output_types:
+  - SearchObservation[]
+  contract_path: capabilities/contracts/search.normalize_snapshot.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §12; MVP Step 3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.store_raw_snapshot
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Persist raw provider payload to CAS with retention metadata
+  input_types:
+  - raw payload
+  output_types:
+  - raw_artifact_ref
+  - raw_content_hash
+  contract_path: capabilities/contracts/search.store_raw_snapshot.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §11.4
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.extract_observations
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Extract typed observations (competitor/citation/ranking) from normalized snapshots
+  input_types:
+  - SearchObservation[]
+  output_types:
+  - CompetitorObservation
+  - CitationObservation
+  - RankingObservation
+  contract_path: capabilities/contracts/search.extract_observations.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.detect_cannibalization
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Execution face of seo.cannibalization_analysis over stored ranking observations
+  input_types:
+  - RankingObservation[]
+  output_types:
+  - CannibalizationAnalysis
+  contract_path: capabilities/contracts/search.detect_cannibalization.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.compare_competitors
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Build normalized competitor comparison tables from observations (no recommendation)
+  input_types:
+  - CompetitorObservation[]
+  output_types:
+  - normalized comparison
+  contract_path: capabilities/contracts/search.compare_competitors.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.build_evidence_pack
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Freeze retrieval refs/ranks/policy versions into an EvidencePack
+  input_types:
+  - retrieval_candidate[]
+  - policy refs
+  output_types:
+  - EvidencePack
+  contract_path: capabilities/contracts/search.build_evidence_pack.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §7
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.generate_brief
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Persist a ContentBrief from brief_synthesis output; emits ContentBriefCreated
+  input_types:
+  - content.brief_synthesis result
+  output_types:
+  - ContentBrief
+  contract_path: capabilities/contracts/content.generate_brief.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; MVP Step 9
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.generate_outline
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Generate a CONTENT_OUTLINE artifact from an approved brief
+  input_types:
+  - ContentBrief
+  output_types:
+  - Artifact (CONTENT_OUTLINE)
+  contract_path: capabilities/contracts/content.generate_outline.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.generate_draft
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Generate a draft Artifact with claim/evidence bindings preserved
+  input_types:
+  - ContentBrief
+  - EvidencePack
+  output_types:
+  - Artifact (draft)
+  contract_path: capabilities/contracts/content.generate_draft.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; MVP Step 10
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.bind_citations
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Bind sentences to Claim/Evidence via sentence-provenance link records (EV-SENTPROV)
+  input_types:
+  - Artifact (draft)
+  - EvidencePack
+  output_types:
+  - sentence-provenance records
+  contract_path: capabilities/contracts/content.bind_citations.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; EV-SENTPROV
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.render_preview
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Render a provider-neutral preview of the draft
+  input_types:
+  - Artifact (draft)
+  output_types:
+  - preview ref
+  contract_path: capabilities/contracts/content.render_preview.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.build_strategy
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Persist a CONTENT_STRATEGY artifact from prioritization results
+  input_types:
+  - prioritized opportunity list
+  output_types:
+  - Artifact (CONTENT_STRATEGY)
+  contract_path: capabilities/contracts/content.build_strategy.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: content.build_refresh_context
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Assemble RefreshContext from DecayObservation/source changes; emits RefreshContextCreated
+  input_types:
+  - DecayObservation
+  - SearchSourceChangeObserved refs
+  output_types:
+  - RefreshContext
+  contract_path: capabilities/contracts/content.build_refresh_context.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; MVP Step 16
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.create_draft
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Create remote draft via adapter (idempotent); emits ContentPublicationCreated
+  input_types:
+  - create_draft input
+  output_types:
+  - create_draft output
+  - ContentPublication
+  contract_path: capabilities/contracts/publishing.create_draft.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.update_draft
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Update remote draft with expected_remote_version (optimistic concurrency)
+  input_types:
+  - publication_ref
+  - expected_remote_version
+  output_types:
+  - remote_version
+  contract_path: capabilities/contracts/publishing.update_draft.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.preview
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Fetch provider-rendered preview (read-only)
+  input_types:
+  - publication_ref
+  output_types:
+  - preview_url
+  contract_path: capabilities/contracts/publishing.preview.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.diff
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Diff current remote / approved artifact / proposed remote
+  input_types:
+  - publication_ref
+  - artifact_ref
+  output_types:
+  - diff record
+  contract_path: capabilities/contracts/publishing.diff.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.schedule
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Schedule production publish under policy/authority
+  input_types:
+  - publication_ref
+  - approval_ref
+  output_types:
+  - scheduled state
+  contract_path: capabilities/contracts/publishing.schedule.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.publish
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Execute production publish under policy/authority
+  input_types:
+  - publication_ref
+  - approval_ref
+  output_types:
+  - published state
+  contract_path: capabilities/contracts/publishing.publish.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.unpublish
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Unpublish/withdraw a publication
+  input_types:
+  - publication_ref
+  output_types:
+  - unpublished state
+  contract_path: capabilities/contracts/publishing.unpublish.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §3
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.rollback
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Roll back to prior verified remote state; emits ContentPublicationRolledBack (EV-ROLLBACK record)
+  input_types:
+  - publication_ref
+  - rollback_ref
+  output_types:
+  - rollback record
+  contract_path: capabilities/contracts/publishing.rollback.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §11
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: publishing.verify
+  kind: CAPABILITY
+  family: publishing
+  owner: search-content.publishing
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Verify remote object/version/content hash; emits ContentPublicationVerified (scope STAGED|PRODUCTION)
+  input_types:
+  - publication_ref
+  output_types:
+  - verification result
+  contract_path: capabilities/contracts/publishing.verify.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: PUBLISHING_ADAPTER_CONTRACT.md §10; MVP Step 13
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.collect_search_performance
+  kind: CAPABILITY
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Collect search performance raw snapshots via provider adapter
+  input_types:
+  - MeasurementRun request
+  output_types:
+  - raw_snapshot_refs
+  contract_path: capabilities/contracts/measurement.collect_search_performance.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: CONTENT_MEASUREMENT_SPEC.md §4
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.collect_ai_visibility
+  kind: CAPABILITY
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Collect AI visibility samples under the sampling contract
+  input_types:
+  - PromptSet
+  - MeasurementRun request
+  output_types:
+  - raw_snapshot_refs
+  contract_path: capabilities/contracts/measurement.collect_ai_visibility.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: CONTENT_MEASUREMENT_SPEC.md §7
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.collect_analytics
+  kind: CAPABILITY
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Collect engagement/analytics raw facts (OQ-SC-3 for metric definitions)
+  input_types:
+  - MeasurementRun request
+  output_types:
+  - raw_snapshot_refs
+  contract_path: capabilities/contracts/measurement.collect_analytics.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: CONTENT_MEASUREMENT_SPEC.md §2
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.collect_conversion
+  kind: CAPABILITY
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Collect conversion/revenue raw facts with currency/timezone metadata
+  input_types:
+  - MeasurementRun request
+  output_types:
+  - raw_snapshot_refs
+  contract_path: capabilities/contracts/measurement.collect_conversion.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: CONTENT_MEASUREMENT_SPEC.md §8-9
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: measurement.persist_snapshot
+  kind: CAPABILITY
+  family: measurement
+  owner: search-content.measurement
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Compute and persist ContentPerformance projection; emits ContentPerformanceCaptured
+  input_types:
+  - MeasurementRun
+  - metric_definition[]
+  output_types:
+  - ContentPerformance
+  contract_path: capabilities/contracts/measurement.persist_snapshot.capability.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: CONTENT_MEASUREMENT_SPEC.md §5/§11
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: knowledge.retrieve_evidence
+  kind: DEPENDENCY_REQUEST
+  family: knowledge
+  owner: 'core.knowledge (requested_by: search-content.vertical)'
+  status: UNCONFIRMED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Requested from Core (OQ-SC-9); SearchContent must not assume it exists
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52 (L4163-L4165 knowledge.* proposals)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: knowledge.resolve_entity
+  kind: DEPENDENCY_REQUEST
+  family: knowledge
+  owner: 'core.knowledge (requested_by: search-content.vertical)'
+  status: UNCONFIRMED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Requested from Core (OQ-SC-9); SearchContent must not assume it exists
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52 (L4163-L4165 knowledge.* proposals)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: knowledge.retrieve_brand_fact
+  kind: DEPENDENCY_REQUEST
+  family: knowledge
+  owner: 'core.knowledge (requested_by: search-content.vertical)'
+  status: UNCONFIRMED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: Requested from Core (OQ-SC-9); SearchContent must not assume it exists
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52 (L4163-L4165 knowledge.* proposals)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search.classify_intent
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — reasoning → Method (ADR-021 §D5)
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: seo.search_intent_analysis
+- id: search.cluster_queries
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — reasoning → Method; see OQ-SC-8 for the content.topic_clustering pairing note
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: search.query_clustering
+- id: search.detect_content_gap
+  kind: CAPABILITY
+  family: search
+  owner: search-content.search
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — reasoning → Method (ADR-021 §D5)
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: content.content_gap_analysis
+- id: measurement.detect_decay
+  kind: CAPABILITY
+  family: measurement
+  owner: search-content.measurement
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — reasoning → Method (ADR-021 §D5)
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: measurement.content_decay_detection
+- id: content.validate_seo
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — validation is the Quality Gate mechanism's job (ADR-021 §D5)
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: search_content.seo.* gates
+- id: content.validate_geo
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — same
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: search_content.geo.* / search_content.evidence.* gates
+- id: content.validate_entity
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — same
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: search_content.seo.entity_coverage / geo.entity_clarity / brand.entity_naming gates
+- id: content.validate_brand
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — same
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: search_content.brand.* gates
+- id: content.validate_conversion
+  kind: CAPABILITY
+  family: content
+  owner: search-content.content
+  status: REJECTED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: REJECTED — same
+  input_types: []
+  output_types: []
+  contract_path: null
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes: []
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §52; Registry §6
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+  replacement: search_content.cro.* / sxo.* gates
+- id: search-content-new-content-v1
+  kind: RECIPE
+  family: recipe
+  owner: search-content.vertical
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: 'New Content Recipe: goal → search research → opportunity/Decision → evidence retrieval → brief → outline → draft
+    → QA gates → human review → publish → measure'
+  input_types: []
+  output_types:
+  - Workflow IR (compiled)
+  contract_path: recipes/validated/search-content-new-content-v1.recipe.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - 'DEFERRED OQ-SC-18: recipe instance + Workflow IR compilation + golden tests are Stage 1 deliverables'
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §54.1 (L5011-L5036)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search-content-refresh-existing-content-v1
+  kind: RECIPE
+  family: recipe
+  owner: search-content.vertical
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: 'Refresh Existing Content Recipe: decline or source change → RefreshContext → current snapshot/evidence → Core
+    Decision → refresh brief → action → QA → review → publish new version → measure'
+  input_types: []
+  output_types:
+  - Workflow IR (compiled)
+  contract_path: recipes/validated/search-content-refresh-existing-content-v1.recipe.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - 'DEFERRED OQ-SC-18: recipe instance + Workflow IR compilation + golden tests are Stage 1 deliverables'
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §54.2 (L5037-L5064)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)
+- id: search-content-platform-rule-change-v1
+  kind: RECIPE
+  family: recipe
+  owner: search-content.vertical
+  status: PROPOSED
+  version: 0.1.0
+  evidence_maturity: NOT_APPLICABLE
+  purpose: 'Platform Rule Change Recipe: official source change → diff → affected claims → affected briefs/publications →
+    impact analysis → Core Decision → human review'
+  input_types: []
+  output_types:
+  - Workflow IR (compiled)
+  contract_path: recipes/validated/search-content-platform-rule-change-v1.recipe.yaml
+  implementation_path: null
+  test_path: null
+  aliases: []
+  distinct_from: []
+  risk_notes:
+  - 'DEFERRED OQ-SC-18: recipe instance + Workflow IR compilation + golden tests are Stage 1 deliverables'
+  source: SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md §54.3 (L5065-L5084)
+  provenance: SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3-§6 + §9; generated record set (2026-09-02, EV-AUDIT-0902
+    task 10)

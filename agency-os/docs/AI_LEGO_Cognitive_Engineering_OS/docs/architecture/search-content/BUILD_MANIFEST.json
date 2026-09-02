@@ -1,0 +1,121 @@
+{
+  "docs": {
+    "CONTENT_BRIEF_CONTRACT.md": {
+      "lines": 220,
+      "chars": 6070,
+      "yaml_blocks": 1,
+      "sha1": "31c5d66e06f39f696c169a8d061008fc211b12f3"
+    },
+    "CONTENT_MEASUREMENT_SPEC.md": {
+      "lines": 278,
+      "chars": 8033,
+      "yaml_blocks": 3,
+      "sha1": "fb8ceb5a715013a596cccb870e37c4fe7c82fa8a"
+    },
+    "PUBLISHING_ADAPTER_CONTRACT.md": {
+      "lines": 291,
+      "chars": 10465,
+      "yaml_blocks": 4,
+      "sha1": "db2096e1d9997f1aee73917dd09aae6a6038c479"
+    },
+    "README.md": {
+      "lines": 46,
+      "chars": 2611,
+      "yaml_blocks": 0,
+      "sha1": "34c79c9f02a68bcc9fa6935edd5d8e18d0015a02"
+    },
+    "SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md": {
+      "lines": 164,
+      "chars": 13769,
+      "yaml_blocks": 0,
+      "sha1": "cb1a555a50d25ee2823b831e31dfafcc696ce72f"
+    },
+    "SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md": {
+      "lines": 5917,
+      "chars": 102685,
+      "yaml_blocks": 25,
+      "sha1": "b75ac26377287c91f61108982a69c74345e496f6"
+    },
+    "SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW.md": {
+      "lines": 2224,
+      "chars": 52779,
+      "yaml_blocks": 13,
+      "sha1": "bb3060d8c4d7328a1738d2d37ee7becd0cd10546"
+    },
+    "SEARCH_CONTENT_DOMAIN_MODEL.md": {
+      "lines": 649,
+      "chars": 21985,
+      "yaml_blocks": 18,
+      "sha1": "b4ff0f6acf40df25ebda2c830bc9be9cb66e83f4"
+    },
+    "SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md": {
+      "lines": 369,
+      "chars": 13493,
+      "yaml_blocks": 1,
+      "sha1": "ec49634c908d33038fd8c83cb5f22d7ad03c0091"
+    },
+    "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md": {
+      "lines": 336,
+      "chars": 11902,
+      "yaml_blocks": 0,
+      "sha1": "c9a3b5aeec0cb5900f6ab0189a088789249734ad"
+    },
+    "SEARCH_CONTENT_PACK_COMMON.md": {
+      "lines": 202,
+      "chars": 18105,
+      "yaml_blocks": 0,
+      "sha1": "c49e3eb153df540b1b80693a564076aa0c41b2d2"
+    },
+    "SEARCH_CONTENT_QUALITY_GATES.md": {
+      "lines": 255,
+      "chars": 9986,
+      "yaml_blocks": 1,
+      "sha1": "c5cc53274021a447be3ed4e418fc1a449886ef69"
+    },
+    "SEARCH_EVIDENCE_RETRIEVAL_SPEC.md": {
+      "lines": 283,
+      "chars": 10268,
+      "yaml_blocks": 4,
+      "sha1": "2f78476c51fc27d83469c8a7795df32b9d702b0e"
+    },
+    "SEARCH_INTELLIGENCE_SPEC.md": {
+      "lines": 229,
+      "chars": 6558,
+      "yaml_blocks": 2,
+      "sha1": "538387f7d7101fd0acd5523975bb56e77ace5017"
+    },
+    "SEARCH_SOURCE_PROFILE_AND_AUTHORITY_POLICY.md": {
+      "lines": 211,
+      "chars": 7374,
+      "yaml_blocks": 4,
+      "sha1": "66354f1b99c6511afee231b3a264267b34b83578"
+    }
+  },
+  "adr": {
+    "path": "docs/adr/ADR-021-search-content-boundary-and-ownership.md",
+    "lines": 382,
+    "chars": 21700,
+    "yaml_blocks": 2,
+    "sha1": "1765f993b5f6b066934649f20b64a7b51bcccff6"
+  },
+  "records": {
+    "registry": {
+      "lines": 2675,
+      "chars": 88472,
+      "yaml_blocks": 0,
+      "sha1": "a8aa9b846a13247ed13130dbbeacec4a1903324f"
+    },
+    "gates": {
+      "lines": 1017,
+      "chars": 37149,
+      "yaml_blocks": 0,
+      "sha1": "e0f5118b83bd53fec8a2adc2cc65ba730d743a6e"
+    },
+    "open_questions": {
+      "lines": 318,
+      "chars": 20412,
+      "yaml_blocks": 0,
+      "sha1": "1e9f1dd291d139c0b35c3a0d89ccd1ccc5498e1e"
+    }
+  }
+}

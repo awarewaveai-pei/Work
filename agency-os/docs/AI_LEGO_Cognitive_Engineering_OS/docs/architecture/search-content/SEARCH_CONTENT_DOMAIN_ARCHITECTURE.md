@@ -1,6 +1,6 @@
 # Search & Content Intelligence Domain Architecture
 
-**Status:** PROPOSED — COMPREHENSIVE MASTER REVISION (v3)  
+**Status:** PROPOSED — COMPREHENSIVE MASTER REVISION (v3)；**規範性版本**見 `docs/adr/ADR-021-search-content-boundary-and-ownership.md`（ACCEPTED 2026-09-02）與同目錄 11 份規格文件；本文件為敘事正本，已知修正見文末「Errata（2026-09-02）」附錄  
 **Architecture Review Baseline:** `awarewaveai-pei/Work@4b26e83612caad72698271545ee1952058cc32dd`  
 **Revision Basis:** Full critical review against AI-LEGO specs / ADRs + complete domain operating architecture  
 **Document Type:** Domain / Vertical Architecture  
@@ -61,7 +61,7 @@ Instead, it extends AI LEGO with domain-specific semantics for:
 
 The core principle is:
 
-> **AI LEGO provides the horizontal intelligence runtime. Search & Content Intelligence provides the vertical domain logic.**
+> **AI LEGO provides the horizontal platform / contract substrate and target execution runtime. Search & Content Intelligence provides the vertical domain logic.**  <!-- Errata E-01 (SCV3-M-01) -->
 
 ---
 
@@ -355,7 +355,7 @@ Refresh / Optimization
 Add a domain pack:
 
 ```text
-/cognitive/domain-packs/search-content/
+/cognitive/domain-packs/search-content/        # Errata E-04 (SCV3-M-03): superseded by ADR-021 §D8 — no domain-packs tree; contracts land in methods/contracts, capabilities/contracts
     /seo/
     /geo/
     /aeo/
@@ -1048,9 +1048,9 @@ content_brief:
 
   evidence:
     evidence_pack_id:
-    required_source_tiers:
-      - P0
-      - P1
+    required_source_tiers: null   # Errata E-02 (SCV3-H-02): superseded by CONTENT_BRIEF_CONTRACT.md FINDING-CB-01 — policy refs + per-claim evidence requirements
+      # (was: - P0)
+      # (was: - P1)
 
   linking:
     required_internal_links: []
@@ -4321,7 +4321,7 @@ At the review baseline, this does **not** mean a complete SearchContent publishi
 
 SearchContent must add publishing-specific policy and provider adapters while reusing the AI-LEGO governance primitives.
 
-## 25.1 Suggested Adapters
+## 38.1 Suggested Adapters
 
 ```text
 WordPress
@@ -4334,7 +4334,7 @@ Git-based CMS
 Custom CMS
 ```
 
-## 25.2 Publishing Operations
+## 38.2 Publishing Operations
 
 ```text
 Create Draft
@@ -4349,7 +4349,7 @@ Rollback
 Verify
 ```
 
-## 25.3 Page Metadata
+## 38.3 Page Metadata
 
 Publishing may manage:
 
@@ -4366,7 +4366,7 @@ Open Graph
 sitemap inclusion
 ```
 
-## 25.4 Publishing Authority Policy
+## 38.4 Publishing Authority Policy
 
 Each operation must map to:
 
@@ -4581,7 +4581,7 @@ SearchContent MUST NOT define an independent `RefreshDecision` decision model.
 
 AI LEGO already owns the canonical Decision object. Content refresh is a **decision context**, not a different kind of decision primitive.
 
-## 32.1 Correct Model
+## 45.1 Correct Model
 
 ```text
 Content Performance
@@ -4603,7 +4603,7 @@ Outcome
 
 ---
 
-## 32.2 Refresh Context
+## 45.2 Refresh Context
 
 ```yaml
 content_refresh_context:
@@ -4628,7 +4628,7 @@ content_refresh_context:
 
 ---
 
-## 32.3 Canonical Decision Options
+## 45.3 Canonical Decision Options
 
 The referenced AI-LEGO Decision may evaluate options such as:
 
@@ -4695,7 +4695,7 @@ AI LEGO owns the canonical Source concept. At the review baseline, a canonical m
 
 The vertical should maintain a **SearchSourceProfile / registry overlay** that points to a canonical `source_ref` and stores search-specific classification and operating policy.
 
-## 34.1 Proposed Search Source Profile
+## 47.1 Proposed Search Source Profile
 
 ```yaml
 search_source_profile:
@@ -4727,7 +4727,7 @@ The canonical Source owner should eventually provide identity / locator / publis
 
 ---
 
-## 34.2 Initial Authority Sources
+## 47.2 Initial Authority Sources
 
 Profiles may be created for sources such as:
 
@@ -4974,7 +4974,7 @@ A domain-pack entry is not sufficient by itself.
 Required lifecycle:
 
 ```text
-/cognitive/domain-packs/search-content/...
+/cognitive/domain-packs/search-content/...     # Errata E-04: superseded by ADR-021 §D8
 ↓
 method implementation
 ↓
@@ -5008,7 +5008,7 @@ SearchContent MUST NOT introduce
 another executable workflow representation.
 ```
 
-## 41.1 New Content Recipe
+## 54.1 New Content Recipe
 
 ```text
 Business Goal
@@ -5034,7 +5034,7 @@ Publish
 Measure
 ```
 
-## 41.2 Refresh Existing Content Recipe
+## 54.2 Refresh Existing Content Recipe
 
 ```text
 Performance Decline
@@ -5062,7 +5062,7 @@ Publish New Version if approved
 Measure
 ```
 
-## 41.3 Platform Rule Change Recipe
+## 54.3 Platform Rule Change Recipe
 
 ```text
 Official Source Change
@@ -5790,7 +5790,7 @@ Recommended order:
 
 ```text
 1. SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md
-2. ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md
+2. ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md (→ docs/adr/ADR-021-search-content-boundary-and-ownership.md, Errata E-05)
 3. SEARCH_CONTENT_DOMAIN_MODEL.md
 4. SEARCH_SOURCE_PROFILE_AND_AUTHORITY_POLICY.md
 5. SEARCH_EVIDENCE_RETRIEVAL_SPEC.md
@@ -5878,3 +5878,39 @@ Therefore the preferred product name is:
 or, when emphasizing the platform relationship:
 
 > **Search & Content Intelligence Vertical for AI LEGO Cognitive Engineering OS**
+
+---
+
+# Errata（2026-09-02）— 附錄
+
+本附錄由 2026-09-02 獨立驗證（`agency-os/reports/audit/2026-09-02-search-content-pack-verification.md`，finding M5／M12）與 ADR-021 落地時加入。**規則**：每一條 in-place 修正都以「一行換一行」進行，本文件的行數與所有 `:LNNN` 引用位置不變（本附錄只附加於檔尾）。本文件維持 `PROPOSED` 敘事正本；規範性內容以 `docs/adr/ADR-021-search-content-boundary-and-ownership.md` 與 `docs/architecture/search-content/` 的 11 份規格文件為準，衝突時以後者為準。
+
+| Errata | 位置 | 修正 | 依據 |
+|---|---|---|---|
+| E-00 | `:3` | Status 行加註規範性版本指標 | ADR-021 |
+| E-01 | `:64` | 「horizontal intelligence runtime」→「horizontal platform / contract substrate and target execution runtime」 | Critical Review SCV3-M-01（`:1036`）；Architecture-defined ≠ Schema-defined ≠ Runtime-implemented |
+| E-02 | `:1051-1053` | `required_source_tiers: [P0, P1]` → `null`（原值保留為註解） | Critical Review SCV3-H-02（`:586`）；`CONTENT_BRIEF_CONTRACT.md` FINDING-CB-01；本包 `search_content.evidence.source_authority` gate 採 claim-scope policy，不採固定 tier |
+| E-03 | 12 個 H2 標題 | 第二組 `## 25.x`／`## 32.x`／`## 34.x`／`## 41.x` 依所屬 H1 重新編號（見下表），消除「§32.2 指哪一節」的歧義 | Critical Review SCV3-M-12（`:1407`）；驗證報告 M5 |
+| E-04 | `:358`、`:4977` | `/cognitive/domain-packs/search-content/` 標記為 superseded；契約落 `methods/contracts/`、`capabilities/contracts/`、`recipes/validated/` | Critical Review SCV3-M-03（`:1110`）；ADR-021 §D8；`REPOSITORY_ARCHITECTURE.md` 無 domain-packs 層 |
+| E-05 | §69 | `ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md` 已編號並移至 `docs/adr/ADR-021-search-content-boundary-and-ownership.md` | ADR_INDEX.md |
+| E-06 | §55（`:5085-5122`）| 15 個 event 中 `ContentOpportunityCreated`／`ContentDraftGenerated`／`ContentQualityGateFailed`／`ContentQualityGatePassed`／`ContentPublished`／`OfficialSourceChanged`／`ClaimSuperseded` 不建或改名；正式 event registry（13 個，各附 aggregate owner）見 ADR-021 §D6 | Critical Review SCV3-H-05（`:768`）；ADR-021 §D6 |
+| E-07 | §52／§53（`:4893-4993`）| 42 個提議 ID 的最終去向（納入／拒絕／DEPENDENCY_REQUEST／OPEN_QUESTION）見 `SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md` §3–§6 與 `SEARCH_CONTENT_REGISTRY_RECORDS.yaml` | 驗證報告 B6；ADR-021 §D4／§D5 |
+| E-08 | §57（`:5147-5188`）| 11 個 flat gate id（`search_content.evidence` 等）由 `search_content.<domain>.<name>` 三段式 catalog 取代，跨領域 evidence gate 獨立為 `search_content.evidence.*` family | `SEARCH_CONTENT_QUALITY_GATES.md` §2／§5.5；驗證報告 M11 |
+| E-09 | §11.1（`:705-716`）| `SearchSurface` 為 taxonomy enum、`EntityObservation` 折入 `SearchObservation.raw_observed_entity`，兩者不建獨立 object | ADR-021 §D1／§D3 |
+
+## E-03 標題重新編號對照
+
+| 行 | 原標題 | 新標題 |
+|---|---|---|
+| `:4324` | `## 25.1 Suggested Adapters` | `## 38.1 Suggested Adapters` |
+| `:4337` | `## 25.2 Publishing Operations` | `## 38.2 Publishing Operations` |
+| `:4352` | `## 25.3 Page Metadata` | `## 38.3 Page Metadata` |
+| `:4369` | `## 25.4 Publishing Authority Policy` | `## 38.4 Publishing Authority Policy` |
+| `:4584` | `## 32.1 Correct Model` | `## 45.1 Correct Model` |
+| `:4606` | `## 32.2 Refresh Context` | `## 45.2 Refresh Context` |
+| `:4631` | `## 32.3 Canonical Decision Options` | `## 45.3 Canonical Decision Options` |
+| `:4698` | `## 34.1 Proposed Search Source Profile` | `## 47.1 Proposed Search Source Profile` |
+| `:4730` | `## 34.2 Initial Authority Sources` | `## 47.2 Initial Authority Sources` |
+| `:5011` | `## 41.1 New Content Recipe` | `## 54.1 New Content Recipe` |
+| `:5037` | `## 41.2 Refresh Existing Content Recipe` | `## 54.2 Refresh Existing Content Recipe` |
+| `:5065` | `## 41.3 Platform Rule Change Recipe` | `## 54.3 Platform Rule Change Recipe` |

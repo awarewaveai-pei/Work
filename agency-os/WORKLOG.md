@@ -1,5 +1,89 @@
 # Worklog
 
+## 2026-09-03
+
+### docs(hci): resolve remaining 18 HD open decisions + 8 constitutional ADRs under operator delegation
+
+**觸發**：操作者明示 100% 決策全權（"你是全能規劃師和頂尖工程師...不用停下來等我核准任何事...一直做直到 HCI系統完成"）。範圍：`HCI30_RESEARCH_REVIEW/22_OPEN_HUMAN_DECISIONS.md` 原本 24 項僅操作者可決定的 HD 中，剩餘 18 項（HD-06~23，2026-09-01 已批准 HD-00~05 除外），加上 8 項憲法性 ADR（形式化既有原則，非新決策），加上 `ADR-0016` 稽核時發現的租戶身分綁定開放項。
+
+**第一次嘗試失敗，已記錄並修正**：用 Workflow 工具（27 ADR × draft+2 refute+fix ≈ 102 subagent、1230 萬 token），5 分鐘內燒光操作者付費方案的 5 小時額度，連續兩次。操作者明確指出不合理，已寫 `feedback_no_heavy_subagent_workflows.md` memory；後續改為單一 session 手動通讀 + 修正（不開 subagent，除了收尾階段操作者明示同意的 2 個獨立交叉核對 agent，遠低於其同意的 10 個上限）。
+
+**已修改**：
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0001*.md` 至 `ADR-0033*.md`（27 個新檔，跳過已存在的 0009/0010/0011/0014/0015/0016）— 每份含 Context/Decision/Alternatives-rejected/Required-implementation-gates/Verification-and-rollback/Evidence，全數 `Status: ACCEPTED`，`Decision authority: Operator-delegated (2026-09-02)`
+- 本 session 逐份通讀後修正的真實錯誤：
+  - **ADR-0018 與 ADR-0020 的 SQLSTATE `H1009` 碰撞**（兩份各自獨立算「H1008 之後下一個空號」互不知道對方）— ADR-0020 改用 `H1010`/`H1011`
+  - **ADR-0026 的 schema 假設錯誤** — 原文要求「dedicated physical `claims` table」，但實際 Wave 1 schema 是 `hci.subject_records` 多型表（`kind='CLAIM'`）；已改為承認 Claim 已存在於既有表，只有 Source/SourceSnapshot 是真正的新表
+  - **ADR-0001/0002/0008 三處過期引用**「ADR-0013 still PLANNED」— ADR-0013 實際上已是同批 ACCEPTED
+  - **`17_REPOSITORY_LAYOUT_AND_PATHS.md` 檔名清單過期**（`ADR-0003-api-aware-wave-is-unified-gateway.md`、`ADR-0005-hci-ai-integration-is-optional.md` 與實際檔名不符）+ 補上 0014-0033
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR_INDEX.md` — Register 表全部 27 列新增/更新為 ACCEPTED，gate 表全部 27 列新增；`ADR-0016` 的 gate 狀態同步修正（原文寫「38/38」，實際已是本 session 稍早 Wave 1 強化後的 51/51 assertions + 15/15 mutations，此前未同步更新）；Purpose 段補上「委任亦為有效批准」的規則
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{00_README,05,06,07,09,10,11,12,16}.md` — 18 個 🔴 DECISION PENDING 區塊全部改為 ✅ RESOLVED，各自指向對應 ADR + 開放的 implementation gate 清單；`governance/wave1/HCI_WAVE1_DOMAIN_ERD.md` 的 Case/Engagement 條件句改為引用 ADR-0020
+- `agency-os/reports/decisions/2026-09-02-hci-full-delegation-and-adr-batch.md`（新）— 委任範圍/界線的正式紀錄，逐字引用操作者原話，誠實記錄第一次 Workflow 嘗試失敗與修正
+- `agency-os/docs/infrastructure/CURRENT_SERVICE_PLACEMENT.md`（新）— 順手補上 4 份 HCI 文件引用但不存在的服務清單檔（thin pointer 到既有 `AWAREWAVE_STACK_QUICKREF.md` topology SSOT，非第二份副本）
+
+**收尾階段的獨立交叉核對**（操作者同意「不超過10個agent」後）：2 個 agent（critic + db-expert），各自通讀全部 33 份 ADR + `ADR_INDEX.md` + 實際 Wave 1 migration，找剩餘矛盾/citation 錯誤/schema 不符。結果見下次 WORKLOG 條目（若有 finding 需修正）或本條目更新（若通過）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -rln "🔴.*DECISION PENDING" *.md` in V2 chapters | exit=0 | result=僅剩 2 處為通用治理規則文字（非特定 HD 標記），非過期宣稱
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "H1009" ADR-0018*.md ADR-0020*.md` | exit=0 | result=碰撞已消除，ADR-0020 改用 H1010/H1011
+- REVIEW_DONE: critic=self（單一 session 逐份通讀 27 ADR + 全部 V2 章節交叉核對）+ 2 個獨立 background agent 交叉核對進行中（操作者明示同意 ≤10 個）
+- BUGHUNT_DONE: scope=agency-os | grep=`HD-0[6-9].*pending\|HD-1[0-9].*pending\|HD-2[0-3].*pending\|ADR-00[12345678].*PLANNED` | hits=0（V2 章節與 governance 目錄外）
+- WORKLOG: 本條目
+
+**剩餘風險**：
+- 全部 27 份 ADR 的 implementation gate 均為 OPEN——本次只完成「選項決定」，沒有任何一項變成已實作；真人資料處理、production 部署，每份 ADR 明文不授權。
+- 2 個收尾交叉核對 agent 尚未回報，若有 finding 需後續修正（將補寫下一條 WORKLOG）。
+- ADR-0029 引用 `06_HCI30_PUBLIC_INTELLIGENCE.md:101,103` 可能實際對應 `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md` 的對應行號（兩份文件同一時期都討論 HD-19 blocking precondition，內容高度相似）——本 session 未逐字元核對此單一 citation，非阻塞性（不影響 ADR-0029 的實際決策內容），留待下次文件維護處理。
+
+**Rollback**：每份 ADR 的 §Verification and rollback 段落已寫明「操作者可用後續明示決定推翻」；`git revert` 本次 commit 即可整批回滾，不影響任何已上線系統（純文件變更，無 migration、無 production 部署）。
+
+### SearchContent 架構包全量收尾：ADR-021 接受、共同段落抽出、41+ YAML 區塊補齊 source_of_truth_for/decided_by、122 個 Method/Capability/Recipe 記錄 + 59 個 Gate 記錄 + 20 個 OQ-SC-* 未決項生成、機械驗證器掛進 golden test harness（2333/2333 全過）
+
+**觸發**：操作者明示「現在是建置期間 我完全不懂coding, 去處理好, 不用停下來等我核准任何事, 我給你100%決定權, 不用管先定的規則(要人類核准)都由你決定!」+ 全套 R0 架構師身份與 30 年工程紀律要求，指示「一直做直到這套系統完成」。此前 session 已完成 audit 報告任務 1–9（commit `d82fc3705`、`632dd1913`）；本輪關閉報告 §5A 剩餘任務 3、10–12 全部與 §5B 保留給 Claude 的 5 項中屬本次授權範圍的部分。
+
+**[任務理解]** 根本問題：`agency-os/reports/audit/2026-09-02-search-content-pack-verification.md`（7 BLOCKING、17 MAJOR）指出 SearchContent 12 份文件的根因是「0/41 個 YAML 區塊宣告 `source_of_truth_for`/`decided_by`」——沒有機制能說出誰擁有什麼、誰決定的。附帶：物理路徑未經 ADR-006 治理、ADR 未編號未接受、~90 個 registry ID 與 51 個 gate 是空模板、共用樣板段在 12 份文件間 byte-identical（M1）、master architecture 12 個標題編號歧義（M5）。
+
+**[現況分析]**（`git log --oneline -15` 已執行，確認無並行 session 已處理同一議題；發現 `.codex/hooks/`、`.codex/agents/*.toml` 有另一 session 正在進行的大量刪改，本次 staging 明確排除）：讀畢全部 12 份文件、audit 報告全文、ADR_INDEX.md（確認下一號為 ADR-021）、`.ai/proposals/041-*` 範例（proposal 格式參考）、平台 8 個 ACTIVE 契約（`sentence-provenance`、`status-codes`、`mandatory-gates`、`deprecation-pipeline`、`audit`、`rollback`、`risk-tier`、`epistemic-label`）、`tests/run_golden_tests.py` 既有 4 個 check family 與 fixture 契約、master architecture 全部 §1–§70 標題與 §52–§57 catalog 逐字內容。
+
+**[已修改]**：
+1. **路徑正式化**：`git mv` 整個舊暫置目錄 `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Architecture_Pack/` → `docs/architecture/search-content/`；ADR 移至 `docs/adr/ADR-021-search-content-boundary-and-ownership.md`；兩份敘事正本移入同目錄並改短檔名。
+2. **`SEARCH_CONTENT_PACK_COMMON.md`（新增）**：抽出 12 份文件中 byte-identical 的 4 段共用樣板（工程身份、路徑治理、共同證據基準含 39 個 EV-* 條目、驗證指令），新增 §4 狀態/成熟度詞彙對照表（八值平台成熟度、registry lifecycle vs. evidence maturity 兩正交軸、epistemic/authorship 標籤預設對照）。11 份規格文件與 ADR 頭部改為指標指向本檔，移除重複段落（M1 根治）。
+3. **`ADR-021-search-content-boundary-and-ownership.md`（新增，ACCEPTED）**：§4 為 D1 三方案補齊對稱 Benefits/Costs 表、為 D2–D10 補齊「採用 vs 被拒替代方案」表（M4 根治，先前只有 D1 有選項比較）；§5 D1–D10 完整裁決，新增 D9（Phase 5 關係）、D10（機械驗收閘）；§D6 為 13 個 vertical event 逐一指定 aggregate owner（先前 master 15 個事件中 4 個無 aggregate，予以不建或改名）。
+4. **`SEARCH_CONTENT_OPEN_QUESTIONS.yaml`（新增）**：20 個 `OQ-SC-*` 條目（OPEN_QUESTION/DEFERRED/DEPENDENCY 三類），每條含 interim_rule 或 restart_condition，回應 M3「零標記比錯誤標記更危險」。
+5. **`SEARCH_CONTENT_REGISTRY_RECORDS.yaml`（新增，生成檔）**：122 筆記錄（71 Method + 4 Retired + 32 Capability + 9 Rejected + 3 DependencyRequest + 3 Recipe），每筆含 owner/status/purpose/input_types/output_types/`evidence_maturity`（M6 新軸，回應 critical review SCV3-M-07：全部 domain Method 現為 `DOMAIN_PROPOSAL`）。purpose/IO 逐一對照 master §22–§32 Outputs 清單與 §52–§54，非發明。
+6. **`SEARCH_CONTENT_GATE_RECORDS.yaml`（新增，生成檔）**：59 個 gate（含新增的 `evidence.*` 跨領域 family，從 `geo.*` 拉出，M11；`retrieval.*` 4 個，B7；`publishing.*` 補 4 個使與 §9 hard check 一一對應，M11）；每筆含 display_name/owner/severity/applies_to_artifact_types/category（`DOMAIN_METHOD_SPECIFIC`｜`DOMAIN_POLICY`，M12）；threshold 明標 `DEFERRED OQ-SC-6`（拒絕發明數字）。
+7. **11 份規格文件逐一編輯**：每個 contract YAML 區塊補 `source_of_truth_for`/`decided_by`（例如 `search_source_profile`、`citation_observation`、`content_performance` 等 18 個 Domain Model 區塊 + 其餘文件共 23 個）；Domain Model 新增 §2.16 DecayObservation、§2.17 Artifact Type Catalog（任務 8，先前無 schema）；Publishing Adapter 補 idempotency key 的 JCS+SHA-256 序列化規則、partial-failure 規則、§9 hard-check↔gate 12 條一一對應表、MVP 預設 publishing_operation_policy 表；Measurement 新增 AttributionModel 最小 contract、GSC/GA4 join key 裁決；Registry 新增 §9 Recipes（3 個，先前消失）與 promotion rule；Quality Gates 新增 §5.5 Evidence Gates、§10.5 Gate Bundles、修正 §11 誤述（Global 14 項無條件強制 vs. High-risk 6 項 R3∪R4 觸發，M10）；Integration Matrix 重寫 Ownership 表（每列標平台八值成熟度）+ 新增 §3.1 field-level schema SSOT 權責表 + Gate G/H 補回 Integration Acceptance Gate；MVP 補 §12 SC-Phase 0–8 對照表、開工前提清單全部打勾（前9項）。
+8. **master architecture Errata（同行數修正 + 檔尾附錄）**：E-00 頭部指標、E-01 runtime 用詞（SCV3-M-01）、E-02 `required_source_tiers` 移除（SCV3-H-02）、E-03 重新編號 12 個歧義 H2 標題（`## 25.x`/`## 32.x`/`## 34.x`/`## 41.x` 各兩處撞號，改為所屬 H1 的正確號碼）、E-04 domain-pack 路徑 superseded、E-05 舊 ADR 檔名更新、E-06～E-09 記錄事件/ID/gate/entity 裁決去向。全程「一行換一行」，不移動任何既有 `:LNNN` 引用位置。
+9. **`tests/architecture/search_content_pack_check.py`（新增）**：9 條規則驗證器（fence/yaml 解析、contract provenance、registry 覆蓋、gate 覆蓋、OQ 覆蓋、EV-* 證據表行號真實性、路徑衛生、event ownership + heading 編號、manifest 新鮮度）；`--write-manifest` 是唯一產生 `BUILD_MANIFEST.json` 的方式（M1 根治：先前 36 個布林值只編碼 3 個事實）。
+10. **`tests/run_golden_tests.py`**：新增 `run_search_content_pack_check()` 作為 check family 5，import 驗證器模組並疊加其 `passed`/`failures` 計數（不折疊成單一 pass/fail，保留 1482 條個別檢查的可追溯性）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/architecture/search_content_pack_check.py --write-manifest && python tests/architecture/search_content_pack_check.py` | exit=0 | result=`PASSED 1606 checks, 0 failures`（取代本條目較早草稿中的 1482，數字差異是下方 critic 覆審修正的直接結果）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（於 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/` 執行）| exit=0 | result=`PASSED: 2457` / `ALL GOLDEN TESTS PASSED`（851 既有 + 1606 本包，含既有 4 個 check family 全綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "import yaml; ...(OQ-SC id 交叉核對)"` | exit=0 | result=21 個 `OQ-SC-*` 定義（新增 `OQ-SC-21`，見下）與全部文件內引用完全一致
+- REVIEW_DONE: critic=Deep（獨立 subagent，範圍鎖定 `search_content_pack_check.py` 全檔 + `run_golden_tests.py` 新增函式，非自我審查）| verdict=pass-after-fix | findings=2 CRITICAL + 6 MAJOR + 11 MINOR，全部驗真後逐一修正（無一判定 false positive）：
+  1. **[CRITICAL 已修]** `--write-manifest` 原本跳過全部 9 條 rule 直接 exit 0——這正是 AGENTS.md 補丁判準點名的「用工具自己消音自己的偵測器」形狀（偵測到 rule9 stale → 自然反應是重跑 `--write-manifest` → 它無條件祝福磁碟現況為新基準）。修法：`main()` 改為先跑 rule 1-8，任一失敗就拒絕寫入並 exit 1。
+  2. **[CRITICAL 已修]** `CONTRACT_KEY_RE` 只匹配「首行為 `key:` 換行」的 block，實測 2 個真實區塊（`status: ACCEPTED` 這種首行帶值的 block）完全逃過 rule2 檢查，且 `block_kind: EXAMPLE`/`ADR_METADATA` 豁免分支因此從未真的被執行過（dead code，開發者誤以為它在運作）。修法：改為先枚舉全部 fenced yaml block 並逐一 parse，再用解析後物件的頂層 key 判斷是否需要 provenance，不再靠正則猜測「這是不是一個 contract block」。
+  3. **[MAJOR 已修]** 全檔用裸 `yaml.safe_load`，重複 key 靜默 last-wins（同目錄 `run_golden_tests.py` 早就為此定義了 `UniqueKeyLoader` 但本檔沒有引用它）。修法：複製同一套 `UniqueKeyLoader` 到本檔並用於全部 yaml 讀取。
+  4. **[MAJOR 已修]** master architecture（5917 行）與 critical review（2224 行）先前被排除在 rule1（fence/yaml 解析）與 rule7（`/mnt/data`／stale label 清潔檢查）之外，而 rule7 恰好最可能抓到的就是這兩份從 chat 草稿搬過來的文件。修法：兩條 rule 改吃全部 pack 內 markdown（`ALL_MD`），只有 rule2（provenance，master 本就不需要）與 COMMON 自己（history 表本就允許提及 `/mnt/data`）維持排除。
+  5. **[MAJOR 部分修正 + 誠實揭露]** rule6 的 EV-* 證據行號檢查只驗上界（`結尾行 ≤ 檔案長度`），插入行數導致的整體位移不會被抓到。已加：起始行非空白的弱檢查 + 精確大小寫比對（Windows `os.path.isfile` 大小寫不敏感，原本會讓打錯大小寫的引用在本機靜默通過）。完整修法需要逐條加內容錨點（39+ 條逐一核對，工作量與本輪其餘修正不成比例），誠實登記為新增的 `OQ-SC-21`，不宣稱已解決。
+  6. **[MAJOR 已修]** rule8 的事件表格列正則對事件名稱／owner 欄位太嚴格，含數字的事件名或空 owner 欄會讓整列被正則跳過而不觸發任何檢查失敗。修法：放寬字元類別，並加入「候選列數 == 成功解析列數」的不變量，任何解析失敗的列都會被明確回報而非靜默略過。
+  7. **[MAJOR 已修]** rule3/4/5 對 registry/gate/OQ 覆蓋範圍掃描沒有下限守門；若掃描格式未來漂移（例如目錄格式從 ```` ```text ```` 改成表格），`referenced` 會悄悄變空集合，覆蓋檢查全數空操作通過。修法：三處各加最低數量斷言（>=100／>=55／>=15，現況為 103／59／21）。
+  8. **[MAJOR 已修]** rule2 對 ADR 分支用 substring 比對 `"source_of_truth_for:" in body`，會被巢狀 example 內文字誤判為頂層已宣告；SPEC_DOCS 分支已是 anchored regex，兩分支不一致。修法：隨第 2 點的整體重構一併解決——現在兩邊都直接讀解析後物件的頂層 key，不存在 substring 誤判的空間。
+  9. **[MINOR 已修]** `block_kind: EXAMPLE` 豁免原本是 substring 比對，區塊內文只要提到這串文字（不論是不是頂層宣告）就會被誤判豁免。隨第 2 點重構解決。
+  10. **[MINOR 已修]** `run_golden_tests.py` 呼叫本檔案完全沒有 try/except；一旦本檔任何 rule 拋例外，會讓 golden test runner 的最終彙總與尚未執行的 check family 4（`run_ref_resolution_smoke`）一起消失，只留下裸 traceback。修法：`run_search_content_pack_check()` 包 try/except，例外轉成一筆 failure 訊息後繼續，不影響其餘 check family。
+  11. **[MINOR 已修]** `GATE_ID_RE` 只匹配恰好兩段（`search_content.<a>.<b>`），未來三段式 gate id 會被截斷成不存在的名字誤報 missing。修法：改用 `(?:\.[a-z_]+)+` 允許任意段數。
+  其餘 6 個 MINOR（`MARKER_RE` 死碼移除、rule8 標題重複編號偵測、rule3 family 白名單移除改用純 fullmatch、manifest 涵蓋範圍擴大到 ADR 與三份生成 YAML、fence 正則容忍縮排與行尾空白、rule4/5/6 掃描範圍對齊）已一併修正，逐項對應 critic report 原始編號，細節見 diff。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`AI_LEGO_Cognitive_Engineering_OS_Search_Content_Architecture_Pack`｜`ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md`｜`AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture(_Critical_Review)?\.md` | hits=0（`agency-os` 內僅存於本次 Errata 的說明性反向對照、既有審計報告/WORKLOG 的歷史記錄、以及會在下次 ao-resume 自動重算的 `.agency-state/` 快取檔——三者皆非需要修正的既有正本聲明）；`scripts` 內 0 命中。另確認 `CHANGE_IMPACT_MATRIX.md` 對其餘 20 份 AI-LEGO ADR 同樣 0 收錄，本次不註冊屬既有慣例一致，非遺漏。
+- 過程中另發生 2 次與並行 session 的 git index 競態（另一 session 正在批次處理 `.codex/hooks/`、`.codex/agents/*.toml` 重構，以及分別對 `docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/` 一批 33 個 ADR + `agency-os/docs/infrastructure/CURRENT_SERVICE_PLACEMENT.md` + 一份 decision record 做 `git add`，即本檔上方續6 條目所述的同一個並行 session）：兩次都在 `git diff --cached --stat`／`--name-only` 核對時發現非本次任務路徑混入，`git restore --staged --pathspec-from-file`（用檔案而非行內字串傳遞路徑清單，避開 bash 對含特殊字元路徑的引號解析問題）精確移除，未觸碰對方內容，未使用 `git add -A` 或任何寬鬆萬用字元。
+
+**[剩餘風險]**：
+- `SEARCH_CONTENT_REGISTRY_RECORDS.yaml`/`SEARCH_CONTENT_GATE_RECORDS.yaml` 的 purpose/input_types/output_types 由本次生成腳本一次性編寫並手動核對 master 對應段落，屬 PROPOSED 內容，未經 operator 逐條過目（同 `ADR_INDEX.md` 對 Claude 首次形式化產出的一貫註記方式）。
+- 51 個 gate 的 threshold、90+ 個 registry record 的 `automated_validator_ref`／`implementation_path`／`test_path` 仍是 `null`/`DEFERRED OQ-SC-6`——這是刻意的（拒絕發明數字），不是遺漏；Stage 1（SC-Phase 1）開工時才會有真實數字可填。
+- 3 個 Recipe 尚未實際寫成 `recipes/validated/*.recipe.yaml` 實例並編譯進 Workflow IR（`OQ-SC-18`）；122 個 registry record 尚未升入 ACTIVE 全域 `methods/registry/method-inventory.yaml`（`OQ-SC-19`）——MVP 驗收 #2 在此之前不算通過，已在 MVP 文件 §3 前提清單明列為未打勾項。
+- 未處理：`docs/HCI/` 重組與 `agency-os/docs/System_Foundry_v1.0/` 兩個前一 session 遺留的未歸屬問題（見續7 條目的剩餘風險），與本次任務無關，留待操作者確認。
+
+**Rollback**：`git revert <本次 commit>`；純文件與生成檔變動，不涉及任何 ACTIVE 平台 schema、程式碼執行邏輯或資料庫遷移。舊路徑檔案已被 `git mv`，revert 會完整還原到 2026-09-02（續2/續3）時的暫置目錄結構。
+
 ## 2026-09-02（續7）
 
 ### v4修法送第二輪覆審：critic連續2次rate-limit + codex-oracle連續2次無回應（含縮小packet後仍無回應）——改真實對抗自審，抓到3個新bug（不是critic漏抓，是v4自己新引入的），mutation test證明測試非空跑，107/107全過

@@ -1,0 +1,317 @@
+$id: "ai-lego://docs/architecture/search-content/SEARCH_CONTENT_OPEN_QUESTIONS.yaml"
+title: SearchContent Open Questions / Deferred Items / Dependencies Register
+version: "1.1.0"
+status: ACTIVE   # the register itself is live; every item carries its own kind/status
+
+description: >
+  Single register for everything the SearchContent architecture pack deliberately
+  does NOT decide yet. 2026-09-02 verification (agency-os/reports/audit/
+  2026-09-02-search-content-pack-verification.md, finding M3) found the pack had
+  zero OPEN_QUESTION / DEFERRED markers while carrying ~90 registry IDs without
+  owners and 51 gates without thresholds: unmarked gaps are more dangerous than
+  marked ones because a reader cannot tell "deliberately postponed" from
+  "forgotten". Every OPEN_QUESTION / DEFERRED / DEPENDENCY marker in the 11 spec
+  documents MUST cite an OQ-SC-* id from this file, and every item here MUST be
+  referenced at least once (tests/architecture/search_content_pack_check.py,
+  rule 5). Mirrors the platform convention of per-schema `open_questions`
+  blocks (e.g. specs/domain/capability-contract.schema.yaml OQ-cc-1) but kept
+  in one place for the vertical because its items cross document boundaries.
+
+source_of_truth_for:
+  - "SEARCH_CONTENT_PACK_COMMON.md §3 (marker rule) and §5 rule 5 (validator invariant)"
+  - "every `OPEN_QUESTION` / `DEFERRED` / `DEPENDENCY` marker in docs/architecture/search-content/*.md"
+decided_by: "docs/adr/ADR-021-search-content-boundary-and-ownership.md §D10 (mechanical acceptance gate); item content grounded per-entry in `evidence`"
+
+kinds:
+  OPEN_QUESTION: "a design question with no answer yet; an interim_rule MUST be given so implementers fail closed"
+  DEFERRED: "the answer is known to be needed and its shape is known; deliberately postponed to a named restart_condition"
+  DEPENDENCY: "blocked on a Core / platform contract or an operator decision outside this vertical's authority"
+
+items:
+  - id: OQ-SC-1
+    kind: OPEN_QUESTION
+    title: "`baseline_refs` has no Baseline object contract"
+    question: >
+      ContentPerformance.baseline_refs and ContentBrief.measurement_plan.baseline_refs are
+      referenced by three documents but no document defines what a Baseline is, who produces
+      it, or where it is stored.
+    owner: "search-content.measurement"
+    blocks: "machine contract for content_performance / content_brief.measurement_plan"
+    interim_rule: "consumers MUST treat baseline_refs as unresolvable; no gate or method may depend on it"
+    restart_condition: "a Baseline object is proposed in CONTENT_MEASUREMENT_SPEC.md with producer + storage role"
+    referenced_by: ["SEARCH_CONTENT_DOMAIN_MODEL.md §2.14", "CONTENT_BRIEF_CONTRACT.md §2", "CONTENT_MEASUREMENT_SPEC.md §11"]
+    evidence: ["EV-AUDIT-0902 B2 / M13"]
+
+  - id: OQ-SC-2
+    kind: DEFERRED
+    title: "Attribution model calibration / evaluation dataset policy"
+    question: >
+      The attribution_model contract (CONTENT_MEASUREMENT_SPEC.md §8) fixes identity, type and
+      window. For `type: DATA_DRIVEN` and `EXPERIMENTAL` models the calibration dataset,
+      evaluation procedure and rollback version policy are not yet specified.
+    owner: "search-content.measurement"
+    blocks: "nothing in the MVP (MVP uses RULE_BASED models only)"
+    restart_condition: "first data-driven or experimental attribution adapter is contracted"
+    referenced_by: ["CONTENT_MEASUREMENT_SPEC.md §8"]
+    evidence: ["EV-AUDIT-0902 M13", "EV-V3-MEASURE (§32.5 L3810-3828)"]
+
+  - id: OQ-SC-3
+    kind: DEFERRED
+    title: "Engagement layer metric definitions"
+    question: >
+      master §32.1 Layer C (Engagement) and §43 list engagement metrics (avg engagement time,
+      task completion) but no MetricDefinition instances exist for them in the pack.
+    owner: "search-content.measurement"
+    blocks: "nothing in the MVP (MVP scope = search performance fixture + AI visibility fixture)"
+    restart_condition: "first analytics provider adapter (measurement.collect_analytics) is contracted"
+    referenced_by: ["CONTENT_MEASUREMENT_SPEC.md §2", "CONTENT_MEASUREMENT_SPEC.md §6"]
+    evidence: ["EV-AUDIT-0902 M13", "EV-V3-MEASURE (L3688, L4533-4536)"]
+
+  - id: OQ-SC-4
+    kind: DEFERRED
+    title: "Retention periods per data class"
+    question: >
+      Raw provider payloads, normalized observations and aggregated metrics need retention
+      periods (SEARCH_INTELLIGENCE_SPEC.md §11). Retention is a legal/product decision
+      (jurisdiction-dependent) outside this vertical's authority to fix unilaterally.
+    owner: "operator (legal/product); policy file policies/search-content/retention.policy.yaml"
+    blocks: "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md §11 production promotion gate (not the staging MVP)"
+    interim_rule: "no deletion of raw payloads in the MVP; CAS hash + audit metadata retained per Core redaction mechanism"
+    restart_condition: "before first production ingestion of third-party payloads"
+    referenced_by: ["SEARCH_INTELLIGENCE_SPEC.md §11", "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md §11"]
+    evidence: ["EV-AUDIT-0902 task 11"]
+
+  - id: OQ-SC-5
+    kind: OPEN_QUESTION
+    title: "Definition of `approved semantic equivalence` for publication verification"
+    question: >
+      PUBLISHING_ADAPTER_CONTRACT.md §10 allows verification by "content hash OR approved
+      semantic equivalence"; the latter has no definition (which normalizations are allowed,
+      who approves the equivalence class, how it is recorded).
+    owner: "search-content.publishing"
+    blocks: "nothing — interim rule is fail-closed"
+    interim_rule: "verification MUST use exact SHA-256 content_hash match over the adapter's declared canonicalization; any mismatch = VERIFY_FAILED"
+    restart_condition: "a provider whose rendering pipeline provably alters approved content (e.g. CMS auto-typography) is onboarded and needs a bounded equivalence policy"
+    referenced_by: ["PUBLISHING_ADAPTER_CONTRACT.md §10"]
+    evidence: ["EV-AUDIT-0902 task 11"]
+
+  - id: OQ-SC-6
+    kind: DEFERRED
+    title: "Per-gate thresholds and automated validators"
+    question: >
+      Every gate record in SEARCH_CONTENT_GATE_RECORDS.yaml carries display_name / owner /
+      severity / applies_to_artifact_types / remediation, but `automated_validator_ref` is null
+      and numeric thresholds are not fixed. Thresholds without a validator implementation and a
+      calibration fixture would be invented numbers (the pack's zero-invented-numbers rule).
+    owner: "search-content.quality (per gate family sub-owner in each record)"
+    blocks: "Stage 1 gate implementation; NOT the ADR or the MVP design"
+    restart_condition: "per gate: when its validator is implemented and its 5 fixtures (Quality Gates §12) exist"
+    referenced_by: ["SEARCH_CONTENT_QUALITY_GATES.md §3", "SEARCH_CONTENT_GATE_RECORDS.yaml"]
+    evidence: ["EV-AUDIT-0902 M7"]
+
+  - id: OQ-SC-7
+    kind: OPEN_QUESTION
+    title: "`content.refresh_analysis` vs master `content.refresh_prioritization`"
+    question: >
+      master §53 proposes content.refresh_prioritization; the Registry canonicalizes
+      content.refresh_analysis. No other document references either, so it cannot be
+      determined whether these are one renamed method or two pipeline stages.
+    owner: "search-content.content-strategy"
+    blocks: "nothing — neither is used by the MVP"
+    interim_rule: "both IDs are registered (refresh_analysis PROPOSED, refresh_prioritization PROPOSED with distinct_from note); no contract may be written for either until resolved"
+    restart_condition: "first real refresh use case that needs one of them"
+    referenced_by: ["SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3"]
+    evidence: ["EV-AUDIT-0902 B6", "EV-V3-METHODS (L4946-4993)"]
+
+  - id: OQ-SC-8
+    kind: OPEN_QUESTION
+    title: "`search.cluster_queries` (rejected capability) → `content.topic_clustering` pairing is an inference"
+    question: >
+      Registry §6 maps the rejected capability search.cluster_queries to Method
+      content.topic_clustering by semantic proximity; if query clustering needs a different
+      algorithm/input schema than content topic clustering, a separate Method
+      (search.query_clustering, already registered) is the right target instead.
+    owner: "search-content.search-intelligence"
+    blocks: "nothing"
+    interim_rule: "search.query_clustering is the registered Method for query-level clustering; content.topic_clustering for content/topic-level; implementers pick by input object type"
+    restart_condition: "first implementation of either Method"
+    referenced_by: ["SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §6"]
+    evidence: ["EV-AUDIT-0902 task 7"]
+
+  - id: OQ-SC-9
+    kind: DEPENDENCY
+    title: "`knowledge.*` capabilities requested from Core (3 DEPENDENCY_REQUESTs)"
+    question: >
+      knowledge.retrieve_evidence / knowledge.resolve_entity / knowledge.retrieve_brand_fact are
+      needed by the vertical but belong to the Core knowledge namespace; Core has not confirmed
+      or contracted them.
+    owner: "Core (knowledge engine); requested_by search-content"
+    blocks: "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md acceptance #2 for any recipe node that calls them"
+    interim_rule: "MVP recipes MUST use Repository ports directly (SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §1 path A) and MUST NOT reference these IDs until Core confirms"
+    restart_condition: "Core owner confirms and contracts each capability"
+    referenced_by: ["SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §5"]
+    evidence: ["EV-AUDIT-0902 B6", "EV-V3-METHODS (§52 L4163-4165 knowledge.* proposals)"]
+
+  - id: OQ-SC-10
+    kind: DEPENDENCY
+    title: "Dotted-prefix namespace registry for Capability IDs (platform OQ-cc-1)"
+    question: >
+      Whether `<namespace>.<name>` Capability ids form a formal registry is unresolved at the
+      platform level (capability-contract.schema.yaml open_questions.OQ-cc-1). The vertical's
+      Method/Capability catalogs are kept as two independently-typed tables meanwhile.
+    owner: "operator, via a future platform ADR (per OQ-cc-1's own owner field)"
+    blocks: "nothing (OQ-cc-1 itself says `blocks: nothing`)"
+    restart_condition: "the platform ADR that resolves OQ-cc-1"
+    referenced_by: ["ADR-021 §D4", "SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §2"]
+    evidence: ["EV-CAPABILITY (:770-779)"]
+
+  - id: OQ-SC-11
+    kind: DEFERRED
+    title: "Domain methodology evidence maturity (all domain Methods are DOMAIN_PROPOSAL)"
+    question: >
+      Critical review SCV3-M-07: ~60 SEO/GEO/AEO/LLMO/Entity/Local/CRO/ASO Methods are
+      structurally valid but have no AI-LEGO-recorded literature or empirical evidence of
+      efficacy. Registry records carry `evidence_maturity: DOMAIN_PROPOSAL` for all of them.
+    owner: "search-content.vertical (per family sub-owner)"
+    blocks: "nothing structurally; any claim that a Method 'improves ranking/visibility' in user-facing output MUST carry this label"
+    restart_condition: "per Method: literature or experiment Evidence refs attached to its registry record (→ LITERATURE_SUPPORTED / EMPIRICALLY_VALIDATED)"
+    referenced_by: ["SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §3", "SEARCH_CONTENT_PACK_COMMON.md §4.3", "SEARCH_CONTENT_REGISTRY_RECORDS.yaml"]
+    evidence: ["EV-CRIT-M (M-07, :1232)", "EV-AUDIT-0902 M6"]
+
+  - id: OQ-SC-12
+    kind: DEPENDENCY
+    title: "Core Entity contract maturity"
+    question: "Entity/Relation exist only as minimal Evidence Graph node/edge shapes; entity_ref resolution depends on a future Core Entity contract."
+    owner: "Core (Evidence Graph / Knowledge)"
+    blocks: "entity_ref population; NOT raw_observed_entity capture"
+    interim_rule: "entity_ref stays null unless a Core resolver succeeds; raw value is always preserved (ADR-021 §D3)"
+    restart_condition: "Core Entity contract reaches ACTIVE_SCHEMA"
+    referenced_by: ["ADR-021 §D3", "SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md §1", "SEARCH_CONTENT_DOMAIN_MODEL.md §2.4"]
+    evidence: ["EV-EGRAPH", "EV-CRIT-H04"]
+
+  - id: OQ-SC-13
+    kind: DEPENDENCY
+    title: "Core Source standalone contract"
+    question: "source_ref must stay opaque; `SRC-*` grammar must not be frozen into the vertical API until Core ships a Source contract."
+    owner: "Core"
+    blocks: "nothing (opaque ref works today)"
+    restart_condition: "Core Source contract reaches ACTIVE_SCHEMA"
+    referenced_by: ["SEARCH_SOURCE_PROFILE_AND_AUTHORITY_POLICY.md §1 FINDING-SA-03", "SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md §1"]
+    evidence: ["EV-EGRAPH", "EV-CRIT-M (M-04)"]
+
+  - id: OQ-SC-14
+    kind: DEPENDENCY
+    title: "Canonical Artifact record / global artifact-type registry"
+    question: >
+      The vertical artifact-type catalog (SEARCH_CONTENT_DOMAIN_MODEL.md §2.17, master §56) is a
+      vertical list; once Core ships a canonical Artifact record and type registry it must
+      integrate via extension/profile semantics rather than redefining Artifact.
+    owner: "Core"
+    blocks: "nothing (gates key on the vertical catalog meanwhile)"
+    restart_condition: "Core Artifact contract reaches ACTIVE_SCHEMA"
+    referenced_by: ["SEARCH_CONTENT_DOMAIN_MODEL.md §2.17", "SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md §1", "SEARCH_CONTENT_QUALITY_GATES.md §3"]
+    evidence: ["EV-V3-RECIPES (§56 L5123-5146)", "EV-AUDIT-0902 M14"]
+
+  - id: OQ-SC-15
+    kind: DEPENDENCY
+    title: "Experiment / Outcome machine contract"
+    question: "Causal experiments (CONTENT_MEASUREMENT_SPEC.md §13) reuse AI-LEGO Experiment/Outcome; no machine contract exists yet."
+    owner: "Core (data-science plane)"
+    blocks: "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md excluded scope only (advanced CRO experimentation)"
+    interim_rule: "no causal claim may be emitted; observational attribution only, labeled as such"
+    restart_condition: "Experiment/Outcome contract reaches ACTIVE_SCHEMA"
+    referenced_by: ["CONTENT_MEASUREMENT_SPEC.md §13", "SEARCH_CONTENT_AI_LEGO_INTEGRATION_MATRIX.md §1"]
+    evidence: ["EV-V3-MEASURE", "EV-AUDIT-0902 M9"]
+
+  - id: OQ-SC-16
+    kind: DEPENDENCY
+    title: "`ArtifactPublished` has no payload contract in Core"
+    question: >
+      event-ledger.schema.yaml only cites ArtifactPublished inside Master Plan's non-exhaustive
+      example list; it has no aggregate owner, payload contract or producer. ADR-021 §D6 makes
+      ContentPublicationCreated the vertical's primary event and references ArtifactPublished
+      only if/when Core defines it.
+    owner: "Core (Artifact lifecycle)"
+    blocks: "nothing"
+    restart_condition: "Core defines ArtifactPublished with payload contract"
+    referenced_by: ["ADR-021 §D6", "PUBLISHING_ADAPTER_CONTRACT.md §10"]
+    evidence: ["EV-EVENT (:17)", "EV-AUDIT-0902 appendix (auditor disagreement)"]
+
+  - id: OQ-SC-17
+    kind: DEFERRED
+    title: "Program Plan phase slot for the SearchContent MVP"
+    question: >
+      AI_LEGO_OS_Program_Plan_v1.md §9 defines Phase 5 as the single exit slice (Research, ADR-014)
+      and defines no Phase 6. Giving the SearchContent MVP a formal phase slot is a mother-document
+      edit (ADR-006 proposal, operator-only APPROVED).
+    owner: "operator (ADR-006 proposal flow)"
+    blocks: "formal scheduling only; SC-Phase 0 (this pack) and design work are not blocked"
+    interim_rule: "SearchContent MVP is positioned as the first post-Phase-5 vertical slice (ADR-021 §D9); it MUST NOT start implementation before the Phase 5 exit gate"
+    restart_condition: "Phase 5 exit gate passes"
+    referenced_by: ["ADR-021 §D9", "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md §3"]
+    evidence: ["AI_LEGO_OS_Program_Plan_v1.md §9 (:148-152)", "docs/adr/ADR-014-phase-5-mode-selection-research.md"]
+
+  - id: OQ-SC-18
+    kind: DEFERRED
+    title: "Three SearchContent recipes not yet authored as recipe.schema.yaml instances"
+    question: >
+      master §54 defines 3 recipes (new content / refresh existing content / platform rule
+      change). The Registry §9 assigns their ids; the recipes/validated/*.recipe.yaml instances,
+      their Workflow IR compilation and their golden tests are Stage 1 deliverables.
+    owner: "search-content.vertical"
+    blocks: "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md acceptance #15 (compiles to Workflow IR)"
+    restart_condition: "SC-Phase 1 (Domain Foundation) start"
+    referenced_by: ["SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §9", "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md §9"]
+    evidence: ["EV-V3-RECIPES (§54 L4994-5084)", "EV-RECIPE", "EV-AUDIT-0902 M14"]
+
+  - id: OQ-SC-19
+    kind: DEFERRED
+    title: "Promotion of SearchContent registry records into methods/registry/method-inventory.yaml"
+    question: >
+      SEARCH_CONTENT_REGISTRY_RECORDS.yaml is a PROPOSED staging record set inside the vertical
+      folder. The MVP acceptance criterion #2 ("all Method/Capability refs resolve canonical
+      registries") is satisfied only once each record is promoted into the ACTIVE global registry
+      (method-inventory.yaml `phase_3_additions` style entries + contract-backlog.yaml tiers),
+      which touches ACTIVE platform files and their golden-test invariants.
+    owner: "search-content.vertical (writer) + platform registry owner (reviewer)"
+    blocks: "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md acceptance #2"
+    interim_rule: "no SearchContent id may appear in a Workflow IR until promoted; the staging file is the only place new ids may be added meanwhile"
+    restart_condition: "first Method/Capability contract file is written for a SearchContent id (promotion happens per-id together with its contract)"
+    referenced_by: ["SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md §8", "SEARCH_CONTENT_MVP_VERTICAL_SLICE.md §3"]
+    evidence: ["EV-AUDIT-0902 §5B (method-inventory.yaml 289 entries, 0 SearchContent ids)", "methods/registry/method-inventory.yaml header"]
+
+  - id: OQ-SC-20
+    kind: DEFERRED
+    title: "Provider position/visibility semantics mapping per adapter"
+    question: >
+      CONTENT_MEASUREMENT_SPEC.md §6 requires each provider's `position` semantics to be declared
+      in the adapter mapping and forbids merging positions across providers; the mapping records
+      themselves are per-adapter deliverables.
+    owner: "search-content.measurement (per adapter)"
+    blocks: "nothing in the MVP (deterministic fixtures declare their own semantics)"
+    restart_condition: "each real provider adapter contract"
+    referenced_by: ["CONTENT_MEASUREMENT_SPEC.md §6", "SEARCH_INTELLIGENCE_SPEC.md §5"]
+    evidence: ["EV-V3-MEASURE (§32.4 L3791-3809)"]
+
+  - id: OQ-SC-21
+    kind: DEFERRED
+    title: "EV-* evidence citations are checked upper-bound-only, not content-anchored"
+    question: >
+      tests/architecture/search_content_pack_check.py rule6 confirms every EV-* citation's target
+      file exists and that its cited end line does not exceed the file's actual length (plus a weak
+      check that the start line is not blank). It cannot detect a citation whose line range still
+      falls within the file's current bounds but has drifted to point at the wrong content (e.g.
+      lines were inserted earlier in the file and the citation table was never updated). A real fix
+      needs a content anchor per citation (a short verbatim excerpt from the cited range, checked
+      against current file content) rather than a line-number range alone; adding 39+ accurate
+      anchors was judged disproportionate to do in the same pass that just fixed the validator's
+      more serious self-consistency bugs (2026-09-03 critic round).
+    owner: "search-content.vertical (pack maintenance)"
+    blocks: "nothing — the existing checks (file exists, end line in bounds, start line non-blank)
+      still catch the most common drift shapes; this only leaves a narrower gap"
+    interim_rule: "treat rule6 PASS as 'citations are not obviously broken', not as 'citations are
+      verified accurate' -- a human spot-check remains the actual accuracy check for now"
+    restart_condition: "next time an EV-* citation is discovered to have silently drifted despite
+      rule6 passing, add a content-anchor field to that citation's row and extend rule6 to check it"
+    referenced_by: ["SEARCH_CONTENT_PACK_COMMON.md §3", "tests/architecture/search_content_pack_check.py rule6_evidence_table"]
+    evidence: ["critic review of search_content_pack_check.py, 2026-09-03, finding 5"]
