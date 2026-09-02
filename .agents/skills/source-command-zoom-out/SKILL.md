@@ -1,12 +1,11 @@
 ---
-name: "source-command-zoom-out"
-description: "Tell the agent to zoom out and give broader context or a higher-level perspective on an unfamiliar section of code. Use when you need a map of relevant modules and callers, or when you say \"zoom out\", \"bigger picture\", \"how does this fit\", \"explain context\", \"what calls this\"."
+name: source-command-zoom-out
+description: >-
+  Execute the shared Claude command /zoom-out using its direct source.
 ---
 
 # source-command-zoom-out
 
-Use this skill when the user asks to run the migrated source command `zoom-out`.
-
-## Command Template
-
-I don't know this area of code well. Go up a layer of abstraction. Give me a map of all the relevant modules and callers, using the project's domain glossary vocabulary.
+This is a generated Codex wrapper. Read `D:\Work\.claude\commands\zoom-out.md` in full, then execute
+the command with current Codex tools, permissions, and project instructions.
+The Claude command file remains the only human-maintained source.

@@ -1,10 +1,13 @@
 ---
 name: grill-me
-description: Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree one at a time. For each question, provide a recommended answer. Use when user wants to stress-test a plan, get grilled on their design, mentions "grill me", "問爆我", "逼我想清楚", "壓力測試計畫", "質問我", or wants deep alignment before starting.
+description: >-
+  Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree one at a time. For each question, provide a recommended answer. Use when user wants to stress-test a plan, get grilled on their design, mentions "grill me", "問爆我", "逼我想清楚", "壓力測試計畫", "質問我", or wants deep alignment before starting.
 ---
 
-Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
+# grill-me
 
-Ask the questions one at a time. Wait for my answer before continuing.
+This is a Codex wrapper for a Claude skill. It intentionally keeps the operational content in one source location instead of duplicating the Claude skill into Codex.
 
-If a question can be answered by exploring the codebase, explore the codebase instead of asking me.
+The source skill lives at `D:\Work\.claude\skills\grill-me\SKILL.md`. When this wrapper triggers, read that `SKILL.md` and follow the source workflow directly.
+
+Use Codex tools, permissions, and current developer instructions while applying the source workflow. Do not edit the Claude source unless the user explicitly asks to update the shared skill.

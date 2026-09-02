@@ -63,6 +63,23 @@ function Backup-And-ReplaceDirectory {
   Remove-Item -LiteralPath $Path -Recurse -Force
 }
 
+function Backup-And-ReplaceFile {
+  param(
+    [string]$Path,
+    [string]$BackupRoot,
+    [string]$AllowedRoot
+  )
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return
+  }
+
+  Assert-ChildPath -Path $Path -Root $AllowedRoot
+  Ensure-Directory $BackupRoot
+  Copy-Item -LiteralPath $Path -Destination (Join-Path $BackupRoot (Split-Path -Leaf $Path)) -Force
+  Remove-Item -LiteralPath $Path -Force
+}
+
 function Escape-TableCell {
   param([AllowNull()][string]$Value)
   if ([string]::IsNullOrWhiteSpace($Value)) {
@@ -94,31 +111,164 @@ function Get-MarkdownFrontmatter {
   return $result
 }
 
-function Set-SkillFrontmatter {
+function ConvertTo-TomlBasicString {
+  param([AllowNull()][string]$Value)
+
+  if ($null -eq $Value) { return '""' }
+  $escaped = $Value.Replace('\', '\\').Replace('"', '\"')
+  $escaped = $escaped -replace "`r?`n", ' '
+  return '"' + $escaped + '"'
+}
+
+function Write-NativeAgentBridge {
+  param(
+    [string]$SourcePath,
+    [string]$DestinationPath,
+    [string]$WorkRoot
+  )
+
+  $frontmatter = Get-MarkdownFrontmatter $SourcePath
+  $name = if ($frontmatter.name) { [string]$frontmatter.name } else { [IO.Path]::GetFileNameWithoutExtension($SourcePath) }
+  $description = if ($frontmatter.description) { [string]$frontmatter.description } else { "Use the shared Claude agent '$name' through its direct source prompt." }
+  $relativeSource = $SourcePath.Substring($WorkRoot.Length).TrimStart('\')
+  $charterPath = Join-Path $WorkRoot 'mcp\claude-userlevel\SUBAGENT_CHARTER.md'
+  $instructions = @"
+This is a generated Codex bridge for Claude agent '$name'. Before any task work,
+read the complete source prompt at '$SourcePath' and the shared engineering charter
+at '$charterPath'. Follow both as developer instructions, then perform the assigned
+task using Codex tools and the current parent sandbox/approval policy. Do not maintain
+or infer a second copy of either source.
+"@.Trim()
+
+  $content = @(
+    '# GENERATED: Claude-first native agent bridge. Do not edit by hand.'
+    "# source: $relativeSource"
+    "name = $(ConvertTo-TomlBasicString $name)"
+    "description = $(ConvertTo-TomlBasicString $description)"
+    "developer_instructions = '''"
+    $instructions
+    "'''"
+    ''
+  ) -join "`n"
+
+  Write-Utf8NoBom -Path $DestinationPath -Value $content
+}
+
+function Sync-NativeAgentBridges {
+  param(
+    [string]$SourceDir,
+    [string]$DestinationDir,
+    [string]$WorkRoot,
+    [string]$BackupRoot
+  )
+
+  Ensure-Directory $DestinationDir
+  $bridgeBackupRoot = Join-Path $BackupRoot 'native-agent-bridges'
+  $sourceNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+
+  Get-ChildItem -File -LiteralPath $SourceDir -Filter '*.md' |
+    Where-Object { $_.Name -notmatch '^(README|AGENT_INDEX)' } |
+    Sort-Object Name |
+    ForEach-Object {
+      $destinationName = "$($_.BaseName).toml"
+      $sourceNames.Add($destinationName) | Out-Null
+      $destination = Join-Path $DestinationDir $destinationName
+      Backup-And-ReplaceFile -Path $destination -BackupRoot $bridgeBackupRoot -AllowedRoot $DestinationDir
+      Write-NativeAgentBridge -SourcePath $_.FullName -DestinationPath $destination -WorkRoot $WorkRoot
+    }
+
+  Get-ChildItem -File -LiteralPath $DestinationDir -Filter '*.toml' |
+    Where-Object {
+      $firstLine = Get-Content -LiteralPath $_.FullName -Encoding UTF8 -TotalCount 1
+      $firstLine -eq '# GENERATED: Claude-first native agent bridge. Do not edit by hand.' -and -not $sourceNames.Contains($_.Name)
+    } |
+    ForEach-Object {
+      Backup-And-ReplaceFile -Path $_.FullName -BackupRoot $bridgeBackupRoot -AllowedRoot $DestinationDir
+    }
+
+  return @($sourceNames | Sort-Object)
+}
+
+function Write-ClaudeCommandSkillWrapper {
   param(
     [string]$SkillPath,
     [string]$Name,
-    [string]$Description
+    [string]$CommandPath,
+    [string]$CommandName
   )
 
-  $skillMd = Join-Path $SkillPath "SKILL.md"
-  $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $skillMd
-  $body = [regex]::Replace($content, "(?s)^---.*?---\s*", "")
-  $descriptionLines = @()
-  foreach ($line in ($Description -split "`r?`n")) {
-    $descriptionLines += "  $line"
+  Ensure-Directory $SkillPath
+  $content = @"
+---
+name: $Name
+description: >-
+  Execute the shared Claude command /$CommandName using its direct source.
+---
+
+# $Name
+
+This is a generated Codex wrapper. Read ``$CommandPath`` in full, then execute
+the command with current Codex tools, permissions, and project instructions.
+The Claude command file remains the only human-maintained source.
+"@
+  Write-Utf8NoBom -Path (Join-Path $SkillPath 'SKILL.md') -Value $content
+}
+
+function Remove-LegacyCodexHookRuntime {
+  param(
+    [string]$CodexHome,
+    [string]$CanonicalHookRoot,
+    [string]$BackupRoot
+  )
+
+  $legacyConfig = Join-Path $CodexHome 'hooks.json'
+  if (Test-Path -LiteralPath $legacyConfig) {
+    $config = Get-Content -Raw -Encoding UTF8 -LiteralPath $legacyConfig | ConvertFrom-Json
+    $commands = @()
+    if ($config.hooks) {
+      foreach ($event in $config.hooks.PSObject.Properties) {
+        foreach ($group in @($event.Value)) {
+          foreach ($hook in @($group.hooks)) {
+            if ($hook.type -eq 'command') { $commands += [string]$hook.command }
+          }
+        }
+      }
+    }
+    $allManaged = $commands.Count -gt 0 -and @($commands | Where-Object { $_ -notmatch [regex]::Escape($CodexHome.TrimEnd('\') + '\hooks\') }).Count -eq 0
+    if (-not $allManaged) {
+      throw "Refusing to remove $legacyConfig because it contains a non-AwareWave or unparseable hook handler. Preserve it manually, then re-run this sync."
+    }
+    $configBackup = Join-Path $BackupRoot 'legacy-global-hooks'
+    Ensure-Directory $configBackup
+    Copy-Item -LiteralPath $legacyConfig -Destination (Join-Path $configBackup 'hooks.json') -Force
+    Remove-Item -LiteralPath $legacyConfig -Force
   }
 
-  $frontmatter = @(
-    "---"
-    "name: $Name"
-    "description: >-"
-    $descriptionLines
-    "---"
-    ""
-  ) -join "`n"
-
-  Write-Utf8NoBom -Path $skillMd -Value ($frontmatter + $body)
+  $legacyHookRoot = Join-Path $CodexHome 'hooks'
+  if (Test-Path -LiteralPath $legacyHookRoot) {
+    $unexpected = @(
+      Get-ChildItem -LiteralPath $legacyHookRoot -File -Recurse | Where-Object {
+        $relative = $_.FullName.Substring($legacyHookRoot.Length).TrimStart('\')
+        $directSource = Join-Path $CanonicalHookRoot $relative
+        # Early Codex migration flattened rule files into hooks/. Canonical
+        # source stores them under hooks/rules/. Treat both layouts as managed
+        # only when the corresponding source exists; anything else blocks
+        # deletion and is preserved for manual ownership review.
+        $ruleSource = Join-Path (Join-Path $CanonicalHookRoot 'rules') $relative
+        # These two names are v1 runner dependencies retired by the v2 source
+        # (documented in hooks/README.md). They are safe to archive/remove only
+        # because this migration has already verified the global config invokes
+        # runner.js rather than either standalone entry point.
+        $retiredLegacy = $relative -in @('_verify-shared.js', 'log-error.sh')
+        -not ($retiredLegacy -or (Test-Path -LiteralPath $directSource) -or (Test-Path -LiteralPath $ruleSource))
+      }
+    )
+    if ($unexpected.Count -gt 0) {
+      $sample = ($unexpected | Select-Object -First 3 -ExpandProperty FullName) -join '; '
+      throw "Refusing to remove $legacyHookRoot because it contains $($unexpected.Count) non-canonical file(s): $sample"
+    }
+    Backup-And-ReplaceDirectory -Path $legacyHookRoot -BackupRoot (Join-Path $BackupRoot 'legacy-global-hooks') -CodexRoot $CodexHome
+  }
 }
 
 function Write-AgentIndex {
@@ -131,7 +281,7 @@ function Write-AgentIndex {
   $rows = @(
     "# Claude Agent Index"
     ""
-    "These are migrated Claude Code agent prompts. Codex cannot register them as native agent_type values; load the matching file and use it as role guidance in the current Codex agent unless the user explicitly asks for Codex sub-agents."
+    'These are Claude-first agent sources. The sync also creates thin native Codex agent bridges in `.codex/agents/`; each bridge reads the matching source before it works.'
     ""
     "| Agent | Model | Tools | Description |"
     "|---|---|---|---|"
@@ -153,23 +303,6 @@ function Write-AgentIndex {
   Write-Utf8NoBom -Path (Join-Path $DestDir "index.md") -Value ($rows -join "`n")
 }
 
-function Copy-FilesByFilter {
-  param(
-    [string]$SourceDir,
-    [string]$Filter,
-    [string]$DestinationDir
-  )
-
-  if (-not (Test-Path -LiteralPath $SourceDir)) {
-    return
-  }
-
-  Get-ChildItem -File -LiteralPath $SourceDir -Filter $Filter |
-    ForEach-Object {
-      Copy-Item -LiteralPath $_.FullName -Destination $DestinationDir -Force
-    }
-}
-
 function Write-CommandIndex {
   param(
     [string]$SourceDir,
@@ -180,7 +313,7 @@ function Write-CommandIndex {
   $rows = @(
     "# Claude Command Index"
     ""
-    "These are migrated Claude slash-command runbooks. For a user request like `/review`, read the matching Markdown file and execute the steps with Codex tools and permission rules."
+    'These are migrated Claude slash-command runbooks. For a user request like `/review`, read the matching Markdown file and execute the steps with Codex tools and permission rules.'
     ""
     "| Command | Summary |"
     "|---|---|"
@@ -208,7 +341,7 @@ function Write-HookIndex {
   $rows = @(
     "# Claude Hook Index"
     ""
-    "Codex does not run Claude Code hooks automatically. Treat these as manual preflight/postflight checks or source material for future Codex/CI automation."
+    'The canonical hook implementation lives under `mcp/claude-userlevel/hooks`. Claude uses its synced user-level runtime copy; Codex project hooks execute this source directly from the git root after hook trust is granted.'
     ""
     "| Event | Matcher | Type | Command |"
     "|---|---|---|---|"
@@ -318,7 +451,7 @@ function Write-RunbookIndex {
   $files |
     Sort-Object -Unique |
     ForEach-Object {
-      $rows += "| $(Escape-TableCell (Split-Path -Leaf $_)) | `$_` |"
+      $rows += "| $(Escape-TableCell (Split-Path -Leaf $_)) | ``$_`` |"
     }
 
   Write-Utf8NoBom -Path (Join-Path $DestDir "index.md") -Value ($rows -join "`n")
@@ -433,7 +566,7 @@ Use this skill as a compatibility layer over the migrated Claude Code assets fro
 
 ## Agents
 
-Claude agents are migrated as prompt references, not native Codex `agent_type` values. When a user asks for a named Claude agent, read `references/agents/<agent>.md` and use it as role guidance in the current Codex agent.
+Each Claude agent has a generated native Codex bridge in `D:\Work\.codex\agents`. The bridge reads the matching source prompt and the shared subagent charter before it works. When a user asks for a named Claude agent, look up its direct source path in `references/agents/index.md`; do not try to read a non-existent copied file under `references/agents/`.
 
 If the user explicitly asks for sub-agents or parallel agent work, map Claude read-only agents to Codex `explorer` where appropriate and implementation agents to Codex `worker`. Keep delegated work concrete and bounded.
 
@@ -443,11 +576,11 @@ Claude is the human-maintained source of truth. For repo-level workflow, read `r
 
 ## Commands
 
-For a slash command such as `/review`, read `references/commands/review.md` and follow its steps using Codex tools. If the command asks for a Claude subagent, emulate the role locally unless the user explicitly asked for subagents.
+For a slash command such as `/review`, read its direct source path in `references/commands/index.md`, then follow its steps using Codex tools. If the command asks for a Claude subagent, emulate the role locally unless the user explicitly asked for subagents.
 
 ## Hooks
 
-Claude hooks are copied for reference but do not execute automatically in Codex. Treat them as manual checks or as source material for future CI/git-hook automation. Do not assume a hook has protected the workspace unless you actually ran the equivalent check.
+The canonical hook implementation is `D:\Work\mcp\claude-userlevel\hooks`. Codex project hooks execute it directly from the git root when the project is trusted and the current hook hash has been trusted. Matching global and project hooks both run, so this migration intentionally removes its obsolete global Codex hook copy. Do not assume a hook has protected the workspace unless the current project hook configuration is trusted and an applicable event actually ran.
 
 ## MCP
 
@@ -570,72 +703,69 @@ Ensure-Directory $skillRoot
 Ensure-Directory $backupRoot
 
 $claudeSkills = Join-Path $ClaudeHome "skills"
+$repoSkillRoot = Join-Path $WorkRoot ".agents\skills"
+$userAgentsRoot = Join-Path $env:USERPROFILE ".agents"
+$userSkillRoot = Join-Path $userAgentsRoot "skills"
 $installedSkills = New-Object System.Collections.Generic.List[string]
 
 if ($Mode -eq "copy") {
-  Get-ChildItem -Directory -LiteralPath $claudeSkills |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") } |
-    Sort-Object Name |
-    ForEach-Object {
-      $destination = Join-Path $skillRoot $_.Name
-      Backup-And-ReplaceDirectory -Path $destination -BackupRoot $backupRoot -CodexRoot $CodexHome
-      Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force
-      $installedSkills.Add($_.Name)
-    }
+  throw "-Mode copy is retired: copying creates a second, drifting workflow source. Use -Mode linked."
+}
 
-  $featurePlan = Join-Path $skillRoot "feature-plan"
-  if (Test-Path -LiteralPath $featurePlan) {
-    Set-SkillFrontmatter -SkillPath $featurePlan -Name "feature-plan" -Description (Get-CodexSkillDescription -Name "feature-plan" -SourceSkillMd (Join-Path $claudeSkills "feature-plan\SKILL.md"))
+Ensure-Directory $repoSkillRoot
+Get-ChildItem -Directory -LiteralPath $claudeSkills |
+  Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") } |
+  Sort-Object Name |
+  ForEach-Object {
+    $destination = Join-Path $repoSkillRoot $_.Name
+    Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot "repo-skill-bridges") -CodexRoot $WorkRoot
+    $sourceSkillMd = Join-Path $_.FullName "SKILL.md"
+    $description = Get-CodexSkillDescription -Name $_.Name -SourceSkillMd $sourceSkillMd
+    Write-WrapperSkill -SkillPath $destination -Name $_.Name -Description $description -SourcePath $sourceSkillMd
+    $installedSkills.Add($_.Name)
   }
 
-  $strategyReview = Join-Path $skillRoot "strategy-review"
-  if (Test-Path -LiteralPath $strategyReview) {
-    Set-SkillFrontmatter -SkillPath $strategyReview -Name "strategy-review" -Description (Get-CodexSkillDescription -Name "strategy-review" -SourceSkillMd (Join-Path $claudeSkills "strategy-review\SKILL.md"))
+Get-ChildItem -File -LiteralPath $claudeSkills -Filter "*.skill" |
+  Sort-Object Name |
+  ForEach-Object {
+    $topLevel = (& tar -tf $_.FullName | Select-Object -First 1) -replace "/.*$", ""
+    if ([string]::IsNullOrWhiteSpace($topLevel)) {
+      throw "Unable to determine top-level folder for archive: $($_.FullName)"
+    }
+    $destination = Join-Path $repoSkillRoot $topLevel
+    Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot "repo-skill-bridges") -CodexRoot $WorkRoot
+    $description = Get-CodexSkillDescription -Name $topLevel -SourceSkillMd ""
+    Write-WrapperSkill -SkillPath $destination -Name $topLevel -Description $description -SourcePath $_.FullName -IsArchive
+    $installedSkills.Add($topLevel)
   }
 
-  Get-ChildItem -File -LiteralPath $claudeSkills -Filter "*.skill" |
-    Sort-Object Name |
-    ForEach-Object {
-      $topLevel = (& tar -tf $_.FullName | Select-Object -First 1) -replace "/.*$", ""
-      if ([string]::IsNullOrWhiteSpace($topLevel)) {
-        throw "Unable to determine top-level folder for archive: $($_.FullName)"
-      }
-      $destination = Join-Path $skillRoot $topLevel
-      Backup-And-ReplaceDirectory -Path $destination -BackupRoot $backupRoot -CodexRoot $CodexHome
-      & tar -xf $_.FullName -C $skillRoot
-      $installedSkills.Add($topLevel)
-    }
-
-  $decisionSkill = Join-Path $skillRoot "ai-decision-intelligence"
-  if (Test-Path -LiteralPath $decisionSkill) {
-    Set-SkillFrontmatter -SkillPath $decisionSkill -Name "ai-decision-intelligence" -Description (Get-CodexSkillDescription -Name "ai-decision-intelligence" -SourceSkillMd "")
+$commandSkillMap = @{
+  "source-command-caveman" = "caveman.md"
+  "source-command-wp-bridge-release" = "wp-bridge-release.md"
+  "source-command-zoom-out" = "zoom-out.md"
+}
+foreach ($entry in $commandSkillMap.GetEnumerator() | Sort-Object Key) {
+  $commandPath = Join-Path $ClaudeHome (Join-Path "commands" $entry.Value)
+  if (-not (Test-Path -LiteralPath $commandPath)) {
+    throw "Expected Claude command source is missing: $commandPath"
   }
-} else {
-  Get-ChildItem -Directory -LiteralPath $claudeSkills |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") } |
-    Sort-Object Name |
-    ForEach-Object {
-      $destination = Join-Path $skillRoot $_.Name
-      Backup-And-ReplaceDirectory -Path $destination -BackupRoot $backupRoot -CodexRoot $CodexHome
-      $sourceSkillMd = Join-Path $_.FullName "SKILL.md"
-      $description = Get-CodexSkillDescription -Name $_.Name -SourceSkillMd $sourceSkillMd
-      Write-WrapperSkill -SkillPath $destination -Name $_.Name -Description $description -SourcePath $sourceSkillMd
-      $installedSkills.Add($_.Name)
-    }
+  $destination = Join-Path $repoSkillRoot $entry.Key
+  Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot "repo-skill-bridges") -CodexRoot $WorkRoot
+  Write-ClaudeCommandSkillWrapper -SkillPath $destination -Name $entry.Key -CommandPath $commandPath -CommandName ([IO.Path]::GetFileNameWithoutExtension($entry.Value))
+  $installedSkills.Add($entry.Key)
+}
 
-  Get-ChildItem -File -LiteralPath $claudeSkills -Filter "*.skill" |
-    Sort-Object Name |
-    ForEach-Object {
-      $topLevel = (& tar -tf $_.FullName | Select-Object -First 1) -replace "/.*$", ""
-      if ([string]::IsNullOrWhiteSpace($topLevel)) {
-        throw "Unable to determine top-level folder for archive: $($_.FullName)"
-      }
-      $destination = Join-Path $skillRoot $topLevel
-      Backup-And-ReplaceDirectory -Path $destination -BackupRoot $backupRoot -CodexRoot $CodexHome
-      $description = Get-CodexSkillDescription -Name $topLevel -SourceSkillMd ""
-      Write-WrapperSkill -SkillPath $destination -Name $topLevel -Description $description -SourcePath $_.FullName -IsArchive
-      $installedSkills.Add($topLevel)
+# The repo skill root is the only Codex-discovered bridge location for shared
+# Claude skills. Remove same-named legacy copies only after backing them up.
+foreach ($skillName in @($installedSkills | Sort-Object -Unique)) {
+  foreach ($legacyRoot in @($skillRoot, $userSkillRoot)) {
+    $legacyPath = Join-Path $legacyRoot $skillName
+    if (Test-Path -LiteralPath $legacyPath) {
+      $allowedRoot = if ($legacyRoot -eq $skillRoot) { $CodexHome } else { $userAgentsRoot }
+      $legacyScope = if ($legacyRoot -eq $skillRoot) { "codex-home" } else { "user-agents" }
+      Backup-And-ReplaceDirectory -Path $legacyPath -BackupRoot (Join-Path $backupRoot (Join-Path "legacy-duplicate-skills" $legacyScope)) -CodexRoot $allowedRoot
     }
+  }
 }
 
 Backup-And-ReplaceDirectory -Path $compatSkill -BackupRoot $backupRoot -CodexRoot $CodexHome
@@ -665,21 +795,15 @@ Ensure-Directory $projectDest
 Ensure-Directory $runbookDest
 Ensure-Directory $pluginDest
 
-if ($Mode -eq "copy") {
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "agents") -Filter "*.md" -DestinationDir $agentDest
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "commands") -Filter "*.md" -DestinationDir $commandDest
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "hooks") -Filter "*.js" -DestinationDir $hookDest
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "hooks") -Filter "*.ps1" -DestinationDir $hookDest
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "hooks") -Filter "*.sh" -DestinationDir $hookDest
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "hooks") -Filter "README*.md" -DestinationDir $hookDest
-  Copy-FilesByFilter -SourceDir (Join-Path $ClaudeHome "hooks") -Filter "hooks.json" -DestinationDir $hookDest
-}
+$nativeAgentRoot = Join-Path $WorkRoot ".codex\agents"
+$nativeAgentNames = Sync-NativeAgentBridges -SourceDir (Join-Path $ClaudeHome "agents") -DestinationDir $nativeAgentRoot -WorkRoot $WorkRoot -BackupRoot $backupRoot
+Remove-LegacyCodexHookRuntime -CodexHome $CodexHome -CanonicalHookRoot (Join-Path $WorkRoot "mcp\claude-userlevel\hooks") -BackupRoot $backupRoot
 
 Write-ClaudeCompatSkill -SkillPath $compatSkill -SourceClaudeHome $ClaudeHome
 Write-AgentIndex -SourceDir (Join-Path $ClaudeHome "agents") -DestDir $agentDest -UseSourceLinks ($Mode -eq "linked")
 Write-CommandIndex -SourceDir (Join-Path $ClaudeHome "commands") -DestDir $commandDest -UseSourceLinks ($Mode -eq "linked")
 Write-HookIndex -ClaudeSettingsPath (Join-Path $ClaudeHome "settings.json") -DestDir $hookDest
-Write-McpIndex -ClaudeMcpPath (Join-Path $ClaudeHome "mcp.json") -CodexConfigPath (Join-Path $CodexHome "config.toml") -DestDir $mcpDest
+Write-McpIndex -ClaudeMcpPath (Join-Path $WorkRoot ".mcp.json") -CodexConfigPath (Join-Path $CodexHome "config.toml") -DestDir $mcpDest
 Write-ProjectIndex -WorkRoot $WorkRoot -DestDir $projectDest -ClaudeHome $ClaudeHome
 Write-RunbookIndex -WorkRoot $WorkRoot -DestDir $runbookDest
 Write-PluginIndex -PluginMarketplacesDir (Join-Path $ClaudeHome "plugins\marketplaces") -DestDir $pluginDest
@@ -691,6 +815,7 @@ $globalAgentsContent = @'
 - Use the `claude-compat` skill when the user asks for migrated Claude agents, slash commands, hooks, runbooks, plugins, or Claude Code workflow parity.
 - Claude source content lives in `D:\Work\CLAUDE.md` and `D:\Work\.claude`; user Codex skills are generated thin wrappers/indexes, not independent copies.
 - Claude is the only human-maintained workflow source. Do not hand-maintain a parallel Codex rule set for migrated Claude behavior.
+- In `D:\Work`, read `CLAUDE.md` and then `agency-os\AGENTS.md` in full before task actions. The repo `AGENTS.md` bridge enforces the same rule for project sessions.
 - This file is the user-level Codex instruction source. Do not add Codex-only instructions or migration helpers to the repo root.
 - Project-specific instructions may live in nested repo `AGENTS.md` files when a project intentionally owns them.
 - The user-level MCP config may contain live secrets. Never print raw `config.toml`, `.mcp.json`, `mcp.json`, `.credentials.json`, or token-bearing env values.
@@ -704,7 +829,7 @@ if (Test-Path -LiteralPath $validationScript) {
   $env:PYTHONUTF8 = "1"
   $skillsToValidate = @($installedSkills | Sort-Object -Unique) + @("claude-compat")
   foreach ($skillName in $skillsToValidate) {
-    $path = Join-Path $skillRoot $skillName
+    $path = if ($skillName -eq "claude-compat") { Join-Path $skillRoot $skillName } else { Join-Path $repoSkillRoot $skillName }
     if (Test-Path -LiteralPath $path) {
       $output = & python $validationScript $path 2>&1
       if ($LASTEXITCODE -eq 0) {
@@ -723,6 +848,8 @@ $summary = [ordered]@{
   codexHome = $CodexHome
   backupRoot = $backupRoot
   installedSkills = @($installedSkills | Sort-Object -Unique)
+  nativeAgentBridges = @($nativeAgentNames)
+  repoSkillRoot = $repoSkillRoot
   compatibilitySkill = $compatSkill
   validation = @($validationResults)
 }
@@ -730,7 +857,8 @@ $summary = [ordered]@{
 $summaryPath = Join-Path $compatSkill "migration-summary.json"
 Write-Utf8NoBom -Path $summaryPath -Value ($summary | ConvertTo-Json -Depth 5)
 
-Write-Host "Installed skills:" (($installedSkills | Sort-Object -Unique) -join ", ")
+Write-Host "Generated repo skill bridges:" (($installedSkills | Sort-Object -Unique) -join ", ")
+Write-Host "Generated native agent bridges:" (($nativeAgentNames) -join ", ")
 Write-Host "Installed compatibility skill: claude-compat"
 Write-Host "Backup root: $backupRoot"
 Write-Host "Validation:"

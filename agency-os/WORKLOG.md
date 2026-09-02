@@ -24,7 +24,7 @@
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=抽出 4 個修好的 index 函式對現役 `~/.codex/skills/claude-compat/references/` 4 個真實子目錄重新產生 | exit=0 | result=`runbooks/index.md` 的字面 `$_` 計數從 40 降到 0；`agents`/`commands`/`hooks` 三個 index 的說明句反引號正確顯示
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=`[System.Management.Automation.Language.Parser]::ParseFile()` | exit=0 | result=PARSE OK，全部改動語法無誤
 - REVIEW_DONE: critic=Deep（獨立 critic subagent，範圍鎖定「這個 bug class 在這個檔案」，非全檔案架構審查）| verdict=pass-after-fix | findings=1 Major(`:454`，已修)+3 Minor(`:284/316/344`，已修)+3 Suggestion(`:42`/`:213`/`:628`/`:529`，範圍外未動，屬不同性質的程式碼品質建議非本 bug class)
-- BUGHUNT_DONE: scope=mcp,agency-os | grep=`` `\$[A-Za-z] `` （單反引號後接插值變數的模式，本檔案內）| hits=0（5 處全部修完後複查，無殘留同款 pattern）
+- BUGHUNT_DONE: scope=mcp,agency-os | grep=Python `re.finditer(r"(?<!\`)\`\$", line)` 逐行掃描本檔案（第一版用 bash grep `` `\$[A-Za-z] `` 有假陽性——連正確的雙反引號 `` ``$Var`` `` 都會命中，因為它的第二個反引號同樣滿足「backtick 後接 $」；改用負向後顧斷言排除「前面也是反引號」的情況後才是真正的「孤立單反引號」偵測）| hits=0（5 處全部修完後複查，確認無殘留同款 pattern；另外 critic 已對全檔案 44 個反引號逐一人工核對，非僅靠這行 grep）
 
 **剩餘風險**：
 - `mcp/claude-userlevel/hooks/runner.js` 的 `isCodexPayload` 判別邏輯（同一批未 commit workstream 的另一個檔案）有另一個**未修復**的真 bug（`hook_event_name` 是所有 Claude Code hook 事件的共通欄位，不是 Codex 專屬標記，會讓正式 Claude 呼叫被誤判），連同 `.codex/hooks/` 整批刪除、`.codex/agents/*.toml` 重生、`SUBAGENT_CHARTER.md`、root `AGENTS.md` 改寫等一整個「Codex↔Claude bridge」workstream **刻意不在本次 commit 範圍內**，已另外向操作者回報，需要操作者決定是否修復後再提交
