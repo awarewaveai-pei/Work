@@ -743,6 +743,15 @@
   - **【2026-08-29 操作者決定：先不開】** 操作者問「portal 密碼可以做什麼」，釐清後發現：portal 帳號是給**未來 HCI-30/Cognitive OS 外部付費客戶**用的,不是給操作者自己用（操作者本來就有 `app.aware-wave.com` owner 權限,兩者身分/用途完全不同）。**現在開公開註冊除了測水管通不通,對操作者沒有任何實際用途**——Cognitive OS 後端還在 Phase 2 規劃、HCI-30 未動工,登入進去 launcher 只會看到兩張「即將推出」卡片。**操作者選擇先不開,只在 TASKS 記提醒**。
   - **重新開放的觸發條件（任一成立再考慮）**：① Cognitive OS 或 HCI-30 任一產品有真實 provisioning API 可接（launcher 卡片有東西可以真的開通）② 操作者明確想做一次端對端 signup 水管測試（非開放給真實客戶,測完可考慮關掉或留著）。**觸發前不要主動再問或自己打開**。
 
+- [ ] **SearchContent vertical SC-Phase 1（Domain Foundation）：把 122 筆 PROPOSED registry 記錄逐一寫成 contract 並升入全域 registry**
+  - `NOT_STARTED` · `2026-09-03 開` · `卡在 Phase 5 Research MVP exit gate（ADR-021 §D9；OQ-SC-17）`
+  - **一句話**：SC-Phase 0（ownership／ID／path／event 收斂）已於 2026-09-02/03 完成並通過機械驗收閘（ADR-021 ACCEPTED；`tests/run_golden_tests.py` 2457/2457）；下一階段是把設計變成可執行契約。
+  - **現在到哪**：`docs/architecture/search-content/` 12 份規格 + 3 份生成 YAML（122 registry 記錄／59 gate 記錄／21 個 OQ-SC-*）+ `tests/architecture/search_content_pack_check.py`（Gate H，1606 checks）全部落地；MVP 文件 §3 前 9 項前提已打勾，後 4 項未打勾。
+  - **下一步**（依 `SEARCH_CONTENT_MVP_VERTICAL_SLICE.md` §3 後 4 項與 §12 SC-Phase 對照）：① 等 Phase 5 exit gate 通過；② 為 §5 Steps 2–16 實際用到的每個 Method/Capability 依 Registry §8 路徑寫 `methods/contracts/<id>.contract.yaml`／`capabilities/contracts/<id>.capability.yaml` + fixture（`EV-TESTS` 契約），**每寫一個就同批升入 `methods/registry/method-inventory.yaml` + `contract-backlog.yaml`**（`OQ-SC-19` promotion rule，不可先寫 Workflow IR 再補 registry）；③ 3 個 recipe 寫成 `recipes/validated/search-content-*-v1.recipe.yaml` 並編譯進 Workflow IR（`OQ-SC-18`）；④ 每個 BLOCK gate 補 validator + 5 個 fixture 後才填 threshold（`OQ-SC-6`，禁止先填數字）。
+  - **完成定義**：MVP 驗收 #2（所有 Method/Capability ref resolve 到 ACTIVE 全域 registry）、#15（recipes compile to Workflow IR）、#16（golden tests 含 Gate H 全綠）三項同時成立；`SEARCH_CONTENT_MVP_VERTICAL_SLICE.md` §3 後 4 項打勾；WORKLOG `AUTO_TASK_DONE: SearchContent vertical SC-Phase 1`。
+  - **卡點**：Phase 5 Research MVP exit gate 尚未通過（ADR-014 那條切片）；為 SearchContent MVP 開正式 Program Plan phase slot 屬母文件修改，走 ADR-006 提案、只能由操作者推進（`OQ-SC-17`）——但 ② ③ ④ 的契約撰寫本身不被它卡住，可在 Phase 5 exit 後立即開工。
+  - **⚠️ 禁止**：跳過 registry promotion 直接在 Workflow IR 引用 SearchContent id；為 gate 發明 threshold 數字；動 `MVP_VERTICAL_SLICE_PLAN.md`／`ADR-014`／任何母文件。
+
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。
@@ -1385,5 +1394,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-02 01:11:17 UTC_
+_Last synced: 2026-09-02 14:30:03 UTC_
 

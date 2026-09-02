@@ -1,4 +1,5 @@
 <!-- 本檔為 2026-09-02 完整版，取代同日稍早的中期版本（commit 7e8fe8d96）。 -->
+<!-- 路徑異動（2026-09-02/03，ADR-021 §D8）：本報告驗證時的路徑 agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_OS_Search_Content_Architecture_Pack/ 已遷至 docs/architecture/search-content/；ADR 已編號為 docs/adr/ADR-021-search-content-boundary-and-ownership.md；兩份敘事文件改名為 SEARCH_CONTENT_DOMAIN_ARCHITECTURE.md / ..._CRITICAL_REVIEW.md。本報告內的路徑與行號保留為驗證當時的歷史紀錄，不回溯修改；§5A 任務 1–12 與 §5B 授權範圍內項目的處置結果見 agency-os/WORKLOG.md 2026-09-02（續1/續2）與 2026-09-03 SearchContent 條目。 -->
 
 # Search & Content Architecture Pack — 獨立驗證報告（完整版）
 
