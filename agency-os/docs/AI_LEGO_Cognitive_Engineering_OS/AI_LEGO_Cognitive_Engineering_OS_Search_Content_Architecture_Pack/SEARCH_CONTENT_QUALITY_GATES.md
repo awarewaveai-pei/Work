@@ -148,6 +148,19 @@ Runtime result 仍寫 canonical Gate Result：
 gate_id / status / evidence / validator / timestamp / rationale
 ```
 
+## 3.5 Retrieval Gates
+
+**2026-09-02 audit remediation 新增**（finding B7）：`SEARCH_EVIDENCE_RETRIEVAL_SPEC.md` §9 Failure Modes 列了 6 種 BLOCK/degradation 行為，先前全部是散文、沒有對應 gate ID 可供機器判定或稽核。補上：
+
+```text
+search_content.retrieval.channel_availability      # 對應 §9「Vector index unavailable」，degraded channel 需記錄不得假裝完整召回
+search_content.retrieval.live_freshness_required   # 對應 §9「Live provider timeout」，要求 current 驗證時不得用 stale cache
+search_content.retrieval.authority_required        # 對應 §9「Authority assessment missing」，rule/high-risk claim FAIL_CLOSED
+search_content.retrieval.tenant_scope              # 對應 §9「Tenant scope missing」，硬 BLOCK
+```
+
+`severity`/`applies_to_artifact_types` 等欄位依 §3 Gate Record 格式填寫，本次新增僅落地 gate ID 本身，欄位值留待與 §12 Tests 一併補（見 Task 10）。
+
 ## 4. SEO Gates
 
 ```text

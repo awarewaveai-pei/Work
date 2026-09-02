@@ -1,0 +1,17 @@
+{"ts":"2026-08-30T04:52:53.926Z","task_id":"dlg-20260830-045253-7d81","agent":"general-purpose","description":"Draft ADR-002 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:53:10.783Z","task_id":"dlg-20260830-045310-28c5","agent":"general-purpose","description":"Draft ADR-003 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:53:29.865Z","task_id":"dlg-20260830-045329-cc50","agent":"general-purpose","description":"Draft ADR-004 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:53:44.676Z","task_id":"dlg-20260830-045344-227f","agent":"general-purpose","description":"Draft ADR-005 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:53:59.427Z","task_id":"dlg-20260830-045359-3005","agent":"general-purpose","description":"Draft ADR-006(b) proposals","result_snippet":""}
+{"ts":"2026-08-30T04:54:14.141Z","task_id":"dlg-20260830-045414-98b2","agent":"general-purpose","description":"Draft ADR-007 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:54:23.573Z","task_id":"dlg-20260830-045423-99dd","agent":"general-purpose","description":"Draft ADR-008 proposal","result_snippet":""}
+{"ts":"2026-08-30T04:54:40.002Z","task_id":"dlg-20260830-045440-e297","agent":"general-purpose","description":"Draft ADR-009 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:54:57.834Z","task_id":"dlg-20260830-045457-473b","agent":"general-purpose","description":"Draft ADR-011 proposals","result_snippet":""}
+{"ts":"2026-08-30T04:55:52.643Z","task_id":"dlg-20260830-045552-56ad","agent":"general-purpose","description":"Build knowledge-canvas and artifact-uri schemas","result_snippet":""}
+{"ts":"2026-08-30T04:56:10.278Z","task_id":"dlg-20260830-045610-03f8","agent":"general-purpose","description":"Build evidence-graph and sentence-provenance schemas","result_snippet":""}
+{"ts":"2026-08-30T04:56:30.462Z","task_id":"dlg-20260830-045630-ca0e","agent":"general-purpose","description":"Build execution-state-machine and audit schemas","result_snippet":""}
+{"ts":"2026-08-30T04:56:53.407Z","task_id":"dlg-20260830-045653-f625","agent":"general-purpose","description":"Build event-ledger schema","result_snippet":""}
+{"ts":"2026-08-30T04:57:09.237Z","task_id":"dlg-20260830-045709-cb6c","agent":"general-purpose","description":"Build Trusted Compute Gate policy","result_snippet":""}
+{"ts":"2026-08-30T04:57:26.780Z","task_id":"dlg-20260830-045726-f178","agent":"general-purpose","description":"Build workflow-ir schema","result_snippet":""}
+{"ts":"2026-08-30T04:57:39.355Z","task_id":"dlg-20260830-045739-6ddb","agent":"general-purpose","description":"Build Data Deletion policy wrapper","result_snippet":""}
+{"ts":"2026-08-30T04:58:13.789Z","task_id":"dlg-20260830-045813-3c66","agent":"general-purpose","description":"Build qualitative research method contracts","result_snippet":""}

@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-09-02（續2）
+
+### Search & Content pack：操作者明示「你決定」後完成任務 6/7/9 + Phase 5 關係註記；ADR 編號/physical path/source_of_truth_for 全量仍未做
+
+**觸發**：操作者對續1列出的「任務 6/7/9 卡在你決定」直接回覆「你決定!」並引用 R0 全能規劃師身份要求完整閉環。判斷：ADR 正式編號指派與 physical path 核准，文件自身內文明文禁止 AI 自行決定（"不得自行猜一個未登記的 ADR number"／須走 proposal 閘），這條界線不因操作者授權而改變——違反文件自己寫死的規則等於製造新的不一致，非我保守。Phase 5 碰撞屬 R0 明文「取捨影響產品方向」的停手情境，故給出建議並寫入文件，但標記 `PENDING_OPERATOR_CONFIRMATION`，不視為定案、不觸碰 `MVP_VERTICAL_SLICE_PLAN.md`/`ADR-014` 正本。
+
+**任務 7（B5，search.\* namespace 矛盾）**：查平台自己的 `specs/domain/capability-contract.schema.yaml` `open_questions.OQ-cc-1`，發現「點號前綴是否構成正式 namespace registry」全庫本來就沒有正本表態，且該問題 `blocks: nothing`、owner 明記「未來 ADR」。判定：Method 與 Capability 是兩個獨立型別化 ID 空間（Registry 本來就分 §3/§5 兩張表），`search.*` 同時出現在兩邊不是真衝突，是文件互相引用時沒講清楚。已在 ADR §D4 與 Registry §2 各補一段 scope note 澄清，不裁決 `OQ-cc-1` 本身（留給其指名的未來 ADR）。順手補上 `search.cluster_queries` 先前缺的對應 Method 映射（`content.topic_clustering`，標記為本次推論非逐字轉錄）。
+
+**任務 6（B6，被丟棄的 machine ID）**：完整讀 master architecture §52（27 個 proposed Capability）+ §53（15 個 proposed Method），對 Registry §3/§4/§5/§6 逐一 set-diff（三組稽核先前給的 16/17/20 三個數字都不採信，自己重算）。42 個 ID 全部核對：
+- 新增 5 個 Method（`search.query_clustering`/`search.competitor_content_analysis`/`search.source_conflict_analysis`/`search.evidence_authority_analysis`/`content.internal_link_planning`）進 §3
+- 新增 6 個 Capability（`search.extract_observations`/`search.detect_cannibalization`/`search.compare_competitors`/`search.build_evidence_pack`/`content.build_strategy`/`content.build_refresh_context`）進 §5
+- 5 個 `content.validate_{seo,geo,entity,brand,conversion}` 判定不建，移入 §6 Rejected，理由：功能已被 Quality Gates 機制涵蓋，另建等於製造第二套驗證路徑
+- 3 個 `knowledge.*`（`retrieve_evidence`/`resolve_entity`/`retrieve_brand_fact`）依 Registry 自己的既有規則補上具名 `DEPENDENCY_REQUEST`，不擅自假設 Core 已提供
+- `content.refresh_analysis` vs v3 提的 `content.refresh_prioritization` 命名疑似漂移但無其他文件引用可判斷，標記 `OPEN_QUESTION` 不強行合併
+- 重跑 set-diff 腳本確認 42/42 全部有去處（27 capability + 15 method）
+
+**任務 9（B7，Retrieval Spec 未綁執行層）**：`RetrievalPlanner` 補 canonical Method ID `search.plan_retrieval`（已登記進 Registry）；EvidencePack 生成明文綁 Capability ID `search.build_evidence_pack`；Cache 段落註明對應 `repository-contract.schema.yaml` 既有 `cache` storage role，非另立機制；新增 `search_content.retrieval.*` gate family（4 個 ID）到 `SEARCH_CONTENT_QUALITY_GATES.md` §3.5，並在 Retrieval Spec §9 Failure Modes 表格逐一綁定；補上「必須編譯進 Workflow IR」的明文要求（對應 master `:4870`/`:4891`），並記錄 MVP 驗收條件先前遺漏 master `:5654`（Recipe 編譯進 Workflow IR）此一缺口，未代為修改 MVP 文件本體。
+
+**Phase 5 關係註記**：於 ADR 新增 §D9，明列全 12 份文件先前對 Phase 5/ADR-014/MVP_VERTICAL_SLICE_PLAN 零引用的事實，給出「平行證明，非取代」的建議理由（不同領域資料模型、共用平台核心保證、避免 Phase 5 三輪已驗證成果變沉沒成本），標記 `PENDING_OPERATOR_CONFIRMATION`。
+
+[已修改]（`AI_LEGO_Cognitive_Engineering_OS_Search_Content_Architecture_Pack/` 內 4 個檔案）
+- `ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md`：§D4 補 scope note；新增 §D9
+- `SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md`：§2 補 scope note；新增 5 method + 6 capability；5 個 validate_* 移入 §6；3 個 knowledge.* 補 DEPENDENCY_REQUEST；`cluster_queries` 補映射
+- `SEARCH_CONTENT_QUALITY_GATES.md`：新增 §3.5 Retrieval Gates（4 個 gate ID）
+- `SEARCH_EVIDENCE_RETRIEVAL_SPEC.md`：§1/§7/§8/§9 分別綁定 Method/Capability/Cache role/Gate
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文件補強，該 pack 為 PROPOSED 設計文件，無可執行測試
+- REVIEW_DONE: critic=Quick（Claude 本人：D4/D5 全文讀完才下 namespace 判斷；master §52/§53 逐字抄出後才做 set-diff，非憑印象；code-fence 配對檢查 4 檔全過）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os（限本 pack 目錄）| grep=`search.plan_retrieval`／`search.build_evidence_pack`／`search_content.retrieval\.` 三組新 ID 跨檔互相引用是否一致 | hits=Registry 各 1 次登記、QUALITY_GATES 4 個 gate ID、RETRIEVAL_SPEC 4 處引用，全部對得上，無孤立引用
+- 42 個 v3 proposed ID 的 set-diff 腳本重跑確認：0 個仍未歸類（27/27 capability + 15/15 method）
+
+[剩餘風險]
+- **ADR 編號、physical path、`OQ-cc-1` 本身的正式 namespace registry 設計**：三項皆為文件自身或平台自身明文保留給操作者/未來 ADR 的決定，本次刻意不碰
+- **`source_of_truth_for`/`decided_by` 全量補齊（41 個 YAML 區塊）仍只完成 3 個**（續1 已完成），本輪新增的 11 個 ID 也未補這兩個欄位——這是本次唯一還沒開始處理的操作者原始要求項目
+- **Phase 5 關係建議是 Claude 的推薦，非操作者確認**，`D9` 明標 `PENDING_OPERATOR_CONFIRMATION`
+- `content.refresh_analysis`/`refresh_prioritization` 命名漂移標記 OPEN_QUESTION 未解決
+- 任務 8（`DecayObservation` 缺 schema）與任務 10-12（Registry/Gate 記錄本體填值、標記所有未決項、文件衛生）皆未開始
+- 工作區其餘既有未提交改動與本條無關，未觸碰
+
+[rollback]
+- `git revert <本次 commit>` 還原本輪 4 個檔案的編輯
+
 ## 2026-09-02（續1）
 
 ### Search & Content pack：套用審查報告任務 1-5（GPT 額度用完，Claude 直接動手），任務 6-12 停下等操作者裁決

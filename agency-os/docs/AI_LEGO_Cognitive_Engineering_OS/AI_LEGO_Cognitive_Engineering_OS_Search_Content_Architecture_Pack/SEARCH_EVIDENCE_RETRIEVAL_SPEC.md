@@ -99,8 +99,10 @@ agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-0XX-search-content-
 
 Confirmed：Repository Contract 已擁有 storage/retrieval substrate；Live Web Search 不能被當另一個 storage engine。證據：`EV-REPOSITORY`、`EV-CRIT-H03`。
 
+**2026-09-02 audit remediation 註記**（finding B7）：`RetrievalPlanner` 先前只標「(SearchContent Method)」卻沒有 canonical Method ID，也從未提及編譯進 Workflow IR，是全包唯一真的踩到自己「不建第二套 workflow runtime」核心原則的地方。已補：canonical Method ID `search.plan_retrieval`（已登記進 `SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md` §3 Search 分節）；EvidencePack 生成對應 Capability ID `search.build_evidence_pack`（已在同一輪 finding B6 補進 Registry §5）；本方法與其下游步驟必須編譯進 Workflow IR 才能執行，不得繞過（對應 master architecture `:4870`「router 應建模為編譯進既有 Workflow/execution path 的 Method/Capability」與 `:4891`「Workflow IR 是唯一可執行的編排表示」；`SEARCH_CONTENT_MVP_VERTICAL_SLICE.md` 驗收條件先前遺漏了 master `:5654`「Recipe 需驗證並編譯進 Workflow IR」，此文件不代為修改 MVP 文件，僅在此註記缺口需要 MVP 一併補回）。
+
 ```text
-RetrievalPlanner (SearchContent Method)
+RetrievalPlanner (SearchContent Method: search.plan_retrieval)
 ├─ Internal Knowledge Retrieval
 │  ├─ SQL / structured
 │  ├─ FTS
@@ -247,6 +249,8 @@ conflict_analysis:
 
 ## 7. EvidencePack Generation
 
+Capability：`search.build_evidence_pack`（2026-09-02 audit remediation 註記，finding B6/B7；已登記進 `SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md` §5）。
+
 EvidencePack freeze 的是 retrieval/assessment context：
 
 ```text
@@ -256,6 +260,8 @@ refs + ranks + policy versions + snapshot refs + execution
 不是複製 canonical Evidence body。
 
 ## 8. Cache
+
+**2026-09-02 audit remediation 註記**（finding B7）：本節的 cache 對應 `specs/domain/repository-contract.schema.yaml` 已定義的 `cache` storage role（該檔 `storage_role` enum 值之一），不是另立一套獨立快取機制——實作時應宣告為該 role 的一個 Repository Contract 實例，而非自建 cache 層。
 
 Cache key 必須包含：
 
@@ -273,14 +279,16 @@ Cache hit 不可略過 freshness policy。
 
 ## 9. Failure Modes
 
-| Failure | Behavior |
-|---|---|
-| Vector index unavailable | degrade to FTS/SQL/Graph；記錄 degraded channel；不得假裝完整召回 |
-| Live provider timeout | retry bounded；若 task 要求 current official verification則 BLOCK，不用 stale cache 假裝 current |
-| Authority assessment missing | rule/high-risk claim FAIL_CLOSED；一般 discovery 可標 UNKNOWN |
-| Contradiction unresolved | preserve both sides；route review/Decision |
-| Provider response malformed | raw payload quarantine；不得 promotion to Evidence |
-| Tenant scope missing | BLOCK |
+**2026-09-02 audit remediation 註記**（finding B7）：以下四項先前只有散文描述，現對應 `SEARCH_CONTENT_QUALITY_GATES.md` §3.5 新增的 gate ID，使其可被機器判定與稽核；其餘兩項（Contradiction unresolved／Provider response malformed）是流程路由行為，非布林通過/失敗判定，暫不強套 gate 語意。
+
+| Failure | Behavior | Gate |
+|---|---|---|
+| Vector index unavailable | degrade to FTS/SQL/Graph；記錄 degraded channel；不得假裝完整召回 | `search_content.retrieval.channel_availability` |
+| Live provider timeout | retry bounded；若 task 要求 current official verification則 BLOCK，不用 stale cache 假裝 current | `search_content.retrieval.live_freshness_required` |
+| Authority assessment missing | rule/high-risk claim FAIL_CLOSED；一般 discovery 可標 UNKNOWN | `search_content.retrieval.authority_required` |
+| Contradiction unresolved | preserve both sides；route review/Decision | — |
+| Provider response malformed | raw payload quarantine；不得 promotion to Evidence | — |
+| Tenant scope missing | BLOCK | `search_content.retrieval.tenant_scope` |
 
 ## 10. Observability
 

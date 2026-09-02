@@ -240,6 +240,8 @@ entity_ref: null  # only populated after resolver succeeds
 
 ### D4 — Method Namespace
 
+**Scope note（2026-09-02 audit remediation, finding B5）**：以下 family 規則管的是 **Method 命名空間**，與 `SEARCH_CONTENT_METHOD_AND_CAPABILITY_REGISTRY.md` §2 的 **Capability 命名空間**（`search.<action>` 等）是兩個獨立的型別化 ID 空間，不是同一份共用 namespace——平台自己的 `specs/domain/capability-contract.schema.yaml` `open_questions.OQ-cc-1` 明文記載「點號前綴是否構成正式 registry」全庫尚無正本表態，且該問題本身標記為 `blocks: nothing`，owner 是「operator, via a future ADR」。Registry 已用 §3（Method catalog）／§5（Capability catalog）兩張獨立表追蹤，兩邊各自的 `search.*` 條目不需要互斥檢查；本 ADR 與 Registry 先前互相引用時未講清楚這點，容易被誤讀成互斥宣告，此處補上讓下一個讀者不必重新推導。這是本次的**推論澄清**，不是逐字轉錄自任何既有正本——真正的正式 namespace registry 設計仍留給 `OQ-cc-1` 指名的未來 ADR，不在本次範圍內動手。
+
 Canonical 方法 family 規則：
 
 ```text
@@ -351,6 +353,17 @@ recipes/validated/
 仍使用 AI-LEGO 既有全域 machine registry。
 
 physical path 只有在此 ADR 被接受後才成為正式決策。
+
+### D9 — Relationship to the Phase 5 Research MVP（本次審查新增，PENDING 操作者最終確認）
+
+**2026-09-02 audit remediation 發現**（非既有正本內容）：全 12 份文件 grep `MVP_VERTICAL_SLICE_PLAN|ADR-014|Phase 5` 皆為 0 命中。但平台已有 `docs/adr/ADR-014-phase-5-mode-selection-research.md`（`Status: ACCEPTED`，2026-08-30）選定 Research Mode，且 `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` 已於 2026-08-30 實際開工（`D:\tmp\ai-lego-phase5-prototype` 三輪原型、17 個真實測試皆通過）。這份 SearchContent pack 提出了第二個 MVP vertical slice，卻完全沒有承認第一個的存在。
+
+**建議裁決（推薦，待操作者確認）**：兩者是**平行的垂直切片，不互相取代**——Phase 5 Research MVP 證明 AI-LEGO 平台在「質性研究」領域可行，SearchContent MVP 證明同一平台在「SEO/內容」領域可行。兩者是同一個「horizontal platform + vertical domain」主張的兩個獨立證據，不是同一條賽道上的競爭者。理由：
+1. 兩者面向完全不同的領域資料模型（訪談逐字稿 + PII 刪除 vs 搜尋查詢 + 內容發布），沒有物件層級的實際衝突。
+2. 兩者共用同一組平台核心保證（Evidence/Decision/Event Ledger/Gate/Tenant 隔離），SearchContent MVP 若通過驗收，等於是平台可重用性的第二次獨立證明，價值大於取代第一次。
+3. 若改列為「取代」，Phase 5 已投入的三輪驗證（含真實 faster-whisper STT、backup/restore replay gate 等已測試通過的機制）會變成沉沒成本重工，違反零重工原則。
+
+**本次僅做到**：在此 ADR 明列此關係並給出建議，**未修改** `MVP_VERTICAL_SLICE_PLAN.md`、`ADR-014` 或任何平台既有正本——那些是受 proposal 閘管制的既有正本，本次任務的授權範圍僅止於 SearchContent pack 自身（仍是 `Status: PROPOSED` 的候選文件）。此裁決在操作者明確核准前，本 ADR 的 `Status` 仍維持 `PROPOSED`，`D9` 標記為 `PENDING_OPERATOR_CONFIRMATION`，不視為已定案。
 
 ## 6. Consequences
 

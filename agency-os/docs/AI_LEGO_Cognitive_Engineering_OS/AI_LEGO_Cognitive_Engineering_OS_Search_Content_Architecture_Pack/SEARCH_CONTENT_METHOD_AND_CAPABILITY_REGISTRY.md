@@ -119,6 +119,8 @@ agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-0XX-search-content-
 
 ### Capability
 
+**Scope note（2026-09-02 audit remediation, finding B5）**：本節的 `search.<action>` 等前綴是 **Capability 命名空間**，與 `ADR_SEARCH_CONTENT_BOUNDARY_AND_OWNERSHIP.md` §D4 的 **Method 命名空間**是兩個獨立型別的 ID 空間（見該節同一次補的 scope note，含 `OQ-cc-1` 引用）。§3／§5 分開建表就是為了讓兩邊各自的 `search.*` 條目不必互斥檢查。
+
 使用 canonical Capability Contract grammar；SearchContent 新 ID 統一採一層 namespace：
 
 ```text
@@ -199,6 +201,18 @@ local.landing_page_analysis
 local.reputation_observation
 ```
 
+### Search (cross-surface reasoning)
+
+**2026-09-02 audit remediation 新增**（finding B6）：master architecture §53 提出但先前未落地的 4 個方法，set-diff 重算後確認全包其他文件已在依賴其中 2 個（見下方個別註記），非投機新增：
+
+```text
+search.query_clustering
+search.competitor_content_analysis
+search.source_conflict_analysis          # SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §7 conflict_analysis 的 method_ref 依賴此 ID
+search.evidence_authority_analysis       # SOURCE_PROFILE/AUTHORITY 產出 AuthorityAssessment 依賴此 ID 當 producer
+search.plan_retrieval                    # finding B7；SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §1 RetrievalPlanner 的 canonical Method ID
+```
+
 ### Content Strategy / Lifecycle
 
 ```text
@@ -209,7 +223,10 @@ content.content_gap_analysis
 content.topic_prioritization
 content.brief_synthesis
 content.refresh_analysis
+content.internal_link_planning           # 2026-09-02 audit remediation 新增，finding B6，master architecture §53
 ```
+
+**OPEN_QUESTION**（2026-09-02 audit remediation, finding B6）：master architecture §53 提的是 `content.refresh_prioritization`，本 catalog 只有 `content.refresh_analysis`。全包 grep 兩個名稱皆無其他文件引用，無法判斷是同一方法改名、還是「先分析要不要 refresh」與「refresh 排優先序」兩個不同階段的方法。本次不強行合併或改名，兩者皆保留現狀，留待實際需要時依真實用例決定。
 
 ### SXO/CRO
 
@@ -263,11 +280,25 @@ search.collect_query_metrics
 search.collect_ai_answer_snapshot
 search.normalize_snapshot
 search.store_raw_snapshot
+search.extract_observations      # 2026-09-02 audit remediation 新增，finding B6，master architecture §52
+search.detect_cannibalization    # 同上；對應既有 Method seo.cannibalization_analysis 的執行面
+search.compare_competitors       # 同上
+search.build_evidence_pack       # 同上；SEARCH_EVIDENCE_RETRIEVAL_SPEC.md §7 已產出 EvidencePack 卻先前無 capability ID 可綁
 ```
 
 ### Knowledge / Evidence actions
 
 若 Core 已提供相同 capability，SearchContent **引用 Core ID，不新建 alias**。垂直需要但 Core 尚無 contract 時先記 `DEPENDENCY_REQUEST`，不自行接管 Core namespace。
+
+**2026-09-02 audit remediation 新增**（finding B6）：master architecture §52（`:4163-4165`）提了 3 個 `knowledge.*` 但從未真的路由給 Core：
+
+```text
+DEPENDENCY_REQUEST: knowledge.retrieve_evidence      — owner=Core, status=UNCONFIRMED, requested_by=SearchContent
+DEPENDENCY_REQUEST: knowledge.resolve_entity         — owner=Core, status=UNCONFIRMED, requested_by=SearchContent
+DEPENDENCY_REQUEST: knowledge.retrieve_brand_fact    — owner=Core, status=UNCONFIRMED, requested_by=SearchContent
+```
+
+在 Core owner 確認/建立這 3 個 capability 之前，SearchContent 不得假設它們已存在並直接呼叫。
 
 ### Content Production
 
@@ -277,6 +308,8 @@ content.generate_outline
 content.generate_draft
 content.bind_citations
 content.render_preview
+content.build_strategy          # 2026-09-02 audit remediation 新增，finding B6，master architecture §52
+content.build_refresh_context   # 同上；MVP Step 16 已需要此 capability 但先前無 ID 可綁
 ```
 
 ### Publishing
@@ -308,13 +341,27 @@ measurement.persist_snapshot
 以下 reasoning 不建 capability alias：
 
 ```text
-search.classify_intent
-search.cluster_queries
-search.detect_content_gap
-measurement.detect_decay
+search.classify_intent      → 對應 Method: seo.search_intent_analysis（見 ADR §D4 KEEP 列表）
+search.cluster_queries      → 對應 Method: content.topic_clustering（本次推論，非既有正本逐字轉錄——見下方註記）
+search.detect_content_gap   → 對應 Method: content.content_gap_analysis（見 ADR §D4 KEEP 列表）
+measurement.detect_decay    → 對應 Method: measurement.content_decay_detection（見 §3 Canonical Method Catalog）
 ```
 
 改用相對應 Method；若需要執行 Method，透過 AI-LEGO method execution mechanism，而不是建同語意 Capability。
+
+**2026-09-02 audit remediation 新增**（finding B6）：master architecture §52 另提了 5 個 `content.validate_*` capability（seo/geo/entity/brand/conversion），set-diff 重算後判定不建：
+
+```text
+content.validate_seo         → 由 SEARCH_CONTENT_QUALITY_GATES.md 的 search_content.seo.* gate family 涵蓋
+content.validate_geo         → 由 search_content.geo.* gate family 涵蓋
+content.validate_entity      → 由 search_content.entity.* gate family 涵蓋
+content.validate_brand       → 由 search_content.brand.* gate family 涵蓋
+content.validate_conversion  → 由 search_content.conversion.* gate family 涵蓋
+```
+
+理由：「驗證內容是否符合某維度」正是 Quality Gate 機制存在的目的（gate 本身就是可執行的驗證判定），另建一組同語意 capability 會製造第二套驗證路徑，違反 README 核心原則 #2。若未來發現 gate 機制無法涵蓋某個 validate_* 的實際需求（例如需要非 gate 語意的獨立呼叫），需要重新開一個具體案例討論，不在本次一次性判定範圍。
+
+**2026-09-02 audit remediation 註記**（finding B6）：`search.cluster_queries` 先前只說「改用相對應 Method」卻沒指名是哪一個——ADR §D4 的 KEEP/RETIRE 列表只解了另外 3 個，唯獨這個沒有。`content.topic_clustering` 是目前 catalog 裡語意最接近的既有 Method（對查詢做主題分群，與對內容做主題分群是同一種分群推理，只是輸入物件不同）；但這是本次的**推論配對**，不是 D4 原本就寫明的裁決。若「查詢分群」與「內容主題分群」在實作上其實需要不同演算法/輸入 schema，這個配對需要重新檢視，屬 `OPEN_QUESTION`，不強行斷言等同。
 
 ## 7. Registry Record
 
