@@ -1,6 +1,96 @@
 # Worklog
 
+## 2026-09-02（續1）
+
+### Search & Content pack：套用審查報告任務 1-5（GPT 額度用完，Claude 直接動手），任務 6-12 停下等操作者裁決
+
+**觸發**：操作者原要 GPT 執行 `2026-09-02-search-content-pack-verification.md` §5A 的 12 項任務，GPT 額度用完（「gpt 額度用完了 你處理」），改由 Claude 直接編修。同一輪操作者也指出 ultracode 系統提示異常開啟（未輸入關鍵字），本次任務判斷為單人謹慎編修比多代理 fan-out 更合適（多代理平行編修同一批互相引用的 schema，正是造成原始 7 個 BLOCKING 的根因類型），未使用 Workflow。
+
+**只做到任務 5**：依報告 §5C 建議順序，任務 6/7/9 需要操作者先裁決 Phase 5 碰撞、`search.*` namespace（ADR vs Registry 矛盾）、physical path 三件事，任務 1-5 不依賴這些裁決，可安全先做。
+
+[已修改]（全部在 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_OS_Search_Content_Architecture_Pack/`，12 個檔案，322 行新增/329 行刪除）
+
+- **任務 1**（B1）：全域替換 2 個不存在的檔名，218→219 處引用（含 12 份文件 header），`find`+`git log --diff-filter=A` 確認新檔名於 commit `14a8a063c` 真實存在
+- **任務 2**（M15）：3 條超尾行號（`L1-L90`/`L1-L220`/`L1-L180`）改為實際行數（84/181/178），×12 檔 = 36 處
+- **任務 3**（B2）：`SEARCH_CONTENT_DOMAIN_MODEL.md` 定為 3 個重複物件的 SSOT（`search_source_profile`／`citation_observation`／`content_performance`），合併雙方欄位（非任選一邊丟棄另一邊），另 2 份文件的重複宣告改為指標＋各自的使用限制說明；三個物件補上 `source_of_truth_for`/`decided_by`（41 個區塊中僅補了這 3 個，其餘尚未做，見剩餘風險）；`baseline_refs` 標記為 `OPEN_QUESTION`，未發明新 schema
+- **任務 4**（B3）：11 個物件補 `tenant_ref`/`workspace_ref`（`search_snapshot`/`search_observation`/`competitor_observation`/`ai_answer_observation`/`ranking_observation`/`authority_assessment`/`freshness_assessment`/`citation_observation`/`content_performance`/`content_publication`/`refresh_context`）；刪除 `Data Invariants` 第 1 條的「where applicable」鬆綁文字；`content_publication` 補回 `project_ref`/`publish_execution_ref`/`provenance`（對照 master architecture `:4420-4448`）與新增 `approval_ref`（誠實標記為推論非逐字轉錄，供 `search_content.publishing.approval_binding` gate 使用）
+- **任務 5**（B4 + 其餘 enum 統一）：ContentPublication failure enum 統一為 9 值（`PUBLISHING_ADAPTER_CONTRACT.md` 原本較完整的版本），並新增 `PREVIEW_READY → VERIFIED(staged)` 分支解決 MVP Step 12/13 走不通主線的問題，MVP Step 13 措辭同步改為明講 `VERIFIED(staged)` 不等於正式 `VERIFIED`；`ContentBrief.status` 補 `REJECTED`；`search_snapshot.status` 補 `REQUESTED`；`capture_at`→`captured_at` 統一命名；`capture_result.partial`（布林）改為 `outcome` enum（布林無法表示 FAILED）；`assertion_type: POLICY` 誤植修正為 `domain: POLICY`；`live_external: conditional` 改為布林並標註「conditional 由 §3 Planning Rules 決定，非型別本身」
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純 Markdown/YAML-in-fence 文字修正，無 runtime/schema 編譯/部署變更；該 pack 本身是 PROPOSED 設計文件，無可執行測試
+- REVIEW_DONE: critic=Quick（Claude 本人逐項自查：改動前逐一 grep 確認舊值存在、確認合併對象的完整欄位，非憑印象改寫；改動後對 12 份文件跑 code-fence 配對檢查全過）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os（限 Search_Content_Architecture_Pack 目錄）| grep=`zh-TW.md`／`L1-L90`／`舊 citation_observation 4 個舊欄位名`／`domains: []`／`baseline_ref:`（單數）／`5 值 failure enum`／`where applicable`／`assertion_type: POLICY`／`live_external: conditional` 共 9 類 | hits=0（僅 2 處為本次新增的說明文字本身，非殘留舊值，已逐一核對排除）
+
+[剩餘風險]
+- `source_of_truth_for`/`decided_by` 僅補了本次處理的 3 個重複物件，全包其餘 38 個 YAML 區塊仍是 0；報告 B2 根因分析涵蓋整個 41 區塊，本次只關掉 3 個實例，未關掉整類——需要後續專門一輪補齊，或在 AO-CLOSE 前明確告知操作者此為已知未盡
+- `approval_ref` 是本次推論新增，非逐字轉錄自任何正本；`baseline_refs` 型別仍未定義（僅統一命名與 cardinality）
+- 任務 6-12 尚未執行，任務 6/7/9 依報告要求等待操作者裁決 Phase 5 碰撞／`search.*` namespace／physical path 三項後才能繼續
+- 工作區其餘既有未提交改動與本條無關，未觸碰
+
+[rollback]
+- `git revert <本次 commit>` 還原本輪全部 12 個檔案的編輯
+
 ## 2026-09-02
+
+### fix(hci): Wave 1 negative suite could not fail - four vacuous assertions + three schema gaps
+
+**根本問題**：Codex 建的 HCI Wave 1 synthetic 骨架（commit `ba5d6002f`／`4b26e8361`）中，`database/tests/wave1-negative-tests.sql` 有 4 個 negative test **結構上不可能失敗**。形狀是：
+
+```sql
+BEGIN
+  <應被控制拒絕的語句>;
+  RAISE EXCEPTION 'expected ... rejection';   -- 測試自己的斷言
+EXCEPTION WHEN raise_exception THEN NULL;
+END;
+```
+
+裸 `RAISE EXCEPTION` 的 SQLSTATE 是 `P0001`（`raise_exception`），觸發器的拒絕也是 `P0001` —— 同一個 handler 把「控制生效」與「斷言失敗」兩條路徑一起吃掉。被消音的正好是 ADR 宣稱已實作的 HD-03/HD-04 閘：tenant authorization、DSR lifecycle、append-only ledger、identity confirmation。
+
+同檔 `:12`（`WHEN insufficient_privilege`）與 `:19`（`WHEN check_violation`）寫法正確 —— 對的與錯的並存於同一檔案，這是純靠閱讀 review 沒抓到的原因。
+
+**這不是推論，是實測**：把原始 suite 對原始 schema 跑，同時 `DROP` 掉 authorization／DSR-lifecycle／append-only／identity 四個觸發器，原始 suite **exit code 0（PASS）**。
+
+WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但也意味著這套 SQL 從未真的跑過；等 Docker 一好、跑出綠燈，那個綠燈有一半是假的，且會被當成「HD-03/04/05 閘已關閉」的證據。這正是 AGENTS.md §補丁判準 講的最惡樣態：偵測器被消音，系統宣稱與真實狀態不符。
+
+**不打補丁的處理（關掉整類，非 4 個實例）**：
+
+| 缺陷 | 實例修法（不採用） | 實際採用的不變量修法 |
+|---|---|---|
+| 4 個 vacuous 測試 | 逐個換 handler | ① 斷言結果寫成**資料**不 raise（`hci_test` harness），沒有東西可以吞掉它 ② domain 規則改用語意化 SQLSTATE `H1001`–`H1005`，不再全擠在 `P0001` ③ 加 assertion 計數檢查，擋「靜默跳過測試」 |
+| MATCH_CONFIRMED 可孤兒化 | 加一個 delete 觸發器 | 認定為「跨列不變量只守單側」這一類，兩側都守：`identity_verifications` 現在拒絕移除/降級最後一份合格證據 |
+| append-only 只有單層 | 對 2 張表補 REVOKE | append-only 成為**單一宣告式清單**驅動，加一張表自動同時得到 grant 層與 trigger 層 |
+| target_kind 與 kind 不一致 | 加 CHECK | 複合 FK `(tenant_id, target_id, target_kind)`，型別不符變成**不可表示** |
+
+**已修改**：
+- `Projects/internal/HCI30/database/migrations/0001_wave1_synthetic_up.sql` — 錯誤碼登記表（SSOT）；5 個 domain 觸發器改語意化 SQLSTATE；新增 `protect_identity_evidence()` 雙側守衛；append-only 改雙陣列宣告式驅動（grant 層 + trigger 層）；`subject_records` 加 `UNIQUE (tenant_id,id,kind)` 供型別化 FK；`enforce_dsr_transition()` 的 INSERT 分支補 early `RETURN`，不再落到會碰 `OLD.*` 的 UPDATE 邏輯
+- `Projects/internal/HCI30/database/migrations/0001_wave1_synthetic_down.sql` — 加 `DROP SCHEMA hci_test`
+- `Projects/internal/HCI30/database/tests/00_test_harness.sql`（新）— `expect_sqlstate`／`expect_success`／`expect_true`／`finish`，全部 SECURITY INVOKER（若用 DEFINER，受測語句會以 owner 身分執行、RLS 失效，隔離測試將失去意義）
+- `Projects/internal/HCI30/database/tests/wave1-negative-tests.sql` — 重寫為 38 個具名斷言，對應已批准的 spec ID；append-only 分別以 app role（grant 層 42501）與 owner（trigger 層 H1003）各測一次
+- `Projects/internal/HCI30/scripts/test-wave1-local.ps1` — 每步各自可讓整跑失敗；加 down→up 可逆性驗證（delivery plan Phase 0 驗收條件）；修 `-Encoding utf8NoBOM`（**PowerShell 7+ 專屬，本機是 5.1**，原腳本在此機根本跑不起來 —— Docker 掛掉遮住了第二個獨立阻塞）
+- `Projects/internal/HCI30/scripts/mutation-check-wave1.ps1`（新）— 突變測試
+- `Projects/internal/HCI30/README.md`、`governance/ADR-001{4,5,6}*.md`、`governance/ADR_INDEX.md`、`governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`、`governance/wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md` — 更新過期的「REALTEST OPEN／remains open／not run」聲稱
+- `agency-os/reports/oracle/2026-09-02-review-hci30-wave1.md`（新）— 補上 `ba5d6002f` 當時 `ORACLE_WAIVED` 所欠的外部覆審
+
+**為什麼加突變測試（最重要的一項）**：修好 6 個缺陷擋不住第 7 個用同樣寫法產生。`mutation-check-wave1.ps1` 逐一刪掉每個控制，要求 suite 變紅、且是**對應那個控制的具體斷言**變紅；任何存活的突變都是 hard error。這才是把「測試可能是空跑」這一類關掉，而不是修好眼前這 4 個。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/HCI30/scripts/test-wave1-local.ps1` | exit=0 | result=真實 PostgreSQL 15.8 in Docker；`38 assertion(s) recorded, 0 failed`；含 populated schema 的 down→up 可逆性驗證
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/HCI30/scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 9 mutations killed`（baseline 綠 + 9 個控制逐一刪除皆令對應斷言變紅）
+- REALTEST_EVIDENCE: tool=Bash | cmd=原始 suite + 原始 schema，DROP 掉 4 個觸發器後執行 | exit=0 | result=**PASS** —— 空跑缺陷的實證，非推論
+- REVIEW_DONE: critic=Deep（自審，見下方 oracle 說明）| verdict=pass | findings=6c/m 全修並各自有殺死突變佐證
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=`REALTEST OPEN|remains open|not run|test-wave1-local|dsr_events_append_only|raise_exception` | hits=5，其中 4 處為過期聲稱已同 commit 修正（ADR_INDEX ×3、PERMISSION_POLICY ×1），歷史 WORKLOG 條目刻意不動（描述當時為真的狀態）
+- WORKLOG: 本條目
+
+**Oracle 說明（誠實記錄）**：`db-expert` subagent 覆審**失敗**（HTTP 429 session rate limit，7:40am Asia/Taipei 才重置），非正常完成。未以「已覆審」帶過，改用突變測試作為補償控制 —— 對「測試是否真的約束 schema」這個問題，突變測試比書面覆審更強。獨立 DB 覆審仍值得補做，本條目不宣稱已完成。
+
+**剩餘風險**：
+- 全部證據僅限 synthetic scope；不支持真人資料、production 部署、portal 整合或法律/市場聲稱。`HD-06`–`HD-10`、`HD-20`、`HD-21` 仍未批准，real-data admission gate 維持關閉。
+- 突變集合只覆蓋 Wave 1 已實作的控制；新增控制必須同步新增突變，否則覆蓋率會靜默退化。
+- Portal-adapter 測試（`TENANT-ADAPTER-NEG-01..03`）仍在本地骨架範圍外。
+- `audit-cp950-traps.ps1` 對兩支 .ps1 仍報 5 處 docker capture drift（warn-only，exit 0）。判定為可接受：唯一被解讀的捕獲輸出是 `$dockerEndpoint`，若被 codepage 破壞會導致 regex 不匹配而**fail closed**（拒絕執行），不是靜默污染。已修的是真正有風險的那項（`Get-Content -Raw` 未指定 `-Encoding UTF8`）。
+
+**Rollback**：`git revert <本 commit>` 一次還原；synthetic-only，無資料、無部署、無外部狀態需要善後。Docker 側僅使用 per-run compose project，跑完即 `down --volumes`。
+
 
 ### fix(health): Kuma endpoint-alert 監控器改名（SG→KS-6）後 checker 字串沒跟上
 

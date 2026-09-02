@@ -4,8 +4,8 @@
 **Status:** `PROPOSED`  
 **Version:** `1.0.0-draft`  
 **AI-LEGO baseline commit:** `4b26e83612caad72698271545ee1952058cc32dd`  
-**Master architecture:** `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md` v3  
-**Critical review:** `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md`  
+**Master architecture:** `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md` v3  
+**Critical review:** `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md`  
 **Proposed repo path:** `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/search-content/SEARCH_CONTENT_DOMAIN_MODEL.md`  
 
 **目的：** 定義 SearchContent vertical 的 object model、aggregate、reference、state machine、cardinality 與 invariants；所有 Core object 僅引用、不複製。
@@ -64,11 +64,11 @@ agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-0XX-search-content-
 
 | ID | 證據 |
 |---|---|
-| EV-CONST | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/Architecture-Constitution-v1.md:L1-L90` — Scoped Authority、文件職責、machine-readable contract/ADR 優先序、ADR-006 提案流程。 |
+| EV-CONST | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/Architecture-Constitution-v1.md:L1-L84` — Scoped Authority、文件職責、machine-readable contract/ADR 優先序、ADR-006 提案流程。 |
 | EV-REPO-ARCH | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/architecture/REPOSITORY_ARCHITECTURE.md:L1-L220` — Shared Kernel、Knowledge engine、Recipe vertical、方法實作/registry 分層、路徑治理。 |
-| EV-ADR006 | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md:L1-L220` — physical path 是 architecture；母文件/高風險規格修改使用 `.ai/proposals/`、不可 AI 自我批准。 |
+| EV-ADR006 | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-006-mother-doc-revision-flow-and-repo-layout.md:L1-L181` — physical path 是 architecture；母文件/高風險規格修改使用 `.ai/proposals/`、不可 AI 自我批准。 |
 | EV-EVIDENCE | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/evidence/evidence.schema.yaml:L1-L180` — canonical Evidence、8 個 quality dimensions、domain-specific hierarchy、source/content 仍有 NEW_DESIGN 邊界。 |
-| EV-CLAIM | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/evidence/claim.schema.yaml:L1-L180` — canonical Claim、supporting/contradicting Evidence、confidence/provenance。 |
+| EV-CLAIM | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/evidence/claim.schema.yaml:L1-L178` — canonical Claim、supporting/contradicting Evidence、confidence/provenance。 |
 | EV-EGRAPH | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/evidence/evidence-graph.schema.yaml:L1-L240` — Source/Evidence/Claim/Assumption/Decision/Entity graph；Entity/Relation 僅 minimal NEW_DESIGN；Source/Entity ID grammar 亦屬 NEW_DESIGN。 |
 | EV-DECISION | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/decision/decision.schema.yaml:L1-L240` — canonical Decision，包含 criteria/evidence/assumptions/unknowns/recommendation/human judgment/reversal/monitoring/outcome。 |
 | EV-METHOD | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/method.schema.yaml:L1-L220` — canonical Method Contract；ADR-005 bare `<family>.<name>` grammar。 |
@@ -78,22 +78,22 @@ agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-0XX-search-content-
 | EV-EVENT | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/event-ledger.schema.yaml:L1-L260` — canonical Event Ledger；`ArtifactPublished` 已存在；event_type 為 open PascalCase；event replay/idempotency invariants。 |
 | EV-AUTH | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/authority.schema.yaml:L1-L230` — A0–A4；Capability ≠ Authority；A3/A4 的 policy/gate/approval 條件。 |
 | EV-REPOSITORY | `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/domain/repository-contract.schema.yaml:L1-L230` — Repository Contract；vector/graph/FTS/event/metrics/cache/queue 等 storage roles；app 不直接依賴 DB。 |
-| EV-V3-BOUNDARY | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L68-L240` — v3 horizontal/vertical boundary、Core reuse、maturity model。 |
-| EV-V3-AUTH | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L385-L651` — authority/freshness/retrieval policy。 |
-| EV-V3-BRIEF | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L1028-L1163` — ContentBrief/EvidencePack。 |
-| EV-V3-METHODS | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L3928-L4257` 與 `L4923-L5180` — domain Method/Capability catalogs、recipes/events/gates。 |
-| EV-V3-PUBLISH | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L4337-L4484` — Publishing engine/safety/publication object。 |
-| EV-V3-MEASURE | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L4485-L4680` — measurement/performance/refresh。 |
-| EV-V3-SOURCE | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_zh-TW.md:L4722-L4922` — SearchSourceProfile、ingestion、Knowledge Card、Hybrid Retrieval Router。 |
-| EV-CRIT-H01 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L496-L585` — Method namespace collision 已確認。 |
-| EV-CRIT-H02 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L586-L653` — ContentBrief `required_source_tiers` 與 claim-scope authority 衝突。 |
-| EV-CRIT-H03 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L654-L715` — Live Web Search boundary 錯置。 |
-| EV-CRIT-H04 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L716-L767` — Entity maturity 被寫得過高。 |
-| EV-CRIT-H05 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L768-L868` — Event semantic ownership/duplicate 風險。 |
-| EV-CRIT-H06 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L869-L914` — Method catalog 分裂。 |
-| EV-CRIT-H07 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L915-L978` — Capability catalog 分裂。 |
-| EV-CRIT-H08 | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L979-L1036` — ContentPerformance 太薄。 |
-| EV-CRIT-M | `SEARCH_CONTENT_DOMAIN_ARCHITECTURE_CRITICAL_REVIEW_zh-TW.md:L1037-L1455` — runtime wording、repo path、Source ID、SearchObservation Entity、domain method shape、publishing approval、evidence versioning、gate mapping、section numbering。 |
+| EV-V3-BOUNDARY | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L68-L240` — v3 horizontal/vertical boundary、Core reuse、maturity model。 |
+| EV-V3-AUTH | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L385-L651` — authority/freshness/retrieval policy。 |
+| EV-V3-BRIEF | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L1028-L1163` — ContentBrief/EvidencePack。 |
+| EV-V3-METHODS | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L3928-L4257` 與 `L4923-L5180` — domain Method/Capability catalogs、recipes/events/gates。 |
+| EV-V3-PUBLISH | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L4337-L4484` — Publishing engine/safety/publication object。 |
+| EV-V3-MEASURE | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L4485-L4680` — measurement/performance/refresh。 |
+| EV-V3-SOURCE | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture.md:L4722-L4922` — SearchSourceProfile、ingestion、Knowledge Card、Hybrid Retrieval Router。 |
+| EV-CRIT-H01 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L496-L585` — Method namespace collision 已確認。 |
+| EV-CRIT-H02 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L586-L653` — ContentBrief `required_source_tiers` 與 claim-scope authority 衝突。 |
+| EV-CRIT-H03 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L654-L715` — Live Web Search boundary 錯置。 |
+| EV-CRIT-H04 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L716-L767` — Entity maturity 被寫得過高。 |
+| EV-CRIT-H05 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L768-L868` — Event semantic ownership/duplicate 風險。 |
+| EV-CRIT-H06 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L869-L914` — Method catalog 分裂。 |
+| EV-CRIT-H07 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L915-L978` — Capability catalog 分裂。 |
+| EV-CRIT-H08 | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L979-L1036` — ContentPerformance 太薄。 |
+| EV-CRIT-M | `AI_LEGO_Cognitive_Engineering_OS_Search_Content_Domain_Architecture_Critical_Review.md:L1037-L1455` — runtime wording、repo path、Source ID、SearchObservation Entity、domain method shape、publishing approval、evidence versioning、gate mapping、section numbering。 |
 ## 1. Aggregate Map
 
 ```text
@@ -140,13 +140,19 @@ search_source_profile:
   platforms: []
   markets: []
   locales: []
+  ingestion_modes: []
   crawl_policy_ref:
   authority_policy_ref:
   freshness_policy_ref:
+  legal_or_terms_constraints: []
+  active_from:
+  active_to: null
   status: ACTIVE | PAUSED | RETIRED
   created_at:
   updated_at:
   provenance:
+source_of_truth_for: SEARCH_SOURCE_PROFILE_AND_AUTHORITY_POLICY.md §2 (SearchSourceProfile) — that document references this schema by field name, it does not redeclare it.
+decided_by: 2026-09-02 audit remediation (agency-os/reports/audit/2026-09-02-search-content-pack-verification.md, finding B2) — this object previously had two divergent copies (this file dropped `ingestion_modes`/`legal_or_terms_constraints`/`active_from`/`active_to`; SEARCH_SOURCE_PROFILE_AND_AUTHORITY_POLICY.md dropped `tenant_ref`/`workspace_ref`/`created_at`/`updated_at`); merged to the union of both, this file kept as SSOT per its own stated purpose (§0 aggregate/object-model owner).
 ```
 
 Invariant：`source_ref` 不得被此 object 重新定義 identity grammar。
@@ -178,6 +184,8 @@ search_query:
 ```yaml
 search_snapshot:
   id:
+  tenant_ref:
+  workspace_ref:
   query_ref:
   provider:
   surface:
@@ -189,7 +197,7 @@ search_snapshot:
   raw_artifact_ref:
   raw_content_hash:
   execution_ref:
-  status: CAPTURED | PARTIAL | FAILED
+  status: REQUESTED | CAPTURED | PARTIAL | FAILED   # REQUESTED 補於 2026-09-02 audit remediation, finding B4 — 本檔自己的 state machine 已含 "REQUESTED → CAPTURED"，此 enum 原本漏列
 ```
 
 Invariant：同一 request fingerprint + capture slot 的 retry 必須 idempotent。
@@ -199,6 +207,8 @@ Invariant：同一 request fingerprint + capture slot 的 retry 必須 idempoten
 ```yaml
 search_observation:
   id:
+  tenant_ref:
+  workspace_ref:
   snapshot_ref:
   observation_type:
   position:
@@ -222,6 +232,8 @@ search_observation:
 ```yaml
 competitor_observation:
   id:
+  tenant_ref:
+  workspace_ref:
   search_observation_ref:
   competitor_entity_ref:
   target_query_ref:
@@ -239,6 +251,8 @@ competitor_observation:
 ```yaml
 ai_answer_observation:
   id:
+  tenant_ref:
+  workspace_ref:
   snapshot_ref:
   prompt_or_query_ref:
   provider:
@@ -257,12 +271,17 @@ ai_answer_observation:
 ```yaml
 citation_observation:
   id:
+  tenant_ref:
+  workspace_ref:
   ai_answer_observation_ref:
   cited_url:
-  cited_source_ref: null
-  claim_context_ref:
+  cited_source_ref: null   # 只有 resolver 成功才填；URL 本身不等於 canonical Source
+  context_span_ref:
+  claim_context_refs: []
   citation_position:
   observed_at:
+source_of_truth_for: SEARCH_INTELLIGENCE_SPEC.md §8 (Citation Observation) — that document references this schema by field name, it does not redeclare it.
+decided_by: 2026-09-02 audit remediation (agency-os/reports/audit/2026-09-02-search-content-pack-verification.md, finding B2) — this object previously had two divergent copies with 6 of 7 fields renamed between them and no `id` in the SEARCH_INTELLIGENCE_SPEC.md copy. Merged: kept `id` from this file, adopted `context_span_ref` and the array cardinality of `claim_context_refs` (renamed from `resolved_claim_refs`) from SEARCH_INTELLIGENCE_SPEC.md since a citation may resolve to more than one claim. This file kept as SSOT per its own stated purpose (§0 aggregate/object-model owner).
 ```
 
 ### 2.8 RankingObservation
@@ -270,6 +289,8 @@ citation_observation:
 ```yaml
 ranking_observation:
   id:
+  tenant_ref:
+  workspace_ref:
   query_ref:
   snapshot_ref:
   observed_url:
@@ -307,6 +328,8 @@ topic_cluster:
 ```yaml
 authority_assessment:
   id:
+  tenant_ref:
+  workspace_ref:
   evidence_ref:
   source_ref:
   claim_scope:
@@ -326,6 +349,8 @@ authority_assessment:
 ```yaml
 freshness_assessment:
   id:
+  tenant_ref:
+  workspace_ref:
   source_ref:
   evidence_ref:
   policy_ref:
@@ -381,7 +406,7 @@ content_brief:
   evidence_pack_ref:
   decision_ref: null
   version:
-  status: DRAFT | VALIDATING | REVIEW_REQUIRED | APPROVED | SUPERSEDED | RETIRED
+  status: DRAFT | VALIDATING | REVIEW_REQUIRED | APPROVED | REJECTED | SUPERSEDED | RETIRED   # REJECTED 補於 2026-09-02 audit remediation, finding B4 — CONTENT_BRIEF_CONTRACT.md §3 state machine 早有此狀態，此 enum 原本漏列
   created_by_execution:
   created_at:
   updated_at:
@@ -392,6 +417,9 @@ content_brief:
 ```yaml
 content_publication:
   id:
+  tenant_ref:
+  workspace_ref:
+  project_ref:
   artifact_ref:
   brief_ref:
   target_ref:
@@ -402,11 +430,16 @@ content_publication:
   published_url:
   content_hash:
   metadata_hash:
+  publish_execution_ref:
+  approval_ref:        # 見下方註記 — 非直接抄自 master architecture
   created_at:
   published_at:
   verified_at:
   rollback_ref: null
+  provenance:
 ```
+
+**2026-09-02 audit remediation 註記**（finding B3）：`project_ref`、`publish_execution_ref`、`provenance` 三個欄位直接對照 master architecture `:4420-4448` 補回。`approval_ref` **不是**master architecture 逐字有的欄位——它是為了讓 `search_content.publishing.approval_binding` gate（`SEARCH_CONTENT_QUALITY_GATES.md`）與 architecture 驗收條件 `:5649`（"A published page is linked to ... an approval record"）有實際欄位可驗而新增，屬本次補的**推論**，不是既有正本轉錄，故標記於此不與其他逐字轉錄的欄位混淆。
 
 ### 2.14 ContentPerformance
 
@@ -415,6 +448,8 @@ content_publication:
 ```yaml
 content_performance:
   id:
+  tenant_ref:
+  workspace_ref:
   publication_ref:
   metric_definition_set_ref:
   measurement_run_refs: []
@@ -423,12 +458,17 @@ content_performance:
   currency: null
   dimensions: {}
   metrics: {}
+  baseline_refs: []          # OPEN_QUESTION：見下方
   data_quality_summary:
   attribution_model_ref: null
   generated_at:
   generated_by_execution:
   provenance:
+source_of_truth_for: CONTENT_MEASUREMENT_SPEC.md, CONTENT_BRIEF_CONTRACT.md `measurement_plan.baseline_refs` — both reference this schema by field name, neither redeclares it.
+decided_by: 2026-09-02 audit remediation (agency-os/reports/audit/2026-09-02-search-content-pack-verification.md, finding B2) — CONTENT_MEASUREMENT_SPEC.md had `baseline_refs: []` where this file had nothing; CONTENT_BRIEF_CONTRACT.md independently used a singular `baseline_ref: null`. Field name and cardinality unified here to plural `baseline_refs: []` (a performance projection may compare against more than one baseline — pre-launch, seasonal, etc.).
 ```
+
+**OPEN_QUESTION（未消音，未虛構解答）**：`baseline_refs` 目前全包沒有任何一份文件定義「baseline 是什麼物件、由誰產生、儲存在哪」——它只是一個被三份文件引用但從未 contract 化的參照型別。本次修正只統一了欄位名稱與 cardinality，**沒有發明一個 Baseline schema**。在有人定義它之前，任何 consumer 都不能假設這個 ref 可解析。
 
 此設計直接修正 `EV-CRIT-H08`。
 
@@ -437,6 +477,8 @@ content_performance:
 ```yaml
 refresh_context:
   id:
+  tenant_ref:
+  workspace_ref:
   publication_ref:
   performance_ref:
   trigger_refs: []
@@ -472,9 +514,14 @@ CONTENT_READY
 → SCHEDULED|PUBLISHED
 → VERIFIED
 
+staged-only branch (no production publish requested):
+PREVIEW_READY → VERIFIED(staged)     # verifies the preview render only; does NOT imply SCHEDULED|PUBLISHED occurred
+
 failure:
-VALIDATION_FAILED | PUBLISH_FAILED | PARTIALLY_PUBLISHED | ROLLBACK_REQUIRED | ROLLED_BACK
+VALIDATION_FAILED | REMOTE_CONFLICT | AUTH_FAILED | RATE_LIMITED | PUBLISH_FAILED | PARTIALLY_PUBLISHED | ROLLBACK_REQUIRED | ROLLED_BACK | VERIFY_FAILED
 ```
+
+**2026-09-02 audit remediation 註記**（finding B4）：failure enum 原本此處只有 5 值，`PUBLISHING_ADAPTER_CONTRACT.md` §4 另有 9 值版本，兩者不一致。統一取 9 值（`PUBLISHING_ADAPTER_CONTRACT.md` 的版本較完整），此檔為 SSOT。另外補上 `staged-only branch`：`SEARCH_CONTENT_MVP_VERTICAL_SLICE.md` Step 12 明說不做 production publish（只到 `PREVIEW_READY`），但 Step 13 卻要求發出 `ContentPublicationVerified`——若不補這條分支，MVP 自己設計的路徑在原本的 state machine 裡走不到 `VERIFIED`。`VERIFIED(staged)` 與正式 `VERIFIED` 不是同一保證等級，consumer 不得混用。
 
 ### SearchSnapshot
 
@@ -502,7 +549,7 @@ Performance time series        → Metrics/time-series derived store
 
 ## 5. Data Invariants
 
-1. Every persisted vertical object has tenant/workspace scope where applicable.
+1. Every persisted vertical object has tenant/workspace scope. There is no "where applicable" exception — see the 2026-09-02 audit remediation (`agency-os/reports/audit/2026-09-02-search-content-pack-verification.md`, finding B3), which added `tenant_ref`/`workspace_ref` to every object in this file that lacked them.
 2. Every externally captured object stores provider, adapter version, captured_at, raw hash/artifact ref.
 3. Derived objects store method/policy version and execution ref.
 4. Core references are refs, not copied core records.
