@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-08-29 (AO-CLOSE, session window 2026-08-27 → 2026-08-29, 三天兩段大整併+搬家後實战抛錯修復)** — **8/28 整併**：soulful（Hostinger）+ SG（5.223.93.113）+ EU（204.168.175.41）三台全部搬入 **ks-aw-01**（OVH，149.202.64.114，SSH -p 58122）；13 筆 DNS 切換、OVH Edge Firewall、三輪 Codex 安全覆審 15 findings 閉環、換機 runbook 建立。**8/29 發現並修復的真實缺陷（非搬家造成，既有架構問題）**：① Netdata Cloud claim（Ubuntu 發行版 --disable-cloud 不能 claim，換官方 stable 版）② aware-wave.com 補 DMARC ③ **studio.aware-wave.com 500** 真根因是 `.htpasswd_studio` 搬家漏拔被 Docker 自動建成空目錄（修復途中意外打掛 SG 站 90 秒，已復原）④ **CF Rate Limit 誤封 studio/trigger**：全域規則排除清單漏內部後台 SPA（已追加 studio/trigger/n8n/uptime/mainwp/postiz）⑤ **api.aware-wave.com / oracle.aware-wave.com 從未接線**（從 2026-06 建立就漏接，錯發到 WordPress 却同樣回 200，狀態碼看不出來）⑥ **wp-admin 無限重導真根因**：`lobster-nginx`（內部只聽 80 埠）的 13 處 `X-Forwarded-Proto $scheme` 把上一跳 host nginx 已正確設的 https 覆寫成 http，导致 WordPress is_ssl() 永遠失效，全改用 `$http_x_forwarded_proto` 修復。⑦自檢發現並修正兩次 R4「聲稱即驗證」違規：(a) 自己誤判 25 處舊 nginx SSOT 檔為「死檔」（grep include 方法論錯，這類檔用 cp+ln -sf 部署非 include）(b) 否正他人的推翻說「現行 production」也錯（SSH 進舊 SG/EU 檔案對了但檔案對應的容器全滞，本機直連實測全部 502，誤把公開網域（DNS 早已指新機）的回應算給舊機）——**正確結論：既非死檔亦非現行，是搬家前架構歷史快照**。⑧ CLAUDE.md/AGENTS.md 部署規則段補上「SG=ks-aw-01非5.223.93.113」明確警告，防未來 session SSH 去已停止的舊機部署。⑨ `check-deploy-drift.ps1` 實測：真實 app-code 落差只有 1 個 commit（就是自己修的 nginx 檔，已手動驗證上線），ks-aw-01 自動部署 cron（每 4 小時）journal 確認持續正常運作。**待辦**：KS-6 付款完成後執行換機 runbook；舊 SG/EU 容器已全滞但保留待操作者說「刪吧」才真删機。
 - **2026-07-05 (AO-CLOSE, session window 2026-07-04 → 2026-07-05)** — Short session focused on onboarding public intake + infrastructure fixes. Key completed: (1) **Phase 4 /intake 公開表單** — Next.js route group 重構 (shell)/(public)、5-step React form、intake-browser API with feature gate + rate limit、critic 安全閉環（2 Critical + 2 Major 全修，915245b0）; (2) **Phase 5 Cloudflare Turnstile 接入**（6306cd8e）— gate logic Critical fix（prod bypass 必須有 SECRET_KEY）+ 前端 widget explicit render + token refresh; (3) nginx /start/→intake redirect 建了再 revert — 還原 FluentForm 原始接單流程（WP→FluentCRM→Supabase→觸發建站，44da8365）; (4) **EU VPS ClickHouse OOM 根治** — mem_limit 1536m→3072m，20GB crash log 清除，restarts=0，healthy（00ea2e03）; (5) **trigger-build CF hairpin 修復**（11886d04）— 改用 http://next-admin:3000 內部路由 + fetchWithRetry（2 retries）+ failed 時 reset intake_form.status→"spec_generated"；MONGOLIA-03 手動解鎖可重試; (6) 蒙古旅遊客戶 handoff docs x4（現場開機 checklist + Cloudways 方案）; (7) repair_runs_source_check 補 'deploy'（0059 migration）; (8) human_only incident 改「已知悉」UI（70b17903）. 仍開放：Stage 4 開閘（High risk，需 go-ahead）、soulfulexpression.org CF DNS 遷移、POD Phase 4 e2e、Canvas 整輪瀏覽器實測。
 
 - **2026-07-02 (AO-CLOSE, long session window 2026-06-12T05:27Z → 2026-07-02)** — Last AO-RESUME stamp was still `2026-06-12T05:27:33.6508893Z`, so this closeout covered a large 2,306 first-parent commit window instead of only today's work. Main completed themes: next-admin/content-studio/canvas/video/oracle/POD feature and fix batches; multi-tenant security guard rollout S1–S5; cold outreach Phase 1 and per-org Supabase routing; customer-service U0–U5 plus U6 Chatwoot handoff gated on buying the dedicated server; WordPress provisioning/catalog/tourism pipeline fixes; ops-inbox `client_slug` propagation; sg-deploy/workflows build fixes; governance hook v2, WORKLOG rotation, junk guard, and command/skill index sync. SG deploy drift was rechecked during closeout: SG `.deployed-commit` matched `origin/main` (`6751854a...`), so `SG production app-code drift` was marked done via WORKLOG `AUTO_TASK_DONE`. A final housekeeping commit removed tracked `$null` and added `/nul` to `.gitignore` to keep AO-CLOSE from staging shell artifacts.
@@ -506,7 +507,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-08-28 11:57:18 UTC_
+_Last synced: 2026-09-02 01:11:17 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -589,6 +590,11 @@ _Last synced: 2026-08-28 11:57:18 UTC_
   **後續兩輪 stop-hook 打回**：自動 review 機制本身回傳無效 JSON（機制故障非發現問題）→ 補跑真實 `codex-oracle.ps1 review`，抓到 2 個真 finding（mirror 目錄未被檢查、「01-04 guides」數字範圍縮寫解不開）；第一版修法（教程式碼用「目錄+同名檔案」推測隱含關係）又被打回「undeclared drift pairs」——自己重新推演找到具體反例（矩陣資料裡一個散文用詞被誤 backtick 包住，推測邏輯會生出完全不相關的假配對），改成**撤掉推測邏輯，回頭把矩陣資料本身寫明確**（跟修「01-04 guides」同一個原則：資料不夠明確就修資料，不要教程式碼猜）。
 
   **剩餘未解**：dedicated 機仍未購買（同 08-15 未解項延續）；`memory/daily/2026-08-16.md`～`2026-08-23.md` 8 個 stub 未回填（AO-CLOSE 指示只補今日檔案，這是已知、非本次引入的缺口）；`scripts/ao-resume.ps1` 有 17 個既有的、跟今天工作無關的未受保護 git 輸出擷取點，已用 spawn_task 記錄成獨立任務（task_b82a2211）未動手修。
+
+
+
+
+
 
 
 

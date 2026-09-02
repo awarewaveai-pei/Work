@@ -6,7 +6,7 @@
     {
       "file": ".claude/settings.json",
       "pattern": "Google app password (4x4x4)",
-      "sourceKey": "line:12",
+      "sourceKey": "line:13",
       "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
     },
     {
