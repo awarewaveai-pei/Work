@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-02
+
+### fix(health): Kuma endpoint-alert 監控器改名（SG→KS-6）後 checker 字串沒跟上
+
+**觸發**：使用者問「整件事都 commit 了嗎？worktree 是不是也有很多沒 commit 的東西？」，查證換機相關 13 個檔案並 commit（`db35ac114`）後，順手檢查 `agency-os/ALERT_REQUIRED.txt`（未追蹤但存在）——System Guard 於 2026-09-01 22:55 FAIL（99.4%，2 項失敗）。
+
+**根因**：`scripts/system-health-check.ps1` 的 Kuma `/metrics` 檢查寫死 monitor name `"AwareWave endpoint-alert (SG)"`；2026-09-01 Uptime Kuma 單機化改名工作（同日 WORKLOG「Uptime Kuma 單機化名稱與目標複核」）已把它改名成 `"AwareWave endpoint-alert (KS-6)"`，checker 沒跟著更新，於是誤報「Monitor not found — was it deleted?」。另一項 `check-claude-sync.ps1` HARD FAIL 重跑後已自行轉 PASS（H1-H4 全綠），判定為並行 session 編輯中的暫時性 drift，非真正的第二個 bug，未另外處理。
+
+**已修改**：
+- `scripts/system-health-check.ps1`：6 處字串常數 `(SG)` → `(KS-6)`（regex 比對字串 + 5 個 Add-Check 顯示名稱/明細）
+- `agency-os/LAST_SYSTEM_STATUS.md`：`system-guard.ps1 -Mode daily` 重跑後的 FAIL→PASS 狀態更新（腳本自動寫入，非手改）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash+SSH+SQLite | cmd=`docker exec uptime-kuma sqlite3 ... SELECT id,name,active,type FROM monitor WHERE type="push"` | exit=0 | result=`21|AwareWave endpoint-alert (KS-6)|1|push`（新字串與現機 monitor 名稱逐字元相符）
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`scripts/system-health-check.ps1` | exit=0 | result=修前 99.4%(315/317) → 修後 **100%(317/317)**
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`scripts/system-guard.ps1 -Mode daily -noUi` | exit=0 | result=PASS，`ALERT_REQUIRED.txt` 由腳本自身邏輯（讀碼確認非猜測）自動刪除
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)，純字串常數改名，語法已過 `Parser::ParseFile`
+
+**剩餘風險**：無新增風險；`check-claude-sync.ps1` 的暫時性 HARD FAIL 未留下可重現的根因記錄（已自行痊癒），若未來再次出現需另查。
+
+**Rollback**：`git revert <本次 commit>` 還原字串，`LAST_SYSTEM_STATUS.md` 會在下次 `system-guard.ps1` 執行時自動覆寫回正確狀態。
+
 ## 2026-09-01
 
 ### docs(host-switch): 換機唯一讀本 + auto-reboot 控制面閉環

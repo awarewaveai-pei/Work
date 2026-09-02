@@ -454,25 +454,25 @@ if (Test-Path $vaultHelper) {
             if ($kumaBase -and $kumaKey) {
                 $auth = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(':' + $kumaKey))
                 $resp = Invoke-WebRequest -Uri ($kumaBase.TrimEnd('/') + '/metrics') -Headers @{ Authorization = $auth } -UseBasicParsing -TimeoutSec 10
-                $line = ($resp.Content -split "`n") | Where-Object { $_ -match 'monitor_status\{[^\}]*monitor_name="AwareWave endpoint-alert \(SG\)"' } | Select-Object -First 1
+                $line = ($resp.Content -split "`n") | Where-Object { $_ -match 'monitor_status\{[^\}]*monitor_name="AwareWave endpoint-alert \(KS-6\)"' } | Select-Object -First 1
                 if (-not $line) {
-                    Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor present" -Pass $false -Detail "Monitor not found in Kuma /metrics — was it deleted?"
+                    Add-Check -Name "Kuma: AwareWave endpoint-alert (KS-6) push monitor present" -Pass $false -Detail "Monitor not found in Kuma /metrics — was it deleted?"
                 } elseif ($line -match '\}\s+(\d+)\s*$') {
                     $val = [int]$matches[1]
                     $statusName = switch ($val) { 0 {'DOWN'} 1 {'UP'} 2 {'PENDING'} 3 {'MAINTENANCE'} default {"UNKNOWN($val)"} }
                     if ($val -eq 1) {
-                        Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail "UP"
+                        Add-Check -Name "Kuma: AwareWave endpoint-alert (KS-6) push monitor healthy" -Pass $true -Detail "UP"
                     } else {
-                        Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $false -Detail ("Status=" + $statusName + " — SG endpoint-alert.timer may have stopped")
+                        Add-Check -Name "Kuma: AwareWave endpoint-alert (KS-6) push monitor healthy" -Pass $false -Detail ("Status=" + $statusName + " — ks-aw-01 endpoint-alert.timer may have stopped")
                     }
                 } else {
-                    Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail "Skipped: could not parse monitor_status value"
+                    Add-Check -Name "Kuma: AwareWave endpoint-alert (KS-6) push monitor healthy" -Pass $true -Detail "Skipped: could not parse monitor_status value"
                 }
             } else {
-                Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail "Skipped: UPTIME_KUMA_BASE_URL or UPTIME_KUMA_API_KEY missing"
+                Add-Check -Name "Kuma: AwareWave endpoint-alert (KS-6) push monitor healthy" -Pass $true -Detail "Skipped: UPTIME_KUMA_BASE_URL or UPTIME_KUMA_API_KEY missing"
             }
         } catch {
-            Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(100, $_.Exception.Message.Length)))
+            Add-Check -Name "Kuma: AwareWave endpoint-alert (KS-6) push monitor healthy" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(100, $_.Exception.Message.Length)))
         }
 
         # --- 8c) PostgREST schema cache freshness for Phase 2 tables ---
