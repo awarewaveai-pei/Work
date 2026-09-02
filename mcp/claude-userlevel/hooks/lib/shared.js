@@ -53,6 +53,22 @@ function getSessionId(parsedJson) {
     return sanitize(fromLegacy.trim());
   }
   // 4. cwd-only fallback (matches accumulator.js trade-offs)
+  //
+  // Known accepted risk for THIS specific consumer (2026-09-02 critic
+  // finding m7): getGitStageTrackerPath/getGitAddPendingPath key off this
+  // same SID. If session_id is ever genuinely absent from BOTH the stdin
+  // payload and both env vars, every concurrent session in the SAME
+  // working directory collapses onto ONE sha1(cwd) SID and shares one
+  // git-add tracker — every other session's adds would then look like
+  // "this session's own" to git-commit-scope-guard.js, silently defeating
+  // it. Accepted here (not fixed) because: (a) it requires ALL THREE
+  // upstream identifiers to be missing, not observed in this repo's real
+  // traffic; (b) the unverified-code tracker (getTrackerPath) already
+  // accepts the identical trade-off, documented at the top of this file;
+  // (c) detecting "am I on the fallback path" and having the git-scope
+  // gates degrade differently (e.g. warn-only) is a real design task, not
+  // a one-line fix, and is not what caused the `632dd1913` incident this
+  // pass closes. Tracked as a residual risk, not silently unaddressed.
   return sanitize(crypto.createHash('sha1').update(process.cwd()).digest('hex').slice(0, 16));
 }
 
@@ -75,6 +91,19 @@ function getTrackerPath(sid) {
 // timing corrupt the other's state.
 function getGitStageTrackerPath(sid) {
   return path.join(os.tmpdir(), `claude-git-staged-${sid}.txt`);
+}
+
+// Transient PreToolUse->PostToolUse handoff for git-add-scope-tracker.js's
+// ACK'd-broad-add case ONLY (2026-09-02, critic finding C1 fix): a `git add
+// -A` (etc.) dry-run at PreToolUse enumerates candidate files BEFORE the
+// real add has run; PostToolUse re-verifies which of those are ACTUALLY
+// staged afterward before recording anything into the real tracker. A
+// separate file from getGitStageTrackerPath's real tracker — this one is
+// write-once-then-consumed per Bash call, never accumulates, and a stale
+// leftover (e.g. the PostToolUse hook never ran) must not silently credit a
+// LATER unrelated command, so callers always read-then-delete it.
+function getGitAddPendingPath(sid) {
+  return path.join(os.tmpdir(), `claude-git-add-pending-${sid}.txt`);
 }
 
 // Backslash line-continuation join, for git-add-scope-tracker / git-commit-scope-guard
@@ -110,6 +139,29 @@ function commandSegmentsBackslashJoined(commandExpanded) {
     }
   }
   return segs;
+}
+
+// Quote-aware tokenizer: a `"..."`/`'...'` run becomes ONE token (quotes
+// stripped, contents preserved verbatim including internal whitespace);
+// everything else splits on whitespace. Shared by git-add-scope-tracker.js
+// (2026-09-02 critic finding M3: `git add "docs/my file.md"` was shredded
+// by a raw whitespace split into two tokens matching no real path) and
+// git-commit-scope-guard.js (finding m6: `git commit -m "fix -a flag"` was
+// tokenized as `-m`, `"fix`, `-a`, `flag"` — only the first fragment got
+// consumed as -m's value, so the bare `-a` fragment then looked like a real
+// flag and false-positived the broad-commit block). Deliberately ONE
+// implementation, not two: this exact bug class (a real invariant enforced
+// independently in two files, each getting it wrong in a different way) is
+// what created the whole `cd`/`-C` incident this same v4 pass fixed — see
+// git-commit-scope-guard.js header.
+function tokenizeQuoted(text) {
+  const tokens = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let m;
+  while ((m = re.exec(String(text == null ? '' : text)))) {
+    tokens.push(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
+  }
+  return tokens;
 }
 
 // Normalize path for dedup: lowercase on Windows (case-insensitive FS), as-is elsewhere.
@@ -246,19 +298,152 @@ function logFailOpen(hookName, err) {
   } catch (_) { /* truly unrecoverable — at least we tried */ }
 }
 
+// Resolve a shell-typed directory argument to a normalized, comparable
+// absolute path. Handles the three shapes this repo's own commands actually
+// use: a native Windows path (`D:\Work`, `D:/Work`), a Git-Bash/MinGW path
+// (`/d/Work` — Node's own path.resolve does NOT understand this convention
+// and would silently misresolve it against the wrong drive), and a WSL path
+// (`/mnt/d/Work`). Relative targets (`cd ..`, `cd sub/dir`) resolve against
+// `baseDir`.
+//
+// WHY THIS EXISTS (2026-09-02): see git-commit-scope-guard.js header —
+// git-commit-scope-guard.js originally bailed on ANY `cd`/`-C` segment,
+// without checking whether the target was actually different from
+// `ctx.cwd`. This repo's own tooling prefixes nearly every Bash command with
+// `cd /d/Work` (a no-op — already `ctx.cwd`), so that gate was silently
+// inert for the vast majority of real commits between 2026-08-30 (when it
+// was built) and 2026-09-02 (when it failed to catch commit `632dd1913`
+// sweeping another session's staged files — the exact incident class it
+// exists to prevent). The fix is real path comparison, not "any cd = bail".
+//
+// v2 (2026-09-02, critic finding m1): a bare POSIX-style path with NO drive
+// letter (`/Work`, not `/d/Work`) is NOT the MinGW convention — on a real
+// Git-Bash shell it resolves relative to the MSYS install root, not any
+// Windows drive root. `path.resolve('/Work')` on win32 silently resolves it
+// against the CURRENT process's drive, which can accidentally equal
+// `baseDir`'s drive and produce a FALSE "same directory" — the dangerous
+// direction (a gate that should have bailed instead checks the wrong
+// repository's git state and can emit a wrong verdict). Such input is
+// deliberately treated as unresolvable (a sentinel that can never equal a
+// real resolved path) rather than guessed.
+function resolveShellPath(raw, baseDir) {
+  let p = String(raw == null ? '' : raw).trim();
+  p = p.replace(/^["']|["']$/g, '');
+  const mingw = /^\/([a-zA-Z])(\/.*)?$/.exec(p);
+  const wsl = !mingw && /^\/mnt\/([a-zA-Z])(\/.*)?$/.exec(p);
+  if (mingw) p = `${mingw[1]}:${mingw[2] || '/'}`;
+  else if (wsl) p = `${wsl[1]}:${wsl[2] || '/'}`;
+  else if (/^\//.test(p)) {
+    // POSIX-absolute with no recognized drive convention — unresolvable on
+    // this platform; never treat as any real directory (see header above).
+    return `\0unresolvable:${normalizePath(p)}`;
+  }
+  const hasDrive = /^[a-zA-Z]:/.test(p);
+  const abs = (path.isAbsolute(p) || hasDrive) ? path.resolve(p) : path.resolve(String(baseDir), p);
+  const slashed = abs.replace(/\\/g, '/').replace(/\/+$/, '') || '/';
+  return normalizePath(slashed);
+}
+
+// True when `rawTarget` (a `cd`/`-C` argument, possibly relative or
+// MinGW/WSL-style) resolves to the SAME directory as `baseDir`. Any
+// resolution failure — including the deliberately-unresolvable sentinel
+// above — is treated as "not the same": the caller's existing
+// fail-open-on-ambiguity behavior (bail rather than guess) is unaffected,
+// and can only make a gate MORE cautious, never less.
+function isSameDir(rawTarget, baseDir) {
+  try {
+    return resolveShellPath(rawTarget, baseDir) === resolveShellPath(baseDir, baseDir);
+  } catch (_) {
+    return false;
+  }
+}
+
+const RE_CD_SEGMENT_TARGET = /^(?:sudo\s+)?cd\s+("[^"]+"|'[^']+'|\S+)/;
+
+// True when any segment BEFORE `beforeIndex` in `segments` is a real
+// `cd <dir>` command (anchored to that segment's own start — this can never
+// match text inside a later argument, e.g. commit-message prose, only a
+// segment whose first token literally IS `cd`) whose target resolves to
+// somewhere OTHER than `cwd`. Only segments strictly before the git
+// invocation being evaluated count: a `cd` typed AFTER a `git add`/
+// `git commit` in the same chained command cannot have affected where that
+// git invocation actually ran — shell executes segments left to right
+// (2026-09-02 critic finding M2: `git add fileA && cd /elsewhere && ...`
+// was wrongly invalidating the EARLIER `git add fileA`).
+//
+// Shared by git-add-scope-tracker.js and git-commit-scope-guard.js so both
+// rules apply the SAME "elsewhere" definition for `cd` — a `-C <dir>` git
+// flag is NOT handled here: it is specific to one git invocation's own flag
+// region (the text between `git` and the verb keyword), which only the
+// caller's own verb regex can correctly delimit without risking a match
+// inside a `-m "..."` message body (2026-09-02 critic finding M1) — see
+// each rule file's own `-C` extraction next to its `RE_GIT_*` regex.
+//
+// Known accepted limitations (2026-09-02 critic round 2, rated Minor —
+// documented per the critic's own guidance rather than fixed, since none
+// of these can produce a false "same directory" — only extra, unnecessary
+// caution):
+//   - m3: only `cd` is recognized. `pushd`/`Push-Location`/`Set-Location`,
+//     a bare `cd` (defaults to $HOME), and `(cd /elsewhere && ...)`
+//     subshell forms are invisible to this check. A subshell `cd` in
+//     particular is actually CORRECT to ignore (it doesn't affect the
+//     parent shell's directory for anything after it) but this function
+//     doesn't distinguish that from a real top-level `cd` — it just never
+//     matches either shape, so a real top-level `pushd`/`Set-Location`
+//     silently fails to trigger the elsewhere-bail it should.
+//   - Same class as dangerous-bash.js's rm-rf segment anchoring (see
+//     runner.js commandSegments() header): a heredoc / commit-message BODY
+//     LINE that happens to literally START with "cd " (its own line
+//     becomes its own segment) is indistinguishable from a real `cd`
+//     without full shell lexing.
+// Both can only make a gate bail MORE (or less) often than strictly
+// necessary in the SAFE direction for THIS function's own contract — it
+// can never make a genuinely different directory register as "same" (that
+// would require resolveShellPath/isSameDir to be wrong, not this scan).
+function hasCdElsewhere(segments, cwd, beforeIndex) {
+  const limit = typeof beforeIndex === 'number' ? beforeIndex : segments.length;
+  for (let i = 0; i < limit && i < segments.length; i++) {
+    const m = segments[i].match(RE_CD_SEGMENT_TARGET);
+    if (m && !isSameDir(m[1], cwd)) return true;
+  }
+  return false;
+}
+
+// Extract every `-C <dir>` target from `flagRegionText` (the captured
+// leading-flags substring of a `git <verb>` invocation — see each rule
+// file's `RE_GIT_*` regex, which now captures this region in group 1
+// specifically so `-C` is never searched for in the WHOLE segment, only in
+// the structurally-bounded region where git itself would actually parse a
+// `-C` flag). `-C` is cumulative in real git (each one rebases off the
+// previous), so ALL occurrences must resolve to `cwd` for this to be
+// considered a no-op (2026-09-02 critic finding m2).
+function cFlagTargets(flagRegionText) {
+  const out = [];
+  const re = /(?:^|\s)-C\s+("[^"]+"|'[^']+'|\S+)/g;
+  let m;
+  while ((m = re.exec(String(flagRegionText || '')))) out.push(m[1]);
+  return out;
+}
+
 module.exports = {
   TRACKER_MAX_ENTRIES,
   STDERR_MAX_LINES,
   getSessionId,
   getTrackerPath,
   getGitStageTrackerPath,
+  getGitAddPendingPath,
   joinBackslashContinuations,
   commandSegmentsBackslashJoined,
   normalizePath,
+  tokenizeQuoted,
   readTracker,
   writeTracker,
   capStderr,
   logFailOpen,
   classifyRisk,
   maxTier,
+  resolveShellPath,
+  isSameDir,
+  hasCdElsewhere,
+  cFlagTargets,
 };

@@ -63,36 +63,107 @@
 //     would need the same dry-run-enumeration machinery as -A and isn't
 //     worth it for a rare pattern).
 //   - cwd mismatch: a `-C <dir>` on the commit itself, or a `cd <dir>`
-//     segment anywhere earlier in the same command, makes the working
-//     directory this Node process actually runs `git` in (ctx.cwd) an
-//     unreliable stand-in for where the commit will really execute — fail
-//     open (return null) rather than check the wrong repository's state.
+//     segment anywhere earlier in the same command, that resolves to a
+//     directory OTHER than ctx.cwd makes the working directory this Node
+//     process actually runs `git` in an unreliable stand-in for where the
+//     commit will really execute — fail open (return null) rather than
+//     check the wrong repository's state.
+//
+// v3 (2026-09-02, real incident `632dd1913`, not a critic finding this
+// time): the v2 cwd-mismatch check bailed on ANY `cd`/`-C` segment, full
+// stop, with no check of what it actually resolved to. This repo's own
+// tooling prefixes nearly every Bash command with `cd /d/Work` — a NO-OP,
+// already ctx.cwd. Treating that as "targets elsewhere" silently disabled
+// this gate for the vast majority of real commits from the day it shipped;
+// a bare commit prefixed with `cd /d/Work` swept another session's 5
+// already-staged files straight past it. First fix: real path comparison
+// via lib/shared.js's resolveShellPath()/isSameDir() (handles Git-Bash
+// `/d/Work`-style paths, which Node's own path module does not understand
+// natively).
+//
+// v4 (2026-09-02, critic round 2 on the v3 fix — genuine bugs found by
+// reading the surrounding logic, not the diff in isolation):
+//   - M1 (Major): `-C <dir>` was matched against the WHOLE segment text —
+//     including inside a `-m "..."` commit message. A REAL commit message
+//     in this repo's own history (this exact fix's own predecessor commit)
+//     contained the substring "git -C" and silently disabled the check.
+//     Fixed: `-C` is now extracted only from the commit segment's own
+//     captured leading-flag region (before the `commit` keyword), which
+//     structurally cannot include the message argument.
+//   - M2 (Major): a `cd` typed AFTER the commit segment in a chained
+//     command no longer affects it (shell executes left to right) — see
+//     lib/shared.js hasCdElsewhere() header. Uses the commit segment's own
+//     index as the boundary instead of scanning the whole array.
+//   - M4 (Major): the pathspec-tail extractor scanned the LAST LINE OF THE
+//     WHOLE COMMAND, not the commit's own segment — `git commit -m "x" &&
+//     git log --oneline -1 -- README.md` had its LATER, unrelated command's
+//     own `-- README.md` misattributed to the commit as "scoped, nothing to
+//     compare", silently skipping the scope check entirely. Fixed: try the
+//     commit segment's OWN trailing pathspec first; only fall back to
+//     scanning the full text's last line when the commit segment itself
+//     ends in an OPEN heredoc marker (this repo's mandated multi-line
+//     commit style — see extractPathspecTail() below), never
+//     unconditionally.
+//   - m6 (Minor): `hasBroadCommitFlag`'s whitespace-only tail split turned
+//     `git commit -m "fix -a flag"` into tokens `-m`, `"fix`, `-a`,
+//     `flag"` — only the FIRST fragment got consumed as -m's value, so the
+//     bare `-a` fragment then read as a real flag and false-blocked a
+//     commit that never asked for `-a`. Fixed with the same quote-aware
+//     tokenizer as git-add-scope-tracker.js's M3 fix (shared.tokenizeQuoted).
+//   - Same-command self-cover (new, not a critic finding — discovered while
+//     implementing git-add-scope-tracker.js's C1 fix): moving that rule's
+//     tracker WRITE to PostToolUse means a chained `git add fileA && git
+//     commit -m x` (bare, no pathspec, as literally this session's first
+//     git action) no longer has fileA in the persisted tracker by the time
+//     THIS rule's PreToolUse check runs — it would fall into the
+//     empty-tracker WARN path instead of the stricter BLOCK-capable path,
+//     weakening protection for exactly the pattern this repo's tooling
+//     habitually uses (chaining commands to save round-trips). Fixed by
+//     also recognizing literal `git add`/`rm`/`mv` tokens EARLIER in the
+//     SAME command (via git-add-scope-tracker.js's exported
+//     `literalCandidatesUpTo`, re-parsing the same command text — no
+//     PreToolUse handoff, so no C1-style side-effect risk) as this
+//     session's own for THIS check only. Scoped to the literal/explicit
+//     case; an ACK'd broad add earlier in the same chained command still
+//     only gets WARN-level protection here (the operator already accepted
+//     broader trust via the ACK).
 const { spawnSync } = require('child_process');
+const addTracker = require('./git-add-scope-tracker');
 
-const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
-const RE_HAS_C_FLAG = /(?:^|\s)-C\s+\S+/;
-const RE_CD_SEGMENT = /^(?:sudo\s+)?cd\s+\S+/;
+const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+((?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*)commit(?=\s|$|["';|&])/;
 const VALUE_FLAGS = new Set(['-m', '--message', '-c', '--reuse-message', '--author', '-F', '--file', '--date', '--fixup', '--squash']);
+// A commit segment ending in an open heredoc opener (this repo's mandated
+// `-m "$(cat <<'EOF'` multi-line style) means the real closing `)" -- <files>`
+// lives on a LATER, separate line-segment — see extractPathspecTail() below.
+const RE_HEREDOC_OPEN = /<<-?\s*['"]?(\w+)['"]?\s*$/;
+
+// isOpenHeredoc() requires BOTH the shape match above AND an odd count of
+// unescaped-looking `"` characters (the `-m "..."` argument genuinely still
+// open at end-of-line). Found via self-review, not a critic finding: the
+// shape regex ALONE also matches a COMPLETE, properly-closed message that
+// merely contains literal "<<word" text near its end — e.g. `git commit -m
+// "foo <<bar"` — which would wrongly re-trigger the fallback this fix
+// exists to bound (M4: scanning the whole multi-line text's last line,
+// which can pick up a LATER unrelated chained command's own pathspec).
+function isOpenHeredoc(commitSegment) {
+  if (!RE_HEREDOC_OPEN.test(commitSegment)) return false;
+  const quoteCount = (commitSegment.match(/"/g) || []).length;
+  return quoteCount % 2 === 1; // odd -> the -m "..." argument is unclosed
+}
 
 function findCommitSegment(segments) {
-  return segments.find((s) => RE_GIT_COMMIT.test(s)) || null;
+  const idx = segments.findIndex((s) => RE_GIT_COMMIT.test(s));
+  return { segment: idx === -1 ? null : segments[idx], index: idx };
 }
 
-function targetsElsewhere(segments) {
-  return segments.some((s) => RE_HAS_C_FLAG.test(s) || RE_CD_SEGMENT.test(s));
-}
-
-// Detect `-a`/`--all`/`-am`/`-ma`/etc on the commit itself. Value-flags (-m,
-// --author, ...) have their arguments skipped so a message token that
-// happens to start with "-" and contain "a" (e.g. `-m "-add note"`) is not
-// misread as a flag — ctx.commandSegments is a naive whitespace split with
-// no quote-awareness, so this is the best available mitigation, not a full
-// fix (documented limitation shared by every sibling rule that scans
-// commandSegments).
-function hasBroadCommitFlag(segment) {
+// v4 fix m6: quote-aware tail parsing (shared.tokenizeQuoted) so
+// `git commit -m "fix -a flag"` treats the whole message as ONE token
+// (correctly consumed as -m's value) instead of shredding it into fragments
+// that individually look like real flags.
+function hasBroadCommitFlag(segment, shared) {
   const m = segment.match(/\bcommit\b(?=\s|$)/);
   if (!m) return false;
-  const tokens = segment.slice(m.index + m[0].length).trim().split(/\s+/).filter(Boolean);
+  const tokens = shared.tokenizeQuoted(segment.slice(m.index + m[0].length).trim());
   let skipNext = false;
   let broad = false;
   for (const t of tokens) {
@@ -107,16 +178,37 @@ function hasBroadCommitFlag(segment) {
   return broad;
 }
 
-// Extract a trailing ` -- <tokens>` from the LAST non-blank line of the
-// (possibly multi-line heredoc) command, then verify every token is a real,
-// git-known path — not just message text that happens to contain " -- ".
-function extractPathspecTail(commandExpanded) {
-  const lines = String(commandExpanded).split('\n').map((l) => l.trim()).filter(Boolean);
-  const last = lines[lines.length - 1] || '';
-  const m = last.match(/\s--\s+(.+)$/);
+// Quote-aware (shared.tokenizeQuoted, same instance as M3/m6): found via
+// self-review, not a critic finding — a plain whitespace split here shreds
+// `-- "docs/my file.md"` into two garbage tokens exactly like the M3 bug
+// this fix already closed in git-add-scope-tracker.js, just in the
+// pathspec-TAIL parser instead of the add-TARGET parser. Consequence here
+// is the conservative direction (a legitimately-scoped commit falls
+// through to the normal foreign-file check instead of being recognized as
+// scoped) rather than a security hole, but it's the same defect class, so
+// it gets the same fix rather than being left as a second, inconsistent
+// instance of it.
+function tailPathspecOf(text, shared) {
+  const m = String(text).match(/\s--\s+(.+)$/);
   if (!m) return null;
-  const tokens = m[1].trim().split(/\s+/).filter(Boolean);
+  const tokens = shared.tokenizeQuoted(m[1].trim());
   return tokens.length ? tokens : null;
+}
+
+// v4 fix M4: try the commit segment's OWN trailing pathspec first — this
+// can never be confused by a LATER chained command's own `-- <file>` tail,
+// because the commit segment is already bounded to just this one git
+// invocation (chain-operator-split, see lib/shared.js
+// commandSegmentsBackslashJoined). Only fall back to scanning the full
+// multi-line text's last line when the commit segment itself is
+// structurally unclosed (an open heredoc), which is the ONE real case
+// where the true pathspec genuinely lives on a different segment.
+function extractPathspecTail(commitSegment, commandExpanded, shared) {
+  const own = tailPathspecOf(commitSegment, shared);
+  if (own) return own;
+  if (!isOpenHeredoc(commitSegment)) return null;
+  const lines = String(shared.joinBackslashContinuations(commandExpanded)).split('\n').map((l) => l.trim()).filter(Boolean);
+  return tailPathspecOf(lines[lines.length - 1] || '', shared);
 }
 
 function isRealPathspec(tokens) {
@@ -130,7 +222,16 @@ function isRealPathspec(tokens) {
 
 // NUL-terminated `git diff --cached --name-only`, optionally scoped to a
 // pathspec. Returns null on any git failure (caller fails open).
-function gitDiffCachedNames(extraArgs) {
+// v4 fix m8: a pathspec-scoped call (`['--', ...tracked]`) with
+// TRACKER_MAX_ENTRIES (500) long repo-relative paths — this repo has
+// entries under lobster-factory/... routinely 80-100+ chars — can approach
+// the ~32KB Windows command-line limit, at which point spawnSync sets
+// `r.error` and the OLD code failed open (gate silently disabled for large
+// sessions, exactly the wrong direction). Chunked here and results unioned
+// so a large tracker degrades to slower, not silently absent.
+const PATHSPEC_CHUNK_SIZE = 100;
+
+function gitDiffCachedNamesRaw(extraArgs) {
   try {
     const r = spawnSync('git', ['diff', '--cached', '--name-only', '-z', ...(extraArgs || [])], { encoding: 'utf8', timeout: 10000 });
     if (r.error || typeof r.status !== 'number' || r.status !== 0) return null;
@@ -140,19 +241,41 @@ function gitDiffCachedNames(extraArgs) {
   }
 }
 
+function gitDiffCachedNames(extraArgs) {
+  if (!extraArgs || extraArgs.length <= PATHSPEC_CHUNK_SIZE + 1) return gitDiffCachedNamesRaw(extraArgs);
+  // extraArgs is `['--', ...paths]` when scoped — chunk the paths only.
+  const [marker, ...paths] = extraArgs;
+  if (marker !== '--') return gitDiffCachedNamesRaw(extraArgs); // unexpected shape — don't guess
+  const out = [];
+  for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK_SIZE) {
+    const chunk = gitDiffCachedNamesRaw(['--', ...paths.slice(i, i + PATHSPEC_CHUNK_SIZE)]);
+    if (chunk === null) return null; // any chunk failing -- fail open for the whole query
+    out.push(...chunk);
+  }
+  return out;
+}
+
 module.exports = {
   check(ctx) {
     const shared = ctx.shared;
     // Backslash-joined, not ctx.commandSegments directly: a real multi-line
     // `git commit ... -- \` command's continuation lines would otherwise
-    // never be visible to findCommitSegment/targetsElsewhere (see
-    // lib/shared.js joinBackslashContinuations header — found live
-    // dogfooding this exact gate).
+    // never be visible (see lib/shared.js joinBackslashContinuations header
+    // — found live dogfooding this exact gate).
     const segments = shared.commandSegmentsBackslashJoined(ctx.commandExpanded);
-    const commitSegment = findCommitSegment(segments);
+    const { segment: commitSegment, index: commitIndex } = findCommitSegment(segments);
     if (!commitSegment) return null;
-    if (targetsElsewhere(segments)) return null; // fail open — different/ambiguous repo target
     if (/--amend\b/.test(ctx.commandExpanded)) return null;
+
+    // -C: check ONLY the commit segment's own captured flag region (v4 fix M1).
+    const cRegionMatch = commitSegment.match(RE_GIT_COMMIT);
+    const cRegion = cRegionMatch ? (cRegionMatch[1] || '') : '';
+    for (const target of shared.cFlagTargets(cRegion)) {
+      if (!shared.isSameDir(target, ctx.cwd)) return null; // -C elsewhere — fail open
+    }
+    // cd: only segments strictly BEFORE the commit segment can have
+    // affected where it actually ran (v4 fix M2).
+    if (shared.hasCdElsewhere(segments, ctx.cwd, commitIndex)) return null;
 
     if (ctx.event === 'PostToolUse') {
       // Re-derive truth from git instead of trusting the Bash tool's result
@@ -172,7 +295,7 @@ module.exports = {
     // PreToolUse from here down.
     const tf = shared.getGitStageTrackerPath(ctx.sid);
 
-    if (hasBroadCommitFlag(commitSegment)) {
+    if (hasBroadCommitFlag(commitSegment, shared)) {
       return {
         block: [
           '[Hook] BLOCKED: `git commit -a`/`--all`/`-am` auto-stages every modified tracked file,',
@@ -183,7 +306,7 @@ module.exports = {
       };
     }
 
-    const pathspecTokens = extractPathspecTail(shared.joinBackslashContinuations(ctx.commandExpanded));
+    const pathspecTokens = extractPathspecTail(commitSegment, ctx.commandExpanded, shared);
     if (pathspecTokens && isRealPathspec(pathspecTokens)) {
       return null; // real, git-verified pathspec — this commit is scoped, nothing to compare
     }
@@ -192,7 +315,14 @@ module.exports = {
     if (allStaged === null) return null; // fail open — can't read git state
     if (!allStaged.length) return null;  // nothing staged; verify-gate-commit / dangerous-bash etc. own that case
 
-    const tracked = shared.readTracker(tf);
+    // Same-command self-cover: literal add/rm/mv targets EARLIER in this
+    // exact chained command count as this session's own even though
+    // git-add-scope-tracker.js hasn't (and, for an unexecuted command,
+    // can't yet) recorded them into the persisted tracker (see module
+    // header). Re-parses the same command text — no side effect, so no
+    // risk of the C1 class of bug this is adjacent to.
+    const selfCover = addTracker.literalCandidatesUpTo(segments, commitIndex - 1, shared, ctx.cwd);
+    const tracked = [...shared.readTracker(tf), ...selfCover.files];
     if (!tracked.length) {
       return {
         warn: [
@@ -208,7 +338,7 @@ module.exports = {
     if (covered === null) return null; // fail open
     const coveredSet = new Set(covered);
     const unexpected = allStaged.filter((f) => !coveredSet.has(f));
-    if (!unexpected.length) return null; // fully covered by this session's own tracked adds
+    if (!unexpected.length) return null; // fully covered by this session's own tracked/self-covered adds
 
     return {
       block: [

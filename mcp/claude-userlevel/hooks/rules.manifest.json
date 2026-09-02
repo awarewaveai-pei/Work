@@ -48,6 +48,7 @@
         "matcher": "Bash",
         "rules": [
           "audit-log",
+          "git-add-scope-tracker",
           "git-commit-scope-guard"
         ]
       },
@@ -97,6 +98,13 @@
       {
         "rules": [
           "vbc-reminder"
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "rules": [
+          "subagent-charter"
         ]
       }
     ]

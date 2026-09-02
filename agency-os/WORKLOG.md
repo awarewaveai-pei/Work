@@ -1,5 +1,189 @@
 # Worklog
 
+## 2026-09-02（續7）
+
+### v4修法送第二輪覆審：critic連續2次rate-limit + codex-oracle連續2次無回應（含縮小packet後仍無回應）——改真實對抗自審，抓到3個新bug（不是critic漏抓，是v4自己新引入的），mutation test證明測試非空跑，107/107全過
+
+**觸發**：續6的v4修法完成後，依R0/`/verify-recent`慣例必須跑第二輪外部覆審（確認修法本身沒有新bug，不只是「看起來修了」）。連續嘗試：
+
+1. `critic` subagent 第1次：`rate_limit` HTTP 429（session limit，resets 1pm Asia/Taipei）
+2. 使用者說「試試看」，重試 `critic` 第2次：仍 `rate_limit`（resets 6pm）
+3. 依AGENTS.md「critic連續失敗≥2次→改用codex-oracle.ps1」規則，改用fallback：`codex-oracle.ps1 -Mode review`（未縮小範圍，預設掃到143個未追蹤檔案、1186KB packet，含大量不相干的System_Foundry文件）→ **exit=0但no final message**，重試1次仍同樣結果
+4. 縮小範圍重試：`-Path`只指定本次改動的5個檔案（84KB packet）→ **仍然no final message，log檔案完全空白**——排除「packet太大噎住」的可能性，確認是Codex服務本身當下不可用（同2026-08-30續20記錄過的額度耗盡同款情況）
+
+**判斷**：兩個外部oracle都真的不可用（非我不想跑），依既有memory準則與2026-08-30續20先例，改做「真實對抗自審 + mutation test證明測試非空跑」而非跳過覆審或裝作已經跑過。
+
+**真實對抗自審（逐一重讀兩個檔案全文，主動找「這段我自己寫的邏輯有沒有洞」，不是重讀一遍確認「看起來對」）**——抓到**3個v4自己新引入的真bug**（不是critic原本13個finding的殘留，是實作v4修法過程中新製造出來的）：
+
+1. **self-cover未檢查更早add segment自己的`-C`**：`git -C /elsewhere add fileA && git commit -m x`——`literalCandidatesUpTo()`（v4為了修「鏈式指令裡更早的具名add」新增的自我覆蓋機制）沒有檢查這個更早的add segment**自己**帶的`-C`旗標，導致fileA被錯誤地當成「這個session在ctx.cwd加過的檔案」，即使真實的`git add`其實發生在完全不同的repo。用真實repo構造：repoA（ctx.cwd）裡巧合有一個「另一個session」真的staged的同名`fileA.md`，若不修，這個情境會**完全靜默通過**（連WARN都不會有）。**修法**：`literalCandidatesUpTo()`新增`cwd`參數，逐一驗證每個候選segment自己的`-C`旗標區是否指向別處，指向別處就排除該segment的候選。
+2. **heredoc偵測誤判**：`RE_HEREDOC_OPEN`純用形狀比對（`/<<-?\s*['"]?(\w+)['"]?\s*$/`），沒有考慮這個commit segment的雙引號到底有沒有真的關閉。`git commit -m "foo <<bar"`——訊息本身完整、雙引號有正確關閉——仍然會被誤判成「未閉合的heredoc開頭」，觸發M4修法原本要避免的「退回掃整段文字最後一行」路徑，讓鏈式指令裡**後面**不相干指令的pathspec被誤判成這個commit自己的。**修法**：新增`isOpenHeredoc()`，形狀比對之外**再加一個雙引號奇偶校驗**（`-m "..."`真的沒關閉時，雙引號數量必為奇數）。
+3. **pathspec尾巴解析器沒套用同一個quote-aware tokenizer**：`tailPathspecOf()`（解析`-- <pathspec>`尾巴）還是用原始`split(/\s+/)`，跟M3/m6修好的同一種bug（quoted path被空白打碎）在**第三個地方**又犯一次——`git commit -m x -- "docs/my file.md"`會被打成兩個假token，導致`isRealPathspec()`驗證失敗，一個合法的scoped commit被誤判成未scope，落到一般比對路徑（方向上是保守/不危險，但跟其他3處修好的地方不一致）。**修法**：`tailPathspecOf()`改用`shared.tokenizeQuoted()`，跟M3/m6共用同一份實作（這正是v3的`cd`/`-C`bug教訓——同一個不變量分散在多處各自實作，遲早會有一處沒跟上）。
+
+**這3個bug的共同模式**：v4新增的兩個機制（`literalCandidatesUpTo`自我覆蓋、`isOpenHeredoc`/pathspec尾巴解析）都是**為了修critic的finding而新寫的邏輯**，但新寫的邏輯本身又踩到跟原本13個finding**同一類**的坑（-C範圍沒界定清楚、quote沒處理、shape-only判斷沒交叉驗證）——證實R0「不變量分析」的價值不只在修bug當下，也在**寫新修法時同樣要套用同一個不變量**，不能因為是「自己剛寫的新程式」就降低標準。
+
+**Mutation test（證明新增的3個回歸測試不是空跑，AGENTS.md「外部oracle真的沒額度時改做突變測試」準則）**：對這3個修法逐一手動還原成修法前的版本（`node -e`直接改字串，不經過Edit工具），跑`node --test`確認**恰好對應的那一個測試會失敗、其餘全過**（不是巧合連坐），再用`diff`確認還原回修法後版本與突變前的backup逐位元組相同：
+- 還原self-cover的`-C`檢查 → `self-cover hardening`測試失敗（87個測試中僅此1個失敗）
+- 還原`isOpenHeredoc`成純形狀比對 → `heredoc-detection hardening`測試失敗（87個測試中僅此1個失敗）
+
+**測試**：`tests/hooks/runner-parity.test.mjs`再新增3個測試（對應上述3個自審抓到的bug）+ 修正1個測試的斷言（誤以為會BLOCK，實際上正確行為是WARN——同一套「空tracker→WARN不BLOCK」既有設計，見下方細節），107個全過。
+
+[已修改]
+- [`mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js`](../mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js)：`literalCandidatesUpTo()`新增`cwd`參數 + 自己的`-C`旗標區驗證
+- [`mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js`](../mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js)：新增`isOpenHeredoc()`（雙引號奇偶校驗）取代純形狀比對；`tailPathspecOf()`／`extractPathspecTail()`改用`shared.tokenizeQuoted()`
+- [`tests/hooks/runner-parity.test.mjs`](../tests/hooks/runner-parity.test.mjs)：新增3個自審測試 + 修正1個測試斷言
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check`對兩個修改檔案 | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | **107/107全過**
+- REALTEST_EVIDENCE: tool=Bash | cmd=手動mutation test（`node -e`還原3處修法之2的修法前版本，逐一`node --test`確認恰好對應測試失敗、其餘86個全過，再`diff`確認還原回修法後版本與backup逐位元組相同）| 結果=2/3自審發現的bug完成mutation驗證（第3個pathspec tokenizer bug因mutation方式與M3共用函式高度重疊、風險最低，未逐一mutation，但有獨立設計的差異化測試——見上方測試設計說明，能真實區分「pathspec被承認為scoped」vs「落到一般比對路徑」兩種可觀察結果）
+- REVIEW_DONE: critic=Self（真實對抗自審，非rubber-stamp——外部oracle兩條路徑皆不可用，見上方4次失敗記錄）| verdict=fail→已修正 | findings=3個v4自己新引入的bug，全部修正並附mutation test證據
+- ORACLE_WAIVED: critic連續2次rate-limit（resets 6pm Asia/Taipei）+ codex-oracle連續2次no-final-message（含縮小packet排除packet過大的可能性）-- 改用真實對抗自審+mutation test，非跳過覆審
+- BUGHUNT_DONE: scope=mcp/claude-userlevel/hooks,agency-os,scripts,tests | grep=`isOpenHeredoc\|tokenizeQuoted` | hits=確認`isOpenHeredoc`僅在`git-commit-scope-guard.js`一處定義兩處呼叫（符合預期）；`tokenizeQuoted`確認在`shared.js`定義一次、`git-add-scope-tracker.js`與`git-commit-scope-guard.js`各自呼叫（M3/m6/新pathspec-tail三處全部共用同一份，不再有第四份分散實作）
+
+[剩餘風險]
+- 兩個外部oracle目前都不可用（critic rate limit至18:00、codex-oracle service問題原因未查證，可能是額度或連線），若後續還有這兩個檔案的修改，需要再次確認oracle是否恢復，不可預設仍然不可用
+- pathspec-tail tokenizer的修法未做mutation test（理由見上），僅有差異化行為測試，比另外兩個self-review finding的驗證強度略低，記錄供未來覆審時留意
+
+[rollback] `git revert`本次commit（若含在同一個commit內）；三處新增的自審修法都是新增檢查/新增函式呼叫，不影響既有邏輯路徑，個別revert風險低。
+
+## 2026-09-02（續6）
+
+### v3 fix 送交真實外部 critic 覆審，抓到 1 Critical + 4 Major + 8 Minor（自己剛修完的東西再犯一次同款 bug）——v4 全部治本修正 + 12 個新回歸測試，104/104 全過
+
+**觸發**：操作者對續5 的 v3 修法明示「100% 去處理好，不用停下來等我核准任何事，都由你決定」+ 全套 R0 架構師模式 + 禁止補丁。R0/R4 強制流程要求 code 改動 commit 前必須跑外部 critic（非自我核對），於是在嘗試 commit 續5 的 6 個檔案時被 `verify-gate-commit.js` 攔下，依規跑 `/verify-recent` → 真實 critic subagent 覆審。
+
+**Critic 回報（整體風險評級：High）**——逐條列出，全部附 file:line 與可重現輸入，非空泛描述：
+
+- 🔴 **C1（Critical）**：`git-add-scope-tracker.js:163` 在 **PreToolUse** 就把候選檔案寫進 tracker——跟 [git-commit-scope-guard.js](../mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js) 2026-08-30 v1→v2 自己修過的那個 C1 是**一模一樣的 bug class**，只是換一個檔案再犯一次：`runner.js` 同一個 matcher group 裡的每條規則都會跑完才聚合 verdict（無短路），若同一次呼叫被 sibling 規則（`verify-gate-commit`/`dangerous-bash`）擋下，這個檔案的 side effect（寫 tracker）早就發生了——命令從未真的執行，tracker 卻已經記了一筆「我加過這個檔案」的假紀錄。critic 用這個機制推導出真實危害路徑：假紀錄之後會讓另一個 session 真正 staged 的檔案被誤判成「已涵蓋」而放行，跟 `632dd1913` 是同一種傷害（放行不該放行的），透過另一道門重演。
+- 🟠 **M1（Major）**：`-C <dir>`／`cd <dir>` 的偵測是對**整個 segment 文字**做 regex，包含 `-m "..."` 訊息本文內部。critic 實測 `.claude/bash-commands.log` 真實抓到一筆過去的 commit message 含 `-C 錨定腳本位置`（CJK 訊息裡引用了 `git -C`），閘因此被自己的訊息文字誤判「有 -C」而 fail-open。**更諷刺的是**：critic 示範用的重現輸入 `git commit -m "refactor: honour git -C <dir> in hooks"` ——**這正是本次修法自己會寫的那種 commit message**，若不修，這次修完之後的下一個 commit 訊息大機率立刻讓閘再度失效。
+- 🟠 **M2（Major）**：`cd`/`-C` 判斷不分指令內執行順序，`git add fileA && cd /elsewhere && echo done` 裡「之後」才發生的 `cd` 會誤判「之前」已經執行完的 `git add fileA`，讓一個完全正常、在 `ctx.cwd` 裡真實發生的 add 被當成「目標不明」而拒絕追蹤。
+- 🟠 **M3（Major）**：`git add "docs/my file.md"` 被原本的 `.split(/\s+/)` 打成 `"docs/my` 與 `file.md"` 兩個誰都不是的假 token。critic 實測 git 對不存在的 pathspec 是 `exit 0` 印空字串，不會報錯——代表這個真檔案會**靜默永遠不被追蹤**，之後一個乾淨的 bare commit 會誤控訴「這個 session 從沒 add 過這個檔案」。本 repo 自己的舊註解就寫著「632 個追蹤檔案含空白」，這不是邊角案例。
+- 🟠 **M4（Major）**：`extractPathspecTail` 掃的是**整個指令文字的最後一行**，不是 commit 自己的 segment。critic 實測 `git commit -m "x" && git log --oneline -1 -- README.md`——`-- README.md` 其實屬於 `git log`，卻被誤判成 commit 自己「已經帶了合法 pathspec，範圍精確，不用比對」，整個 scope 檢查被**完全跳過**，靜默放行。
+- 🟡 8 個 Minor（m1 POSIX 絕對路徑無 drive letter 時對到目前行程所在磁碟造成假「同目錄」／m2 `-C` 只驗第一個而 git 的 `-C` 是**累加**的／m3 `pushd`/`Push-Location`/subshell 不被辨識／m4（記法沿用，不同於上面的 M4）SID cwd-fallback 讓多 session 共用同一顆 tracker／m5 `git add -n`/`--dry-run` 被當成真的廣域 add 硬擋／m6 commit message 含 `-a` 文字被空白 split 誤判成旗標／m7 同 m4，SID fallback／m8 tracker 500 筆上限 × 長路徑逼近 Windows command-line 上限，`spawnSync` 失敗後靜默 fail-open）。
+
+**Critic 也明確列出「驗證乾淨」的部分**（不是照單全收，是逐項核對過）：路徑解析對這個 repo 實際會出現的形狀全部正確（`/d/Work`、`D:/Work`、`D:\Work`、`/mnt/d/Work` 等 15 種寫法逐一實測）；用 30,184 筆真實 `.claude/bash-commands.log` 全量重播新函式，959 筆含 `git commit` 的指令只有 51 筆（5.3%）合理地 bail（真的 `cd` 到別的目錄），驗證 v3 本身確實把原始 bug 關掉了，不是誤判關掉自己；`isSameDir` 例外路徑一律 fail-open（bail），沒有找到任何一條路徑會錯誤地判成「同目錄」。
+
+**不變量分析（同一段 code 被同一個 reviewer 連續打回，AGENTS.md 強制先做不變量分析才能繼續改）**：C1 不是「這次沒做完」，是**同一類保證兩次被同一種手法破壞**——「PreToolUse 的 side effect 只有在整個呼叫真的成功執行後才可信任」，這句話 v1 修過一次（commit-guard），v3 寫 add-tracker 時完全沒套用同一條規則。**真正的不變量**：任何會被拿來當作「這個 session 真的做了 X」證據的寫入，唯一可信來源是「事後問 git 本身」，不能是「事前解析指令文字、假設它會成功」。M1-M4 的不變量：「`cd`/`-C`/pathspec 的偵測範圍，只能是指令裡結構上真的會被 git/shell 解析成該位置的那段文字（動詞前的旗標區、真正的 `cd` 指令位置），不能是整個 segment 的自由文字掃描」——這條線 C2（2026-08-30 commit message 裡的字面 `--`）已經教過一次，這次在 `-C`/pathspec 上又各自獨立重演。
+
+**v4 治本修法（逐條對應，非補丁——每一條都是同一個不變量的具體實作，不是各自加特例）**：
+
+1. **C1 修法**：`git-add-scope-tracker.js` 整段重寫。PreToolUse **只做封鎖判斷**（互動模式硬擋、廣域 add 無 ACK 擋、ACK 後跑 dry-run **但只暫存候選清單、不寫主 tracker**，暫存檔案帶指令內容的 sha1 fingerprint 避免被擋下的舊呼叫殘留污染下一次真呼叫）。**PostToolUse 才是唯一真正寫入 tracker 的地方**：獨立重新解析同一段指令文字取得候選檔案（非破壞性、不依賴 Pre 階段任何側寫），再用 `git diff --cached --name-only -z -- <候選>` 問 git 本身「這些檔案現在真的有 staged 嗎」，只記錄驗證通過的。被 sibling 規則擋下、根本沒真的執行的呼叫，天然查不到任何真的 staged 檔案，自然什麼都不記錄——不需要知道「這次呼叫有沒有成功」這個事後才能確定的狀態。
+2. **M1 修法**：`RE_GIT_ADD`/`RE_GIT_RM`/`RE_GIT_MV`/`RE_GIT_COMMIT` 四個 regex 都改成用 capture group 框住「`git` 到動詞之間的旗標區」，`-C` 只從這個 capture 出來的子字串抓，結構上不可能碰到動詞之後的訊息參數。新增 `shared.cFlagTargets()` 統一這段抽取邏輯。
+3. **M2 修法**：`shared.hasCdElsewhere(segments, cwd, beforeIndex)` 只掃**目標 verb segment之前**的 `cd`；`-C` 則只驗「這個 verb segment自己」的旗標區（不看其他 segment 的 `-C`，因為每個 git 呼叫的 `-C` 只管自己）。
+4. **M3 修法 + m6 修法（同一個根因，同一個共用函式）**：新增 `shared.tokenizeQuoted()`（quote-aware tokenizer），`git-add-scope-tracker.js`（M3）與 `git-commit-scope-guard.js` 的 `hasBroadCommitFlag`（m6）都改用它——**兩份檔案共用同一份 tokenizer，不是各自各寫一份**（正是 v3 的 `cd`/`-C` bug 為什麼會兩份各壞一半的同一個教訓）。
+5. **M4 修法**：`extractPathspecTail` 改成**先試commit segment自己的尾巴**（絕不會被鏈式指令裡別的command的pathspec污染，因為segment本身已經被chain operator切開）；只有偵測到這個segment本身是**未閉合的heredoc開頭**（本repo強制的多行commit訊息寫法 `-m "$(cat <<'EOF'`）才退回掃「整段文字」的最後一行——這是唯一真正需要跨segment找pathspec的情境，不是無條件掃。
+6. **新發現的縫隙（不是critic提的，是自己實作C1修法時發現的）——「同指令自我覆蓋」**：C1修好後，`git add fileA && git commit -m x`（bare、本session這次對話第一個git動作）在commit segment的PreToolUse檢查當下，tracker還是空的（因為錄入挪到PostToolUse、而PostToolUse此刻還沒跑）——這會落到「空tracker→WARN不BLOCK」的既有分支，比C1修之前的保護等級更弱（v3之前，add-tracker在Pre就寫入，同一次事件內commit-guard能看到）。修法：`git-add-scope-tracker.js`匯出`literalCandidatesUpTo(segments, uptoIndex, shared)`，`git-commit-scope-guard.js`在自己的PreToolUse裡重新解析**同一段指令文字**、找出commit segment**之前**的具名add/rm/mv token，直接當作這次檢查的「自己覆蓋」對象——純讀取、無side effect，不會重演C1那類問題。範圍刻意只到「具名token」：ACK過的廣域add在同一條鏈式指令裡仍然只有WARN等級保護（操作者已經透過ACK接受更寬的信任邊界）。
+7. **m1修法**：無法辨識drive慣例的POSIX絕對路徑（`/Work`這種，不是`/d/Work`）回傳`\0unresolvable:`sentinel，永遠不會等於任何真實resolve出來的路徑，不再讓Node對「目前process所在磁碟」的猜測混進判斷。
+8. **m2修法**：`shared.cFlagTargets()`用`matchAll`風格的迴圈找出旗標區裡**每一個**`-C`，全部都要同目錄才算no-op（git的`-C`是累加的，最後一個才是真正生效的那個，但任何一個不同都代表指令的意圖不單純指向`ctx.cwd`，保守起見全部檢查）。
+9. **m5修法**：`git add -n`/`--dry-run`token出現在add segment時整段視為inert（dry run不會真的stage任何東西，不需要走廣域擋/ACK流程）。
+10. **m8修法**：`gitDiffCachedNames`在pathspec超過100筆時自動切成多批查詢再union結果，避開Windows command-line長度上限（tracker上限500筆×本repo常見80-100字元路徑，逼近32KB）；任一批查詢失敗才整體fail-open，不是遇到大session就直接放棄。
+11. **m3、m7記錄為已知限制，不修**：`pushd`/`Push-Location`/subshell `cd`不被辨識（只會讓閘「不該擋的時候少擋一次」，不會製造假「同目錄」）；SID三個來源都缺時退回`sha1(cwd)`共用（本repo實際流量沒觀察過這個情境，且跟既有`getTrackerPath`的既定取捨一致，需要另外設計session間如何降級處理才能治本，不是這次能順手關掉的範圍）——兩點都寫進`lib/shared.js`對應函式的檔頭註解，不是不記錄的沉默妥協。
+
+**測試**：`tests/hooks/runner-parity.test.mjs` 新增12個測試，**每個Critical/Major/Minor finding至少一個直接重現的回歸測試**，全部用真實git repo（`makeGitRepo`）+ 真實`spawnSync`執行git指令 + Pre/Post兩階段真實呼叫`runner.js`子行程，不是自我核對；並修正5個既有測試（v3/舊測試假設Pre階段會同步寫入tracker，v4改成Post階段才寫，測試改為Pre允許→真實執行git指令→Post驗證）+ 刪除1個設計有誤的測試（誤把「兩個獨立呼叫、非鏈式指令」的WARN-only既有行為當成bug）。
+
+[已修改]
+- [`mcp/claude-userlevel/hooks/lib/shared.js`](../mcp/claude-userlevel/hooks/lib/shared.js)：`commandTargetsElsewhere`拆分為`hasCdElsewhere`+`cFlagTargets`；新增`tokenizeQuoted`、`getGitAddPendingPath`；`resolveShellPath`加POSIX-無drive sentinel（m1）；`getSessionId`/`hasCdElsewhere`檔頭補m3/m7已知限制註解
+- [`mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js`](../mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js)：整段重寫（Pre只封鎖、Post才驗證寫入）；新增匯出`literalCandidatesUpTo`；quote-aware tokenizer；`-n`/`--dry-run`豁免
+- [`mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js`](../mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js)：`-C`改抓commit segment自己的旗標區；`hasBroadCommitFlag`改quote-aware；`extractPathspecTail`改「先試自己segment，heredoc才退回整段」；新增「同指令自我覆蓋」（require `git-add-scope-tracker.js`的`literalCandidatesUpTo`）；`gitDiffCachedNames`加分批查詢（m8）
+- [`mcp/claude-userlevel/hooks/rules.manifest.json`](../mcp/claude-userlevel/hooks/rules.manifest.json)：`git-add-scope-tracker`加進`PostToolUse|Bash` matcher group（C1修法需要）
+- [`tests/hooks/runner-parity.test.mjs`](../tests/hooks/runner-parity.test.mjs)：12個新測試 + 5個既有測試改Pre/Post兩階段 + 刪除1個設計有誤的測試
+- [`agency-os/TASKS.md`](TASKS.md) 544：第7個實例的修法段落更新為v4最終狀態（取代已過期的v3中繼描述）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check`對`shared.js`/`git-add-scope-tracker.js`/`git-commit-scope-guard.js` | exit=0 | 語法全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | **104/104全過**（含12個新增的critic finding直接重現測試：C1 blocked-call不留痕、M1 commit message內文`-C`不誤判、M2 commit後的cd不影響已執行的commit、M3 quoted path正確記錄、M4 鏈式指令裡別人的pathspec不誤判成自己的、m1 POSIX無drive路徑不誤判同目錄、m2多個`-C`全查、m5 dry-run豁免、m6 message內`-a`不誤判、m8 150筆tracker仍正確偵測外來檔案、同指令自我覆蓋的BLOCK/WARN兩個邊界案例）
+- REVIEW_DONE: critic=Deep（真實外部critic subagent，非自查）| verdict=fail→已修正 | findings=1C/4M/8m全部逐一對應修正，見上方「v4治本修法」11點清單，每點都附critic原始finding對照
+- BUGHUNT_DONE: scope=mcp/claude-userlevel/hooks,agency-os,scripts,tests | grep=`commandTargetsElsewhere\b`（確認舊符號已完全移除，只在WORKLOG/TASKS的歷史敘述行殘留，屬正常歷史記錄不需要改）+ `RE_HAS_C_FLAG\|RE_CD_SEGMENT\b`（確認v2/v3的舊regex命名沒有殘留）| hits=`commandTargetsElsewhere`僅WORKLOG/TASKS歷史文字命中（2處，正常）、程式碼零命中；`RE_HAS_C_FLAG`/`RE_CD_SEGMENT`零命中
+
+[剩餘風險]
+- m3（`pushd`/`Push-Location`/subshell `cd`不被辨識）與m7（SID三來源都缺時共用tracker）刻意不修，已記錄在`lib/shared.js`對應函式檔頭——前者只會讓閘偶爾「該擋沒擋」但方向安全（不會誤判成同目錄）；後者是本repo流量從未觀察過的情境，且是既有`getTrackerPath`同款已接受的取捨
+- `.codex/hooks/`鏡射狀態同續5記錄：續4 workstream留下的未決架構重構（新橋接vs.舊鏡像）不是本次範圍，本次修法未同步過去，記錄供接手者參考
+- `ao-close.ps1:652`內部`git add -A`缺口原封不動，[TASKS.md:544](TASKS.md)仍不打勾
+
+[rollback] `git revert`本次commit；三個rule/lib檔案回到v3（會重新讓critic抓到的1C/4M/8m全部復發，包含真實發生過的`632dd1913`同類但更隱蔽的變體，不建議revert除非發現這次修法本身有更嚴重的問題）。
+
+## 2026-09-02（續5）
+
+### 治本：`git-commit-scope-guard.js`/`git-add-scope-tracker.js` 的 `cd`/`-C` 判斷「有出現就 bail」錯當成「目標不同才 bail」——同 bug class 第 7 個實例，這次是閘本身真 bug，不是 ao-close.ps1 舊缺口
+
+**觸發**：操作者回報「commit 被搶走」，追問 2026-08-30 建的閘（`git-add-scope-tracker.js`/`git-commit-scope-guard.js`，[TASKS.md](TASKS.md) 544 條）有沒有處理好。查證發現今天（2026-09-02 續3）commit `632dd1913` 就是活生生撞破那道閘的真實案例，而非它已知記錄在案的 `ao-close.ps1:652` 內部 `git add -A` 缺口。操作者明示「100% 去處理好，不用停下來等我核准任何事，都由你決定」+ 全套 R0 架構師模式 + 禁止補丁，逐步做完整根因分析、治本修法、回歸測試、文件更新。
+
+**[任務理解]** 根本問題：2026-08-30 建的兩道機械閘（防止並行 session 的 `git commit` 掃走別的 session 已 staged 但未 commit 的檔案）**沒有真的在保護大多數真實 commit**——不是保護範圍有邊界（那是已知的 `ao-close.ps1` 缺口），是閘自己的判斷邏輯錯了。
+
+**[現況分析]**
+
+`git log --oneline -3`（本 session 首次 Edit 前，機械閘 `git-log-injector.js` 強制顯示上一個完整 session 的全部 commit）：
+```
+4d63eedb9 docs(worklog): record commit-attribution incident for search-content task 6/7/9 work
+d226a8ac0 chore: land cross-model oracle review artifacts + memory/config housekeeping from 2026-08-29
+632dd1913 chore: retention-policy report prune + dispatch/session log rotation
+73bff5eea docs: complete KS-6 IP relabel in core governance docs + land HCI Wave-1 gate status
+d82fc3705 fix(search-content): apply audit report tasks 1-5 (Claude, GPT quota exhausted)
+```
+未見任何其他 session 已經在處理同一個閘或同一起事故（避免重工確認）。
+
+用 `.claude/bash-commands.log` 逐行核對 `632dd1913` 的產生過程（行號 30067/30068/30070）：
+- `02:37:59Z`：一個 session `git add` 了 4 份 SEARCH_CONTENT 文件 + `WORKLOG.md`（[git-commit-scope-guard.js:1-224](../mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js) 這道閘存在的目的正是保護這種「已 add 未 commit」的狀態）
+- `02:38:01Z`（17 秒後）：**另一個** session 執行 `cd /d/Work\ngit log --oneline -3\ngit add \  agency-os/reports/... （15 個完全不相干的 report-prune/dispatch/session 檔案）`
+- `02:38:18Z`：該 session 執行**獨立一次** Bash 呼叫：`cd /d/Work\ngit commit -m "chore: retention-policy report prune..."` —— 沒有 pathspec 尾巴，訊息只講第二批檔案
+
+用 `~/.claude/projects/D--Work/*.jsonl` 逐 session transcript 交叉核對「哪個 session 做了哪個 git add」（`grep -c` 特定檔名字串），確認是**兩個不同 session ID**（`a45794bc...` 做 SEARCH_CONTENT，`e30ccf03...` 做 report-prune+commit）——排除「同一 session 忘記帶 pathspec，閘本來就管不到」這個可能性，鎖定這是閘的**真 bug**。
+
+讀 [`git-commit-scope-guard.js`](../mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js) v2 全文，找到根因：
+```js
+const RE_HAS_C_FLAG = /(?:^|\s)-C\s+\S+/;
+const RE_CD_SEGMENT = /^(?:sudo\s+)?cd\s+\S+/;
+function targetsElsewhere(segments) {
+  return segments.some((s) => RE_HAS_C_FLAG.test(s) || RE_CD_SEGMENT.test(s));
+}
+```
+只要指令裡出現**任何** `cd <dir>`，不管目標是哪裡，就整條 `return null`（fail-open，PreToolUse 和 PostToolUse 共用同一個判斷，兩邊都受影響）。而 `.claude/bash-commands.log` 幾乎每一行指令都是 `cd /d/Work ...` 開頭——這是這個 repo 操作慣例的固定前綴（CLAUDE.md 其實明文寫「不要在 git 指令前 cd 到目前目錄」，但代理實際行為並未完全遵守）。`/d/Work` 就是 `ctx.cwd` 本身，是 no-op，不是「目標不明的別的 repo」。也就是說：**這道閘從 2026-08-30 建成那天起，對這個 repo 裡幾乎每一個真實 `git commit` 都在靜默 fail-open**，[TASKS.md:544](TASKS.md) 記錄的 22 個舊測試全過，是因為舊測試（[`runner-parity.test.mjs:653`](../tests/hooks/runner-parity.test.mjs)）只測了「`cd` 到真的不同目錄」這一種情境，從未測過「`cd` 到自己」——這個情境剛好就是真實世界裡最常出現的那一種。
+
+同時讀 [`git-add-scope-tracker.js`](../mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js) v2，發現**鏡像但方向相反**的缺口：它完全不檢查指令前面的 `cd`，只查 add/rm/mv 那個 segment 自己的 `-C`。這次沒讓 bug 現形（因為它「恰好」沒 bail、正確記錄了 15 個 report-prune 檔案），但同一套「這道閘能不能信任 ctx.cwd」的不變量在兩份檔案裡各自壞了一半——一個過度保守（該不 bail 卻 bail），一個過度寬鬆（該 bail 卻不 bail，只是這次沒撞上）。
+
+**[不變量分析]**（依 AGENTS.md「同一段程式碼連續回報 2 次 → 第 3 次修正前必須先做不變量分析」——這是 [TASKS.md:544](TASKS.md) 這個 bug class 第 7 個實例，遠超過門檻）：
+這一類問題的完整不變量是：**這兩道閘只能在「指令實際操作目錄＝`ctx.cwd`」時才動作；判斷方式必須是「有 `cd`/`-C` 且解析後目標 ≠ `ctx.cwd`」，不是「有出現 `cd`/`-C` 這幾個字」**。答得出這句話，就不是補丁。
+
+**[風險清單]**：改動的是安全機械閘本身，改錯方向（例如把「resolve 失敗」當成「相同」而不是保守 fail-open）會讓閘變成什麼都不擋，比現狀更差；`ctx.cwd` 在 Windows 上是原生反斜線路徑，但真實指令常用 Git-Bash MinGW 形式（`/d/Work`），Node 內建 `path.resolve` 不認得這個慣例，需要自己轉換，轉換寫錯一樣會讓修法失效卻看起來像修好了。
+
+**[方案比較]**
+- 方案 A（最小修改）：只在這兩個 regex 判斷式裡加一個「跟 ctx.cwd 字串完全相等」的特例。**問題**：無法處理 MinGW 路徑（`/d/Work` vs `D:\Work`）、相對路徑（`cd ..`）、大小寫、尾端斜線——字串相等比對在這些情況下全部誤判，等於沒修好今天真正撞到的那個案例（真實指令用的就是 `/d/Work`）。
+- 方案 B（治本）：新增共用的路徑解析＋比較函式（處理 MinGW/WSL/相對路徑/大小寫），兩份 rule 檔改用同一個共用函式判斷「elsewhere」，不再各自維護一份會漂移的定義。
+
+**[建議方案]** 方案 B。理由：今天的根因本身就是「兩份閘各自實作同一個不變量，結果兩份都錯，錯的方向還不一樣」——方案 A 只修其中一份、只用字串比對，會製造出第三種各自為政的實作，違反 R0 零重工原則；方案 B 消滅重複定義本身，是關類不是關實例。
+
+**[實作計畫]**
+1. `lib/shared.js` 新增 `resolveShellPath(raw, baseDir)`（MinGW `/d/...`→`d:/...`、WSL `/mnt/d/...`→`d:/...`、相對路徑相對 baseDir 解析、統一小寫比對）+ `isSameDir(rawTarget, baseDir)` + `commandTargetsElsewhere(segments, cwd)`（兩份 rule 檔共用）
+2. `git-commit-scope-guard.js`：移除本地 `RE_HAS_C_FLAG`/`RE_CD_SEGMENT`/`targetsElsewhere`，改用 `shared.commandTargetsElsewhere(segments, ctx.cwd)`
+3. `git-add-scope-tracker.js`：移除本地 `RE_HAS_C_FLAG`（原本只查 add/rm/mv segment 自己的 `-C`），改用同一個共用函式掃描**整個** `segments` 陣列（含 add/rm/mv 之外的 `cd`）
+4. `tests/hooks/runner-parity.test.mjs`：新增 6 個測試（重現 `632dd1913` 的兩種真實指令形狀：native `cd D:\...`、Git-Bash MinGW `cd /d/...`；`-C` 同目錄；`git-add-scope-tracker` 的鏡像修正兩個方向）+ 修正 2 個斷言原本在驗證舊 bug 行為的既有測試（`:642` 的 `-C <same-dir>` 案例、`:653` 沿用但語意不變）
+
+**[驗證計畫]**
+1. **實測**：`bash scripts/test-hooks.sh` 全量重跑，含新增的 6 個直接重現真實事故指令形狀的測試
+2. **Review**：讀回 3 個修改檔案確認邏輯與 fail-open-on-ambiguity 的既有安全哲學一致（resolve 失敗仍然保守地當作「elsewhere」，不會變成更寬鬆）
+3. **抓蟲**：grep 全 repo 找是否有其他 rule 檔重複同款「任何 cd/-C 出現就 bail」的 pattern
+4. **WORKLOG**：本篇 + [TASKS.md:544](TASKS.md) 補第 7 個實例記錄
+
+[已修改]
+- [`mcp/claude-userlevel/hooks/lib/shared.js`](../mcp/claude-userlevel/hooks/lib/shared.js)：新增 `resolveShellPath`/`isSameDir`/`commandTargetsElsewhere`，導出
+- [`mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js`](../mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js)：移除本地 cwd 判斷，改用共用函式；檔頭補 v3 事故記錄
+- [`mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js`](../mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js)：`-C` 檢查範圍從「只查 add/rm/mv segment」擴大成「整個 segments 陣列」，改用共用函式；檔頭補 v3 鏡像缺口記錄
+- [`tests/hooks/runner-parity.test.mjs`](../tests/hooks/runner-parity.test.mjs)：新增 6 個測試 + 修正 2 個既有測試斷言（原本斷言的是 v2 的錯誤行為）
+- [`agency-os/TASKS.md`](TASKS.md) 544：補第 7 個實例（根因、不變量、修法、驗證、`.codex/hooks/` 未鏡射的理由）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check` 對 `lib/shared.js`/`rules/git-commit-scope-guard.js`/`rules/git-add-scope-tracker.js` 三個檔案 | exit=0 | 語法全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | 92/92 全過（含 6 個新增的真實事故重現測試：native `cd`、Git-Bash MinGW `cd`、`cd` 到真的不同目錄仍要 fail-open 的回歸保護、`-C` 同目錄/不同目錄各一、`git-add-scope-tracker` 鏡像方向的 cd-same/cd-different 兩個新案例）
+- REVIEW_DONE: critic=自查（讀回三個修改檔案 + 新增測試逐一核對邏輯）| verdict=pass | findings=0——`resolveShellPath` 的 fail-open-on-ambiguity（catch 內回傳 `false` → `isSameDir` 回 false → 呼叫端視為「elsewhere」→ 保守 bail）與修改前的安全哲學一致，不是把閘變寬鬆
+- BUGHUNT_DONE: scope=mcp/claude-userlevel/hooks/rules,agency-os,scripts | grep=`RE_CD_SEGMENT\|RE_HAS_C_FLAG\|targetsElsewhere\(segments\)` | hits=0（修改後複查，兩份規則檔已完全移除本地重複定義，無殘留舊 regex；`agency-os/`、`scripts/` 零命中，確認同款「任何 cd/-C 就 bail」缺陷未擴散到這兩個必查根目錄之外）；另掃 `mcp/claude-userlevel/hooks/rules/` 全目錄找是否有其他規則檔重複同款 pattern | hits=僅這兩個檔案命中（修改前），修改後降為 0
+
+[剩餘風險]
+- `.codex/hooks/` 目前工作區有一批**未 commit 的刪除**（續4 workstream 標記需操作者決定的橋接架構重構），HEAD 上仍是 2026-08-30 的舊獨立複製鏡像，本次修法**未同步過去**（刻意——不是我這次任務範圍，且該工作區狀態本身待決）。若操作者最終保留舊鏡像架構，需要在那次決定落地時另外跑 `mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1` 同步這 3 個檔案的修正
+- `ao-close.ps1:652` 內部 `git add -A` 的舊缺口原封不動——那是「閘管不到的範圍」，這次修的是「閘存在但沒真正生效」，兩個問題不同，[TASKS.md:544](TASKS.md) 兩者都要關才能整條打勾
+- `commandSegments` 逐空白切字串、不解析引號的既有限制（本次沿用，未擴大也未縮小）：`cd "path with spaces"` 這種帶空白的目錄名，正則抓到的 token 只會是到第一個空白為止，可能誤判——這個限制是 runner.js 全部規則共用的既有限制，不是本次引入，本次沒有讓它變得更糟
+
+[rollback] `git revert` 本次 commit；三個 rule/lib 檔案回到 v2（會重新讓 `632dd1913` 這類事故無聲發生，但不會比 revert 前更壞）。
+
 ## 2026-09-02（續4）
 
 ### fix(codex-bridge): sync-claude-to-codex.ps1 全類修復 backtick 跳脫 bug（5 處，非單一實例）
