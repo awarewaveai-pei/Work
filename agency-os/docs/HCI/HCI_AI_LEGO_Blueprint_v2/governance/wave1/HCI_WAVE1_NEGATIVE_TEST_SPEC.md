@@ -44,12 +44,12 @@ An isolated synthetic-only PostgreSQL 15.8 schema, non-owner test role, request
 validator, and runner exist at `D:\Work\Projects\internal\hci30\`.
 
 **Execution evidence (2026-09-02).** `scripts/test-wave1-local.ps1` runs green
-against real PostgreSQL 15.8 in Docker: 38 assertions recorded, 0 failed, plus a
+against real PostgreSQL 15.8 in Docker: 51 assertions recorded, 0 failed, plus a
 down/up reversibility pass over a populated schema.
 
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on the specific assertions covering it; all 9
+requires the suite to go red on exactly the assertions covering it; all 15
 mutations are killed. This exists because the first version of this suite could
 not fail: four assertions caught their own failure signal with the same handler
 that caught the control's rejection (both SQLSTATE P0001). That defect was

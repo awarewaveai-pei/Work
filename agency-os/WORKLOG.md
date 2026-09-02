@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-09-02（續4）
+
+### fix(codex-bridge): sync-claude-to-codex.ps1 全類修復 backtick 跳脫 bug（5 處，非單一實例）
+
+**觸發**：Codex 額度用罄，操作者要求接手處理留在 worktree 裡的一批未 commit 檔案。開 workflow 分 6 個 workstream 平行調查，其中「skill companion-doc consolidation」workstream 由對抗式驗證確認一個真 bug：`Write-ClaudeCommandSkillWrapper` 用單一反引號 `` `$CommandPath` `` 跳脫，PowerShell 把 `` `$ `` 解讀成跳脫字元，導致展開失敗，3 個生成的 wrapper 檔案(`source-command-{caveman,wp-bridge-release,zoom-out}`)字面內容是壞掉的 `"Read $CommandPath in full"`。
+
+**不變量分析（AGENTS.md 補丁判準要求）**：修好 `:210` 這一個實例前，先問「這一類問題的不變量是什麼」——答案是「這個檔案裡任何要輸出 markdown code span 的反引號，若處於雙引號字串/here-string 中且只用單一反引號，就一定是壞的」。找外部 critic 對整個檔案做反引號用法普查(不是只看 `:210` 附近)，抓到同一 bug class 還有 **4 處**：
+- `:454`（`Write-RunbookIndex`，同款單反引號跳脫）——**已經在正式環境壞掉**：`C:\Users\user1115\.codex\skills\claude-compat\references\runbooks\index.md` 40/40 列的 Path 欄位全是字面 `$_`，此索引正是 incident-response 時用來定位 `HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 等急救手冊的入口，事故當下代理拿到的會是查不到路徑的檔名清單
+- `:284`/`:316`/`:344`（agent/command/hook 三個 index 的說明句)——反引號前無 `$` 插值，屬於「靜態字串裡的孤立反引號」子類：跳脫吃掉自己也吃掉緊鄰字元，兩邊反引號都消失（純外觀退化，內容不受影響）
+
+**已修改**：
+- `mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1`：
+  - `:210` 單反引號 → 雙反引號（`` `$CommandPath` `` → ` ``$CommandPath`` `，比照同檔 `:610-611` 已驗證正確的寫法）
+  - `:454` 同款修法
+  - `:284`/`:316`/`:344` 三處純靜態字串改用單引號字串（no interpolation，單引號不做跳脫處理，反引號自動變字面值，且未來不會回歸——這是關類不是關實例）
+- `.agents/skills/source-command-{caveman,wp-bridge-release,zoom-out}/SKILL.md`：用修好的函式對真實目的路徑重新產生，確認內容含正確展開的路徑
+- `C:\Users\user1115\.codex\skills\claude-compat\references\{agents,commands,hooks,runbooks}\index.md`（**機器本機檔案，不在 git repo 內，不進這次 commit**）：用修好的函式對真實現役路徑重新產生，修復當下正式環境已損壞的 runbook 索引
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=抽出修好的 `Write-ClaudeCommandSkillWrapper`（含真實 `Ensure-Directory`/`Write-Utf8NoBom` helper）對臨時路徑執行 | exit=0 | result=輸出含正確展開的路徑 + 正確 markdown code span
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=對 3 個真實 broken 檔案的真實目的路徑（`D:\Work\.claude\commands\{caveman,wp-bridge-release,zoom-out}.md`，先確認存在）重新產生 | exit=0 | result=`grep -c '$CommandPath'` 3 個檔案皆為 0
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=抽出 4 個修好的 index 函式對現役 `~/.codex/skills/claude-compat/references/` 4 個真實子目錄重新產生 | exit=0 | result=`runbooks/index.md` 的字面 `$_` 計數從 40 降到 0；`agents`/`commands`/`hooks` 三個 index 的說明句反引號正確顯示
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`[System.Management.Automation.Language.Parser]::ParseFile()` | exit=0 | result=PARSE OK，全部改動語法無誤
+- REVIEW_DONE: critic=Deep（獨立 critic subagent，範圍鎖定「這個 bug class 在這個檔案」，非全檔案架構審查）| verdict=pass-after-fix | findings=1 Major(`:454`，已修)+3 Minor(`:284/316/344`，已修)+3 Suggestion(`:42`/`:213`/`:628`/`:529`，範圍外未動，屬不同性質的程式碼品質建議非本 bug class)
+- BUGHUNT_DONE: scope=mcp,agency-os | grep=`` `\$[A-Za-z] `` （單反引號後接插值變數的模式，本檔案內）| hits=0（5 處全部修完後複查，無殘留同款 pattern）
+
+**剩餘風險**：
+- `mcp/claude-userlevel/hooks/runner.js` 的 `isCodexPayload` 判別邏輯（同一批未 commit workstream 的另一個檔案）有另一個**未修復**的真 bug（`hook_event_name` 是所有 Claude Code hook 事件的共通欄位，不是 Codex 專屬標記，會讓正式 Claude 呼叫被誤判），連同 `.codex/hooks/` 整批刪除、`.codex/agents/*.toml` 重生、`SUBAGENT_CHARTER.md`、root `AGENTS.md` 改寫等一整個「Codex↔Claude bridge」workstream **刻意不在本次 commit 範圍內**，已另外向操作者回報，需要操作者決定是否修復後再提交
+- critic 標出的 3 個 Suggestion 級建議（`Ensure-Directory` 的 `-Path` vs `-LiteralPath`、兩處 here-string 缺尾端換行、`:529` 的引號慣例不一致）未處理，屬於程式碼品質而非本次 bug class 範圍，留待下次碰這個檔案時處理
+
+**Rollback**：`git revert <本次 commit>`；`~/.codex/skills/claude-compat/references/*/index.md` 4 個本機檔案不受 git revert 影響（本就不在 repo 內），下次跑 `sync-claude-to-codex.ps1` 會依當時的腳本版本重新產生。
+
 ## 2026-09-02（續3）
 
 ### 併入事故（透明記錄，同續16模式）：續2 的 commit 被並行 session 的廣域 commit 收走
@@ -140,18 +172,31 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 **為什麼加突變測試（最重要的一項）**：修好 6 個缺陷擋不住第 7 個用同樣寫法產生。`mutation-check-wave1.ps1` 逐一刪掉每個控制，要求 suite 變紅、且是**對應那個控制的具體斷言**變紅；任何存活的突變都是 hard error。這才是把「測試可能是空跑」這一類關掉，而不是修好眼前這 4 個。
 
 **驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/HCI30/scripts/test-wave1-local.ps1` | exit=0 | result=真實 PostgreSQL 15.8 in Docker；`38 assertion(s) recorded, 0 failed`；含 populated schema 的 down→up 可逆性驗證
-- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/HCI30/scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 9 mutations killed`（baseline 綠 + 9 個控制逐一刪除皆令對應斷言變紅）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/HCI30/scripts/test-wave1-local.ps1` | exit=0 | result=真實 PostgreSQL 15.8 in Docker；`51 assertion(s) recorded, 0 failed`；含 populated schema 的 down→up 可逆性驗證
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/HCI30/scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 15 mutations killed`（baseline 綠 + 15 個控制逐一刪除，且要求**恰好**對應的斷言變紅（集合相等而非子集））
 - REALTEST_EVIDENCE: tool=Bash | cmd=原始 suite + 原始 schema，DROP 掉 4 個觸發器後執行 | exit=0 | result=**PASS** —— 空跑缺陷的實證，非推論
-- REVIEW_DONE: critic=Deep（自審，見下方 oracle 說明）| verdict=pass | findings=6c/m 全修並各自有殺死突變佐證
+- REVIEW_DONE: critic=Deep（subagent，實跑 PoC）| verdict=pass-after-fixes | findings=1 Critical + 4 Major + 5 Minor，全數修完並各自有殺死突變佐證；1 項屬架構決策，已立案不擅改
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=`REALTEST OPEN|remains open|not run|test-wave1-local|dsr_events_append_only|raise_exception` | hits=5，其中 4 處為過期聲稱已同 commit 修正（ADR_INDEX ×3、PERMISSION_POLICY ×1），歷史 WORKLOG 條目刻意不動（描述當時為真的狀態）
 - WORKLOG: 本條目
 
-**Oracle 說明（誠實記錄）**：`db-expert` subagent 覆審**失敗**（HTTP 429 session rate limit，7:40am Asia/Taipei 才重置），非正常完成。未以「已覆審」帶過，改用突變測試作為補償控制 —— 對「測試是否真的約束 schema」這個問題，突變測試比書面覆審更強。獨立 DB 覆審仍值得補做，本條目不宣稱已完成。
+**第二輪：critic 對抗式覆審（實跑 PoC）**：第一輪修完後交給獨立 `critic` subagent，它自己開一次性 PostgreSQL 15.8 容器跑 PoC，抳出我第一輪**漏掉的 1 個 Critical**：
+
+- 【Critical】`identity_candidates.person_id` 在 `MATCH_CONFIRMED` 後仍可被一般租戶角色改寫 —— 不碰任何 evidence 列就能達成 HD-04 要擋的終局狀態：某人被標為【已確認匹配】，而支撐它的每一筆證據都是為另一個人蒐集的。在這個產品領域，這就是對真人的錯誤歸屬。
+- 【Major】`TRUNCATE` 不觸發 row-level trigger 且是獨立權限，break-glass owner 一行指令清空 ledger，兩層都沒響
+- 【Major】ledger 的 `created_at` 由呼叫端控制，可回填造假時間軸
+- 【Major】DSR 只守 `UPDATE OF status`，其他欄位與整列 DELETE 完全無閘
+- 【Minor ×5】`evidence_ref IS NOT NULL` 可被空字串滿足；以及我自己新程式碼的 4 個缺陷（`finish()` 只數列數不數 distinct、`results` 整表 INSERT 可偽造 `actor`、`Invoke-SqlFile` 檔案不存在回傳 0 假成功、PS 5.1 native pipe 對 SQL 是 ASCII 有損通道）
+
+**critic 最重要的一句（改變了我的修法）**：上述 Critical + created_at + DSR + 空字串 不是四個 bug，是**同一個沒寫下來的不變量**：「哪些欄位在哪些狀態下是 immutable」從未被定義，於是每個 trigger 各自守自己看得到的那一欄；逐點修會讓它們互相保護。這正是本 repo 的反補丁判準被用在我的產出上。因此先寫出 **field mutability matrix**（migration 檔頭部），再讓 trigger/grant 從它推導；`tenant_id` immutability 改成由驅動 RLS 與 append-only 的**同一份宣告式清單**自動套用，並加 catalog drift 自檢（新增表未分類就讓 migration 當場爆）。
+
+**critic 逐項驗過確認沒問題的**：`H1TST` sentinel 子交易語意、雙側守衛對多列語句的正確性、複合 FK 無跨租戶探測 oracle、PowerShell 作用域與 `$LASTEXITCODE`、原 9 個突變確實被殺死、`docker context inspect` 閘擋得住 `DOCKER_HOST` 覆寫。
+
+**Oracle 說明（誠實記錄）**：`db-expert` subagent 覆審**失敗**（HTTP 429 session rate limit），未以「已覆審」帶過；`critic` subagent 覆審則成功完成且已折回（每條 finding 都對 schema 驗證過，不是直接採信）。專責 DB-expert pass 仍值得補做，本條目不宣稱已完成。
 
 **剩餘風險**：
 - 全部證據僅限 synthetic scope；不支持真人資料、production 部署、portal 整合或法律/市場聲稱。`HD-06`–`HD-10`、`HD-20`、`HD-21` 仍未批准，real-data admission gate 維持關閉。
 - 突變集合只覆蓋 Wave 1 已實作的控制；新增控制必須同步新增突變，否則覆蓋率會靜默退化。
+- **【未解決，需操作者決策】租戶身分的綁定方式**：`hci.current_tenant_id()` 將租戶綁在 `role` GUC，而 `SET ROLE` 可自由改變它；兩個租戶角色又都是 `NOLOGIN`，意味著設計上**必然**存在一個可 `SET ROLE` 進兩邊的共用 login role。一次漏掉的 `RESET ROLE`、一個未 `DISCARD ALL` 的 pooler 連線回收、或一次 SQL injection，整個 session 就換了租戶而 RLS 完全跟著跑。目前的 suite 無法對此做有意義的斷言（它自己就是 superuser 在 `SET ROLE`，斷言會因錯誤的理由通過）。這是架構選擇（per-tenant LOGIN role vs. pooled + 驗簽的 `SET LOCAL app.tenant_id`），**不在測試修正裡自行決定**；已寫進 `ADR-0016` 的 🔴 OPEN DECISION 段。未決定前不得接入非 synthetic 租戶資料。
 - Portal-adapter 測試（`TENANT-ADAPTER-NEG-01..03`）仍在本地骨架範圍外。
 - `audit-cp950-traps.ps1` 對兩支 .ps1 仍報 5 處 docker capture drift（warn-only，exit 0）。判定為可接受：唯一被解讀的捕獲輸出是 `$dockerEndpoint`，若被 codepage 破壞會導致 regex 不匹配而**fail closed**（拒絕執行），不是靜默污染。已修的是真正有風險的那項（`Get-Content -Raw` 未指定 `-Encoding UTF8`）。
 
