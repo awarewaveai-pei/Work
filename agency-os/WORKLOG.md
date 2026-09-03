@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-03（續3）
+
+### Subagent 扇出治理閘（token 燒量事故追蹤）——第一版掛錯事件，外部 critic 用真實 spawn 抓到，改掛 PreToolUse 後複驗通過
+
+**背景**：操作者回報連續多日 5 小時 Max 額度在 20-30 分鐘內燒光。grep `WORKLOG.md` 找到真因：一次 Workflow 工具 pipeline（27 個 ADR × draft+2refute+fix = 102 agent）一次性 fan out。與操作者逐輪對齊設計（0-5 放行 / 6-10 需 marker justify / >10 無條件擋 + 強制分批）後動手。
+
+**[已修改]**
+1. `mcp/claude-userlevel/hooks/rules/subagent-budget.js`（新增，SSOT）—— PreToolUse(matcher `Agent`) + UserPromptSubmit(歸零) 雙事件治理閘，append-only 計數（非 read-modify-write）
+2. `mcp/claude-userlevel/hooks/rules.manifest.json` —— `PreToolUse` 加 `{matcher:"Agent", rules:["subagent-budget"]}`；`UserPromptSubmit` 加入 `subagent-budget`
+3. 跑 `scripts/sync-claude-userlevel.ps1 -Mode merge` 下放到 runtime `.claude/hooks/`（順帶修掉 settings.json 11 處 hooks object→array 結構問題，不含 `SubagentStart` 本身——該事件的 object 形狀仍未修，見下方殘留風險）
+4. `agency-os/AGENTS.md` 新增 §Agent 扇出治理——區分「路徑A: Agent tool 機械可攔」與「路徑B: Workflow tool 機械攔不到，僅程序紀律」，明文承認路徑B無機械保護
+
+**第一版失敗記錄（不可省略，這是本次最重要的教訓）**：第一版把閘掛在 `SubagentStart`，用合成 payload 手測「全部通過」就當完工回報給操作者。外部 critic subagent 覆審（Codex 額度用罄，走既有 fallback）自己觸發一次真實 Task spawn 當證據，證實：① Claude Code 官方 hooks reference 明文 `SubagentStart` 的 exit code 被忽略，無法 block ②真實 spawn 當下 tracker 檔案沒有被寫入、`verify-gate-failures.log` 同時段零筆——`SubagentStart` 在真實環境根本沒觸發到這個 rule。即：**閘完全無效，但我原本以為驗證過了**——用合成 payload 測試不能證明機制真的接得上真實事件路徑，這是本次唯一的核心教訓。另發現 M1-M4 四項：marker 讀不到真實 payload 欄位、regex 無錨點大小寫不敏感（覆審 briefing 本身文字就會誤觸）、read-modify-write 在平行 spawn 下有 race（且失效方向正是「放行超量」，剛好是本閘要防的場景）、fail-open 完全靜音。
+
+**[驗證計畫]**
+1. 實測：改掛 `PreToolUse`(matcher Agent) 後，先跑 `node --check` 語法檢查；跑一顆真實 haiku subagent（非合成 payload）驗證 wiring；20 個平行 process 對同一 tracker 檔 append 的 race test（驗 M3 修復）；6 組 marker regex 邊界案例（驗 M2 修復，大小寫/無錨點/空理由全部拒絕，正確理由通過）
+2. Review：critic subagent 覆審第一版（Codex 額度用罄，fallback 路徑，AGENTS.md §跨模型 oracle 明文列為等價）；本次第二版修正未再召額外 critic（見剩餘風險）
+3. 抓蟲：`grep -rn subagent-budget D:\Work`（排除 .jsonl）——SSOT+runtime 各一份，無孤兒引用、無舊版殘留；`grep "Agent 扇出治理"` 確認無其他文件衝突宣告
+4. WORKLOG：本條目
+
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`node --check mcp/claude-userlevel/hooks/rules/subagent-budget.js` | exit=0 | ms<500
+**REALTEST_EVIDENCE**: tool=Agent | cmd=真實 haiku subagent spawn（wiring smoke test）+ 事後檢查 tracker 檔案 `%TEMP%\claude-subagent-budget-<真實sid>.txt` size=2（累計含 critic 覆審那次 spawn）| exit=0
+**REALTEST_EVIDENCE**: tool=Bash | cmd=20 個並行 child process 對同一 tracker append，驗證無 lost update | exit=0 | 結果 PASS expected=20 actual=20
+**REVIEW_DONE**: critic=Deep（真實 Task spawn 當自己的證據）| verdict=第一版 fail（Critical C1/C2 + Major M1-M4）→ 已依覆審結果重寫並用真實 spawn 複驗 | findings=2c(Critical)/4m(Major)/4n(Minor)/2s(Suggestion)
+**BUGHUNT_DONE**: scope=agency-os,scripts,.claude,mcp | grep=`subagent-budget` | hits=2（SSOT `mcp/claude-userlevel/hooks/` 一份 + sync 後 runtime `.claude/hooks/` 一份，無孤兒無衝突）
+
+**剩餘風險**：
+- 路徑B（Workflow）沒有機械保護，僅程序紀律，AGENTS.md 已明文承認，不得誤讀為「已解決」
+- `settings.json` 的 `SubagentStart` 事件本身仍是 object 形狀（sync normalize 這輪沒修到，只修了 UserPromptSubmit/PreToolUse/PostToolUse/PostToolUseFailure/SessionStart/Stop），連帶 `subagent-charter.js` 的 charter 注入目前極可能整條路徑不會真的觸發——**這是既有問題，非本次引入，本次範圍未修**，留待獨立任務處理（含 `~/.claude/SUBAGENT_CHARTER.md` 檔案本身也不存在這個更早的 bug）
+- 第二版的四項修正（appendOnly/regex/PreToolUse遷移/AGENTS.md）未再送一輪獨立 critic 覆審——本輪用真實 spawn 實測 + 針對每條 finding 的具體單元測試取代，理由是這些修正都是機械可驗證的性質（語法/正則/並行寫入），不是需要語意判斷的新邏輯；如果操作者認為仍需要獨立覆審，可另起一輪
+
+**Rollback**: `git checkout -- mcp/claude-userlevel/hooks/ agency-os/AGENTS.md`，再跑 `sync-claude-userlevel.ps1 -Mode merge` 把 runtime 沖回舊版。
+
 ## 2026-09-03（續2）
 
 ### `runner.js` 的 `isCodexPayload` 真 bug 修好——查兩邊官方文件，不是猜

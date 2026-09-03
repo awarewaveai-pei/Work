@@ -167,6 +167,22 @@
 3. **設計討論每三輪自問「這該落地成文件了嗎」**。討論留在對話裡 = 每輪重付且 session 結束即蒸發；寫進 repo = 付一次。
 4. **任務結束時主動提醒操作者 `/clear`**，不等對方想到。
 
+## Agent 扇出治理（token 燒量控管，2026-09-03 起）
+
+**背景**：連續多日單一 session 5 小時額度在 20-30 分鐘內燒光。根因分兩條路徑，機制不同，治理手段也不同：
+
+**路徑 A — Agent tool（本地 subagent spawn，機械可攔）**：`.claude/hooks/rules/subagent-budget.js`（SSOT 在 `mcp/claude-userlevel/hooks/`）掛 `PreToolUse`（matcher `Agent`）+ `UserPromptSubmit`（歸零），per-session per-turn 硬上限：
+- 0-5 個：放行
+- 6-10 個：block，除非該 Agent 呼叫的 `prompt` 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`（不需要操作者在場確認，Claude 自己補理由重試）
+- \>10 個：無條件 block，無 marker 可解鎖，必須拆成更小批次分散到後續輪次完成
+
+⚠️ **本閘最初版本掛在 `SubagentStart`，被外部 critic 覆審（2026-09-03）用真實 spawn 證實完全無效**——`SubagentStart` 的 exit code 官方文件明講被忽略，且真實 spawn 當下該事件根本沒進 runner。改掛 `PreToolUse` 後已用真實 Agent spawn 複驗（tracker 檔隨真實 spawn 正確累計）。**教訓**：任何 hook 類治理閘，驗證必須用真實 tool call，合成 payload 測試不能證明機制真的接得上。
+
+**路徑 B — Workflow tool（背景/雲端執行，機械攔不到）**：`Workflow` 的 `agent()` fan-out 在背景執行，不經過本地 `PreToolUse`/`SubagentStart`，路徑 A 的閘對它無效（已查證，非推測）。唯一防線是程序紀律：
+1. 呼叫 `Workflow` 前，訊息裡必須先寫出「N 項 × M agent/項 = 預估總數」這個算式
+2. 預估總數 > 15（Workflow 工具自己的建議上限）時，優先改成分批（例如一次 5 項，看過品質再繼續），不整批一次性 fan out
+3. **這條沒有機械閘，是誠實承認的殘留風險**——不得假裝路徑 A 的 hook 也保護得到 Workflow，那是消音偵測器的樣態（見 §已知信任邊界）
+
 ## 執行安全
 
 不做不可逆破壞操作；生產環境先列風險與 rollback 方案；客戶新增需求先判定 `docs/operations/scope-change-policy.md`。

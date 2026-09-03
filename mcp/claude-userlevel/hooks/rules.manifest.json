@@ -15,6 +15,12 @@
         ]
       },
       {
+        "matcher": "Agent",
+        "rules": [
+          "subagent-budget"
+        ]
+      },
+      {
         "matcher": "Write|Edit",
         "rules": [
           "sensitive-file-block",
@@ -98,6 +104,7 @@
     "UserPromptSubmit": [
       {
         "rules": [
+          "subagent-budget",
           "vbc-reminder"
         ]
       }
