@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-09-03（續8）
+
+### VBC 複驗續7的 layer-4 charter 修正 + 補一個小缺口（test-hooks.sh 漏登記新測試檔）
+
+**背景**：操作者回報「Layer 4 修好了」，依 AGENTS.md R4 VBC 協議先查證再接受，不直接採信。
+
+**[驗證結果]**：獨立重跑 `bash scripts/test-hooks.sh` 只有 131 pass，跟續7宣稱的 147 對不上；追查發現 `node --test tests/hooks/*.test.mjs`（glob）確實是 147（續7的宣稱屬實，不是造假），但 `test-hooks.sh` 的明確清單漏登記續7新增的 `normalize-claude-settings.test.mjs` 與 `subagent-charter-rule.test.mjs`——跟我自己今天稍早（續3）犯的同一個缺口一樣（明確清單非 glob，新檔案不會自動被跑到）。已補登記，`bash scripts/test-hooks.sh` 現在正確跑出 147 pass。
+
+**[已修改]**：`scripts/test-hooks.sh` 標頭註解 + 執行清單各加兩行
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)，純新增檔名到兩個既有清單，無邏輯變更
+
+**Rollback**: `git revert` 本次 commit。
+
 ## 2026-09-03（續7）
 
 ### Charter 注入第 4 層修好——SubagentStart→PreToolUse `^Agent$` 遷移，真實 spawn 複驗，`updatedInput` 路線已證實不通
