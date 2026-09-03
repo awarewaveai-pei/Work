@@ -1,0 +1,78 @@
+{
+  "version": "1.6.0",
+  "required_questions": {
+    "identity": [
+      "system_name",
+      "one_sentence_purpose",
+      "owners"
+    ],
+    "users": [
+      "actors",
+      "critical_user_journeys",
+      "accessibility_needs"
+    ],
+    "business": [
+      "goals",
+      "non_goals",
+      "success_metrics",
+      "commercial_model"
+    ],
+    "criticality": [
+      "availability_target",
+      "rto",
+      "rpo",
+      "safety_or_financial_impact"
+    ],
+    "data": [
+      "data_classes",
+      "pii",
+      "retention",
+      "residency",
+      "system_of_record"
+    ],
+    "security": [
+      "trust_boundaries",
+      "authn",
+      "authz",
+      "threat_level",
+      "secrets"
+    ],
+    "integration": [
+      "upstreams",
+      "downstreams",
+      "external_providers",
+      "contracts"
+    ],
+    "scale": [
+      "users",
+      "throughput",
+      "storage",
+      "growth",
+      "latency"
+    ],
+    "operations": [
+      "environments",
+      "deployment_model",
+      "on_call",
+      "observability"
+    ],
+    "lifecycle": [
+      "expected_lifetime",
+      "compatibility_commitments",
+      "exit_strategy"
+    ],
+    "constraints": [
+      "budget",
+      "time",
+      "team",
+      "mandatory_technology",
+      "forbidden_technology"
+    ]
+  },
+  "output": [
+    "project-profile.json",
+    "source-of-truth-map.json",
+    "risk-classification.json",
+    "foundry-plan.json"
+  ]
+}

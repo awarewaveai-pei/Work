@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/evidence-finding.schema.json",
+  "title": "Content-addressed Evidence-backed Finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "finding_id",
+    "statement",
+    "state"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "VERIFIED",
+        "INFERRED",
+        "ASSUMED",
+        "UNKNOWN",
+        "DISPUTED"
+      ]
+    },
+    "repository_revision": {
+      "type": "string",
+      "minLength": 7
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "start_line",
+          "end_line",
+          "blob_sha256",
+          "content_sha256",
+          "proves"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?![A-Za-z]:\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+          },
+          "start_line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "end_line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "blob_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "proves": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "inference_chain": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "validation_plan": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "VERIFIED",
+              "INFERRED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "repository_revision",
+          "observed_at",
+          "observed_by",
+          "evidence"
+        ],
+        "properties": {
+          "evidence": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "INFERRED"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "inference_chain"
+        ],
+        "properties": {
+          "inference_chain": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ASSUMED"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "validation_plan",
+          "owner"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.0.0",
+  "machines": [
+    {
+      "id": "project",
+      "states": [
+        "PREPARING",
+        "ACTIVE",
+        "PAUSED",
+        "PENDING_ACCEPTANCE",
+        "COMPLETED",
+        "WARRANTY",
+        "CLOSED"
+      ],
+      "source": {
+        "source": "REFERENCE_PROJECT",
+        "claim": "Project lifecycle states."
+      }
+    },
+    {
+      "id": "dispatch",
+      "states": [
+        "DRAFT",
+        "PUBLISHED",
+        "ACK_REQUIRED",
+        "ACKNOWLEDGED",
+        "AMENDED",
+        "CANCELLED"
+      ],
+      "rules": [
+        "PUBLISH creates ACK_REQUIRED for assigned members",
+        "material amendment transitions acknowledgements to invalid and returns to ACK_REQUIRED",
+        "CANCELLED is terminal for that dispatch version"
+      ],
+      "source": {
+        "source": "REFERENCE_PROJECT",
+        "claim": "Dispatch amendment/cancel/acknowledgement behavior."
+      }
+    },
+    {
+      "id": "work_progress",
+      "states": [
+        "NOT_STARTED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "PENDING_ACCEPTANCE",
+        "ACCEPTED"
+      ],
+      "source": {
+        "source": "REFERENCE_PROJECT",
+        "claim": "Work progress states."
+      }
+    },
+    {
+      "id": "defect",
+      "states": [
+        "OPEN",
+        "ASSIGNED",
+        "IN_REMEDIATION",
+        "READY_FOR_REINSPECTION",
+        "CLOSED"
+      ],
+      "source": {
+        "source": "REFERENCE_PROJECT",
+        "claim": "Defect management is part of Phase 2; detailed state model is Foundry-derived and must be confirmed before P2 implementation."
+      }
+    },
+    {
+      "id": "material_procurement",
+      "states": [
+        "REQUESTED",
+        "CONFIRMED",
+        "RFQ",
+        "ORDERED",
+        "PARTIALLY_RECEIVED",
+        "RECEIVED",
+        "ISSUED_OR_RETURNED",
+        "CLOSED"
+      ],
+      "source": {
+        "source": "REFERENCE_PROJECT",
+        "claim": "Material request through issue/return workflow."
+      }
+    },
+    {
+      "id": "offline_sync",
+      "states": [
+        "LOCAL_PENDING",
+        "SYNCING",
+        "APPLIED",
+        "CONFLICT",
+        "REJECTED"
+      ],
+      "rules": [
+        "Only explicitly allow-listed commands may enter LOCAL_PENDING",
+        "APPLIED requires server acknowledgement of the idempotency key",
+        "CONFLICT/REJECTED must remain visible and auditable"
+      ],
+      "source": {
+        "source": "PACK_POLICY",
+        "claim": "Industry-pack state model activated only when corresponding capability is selected."
+      },
+      "applies_when_capability": "MEP-CAP-OFFLINE"
+    },
+    {
+      "id": "labor_time",
+      "states": [
+        "DRAFT",
+        "SUBMITTED",
+        "APPROVED",
+        "REJECTED",
+        "ADJUSTED"
+      ],
+      "rules": [
+        "Dispatch may prefill context but never becomes approved labor time automatically",
+        "APPROVED records are the authoritative labor-cost input",
+        "Adjustment preserves prior approved history"
+      ],
+      "source": {
+        "source": "PACK_POLICY",
+        "claim": "Industry-pack state model activated only when corresponding capability is selected."
+      },
+      "applies_when_capability": "MEP-CAP-APPROVED-LABOR-TIME"
+    },
+    {
+      "id": "accounting_sync",
+      "states": [
+        "PENDING",
+        "DELIVERED",
+        "ACKNOWLEDGED",
+        "RECONCILED",
+        "FAILED"
+      ],
+      "rules": [
+        "Retries use stable idempotency keys",
+        "RECONCILED requires source/provider comparison",
+        "FAILED remains visible for operator action"
+      ],
+      "source": {
+        "source": "PACK_POLICY",
+        "claim": "Industry-pack state model activated only when corresponding capability is selected."
+      },
+      "applies_when_capability": "MEP-CAP-ACCOUNTING-INTEGRATION"
+    }
+  ]
+}

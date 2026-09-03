@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Architecture Decision",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "problem",
+    "options",
+    "status"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string"
+    },
+    "problem": {
+      "type": "string"
+    },
+    "options": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object"
+      }
+    },
+    "status": {
+      "type": "string"
+    },
+    "rollback": {
+      "type": "string"
+    },
+    "expected_result": {
+      "type": "string"
+    }
+  }
+}

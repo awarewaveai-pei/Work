@@ -1,0 +1,27 @@
+{
+  "_schema": "release-evidence.schema.json",
+  "version": "1.0.0",
+  "source_revision": "abcdef012345",
+  "artifact_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "risk_tier": "R4",
+  "change_set_ref": "CR-1",
+  "test_evidence": [
+    "tests"
+  ],
+  "rollback": "deploy prior artifact",
+  "rollback_thresholds": [
+    "5xx > 1%"
+  ],
+  "observability": [
+    "dashboard"
+  ],
+  "approvals": [],
+  "deployment_strategy": "CANARY",
+  "sbom_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "provenance_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "migration_evidence": null,
+  "release_notes_ref": "notes",
+  "post_release_checks": [
+    "smoke"
+  ]
+}

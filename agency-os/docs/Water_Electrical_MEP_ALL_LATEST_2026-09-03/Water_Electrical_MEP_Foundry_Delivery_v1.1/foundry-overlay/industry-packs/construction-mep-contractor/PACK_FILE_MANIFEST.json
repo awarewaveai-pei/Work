@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0.0",
+  "pack_version": "1.1.0",
+  "file_count": 13,
+  "files": [
+    {
+      "path": "CHANGELOG_v1.1.md",
+      "sha256": "bc8d7111845a8244a74e983b5a67b75b42c3e9966f09db17484c3013ab0a8cee",
+      "bytes": 478
+    },
+    {
+      "path": "INDUSTRY_MANIFEST.json",
+      "sha256": "5a40e1215d73603e04d2305c0533d347e2d76e7dfdaf159bac39359978c9f486",
+      "bytes": 942
+    },
+    {
+      "path": "PROJECT_DECISION_EXAMPLE.json",
+      "sha256": "43c78c7a7f3232420e09bb83bfb75417001650fe3d96d52a7ae7edde1639d628",
+      "bytes": 177
+    },
+    {
+      "path": "README.md",
+      "sha256": "140aa93df93be82397da6271c3e0440a880833a682d728a360ac6184a35e3b69",
+      "bytes": 720
+    },
+    {
+      "path": "REFERENCE_ORIGIN.md",
+      "sha256": "ed679aca2fe183de876ec47ff463b051a8ca0d26e56e22753915dc80994464d2",
+      "bytes": 502
+    },
+    {
+      "path": "acceptance-patterns.json",
+      "sha256": "86c773b1916c5542a5824b64ce84c66ae705bedb562d8fea05a977c1343c43b4",
+      "bytes": 2981
+    },
+    {
+      "path": "capabilities.json",
+      "sha256": "cf074f2cf1c12bcd68a7eb393a6306ad6192739710773b0d86a57dbe402ffebf",
+      "bytes": 12665
+    },
+    {
+      "path": "domain-patterns.json",
+      "sha256": "d8005b164f73d2b9d9aa39df7b39d516fb90a6b25c9ec956ef894e8f787848b4",
+      "bytes": 3450
+    },
+    {
+      "path": "failure-patterns.json",
+      "sha256": "f5ec55970c77e146a12e73d5184f8c4723baf781eb53086b04c1384db7bf384c",
+      "bytes": 3445
+    },
+    {
+      "path": "invariants.json",
+      "sha256": "79da42d71f3267e2a2ad955cf33d0261d0622eaefc1f55784c93e1183604868c",
+      "bytes": 4800
+    },
+    {
+      "path": "module-rules.json",
+      "sha256": "f940c75373b8668f8bbffa59be35369f09a9569b2a69d60d5852c5ebad2efd75",
+      "bytes": 1967
+    },
+    {
+      "path": "questions.json",
+      "sha256": "d195f88d2e08e2877e9177276f14ba438deef2b32307e57eb78b72eac09e0e86",
+      "bytes": 17839
+    },
+    {
+      "path": "state-machines.json",
+      "sha256": "b0519bd5aa8a45e53e1df4671df94a81db18659a2799ede434dc286fb0fc6143",
+      "bytes": 3829
+    }
+  ]
+}

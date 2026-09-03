@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0.0",
+  "patterns": [
+    {
+      "id": "MEP-FAIL-001",
+      "failure": "Dispatch saved but LINE notification fails",
+      "required_response": "Dispatch remains authoritative; record delivery failure and retry without duplicating dispatch."
+    },
+    {
+      "id": "MEP-FAIL-002",
+      "failure": "Dispatch saved but Google Calendar update fails",
+      "required_response": "Persist projection failure, retry idempotently, expose reconciliation status."
+    },
+    {
+      "id": "MEP-FAIL-003",
+      "failure": "Google callback/token retry creates duplicate event",
+      "required_response": "Use stable dispatch-to-event binding and idempotent update semantics."
+    },
+    {
+      "id": "MEP-FAIL-004",
+      "failure": "Employee acknowledges stale dispatch version",
+      "required_response": "Reject acknowledgement for superseded version and require current version acknowledgement."
+    },
+    {
+      "id": "MEP-FAIL-005",
+      "failure": "Concurrent dispatch edits overwrite one another",
+      "required_response": "Use optimistic concurrency/version check and explicit conflict response."
+    },
+    {
+      "id": "MEP-FAIL-006",
+      "failure": "Permission scope changes while user session is active",
+      "required_response": "Authorization is evaluated server-side on every protected operation; do not trust cached UI capability."
+    },
+    {
+      "id": "MEP-FAIL-007",
+      "failure": "Phase 2 photo upload succeeds but metadata write fails",
+      "required_response": "No orphan becomes authoritative; reconcile/delete unreferenced objects."
+    },
+    {
+      "id": "MEP-FAIL-008",
+      "failure": "Old drawing is displayed as current",
+      "required_response": "Current version is explicit and superseded versions cannot be presented as latest."
+    },
+    {
+      "id": "MEP-FAIL-009",
+      "failure": "Material issue is recorded twice",
+      "required_response": "Use idempotency/source reference and prevent double costing."
+    },
+    {
+      "id": "MEP-FAIL-010",
+      "failure": "Cost source is corrected after project P&L calculation",
+      "required_response": "Costs are traceable/reversible; recompute/project ledger reflects adjustment without losing history."
+    },
+    {
+      "id": "MEP-FAIL-011",
+      "failure": "Field user queues an acknowledgement offline and network returns after the dispatch was materially amended",
+      "required_response": "Do not apply the stale acknowledgement; synchronize current dispatch version, mark queued action rejected/conflicted, and require acknowledgement of the current version."
+    },
+    {
+      "id": "MEP-FAIL-012",
+      "failure": "Offline cache is available after user permission or employment status is revoked",
+      "required_response": "Apply cache TTL/user binding/revocation policy; on reconnect purge inaccessible data and reject queued actions that no longer authorize."
+    },
+    {
+      "id": "MEP-FAIL-013",
+      "failure": "Accounting export succeeds but local acknowledgement is lost",
+      "required_response": "Retry by stable idempotency key and reconcile before creating a second provider transaction."
+    },
+    {
+      "id": "MEP-FAIL-014",
+      "failure": "Planned dispatch duration differs from actual approved labor time",
+      "required_response": "Preserve both values; labor costing consumes approved labor time and retains traceability to dispatch/project/work log."
+    }
+  ]
+}

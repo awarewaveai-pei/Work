@@ -1,0 +1,17 @@
+{
+  "_schema": "risk-classification.schema.json",
+  "dimensions": {
+    "data": 4,
+    "privilege": 0,
+    "blast_radius": 0,
+    "reversibility": 0,
+    "customer": 0,
+    "regulatory": 0,
+    "financial": 0,
+    "criticality": 0,
+    "novelty": 0,
+    "uncertainty": 0
+  },
+  "computed_risk_tier": "R4",
+  "rationale": "Maximum dimension determines risk."
+}

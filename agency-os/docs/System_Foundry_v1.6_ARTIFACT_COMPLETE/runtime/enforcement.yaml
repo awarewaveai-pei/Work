@@ -1,0 +1,33 @@
+{
+  "version": "1.6.0",
+  "mode": "fail_closed",
+  "canonical_registries": [
+    "registries/kernel.yaml",
+    "registries/status-codes.yaml",
+    "registries/risk-authority.yaml",
+    "registries/non-waivable-rules.yaml"
+  ],
+  "rules": {
+    "evidence_required_for_verified_repository_claim": true,
+    "exact_file_line_required": true,
+    "content_addressed_evidence_required": true,
+    "root_cause_required_before_implementation": true,
+    "patch_engineering_forbidden": true,
+    "minimum_architecture_options": 3,
+    "rollback_required": true,
+    "migration_required_when_data_or_contract_changes": true,
+    "observability_required": true,
+    "acceptance_evidence_required": true,
+    "independent_assurance_required": true,
+    "same_agent_design_and_final_assurance_forbidden": true,
+    "child_agent_may_weaken_kernel": false,
+    "vendor_semantics_in_domain_core_forbidden": true,
+    "hidden_cross_context_ownership_forbidden": true,
+    "completion_requires_closed_loop": true,
+    "risk_tier_is_computed": true,
+    "authority_is_derived": true,
+    "unknown_status_code_forbidden": true,
+    "cross_reference_drift_forbidden": true,
+    "manifest_hash_drift_forbidden": true
+  }
+}

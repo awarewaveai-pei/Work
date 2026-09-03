@@ -1,0 +1,21 @@
+{
+  "recipe_id": "awarewave.build-top-tier-commercial-system",
+  "version": "1.6.0",
+  "status": "stable_enforced",
+  "execution_mode": "fail_closed",
+  "kernel_version": "1.6.0",
+  "kernel_registry": "registries/kernel.yaml",
+  "extends": "recipes/build-universal-system.yaml",
+  "commercial_modules": [
+    "commercial_architecture",
+    "architecture_economics",
+    "edition_architecture",
+    "entitlement",
+    "billing",
+    "licensing",
+    "customer_lifecycle",
+    "unit_economics",
+    "vendor_exit"
+  ],
+  "rule": "commercial recipe may add controls but may not weaken universal gates"
+}

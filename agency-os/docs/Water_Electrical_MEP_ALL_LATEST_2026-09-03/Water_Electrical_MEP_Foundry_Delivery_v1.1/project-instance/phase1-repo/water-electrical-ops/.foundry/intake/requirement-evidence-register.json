@@ -1,0 +1,296 @@
+{
+  "schema_version": "1.1.0",
+  "requirements": [
+    {
+      "id": "REQ-P1-001",
+      "title": "登入、員工、角色與權限",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "126-146",
+          "claim": "Phase 1 required features include login, employee data, role/permission."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-002",
+      "title": "Role + Scope + Permission 授權模型",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "164-196",
+          "claim": "Permission model and matrix."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-003",
+      "title": "工程/工地基本資料",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "228-255",
+          "claim": "Project fields and lifecycle."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-004",
+      "title": "多人/班組派工",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "260-295",
+          "claim": "Dispatch fields and multi-person requirement."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-005",
+      "title": "公司總行事曆與未派工人員",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "299-348",
+          "claim": "Calendar and unassigned workforce."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-006",
+      "title": "LINE 發布/異動/取消通知",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "399-452",
+          "claim": "LINE integration behaviors."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-007",
+      "title": "派工確認與異動重確認",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "457-479",
+          "claim": "Acknowledgement and invalidation."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-008",
+      "title": "Google Calendar 同一 Event 建立/更新/取消",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "499-542",
+          "claim": "Google Calendar synchronization rules."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-009",
+      "title": "重要操作 Audit before/after",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "598-619",
+          "claim": "Audit log contents."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-010",
+      "title": "單一 RWD Web；無原生 App/PWA",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "USER_OVERRIDE",
+          "path": "sources/USER_OVERRIDE_RWD.md",
+          "lines": "1-16",
+          "claim": "RWD web only."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P2-001",
+      "title": "工作進度/圖面/照片/日報/缺失/查驗",
+      "phase": "P2",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "623-697",
+          "claim": "Phase 2 field management."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P3-001",
+      "title": "材料需求至採購/到貨/領退料/材料成本",
+      "phase": "P3",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-746",
+          "claim": "Phase 3 procurement workflow and permissions."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P4-001",
+      "title": "合約/追加減/估驗請款/成本/毛利",
+      "phase": "P4",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-810",
+          "claim": "Phase 4 financial/project cost features and permissions."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P5-001",
+      "title": "AI 日報整理與權限內查詢",
+      "phase": "P5",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "815-851",
+          "claim": "AI summary/query scope and authorization."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "REQ-P1-011",
+      "title": "Bounded offline RWD continuity",
+      "phase": "P1",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "7-7",
+          "claim": "Offline operation required."
+        },
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "23-26",
+          "claim": "Phase 1 offline scope and synchronization constraints."
+        }
+      ],
+      "notes": "No native app or installable PWA; offline web primitives are allowed."
+    },
+    {
+      "id": "REQ-P4-002",
+      "title": "Actual/approved labor time separate from planned Dispatch",
+      "phase": "P4",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "10-10",
+          "claim": "Latest architecture decision separates labor-time semantics."
+        }
+      ],
+      "notes": "Labor cost uses approved labor time; dispatch remains planned work."
+    },
+    {
+      "id": "REQ-P4-003",
+      "title": "Automatic accounting-system synchronization",
+      "phase": "P4",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "9-9",
+          "claim": "Accounting synchronization required."
+        }
+      ],
+      "notes": "Provider selected later; adapter/reconciliation boundary is mandatory."
+    },
+    {
+      "id": "REQ-EXCL-001",
+      "title": "No multi-tenant SaaS productization",
+      "phase": "ALL",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "8-8",
+          "claim": "Single-company system."
+        }
+      ],
+      "notes": "Do not add tenant commercial infrastructure."
+    },
+    {
+      "id": "REQ-EXCL-002",
+      "title": "No online payment gateway",
+      "phase": "P4",
+      "status": "VERIFIED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "11-11",
+          "claim": "Online payment gateway not required."
+        }
+      ],
+      "notes": "Progress billing/receivables/receipt records remain in scope."
+    }
+  ]
+}

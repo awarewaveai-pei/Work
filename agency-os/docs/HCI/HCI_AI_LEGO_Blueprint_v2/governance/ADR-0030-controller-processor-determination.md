@@ -1,0 +1,67 @@
+# ADR-0030 — Controller/Processor Determination (HD-21)
+
+Status: **ACCEPTED**
+Date: 2026-09-02
+Decision authority: Operator-delegated (2026-09-02, full delegation to Claude); operator may supersede with a later explicit decision
+Scope: Data-protection role determination (processor vs. controller) per HCI processing activity, for the customer DPA template and the runtime `controller_role` gate below; this is a design determination, not legal advice, and does not authorize real-person processing or production deployment.
+
+## Context
+
+`11_SECURITY_PRIVACY_GOVERNANCE.md:92-94` records `🔴 DECISION PENDING (HD-21 / REG-02)`: GDPR's actual data subject for HCI-30's sensitive processing is the researched Person, not the paying tenant, and "Aware Wave's own AI systems (identity resolution, claim extraction, synthesis) exercise independent processing decisions about that third party" — a real controller/processor question the architecture cannot resolve on its own. `HCI30_RESEARCH_REVIEW/REGULATORY_STANDARDS_RESEARCH_SUPPLEMENTARY.md:95-114` (REG-02) recommends a short Data Protection Roles Memo determining the role "per processing activity," names GDPR Art. 4(7)-(8) controller/processor definitions and Art. 26 joint controllers as the governing structure, and flags the risk of unchanged status: "ambiguous liability allocation if a profiled Person brings a GDPR complaint or defamation claim."
+
+Two structurally distinct processing activities already exist in the accepted design:
+
+1. **Tenant-directed research** — `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md:47` records a `Case`/`Engagement` aggregate carrying `purpose`, `risk_level`, `relationship_context`, `requester_context` — the tenant supplies the purpose and scope; Aware Wave records the tenant's own evidence/notes under that instruction (`11_SECURITY_PRIVACY_GOVERNANCE.md:82`, "Customer data ownership").
+2. **The Public Intelligence & Evidence Acquisition pipeline** — `06_HCI30_PUBLIC_INTELLIGENCE.md:11-40` names the module and pipeline (`Identity Resolution → Content Isolation & Authenticity Check → Search Planning → Multi-source Retrieval → … → Claim Extraction → Entity/Event Resolution → Cross-source Corroboration → Contradiction Detection → Timeline`). None of these steps take tenant-supplied search terms or synthesis rules as their means; Aware Wave's own system decides what to retrieve, what to extract, and how to resolve contradictions about a non-consenting third party — the Art. 4(7) "means" test points at Aware Wave, not the tenant.
+3. **The `DataSubjectRequest` channel** — `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md:58-64` (ADR-0014, `HD-03=A`) resolves that HCI operates a `DataSubjectRequest` entity with lifecycle, append-only event history, and affected-record lineage as a P0 requirement, and explicitly separates this from tenant DSAR/deletion runbooks: "do not conflate 'the tenant's own account data' rights processes with the separate rights process a Person needs" (`:52`). Line `:66` flags the controller/processor question as "related, separate" and points back to this section.
+
+`07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md:50` establishes `User != Person`: the profiled Person is never a User, has no account, and by design typically does not know a record exists — so a consent- or tenant-gated response channel cannot be the design (there is no tenant relationship to gate on when the Person themself is the requester). `governance/wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md:31,33` already treats HD-21 as a hard predecessor to DPA language and to ADR-0014's real-data admission gate. `11_SECURITY_PRIVACY_GOVERNANCE.md:96-98` fixes the deadline: Public Intelligence ships Wave 6, founder dogfooding on real people begins Phase 5, and a one-page privacy-ops artifact set is required before that point — this ADR's memo belongs in that set.
+
+`git log --oneline -10` on `governance/` shows only the prior ADR-0009/0010/0011/0014/0015/0016 authoring commits and the audit-verification commit; no prior commit resolves HD-21.
+
+## Decision
+
+**Aware Wave is a data PROCESSOR for tenant-directed research, and a data CONTROLLER for two activities it determines itself: operating the Public Intelligence & Evidence Acquisition pipeline, and operating the `DataSubjectRequest` channel.** Every processing activity carries a recorded role; the customer DPA template reflects the processor role for tenant-directed work and discloses the controller role for the other two.
+
+**Alternative A — Aware Wave is always processor, tenant is sole controller.** Loses: it mislabels the Public Intelligence pipeline, where Aware Wave's own systems — not the tenant — decide what to search, what claims to extract, and how to resolve contradictions about a non-consenting third party. Art. 4(7)'s "determines the purposes and means" test attaches to Aware Wave for that slice regardless of the contract's label; a processor-only DPA would misstate Aware Wave's actual GDPR role and increase, not reduce, liability ambiguity (the REG-02 risk this ADR exists to close).
+
+**Alternative B — Aware Wave is always (joint) controller for everything, including tenant-entered evidence.** Loses: it overstates Aware Wave's role for a tenant's own case notes and evidence entry, where the tenant supplies the purpose (who to investigate, why) and the means (what to record) and Aware Wave stores it under instruction — the textbook processor case. Treating every tenant engagement as joint-controller would require an Art. 26 joint-controller arrangement per Case, which is disproportionate to activity the tenant fully directs and does not track where Aware Wave's own independent judgment actually operates.
+
+**Alternative C (chosen) — role determined per processing activity.** Matches REG-02's own recommendation and the Art. 4(7)/4(8) means-and-purposes test applied separately to each of the three activities identified above. It is the conservative choice in engineering terms: it assigns Aware Wave *more* controller-level duty and audit obligation than Alternative A, not less — consistent with `AGENTS.md` §補丁判準's instruction to close the class of risk (mislabeling) rather than the narrowest instance, and with `11_SECURITY_PRIVACY_GOVERNANCE.md`'s own mandate to "actively hunt for underestimated risk" (§Severe-evidence dual control, same document).
+
+This decision does **not** authorize: processing of real (non-synthetic) person data under any role; production deployment of the Public Intelligence pipeline or the DSR channel; or any DPA, ToS, or public statement asserting legal compliance. `governance/wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`'s fail-closed rule 5 remains controlling: no real-person processing is permitted merely because this ADR exists. This is a design determination pending qualified-counsel review before any real-person processing under either role.
+
+## Required implementation gates
+
+1. **Data Protection Roles Memo.** `governance/wave1/HCI_DATA_PROTECTION_ROLES_MEMO.md` — one page, per `11_SECURITY_PRIVACY_GOVERNANCE.md:98`'s one-page privacy-ops standard — listing each of the three processing activities above, its recorded role (`PROCESSOR` | `CONTROLLER`), the Art. 4 basis for that role, and a `reviewed_by_counsel_at` field (nullable until counsel sign-off). Required before Wave 6 (Public Intelligence ship) / Phase 5 (real-person dogfooding), per `11_SECURITY_PRIVACY_GOVERNANCE.md:98`. Gate proof: file exists, all three activities present, and `reviewed_by_counsel_at` is non-null before Wave 6/Phase 5 admission — checked the same way `scripts/check-governance-docs-drift.ps1` already checks other privacy artifacts for existence/freshness.
+2. **Schema-level role tagging.** Add a `controller_role` enum column (`PROCESSOR` | `CONTROLLER`), `NOT NULL`, to the Wave 1 ERD (`governance/wave1/HCI_WAVE1_DOMAIN_ERD.md`) on: `case_engagement` (defaults `PROCESSOR`, tenant-owned `purpose`/`requester_context` required non-null per row 47's Case Aggregate fields), the Public Intelligence acquisition-job table (defaults `CONTROLLER`, no tenant-supplied search/synthesis directive field permitted to override it), and `data_subject_request` (defaults `CONTROLLER`). Lands with the Wave 1 schema freeze already gated open by ADR-0009/0010/0011.
+3. **Negative tests** in `governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`, same CI-blocking status as `CONSENT-NEG-*`/`SUBJECT-NEG-*`:
+   - `ROLE-NEG-01` — a `case_engagement` row is rejected if created without a tenant-supplied `purpose`; proves the processor role's means-test (tenant determines purpose) is enforced, not asserted.
+   - `ROLE-NEG-02` — a Public Intelligence acquisition-job row is rejected if `controller_role` is set to `PROCESSOR` or supplied a tenant-authored search/synthesis directive as its means; proves the pipeline cannot be relabeled tenant-directed.
+   - `ROLE-NEG-03` — a `DataSubjectRequest` can be created, actioned, and resolved with no linked `tenant_authorization` record; proves the DSR channel is operated as controller and can act without tenant consent, per this ADR's decision. This is a new assertion beyond ADR-0014's existing lifecycle tests, which did not test consent-independence.
+4. **DPA template gate.** `governance/wave1/HCI_CUSTOMER_DPA_TEMPLATE.md` (new) must name all three activities and their role, cross-referencing gate 1; a lint check (extending the existing `scripts/check-governance-docs-drift.ps1` pattern) asserts the file exists and contains the literal strings `PROCESSOR` and `CONTROLLER` each at least twice (once per activity class) before this ADR's `SPECIFIED — RUNTIME OPEN` gate may close in `ADR_INDEX.md`. Lands with the same Wave 6/Phase 5 deadline as gate 1.
+
+## Consequences
+
+- The Public Intelligence pipeline and the DSR channel now carry Aware Wave's own controller-level audit and accountability duty (Art. 5(2) accountability, Art. 24) — this is additional obligation, not a liability shortcut, and must be reflected in the Wave 6 threat model and P1-01 privacy-ops artifacts (`11_SECURITY_PRIVACY_GOVERNANCE.md:96-98`).
+- The DSR channel (ADR-0014) is now explicitly authorized to act on a Person's request without tenant consent or tenant authorization; `HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`'s three-record consent model (ADR-0010) is unaffected — tenant authorization still gates *tenant-directed* research, not Aware-Wave-operated DSR handling.
+- The customer DPA template can no longer describe Aware Wave as processor-only; every future new processing activity must be classified against this ADR's per-activity test before it ships, not defaulted to either role.
+- `HD-20` (regulatory market scope, `ADR-0012`, still `PLANNED`) is a separate decision and is not resolved by this ADR; a market decision to sell into EU/US-employment-adjacent use cases still requires its own ADR.
+
+## Verification and rollback
+
+- Verification recorded here is documentation-only: the chosen option is cross-linked to `11_SECURITY_PRIVACY_GOVERNANCE.md` §Data Protection Roles, `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` §Data Subject Rights, `governance/wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`, and `governance/ADR_INDEX.md` (index entry to be added by the ADR-Index owner, not by this file).
+- The memo, schema column, negative tests, and DPA template required above do not yet exist; all four gates remain **OPEN**. This ADR sets the role; it does not by itself admit real-person data under either role.
+- Before implementation, rollback is to supersede this ADR with a new explicit human decision — including reverting to operator-only approval if the operator narrows or withdraws the 2026-09-02 delegation. After implementation, rollback must be a reviewed migration; `controller_role` is never silently reassigned in place, consistent with `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md`'s Invariant 6 (never overwrite history) already governing the DSR lineage this ADR builds on.
+
+## Evidence
+
+- `11_SECURITY_PRIVACY_GOVERNANCE.md:92-94` — HD-21/REG-02 decision-pending block (Data Protection Roles).
+- `11_SECURITY_PRIVACY_GOVERNANCE.md:96-98` — Wave 6/Phase 5 privacy-ops sequencing deadline this ADR's gates target.
+- `HCI30_RESEARCH_REVIEW/REGULATORY_STANDARDS_RESEARCH_SUPPLEMENTARY.md:95-114` — REG-02 full reasoning, Art. 4(7)-(8)/Art. 26 basis, recommended per-activity memo.
+- `06_HCI30_PUBLIC_INTELLIGENCE.md:11-40` — Public Intelligence & Evidence Acquisition Layer pipeline, evidence that Aware Wave's own systems determine the means for this activity.
+- `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md:47` — Case/Engagement aggregate (`purpose`, `requester_context`), evidence for the tenant-directed processor activity.
+- `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md:50-52,58-66` — User != Person; `DataSubjectRequest` entity and ADR-0014 cross-reference to this decision.
+- `governance/wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md:31,33` — HD-21 as predecessor to DPA language and to ADR-0014's real-data admission gate.
+- `governance/ADR-0014-data-subject-rights-channel.md` — DSR channel decision this ADR assigns a controller role to.
+- `governance/ADR-0009-tenant-organization-model-reconciliation.md` — format exemplar for this ADR.

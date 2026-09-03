@@ -1,0 +1,27 @@
+{
+  "pack_id": "construction-mep-contractor",
+  "version": "1.1.0",
+  "name": "Construction / MEP Contractor Operations",
+  "compatible_foundry": "1.6.x",
+  "scope": "10–25 person construction/MEP subcontractor and contractor operations systems, including RWD field operation, offline continuity, project costing and accounting integration boundaries",
+  "principles": [
+    "industry semantics extend but never weaken Foundry kernel",
+    "questions are business choices only",
+    "engineering baselines are derived/mandatory",
+    "phase boundaries are explicit",
+    "vendor/framework choices remain replaceable"
+  ],
+  "files": [
+    "questions.json",
+    "capabilities.json",
+    "domain-patterns.json",
+    "invariants.json",
+    "state-machines.json",
+    "failure-patterns.json",
+    "acceptance-patterns.json",
+    "module-rules.json",
+    "PROJECT_DECISION_EXAMPLE.json",
+    "REFERENCE_ORIGIN.md",
+    "CHANGELOG_v1.1.md"
+  ]
+}

@@ -53,7 +53,7 @@ Tier D — Dedicated region / customer cloud
 
 Tenant settings should support: `home_region`, `allowed_regions`, `data_residency_policy`, `backup_region`, `ai_processing_regions`.
 
-> 🔴 **DECISION PENDING (`HD-14`)** — ratify "a signed enterprise/Group contract with a data-residency clause" as the explicit, named trigger for building real multi-region infrastructure, replacing the current implicit phase-ordering? **Recommended: yes** — keep the schema stubs above (cheap, no enforcement built yet) per the single-region-honestly-documented posture (see `20_VERIFIED_SUBDOMAIN_INVENTORY_AND_BRAND_IA.md`, `HCI30_RESEARCH_REVIEW/13_ARCHITECTURE_OPTIONS_MATRIX.md` §3c), and state honestly to customers that region enforcement isn't implemented yet. This is a low-cost, low-controversy ratification — but it's still the operator's call to name the exact trigger condition, not an engineering default. Full reasoning: `HCI30_RESEARCH_REVIEW/22_OPEN_HUMAN_DECISIONS.md` HD-14.
+> ✅ **RESOLVED (`HD-14`, 2026-09-02) — ADR-0024**: yes — the sole trigger for real multi-region/residency infrastructure is a signed Enterprise/Group contract containing a data-residency clause. Until that record exists, the five columns stay nullable schema stubs read by nothing, and every customer-facing statement says residency enforcement is not built (via `ADR-0023`'s `nonclaim:` mechanism). Schema-stub-only constraint and residency trigger-record/CI check are open implementation gates. See `governance/ADR-0024-multi-region-trigger-condition.md`.
 
 ## Platform control plane vs HCI data plane
 

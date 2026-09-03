@@ -1,0 +1,1217 @@
+{
+  "version": "1.6.0",
+  "rules": [
+    {
+      "id": "RULE-Q-SCOPE-001",
+      "when": {
+        "question": "Q-SCOPE-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-INTERNAL-USERS"
+      ]
+    },
+    {
+      "id": "RULE-Q-SCOPE-002",
+      "when": {
+        "question": "Q-SCOPE-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-CUSTOMER-USERS"
+      ]
+    },
+    {
+      "id": "RULE-Q-SCOPE-003",
+      "when": {
+        "question": "Q-SCOPE-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PARTNER-USERS"
+      ]
+    },
+    {
+      "id": "RULE-Q-SCOPE-004",
+      "when": {
+        "question": "Q-SCOPE-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-ANON-PUBLIC"
+      ]
+    },
+    {
+      "id": "RULE-Q-CH-001",
+      "when": {
+        "question": "Q-CH-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-WEB"
+      ]
+    },
+    {
+      "id": "RULE-Q-CH-002",
+      "when": {
+        "question": "Q-CH-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-MOBILE"
+      ]
+    },
+    {
+      "id": "RULE-Q-CH-003",
+      "when": {
+        "question": "Q-CH-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-DESKTOP"
+      ]
+    },
+    {
+      "id": "RULE-Q-CH-004",
+      "when": {
+        "question": "Q-CH-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-PUBLIC-API"
+      ]
+    },
+    {
+      "id": "RULE-Q-CH-005",
+      "when": {
+        "question": "Q-CH-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-CLI"
+      ]
+    },
+    {
+      "id": "RULE-Q-ID-001",
+      "when": {
+        "question": "Q-ID-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-IDENTITY"
+      ]
+    },
+    {
+      "id": "RULE-Q-ID-002",
+      "when": {
+        "question": "Q-ID-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SELF-REG"
+      ]
+    },
+    {
+      "id": "RULE-Q-ID-003",
+      "when": {
+        "question": "Q-ID-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-ROLES"
+      ]
+    },
+    {
+      "id": "RULE-Q-ID-004",
+      "when": {
+        "question": "Q-ID-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-INVITES"
+      ]
+    },
+    {
+      "id": "RULE-Q-ID-005",
+      "when": {
+        "question": "Q-ID-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-SSO"
+      ]
+    },
+    {
+      "id": "RULE-Q-ID-006",
+      "when": {
+        "question": "Q-ID-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORG-ADMIN"
+      ]
+    },
+    {
+      "id": "RULE-Q-ORG-001",
+      "when": {
+        "question": "Q-ORG-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-MULTI-TENANT"
+      ]
+    },
+    {
+      "id": "RULE-Q-ORG-002",
+      "when": {
+        "question": "Q-ORG-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORG-HIERARCHY"
+      ]
+    },
+    {
+      "id": "RULE-Q-ORG-003",
+      "when": {
+        "question": "Q-ORG-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-GROUP"
+      ]
+    },
+    {
+      "id": "RULE-Q-ORG-004",
+      "when": {
+        "question": "Q-ORG-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-CROSS-TENANT-COLLAB"
+      ]
+    },
+    {
+      "id": "RULE-Q-ORG-005",
+      "when": {
+        "question": "Q-ORG-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-CROSS-TENANT-SHARE"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-001",
+      "when": {
+        "question": "Q-DATA-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-CUSTOMER-DATA"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-002",
+      "when": {
+        "question": "Q-DATA-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORG-DATA"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-003",
+      "when": {
+        "question": "Q-DATA-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PRODUCTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-004",
+      "when": {
+        "question": "Q-DATA-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORDERS"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-005",
+      "when": {
+        "question": "Q-DATA-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-PROJECTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-006",
+      "when": {
+        "question": "Q-DATA-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-CONTRACTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-007",
+      "when": {
+        "question": "Q-DATA-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-INVENTORY"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-008",
+      "when": {
+        "question": "Q-DATA-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-BOOKING"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-009",
+      "when": {
+        "question": "Q-DATA-009",
+        "equals": true
+      },
+      "require": [
+        "CAP-FINANCIAL-RECORDS"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-010",
+      "when": {
+        "question": "Q-DATA-010",
+        "equals": true
+      },
+      "require": [
+        "CAP-UGC"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-001",
+      "when": {
+        "question": "Q-WF-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-STATE-WORKFLOW"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-002",
+      "when": {
+        "question": "Q-WF-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-APPROVAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-003",
+      "when": {
+        "question": "Q-WF-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-MULTI-APPROVAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-004",
+      "when": {
+        "question": "Q-WF-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-TASKS"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-005",
+      "when": {
+        "question": "Q-WF-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-COMMENTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-006",
+      "when": {
+        "question": "Q-WF-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-REALTIME-COLLAB"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-007",
+      "when": {
+        "question": "Q-WF-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-SCHEDULING"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-008",
+      "when": {
+        "question": "Q-WF-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-ESIGN"
+      ]
+    },
+    {
+      "id": "RULE-Q-FILE-001",
+      "when": {
+        "question": "Q-FILE-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-FILES"
+      ]
+    },
+    {
+      "id": "RULE-Q-FILE-002",
+      "when": {
+        "question": "Q-FILE-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-IMAGES"
+      ]
+    },
+    {
+      "id": "RULE-Q-FILE-003",
+      "when": {
+        "question": "Q-FILE-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-VIDEO"
+      ]
+    },
+    {
+      "id": "RULE-Q-FILE-004",
+      "when": {
+        "question": "Q-FILE-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-FILE-VERSION"
+      ]
+    },
+    {
+      "id": "RULE-Q-FILE-005",
+      "when": {
+        "question": "Q-FILE-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-SHARE-LINKS"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-001",
+      "when": {
+        "question": "Q-SR-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-SEARCH"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-002",
+      "when": {
+        "question": "Q-SR-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-FILTERS"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-003",
+      "when": {
+        "question": "Q-SR-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-DASHBOARD"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-004",
+      "when": {
+        "question": "Q-SR-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-REPORTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-005",
+      "when": {
+        "question": "Q-SR-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-EXPORT"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-006",
+      "when": {
+        "question": "Q-SR-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-ANALYTICS"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-001",
+      "when": {
+        "question": "Q-COM-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-COMMERCIAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-002",
+      "when": {
+        "question": "Q-COM-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUBSCRIPTION"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-003",
+      "when": {
+        "question": "Q-COM-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-EDITIONS"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-004",
+      "when": {
+        "question": "Q-COM-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-TRIAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-005",
+      "when": {
+        "question": "Q-COM-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-USAGE-METERING"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-006",
+      "when": {
+        "question": "Q-COM-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-LICENSE"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-001",
+      "when": {
+        "question": "Q-PAY-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-PAYMENTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-002",
+      "when": {
+        "question": "Q-PAY-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-REFUNDS"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-003",
+      "when": {
+        "question": "Q-PAY-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PARTIAL-REFUND"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-004",
+      "when": {
+        "question": "Q-PAY-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-INVOICES"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-005",
+      "when": {
+        "question": "Q-PAY-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-TAX"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-006",
+      "when": {
+        "question": "Q-PAY-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-SAVED-PAYMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-NOT-001",
+      "when": {
+        "question": "Q-NOT-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-EMAIL"
+      ]
+    },
+    {
+      "id": "RULE-Q-NOT-002",
+      "when": {
+        "question": "Q-NOT-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SMS"
+      ]
+    },
+    {
+      "id": "RULE-Q-NOT-003",
+      "when": {
+        "question": "Q-NOT-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PUSH"
+      ]
+    },
+    {
+      "id": "RULE-Q-NOT-004",
+      "when": {
+        "question": "Q-NOT-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-INAPP-NOTIFY"
+      ]
+    },
+    {
+      "id": "RULE-Q-NOT-005",
+      "when": {
+        "question": "Q-NOT-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-WEBHOOK"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-001",
+      "when": {
+        "question": "Q-INT-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-EXTERNAL-API"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-002",
+      "when": {
+        "question": "Q-INT-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-ERP"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-003",
+      "when": {
+        "question": "Q-INT-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-CRM"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-004",
+      "when": {
+        "question": "Q-INT-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-ACCOUNTING"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-005",
+      "when": {
+        "question": "Q-INT-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-IDP"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-006",
+      "when": {
+        "question": "Q-INT-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-EXT-STORAGE"
+      ]
+    },
+    {
+      "id": "RULE-Q-INT-007",
+      "when": {
+        "question": "Q-INT-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-IMPORT-EXPORT"
+      ]
+    },
+    {
+      "id": "RULE-Q-MOB-001",
+      "when": {
+        "question": "Q-MOB-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-OFFLINE"
+      ]
+    },
+    {
+      "id": "RULE-Q-MOB-002",
+      "when": {
+        "question": "Q-MOB-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-BG-SYNC"
+      ]
+    },
+    {
+      "id": "RULE-Q-MOB-003",
+      "when": {
+        "question": "Q-MOB-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-CAMERA"
+      ]
+    },
+    {
+      "id": "RULE-Q-MOB-004",
+      "when": {
+        "question": "Q-MOB-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-LOCATION"
+      ]
+    },
+    {
+      "id": "RULE-Q-MOB-005",
+      "when": {
+        "question": "Q-MOB-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-BARCODE"
+      ]
+    },
+    {
+      "id": "RULE-Q-GLO-001",
+      "when": {
+        "question": "Q-GLO-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-I18N"
+      ]
+    },
+    {
+      "id": "RULE-Q-GLO-002",
+      "when": {
+        "question": "Q-GLO-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-MULTI-CURRENCY"
+      ]
+    },
+    {
+      "id": "RULE-Q-GLO-003",
+      "when": {
+        "question": "Q-GLO-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-TIMEZONES"
+      ]
+    },
+    {
+      "id": "RULE-Q-GLO-004",
+      "when": {
+        "question": "Q-GLO-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-RTL"
+      ]
+    },
+    {
+      "id": "RULE-Q-GLO-005",
+      "when": {
+        "question": "Q-GLO-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-RESIDENCY"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-001",
+      "when": {
+        "question": "Q-AI-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-002",
+      "when": {
+        "question": "Q-AI-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-SEARCH"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-003",
+      "when": {
+        "question": "Q-AI-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-SUMMARY"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-004",
+      "when": {
+        "question": "Q-AI-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-GENERATE"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-005",
+      "when": {
+        "question": "Q-AI-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-CLASSIFY"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-006",
+      "when": {
+        "question": "Q-AI-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-RECOMMEND"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-007",
+      "when": {
+        "question": "Q-AI-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-WRITE"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-008",
+      "when": {
+        "question": "Q-AI-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-EXTERNAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-009",
+      "when": {
+        "question": "Q-AI-009",
+        "equals": true
+      },
+      "require": [
+        "CAP-MULTI-AGENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-010",
+      "when": {
+        "question": "Q-AI-010",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-VOICE"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-001",
+      "when": {
+        "question": "Q-MIG-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-LEGACY-MIGRATION"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-002",
+      "when": {
+        "question": "Q-MIG-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-HISTORICAL-IMPORT"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-003",
+      "when": {
+        "question": "Q-MIG-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-COEXISTENCE"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-004",
+      "when": {
+        "question": "Q-MIG-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-LEGACY-SYNC"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-005",
+      "when": {
+        "question": "Q-MIG-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-CUSTOMER-EXPORT"
+      ]
+    },
+    {
+      "id": "RULE-Q-PORT-001",
+      "when": {
+        "question": "Q-PORT-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-PUBLIC-PAGES"
+      ]
+    },
+    {
+      "id": "RULE-Q-PORT-002",
+      "when": {
+        "question": "Q-PORT-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-CUSTOMER-PORTAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-PORT-003",
+      "when": {
+        "question": "Q-PORT-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PARTNER-PORTAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-PORT-004",
+      "when": {
+        "question": "Q-PORT-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-EMBED"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-001",
+      "when": {
+        "question": "Q-REG-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-HEALTH-DATA"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-002",
+      "when": {
+        "question": "Q-REG-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-FINANCIAL-DECISION"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-003",
+      "when": {
+        "question": "Q-REG-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-MINORS"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-004",
+      "when": {
+        "question": "Q-REG-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-GOV"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-005",
+      "when": {
+        "question": "Q-REG-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-BIOMETRIC"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-006",
+      "when": {
+        "question": "Q-REG-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-GEOLOCATION"
+      ]
+    },
+    {
+      "id": "RULE-Q-REG-007",
+      "when": {
+        "question": "Q-REG-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-LEGAL-RECORD"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-001",
+      "when": {
+        "question": "Q-IMP-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-24X7"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-002",
+      "when": {
+        "question": "Q-IMP-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-REALTIME"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-003",
+      "when": {
+        "question": "Q-IMP-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-NONREPEATABLE"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-004",
+      "when": {
+        "question": "Q-IMP-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-SAFETY-IMPACT"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-005",
+      "when": {
+        "question": "Q-IMP-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-FINANCIAL-IMPACT"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-006",
+      "when": {
+        "question": "Q-IMP-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-LEGAL-IMPACT"
+      ]
+    },
+    {
+      "id": "RULE-Q-IMP-007",
+      "when": {
+        "question": "Q-IMP-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-SPIKY-LOAD"
+      ]
+    },
+    {
+      "id": "RULE-Q-FUT-001",
+      "when": {
+        "question": "Q-FUT-001",
+        "equals": true
+      },
+      "defer": [
+        "CAP-MOBILE"
+      ]
+    },
+    {
+      "id": "RULE-Q-FUT-002",
+      "when": {
+        "question": "Q-FUT-002",
+        "equals": true
+      },
+      "defer": [
+        "CAP-MULTI-TENANT"
+      ]
+    },
+    {
+      "id": "RULE-Q-FUT-003",
+      "when": {
+        "question": "Q-FUT-003",
+        "equals": true
+      },
+      "defer": [
+        "CAP-I18N",
+        "CAP-MULTI-CURRENCY",
+        "CAP-TIMEZONES"
+      ]
+    },
+    {
+      "id": "RULE-Q-FUT-004",
+      "when": {
+        "question": "Q-FUT-004",
+        "equals": true
+      },
+      "defer": [
+        "CAP-AI"
+      ]
+    },
+    {
+      "id": "RULE-Q-FUT-005",
+      "when": {
+        "question": "Q-FUT-005",
+        "equals": true
+      },
+      "defer": [
+        "CAP-PUBLIC-API"
+      ]
+    }
+  ]
+}

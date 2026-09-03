@@ -1,1 +1,36 @@
-﻿{"verdict":"topology-retired","generated":"2026-08-28 10:30:07 UTC","note":"SG/EU consolidated onto ks-aw-01 2026-08-28; auto-reboot decision pending (TASKS.md)"}
+{
+    "generated_utc":  "2026-09-03 04:46:01",
+    "overall_label":  "healthy",
+    "overall_user":  "PASS",
+    "ssot":  {
+                 "sha52":  "7f4e36d2b153f2450dc5bbd44c36e3c492068551af677a2d1ab795922fc682d4"
+             },
+    "ks_aw_01":  {
+                     "snapshot":  {
+                                      "host":  "145.239.195.47",
+                                      "ok":  true,
+                                      "ar_on":  "true",
+                                      "ar_time":  "20:00",
+                                      "ar_users":  "true",
+                                      "sha52":  "7f4e36d2b153f2450dc5bbd44c36e3c492068551af677a2d1ab795922fc682d4",
+                                      "sha53":  "",
+                                      "daemon_active":  "active",
+                                      "daemon_enabled":  "enabled",
+                                      "boot_notify_enabled":  "enabled",
+                                      "boot_notify_unit":  "present",
+                                      "boot_notify_script":  "present",
+                                      "boot_notify_telegram":  "present",
+                                      "reboot_pending":  "0",
+                                      "reboot_pkgs":  "",
+                                      "kernel":  "6.8.0-138-generic",
+                                      "last_reboot":  "Mon Aug 31 10:45 still"
+                                  },
+                     "verdict":  {
+                                     "label":  "healthy",
+                                     "reasons":  [
+
+                                                 ],
+                                     "pending":  false
+                                 }
+                 }
+}

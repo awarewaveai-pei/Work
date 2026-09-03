@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assumption",
+  "type": "object",
+  "required": [
+    "assumption_id",
+    "statement",
+    "state"
+  ],
+  "properties": {
+    "assumption_id": {
+      "type": "string"
+    },
+    "statement": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "VERIFIED",
+        "INFERRED",
+        "ASSUMED",
+        "UNKNOWN",
+        "DISPUTED"
+      ]
+    }
+  }
+}

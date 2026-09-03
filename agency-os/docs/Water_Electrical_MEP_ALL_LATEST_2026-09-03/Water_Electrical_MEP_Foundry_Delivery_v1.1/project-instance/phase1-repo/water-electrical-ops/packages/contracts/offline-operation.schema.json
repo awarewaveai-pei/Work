@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OfflineQueuedAction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "idempotency_key",
+    "actor_user_id",
+    "command_type",
+    "command_version",
+    "target_id",
+    "target_revision",
+    "created_at"
+  ],
+  "properties": {
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 16
+    },
+    "actor_user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command_type": {
+      "const": "ACKNOWLEDGE_DISPATCH"
+    },
+    "command_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}

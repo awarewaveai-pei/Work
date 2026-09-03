@@ -1,0 +1,8 @@
+{
+  "_schema": "lifecycle-record.schema.json",
+  "asset_id": "api-v1",
+  "asset_type": "API",
+  "state": "RETIRED",
+  "owner": "api-team",
+  "version": "1"
+}

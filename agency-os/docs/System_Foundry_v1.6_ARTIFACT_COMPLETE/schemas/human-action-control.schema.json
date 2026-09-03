@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/human-action-control.schema.json",
+  "title": "Human Action Control",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id",
+    "risk",
+    "reversibility",
+    "authority_required",
+    "confirmation",
+    "dual_control",
+    "recovery",
+    "audit_required"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "risk": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ]
+    },
+    "reversibility": {
+      "enum": [
+        "REVERSIBLE",
+        "COMPENSATABLE",
+        "IRREVERSIBLE"
+      ]
+    },
+    "authority_required": {
+      "enum": [
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4"
+      ]
+    },
+    "confirmation": {
+      "type": "boolean"
+    },
+    "dual_control": {
+      "type": "boolean"
+    },
+    "recovery": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_required": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "risk": {
+            "const": "CRITICAL"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "authority_required": {
+            "const": "A4"
+          },
+          "confirmation": {
+            "const": true
+          },
+          "dual_control": {
+            "const": true
+          },
+          "audit_required": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reversibility": {
+            "const": "IRREVERSIBLE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "confirmation": {
+            "const": true
+          },
+          "audit_required": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+# System Foundry v1.4 Quality Strength Matrix
+
+| Capability | Status | Executable enforcement |
+|---|---|---|
+| Multidisciplinary identity / subagent inheritance | **VERY STRONG** | Canonical content-hashed kernel registry + inheritance digest validation |
+| Exact repository evidence | **VERY STRONG** | revision + exact line range + blob SHA-256 + selected-content SHA-256 |
+| Root-cause first / anti-patch | **VERY STRONG** | fail-closed existing-system G1/G2 gates |
+| Risk classification | **VERY STRONG** | deterministic max-dimension computation; contradictory tier rejected |
+| Authority/autonomy | **VERY STRONG** | canonical risk→authority derivation; insufficient grant rejected |
+| Runtime orchestration | **VERY STRONG** | DAG cycle/dependency validation + canonical gate references |
+| Status/state semantics | **VERY STRONG** | canonical status registry; unknown stop codes invalid |
+| Exceptions | **VERY STRONG** | expiry/removal/monitoring/evidence required + non-waivable registry |
+| Release engineering | **VERY STRONG** | immutable artifact/SBOM/provenance evidence + risk-dependent approvals |
+| Lifecycle/deprecation | **VERY STRONG** | state-dependent migration/consumer/retention/rollback requirements |
+| Human/operator safety | **VERY STRONG** | CRITICAL/IRREVERSIBLE controls enforced semantically |
+| DB/data | **VERY STRONG** | database architecture + migration + source-of-truth/dependency schemas |
+| Security/privacy | **VERY STRONG** | security review schema + supply-chain policy + authority/tool boundaries |
+| DevOps/SRE/observability | **VERY STRONG** | SRE, observability, restore, release and rollback contracts |
+| Testing/assurance | **VERY STRONG** | golden + adversarial tests + independent assurance + E2E bootstrap |
+| LEGO modularity / 30-year replaceability | **VERY STRONG** | kernel contracts + lifecycle + provider exit + versioned control plane |
+| Project bootstrap | **VERY STRONG** | executable `foundry_new.py`, safe bounded scaffold, E2E verification |
+| Foundry self-integrity | **VERY STRONG** | version consistency + manifest file hashes + kernel hashes + CI gate |
+
+## v1.6 Artifact/Selection Strength Addendum
+
+| Capability | Strength | Executable enforcement |
+|---|---|---|
+| Binary user configuration | VERY_STRONG | question schema + UI + `validate_answers` |
+| Locked production baseline | VERY_STRONG | non-disableable baseline + resolver foundation |
+| Dependency closure | VERY_STRONG | fixed-point capability closure |
+| Deferred/current consistency | VERY_STRONG | current closure deterministically removes deferred overlap |
+| No over-generation | VERY_STRONG | exact module projection + unselected path/doc absence tests |
+| Selected LEGO completeness | VERY_STRONG | 10 required artifacts/module + staging validator |
+| Blueprint completeness | VERY_STRONG | all 73 controlled sections emitted ACTIVE/N/A |
+| Custom requirements | VERY_STRONG | verbatim stable ID + dedicated review module; no technology guessing |
+| Selection reverse testing | VERY_STRONG | ALL-NO, ALL-YES, 121 singles, exhaustive pairs, 1000 random |
+| Artifact integrity | VERY_STRONG | generated SHA-256 artifact manifest |
+| Generator blast radius | VERY_STRONG | staging + validation + atomic commit + overwrite refusal |

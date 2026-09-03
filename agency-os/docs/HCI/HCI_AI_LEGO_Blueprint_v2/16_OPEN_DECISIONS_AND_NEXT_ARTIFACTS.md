@@ -2,7 +2,7 @@
 
 ## Status note (new in V2)
 
-**`D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` is the immutable 24-item research evidence list.** Current state is in `governance/ADR_INDEX.md`: on 2026-09-01, `HD-00=C`, `HD-01=A`, and `HD-02=C` were explicitly approved and recorded as ADR-0011, ADR-0009, and ADR-0010. The other 21 decisions remain open. This chapter keeps V1's original decision list for continuity, marked against what V2 resolved, and folds in the items that list omitted.
+**`D:\Work\agency-os\docs\HCI\HCI30_RESEARCH_REVIEW\22_OPEN_HUMAN_DECISIONS.md` is the immutable 24-item research evidence list.** Current state is in `governance/ADR_INDEX.md`: all 24 findings (`HD-00` through `HD-23`) now have a recorded ADR decision — six via explicit per-decision operator approval on 2026-09-01 (`HD-00=C`/`ADR-0011`, `HD-01=A`/`ADR-0009`, `HD-02=C`/`ADR-0010`, `HD-03=A`/`ADR-0014`, `HD-04=A`/`ADR-0015`, `HD-05=A`/`ADR-0016`), the remaining eighteen under the operator's 2026-09-02 explicit blanket delegation (`ADR-0012`, `ADR-0013`, `ADR-0017` through `ADR-0032`), plus `ADR-0033` resolving a tenancy-principal gap `ADR-0016` itself surfaced. **A recorded decision is not an implementation** — every ADR's runtime gate remains `OPEN`; see `ADR_INDEX.md`'s gate table for what still needs to be built and tested before each is real. This chapter keeps V1's original decision list for continuity, marked against what V2 resolved, and folds in the items that list omitted.
 
 ## Governance starter — before the next artifact
 

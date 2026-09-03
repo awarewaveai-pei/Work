@@ -1,0 +1,28 @@
+{
+  "active_answer_count": 92,
+  "current_capabilities": [
+    "FOUND-AUDIT",
+    "FOUND-BACKUP",
+    "FOUND-BLAST-RADIUS",
+    "FOUND-DATA-INTEGRITY",
+    "FOUND-DEPENDENCY",
+    "FOUND-ERROR",
+    "FOUND-EVIDENCE",
+    "FOUND-INCIDENT",
+    "FOUND-LIFECYCLE",
+    "FOUND-MIGRATION-SAFETY",
+    "FOUND-OBSERVABILITY",
+    "FOUND-RELEASE",
+    "FOUND-RESTORE-VERIFY",
+    "FOUND-ROLLBACK",
+    "FOUND-SECRETS",
+    "FOUND-SECURITY",
+    "FOUND-SUPPLY-CHAIN",
+    "FOUND-TESTING"
+  ],
+  "modules": [
+    "core"
+  ],
+  "profile": "standard",
+  "criticality": "low"
+}

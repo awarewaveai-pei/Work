@@ -1,6 +1,6 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-08-28 18:30:49
+- Generated: 2026-09-03 12:46:42
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: PASS**
 
@@ -22,7 +22,7 @@
 - CF WAF scanner/path rules may exist, but wp-login health is judged by the server-side layer.
 - This check verifies CF posture plus Origin Lockdown; WordPress plugin protection is verified separately (client-status / WP plugin checks).
 
-## Origin Lockdown (ks-aw-01 149.202.64.114, since 2026-08-28 consolidation)
+## Origin Lockdown (ks-aw-01 145.239.195.47, since 2026-08-31 KS-6 host switch)
 - Status: **active**
 - Probe aware-wave direct-origin: 403 / soulful: 403 (403 = guarded)
 - Architecture: nginx geo guard (conf.d/cf-edge-geo.conf + snippets/cf-only.conf) returns 403 unless the raw TCP peer is a CF edge or localhost; DNS-only vhosts (remotion-svc/video-svc) deliberately unguarded.

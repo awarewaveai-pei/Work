@@ -50,7 +50,7 @@ Authority names never increase evidence weight by themselves.
 
 ## Psychology
 
-> 🔴 **DECISION PENDING (`HD-23`)** — this entire section (Big Five instrument choice, MBTI, Enneagram, and 紫微/八字 below) is a cluster of product-positioning calls about what "scientific" means for this brand, explicitly reserved for the operator, not resolved by this review. **Nothing below is implemented until the operator picks.** What follows is the independently-recommended direction, shown in full so the operator can approve, adjust, or reject each item quickly rather than starting from a blank page.
+> ✅ **RESOLVED (`HD-23`, 2026-09-02) — ADR-0032**: (a) Big Five = IPIP-NEO-120, `third_party_inferred` one grade step below `self_report`; (b) MBTI-style typing REMOVED; (c) Enneagram ungraded, self-reflection only; (d) 紫微/八字 REMOVED from any path that can target a named third party — self-only entertainment, `third_party_allowed=false` immutable; (e) qualitative confidence bands (ICD 203) replace bare percentages until Confidence Algorithm v1 ships. The method-contract schema, grade-delta trigger, MBTI/Enneagram/third-party-invocation gates, and confidence-band gate are open implementation gates; see `governance/ADR-0032-personality-and-behavioral-method-disposition.md`.
 
 **Big Five / Five-Factor Model — recommended change**: "Big Five" is a construct name, not an implementable method on its own — V1 named no specific instrument and did not distinguish subject-administered self-report (strong validity) from AI-inferred trait estimation from a third party's digital footprint (materially weaker validity — automated-personality-inference literature reports ~r=0.2-0.4 correlation with self-report). Shipping the latter with the evidence badge of the former is false certainty.
 
@@ -137,7 +137,7 @@ Sun Tzu methods may not: diagnose psychology, determine honesty, directly increa
 
 ## Self-reflection
 
-> This sub-section is still part of the `HD-23` pending decision above — see that block before treating anything below as final.
+> This sub-section is resolved by the same `HD-23` decision above (`ADR-0032`) — MBTI removed, Zi Wei Dou Shu/Bazi removed from any third-party-targeting path.
 
 V1 examples: MBTI-style preference frameworks *(recommended for removal, see §Psychology above)*, Enneagram *(recommended to leave ungraded, see §Psychology above)*.
 

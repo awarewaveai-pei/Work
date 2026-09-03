@@ -1,7 +1,7 @@
 # soulfulexpression.org 切換手冊 — Hostinger → ks-aw-01
 
 > **狀態（2026-08-28）**：**切換已完成。** 03:02 UTC rehearse-freeze 通過（200→503→200）、
-> 03:04 `--live` 78 秒完成（288 表一致）、03:08:00 UTC DNS PATCH（191.101.230.176 → 149.202.64.114，
+> 03:04 `--live` 78 秒完成（288 表一致）、03:08:00 UTC DNS PATCH（191.101.230.176 → 前任 `149.202.64.114`；2026-08-31 已再切至 `145.239.195.47`，
 > proxied=true 維持）、03:08 起流量實測走新機（`x-soulful-cache` header）、03:08:57 強制寄信
 > `sent` row id=97。舊站依設計**維持凍結**（`.maintenance` 留著當回滾路徑）。
 > 本文件其餘段落轉為歷史記錄 + 「切換後」章節的執行依據（觀察期 ≥7 天 → 2026-09-04 起收尾）。
@@ -23,7 +23,7 @@ DNS 那一筆幾秒生效，改回去就是回滾 —— 但單改 DNS **不是*
 | Cloudflare zone id | `bb1358fe8d3e1d73c822bdb31d3cd823` |
 | A 記錄 id（apex）| `5287ae0edbce87ec8a9fa6152e05e220` |
 | 現在指向（Hostinger）| `191.101.230.176` |
-| 要改成（ks-aw-01）| `149.202.64.114` |
+| 現役 ks-aw-01 | `145.239.195.47` |
 | proxied | `true`（**維持橘雲，不要改**）|
 
 ---
@@ -34,23 +34,23 @@ DNS 那一筆幾秒生效，改回去就是回滾 —— 但單改 DNS **不是*
 # 1. 新機直接對打，完全不動 DNS
 for p in / /wp-login.php /shop/ /expressions/music/into-the-deep/; do
   curl -sS -o /dev/null -w "$p -> %{http_code}\n" --max-time 30 \
-    --resolve soulfulexpression.org:443:149.202.64.114 "https://soulfulexpression.org$p"
+    --resolve soulfulexpression.org:443:145.239.195.47 "https://soulfulexpression.org$p"
 done
 # 期望：全部 200
 
 # 2. 中文永久連結（要用 url-encode，否則是你的終端機在騙你）
 ENC=$(python3 -c "import urllib.parse;print(urllib.parse.quote('insights/general/感恩日記改變人生的五分鐘習慣'))")
 curl -sS -o /dev/null -w "CJK -> %{http_code}\n" --max-time 30 \
-  --resolve soulfulexpression.org:443:149.202.64.114 "https://soulfulexpression.org/$ENC/"
+  --resolve soulfulexpression.org:443:145.239.195.47 "https://soulfulexpression.org/$ENC/"
 # 期望：200
 
 # 3. 容器健康
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 \
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 \
   'sudo docker ps --filter name=soulful --format "{{.Names}} {{.Status}}"'
 # 期望：兩個都 (healthy)
 
 # 4. 憑證還有效
-echo | openssl s_client -connect 149.202.64.114:443 -servername soulfulexpression.org 2>/dev/null \
+echo | openssl s_client -connect 145.239.195.47:443 -servername soulfulexpression.org 2>/dev/null \
   | openssl x509 -noout -dates
 # 期望：notAfter 尚未到期（目前 2026-11-25）
 
@@ -91,17 +91,17 @@ FluentCRM 聯絡人）都還在 Hostinger。這個差額不是「建議補」，
 
 ```bash
 # 0a. 部署 repo 版本上去
-scp -i ~/.ssh/id_ed25519 -P 58122   lobster-factory/infra/soulful/cutover-sync.sh ubuntu@149.202.64.114:/tmp/cutover-sync.sh
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   'sudo install -o root -g root -m 700 /tmp/cutover-sync.sh /root/soulful/cutover-sync.sh && rm -f /tmp/cutover-sync.sh'
+scp -i ~/.ssh/id_ed25519 -P 58122   lobster-factory/infra/soulful/cutover-sync.sh ubuntu@145.239.195.47:/tmp/cutover-sync.sh
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47   'sudo install -o root -g root -m 700 /tmp/cutover-sync.sh /root/soulful/cutover-sync.sh && rm -f /tmp/cutover-sync.sh'
 
 # 0b. 兩邊 sha256 必須一致
 sha256sum lobster-factory/infra/soulful/cutover-sync.sh | cut -c1-12
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   'sudo sha256sum /root/soulful/cutover-sync.sh | cut -c1-12'
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47   'sudo sha256sum /root/soulful/cutover-sync.sh | cut -c1-12'
 ```
 
 ```bash
 # 演練：完全不碰 live，跑完自動把新機還原回起點
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo /root/soulful/cutover-sync.sh --dry-run'
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 'sudo /root/soulful/cutover-sync.sh --dry-run'
 
 # 正式：會凍結 live，並「保持凍結」等你切 DNS
 # REQUIRE_VERSION 讓舊副本直接拒跑，而不是安靜地跑出錯誤結果
@@ -110,10 +110,10 @@ ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo /root/soulful/cuto
 #    腳本裝了 SIGHUP handler：ssh 斷線 -> 收到 HUP -> 自動解凍 -> exit 129。
 #    那個行為在「腳本自己失敗」時是對的，但在「你家網路閃一下」時，
 #    它會在你正要切 DNS 的當下把凍結解掉，而你的終端機已經沒了、什麼都看不到。
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-28-r10 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47   "tmux new -d -s cutover 'sudo REQUIRE_VERSION=2026-08-28-r10 /root/soulful/cutover-sync.sh --live 2>&1 | tee /root/cutover-live.log'"
 
 # 另開一個連線看進度（斷線也不影響那邊的執行）
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'tail -f /root/cutover-live.log'
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 'tail -f /root/cutover-live.log'
 ```
 
 > **證據檔在哪**：`/root/soulful-cutover/<STAMP>/evidence.txt`（每次執行一個目錄）。
@@ -150,7 +150,7 @@ ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'tail -f /root/cutover-l
 
 ```bash
 # 2. DNS
-curl -sS -X PATCH   "https://api.cloudflare.com/client/v4/zones/bb1358fe8d3e1d73c822bdb31d3cd823/dns_records/5287ae0edbce87ec8a9fa6152e05e220"   -H "Authorization: Bearer <CLOUDFLARE_API_TOKEN>"   -H "Content-Type: application/json"   --data '{"type":"A","name":"soulfulexpression.org","content":"149.202.64.114","proxied":true}'
+curl -sS -X PATCH   "https://api.cloudflare.com/client/v4/zones/bb1358fe8d3e1d73c822bdb31d3cd823/dns_records/5287ae0edbce87ec8a9fa6152e05e220"   -H "Authorization: Bearer <CLOUDFLARE_API_TOKEN>"   -H "Content-Type: application/json"   --data '{"type":"A","name":"soulfulexpression.org","content":"145.239.195.47","proxied":true}'
 ```
 
 > 監控會把舊站報成 down —— 那是**正確的**，它確實不在服務。同一天要把
@@ -185,7 +185,7 @@ curl -sS -X PATCH   "https://api.cloudflare.com/client/v4/zones/bb1358fe8d3e1d73
 ```bash
 # 強制寄一封，並確認資料庫真的多了一列 sent —— 「wp_mail 回 true」不算數，
 # 它只代表交給了 SMTP 層，不代表對方收下。
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114 'sudo bash -s' <<'SH'
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 'sudo bash -s' <<'SH'
 before=$(docker exec soulful-wp wp --allow-root db query   "SELECT COUNT(*) FROM wp_fsmpt_email_logs WHERE status='sent'" --skip-column-names)
 docker exec soulful-wp wp --allow-root eval   'var_dump( wp_mail( "peijingartstudio@gmail.com", "cutover mail test", "sent from ks-aw-01" ) );'
 sleep 5
@@ -209,7 +209,7 @@ curl -sSI -H 'Cookie: woocommerce_items_in_cart=1'  https://soulfulexpression.or
 curl -sSI https://soulfulexpression.org/checkout/ | grep -i x-soulful-cache
 
 # 3. 物件快取有在動
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114   'sudo docker exec soulful-redis redis-cli INFO stats | grep keyspace'
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47   'sudo docker exec soulful-redis redis-cli INFO stats | grep keyspace'
 ```
 
 > **`cutover-sync.sh` 會在載入 DB 之後、web 層重啟之前自動 `FLUSHALL` Redis。**
@@ -243,7 +243,7 @@ curl -sS https://soulfulexpression.org/ | grep -o '<title>[^<]*'   # 期望是�
 > 若當初是用 `allow 443` 或 app profile 加的，delete 會靜默無動作，而你會以為已經鎖上了。
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@149.202.64.114
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
 sudo bash -c '
   set -euo pipefail
   # 1) 先取得清單，空的就中止 —— 絕不在沒有替代規則的情況下刪掉現有規則
@@ -273,7 +273,7 @@ print(\"\n\".join(d[\"ipv4_cidrs\"]+d[\"ipv6_cidrs\"]))")
 ```bash
 # 4) 從 Cloudflare 外部驗證真的鎖上了（在你自己的機器跑，不是在 VPS 上）
 curl -sS -o /dev/null -w "直連 origin -> %{http_code}\n" --max-time 15 \
-  --resolve soulfulexpression.org:443:149.202.64.114 https://soulfulexpression.org/ || echo "直連逾時/被拒 = 正確"
+  --resolve soulfulexpression.org:443:145.239.195.47 https://soulfulexpression.org/ || echo "直連逾時/被拒 = 正確"
 curl -sSI --max-time 15 https://soulfulexpression.org/ | head -1   # 走 CF 必須仍是 200
 ```
 

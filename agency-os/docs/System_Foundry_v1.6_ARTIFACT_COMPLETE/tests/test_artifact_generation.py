@@ -1,0 +1,31 @@
+import json,tempfile,unittest,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
+from configurator_engine import resolve
+from foundry_generate import generate,MODULE_DOCS
+import test_selection_matrix as matrix
+
+class ArtifactGenerationTests(unittest.TestCase):
+    def test_all_yes_materializes_complete_standard_modules_and_blueprint(self):
+        a=matrix.complete({},True); p=resolve({'name':'all-yes-unit'},a,[])
+        self.assertEqual(len(p['current_capabilities']),160)
+        self.assertEqual(len(p['modules']),24)
+        with tempfile.TemporaryDirectory() as td:
+            out=generate(p,a,[],td)
+            self.assertEqual(len(list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))),73)
+            for mid in p['modules']:
+                for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
+                    self.assertTrue((out/'docs/modules'/mid/role).is_file(),f'{mid}/{role}')
+            cov=json.loads((out/'.foundry/verification/generation-coverage.json').read_text())
+            self.assertEqual(cov['blueprints_active'],73)
+    def test_custom_requirement_materializes_review_module_without_guessing_capability(self):
+        a=matrix.complete({},False); custom=[{'category':'custom','statement':'支援特殊工業設備協定'}]; p=resolve({'name':'custom-unit'},a,custom)
+        self.assertIn('custom',p['modules'])
+        self.assertEqual(p['module_reasons']['custom'],['REQ-CUSTOM-00001'])
+        with tempfile.TemporaryDirectory() as td:
+            out=generate(p,a,custom,td)
+            m=json.loads((out/'docs/modules/custom/MODULE_MANIFEST.json').read_text())
+            self.assertEqual(m['activated_capabilities'],[])
+            self.assertEqual(m['custom_requirements'],['REQ-CUSTOM-00001'])
+            self.assertTrue((out/'extensions/custom/README.md').is_file())
+if __name__=='__main__':unittest.main()

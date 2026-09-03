@@ -1,26 +1,23 @@
 # Capacity health report
 
-- Generated: 2026-08-28 18:30:29 +08:00  (UTC: 2026-08-28 10:30:29)
-- Overall: **FAIL** 🔴
+- Generated: 2026-09-03 12:46:20 +08:00  (UTC: 2026-09-03 04:46:20)
+- Overall: **PASS** 🟢
 
-> ks-aw-01 runs the strictest thresholds on purpose: it is the consolidation target
-> bought at 64 GB against a plan that called for 128 GB. This check is the agreed
-> compensating control for that gap.
+> ks-aw-01 runs the strictest thresholds on purpose: it is the sole consolidation host
+> for all production services. Its 128 GB RAM meets the planned floor; these thresholds
+> preserve early warning for whole-host pressure rather than compensating for a spec gap.
 
 | host | verdict | mem used | disk | swap | PSI mem some/full | containers |
 |---|---|---|---|---|---|---|
-| ks-aw-01 | 🔴 | 18.8% of 62.7G | 12% of 877G | 0.3% | 0 / 0 | 41/41 |
+| ks-aw-01 | 🟢 | 10.7% of 125.8G | 10% of 935.7G | 9.4% | 0 / 0 | 42/42 |
 
-## ks-aw-01 (149.202.64.114) 🔴
-- Memory: 18.8% used (11.8G of 62.7G), swap 0.3%
+## ks-aw-01 (145.239.195.47) 🟢
+- Memory: 10.7% used (13.5G of 125.8G), swap 9.4%
 - PSI memory avg60: some 0%, full 0%  | io some 0%
-- OOM kills: vmstat 15, journal(7d) 15
-- Disk /: 12% (93.5G of 877G), inodes 5%
-- Docker reclaimable: Images=463.6MB (1%),Containers=0B (0%),Local Volumes=12.76GB (56%),Build Cache=57.19MB
-- Containers: 41 running / 41 total, unhealthy 0
-- Top memory: soulful-db=2.76GiB postiz=1.193GiB soulful-wp=1009MiB trigger-webapp=749.9MiB trigger-clickhouse=398MiB supabase-kong=290.2MiB
-- CPU: 16 cores, load1 0.32 (0.02 per core), PSI cpu some 6.44%, up 1d
-
-**Findings:**
-- OOM kills observed: 15 (vmstat=15, journal=15)
+- OOM kills: vmstat 0, journal(7d) 0
+- Disk /: 10% (84.4G of 935.7G), inodes 4%
+- Docker reclaimable: Images=677.4MB (1%),Containers=0B (0%),Local Volumes=183.5MB (0%),Build Cache=0B
+- Containers: 42 running / 42 total, unhealthy 0
+- Top memory: trigger-webapp=2.473GiB postiz=1.217GiB soulful-wp=946.3MiB soulful-db=620.3MiB supabase-kong=471MiB trigger-clickhouse=466MiB
+- CPU: 32 cores, load1 1.02 (0.03 per core), PSI cpu some 7.75%, up 2d
 

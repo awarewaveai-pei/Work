@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0.0",
+  "version": "1.1.0",
+  "file_count": 36,
+  "files": [
+    {
+      "path": ".foundry/intake/requirement-evidence-register.json",
+      "sha256": "1995043d3e1dfca63279b1bd6261a3faa196b904e9d35cb8772427e0c6923481",
+      "bytes": 8130
+    },
+    {
+      "path": ".foundry/resolution/core-foundry-plan.phase1.json",
+      "sha256": "3478c934503c48a796d6f8aed6b907403b40a461b1351ce004b7409d3f7e458b",
+      "bytes": 4973
+    },
+    {
+      "path": ".foundry/resolution/industry-foundry-plan.json",
+      "sha256": "c41788429c1065cb1ad48ce1250e2189f4bd90e47ad8275dc93d30c7c722c888",
+      "bytes": 6662
+    },
+    {
+      "path": "CHANGELOG_v1.1.md",
+      "sha256": "f1321ea99c7f72ea945836255789d186169e5c2615182e797acb523bfe8d57d5",
+      "bytes": 401
+    },
+    {
+      "path": "README.md",
+      "sha256": "e04f1ab35b0290fa88fe426b0d8124fb0e3cc1b751c38a39ce921c5362e1420d",
+      "bytes": 1023
+    },
+    {
+      "path": "apps/web/OFFLINE_WEB_CONTRACT.md",
+      "sha256": "c134ccbdc7cf6059dd05171760d523332cb955c32db62e6f62e9c83d6b359f65",
+      "bytes": 832
+    },
+    {
+      "path": "apps/web/RWD_CONTRACT.md",
+      "sha256": "70defd35da9f285463166c94ac66ec0790ed79cb37752938d187788a839ca7a3",
+      "bytes": 693
+    },
+    {
+      "path": "docs/ACCOUNTING_INTEGRATION_BOUNDARY.md",
+      "sha256": "5d9dfa1bb2a36a4d0bdac7ca6ea25d58f351bd5168b85ea8c8a5457e60ef1c1b",
+      "bytes": 337
+    },
+    {
+      "path": "docs/LABOR_TIME_BOUNDARY.md",
+      "sha256": "0cb9f02833076d465473a81dfa121f396cf229e17ee9358ba029d0e7c7e8a906",
+      "bytes": 313
+    },
+    {
+      "path": "docs/PHASE_BOUNDARIES.md",
+      "sha256": "dcb2fb4eadf26109fb816dbfb3d3421c7812a02461b52a1c7d2ddfec9d3ea8b8",
+      "bytes": 568
+    },
+    {
+      "path": "docs/adr/ADR-001-architecture-shape.md",
+      "sha256": "48e5ff9f9f53c5e99f651bec0142514a7c5273fc7cc0848bd3fdcae1bc797393",
+      "bytes": 528
+    },
+    {
+      "path": "integrations/google-calendar/IDEMPOTENCY.md",
+      "sha256": "39c5758e0f0f68f9205ab0c5393f4d9ea5ea8fee4b9bbc3fc1d2409b0a922afc",
+      "bytes": 423
+    },
+    {
+      "path": "integrations/google-calendar/README.md",
+      "sha256": "152dd0f268f3be3a858aff726aadbbfd30624a94606a89fdc027efede6978bfe",
+      "bytes": 193
+    },
+    {
+      "path": "integrations/line/DELIVERY_CONTRACT.md",
+      "sha256": "36163f97ef0b0ed965eedfc8a977809d4da95f96cd6aabddd6b8ae4a479ea912",
+      "bytes": 347
+    },
+    {
+      "path": "integrations/line/README.md",
+      "sha256": "b91898257861d842a5c3f6a58ab169af1e74bede7a6b2d84de2e1aa86070bb7d",
+      "bytes": 174
+    },
+    {
+      "path": "integrations/maps/README.md",
+      "sha256": "ee40890351e5f677d608eb700d45eab15aab7e941a4322abac864f4c1a483252",
+      "bytes": 174
+    },
+    {
+      "path": "modules/audit/README.md",
+      "sha256": "4d8f400281342816140889f713e079c29a0f6cab0c99acfd9face3539aec6737",
+      "bytes": 239
+    },
+    {
+      "path": "modules/authorization/README.md",
+      "sha256": "56b48c42acc5f1a350477429448baf88e51ee7a4bcd96fbfc4da54f6942b2633",
+      "bytes": 247
+    },
+    {
+      "path": "modules/dispatch/README.md",
+      "sha256": "c124329d7b4600c67d61a8fbf6109145f269ff19cf466d65b75a37ed40fa9383",
+      "bytes": 515
+    },
+    {
+      "path": "modules/dispatch/state-machine.json",
+      "sha256": "f5a0a646325fa315d7785a137faf6169fd7c6eac00e5eaa236ab4288bc5df764",
+      "bytes": 316
+    },
+    {
+      "path": "modules/identity/README.md",
+      "sha256": "66ea21506189d90f743835120c790f20f37c15005abd1ffd1f5adfec9b2a66e1",
+      "bytes": 232
+    },
+    {
+      "path": "modules/notification/README.md",
+      "sha256": "bfac9b28aa5b1a38d29211aa31247b26fbbeebdb2193bfef554213ace352ae92",
+      "bytes": 272
+    },
+    {
+      "path": "modules/project/README.md",
+      "sha256": "5654c59510e37cf2d4768968a19440be3b7476c666ea8f9387dd1ad8cd5befa5",
+      "bytes": 242
+    },
+    {
+      "path": "modules/workforce/README.md",
+      "sha256": "f90c73a59b3f38b3d093acdc7b2ce8b2e03b6c3ea5c9d54b9e488c72e1548a1c",
+      "bytes": 239
+    },
+    {
+      "path": "observability/runbooks/database-restore.md",
+      "sha256": "483effd49815456e993d02c0009bf3a829b0d4720ba8988525b896594a245ea9",
+      "bytes": 279
+    },
+    {
+      "path": "observability/runbooks/offline-sync-conflict.md",
+      "sha256": "9addfb7c6512c70f9b81fca8ca1066e0baf680ea2830a412533b3f2becb33a59",
+      "bytes": 440
+    },
+    {
+      "path": "observability/runbooks/provider-outage.md",
+      "sha256": "05d871c5c4a45d34f474b297dddc35f30b00cae1435bd74419a32f8717176bdd",
+      "bytes": 449
+    },
+    {
+      "path": "packages/contracts/audit-event.schema.json",
+      "sha256": "5bef54559137f7b7f54cc95601e59c21c414a02ba77ce7504f48fd8524fe7b3c",
+      "bytes": 605
+    },
+    {
+      "path": "packages/contracts/dispatch-acknowledgement.schema.json",
+      "sha256": "52fd76919cef27113e6a1d1661e41c80e54e37f469ac2febb2de2e1d70a9335f",
+      "bytes": 545
+    },
+    {
+      "path": "packages/contracts/dispatch.schema.json",
+      "sha256": "4c3459731201e30887b0c49e12f7459032acacd9810d9b900da7a0496ca0b667",
+      "bytes": 1206
+    },
+    {
+      "path": "packages/contracts/offline-operation.schema.json",
+      "sha256": "37fa102e5388815207ecf2392ddb6d5519f77224f623649ba032d13cdbf8b609",
+      "bytes": 907
+    },
+    {
+      "path": "packages/offline-sync/OFFLINE_SCOPE.json",
+      "sha256": "b7f264bd3905df7e6e42f44773a49f7070ade44c02d222a76e004af391b58914",
+      "bytes": 483
+    },
+    {
+      "path": "packages/offline-sync/README.md",
+      "sha256": "89ed07608454c798c2aa0dd70186913d3a10dde07dff0833323bf492b03c40f4",
+      "bytes": 386
+    },
+    {
+      "path": "scripts/validate_rwd_boundary.py",
+      "sha256": "900f29fc700e4d2ce5c1ff04d6ad2c78e3185d8262675ae00d1a1ae65a322e90",
+      "bytes": 925
+    },
+    {
+      "path": "tests/contract/offline/README.md",
+      "sha256": "ceedc708e2ccc067631ae9224eb80b841fbcd34dfa2a250c1d56b08407e4fe25",
+      "bytes": 250
+    },
+    {
+      "path": "tests/e2e/README.md",
+      "sha256": "004c375f27f81b8faebda8e1e8be7a421f5aa8cd3085ddb9f100dd81ad3cad61",
+      "bytes": 372
+    }
+  ]
+}

@@ -98,7 +98,7 @@ Possible Cognitive events: `cognitive.run.started`, `cognitive.run.completed`, `
 
 **Additional gate requirement (new in V2)**: V1's `LOW` tier definition ("single model + deterministic checks") had no human-review requirement and no definition anywhere of what "deterministic checks" means. A hallucinated claim generated during a nominally-LOW-risk request could enter the evidence base unreviewed and later silently contribute to a HIGH-risk decision, because only newly-added evidence gets reviewed at a case's *current* risk tier, not its eventual one. Require at minimum a lightweight human spot-check for any AI-generated claim before it can be admitted as an Assessment Candidate regardless of case risk tier, plus a periodic re-audit of accumulated LOW-risk-cleared claims when a case's risk tier is later elevated. Full reasoning: `HCI30_RESEARCH_REVIEW/12_RED_TEAM_FAILURE_ANALYSIS.md` RT-09.
 
-> 🔴 **DECISION PENDING (`HD-08`)** — without an explicit, ratified, field-by-field policy, individual implementers will each make ad hoc calls about which fields an LLM may set directly — exactly what `16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md`'s own closing line warns against ("create an ADR rather than silently inventing behavior"). **Recommended enumeration** (adapted from the AI/Intelligence reviewer's proposal, reusing AI LEGO's A0-A4/R0-R4 gating machinery rather than a parallel one):
+> ✅ **RESOLVED (`HD-08`, 2026-09-02) — ADR-0019**: the enumeration below is ratified verbatim, plus: every AI-generated claim requires a human spot-check before Assessment-candidate admission regardless of case risk tier, and LOW-tier-cleared claims are re-audited when a case's risk tier is elevated.
 >
 > ```text
 > MUST be deterministic:       identity MATCH_CONFIRMED for RESTRICTED subjects (see 06),
@@ -115,7 +115,7 @@ Possible Cognitive events: `cognitive.run.started`, `cognitive.run.completed`, `
 >                               locked-record write
 > ```
 >
-> Ratify this enumeration (adjust as needed) before Wave 0 closes — it is referenced as already-adopted policy throughout `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-05, so downstream chapters assume an answer here. Full reasoning: `HCI30_RESEARCH_REVIEW/22_OPEN_HUMAN_DECISIONS.md` HD-08, `HCI30_RESEARCH_REVIEW/09_AI_INTELLIGENCE_REVIEW.md` C5.
+> An unenumerated field defaults to `HUMAN_ONLY` until amended. Machine-readable policy artifact, `author_class` schema columns, and admission/re-audit triggers are open implementation gates. See `governance/ADR-0019-deterministic-probabilistic-llm-human-field-policy.md`.
 
 ## Confidence separation
 
@@ -125,7 +125,7 @@ HCI should display separately: Evidence Confidence, Model Agreement, Method Robu
 
 ## Usage Metering *(new section in V2)*
 
-> 🔴 **DECISION PENDING (`HD-22`)** — should each Cognitive OS execution invoked on behalf of an HCI tenant be metered and billed against that tenant's own verified Cognitive OS subscription/entitlement, verified via a signed/authenticated tenant credential rather than a trusted-by-convention `tenant_context` string? **Recommended: yes** — this is cheap now (one contract clause) and forecloses a foreseeable commercial-independence leak later: without it, HCI customers who don't also subscribe to Cognitive OS would get free/unmetered usage riding on someone else's plan, and the two products' otherwise-clean domain separation would develop a commercial coupling through the billing layer by default. The alternative — deciding AI LEGO calls are simply included free in any HCI paid tier — is a legitimate choice too, but forecloses AI LEGO's independent monetization and should only be chosen deliberately. Full reasoning: `HCI30_RESEARCH_REVIEW/22_OPEN_HUMAN_DECISIONS.md` HD-22, `HCI30_RESEARCH_REVIEW/11_ENTERPRISE_COMMERCIAL_REVIEW.md` G-04, `08_HCI30_COMMERCIAL_EDITION_ARCHITECTURE.md` §AI LEGO Usage Metering.
+> ✅ **RESOLVED (`HD-22`, 2026-09-02) — ADR-0031**: yes. Every Cognitive OS execution invoked on behalf of an HCI tenant carries a signed, cryptographically verified `entitlement_ref` naming that tenant's own `product_key='cognitive'` subscription; `entitlement_ref` replaces the bare `tenant_context` string as the field actually trusted. Verification is signature/expiry/product-key checking against a control-plane public key — never a direct cross-product database read (stays inside `ADR-0002`'s boundary). Contract-schema, issuing-side, verifying-side, and metering-ledger gates are open. See `governance/ADR-0031-ai-lego-usage-metering-attribution.md`.
 
 ## Compatibility
 

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Canonical Foundry Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "compiler_version",
+    "input_digest",
+    "project",
+    "foundation",
+    "user_selected",
+    "derived",
+    "deferred",
+    "current_capabilities",
+    "custom_requirements",
+    "modules",
+    "module_reasons",
+    "archetypes",
+    "profile",
+    "criticality",
+    "traceability"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1.0"
+    },
+    "compiler_version": {
+      "const": "1.6.0"
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "foundation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "user_selected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "derived": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "deferred": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "current_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "archetypes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "custom_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "module_reasons": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      }
+    },
+    "profile": {
+      "enum": [
+        "lite",
+        "standard",
+        "commercial",
+        "enterprise"
+      ]
+    },
+    "criticality": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "mission_critical"
+      ]
+    },
+    "traceability": {
+      "type": "object"
+    }
+  }
+}

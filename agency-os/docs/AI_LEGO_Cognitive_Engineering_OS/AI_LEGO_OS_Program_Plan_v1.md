@@ -60,7 +60,7 @@
 
 `PROJECT_ROOT` = `D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\`
 
-Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/methods/`、`/recipes/`、`/docs/`、`/tests/`、`/infra/`、`/apps/` …）一律解讀為 **PROJECT_ROOT 相對路徑**，直到 Phase 4 的 repository decision 決定正式家（獨立 repo 或 monorepo 子樹）後**整批 `git mv` 搬遷保留歷史**。理由：最小爆炸半徑——不污染 `D:\Work` monorepo 根目錄、不與既有 agency-os 治理搶路徑。已列 **OQ-3**。
+Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/methods/`、`/recipes/`、`/docs/`、`/tests/`、`/infra/`、`/apps/` …）一律解讀為 **PROJECT_ROOT 相對路徑**，直到 Phase 4 的 repository decision 決定正式家（獨立 repo 或 monorepo 子樹）後**整批 `git mv` 搬遷保留歷史**。理由：最小爆炸半徑——不污染 `D:\Work` monorepo 根目錄、不與既有 agency-os 治理搶路徑。已列 **OQ-3**。**2026-09-03 更新（ADR-022）**：runtime 程式碼落點已定為 `Projects/internal/cognitive-engineering-os/`（repo 產品根目錄慣例，同 `Projects/internal/hci30/`）；spec 語料（`/specs` `/policies` `/methods` `/recipes` `/docs` `/tests` 等）維持本 PROJECT_ROOT，runtime 對其**唯讀**（`ai_lego.resolve_spec_root`）。整批搬遷 spec 語料仍是另一個未做的決定，不由 ADR-022 隱含。
 
 ---
 
@@ -147,7 +147,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 
 ## 9. Phase 5 — MVP Vertical Slice
 
-**Status：NOT_STARTED**。一條垂直切片證明全鏈：Source → Ingest → Normalize → Knowledge → Human Contribution → Method Selection → Workflow → AI/Compute → Evidence → Artifact → Human Review → Version → Audit → Replay/Rollback。Learning / Research / Business 三選一——選「最能驗證 architecture」而非功能最多，Claude 與 Codex 各自論證後比較。
+**Status：EXIT GATE PASSED（2026-09-03，本機合成資料範圍；詳見 §11 Phase 5 列與 `docs/adr/ADR-022-phase-5-runtime-landing.md`；runtime 落點 `Projects/internal/cognitive-engineering-os/`）**。原始目標敘述保留如下。一條垂直切片證明全鏈：Source → Ingest → Normalize → Knowledge → Human Contribution → Method Selection → Workflow → AI/Compute → Evidence → Artifact → Human Review → Version → Audit → Replay/Rollback。Learning / Research / Business 三選一——選「最能驗證 architecture」而非功能最多，Claude 與 Codex 各自論證後比較。
 
 **已定決策（操作者 2026-08-29）**：部署主機名 = **`cognitive.aware-wave.com`**（獨立一級子網域，不放 app.aware-wave.com；CF Universal cert 涵蓋一級）。**DNS 記錄延後至本 Phase 有 MVP 可 serve 時才建**（避免 dangling DNS / subdomain takeover / Kuma 假紅），屆時寫入 deployment ADR。
 
@@ -171,7 +171,7 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 | 2 | Architecture Convergence | **COMPLETE**（2026-08-30 更新；全數 20 份 ADR 皆 `ACCEPTED`（含 2026-08-30 稍晚 ADR-017~020，OQ-1/4/13/14），見 `docs/adr/ADR_INDEX.md`） | 15+ deliverables ✅ → HUMAN REVIEW 已審閱裁決 → **Phase 3 已開工（見下列）** |
 | 3 | Machine-readable Foundation | **COMPLETE（2026-08-30）**——`tests/run_golden_tests.py` 851/851 全過；`.ai/proposals/` 機制：41 個提案全數 `status: APPLIED`；ADR-019 `reason_code` 已落地；`policies/jurisdiction/legal-freshness-sla.policy.yaml` 已建（解 P1-GAP-LEGAL-1）；`specs/governance/document-registry.schema.yaml` 已建（EC §4 靜態登記表，發現並誠實記錄與 `manifest.schema.yaml` 既有 enum 的潛在漂移風險為 `OQ-DOCREG-1`，不擅自重構既有 ACTIVE 檔案）。**10 個 `typed-objects/*.schema.yaml`（knowledge-set/swot-analysis 等）刻意 DEFERRED**——grep 全文 `MVP_VERTICAL_SLICE_PLAN.md` 確認 Research Mode 切片零命中這 10 個物件（皆屬 Business/Decision Mode），依「優先做切片實際用到的節點」原則誠實結論為目前不需建置，非遺漏 | specs/policies/tests 樹 + schema 驗證 ✅ |
 | 4 | Repository Architecture | **ACCEPTED**（`docs/architecture/REPOSITORY_ARCHITECTURE.md` 於 2026-08-30 由操作者於對話中明示核准（「我核准了」）從 `PROPOSED` 轉為 `ACCEPTED`；內容已落地至 `.ai/research/phase-2/repo-layout-draft.yaml`（status: `DRAFT_PENDING_PHASE_4`，指標式落地不重複內容）；proposals 027/028（repo-layout pointer 批次）已據此套用完成） | bounded contexts 驗證 + repo 決策 |
-| 5 | MVP Vertical Slice | **STOP-FOR-HUMAN-REVIEW 通過，實作開工（2026-08-30）**——Mode 選定 Research（ADR-014）；Phase 3/4 已完全收尾（見上列）；操作者於對話中被完整告知本關解鎖範圍（真的寫會執行的程式碼：音檔轉錄、加密金鑰管理、租戶隔離儲存、workflow 執行引擎、真實資料刪除流程，非文件工作，規模預期跨多個 session）後明示確認「理解，開始寫真正的程式碼」；部署環境明示選定「本機隔離環境（假資料/測試資料，不碰 ks-aw-01 或真實客戶資料）」。**Program Plan §10 Phase 0-2 禁寫 production code/UI/DB schema 的規定，自本次批准起對 Phase 5 本機隔離原型解除**；正式對外部署仍受既有 High-risk 規則約束，需另外走 go-ahead | 全鏈 e2e + replay/rollback 實證 |
+| 5 | MVP Vertical Slice | **EXIT GATE PASSED（2026-09-03，本機合成資料範圍；`docs/adr/ADR-022-phase-5-runtime-landing.md`）**——Codex 三輪 `D:\tmp` 原型經 Claude 逐模組重讀後移植為 `Projects/internal/cognitive-engineering-os/`（repo 產品根目錄慣例，ADR-022 §Decision 1），`ai_lego` 套件依 `REPOSITORY_ARCHITECTURE.md` 樹分模組；§5 六項驗收以測試形式在**兩種 adapter 模式**（決定性 fixture／真 Windows SAPI 語音＋離線 faster-whisper）各跑一次全過（36 unit + 23 + 22 = 81 tests，2026-09-03 實跑），每個 emitted record 皆經 spec root schema 驗證；五個 method-specific gate 由程式真實評估（可 FAIL）、EC §31 十步 deletion_request、state_transition_event 無跳步驗證、Recipe→Workflow IR 編譯皆為 schema-backed。**不主張** production readiness（KMS／實體抹除／diarization／UI／release states 皆未證，見該產品根 `docs/PHASE5_RESEARCH_SLICE.md`）。歷史保留：**STOP-FOR-HUMAN-REVIEW 通過，實作開工（2026-08-30）**——Mode 選定 Research（ADR-014）；Phase 3/4 已完全收尾（見上列）；操作者於對話中被完整告知本關解鎖範圍（真的寫會執行的程式碼：音檔轉錄、加密金鑰管理、租戶隔離儲存、workflow 執行引擎、真實資料刪除流程，非文件工作，規模預期跨多個 session）後明示確認「理解，開始寫真正的程式碼」；部署環境明示選定「本機隔離環境（假資料/測試資料，不碰 ks-aw-01 或真實客戶資料）」。**Program Plan §10 Phase 0-2 禁寫 production code/UI/DB schema 的規定，自本次批准起對 Phase 5 本機隔離原型解除**；正式對外部署仍受既有 High-risk 規則約束，需另外走 go-ahead | 全鏈 e2e + replay/rollback 實證 ✅（2026-09-03，`powershell -File Projects\internal\cognitive-engineering-os\scripts\test-phase5-local.ps1`）|
 
 ---
 

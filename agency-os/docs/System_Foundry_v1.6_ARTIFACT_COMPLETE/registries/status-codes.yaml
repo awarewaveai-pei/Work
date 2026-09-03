@@ -1,0 +1,125 @@
+{
+  "version": "1.6.0",
+  "codes": {
+    "PASS": {
+      "class": "SUCCESS"
+    },
+    "FAIL": {
+      "class": "FAILURE"
+    },
+    "BLOCKED": {
+      "class": "BLOCKED"
+    },
+    "CANCELLED": {
+      "class": "TERMINAL"
+    },
+    "ROLLED_BACK": {
+      "class": "RECOVERY"
+    },
+    "NEEDS_HUMAN_REVIEW": {
+      "class": "BLOCKED"
+    },
+    "INSUFFICIENT_EVIDENCE": {
+      "class": "BLOCKED"
+    },
+    "CURRENT_STATE_NOT_UNDERSTOOD": {
+      "class": "BLOCKED"
+    },
+    "AUTHORITY_UNRESOLVED": {
+      "class": "BLOCKED"
+    },
+    "ROOT_CAUSE_NOT_ESTABLISHED": {
+      "class": "BLOCKED"
+    },
+    "DEPENDENCY_UNAVAILABLE": {
+      "class": "BLOCKED"
+    },
+    "POLICY_DENIED": {
+      "class": "BLOCKED"
+    },
+    "RISK_TOO_HIGH": {
+      "class": "BLOCKED"
+    },
+    "STALE_EVIDENCE": {
+      "class": "BLOCKED"
+    },
+    "EXCEPTION_EXPIRED": {
+      "class": "BLOCKED"
+    },
+    "INDEPENDENCE_VIOLATION": {
+      "class": "BLOCKED"
+    },
+    "ROLLBACK_NOT_PROVEN": {
+      "class": "BLOCKED"
+    },
+    "MIGRATION_NOT_PROVEN": {
+      "class": "BLOCKED"
+    },
+    "SCHEMA_INVALID": {
+      "class": "BLOCKED"
+    },
+    "REFERENCE_INVALID": {
+      "class": "BLOCKED"
+    },
+    "VERSION_DRIFT": {
+      "class": "BLOCKED"
+    },
+    "MANIFEST_DRIFT": {
+      "class": "BLOCKED"
+    },
+    "KERNEL_INHERITANCE_INVALID": {
+      "class": "BLOCKED"
+    },
+    "RISK_CLASSIFICATION_INVALID": {
+      "class": "BLOCKED"
+    },
+    "AUTHORITY_INSUFFICIENT": {
+      "class": "BLOCKED"
+    },
+    "LIFECYCLE_TRANSITION_INVALID": {
+      "class": "BLOCKED"
+    },
+    "RELEASE_EVIDENCE_INCOMPLETE": {
+      "class": "BLOCKED"
+    },
+    "EVIDENCE_STALE": {
+      "class": "BLOCKED"
+    },
+    "CONTROL_PLANE_MIGRATION_REQUIRED": {
+      "class": "BLOCKED"
+    },
+    "ADVERSARIAL_TEST_FAILED": {
+      "class": "BLOCKED"
+    },
+    "BOOTSTRAP_E2E_FAILED": {
+      "class": "BLOCKED"
+    },
+    "NEEDS_HUMAN_DECISION": {
+      "class": "BLOCKED"
+    },
+    "NEEDS_PROTOTYPE": {
+      "class": "BLOCKED"
+    },
+    "NEEDS_BENCHMARK": {
+      "class": "BLOCKED"
+    },
+    "NEEDS_EXTERNAL_REVIEW": {
+      "class": "BLOCKED"
+    },
+    "NEEDS_LEGAL_REVIEW": {
+      "class": "BLOCKED"
+    },
+    "ARCHITECTURE_CONFLICT": {
+      "class": "BLOCKED"
+    },
+    "UNBOUNDED_BLAST_RADIUS": {
+      "class": "BLOCKED"
+    },
+    "CONTRACT_COMPATIBILITY_UNPROVEN": {
+      "class": "BLOCKED"
+    },
+    "SECURITY_REVIEW_REQUIRED": {
+      "class": "BLOCKED"
+    }
+  }
+}

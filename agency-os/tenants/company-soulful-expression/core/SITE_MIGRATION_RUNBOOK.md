@@ -58,7 +58,7 @@
 
 ## 1. 新主機最低需求
 
-> **目標主機已定（2026-08-26 更新）：OVH SYS-GAME-2**（149.202.64.114，Ubuntu 24.04 已裝、RAID1 已驗；憑證在 `AWARE_WAVE_CREDENTIALS.md`「OVH Dedicated Server」節）——**不是**原規劃的二手 Hetzner（KS-6 缺貨改買，見上方 §0.5②）。
+> **現役目標主機（2026-08-31 更新）：OVH KS-6**（145.239.195.47，Ubuntu 24.04、RAID1 已驗；憑證在 `AWARE_WAVE_CREDENTIALS.md`「OVH Dedicated Server」節）。前任 SYS-GAME-2 已終止，不是回退選項。
 > 機器等級（8c/16t／64GB ECC／2×960GB RAID1）超過本站需求，下表因此是「最低門檻」而非規格建議 —— 真正要注意的是**軟體版本要對齊**，不是硬體夠不夠。
 >
 > **所有權澄清**：soulfulexpression.org 是**操作者自己的產業**，不是第三方客戶。文中的「授權確認」「約時間」因此是自己決定，不需對外協調。

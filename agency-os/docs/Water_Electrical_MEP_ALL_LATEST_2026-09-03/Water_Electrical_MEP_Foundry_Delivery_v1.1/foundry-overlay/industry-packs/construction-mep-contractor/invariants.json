@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0.0",
+  "invariants": [
+    {
+      "id": "MEP-INV-SOT",
+      "statement": "The company system is the authoritative source for dispatch, project, procurement, cost, and audit records; LINE/Google Calendar cannot overwrite it.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Company system is source of truth; LINE/Google Calendar must not overwrite official dispatch data."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-AUTH",
+      "statement": "Authorization is Role + Scope + Permission from Phase 1.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Authorization model is Role + Scope + Permission from Phase 1."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-MULTI-DISPATCH",
+      "statement": "One work assignment may contain one person, many people, or a whole crew; do not duplicate one assignment into separate dispatch records per person.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Single dispatch can assign one, many, or a crew; duplicate per-person dispatch records are prohibited."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-REACK",
+      "statement": "A material dispatch amendment invalidates prior acknowledgements and requires re-acknowledgement.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Dispatch amendment invalidates the original acknowledgement."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-GCAL-IDEMPOTENT",
+      "statement": "Modifying a dispatch updates the same Google event and must not create duplicate events.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Create/update/cancel mapping and no duplicate event on modification."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-AUDIT",
+      "statement": "Important changes preserve actor, time, function, before/after values, and related identifiers.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Audit log requires actor, time, function, before/after, related IDs."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-EMPLOYEE-HISTORY",
+      "statement": "Former employees are not hard-deleted when historical dispatch/cost records depend on them.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "Employee records and no hard delete after departure."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-AI-AUTH",
+      "statement": "AI can only access data the requesting user is already authorized to view.",
+      "evidence": [
+        {
+          "source": "REFERENCE_PROJECT",
+          "claim": "AI may only query data the user already has permission to see."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-RWD",
+      "statement": "The implementation uses one RWD web application; no native mobile app, separate mobile codebase, or installable PWA is part of the current project.",
+      "evidence": [
+        {
+          "source": "USER_OVERRIDE",
+          "path": "sources/USER_OVERRIDE_RWD.md",
+          "lines": "1-16",
+          "claim": "Authoritative RWD-only override."
+        }
+      ]
+    },
+    {
+      "id": "MEP-INV-OFFLINE-AUTHORITY",
+      "statement": "Offline browser state is bounded local cache/queued intent; the company system remains authoritative, queued writes are idempotent and conflict-checked before commit.",
+      "evidence": [
+        {
+          "source": "PACK_POLICY",
+          "claim": "Conditional invariant activated when bounded offline capability is selected."
+        }
+      ],
+      "applies_when_capability": "MEP-CAP-OFFLINE"
+    },
+    {
+      "id": "MEP-INV-LABOR-TIME",
+      "statement": "Dispatch is planned work assignment; actual attendance and approved labor time are separate records, and Phase 4 labor cost uses approved labor time rather than planned dispatch duration.",
+      "evidence": [
+        {
+          "source": "PACK_POLICY",
+          "claim": "Conditional invariant activated when separate actual/approved labor time is selected."
+        }
+      ],
+      "applies_when_capability": "MEP-CAP-APPROVED-LABOR-TIME"
+    },
+    {
+      "id": "MEP-INV-ACCOUNTING-ADAPTER",
+      "statement": "Accounting synchronization uses a replaceable adapter, idempotent export/import semantics and reconciliation; accounting-provider records cannot silently overwrite operational source-of-truth records.",
+      "evidence": [
+        {
+          "source": "PACK_POLICY",
+          "claim": "Conditional invariant activated when accounting synchronization is selected."
+        }
+      ],
+      "applies_when_capability": "MEP-CAP-ACCOUNTING-INTEGRATION"
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "version": "1.6.0",
+  "fail_closed": true,
+  "status_registry": "registries/status-codes.yaml",
+  "gates": {
+    "G0_INTAKE_COMPLETE": {
+      "requires": [
+        "scope",
+        "goals",
+        "non_goals",
+        "stakeholders",
+        "criticality",
+        "profile",
+        "archetype",
+        "human_system_applicability"
+      ]
+    },
+    "G1_CURRENT_STATE_UNDERSTOOD": {
+      "applies_to": "existing_system_change",
+      "requires": [
+        "repository_inventory",
+        "source_of_truth_map",
+        "dependency_map",
+        "ownership_map",
+        "evidence_register"
+      ],
+      "stop_on": [
+        "INSUFFICIENT_EVIDENCE",
+        "CURRENT_STATE_NOT_UNDERSTOOD"
+      ]
+    },
+    "G2_ROOT_CAUSE_ESTABLISHED": {
+      "applies_to": "existing_system_change",
+      "requires": [
+        "reproduction",
+        "verified_root_cause",
+        "owner",
+        "boundary"
+      ],
+      "stop_on": [
+        "ROOT_CAUSE_NOT_ESTABLISHED"
+      ]
+    },
+    "G3_POLICY_CONTEXT_RESOLVED": {
+      "requires": [
+        "risk_classification",
+        "authority_model",
+        "tool_boundaries",
+        "external_fact_freshness"
+      ],
+      "stop_on": [
+        "AUTHORITY_UNRESOLVED",
+        "STALE_EVIDENCE",
+        "POLICY_DENIED",
+        "RISK_CLASSIFICATION_INVALID",
+        "AUTHORITY_INSUFFICIENT"
+      ]
+    },
+    "G4_DOMAIN_STABLE": {
+      "requires": [
+        "domain_model",
+        "bounded_contexts",
+        "invariants",
+        "ownership",
+        "lifecycle_surfaces"
+      ]
+    },
+    "G5_OPTIONS_COMPARED": {
+      "requires": [
+        "architecture_options",
+        "decision_matrix",
+        "failure_modes",
+        "economics"
+      ],
+      "minimum_options": 3
+    },
+    "G6_ENGINEERING_REVIEWED": {
+      "requires": [
+        "security",
+        "data",
+        "iam",
+        "sre",
+        "observability",
+        "testing",
+        "migration",
+        "rollback",
+        "supply_chain",
+        "compatibility",
+        "provider_resilience",
+        "human_factors_if_applicable",
+        "accessibility_globalization_if_applicable",
+        "explainability_if_applicable"
+      ]
+    },
+    "G7_FALSIFICATION_COMPLETE": {
+      "requires": [
+        "falsification",
+        "red_team",
+        "complexity_audit"
+      ]
+    },
+    "G8_ASSURANCE_READY": {
+      "requires": [
+        "claim_register",
+        "control_evidence_matrix",
+        "independent_review",
+        "golden_contract_tests",
+        "counterfactual_shadow_validation_if_applicable"
+      ],
+      "stop_on": [
+        "INDEPENDENCE_VIOLATION",
+        "ADVERSARIAL_TEST_FAILED"
+      ]
+    },
+    "G9_HUMAN_APPROVED": {
+      "requires": [
+        "decision_record",
+        "accepted_residual_risk"
+      ]
+    },
+    "G10_IMPLEMENTATION_READY": {
+      "requires": [
+        "implementation_backlog",
+        "exact_paths",
+        "tests",
+        "observability",
+        "rollback",
+        "authority_grants"
+      ]
+    },
+    "G11_VERIFIED": {
+      "requires": [
+        "acceptance_evidence",
+        "rollback_evidence",
+        "migration_evidence",
+        "security_evidence",
+        "supply_chain_evidence",
+        "experience_validation_if_applicable"
+      ],
+      "stop_on": [
+        "ROLLBACK_NOT_PROVEN",
+        "MIGRATION_NOT_PROVEN",
+        "EVIDENCE_STALE"
+      ]
+    },
+    "G12_RELEASE_READY": {
+      "requires": [
+        "release_evidence_bundle",
+        "immutable_version",
+        "approvals",
+        "deployment_strategy",
+        "rollback_thresholds"
+      ],
+      "stop_on": [
+        "RELEASE_EVIDENCE_INCOMPLETE"
+      ]
+    },
+    "G13_RELEASE_CLOSED_LOOP": {
+      "requires": [
+        "release_evidence",
+        "production_observability",
+        "runbook",
+        "post_release_validation",
+        "audit_events",
+        "handoff_record"
+      ]
+    }
+  }
+}

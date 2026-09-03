@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://system-foundry.local/schemas/experience-validation.schema.json",
+  "title":"Experience Validation",
+  "type":"object",
+  "required":["applicability","critical_journeys","error_recovery","human_oversight","result"],
+  "properties":{
+    "applicability":{"enum":["APPLICABLE","NOT_APPLICABLE"]},
+    "na_rationale":{"type":"string","minLength":1},
+    "critical_journeys":{"type":"array","items":{"type":"object","required":["id","tests"],"properties":{"id":{"type":"string"},"tests":{"type":"array","minItems":1,"items":{"type":"string"}}}}},
+    "error_recovery":{"type":"array","items":{"type":"string"}},
+    "accessibility":{"type":"object"},
+    "globalization":{"type":"object"},
+    "human_oversight":{"type":"array","items":{"type":"string"}},
+    "explainability":{"type":"object"},
+    "result":{"enum":["PASS","FAIL","BLOCKED","NOT_APPLICABLE"]}
+  },
+  "allOf":[{"if":{"properties":{"applicability":{"const":"NOT_APPLICABLE"}}},"then":{"required":["na_rationale"]}}]
+}

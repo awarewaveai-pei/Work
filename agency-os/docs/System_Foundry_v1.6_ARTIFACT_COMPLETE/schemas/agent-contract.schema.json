@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/agent-contract.schema.json",
+  "title": "Foundry Agent Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_id",
+    "specialization",
+    "kernel_version",
+    "kernel_digest",
+    "independence_role",
+    "task_scope",
+    "forbidden_scope",
+    "kernel_weakening_allowed"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "specialization": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kernel_version": {
+      "const": "1.6.0"
+    },
+    "kernel_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "independence_role": {
+      "enum": [
+        "DESIGN",
+        "REVIEW",
+        "ASSURANCE"
+      ]
+    },
+    "task_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "forbidden_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kernel_weakening_allowed": {
+      "const": false
+    }
+  }
+}

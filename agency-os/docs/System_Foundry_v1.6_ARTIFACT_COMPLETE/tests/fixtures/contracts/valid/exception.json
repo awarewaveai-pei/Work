@@ -1,0 +1,26 @@
+{
+  "_schema": "exception.schema.json",
+  "id": "EX-1",
+  "violated_rule": "NON_CRITICAL_LATENCY_TARGET",
+  "rationale": "Temporary vendor outage requires controlled deviation.",
+  "risk_tier": "R2",
+  "scope": [
+    "service-a"
+  ],
+  "owner": "team",
+  "approver": "reviewer",
+  "starts_at": "2026-01-01T00:00:00Z",
+  "expires_at": "2026-01-02T00:00:00Z",
+  "compensating_controls": [
+    "monitor"
+  ],
+  "monitoring": [
+    "alert"
+  ],
+  "evidence": [
+    "incident-1"
+  ],
+  "removal_task": "TASK-1",
+  "permanent_target_fix": "restore primary path",
+  "rollback": "remove exception"
+}

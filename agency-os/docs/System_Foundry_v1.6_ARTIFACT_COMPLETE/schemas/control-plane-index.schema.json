@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/control-plane-index.schema.json",
+  "title": "Control Plane Artifact Index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "foundry_kernel_version",
+    "artifacts"
+  ],
+  "properties": {
+    "foundry_kernel_version": {
+      "const": "1.6.0"
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  }
+}

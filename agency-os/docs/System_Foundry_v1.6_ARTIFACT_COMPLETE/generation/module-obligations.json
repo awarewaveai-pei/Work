@@ -1,0 +1,613 @@
+{
+  "version": "1.6.0",
+  "modules": {
+    "core": {
+      "purpose": "Establish the system-wide engineering foundation and clean architecture boundaries.",
+      "invariants": [
+        "Domain rules remain independent from delivery/runtime vendors.",
+        "Every authoritative datum has an explicit owner and source of truth.",
+        "All production changes are observable, testable, reversible, and evidence-linked.",
+        "No adapter or framework may become the canonical business model."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "web": {
+      "purpose": "Human-facing web application surface.",
+      "invariants": [
+        "Server-side authorization remains authoritative.",
+        "UI state never becomes the source of truth.",
+        "Critical actions expose clear confirmation/recovery states.",
+        "Accessibility is native, not retrofit."
+      ],
+      "security": [
+        "CSP and browser security headers.",
+        "CSRF/XSS/input/output encoding controls.",
+        "Secure session/cookie handling."
+      ],
+      "tests": [
+        "Critical-journey browser E2E.",
+        "Keyboard/focus/accessibility checks.",
+        "Error/degraded-state tests."
+      ],
+      "operations": [
+        "Frontend error telemetry.",
+        "Performance budgets and real-user signals where applicable."
+      ],
+      "recovery": [
+        "Backward-compatible deploys or rollback path.",
+        "No irreversible client migration without server compatibility."
+      ]
+    },
+    "mobile": {
+      "purpose": "Mobile application surface with device-aware safety.",
+      "invariants": [
+        "Server remains authoritative unless an explicit offline model is selected.",
+        "Local data is minimized and encrypted when sensitive.",
+        "Device lifecycle and revocation are explicit."
+      ],
+      "security": [
+        "Secure platform storage for tokens.",
+        "Certificate/network protections appropriate to threat model.",
+        "No secrets embedded in application bundles."
+      ],
+      "tests": [
+        "Device lifecycle tests.",
+        "Upgrade/downgrade compatibility tests.",
+        "Accessibility tests.",
+        "Offline/sync tests only when offline capability is selected."
+      ],
+      "operations": [
+        "Crash/performance telemetry with privacy controls.",
+        "App-version compatibility monitoring."
+      ],
+      "recovery": [
+        "Remote session/device revocation.",
+        "Safe local cache invalidation.",
+        "Backward-compatible API rollout."
+      ]
+    },
+    "desktop": {
+      "purpose": "Desktop application surface.",
+      "invariants": [
+        "Local state is explicit and bounded.",
+        "Business truth is not silently forked onto unmanaged clients."
+      ],
+      "security": [
+        "Signed release artifacts.",
+        "Secure secret/token storage.",
+        "Update channel integrity."
+      ],
+      "tests": [
+        "Install/update/rollback tests.",
+        "Local permission boundary tests."
+      ],
+      "operations": [
+        "Crash/update telemetry where permitted."
+      ],
+      "recovery": [
+        "Rollback-capable auto-update strategy.",
+        "Local data export/recovery if authoritative local state exists."
+      ]
+    },
+    "api": {
+      "purpose": "Stable machine-to-machine API boundary.",
+      "invariants": [
+        "Contracts are versioned and compatibility-managed.",
+        "Writes are idempotent where retries are possible.",
+        "Authorization is enforced on every protected resource."
+      ],
+      "security": [
+        "Authentication, authorization, rate limiting, input validation.",
+        "No sensitive internal implementation leakage."
+      ],
+      "tests": [
+        "Schema/contract compatibility tests.",
+        "AuthN/AuthZ negative tests.",
+        "Idempotency/retry tests."
+      ],
+      "operations": [
+        "Latency/error/saturation metrics by endpoint class.",
+        "Consumer/version visibility."
+      ],
+      "recovery": [
+        "Backward-compatible release strategy.",
+        "Consumer migration/deprecation path."
+      ]
+    },
+    "cli": {
+      "purpose": "Command-line/operator interface.",
+      "invariants": [
+        "Destructive commands are explicit and fail closed.",
+        "Exit codes and output contracts are stable for automation."
+      ],
+      "security": [
+        "No secrets in command history/output.",
+        "Privilege escalation requires explicit authority."
+      ],
+      "tests": [
+        "Command contract and exit-code tests.",
+        "Destructive-action dry-run tests."
+      ],
+      "operations": [
+        "Auditable invocation for consequential actions."
+      ],
+      "recovery": [
+        "Dry-run/preview and rollback/compensation for mutations."
+      ]
+    },
+    "identity": {
+      "purpose": "Identity, authentication, session, and role boundary.",
+      "invariants": [
+        "Identity proof, authentication, authorization, and entitlement are separate concerns.",
+        "Sessions and credentials have explicit lifecycle and revocation.",
+        "Least privilege is default."
+      ],
+      "security": [
+        "Credential hashing/secure federation.",
+        "Session fixation/hijack protections.",
+        "MFA/SSO controls when selected."
+      ],
+      "tests": [
+        "Login/logout/session revocation.",
+        "Privilege escalation negatives.",
+        "Role boundary tests."
+      ],
+      "operations": [
+        "Auth failure/anomaly monitoring without secret leakage."
+      ],
+      "recovery": [
+        "Emergency credential/session revocation.",
+        "Identity-provider fallback/lockout recovery where relevant."
+      ]
+    },
+    "tenant": {
+      "purpose": "Multi-organization ownership and isolation boundary.",
+      "invariants": [
+        "Tenant context is explicit and immutable within a request/transaction.",
+        "Cross-tenant access is deny-by-default.",
+        "Sharing/collaboration is explicit, scoped, and audited."
+      ],
+      "security": [
+        "Tenant-scoped authorization on every owned object.",
+        "No tenant identifier may be trusted solely from client input."
+      ],
+      "tests": [
+        "Cross-tenant negative tests.",
+        "Tenant-scoped backup/restore tests.",
+        "Shared-resource authorization tests when selected."
+      ],
+      "operations": [
+        "Tenant dimension in audit/observability without leaking sensitive data."
+      ],
+      "recovery": [
+        "Tenant-scoped recovery minimizes other-tenant impact.",
+        "Cross-tenant repair requires elevated authority and audit."
+      ]
+    },
+    "domain": {
+      "purpose": "Business domain models and invariants.",
+      "invariants": [
+        "Every aggregate/entity has explicit ownership and lifecycle.",
+        "Business invariants are enforced close to domain truth.",
+        "Vendor/framework semantics do not leak into the domain."
+      ],
+      "security": [
+        "Sensitive domain attributes are classified and access-scoped."
+      ],
+      "tests": [
+        "Invariant/state-transition tests.",
+        "Property tests for critical calculations where useful."
+      ],
+      "operations": [
+        "Business-event/audit signals for consequential transitions."
+      ],
+      "recovery": [
+        "State corrections preserve audit/history.",
+        "Migrations protect semantic meaning, not only columns."
+      ]
+    },
+    "workflow": {
+      "purpose": "Workflow, approval, task, and state-transition orchestration.",
+      "invariants": [
+        "State transitions are explicit and validated.",
+        "Approval identity/time/reason are auditable.",
+        "Duplicate delivery cannot cause duplicate business effects."
+      ],
+      "security": [
+        "Authorization is checked per transition, not only per screen.",
+        "High-impact approvals enforce required authority/dual control."
+      ],
+      "tests": [
+        "Valid/invalid transition matrix.",
+        "Concurrent transition/idempotency tests.",
+        "Approval revocation/cancellation paths."
+      ],
+      "operations": [
+        "Stuck/failed workflow visibility.",
+        "Transition latency and failure signals."
+      ],
+      "recovery": [
+        "Compensating transitions or explicit irreversible boundary.",
+        "Resume/retry semantics are deterministic."
+      ]
+    },
+    "files": {
+      "purpose": "File/media storage and access boundary.",
+      "invariants": [
+        "Object metadata and ownership are explicit.",
+        "Storage objects are never authorized by opaque URL possession alone.",
+        "Integrity/lifecycle are managed."
+      ],
+      "security": [
+        "Type/size validation.",
+        "Malware/content scanning when untrusted uploads exist.",
+        "Signed/short-lived access as appropriate."
+      ],
+      "tests": [
+        "Unauthorized object access negatives.",
+        "Upload corruption/interruption tests.",
+        "Version/lifecycle tests when selected."
+      ],
+      "operations": [
+        "Storage growth, scan failures, orphan detection."
+      ],
+      "recovery": [
+        "Object/version recovery and metadata consistency checks."
+      ]
+    },
+    "search": {
+      "purpose": "Search/indexing capability.",
+      "invariants": [
+        "Search index is derived unless explicitly justified otherwise.",
+        "Index can be rebuilt from authoritative sources.",
+        "Authorization filtering cannot be bypassed by search."
+      ],
+      "security": [
+        "Search results obey the same object authorization model."
+      ],
+      "tests": [
+        "Rebuild consistency.",
+        "Unauthorized-result exclusion.",
+        "Index lag behavior."
+      ],
+      "operations": [
+        "Index lag, failure, size, query latency."
+      ],
+      "recovery": [
+        "Deterministic rebuild/reindex procedure."
+      ]
+    },
+    "analytics": {
+      "purpose": "Reporting, analytics, dashboard, and export capability.",
+      "invariants": [
+        "Metric definitions are versioned and reproducible.",
+        "Analytics is not an accidental source of transactional truth.",
+        "Exports respect authorization and data minimization."
+      ],
+      "security": [
+        "Row/tenant access controls.",
+        "Sensitive exports are auditable."
+      ],
+      "tests": [
+        "Metric reconciliation.",
+        "Authorization on reports/exports.",
+        "Time-zone/currency correctness where applicable."
+      ],
+      "operations": [
+        "Pipeline freshness and reconciliation signals."
+      ],
+      "recovery": [
+        "Rebuild derived aggregates from source data."
+      ]
+    },
+    "commercial": {
+      "purpose": "Commercial editions, subscriptions, entitlements, trials, and licensing.",
+      "invariants": [
+        "Entitlement is separate from payment-provider state.",
+        "Commercial state transitions are explicit and auditable.",
+        "Product capability gates are centrally defined."
+      ],
+      "security": [
+        "Entitlement checks are server-side authoritative.",
+        "Administrative overrides require audit/authority."
+      ],
+      "tests": [
+        "Edition/entitlement matrix.",
+        "Subscription lifecycle.",
+        "Trial expiry/grace period."
+      ],
+      "operations": [
+        "Entitlement mismatch and lifecycle failure monitoring."
+      ],
+      "recovery": [
+        "Provider outage does not silently corrupt entitlement truth.",
+        "Manual correction is audited and reversible."
+      ]
+    },
+    "payments": {
+      "purpose": "Payment, invoice, refund, tax, and reconciliation boundary.",
+      "invariants": [
+        "Provider adapter isolates external payment semantics.",
+        "Every money-moving write is idempotent.",
+        "Ledger/reconciliation distinguishes requested, provider, and settled state."
+      ],
+      "security": [
+        "Do not store raw payment credentials when a provider can tokenize.",
+        "Webhook authenticity and replay defenses."
+      ],
+      "tests": [
+        "Duplicate callback/idempotency.",
+        "Partial failure/reconciliation.",
+        "Refund/partial-refund state transitions."
+      ],
+      "operations": [
+        "Payment failure/reconciliation alerts.",
+        "Provider latency/outage visibility."
+      ],
+      "recovery": [
+        "Compensation/refund paths.",
+        "Provider replay/reconciliation before manual mutation."
+      ]
+    },
+    "notifications": {
+      "purpose": "Email/SMS/push/in-app/webhook delivery.",
+      "invariants": [
+        "Notification request and delivery state are separate.",
+        "Retry cannot duplicate consequential external effects.",
+        "User/channel preferences are explicit where required."
+      ],
+      "security": [
+        "Template/output escaping.",
+        "Secrets and sensitive payload minimization.",
+        "Webhook signatures when emitting webhooks."
+      ],
+      "tests": [
+        "Retry/deduplication.",
+        "Provider failure/fallback.",
+        "Template rendering."
+      ],
+      "operations": [
+        "Delivery rate, bounce/failure, provider health."
+      ],
+      "recovery": [
+        "Dead-letter/retry policy.",
+        "Provider switch through adapter boundary."
+      ]
+    },
+    "integrations": {
+      "purpose": "External system/provider integration boundary.",
+      "invariants": [
+        "External semantics terminate at adapters.",
+        "Timeout/retry/circuit-breaker behavior is explicit.",
+        "Compatibility and version ownership are known."
+      ],
+      "security": [
+        "Scoped credentials.",
+        "Inbound authenticity validation.",
+        "Outbound data minimization."
+      ],
+      "tests": [
+        "Contract tests against provider fixtures/sandboxes.",
+        "Timeout/retry/idempotency.",
+        "Schema/version changes."
+      ],
+      "operations": [
+        "Per-provider health, latency, error, quota signals."
+      ],
+      "recovery": [
+        "Fallback/degraded mode when justified.",
+        "Replay/reconciliation for missed external events."
+      ]
+    },
+    "offline": {
+      "purpose": "Offline/local-first and synchronization capability.",
+      "invariants": [
+        "Local authoritative scope is explicitly defined.",
+        "Conflict resolution is deterministic.",
+        "Sync operations are idempotent and tenant-safe."
+      ],
+      "security": [
+        "Sensitive local data encrypted.",
+        "Device/session revocation semantics.",
+        "No cross-user local cache leakage."
+      ],
+      "tests": [
+        "Conflict matrix.",
+        "Interrupted sync/retry.",
+        "Clock/order skew.",
+        "Revoked-device behavior."
+      ],
+      "operations": [
+        "Sync backlog/conflict/error visibility."
+      ],
+      "recovery": [
+        "Local reset/resync procedure.",
+        "Server reconciliation remains auditable."
+      ]
+    },
+    "globalization": {
+      "purpose": "Localization, timezone, currency, and RTL capability.",
+      "invariants": [
+        "Canonical data representation is locale-independent.",
+        "Presentation formatting is locale-aware.",
+        "Timezone meaning is explicit for scheduled/business events."
+      ],
+      "security": [
+        "Localization does not bypass validation/encoding."
+      ],
+      "tests": [
+        "Unicode/RTL.",
+        "Timezone/DST boundaries.",
+        "Currency/number/date formats."
+      ],
+      "operations": [
+        "Locale-specific rendering/error telemetry where useful."
+      ],
+      "recovery": [
+        "Data remains canonical when locale settings change."
+      ]
+    },
+    "ai": {
+      "purpose": "AI/LLM/agent capability with bounded authority.",
+      "invariants": [
+        "AI output is not treated as verified fact without evidence.",
+        "Model/provider/version and input evidence are reproducible for consequential outputs.",
+        "Tool/action authority is explicit and risk-derived."
+      ],
+      "security": [
+        "Prompt/context injection defenses.",
+        "Data minimization and provider policy.",
+        "Tool permission boundary and secret isolation."
+      ],
+      "tests": [
+        "Golden/adversarial prompts.",
+        "Authority/tool negatives.",
+        "Model/provider fallback.",
+        "Counterfactual tests for consequential decisions."
+      ],
+      "operations": [
+        "Quality, cost, latency, refusal/failure, provider/model version signals."
+      ],
+      "recovery": [
+        "Disable/fallback/rollback model or prompt version.",
+        "Compensate/revert AI actions where reversible."
+      ]
+    },
+    "migration": {
+      "purpose": "Legacy migration, coexistence, import/export, and transition architecture.",
+      "invariants": [
+        "Source-to-target mapping is explicit.",
+        "Migration is measurable and reconcilable.",
+        "Cutover has rollback/forward-recovery criteria."
+      ],
+      "security": [
+        "Migration credentials/data extracts are controlled and time-bounded."
+      ],
+      "tests": [
+        "Dry run.",
+        "Row/count/value reconciliation.",
+        "Idempotent rerun.",
+        "Rollback rehearsal."
+      ],
+      "operations": [
+        "Progress, mismatch, error, lag dashboards."
+      ],
+      "recovery": [
+        "Documented abort point and rollback/forward-fix path."
+      ]
+    },
+    "portals": {
+      "purpose": "Customer/partner/public portal surfaces.",
+      "invariants": [
+        "External users have an explicit trust boundary.",
+        "Public and authenticated content paths are separated.",
+        "Embedded/public capabilities never inherit internal privileges."
+      ],
+      "security": [
+        "Rate limiting/abuse controls.",
+        "Session/access controls.",
+        "Content security/accessibility."
+      ],
+      "tests": [
+        "Anonymous/authenticated boundary tests.",
+        "Partner/customer isolation.",
+        "Abuse/rate-limit paths."
+      ],
+      "operations": [
+        "External journey availability and abuse signals."
+      ],
+      "recovery": [
+        "Safe session revocation and backward-compatible frontend rollout."
+      ]
+    },
+    "compliance": {
+      "purpose": "Regulatory/privacy/sensitive-domain obligations.",
+      "invariants": [
+        "Obligations are evidence-backed and freshness-bounded.",
+        "Data minimization, purpose, retention, and access are explicit.",
+        "Compliance claims never exceed evidence."
+      ],
+      "security": [
+        "Sensitive data has stronger access/audit controls as required."
+      ],
+      "tests": [
+        "Control evidence tests.",
+        "Retention/deletion/export checks.",
+        "Policy freshness checks."
+      ],
+      "operations": [
+        "Control failures and stale-evidence alerts."
+      ],
+      "recovery": [
+        "Breach/incident procedures.",
+        "Policy change migration path."
+      ]
+    },
+    "reliability": {
+      "purpose": "High-impact reliability, availability, realtime, and assurance.",
+      "invariants": [
+        "SLIs/SLOs reflect user/business outcomes.",
+        "Failure domains and blast radius are explicit.",
+        "High-impact changes require independent assurance."
+      ],
+      "security": [
+        "Emergency access is controlled and audited."
+      ],
+      "tests": [
+        "Failure injection/game days.",
+        "Capacity/peak tests.",
+        "DR/restore rehearsal.",
+        "Human oversight tests for high-impact operations."
+      ],
+      "operations": [
+        "Error budget, saturation, dependency health, recovery metrics."
+      ],
+      "recovery": [
+        "Tested failover/restore procedures.",
+        "Defined RTO/RPO derived from business impact evidence."
+      ]
+    },
+    "custom": {
+      "purpose": "Hold user-added requirements that do not yet have a deterministic capability mapping, without silently dropping or guessing them.",
+      "invariants": [
+        "Every custom requirement is preserved verbatim with a stable ID.",
+        "Custom text never silently activates an implementation technology.",
+        "Architecture review must map each custom requirement to existing or newly approved capabilities before implementation."
+      ],
+      "security": [
+        "Custom requirements are reviewed for new trust boundaries, sensitive data, authority, and abuse cases."
+      ],
+      "tests": [
+        "Traceability test from custom requirement ID to final mapped capability/module.",
+        "Acceptance tests are added before implementation after mapping."
+      ],
+      "operations": [
+        "Operational impact must be classified during architecture review."
+      ],
+      "recovery": [
+        "No implementation begins until rollback/compensation implications are recorded."
+      ]
+    }
+  }
+}

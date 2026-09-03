@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/restore-evidence.schema.json",
+  "title": "Restore Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "backup_id",
+    "restore_target",
+    "started_at",
+    "completed_at",
+    "integrity_checks",
+    "rto_observed",
+    "rpo_observed",
+    "result"
+  ],
+  "properties": {
+    "backup_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "restore_target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "completed_at": {
+      "type": "string"
+    },
+    "integrity_checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "rto_observed": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rpo_observed": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    }
+  }
+}

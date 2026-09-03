@@ -1,0 +1,8 @@
+{
+  "offline": true,
+  "multi_tenant_saas": false,
+  "accounting_sync": true,
+  "separate_approved_labor_time": true,
+  "online_payment_gateway": false,
+  "client": "RWD_WEB"
+}

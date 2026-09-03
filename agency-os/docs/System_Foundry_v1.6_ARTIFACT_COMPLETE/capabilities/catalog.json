@@ -1,0 +1,1243 @@
+{
+  "version": "1.6.0",
+  "capabilities": [
+    {
+      "id": "CAP-24X7",
+      "name": "24x7 Business Requirement",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ACCOUNTING",
+      "name": "Accounting Integration",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI",
+      "name": "AI Runtime",
+      "module": "ai",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-CLASSIFY",
+      "name": "AI Classification",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-EXTERNAL",
+      "name": "AI External Actions",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-GENERATE",
+      "name": "AI Generation",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-RECOMMEND",
+      "name": "AI Recommendation",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-SEARCH",
+      "name": "AI Search",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-SUMMARY",
+      "name": "AI Summary",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-VOICE",
+      "name": "Voice AI",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-AI-WRITE",
+      "name": "AI Write Actions",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-ANALYTICS",
+      "name": "Analytics",
+      "module": "analytics",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ANON-PUBLIC",
+      "name": "Anonymous Public Access",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-APPROVAL",
+      "name": "Approval Workflow",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-BARCODE",
+      "name": "Barcode / QR",
+      "module": "mobile",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-BG-SYNC",
+      "name": "Background Sync",
+      "module": "offline",
+      "requires": [
+        "CAP-OFFLINE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-BIOMETRIC",
+      "name": "Biometric Data",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-BOOKING",
+      "name": "Booking / Schedule Records",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CAMERA",
+      "name": "Camera",
+      "module": "mobile",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CLI",
+      "name": "CLI Interface",
+      "module": "cli",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-COEXISTENCE",
+      "name": "Parallel Run",
+      "module": "migration",
+      "requires": [
+        "CAP-LEGACY-MIGRATION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-COMMENTS",
+      "name": "Comments / Discussion",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-COMMERCIAL",
+      "name": "Commercial Product",
+      "module": "commercial",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CONTRACTS",
+      "name": "Contracts",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CRM",
+      "name": "CRM Integration",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CROSS-TENANT-COLLAB",
+      "name": "Cross-organization Collaboration",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-CROSS-TENANT-SHARE",
+      "name": "Explicit Cross-organization Sharing",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-CUSTOMER-DATA",
+      "name": "Customer Records",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CUSTOMER-EXPORT",
+      "name": "Customer Data Export",
+      "module": "migration",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CUSTOMER-PORTAL",
+      "name": "Customer Portal",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-CUSTOMER-USERS",
+      "name": "Customer Users",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-DASHBOARD",
+      "name": "Dashboard",
+      "module": "analytics",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-DESKTOP",
+      "name": "Desktop App",
+      "module": "desktop",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-EDITIONS",
+      "name": "Product Editions",
+      "module": "commercial",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-EMAIL",
+      "name": "Email Notifications",
+      "module": "notifications",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-EMBED",
+      "name": "Embeddable Widget",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ERP",
+      "name": "ERP Integration",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ESIGN",
+      "name": "Electronic Signing",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-EXPORT",
+      "name": "Data Export",
+      "module": "analytics",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-EXT-STORAGE",
+      "name": "External Storage",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-EXTERNAL-API",
+      "name": "Third-party API Integration",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-FILE-VERSION",
+      "name": "File Versioning",
+      "module": "files",
+      "requires": [
+        "CAP-FILES"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-FILES",
+      "name": "Document Upload",
+      "module": "files",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-FILTERS",
+      "name": "Advanced Filtering",
+      "module": "search",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-FINANCIAL-DECISION",
+      "name": "Financial Decision",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-FINANCIAL-IMPACT",
+      "name": "Financial Impact",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-FINANCIAL-RECORDS",
+      "name": "Financial Records",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-GEOLOCATION",
+      "name": "Precise Geolocation",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-GOV",
+      "name": "Government Context",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-GROUP",
+      "name": "Group / Parent-child Organization",
+      "module": "tenant",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-HEALTH-DATA",
+      "name": "Health Data",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-HISTORICAL-IMPORT",
+      "name": "Historical Import",
+      "module": "migration",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-I18N",
+      "name": "Multiple Languages",
+      "module": "globalization",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-IDENTITY",
+      "name": "Identity",
+      "module": "identity",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-IDP",
+      "name": "External Identity Provider",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-IMAGES",
+      "name": "Images",
+      "module": "files",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-IMPORT-EXPORT",
+      "name": "Import / Export Interface",
+      "module": "integrations",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-INAPP-NOTIFY",
+      "name": "In-app Notifications",
+      "module": "notifications",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-INTERNAL-USERS",
+      "name": "Internal Users",
+      "module": "identity",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-INVENTORY",
+      "name": "Inventory",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-INVITES",
+      "name": "Invitations",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-INVOICES",
+      "name": "Invoices",
+      "module": "payments",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-LEGACY-MIGRATION",
+      "name": "Legacy Migration",
+      "module": "migration",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-LEGACY-SYNC",
+      "name": "Legacy Sync",
+      "module": "migration",
+      "requires": [
+        "CAP-LEGACY-MIGRATION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-LEGAL-IMPACT",
+      "name": "Legal Impact",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-LEGAL-RECORD",
+      "name": "Legal-effect Records",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-LICENSE",
+      "name": "License Management",
+      "module": "commercial",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-LOCATION",
+      "name": "Location",
+      "module": "mobile",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-MINORS",
+      "name": "Minor Users",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-MOBILE",
+      "name": "Mobile App",
+      "module": "mobile",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-MULTI-AGENT",
+      "name": "Multi-agent",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-MULTI-APPROVAL",
+      "name": "Multi-party Approval",
+      "module": "workflow",
+      "requires": [
+        "CAP-APPROVAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-MULTI-CURRENCY",
+      "name": "Multiple Currencies",
+      "module": "globalization",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-MULTI-TENANT",
+      "name": "Multi-organization Ownership",
+      "module": "tenant",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-NONREPEATABLE",
+      "name": "Non-repeatable Transactions",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-OFFLINE",
+      "name": "Offline Operation",
+      "module": "offline",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ORDERS",
+      "name": "Orders / Transactions",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ORG-ADMIN",
+      "name": "Organization User Administration",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-ORG-DATA",
+      "name": "Organization Records",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ORG-HIERARCHY",
+      "name": "Organization Hierarchy",
+      "module": "tenant",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PARTIAL-REFUND",
+      "name": "Partial Refunds",
+      "module": "payments",
+      "requires": [
+        "CAP-REFUNDS"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-PARTNER-PORTAL",
+      "name": "Partner Portal",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PARTNER-USERS",
+      "name": "Partner Users",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PAYMENTS",
+      "name": "Online Payments",
+      "module": "payments",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-PRODUCTS",
+      "name": "Product / Service Catalog",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PROJECTS",
+      "name": "Cases / Projects",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PUBLIC-API",
+      "name": "Public API",
+      "module": "api",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PUBLIC-PAGES",
+      "name": "Public Pages",
+      "module": "portals",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-PUSH",
+      "name": "Push Notifications",
+      "module": "notifications",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-REALTIME",
+      "name": "Realtime Business Requirement",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-REALTIME-COLLAB",
+      "name": "Realtime Collaboration",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-REFUNDS",
+      "name": "Refunds",
+      "module": "payments",
+      "requires": [
+        "CAP-PAYMENTS"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-REPORTS",
+      "name": "Reports",
+      "module": "analytics",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-RESIDENCY",
+      "name": "Data Residency",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-ROLES",
+      "name": "Role Model",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-RTL",
+      "name": "RTL UI",
+      "module": "globalization",
+      "requires": [
+        "CAP-I18N"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-SAFETY-IMPACT",
+      "name": "Safety Impact",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SAVED-PAYMENT",
+      "name": "Saved Payment Method",
+      "module": "payments",
+      "requires": [
+        "CAP-PAYMENTS"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-SCHEDULING",
+      "name": "Scheduling",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SEARCH",
+      "name": "Full-text Search",
+      "module": "search",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SELF-REG",
+      "name": "Self Registration",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-SHARE-LINKS",
+      "name": "Share Links",
+      "module": "files",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SMS",
+      "name": "SMS Notifications",
+      "module": "notifications",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SPIKY-LOAD",
+      "name": "Spiky Load",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SSO",
+      "name": "Enterprise SSO",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-STATE-WORKFLOW",
+      "name": "State Workflow",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-SUBSCRIPTION",
+      "name": "Subscription",
+      "module": "commercial",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-TASKS",
+      "name": "Task Assignment",
+      "module": "workflow",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-TAX",
+      "name": "Tax Calculation",
+      "module": "payments",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-TIMEZONES",
+      "name": "Multiple Time Zones",
+      "module": "globalization",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-TRIAL",
+      "name": "Trial",
+      "module": "commercial",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-UGC",
+      "name": "User-generated Content",
+      "module": "domain",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-USAGE-METERING",
+      "name": "Usage Metering",
+      "module": "commercial",
+      "requires": [
+        "CAP-COMMERCIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "CAP-VIDEO",
+      "name": "Video",
+      "module": "files",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-WEB",
+      "name": "Web UI",
+      "module": "web",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "CAP-WEBHOOK",
+      "name": "Outbound Webhooks",
+      "module": "notifications",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "DER-AI-AUDIT",
+      "name": "AI Action Audit",
+      "module": "ai",
+      "requires": [
+        "FOUND-AUDIT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-AI-AUTHORITY",
+      "name": "AI Authority Control",
+      "module": "ai",
+      "requires": [
+        "CAP-AI-WRITE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-AI-HUMAN",
+      "name": "AI Human Oversight",
+      "module": "ai",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "DER-AI-IDEMPOTENCY",
+      "name": "AI Action Idempotency",
+      "module": "ai",
+      "requires": [
+        "FOUND-ROLLBACK"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-AI-TOOLS",
+      "name": "AI Tool Boundary",
+      "module": "ai",
+      "requires": [
+        "CAP-AI-WRITE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-BILLING-LIFECYCLE",
+      "name": "Billing Lifecycle",
+      "module": "commercial",
+      "requires": [
+        "CAP-SUBSCRIPTION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-COMPLIANCE-RESEARCH",
+      "name": "Current Compliance Research",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "DER-DEVICE-REVOCATION",
+      "name": "Device Revocation",
+      "module": "offline",
+      "requires": [
+        "CAP-OFFLINE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-ENTITLEMENT",
+      "name": "Entitlement Boundary",
+      "module": "commercial",
+      "requires": [
+        "CAP-SUBSCRIPTION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-FILE-AUTHZ",
+      "name": "Object Authorization",
+      "module": "files",
+      "requires": [
+        "FOUND-SECURITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-FILE-INTEGRITY",
+      "name": "File Integrity / Lifecycle",
+      "module": "files",
+      "requires": [
+        "FOUND-DATA-INTEGRITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-HUMAN-OVERSIGHT",
+      "name": "Meaningful Human Oversight",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "DER-INDEPENDENT-ASSURANCE",
+      "name": "Independent Assurance",
+      "module": "reliability",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "DER-OFFLINE-CRYPTO",
+      "name": "Offline Local Encryption",
+      "module": "offline",
+      "requires": [
+        "CAP-OFFLINE",
+        "FOUND-SECURITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-PAYMENT-ADAPTER",
+      "name": "Payment Provider Boundary",
+      "module": "payments",
+      "requires": [
+        "CAP-PAYMENTS"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-PAYMENT-IDEMPOTENCY",
+      "name": "Payment Idempotency",
+      "module": "payments",
+      "requires": [
+        "CAP-PAYMENTS",
+        "FOUND-ROLLBACK"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-PAYMENT-RECON",
+      "name": "Payment Reconciliation",
+      "module": "payments",
+      "requires": [
+        "CAP-PAYMENTS",
+        "FOUND-AUDIT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-POLICY-FRESHNESS",
+      "name": "External Policy Freshness",
+      "module": "compliance",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "DER-PROMPT-SECURITY",
+      "name": "Prompt / Context Security",
+      "module": "ai",
+      "requires": [
+        "FOUND-SECURITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-SESSION",
+      "name": "Session / Credential Safety",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY",
+        "FOUND-SECURITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-SYNC-CONFLICT",
+      "name": "Sync Conflict Handling",
+      "module": "offline",
+      "requires": [
+        "CAP-BG-SYNC",
+        "FOUND-DATA-INTEGRITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-TENANT-AUDIT",
+      "name": "Tenant-aware Audit",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT",
+        "FOUND-AUDIT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-TENANT-AUTHZ",
+      "name": "Tenant-aware Authorization",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-TENANT-ISOLATION",
+      "name": "Tenant Isolation",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-TENANT-OBS",
+      "name": "Tenant-aware Observability",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT",
+        "FOUND-OBSERVABILITY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "DER-TENANT-RECOVERY",
+      "name": "Tenant-safe Recovery",
+      "module": "tenant",
+      "requires": [
+        "CAP-MULTI-TENANT",
+        "FOUND-BACKUP"
+      ],
+      "description": ""
+    },
+    {
+      "id": "FOUND-AUDIT",
+      "name": "Critical Action Audit",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-BACKUP",
+      "name": "Backup & Recovery",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-BLAST-RADIUS",
+      "name": "Minimum Blast Radius",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-DATA-INTEGRITY",
+      "name": "Data Integrity",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-DEPENDENCY",
+      "name": "Dependency Integrity",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-ERROR",
+      "name": "Error Handling",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-EVIDENCE",
+      "name": "Evidence & Traceability",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-INCIDENT",
+      "name": "Incident / Recovery Readiness",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-LIFECYCLE",
+      "name": "Lifecycle / Deprecation",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-MIGRATION-SAFETY",
+      "name": "Migration Safety",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-OBSERVABILITY",
+      "name": "Observability",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-RELEASE",
+      "name": "Release Verification",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-RESTORE-VERIFY",
+      "name": "Restore Verification",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-ROLLBACK",
+      "name": "Rollback / Compensation",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-SECRETS",
+      "name": "Secret Protection",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-SECURITY",
+      "name": "Security Baseline",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-SUPPLY-CHAIN",
+      "name": "Supply-chain Security",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    },
+    {
+      "id": "FOUND-TESTING",
+      "name": "Testing",
+      "module": "core",
+      "requires": [],
+      "description": ""
+    }
+  ]
+}

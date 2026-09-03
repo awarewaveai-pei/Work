@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/freshness-record.schema.json",
+  "title": "External Evidence Freshness Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject",
+    "source",
+    "verified_at",
+    "freshness_class",
+    "owner"
+  ],
+  "properties": {
+    "subject": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "freshness_class": {
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
+    },
+    "owner": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "FRESH",
+        "STALE",
+        "UNKNOWN"
+      ]
+    }
+  }
+}

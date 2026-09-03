@@ -1,0 +1,29 @@
+{
+  "profile": "standard",
+  "version": "1.6.0",
+  "use_for": [
+    "production_application",
+    "internal_platform",
+    "customer_facing_nonregulated"
+  ],
+  "required_gates": [
+    "G0_INTAKE_COMPLETE",
+    "G3_POLICY_CONTEXT_RESOLVED",
+    "G4_DOMAIN_STABLE",
+    "G5_OPTIONS_COMPARED",
+    "G6_ENGINEERING_REVIEWED",
+    "G7_FALSIFICATION_COMPLETE",
+    "G8_ASSURANCE_READY",
+    "G9_HUMAN_APPROVED",
+    "G10_IMPLEMENTATION_READY",
+    "G11_VERIFIED",
+    "G12_RELEASE_READY",
+    "G13_RELEASE_CLOSED_LOOP"
+  ],
+  "conditional_gates": [
+    "G1_CURRENT_STATE_UNDERSTOOD",
+    "G2_ROOT_CAUSE_ESTABLISHED"
+  ],
+  "commercial": false,
+  "independent_assurance": "required"
+}

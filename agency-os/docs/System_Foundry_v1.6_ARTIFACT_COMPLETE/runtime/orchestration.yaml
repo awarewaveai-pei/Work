@@ -1,0 +1,164 @@
+{
+  "version": "1.6.0",
+  "execution_model": "directed_acyclic_stage_graph",
+  "concurrency_policy": "independent_analysis_first",
+  "gate_registry": "runtime/stage-gates.yaml",
+  "stages": [
+    {
+      "id": "intake",
+      "gate": "G0_INTAKE_COMPLETE",
+      "depends_on": []
+    },
+    {
+      "id": "current_state_audit",
+      "gate": "G1_CURRENT_STATE_UNDERSTOOD",
+      "when": "existing_system_change",
+      "depends_on": [
+        "intake"
+      ]
+    },
+    {
+      "id": "root_cause",
+      "gate": "G2_ROOT_CAUSE_ESTABLISHED",
+      "when": "existing_system_change",
+      "depends_on": [
+        "current_state_audit"
+      ]
+    },
+    {
+      "id": "policy_context",
+      "gate": "G3_POLICY_CONTEXT_RESOLVED",
+      "depends_on": [
+        "intake"
+      ],
+      "optional_dependencies": [
+        "root_cause"
+      ]
+    },
+    {
+      "id": "research",
+      "parallel": [
+        "industry_research",
+        "cross_industry_research"
+      ],
+      "depends_on": [
+        "intake"
+      ]
+    },
+    {
+      "id": "domain",
+      "gate": "G4_DOMAIN_STABLE",
+      "depends_on": [
+        "policy_context",
+        "research"
+      ]
+    },
+    {
+      "id": "architecture_options",
+      "gate": "G5_OPTIONS_COMPARED",
+      "depends_on": [
+        "domain"
+      ]
+    },
+    {
+      "id": "engineering_review",
+      "parallel": [
+        "security",
+        "database",
+        "iam",
+        "devops",
+        "sre",
+        "observability",
+        "testing",
+        "migration",
+        "rollback",
+        "supply_chain",
+        "provider_resilience",
+        "human_factors"
+      ],
+      "gate": "G6_ENGINEERING_REVIEWED",
+      "depends_on": [
+        "architecture_options"
+      ]
+    },
+    {
+      "id": "commercial_review",
+      "when": "commercial_intent",
+      "depends_on": [
+        "architecture_options"
+      ]
+    },
+    {
+      "id": "falsification",
+      "parallel": [
+        "falsification",
+        "red_team",
+        "complexity_audit"
+      ],
+      "gate": "G7_FALSIFICATION_COMPLETE",
+      "depends_on": [
+        "engineering_review"
+      ]
+    },
+    {
+      "id": "convergence",
+      "depends_on": [
+        "falsification"
+      ]
+    },
+    {
+      "id": "independent_assurance",
+      "gate": "G8_ASSURANCE_READY",
+      "depends_on": [
+        "convergence"
+      ]
+    },
+    {
+      "id": "human_approval",
+      "gate": "G9_HUMAN_APPROVED",
+      "depends_on": [
+        "independent_assurance"
+      ]
+    },
+    {
+      "id": "repo_bootstrap",
+      "depends_on": [
+        "human_approval"
+      ]
+    },
+    {
+      "id": "implementation",
+      "gate": "G10_IMPLEMENTATION_READY",
+      "depends_on": [
+        "repo_bootstrap"
+      ]
+    },
+    {
+      "id": "verification",
+      "gate": "G11_VERIFIED",
+      "depends_on": [
+        "implementation"
+      ]
+    },
+    {
+      "id": "release_ready",
+      "gate": "G12_RELEASE_READY",
+      "depends_on": [
+        "verification"
+      ]
+    },
+    {
+      "id": "release",
+      "depends_on": [
+        "release_ready"
+      ]
+    },
+    {
+      "id": "post_release_proof",
+      "gate": "G13_RELEASE_CLOSED_LOOP",
+      "depends_on": [
+        "release"
+      ]
+    }
+  ]
+}

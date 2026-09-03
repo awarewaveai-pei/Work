@@ -1,0 +1,115 @@
+{
+  "version": "1.6.0",
+  "baseline_id": "PRODUCTION_BASELINE_V1",
+  "locked": true,
+  "capabilities": [
+    {
+      "id": "FOUND-EVIDENCE",
+      "name": "Evidence & Traceability",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-SECURITY",
+      "name": "Security Baseline",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-DATA-INTEGRITY",
+      "name": "Data Integrity",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-BACKUP",
+      "name": "Backup & Recovery",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-RESTORE-VERIFY",
+      "name": "Restore Verification",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-TESTING",
+      "name": "Testing",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-OBSERVABILITY",
+      "name": "Observability",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-ERROR",
+      "name": "Error Handling",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-MIGRATION-SAFETY",
+      "name": "Migration Safety",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-ROLLBACK",
+      "name": "Rollback / Compensation",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-SUPPLY-CHAIN",
+      "name": "Supply-chain Security",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-RELEASE",
+      "name": "Release Verification",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-AUDIT",
+      "name": "Critical Action Audit",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-LIFECYCLE",
+      "name": "Lifecycle / Deprecation",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-BLAST-RADIUS",
+      "name": "Minimum Blast Radius",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-SECRETS",
+      "name": "Secret Protection",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-DEPENDENCY",
+      "name": "Dependency Integrity",
+      "source": "FOUNDATION",
+      "disableable": false
+    },
+    {
+      "id": "FOUND-INCIDENT",
+      "name": "Incident / Recovery Readiness",
+      "source": "FOUNDATION",
+      "disableable": false
+    }
+  ]
+}

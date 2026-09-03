@@ -21,15 +21,16 @@ The later addition of `ORGANIZATION` requires a superseding ADR plus its own Evi
 ## Permission-model relationships
 
 ```text
-HCI Tenant ──< TenantAuthorization >── Case/Engagement (when HD-10 is resolved)
+HCI Tenant ──< TenantAuthorization >── Case/Engagement (hci.cases, ADR-0020)
 Person ──< SubjectLawfulBasisRecord
 Source ──< SourceTermsRecord
 
 Evidence / Claim / Assessment / TrustDomain
   └── Person subject reference + reserved subject_type / subject_id stub
+  └── case_id (ADR-0020, Wave 1 ownership-binding gate)
 ```
 
-`Case/Engagement` is deliberately conditional because HD-10 remains unresolved. ADR-0010 does not approve a Case aggregate; the authorization record must be associated with the approved workflow aggregate when that decision is made.
+**Updated 2026-09-02**: `Case/Engagement` is resolved — `ADR-0020` adopts Option A, `hci.cases` as a Wave 1 aggregate root. The authorization record, and Evidence/Claim/Assessment/TrustDomain rows, are bound to a Case via `case_id`; the schema/lifecycle/ownership-binding tests remain open implementation gates, tracked in `ADR_INDEX.md`. This ERD addendum's own scope note above (Consent/Subject-type only) is otherwise unchanged by that decision.
 
 ## Required constraint semantics
 

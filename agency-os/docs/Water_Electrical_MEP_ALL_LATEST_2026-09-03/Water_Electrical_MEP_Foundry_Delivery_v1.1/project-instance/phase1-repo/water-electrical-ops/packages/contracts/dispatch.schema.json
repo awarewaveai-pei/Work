@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dispatch",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "date",
+    "start_time",
+    "end_time",
+    "project_id",
+    "site_id",
+    "work_description",
+    "member_ids",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "start_time": {
+      "type": "string"
+    },
+    "end_time": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "work_description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "foreman_employee_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "status": {
+      "enum": [
+        "DRAFT",
+        "PUBLISHED",
+        "ACK_REQUIRED",
+        "ACKNOWLEDGED",
+        "AMENDED",
+        "CANCELLED"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

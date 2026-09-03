@@ -1,0 +1,728 @@
+{
+  "Q-SCOPE-001": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SCOPE-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SCOPE-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SCOPE-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-CH-001": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-CH-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-CH-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-CH-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-CH-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ID-001": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ID-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ID-003": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ID-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ID-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ID-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ORG-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ORG-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ORG-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ORG-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-ORG-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-001": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-002": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-005": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-006": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-007": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-008": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-009": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-DATA-010": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-001": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-002": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-004": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-007": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-WF-008": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FILE-001": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FILE-002": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FILE-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FILE-004": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FILE-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SR-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SR-002": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SR-003": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SR-004": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SR-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-SR-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-COM-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-COM-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-COM-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-COM-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-COM-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-COM-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PAY-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PAY-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PAY-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PAY-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PAY-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PAY-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-NOT-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-NOT-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-NOT-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-NOT-004": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-NOT-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-001": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-INT-007": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MOB-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MOB-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MOB-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MOB-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MOB-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-GLO-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-GLO-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-GLO-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-GLO-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-GLO-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-001": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-002": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-003": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-007": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-008": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-009": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-AI-010": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MIG-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MIG-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MIG-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MIG-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-MIG-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PORT-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PORT-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PORT-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-PORT-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-REG-007": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-003": {
+    "phase1": true,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-004": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-005": {
+    "phase1": false,
+    "full_target": true,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-006": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-IMP-007": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FUT-001": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FUT-002": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FUT-003": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FUT-004": {
+    "phase1": true,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  },
+  "Q-FUT-005": {
+    "phase1": false,
+    "full_target": false,
+    "provenance": "SPEC_EXPLICIT_OR_SCOPE_DEFAULT",
+    "warning": "FALSE may mean not requested by the comprehensive source spec for that target slice; it is not a universal claim."
+  }
+}

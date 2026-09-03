@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+from pathlib import Path
+import argparse, json, tempfile, shutil, os, datetime, hashlib
+from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name
+
+MODULE_DOCS=[
+ '00_REQUIREMENTS.md','01_ARCHITECTURE.md','02_CONTRACTS.md','03_SECURITY.md','04_DATA_AND_MIGRATION.md',
+ '05_TEST_STRATEGY.md','06_OBSERVABILITY_AND_SRE.md','07_ROLLBACK_AND_RECOVERY.md','08_IMPLEMENTATION_BACKLOG.md'
+]
+
+def dump(p,obj): p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+def write(p,text): p.parent.mkdir(parents=True,exist_ok=True); p.write_text(text.rstrip()+'\n',encoding='utf-8')
+def sha256_file(p):
+    h=hashlib.sha256()
+    with p.open('rb') as f:
+        for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
+    return h.hexdigest()
+
+def cap_maps():
+    caps={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
+    qs={q['id']:q for q in load('questionnaires/catalog.json')['questions']}
+    return caps,qs
+
+def cap_source(plan,cid):
+    if cid in plan['foundation']: return 'FOUNDATION'
+    if cid in plan['user_selected']: return 'USER_SELECTED'
+    if cid in plan['derived']: return 'DERIVED'
+    if cid in plan['deferred']: return 'DEFERRED'
+    return 'UNKNOWN'
+
+def blueprint_active(cond,plan):
+    if cond.get('always'): return True
+    mods=set(plan['modules']); caps=set(plan['current_capabilities'])
+    return bool((set(cond.get('any_modules',[])) & mods) or (set(cond.get('any_capabilities',[])) & caps) or (plan['profile'] in cond.get('profiles',[])))
+
+def module_doc_text(mid,role,plan,obl,caps):
+    mcaps=plan['module_reasons'].get(mid,[])
+    caplines=[]
+    for cid in mcaps:
+        if cid in caps: caplines.append(f"- `{cid}` — {caps[cid]['name']} — **{cap_source(plan,cid)}**")
+        else: caplines.append(f"- `{cid}` — user custom requirement — **USER_CUSTOM**")
+    trace=[]
+    for cid in mcaps:
+        refs=plan['traceability'].get(cid,[])
+        if refs: trace.append(f"- `{cid}` <- {', '.join(f'`{x}`' for x in refs)}")
+    title=role.replace('_',' ').replace('.md','').title()
+    common=f"""# {mid} — {title}
+
+Status: **GENERATED_CONTRACT**  
+Foundry: `{VERSION}`  
+Module: `{mid}`
+
+## Purpose
+{obl['purpose']}
+
+## Activated capabilities
+{chr(10).join(caplines) if caplines else '- Core foundation only.'}
+
+## Traceability
+{chr(10).join(trace) if trace else '- Activation comes from locked Foundry baseline.'}
+"""
+    if role=='00_REQUIREMENTS.md':
+        body="## Mandatory invariants\n"+'\n'.join(f'- {x}' for x in obl['invariants'])+"\n\n## Acceptance boundary\n- These invariants are mandatory; implementation technology remains an architecture decision.\n- Custom requirements mapped to this module remain `ARCHITECTURE_REVIEW_REQUIRED` until explicitly mapped.\n"
+    elif role=='01_ARCHITECTURE.md':
+        body="## Stable boundary\n"+'\n'.join(f'- {x}' for x in obl['invariants'])+"\n\n## Architecture decisions still required\n- Select implementation/provider only after comparing at least three viable options where material.\n- Keep domain semantics and contracts replaceable independently from framework/vendor choices.\n- Record exact paths, migration, rollback, observability, and expected result before implementation.\n"
+    elif role=='02_CONTRACTS.md':
+        body="## Contract obligations\n- All public/inter-module contracts are explicit, versioned, testable, and compatibility-managed.\n- Internal implementation details and vendor-specific semantics do not leak across the module boundary.\n- Consequential writes define idempotency or explicitly prove why retries cannot occur.\n\n## Contract test location\n- `tests/contract/` or the module-specific test path generated for this module.\n"
+    elif role=='03_SECURITY.md':
+        body="## Security obligations\n"+'\n'.join(f'- {x}' for x in obl['security'])+"\n\n## Verification\n- Negative authorization/abuse tests are required where a trust boundary exists.\n- Secrets, sensitive data, and elevated actions follow Foundry authority and evidence contracts.\n"
+    elif role=='04_DATA_AND_MIGRATION.md':
+        body="## Data obligations\n- Identify authoritative data, owner, lifecycle, retention, and restore semantics before persistence implementation.\n- Derived data must be rebuildable from authoritative sources.\n- Schema/data changes require compatibility, migration, validation, and rollback/forward-recovery plans.\n\n## Migration gate\n- No destructive migration proceeds without verified backup/restore and reconciliation criteria.\n"
+    elif role=='05_TEST_STRATEGY.md':
+        body="## Required tests\n"+'\n'.join(f'- {x}' for x in obl['tests'])+"\n\n## Gate\n- A selected module is not complete while any required test category has no executable test or explicit evidence-backed N/A rationale.\n"
+    elif role=='06_OBSERVABILITY_AND_SRE.md':
+        body="## Operational obligations\n"+'\n'.join(f'- {x}' for x in obl['operations'])+"\n\n## Required evidence\n- Signals, ownership, alert/routing, dashboard/query, and runbook references are recorded before production release.\n"
+    elif role=='07_ROLLBACK_AND_RECOVERY.md':
+        body="## Recovery obligations\n"+'\n'.join(f'- {x}' for x in obl['recovery'])+"\n\n## Gate\n- Rollback/compensation is defined before implementation and verified before release.\n- Recovery must minimize blast radius and preserve auditability.\n"
+    else:
+        base=f"implementation/{mid}"
+        body=f"""## Implementation tasks
+
+### TASK-{mid.upper()}-001 — Establish module boundary
+- Exact path: `{base}` or the stack-specific path selected by architecture.
+- Change: implement only the contracts and invariants recorded in this module package.
+- Dependencies: see `.foundry/resolution/foundry-plan.json`.
+- Tests: satisfy `05_TEST_STRATEGY.md`.
+- Observability: satisfy `06_OBSERVABILITY_AND_SRE.md`.
+- Rollback: satisfy `07_ROLLBACK_AND_RECOVERY.md`.
+- Acceptance criteria: module contract and all negative/positive tests pass.
+- Expected result: replaceable, independently verifiable `{mid}` module.
+
+### TASK-{mid.upper()}-002 — Prove integration
+- Exact path: generated module path(s) listed in `MODULE_MANIFEST.json`.
+- Change: connect through explicit interfaces only.
+- Acceptance criteria: contract tests pass and no undeclared dependency is introduced.
+- Expected result: LEGO-compatible integration without hidden coupling.
+"""
+    return common+'\n'+body
+
+def write_module_package(stage,mid,plan,module_manifest,obl,caps):
+    d=stage/'docs/modules'/mid
+    d.mkdir(parents=True,exist_ok=True)
+    for role in MODULE_DOCS:
+        write(d/role,module_doc_text(mid,role,plan,obl,caps))
+    manifest={
+      'schema_version':'1.0.0','module_id':mid,'status':'SELECTED','purpose':obl['purpose'],
+      'activated_capabilities':[x for x in plan['module_reasons'].get(mid,[]) if x in caps],
+      'custom_requirements':[x for x in plan['module_reasons'].get(mid,[]) if x.startswith('REQ-CUSTOM-')],
+      'generated_paths':module_manifest['paths'],
+      'required_documents':MODULE_DOCS,'invariants':obl['invariants'],'security_obligations':obl['security'],
+      'test_obligations':obl['tests'],'operational_obligations':obl['operations'],'recovery_obligations':obl['recovery']
+    }
+    dump(d/'MODULE_MANIFEST.json',manifest)
+    for rel in module_manifest['paths']:
+        p=stage/rel; p.mkdir(parents=True,exist_ok=True)
+        link='docs/modules/'+mid+'/MODULE_MANIFEST.json'
+        write(p/'README.md',f"# Generated Foundry Module Path\n\nModule: `{mid}`  \nStatus: `SCAFFOLDED`\n\nThis path is intentionally technology-neutral until architecture selects a stack. The executable requirements are in `{link}` and `docs/modules/{mid}/`.\n\nDo not add implementation that violates the generated module contract.\n")
+
+def write_requirements(stage,plan,answers):
+    caps,qs=cap_maps(); qr={r['when']['question']:r for r in load('rules/question-rules.json')['rules'] if 'question' in r.get('when',{})}
+    decisions=['# User Requirement Decisions','', '| Question | Decision | Direct effect |','|---|---|---|']
+    for qid,val in sorted(answers.items()):
+        q=qs[qid]; r=qr.get(qid,{}); eff=(r.get('require') or r.get('defer') or [])
+        decisions.append(f"| `{qid}` {q['label']} | {'要' if val else '不要'} | {', '.join(f'`{x}`' for x in eff) if val else 'none'} |")
+    write(stage/'docs/requirements/USER_DECISIONS.md','\n'.join(decisions))
+    for key,title in [('user_selected','User-selected capabilities'),('derived','Foundry-derived mandatory capabilities'),('deferred','Deferred / option-preserved capabilities')]:
+        lines=[f'# {title}','']
+        for cid in plan[key]:
+            lines.append(f"- `{cid}` — {caps[cid]['name']} — trace: {', '.join(plan['traceability'].get(cid,[])) or 'dependency/baseline'}")
+        if not plan[key]: lines.append('- None.')
+        write(stage/'docs/requirements'/(key.upper()+'.md'),'\n'.join(lines))
+
+def write_blueprints(stage,plan):
+    caps=set(plan['current_capabilities']); mods=set(plan['modules']); bpmap=load('generation/blueprint-map.json')['documents']; index=['# System Blueprint Index','',f"Foundry `{VERSION}` generated applicability from canonical plan.",'','| Document | Status |','|---|---|']
+    active_count=0
+    for rec in bpmap:
+        fn=rec['file']; active=blueprint_active(rec['when'],plan); active_count+=int(active); status='ACTIVE' if active else 'NOT_APPLICABLE'
+        index.append(f'| `{fn}` | {status} |')
+        template=(ROOT/'templates/TOP_TIER_SYSTEM_BLUEPRINT'/fn).read_text(encoding='utf-8'); title=template.splitlines()[0] if template.strip() else '# Blueprint'
+        if active:
+            basis=[]
+            if rec['when'].get('always'): basis.append('Foundry baseline')
+            basis += [f'module `{x}`' for x in rec['when'].get('any_modules',[]) if x in mods]
+            basis += [f'capability `{x}`' for x in rec['when'].get('any_capabilities',[]) if x in caps]
+            if plan['profile'] in rec['when'].get('profiles',[]): basis.append(f"profile `{plan['profile']}`")
+            body=f"""{title}
+
+Status: **ACTIVE**  
+Generated from: `.foundry/resolution/foundry-plan.json`
+
+## Purpose
+This blueprint section is applicable because: {', '.join(basis) or 'selected system scope'}.
+
+## Current Truth
+This is a generated new-system contract. Implementation truth is not yet claimed; implementation evidence must be added with exact file:line references when code exists.
+
+## Target Truth
+Implement the selected capabilities through the module contracts in `docs/modules/` while preserving Foundry baseline invariants.
+
+## Evidence
+- Input digest: `{plan['input_digest']}`
+- Current capabilities: {len(plan['current_capabilities'])}
+- Selected modules: {', '.join(f'`{x}`' for x in plan['modules'])}
+
+## Decisions
+Technology/provider decisions remain `UNRESOLVED` until architecture option comparison and human approval where required. This is deliberate to prevent premature lock-in.
+
+## Risks
+Implementation-specific risks must be entered in the risk register before implementation. No unstated risk is treated as verified.
+
+## Exact Paths
+- `.foundry/resolution/foundry-plan.json`
+- `docs/modules/`
+- `docs/requirements/`
+
+## Validation
+- Run Foundry verification and module-specific test contracts.
+- Every factual implementation claim requires content-addressed exact file:line evidence.
+
+## Rollback
+Generation is staging-first and atomic. Implementation changes must define module-specific rollback/compensation before execution.
+
+## Expected Result
+A traceable, replaceable, testable implementation of this applicable blueprint section without adding unselected capabilities.
+"""
+        else:
+            body=f"""{title}
+
+Status: **NOT_APPLICABLE**
+
+## Reason
+No selected or derived capability satisfied this blueprint section's applicability rule in `generation/blueprint-map.json`.
+
+## Evidence
+- Input digest: `{plan['input_digest']}`
+- Selected modules: {', '.join(f'`{x}`' for x in plan['modules'])}
+
+## Re-evaluation
+If a future questionnaire answer activates the mapped capability/module/profile, regenerate from the new immutable answer snapshot. Do not manually convert this section to ACTIVE.
+"""
+        write(stage/'docs/blueprint'/fn,body)
+    write(stage/'docs/blueprint/INDEX.md','\n'.join(index))
+    return active_count,len(bpmap)
+
+def validate_generated(stage,plan,module_data):
+    errors=[]
+    selected=set(plan['modules'])
+    for mid in selected:
+        for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
+            if not (stage/'docs/modules'/mid/role).is_file(): errors.append(f'{mid}: missing module artifact {role}')
+        for rel in module_data[mid]['paths']:
+            if not (stage/rel/'README.md').is_file(): errors.append(f'{mid}: missing path scaffold {rel}/README.md')
+    for mid,m in module_data.items():
+        if mid not in selected:
+            if (stage/'docs/modules'/mid).exists(): errors.append(f'unselected module docs generated: {mid}')
+            for rel in m['paths']:
+                if (stage/rel).exists(): errors.append(f'unselected module path generated: {mid}:{rel}')
+    bps=list((stage/'docs/blueprint').glob('[0-9][0-9]_*.md'))
+    if len(bps)!=73: errors.append(f'blueprint document count {len(bps)} != 73')
+    required=[stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md',stage/'docs/IMPLEMENTATION_BACKLOG.md']
+    for p in required:
+        if not p.is_file(): errors.append('missing required generated file '+str(p.relative_to(stage)))
+    if errors: raise RuntimeError('staging validation failed:\n'+'\n'.join(errors))
+
+def artifact_manifest(stage):
+    rows=[]
+    for p in sorted(x for x in stage.rglob('*') if x.is_file() and x.relative_to(stage).as_posix()!='.foundry/resolution/artifact-manifest.json'):
+        rows.append({'path':p.relative_to(stage).as_posix(),'sha256':sha256_file(p),'bytes':p.stat().st_size})
+    return {'schema_version':'1.0.0','file_count':len(rows),'files':rows}
+
+def generate(plan,answers,custom,out_root):
+    name=safe_name(plan['project']['name']); out_root=Path(out_root).resolve(); target=out_root/name
+    if target.exists(): raise FileExistsError('target already exists: '+str(target))
+    out_root.mkdir(parents=True,exist_ok=True)
+    stage=Path(tempfile.mkdtemp(prefix='.foundry-stage-',dir=out_root))
+    try:
+        module_data={m['id']:m for m in load('generation/module-manifests.json')['modules']}
+        obligations=load('generation/module-obligations.json')['modules']; caps,_=cap_maps()
+        for mid in plan['modules']:
+            if mid not in module_data: raise ValueError('unknown generation module '+mid)
+            if mid not in obligations: raise ValueError('missing module obligations '+mid)
+            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps)
+        for rel in ['.foundry/intake','.foundry/resolution','.foundry/handoffs','.foundry/verification','.foundry/migration-history','docs/requirements','docs/blueprint']:
+            (stage/rel).mkdir(parents=True,exist_ok=True)
+        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
+        snapshot={'schema_version':'1.0.0','questionnaire_version':load('questionnaires/catalog.json')['questionnaire_version'],'questionnaire_digest':questionnaire_digest(),'submitted_at':now,'project':plan['project'],'answers':dict(sorted(answers.items())),'custom_requirements':plan['custom_requirements']}
+        dump(stage/'.foundry/intake/answers.json',snapshot); dump(stage/'.foundry/resolution/foundry-plan.json',plan)
+        dump(stage/'.foundry/foundry-lock.json',{'foundry_version':VERSION,'compiler_version':VERSION,'input_digest':plan['input_digest'],'questionnaire_digest':snapshot['questionnaire_digest']})
+        profile={'project_id':name,'profile':plan['profile'],'system_type':'+'.join(plan['archetypes']),'criticality':plan['criticality'],'commercial':'CAP-COMMERCIAL' in plan['current_capabilities'],'multi_tenant':'CAP-MULTI-TENANT' in plan['current_capabilities'],'regulated':'compliance' in plan['modules']}
+        dump(stage/'.foundry/project-profile.json',profile)
+        custom_lines=['# Custom Requirements','']
+        for r in plan['custom_requirements']: custom_lines += [f"## {r['id']}",f"Category: `{r['category']}`",'',r['statement'],'',f"Mapping: `{r['mapping_status']}`",'']
+        if not plan['custom_requirements']: custom_lines.append('- None.')
+        write(stage/'docs/requirements/custom.md','\n'.join(custom_lines)); write_requirements(stage,plan,answers)
+        cap_lines=['# Foundry Capability Plan','',f"Generated by System Foundry {VERSION}.",'','## Foundation (locked)']+[f'- {x}' for x in plan['foundation']]+['','## User selected']+[f'- {x}' for x in plan['user_selected']]+['','## Derived']+[f'- {x}' for x in plan['derived']]+['','## Deferred / option preserved']+[f'- {x}' for x in plan['deferred']]
+        write(stage/'docs/FOUNDRY_CAPABILITY_PLAN.md','\n'.join(cap_lines))
+        active_bp,total_bp=write_blueprints(stage,plan)
+        system_lines=[f'# {name} — Generated System Blueprint','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",'', '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'','## LEGO modules']+[f'- `{m}`' for m in plan['modules']]+['','## Blueprint applicability',f'- Active: {active_bp}',f'- Not applicable: {total_bp-active_bp}',f'- Total controlled sections: {total_bp}','','## Truth boundary','This document is a deterministic planning/assurance output. It does not claim that implementation exists. Implementation claims become VERIFIED only with exact content-addressed file:line evidence.']
+        write(stage/'docs/SYSTEM_BLUEPRINT.md','\n'.join(system_lines))
+        backlog=['# Implementation Backlog','', 'Every selected LEGO module has a generated implementation contract. Execute only after architecture gates converge.','']
+        for mid in plan['modules']:
+            backlog += [f'## {mid}',f'- Contract: `docs/modules/{mid}/08_IMPLEMENTATION_BACKLOG.md`',f'- Module paths: '+', '.join(f'`{x}`' for x in module_data[mid]['paths']),'']
+        write(stage/'docs/IMPLEMENTATION_BACKLOG.md','\n'.join(backlog))
+        trace={'schema_version':'1.0.0','input_digest':plan['input_digest'],'module_reasons':plan['module_reasons'],'capability_traceability':plan['traceability'],'deferred':plan['deferred']}
+        dump(stage/'.foundry/resolution/selection-traceability.json',trace)
+        coverage={'schema_version':'1.0.0','modules_selected':len(plan['modules']),'module_artifacts_per_module':len(MODULE_DOCS)+1,'blueprints_active':active_bp,'blueprints_not_applicable':total_bp-active_bp,'blueprints_total':total_bp,'current_capabilities':len(plan['current_capabilities']),'deferred_capabilities':len(plan['deferred'])}
+        dump(stage/'.foundry/verification/generation-coverage.json',coverage)
+        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `docs/SYSTEM_BLUEPRINT.md`, `docs/blueprint/INDEX.md`, and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has a complete planning/assurance package under `docs/modules/<module>/`.\n")
+        validate_generated(stage,plan,module_data)
+        dump(stage/'.foundry/resolution/artifact-manifest.json',artifact_manifest(stage))
+        os.replace(stage,target)
+        return target
+    except Exception:
+        shutil.rmtree(stage,ignore_errors=True); raise
+
+def main(argv=None):
+    ap=argparse.ArgumentParser(); ap.add_argument('--input',required=True,help='JSON containing project, answers, custom_requirements'); ap.add_argument('--out',required=True); a=ap.parse_args(argv)
+    data=json.loads(Path(a.input).read_text(encoding='utf-8')); plan=resolve(data['project'],data['answers'],data.get('custom_requirements',[])); print(generate(plan,data['answers'],data.get('custom_requirements',[]),a.out)); return 0
+if __name__=='__main__': raise SystemExit(main())

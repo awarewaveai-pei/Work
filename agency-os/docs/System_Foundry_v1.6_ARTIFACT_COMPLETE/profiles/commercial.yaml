@@ -1,0 +1,25 @@
+{
+  "profile": "commercial",
+  "version": "1.6.0",
+  "use_for": [
+    "saas",
+    "paid_product",
+    "multitenant_product"
+  ],
+  "required_gates": "ALL",
+  "conditional_gates": [
+    "G1_CURRENT_STATE_UNDERSTOOD",
+    "G2_ROOT_CAUSE_ESTABLISHED"
+  ],
+  "commercial": true,
+  "requires": [
+    "edition_architecture",
+    "entitlement",
+    "billing",
+    "licensing",
+    "customer_lifecycle",
+    "unit_economics",
+    "vendor_exit"
+  ],
+  "independent_assurance": "required"
+}

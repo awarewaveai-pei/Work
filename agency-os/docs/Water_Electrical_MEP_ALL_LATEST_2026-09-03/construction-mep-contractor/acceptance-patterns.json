@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0.0",
+  "patterns": [
+    {
+      "id": "MEP-ACC-P1-DISPATCH-E2E",
+      "name": "Phase 1 dispatch publish/amend E2E",
+      "steps": [
+        "persist dispatch in company source of truth",
+        "show on company calendar",
+        "show on each employee My Dispatch",
+        "create/update the same Google Calendar event",
+        "send LINE notification",
+        "allow employee acknowledgement",
+        "show acknowledgement to coordinator",
+        "invalidate prior acknowledgement on material amendment",
+        "update Google Calendar projection",
+        "send LINE amendment notification",
+        "preserve before/after audit record"
+      ],
+      "source": {
+        "source": "REFERENCE_PROJECT",
+        "claim": "Phase 1 acceptance flow; all steps must succeed."
+      }
+    },
+    {
+      "id": "MEP-ACC-P1-OFFLINE",
+      "name": "Phase 1 bounded offline continuity",
+      "steps": [
+        "load previously synchronized current/next dispatch and site summary without network",
+        "queue an allow-listed dispatch acknowledgement with stable idempotency key",
+        "restore connectivity and synchronize company-system write before provider side effects",
+        "reject stale acknowledgement if dispatch version changed while offline",
+        "show conflict/rejected state to the user",
+        "do not expose installable PWA/native-app artifacts"
+      ],
+      "source": {
+        "source": "PACK_POLICY",
+        "claim": "Conditional acceptance pattern activated by project selection."
+      },
+      "applies_when_capability": "MEP-CAP-OFFLINE"
+    },
+    {
+      "id": "MEP-ACC-P4-LABOR-TIME",
+      "name": "Approved labor time drives labor cost",
+      "steps": [
+        "record planned dispatch",
+        "record actual work/attendance independently",
+        "submit and approve labor time",
+        "post labor cost from approved labor time",
+        "adjust approved time with traceable reversal/adjustment",
+        "recompute project P&L without losing history"
+      ],
+      "source": {
+        "source": "PACK_POLICY",
+        "claim": "Conditional acceptance pattern activated by project selection."
+      },
+      "applies_when_capability": "MEP-CAP-APPROVED-LABOR-TIME"
+    },
+    {
+      "id": "MEP-ACC-P4-ACCOUNTING",
+      "name": "Accounting sync and reconciliation",
+      "steps": [
+        "emit accounting integration record from authoritative project/procurement/billing source",
+        "deliver through provider adapter with stable idempotency key",
+        "record provider identifier only in integration boundary",
+        "retry without duplicate provider transaction",
+        "reconcile source and provider state",
+        "surface unreconciled failures"
+      ],
+      "source": {
+        "source": "PACK_POLICY",
+        "claim": "Conditional acceptance pattern activated by project selection."
+      },
+      "applies_when_capability": "MEP-CAP-ACCOUNTING-INTEGRATION"
+    }
+  ]
+}

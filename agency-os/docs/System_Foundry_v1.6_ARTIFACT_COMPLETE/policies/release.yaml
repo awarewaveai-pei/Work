@@ -1,0 +1,29 @@
+{
+  "version": "1.6.0",
+  "fail_closed": true,
+  "requires": [
+    "immutable_version",
+    "source_revision",
+    "artifact_digest",
+    "change_set_ref",
+    "test_evidence",
+    "risk_classification",
+    "migration_and_rollback",
+    "rollback_thresholds",
+    "observability",
+    "approvals_per_risk",
+    "deployment_strategy",
+    "sbom_digest",
+    "provenance_digest",
+    "release_notes_ref",
+    "post_release_checks"
+  ],
+  "conditional": {
+    "R3_or_R4": [
+      "independent_release_review"
+    ],
+    "R4": [
+      "two_independent_approvals"
+    ]
+  }
+}

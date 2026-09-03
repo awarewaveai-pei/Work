@@ -1,6 +1,6 @@
 {
-    "generatedAt":  "2026-08-28T10:30:29.6116570Z",
-    "overall":  "FAIL",
+    "generatedAt":  "2026-09-03T04:46:20.7941593Z",
+    "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
     "policy":  {
@@ -25,45 +25,45 @@
                },
     "hosts":  {
                   "ks-aw-01":  {
-                                   "host":  "149.202.64.114",
+                                   "host":  "145.239.195.47",
                                    "ok":  true,
                                    "error":  "",
-                                   "mem_total_kb":  65731400,
-                                   "mem_avail_kb":  53360068,
-                                   "mem_used_kb":  12371332,
-                                   "mem_used_pct":  18.8,
-                                   "swap_used_pct":  0.3,
+                                   "mem_total_kb":  131877056,
+                                   "mem_avail_kb":  117768556,
+                                   "mem_used_kb":  14108500,
+                                   "mem_used_pct":  10.7,
+                                   "swap_used_pct":  9.4,
                                    "psi_mem_some":  0,
                                    "psi_mem_full":  0,
                                    "psi_io_some":  0,
-                                   "psi_cpu_some":  6.44,
-                                   "oom_vmstat":  15,
-                                   "oom_journal":  15,
-                                   "disk_total_kb":  919652204,
-                                   "disk_used_kb":  98081460,
-                                   "disk_pct":  12,
-                                   "inode_pct":  5,
-                                   "containers_running":  41,
-                                   "containers_total":  41,
+                                   "psi_cpu_some":  7.75,
+                                   "oom_vmstat":  0,
+                                   "oom_journal":  0,
+                                   "disk_total_kb":  981183088,
+                                   "disk_used_kb":  88546168,
+                                   "disk_pct":  10,
+                                   "inode_pct":  4,
+                                   "containers_running":  42,
+                                   "containers_total":  42,
                                    "containers_unhealthy":  0,
                                    "restarts":  "",
                                    "restarts_measured":  true,
                                    "docker_present":  true,
-                                   "top_mem":  "soulful-db=2.76GiB postiz=1.193GiB soulful-wp=1009MiB trigger-webapp=749.9MiB trigger-clickhouse=398MiB supabase-kong=290.2MiB",
-                                   "reclaimable":  "Images=463.6MB (1%),Containers=0B (0%),Local Volumes=12.76GB (56%),Build Cache=57.19MB",
-                                   "cpu_cores":  16,
-                                   "load1":  0.32,
-                                   "uptime_days":  1
+                                   "top_mem":  "trigger-webapp=2.473GiB postiz=1.217GiB soulful-wp=946.3MiB soulful-db=620.3MiB supabase-kong=471MiB trigger-clickhouse=466MiB",
+                                   "reclaimable":  "Images=677.4MB (1%),Containers=0B (0%),Local Volumes=183.5MB (0%),Build Cache=0B",
+                                   "cpu_cores":  32,
+                                   "load1":  1.02,
+                                   "uptime_days":  2
                                }
               },
     "verdicts":  {
                      "ks-aw-01":  {
-                                      "level":  2,
+                                      "level":  0,
                                       "blind":  [
 
                                                 ],
                                       "reasons":  [
-                                                      "OOM kills observed: 15 (vmstat=15, journal=15)"
+
                                                   ]
                                   }
                  },

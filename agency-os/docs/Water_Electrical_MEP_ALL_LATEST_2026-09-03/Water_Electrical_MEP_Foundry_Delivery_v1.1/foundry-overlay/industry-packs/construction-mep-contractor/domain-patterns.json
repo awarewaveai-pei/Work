@@ -1,0 +1,165 @@
+{
+  "schema_version": "1.0.0",
+  "bounded_contexts": [
+    {
+      "id": "project",
+      "owns": [
+        "Project",
+        "ProjectSite",
+        "ProjectMember"
+      ],
+      "phase": "P1"
+    },
+    {
+      "id": "workforce",
+      "owns": [
+        "Employee",
+        "Crew",
+        "Foreman"
+      ],
+      "phase": "P1"
+    },
+    {
+      "id": "dispatch",
+      "owns": [
+        "Dispatch",
+        "DispatchMember",
+        "DispatchAcknowledgement"
+      ],
+      "phase": "P1"
+    },
+    {
+      "id": "notification",
+      "owns": [
+        "NotificationDelivery",
+        "NotificationAttempt"
+      ],
+      "phase": "P1"
+    },
+    {
+      "id": "calendar_integration",
+      "owns": [
+        "CalendarBinding",
+        "CalendarProjection"
+      ],
+      "phase": "P1"
+    },
+    {
+      "id": "field_execution",
+      "owns": [
+        "WorkItem",
+        "DailyReport"
+      ],
+      "phase": "P2"
+    },
+    {
+      "id": "document_control",
+      "owns": [
+        "Drawing",
+        "DrawingVersion",
+        "SitePhoto"
+      ],
+      "phase": "P2"
+    },
+    {
+      "id": "quality",
+      "owns": [
+        "Defect",
+        "Inspection"
+      ],
+      "phase": "P2"
+    },
+    {
+      "id": "procurement",
+      "owns": [
+        "Material",
+        "MaterialRequest",
+        "RFQ",
+        "Quotation",
+        "PurchaseOrder",
+        "Delivery",
+        "MaterialIssue",
+        "MaterialReturn",
+        "Vendor"
+      ],
+      "phase": "P3"
+    },
+    {
+      "id": "commercial",
+      "owns": [
+        "ProjectContract",
+        "Budget",
+        "ChangeOrder",
+        "ProgressEstimate",
+        "ProgressBilling",
+        "Retention"
+      ],
+      "phase": "P4"
+    },
+    {
+      "id": "subcontract",
+      "owns": [
+        "Subcontractor",
+        "SubcontractBilling"
+      ],
+      "phase": "P4"
+    },
+    {
+      "id": "cost",
+      "owns": [
+        "LaborCost",
+        "MaterialCost",
+        "SubcontractCost",
+        "OtherCost",
+        "ProjectPnL"
+      ],
+      "phase": "P4"
+    },
+    {
+      "id": "ai",
+      "owns": [
+        "AIQueryPolicy",
+        "AIExecutionEvidence"
+      ],
+      "phase": "P5"
+    },
+    {
+      "id": "offline_sync",
+      "owns": [
+        "OfflineReadCache",
+        "OfflineQueuedAction",
+        "SyncCheckpoint",
+        "SyncConflict"
+      ],
+      "phase": "P1"
+    },
+    {
+      "id": "labor_time",
+      "owns": [
+        "AttendanceRecord",
+        "WorkLog",
+        "ApprovedLaborTime"
+      ],
+      "phase": "P4"
+    },
+    {
+      "id": "accounting_integration",
+      "owns": [
+        "AccountingBinding",
+        "AccountingExport",
+        "AccountingReconciliation"
+      ],
+      "phase": "P4"
+    }
+  ],
+  "stable_boundaries": [
+    "Dispatch is not a Google Calendar event. Calendar events are projections.",
+    "LINE is a notification channel, not a source of truth.",
+    "Project cost sources remain traceable to source records.",
+    "Drawing is distinct from DrawingVersion.",
+    "User authorization is evaluated before AI retrieval.",
+    "Planned Dispatch time is not Actual Attendance and is not Approved Labor Time.",
+    "Offline client state is a bounded cache/queue; server records remain authoritative unless a future ADR explicitly changes ownership.",
+    "Accounting provider data is integrated through adapters and reconciliation; provider-specific identifiers do not leak into core project/cost semantics."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "P1",
+  "read_cache": [
+    "current_dispatch",
+    "next_dispatch",
+    "project_site_summary",
+    "site_address_contact_navigation"
+  ],
+  "queued_commands": [
+    "ACKNOWLEDGE_DISPATCH"
+  ],
+  "online_only": [
+    "CREATE_DISPATCH",
+    "AMEND_DISPATCH",
+    "CANCEL_DISPATCH",
+    "CHANGE_PERMISSION",
+    "EDIT_INTEGRATION_CREDENTIALS"
+  ],
+  "authority": "SERVER_AUTHORITATIVE",
+  "installable_pwa": false,
+  "native_mobile": false
+}

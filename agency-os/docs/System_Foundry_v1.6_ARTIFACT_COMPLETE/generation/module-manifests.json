@@ -1,0 +1,388 @@
+{
+  "version": "1.6.0",
+  "modules": [
+    {
+      "id": "core",
+      "paths": [
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/interfaces",
+        "tests/unit",
+        "tests/integration",
+        "tests/contract",
+        "tests/e2e",
+        "infra",
+        "docs/architecture"
+      ],
+      "activated_by": [
+        "FOUND-AUDIT",
+        "FOUND-BACKUP",
+        "FOUND-BLAST-RADIUS",
+        "FOUND-DATA-INTEGRITY",
+        "FOUND-DEPENDENCY",
+        "FOUND-ERROR",
+        "FOUND-EVIDENCE",
+        "FOUND-INCIDENT",
+        "FOUND-LIFECYCLE",
+        "FOUND-MIGRATION-SAFETY",
+        "FOUND-OBSERVABILITY",
+        "FOUND-RELEASE",
+        "FOUND-RESTORE-VERIFY",
+        "FOUND-ROLLBACK",
+        "FOUND-SECRETS",
+        "FOUND-SECURITY",
+        "FOUND-SUPPLY-CHAIN",
+        "FOUND-TESTING"
+      ]
+    },
+    {
+      "id": "web",
+      "paths": [
+        "apps/web",
+        "tests/e2e/web"
+      ],
+      "activated_by": [
+        "CAP-WEB"
+      ]
+    },
+    {
+      "id": "mobile",
+      "paths": [
+        "apps/mobile",
+        "tests/e2e/mobile"
+      ],
+      "activated_by": [
+        "CAP-BARCODE",
+        "CAP-CAMERA",
+        "CAP-LOCATION",
+        "CAP-MOBILE"
+      ]
+    },
+    {
+      "id": "desktop",
+      "paths": [
+        "apps/desktop"
+      ],
+      "activated_by": [
+        "CAP-DESKTOP"
+      ]
+    },
+    {
+      "id": "api",
+      "paths": [
+        "services/api",
+        "tests/contract/api"
+      ],
+      "activated_by": [
+        "CAP-PUBLIC-API"
+      ]
+    },
+    {
+      "id": "cli",
+      "paths": [
+        "apps/cli"
+      ],
+      "activated_by": [
+        "CAP-CLI"
+      ]
+    },
+    {
+      "id": "identity",
+      "paths": [
+        "packages/identity",
+        "tests/contract/identity"
+      ],
+      "activated_by": [
+        "CAP-IDENTITY",
+        "CAP-INTERNAL-USERS",
+        "CAP-INVITES",
+        "CAP-ORG-ADMIN",
+        "CAP-ROLES",
+        "CAP-SELF-REG",
+        "CAP-SSO",
+        "DER-SESSION"
+      ]
+    },
+    {
+      "id": "tenant",
+      "paths": [
+        "packages/tenant",
+        "tests/contract/tenant"
+      ],
+      "activated_by": [
+        "CAP-CROSS-TENANT-COLLAB",
+        "CAP-CROSS-TENANT-SHARE",
+        "CAP-GROUP",
+        "CAP-MULTI-TENANT",
+        "CAP-ORG-HIERARCHY",
+        "DER-TENANT-AUDIT",
+        "DER-TENANT-AUTHZ",
+        "DER-TENANT-ISOLATION",
+        "DER-TENANT-OBS",
+        "DER-TENANT-RECOVERY"
+      ]
+    },
+    {
+      "id": "domain",
+      "paths": [
+        "packages/domain-model"
+      ],
+      "activated_by": [
+        "CAP-BOOKING",
+        "CAP-CONTRACTS",
+        "CAP-CUSTOMER-DATA",
+        "CAP-FINANCIAL-RECORDS",
+        "CAP-INVENTORY",
+        "CAP-ORDERS",
+        "CAP-ORG-DATA",
+        "CAP-PRODUCTS",
+        "CAP-PROJECTS",
+        "CAP-UGC"
+      ]
+    },
+    {
+      "id": "workflow",
+      "paths": [
+        "packages/workflow",
+        "tests/contract/workflow"
+      ],
+      "activated_by": [
+        "CAP-APPROVAL",
+        "CAP-COMMENTS",
+        "CAP-ESIGN",
+        "CAP-MULTI-APPROVAL",
+        "CAP-REALTIME-COLLAB",
+        "CAP-SCHEDULING",
+        "CAP-STATE-WORKFLOW",
+        "CAP-TASKS"
+      ]
+    },
+    {
+      "id": "files",
+      "paths": [
+        "packages/files",
+        "tests/contract/files"
+      ],
+      "activated_by": [
+        "CAP-FILE-VERSION",
+        "CAP-FILES",
+        "CAP-IMAGES",
+        "CAP-SHARE-LINKS",
+        "CAP-VIDEO",
+        "DER-FILE-AUTHZ",
+        "DER-FILE-INTEGRITY"
+      ]
+    },
+    {
+      "id": "search",
+      "paths": [
+        "packages/search"
+      ],
+      "activated_by": [
+        "CAP-FILTERS",
+        "CAP-SEARCH"
+      ]
+    },
+    {
+      "id": "analytics",
+      "paths": [
+        "packages/analytics"
+      ],
+      "activated_by": [
+        "CAP-ANALYTICS",
+        "CAP-DASHBOARD",
+        "CAP-EXPORT",
+        "CAP-REPORTS"
+      ]
+    },
+    {
+      "id": "commercial",
+      "paths": [
+        "packages/commercial",
+        "tests/contract/commercial"
+      ],
+      "activated_by": [
+        "CAP-COMMERCIAL",
+        "CAP-EDITIONS",
+        "CAP-LICENSE",
+        "CAP-SUBSCRIPTION",
+        "CAP-TRIAL",
+        "CAP-USAGE-METERING",
+        "DER-BILLING-LIFECYCLE",
+        "DER-ENTITLEMENT"
+      ]
+    },
+    {
+      "id": "payments",
+      "paths": [
+        "packages/payments",
+        "tests/contract/payments"
+      ],
+      "activated_by": [
+        "CAP-INVOICES",
+        "CAP-PARTIAL-REFUND",
+        "CAP-PAYMENTS",
+        "CAP-REFUNDS",
+        "CAP-SAVED-PAYMENT",
+        "CAP-TAX",
+        "DER-PAYMENT-ADAPTER",
+        "DER-PAYMENT-IDEMPOTENCY",
+        "DER-PAYMENT-RECON"
+      ]
+    },
+    {
+      "id": "notifications",
+      "paths": [
+        "packages/notifications"
+      ],
+      "activated_by": [
+        "CAP-EMAIL",
+        "CAP-INAPP-NOTIFY",
+        "CAP-PUSH",
+        "CAP-SMS",
+        "CAP-WEBHOOK"
+      ]
+    },
+    {
+      "id": "integrations",
+      "paths": [
+        "packages/integrations"
+      ],
+      "activated_by": [
+        "CAP-ACCOUNTING",
+        "CAP-CRM",
+        "CAP-ERP",
+        "CAP-EXT-STORAGE",
+        "CAP-EXTERNAL-API",
+        "CAP-IDP",
+        "CAP-IMPORT-EXPORT"
+      ]
+    },
+    {
+      "id": "offline",
+      "paths": [
+        "packages/offline-sync",
+        "tests/contract/offline"
+      ],
+      "activated_by": [
+        "CAP-BG-SYNC",
+        "CAP-OFFLINE",
+        "DER-DEVICE-REVOCATION",
+        "DER-OFFLINE-CRYPTO",
+        "DER-SYNC-CONFLICT"
+      ]
+    },
+    {
+      "id": "globalization",
+      "paths": [
+        "packages/globalization"
+      ],
+      "activated_by": [
+        "CAP-I18N",
+        "CAP-MULTI-CURRENCY",
+        "CAP-RTL",
+        "CAP-TIMEZONES"
+      ]
+    },
+    {
+      "id": "ai",
+      "paths": [
+        "packages/ai",
+        "tests/contract/ai"
+      ],
+      "activated_by": [
+        "CAP-AI",
+        "CAP-AI-CLASSIFY",
+        "CAP-AI-EXTERNAL",
+        "CAP-AI-GENERATE",
+        "CAP-AI-RECOMMEND",
+        "CAP-AI-SEARCH",
+        "CAP-AI-SUMMARY",
+        "CAP-AI-VOICE",
+        "CAP-AI-WRITE",
+        "CAP-MULTI-AGENT",
+        "DER-AI-AUDIT",
+        "DER-AI-AUTHORITY",
+        "DER-AI-HUMAN",
+        "DER-AI-IDEMPOTENCY",
+        "DER-AI-TOOLS",
+        "DER-PROMPT-SECURITY"
+      ]
+    },
+    {
+      "id": "migration",
+      "paths": [
+        "packages/migration",
+        "tests/migration"
+      ],
+      "activated_by": [
+        "CAP-COEXISTENCE",
+        "CAP-CUSTOMER-EXPORT",
+        "CAP-HISTORICAL-IMPORT",
+        "CAP-LEGACY-MIGRATION",
+        "CAP-LEGACY-SYNC"
+      ]
+    },
+    {
+      "id": "portals",
+      "paths": [
+        "apps/portals"
+      ],
+      "activated_by": [
+        "CAP-ANON-PUBLIC",
+        "CAP-CUSTOMER-PORTAL",
+        "CAP-CUSTOMER-USERS",
+        "CAP-EMBED",
+        "CAP-PARTNER-PORTAL",
+        "CAP-PARTNER-USERS",
+        "CAP-PUBLIC-PAGES"
+      ]
+    },
+    {
+      "id": "compliance",
+      "paths": [
+        "docs/compliance",
+        "tests/assurance/compliance"
+      ],
+      "activated_by": [
+        "CAP-BIOMETRIC",
+        "CAP-FINANCIAL-DECISION",
+        "CAP-GEOLOCATION",
+        "CAP-GOV",
+        "CAP-HEALTH-DATA",
+        "CAP-LEGAL-RECORD",
+        "CAP-MINORS",
+        "CAP-RESIDENCY",
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "reliability",
+      "paths": [
+        "docs/reliability",
+        "tests/assurance/reliability"
+      ],
+      "activated_by": [
+        "CAP-24X7",
+        "CAP-FINANCIAL-IMPACT",
+        "CAP-LEGAL-IMPACT",
+        "CAP-NONREPEATABLE",
+        "CAP-REALTIME",
+        "CAP-SAFETY-IMPACT",
+        "CAP-SPIKY-LOAD",
+        "DER-HUMAN-OVERSIGHT",
+        "DER-INDEPENDENT-ASSURANCE"
+      ]
+    },
+    {
+      "id": "custom",
+      "paths": [
+        "extensions/custom"
+      ],
+      "activated_by": [],
+      "activated_by_custom_requirements": true
+    }
+  ]
+}

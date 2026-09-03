@@ -1,0 +1,59 @@
+{
+  "version": "1.6.0",
+  "inheritance": {
+    "mode": "non_overridable_monotonic",
+    "kernel_registry": "registries/kernel.yaml",
+    "kernel_version": "1.6.0",
+    "kernel_digest": "2eac4f8f90b1f1e679384a326b5335166a19c86cd11ebd928755f4328dde0534"
+  },
+  "roles": {
+    "principal_architect": {
+      "independence_role": "DESIGN"
+    },
+    "product_pm": {
+      "independence_role": "DESIGN"
+    },
+    "domain_architect": {
+      "independence_role": "DESIGN"
+    },
+    "database_architect": {
+      "independence_role": "DESIGN"
+    },
+    "security_engineer": {
+      "independence_role": "REVIEW"
+    },
+    "privacy_compliance": {
+      "independence_role": "REVIEW"
+    },
+    "devops_platform": {
+      "independence_role": "DESIGN"
+    },
+    "sre_reliability": {
+      "independence_role": "REVIEW"
+    },
+    "api_contract": {
+      "independence_role": "DESIGN"
+    },
+    "qa_verification": {
+      "independence_role": "REVIEW"
+    },
+    "finops": {
+      "independence_role": "REVIEW"
+    },
+    "human_factors": {
+      "independence_role": "REVIEW"
+    },
+    "red_team": {
+      "independence_role": "REVIEW"
+    },
+    "falsification_architect": {
+      "independence_role": "REVIEW"
+    },
+    "complexity_auditor": {
+      "independence_role": "REVIEW"
+    },
+    "independent_assurance": {
+      "independence_role": "ASSURANCE"
+    }
+  }
+}

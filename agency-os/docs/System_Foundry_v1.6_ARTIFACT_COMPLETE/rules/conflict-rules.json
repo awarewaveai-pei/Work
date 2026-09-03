@@ -1,0 +1,80 @@
+{
+  "version": "1.6.0",
+  "rules": [
+    {
+      "id": "CONFLICT-SELFREG-NO-IDENTITY",
+      "if_all": [
+        {
+          "question": "Q-ID-002",
+          "equals": true
+        },
+        {
+          "question": "Q-ID-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "使用者自行註冊需要使用者帳號。"
+    },
+    {
+      "id": "CONFLICT-SSO-NO-IDENTITY",
+      "if_all": [
+        {
+          "question": "Q-ID-005",
+          "equals": true
+        },
+        {
+          "question": "Q-ID-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "企業 SSO 需要使用者帳號。"
+    },
+    {
+      "id": "CONFLICT-SUB-NO-CHARGE",
+      "if_all": [
+        {
+          "question": "Q-COM-002",
+          "equals": true
+        },
+        {
+          "question": "Q-COM-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "訂閱制與「不向客戶收費」互相矛盾。"
+    },
+    {
+      "id": "CONFLICT-REFUND-NO-PAY",
+      "if_all": [
+        {
+          "question": "Q-PAY-002",
+          "equals": true
+        },
+        {
+          "question": "Q-PAY-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "退款需要線上付款能力。"
+    },
+    {
+      "id": "CONFLICT-CROSS-NO-MULTI",
+      "if_all": [
+        {
+          "question": "Q-ORG-004",
+          "equals": true
+        },
+        {
+          "question": "Q-ORG-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "跨公司共同案件需要多家公司使用。"
+    }
+  ]
+}

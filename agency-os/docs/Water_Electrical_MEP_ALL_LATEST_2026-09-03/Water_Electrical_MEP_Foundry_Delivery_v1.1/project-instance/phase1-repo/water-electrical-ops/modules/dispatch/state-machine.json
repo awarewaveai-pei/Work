@@ -1,0 +1,15 @@
+{
+  "states": [
+    "DRAFT",
+    "PUBLISHED",
+    "ACK_REQUIRED",
+    "ACKNOWLEDGED",
+    "AMENDED",
+    "CANCELLED"
+  ],
+  "invariants": [
+    "acknowledgement is dispatch-version-bound",
+    "material amendment invalidates old acknowledgement",
+    "cancellation stops future reminders/provider projections"
+  ]
+}

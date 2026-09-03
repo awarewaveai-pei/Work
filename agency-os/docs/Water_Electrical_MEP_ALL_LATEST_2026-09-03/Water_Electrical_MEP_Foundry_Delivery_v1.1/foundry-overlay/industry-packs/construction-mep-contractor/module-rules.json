@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0.0",
+  "phase_modules": {
+    "P1": [
+      "project",
+      "workforce",
+      "dispatch",
+      "identity_authorization",
+      "notification",
+      "calendar_integration",
+      "rwd_web",
+      "audit_observability",
+      "offline_sync"
+    ],
+    "P2": [
+      "field_execution",
+      "document_control",
+      "quality"
+    ],
+    "P3": [
+      "procurement"
+    ],
+    "P4": [
+      "commercial",
+      "subcontract",
+      "cost",
+      "labor_time",
+      "accounting_integration"
+    ],
+    "P5": [
+      "ai"
+    ]
+  },
+  "rules": [
+    {
+      "when_capability": "MEP-CAP-DISPATCH",
+      "require_modules": [
+        "dispatch",
+        "project",
+        "workforce",
+        "identity_authorization"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-LINE-INTEGRATION",
+      "require_modules": [
+        "notification",
+        "dispatch"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-GCAL-INTEGRATION",
+      "require_modules": [
+        "calendar_integration",
+        "dispatch"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-RWD-WEB",
+      "require_modules": [
+        "rwd_web"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-PROJECT-PNL",
+      "require_modules": [
+        "cost",
+        "commercial",
+        "procurement",
+        "subcontract"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-OFFLINE",
+      "require_modules": [
+        "offline_sync",
+        "rwd_web",
+        "identity_authorization",
+        "audit_observability"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-ATTENDANCE",
+      "require_modules": [
+        "labor_time",
+        "workforce",
+        "project",
+        "audit_observability"
+      ]
+    },
+    {
+      "when_capability": "MEP-CAP-ACCOUNTING-INTEGRATION",
+      "require_modules": [
+        "accounting_integration",
+        "commercial",
+        "procurement",
+        "cost",
+        "audit_observability"
+      ]
+    }
+  ]
+}

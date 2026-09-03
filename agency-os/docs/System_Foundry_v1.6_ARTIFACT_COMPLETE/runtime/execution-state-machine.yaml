@@ -1,0 +1,33 @@
+{
+  "version": "1.6.0",
+  "initial": "INTAKE",
+  "states": [
+    "INTAKE",
+    "DISCOVERY",
+    "DESIGN",
+    "ASSURANCE",
+    "APPROVED",
+    "IMPLEMENTING",
+    "VERIFYING",
+    "RELEASE_READY",
+    "RELEASING",
+    "OPERATING",
+    "DEPRECATED",
+    "RETIRED",
+    "BLOCKED",
+    "ROLLED_BACK"
+  ],
+  "terminal": [
+    "RETIRED"
+  ],
+  "blocked_is_recoverable": true,
+  "rules": {
+    "no_implementation_before_approval": true,
+    "no_release_before_verification": true,
+    "every_side_effect_emits_audit_event": true,
+    "rollback_transitions_to": "ROLLED_BACK",
+    "resume_requires_gate_re_evaluation": true,
+    "lifecycle_transition_validation_required": true,
+    "control_plane_migration_required_on_schema_version_change": true
+  }
+}

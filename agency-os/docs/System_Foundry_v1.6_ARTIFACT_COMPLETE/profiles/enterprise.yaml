@@ -1,0 +1,26 @@
+{
+  "profile": "enterprise",
+  "version": "1.6.0",
+  "use_for": [
+    "mission_critical",
+    "regulated",
+    "private_deployment",
+    "group_enterprise"
+  ],
+  "required_gates": "ALL",
+  "conditional_gates": [
+    "G1_CURRENT_STATE_UNDERSTOOD",
+    "G2_ROOT_CAUSE_ESTABLISHED"
+  ],
+  "commercial": true,
+  "requires": [
+    "private_deployment",
+    "compliance",
+    "failure_injection",
+    "restore_verification",
+    "vendor_exit",
+    "thirty_year_replacement_test",
+    "external_review_when_triggered"
+  ],
+  "independent_assurance": "required_strict"
+}

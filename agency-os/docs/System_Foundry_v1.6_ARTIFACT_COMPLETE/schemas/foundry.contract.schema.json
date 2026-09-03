@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Foundry Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project_id",
+    "system_name",
+    "profile",
+    "status",
+    "kernel_version",
+    "fail_closed"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "enum": [
+        "lite",
+        "standard",
+        "commercial",
+        "enterprise"
+      ]
+    },
+    "commercial_intent": {
+      "type": "boolean"
+    },
+    "kernel_version": {
+      "const": "1.6.0"
+    },
+    "fail_closed": {
+      "const": true
+    },
+    "status": {
+      "enum": [
+        "DISCOVERY",
+        "RESEARCH",
+        "DESIGN",
+        "ASSURANCE",
+        "APPROVED",
+        "IMPLEMENTING",
+        "VERIFYING",
+        "RELEASED",
+        "REJECTED",
+        "BLOCKED"
+      ]
+    },
+    "active_stop_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

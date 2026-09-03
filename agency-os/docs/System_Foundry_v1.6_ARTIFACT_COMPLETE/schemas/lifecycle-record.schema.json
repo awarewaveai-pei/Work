@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/lifecycle-record.schema.json",
+  "title": "Lifecycle and Deprecation Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "asset_type",
+    "state",
+    "owner",
+    "version"
+  ],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_type": {
+      "enum": [
+        "API",
+        "EVENT",
+        "SCHEMA",
+        "MODULE",
+        "CAPABILITY",
+        "PROVIDER",
+        "WORKFLOW",
+        "CONFIG",
+        "DATA_FORMAT",
+        "POLICY"
+      ]
+    },
+    "state": {
+      "enum": [
+        "PROPOSED",
+        "ACTIVE",
+        "DEPRECATED",
+        "RETIRING",
+        "RETIRED"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replacement": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "compatibility_until": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "consumer_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "migration_recipe": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "communication_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "removal_criteria": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "retention_decision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rollback": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "DEPRECATED"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "replacement",
+          "compatibility_until",
+          "consumer_evidence"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "RETIRING"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "replacement",
+          "consumer_evidence",
+          "migration_recipe",
+          "communication_evidence",
+          "rollback"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "RETIRED"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "consumer_evidence",
+          "migration_recipe",
+          "communication_evidence",
+          "removal_criteria",
+          "retention_decision",
+          "rollback"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "_schema": "evidence-finding.schema.json",
+  "finding_id": "F-1",
+  "statement": "Verified code fact",
+  "state": "VERIFIED",
+  "repository_revision": "abcdef0",
+  "observed_at": "2026-01-01T00:00:00Z",
+  "observed_by": "reviewer",
+  "evidence": [
+    {
+      "path": "src/a.py",
+      "start_line": 1,
+      "end_line": 2,
+      "blob_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "proves": "fact"
+    }
+  ]
+}

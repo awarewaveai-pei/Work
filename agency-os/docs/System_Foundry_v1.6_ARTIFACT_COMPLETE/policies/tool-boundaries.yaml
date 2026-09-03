@@ -1,0 +1,29 @@
+{
+  "version": "1.6.0",
+  "default": "deny",
+  "classes": {
+    "read_only": {
+      "minimum_authority": "A0"
+    },
+    "local_reversible_write": {
+      "minimum_authority": "A1"
+    },
+    "repository_or_scoped_data_write": {
+      "minimum_authority": "A2"
+    },
+    "release_or_deploy": {
+      "minimum_authority": "A3"
+    },
+    "irreversible_or_sovereign": {
+      "minimum_authority": "A4"
+    }
+  },
+  "network_egress": {
+    "default": "deny_unless_required",
+    "require_destination_purpose_and_data_classification": true
+  },
+  "secrets": {
+    "expose_to_agent_output": false,
+    "require_secret_broker_or_scoped_runtime_injection": true
+  }
+}

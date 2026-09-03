@@ -1,0 +1,33 @@
+{
+  "version": "1.6.0",
+  "name": "build-universal-system",
+  "fail_closed": true,
+  "stage_registry": "registries/workflow-stages.yaml",
+  "stages": [
+    "classify_archetype_and_profile",
+    "intake",
+    "current_state_audit_if_existing",
+    "root_cause_gate_if_existing_system",
+    "policy_and_risk_context",
+    "requirements_and_domain",
+    "human_system_applicability_and_critical_journeys",
+    "research_and_external_fact_freshness",
+    "architecture_options",
+    "security_data_iam_sre_review",
+    "human_factors_accessibility_globalization_review_if_applicable",
+    "supply_chain_and_provider_resilience",
+    "compatibility_and_lifecycle_design",
+    "falsification_and_red_team",
+    "independent_assurance",
+    "human_approval",
+    "repository_bootstrap",
+    "implementation",
+    "golden_and_contract_verification",
+    "counterfactual_shadow_and_experience_validation_if_applicable",
+    "release_readiness",
+    "progressive_release",
+    "post_release_proof",
+    "structured_handoff",
+    "lifecycle_monitoring"
+  ]
+}

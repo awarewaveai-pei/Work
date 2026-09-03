@@ -1,0 +1,188 @@
+{
+  "version": "1.6.0",
+  "rules": [
+    {
+      "id": "DERIVE-IDENTITY",
+      "when_capability": "CAP-IDENTITY",
+      "derive": [
+        "DER-SESSION"
+      ]
+    },
+    {
+      "id": "DERIVE-TENANT",
+      "when_capability": "CAP-MULTI-TENANT",
+      "derive": [
+        "DER-TENANT-ISOLATION",
+        "DER-TENANT-AUTHZ",
+        "DER-TENANT-AUDIT",
+        "DER-TENANT-RECOVERY",
+        "DER-TENANT-OBS"
+      ]
+    },
+    {
+      "id": "DERIVE-FILES",
+      "when_capability": "CAP-FILES",
+      "derive": [
+        "DER-FILE-AUTHZ",
+        "DER-FILE-INTEGRITY"
+      ]
+    },
+    {
+      "id": "DERIVE-IMAGES",
+      "when_capability": "CAP-IMAGES",
+      "derive": [
+        "DER-FILE-AUTHZ",
+        "DER-FILE-INTEGRITY"
+      ]
+    },
+    {
+      "id": "DERIVE-VIDEO",
+      "when_capability": "CAP-VIDEO",
+      "derive": [
+        "DER-FILE-AUTHZ",
+        "DER-FILE-INTEGRITY"
+      ]
+    },
+    {
+      "id": "DERIVE-PAYMENTS",
+      "when_capability": "CAP-PAYMENTS",
+      "derive": [
+        "DER-PAYMENT-IDEMPOTENCY",
+        "DER-PAYMENT-RECON",
+        "DER-PAYMENT-ADAPTER"
+      ]
+    },
+    {
+      "id": "DERIVE-SUBSCRIPTION",
+      "when_capability": "CAP-SUBSCRIPTION",
+      "derive": [
+        "DER-ENTITLEMENT",
+        "DER-BILLING-LIFECYCLE"
+      ]
+    },
+    {
+      "id": "DERIVE-AI",
+      "when_capability": "CAP-AI",
+      "derive": [
+        "DER-PROMPT-SECURITY"
+      ]
+    },
+    {
+      "id": "DERIVE-AI-WRITE",
+      "when_capability": "CAP-AI-WRITE",
+      "derive": [
+        "DER-AI-AUTHORITY",
+        "DER-AI-TOOLS",
+        "DER-AI-AUDIT",
+        "DER-AI-IDEMPOTENCY",
+        "DER-AI-HUMAN"
+      ]
+    },
+    {
+      "id": "DERIVE-AI-EXT",
+      "when_capability": "CAP-AI-EXTERNAL",
+      "derive": [
+        "DER-AI-AUTHORITY",
+        "DER-AI-TOOLS",
+        "DER-AI-AUDIT",
+        "DER-AI-IDEMPOTENCY",
+        "DER-AI-HUMAN"
+      ]
+    },
+    {
+      "id": "DERIVE-OFFLINE",
+      "when_capability": "CAP-OFFLINE",
+      "derive": [
+        "DER-OFFLINE-CRYPTO",
+        "DER-DEVICE-REVOCATION"
+      ]
+    },
+    {
+      "id": "DERIVE-SYNC",
+      "when_capability": "CAP-BG-SYNC",
+      "derive": [
+        "DER-SYNC-CONFLICT"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-HEALTH",
+      "when_capability": "CAP-HEALTH-DATA",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-FIN",
+      "when_capability": "CAP-FINANCIAL-DECISION",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-MINOR",
+      "when_capability": "CAP-MINORS",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-GOV",
+      "when_capability": "CAP-GOV",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-BIO",
+      "when_capability": "CAP-BIOMETRIC",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-LEGAL",
+      "when_capability": "CAP-LEGAL-RECORD",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-RES",
+      "when_capability": "CAP-RESIDENCY",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
+    },
+    {
+      "id": "DERIVE-SAFETY",
+      "when_capability": "CAP-SAFETY-IMPACT",
+      "derive": [
+        "DER-INDEPENDENT-ASSURANCE",
+        "DER-HUMAN-OVERSIGHT"
+      ]
+    },
+    {
+      "id": "DERIVE-FIN-IMPACT",
+      "when_capability": "CAP-FINANCIAL-IMPACT",
+      "derive": [
+        "DER-INDEPENDENT-ASSURANCE",
+        "DER-HUMAN-OVERSIGHT"
+      ]
+    },
+    {
+      "id": "DERIVE-LEGAL-IMPACT",
+      "when_capability": "CAP-LEGAL-IMPACT",
+      "derive": [
+        "DER-INDEPENDENT-ASSURANCE",
+        "DER-HUMAN-OVERSIGHT"
+      ]
+    }
+  ]
+}

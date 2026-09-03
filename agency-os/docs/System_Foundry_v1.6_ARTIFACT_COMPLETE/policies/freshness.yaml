@@ -1,0 +1,19 @@
+{
+  "version": "1.6.0",
+  "classes": {
+    "CRITICAL": {
+      "default_max_age_days": 7
+    },
+    "HIGH": {
+      "default_max_age_days": 30
+    },
+    "MEDIUM": {
+      "default_max_age_days": 90
+    },
+    "LOW": {
+      "default_max_age_days": 365
+    }
+  },
+  "override": "project_profile_may_tighten_but_not_silently_relax",
+  "on_stale": "STALE_EVIDENCE"
+}

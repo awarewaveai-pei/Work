@@ -1,0 +1,18 @@
+{
+  "_schema": "lifecycle-record.schema.json",
+  "asset_id": "api-v1",
+  "asset_type": "API",
+  "state": "RETIRED",
+  "owner": "api-team",
+  "version": "1",
+  "consumer_evidence": [
+    "zero-consumer-proof"
+  ],
+  "migration_recipe": "migrate-to-v2",
+  "communication_evidence": [
+    "notice"
+  ],
+  "removal_criteria": "zero consumers 30d",
+  "retention_decision": "archive spec 7y",
+  "rollback": "restore compatibility adapter"
+}

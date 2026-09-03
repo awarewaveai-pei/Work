@@ -1,0 +1,1314 @@
+{
+  "version": "1.6.0",
+  "questionnaire_version": "1.1.0",
+  "answer_contract": "YES_NO_ONLY",
+  "principles": [
+    "Only legitimate product/business choices are user-selectable.",
+    "Universal engineering quality requirements are Foundation Baseline and cannot be disabled.",
+    "Requirements safely derivable from prior answers are not asked again.",
+    "Inactive questions are visible but not answerable.",
+    "Custom requirements are allowed and become formal requirement artifacts."
+  ],
+  "categories": [
+    {
+      "id": "scope",
+      "order": 1,
+      "title": "使用對象",
+      "description": "誰會直接使用或存取這套系統"
+    },
+    {
+      "id": "channels",
+      "order": 2,
+      "title": "使用介面",
+      "description": "使用者透過哪些介面操作"
+    },
+    {
+      "id": "identity",
+      "order": 3,
+      "title": "帳號與成員",
+      "description": "產品層級的帳號、邀請與企業登入需求"
+    },
+    {
+      "id": "organization",
+      "order": 4,
+      "title": "公司與組織",
+      "description": "公司、分公司、集團與跨公司合作"
+    },
+    {
+      "id": "records",
+      "order": 5,
+      "title": "核心資料",
+      "description": "系統需要管理哪些主要業務資料"
+    },
+    {
+      "id": "workflow",
+      "order": 6,
+      "title": "流程與協作",
+      "description": "審核、任務、狀態、協作與簽核"
+    },
+    {
+      "id": "files",
+      "order": 7,
+      "title": "檔案與媒體",
+      "description": "使用者需要處理哪些檔案或媒體能力"
+    },
+    {
+      "id": "search_reporting",
+      "order": 8,
+      "title": "搜尋與報表",
+      "description": "搜尋、報表、分析與資料輸出"
+    },
+    {
+      "id": "commercial",
+      "order": 9,
+      "title": "商業模式",
+      "description": "收費、方案、訂閱與授權"
+    },
+    {
+      "id": "payments",
+      "order": 10,
+      "title": "付款與帳務",
+      "description": "實際金流、退款、發票與稅務"
+    },
+    {
+      "id": "notifications",
+      "order": 11,
+      "title": "通知",
+      "description": "系統主動通知使用者或其他系統"
+    },
+    {
+      "id": "integrations",
+      "order": 12,
+      "title": "外部整合",
+      "description": "和既有服務、供應商或企業系統連接"
+    },
+    {
+      "id": "mobile_offline",
+      "order": 13,
+      "title": "行動與離線",
+      "description": "行動裝置、現場作業與離線能力"
+    },
+    {
+      "id": "globalization",
+      "order": 14,
+      "title": "多國與在地化",
+      "description": "語言、幣別、時區與資料所在地"
+    },
+    {
+      "id": "ai",
+      "order": 15,
+      "title": "AI 與自動化",
+      "description": "AI 輔助、生成、決策與代理操作"
+    },
+    {
+      "id": "migration",
+      "order": 16,
+      "title": "既有系統與資料遷移",
+      "description": "舊系統、歷史資料與平行運作"
+    },
+    {
+      "id": "portals",
+      "order": 17,
+      "title": "對外入口",
+      "description": "客戶、合作夥伴與公開入口"
+    },
+    {
+      "id": "regulated",
+      "order": 18,
+      "title": "特殊資料與產業",
+      "description": "會觸發額外治理或法規研究的領域事實"
+    },
+    {
+      "id": "business_impact",
+      "order": 19,
+      "title": "營運影響",
+      "description": "描述業務本身的運作方式與影響，不是選工程技術"
+    },
+    {
+      "id": "future",
+      "order": 20,
+      "title": "未來規劃",
+      "description": "目前不做，但已確定希望未來具備的產品能力"
+    },
+    {
+      "id": "custom",
+      "order": 21,
+      "title": "其他需求",
+      "description": "預設題庫未涵蓋的特殊需求，可自行新增"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-SCOPE-001",
+      "category": "scope",
+      "label": "公司內部員工使用",
+      "description": "員工會直接登入或操作系統。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SCOPE-002",
+      "category": "scope",
+      "label": "外部客戶使用",
+      "description": "客戶會直接登入或操作系統。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SCOPE-003",
+      "category": "scope",
+      "label": "外部合作夥伴使用",
+      "description": "供應商、承包商、經銷商或合作方會直接使用。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SCOPE-004",
+      "category": "scope",
+      "label": "匿名公開使用",
+      "description": "未登入的人也可以使用部分功能。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CH-001",
+      "category": "channels",
+      "label": "瀏覽器操作介面",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CH-002",
+      "category": "channels",
+      "label": "手機 App",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CH-003",
+      "category": "channels",
+      "label": "桌面應用程式",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CH-004",
+      "category": "channels",
+      "label": "對外 API",
+      "description": "第三方或客戶系統可以正式串接你的 API。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CH-005",
+      "category": "channels",
+      "label": "CLI / 指令工具",
+      "description": "使用者或自動化流程需要命令列介面。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-ID-001",
+      "category": "identity",
+      "label": "使用者帳號",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-ID-002",
+      "category": "identity",
+      "label": "使用者自行註冊",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ID-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-ID-003",
+      "category": "identity",
+      "label": "不同使用者角色",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ID-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-ID-004",
+      "category": "identity",
+      "label": "管理員邀請成員",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ID-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-ID-005",
+      "category": "identity",
+      "label": "企業 SSO",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ID-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-ID-006",
+      "category": "identity",
+      "label": "客戶公司自行管理成員",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ID-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-ORG-001",
+      "category": "organization",
+      "label": "多家公司使用",
+      "description": "不同公司或組織會擁有自己的使用者或資料。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-ORG-002",
+      "category": "organization",
+      "label": "公司底下有多個分公司",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-ORG-003",
+      "category": "organization",
+      "label": "集團 / 母子公司結構",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-ORG-004",
+      "category": "organization",
+      "label": "不同公司共同參與同一案件 / 專案",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ORG-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-ORG-005",
+      "category": "organization",
+      "label": "跨公司共享指定資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ORG-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DATA-001",
+      "category": "records",
+      "label": "客戶 / 聯絡人資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-002",
+      "category": "records",
+      "label": "公司 / 組織資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-003",
+      "category": "records",
+      "label": "產品 / 商品 / 服務資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-004",
+      "category": "records",
+      "label": "訂單 / 交易資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-005",
+      "category": "records",
+      "label": "案件 / 專案資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-006",
+      "category": "records",
+      "label": "合約 / 協議資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-007",
+      "category": "records",
+      "label": "庫存 / 倉儲資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-008",
+      "category": "records",
+      "label": "預約 / 行程資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-009",
+      "category": "records",
+      "label": "會計 / 財務紀錄",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DATA-010",
+      "category": "records",
+      "label": "使用者產生內容",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-001",
+      "category": "workflow",
+      "label": "多步驟狀態流程",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-002",
+      "category": "workflow",
+      "label": "審核流程",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-003",
+      "category": "workflow",
+      "label": "需要兩人或多人共同批准",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-WF-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-WF-004",
+      "category": "workflow",
+      "label": "任務指派",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-005",
+      "category": "workflow",
+      "label": "留言 / 討論",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-006",
+      "category": "workflow",
+      "label": "多人即時協作",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-007",
+      "category": "workflow",
+      "label": "排程 / 預約執行",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-008",
+      "category": "workflow",
+      "label": "電子簽核 / 簽名",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FILE-001",
+      "category": "files",
+      "label": "上傳一般文件",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FILE-002",
+      "category": "files",
+      "label": "圖片",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FILE-003",
+      "category": "files",
+      "label": "影片",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FILE-004",
+      "category": "files",
+      "label": "檔案版本管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-FILE-001",
+            "equals": true
+          },
+          {
+            "question": "Q-FILE-002",
+            "equals": true
+          },
+          {
+            "question": "Q-FILE-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-FILE-005",
+      "category": "files",
+      "label": "分享下載連結",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-FILE-001",
+            "equals": true
+          },
+          {
+            "question": "Q-FILE-002",
+            "equals": true
+          },
+          {
+            "question": "Q-FILE-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-SR-001",
+      "category": "search_reporting",
+      "label": "全文搜尋",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SR-002",
+      "category": "search_reporting",
+      "label": "進階篩選",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SR-003",
+      "category": "search_reporting",
+      "label": "Dashboard",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SR-004",
+      "category": "search_reporting",
+      "label": "自訂報表",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SR-005",
+      "category": "search_reporting",
+      "label": "Excel / CSV 匯出",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SR-006",
+      "category": "search_reporting",
+      "label": "使用分析 / Analytics",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-COM-001",
+      "category": "commercial",
+      "label": "向客戶收費",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-COM-002",
+      "category": "commercial",
+      "label": "訂閱制",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-COM-003",
+      "category": "commercial",
+      "label": "不同方案 / Edition",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-COM-004",
+      "category": "commercial",
+      "label": "免費試用",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-COM-005",
+      "category": "commercial",
+      "label": "依使用量計費",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-COM-006",
+      "category": "commercial",
+      "label": "授權碼 / License",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-001",
+      "category": "payments",
+      "label": "線上付款",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-002",
+      "category": "payments",
+      "label": "退款",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PAY-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-003",
+      "category": "payments",
+      "label": "部分退款",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PAY-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-004",
+      "category": "payments",
+      "label": "發票 / Invoice",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-005",
+      "category": "payments",
+      "label": "稅務計算",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-006",
+      "category": "payments",
+      "label": "保存付款方式供下次使用",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PAY-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-NOT-001",
+      "category": "notifications",
+      "label": "Email 通知",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-NOT-002",
+      "category": "notifications",
+      "label": "SMS 通知",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-NOT-003",
+      "category": "notifications",
+      "label": "App Push 通知",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-NOT-004",
+      "category": "notifications",
+      "label": "系統內通知",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-NOT-005",
+      "category": "notifications",
+      "label": "Webhook 通知其他系統",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-001",
+      "category": "integrations",
+      "label": "第三方 API 整合",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-002",
+      "category": "integrations",
+      "label": "ERP 整合",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-003",
+      "category": "integrations",
+      "label": "CRM 整合",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-004",
+      "category": "integrations",
+      "label": "會計系統整合",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-005",
+      "category": "integrations",
+      "label": "外部身分供應商整合",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-006",
+      "category": "integrations",
+      "label": "外部檔案儲存服務",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-INT-007",
+      "category": "integrations",
+      "label": "資料匯入 / 匯出介面",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MOB-001",
+      "category": "mobile_offline",
+      "label": "沒有網路時仍可使用部分功能",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-CH-001",
+            "equals": true
+          },
+          {
+            "question": "Q-CH-002",
+            "equals": true
+          },
+          {
+            "question": "Q-CH-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-MOB-002",
+      "category": "mobile_offline",
+      "label": "恢復網路後自動同步",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MOB-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MOB-003",
+      "category": "mobile_offline",
+      "label": "使用裝置相機",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CH-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MOB-004",
+      "category": "mobile_offline",
+      "label": "使用裝置定位",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CH-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MOB-005",
+      "category": "mobile_offline",
+      "label": "掃描條碼 / QR Code",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CH-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-GLO-001",
+      "category": "globalization",
+      "label": "多語言",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-GLO-002",
+      "category": "globalization",
+      "label": "多種幣別",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-GLO-003",
+      "category": "globalization",
+      "label": "跨多個時區",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-GLO-004",
+      "category": "globalization",
+      "label": "由右至左語言介面",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-GLO-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-GLO-005",
+      "category": "globalization",
+      "label": "特定國家 / 區域資料必須留在當地",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-001",
+      "category": "ai",
+      "label": "AI 問答助手",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-002",
+      "category": "ai",
+      "label": "AI 搜尋",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-003",
+      "category": "ai",
+      "label": "AI 摘要",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-004",
+      "category": "ai",
+      "label": "AI 產生內容",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-005",
+      "category": "ai",
+      "label": "AI 自動分類",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-006",
+      "category": "ai",
+      "label": "AI 推薦 / 預測",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-007",
+      "category": "ai",
+      "label": "AI 可以修改系統資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-008",
+      "category": "ai",
+      "label": "AI 可以執行外部操作",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-009",
+      "category": "ai",
+      "label": "多個 AI Agent 協作",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-010",
+      "category": "ai",
+      "label": "語音 AI 互動",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MIG-001",
+      "category": "migration",
+      "label": "從既有系統遷移",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MIG-002",
+      "category": "migration",
+      "label": "匯入歷史資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MIG-003",
+      "category": "migration",
+      "label": "新舊系統一段時間平行運作",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MIG-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MIG-004",
+      "category": "migration",
+      "label": "持續與舊系統同步資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MIG-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MIG-005",
+      "category": "migration",
+      "label": "提供客戶完整資料匯出",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PORT-001",
+      "category": "portals",
+      "label": "公開網站 / 頁面",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PORT-002",
+      "category": "portals",
+      "label": "客戶自助入口",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PORT-003",
+      "category": "portals",
+      "label": "合作夥伴入口",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PORT-004",
+      "category": "portals",
+      "label": "可嵌入其他網站的元件",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-001",
+      "category": "regulated",
+      "label": "處理醫療 / 健康資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-002",
+      "category": "regulated",
+      "label": "系統結果直接影響金融 / 信用決策",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-003",
+      "category": "regulated",
+      "label": "主要使用者包含未成年人",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-004",
+      "category": "regulated",
+      "label": "政府 / 公部門資料或流程",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-005",
+      "category": "regulated",
+      "label": "生物辨識資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-006",
+      "category": "regulated",
+      "label": "精確位置資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REG-007",
+      "category": "regulated",
+      "label": "具有法律效力的正式紀錄",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-001",
+      "category": "business_impact",
+      "label": "非上班時間也需要持續提供服務",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-002",
+      "category": "business_impact",
+      "label": "使用者需要看到即時更新",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-003",
+      "category": "business_impact",
+      "label": "系統會處理不可重複執行的交易 / 動作",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-004",
+      "category": "business_impact",
+      "label": "錯誤結果可能造成人身安全影響",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-005",
+      "category": "business_impact",
+      "label": "錯誤結果可能造成直接金錢損失",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-006",
+      "category": "business_impact",
+      "label": "系統操作可能產生法律效果",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-007",
+      "category": "business_impact",
+      "label": "使用量會有明顯尖峰時段",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FUT-001",
+      "category": "future",
+      "label": "未來計畫增加手機 App",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CH-002",
+        "equals": false
+      }
+    },
+    {
+      "id": "Q-FUT-002",
+      "category": "future",
+      "label": "未來計畫提供多家公司使用",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ORG-001",
+        "equals": false
+      }
+    },
+    {
+      "id": "Q-FUT-003",
+      "category": "future",
+      "label": "未來計畫進入多國市場",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FUT-004",
+      "category": "future",
+      "label": "未來計畫加入 AI 能力",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "all": [
+          {
+            "question": "Q-AI-001",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-002",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-003",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-004",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-005",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-006",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-007",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-008",
+            "equals": false
+          },
+          {
+            "question": "Q-AI-009",
+            "equals": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-FUT-005",
+      "category": "future",
+      "label": "未來計畫提供對外 API",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CH-004",
+        "equals": false
+      }
+    }
+  ]
+}

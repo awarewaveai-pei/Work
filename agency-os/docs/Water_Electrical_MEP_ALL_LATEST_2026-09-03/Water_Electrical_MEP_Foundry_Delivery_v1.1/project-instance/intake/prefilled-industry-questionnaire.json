@@ -1,0 +1,801 @@
+{
+  "schema_version": "1.0.0",
+  "pack_id": "construction-mep-contractor",
+  "submission_rule": "All active user choices are resolved YES/NO in this latest project instance.",
+  "answers": {
+    "MEP-Q-PROJ-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "128-146",
+          "claim": "Phase 1 project basic data required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-PROJ-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "228-244",
+          "claim": "Project/site data includes worksite address and project site semantics."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-PROJ-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "228-244",
+          "claim": "Project responsible engineer and foreman fields."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-PROJ-004": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "246-255",
+          "claim": "Project status lifecycle."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-PROJ-005": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "246-255",
+          "claim": "Warranty is a project state."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "126-146",
+          "claim": "Employee data required in Phase 1."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "126-146",
+          "claim": "Crew/team management required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "150-160",
+          "claim": "Foreman is a standard role."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-004": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "126-146",
+          "claim": "Daily dispatch required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-005": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "287-295",
+          "claim": "Multi-person/crew dispatch."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-006": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "335-348",
+          "claim": "Daily unassigned employee list."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-007": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "141-146",
+          "claim": "Dispatch acknowledgement required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-008": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "457-479",
+          "claim": "Amendment invalidates acknowledgement."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-009": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "352-367",
+          "claim": "Desktop drag and drop dispatch."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-010": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "299-313",
+          "claim": "Company day/week/month calendar and filters."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DSP-011": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "371-395",
+          "claim": "My dispatch today/tomorrow/week."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-FLD-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "623-645",
+          "claim": "Phase 2 work progress."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-FLD-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "671-685",
+          "claim": "Daily site report fields."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DOC-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "623-659",
+          "claim": "Drawing management."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DOC-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "651-659",
+          "claim": "Drawing version/latest indication."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-DOC-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "659-669",
+          "claim": "Site photos."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-QA-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "623-635",
+          "claim": "Defect management."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-QA-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "623-635",
+          "claim": "Inspection management."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Material master."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Material request."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "RFQ."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-004": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Purchase order."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-005": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Delivery and site acceptance."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-006": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Material issue."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-007": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Material return."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-MAT-008": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "701-735",
+          "claim": "Project material cost."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-VEN-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "727-735",
+          "claim": "Vendor management."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-VEN-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Subcontractor costs/management implied by Phase 4 modules."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-VEN-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Subcontract billing."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-BIL-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Project contract."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-BIL-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Original quote/budget."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-BIL-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Change orders."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-BIL-004": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Owner progress estimate."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-BIL-005": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Billing."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-BIL-006": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-766",
+          "claim": "Retention."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-COST-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "769-799",
+          "claim": "Dispatch records feed labor cost."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-COST-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "769-799",
+          "claim": "Procurement/material issue feed material cost."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-COST-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "769-799",
+          "claim": "Subcontract estimate feeds subcontract cost."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-COST-004": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "769-799",
+          "claim": "Other expense cost."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-COST-005": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "750-799",
+          "claim": "Project P&L."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-COST-006": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "785-799",
+          "claim": "Project margin formula."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-INT-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "399-452",
+          "claim": "LINE notification integration."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-INT-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "499-542",
+          "claim": "Google Calendar integration."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-INT-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "371-395",
+          "claim": "Mobile-browser user has address navigation action."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-AI-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "815-851",
+          "claim": "AI daily report summary."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-AI-002": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "815-851",
+          "claim": "AI query examples."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-AI-003": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "83-106",
+          "claim": "Phase table explicitly includes AI assistant reminder/anomaly analysis scope."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-UX-001": {
+      "value": true,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "USER_OVERRIDE",
+          "path": "sources/USER_OVERRIDE_RWD.md",
+          "lines": "1-16",
+          "claim": "Single responsive web application."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-UX-002": {
+      "value": false,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "USER_OVERRIDE",
+          "path": "sources/USER_OVERRIDE_RWD.md",
+          "lines": "1-16",
+          "claim": "No native mobile app."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-UX-003": {
+      "value": false,
+      "status": "SOURCE_VERIFIED",
+      "evidence": [
+        {
+          "source": "USER_OVERRIDE",
+          "path": "sources/USER_OVERRIDE_RWD.md",
+          "lines": "1-16",
+          "claim": "No installable PWA."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-AI-004": {
+      "value": false,
+      "status": "SOURCE_SCOPE_FALSE",
+      "evidence": [
+        {
+          "source": "SPEC",
+          "path": "sources/water_electrical_project_management_spec.md",
+          "lines": "815-851",
+          "claim": "Specified AI functions are query/summary/analysis; direct modification is not included."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-UX-004": {
+      "value": true,
+      "status": "OWNER_DECISION_LOCKED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "7-7",
+          "claim": "Offline operation required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-FUT-001": {
+      "value": false,
+      "status": "OWNER_DECISION_LOCKED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "8-8",
+          "claim": "Multi-tenant SaaS explicitly not required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-FUT-002": {
+      "value": true,
+      "status": "OWNER_DECISION_LOCKED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "9-9",
+          "claim": "Accounting synchronization required."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-FUT-003": {
+      "value": true,
+      "status": "ARCHITECTURE_DECISION_ADOPTED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "10-10",
+          "claim": "Latest package adopts separate actual/approved labor time."
+        }
+      ],
+      "note": ""
+    },
+    "MEP-Q-FUT-004": {
+      "value": false,
+      "status": "OWNER_DECISION_LOCKED",
+      "evidence": [
+        {
+          "source": "OWNER_DECISION",
+          "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+          "lines": "11-11",
+          "claim": "Online payment gateway explicitly not required."
+        }
+      ],
+      "note": ""
+    }
+  },
+  "decision_set": "2026-09-03-latest"
+}

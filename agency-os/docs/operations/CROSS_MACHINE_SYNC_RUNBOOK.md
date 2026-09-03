@@ -12,6 +12,7 @@
 |----|---------|
 | Repo 所有檔案（WORKLOG、TASKS、rules、memory content） | `git pull` ✅ |
 | Claude hooks / settings.json / commands | `sync-claude-userlevel.ps1 -Mode merge`（讀 repo SSOT） ✅ |
+| Codex skills / native agents / hook bridge | `sync-claude-to-codex.ps1 -Mode linked`（讀 Claude source，僅生成薄 bridge）✅ |
 | MCP 設定（.mcp.json / Codex / Copilot / Gemini） | `sync-mcp-config.ps1`（讀 registry.template.json） ✅ |
 | **MEMORY.md**（Claude Code 讀取的 project memory index） | ❌ 不在 git → AO-CLOSE 自動複製到桌面 |
 
@@ -46,7 +47,8 @@ AO-RESUME
 1. `git pull origin main`（取得所有 memory 內容、rules、WORKLOG）
 2. `sync-claude-userlevel.ps1 -Mode merge`（Claude hooks/settings 對齊）
 3. `sync-mcp-config.ps1`（MCP 設定重生）
-4. `import-cross-machine-memory.ps1`（偵測桌面 AO-SYNC 資料夾 → 自動匯入 MEMORY.md）
+4. `sync-claude-to-codex.ps1 -Mode linked` + `check-claude-codex-parity.ps1`（Codex bridge 重生並機械驗證）
+5. `import-cross-machine-memory.ps1`（偵測桌面 AO-SYNC 資料夾 → 自動匯入 MEMORY.md）
 
 > **注意**：AO-SYNC 資料夾放桌面後，AO-RESUME 執行時會自動匯入並寫入 `.imported` 標記，之後不再重複匯入同一份。
 
@@ -63,7 +65,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlinePa
 
 ## 為什麼需要 sync-claude-userlevel 和 sync-mcp-config？
 
-`ao-resume.ps1` 在 AO-RESUME 時會自動執行 `sync-claude-userlevel.ps1 -Mode verify`（只偵測漂移，印出警告）。若看到：
+`ao-resume.ps1` 在 AO-RESUME 時會自動執行 `sync-claude-userlevel.ps1 -Mode merge`、`sync-mcp-config.ps1`，以及 `sync-claude-to-codex.ps1 -Mode linked` 後的 parity proof。既有 Claude skill/agent/command 的內容由 Codex bridge 直接讀 source；只有新增、改名或刪除資產才需要這個自動 discovery step。
+
+若 Claude user-level sync 仍看到：
 
 ```
 WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/).
@@ -72,7 +76,12 @@ WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/).
 
 代表本機 hooks/settings 與 repo SSOT 不同步 → 補跑 `-Mode merge` 即可（normalizer 自動處理 PS 5.1 array bug，不需手動修補）。
 
-`sync-mcp-config.ps1` 不在 ao-resume 自動流程中，需手動跑一次確保 `.mcp.json`、`~/.codex/config.toml`、`~/.copilot/mcp-config.json`、`~/.gemini/settings.json` 來自最新 `mcp/registry.template.json`。
+若需要在 AO-RESUME 之外立即修復 Codex bridge，執行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\mcp\codex-userlevel\scripts\sync-claude-to-codex.ps1 -WorkRoot D:\Work -Mode linked
+powershell -NoProfile -ExecutionPolicy Bypass -File .\mcp\codex-userlevel\scripts\check-claude-codex-parity.ps1 -WorkRoot D:\Work
+```
 
 ---
 
@@ -137,4 +146,6 @@ c:\Users\<帳號>\Work\agency-os\memory\   ← git-tracked，git pull 自動到�
 | `scripts/ao-close.ps1` | 收工主腳本（最後一步呼叫 export）|
 | `scripts/sync-claude-userlevel.ps1` | Claude hooks/settings SSOT 同步 |
 | `scripts/sync-mcp-config.ps1` | MCP 設定 SSOT 同步 |
+| `mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1` | Codex thin bridge 生成、備份與舊副本清除 |
+| `mcp/codex-userlevel/scripts/check-claude-codex-parity.ps1` | 讀取式 Claude/Codex parity 檢查（不輸出機密） |
 | `docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2 | 完整開機步驟正本 |

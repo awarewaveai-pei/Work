@@ -1,0 +1,42 @@
+# Idea Intake Standard
+
+## Purpose
+定義 System Foundry 在此領域的最低可重用標準。
+
+## Required Scope
+- problem
+- buyer
+- users
+- commercial intent
+- criticality
+- constraints
+- success metrics
+- unknowns
+
+## Mandatory Questions
+- Why is this required?
+- Current state?
+- Target state?
+- Evidence?
+- Alternatives?
+- Failure mode?
+- Exact path?
+- Migration?
+- Test?
+- Rollback?
+- Expected result?
+
+## Output Contract
+```text
+WHAT
+WHY
+WHERE
+DEPENDENCIES
+RISK
+TEST
+ROLLBACK
+EXPECTED RESULT
+```
+
+## Evidence States
+VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED

@@ -1,0 +1,447 @@
+{
+  "schema_version": "1.1.0",
+  "version": "1.1.0-latest",
+  "file_count": 88,
+  "files": [
+    {
+      "path": "CHANGELOG_v1.1.md",
+      "sha256": "dc2501ac1fe68234860f24b92dd034ab2af702e179fcc336439410ae1cf15d6d",
+      "bytes": 764
+    },
+    {
+      "path": "INSTALL.md",
+      "sha256": "834555d4e93a9cf53d000c8eb9e19e75d6b15ff992ba6449244a031561ace77a",
+      "bytes": 680
+    },
+    {
+      "path": "README.md",
+      "sha256": "d5dbf038ccfb1201b69db9f62bc0bbef6ccaafc0320b6d7db6d646e2b9c7a9d4",
+      "bytes": 1395
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/CHANGELOG_v1.1.md",
+      "sha256": "bc8d7111845a8244a74e983b5a67b75b42c3e9966f09db17484c3013ab0a8cee",
+      "bytes": 478
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/INDUSTRY_MANIFEST.json",
+      "sha256": "5a40e1215d73603e04d2305c0533d347e2d76e7dfdaf159bac39359978c9f486",
+      "bytes": 942
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/PACK_FILE_MANIFEST.json",
+      "sha256": "219a9f25a9a24aaa8bdbc662f07409b61d8f4feb21b1033cdc585bbe9d7ff712",
+      "bytes": 2091
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/PROJECT_DECISION_EXAMPLE.json",
+      "sha256": "43c78c7a7f3232420e09bb83bfb75417001650fe3d96d52a7ae7edde1639d628",
+      "bytes": 177
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/README.md",
+      "sha256": "140aa93df93be82397da6271c3e0440a880833a682d728a360ac6184a35e3b69",
+      "bytes": 720
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/REFERENCE_ORIGIN.md",
+      "sha256": "ed679aca2fe183de876ec47ff463b051a8ca0d26e56e22753915dc80994464d2",
+      "bytes": 502
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/acceptance-patterns.json",
+      "sha256": "86c773b1916c5542a5824b64ce84c66ae705bedb562d8fea05a977c1343c43b4",
+      "bytes": 2981
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/capabilities.json",
+      "sha256": "cf074f2cf1c12bcd68a7eb393a6306ad6192739710773b0d86a57dbe402ffebf",
+      "bytes": 12665
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/domain-patterns.json",
+      "sha256": "d8005b164f73d2b9d9aa39df7b39d516fb90a6b25c9ec956ef894e8f787848b4",
+      "bytes": 3450
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/failure-patterns.json",
+      "sha256": "f5ec55970c77e146a12e73d5184f8c4723baf781eb53086b04c1384db7bf384c",
+      "bytes": 3445
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/invariants.json",
+      "sha256": "79da42d71f3267e2a2ad955cf33d0261d0622eaefc1f55784c93e1183604868c",
+      "bytes": 4800
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/module-rules.json",
+      "sha256": "f940c75373b8668f8bbffa59be35369f09a9569b2a69d60d5852c5ebad2efd75",
+      "bytes": 1967
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/questions.json",
+      "sha256": "d195f88d2e08e2877e9177276f14ba438deef2b32307e57eb78b72eac09e0e86",
+      "bytes": 17839
+    },
+    {
+      "path": "foundry-overlay/industry-packs/construction-mep-contractor/state-machines.json",
+      "sha256": "b0519bd5aa8a45e53e1df4671df94a81db18659a2799ede434dc286fb0fc6143",
+      "bytes": 3829
+    },
+    {
+      "path": "project-instance/evidence/requirement-evidence-register.json",
+      "sha256": "1995043d3e1dfca63279b1bd6261a3faa196b904e9d35cb8772427e0c6923481",
+      "bytes": 8130
+    },
+    {
+      "path": "project-instance/evidence/requirement-evidence-register.md",
+      "sha256": "e68466158b1bf1f5f52b80b31c176c4c0782ad0cf5ee44f6d38f41e678548a8f",
+      "bytes": 2558
+    },
+    {
+      "path": "project-instance/intake/OWNER_DECISIONS_LOCKED.md",
+      "sha256": "7387f29459bbe2e0ac8631e3a40bd1e9394ef7edf77c628aa714051ef2eb9983",
+      "bytes": 513
+    },
+    {
+      "path": "project-instance/intake/core-answer-provenance.json",
+      "sha256": "5cb5fb9dd5f88f06099b25f1925d70b1bd4c06c074d5d27cb14591c763472834",
+      "bytes": 30442
+    },
+    {
+      "path": "project-instance/intake/core-foundry-answers.full-target.json",
+      "sha256": "12a46e399b3534e6ebc37ac65a72712a29269173bb26ccf561e93659dce9f991",
+      "bytes": 3238
+    },
+    {
+      "path": "project-instance/intake/core-foundry-answers.phase1.json",
+      "sha256": "65b72994f516d841e2205263db5d2048769b06021be555514eea01e7fac2ead0",
+      "bytes": 3178
+    },
+    {
+      "path": "project-instance/intake/prefilled-industry-questionnaire.json",
+      "sha256": "327db3b8d8b80488d4e8fb32397f12152a168b9efb4ef898cda9d864af810f90",
+      "bytes": 20611
+    },
+    {
+      "path": "project-instance/phase1-blueprint/00_EXECUTIVE_SUMMARY.md",
+      "sha256": "c42817ea58e6c8ba9b91e2883b6e23f7c89f54a3868cf79c5a0df878928e5e22",
+      "bytes": 1460
+    },
+    {
+      "path": "project-instance/phase1-blueprint/01_SCOPE_AND_TRACEABILITY.md",
+      "sha256": "e8c0e93fe26d6fb7b1679a406f28425d4990d758620b7ba254c00d85123563c8",
+      "bytes": 827
+    },
+    {
+      "path": "project-instance/phase1-blueprint/02_DOMAIN_BOUNDARIES.md",
+      "sha256": "822cc70de588a205a0aee10416c9fc6b99ce88f85d78a8c5a9be5e371abccc88",
+      "bytes": 1548
+    },
+    {
+      "path": "project-instance/phase1-blueprint/03_ARCHITECTURE_OPTIONS.md",
+      "sha256": "5935b9d36a144c0d0aca61558642fe3e508a3adc385b253de605219efcdf7899",
+      "bytes": 1996
+    },
+    {
+      "path": "project-instance/phase1-blueprint/04_DATA_MODEL.md",
+      "sha256": "58a919f13ed88e6c62f85c745c1266ab623dcf942566d2bd740081eda904126f",
+      "bytes": 1760
+    },
+    {
+      "path": "project-instance/phase1-blueprint/05_AUTHORIZATION.md",
+      "sha256": "47277481437126f627915d06c5d0da457f836670dab39ba9651cf0d9d32a1f8b",
+      "bytes": 820
+    },
+    {
+      "path": "project-instance/phase1-blueprint/06_DISPATCH_STATE_MACHINE.md",
+      "sha256": "1afb7f383ba8d920e7415ff1a44f1be8d094fcbbaa10b7db64c59fefeb399ca3",
+      "bytes": 769
+    },
+    {
+      "path": "project-instance/phase1-blueprint/07_INTEGRATIONS.md",
+      "sha256": "af73d49146fee6ee6f0c792e8d4739cdbd7b0b4de92d2166a8b9a238410bb360",
+      "bytes": 1216
+    },
+    {
+      "path": "project-instance/phase1-blueprint/08_RWD_UX.md",
+      "sha256": "6939f96bb97f9f4d12a97d3643f794bf059ff41a1117fdaf5c85a6489f77977b",
+      "bytes": 1924
+    },
+    {
+      "path": "project-instance/phase1-blueprint/09_SECURITY.md",
+      "sha256": "ca2687ee8e845ba51bbddab140da6437d41f6f8aa78c3ae28aa176a250197951",
+      "bytes": 1303
+    },
+    {
+      "path": "project-instance/phase1-blueprint/10_OBSERVABILITY_SRE.md",
+      "sha256": "7e2386afebf03119aa2d612050a1f638ad0cd49bd4e0ef996f57ff8c36b32d99",
+      "bytes": 855
+    },
+    {
+      "path": "project-instance/phase1-blueprint/11_TEST_STRATEGY.md",
+      "sha256": "f964731ffe21558765433527e9c658f055120f83684db9bd21b81bdaa7a58702",
+      "bytes": 1509
+    },
+    {
+      "path": "project-instance/phase1-blueprint/12_DEPLOYMENT_ROLLBACK.md",
+      "sha256": "f9fc5bf297b2bf5bb29888997b4d9520383a2e2722903ee5f7a609b017ad7092",
+      "bytes": 1216
+    },
+    {
+      "path": "project-instance/phase1-blueprint/13_ACCEPTANCE_CRITERIA.md",
+      "sha256": "1756b0b97ab24594b926715116fadb6c12f0a1ef5364e04a281b9bbfb385dbba",
+      "bytes": 1280
+    },
+    {
+      "path": "project-instance/phase1-blueprint/14_PHASE2_TO_PHASE5_BOUNDARIES.md",
+      "sha256": "2ba80030022862c3736997c100dd0348aee091add68c1d9444d9b83b80665476",
+      "bytes": 1504
+    },
+    {
+      "path": "project-instance/phase1-blueprint/15_IMPLEMENTATION_BACKLOG.md",
+      "sha256": "beea9684f1af988fc25fa36d10a9aaf5f6a244de5f94a2c4ed5427cf37566939",
+      "bytes": 2294
+    },
+    {
+      "path": "project-instance/phase1-blueprint/16_LOCKED_OWNER_DECISIONS.md",
+      "sha256": "9406e770ed745c23c20e24d42efca25e935dce8ccd7aa65fa7ecc874dca78be8",
+      "bytes": 475
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/.foundry/intake/requirement-evidence-register.json",
+      "sha256": "1995043d3e1dfca63279b1bd6261a3faa196b904e9d35cb8772427e0c6923481",
+      "bytes": 8130
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/.foundry/resolution/core-foundry-plan.phase1.json",
+      "sha256": "3478c934503c48a796d6f8aed6b907403b40a461b1351ce004b7409d3f7e458b",
+      "bytes": 4973
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/.foundry/resolution/industry-foundry-plan.json",
+      "sha256": "c41788429c1065cb1ad48ce1250e2189f4bd90e47ad8275dc93d30c7c722c888",
+      "bytes": 6662
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/CHANGELOG_v1.1.md",
+      "sha256": "f1321ea99c7f72ea945836255789d186169e5c2615182e797acb523bfe8d57d5",
+      "bytes": 401
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/README.md",
+      "sha256": "e04f1ab35b0290fa88fe426b0d8124fb0e3cc1b751c38a39ce921c5362e1420d",
+      "bytes": 1023
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/REPO_MANIFEST.json",
+      "sha256": "a1acf71bf3ce67e612a450e03513a3388ae4b8ad710feeaeff61878e3e2b8376",
+      "bytes": 6139
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/apps/web/OFFLINE_WEB_CONTRACT.md",
+      "sha256": "c134ccbdc7cf6059dd05171760d523332cb955c32db62e6f62e9c83d6b359f65",
+      "bytes": 832
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/apps/web/RWD_CONTRACT.md",
+      "sha256": "70defd35da9f285463166c94ac66ec0790ed79cb37752938d187788a839ca7a3",
+      "bytes": 693
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/docs/ACCOUNTING_INTEGRATION_BOUNDARY.md",
+      "sha256": "5d9dfa1bb2a36a4d0bdac7ca6ea25d58f351bd5168b85ea8c8a5457e60ef1c1b",
+      "bytes": 337
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/docs/LABOR_TIME_BOUNDARY.md",
+      "sha256": "0cb9f02833076d465473a81dfa121f396cf229e17ee9358ba029d0e7c7e8a906",
+      "bytes": 313
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/docs/PHASE_BOUNDARIES.md",
+      "sha256": "dcb2fb4eadf26109fb816dbfb3d3421c7812a02461b52a1c7d2ddfec9d3ea8b8",
+      "bytes": 568
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/docs/adr/ADR-001-architecture-shape.md",
+      "sha256": "48e5ff9f9f53c5e99f651bec0142514a7c5273fc7cc0848bd3fdcae1bc797393",
+      "bytes": 528
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/integrations/google-calendar/IDEMPOTENCY.md",
+      "sha256": "39c5758e0f0f68f9205ab0c5393f4d9ea5ea8fee4b9bbc3fc1d2409b0a922afc",
+      "bytes": 423
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/integrations/google-calendar/README.md",
+      "sha256": "152dd0f268f3be3a858aff726aadbbfd30624a94606a89fdc027efede6978bfe",
+      "bytes": 193
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/integrations/line/DELIVERY_CONTRACT.md",
+      "sha256": "36163f97ef0b0ed965eedfc8a977809d4da95f96cd6aabddd6b8ae4a479ea912",
+      "bytes": 347
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/integrations/line/README.md",
+      "sha256": "b91898257861d842a5c3f6a58ab169af1e74bede7a6b2d84de2e1aa86070bb7d",
+      "bytes": 174
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/integrations/maps/README.md",
+      "sha256": "ee40890351e5f677d608eb700d45eab15aab7e941a4322abac864f4c1a483252",
+      "bytes": 174
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/audit/README.md",
+      "sha256": "4d8f400281342816140889f713e079c29a0f6cab0c99acfd9face3539aec6737",
+      "bytes": 239
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/authorization/README.md",
+      "sha256": "56b48c42acc5f1a350477429448baf88e51ee7a4bcd96fbfc4da54f6942b2633",
+      "bytes": 247
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/dispatch/README.md",
+      "sha256": "c124329d7b4600c67d61a8fbf6109145f269ff19cf466d65b75a37ed40fa9383",
+      "bytes": 515
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/dispatch/state-machine.json",
+      "sha256": "f5a0a646325fa315d7785a137faf6169fd7c6eac00e5eaa236ab4288bc5df764",
+      "bytes": 316
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/identity/README.md",
+      "sha256": "66ea21506189d90f743835120c790f20f37c15005abd1ffd1f5adfec9b2a66e1",
+      "bytes": 232
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/notification/README.md",
+      "sha256": "bfac9b28aa5b1a38d29211aa31247b26fbbeebdb2193bfef554213ace352ae92",
+      "bytes": 272
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/project/README.md",
+      "sha256": "5654c59510e37cf2d4768968a19440be3b7476c666ea8f9387dd1ad8cd5befa5",
+      "bytes": 242
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/modules/workforce/README.md",
+      "sha256": "f90c73a59b3f38b3d093acdc7b2ce8b2e03b6c3ea5c9d54b9e488c72e1548a1c",
+      "bytes": 239
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/observability/runbooks/database-restore.md",
+      "sha256": "483effd49815456e993d02c0009bf3a829b0d4720ba8988525b896594a245ea9",
+      "bytes": 279
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/observability/runbooks/offline-sync-conflict.md",
+      "sha256": "9addfb7c6512c70f9b81fca8ca1066e0baf680ea2830a412533b3f2becb33a59",
+      "bytes": 440
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/observability/runbooks/provider-outage.md",
+      "sha256": "05d871c5c4a45d34f474b297dddc35f30b00cae1435bd74419a32f8717176bdd",
+      "bytes": 449
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/packages/contracts/audit-event.schema.json",
+      "sha256": "5bef54559137f7b7f54cc95601e59c21c414a02ba77ce7504f48fd8524fe7b3c",
+      "bytes": 605
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/packages/contracts/dispatch-acknowledgement.schema.json",
+      "sha256": "52fd76919cef27113e6a1d1661e41c80e54e37f469ac2febb2de2e1d70a9335f",
+      "bytes": 545
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/packages/contracts/dispatch.schema.json",
+      "sha256": "4c3459731201e30887b0c49e12f7459032acacd9810d9b900da7a0496ca0b667",
+      "bytes": 1206
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/packages/contracts/offline-operation.schema.json",
+      "sha256": "37fa102e5388815207ecf2392ddb6d5519f77224f623649ba032d13cdbf8b609",
+      "bytes": 907
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/packages/offline-sync/OFFLINE_SCOPE.json",
+      "sha256": "b7f264bd3905df7e6e42f44773a49f7070ade44c02d222a76e004af391b58914",
+      "bytes": 483
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/packages/offline-sync/README.md",
+      "sha256": "89ed07608454c798c2aa0dd70186913d3a10dde07dff0833323bf492b03c40f4",
+      "bytes": 386
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/scripts/validate_rwd_boundary.py",
+      "sha256": "900f29fc700e4d2ce5c1ff04d6ad2c78e3185d8262675ae00d1a1ae65a322e90",
+      "bytes": 925
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/tests/contract/offline/README.md",
+      "sha256": "ceedc708e2ccc067631ae9224eb80b841fbcd34dfa2a250c1d56b08407e4fe25",
+      "bytes": 250
+    },
+    {
+      "path": "project-instance/phase1-repo/water-electrical-ops/tests/e2e/README.md",
+      "sha256": "004c375f27f81b8faebda8e1e8be7a421f5aa8cd3085ddb9f100dd81ad3cad61",
+      "bytes": 372
+    },
+    {
+      "path": "project-instance/resolution/core-foundry-plan.full-target.json",
+      "sha256": "89de5c38c51068d41657791ebd3fb597ba222d81c69447c490cc9db09d70ce27",
+      "bytes": 7293
+    },
+    {
+      "path": "project-instance/resolution/core-foundry-plan.phase1.json",
+      "sha256": "3478c934503c48a796d6f8aed6b907403b40a461b1351ce004b7409d3f7e458b",
+      "bytes": 4973
+    },
+    {
+      "path": "project-instance/resolution/industry-foundry-plan.json",
+      "sha256": "c41788429c1065cb1ad48ce1250e2189f4bd90e47ad8275dc93d30c7c722c888",
+      "bytes": 6662
+    },
+    {
+      "path": "scripts/install_industry_pack.py",
+      "sha256": "ee049cb5906a15d9070c914a69a2776c3cfd2f7bd8d90c2a5ecf81545af5507b",
+      "bytes": 638
+    },
+    {
+      "path": "scripts/resolve_industry_pack.py",
+      "sha256": "0f422b9d53761ea4ae5f77933f7723799cbaaac281e469bc03a5231100bb9b76",
+      "bytes": 2101
+    },
+    {
+      "path": "scripts/validate_delivery.py",
+      "sha256": "60b551496f950a477629eca6a1fde7c6f9f8d60f95d365fdbca37cc4849146a2",
+      "bytes": 6554
+    },
+    {
+      "path": "sources/OWNER_DECISIONS_2026-09-03.md",
+      "sha256": "f2d74ad5a934ffb1adb463077e7ec304cf74e948291fe9bd3cfc1d6c1c40f3fe",
+      "bytes": 2300
+    },
+    {
+      "path": "sources/USER_OVERRIDE_RWD.md",
+      "sha256": "49fa8757dea26b93fbb633d1e0eefd9af722731ac36bb0648633881360082d4e",
+      "bytes": 920
+    },
+    {
+      "path": "sources/water_electrical_project_management_spec.md",
+      "sha256": "a59c45f48e777b1dca62c2a9745c1a0148fe2db8ba0bdb9a1c8b0a6ad9fa907c",
+      "bytes": 19019
+    },
+    {
+      "path": "verification/VALIDATION_REPORT.md",
+      "sha256": "26482b5ea03b8d861fb0107499f69442411bd6dc3faf68b38bbc20b8e94145ed",
+      "bytes": 1223
+    }
+  ]
+}

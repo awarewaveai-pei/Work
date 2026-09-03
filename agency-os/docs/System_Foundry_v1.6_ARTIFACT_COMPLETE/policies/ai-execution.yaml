@@ -1,0 +1,24 @@
+{
+  "version": "1.6.0",
+  "fail_closed": true,
+  "authority_registry": "registries/risk-authority.yaml",
+  "forbidden_without_explicit_authority": [
+    "destructive_production_data_change",
+    "protected_branch_bypass",
+    "production_deploy",
+    "external_publish_or_send",
+    "secret_or_root_identity_change",
+    "legal_or_financial_commitment",
+    "disabling_security_or_audit_controls",
+    "accepting_R4_residual_risk"
+  ],
+  "rules": [
+    "tool_availability_is_not_permission",
+    "child_authority_must_not_exceed_parent",
+    "risk_tier_is_computed_not_self_declared",
+    "required_authority_is_derived_not_self_declared",
+    "R3_requires_independent_review",
+    "R4_requires_human_sovereign_approval",
+    "unresolved_policy_means_deny"
+  ]
+}

@@ -87,7 +87,7 @@ Excluded 不代表之後重寫核心 contract；只增加 adapters/methods/recip
 [x] Entity raw/ref split defined                             → ADR-021 §D3
 [x] Publishing operation policy exists for staging operation → Publishing §5 MVP 預設表
 [x] Pack validator green（Gate H）                           → tests/architecture/search_content_pack_check.py
-[ ] Phase 5 Research MVP exit gate passed                    → ADR-021 §D9；DEFERRED OQ-SC-17（本 slice 是 post-Phase-5 vertical）
+[x] Phase 5 Research MVP exit gate passed                    → 2026-09-03 通過（本機合成資料範圍；`docs/adr/ADR-022-phase-5-runtime-landing.md`；runtime `Projects/internal/cognitive-engineering-os/`）；ADR-021 §D9 的定位不變；OQ-SC-17（Program Plan phase slot）仍 DEFERRED
 [ ] Registry records promoted into methods/registry/*        → DEFERRED OQ-SC-19（per-id，與 contract 同批）
 [ ] 3 recipes authored + validated + compiled to Workflow IR → DEFERRED OQ-SC-18
 [ ] Method/Capability contracts for every id used in §5      → SC-Phase 1（Registry §8 contract paths）

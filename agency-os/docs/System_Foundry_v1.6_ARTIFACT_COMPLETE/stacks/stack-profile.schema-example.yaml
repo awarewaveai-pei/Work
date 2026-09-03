@@ -1,0 +1,14 @@
+stack_id: example.typescript-web
+version: 1.0.0
+language: typescript
+frontend: replace_me
+backend: replace_me
+database: replace_me
+cache: optional
+queue: optional
+infra: replace_me
+runtime: replace_me
+constraints:
+  domain_must_not_depend_on_framework: true
+  provider_adapters_required: true
+  contract_tests_required: true

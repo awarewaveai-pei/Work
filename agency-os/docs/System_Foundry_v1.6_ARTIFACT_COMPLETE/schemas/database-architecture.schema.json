@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/database-architecture.schema.json",
+  "title": "Database Architecture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "system_id",
+    "ownership",
+    "data_model",
+    "constraints",
+    "index_strategy",
+    "migration_strategy",
+    "backup_restore",
+    "retention"
+  ],
+  "properties": {
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ownership": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "constraints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "index_strategy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "migration_strategy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backup_restore": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retention": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

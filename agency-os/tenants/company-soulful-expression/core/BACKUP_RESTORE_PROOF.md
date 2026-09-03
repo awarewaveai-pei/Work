@@ -199,7 +199,7 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 > Drill #1（2026-08-16）證明的是「資料還原得出來」。Drill #2 證明的是**「還原後的站與 live 行為一致」** ——
 > 兩者差別在於前者比對數量，後者比對**真實 HTTP 回應**。
 
-**還原目標**：ks-aw-01（149.202.64.114）`/root/soulful/` docker compose stack
+**還原目標**：ks-aw-01（145.239.195.47）`/root/soulful/` docker compose stack
 （`soulful-db` = mariadb:11.8.8 精確對齊 live、`soulful-wp` = 自建映像，見
 [`lobster-factory/infra/soulful/`](../../../../lobster-factory/infra/soulful/)）
 

@@ -1,0 +1,253 @@
+{
+  "schema_version": "1.1.0",
+  "compiler_version": "1.6.0",
+  "input_digest": "b0e57e66907b50249c681d948c3b4e7bb20263ec90bc57d6f511fe16d30275c1",
+  "project": {
+    "name": "water-electrical-ops-phase1"
+  },
+  "foundation": [
+    "FOUND-AUDIT",
+    "FOUND-BACKUP",
+    "FOUND-BLAST-RADIUS",
+    "FOUND-DATA-INTEGRITY",
+    "FOUND-DEPENDENCY",
+    "FOUND-ERROR",
+    "FOUND-EVIDENCE",
+    "FOUND-INCIDENT",
+    "FOUND-LIFECYCLE",
+    "FOUND-MIGRATION-SAFETY",
+    "FOUND-OBSERVABILITY",
+    "FOUND-RELEASE",
+    "FOUND-RESTORE-VERIFY",
+    "FOUND-ROLLBACK",
+    "FOUND-SECRETS",
+    "FOUND-SECURITY",
+    "FOUND-SUPPLY-CHAIN",
+    "FOUND-TESTING"
+  ],
+  "user_selected": [
+    "CAP-BG-SYNC",
+    "CAP-BOOKING",
+    "CAP-CUSTOMER-DATA",
+    "CAP-DASHBOARD",
+    "CAP-EXTERNAL-API",
+    "CAP-FILTERS",
+    "CAP-IDENTITY",
+    "CAP-INAPP-NOTIFY",
+    "CAP-INTERNAL-USERS",
+    "CAP-NONREPEATABLE",
+    "CAP-OFFLINE",
+    "CAP-ORG-DATA",
+    "CAP-PROJECTS",
+    "CAP-ROLES",
+    "CAP-SCHEDULING",
+    "CAP-STATE-WORKFLOW",
+    "CAP-TASKS",
+    "CAP-WEB"
+  ],
+  "derived": [
+    "DER-DEVICE-REVOCATION",
+    "DER-OFFLINE-CRYPTO",
+    "DER-SESSION",
+    "DER-SYNC-CONFLICT"
+  ],
+  "deferred": [
+    "CAP-AI"
+  ],
+  "current_capabilities": [
+    "CAP-BG-SYNC",
+    "CAP-BOOKING",
+    "CAP-CUSTOMER-DATA",
+    "CAP-DASHBOARD",
+    "CAP-EXTERNAL-API",
+    "CAP-FILTERS",
+    "CAP-IDENTITY",
+    "CAP-INAPP-NOTIFY",
+    "CAP-INTERNAL-USERS",
+    "CAP-NONREPEATABLE",
+    "CAP-OFFLINE",
+    "CAP-ORG-DATA",
+    "CAP-PROJECTS",
+    "CAP-ROLES",
+    "CAP-SCHEDULING",
+    "CAP-STATE-WORKFLOW",
+    "CAP-TASKS",
+    "CAP-WEB",
+    "DER-DEVICE-REVOCATION",
+    "DER-OFFLINE-CRYPTO",
+    "DER-SESSION",
+    "DER-SYNC-CONFLICT",
+    "FOUND-AUDIT",
+    "FOUND-BACKUP",
+    "FOUND-BLAST-RADIUS",
+    "FOUND-DATA-INTEGRITY",
+    "FOUND-DEPENDENCY",
+    "FOUND-ERROR",
+    "FOUND-EVIDENCE",
+    "FOUND-INCIDENT",
+    "FOUND-LIFECYCLE",
+    "FOUND-MIGRATION-SAFETY",
+    "FOUND-OBSERVABILITY",
+    "FOUND-RELEASE",
+    "FOUND-RESTORE-VERIFY",
+    "FOUND-ROLLBACK",
+    "FOUND-SECRETS",
+    "FOUND-SECURITY",
+    "FOUND-SUPPLY-CHAIN",
+    "FOUND-TESTING"
+  ],
+  "custom_requirements": [],
+  "modules": [
+    "analytics",
+    "core",
+    "domain",
+    "identity",
+    "integrations",
+    "notifications",
+    "offline",
+    "reliability",
+    "search",
+    "web",
+    "workflow"
+  ],
+  "module_reasons": {
+    "notifications": [
+      "CAP-INAPP-NOTIFY"
+    ],
+    "offline": [
+      "CAP-BG-SYNC",
+      "CAP-OFFLINE",
+      "DER-DEVICE-REVOCATION",
+      "DER-OFFLINE-CRYPTO",
+      "DER-SYNC-CONFLICT"
+    ],
+    "analytics": [
+      "CAP-DASHBOARD"
+    ],
+    "reliability": [
+      "CAP-NONREPEATABLE"
+    ],
+    "web": [
+      "CAP-WEB"
+    ],
+    "search": [
+      "CAP-FILTERS"
+    ],
+    "workflow": [
+      "CAP-SCHEDULING",
+      "CAP-STATE-WORKFLOW",
+      "CAP-TASKS"
+    ],
+    "domain": [
+      "CAP-BOOKING",
+      "CAP-CUSTOMER-DATA",
+      "CAP-ORG-DATA",
+      "CAP-PROJECTS"
+    ],
+    "integrations": [
+      "CAP-EXTERNAL-API"
+    ],
+    "core": [
+      "FOUND-AUDIT",
+      "FOUND-BACKUP",
+      "FOUND-BLAST-RADIUS",
+      "FOUND-DATA-INTEGRITY",
+      "FOUND-DEPENDENCY",
+      "FOUND-ERROR",
+      "FOUND-EVIDENCE",
+      "FOUND-INCIDENT",
+      "FOUND-LIFECYCLE",
+      "FOUND-MIGRATION-SAFETY",
+      "FOUND-OBSERVABILITY",
+      "FOUND-RELEASE",
+      "FOUND-RESTORE-VERIFY",
+      "FOUND-ROLLBACK",
+      "FOUND-SECRETS",
+      "FOUND-SECURITY",
+      "FOUND-SUPPLY-CHAIN",
+      "FOUND-TESTING"
+    ],
+    "identity": [
+      "CAP-IDENTITY",
+      "CAP-INTERNAL-USERS",
+      "CAP-ROLES",
+      "DER-SESSION"
+    ]
+  },
+  "archetypes": [
+    "web_application"
+  ],
+  "profile": "standard",
+  "criticality": "medium",
+  "traceability": {
+    "CAP-AI": [
+      "RULE-Q-FUT-004"
+    ],
+    "CAP-BG-SYNC": [
+      "RULE-Q-MOB-002"
+    ],
+    "CAP-BOOKING": [
+      "RULE-Q-DATA-008"
+    ],
+    "CAP-CUSTOMER-DATA": [
+      "RULE-Q-DATA-001"
+    ],
+    "CAP-DASHBOARD": [
+      "RULE-Q-SR-003"
+    ],
+    "CAP-EXTERNAL-API": [
+      "RULE-Q-INT-001"
+    ],
+    "CAP-FILTERS": [
+      "RULE-Q-SR-002"
+    ],
+    "CAP-IDENTITY": [
+      "RULE-Q-ID-001"
+    ],
+    "CAP-INAPP-NOTIFY": [
+      "RULE-Q-NOT-004"
+    ],
+    "CAP-INTERNAL-USERS": [
+      "RULE-Q-SCOPE-001"
+    ],
+    "CAP-NONREPEATABLE": [
+      "RULE-Q-IMP-003"
+    ],
+    "CAP-OFFLINE": [
+      "RULE-Q-MOB-001"
+    ],
+    "CAP-ORG-DATA": [
+      "RULE-Q-DATA-002"
+    ],
+    "CAP-PROJECTS": [
+      "RULE-Q-DATA-005"
+    ],
+    "CAP-ROLES": [
+      "RULE-Q-ID-003"
+    ],
+    "CAP-SCHEDULING": [
+      "RULE-Q-WF-007"
+    ],
+    "CAP-STATE-WORKFLOW": [
+      "RULE-Q-WF-001"
+    ],
+    "CAP-TASKS": [
+      "RULE-Q-WF-004"
+    ],
+    "CAP-WEB": [
+      "RULE-Q-CH-001"
+    ],
+    "DER-DEVICE-REVOCATION": [
+      "DERIVE-OFFLINE"
+    ],
+    "DER-OFFLINE-CRYPTO": [
+      "DERIVE-OFFLINE"
+    ],
+    "DER-SESSION": [
+      "DERIVE-IDENTITY"
+    ],
+    "DER-SYNC-CONFLICT": [
+      "DERIVE-SYNC"
+    ]
+  }
+}

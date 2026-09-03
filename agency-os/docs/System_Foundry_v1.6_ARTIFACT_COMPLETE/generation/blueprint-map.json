@@ -1,0 +1,520 @@
+{
+  "version": "1.6.0",
+  "documents": [
+    {
+      "file": "00_EXECUTIVE_SUMMARY.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "01_SYSTEM_CONSTITUTION.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "02_PRODUCT_VISION_AND_SCOPE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "03_USER_AND_OPERATING_MODEL.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "04_MARKET_AND_INDUSTRY_RESEARCH.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "05_COMPETITOR_ANALYSIS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "06_CROSS_INDUSTRY_LESSONS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "07_BUSINESS_ARCHITECTURE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "08_DOMAIN_MODEL.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "09_BOUNDED_CONTEXTS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "10_ERD.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "11_DATA_ARCHITECTURE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "12_API_ARCHITECTURE.md",
+      "when": {
+        "any_modules": [
+          "api",
+          "web",
+          "mobile",
+          "desktop",
+          "portals",
+          "integrations",
+          "ai"
+        ]
+      }
+    },
+    {
+      "file": "13_EVENT_ARCHITECTURE.md",
+      "when": {
+        "any_modules": [
+          "workflow",
+          "notifications",
+          "integrations",
+          "payments",
+          "ai",
+          "offline"
+        ]
+      }
+    },
+    {
+      "file": "14_SECURITY_ARCHITECTURE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "15_PRIVACY_COMPLIANCE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "16_IDENTITY_AND_ACCESS.md",
+      "when": {
+        "any_modules": [
+          "identity",
+          "tenant",
+          "portals",
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "17_TENANT_ARCHITECTURE.md",
+      "when": {
+        "any_modules": [
+          "tenant"
+        ]
+      }
+    },
+    {
+      "file": "18_DEPLOYMENT_ARCHITECTURE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "19_DEVOPS_CICD.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "20_OBSERVABILITY.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "21_SRE_DR.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "22_TEST_STRATEGY.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "23_THREAT_MODEL.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "24_RISK_REGISTER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "25_ASSUMPTION_REGISTER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "26_ARCHITECTURE_OPTIONS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "27_DECISION_MATRIX.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "28_RED_TEAM_REPORT.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "29_FALSIFICATION_REPORT.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "30_COMPLEXITY_AUDIT.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "31_EDITION_MATRIX.md",
+      "when": {
+        "any_modules": [
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "32_ENTITLEMENT_ARCHITECTURE.md",
+      "when": {
+        "any_modules": [
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "33_SUBSCRIPTION_AND_BILLING.md",
+      "when": {
+        "any_modules": [
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "34_LICENSE_ARCHITECTURE.md",
+      "when": {
+        "any_modules": [
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "35_CUSTOMER_LIFECYCLE.md",
+      "when": {
+        "any_modules": [
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "36_ENTERPRISE_ARCHITECTURE.md",
+      "when": {
+        "profiles": [
+          "enterprise"
+        ]
+      }
+    },
+    {
+      "file": "37_GROUP_ARCHITECTURE.md",
+      "when": {
+        "any_capabilities": [
+          "CAP-GROUP",
+          "CAP-ORG-HIERARCHY"
+        ]
+      }
+    },
+    {
+      "file": "38_PRIVATE_DEPLOYMENT.md",
+      "when": {
+        "profiles": [
+          "enterprise"
+        ]
+      }
+    },
+    {
+      "file": "39_UNIT_ECONOMICS.md",
+      "when": {
+        "any_modules": [
+          "commercial",
+          "payments"
+        ]
+      }
+    },
+    {
+      "file": "40_ARCHITECTURE_ECONOMICS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "41_IMPLEMENTATION_ROADMAP.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "42_DEFINITION_OF_DONE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "43_MIGRATION_PLAN.md",
+      "when": {
+        "any_modules": [
+          "migration"
+        ]
+      }
+    },
+    {
+      "file": "44_ROLLBACK_PLAN.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "45_30_YEAR_EVOLUTION.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "46_VENDOR_EXIT_PLAN.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "47_OPEN_DECISIONS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "48_CONVERGENCE_MATRIX.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "49_ASSURANCE_CASE.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "50_TRANSITION_ARCHITECTURE.md",
+      "when": {
+        "any_modules": [
+          "migration"
+        ]
+      }
+    },
+    {
+      "file": "51_GOVERNANCE_CHARTER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "52_REQUIREMENTS_TRACEABILITY_MATRIX.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "53_NON_GOALS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "54_DO_NOT_BUILD_YET.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "55_EVIDENCE_REGISTER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "56_ROOT_CAUSE_REGISTER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "57_MODULE_CONTRACTS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "58_IMPLEMENTATION_VERIFICATION.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "59_AUTHORITY_AND_RISK_MODEL.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "60_SUPPLY_CHAIN_SECURITY.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "61_RELEASE_ENGINEERING.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "62_COMPATIBILITY_AND_DEPRECATION.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "63_HANDOFF_AND_CONTINUITY.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "64_EXTERNAL_FACT_FRESHNESS.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "65_PROVIDER_RESILIENCE.md",
+      "when": {
+        "any_modules": [
+          "integrations",
+          "payments",
+          "notifications",
+          "ai"
+        ]
+      }
+    },
+    {
+      "file": "66_AUDIT_AND_EVENT_LEDGER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "67_EXCEPTION_REGISTER.md",
+      "when": {
+        "always": true
+      }
+    },
+    {
+      "file": "68_HUMAN_CENTERED_EXPERIENCE.md",
+      "when": {
+        "any_modules": [
+          "web",
+          "mobile",
+          "desktop",
+          "portals"
+        ]
+      }
+    },
+    {
+      "file": "69_ACCESSIBILITY_AND_GLOBALIZATION.md",
+      "when": {
+        "any_modules": [
+          "web",
+          "mobile",
+          "desktop",
+          "portals",
+          "globalization"
+        ]
+      }
+    },
+    {
+      "file": "70_EXPLAINABILITY_AND_REPRODUCIBILITY.md",
+      "when": {
+        "any_modules": [
+          "ai"
+        ]
+      }
+    },
+    {
+      "file": "71_HUMAN_OVERSIGHT_AND_OPERATOR_SAFETY.md",
+      "when": {
+        "any_modules": [
+          "ai",
+          "reliability",
+          "workflow"
+        ]
+      }
+    },
+    {
+      "file": "72_COUNTERFACTUAL_AND_SHADOW_VALIDATION.md",
+      "when": {
+        "any_modules": [
+          "ai",
+          "reliability"
+        ]
+      }
+    }
+  ]
+}

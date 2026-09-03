@@ -1,0 +1,11 @@
+{
+  "_schema": "human-action-control.schema.json",
+  "action_id": "deploy",
+  "risk": "CRITICAL",
+  "reversibility": "IRREVERSIBLE",
+  "authority_required": "A0",
+  "confirmation": false,
+  "dual_control": false,
+  "recovery": "restore previous release",
+  "audit_required": false
+}

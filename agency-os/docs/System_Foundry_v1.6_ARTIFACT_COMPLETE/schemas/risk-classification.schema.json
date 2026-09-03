@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/risk-classification.schema.json",
+  "title": "Deterministic Risk Classification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dimensions",
+    "computed_risk_tier",
+    "rationale"
+  ],
+  "properties": {
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data",
+        "privilege",
+        "blast_radius",
+        "reversibility",
+        "customer",
+        "regulatory",
+        "financial",
+        "criticality",
+        "novelty",
+        "uncertainty"
+      ],
+      "properties": {
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "privilege": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "blast_radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "reversibility": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "customer": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "regulatory": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "financial": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "criticality": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "novelty": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "uncertainty": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        }
+      }
+    },
+    "computed_risk_tier": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "readOnly": true
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 10
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}

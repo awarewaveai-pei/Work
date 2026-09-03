@@ -1,0 +1,67 @@
+{
+  "version": "1.6.0",
+  "mode": "non_overridable_monotonic",
+  "files": [
+    {
+      "path": "kernel/00_IDENTITY_CONTRACT.md",
+      "sha256": "30a31e8efbdf408ae00950487e6bc71a6bb6bc7c406d107b14b75cef4ccce176"
+    },
+    {
+      "path": "kernel/01_EXECUTION_INVARIANTS.md",
+      "sha256": "5abdf54d115165b7b5d0e0f3443dbe27341bd14473a830af7b6d3f06053a83c7"
+    },
+    {
+      "path": "kernel/02_EVIDENCE_CONTRACT.md",
+      "sha256": "b3bdf7989f771d3b5aa0679138a0e350179c7b5b4796cf67d125d8089adf7993"
+    },
+    {
+      "path": "kernel/03_CHANGE_CONTRACT.md",
+      "sha256": "0ce6099115c485e8a2214e18108ca43a0af54cf54344653d2c0888b2ad8d6286"
+    },
+    {
+      "path": "kernel/04_SUBAGENT_INHERITANCE.md",
+      "sha256": "5f266161e1ef18f34c0ab0b7d779b49b4f327fbc510867322052464e296ba002"
+    },
+    {
+      "path": "kernel/05_FAILURE_POLICY.md",
+      "sha256": "526111cd83f8431bc2310f49b6fe792890a7b297404eff439748e4b52174db8c"
+    },
+    {
+      "path": "kernel/06_MODULARITY_CONTRACT.md",
+      "sha256": "de6a67f0a5afbbe9c4b894995a8c8ffdcbb77d46e22799cfe59270910a4b0468"
+    },
+    {
+      "path": "kernel/07_30_YEAR_EVOLUTION_CONTRACT.md",
+      "sha256": "a32f20969d9215b09884cf5aef99023c81ad6590b38f851cacaa1d411f1c97d6"
+    },
+    {
+      "path": "kernel/08_REPOSITORY_ANALYSIS_CONTRACT.md",
+      "sha256": "545b29af991f3f925dd9b43ac9fd8a1e80c3d25bf09e81689f8e6bba38daa5d3"
+    },
+    {
+      "path": "kernel/09_AUTHORITY_AND_AUTONOMY_CONTRACT.md",
+      "sha256": "2c0574c9870a606da3dd3ac741772e717d93e53de00c137a25a388b84eab02dd"
+    },
+    {
+      "path": "kernel/10_RISK_AND_EXCEPTION_CONTRACT.md",
+      "sha256": "670da2145c510fe153ae65641a2514c19d3a7ad5bdc98c2f54a5cd179b2c4327"
+    },
+    {
+      "path": "kernel/11_LIFECYCLE_AND_DEPRECATION_CONTRACT.md",
+      "sha256": "90f78814184bd18e617b16057cc9c246dd20212c27cdca244ab99a20283c9ae0"
+    },
+    {
+      "path": "kernel/12_HUMAN_SYSTEM_SAFETY_CONTRACT.md",
+      "sha256": "726c60c10de6aa271e7cf659adaf200a82509d5bb4b49c935301b1514db323d9"
+    },
+    {
+      "path": "kernel/13_CONFIGURATION_COMPILER_CONTRACT.md",
+      "sha256": "deb4b11e743b38971ab2d96c779a7bdf72df8ea8c79045c9ac6461be35d94420"
+    },
+    {
+      "path": "kernel/14_ARTIFACT_GENERATION_AND_SELECTION_CORRECTNESS.md",
+      "sha256": "ccadd8c892c297386147418861b09e99f211c47dd65c1e79e11281a045eddbbf"
+    }
+  ],
+  "kernel_digest": "2eac4f8f90b1f1e679384a326b5335166a19c86cd11ebd928755f4328dde0534"
+}

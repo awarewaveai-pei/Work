@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://system-foundry.local/schemas/sre-plan.schema.json",
+  "title": "Sre Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "slis",
+    "slos",
+    "rto",
+    "rpo",
+    "error_budget",
+    "incident_response",
+    "dr_plan",
+    "game_day"
+  ],
+  "properties": {
+    "slis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "slos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "rto": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rpo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "error_budget": {
+      "type": "string",
+      "minLength": 1
+    },
+    "incident_response": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dr_plan": {
+      "type": "string",
+      "minLength": 1
+    },
+    "game_day": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,731 @@
+{
+  "schema_version": "1.0.0",
+  "categories": [
+    {
+      "id": "project_site",
+      "name": "工程與工地"
+    },
+    {
+      "id": "workforce_dispatch",
+      "name": "人員與派工"
+    },
+    {
+      "id": "field_execution",
+      "name": "現場施工"
+    },
+    {
+      "id": "drawings_evidence",
+      "name": "圖面與現場證據"
+    },
+    {
+      "id": "quality",
+      "name": "缺失與查驗"
+    },
+    {
+      "id": "materials_procurement",
+      "name": "材料與採購"
+    },
+    {
+      "id": "vendors_subcontractors",
+      "name": "廠商與下包"
+    },
+    {
+      "id": "contracts_billing",
+      "name": "合約與請款"
+    },
+    {
+      "id": "cost_profit",
+      "name": "成本與毛利"
+    },
+    {
+      "id": "integrations",
+      "name": "外部整合"
+    },
+    {
+      "id": "experience",
+      "name": "操作介面"
+    },
+    {
+      "id": "ai",
+      "name": "AI"
+    },
+    {
+      "id": "future",
+      "name": "未來邊界"
+    }
+  ],
+  "questions": [
+    {
+      "id": "MEP-Q-PROJ-001",
+      "category": "project_site",
+      "label": "工程案件管理",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-PROJ-002",
+      "category": "project_site",
+      "label": "一個工程可包含多個工地 / 區域",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-SITE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-PROJ-003",
+      "category": "project_site",
+      "label": "工程負責人 / 工務負責人",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-PROJECT-OWNERSHIP"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-PROJ-004",
+      "category": "project_site",
+      "label": "工程狀態生命週期",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-PROJECT-LIFECYCLE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-PROJ-005",
+      "category": "project_site",
+      "label": "保固期管理",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-WARRANTY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-001",
+      "category": "workforce_dispatch",
+      "label": "員工資料",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-EMPLOYEE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-002",
+      "category": "workforce_dispatch",
+      "label": "班組管理",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-CREW"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-003",
+      "category": "workforce_dispatch",
+      "label": "領班管理",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-FOREMAN"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-004",
+      "category": "workforce_dispatch",
+      "label": "每日派工",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-005",
+      "category": "workforce_dispatch",
+      "label": "單筆派工指派多人 / 整班",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-MULTI-PERSON-DISPATCH"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-006",
+      "category": "workforce_dispatch",
+      "label": "未派工人員清單",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-UNASSIGNED-WORKFORCE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-007",
+      "category": "workforce_dispatch",
+      "label": "派工確認收到",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-DISPATCH-ACK"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-008",
+      "category": "workforce_dispatch",
+      "label": "派工異動後重新確認",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-DISPATCH-REACK"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-009",
+      "category": "workforce_dispatch",
+      "label": "桌面拖曳式派工",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-DISPATCH-DND"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-010",
+      "category": "workforce_dispatch",
+      "label": "公司日 / 週 / 月行事曆",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-COMPANY-CALENDAR"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DSP-011",
+      "category": "workforce_dispatch",
+      "label": "個人今日 / 明日 / 本週派工",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-MY-DISPATCH"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-FLD-001",
+      "category": "field_execution",
+      "label": "工作項目與進度",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-WORK-PROGRESS"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-FLD-002",
+      "category": "field_execution",
+      "label": "工地日報",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-DAILY-REPORT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DOC-001",
+      "category": "drawings_evidence",
+      "label": "工程圖面管理",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-DRAWING"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DOC-002",
+      "category": "drawings_evidence",
+      "label": "圖面版本管理",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-DRAWING-VERSION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-DOC-003",
+      "category": "drawings_evidence",
+      "label": "工地照片",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-SITE-PHOTO"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-QA-001",
+      "category": "quality",
+      "label": "缺失管理",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-DEFECT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-QA-002",
+      "category": "quality",
+      "label": "查驗管理",
+      "answer_type": "YES_NO",
+      "phase": "P2",
+      "require_capabilities": [
+        "MEP-CAP-INSPECTION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-001",
+      "category": "materials_procurement",
+      "label": "材料主檔",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-MATERIAL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-002",
+      "category": "materials_procurement",
+      "label": "材料需求",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-MATERIAL-REQUEST"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-003",
+      "category": "materials_procurement",
+      "label": "詢價",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-RFQ"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-004",
+      "category": "materials_procurement",
+      "label": "採購單",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-PURCHASE-ORDER"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-005",
+      "category": "materials_procurement",
+      "label": "到貨驗收",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-DELIVERY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-006",
+      "category": "materials_procurement",
+      "label": "領料",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-MATERIAL-ISSUE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-007",
+      "category": "materials_procurement",
+      "label": "退料",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-MATERIAL-RETURN"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-MAT-008",
+      "category": "materials_procurement",
+      "label": "材料歸屬工程成本",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-MATERIAL-COST"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-VEN-001",
+      "category": "vendors_subcontractors",
+      "label": "材料供應商管理",
+      "answer_type": "YES_NO",
+      "phase": "P3",
+      "require_capabilities": [
+        "MEP-CAP-VENDOR"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-VEN-002",
+      "category": "vendors_subcontractors",
+      "label": "下包商管理",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-SUBCONTRACTOR"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-VEN-003",
+      "category": "vendors_subcontractors",
+      "label": "下包估驗 / 請款",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-SUBCONTRACT-BILLING"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-BIL-001",
+      "category": "contracts_billing",
+      "label": "工程合約",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-CONTRACT"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-BIL-002",
+      "category": "contracts_billing",
+      "label": "原始報價 / 預算",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-BUDGET"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-BIL-003",
+      "category": "contracts_billing",
+      "label": "追加減",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-CHANGE-ORDER"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-BIL-004",
+      "category": "contracts_billing",
+      "label": "業主估驗",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-PROGRESS-ESTIMATE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-BIL-005",
+      "category": "contracts_billing",
+      "label": "工程請款",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-PROGRESS-BILLING"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-BIL-006",
+      "category": "contracts_billing",
+      "label": "保留款",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-RETENTION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-COST-001",
+      "category": "cost_profit",
+      "label": "人工成本",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-LABOR-COST"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-COST-002",
+      "category": "cost_profit",
+      "label": "材料成本",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-MATERIAL-COST"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-COST-003",
+      "category": "cost_profit",
+      "label": "外包成本",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-SUBCONTRACT-COST"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-COST-004",
+      "category": "cost_profit",
+      "label": "其他成本",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-OTHER-COST"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-COST-005",
+      "category": "cost_profit",
+      "label": "工程損益",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-PROJECT-PNL"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-COST-006",
+      "category": "cost_profit",
+      "label": "工程毛利",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-PROJECT-MARGIN"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-INT-001",
+      "category": "integrations",
+      "label": "LINE 派工通知與異動提醒",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-LINE-INTEGRATION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-INT-002",
+      "category": "integrations",
+      "label": "Google Calendar 個人派工同步",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-GCAL-INTEGRATION"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-INT-003",
+      "category": "integrations",
+      "label": "工地地址導航連結",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-MAP-LINK"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-UX-001",
+      "category": "experience",
+      "label": "單一 RWD Web 介面",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-RWD-WEB"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-UX-002",
+      "category": "experience",
+      "label": "原生手機 App",
+      "answer_type": "YES_NO",
+      "phase": "FUTURE",
+      "require_capabilities": [
+        "MEP-CAP-NATIVE-MOBILE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-UX-003",
+      "category": "experience",
+      "label": "可安裝 PWA",
+      "answer_type": "YES_NO",
+      "phase": "FUTURE",
+      "require_capabilities": [
+        "MEP-CAP-PWA"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-UX-004",
+      "category": "experience",
+      "label": "無網路仍可操作",
+      "answer_type": "YES_NO",
+      "phase": "P1",
+      "require_capabilities": [
+        "MEP-CAP-OFFLINE"
+      ],
+      "description": "Field users can continue a bounded set of work when network connectivity is unavailable. YES derives offline cache/sync/security obligations; it does not imply a native app or installable PWA."
+    },
+    {
+      "id": "MEP-Q-AI-001",
+      "category": "ai",
+      "label": "AI 工地日報整理",
+      "answer_type": "YES_NO",
+      "phase": "P5",
+      "require_capabilities": [
+        "MEP-CAP-AI-REPORT-SUMMARY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-AI-002",
+      "category": "ai",
+      "label": "AI 權限內資料查詢",
+      "answer_type": "YES_NO",
+      "phase": "P5",
+      "require_capabilities": [
+        "MEP-CAP-AI-QUERY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-AI-003",
+      "category": "ai",
+      "label": "AI 異常分析",
+      "answer_type": "YES_NO",
+      "phase": "P5",
+      "require_capabilities": [
+        "MEP-CAP-AI-ANOMALY"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-AI-004",
+      "category": "ai",
+      "label": "AI 直接修改正式資料",
+      "answer_type": "YES_NO",
+      "phase": "FUTURE",
+      "require_capabilities": [
+        "MEP-CAP-AI-WRITE"
+      ],
+      "description": ""
+    },
+    {
+      "id": "MEP-Q-FUT-001",
+      "category": "future",
+      "label": "多家公司 / 多租戶 SaaS",
+      "answer_type": "YES_NO",
+      "phase": "FUTURE",
+      "require_capabilities": [
+        "MEP-CAP-MULTI-TENANT"
+      ],
+      "description": "Product will be offered as a multi-company/multi-tenant SaaS product rather than a single-company internal system."
+    },
+    {
+      "id": "MEP-Q-FUT-002",
+      "category": "future",
+      "label": "與會計系統自動同步",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-ACCOUNTING-INTEGRATION"
+      ],
+      "description": "Project procurement/billing/cost data automatically synchronizes with an external accounting system through a replaceable adapter and reconciliation process."
+    },
+    {
+      "id": "MEP-Q-FUT-003",
+      "category": "future",
+      "label": "現場實際出勤 / 工時核定",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-ATTENDANCE",
+        "MEP-CAP-APPROVED-LABOR-TIME"
+      ],
+      "description": "Actual attendance/work time and supervisor-approved labor time are managed separately from planned Dispatch time."
+    },
+    {
+      "id": "MEP-Q-FUT-004",
+      "category": "future",
+      "label": "線上金流收款",
+      "answer_type": "YES_NO",
+      "phase": "P4",
+      "require_capabilities": [
+        "MEP-CAP-ONLINE-PAYMENT"
+      ],
+      "description": "The system itself initiates/collects online payment through a payment provider. NO still allows progress billing, receivables and receipt recording."
+    }
+  ]
+}

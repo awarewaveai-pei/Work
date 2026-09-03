@@ -172,22 +172,42 @@ These recipes may optionally invoke AI LEGO capabilities.
 
 **Verified 2026-08-29**: a working deploy pipeline (`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` — pre-build image snapshot, Docker healthcheck wait loop, HTTP smoke-check gate, automatic rollback on smoke failure), a primary+verify+offsite backup discipline (`backup-ks-aw-01.sh`, `verify-backup-ks-aw-01.sh`), an observability stack (`docker-compose.observability.yml` — Grafana/Loki/Promtail), and CI/CD gates (`.github/workflows/sg-deploy.yml`, `next-admin-typecheck.yml`, `release-gate-main.yml`) **already exist and are production-proven** on the current infrastructure. HCI-30 must plug into these, not design parallel replacements — reading Waves in isolation without knowing this tooling exists is a direct zero-rework violation. Full reasoning: `HCI30_RESEARCH_REVIEW/08_DEVOPS_SRE_REVIEW.md` D-03, D-06.
 
-## ADRs to create
+## ADRs
 
-At minimum, extended in V2. Until Wave 0 creates an ADR and records its approval, the authoritative planning state is `governance/ADR_INDEX.md`; use `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md` to prepare a change without silently choosing an option.
+**Updated 2026-09-02**: all 33 ADRs listed below now exist and are `ACCEPTED` — `governance/ADR_INDEX.md` is the authoritative state (topic, gate status, approval citation) for every one; this list is a filename/scope index only. A decision record is not an implementation — every gate remains `OPEN` until its named artifact and test exist, per `ADR_INDEX.md`'s gate table. Use `governance/HCI_CHANGE_PROPOSAL_TEMPLATE.md` for any future material change.
 
 ```text
 ADR-0001-hci-and-cognitive-os-are-peer-products.md
 ADR-0002-no-cross-product-database-access.md
-ADR-0003-api-aware-wave-is-unified-gateway.md
+ADR-0003-api-aware-wave-unified-gateway.md
 ADR-0004-no-universal-human-trust-score.md
-ADR-0005-hci-ai-integration-is-optional.md
+ADR-0005-hci-ai-lego-integration-is-optional.md
 ADR-0006-domain-evidence-and-execution-evidence-are-distinct.md
-ADR-0007-modular-monolith-first.md
+ADR-0007-modular-monolith-first.md                             -- amended on one point by ADR-0021
 ADR-0008-vendor-neutral-domain-core.md
-ADR-0009-tenant-organization-model-reconciliation.md         -- new, resolves 02 HD-01
-ADR-0010-consent-entity-scope.md                              -- new, resolves 07 HD-02
-ADR-0011-hci-subject-type-scope.md                             -- new, resolves 02 HD-00
-ADR-0012-regulatory-market-scope.md                            -- new, resolves 11 HD-20
-ADR-0013-shared-foundation-kernel-extraction.md                -- new, formalizes 09 §Shared Kernel
+ADR-0009-tenant-organization-model-reconciliation.md          -- resolves 02 HD-01
+ADR-0010-consent-entity-scope.md                               -- resolves 07 HD-02
+ADR-0011-hci-subject-type-scope.md                             -- resolves 02 HD-00
+ADR-0012-regulatory-market-scope.md                            -- resolves 11 HD-20
+ADR-0013-shared-foundation-kernel-extraction.md                -- resolves 09 HD-09
+ADR-0014-data-subject-rights-channel.md                        -- resolves 07 HD-03
+ADR-0015-restricted-subject-identity-confirmation.md           -- resolves 06 HD-04
+ADR-0016-mandatory-tenant-rls.md                                -- resolves 11 HD-05; tenancy-principal mechanism -> ADR-0033
+ADR-0017-bitemporal-scope.md                                    -- resolves 07 HD-06
+ADR-0018-crypto-shredding-for-erasure.md                        -- resolves 07 HD-07
+ADR-0019-deterministic-probabilistic-llm-human-field-policy.md  -- resolves 10 HD-08
+ADR-0020-case-engagement-aggregate.md                            -- resolves 07 HD-10
+ADR-0021-physical-isolation-of-hci-postgres.md                  -- resolves 07 HD-11; amends ADR-0007
+ADR-0022-minimal-key-rotation-and-compromise-runbook.md         -- resolves 11 HD-12
+ADR-0023-block-byok-dedicated-db-sales-claims.md                -- resolves 11 HD-13
+ADR-0024-multi-region-trigger-condition.md                      -- resolves 12 HD-14
+ADR-0025-ai-agent-credentials-for-restricted-data.md            -- resolves 11 HD-15
+ADR-0026-claim-source-tenant-ownership.md                       -- resolves 06 HD-16
+ADR-0027-sanctions-screening-ownership.md                       -- resolves 09 HD-17
+ADR-0028-bulk-export-prevention-control.md                      -- resolves 11 HD-18
+ADR-0029-isolated-fetch-worker-not-trigger-dev.md                -- resolves 06 HD-19; narrows ADR-0007 gate 4
+ADR-0030-controller-processor-determination.md                   -- resolves 11 HD-21
+ADR-0031-ai-lego-usage-metering-attribution.md                   -- resolves 10 HD-22
+ADR-0032-personality-and-behavioral-method-disposition.md        -- resolves 05 HD-23
+ADR-0033-signed-tenant-context-principal.md                      -- resolves ADR-0016's tenancy-principal open item
 ```

@@ -17,11 +17,12 @@ questions:
     context: "Master Plan §0.0.1 (lines 55-56) references 'ai_lego_cognitive_engineering_os_global_master_plan_v2_1.md' and 'AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1_2_zhTW.md'. Neither exists on disk (D:/Work + Downloads searched 2026-08-28). Are the on-disk v1 files the newest canonical lineage, or do newer drafts exist elsewhere (cloud / another export)?"
     needed_from_human: "confirm on-disk v1 = canonical; if newer drafts exist, provide them before Phase 1"
   - id: OQ-3
-    status: PROVISIONAL_DECISION_TAKEN
+    status: RUNTIME_ROOT_DECIDED_SPEC_CORPUS_MOVE_PENDING
     title: "Path root mapping for directive's absolute paths"
     decision: "PROJECT_ROOT = agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/; all /.ai /specs /policies etc. are PROJECT_ROOT-relative until Phase 4 repository decision; wholesale git mv later preserves history"
     rationale: "minimum blast radius — keeps monorepo root and agency-os governance untouched"
     revisit_at: "Phase 4"
+    update_2026_09_03: "docs/adr/ADR-022-phase-5-runtime-landing.md (ACCEPTED): runtime code lives at Projects/internal/cognitive-engineering-os/ (repo product-root convention, commit 4b26e8361 / HCI chapter 17 L128/L148); the spec corpus stays at PROJECT_ROOT and the runtime reads it read-only. Whether to git-mv the spec corpus into the product root later remains open and is NOT implied by ADR-022."
   - id: OQ-4
     status: RESOLVED_BY_HUMAN
     proposed_adr: "docs/adr/ADR-018-codex-write-authority-and-delegation-exceptions.md (ACCEPTED 2026-08-30) — Option A as default model; the same-day proposal-apply delegation to Codex is recorded as an explicit, bounded, one-time exception, not a policy reversal"

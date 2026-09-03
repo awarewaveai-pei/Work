@@ -149,3 +149,19 @@ Date: 2026-08-29
 ---
 
 **邊界確認**：本次任務全程僅執行 Read/Grep/Bash（唯讀）與內部交叉核對，未對三母文件、ADR 檔案或任何 Phase 0/1 registers 做任何修改。所有機制引用附 file:line；一個既有 ID 錯誤（任務摘要與 `ASSUMPTION_REGISTER.yaml` 共同承襲的 `P1-GAP-PROD-9` 誤植）已在 §0 更正並附獨立驗證證據。
+
+---
+
+## 7. Exit-gate evidence（2026-09-03 補記；本節為狀態記錄，不改動 §0–§6 任何規劃內容）
+
+§5 六項驗收於 2026-09-03 以**可重放的測試**在 repo 內落地，決策記錄為 `docs/adr/ADR-022-phase-5-runtime-landing.md`（ACCEPTED）：
+
+| 項目 | 落點 |
+|---|---|
+| runtime 實作（28 步全數） | `D:\Work\Projects\internal\cognitive-engineering-os\ai_lego\apps\cli\run_research_slice.py` + 各 `ai_lego/*` 子套件（依 `REPOSITORY_ARCHITECTURE.md` 樹） |
+| §5 六項驗收測試（兩種 adapter 模式共用同一組斷言） | `tests/acceptance/criteria.py`；fixture 模式 `test_research_slice_fixture_mode.py`（23 passed）；真 SAPI 語音＋離線 faster-whisper 模式 `test_research_slice_offline_stt.py`（22 passed；機器缺 adapter 時**明示 skip**，不算通過） |
+| 每個 emitted record 的 schema 驗證 | `ai_lego/core/contracts/schema_contracts.py` 對本 spec root 的 17 種 record（event / envelope / key_record / key_destruction_record / vault_restore_event / evidence_graph / sentence_provenance / PersonalDataRedacted / manifest / audit / workflow_ir / state_transition_event / method_resolution_result / gate_result / deletion_request / tenant / artifact_uri+cas_path） |
+| 一鍵驗證 | `powershell -ExecutionPolicy Bypass -File Projects\internal\cognitive-engineering-os\scripts\test-phase5-local.ps1` |
+| 誠實範圍與未決項 | 該產品根 `docs/PHASE5_RESEARCH_SLICE.md`（Current limitations；OQ-P5-1～6） |
+
+**通過範圍**：本機隔離、合成資料。**不主張**：production KMS／實體抹除／diarization／UI／release states。§4 第 117 行「Research Quality Gate ↔ EC Global Gates enum 對照表」在現況以 `methods/contracts/research.qualitative_coding.contract.yaml#/method_specific_gates`（method-specific，非 platform-global）落地，runtime 依該契約的五個 gate id 真實評估（`ai_lego/modules/research/gates.py`）；是否另建 platform-global 對照表仍是該契約 `OQ-QCODE-5` 的未決問題，本節不代為裁決。

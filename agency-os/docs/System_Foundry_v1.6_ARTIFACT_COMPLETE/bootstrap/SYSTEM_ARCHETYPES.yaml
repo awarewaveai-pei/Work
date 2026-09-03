@@ -1,0 +1,95 @@
+{
+  "version": "1.6.0",
+  "archetypes": {
+    "internal_tool": [
+      "identity",
+      "security_baseline",
+      "data",
+      "tests",
+      "deploy",
+      "observability",
+      "operator_safety"
+    ],
+    "web_application": [
+      "frontend",
+      "backend",
+      "api",
+      "data",
+      "iam",
+      "security",
+      "deploy",
+      "observability",
+      "human_centered_experience",
+      "accessibility",
+      "globalization"
+    ],
+    "api_service": [
+      "domain",
+      "api",
+      "data",
+      "iam",
+      "rate_limit",
+      "resiliency",
+      "observability"
+    ],
+    "event_platform": [
+      "event_contracts",
+      "schema_registry",
+      "idempotency",
+      "replay",
+      "dlq",
+      "observability"
+    ],
+    "data_platform": [
+      "lineage",
+      "quality",
+      "access",
+      "retention",
+      "batch_stream",
+      "recovery"
+    ],
+    "ai_system": [
+      "model_provider",
+      "evals",
+      "prompt_data_security",
+      "fallback",
+      "provenance",
+      "human_oversight",
+      "explainability",
+      "counterfactual_validation",
+      "shadow_validation"
+    ],
+    "mobile_application": [
+      "client_compatibility",
+      "api",
+      "offline_state",
+      "release_channels",
+      "telemetry",
+      "human_centered_experience",
+      "accessibility",
+      "globalization"
+    ],
+    "cli_or_agent": [
+      "command_contract",
+      "permissions",
+      "local_state",
+      "upgrade",
+      "rollback"
+    ],
+    "regulated_system": [
+      "compliance",
+      "audit",
+      "data_governance",
+      "segregation_of_duties",
+      "evidence_retention"
+    ],
+    "embedded_or_edge": [
+      "hardware_contract",
+      "offline_operation",
+      "update_signing",
+      "recovery",
+      "compatibility"
+    ]
+  },
+  "rule": "archetype_adds_required_modules_but_never_weakens_kernel"
+}
