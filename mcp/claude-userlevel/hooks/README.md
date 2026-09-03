@@ -42,7 +42,7 @@ module.exports = {
 };
 ```
 
-Adding a gate = one file in `rules/` + one name in `rules.manifest.json` + one case in `tests/hooks/runner-parity.test.mjs`. Removing one = the reverse. Nothing else changes.
+Adding a gate = one file in `rules/` + one name in `rules.manifest.json` + one case in `tests/hooks/runner-parity.test.mjs` (or its own `tests/hooks/<rule>.test.mjs` when the verdict matrix is large enough to warrant a dedicated file, e.g. `subagent-budget.test.mjs` -- register it in `scripts/test-hooks.sh`'s explicit file list, which is NOT a glob). Removing one = the reverse. Nothing else changes.
 
 ## Wiring (three consumers, one manifest)
 
@@ -70,7 +70,7 @@ Authoritative list: `rules.manifest.json`. Behavior spec: `tests/hooks/runner-pa
 bash scripts/test-hooks.sh
 ```
 
-`tests/hooks/runner-core.test.mjs` covers the runner guarantees (dispatch, crash isolation, aggregation, fail-open) against fixture rules; `tests/hooks/runner-parity.test.mjs` covers every rule's verdict matrix against the real manifest, including the manifest↔rules completeness check (no missing rules, no orphans). Node ≥ 18, zero packages.
+`tests/hooks/runner-core.test.mjs` covers the runner guarantees (dispatch, crash isolation, aggregation, fail-open) against fixture rules; `tests/hooks/runner-parity.test.mjs` covers most rules' verdict matrix against the real manifest, including the manifest↔rules completeness check (no missing rules, no orphans) -- a few rules with a large enough verdict matrix (e.g. `subagent-budget.test.mjs`) have their own dedicated file instead, all registered in `scripts/test-hooks.sh`. Node ≥ 18, zero packages.
 
 ## History
 

@@ -1,6 +1,6 @@
 # Worklog
 
-## 2026-09-03（續4）
+## 2026-09-03（續6）
 
 ### Subagent charter 注入死功能——修 3 層根因，第 4 層（host 從未觸發 SubagentStart）確認為已知平台限制，未修
 
@@ -34,6 +34,89 @@
 - Review 步驟為自我對抗覆審 + mutation test 代打，非獨立第三方模型覆審；兩條 oracle 恢復可用後建議補跑一輪
 
 **Rollback**: `git checkout -- mcp/claude-userlevel/hooks/ mcp/claude-userlevel/manifest.json scripts/normalize-claude-settings.mjs scripts/sync-claude-userlevel.ps1 tests/hooks/runner-core.test.mjs`，刪除新增的 2 個測試檔，再跑 `sync-claude-userlevel.ps1 -Mode merge` 把 runtime 沖回舊版（`~/.claude/SUBAGENT_CHARTER.md` 需手動刪除，install 模式才會清理 extra）。
+
+## 2026-09-03（續5）
+
+### Subagent 扇出治理閘第三輪修正——C-1(Workflow真實輸入形狀31%會被永久擋死)+M-1(壓縮邏輯重新引入race,20並行掉33-45%)+M-3(Workflow上限比操作者明訂更鬆)，第三輪 critic 且對自己的驗證程序做 mutation test
+
+**背景**：續4 commit 後，主動再送一輪 critic（未等操作者要求——續3 的教訓是「不驗證是在害死我」，這次是我自己判斷 stakes 夠高，第三輪覆審該做）。針對**未 commit 的 v3 on-disk 狀態**做全新審查，不預設前兩輪結論仍成立。
+
+**第三輪找到的（全部要求真實資料/真實並行/mutation test 才抓得到，讀 diff 抓不到）**：
+- **C-1（最重要）**：掃這個環境全部 13 次真實 `Workflow` 呼叫的 tool_input 形狀，發現 3 種：`{script}`(7次)、`{scriptPath,resumeFromRunId}`(**4次，31%，最近一次昨天 2026-09-02 13:46**)、`{description,script}`(2次)。v3 只處理了 `script` 欄位——`scriptPath+resumeFromRunId` 形狀完全沒有 `script` 可以放 marker，會被無條件 block 且**訊息叫人做的事物理上不存在**（block 完全無法滿足）。而且被擋的是「續跑」，續跑被擋等於整個 workflow 從頭重來 = 燒**更多** token，這道閘在自己要防的那件事上反而幫倒忙。
+- **M-1**：v3 為了「檔案不要無限長」加的 `>200行壓縮成滑動視窗內容` 邏輯，是 read→計算→truncate+write 的完整 read-modify-write，跟 append-only 設計互斥。20 並行實測：壓縮觸發時掉 33-45%（150/20次落在觸發線下沒事，250/20次觸發壓縮掉 9-12 筆）——**在這道閘唯一存在理由的並行 fan-out 場景下靜默弱化一半**，而註解上一段才剛宣稱這個 race 已消滅。
+- **M-3**：Workflow 上限沿用工具自己的建議值 15，比操作者 2026-09-03 明訂的「一次≤5、真正需要才到10」更鬆，也比同一支檔案 Agent 路徑的硬上限 10 更鬆——真正燒錢的那條路徑，門檻反而最寬。
+- Minor：多行 estimate 只讀第一行（誠實分兩批各12會漏抓總和24）；shared.js 版本偏移（缺 `isAgentTool`）會讓整條 rule crash 掉回全放行；「20並行stress test已進套件」的註解宣稱不實（實際只是一次性手動跑）；README 對 test 慣例的描述過時；env override 用 `||` 吞掉合法的 `0` 值。
+- 逐項複驗前兩輪 REAL EVIDENCE（Path A 真實 block、123 pass）：**屬實**，不是編的。
+
+**[已修改]**
+1. `subagent-budget.js`：`checkWorkflow()` 改四態——`script`（現行規則）／`scriptPath`（讀檔套同規則，讀檔失敗給正確錯誤訊息而非「加一行到script」）／`resumeFromRunId`-only（放行+誠實 context note，標記「未經真實 Workflow 呼叫驗證」）；`WORKFLOW_ESTIMATE_RE` 改 global + sum 而非只取第一個 match；移除壓縮邏輯（M-1，直接刪掉，接受 tracker 檔會變長這個小得多的代價）；`WORKFLOW_ESTIMATE_LIMIT` 15→10；`envInt()` helper 修正 `0` 被吞掉的問題；matcher 身分判斷加版本偏移防護（`typeof shared.isAgentTool === 'function'`）
+2. `agent-dispatch-log.js` 同步套用版本偏移防護
+3. `README.md`：修正 test 慣例描述（獨立測試檔案存在，且要註冊進 `test-hooks.sh` 這個非 glob 的明確清單）
+4. `tests/hooks/subagent-budget.test.mjs` 從 11 條擴到 16 條：新增真實 20 並行 process stress test（不是 in-process fork，是真的 spawn 20 個 node 子行程）、`scriptPath`/`resumeFromRunId` 三態、多行 sum、version-skew fallback；**修正一條被證實是空測試的舊測試**（原本走 manifest matcher 過濾，guard 拔掉照樣通過——改成直接 `require()` rule module 呼叫）
+5. `agency-os/AGENTS.md`：改寫 §Agent 扇出治理，移除「每一項都用真實 spawn 驗證」這句對 Workflow 路徑不實的宣稱，改為誠實分述兩條路徑各自的驗證程度
+
+**[驗證計畫]／[驗證結果]**
+1. **實測**：`bash scripts/test-hooks.sh` 128 pass / 0 fail（112+16）；**對自己新寫的測試做 mutation test**——手動拔掉 `isAgentFn` guard，重跑套件，6 條測試正確從 pass 變 fail（證實不是空測試，這正是第三輪抓到舊測試造假的同一套方法，這次用在自己身上而非等下一輪 critic 抓）；mutation 測完立刻用備份復原檔案，`node --check` 確認語法正常，重跑套件確認 128 pass 恢復
+2. **Review**：`resumeFromRunId`-only 分支**尚未被真實 Workflow 呼叫驗證**——如實記錄為未驗證，不是假裝驗證過。理由：驗證需要使用者明確 opt-in 多代理編排（Workflow 工具本身的前置規則），這件事不能自己授權自己去測，否則就是重演促成整個這件事的違規（跳過 opt-in 檢查）
+3. **抓蟲**：`grep -rn "subagent-budget|WORKFLOW_ESTIMATE_LIMIT|isAgentTool" agency-os scripts .claude/hooks mcp/claude-userlevel tests`（含 .mjs，前一輪漏了這個副檔名）——SSOT+runtime+測試+文件各一份，無孤兒
+4. **回歸**：128 pass / 0 fail，含新的真實並行 process 測試（非模擬）
+
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`bash scripts/test-hooks.sh`（128 pass 含 20 個真實 node 子行程並行 append 測試）| exit=0
+**REALTEST_EVIDENCE**: tool=Bash | cmd=mutation test（拔除 isAgentFn guard 後重跑套件，確認 6 條測試正確失敗，再復原）| exit=見上，6 fail→復原後 0 fail
+**REVIEW_DONE**: critic=Deep（第三輪，掃 13 次真實 Workflow tool_use payload + 20並行真實壓測 + mutation test 反查舊測試）| verdict=on-disk v3 fail（1 Critical + 3 Major + 6 Minor + 5 Suggestion）→ 全部 Critical/Major 已修，部分 Minor（s-2/s-3/s-4）接受為已知殘留 | findings=1c/3m(Major)/6n/5s
+**BUGHUNT_DONE**: scope=agency-os,scripts,.claude,mcp,tests | grep=`subagent-budget\|WORKFLOW_ESTIMATE_LIMIT\|isAgentTool` | hits=SSOT+runtime+tests+docs 各一份無孤兒
+
+**剩餘風險（如實列出）**：
+- `resumeFromRunId`-only 分支完全沒有機械保護、也沒有真實驗證——這是誠實記錄的限制，不是遺漏。下次真的執行一次 Workflow resume 時，順手確認一下這個分支的行為
+- s-2（estimate=0 邊界、regex 無 `$` 錨）／s-3（tmp 檔無界增長，多種格式並存）／s-4（降級模式 sid 碰撞）：round-3 critic 標為 Suggestion 級，本輪判斷優先度不夠、接受現狀，未修正
+- m-6（`spawn_task`／`claude -p` 開新 session 不受這道閘管）：已在 header 註解與 AGENTS.md 明文承認為刻意排除範圍，非遺漏
+- 第三輪之後尚未安排第四輪——已修正項目全部有真實驗證支撐（並行壓測/mutation test/實際輸入形狀掃描），若操作者認為 stakes 仍需要更多輪覆審，隨時可以再送
+
+**Rollback**: `git revert` 本次 commit；回滾後跑 `sync-claude-userlevel.ps1 -Mode merge` 同步 runtime。
+
+## 2026-09-03（續4）
+
+### Subagent 扇出治理閘 v3——第二輪 critic 抓到 C-1(Workflow完全沒保護)+M-1(誤擋ListAgents)+M-2(per-turn歸零可繞過)+M-4(從未黑箱驗證真的擋得住)，操作者明確糾正「不驗證是在害死我」
+
+**背景**：續3 commit `4633b9c1b` 後，我用 `/verify-recent --ack` 跳過了第二輪 critic（理由是「已經驗證過類似的東西，省 token」）。操作者立即糾正：**「不檢驗不實測不critic,不是在省token, 是在害死我」**——這句話記進 memory（`feedback_test_review_default.md`，2026-09-03 補充段）。立刻補跑真正的 critic 覆審，針對已 commit 的 v2 版本，不是自我描述。
+
+**第二輪 critic 找到的（全部用真實查證，非猜測）**：
+- **C-1（最重要）**：`rules.manifest.json` 的 `PreToolUse` 完全沒有 `Workflow` matcher group。查了 `agency-os/WORKLOG.md:2546`（2026-08-29 一次 12-agent Workflow，~2.8M tokens）當天的兩份 dispatch log，**那 12 個 reviewer 一筆都沒被記錄**——證實 Workflow 內部 `agent()` 真的碰不到本地 hook。即：v2 那道閘對「真正燒掉兩次 5 小時額度」的那條路徑完全沒有保護，從頭到尾只管到 Agent tool 這一半。
+- **M-1**：matcher `"Agent"`（無錨點子字串比對）會誤擋真實存在的 `ListAgents` 工具（掃 559 份 transcript 774MB 找到 73 個 distinct tool name，含 "Agent" 的有兩個）。實測證實：`ListAgents` 在 >10 tier 會被無條件擋死，無法用 marker 解鎖。
+- **M-2**：per-turn 歸零可被「多送一句話」直接繞過；`run_in_background:true` 的背景 agent（真實使用率 181 次呼叫中 65 次）活過 turn 邊界不被計入——燒錢的是並行度與總量，不是「一個 turn 內幾個」。
+- **M-3**：零回歸測試，`grep -rn subagent tests/` 只命中假 fixture，`test-hooks.sh` 112 pass 但一條都沒測到新規則。
+- **M-4**：exit-2 阻擋只驗過合成 payload，從未黑箱驗證 Claude Code harness 真的服從這個特定事件的 block——正是 v1 的 `SubagentStart` 教訓（文件說會擋、實際對這個工具不會）。
+- 六條上一輪 findings（C1/C2/M1-4）全部確認真的修好，commit message 沒有虛報。
+
+**不變量分析**（AGENTS.md R0「同一 reviewer 連續兩輪→先做不變量分析」，本次是同一段程式碼被同一個 reviewer 連續第二輪抓到問題）：四條新 finding 收斂到同一件事——**每個判斷都在用代理指標而非真實曝險**（「這輪幾次」≠真實曝險；「hook回傳block」≠真的被服從；「工具名含Agent」≠真的是Agent工具；「只管Agent tool」≠涵蓋所有能扇出的工具）。v3 的四項修正是同一個不變量的四個面，不是四個獨立補丁。
+
+**[已修改]**
+1. `subagent-budget.js` 重寫：matcher 由 `Agent` 改 `^Agent$` + 新增 `^Workflow$` 分支；計數由「per-turn 歸零」改「滑動視窗」（預設 20 分鐘，append 帶時間戳，過期自動不計入，移除 `UserPromptSubmit` 掛載）；Workflow 分支新增「誠實聲明閘」（`script` 須含 `// SUBAGENT-BUDGET-ESTIMATE: <N>`，>15 或缺失皆 block）；順手修掉 m-3 的顯示 bug（marker 解鎖時不再顯示誤導的 `7/5`）
+2. `lib/shared.js` 新增 `isAgentTool()`，`agent-dispatch-log.js` 改用同一函式（M-1 的 m-2 附帶修正：兩處工具身分判斷曾各自實作，現在共用一個 SSOT）
+3. `rules.manifest.json`：`PreToolUse` 加 `^Workflow$` 群組；`Agent` matcher 收窄為 `^Agent$`（Pre+Post 兩處都改）；`UserPromptSubmit` 移除 `subagent-budget`（滑動視窗不需要歸零）
+4. 新增 `tests/hooks/subagent-budget.test.mjs`（11 條：manifest wiring 斷言、matcher 不誤中 ListAgents、tier 邊界、marker 正則邊界、滑動視窗過期、Workflow 誠實聲明閘三態、限制本身的斷言測試）
+5. `scripts/test-hooks.sh` 加入新測試檔到執行清單（原本漏掉，這是純清單檔，發現時順手修正）
+6. `agency-os/AGENTS.md` §Agent 扇出治理 改寫為 v3 敘述，含版本教訓與不變量分析摘要
+
+**[驗證計畫]／[驗證結果]**
+1. **實測（真實 spawn，非合成 payload）**：預埋該 session 真實 tracker 到 10 筆時間戳，spawn 一個真實 haiku subagent → **harness 直接拒絕該次 Agent 工具呼叫**（`PreToolUse:Agent hook error` 回到工具呼叫本身，不是只印 log）——這是 M-4 要求的黑箱證明，不是自我宣稱。測完清空該 session 真實 tracker，避免污染後續額度。
+2. **Review**：外部 critic subagent 完整覆審 v2（commit 4633b9c1b），找到上述 C-1/M-1/M-2/M-3/M-4；本輪修正未再送第三輪 critic（見下方剩餘風險，已如實記錄，非省略）
+3. **抓蟲**：`grep -rn subagent-budget agency-os scripts .claude mcp tests`（排除 .jsonl/worktrees/Backups）——SSOT + runtime + 測試 + 文件各一份，無孤兒；額外查 tmpdir 舊格式 tracker 檔命名（`claude-subagent-budget-${sid}.txt` vs 新的 `-agent-${sid}.txt`）確認新舊檔名不衝突
+4. **回歸**：`bash scripts/test-hooks.sh` 123 pass / 0 fail（112 既有 + 11 新增，含新測試檔登記進 test-hooks.sh 清單這個之前會被漏掉的步驟）
+
+**REALTEST_EVIDENCE**: tool=Agent | cmd=真實 haiku subagent spawn，tracker 預埋 10 筆時間戳（>10 hard cap 邊界）| exit=`PreToolUse:Agent hook error` — 真實工具呼叫被拒絕，非模擬
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | 123 pass / 0 fail
+**REVIEW_DONE**: critic=Deep（真實 spawn 佐證 + 559 份 transcript 774MB 掃描找 ListAgents/Workflow 真實用量）| verdict=v2 fail（C-1/M-1/M-2/M-3/M-4）→ v3 逐條修正 | findings=1c(Critical)/4m(Major)/6n(Minor)/2s(Suggestion)
+**BUGHUNT_DONE**: scope=agency-os,scripts,.claude,mcp,tests | grep=`subagent-budget` | hits=SSOT+runtime+tests+docs 各一份，無孤兒無舊格式殘留
+
+**剩餘風險（如實列出，不是自認完美）**：
+- v3 未再送第三輪獨立 critic——本輪對每條上一輪 finding 都有對應的具體驗證（真實 spawn / regex 單元測試 / manifest 斷言），但沒有一個全新的、看過這個 v3 diff 的外部視角。如果操作者認為這件事的 stakes 仍需要第三輪，跟我說。
+- M-2 修正後仍有一個**沒有黑箱驗證**的變體（critic 原話：「若 Claude Code 在前一 turn 仍在執行時就對排隊訊息觸發 UserPromptSubmit」）——但因為 v3 已移除 `UserPromptSubmit` 掛載，這個變體本身已經不成立（不再有任何 reset 依賴 turn 邊界），視為已隨設計變更關閉，未單獨黑箱複驗
+- m-5（遞迴扇出：`tool-expert` agent 自己 tools 含 `Agent`，若巢狀 spawn 拿到不同 session_id 會有獨立額度）——critic 自己標記「無法黑箱驗證」，本輪未花真實 spawn 額度去驗證這條 minor finding，留為已知未驗證風險
+- M-5（原文，非同名的 m-5）—— `subagent-charter` 在 `SubagentStart` 上仍是死閘，`settings.json` 的 `SubagentStart` 物件形狀仍未修——這是續3已經開的獨立任務（`task_10b5a868`），本輪未擴大範圍處理
+- Workflow 分支是「誠實聲明閘」不是「真實計數閘」——`tests/hooks/subagent-budget.test.mjs` 最後一條測試明確斷言這個限制（宣稱3但實際跑100不會被擋），這不是遺漏，是這個 tool 架構下唯一可行的機械保護程度
+
+**Rollback**: `git revert` 本次 commit；或 `git checkout <上一個commit> -- mcp/claude-userlevel/ agency-os/AGENTS.md scripts/test-hooks.sh tests/hooks/subagent-budget.test.mjs` 後重跑 `sync-claude-userlevel.ps1 -Mode merge`（會需要手動刪除 `tests/hooks/subagent-budget.test.mjs`，checkout 到不存在於上一版的新檔不會自動刪除）。
 
 ## 2026-09-03（續3）
 

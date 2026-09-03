@@ -40,7 +40,15 @@ function extractResult(response) {
 
 module.exports = {
   check(ctx) {
-    if (ctx.toolName.toLowerCase() !== 'agent') return null;
+    // ctx.shared can be null in degraded mode (lib/shared.js failed to
+    // require), OR present but version-skewed (synced mid-deploy, missing
+    // isAgentTool() from an older copy -- 2026-09-03 round-3 critic m-5).
+    // Both fall back to the inline check rather than crash this rule open.
+    const shared = ctx.shared;
+    const isAgentFn = (shared && typeof shared.isAgentTool === 'function')
+      ? shared.isAgentTool
+      : (n) => String(n || '').toLowerCase() === 'agent';
+    if (!isAgentFn(ctx.toolName)) return null;
 
     const input = ctx.toolInput;
     const now = new Date();
