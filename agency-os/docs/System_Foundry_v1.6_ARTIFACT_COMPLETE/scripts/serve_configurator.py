@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Local development server only: per-run in-memory X-Foundry-Token is a lightweight
+# CSRF guard, not authentication -- there is no rate limiting and no TLS. Do not run
+# with --host bound to a non-loopback address on a network you do not trust.
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from pathlib import Path
 import argparse,json,secrets,mimetypes
@@ -31,5 +34,7 @@ class H(BaseHTTPRequestHandler):
     def log_message(self,fmt,*args): print('[configurator]',fmt%args)
 def main():
     global OUTPUT_ROOT
-    ap=argparse.ArgumentParser();ap.add_argument('--host',default='127.0.0.1');ap.add_argument('--port',type=int,default=8765);ap.add_argument('--output-root',default=str(ROOT/'generated'));a=ap.parse_args();OUTPUT_ROOT=Path(a.output_root).resolve();print(f'Open http://{a.host}:{a.port}');print('Output root:',OUTPUT_ROOT);ThreadingHTTPServer((a.host,a.port),H).serve_forever()
+    ap=argparse.ArgumentParser();ap.add_argument('--host',default='127.0.0.1');ap.add_argument('--port',type=int,default=8765);ap.add_argument('--output-root',default=str(ROOT/'generated'));a=ap.parse_args();OUTPUT_ROOT=Path(a.output_root).resolve()
+    if a.host not in ('127.0.0.1','localhost','::1'): print(f'WARNING: binding to non-loopback host {a.host!r}. This server has no rate limiting and no TLS; the CSRF token is a local-only convenience, not authentication. Only do this on a network you trust.')
+    print(f'Open http://{a.host}:{a.port}');print('Output root:',OUTPUT_ROOT);ThreadingHTTPServer((a.host,a.port),H).serve_forever()
 if __name__=='__main__':main()

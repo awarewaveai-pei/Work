@@ -5,6 +5,13 @@ from functools import lru_cache
 import json, hashlib, re
 ROOT=Path(__file__).resolve().parents[1]
 VERSION='1.6.0'
+# SSOT for the "full 73-section blueprint" guarantee (README.md Selection correctness
+# guarantees; kernel/14_ARTIFACT_GENERATION_AND_SELECTION_CORRECTNESS.md; assurance/
+# SELECTION_OUTPUT_CORRECTNESS_STANDARD.md). Previously hardcoded independently in
+# foundry_generate.py, validate_artifact_generation.py, test_selection_matrix.py (x2),
+# test_configurator_http_e2e.py and ../tests/test_artifact_generation.py (x2)
+# -- 5 files, 7 call sites -- import from here instead of re-hardcoding.
+EXPECTED_BLUEPRINT_COUNT=73
 
 @lru_cache(maxsize=None)
 def load(rel):

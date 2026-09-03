@@ -2,15 +2,21 @@
 from __future__ import annotations
 from pathlib import Path
 import argparse, json, tempfile, shutil, os, datetime, hashlib
-from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name
+from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name, EXPECTED_BLUEPRINT_COUNT
 
 MODULE_DOCS=[
  '00_REQUIREMENTS.md','01_ARCHITECTURE.md','02_CONTRACTS.md','03_SECURITY.md','04_DATA_AND_MIGRATION.md',
  '05_TEST_STRATEGY.md','06_OBSERVABILITY_AND_SRE.md','07_ROLLBACK_AND_RECOVERY.md','08_IMPLEMENTATION_BACKLOG.md'
 ]
 
-def dump(p,obj): p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-def write(p,text): p.parent.mkdir(parents=True,exist_ok=True); p.write_text(text.rstrip()+'\n',encoding='utf-8')
+# newline='\n' pinned on both writers: every byte Foundry writes here is later sha256-hashed
+# (sha256_file below, and verify_artifact_manifest in test_selection_matrix.py) and is meant to
+# be committed to git (LF-normalized). Without pinning it, Path.write_text() applies the platform
+# default newline translation (CRLF on Windows), so a manifest hashed at generation time on
+# Windows would mismatch after any git round-trip or Linux verification -- the same class of bug
+# fixed in regenerate_integrity.py, but here it hits every generated artifact, not just 2 files.
+def dump(p,obj): p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
+def write(p,text): p.parent.mkdir(parents=True,exist_ok=True); p.write_text(text.rstrip()+'\n',encoding='utf-8',newline='\n')
 def sha256_file(p):
     h=hashlib.sha256()
     with p.open('rb') as f:
@@ -217,7 +223,7 @@ def validate_generated(stage,plan,module_data):
             for rel in m['paths']:
                 if (stage/rel).exists(): errors.append(f'unselected module path generated: {mid}:{rel}')
     bps=list((stage/'docs/blueprint').glob('[0-9][0-9]_*.md'))
-    if len(bps)!=73: errors.append(f'blueprint document count {len(bps)} != 73')
+    if len(bps)!=EXPECTED_BLUEPRINT_COUNT: errors.append(f'blueprint document count {len(bps)} != {EXPECTED_BLUEPRINT_COUNT}')
     required=[stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md',stage/'docs/IMPLEMENTATION_BACKLOG.md']
     for p in required:
         if not p.is_file(): errors.append('missing required generated file '+str(p.relative_to(stage)))

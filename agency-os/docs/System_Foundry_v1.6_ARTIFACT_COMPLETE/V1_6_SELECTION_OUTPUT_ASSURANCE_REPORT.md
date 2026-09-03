@@ -24,14 +24,14 @@ Fix: output must be an exact projection of the canonical plan.
 Expected result: no unnecessary architecture or implementation surface is generated.
 
 ### F-003 — Deferred and current capability states could conflict
-Evidence: rule/dependency fixed-point resolution is `scripts/configurator_engine.py:68-86`; current closure now removes any overlapping deferred state at `scripts/configurator_engine.py:87-88`.
+Evidence: rule/dependency fixed-point resolution is `scripts/configurator_engine.py:74-92`; current closure now removes any overlapping deferred state at `scripts/configurator_engine.py:93-94`.
 
 Fix: CURRENT deterministically wins over DEFERRED when another selected/derived dependency makes the capability necessary now.
 
 Expected result: no capability can be simultaneously “build now” and “future only.”
 
 ### F-004 — Custom requirements could be preserved without a generated work surface
-Evidence: custom requirements receive stable IDs and `ARCHITECTURE_REVIEW_REQUIRED` at `scripts/configurator_engine.py:100-104`; they activate a dedicated `custom` module at `scripts/configurator_engine.py:105-107`. The module is declared at `generation/module-manifests.json:379-386`.
+Evidence: custom requirements receive stable IDs and `ARCHITECTURE_REVIEW_REQUIRED` at `scripts/configurator_engine.py:106-110`; they activate a dedicated `custom` module at `scripts/configurator_engine.py:111-113`. The module is declared at `generation/module-manifests.json:379-386`.
 
 Fix: `+新增其他需求` can no longer disappear into notes. It creates an explicit review extension while still refusing to guess technology.
 

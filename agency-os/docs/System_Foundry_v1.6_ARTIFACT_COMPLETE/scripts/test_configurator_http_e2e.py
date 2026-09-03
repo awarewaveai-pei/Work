@@ -3,6 +3,7 @@ from pathlib import Path
 import sys,tempfile,subprocess,socket,time,json,urllib.request
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 import test_selection_matrix as matrix
+from configurator_engine import EXPECTED_BLUEPRINT_COUNT
 
 def free_port():
     s=socket.socket(); s.bind(('127.0.0.1',0)); p=s.getsockname()[1]; s.close(); return p
@@ -24,7 +25,7 @@ def main():
             req=urllib.request.Request(base+'/api/generate',data=payload,method='POST',headers={'Content-Type':'application/json','X-Foundry-Token':token})
             with urllib.request.urlopen(req,timeout=30) as r: result=json.load(r)
             out=Path(result['path'])
-            if result['coverage']['blueprints_total']!=73: raise RuntimeError('HTTP generation blueprint coverage invalid')
+            if result['coverage']['blueprints_total']!=EXPECTED_BLUEPRINT_COUNT: raise RuntimeError('HTTP generation blueprint coverage invalid')
             for rel in ['docs/modules/web/MODULE_MANIFEST.json','docs/modules/identity/MODULE_MANIFEST.json','docs/modules/tenant/MODULE_MANIFEST.json','docs/modules/ai/MODULE_MANIFEST.json','docs/modules/custom/MODULE_MANIFEST.json','.foundry/resolution/artifact-manifest.json']:
                 if not (out/rel).is_file(): raise RuntimeError('HTTP generation missing '+rel)
             print('CONFIGURATOR HTTP E2E: PASS')

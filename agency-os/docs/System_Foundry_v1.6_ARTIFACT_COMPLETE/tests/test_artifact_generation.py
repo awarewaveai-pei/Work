@@ -1,7 +1,7 @@
 import json,tempfile,unittest,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
-from configurator_engine import resolve
+from configurator_engine import resolve,EXPECTED_BLUEPRINT_COUNT
 from foundry_generate import generate,MODULE_DOCS
 import test_selection_matrix as matrix
 
@@ -12,12 +12,12 @@ class ArtifactGenerationTests(unittest.TestCase):
         self.assertEqual(len(p['modules']),24)
         with tempfile.TemporaryDirectory() as td:
             out=generate(p,a,[],td)
-            self.assertEqual(len(list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))),73)
+            self.assertEqual(len(list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))),EXPECTED_BLUEPRINT_COUNT)
             for mid in p['modules']:
                 for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
                     self.assertTrue((out/'docs/modules'/mid/role).is_file(),f'{mid}/{role}')
             cov=json.loads((out/'.foundry/verification/generation-coverage.json').read_text())
-            self.assertEqual(cov['blueprints_active'],73)
+            self.assertEqual(cov['blueprints_active'],EXPECTED_BLUEPRINT_COUNT)
     def test_custom_requirement_materializes_review_module_without_guessing_capability(self):
         a=matrix.complete({},False); custom=[{'category':'custom','statement':'支援特殊工業設備協定'}]; p=resolve({'name':'custom-unit'},a,custom)
         self.assertIn('custom',p['modules'])

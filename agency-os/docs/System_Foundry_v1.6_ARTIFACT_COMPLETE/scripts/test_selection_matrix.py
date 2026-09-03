@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys,tempfile,json,hashlib,random,itertools
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
-from configurator_engine import load,resolve,active_questions,eval_condition
+from configurator_engine import load,resolve,active_questions,eval_condition,EXPECTED_BLUEPRINT_COUNT
 from foundry_generate import generate,MODULE_DOCS,blueprint_active
 
 QMAP={q['id']:q for q in load('questionnaires/catalog.json')['questions']}
@@ -90,7 +90,7 @@ def verify_generated(out,plan):
             for rel in m['paths']:
                 if (out/rel).exists(): raise AssertionError('unselected module path leaked '+mid+':'+rel)
     bpdocs=list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))
-    if len(bpdocs)!=73: raise AssertionError('blueprint count != 73')
+    if len(bpdocs)!=EXPECTED_BLUEPRINT_COUNT: raise AssertionError(f'blueprint count != {EXPECTED_BLUEPRINT_COUNT}')
     for rec in BPMAP:
         text=(out/'docs/blueprint'/rec['file']).read_text()
         expected='**ACTIVE**' if blueprint_active(rec['when'],plan) else '**NOT_APPLICABLE**'
@@ -160,7 +160,7 @@ def main():
         out0=generate(p0,a0,[],td); verify_generated(out0,p0)
         outy=generate(py,ay,[],td); verify_generated(outy,py)
         cov=json.loads((outy/'.foundry/verification/generation-coverage.json').read_text())
-        if cov['modules_selected']!=len(set(MODS)-{'custom'}) or cov['blueprints_active']!=73: raise AssertionError('all-YES coverage report incomplete')
+        if cov['modules_selected']!=len(set(MODS)-{'custom'}) or cov['blueprints_active']!=EXPECTED_BLUEPRINT_COUNT: raise AssertionError('all-YES coverage report incomplete')
     # 8) one representative generation per module (except core already covered)
     reps={}
     for qid in ids:

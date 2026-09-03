@@ -1,5 +1,72 @@
 # Worklog
 
+## 2026-09-04（續，新 session）
+
+### 讀懂並歸檔 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/`（解決 2026-09-03 WORKLOG「未歸屬」遺留問題）+ 訂下「讀資料類任務只能派 1 個 agent」新規則
+
+**觸發**：操作者「以後要做 System Foundry」先卡位此 session，接著要求「仔細詳細了解」該目錄。2026-09-03 WORKLOG 續10 條目 §剩餘風險曾記錄 `agency-os/docs/System_Foundry_v1.0/`「大型未提交新框架…均未在此 WORKLOG 留下起源記錄，留待與操作者確認後續處置」；現況已是 v1.6（commit `6c744467c`，2026-09-03 13:13:59+08，隨 HCI-30/AI-LEGO ADR 治理批次一起進 repo，非獨立 commit）。本條目是研究/調研類任務（純讀取，未改動 System Foundry 本身任何檔案），依 DoD 只需具體答案+來源引用+結論寫入 WORKLOG，不適用 R0 REALTEST/REVIEW/BUGHUNT 三件式（無程式碼變更）。
+
+**方法**：9 個角色式 Workflow agent 平行讀（依子系統分工，非逐檔配 agent，符合治理 ≤10 上限的誠實聲明 `SUBAGENT-BUDGET-ESTIMATE: 9`），涵蓋 manifest.json 列出的 310 檔中約 210 檔完整讀 + 其餘按檔名/交叉引用歸類。耗時 296.9s，共 255 次工具呼叫，**1,316,950 subagent tokens**。任務完成後操作者立即訂新規則：「以後只能派一個agent 讀資料」——已存入 `feedback_no_heavy_subagent_workflows.md` 2026-09-04 段落，往後讀/理解類任務不得再用多 agent 平行 Workflow，即使是 role-based、在 ≤10 上限內也不行。
+
+**結論（具體答案）**：
+1. **它是什麼**：README 自述 = reusable engineering kernel + semantic assurance runtime + binary product configurator + capability compiler + LEGO artifact generator。實測管線真的可執行：`configurator_engine.py resolve()` 把使用者對 ~90 題「要/不要」問卷的答案，經 `rules/question-rules.json`（選取）+ `rules/derivation-rules.json`（機械衍生）+ `rules/conflict-rules.json`（衝突偵測）轉成能力集合（`capabilities/catalog.json`，CAP-/DER-/FOUND- 前綴），`foundry_generate.py` 依此具現化成 per-module 10 件式產物包 + 73 節 System Blueprint（`templates/TOP_TIER_SYSTEM_BLUEPRINT/`，經 Glob+manifest 核對確實恰為 00–72 共 73 檔），全程內容雜湊、暫存目錄+原子搬遷、`make verify`（12 道閘）含窮舉 121 題 pairwise（7,260 對）+ 1,000 組隨機配置回歸測試。
+2. **完成度與宣稱有落差**：目錄結構 100% 到位，但內容填實度不均——engineering/ 20 份中 16 份、assurance/ 17 份中 11 份、methodology/ 15 份中 13 份、commercial/ 全部 15 份，都只是同一套「Purpose/Required Scope/Mandatory Questions/Output Contract/Evidence States」母模板的批量實例化，換了 Required Scope 關鍵詞、未展開具體機制；governance/DECISION_RIGHTS_MATRIX.md、RISK_ACCEPTANCE_REGISTER.md、assurance/CONTROL_EVIDENCE_MATRIX.md、runbooks/INCIDENT_RUNBOOK_TEMPLATE.md 四份藍圖子模板僅有 H1 標題無內容。真正寫實的是：kernel/ 15 份契約全部、methodology 01+06、engineering 4 份敘述型標準、experience+governance 全部、assurance 6 份具體標準、以及整個 scripts/+configurator/ 可執行層（H 組）。「ARTIFACT_COMPLETE」標籤應理解為「目錄骨架與可執行驗證鏈已完工」，不是「每份治理文件內容都寫完」。
+3. **與 D:\Work 自身治理哲學高度同構、疑似部分泛化自本 repo**：kernel 的 Evidence States/Fail-closed/Root Cause Gate/No Patch Engineering/Independence 與 `agency-os/AGENTS.md` 的 R0/R4/VBC/補丁判準/跨模型 oracle 分工幾乎一一對應（各子系統摘要皆逐條列出對照）。F 組讀到明確證據：`REFERENCE_PROJECT_GAP_INTEGRATION_REPORT.md`（標「-> v1.2」）與 `HCI_REFERENCE_GAP_INTEGRATION_REPORT.md` 兩份差距整合報告，全部 file:line 證據指向 `Projects/internal/cognitive-engineering-os`（AI_LEGO_Cognitive_Engineering_OS）與 `agency-os/docs/HCI`——即 System Foundry 至少部分規則是從這兩個本地專案的既有成果泛化抽象化而來，不是憑空外來的框架。
+4. **具體風險/待清理項**（可行動）：
+   - `tests/test_configurator.py.tmp` 經 Read 確認 0 位元組，疑似編輯中斷遺留的暫存檔，未見任何引用或存在理由。
+   - `capabilities/catalog.json` 約 115 個能力節點 `description` 欄位幾乎全空字串。
+   - `QUALITY_STRENGTH_MATRIX.md` 全篇自評每項 VERY STRONG、`manifest.json.status` 亦自稱 `very-strong-…`，與框架自己在 kernel/01_CONSTITUTION 明文禁止「把 Expert Agreement 當 Evidence」「同一團隊自證」的規則構成表面張力（讀取範圍內未見獨立第三方覆核證據）。
+   - 73 這個藍圖節數在 `foundry_generate.py`/`validate_artifact_generation.py`/`test_selection_matrix.py` 三處各自硬編，無單一常數 SSOT。
+   - `schemas/foundry-plan.schema.json` 的 `schema_version`/`compiler_version` 皆硬編 const，版本推進需人工同步，非機械推導。
+   - `CLAUDE_CODE_CODEX_SYSTEM_FOUNDRY_RESEARCH_MISSION.md` 通篇針對「v1.0」設計一套 Claude+Codex 雙代理研究協定，指定輸出到 `docs/SYSTEM_FOUNDRY_RESEARCH/`（不在現行 v1.6 manifest 310 檔內）——是否曾真的執行過、其結論是否就是 v1.1 起各次強化的來源，未經證實，需操作者確認現況。
+   - `serve_configurator.py` 本機開發用 HTTP server 無 rate limit、無強制 HTTPS，`--host` 可傳 `0.0.0.0`，程式碼內無任何「僅限本機」的邊界註記。
+
+**未做**：未實際跑 `make verify`／`serve_configurator.py` 驗證上述可執行鏈當下是否真的全綠（只讀了程式碼邏輯，未執行）；未重算 `manifest.json` 310 檔 SHA-256 逐一比對雜湊真偽；未確認 `docs/Water_Electrical_MEP_ALL_LATEST_2026-09-03/` 是否為此框架實際產出的第一個交付案例（該目錄也提及 "System Foundry"，本次未展開讀取，僅 grep 命中）。這些留給操作者下一步決定是否要做。
+
+**WORKLOG**：本條目。**Memory**：新增 `project_system_foundry_v16.md`（指標記憶，不重複本條目內容）。
+
+### 續：處理上一條目列出的清理項與未驗證項（操作者「都去處理好」，全程 0 個 agent，自己動手）
+
+**觸發**：操作者「具體待清理項和沒做的 都去處理好，不准一次無效益的派出多個agents，要聰明智慧使用」。全程未呼叫 Agent／Workflow，直接用 Bash/Read/Edit 自己執行；過程中操作者一度提醒「先不要管水電工程」，已確認範圍僅限 System_Foundry 本身、水電工程客戶目錄全程未讀寫（僅先前一次 grep 確認命名關聯）。
+
+**[已修改]**：
+- `scripts/configurator_engine.py`：新增 `EXPECTED_BLUEPRINT_COUNT=73` 常數（帶註解說明權威來源：README/kernel 14/assurance SELECTION_OUTPUT_CORRECTNESS_STANDARD），取代原本 3 個檔案各自獨立硬編 `73` 的寫法
+- `scripts/foundry_generate.py`、`scripts/validate_artifact_generation.py`、`scripts/test_selection_matrix.py`（2 處）：4 個硬編 `73` 全部改成 import 上述常數
+- `scripts/serve_configurator.py`：加檔頭安全邊界註解 + `--host` 非 loopback 時印警告（no rate limit/no TLS/token 只是本機防護不是驗證），不改變預設行為
+- `tests/test_configurator.py.tmp`：確認 0 位元組、無任何引用後刪除
+- `scripts/regenerate_integrity.py`：修真正的 bug——原本 3 處 `write_text()` 未指定 `newline='\n'`，Windows 平台預設會把換行轉成 CRLF，導致連續兩次 `make verify` 之間 `registries/kernel.yaml`／`runtime/agent-roles.yaml` 出現 hash drift 假警報（`git diff --ignore-all-space` 確認內容從未真的變過）。這是在跑第二輪驗證時**意外實測發現**的真實 bug，不在原本列出的待清理項裡。
+- 跑 `python scripts/regenerate_integrity.py --write` 同步 `manifest.json`（310→309 檔，含新 hash）
+
+**[未做，刻意不做]**：`capabilities/catalog.json` ~115 個空 `description` 欄位、`QUALITY_STRENGTH_MATRIX.md` 的自評用語——兩者都需要對框架內容本身的判斷/創作，不是機械清理；擅自捏造內容違反這份框架自己的 Evidence Law（禁止臆測填空），故只如實記錄現況給操作者決定，不動手寫。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/validate_versions.py` ~ `validate_manifest.py`（12 步）+ `python -m unittest discover -s tests`（29 tests）在改動前先跑一次全部 PASS/OK（確認「沒做的」項目之一：`make verify` 現況真的是綠的，含 121 題×7,260 對窮舉、1,000 組隨機、310 檔 SHA-256 manifest 比對、HTTP e2e）；改動後（73 常數化 + 刪 .tmp + regenerate_integrity）再跑一次同 12 步 + 29 tests，全部 exit=0/OK；`git diff --stat` 只變動 8 個預期檔案，`registries/kernel.yaml`／`runtime/agent-roles.yaml` 對 git HEAD 零差異（純 CRLF 假警報已修復，不再出現）
+- REVIEW_DONE: critic=self（純機械式硬編碼→具名常數置換 + 加註解 + 刪 0 位元組檔 + newline 修正，無邏輯分支變更；每處改動皆用 Read 讀回確認 + 用該框架自己的驗證套件 12+29 項機械覆核，未額外派 critic subagent——單一小型機械修改，符合風險分級 Low/Medium 可自行判斷完成的範圍）
+- BUGHUNT_DONE: scope=agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE | grep=`!=73\|== *73\|\bEXPECTED_BLUEPRINT_COUNT\b` | hits=4（全部是本次改動位置本身，確認硬編碼已無殘留、常數已正確接上）
+- BUGHUNT_WAIVED: 未擴大掃 `agency-os`/`scripts`（repo 其他部分）——本次改動全部侷限在 System_Foundry 套件內部私有腳本，無任何外部 call site 引用這些函式/常數（H 組讀取時已確認這是獨立封閉套件，`make verify` 本身就是完整的跨檔一致性覆核）
+
+**剩餘風險**：`capabilities/catalog.json` 空描述與自評用語仍未處理，留給操作者。
+
+### 續：commit 前機械閘擋下（verify-gate-commit）→ 跑 `/verify-recent` → 1 個 critic agent 抓到 3 個真 Major，全修
+
+**觸發**：`git commit` 被 `hooks/rules/verify-gate-commit.js` 擋下（6 個 `.py` 檔未過本 session 驗證）。依閘訊息跑 `/verify-recent`：syntax（6 檔 `py_compile` 全過）→ critic（1 個 agent，操作者「不准派多個agent」下的唯一必要 agent，符合「≤5個獨立覆審」允許範圍）。
+
+**Critic 抓到（3 Major + 1 Minor，均為真，非誤報）**：
+1. **M-1** 上一條目的「73 常數化」漏了 3 個執行點：`scripts/test_configurator_http_e2e.py:27`、`tests/test_artifact_generation.py:15,20`（實際是 5 檔 7 處硬編碼，不是原記的 3 檔 4 處）；且我加在 `configurator_engine.py` 的常數註解本身宣稱「4 call sites」也是假宣稱——已修正註解為「5 files, 7 call sites」
+2. **M-2（最高優先級，範圍比我原本修的大很多）**：`foundry_generate.py:12-13`（`dump()`/`write()`，生成專案時實際寫檔的兩個 helper）有跟 `regenerate_integrity.py` 完全同款的 CRLF/雜湊 bug，但影響的是**每次生成專案的全部產物檔案**（critic 實測：110/110 生成檔案含 CRLF、109/109 會在 git LF 正規化後雜湊比對失敗），而不是只有 2 個 registry 檔。這條是我在原條目只修了「發現的那個實例」、沒推廣到「同一類問題」的典型補丁式修法——已補 `newline='\n'`，補完後真實生成 377 個檔案重新實測 0 個含 CRLF（原本 110/110）
+3. **M-3**：我加在 `configurator_engine.py` 頂部的 6 行註解讓檔案往下位移 6 行，導致 `V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` 兩處 `file:line` 證據引用（`:27`、`:34`）指向錯誤內容——已依 critic 逐行核對後的新行號修正（`68-86→74-92`、`87-88→93-94`、`100-104→106-110`、`105-107→111-113`），修正後重跑 `regenerate_integrity.py --write` 同步 manifest（該 .md 本身也在雜湊清單內）
+4. **m-1**：`regenerate_integrity.py` 的 2 處 `read_text()`/3 處 `write_text()` 缺 `encoding='utf-8'`（目前全 ASCII 內容故無害，但屬本 repo 已知 CP950 陷阱同款模式）——已補齊，與其餘已修檔案一致
+
+**未採納（out of scope，如實記錄）**：s-1（`serve_configurator.py` 預設輸出路徑在套件內、未加入 manifest 排除清單的潛在自我汙染風險）、s-2（`tests/test_artifact_generation.py` 另有 `160`/`24` 兩個硬編碼可比照 73 常數化）——critic 自己標為建議而非必要，且不在本次「清理已列項目」授權範圍，留給操作者決定是否要開新任務。
+
+**[驗證結果]（本續內）**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile`（6 檔）+ 真實 generate() 呼叫檢查輸出 CRLF | exit=0 | result=`generated files: 377 | CRLF files: 0`（M-2 修復前對照組：110/110 含 CRLF）
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain + `python -m unittest discover -s tests` | exit=0 | result=全綠；額外驗證 `regenerate_integrity.py --write` 連續執行兩次自洽（idempotent）
+- REVIEW_DONE: critic=Standard（1 個 agent，6 檔全文 + 跨檔 grep 覆核，含實際跑一次生成驗證 CRLF 主張）| verdict=warn → 全部 3 Major + 1 Minor 修正後 pass
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`EXPECTED_BLUEPRINT_COUNT` | hits=0（repo 其他部分零引用，符合預期——這是套件內部私有符號，`agency-os`/`scripts` 兩必要 root 皆已掃）；套件內部另 grep `!=73\|==73\b` 於 `scripts/`+`tests/` hits=0（確認硬編碼點清零）
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE`（11 檔全部可用 git 還原，無外部相依）。
+
 ## 2026-09-04（凌晨，續 2026-09-03 session）
 
 ### Cognitive OS OQ-P5-1 關閉：capability resolution fail-closed（ADR-023）+ 同日 critic 覆審 10 條全修
