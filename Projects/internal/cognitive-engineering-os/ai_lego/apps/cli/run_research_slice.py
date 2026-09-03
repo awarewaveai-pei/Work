@@ -13,6 +13,22 @@ There is no separate "PASS but a gate failed" state to accidentally report:
 the on-disk result, the CLI exit code, and `results.status`/`step_status`
 are only ever written for a run that reached the end with every gate PASS.
 
+Capability resolution (ADR-023) is fail-closed **at invocation**: the one
+capability this slice invokes as a capability (``run_statistics``) goes through
+``CapabilityCatalog.invoke`` and an unresolved ref raises before the
+implementation runs. At plan time it is **recorded, not enforced** (method
+resolution, by contrast, raises at plan time): every capability ref of the
+compiled plan is resolved against the live catalog and the verdict lands in
+the ledger, the result, the manifest's ``results`` block and the CLI output;
+the plan-level BLOCKED transition waits on the spec-root contracts ADR-023
+names. Two things this slice does that look like capabilities are performed
+OUTSIDE the capability plane and are declared as such
+(``OUTSIDE_CAPABILITY_PLANE``): ingest transcription through the Transcriber
+port, and the harness's own synthetic memo. The declaration is self-expiring:
+the run refuses to start (``CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED``) as soon as
+one of those refs gains an ACTIVE contract, so the bypass cannot outlive its
+reason.
+
 Run::
 
     python -m ai_lego.apps.cli.run_research_slice --transcription fixture
@@ -49,6 +65,7 @@ from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_speci
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
 from ai_lego.modules.research.review import fixture_review, locked_code_from_review, review_code_interactively
 from ai_lego.modules.research.synthetic_fixtures import PROJECT_ID, SUGGESTED_LABEL, SYNTHETIC_CONSENT, SYNTHETIC_TRANSCRIPTS, expanded_synthetic_coder_judgments
+from ai_lego.platform.ai_execution.capability_resolver import CAPABILITY_RESOLUTION_BLOCKED, CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.ai_execution.current_state import build_current_state
 from ai_lego.platform.ai_execution.deletion import DeletionRequestBuilder
 from ai_lego.platform.ai_execution.mandatory_gates import inject_mandatory_gates
@@ -68,6 +85,14 @@ DELETION_AUTHORIZATION = "AUTH-SYNTHETIC-P2-ERASURE-A4"
 TRANSCRIPTION_MODES = ("fixture", "offline-stt")
 REVIEW_MODES = ("fixture", "interactive")
 GOAL_TEXT = "Code these interview transcripts for after-hours boundary themes and check inter-rater reliability between two coders."
+
+# Capability-like work this slice performs WITHOUT going through CapabilityCatalog.invoke -- declared, not hidden
+# (ADR-023 section Decision 4). Every entry must be an UNRESOLVED ref on the live catalog: the moment a contract exists
+# the run refuses to start until that path is re-homed behind `invoke` (CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED below).
+OUTSIDE_CAPABILITY_PLANE = {
+    "transcribe": "performed as ingest through the Transcriber port (ai_lego.modules.knowledge.ingest.transcription) at ledger offsets 2-5, before the goal is compiled to a Workflow IR; not an execution of the IR's transcribe node and not contract-backed",
+    "artifact.generate_research_paper": "the harness writes a minimal synthetic memo (artifacts/research_memo.md) so that criterion 5 has an artifact to trace and the method-specific gates have an output to evaluate; not the contracted capability's output and not contract-backed",
+}
 
 S = {
     "tenant": "ai-lego://specs/domain/tenant.schema.yaml",
@@ -122,6 +147,13 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     if config.review not in REVIEW_MODES:
         raise InvariantViolation(f"REVIEW_MODE_UNKNOWN: {config.review!r}")
     spec_root = resolve_spec_root(config.spec_root)
+    # ADR-023: the capability catalog is loaded FIRST, before any side effect (runtime dir, adapters, ingest), so that
+    # a catalog problem (CONTRACT_ID_DUPLICATE / CONTRACT_CATALOG_UNREADABLE) or an expired bypass declaration stops
+    # the run before a single event reaches the append-only ledger.
+    capabilities = CapabilityCatalog.from_spec_root(spec_root)
+    bypass_no_longer_justified = sorted(ref for ref in OUTSIDE_CAPABILITY_PLANE if capabilities.is_resolvable(ref))
+    if bypass_no_longer_justified:
+        raise InvariantViolation(f"CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED: {', '.join(bypass_no_longer_justified)} now has an ACTIVE contract; route that path through CapabilityCatalog.invoke before running this slice")
     runtime = (config.runtime_dir or default_runtime_dir()).resolve()
     allowed_repo_location = PRODUCT_ROOT / ".runtime"
     guard_runtime_dir(runtime, spec_root, REPO_ROOT, allowed_repo_location)
@@ -251,6 +283,27 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     resumed_transition = transition("BLOCKED", "METHODS_RESOLVED", 21)
     emit(NORDBROOK.tenant_id, nord_aggregate, "MethodResolved", {"method_ids": method_ids, "catalog": live.label, "resolution": resolved_resolution, "transition": resumed_transition}, 21)
 
+    # Step 13.5: capability resolution (MP §7 pipeline; MP §8.4 "reject illegal combinations before execution"),
+    # ADR-023. Fail-closed at invocation (`capabilities.invoke` below); at plan time the verdict against the live catalog
+    # is recorded (ledger event, result, manifest results block, CLI output) but not yet enforced as a BLOCKED state
+    # transition -- that waits on the spec-root contracts ADR-023 names, and the acceptance expectation is computed from
+    # the contract files on disk so it moves with them.
+    plan_capability_refs = capability_refs(workflow_ir)
+    capability_resolution = capabilities.resolve(plan_capability_refs)
+    executability = plan_executability(workflow_ir, capability_resolution)
+    capability_record: dict[str, Any] = {
+        "catalog": capabilities.label,
+        "refs": plan_capability_refs,
+        "resolution": capability_resolution,
+        "plan_executability": executability,
+        # Declared unconditionally: the bypasses happen on every run, whatever the compiled plan happens to contain.
+        "performed_outside_capability_plane": dict(OUTSIDE_CAPABILITY_PLANE),
+    }
+    if capability_resolution["blocked"] is not None:
+        emit(NORDBROOK.tenant_id, nord_aggregate, "CapabilityResolutionBlocked", {**capability_record, "signal": CAPABILITY_RESOLUTION_BLOCKED}, 21.5)
+    else:
+        emit(NORDBROOK.tenant_id, nord_aggregate, "CapabilitiesResolved", capability_record, 21.5)
+
     # Steps 14-15: human review. `quote` is always the source's own PII-free `quote` field -- never the raw transcript.
     if config.review == "fixture":
         locked_code, ai_review = fixture_review()
@@ -275,7 +328,9 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
 
     # Steps 16-18 continued: Trusted Compute statistics (never LLM mental arithmetic); champion v11 theme set.
     coder_one, coder_two = expanded_synthetic_coder_judgments()
-    statistics = interrater_reliability_result(coder_one, coder_two)
+    # MP §7: the Capability Request passes the resolver BEFORE the implementation runs -- an unresolved ref raises here,
+    # so there is no path on which uncontracted compute produces a CALCULATED_RESULT.
+    run_statistics_contract, statistics = capabilities.invoke("run_statistics", interrater_reliability_result, coder_one, coder_two)
     emit(NORDBROOK.tenant_id, nord_aggregate, "StatisticsCalculated", statistics, 24.5)
     method_execution_log.append(
         {
@@ -343,7 +398,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     )
     (runtime / "artifacts").mkdir(parents=True, exist_ok=True)
     (runtime / "artifacts" / "research_memo.md").write_text(memo + "\n", encoding="utf-8")
-    emit(NORDBROOK.tenant_id, nord_aggregate, "ArtifactPublished", {"artifact": "research_memo.md", "trace": trace, "gates": gates}, 26.5)
+    emit(NORDBROOK.tenant_id, nord_aggregate, "ArtifactPublished", {"artifact": "research_memo.md", "contract_backed": False, "capability_ref": "artifact.generate_research_paper", "trace": trace, "gates": gates}, 26.5)
     transition("EXECUTING", "VERIFYING", 26.6, gate_results=gate_results)
 
     # Steps 23-26: the EC section 31 deletion contract, built incrementally as each step actually happens --
@@ -464,7 +519,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "execution_id": EXECUTION_ID,
         "run_id": RUN_ID,
         "block_id": "run_statistics",
-        "capability_version": __version__,
+        "capability_version": run_statistics_contract["version"],  # the Capability Contract version that ran (manifest.schema.yaml), not the package version
         "model": "NOT_APPLICABLE_LOCAL_DETERMINISTIC_COMPUTE",
         "model_version": f"python-{sys.version_info.major}.{sys.version_info.minor}",
         "prompt_version": "11",
@@ -481,14 +536,21 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "knowledge_snapshot": sha256_json(evidence_graph),
     }
     contracts.validate("ai-lego://specs/execution/audit.schema.yaml", audit, "execution audit")
+    # A CAPABILITY invocation homed on the manifest's method_execution_log, because the spec root has no capability
+    # execution log yet (ADR-023 section Consequences 6). `method_id` is schema-required and carries the capability ref;
+    # every version field here is the CONTRACT version that ran -- the same semantics as the sibling method entry above,
+    # never the package version -- and the entry has its own invocation id, distinct from the top-level execution id.
     method_execution_log.append(
         {
-            "execution_id": EXECUTION_ID,
+            "execution_id": "EX-CAP-RUNSTATS-001",
             "method_id": "run_statistics",
-            "method_version": __version__,
+            "method_version": run_statistics_contract["version"],
             "workflow_id": workflow_ir["id"],
             "block_id": "run_statistics",
-            "capability_version": __version__,
+            "capability_ref": run_statistics_contract["ref"],
+            "contract_path": run_statistics_contract["path"],
+            "contract_sha256": run_statistics_contract["content_sha256"],
+            "capability_version": run_statistics_contract["version"],
             "prompt_version": "11",
         }
     )
@@ -504,7 +566,14 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         app_version=__version__,
         source=source_description,
         documents=documents,
-        results={"status": "PASS", "gates": list(gates)},
+        results={
+            "status": "PASS",
+            "gates": list(gates),
+            # The plan-time capability verdict reaches the audit record of record, not only a nested result field.
+            "capability_plan_executable": executability["executable"],
+            "capability_plan_fully_resolved": executability["fully_resolved"],
+            "unresolved_capabilities": (capability_resolution["blocked"] or {}).get("unresolved", []),
+        },
         prompt_version="11",
         method_execution_log=method_execution_log,
     )
@@ -529,6 +598,11 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "transcriptions": transcriptions,
         "coding_outputs": coding_outputs,
         "method_resolution": {"blocked": blocked_resolution, "resolved": resolved_resolution, "method_ids": method_ids},
+        "capability_resolution": {
+            **capability_record,
+            "invoked": list(capabilities.invocations),  # the catalog's own observation log, not a literal
+            "not_performed": [ref for ref in plan_capability_refs if ref not in {entry["ref"] for entry in capabilities.invocations} and ref not in OUTSIDE_CAPABILITY_PLANE],
+        },
         "state_transitions": transitions,
         "source_audio_erasure": source_audio_erasure,
         "deletion_request": deletion_request,
@@ -566,6 +640,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
     print("PASS: synthetic Phase 5 Research Mode slice completed (28/28 steps, all gates PASS)")
+    plan = result["capability_resolution"]["plan_executability"]
+    if not plan["executable"] or not plan["fully_resolved"]:
+        unresolved = (result["capability_resolution"]["resolution"]["blocked"] or {}).get("unresolved", [])
+        verdict = "NOT executable" if not plan["executable"] else "executable but not fully resolved"
+        blocking = ", ".join(entry["ref"] for entry in plan["blocking"]) or "none"
+        print(f"WARN: compiled plan is {verdict} on this spec root -- capability refs without an ACTIVE contract: {', '.join(unresolved)} (blocking REQUIRED_*: {blocking}); plan-level BLOCKED transition not yet wired, see ADR-023")
     print(f"adapters={result['adapters']}")
     print(f"Kappa={result['statistics']['kappa']} CI95={result['statistics']['confidence_interval_95']} gates={result['gates']}")
     print(f"Replay P2 T0={result['replays']['T0']['transcripts']['P2']['pii']}")

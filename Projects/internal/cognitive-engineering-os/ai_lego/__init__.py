@@ -33,7 +33,7 @@ from pathlib import Path
 
 from ai_lego.errors import SpecRootNotFound
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 PRODUCT_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PRODUCT_ROOT.parents[2]

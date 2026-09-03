@@ -17,10 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
+from ai_lego.platform.ai_execution.contract_catalog import catalog_label, is_active, scan_contract_files
 
 METHOD_RESOLUTION_BLOCKED = "METHOD_RESOLUTION_BLOCKED"
 DEPRECATED_ALIAS = "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+CONTRACTS_DIR = "methods/contracts"
+CONTRACT_GLOB = "*.contract.yaml"
 
 
 @dataclass(frozen=True)
@@ -30,17 +32,10 @@ class MethodCatalog:
 
     @classmethod
     def from_spec_root(cls, spec_root: Path) -> "MethodCatalog":
-        contracts: dict[str, dict[str, Any]] = {}
-        for path in sorted((spec_root / "methods" / "contracts").glob("*.contract.yaml")):
-            document = yaml.safe_load(path.read_text(encoding="utf-8"))
-            if not isinstance(document, dict) or not document.get("id"):
-                continue
-            contracts[str(document["id"])] = {
-                "path": str(path.relative_to(spec_root)).replace("\\", "/"),
-                "status": document.get("status"),
-                "version": str(document.get("version", "")),
-            }
-        return cls(label=f"live:{spec_root}", contracts=contracts)
+        # Same "registered" definition as the capability catalog (contract_catalog.py) -- one scan, two resolvers.
+        # The label fingerprints the catalog's content; it never carries the host's absolute path into the ledger.
+        contracts = scan_contract_files(spec_root, CONTRACTS_DIR, CONTRACT_GLOB)
+        return cls(label=catalog_label(CONTRACTS_DIR, contracts), contracts=contracts)
 
     @classmethod
     def empty(cls, label: str) -> "MethodCatalog":
@@ -48,7 +43,7 @@ class MethodCatalog:
 
     def resolve(self, method_ids: list[str]) -> dict[str, Any]:
         """Instance of ``specs/execution/method-resolution.schema.yaml#/method_resolution_result``."""
-        missing = [method_id for method_id in method_ids if self.contracts.get(method_id, {}).get("status") != "ACTIVE"]
+        missing = [method_id for method_id in method_ids if not is_active(self.contracts.get(method_id))]
         if missing:
             return {
                 "candidate_methods": [],

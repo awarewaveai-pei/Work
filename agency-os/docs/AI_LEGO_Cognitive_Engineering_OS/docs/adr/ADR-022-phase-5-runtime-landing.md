@@ -57,7 +57,7 @@ This is the same round-3-unnecessary discipline AGENTS.md's own "同一 reviewer
 | No detected PII reaches the append-only ledger, for any subject | CLOSED | round 2; `PiiLedgerGuard` + `test_no_detected_pii_reaches_the_ledger_for_any_subject` |
 | Program Plan §11 / MVP plan §7 / OQ-3 / TASKS updated | CLOSED | round 1 commit |
 | HCI chapter 17 pointer to this root's internal layout | OPEN | edit deferred: file in flight in a paused session |
-| Capability-contract resolution fail-closed (OQ-P5-1) | OPEN | future Phase 3 capability-contract pass |
+| Capability-contract resolution fail-closed (OQ-P5-1) | CLOSED for the runtime (ADR-023, 2026-09-03); OPEN for the spec root | invocation gate + plan-time honest record live (`ai_lego/platform/ai_execution/capability_resolver.py`, 122 tests); the plan-level BLOCKED transition waits on the three missing `capabilities/contracts/*.capability.yaml` — ADR-023 §Consequences |
 | `REPOSITORY_ARCHITECTURE.md` tree deviations reconciled (OQ-P5-8) | OPEN | recorded honestly in Decision §2 above; next repository-architecture revision |
 
 ## Consequences
@@ -68,4 +68,4 @@ This is the same round-3-unnecessary discipline AGENTS.md's own "同一 reviewer
 
 ## Verification and rollback
 
-Verification: `powershell -ExecutionPolicy Bypass -File Projects\internal\cognitive-engineering-os\scripts\test-phase5-local.ps1` (compile + 99 tests + CLI smoke, with explicit blind-spot reporting via distinct exit codes 0/1/3). Rollback: `git revert` of the landing + hardening commits removes the product root and the Program Plan/OQ-3/MVP-plan/TASKS status lines; no deployed system, database or mother document is touched, so the revert is complete and safe. A later explicit operator decision may move the product root (a `git mv` preserves history) without invalidating any other sub-decision here.
+Verification: `powershell -ExecutionPolicy Bypass -File Projects\internal\cognitive-engineering-os\scripts\test-phase5-local.ps1` (compile + 99 tests at this ADR's date — 122 after ADR-023 — + CLI smoke, with explicit blind-spot reporting via distinct exit codes 0/1/3). Rollback: `git revert` of the landing + hardening commits removes the product root and the Program Plan/OQ-3/MVP-plan/TASKS status lines; no deployed system, database or mother document is touched, so the revert is complete and safe. A later explicit operator decision may move the product root (a `git mv` preserves history) without invalidating any other sub-decision here.

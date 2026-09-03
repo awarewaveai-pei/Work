@@ -1,6 +1,6 @@
 [project]
 name = "cognitive-engineering-os"
-version = "0.4.0"
+version = "0.5.0"
 description = "AI-LEGO Cognitive Engineering OS runtime -- Phase 5 Research Mode vertical slice (synthetic data only)"
 requires-python = ">=3.12"
 dependencies = [

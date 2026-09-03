@@ -1,17 +1,17 @@
 # Phase 5 Research Mode slice — status, evidence, limits
 
-Status: **EXIT-GATE EVIDENCE COMPLETE for the local synthetic scope (2026-09-03, round 2)**. This document is the runtime-side record; the program-side gate state lives in `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md` §11 and `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §7.
+Status: **EXIT-GATE EVIDENCE COMPLETE for the local synthetic scope (2026-09-03, round 2)**; round 3 (same day) closed OQ-P5-1 — capability resolution is now fail-closed (ADR-023, §Round 3 below). This document is the runtime-side record; the program-side gate state lives in `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_OS_Program_Plan_v1.md` §11 and `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §7.
 
 Lineage: three Codex prototype rounds in `D:\tmp\ai-lego-phase5-prototype` (2026-08-31, v0.3.0, 21 tests, single 1220-line file) → ported into this product root by Claude (2026-09-03, round 1) as a modular implementation → adversarially reviewed by 5 independent lens agents reading every file in full against the governing schemas (round 2, same day): 47 findings, all fixed. Round 2's own findings and fixes are the "Round 2 hardening" section below — this file does not silently overwrite round 1's record, it supersedes the specific claims round 2 disproved.
 
-## Evidence (real runs, this machine, 2026-09-03, round 2)
+## Evidence (real runs, this machine, 2026-09-03, round 3)
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit (13 modules, invariants + mutation-style gate/vault/ledger tests) | `python -m unittest discover -s tests/unit -t . -v` | 44 passed |
-| Acceptance, fixture adapters (stdlib tone WAV + declared transcript) | `python -m unittest tests.acceptance.test_research_slice_fixture_mode -v` | 28 passed |
-| Acceptance, real adapters (Windows SAPI speech + offline faster-whisper Medium, CPU int8) | `python -m unittest tests.acceptance.test_research_slice_offline_stt -v` | 27 passed, ~21 s |
-| Full discovery | `python -m unittest discover -s tests -t . -v` | **99 passed** |
+| Unit (15 modules, invariants + mutation-style gate/vault/ledger/resolver tests) | `python -m unittest discover -s tests/unit -t . -v` | 61 passed |
+| Acceptance, fixture adapters (stdlib tone WAV + declared transcript) | `python -m unittest tests.acceptance.test_research_slice_fixture_mode -v` | 31 passed |
+| Acceptance, real adapters (Windows SAPI speech + offline faster-whisper Medium, CPU int8) | `python -m unittest tests.acceptance.test_research_slice_offline_stt -v` | 30 passed, ~22 s |
+| Full discovery | `python -m unittest discover -s tests -t . -v` | **122 passed** (99 after round 2) |
 | One-shot runner (compile + full suite + CLI smoke, distinct exit codes) | `powershell -File scripts\test-phase5-local.ps1` | exit 0, "PASS (fixture AND offline-STT both exercised, zero skips)" |
 | CLI smoke | `python -m ai_lego.apps.cli.run_research_slice --transcription fixture` | `PASS … 28/28 steps, all gates PASS`, Kappa 0.75, CI95 [0.5417, 0.9165], 5/5 substantive gates PASS + 2 R3/R4 gates NOT_APPLICABLE |
 
@@ -50,7 +50,20 @@ Every record names its adapter (`audio_mode`, `transcription_mode`), so fixture 
 
 Full finding-by-finding detail lives in the round-2 review transcript (not committed — session-local); the fixes themselves are the durable record, verified by the 99 real, passing tests above plus 25 new/rewritten tests added specifically because a prior test could not fail for the property it claimed to check (`test_p2_deletion_unlinks_…`, `test_destruction_scope_honestly_reports_…`, `test_gate_failure_aborts_before_…`, `test_terminal_state_guard_actually_refuses_…`, `test_locked_fact_rewrite_is_refused_…`, `test_replay_compares_real_instants_…`, `test_envelope_encryption_is_real_not_decorative`, among others).
 
-## Current limitations (honest scope, unchanged by round 2 — these were never in question)
+## Round 3 (2026-09-03): OQ-P5-1 closed — capability resolution is fail-closed (ADR-023)
+
+Round 2 left one structural asymmetry on the record: method nodes were resolved fail-closed against `methods/contracts/` (criterion 6), capability nodes were not resolved at all — the slice ran `run_statistics` with no check that a contract existed, which is the opposite of MP §7's `Capability Request → Capability Resolver → Policy Engine → AI Gateway` and MP §8.4's "不合法組合在執行前拒絕". Round 3 closes it in `ai_lego/platform/ai_execution/`:
+
+- `contract_catalog.py` — one scan, one definition of "registered" (file exists, declares `id`, `status: ACTIVE`) now shared by `MethodCatalog` and the new `CapabilityCatalog`, so the two resolvers cannot drift.
+- `capability_resolver.py` — `CapabilityCatalog.resolve()` (all-or-nothing, `CAPABILITY_RESOLUTION_BLOCKED`, with a machine-readable `unresolved`/`resolvable` split), `require()`/`invoke()` (the per-invocation gate; the implementation is never reached on an unresolved ref), and `plan_executability()` (classifies unresolved IR nodes by the Recipe's `necessity`: `REQUIRED_*` → `blocking`, others → `not_invocable`).
+- The slice: `run_statistics` is invoked through `invoke` (an empty catalog aborts before `StatisticsCalculated`, before any manifest/result write — proven by a mutation test in both adapter modes); all four IR capability refs are resolved after `MethodResolved` and the verdict is a ledger event (`CapabilityResolutionBlocked` on today's spec root) plus `result["capability_resolution"]`.
+- **What is honestly still open**: the plan-level `BLOCKED` transition (a plan with `executable: false` must not reach `PLAN_COMPILED`) is decided but not wired, because on the live spec root it would stop this slice until `transcribe`/`literature_search`/`artifact.generate_research_paper` get contracts — spec-root work with its own owner. The acceptance expectation is computed from the contract files on disk, so it flips the day they land. Ingest transcription (ports, before the goal is compiled) and the harness's synthetic memo are not capability invocations and are not claimed as such; both are named in ADR-023 §Decision 4 as candidates to re-home behind `invoke` once contracted.
+
+**Same-day independent review, two passes** (one critic agent each; pass 1: 0 critical / 2 major / 8 minor; pass 2 on the fixed code: 0 / 2 / 5 — all fixed, itemised in ADR-023 §Independent review, pass 2 preceded by the invariant analysis this repo requires when the same code draws findings twice): the plan verdict now also reaches the manifest `results` block and a CLI `WARN:` line (it had lived only in a nested result field while manifest and CLI said an unqualified PASS); capability-like work done outside the plane is declared in code (`OUTSIDE_CAPABILITY_PLANE`), recorded per run unconditionally, and guarded by a self-expiring check (`CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED`) that runs before the runtime directory is prepared or any adapter runs — pass 2 found it originally fired *after* ingest had already written events; `plan_executability` refuses a resolution that does not cover the IR; the shared catalog scan refuses duplicate ids, unreadable files and case-insensitive glob hits, and fingerprints every file's content (an in-place edit without a version bump changes the label); audit/manifest carry the contract version that ran and the capability invocation has its own invocation id; catalog labels are content fingerprints for both catalogs, not host paths; `invoked` is the catalog's own log.
+
+Mutation evidence on the final code: forcing `contract_catalog.is_active` to return true turns `test_empty_catalog_blocks_the_request_…`, `test_live_catalog_reports_exactly_the_recipe_refs_…` and the acceptance mutation test red; disabling the coverage guard turns `test_a_resolution_that_does_not_cover_every_ir_capability_node_is_refused` red; disabling the bypass guard lets a run with a newly contracted `transcribe` create its runtime directory (restored: it raises before the directory exists — now pinned by `test_an_expired_bypass_declaration_refuses_to_start_before_any_side_effect`); restored → 122/122 green.
+
+## Current limitations (honest scope, unchanged by rounds 2–3 — these were never in question)
 
 - **Key management**: an in-process AES-256-GCM model with a JSON file, now with genuine envelope encryption (round 2), but still not a KMS, not hardware-backed, no proof against RAM/disk forensics or filesystem snapshots. The tenant KEK is itself persisted in the same local file as the wrapped DEKs it protects — a production deployment needs the KEK in a real KMS/HSM whose unwrap authorization can be revoked independently (OQ-P5-7).
 - **Source-media erasure** is `PLAIN_UNLINK_SYNTHETIC_SCOPE`; `physical_sanitization_claimed: false`. The cross-store sequence (vault → CAS → fixture file → transcription cache) is not an atomic transaction; a failure mid-way raises `SOURCE_AUDIO_ERASURE_PARTIAL`.
@@ -59,14 +72,14 @@ Full finding-by-finding detail lives in the round-2 review transcript (not commi
 - **Coding stages**: coder 2, the CategorySet, ThemeSet and SaturationAssessment are synthetic fixtures shaped to the method contract; they prove the gate mechanics, not research quality. `saturated: false` is recorded, not asserted otherwise.
 - **State machine** stops at `VERIFYING`; release states are outside a local synthetic run.
 - **Statistics**: 48 synthetic units; the Kappa acceptance threshold stays `OPERATOR_SET_PENDING` per the capability contract.
-- **Recipe nodes not executed by this slice**: `literature_search`, `evidence.triangulation`, `artifact.generate_research_paper` are compiled into the IR (so resolution is real) but the slice's memo is its own minimal artifact step.
+- **Recipe nodes not executed by this slice**: `literature_search`, `evidence.triangulation`, `artifact.generate_research_paper` are compiled into the IR (so resolution is real) but the slice's memo is its own minimal artifact step. Since round 3 this is machine-recorded, not just prose: `result["capability_resolution"]` lists what was invoked through the gate (`run_statistics`, from the catalog's own observation log), what was performed *outside* the capability plane and declared as such (`transcribe` — ingest through the Transcriber port before the goal is compiled; the harness memo standing in for `artifact.generate_research_paper`), what nothing performs (`literature_search`), and the plan-time verdict for all four refs (`fully_resolved: false`, `executable: false` on today's spec root; also in the manifest `results` block and as a CLI `WARN:` line — see §Round 3 and ADR-023).
 - **The R3/R4 mandatory gates are `NOT_APPLICABLE`, not exercised**: a local synthetic slice has no human specialist reviewer and no rehearsed recovery run to genuinely PASS them against.
 
 ## Open questions surfaced by the port (OQ-P5-*)
 
 | ID | Question | Owner |
 |---|---|---|
-| OQ-P5-1 | `transcribe`, `literature_search`, `artifact.generate_research_paper` have no `capabilities/contracts/*.capability.yaml`; only `run_statistics` does. Should capability resolution fail-closed like method resolution (MP L45 red line covers methods only)? | operator / next Phase 3 capability-contract pass |
+| OQ-P5-1 | **DECIDED 2026-09-03 — `docs/adr/ADR-023-capability-resolution-fail-closed.md`.** Yes: same "registered" definition as methods (shared scan), `CAPABILITY_RESOLUTION_BLOCKED`, fail-closed at invocation now (`CapabilityCatalog.invoke`), plan-time verdict recorded now. Remaining, all spec-root: author the three missing contracts; register the status code; add/generalize a resolution schema; then wire the plan-level BLOCKED transition. | spec-root maintainer / next Phase 3 capability-contract pass (contracts + registration); runtime wires the transition once they exist |
 | OQ-P5-2 | Which primary state a run should end in for a local synthetic slice (this slice stops at `VERIFYING`). | operator |
 | OQ-P5-3 | Transcript `provenance_record` authorship for real STT output is `AI_GENERATED`; for the fixture adapter `SOURCE_QUOTATION`. Is a dedicated value for machine transcription warranted in `epistemic-label.schema.yaml`? | future ADR |
 | OQ-P5-4 | A production deletion needs durable transactional/outbox recovery across vault, CAS, media and caches; the slice raises `SOURCE_AUDIO_ERASURE_PARTIAL` instead. | Phase 6+ |

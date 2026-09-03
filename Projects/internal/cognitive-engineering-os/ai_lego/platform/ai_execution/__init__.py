@@ -1,1 +1,1 @@
-"""AI execution runtime pieces (`/platform/ai-execution`, EC §95): method resolution, manifest, deletion contract."""
+"""AI execution runtime pieces (`/platform/ai-execution`, EC §95): method + capability resolution (both fail-closed), manifest, deletion contract."""

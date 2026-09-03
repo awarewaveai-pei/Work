@@ -21,11 +21,13 @@ from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.gates import GATE_ORDER
 from ai_lego.modules.research.synthetic_fixtures import P2_SYNTHETIC_PII_VALUES
+from ai_lego.platform.ai_execution.capability_resolver import CAPABILITY_RESOLUTION_BLOCKED
 from ai_lego.platform.ai_execution.deletion import DELETION_STEPS
 from ai_lego.platform.ai_execution.mandatory_gates import HIGH_RISK_GATE_IDS
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED
 from ai_lego.platform.ai_execution.replay import project
 from ai_lego.security.key_vault.local_key_vault import LocalKeyVault
+from tests.support import active_contract_on_disk
 
 REDACTED_PII = {"name": "REDACTED", "employer": "REDACTED", "city": "REDACTED"}
 PRIMARY_PATH = ["RECEIVED", "DOCUMENTS_RESOLVED", "CURRENT_STATE_ESTABLISHED", "RISK_CLASSIFIED", "BLOCKED", "METHODS_RESOLVED", "PLAN_COMPILED", "ROLLBACK_VALIDATED", "APPROVED", "EXECUTING", "VERIFYING"]
@@ -114,6 +116,96 @@ class SliceCriteriaMixin:
         self.assertEqual([item["method_id"] for item in resolution["resolved"]["candidate_methods"]], ["evidence.triangulation", "research.qualitative_coding"])
         kinds = [event["event_type"] for event in self._events()]
         self.assertLess(kinds.index("MethodResolutionBlocked"), kinds.index("MethodResolved"))
+
+    # --- ADR-023: capability resolution -- honest at plan time, fail-closed at invocation ----------------------------
+    def test_capability_resolution_is_honest_at_plan_time_and_the_only_invocation_went_through_the_gate(self):
+        from ai_lego import resolve_spec_root
+
+        record = self.result["capability_resolution"]
+        self.assertEqual(record["refs"], ["transcribe", "literature_search", "run_statistics", "artifact.generate_research_paper"])
+        # Independent oracle computed from the spec root (file exists AND status ACTIVE): it moves with the contracts.
+        contracts_dir = resolve_spec_root() / "capabilities" / "contracts"
+        expected_unresolved = [ref for ref in record["refs"] if not active_contract_on_disk(contracts_dir, ref)]
+        resolution = record["resolution"]
+        if expected_unresolved:
+            self.assertEqual(resolution["blocked"]["status"], CAPABILITY_RESOLUTION_BLOCKED)
+            self.assertEqual(resolution["blocked"]["unresolved"], expected_unresolved)
+            self.assertEqual(resolution["blocked"]["resolvable"], [ref for ref in record["refs"] if ref not in expected_unresolved])
+            self.assertEqual(resolution["candidate_capabilities"], [])
+        else:
+            self.assertIsNone(resolution["blocked"])
+        executability = record["plan_executability"]
+        self.assertEqual(executability["fully_resolved"], not expected_unresolved)
+        required_unresolved = [
+            node["ref"]
+            for node in self.result["workflow_ir"]["nodes"]
+            if node["node_kind"] == "capability" and node["ref"] in expected_unresolved and node.get("necessity", "RECOMMENDED").startswith("REQUIRED_")
+        ]
+        self.assertEqual([entry["ref"] for entry in executability["blocking"]], required_unresolved)
+        self.assertEqual(executability["executable"], not required_unresolved)
+        # What went through the gate is the catalog's own observation log, not a literal the slice wrote.
+        self.assertEqual([entry["ref"] for entry in record["invoked"]], ["run_statistics"])
+        self.assertEqual(record["invoked"][0]["path"], "capabilities/contracts/run_statistics.capability.yaml")
+        self.assertEqual(record["invoked"][0]["version"], "1.0.0")
+        # Capability-like work done outside the plane is declared, and every declared ref is genuinely uncontracted.
+        outside = record["performed_outside_capability_plane"]
+        self.assertEqual(set(outside), {"transcribe", "artifact.generate_research_paper"})
+        self.assertTrue(set(outside) <= set(expected_unresolved), "a declared bypass must not survive its ref gaining a contract")
+        self.assertEqual(record["not_performed"], [ref for ref in record["refs"] if ref not in {"run_statistics", *outside}])
+        # The verdict reaches the authoritative outputs (manifest results block, audit record), not only a nested field.
+        manifest_results = self.result["manifest"]["results"]
+        self.assertEqual(manifest_results["capability_plan_executable"], executability["executable"])
+        self.assertEqual(manifest_results["capability_plan_fully_resolved"], executability["fully_resolved"])
+        self.assertEqual(manifest_results["unresolved_capabilities"], expected_unresolved)
+        self.assertEqual(self.result["audit"]["capability_version"], "1.0.0")
+        statistics_log = next(entry for entry in self.result["manifest"]["method_execution_log"] if entry["block_id"] == "run_statistics")
+        self.assertEqual((statistics_log["capability_version"], statistics_log["method_version"], statistics_log["contract_path"]), ("1.0.0", "1.0.0", "capabilities/contracts/run_statistics.capability.yaml"))
+        self.assertNotEqual(statistics_log["execution_id"], self.result["manifest"]["execution"]["execution_id"], "an invocation id is not the execution id")
+        self.assertRegex(statistics_log["contract_sha256"], r"^[0-9a-f]{64}$")
+        # No host path in the append-only ledger: BOTH catalog labels are content fingerprints.
+        self.assertRegex(record["catalog"], r"^live:capabilities/contracts@[0-9a-f]{12}$")
+        events = self._events()
+        method_resolved = next(event for event in events if event["event_type"] == "MethodResolved")
+        self.assertRegex(method_resolved["payload"]["catalog"], r"^live:methods/contracts@[0-9a-f]{12}$")
+        kinds = [event["event_type"] for event in events]
+        resolution_event = "CapabilityResolutionBlocked" if expected_unresolved else "CapabilitiesResolved"
+        self.assertLess(kinds.index("MethodResolved"), kinds.index(resolution_event))
+        self.assertLess(kinds.index(resolution_event), kinds.index("StatisticsCalculated"))
+        published = next(event for event in events if event["event_type"] == "ArtifactPublished")
+        self.assertIs(published["payload"]["contract_backed"], False)
+
+    def test_an_expired_bypass_declaration_refuses_to_start_before_any_side_effect(self):
+        """The day a declared out-of-plane ref gains an ACTIVE contract, the run must abort BEFORE the runtime dir or ingest exist."""
+        from ai_lego.apps.cli.run_research_slice import OUTSIDE_CAPABILITY_PLANE, SliceConfig, run_research_slice
+        from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
+
+        newly_contracted = next(iter(OUTSIDE_CAPABILITY_PLANE))
+        contracted = CapabilityCatalog(label="mutation:bypass-ref-now-contracted", contracts={newly_contracted: {"path": "synthetic", "status": "ACTIVE", "version": "1.0.0"}})
+        with tempfile.TemporaryDirectory(prefix="ai-lego-bypass-expired-") as tmp:
+            runtime = Path(tmp) / "runtime"
+            with mock.patch.object(CapabilityCatalog, "from_spec_root", classmethod(lambda cls, spec_root: contracted)):
+                with self.assertRaisesRegex(InvariantViolation, f"CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED: {newly_contracted}"):
+                    run_research_slice(SliceConfig(runtime_dir=runtime, transcription="fixture", review="fixture"))
+            self.assertFalse(runtime.exists(), "the guard must fire before the runtime directory is even prepared")
+
+    def test_uncontracted_capability_invocation_aborts_before_statistics_or_any_manifest_is_written(self):
+        """Mutation: an empty capability catalog must stop the run at the invocation gate, never degrade to computing anyway."""
+        from ai_lego.apps.cli.run_research_slice import SliceConfig, run_research_slice
+        from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
+
+        with tempfile.TemporaryDirectory(prefix="ai-lego-cap-block-") as tmp:
+            runtime = Path(tmp) / "runtime"
+            empty_catalog = classmethod(lambda cls, spec_root: cls.empty("mutation:empty-capability-catalog"))
+            with mock.patch.object(CapabilityCatalog, "from_spec_root", empty_catalog):
+                with self.assertRaisesRegex(InvariantViolation, "CAPABILITY_RESOLUTION_BLOCKED.*run_statistics"):
+                    run_research_slice(SliceConfig(runtime_dir=runtime, transcription="fixture", review="fixture"))
+            events = [json.loads(line) for line in (runtime / "data" / "events" / "ledger.jsonl").read_text(encoding="utf-8").splitlines()]
+            kinds = [event["event_type"] for event in events]
+            self.assertIn("CapabilityResolutionBlocked", kinds)
+            self.assertNotIn("StatisticsCalculated", kinds)
+            self.assertFalse((runtime / "results" / "slice_result.json").exists())
+            self.assertFalse((runtime / "artifacts" / "research_memo.md").exists())
+            self.assertFalse((runtime / "platform" / "execution" / "manifest.json").exists())
 
     def test_state_machine_path_is_the_legal_no_skip_sequence(self):
         path = [transition["to_state"] for transition in self.result["state_transitions"]]
