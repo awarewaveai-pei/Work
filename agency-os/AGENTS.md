@@ -185,6 +185,17 @@
 - 第三輪（現況）修完上述，且回歸測試套件本身也被 mutation test 驗證過（拔掉 guard 後測試真的會失敗，不是空測試）。
 - **這條教訓本身也適用於治理紀律，且套用了兩層**：① 同一份程式碼被同一個 reviewer 連續抓到兩輪問題時，第三次修正前必須先做不變量分析（R0「補丁判準」）；② **驗證程序本身也要接受同一套紀律**——「每項都用真實 spawn 驗證」這句話在 v3 寫下時是對 Agent 路徑講的真話，套用到 Workflow 路徑就是自我宣稱未經檢驗；發現即改寫，不維持錯的宣稱。
 
+**禁止樣態（操作者明訂，2026-09-03，機械閘擋不到的情況直接寫死規則）**：
+
+**禁止**：對一批 N 個項目（finding／ADR／檔案／任何清單）逐項各自配一個或多個 agent 處理或驗證（1:N 或 1:2N 映射）。這個寫法的 agent 總數會隨 N 線性放大，且 `subagent-budget.js` 的 Workflow 分支**擋不到**——真實數量是腳本執行到一半才算出來的（例如「5 個 reviewer 產出 47 個 finding」），呼叫 Workflow 那一刻根本不知道 N 是多少，事先聲明的 `SUBAGENT-BUDGET-ESTIMATE` 防不了這種動態爆量。
+
+**真實案例（2026-09-03，另一 session，Cognitive Engineering OS Phase 5 覆審）**：5 個 reviewer 產出 47 個 finding，設計成每個 finding 配 2 個 refuter 驗證 → 總數衝到 99 個 agent，94 個因 session limit 全部失敗，5 小時額度燒光。閘本身沒壞，是**腳本設計違反這條規則**。
+
+**正確做法（唯一允許的模式）**：
+1. 單一 artifact（一份文件／一段程式碼／一批相關修改）的**修改工作，自己動手做一次**，不分派給 agent
+2. 改完後，若需要獨立覆核，派 **≤5 個**獨立 agent 做覆審（特殊情況才到 10），**覆審的對象是「整批改完的結果」，不是「每個finding／每個item各自一個agent」**
+3. 真正大量、彼此獨立、可切割的工作（例如 27 個真的互不相依的檔案）→ 分批塞進 ≤10 個 agent，每個 agent 一次處理多項（見上方路徑 A 的批次原則），**絕對不是一項配一個 agent**
+
 ## 執行安全
 
 不做不可逆破壞操作；生產環境先列風險與 rollback 方案；客戶新增需求先判定 `docs/operations/scope-change-policy.md`。
@@ -463,5 +474,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-02 14:30:03 UTC_
+_Last synced: 2026-09-03 14:30:03 UTC_
 
