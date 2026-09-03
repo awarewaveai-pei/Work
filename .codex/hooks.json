@@ -1,4 +1,5 @@
 {
+  "description": "Codex project hook bridge. It executes the canonical Claude-first runner from the repository git root; no hook code is copied under .codex/.",
   "hooks": {
     "PreToolUse": [
       {
@@ -6,7 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' PreToolUse",
+            "command": "node \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/runner.js\" PreToolUse",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & node (Join-Path $root 'mcp\\claude-userlevel\\hooks\\runner.js') PreToolUse\"",
             "timeout": 60
           }
         ]
@@ -18,7 +20,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' PostToolUse",
+            "command": "node \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/runner.js\" PostToolUse",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & node (Join-Path $root 'mcp\\claude-userlevel\\hooks\\runner.js') PostToolUse\"",
             "timeout": 90
           }
         ]
@@ -30,7 +33,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' SessionStart",
+            "command": "node \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/runner.js\" SessionStart",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & node (Join-Path $root 'mcp\\claude-userlevel\\hooks\\runner.js') SessionStart\"",
             "timeout": 15
           }
         ]
@@ -41,12 +45,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File 'D:\\Work\\.codex\\hooks\\ao-resume-on-prompt.ps1'",
+            "command": "pwsh -NoProfile -File \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & (Join-Path $root 'mcp\\claude-userlevel\\hooks\\ao-resume-on-prompt.ps1')\"",
             "timeout": 1200
           },
           {
             "type": "command",
-            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' UserPromptSubmit",
+            "command": "node \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/runner.js\" UserPromptSubmit",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & node (Join-Path $root 'mcp\\claude-userlevel\\hooks\\runner.js') UserPromptSubmit\"",
             "timeout": 15
           }
         ]
@@ -57,8 +63,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node 'D:\\Work\\.codex\\hooks\\runner.js' Stop",
+            "command": "node \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/runner.js\" Stop",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & node (Join-Path $root 'mcp\\claude-userlevel\\hooks\\runner.js') Stop\"",
             "timeout": 300
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/mcp/claude-userlevel/hooks/runner.js\" SubagentStart",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; & node (Join-Path $root 'mcp\\claude-userlevel\\hooks\\runner.js') SubagentStart\"",
+            "timeout": 15
           }
         ]
       }
