@@ -472,6 +472,28 @@ if (Test-Path -LiteralPath $claudeUserlevelSync) {
     $global:LASTEXITCODE = 0
 }
 
+# --- Codex Claude-first bridge alignment (same source, no copied workflows) ---
+# The generator writes only thin repo skill/native-agent bridges and removes
+# verified legacy duplicates after backup. Source edits themselves are live,
+# but new/renamed Claude assets need this deterministic discovery step.
+$codexBridgeSync = Join-Path $WorkRoot "mcp\codex-userlevel\scripts\sync-claude-to-codex.ps1"
+$codexParityCheck = Join-Path $WorkRoot "mcp\codex-userlevel\scripts\check-claude-codex-parity.ps1"
+$codexHome = Join-Path $env:USERPROFILE ".codex"
+if ((Test-Path -LiteralPath $codexBridgeSync) -and (Test-Path -LiteralPath $codexHome)) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: Codex Claude-first bridge sync (auto) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $codexBridgeSync -WorkRoot $WorkRoot -Mode linked
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: Codex bridge sync returned non-zero; generated bridges may be stale." -ForegroundColor Yellow
+    } elseif (Test-Path -LiteralPath $codexParityCheck) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $codexParityCheck -WorkRoot $WorkRoot
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "WARN: Codex bridge parity check failed after sync; inspect the named checks above." -ForegroundColor Yellow
+        }
+    }
+    $global:LASTEXITCODE = 0
+}
+
 Write-Host "== AO-RESUME: preflight auto-fix ==" -ForegroundColor Cyan
 
 # Health gate exit code: populated if any health gate fails; ao-resume continues to generate ALL

@@ -122,6 +122,15 @@ if (Test-Path -LiteralPath $syncCodexUserlevel) {
     if ($LASTEXITCODE -ne 0) {
         throw "sync-claude-to-codex.ps1 failed (exit $LASTEXITCODE)"
     }
+
+    $checkCodexParity = Join-Path $WorkspaceRoot "mcp\codex-userlevel\scripts\check-claude-codex-parity.ps1"
+    if (Test-Path -LiteralPath $checkCodexParity) {
+        Write-Host "Verifying Claude/Codex bridge parity (names and structure only)..." -ForegroundColor Green
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkCodexParity -WorkRoot $WorkspaceRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw "check-claude-codex-parity.ps1 failed (exit $LASTEXITCODE)"
+        }
+    }
 }
 
 Write-Host ""

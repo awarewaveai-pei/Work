@@ -12,4 +12,17 @@
 #   tests/hooks/maintenance-scripts.test.mjs — rotate-worklog + checkpoint-junk-guard
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-node --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs
+
+if command -v node >/dev/null 2>&1; then
+  NODE_BIN="$(command -v node)"
+elif command -v node.exe >/dev/null 2>&1; then
+  NODE_BIN="$(command -v node.exe)"
+elif [[ -x /mnt/c/Program\ Files/nodejs/node.exe ]]; then
+  # WSL often inherits Windows Node without placing it on PATH.
+  NODE_BIN="/mnt/c/Program Files/nodejs/node.exe"
+else
+  echo "ERROR: Node.js >= 18 was not found (tried node, node.exe, and the standard WSL Windows install)." >&2
+  exit 127
+fi
+
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs

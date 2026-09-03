@@ -133,6 +133,18 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/runner.js SubagentStart",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

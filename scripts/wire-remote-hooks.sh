@@ -55,6 +55,9 @@ cat > "$TARGET" <<JSON
     ],
     "SessionStart": [
       { "matcher": "startup|resume", "hooks": [ { "type": "command", "command": "node \"$RUNNER\" SessionStart", "timeout": 15 } ] }
+    ],
+    "SubagentStart": [
+      { "matcher": ".*", "hooks": [ { "type": "command", "command": "node \"$RUNNER\" SubagentStart", "timeout": 15 } ] }
     ]
   }
 }
