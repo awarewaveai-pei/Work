@@ -1,0 +1,87 @@
+"""Method resolution against the Method Atlas contract catalog (EC §14) + state transitions (EC §10).
+
+Red line (Master Plan L45): a method that is not registered MUST block
+execution (``METHOD_RESOLUTION_BLOCKED``) -- an LLM may never improvise it
+from narrative. The catalog is built by scanning the spec root's real
+``methods/contracts/*.contract.yaml`` files, so "registered" means "a contract
+file exists and is ACTIVE", not "a name appears in a list".
+
+``PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`` is the Master Plan's wording for
+the same signal; ``specs/execution/status-codes.schema.yaml`` makes it a
+deprecated alias of the canonical ``METHOD_RESOLUTION_BLOCKED``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+METHOD_RESOLUTION_BLOCKED = "METHOD_RESOLUTION_BLOCKED"
+DEPRECATED_ALIAS = "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+
+
+@dataclass(frozen=True)
+class MethodCatalog:
+    label: str
+    contracts: dict[str, dict[str, Any]]
+
+    @classmethod
+    def from_spec_root(cls, spec_root: Path) -> "MethodCatalog":
+        contracts: dict[str, dict[str, Any]] = {}
+        for path in sorted((spec_root / "methods" / "contracts").glob("*.contract.yaml")):
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+            if not isinstance(document, dict) or not document.get("id"):
+                continue
+            contracts[str(document["id"])] = {
+                "path": str(path.relative_to(spec_root)).replace("\\", "/"),
+                "status": document.get("status"),
+                "version": str(document.get("version", "")),
+            }
+        return cls(label=f"live:{spec_root}", contracts=contracts)
+
+    @classmethod
+    def empty(cls, label: str) -> "MethodCatalog":
+        return cls(label=label, contracts={})
+
+    def resolve(self, method_ids: list[str]) -> dict[str, Any]:
+        """Instance of ``specs/execution/method-resolution.schema.yaml#/method_resolution_result``."""
+        missing = [method_id for method_id in method_ids if self.contracts.get(method_id, {}).get("status") != "ACTIVE"]
+        if missing:
+            return {
+                "candidate_methods": [],
+                "blocked": {
+                    "status": METHOD_RESOLUTION_BLOCKED,
+                    "reason": f"no ACTIVE contract in catalog {self.label} for: {', '.join(missing)}",
+                },
+            }
+        return {
+            "candidate_methods": [
+                {"method_id": method_id, "score": None, "rationale": f"ACTIVE contract {self.contracts[method_id]['path']} v{self.contracts[method_id]['version']}"}
+                for method_id in method_ids
+            ],
+            "blocked": None,
+        }
+
+
+def state_transition(
+    from_state: str | None,
+    to_state: str,
+    transitioned_at: str,
+    execution_id: str,
+    trigger_signal: str | None = None,
+    gate_results: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Instance of ``specs/execution/execution-state-machine.schema.yaml#/state_transition_event``."""
+    event: dict[str, Any] = {
+        "from_state": from_state,
+        "to_state": to_state,
+        "transitioned_at": transitioned_at,
+        "execution_id": execution_id,
+        "trigger_signal": trigger_signal,
+    }
+    if gate_results:
+        event["gate_results"] = gate_results
+    return event

@@ -1,0 +1,162 @@
+"""Open / axial / selective coding outputs for ``research.qualitative_coding`` (Strauss & Corbin).
+
+Produces the three stage outputs the method contract requires -- CodeSet
+(open), CategorySet (axial), ThemeSet (selective) -- in that order, plus a
+``SaturationAssessment`` record. Every output object carries a
+``provenance_record`` so the Authorship Gate has something real to check.
+
+``epistemic_type`` on a locked code is an explicit human assertion (the
+review records whether the human is confirming a directly-quoted
+SOURCE_FACT), never derived from the lock action itself -- the schema makes
+SOURCE_FACT a *precondition* of LOCKED_FACT, not a consequence of locking.
+
+Coder 2 is a synthetic fixture standing in for an independent second human
+coder; its objects are flagged ``synthetic_fixture: true``.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from ai_lego.core.domain.provenance import make_provenance
+from ai_lego.modules.research.synthetic_fixtures import (
+    CATEGORY_OF_LABEL,
+    CODER_ONE_PENDING_AI_LABELS,
+    CODER_TWO_LABELS,
+    SYNTHETIC_TRANSCRIPTS,
+    THEMES_V11,
+)
+
+STAGE_SEQUENCE = ["open_coding", "axial_coding", "selective_coding"]
+PENDING_CATEGORY = "pending_axial_review"
+
+_HUMAN_AUTHORSHIP = {"ACCEPT": "HUMAN_APPROVED", "ACCEPT_AND_LOCK": "HUMAN_APPROVED", "EDIT": "HUMAN_EDITED"}
+
+
+def code_from_review(review: dict[str, Any], code_id: str, coder_id: str = "CODER-1") -> dict[str, Any] | None:
+    """An AI suggestion after human review; None when the human rejected it.
+
+    ``review["asserted_epistemic_type"]`` (defaulting to ``AI_INFERENCE``) is
+    the human's own assertion for a locked code, per the schema's
+    SOURCE_FACT-is-a-precondition-of-LOCKED_FACT direction; the reviewer, not
+    the lock keypress, decides what kind of claim this is.
+    """
+    action = review["action"]
+    if action == "REJECT":
+        return None
+    locked = "LOCKED_FACT" if action == "ACCEPT_AND_LOCK" else None
+    epistemic_type = review.get("asserted_epistemic_type") or "AI_INFERENCE"
+    if locked == "LOCKED_FACT" and epistemic_type != "SOURCE_FACT":
+        raise ValueError(f"LOCK_REQUIRES_SOURCE_FACT: cannot lock {code_id} as {epistemic_type}")
+    return {
+        "code_id": code_id,
+        "coder_id": coder_id,
+        "source_id": review["source_id"],
+        "quote": review["quote"],
+        "label": review["result_label"],
+        "provenance": make_provenance(epistemic_type, _HUMAN_AUTHORSHIP[action], locked),
+        "human_action": action,
+        "originated_as": review["suggestion_id"],
+    }
+
+
+def _quote_for(source_id: str) -> str:
+    return next(entry["quote"] for entry in SYNTHETIC_TRANSCRIPTS if entry["source_id"] == source_id)
+
+
+def assemble_coding_outputs(locked_code: dict[str, Any], ai_review: dict[str, Any], at: str) -> dict[str, Any]:
+    reviewed = code_from_review(ai_review, "CODE-C1-002")
+    coder_one: list[dict[str, Any]] = [locked_code]
+    rejected: list[dict[str, Any]] = []
+    if reviewed is None:
+        rejected.append({**ai_review, "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED")})
+    else:
+        coder_one.append(reviewed)
+    for index, (source_id, label) in enumerate(sorted(CODER_ONE_PENDING_AI_LABELS.items()), start=3):
+        coder_one.append(
+            {
+                "code_id": f"CODE-C1-{index:03d}",
+                "coder_id": "CODER-1",
+                "source_id": source_id,
+                "quote": _quote_for(source_id),
+                "label": label,
+                "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED"),
+                "human_action": None,
+            }
+        )
+    coder_two = [
+        {
+            "code_id": f"CODE-C2-{index:03d}",
+            "coder_id": "CODER-2-SYNTHETIC",
+            "source_id": source_id,
+            "quote": _quote_for(source_id),
+            "label": label,
+            "provenance": make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL"),
+            "human_action": "ORIGINAL",
+            "synthetic_fixture": True,
+        }
+        for index, (source_id, label) in enumerate(sorted(CODER_TWO_LABELS.items()), start=1)
+    ]
+
+    all_codes = coder_one + coder_two
+    categories: dict[str, dict[str, Any]] = {}
+    for code in all_codes:
+        category_label = CATEGORY_OF_LABEL.get(code["label"], PENDING_CATEGORY)
+        category = categories.setdefault(
+            category_label,
+            {"category_id": f"CAT-{category_label}", "label": category_label, "code_ids": [], "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")},
+        )
+        category["code_ids"].append(code["code_id"])
+    category_set = sorted(categories.values(), key=lambda item: item["category_id"])
+
+    themes = []
+    for index, (theme_label, category_labels) in enumerate(THEMES_V11, start=1):
+        category_ids = [f"CAT-{label}" for label in category_labels if f"CAT-{label}" in {c["category_id"] for c in category_set}]
+        code_ids = [code_id for category in category_set if category["category_id"] in category_ids for code_id in category["code_ids"]]
+        themes.append({"theme_id": f"THEME-{index}", "label": theme_label, "category_ids": category_ids, "code_ids": code_ids, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")})
+    if PENDING_CATEGORY in categories:
+        themes.append(
+            {
+                "theme_id": f"THEME-{len(themes) + 1}",
+                "label": PENDING_CATEGORY,
+                "category_ids": [f"CAT-{PENDING_CATEGORY}"],
+                "code_ids": categories[PENDING_CATEGORY]["code_ids"],
+                "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED"),
+            }
+        )
+
+    saturation_assessment = {
+        "assessment_id": "SAT-1",
+        "criterion": "theoretical_saturation",
+        "citation": "Glaser & Strauss (1967); Strauss & Corbin (1990/1998) Ch. 12",
+        "units_assessed": len(SYNTHETIC_TRANSCRIPTS),
+        "new_codes_in_last_unit": 1,
+        "saturated": False,
+        "threshold_data_units": None,
+        "threshold_status": "OPERATOR_SET_PENDING",
+        "rationale": "Four synthetic interviews cannot demonstrate saturation; the last unit still introduced a new code. Recorded, not asserted.",
+        "assessed_at": at,
+        "provenance": make_provenance("HUMAN_OPINION", "HUMAN_APPROVED"),
+    }
+    return {
+        "stage_sequence": list(STAGE_SEQUENCE),
+        "coder_1": {"coder_id": "CODER-1", "code_set": coder_one},
+        "coder_2": {"coder_id": "CODER-2-SYNTHETIC", "code_set": coder_two, "synthetic_fixture": True},
+        "rejected": rejected,
+        "category_set": category_set,
+        "theme_set": {"prompt_version": 11, "themes": themes},
+        "saturation_assessment": saturation_assessment,
+    }
+
+
+def build_v12_over_merged_theme_set(coding_outputs: dict[str, Any]) -> list[dict[str, Any]]:
+    """A real (deliberately degraded) v12 variant: all categories collapsed into one over-merged theme.
+
+    This is what makes PromptVersionRollback a genuine state change to
+    reverse, rather than an event whose payload is never read (the recipe's
+    'over-merged themes' failure mode, produced honestly rather than
+    asserted as a literal string).
+    """
+    category_ids = [category["category_id"] for category in coding_outputs["category_set"]]
+    code_ids = [code_id for category in coding_outputs["category_set"] for code_id in category["code_ids"]]
+    return [{"theme_id": "THEME-V12-1", "label": "over_merged_all_categories", "category_ids": category_ids, "code_ids": code_ids, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")}]

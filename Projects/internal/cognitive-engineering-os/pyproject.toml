@@ -1,0 +1,19 @@
+[project]
+name = "cognitive-engineering-os"
+version = "0.4.0"
+description = "AI-LEGO Cognitive Engineering OS runtime -- Phase 5 Research Mode vertical slice (synthetic data only)"
+requires-python = ">=3.12"
+dependencies = [
+  "PyYAML>=6.0",
+  "jsonschema>=4.18",
+  "referencing>=0.30",
+  "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+# Real local speech-to-text path (Windows SAPI speech + cached faster-whisper Medium).
+# Never downloads a model; see ai_lego/modules/knowledge/ingest/transcription.py.
+offline-stt = ["faster-whisper>=1.0"]
+
+[tool.setuptools.packages.find]
+include = ["ai_lego*"]

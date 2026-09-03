@@ -1,0 +1,7 @@
+# Runtime artefacts (the slice writes to a temp dir by default; .runtime/ is the only in-repo location it accepts)
+.runtime/
+# Python build/test residue
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/

@@ -1,0 +1,82 @@
+"""Tenant-scoped content-addressed storage (ADR-003 Sub-decision (b) Option A).
+
+Path grammar is owned by ``specs/artifact/cas-path.schema.yaml``:
+``/objects/<tenant_id>/sha256/<aa>/<bb>/<hash>``. Two tenants storing
+byte-identical content get two different paths, and a tenant can only read,
+list or unlink objects inside its own namespace -- enforced by path
+containment, not by convention.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from ai_lego.core.support import sha256_bytes
+from ai_lego.errors import InvariantViolation
+
+
+class TenantScopedCas:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def _tenant_root(self, tenant_id: str) -> Path:
+        return (self.root / "objects" / tenant_id).resolve()
+
+    def _resolve_owned(self, tenant_id: str, cas_path: dict[str, str]) -> Path:
+        if cas_path.get("tenant_segment") != tenant_id:
+            raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")
+        target = (self.root / Path(cas_path["path"].lstrip("/"))).resolve()
+        if self._tenant_root(tenant_id) not in target.parents:
+            raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")
+        return target
+
+    def put(self, tenant_id: str, content: bytes) -> dict[str, str]:
+        digest = sha256_bytes(content)
+        relative = Path("objects") / tenant_id / "sha256" / digest[:2] / digest[2:4] / digest
+        target = self.root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        return {
+            "path": "/" + relative.as_posix(),
+            "tenant_segment": tenant_id,
+            "hash": digest,
+            "shard_1": digest[:2],
+            "shard_2": digest[2:4],
+        }
+
+    @staticmethod
+    def artifact_uri(tenant_label: str, project_id: str, source_id: str, cas_path: dict[str, str]) -> dict[str, Any]:
+        """Instance of ``ai-lego://specs/artifact/portable-uri.schema.yaml#/definitions/artifact_uri``."""
+        return {
+            "uri": f"artifact://tenant/{tenant_label}/project/{project_id}/source/{source_id}",
+            "segments": [
+                {"segment_type": "tenant", "segment_id": tenant_label},
+                {"segment_type": "project", "segment_id": project_id},
+                {"segment_type": "source", "segment_id": source_id},
+            ],
+            "resolved_cas_path": cas_path,
+        }
+
+    def read(self, tenant_id: str, cas_path: dict[str, str]) -> bytes:
+        """Read only an object whose tenant segment matches the requester."""
+        target = self._resolve_owned(tenant_id, cas_path)
+        if not target.is_file():
+            raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")
+        return target.read_bytes()
+
+    def list_objects(self, tenant_id: str) -> list[str]:
+        tenant_root = self.root / "objects" / tenant_id
+        if not tenant_root.exists():
+            return []
+        return sorted("/" + item.relative_to(self.root).as_posix() for item in tenant_root.rglob("*") if item.is_file())
+
+    def unlink(self, tenant_id: str, cas_path: dict[str, str]) -> str:
+        """Remove one tenant-owned object. Plain unlink: NOT physical media sanitization."""
+        target = self._resolve_owned(tenant_id, cas_path)
+        if not target.is_file():
+            raise InvariantViolation("CAS_OBJECT_NOT_FOUND")
+        target.unlink()
+        if target.exists():
+            raise InvariantViolation("CAS_OBJECT_UNLINK_FAILED")
+        return str(target)

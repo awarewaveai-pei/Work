@@ -750,11 +750,11 @@
   - **現在到哪**：`docs/architecture/search-content/` 12 份規格 + 3 份生成 YAML（122 registry 記錄／59 gate 記錄／21 個 OQ-SC-*）+ `tests/architecture/search_content_pack_check.py`（Gate H，1606 checks）全部落地；MVP 文件 §3 前 9 項前提已打勾，後 4 項未打勾。
   - **下一步**（依 `SEARCH_CONTENT_MVP_VERTICAL_SLICE.md` §3 後 4 項與 §12 SC-Phase 對照）：① 等 Phase 5 exit gate 通過；② 為 §5 Steps 2–16 實際用到的每個 Method/Capability 依 Registry §8 路徑寫 `methods/contracts/<id>.contract.yaml`／`capabilities/contracts/<id>.capability.yaml` + fixture（`EV-TESTS` 契約），**每寫一個就同批升入 `methods/registry/method-inventory.yaml` + `contract-backlog.yaml`**（`OQ-SC-19` promotion rule，不可先寫 Workflow IR 再補 registry）；③ 3 個 recipe 寫成 `recipes/validated/search-content-*-v1.recipe.yaml` 並編譯進 Workflow IR（`OQ-SC-18`）；④ 每個 BLOCK gate 補 validator + 5 個 fixture 後才填 threshold（`OQ-SC-6`，禁止先填數字）。
   - **完成定義**：MVP 驗收 #2（所有 Method/Capability ref resolve 到 ACTIVE 全域 registry）、#15（recipes compile to Workflow IR）、#16（golden tests 含 Gate H 全綠）三項同時成立；`SEARCH_CONTENT_MVP_VERTICAL_SLICE.md` §3 後 4 項打勾；WORKLOG `AUTO_TASK_DONE: SearchContent vertical SC-Phase 1`。
-  - **卡點（2026-09-03 更新）**：Phase 5 exit gate **已通過**（`docs/adr/ADR-022-phase-5-runtime-landing.md`；runtime 在 `Projects/internal/cognitive-engineering-os/`，81 tests 兩種 adapter 模式全過）；為 SearchContent MVP 開正式 Program Plan phase slot 屬母文件修改，走 ADR-006 提案、只能由操作者推進（`OQ-SC-17`）——但 ② ③ ④ 的契約撰寫本身不被它卡住，可在 Phase 5 exit 後立即開工。
+  - **卡點（2026-09-03 更新）**：Phase 5 exit gate **已通過**（`docs/adr/ADR-022-phase-5-runtime-landing.md`；runtime 在 `Projects/internal/cognitive-engineering-os/`，99 tests 兩種 adapter 模式全過，含同日 round 2 對抗式覆審 47 個 finding 全修）；為 SearchContent MVP 開正式 Program Plan phase slot 屬母文件修改，走 ADR-006 提案、只能由操作者推進（`OQ-SC-17`）——但 ② ③ ④ 的契約撰寫本身不被它卡住，可在 Phase 5 exit 後立即開工。
   - **⚠️ 禁止**：跳過 registry promotion 直接在 Workflow IR 引用 SearchContent id；為 gate 發明 threshold 數字；動 `MVP_VERTICAL_SLICE_PLAN.md`／`ADR-014`／任何母文件。
 
 - [ ] **Cognitive OS Phase 5 落地後續（ADR-022 OPEN gates；2026-09-03 開）**
-  - **一句話**：Phase 5 runtime 已落地 `Projects/internal/cognitive-engineering-os/`（`ai_lego` 套件 + 81 tests + `scripts/test-phase5-local.ps1`），exit gate 通過（本機合成範圍）；以下是該 ADR 明列的 OPEN 項與移植時發現的 spec-root 文件缺陷。
+  - **一句話**：Phase 5 runtime 已落地 `Projects/internal/cognitive-engineering-os/`（`ai_lego` 套件 + 99 tests + `scripts/test-phase5-local.ps1`），exit gate 通過（本機合成範圍），同日已經一輪獨立對抗式覆審（47 finding 全修，含 2 個真實 crypto/timing bug）；以下是該 ADR 明列的 OPEN 項與移植時發現的 spec-root 文件缺陷。
   - ① `docs/HCI/HCI_AI_LEGO_Blueprint_v2/17_REPOSITORY_LAYOUT_AND_PATHS.md` L129-141 的 cognitive-engineering-os 子樹草圖 → 改為指向 `REPOSITORY_ARCHITECTURE.md`（AI-LEGO 自己的 ACCEPTED 內部樹）。**未動的原因**：該檔在暫停中的 HCI session 工作樹裡有未 commit 修改，不併行編輯。
   - ② `recipes/validated/research-qualitative-v1.recipe.yaml` 敘述自相矛盾（OQ-P5-6）：prose 寫「8 steps」且「run_statistics 在 evidence.triangulation 之後」，但 normative `steps:` 是 **7** 步且 run_statistics 在 triangulation **之前**。runtime 編譯器以 `steps:` 為準；prose 待修（spec root 內小修，走 R0 Low）。
   - ③ OQ-P5-1：`transcribe`／`literature_search`／`artifact.generate_research_paper` 無 capability contract（只有 `run_statistics` 有）。capability 解析是否比照 method 解析 fail-closed，需裁決。
@@ -1403,5 +1403,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-02 14:30:03 UTC_
+_Last synced: 2026-09-03 14:30:03 UTC_
 
