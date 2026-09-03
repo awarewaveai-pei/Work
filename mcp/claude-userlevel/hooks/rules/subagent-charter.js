@@ -7,8 +7,14 @@ const path = require('path');
 const CHARTER_PATH = path.resolve(__dirname, '..', '..', 'SUBAGENT_CHARTER.md');
 
 module.exports = {
-  check() {
-    const charter = fs.readFileSync(CHARTER_PATH, 'utf8').trim();
+  check(ctx) {
+    let charter;
+    try {
+      charter = fs.readFileSync(CHARTER_PATH, 'utf8').trim();
+    } catch (e) {
+      if (ctx && ctx.shared) ctx.shared.logFailOpen('subagent-charter', e);
+      return null; // fail open: missing/unreadable charter never blocks a spawn
+    }
     return { context: [`[Subagent Charter]\n${charter}`] };
   },
 };

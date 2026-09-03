@@ -38,6 +38,7 @@ const HOOK_EVENTS = [
   'PostToolUseFailure',
   'SessionStart',
   'SessionEnd',
+  'SubagentStart',
   'SubagentStop',
   'Stop',
   'Notification',

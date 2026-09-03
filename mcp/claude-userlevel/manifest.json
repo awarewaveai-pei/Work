@@ -54,6 +54,13 @@
       "target": "${USERPROFILE}\\.claude\\commands",
       "syncMode": "mirror",
       "description": "Slash commands mirrored from project SSOT (.claude/commands/) to user-level. Project-level takes priority when repo is open; user-level serves as fallback. Never create standalone copies in ~/.claude/commands/ directly."
+    },
+    "subagent-charter-file": {
+      "type": "copy-file",
+      "source": "mcp/claude-userlevel/SUBAGENT_CHARTER.md",
+      "target": "${USERPROFILE}\\.claude\\SUBAGENT_CHARTER.md",
+      "syncMode": "copy",
+      "description": "hooks/rules/subagent-charter.js resolves CHARTER_PATH two levels up from its own deployed location (~/.claude/hooks/rules -> ~/.claude/SUBAGENT_CHARTER.md). The hooks/ directory mirror above does not reach this file because it lives one level higher (repo root of mcp/claude-userlevel/, not inside hooks/) -- kept there deliberately so the 27 .codex/agents/*.toml files and the codex sync scripts that hard-reference 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' keep working unchanged (2026-09-03: found this file was never governed at all, so the deployed rule always threw ENOENT)."
     }
   },
   "excludeFromHash": [

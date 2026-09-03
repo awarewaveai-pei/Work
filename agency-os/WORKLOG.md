@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-09-03（續4）
+
+### Subagent charter 注入死功能——修 3 層根因，第 4 層（host 從未觸發 SubagentStart）確認為已知平台限制，未修
+
+**背景**：續3 WORKLOG 明文留下的殘留風險：`settings.json` 的 `SubagentStart` 仍是 object 形狀、`subagent-charter.js` 讀的 `~/.claude/SUBAGENT_CHARTER.md` 從未被同步部署。操作者指示「處理好」，依 R0 走完整流程。
+
+**[已修改]**
+1. `scripts/normalize-claude-settings.mjs`：`HOOK_EVENTS` 補 `SubagentStart`（根因：PS5.1 `ConvertTo-Json` 對單元素陣列的已知 lossy bug，每次 sync 都把它壓扁成 object，normalizer 事後修正清單漏了這個事件，永遠修不到）
+2. `mcp/claude-userlevel/manifest.json` + `scripts/sync-claude-userlevel.ps1`：新增 `copy-file` 治理類型 + `Sync-File-Copy` 函式，把 `mcp/claude-userlevel/SUBAGENT_CHARTER.md`（SSOT，27 個 `.codex/agents/*.toml` + 2 支 codex sync 腳本硬編引用，刻意不搬動）同步到 `~/.claude/SUBAGENT_CHARTER.md`（`subagent-charter.js` 實際讀取的部署後路徑）
+3. `mcp/claude-userlevel/hooks/rules/subagent-charter.js`：`readFileSync` 包 try/catch，失敗時呼叫 `ctx.shared.logFailOpen('subagent-charter', e)` 並 return null，簽名改 `check(ctx)`（比照姊妹檔 `subagent-budget.js` 既定寫法，不再只靠 runner.js 外層 catch）
+4. **第 3 層根因（原 2 個 bug 之外新發現，非擴大範圍——不修這層 charter 仍然到不了 subagent）**：`mcp/claude-userlevel/hooks/runner.js`——真實 spawn 測試（見下）證明修完 1+2 後 charter 仍未注入；查官方 hooks 文件（`code.claude.com/docs/en/hooks`，web-researcher 查證）確認 `SubagentStart` **不在**「plain stdout 也算 context」白名單（只有 `UserPromptSubmit`/`UserPromptExpansion`/`SessionStart`/`PostModelSwitch` 在），必須輸出結構化 `hookSpecificOutput.additionalContext` JSON——runner.js 原本只對 `isCodexPayload` 這樣做,原生 Claude 一律 plain stdout,SubagentStart 剛好不在白名單卻被當白名單事件處理。修法：新增 `PLAIN_STDOUT_CONTEXT_EVENTS` 白名單集合（依事件類型判斷,不是硬編 `event==='SubagentStart'` 特例,滿足不變量分析要求）,`needsStructuredContext = isCodexPayload || !PLAIN_STDOUT_CONTEXT_EVENTS.has(event)`
+5. `tests/hooks/runner-core.test.mjs`：既有 `SubagentStart` 測試斷言的是舊（錯誤）plain-stdout 行為，改斷言正確的 JSON 形狀；順手修正相鄰測試裡一句過度概化的舊註解
+6. 新增 `tests/hooks/normalize-claude-settings.test.mjs`（13 案例，涵蓋全部 11 個 `HOOK_EVENTS`）+ `tests/hooks/subagent-charter-rule.test.mjs`（3 案例，直接單元測試該 rule 的成功/fail-open/防禦性 ctx 路徑——此前完全沒有測試涵蓋這條 try/catch）
+
+**第 4 層發現（確認為已知平台限制，本次刻意不修，回報操作者決定）**：三層都修完、單元測試全綠、手動直接呼叫部署後的 `runner.js` 產出完全正確 JSON 之後，**兩次真實 Agent spawn（runner.js 修前修後各一次）subagent 仍回報看不到 charter**，且 `verify-gate-failures.log` 同時段零筆新增——代表 `SubagentStart` 這個 hook 事件在**本 host**（Claude Desktop app / Agent SDK，非 terminal CLI）對真實 Agent 呼叫根本沒被觸發，不是程式碼問題。這與姊妹檔 `subagent-budget.js` 自己的檔頭註解記載的發現完全一致（critic 用真實 spawn 證明同一事件對它也沒到達 runner.js，因此該閘才改掛 `PreToolUse`）。Charter 注入若要在此 host 真正生效，可能需要仿照 `subagent-budget.js` 遷移到別的機制（例如 `PreToolUse` matcher `Agent` 時把 charter 文字塞進某個可被 subagent 讀到的管道）——但這是架構決策，不在本次「修 2 個已知 bug」授權範圍內，未動手，留給操作者決定。
+
+**[驗證計畫]**
+1. 實測：①`node --test tests/hooks/*.test.mjs`（128 案例全綠）②真部署：`sync-claude-userlevel.ps1 -Mode merge -MonorepoRootOverride <本 worktree>` 兩輪（先部署 1-3 層，發現第 4 層問題後修 runner.js 再部署一輪）③手動直接呼叫部署後 `~/.claude/hooks/runner.js SubagentStart`，確認產出正確 JSON ④兩次真實 Agent 工具 spawn 驗證端到端結果（誠實回報：仍是 NOT FOUND，見上）
+2. Review：critic 連續 3 次 529/500（伺服器過載）、`/codex-review` 額度用罄至 2026-09-07——**兩條外部 oracle 都不可用**，改用自我對抗覆審 + mutation test 補強：把 3 個修正逐一還原回 HEAD 版本，證明對應測試真的會抓到（見 REVIEW_WAIVED 行）
+3. 抓蟲：grep `HOOK_EVENTS|SubagentStart|SUBAGENT_CHARTER|PLAIN_STDOUT_CONTEXT_EVENTS|isContextEvent` scope 涵蓋 `agency-os/ scripts/ mcp/ tests/ .claude/`（29 個命中，`.codex/agents/*.toml`、`README.md`、codex sync 腳本等純引用檔全部仍指向未搬動的 SSOT 路徑，無孤兒無過期宣告）
+4. WORKLOG：本條目
+
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`node --test tests/hooks/*.test.mjs` | exit=0 | 128 pass / 0 fail
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`sync-claude-userlevel.ps1 -Mode merge -MonorepoRootOverride <worktree>`（兩輪）| exit=0 | normalizer 修正 13 處結構問題含 `hooks.SubagentStart: object → array(1)`；`subagent-charter-file` copy-file 項 drift=YES→synced
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`echo '{"session_id":"manual-check"}' \| node ~/.claude/hooks/runner.js SubagentStart` | exit=0 | 產出 `{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"[Subagent Charter]..."}}`（正確）
+**REALTEST_EVIDENCE**: tool=Agent | cmd=真實 general-purpose subagent spawn ×2（runner.js 修前/修後各一次），要求回報是否在自己初始 context 看到 `[Subagent Charter]` | exit=0 | 結果=NOT FOUND（兩次皆是，見上方第 4 層發現，誠實回報非隱藏）
+**REVIEW_WAIVED**: NA -- critic 連續 3 次 529/500（server_error，非本次程式碼問題）+ `/codex:adversarial-review` 額度用罄至 2026-09-07（`Codex error: You've hit your usage limit`）。兩條路徑皆不可用，依既有先例（`bbfa232d9` 同類 ORACLE_WAIVED）改用自我對抗覆審：把 `normalize-claude-settings.mjs`／`subagent-charter.js`／`runner.js` 三處修正逐一還原至 `git show HEAD:<path>`（修正前狀態），各跑對應測試，確認 3/3 案例都真的失敗（mutation kill），再還原修正版，確認 `diff` 與修正版完全一致；還原修正後完整 128 案例重跑仍全綠
+**BUGHUNT_DONE**: scope=agency-os,scripts,mcp,tests,.claude | grep=`HOOK_EVENTS\|SubagentStart\|SUBAGENT_CHARTER\|PLAIN_STDOUT_CONTEXT_EVENTS\|isContextEvent` | hits=29（全數為預期引用：SSOT/runtime 各一份鏡射、`.codex/agents/*.toml` 與 codex sync 腳本引用未搬動的 SSOT 路徑、`agency-os/WORKLOG.md` 續3 條目的歷史記述、session transcript 自動記錄——無孤兒、無過期宣告需要修正）
+
+**剩餘風險**：
+- 第 4 層（host 未觸發 `SubagentStart`）未修，charter 注入在 Claude Desktop app 環境目前仍是功能性死碼——僅程式碼層面正確，端到端未成功，需操作者決定是否要仿 `subagent-budget.js` 遷移機制
+- Review 步驟為自我對抗覆審 + mutation test 代打，非獨立第三方模型覆審；兩條 oracle 恢復可用後建議補跑一輪
+
+**Rollback**: `git checkout -- mcp/claude-userlevel/hooks/ mcp/claude-userlevel/manifest.json scripts/normalize-claude-settings.mjs scripts/sync-claude-userlevel.ps1 tests/hooks/runner-core.test.mjs`，刪除新增的 2 個測試檔，再跑 `sync-claude-userlevel.ps1 -Mode merge` 把 runtime 沖回舊版（`~/.claude/SUBAGENT_CHARTER.md` 需手動刪除，install 模式才會清理 extra）。
+
 ## 2026-09-03（續3）
 
 ### Subagent 扇出治理閘（token 燒量事故追蹤）——第一版掛錯事件，外部 critic 用真實 spawn 抓到，改掛 PreToolUse 後複驗通過

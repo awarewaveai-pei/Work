@@ -257,6 +257,33 @@ function Sync-Directory-Mirror($spec, [string]$mode, [string]$label = 'dir') {
   Write-Host "  -> $label synced" -ForegroundColor Green
 }
 
+# ---------- FILE COPY (single governed file, e.g. SUBAGENT_CHARTER.md) ----------
+function Sync-File-Copy($spec, [string]$mode, [string]$label = 'file') {
+  $src = Join-Path $MonorepoRoot ($spec.source -replace '/','\')
+  $tgt = Expand-Vars $spec.target
+  if (-not (Test-Path $src)) { throw "Source file missing: $src" }
+
+  $h1 = Get-FileMd5 $src
+  $h2 = Get-FileMd5 $tgt
+  $hasDrift = ($h1 -ne $h2)
+
+  Write-Host "[$label] target=$tgt" -ForegroundColor Yellow
+  Write-Host ("  drift: {0}" -f $(if ($hasDrift) {'YES'} else {'no'}))
+
+  if ($mode -eq 'verify') {
+    if ($hasDrift) { $script:exitCode = 1 }
+    return
+  }
+  if ($mode -eq 'dry-run') { return }
+  if (-not $hasDrift) { return }
+
+  Backup-Path $tgt "$label.before"
+  $tgtDir = Split-Path -Parent $tgt
+  if (-not (Test-Path $tgtDir)) { New-Item -ItemType Directory -Path $tgtDir -Force | Out-Null }
+  Copy-Item -Path $src -Destination $tgt -Force
+  Write-Host "  -> $label synced" -ForegroundColor Green
+}
+
 # ---------- JSON MERGE (settings.json) ----------
 function Get-NestedKey($obj, [string]$path) {
   $cur = $obj
@@ -588,6 +615,7 @@ foreach ($name in $manifest.files.PSObject.Properties.Name) {
   Write-Host "----- governing: $name ($($spec.type)) -----" -ForegroundColor Cyan
   switch ($spec.type) {
     'directory'    { Sync-Directory-Mirror $spec $Mode $name }
+    'copy-file'    { Sync-File-Copy $spec $Mode $name }
     'merge-json'   { Sync-Json-Merge $spec $Mode }
     'replace-json' { Sync-Json-Replace $spec $Mode }
     'prune-duplicate-json' { Sync-Json-PruneDuplicate $spec $Mode }

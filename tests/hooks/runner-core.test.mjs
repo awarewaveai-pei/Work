@@ -131,10 +131,20 @@ test('runner: passthrough echoes stdin exactly on pass', () => {
   assert.equal(r.stdout, payload);
 });
 
-test('runner: SubagentStart injects rule context only, never the raw payload', () => {
+test('runner: SubagentStart injects rule context as structured hook JSON, never the raw payload', () => {
+  // SubagentStart is NOT on Claude Code's documented plain-stdout-context
+  // whitelist (only UserPromptSubmit/UserPromptExpansion/SessionStart/
+  // PostModelSwitch are, per code.claude.com/docs/en/hooks checked
+  // 2026-09-03) -- plain text here is silently dropped by the host, so this
+  // must always be the same hookSpecificOutput.additionalContext JSON shape
+  // Codex requires. This is the exact bug that made subagent-charter.js
+  // context injection silently dead: runner.js used to write plain stdout
+  // for every native-Claude context event, this one included.
   const r = run('SubagentStart', { session_id: 'subagent-core', secret: 'must-not-echo' });
   assert.equal(r.status, 0);
-  assert.equal(r.stdout, 'shared charter\n');
+  const output = JSON.parse(r.stdout);
+  assert.equal(output.hookSpecificOutput.hookEventName, 'SubagentStart');
+  assert.equal(output.hookSpecificOutput.additionalContext, 'shared charter');
   assert.doesNotMatch(r.stdout, /must-not-echo/);
 });
 
@@ -158,9 +168,11 @@ test('runner: a real Claude Code payload (has hook_event_name, no turn_id) is NO
   // Regression test for the actual bug: Claude Code's own documented hook input
   // schema includes hook_event_name on every event -- checking for its presence
   // alone used to classify every genuine Claude Code call as Codex, which meant
-  // context events (UserPromptSubmit/SubagentStart) emitted Codex's structured
-  // JSON hookSpecificOutput shape to Claude Code, which does not understand it
-  // (Claude Code expects plain text on stdout for context injection).
+  // UserPromptSubmit (on the plain-stdout-context whitelist, per
+  // code.claude.com/docs/en/hooks) emitted Codex's structured JSON
+  // hookSpecificOutput shape instead of the plain text Claude Code expects
+  // for THIS event. (SubagentStart is a different case, covered above: it is
+  // NOT on that whitelist and needs the JSON shape regardless of vendor.)
   const r = run('UserPromptSubmit', {
     hook_event_name: 'UserPromptSubmit',
     session_id: 'real-claude-session',

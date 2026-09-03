@@ -133,6 +133,17 @@ function main() {
     // the event payload into the conversation. SubagentStart makes the shared
     // engineering charter mechanically inherited by every spawned agent.
     const isContextEvent = event === 'UserPromptSubmit' || event === 'SubagentStart';
+    // Per the official Claude Code hooks reference (checked 2026-09-03): only
+    // a short whitelist of events treat plain stdout as injected context --
+    // UserPromptSubmit is one of them. Every OTHER context event (currently
+    // just SubagentStart) is NOT on that list and requires the structured
+    // hookSpecificOutput.additionalContext JSON shape; plain stdout is
+    // silently dropped there, exactly like Codex's contract. Root cause of a
+    // real bug: this rule used to only branch on isCodexPayload, so native
+    // Claude SubagentStart wrote plain text that the host never surfaced --
+    // no crash, no fail-open entry, charter simply never reached the
+    // subagent. Extend this set if a future event needs the same treatment.
+    const PLAIN_STDOUT_CONTEXT_EVENTS = new Set(['UserPromptSubmit']);
     try {
       let payload;
       try { payload = JSON.parse(d); } catch (_) { payload = null; }
@@ -219,9 +230,11 @@ function main() {
       return;
     }
     if (isContextEvent) {
-      // Claude accepts plain context text. Codex requires the documented JSON
-      // hook output shape; plain stdout is ignored there. Never emit raw stdin.
-      if (isCodexPayload && contexts.length) {
+      // Claude accepts plain context text only for events on the whitelist
+      // above. Codex always requires the documented JSON hook output shape;
+      // so does every other native-Claude context event. Never emit raw stdin.
+      const needsStructuredContext = isCodexPayload || !PLAIN_STDOUT_CONTEXT_EVENTS.has(event);
+      if (needsStructuredContext && contexts.length) {
         process.stdout.write(JSON.stringify({
           hookSpecificOutput: {
             hookEventName: event,
