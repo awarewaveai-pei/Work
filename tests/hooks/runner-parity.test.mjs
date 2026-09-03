@@ -259,8 +259,12 @@ test('parity: SubagentStart injects the shared charter without echoing payload',
 });
 
 test('parity: Codex SubagentStart uses hook JSON and carries the same charter', () => {
+  // turn_id is the real Codex-specific signal (2026-09-03 fix, runner.js
+  // isCodexPayload) -- hook_event_name alone is not: Claude Code's own hook
+  // payloads include it too.
   const r = run('SubagentStart', {
     hook_event_name: 'SubagentStart',
+    turn_id: 'turn-parity-test',
     agent_name: 'critic',
     private_note: 'must-not-echo',
   });

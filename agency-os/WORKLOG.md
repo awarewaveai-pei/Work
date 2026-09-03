@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-03（續2）
+
+### `runner.js` 的 `isCodexPayload` 真 bug 修好——查兩邊官方文件，不是猜
+
+**觸發**：操作者要求「把 GitHub 跟我的電腦對齊」，工作目錄有 227 個未 commit 檔案，其中 `.codex/`（88 個）是另一個並行 session 留下的未決架構重構（刪 `.codex/hooks/` 鏡像、改用新橋接架構），且 2026-09-02（續4）WORKLOG 已記錄這批連帶一個未修復的真 bug。操作者選「先修好那個 bug 再 commit」。
+
+**[根因]** `runner.js:139`（修復前）：`isCodexPayload = !!(payload && typeof payload === 'object' && typeof payload.hook_event_name === 'string')`——用 `hook_event_name` 欄位是否存在判斷是不是 Codex 呼叫。**查證（[Claude Code 官方 hooks 文件](https://code.claude.com/docs/en/hooks) + [Codex 官方 hooks 文件](https://learn.chatgpt.com/docs/hooks)，不是憑訓練資料猜）**：Claude Code 自己的 PreToolUse/PostToolUse payload 本來就含 `hook_event_name`（標準欄位），不是 Codex 專屬標記——這個判斷式對「正式 Claude Code 呼叫」也會回傳 `true`，把它們全部誤判成 Codex。誤判的後果：`isCodexPayload` 為真時，context 事件（UserPromptSubmit/SubagentStart）會改用 Codex 專屬的 `hookSpecificOutput` JSON 包裝輸出，而 Claude Code 端只接受純文字 context——正式 Claude 呼叫全部收到它看不懂的格式。
+
+**[真正的 Codex 專屬訊號]**：兩邊官方文件比對後，Codex hooks 文件明確寫「`turn_id` is a Codex-specific extension」（連同 `model` 欄位），這兩個欄位在 Claude Code 官方 schema 裡完全沒有列出。改用 `turn_id` 判斷。
+
+**[已修改]**
+- [`mcp/claude-userlevel/hooks/runner.js`](../mcp/claude-userlevel/hooks/runner.js)：`isCodexPayload` 改查 `payload.turn_id`
+- [`tests/hooks/runner-core.test.mjs`](../tests/hooks/runner-core.test.mjs) / [`tests/hooks/runner-parity.test.mjs`](../tests/hooks/runner-parity.test.mjs)：既有 2 個「模擬 Codex payload」的測試 fixture 原本只帶 `hook_event_name`（跟 bug 犯的是同一個錯誤假設，這正是為什麼舊測試沒抓到——測試本身也信了同一個錯誤前提），補上 `turn_id`；新增 1 個回歸測試，直接重現原始 bug 場景（payload 有 `hook_event_name` 沒有 `turn_id` = 真實 Claude Code 呼叫，斷言輸出是純文字 context 不是 Codex 的 JSON 包裝）
+- `agency-os/TASKS.md:554` / `agency-os/WORKLOG.md`（續4 條目）：訂正「未修復」為指向本條目
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check mcp/claude-userlevel/hooks/runner.js` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | 112/112 全過（含新增的直接重現 bug 場景的回歸測試）
+- REALTEST_EVIDENCE: tool=WebFetch | url=code.claude.com/docs/en/hooks + learn.chatgpt.com/docs/hooks | 確認兩邊官方 schema：Claude Code 的 `hook_event_name` 是通用欄位（7 個「所有 hook 共通欄位」之一）；Codex 文件明確標記 `turn_id`／`model` 為「Codex-specific extension」，不在 Claude Code schema 內
+- REVIEW_DONE: critic=Quick（自查，非外部 subagent——Codex CLI 額度已用罄無法當 oracle，且本次修法有兩邊官方文件佐證，非猜測，風險相對低；改動範圍極小：一行判斷式 + 2 個測試 fixture 補欄位）| verdict=pass | findings=0——已核對 `isCodexPayload` 唯二兩個消費點（context 事件 JSON 包裝、pass-through echo 抑制）邏輯不變，只換判斷依據
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests | grep=`hook_event_name`（確認沒有其他地方複製同一個錯誤判斷式；`tests/hooks/*.mjs` 3 處命中皆為本次修正過的正確測試）+ `isCodexPayload`（確認 TASKS.md/WORKLOG.md 的過期「未修復」宣稱已對應更新）| hits=`hook_event_name` 3 處（測試檔，正確）；程式碼零處殘留舊邏輯；`agency-os/Backups/` 下 15 份歷史備份仍含舊版（預期中，備份不追蹤最新狀態，不需要修）
+
+**[剩餘風險]**
+- 沒有真的 Codex CLI 可以端到端驗證（額度用罄）——修法完全依賴官方文件的欄位宣告，未真機驗證 Codex 呼叫時 `payload.turn_id` 真的會被填入
+- `.codex/` 剩餘 87 個檔案（`.codex/hooks/` 整批刪除、`.codex/agents/*.toml` 重生、`SUBAGENT_CHARTER.md`、root `AGENTS.md` 改寫）本身仍是續4 workstream 的未決架構決策，本次只修 bug，不代表已經審查或同意那個架構本身——commit 只是操作者明示「先修 bug 再 commit」的執行
+
+**[rollback]** `git revert` 本次 commit；`isCodexPayload` 改回舊邏輯即回到已知有 bug 的狀態。
+
 ## 2026-09-03（續1）
 
 ### `ao-close.ps1` 的 `git add -A` 缺口（TASKS.md 544 最後一塊）——scoped add 全面重寫，3 輪真實外部 critic 覆審，每輪都抓到新的真 Critical/Major，最後一輪連自己那輪的修法都撞到自己剛修過的 bug class
@@ -341,7 +369,7 @@ function targetsElsewhere(segments) {
 - BUGHUNT_DONE: scope=mcp,agency-os | grep=Python `re.finditer(r"(?<!\`)\`\$", line)` 逐行掃描本檔案（第一版用 bash grep `` `\$[A-Za-z] `` 有假陽性——連正確的雙反引號 `` ``$Var`` `` 都會命中，因為它的第二個反引號同樣滿足「backtick 後接 $」；改用負向後顧斷言排除「前面也是反引號」的情況後才是真正的「孤立單反引號」偵測）| hits=0（5 處全部修完後複查，確認無殘留同款 pattern；另外 critic 已對全檔案 44 個反引號逐一人工核對，非僅靠這行 grep）
 
 **剩餘風險**：
-- `mcp/claude-userlevel/hooks/runner.js` 的 `isCodexPayload` 判別邏輯（同一批未 commit workstream 的另一個檔案）有另一個**未修復**的真 bug（`hook_event_name` 是所有 Claude Code hook 事件的共通欄位，不是 Codex 專屬標記，會讓正式 Claude 呼叫被誤判），連同 `.codex/hooks/` 整批刪除、`.codex/agents/*.toml` 重生、`SUBAGENT_CHARTER.md`、root `AGENTS.md` 改寫等一整個「Codex↔Claude bridge」workstream **刻意不在本次 commit 範圍內**，已另外向操作者回報，需要操作者決定是否修復後再提交
+- `mcp/claude-userlevel/hooks/runner.js` 的 `isCodexPayload` 判別邏輯（同一批未 commit workstream 的另一個檔案）有另一個真 bug（`hook_event_name` 是所有 Claude Code hook 事件的共通欄位，不是 Codex 專屬標記，會讓正式 Claude 呼叫被誤判）——**已於 2026-09-03（續2）修復**，連同 `.codex/hooks/` 整批刪除、`.codex/agents/*.toml` 重生、`SUBAGENT_CHARTER.md`、root `AGENTS.md` 改寫等一整個「Codex↔Claude bridge」workstream 本體，架構本身是否採用仍是操作者決定範圍
 - critic 標出的 3 個 Suggestion 級建議（`Ensure-Directory` 的 `-Path` vs `-LiteralPath`、兩處 here-string 缺尾端換行、`:529` 的引號慣例不一致）未處理，屬於程式碼品質而非本次 bug class 範圍，留待下次碰這個檔案時處理
 
 **Rollback**：`git revert <本次 commit>`；`~/.codex/skills/claude-compat/references/*/index.md` 4 個本機檔案不受 git revert 影響（本就不在 repo 內），下次跑 `sync-claude-to-codex.ps1` 會依當時的腳本版本重新產生。

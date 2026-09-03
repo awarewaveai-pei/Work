@@ -2,7 +2,8 @@
 // Hook runner — single entry point for all portable governance hooks.
 //
 //   node runner.js <event>
-//   event ∈ PreToolUse | PostToolUse | PostToolUseFailure | Stop | SessionStart | UserPromptSubmit
+//   event ∈ PreToolUse | PostToolUse | PostToolUseFailure | Stop | SessionStart |
+//           UserPromptSubmit | SubagentStart
 //
 // Replaces 23 standalone hook files that each hand-rolled the same lifecycle
 // (stdin read → JSON parse → try/catch → fail-open → exit). The lifecycle now
@@ -126,16 +127,29 @@ function main() {
   process.stdin.on('end', () => {
     let blocks = [];
     const contexts = [];
-    // UserPromptSubmit is special: stdout on exit 0 is INJECTED INTO CLAUDE'S
-    // CONTEXT (not a passthrough channel). Rules return { context: [lines] }
-    // for that injection; the raw stdin JSON must NEVER be echoed on this
-    // event or it would spam the context on every prompt.
-    const isPromptEvent = event === 'UserPromptSubmit';
+    let isCodexPayload = false;
+    // These events add stdout to model/developer context. Rules return
+    // { context: [lines] }; raw stdin must never be echoed or it would inject
+    // the event payload into the conversation. SubagentStart makes the shared
+    // engineering charter mechanically inherited by every spawned agent.
+    const isContextEvent = event === 'UserPromptSubmit' || event === 'SubagentStart';
     try {
       let payload;
       try { payload = JSON.parse(d); } catch (_) { payload = null; }
+      // `hook_event_name` is NOT a valid Codex signal -- confirmed against both
+      // vendors' official hook docs (2026-09-03): Claude Code's own PreToolUse/
+      // PostToolUse payload includes `hook_event_name` as a standard field
+      // (code.claude.com/docs/en/hooks), so the old check classified every real
+      // Claude Code call as Codex. `turn_id` (and `model`) are documented
+      // Codex-specific extensions, absent from Claude Code's schema
+      // (learn.chatgpt.com/docs/hooks: "Turn-scoped hooks list turn_id as a
+      // Codex-specific extension") -- use that instead.
+      isCodexPayload = !!(payload && typeof payload === 'object' && typeof payload.turn_id === 'string');
       if (payload === null || typeof payload !== 'object') {
-        if (!isPromptEvent) process.stdout.write(d);
+        // Claude Code expects its original stdin echoed on ordinary pass-through
+        // events. Codex command hooks ignore plain stdout, so never echo an
+        // unparseable Codex payload back into its event stream.
+        if (!isContextEvent && !isCodexPayload) process.stdout.write(d);
         return; // unparseable stdin → passthrough (fail-open)
       }
 
@@ -204,16 +218,26 @@ function main() {
       process.stderr.write('', () => process.exit(2));
       return;
     }
-    if (isPromptEvent) {
-      // stdout here = context injection; emit ONLY rule-produced context.
-      for (const ln of contexts) process.stdout.write(ln + '\n');
+    if (isContextEvent) {
+      // Claude accepts plain context text. Codex requires the documented JSON
+      // hook output shape; plain stdout is ignored there. Never emit raw stdin.
+      if (isCodexPayload && contexts.length) {
+        process.stdout.write(JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: event,
+            additionalContext: contexts.join('\n'),
+          },
+        }));
+      } else {
+        for (const ln of contexts) process.stdout.write(ln + '\n');
+      }
       return;
     }
     if (contexts.length) {
       // context on non-prompt events degrades to a stderr warn (visible, not injected)
       for (const ln of contexts) process.stderr.write(ln + '\n');
     }
-    process.stdout.write(d);
+    if (!isCodexPayload) process.stdout.write(d);
   });
 }
 

@@ -27,6 +27,7 @@ before(() => {
   rule('expanded-scan', `module.exports = { check: (ctx) =>
     /^\\s*secret-verb\\b/im.test(ctx.commandExpanded) ? { block: ['[Hook] BLOCKED: expanded'] } : null };`);
   rule('sid-echo', `module.exports = { check: (ctx) => ({ warn: ['sid=' + ctx.sid] }) };`);
+  rule('subagent-context', `module.exports = { check: () => ({ context: ['shared charter'] }) };`);
 
   fs.writeFileSync(path.join(FIX, 'rules.manifest.json'), JSON.stringify({
     events: {
@@ -37,6 +38,8 @@ before(() => {
         { matcher: '(broken[', rules: ['always-warn'] },
       ],
       Stop: [{ rules: ['missing-rule', 'always-warn'] }],
+      SubagentStart: [{ rules: ['subagent-context'] }],
+      UserPromptSubmit: [{ rules: ['subagent-context'] }],
     },
   }));
 });
@@ -126,6 +129,47 @@ test('runner: passthrough echoes stdin exactly on pass', () => {
   const r = run('PreToolUse', payload);
   assert.equal(r.status, 0);
   assert.equal(r.stdout, payload);
+});
+
+test('runner: SubagentStart injects rule context only, never the raw payload', () => {
+  const r = run('SubagentStart', { session_id: 'subagent-core', secret: 'must-not-echo' });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, 'shared charter\n');
+  assert.doesNotMatch(r.stdout, /must-not-echo/);
+});
+
+test('runner: Codex context event emits documented hook JSON, never raw payload', () => {
+  // turn_id is the real Codex-specific signal (2026-09-03 fix) -- see runner.js
+  // isCodexPayload comment. hook_event_name alone is NOT Codex-specific: Claude
+  // Code's own official hook payload includes it too (code.claude.com/docs/en/hooks).
+  const r = run('UserPromptSubmit', {
+    hook_event_name: 'UserPromptSubmit',
+    turn_id: 'turn-abc123',
+    secret: 'must-not-echo',
+  });
+  assert.equal(r.status, 0);
+  const output = JSON.parse(r.stdout);
+  assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
+  assert.equal(output.hookSpecificOutput.additionalContext, 'shared charter');
+  assert.doesNotMatch(r.stdout, /must-not-echo/);
+});
+
+test('runner: a real Claude Code payload (has hook_event_name, no turn_id) is NOT misclassified as Codex (2026-09-03 fix)', () => {
+  // Regression test for the actual bug: Claude Code's own documented hook input
+  // schema includes hook_event_name on every event -- checking for its presence
+  // alone used to classify every genuine Claude Code call as Codex, which meant
+  // context events (UserPromptSubmit/SubagentStart) emitted Codex's structured
+  // JSON hookSpecificOutput shape to Claude Code, which does not understand it
+  // (Claude Code expects plain text on stdout for context injection).
+  const r = run('UserPromptSubmit', {
+    hook_event_name: 'UserPromptSubmit',
+    session_id: 'real-claude-session',
+    cwd: '/x',
+  });
+  assert.equal(r.status, 0);
+  // Plain text context, NOT the Codex hookSpecificOutput JSON wrapper.
+  assert.equal(r.stdout, 'shared charter\n');
+  assert.doesNotMatch(r.stdout, /hookSpecificOutput/);
 });
 
 test('runner: real manifest parses and every referenced rule name is unique per group', () => {
