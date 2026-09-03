@@ -1,0 +1,2 @@
+{"ts":"2026-09-02T18:52:44.934Z","task_id":"dlg-20260902-185244-d888","agent":"critic","description":"Cross-check all 27 ADRs for contradictions","result_snippet":""}
+{"ts":"2026-09-02T18:52:57.355Z","task_id":"dlg-20260902-185257-60c5","agent":"db-expert","description":"Verify ADR schema claims against real DB schema","result_snippet":""}
