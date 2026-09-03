@@ -141,6 +141,33 @@ is no longer discretionary.
 > If the script printed `report already present -> ...` instead, the file existed (e.g. you
 > pre-wrote it) — still overwrite it with the final four-section content.
 
+**Then commit + push that overwrite yourself** (2026-09-03 — critic finding M-C on the
+`ao-close.ps1` scoped-add fix, TASKS.md 544). `ao-close.ps1` commits and pushes the
+**skeleton** at write time, but your `Write` of the real four-section content happens
+*after* that — under the old `git add -A` the next close's blind stage-everything swept
+it in for you; under the new scoped add nothing does that automatically, so without this
+step your real report never reaches origin and only the `AUTO-SKELETON` stub does (which
+the file's own text defines as *"seeing this stub committed means the agent forgot to fill
+it"* — exactly backwards). Right after the `Write` above:
+
+```bash
+git add -- agency-os/reports/ao-close/YYYY-MM-DD-HHmm.md
+git commit -m "$(cat <<'EOF'
+[claude] docs: AO-CLOSE report — YYYY-MM-DD HHmm
+
+Fills in the AUTO-SKELETON stub ao-close.ps1 committed at close time with the
+real four-section report.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+EOF
+)"
+git push origin main
+```
+
+(substitute the real `YYYY-MM-DD-HHmm` stamp). This is a single named-path `git add`, so
+`git-add-scope-tracker.js` / `git-commit-scope-guard.js` pass it through normally — no ACK
+needed.
+
 ### Prune old reports
 
 **Nothing to do by hand.** `ao-close.ps1` runs `scripts/prune-reports.ps1` before staging,
@@ -158,4 +185,5 @@ If the archive folder doesn't exist yet, create it first.
 ### Self-check
 
 If you forgot the archive step, the user is allowed to re-prompt with「你忘了寫 archive」—
-acknowledge the lapse and write the file immediately.
+acknowledge the lapse and write the file immediately (then commit + push it per the step
+above — writing alone no longer reaches origin).

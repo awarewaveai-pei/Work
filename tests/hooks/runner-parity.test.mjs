@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process';
 import {
   runNode, freshSid, makeGitRepo, makeTmpHome,
   trackerPathFor, writeTracker, readFileSafe, REPO_ROOT, HOOKS_DIR,
-  gitStagePathFor, writeGitStageTracker,
+  gitStagePathFor, writeGitStageTracker, sessionEditPathFor,
 } from './helpers.mjs';
 
 const RUNNER = path.join(HOOKS_DIR, 'runner.js');
@@ -1095,4 +1095,48 @@ test('git-commit-scope-guard v4 fix m2: multiple cumulative `-C` flags are all c
   // — this must NOT evaluate repoB's real state and produce a wrong verdict.
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(r.stderr, /fileB\.md/);
+});
+
+// ---------------------------------------------------------------- session-edit-tracker (2026-09-03, ao-close.ps1 scoped-add)
+
+test('session-edit-tracker: Write/Edit records the file regardless of extension (not just code files)', () => {
+  const sid = freshSid('setmd');
+  const r = run('PostToolUse', { session_id: sid, tool_name: 'Edit', tool_input: { file_path: '/x/agency-os/WORKLOG.md' } });
+  assert.equal(r.status, 0, r.stderr);
+  const recorded = fs.readFileSync(sessionEditPathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded, ['/x/agency-os/WORKLOG.md']);
+  fs.rmSync(sessionEditPathFor(sid), { force: true });
+});
+
+test('session-edit-tracker: MultiEdit edits[] shape is recorded too (matches existing Write|Edit matcher reach)', () => {
+  const sid = freshSid('setme');
+  const r = run('PostToolUse', {
+    session_id: sid, tool_name: 'MultiEdit',
+    tool_input: { edits: [{ file_path: '/x/a.md' }, { file_path: '/x/b.py' }] },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const recorded = fs.readFileSync(sessionEditPathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded.sort(), ['/x/a.md', '/x/b.py']);
+  fs.rmSync(sessionEditPathFor(sid), { force: true });
+});
+
+test('session-edit-tracker: does not clear on /verify-recent (separate tracker from code-change-tracker.js)', () => {
+  const sid = freshSid('setsep');
+  run('PostToolUse', { session_id: sid, tool_name: 'Edit', tool_input: { file_path: '/x/src/foo.ts' } });
+  // code-change-tracker.js's tracker (trackerPathFor) is a DIFFERENT file —
+  // clearing IT (what /verify-recent does) must not touch this one.
+  fs.rmSync(trackerPathFor(sid), { force: true });
+  const recorded = fs.readFileSync(sessionEditPathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded, ['/x/src/foo.ts']);
+  fs.rmSync(sessionEditPathFor(sid), { force: true });
+});
+
+test('session-edit-tracker: dedups repeated edits to the same file', () => {
+  const sid = freshSid('setdedup');
+  run('PostToolUse', { session_id: sid, tool_name: 'Edit', tool_input: { file_path: '/x/a.md' } });
+  run('PostToolUse', { session_id: sid, tool_name: 'Edit', tool_input: { file_path: '/x/a.md' } });
+  run('PostToolUse', { session_id: sid, tool_name: 'Write', tool_input: { file_path: '/x/b.md' } });
+  const recorded = fs.readFileSync(sessionEditPathFor(sid), 'utf8').split('\n').filter(Boolean);
+  assert.deepEqual(recorded, ['/x/a.md', '/x/b.md']);
+  fs.rmSync(sessionEditPathFor(sid), { force: true });
 });

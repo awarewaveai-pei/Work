@@ -58,7 +58,8 @@
           "accumulator",
           "design-quality",
           "test-runner",
-          "code-change-tracker"
+          "code-change-tracker",
+          "session-edit-tracker"
         ]
       },
       {

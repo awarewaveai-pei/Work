@@ -533,7 +533,7 @@
   - **下一步**：照本檔 §條目格式規約的固定槽位（一句話／現在到哪／下一步／完成定義／卡點／證據）逐條歸位。**這是判斷工作，不能機器化**，故與拆行分開做。
   - **完成定義**：所有開放項的子項標籤都落在規約列出的詞彙表內；新寫入的條目照模板。
 
-- [ ] **【2026-08-26 開出｜🔴 交叉污染｜第 4 個 `git add -A`】AO-CLOSE 的 `git add -A` 會掃走其他 session 進行中的檔案**
+- [x] **【2026-08-26 開出｜🔴 交叉污染｜第 4 個 `git add -A`】AO-CLOSE 的 `git add -A` 會掃走其他 session 進行中的檔案**
   - **實際發生於 2026-08-26**：另一 session 的 AO-CLOSE 把本 session 6 個未完成檔案（`app/api/video/{generate,render-draft,status}/route.ts`、`lib/content/video/job-store.ts`、`packages/db/{migrations,scripts}/0060_*`）掃進 `2dbe858a`（標題「fix(reports): 報告保留政策」，1247 檔）。
   - **兩層後果**：
     - ① 一批資安修改被歸屬到完全不相干的 commit，30 秒故障手冊失效
@@ -553,6 +553,7 @@
     - **測試**：`tests/hooks/runner-parity.test.mjs` v3 新增 6 個 + v4 再新增 12 個（每個 Critical/Major/Minor finding 至少一個直接重現的回歸測試，含用真實 git repo + 真實 `spawnSync` 執行 + Pre/Post 兩階段呼叫，不是自我核對）+ 修正若干斷言原本在驗證 v2/v3 的錯誤行為，104 個全過。
     - **驗證**：`bash scripts/test-hooks.sh` → 104/104 全過。**未鏡射 `.codex/hooks/`——查證後這是刻意的，不是漏做**：`.codex/hooks/` 目前在工作區是「已刪除但未 commit」狀態，屬於續4 workstream（`sync-claude-to-codex.ps1` backtick bug 修復той那批）已明確標記「需操作者決定是否修復後再提交」的未決範圍（該 workstream 同時發現 `runner.js` 的 `isCodexPayload` 判別有真 bug，故意保留未 commit）。**已提交的 HEAD 版本 `.codex/hooks/` 仍是舊的獨立複製鏡像**（`git show HEAD:.codex/hooks/rules/git-add-scope-tracker.js` 證實），本次改動未同步。這是刻意的最小爆炸半徑選擇：兩條路都不需要我現在動 `.codex/hooks/`——若操作者最終接受續4 的新橋接架構（`.codex/hooks.json` 直接呼叫 `mcp/claude-userlevel/hooks/runner.js`，零複製），本次修的 SSOT 對 Codex 自動生效；若操作者否決、保留舊鏡像架構，屆時重新 commit 前跑一次 `mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1` 即可把本次修好的 3 個檔案同步過去——不是本次需要處理的範圍，記錄在此供接手的 session 參考。
     - **本項仍不打勾**：`ao-close.ps1:652` 的內部 `git add -A` 缺口原封不動，這次修的是「閘存在但沒真正生效」，不是「閘管不到的範圍」。兩個缺口都要關才能整條打勾。
+  - **【✅ 2026-09-03 已修復，本項整條打勾】** `ao-close.ps1` 的 `git add -A` 改成三來源聯集的 scoped add（新建 `session-edit-tracker.js` 追蹤 Write/Edit 過的任意檔案 + AO-CLOSE 自己 pipeline 執行前後的 `git status` diff + 沿用 `git-add-scope-tracker.js` 的既驗證清單）；whole-script 新增 merge/cherry-pick/revert/rebase/stash-pop/am 進行中偵測，提早中止拒絕在衝突狀態下跑。**3 輪真實外部 critic 覆審**，每輪都抓到新的真 bug（第 1 輪 1C+4M+6m；第 2 輪對第 1 輪的修法又抓到 2 個新 Critical，其中一個是會上 origin 的真資料遺失——foreign staged rename 只 reset 新路徑會誤刪別人的檔案；第 3 輪抓到**我自己在這次任務裡剛修過的同一個 bug class**又在新寫的 merge-conflict 中止檢查裡復發一次——`@()` 包錯位置導致空陣列變 `$null`，AO-CLOSE 100% 會 crash），全部修正並各自附真實重現測試。最後一輪額外做了「跑真實完整腳本（非抽出片段）對 D:\Work 本尊唯讀執行」驗證，直接對應第 3 輪抓到的 crash class，用完全相同方法論重現確認修好。細節見 `WORKLOG.md` 2026-09-03（續1）。**兩個缺口（閘本身 + ao-close.ps1）都已關閉，本項整條打勾**。
 
 - [ ] **【2026-08-26 開出｜營運｜搬站前必處理｜⚠️ 2026-08-30 稽核：疑似 MOOT，需操作者確認】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — 現況查證：`BACKUP_AUTO_STATUS.json` 最新 3 筆已全部 `Succeeded`（2026-08-26 起），`last_failure`（2026-08-24）已不是最新事件，本項描述的即時狀態已經過期。**更根本的是**：這條追的是 Hostinger 時代 WPvivid→Google Drive 那條備份鏈；Soulful 已於 2026-08-28 正式切換 Hostinger→ks-aw-01（`WORKLOG.md` "🎉 Soulful 正式切換完成"），現行備份走全新的 `ks-aw-01-backup` 管線（已實測 PASS，見 WORKLOG 2026-08-27）。舊 WPvivid 鏈的失敗模式**很可能隨舊主機一起結束**，但 WPvivid 外掛在新機上是否還在跑、是否該完全停用，本次稽核未查證，故列 MOOT 疑似而非直接關閉——需操作者確認新機上是否還留著這條舊備份路徑。
   - **這不是偵測器問題**Phase 4 Check 3 今天已經在正確地叫（3B「距上次成功 9 天」+ 3C「最新一次失敗」），是備份本身壞了。

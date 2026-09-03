@@ -1,5 +1,50 @@
 # Worklog
 
+## 2026-09-03（續1）
+
+### `ao-close.ps1` 的 `git add -A` 缺口（TASKS.md 544 最後一塊）——scoped add 全面重寫，3 輪真實外部 critic 覆審，每輪都抓到新的真 Critical/Major，最後一輪連自己那輪的修法都撞到自己剛修過的 bug class
+
+**觸發**：操作者確認要處理 [TASKS.md:544](TASKS.md) 記錄的已知缺口——`ao-close.ps1:668`（v1 行號）用 `git add -A` blind stage 整個工作目錄，跟這次任務稍早修的 git-scope-guard hooks 是同一個不變量、同一天發現、唯一還沒關的一塊。操作者明示「延續這次的架構師模式，設計+實作+真實測試」，並主動設下「subagent 一次不能超過 5 個，要省 token」的預算，但事後追加「如果有需要」放寬。
+
+**[任務理解]** AO-CLOSE 是預授權的自動 commit+push 腳本，每個 session 收工都會跑。`git add -A` 會把「這個 session 沒碰過的東西」一起吞進去——可能是另一個並行 session 尚未 commit 的工作。修法方向 TASKS.md 早就寫好：「改成只 add 本 session 觸碰過的路徑清單」。
+
+**[現況分析]** `code-change-tracker.js`（TASKS.md 原本建議的來源）不適用——只追蹤 code 副檔名、且被 `/verify-recent` 清空，AO-CLOSE 真正需要的是「這個 session Write/Edit 過的**任何**檔案，整個 session 期間，不會被清空」。這個 tracker 完全不存在，需要新建。
+
+**[方案]** 新增 `mcp/claude-userlevel/hooks/rules/session-edit-tracker.js`（PostToolUse on Write/Edit/MultiEdit，任何副檔名，獨立於既有兩個 tracker）。`ao-close.ps1` 的 staging 邏輯改成三個來源取聯集：A) session-edit-tracker 的清單 B) AO-CLOSE 自己 pipeline 執行前後的 `git status` diff（不是寫死路徑清單——pipeline 有 ~8 步且會一直長，diff 自動涵蓋未來新增的步驟）C) 這個 session 自己透過 `git-add-scope-tracker.js`（今天稍早才修好的那個)驗證過的 `git add`。三者之外、baseline 就已經 dirty 的東西——刻意留著不 stage：不是另一個 session 的東西，就是這個 session 用 Bash 腳本直接寫檔（沒經過 Write/Edit）沒被任何 tracker 看到，需要 agent 自己明確 `git add`。
+
+**[三輪真實外部 critic 覆審，每輪都抓到新的真 bug，不是同一批重複]**：
+
+- **第 1 輪**：1 Critical（`$stagePaths.Count` 在空陣列時因為 PowerShell 把空陣列摺成 `$null` 而直接 crash——跟這次任務稍早修的 git-scope-guard C1 是同一個 bug class）+ 4 Major（`-C`/pathspec 掃到整個 segment 文字被 commit message 內文騙過、`cd` 不分執行順序、quoted path 被空白 split 打碎、pathspec tail 掃錯範圍）+ 6 Minor，全部修正。
+- **第 2 輪**：對第 1 輪的修法再抓到 **2 個新 Critical**：C-A（rename 偵測只查一個 status 欄位，另一個真實 git shape `' R'` 會漏檢，導致垃圾路徑讓 `git add` exit 128 整批失敗）+ **C-B（會上 origin 的真資料遺失）**——foreign staged rename 只 reset 新路徑，舊路徑留在 index 變成一個「刪除另一個 session 檔案」的假 commit。加上 1 個 Major（M-D：unmerged/conflict 狀態被誤判成「foreign staged」，`git reset` 會摧毀 merge conflict 的 stage 1/2/3 blob 且讓下一個 `git commit` 悄悄結束別人沒解完的 merge），全部修正（含新增 whole-script 層級的 MERGE_HEAD/CHERRY_PICK_HEAD/REVERT_HEAD 提早中止）。
+- **第 3 輪**：**在我自己修 M-D 的那段程式碼裡，抓到我自己剛在這次任務稍早修過的同一個 bug class**——`@('MERGE_HEAD',...) | Where-Object {...}` 的 `@()` 包住的是陣列字面值不是 pipeline 結果，導致這個新檢查在「0 或 1 個 marker」（=每一次正常執行）時直接 crash，AO-CLOSE 100% 掛掉。加上 M3-1（marker 檔案清單是「照路徑」不是「照不變量」，真實 `git stash pop`/`git rebase`/`git am` 衝突都不會建立那 3 個 marker，改用 `git ls-files --unmerged` + `rev-parse --git-path` 涵蓋全部 sequencer 狀態）、M3-2（Unmerged 排除只做在 baseline 那一側，current 側没做，仍可能在跑到一半時把別人的衝突「解決掉」）、M3-3（M2 的 skeleton 報告修法只解決「沒 commit」，沒解決「agent 忘記覆寫/寫錯檔名時，stub 本身照樣被當成『已完成』通過既有的存在性檢查」——改成檢查內容有沒有還是 `AUTO-SKELETON` 字樣）+ 6 個 Minor。
+
+**方法論教訓（critic 自己點名）**：第 3 輪抓到的 crash 之所以在我自己的驗證裡漏掉，是因為我全部的測試都是「抽出函式片段單獨測」，從沒真的跑過完整腳本的頂層程式碼。第 3 輪修完後**改用 critic 同款方法**：把腳本 prologue 整段（含真正的頂層變數作用域）複製到 `scripts/` 目錄本身（讓 `$PSScriptRoot` 正確解析到真正的 sibling 腳本），對 D:\Work 這個真實、當下就有 700+ 個 dirty 檔案的 repo 跑一次唯讀探測——證實新檢查不再 crash，且輸出數字合理（`LeftUnstaged.Count = 725`，全部正確地沒被誤 stage）。
+
+**[已修改]**
+- [`mcp/claude-userlevel/hooks/rules/session-edit-tracker.js`](../mcp/claude-userlevel/hooks/rules/session-edit-tracker.js)（新增）
+- [`mcp/claude-userlevel/hooks/lib/shared.js`](../mcp/claude-userlevel/hooks/lib/shared.js)：新增 `getSessionEditTrackerPath`
+- [`mcp/claude-userlevel/hooks/rules.manifest.json`](../mcp/claude-userlevel/hooks/rules.manifest.json)：`session-edit-tracker` 掛進 `PostToolUse|Write|Edit`
+- [`scripts/ao-close.ps1`](../scripts/ao-close.ps1)：`Get-GitPreflightSnapshot` 新增 `StatusRawZ`（`-z --untracked-files=all`，取代原本的文字模式 porcelain）；新增 `Get-AoCloseStagePaths`（含 `ConvertTo-RepoRelativePath`/`ConvertTo-StatusPathMap` 兩個內部函式，處理 rename/copy 雙路徑、merge conflict 排除、大小寫敏感比對）；whole-script 層級新增 merge/cherry-pick/revert/rebase/stash-pop/am 進行中偵測（`git ls-files --unmerged` + `rev-parse --git-path` 涵蓋全部 sequencer 狀態）；`git add -A` 換成分批（100 筆一批）的具名 `git add`；新增 foreign-staged-at-baseline 的分批 `git reset`（含 rename 雙路徑）；skeleton report 改為寫入後立刻自己 `git add`+`commit`+`push`（獨立小 commit，沿用 `$autoPrefix`，push 結果有檢查）；prior-close archive report guard 從「存在即可」升級為「內容不可還是 AUTO-SKELETON stub」
+- [`.claude/commands/ao-close.md`](../.claude/commands/ao-close.md)：Final Step 新增「agent 覆寫完 skeleton 後要自己 `git add`+`commit`+`push`」的明確指令（單一具名路徑，`git-add-scope-tracker.js` 不需要 ACK）
+- [`tests/hooks/helpers.mjs`](../tests/hooks/helpers.mjs) / [`tests/hooks/runner-parity.test.mjs`](../tests/hooks/runner-parity.test.mjs)：新增 4 個 `session-edit-tracker` 測試（任意副檔名、MultiEdit、不被 `/verify-recent` 清空、去重）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`[System.Management.Automation.Language.Parser]::ParseFile` 對 `ao-close.ps1` 全檔 | exit=0（每次修改後都重跑，全程 PARSE OK）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | 111/111 全過（含 4 個新增 session-edit-tracker 測試）
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=抽出真實 `Get-AoCloseStagePaths` 函式（非改寫版，`sed` 逐行切出）於真實 PowerShell 5.1（非 pwsh，`.claude/commands/ao-close.md` 記載的正式執行環境）+ 真實 scratch git repo，7 種情境同時測試（另一 session 工作目錄 dirty／另一 session staged／本 session 自己較早 staged／pipeline 新增檔案／pipeline 在新目錄新增檔案／pipeline 刪除／本 session 帶空白檔名）| exit=0 | 全部符合預期，且用真實 `git add --`/`git diff --cached --name-status` 驗證最終 index 狀態
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=真實 `git mv` 製造 rename 後 staged，模擬「foreign session」，驗證 `git reset` 同時處理新舊路徑 | exit=0 | 結果：`git diff --cached --name-status` 完全清空（無誤刪別人 rename 的 bug）、`git status --short` 正確顯示 rename 完整保留在 worktree 可復原
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=真實製造 `git merge` conflict（`MERGE_HEAD` 真的存在）| exit=0 | 結果：whole-script 中止檢查與 `Get-AoCloseStagePaths` 內建的 defense-in-depth 排除都正確觸發
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=**真實完整腳本**（非片段，複製 prologue 到 `scripts/` 目錄讓 `$PSScriptRoot` 正確解析）對 D:\Work 本尊唯讀執行至 `Get-AoCloseStagePaths` 呼叫點 | exit=0 | `REACHED-PROLOGUE-END-WITHOUT-CRASH`+`PROBE-COMPLETE-NO-CRASH`，`LeftUnstaged.Count=725`（D:\Work 當下真實混亂狀態，全部正確不被誤 stage）——這個測試直接對應第 3 輪 critic 抓到的 crash class，用完全相同方法論重現並確認修好
+- REVIEW_DONE: critic=Deep（3 輪真實外部 critic subagent，非自查；第 3 輪因 Opus rate limit 中斷一次，用 SendMessage resume 同一個 agent 帶著完整 context 續跑完成）| verdict=fail→fail→fail→（本輪）已修正 | findings=第1輪 1C+4M+6m、第2輪 2C+1M（含跨 session 真資料遺失級）、第3輪 1C+3M+6m，全部逐條修正並個別附真實重現測試
+- BUGHUNT_DONE: scope=mcp/claude-userlevel/hooks,agency-os,scripts,tests,.claude | grep=`git add -A`（確認 ao-close.ps1 內不再有任何**會真的執行**的 blind broad add）+ `\.StatusLines\b`（確認舊屬性名沒有殘留引用，已全部改名 StatusRawZ）| hits=`git add -A` 在 `scripts/ao-close.ps1` 命中 9 處，逐一核對後**全部是註解**（解釋改動前後對照，例如「Replaces `git add -A`」「OLD `git add -A`」），零處是真的會執行的指令——原本寫「零命中」不準確，訂正為「9 處註解命中，0 處可執行程式碼命中」；`.StatusLines` 在 `mcp/ scripts/ agency-os/ tests/` 零命中，僅 WORKLOG/TASKS 歷史敘述行提及（正常，那些是文件不是程式碼）
+
+**[剩餘風險]**
+- m3（round 2 已承認）：baseline 快照到實際 staging 之間有數分鐘的 pipeline 執行窗口，這段時間另一個 session 的變更仍可能被誤判成「這次 pipeline 自己的輸出」——`LeftUnstaged`/foreign-staged 的即時報告是唯一緩解，沒有徹底關閉（設計上的已知取捨，跟 hardcode allowlist 的取捨互斥，選了更 robust 的那個）
+- 這次全程唯讀驗證，**真正的活體端到端測試（含真的 commit+push）留給這次對話實際收工時的那次真實 AO-CLOSE**——這是操作者原本同意的「抓乾淨的時機點」
+- `.claude/commands/ao-close.md` 的新指令依賴 agent 自己記得執行（`prior-close archive report guard` 的內容檢查是唯一的機械保險，但要等**下一次** AO-CLOSE 才會驗到這一次的報告）
+
+**[rollback]** `git revert` 本次 commit；`ao-close.ps1` 回到 v1 的 `git add -A`（重新打開 TASKS.md 544 的原始缺口，但不會比現在更壞——這次的每一版中繼態都被真實測試擋下，沒有任何一版壞掉的邏輯進過 commit）。
+
 ## 2026-09-03
 
 ### docs(hci): resolve remaining 18 HD open decisions + 8 constitutional ADRs under operator delegation

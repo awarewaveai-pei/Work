@@ -92,6 +92,13 @@ export function writeGitStageTracker(sid, entries) {
   fs.writeFileSync(gitStagePathFor(sid), entries.join('\n') + '\n', 'utf8');
 }
 
+// Sibling tracker for session-edit-tracker.js (2026-09-03) / ao-close.ps1
+// scoped-add. See lib/shared.js getSessionEditTrackerPath header.
+export function sessionEditPathFor(sid) {
+  const sanitized = String(sid).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  return path.join(os.tmpdir(), `claude-session-edits-${sanitized}.txt`);
+}
+
 export function readFileSafe(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
 }

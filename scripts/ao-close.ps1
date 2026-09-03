@@ -134,6 +134,7 @@ function Get-GitPreflightSnapshot {
                 IsGitRepo   = $false
                 Branch      = ""
                 StatusLine  = ""
+                StatusRawZ  = ""
                 Ahead       = $null
                 Behind      = $null
                 Dirty       = $null
@@ -168,15 +169,33 @@ function Get-GitPreflightSnapshot {
             }
         }
 
-        $dirty = @(
-            git status --porcelain 2>$null |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        ).Count -gt 0
+        # `-z`: NOT `--porcelain` text mode. Two real bugs found by critic review
+        # (2026-09-03) on the FIRST version of the scoped-add fix that used text mode:
+        #   - text mode C-quotes any path containing a space (`"with space.md"`,
+        #     quotes included) even with core.quotepath=false, which only suppresses
+        #     non-ASCII escaping, not quoting -- 632 tracked paths in this repo contain
+        #     spaces. `-z` never quotes.
+        #   - default `--porcelain` (without `-uall`/`--untracked-files=all`) collapses
+        #     an untracked DIRECTORY into one line (`?? newdir/`), so a NEW file inside
+        #     a NEW directory (a normal shape for this session's own work) is invisible
+        #     to per-file parsing. `-uall` lists every untracked file individually.
+        # `-z` output is NUL-separated with NO quoting; a rename/copy entry is TWO
+        # consecutive NUL-terminated fields (`XY new-path\0old-path\0`, new path first
+        # -- verified empirically, this is the REVERSE of the human-readable
+        # `old -> new` arrow form). Captured as ONE raw string (not split into lines --
+        # there are no newlines in `-z` output, and PowerShell's native-command output
+        # capture does NOT truncate embedded NUL bytes within a single returned string,
+        # confirmed empirically on this machine's real powershell.exe 5.1). Parsed by
+        # Get-AoCloseStagePaths's ConvertTo-StatusPathMap, which needs real paths, not
+        # just a count.
+        $statusRawZ = (Invoke-WithUtf8Console { git -c core.quotepath=false status --porcelain -z --untracked-files=all }) -join ''
+        $dirty = -not [string]::IsNullOrEmpty($statusRawZ)
 
         return [pscustomobject]@{
             IsGitRepo   = $true
             Branch      = $branch
             StatusLine  = $statusLine
+            StatusRawZ  = $statusRawZ
             Ahead       = $ahead
             Behind      = $behind
             Dirty       = $dirty
@@ -188,12 +207,402 @@ function Get-GitPreflightSnapshot {
     }
 }
 
+# Replaces `git add -A` (TASKS.md 544 "AO-CLOSE 的 git add -A"): a bare, un-scoped
+# stage sweeps up ANY dirty file in this repo's shared working directory, including
+# another concurrent Claude Code session's uncommitted work -- attributed to whatever
+# commit message THIS AO-CLOSE run happens to write. Same invariant as
+# git-add-scope-tracker.js's 2026-09-02 fix (mcp/claude-userlevel/hooks/rules/): only
+# stage paths this session can actually account for.
+#
+# THREE sources, unioned (a third added 2026-09-03 after critic review found the
+# first version only handled the WORKING TREE, not the INDEX -- see M1 below):
+#   A. session-edit-tracker.js's tracker -- every file THIS session's Write/Edit/
+#      MultiEdit tool calls touched, any extension, for the WHOLE session (not
+#      cleared by /verify-recent or anything else).
+#   B. a before/after `git status --porcelain -z --untracked-files=all` diff
+#      bracketing AO-CLOSE's own pipeline (baseline captured at preflight, before
+#      scaffold/inbox-merge/checkmarks/dispatch/WORKLOG-rotate/prune-reports run;
+#      "after" taken here). Deliberately NOT a hardcoded path allowlist: AO-CLOSE's
+#      pipeline has ~8 steps today and grows over time, and a list needs updating
+#      every time a step's output path changes -- a status diff captures whatever
+#      changed without needing to know in advance where.
+#   C. git-add-scope-tracker.js's OWN tracker (the SAME session-scoped "files this
+#      session verified via `git add`" list that git-commit-scope-guard.js already
+#      uses to protect a bare `git commit` typed directly in a Bash tool call) --
+#      reused here so a file THIS session legitimately `git add`-ed earlier (and is
+#      therefore already sitting in the INDEX, not just the working tree) is not
+#      mistaken for "foreign" by the M1 guard below.
+# A path dirty at baseline that none of A/B/C account for is left UNSTAGED on
+# purpose: it is either another session's work, or a file this session changed some
+# OTHER way (e.g. a Bash script writing directly to disk) that was never routed
+# through Write/Edit or `git add` -- the agent must stage that explicitly if it
+# needs to be part of this commit, same as git-add-scope-tracker.js already
+# requires for a bare `git add`/`git commit`.
+#
+# M1 (critic finding, 2026-09-03): the working-tree diff above says nothing about
+# the INDEX. Another session can `git add` its own files and leave them staged,
+# mid-session, in this repo's shared index (a designed-for state --
+# git-add-scope-tracker.js actively expects sessions to do exactly this). `git
+# commit` publishes the WHOLE index, not just what THIS run just staged -- so
+# without this guard, AO-CLOSE would still absorb another session's already-staged
+# work under its own auto-generated message, the exact bug this fix exists to
+# close, just through the index instead of a blind `git add -A`. Caller
+# (ao-close.ps1's staging section) unstages ("git reset --") any baseline index
+# entry this function reports as foreign, BEFORE running the scoped `git add`.
+function Get-AoCloseStagePaths {
+    param(
+        [Parameter(Mandatory = $true)] [string]$RepoRoot,
+        [string]$BaselineStatusRawZ = ''
+    )
+
+    # NOT [System.IO.Path]::GetRelativePath -- that's .NET Core-only and this
+    # script runs under Windows PowerShell 5.1 (.NET Framework) in production
+    # (`powershell -ExecutionPolicy Bypass -File ao-close.ps1`, per
+    # .claude/commands/ao-close.md); calling it throws MethodNotFound. All these
+    # paths are already known to be under $RepoRoot, so a simple case-insensitive
+    # prefix strip is sufficient -- no need for full relative-path resolution
+    # (no `..` traversal to handle).
+    #
+    # M4 (critic finding): CLAUDE.md documents `.claude/` in the repo as a junction
+    # to `~/.claude/`. A Write/Edit tool call can address the SAME file via either
+    # path (repo-relative-resolved-absolute, or the profile-side junction target),
+    # and only the FIRST form strips to a repo-relative path directly. If the direct
+    # strip fails, retry against the junction target so a session edit made via the
+    # profile-side path is not silently dropped from staging.
+    function ConvertTo-RepoRelativePath {
+        param([string]$RepoRoot, [string]$AbsPath)
+        $rootNorm = ($RepoRoot.TrimEnd('\', '/') -replace '/', '\')
+        $pathNorm = ($AbsPath -replace '/', '\')
+        if ($pathNorm.Length -gt $rootNorm.Length -and
+            $pathNorm.Substring(0, $rootNorm.Length).ToLowerInvariant() -eq $rootNorm.ToLowerInvariant() -and
+            $pathNorm[$rootNorm.Length] -eq '\') {
+            return ($pathNorm.Substring($rootNorm.Length + 1) -replace '\\', '/')
+        }
+        $claudeJunctionPath = Join-Path $RepoRoot ".claude"
+        if (Test-Path -LiteralPath $claudeJunctionPath) {
+            try {
+                $junctionItem = Get-Item -LiteralPath $claudeJunctionPath -Force -ErrorAction Stop
+                $target = $null
+                if ($junctionItem.PSObject.Properties['Target'] -and $junctionItem.Target) {
+                    $target = $junctionItem.Target | Select-Object -First 1
+                }
+                if ($target) {
+                    $targetNorm = ($target.TrimEnd('\', '/') -replace '/', '\')
+                    if ($pathNorm.Length -gt $targetNorm.Length -and
+                        $pathNorm.Substring(0, $targetNorm.Length).ToLowerInvariant() -eq $targetNorm.ToLowerInvariant() -and
+                        $pathNorm[$targetNorm.Length] -eq '\') {
+                        return (".claude/" + ($pathNorm.Substring($targetNorm.Length + 1) -replace '\\', '/'))
+                    }
+                }
+            } catch {
+                # Get-Item on the junction failed -- fall through to $null rather than guess.
+            }
+        }
+        return $null
+    }
+
+    # C2/C3 fix (critic findings, 2026-09-03): the first version of this function
+    # parsed `git status --porcelain` TEXT output, which (a) C-quotes any path
+    # containing a space even with core.quotepath=false (that setting only
+    # suppresses non-ASCII escaping, not quoting -- 632 tracked paths in this repo
+    # contain spaces) and (b) without `-uall` collapses a whole untracked directory
+    # into one line, so a new file inside a new directory was invisible to per-file
+    # parsing. `-z --untracked-files=all` fixes both: NUL-separated, never quoted,
+    # every untracked file listed individually. A rename/copy entry is TWO
+    # consecutive NUL-terminated fields (`XY new-path\0old-path\0`, NEW path first
+    # -- verified empirically; this is the REVERSE of the human-readable
+    # `old -> new` arrow form `git status` uses without `-z`).
+    # v2 (critic round 2, 2026-09-03 -- 2 more Critical findings on the v1 of this
+    # function, reproduced live):
+    #   - C-A: rename/copy is only correctly signaled by column 1 (Y) in some git
+    #     shapes (` R`/` C`, e.g. a worktree-only rename with an intent-to-add index
+    #     entry -- reachable via `git add -N`, which `git stash -u` and some editor
+    #     integrations use). Checking only `$xy[0]` missed these, so the paired
+    #     OLD-path token got RE-PARSED as if it were its own status entry --
+    #     `Substring(0,2)`/`Substring(3)` on a bare filename produces a GARBAGE path
+    #     that then either hard-aborts a later `git add` (pathspec matches nothing,
+    #     exit 128) or silently no-ops a `git reset`. Fixed: check BOTH `$xy[0]` and
+    #     `$xy[1]`.
+    #   - C-B: even with C-A fixed, `git reset -- <new-path>` on a FOREIGN staged
+    #     rename only removes the new-path index entry, leaving the old path staged
+    #     as a bare deletion -- AO-CLOSE would then commit "deleted: <old-path>" for
+    #     a file another session only renamed, never deleted. Fixed: this function
+    #     now also returns a new-path -> old-path map so the caller can reset BOTH
+    #     paths for any foreign rename/copy.
+    # m3-3 fix (critic round 3): the old `if ($null -ne $old)` guard on
+    # `$tokens[$i+1]` was dead code -- under this script's own Set-StrictMode, an
+    # out-of-bounds array index throws IndexOutOfRangeException, it does not
+    # return $null. Not reachable with well-formed `-z` output (git always
+    # NUL-terminates the final token too, so a trailing "" element follows any
+    # real rename entry), but the guard as written claimed a safety it didn't
+    # have. Fixed with an explicit bounds check.
+    # m3-4 fix (critic round 3): bare `@{}` hashtables are case-INSENSITIVE by
+    # default in PowerShell -- silently undoes the case-sensitive Ordinal
+    # HashSets used downstream ($targetSet/$stageSet, m6) if two case-variant
+    # paths ever appear in one status output (e.g. this session's `foo.md` vs.
+    # another session's staged `Foo.md`). Fixed with an explicit ordinal
+    # comparer on both hashtables.
+    function ConvertTo-StatusPathMap {
+        param([string]$RawZ)
+        $map = New-Object System.Collections.Hashtable ([StringComparer]::Ordinal)
+        $renameOldPath = New-Object System.Collections.Hashtable ([StringComparer]::Ordinal)
+        $unmerged = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::Ordinal)
+        if ([string]::IsNullOrEmpty($RawZ)) {
+            return [pscustomobject]@{ Map = $map; RenameOldPath = $renameOldPath; Unmerged = $unmerged }
+        }
+        $tokens = $RawZ -split "`0"
+        $i = 0
+        while ($i -lt $tokens.Count) {
+            $entry = $tokens[$i]
+            if ([string]::IsNullOrEmpty($entry) -or $entry.Length -lt 3) { $i++; continue }
+            $xy = $entry.Substring(0, 2)
+            $p  = $entry.Substring(3)
+            $map[$p] = $entry
+            # Merge conflict shapes (git status --porcelain table): UU, AA, DD, AU,
+            # UA, DU, UD -- ANY of these has 'U' in a column, or is the literal 'AA'/
+            # 'DD' pair. M-D fix: these must never be treated as "just another staged
+            # file" -- the caller aborts rather than `git reset`-ing them (that would
+            # destroy the conflict's stage-1/2/3 blobs, see header note at the reset
+            # call site).
+            if ($xy[0] -eq 'U' -or $xy[1] -eq 'U' -or $xy -eq 'AA' -or $xy -eq 'DD') {
+                [void]$unmerged.Add($p)
+            }
+            if ($xy[0] -eq 'R' -or $xy[0] -eq 'C' -or $xy[1] -eq 'R' -or $xy[1] -eq 'C') {
+                if ($i + 1 -lt $tokens.Count) { $renameOldPath[$p] = $tokens[$i + 1] }
+                $i += 2  # skip the paired OLD-path token
+            } else {
+                $i += 1
+            }
+        }
+        return [pscustomobject]@{ Map = $map; RenameOldPath = $renameOldPath; Unmerged = $unmerged }
+    }
+
+    Push-Location $RepoRoot
+    try {
+        $currentRawZ = (Invoke-WithUtf8Console { git -c core.quotepath=false status --porcelain -z --untracked-files=all }) -join ''
+    } finally {
+        Pop-Location
+    }
+    $baselineInfo = ConvertTo-StatusPathMap -RawZ $BaselineStatusRawZ
+    $currentInfo  = ConvertTo-StatusPathMap -RawZ $currentRawZ
+    $baselineMap = $baselineInfo.Map
+    $currentMap  = $currentInfo.Map
+
+    # B: present now with a DIFFERENT (or absent-at-baseline) status entry.
+    # M3-2 fix (critic round 3): the Unmerged exclusion below only covered the
+    # BASELINE side -- a path that was clean at baseline but becomes a live
+    # conflict DURING this run (e.g. AO-CLOSE's own pipeline writes to a file
+    # that's mid-`git stash pop` conflict for someone else, changing its status
+    # entry) was still eligible for `$pipelinePaths` and would get `git add`-ed,
+    # RESOLVING that conflict as a side effect. Excluded here too; the primary
+    # whole-script abort above should make this unreachable in practice, but this
+    # is defense-in-depth for the same reason the baseline-side exclusion is.
+    $pipelinePaths = @($currentMap.Keys | Where-Object {
+        (-not $baselineMap.ContainsKey($_) -or $baselineMap[$_] -ne $currentMap[$_]) -and
+            -not $currentInfo.Unmerged.Contains($_)
+    })
+
+    # M1: baseline INDEX entries (first status char not ' ' and not '?') that this
+    # session's OWN git-add-scope-tracker.js tracker does not claim -- i.e. staged
+    # by someone/something else before this run even started.
+    # IgnoreCase deliberately, unlike $targetSet/$stageSet below (m6, case-sensitive
+    # Ordinal): this set is membership-tested against Windows filesystem paths from a
+    # tracker file, mirroring lib/shared.js normalizePath()'s win32 case-insensitive
+    # dedup for the SAME tracker on the JS side -- not an oversight.
+    $ownGitAddSet = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
+    $sidHelperPath = Join-Path $PSScriptRoot "verify-sid-shared.ps1"
+    $sid = $null
+    # m2 fix (critic finding): writeTracker() in lib/shared.js caps a tracker at
+    # TRACKER_MAX_ENTRIES (500) and appends a `# +N entries truncated` marker line
+    # once a session crosses that -- the ONE signal that data was lost. Both
+    # trackers read below used to filter `^#` lines and discard that marker
+    # silently along with genuine comments. $trackerTruncated below surfaces it.
+    $trackerTruncated = $false
+    if (Test-Path -LiteralPath $sidHelperPath) {
+        . $sidHelperPath
+        $sid = Get-VerifySid
+        $gitAddTrackerFile = Join-Path $env:TEMP "claude-git-staged-$sid.txt"
+        if (Test-Path -LiteralPath $gitAddTrackerFile) {
+            $gitAddRawLines = @(Get-Content -LiteralPath $gitAddTrackerFile -Encoding UTF8 | ForEach-Object { $_.Trim() })
+            if ($gitAddRawLines | Where-Object { $_ -match '^#.*truncated' }) { $trackerTruncated = $true }
+            $gitAddRawLines | Where-Object { $_ -and $_ -notmatch '^#' } |
+                ForEach-Object { [void]$ownGitAddSet.Add($_) }
+        }
+    }
+    # M-D fix (critic round 2): an unmerged path (conflict stages 1/2/3 --
+    # UU/AA/DD/AU/UA/DU/UD) must NEVER be treated as "just another foreign staged
+    # file" -- `git reset -- <path>` on one DESTROYS the conflict's stage entries
+    # (verified: `git ls-files -u` goes from 3 stages to none after reset) while
+    # leaving MERGE_HEAD in place, so the NEXT `git commit` silently CONCLUDES
+    # someone else's unresolved merge with whatever half-state remains -- and the
+    # conflict-marker gate elsewhere in this script can no longer see it, because
+    # the file is no longer staged. The whole-script MERGE_HEAD/CHERRY_PICK_HEAD/
+    # REVERT_HEAD check right after Get-GitPreflightSnapshot below is the primary
+    # defense (aborts before ANY pipeline step runs); this exclusion is
+    # defense-in-depth for the case that check somehow misses (e.g. a conflict
+    # left over from something other than merge/cherry-pick/revert).
+    $foreignStagedAtBaseline = @($baselineMap.Keys | Where-Object {
+        $entry = $baselineMap[$_]
+        $entry.Length -ge 1 -and $entry[0] -ne ' ' -and $entry[0] -ne '?' -and
+            -not $ownGitAddSet.Contains($_) -and -not $baselineInfo.Unmerged.Contains($_)
+    })
+    # C-B fix (critic round 2): a foreign staged RENAME/COPY is keyed on the NEW
+    # path only; resetting just that path leaves the OLD path staged as a bare
+    # deletion -- AO-CLOSE would then commit "deleted: <old path>" for a file
+    # another session only renamed. Expand the reset target list to include the
+    # paired old path for any foreign entry that is a rename/copy.
+    # m3-2 fix (critic round 3): if that OLD path happens to be something THIS
+    # session separately, legitimately `git add`-ed (this session staged A;
+    # another session then `git mv A B`) -- resetting it would discard this
+    # session's own staged content (A no longer exists on disk once moved, so
+    # it's only recoverable as a dangling blob). Skip + warn instead of silently
+    # preferring the foreign rename in that narrow collision.
+    $foreignStagedResetPaths = @()
+    foreach ($p in $foreignStagedAtBaseline) {
+        $foreignStagedResetPaths += $p
+        if ($baselineInfo.RenameOldPath.ContainsKey($p)) {
+            $oldPath = $baselineInfo.RenameOldPath[$p]
+            if ($ownGitAddSet.Contains($oldPath)) {
+                Write-Warning "ao-close: '$oldPath' is both this session's own staged content AND the source of a foreign rename to '$p' -- NOT resetting it (would discard this session's own staged blob). Leaving '$p' staged may still absorb the foreign rename; check manually."
+            } else {
+                $foreignStagedResetPaths += $oldPath
+            }
+        }
+    }
+    $foreignStagedResetPaths = @($foreignStagedResetPaths | Select-Object -Unique)
+
+    # A: session-edit-tracker.js's list, normalized to repo-relative (the tracker
+    # stores whatever path form the tool_input used, typically absolute).
+    $sessionRelPaths = @()
+    $sessionTrackerMissing = $true
+    if ($sid) {
+        $editTrackerFile = Join-Path $env:TEMP "claude-session-edits-$sid.txt"
+        if (Test-Path -LiteralPath $editTrackerFile) {
+            $sessionTrackerMissing = $false
+            $editRawLines = @(Get-Content -LiteralPath $editTrackerFile -Encoding UTF8 | ForEach-Object { $_.Trim() })
+            if ($editRawLines | Where-Object { $_ -match '^#.*truncated' }) { $trackerTruncated = $true }
+            $rawSessionPaths = @($editRawLines | Where-Object { $_ -and $_ -notmatch '^#' })
+            foreach ($p in $rawSessionPaths) {
+                $abs = if ([System.IO.Path]::IsPathRooted($p)) { $p } else { Join-Path $RepoRoot $p }
+                $rel = ConvertTo-RepoRelativePath -RepoRoot $RepoRoot -AbsPath $abs
+                if ($rel) { $sessionRelPaths += $rel } # $null -> outside RepoRoot, skip rather than guess
+            }
+        }
+    }
+
+    # M6: deliberately a case-sensitive .NET HashSet, not `Select-Object -Unique`
+    # (git paths are case-sensitive; correction, critic round 3: `-Unique` was
+    # measured NOT to collapse case-variant strings on PS 5.1 either, so the
+    # original "-Unique is case-insensitive" rationale was itself wrong -- but an
+    # explicit Ordinal HashSet is still the right, unambiguous choice here, and
+    # critically the OLD-path addition further below (C-B fix) depends on this
+    # collection actually being ordinal, not on whatever `-Unique`'s real
+    # comparison semantics happen to be).
+    $targetSet = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::Ordinal)
+    foreach ($p in ($pipelinePaths + $sessionRelPaths)) { [void]$targetSet.Add($p) }
+    # Only paths ACTUALLY dirty right now: drops anything from the session tracker
+    # that was already committed/reverted some other way, and avoids a no-op `git add`
+    # warning for a clean path.
+    $stagePaths = @($targetSet | Where-Object { $currentMap.ContainsKey($_) })
+
+    # M3: everything dirty right now that this function is NOT staging AND is not
+    # already legitimately staged some other way (source C -- own git-add-tracker
+    # entries are already sitting correctly in the index; they don't appear in
+    # $stagePaths because there is nothing left to `git add`, not because they were
+    # dropped), for the caller to print -- turns every silent-drop scenario above
+    # into a visible one.
+    $stageSet = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::Ordinal)
+    foreach ($p in $stagePaths) { [void]$stageSet.Add($p) }
+    $leftUnstaged = @($currentMap.Keys | Where-Object {
+        if ($stageSet.Contains($_)) { return $false }
+        $entry = $currentMap[$_]
+        $alreadyLegitimatelyStaged = ($entry.Length -ge 1 -and $entry[0] -ne ' ' -and $entry[0] -ne '?' -and $ownGitAddSet.Contains($_))
+        -not $alreadyLegitimatelyStaged
+    })
+
+    return [pscustomobject]@{
+        StagePaths              = $stagePaths
+        ForeignStagedAtBaseline = $foreignStagedAtBaseline   # for display: new-path names only
+        ForeignStagedResetPaths = $foreignStagedResetPaths   # for `git reset --`: includes paired old paths (C-B)
+        LeftUnstaged            = $leftUnstaged
+        SessionTrackerMissing   = $sessionTrackerMissing
+        TrackerTruncated        = $trackerTruncated
+    }
+}
+
 Write-Host "== AO-CLOSE: preflight git snapshot (branch/ahead/behind/dirty) ==" -ForegroundColor Cyan
 $preflight = Get-GitPreflightSnapshot -RepoRoot $WorkRoot
 if (-not $preflight.IsGitRepo) {
     Write-Error "ao-close: not a git repository at $WorkRoot"
     exit 1
 }
+
+# M-D fix, primary defense (critic round 2, 2026-09-03): a merge/cherry-pick/
+# revert/rebase/stash-pop/am genuinely in progress leaves conflict-stage index
+# entries (UU/AA/DD/...) that the scoped-add machinery below must never touch --
+# `git reset -- <path>` on one destroys the conflict's stage 1/2/3 blobs, so the
+# next `git commit` would silently CONCLUDE someone else's unresolved operation
+# with whatever half-state remains, and the conflict-marker gate further down
+# this script can no longer see it (the file is no longer staged).
+#
+# v2 (critic round 3, 2026-09-03 -- TWO more real bugs found in v1 of this exact
+# check, both reproduced live):
+#   - C3-1 (Critical): `@('MERGE_HEAD', ...) | Where-Object {...}` -- the `@()`
+#     wraps the ARRAY LITERAL, not the pipeline's result. `Where-Object` with
+#     zero matches (the normal case, every ordinary run) returns $null, and
+#     exactly one match returns a bare [String] -- both throw
+#     PropertyNotFoundStrict on `.Count` under this script's own
+#     Set-StrictMode. Reproduced: AO-CLOSE crashed on 100% of runs with zero or
+#     one marker present, i.e. every normal run and every real single-marker
+#     conflict -- only "2+ markers simultaneously" (essentially never) survived
+#     to the intended `exit 1`. The EXACT C1 bug class this same pass already
+#     fixed elsewhere, reintroduced fresh in this new check. Fixed by wrapping
+#     the WHOLE pipeline: `@(@(...) | Where-Object {...})`.
+#   - M3-1 (Major): checking only 3 marker FILES is path-shaped, not
+#     invariant-shaped. Measured against this repo's own real tooling
+#     (git-align-main-aoresume-feature.ps1's documented `git stash pop`
+#     conflict recovery path; ao-resume.ps1's documented `git rebase
+#     --continue` recovery path): a conflicted `git stash pop` leaves ONLY
+#     `AUTO_MERGE` (no MERGE_HEAD); a conflicted `git rebase`/`git am -3`
+#     leaves `REBASE_HEAD` + `rebase-merge`/`rebase-apply` (not one of the
+#     three checked); and a rebase whose conflicts were already resolved +
+#     `git add`-ed but not yet `--continue`d has NO unmerged index entries AT
+#     ALL while still mid-rebase on a detached HEAD -- invisible to both the
+#     marker check AND the Unmerged status-code exclusion. The real invariant
+#     is "no unmerged index entries AND no sequencer operation in progress",
+#     checked via `git ls-files --unmerged` (catches every conflict-shaped
+#     index state regardless of which operation produced it) UNIONED with the
+#     broader marker/directory set `git rev-parse --git-path` resolves
+#     correctly even from a linked worktree (m3-1's `Join-Path .git` did not).
+$inProgressMarkers = @('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer')
+$inProgress = @($inProgressMarkers | Where-Object {
+    $p = (Invoke-WithUtf8Console { git -C $WorkRoot rev-parse --git-path $_ 2>$null }).Trim()
+    $p -and (Test-Path -LiteralPath $p)
+})
+$unmergedNow = @(Invoke-WithUtf8Console { git -C $WorkRoot ls-files --unmerged } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($inProgress.Count -gt 0 -or $unmergedNow.Count -gt 0) {
+    Write-Host @"
+ao-close: refusing to run -- a merge/cherry-pick/revert/rebase/stash-pop/am
+operation is in progress in $WorkRoot ($(if ($inProgress.Count -gt 0) { "markers: $($inProgress -join ', ')" } else { "$($unmergedNow.Count) unmerged path(s)" })).
+AO-CLOSE's scoped `git add`/`git reset` logic is not safe to run over an
+unresolved operation (it can destroy conflict stage entries and silently
+conclude the operation with the wrong content). Resolve or abort it first
+(e.g. `git merge --abort` / `git cherry-pick --abort` / `git revert --abort` /
+`git rebase --abort` / `git am --abort`, or finish resolving and continue it),
+then re-run AO-CLOSE.
+"@ -ForegroundColor Red
+    exit 1
+}
+
+# Baseline for the scoped `git add` below (replaces `git add -A` -- TASKS.md 544):
+# captured HERE, before any pipeline step (scaffold/inbox-merge/checkmarks/dispatch/
+# WORKLOG-rotate/prune-reports) has run, so Get-AoCloseStagePaths can tell "AO-CLOSE's
+# own output this run" apart from "was already dirty before this run started" (which
+# may be another concurrent session's uncommitted work in this repo's shared working
+# directory, or this session's own earlier edits already captured separately via the
+# session-edit-tracker).
+$aoCloseBaselineStatus = $preflight.StatusRawZ
 if (-not [string]::IsNullOrWhiteSpace($preflight.StatusLine)) {
     Write-Host "  status: $($preflight.StatusLine)" -ForegroundColor DarkGray
 }
@@ -335,6 +744,18 @@ try {
                 Add-CloseoutGateResult -Gate $gate -Name "prior AO-CLOSE archive report" -Failed $true `
                     -Detail "last AO-CLOSE sync commit ($($m.Groups[1].Value) $($m.Groups[2].Value)) has no archive report at agency-os/reports/ao-close/$rptName" `
                     -Fix "write the four-section AO-CLOSE report to agency-os/reports/ao-close/$rptName (ao-close skill Final Step), then re-run ao-close.ps1"
+            } elseif ((Get-Content -LiteralPath $rptPath -Raw -Encoding UTF8) -match 'AUTO-SKELETON') {
+                # M3-3 fix (critic round 3): existence alone is not enough once this
+                # script commits+pushes the skeleton itself (M2/M-C fix, 2026-09-03) --
+                # "forgot to overwrite", "overwrote but forgot to commit", and "wrong
+                # timestamp guessed" all now leave a file that EXISTS at $rptPath and
+                # would silently pass an existence-only check, while what actually
+                # reached origin is the stub whose own text says "seeing this stub
+                # committed means the agent forgot to fill it". Keyed on the literal
+                # marker this script itself writes into the skeleton template below.
+                Add-CloseoutGateResult -Gate $gate -Name "prior AO-CLOSE archive report content" -Failed $true `
+                    -Detail "agency-os/reports/ao-close/$rptName is still the AUTO-SKELETON stub (agent did not overwrite it, or overwrote but never committed it)" `
+                    -Fix "overwrite it with the real four-section report, then git add + commit + push it (ao-close skill Final Step), then re-run ao-close.ps1"
             } else {
                 Write-Host "  prior-close report present: $rptName" -ForegroundColor DarkGray
             }
@@ -462,6 +883,22 @@ if (Test-Path -LiteralPath $syncScript) {
     }
 }
 # --- end Claude Code user-level sync self-heal ---
+
+# --- Codex Claude-first bridge self-heal and proof ---
+$codexBridgeSync = Join-Path $WorkRoot "mcp\codex-userlevel\scripts\sync-claude-to-codex.ps1"
+$codexParityCheck = Join-Path $WorkRoot "mcp\codex-userlevel\scripts\check-claude-codex-parity.ps1"
+if ((Test-Path -LiteralPath $codexBridgeSync) -and (Test-Path -LiteralPath (Join-Path $env:USERPROFILE '.codex'))) {
+    Write-Host "== AO-CLOSE: Codex Claude-first bridge sync + parity proof ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $codexBridgeSync -WorkRoot $WorkRoot -Mode linked
+    if ($LASTEXITCODE -ne 0) {
+        Add-CloseoutGateResult -Gate $gate -Name "codex Claude-first bridge sync" -Failed $true -Detail "sync-claude-to-codex exited $LASTEXITCODE" -Fix "run mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1 -WorkRoot $WorkRoot -Mode linked and inspect its backup"
+    } elseif (Test-Path -LiteralPath $codexParityCheck) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $codexParityCheck -WorkRoot $WorkRoot
+        if ($LASTEXITCODE -ne 0) {
+            Add-CloseoutGateResult -Gate $gate -Name "codex Claude-first bridge parity" -Failed $true -Detail "check-claude-codex-parity exited $LASTEXITCODE" -Fix "repair the failed named parity check, then rerun the generated bridge sync"
+        }
+    }
+}
 
 Write-Host "== AO-CLOSE: system-guard (doc-sync + health + guard) ==" -ForegroundColor Cyan
 $guardArgs = @("-WorkspaceRoot", $agencyRoot, "-Mode", "manual")
@@ -619,20 +1056,28 @@ Run /verify-recent (or /verify-recent --trivial for comment-only edits), then re
         }
     }
 
-    # ── Last line of defence before `git add -A` (moved here 2026-08-25) ──────────
+    # ── Last line of defence before staging (moved here 2026-08-25; staging itself
+    # de-scoped from `git add -A` on 2026-09-03, see Get-AoCloseStagePaths above) ──
     # These two guards lived in commit-checkpoint.ps1 and protected ITS `git add -A`.
-    # That call site is gone (checkpoint now requires explicit -Paths), but the hazards
-    # were never about which script staged everything -- they are about `git add -A`
-    # itself, and this is now the only one left in the repo. Leaving the guards behind
-    # in a script that no longer stages blindly would have retired the protection while
-    # keeping the danger.
+    # That call site is gone (checkpoint now requires explicit -Paths), and THIS
+    # call site no longer blindly stages everything either -- but both guards stay:
+    # Guard 1 is still relevant whenever `.claude` paths legitimately end up in the
+    # scoped list (this session edited something under `.claude/`), and Guard 2 is
+    # cheap, unconditional insurance against a scoped path itself being shell-junk
+    # (e.g. a stray `$null` this session's own tool calls happened to create).
+    # Leaving the guards behind in a script that no longer stages blindly would have
+    # retired the protection while the danger (a broken junction, stray junk) can
+    # still occur for the SAME underlying reasons, just through a narrower door.
 
     # Guard 1 -- broken .claude junction. ensure-claude-junction.ps1 runs at
     # UserPromptSubmit STEP 0 and at health gate 12b, but both are point-in-time: if the
     # junction dies mid-session, every earlier check has already passed and nothing
-    # stands between `git add -A` and a commit that deletes the whole shared .claude/
-    # tree for every machine. Observed twice: 49 tracked files (2026-05-28, 0d63eb9) and
-    # 12 files under .claude/plans/ (853cd26a). Runs immediately before staging.
+    # stands between staging `.claude/...` paths and a commit that deletes the whole
+    # shared .claude/ tree for every machine. Observed twice: 49 tracked files
+    # (2026-05-28, 0d63eb9) and 12 files under .claude/plans/ (853cd26a, back when
+    # staging WAS `git add -A`; kept as a guard because the failure mode is identical
+    # whenever `.claude` paths are in the scoped list, not specific to `-A`). Runs
+    # immediately before staging.
     $claudeJunction = Join-Path $WorkRoot ".claude"
     # UTF-8 wrapped: tracked paths under .claude/ may contain non-ASCII, and a CP950
     # console mangles them on capture (scripts/audit-cp950-traps.ps1 trap class).
@@ -640,8 +1085,8 @@ Run /verify-recent (or /verify-recent --trivial for comment-only edits), then re
     if ($claudeTracked.Count -gt 0 -and -not (Test-Path -LiteralPath $claudeJunction)) {
         Write-Error @"
 ao-close: refusing to stage. '.claude' is tracked in git ($($claudeTracked.Count) files)
-but does not exist on disk. The junction is broken, so 'git add -A' would stage every one
-of those files as a DELETION and propagate it to all machines on push.
+but does not exist on disk. The junction is broken, so staging any '.claude/...' path
+would record it as a DELETION and propagate that to all machines on push.
 
 Repair it first, then re-run:
   powershell -NoProfile -ExecutionPolicy Bypass -File "$WorkRoot\scripts\ensure-claude-junction.ps1"
@@ -649,17 +1094,109 @@ Repair it first, then re-run:
         exit 1
     }
 
-    git add -A
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "ao-close: git add failed"
-        exit 1
+    # Scoped add (TASKS.md 544 "AO-CLOSE 的 git add -A" -- replaces the former
+    # `git add -A`): only paths this session's own Write/Edit tool calls touched
+    # (session-edit-tracker.js), this session's own verified `git add`s
+    # (git-add-scope-tracker.js), or AO-CLOSE's own pipeline steps produced this run
+    # (the $aoCloseBaselineStatus vs. now diff) get staged. See Get-AoCloseStagePaths
+    # above for the full rationale and all three sources.
+    #
+    # C1 fix (critic finding, 2026-09-03): PowerShell returning an EMPTY array from a
+    # function/pipeline collapses to $null, not @() -- under this script's
+    # Set-StrictMode + $ErrorActionPreference='Stop', `$null.SomeProperty` throws
+    # PropertyNotFound. Reproduced live: any run with nothing to stage (common --
+    # e.g. a re-run after a push failure where everything is already committed)
+    # crashed here with a raw stack trace, AFTER the pipeline had already mutated
+    # the working tree and BEFORE any commit/push. `$result` below is never $null
+    # (Get-AoCloseStagePaths always returns a pscustomobject), but its array
+    # PROPERTIES need the same @() guard at the point they're read.
+    $result = Get-AoCloseStagePaths -RepoRoot $WorkRoot -BaselineStatusRawZ $aoCloseBaselineStatus
+    $stagePaths = @($result.StagePaths)
+    $foreignStagedAtBaseline = @($result.ForeignStagedAtBaseline)
+    $foreignStagedResetPaths = @($result.ForeignStagedResetPaths)
+    $leftUnstaged = @($result.LeftUnstaged)
+
+    if ($result.SessionTrackerMissing) {
+        Write-Warning "ao-close: session-edit-tracker.js's tracker file was not found -- this session's own Write/Edit-tool file edits (if any) will only be staged if AO-CLOSE's own pipeline also touched them. (Normal for a session that made no Write/Edit calls, or if mcp/claude-userlevel/hooks/ was synced to ~/.claude/ mid-session -- see WORKLOG 2026-09-03.)"
+    }
+    if ($result.TrackerTruncated) {
+        Write-Warning "ao-close: a session tracker (session-edit-tracker.js or git-add-scope-tracker.js) hit its 500-entry cap and truncated -- some of this session's own file edits/adds may be MISSING from staging. See lib/shared.js TRACKER_MAX_ENTRIES."
     }
 
-    # Guard 2 -- shell-artifact junk. `git add -A` blindly stages stray files created by
-    # shell accidents: literal `$null`/`null` (PowerShell-style redirection run under
-    # bash) and 0-byte files whose NAMES are doc-content fragments (word-split heredoc).
-    # Those reached the SSOT on 2026-06-20 (16d95c8). Policy: UNSTAGE junk and continue,
-    # never abort -- the close-out's real work must still be committed.
+    # M1 fix (critic finding, 2026-09-03): unstage (NOT discard -- `git reset` only
+    # touches the index, the working-tree content is untouched and fully recoverable)
+    # any baseline index entry this session cannot account for, BEFORE the scoped
+    # add below. `git commit` publishes the WHOLE index regardless of what gets
+    # `git add`-ed now, so leaving these staged would let AO-CLOSE's commit absorb
+    # another session's already-staged work -- the exact mis-attribution bug this
+    # fix exists to close, reached through the index instead of a blind `-A`.
+    if ($foreignStagedAtBaseline.Count -gt 0) {
+        Write-Host "== AO-CLOSE: unstaging $($foreignStagedAtBaseline.Count) path(s) already staged by something other than this session ==" -ForegroundColor Yellow
+        foreach ($f in $foreignStagedAtBaseline) { Write-Host "  unstaging (left on disk, untouched): $f" -ForegroundColor Yellow }
+        # C-B fix: $foreignStagedResetPaths includes the paired OLD path for any
+        # foreign rename/copy (see Get-AoCloseStagePaths / ConvertTo-StatusPathMap) --
+        # resetting only the new path would leave the old path staged as a bare
+        # deletion of another session's file.
+        # m-E fix: chunked, same reasoning as the `git add` chunking below (m4) --
+        # an ACK'd broad add by another session can leave hundreds of paths staged.
+        $resetChunkSize = 100
+        $resetFailedAt = $null
+        Push-Location $WorkRoot
+        try {
+            for ($i = 0; $i -lt $foreignStagedResetPaths.Count; $i += $resetChunkSize) {
+                $chunk = $foreignStagedResetPaths[$i..([Math]::Min($i + $resetChunkSize, $foreignStagedResetPaths.Count) - 1)]
+                & git reset -q -- $chunk
+                if ($LASTEXITCODE -ne 0) { $resetFailedAt = $i; break }
+            }
+        } finally { Pop-Location }
+        if ($null -ne $resetFailedAt) {
+            Write-Error "ao-close: git reset (unstaging foreign index entries) failed (chunk starting at index $resetFailedAt)"
+            exit 1
+        }
+    }
+
+    if ($stagePaths.Count -gt 0) {
+        Write-Host "== AO-CLOSE: staging $($stagePaths.Count) path(s) (session edits + this run's own pipeline output) ==" -ForegroundColor Cyan
+        # m4 fix (critic finding): chunk the pathspec list. A 500-entry tracker at
+        # ~60 chars/path approaches the ~32KB Windows command-line limit; overflow
+        # previously surfaced as an opaque `git add failed`.
+        $addChunkSize = 100
+        $addFailedAt = $null
+        Push-Location $WorkRoot
+        try {
+            for ($i = 0; $i -lt $stagePaths.Count; $i += $addChunkSize) {
+                $chunk = $stagePaths[$i..([Math]::Min($i + $addChunkSize, $stagePaths.Count) - 1)]
+                & git add -- $chunk
+                if ($LASTEXITCODE -ne 0) { $addFailedAt = $i; break }
+            }
+        } finally { Pop-Location }
+        if ($null -ne $addFailedAt) {
+            Write-Error "ao-close: git add failed (chunk starting at index $addFailedAt)"
+            exit 1
+        }
+    } else {
+        Write-Host "== AO-CLOSE: nothing to stage (no session edits or pipeline output this run) ==" -ForegroundColor DarkGray
+    }
+
+    # M3 fix (critic finding, 2026-09-03): print what's dirty right now but NOT
+    # staged -- every silent-drop scenario above (out-of-root session path, a path
+    # gone stale between capture and staging, ...) becomes visible here instead of
+    # invisible. This is also what a concurrent session's genuinely unrelated
+    # uncommitted work looks like -- expected to appear here, not an error.
+    if ($leftUnstaged.Count -gt 0) {
+        Write-Host "== AO-CLOSE: $($leftUnstaged.Count) dirty path(s) left unstaged (not attributable to this session) ==" -ForegroundColor DarkGray
+        foreach ($f in ($leftUnstaged | Select-Object -First 20)) { Write-Host "  left unstaged: $f" -ForegroundColor DarkGray }
+        if ($leftUnstaged.Count -gt 20) { Write-Host "  ...and $($leftUnstaged.Count - 20) more" -ForegroundColor DarkGray }
+    }
+
+    # Guard 2 -- shell-artifact junk. Kept as unconditional insurance even though
+    # staging is now scoped: a stray `$null`/word-split file could in principle still
+    # land in $stagePaths if this session's own tool calls created one. Was originally
+    # written for `git add -A` blindly staging shell accidents: literal `$null`/`null`
+    # (PowerShell-style redirection run under bash) and 0-byte files whose NAMES are
+    # doc-content fragments (word-split heredoc). Those reached the SSOT on 2026-06-20
+    # (16d95c8). Policy: UNSTAGE junk and continue, never abort -- the close-out's real
+    # work must still be committed.
     # Delegated to Node: with git's default core.quotePath=true, non-ASCII staged names
     # reach PowerShell as octal-escaped ASCII, so a PS-side non-ASCII test never fires.
     $junkGuard = Join-Path $PSScriptRoot "checkpoint-junk-guard.mjs"
@@ -832,6 +1369,52 @@ Repair it first, then re-run:
                 Move-Item -LiteralPath $rptTmp -Destination $rptFile -Force
                 Write-Host ("AO-CLOSE: report skeleton written -> agency-os/reports/ao-close/{0}.md" -f $rptStamp) -ForegroundColor Cyan
                 Write-Host ("AO-CLOSE: OVERWRITE that file with the full four-section report (do not leave the AUTO-SKELETON stub)." ) -ForegroundColor Yellow
+
+                # M2 fix (critic finding, 2026-09-03): this file is written AFTER the
+                # main commit+push above, so it is NOT part of that commit. Under the
+                # OLD `git add -A`, the NEXT run's blind stage-everything swept it in
+                # anyway; under the NEW scoped add, a file written directly to disk by
+                # this script (not through Write/Edit, not in ANY session's tracker) is
+                # baseline-dirty on every future run and would never be captured by
+                # either scoped-add source -- permanently orphaned on disk, never
+                # committed. Fixed by giving it its own tiny follow-up commit+push right
+                # here, self-contained, instead of relying on a later run to pick it up.
+                try {
+                    $rptRelPath = "agency-os/reports/ao-close/$rptStamp.md"
+                    git add -- $rptRelPath
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Warning "AO-CLOSE: could not stage report skeleton (non-fatal, will remain uncommitted on disk): git add exited $LASTEXITCODE"
+                    } else {
+                        # m3-5 fix (critic round 3): use the SAME prefix logic as the main
+                        # commit ($autoPrefix, honours AO_CLOSE_COMMIT_PREFIX / Cursor
+                        # detection) instead of a hardcoded "[claude]" -- two commits from
+                        # one run should not carry different prefixes.
+                        git commit -q -m "$autoPrefix chore: AO-CLOSE report skeleton $autoCloseStamp"
+                        if ($LASTEXITCODE -ne 0) {
+                            Write-Warning "AO-CLOSE: could not commit report skeleton (non-fatal, will remain staged/uncommitted on disk): git commit exited $LASTEXITCODE"
+                        } else {
+                            # m3-6 fix (critic round 3): the push result was never checked --
+                            # Invoke-SafeGitPush throws on failure (caught below), but the
+                            # bare-git fallback's exit code was silently discarded, so a
+                            # failed push there would still print the "committed + pushed"
+                            # success line.
+                            $skeletonPushOk = $true
+                            if (Get-Command Invoke-SafeGitPush -ErrorAction SilentlyContinue) {
+                                Invoke-SafeGitPush -WorkRoot $WorkRoot -Branch $branch
+                            } else {
+                                git push origin $branch 2>&1 | Out-Host
+                                if ($LASTEXITCODE -ne 0) { $skeletonPushOk = $false }
+                            }
+                            if ($skeletonPushOk) {
+                                Write-Host "AO-CLOSE: report skeleton committed + pushed separately (see M2, WORKLOG 2026-09-03)." -ForegroundColor DarkGray
+                            } else {
+                                Write-Warning "AO-CLOSE: report skeleton committed locally but push failed (non-fatal here, but it will NOT be on origin until pushed manually)."
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Warning "AO-CLOSE: report skeleton follow-up commit/push failed (non-fatal, will remain on disk): $_"
+                }
             } else {
                 Write-Host ("AO-CLOSE: report already present -> agency-os/reports/ao-close/{0}.md" -f $rptStamp) -ForegroundColor DarkGray
             }

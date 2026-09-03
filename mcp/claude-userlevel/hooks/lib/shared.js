@@ -93,6 +93,21 @@ function getGitStageTrackerPath(sid) {
   return path.join(os.tmpdir(), `claude-git-staged-${sid}.txt`);
 }
 
+// Every file path this session's Write/Edit/MultiEdit tool calls touched,
+// ANY extension — not code-change-tracker.js's tracker (code files only,
+// cleared by /verify-recent) and not accumulator.js's (JS/TS only, consumed
+// by batch-format.js at Stop). Built 2026-09-02/03 as the missing piece for
+// ao-close.ps1 to stage only what THIS session actually wrote, instead of
+// `git add -A` (TASKS.md 544 "AO-CLOSE 的 git add -A" — a bare, un-scoped
+// stage sweeps up another concurrent session's uncommitted work in this
+// repo's shared working directory). Persists for the whole session — never
+// cleared automatically; ao-close.ps1 reads it as one of the two inputs to
+// its scoped-add computation (the other being a before/after `git status`
+// diff around its own pipeline steps — see ao-close.ps1's staging section).
+function getSessionEditTrackerPath(sid) {
+  return path.join(os.tmpdir(), `claude-session-edits-${sid}.txt`);
+}
+
 // Transient PreToolUse->PostToolUse handoff for git-add-scope-tracker.js's
 // ACK'd-broad-add case ONLY (2026-09-02, critic finding C1 fix): a `git add
 // -A` (etc.) dry-run at PreToolUse enumerates candidate files BEFORE the
@@ -432,6 +447,7 @@ module.exports = {
   getTrackerPath,
   getGitStageTrackerPath,
   getGitAddPendingPath,
+  getSessionEditTrackerPath,
   joinBackslashContinuations,
   commandSegmentsBackslashJoined,
   normalizePath,
