@@ -10,6 +10,8 @@
 #   tests/hooks/runner-parity.test.mjs  — every rule's verdict matrix + the
 #                                         manifest↔rules completeness check
 #   tests/hooks/maintenance-scripts.test.mjs — rotate-worklog + checkpoint-junk-guard
+#   tests/hooks/subagent-budget.test.mjs — Agent/Workflow fan-out budget gate
+#                                         (tiers, marker, sliding window, ListAgents non-match)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -25,4 +27,4 @@ else
   exit 127
 fi
 
-"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs

@@ -76,6 +76,22 @@ function sanitize(s) {
   return String(s).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
 }
 
+// True when `toolName` is exactly the Agent tool (case-insensitive), never
+// a substring match. SSOT for this check -- agent-dispatch-log.js and
+// subagent-budget.js both need it and MUST agree, or their records silently
+// diverge if the real tool name ever changes case (2026-09-03 critic
+// finding m-2: they previously each rolled their own comparison). A naive
+// `matcher: "Agent"` regex-substring match in rules.manifest.json is a
+// SEPARATE, coarser filter (routing which rules run at all) -- this
+// function is the precise identity check every consuming rule must ALSO
+// apply inline, because a substring matcher alone was proven to
+// mis-classify real tools whose name merely contains "Agent" as a
+// component (e.g. `ListAgents` -- critic finding M-1, confirmed against a
+// real tool that exists in this environment).
+function isAgentTool(toolName) {
+  return String(toolName || '').toLowerCase() === 'agent';
+}
+
 function getTrackerPath(sid) {
   return path.join(os.tmpdir(), `claude-unverified-code-${sid}.txt`);
 }
@@ -444,6 +460,7 @@ module.exports = {
   TRACKER_MAX_ENTRIES,
   STDERR_MAX_LINES,
   getSessionId,
+  isAgentTool,
   getTrackerPath,
   getGitStageTrackerPath,
   getGitAddPendingPath,

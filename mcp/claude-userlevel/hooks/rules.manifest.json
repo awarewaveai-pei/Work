@@ -15,7 +15,13 @@
         ]
       },
       {
-        "matcher": "Agent",
+        "matcher": "^Agent$",
+        "rules": [
+          "subagent-budget"
+        ]
+      },
+      {
+        "matcher": "^Workflow$",
         "rules": [
           "subagent-budget"
         ]
@@ -69,7 +75,7 @@
         ]
       },
       {
-        "matcher": "Agent",
+        "matcher": "^Agent$",
         "rules": [
           "agent-dispatch-log"
         ]
@@ -104,7 +110,6 @@
     "UserPromptSubmit": [
       {
         "rules": [
-          "subagent-budget",
           "vbc-reminder"
         ]
       }

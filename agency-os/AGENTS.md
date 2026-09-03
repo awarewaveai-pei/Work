@@ -167,21 +167,23 @@
 3. **設計討論每三輪自問「這該落地成文件了嗎」**。討論留在對話裡 = 每輪重付且 session 結束即蒸發；寫進 repo = 付一次。
 4. **任務結束時主動提醒操作者 `/clear`**，不等對方想到。
 
-## Agent 扇出治理（token 燒量控管，2026-09-03 起）
+## Agent 扇出治理（token 燒量控管，2026-09-03 起，第三輪修正後）
 
-**背景**：連續多日單一 session 5 小時額度在 20-30 分鐘內燒光。根因分兩條路徑，機制不同，治理手段也不同：
+**背景**：連續多日單一 session 5 小時額度在 20-30 分鐘內燒光，真因是一次 `Workflow` pipeline 27 項 × 4 agent/項 = 102 個 agent 一次性 fan out。`.claude/hooks/rules/subagent-budget.js`（SSOT 在 `mcp/claude-userlevel/hooks/`）掛 `PreToolUse`，涵蓋兩條真實**session 內**路徑（`mcp__ccd_session__spawn_task`／`claude -p` 另開 session，架構上看不到，刻意不管，見檔頭註解）：
 
-**路徑 A — Agent tool（本地 subagent spawn，機械可攔）**：`.claude/hooks/rules/subagent-budget.js`（SSOT 在 `mcp/claude-userlevel/hooks/`）掛 `PreToolUse`（matcher `Agent`）+ `UserPromptSubmit`（歸零），per-session per-turn 硬上限：
-- 0-5 個：放行
-- 6-10 個：block，除非該 Agent 呼叫的 `prompt` 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`（不需要操作者在場確認，Claude 自己補理由重試）
-- \>10 個：無條件 block，無 marker 可解鎖，必須拆成更小批次分散到後續輪次完成
+**路徑 A — Agent tool**（matcher `^Agent$`，機械可攔，**已用真實 spawn 驗證**）：滑動視窗計數（預設 20 分鐘，對應實際事故時間尺度），非 per-turn 歸零：
+- 視窗內 0-5 個：放行
+- 6-10 個：block，除非該 Agent 呼叫的 `prompt` 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`
+- \>10 個：無條件 block，無 marker 可解鎖（上限是「嘗試次數」不是「放行次數」——被擋的重試也計入，見檔頭 m-4 說明；要提早重置：刪 `%TEMP%\claude-subagent-budget-agent-<sid>.txt`）
 
-⚠️ **本閘最初版本掛在 `SubagentStart`，被外部 critic 覆審（2026-09-03）用真實 spawn 證實完全無效**——`SubagentStart` 的 exit code 官方文件明講被忽略，且真實 spawn 當下該事件根本沒進 runner。改掛 `PreToolUse` 後已用真實 Agent spawn 複驗（tracker 檔隨真實 spawn 正確累計）。**教訓**：任何 hook 類治理閘，驗證必須用真實 tool call，合成 payload 測試不能證明機制真的接得上。
+**路徑 B — Workflow tool**（matcher `^Workflow$`）：`agent()` 內部 fan-out 在背景執行，本閘看不到真實數量，改成**誠實聲明閘**——依真實輸入形狀分三態：`script`（inline 腳本）須含 `// SUBAGENT-BUDGET-ESTIMATE: <N>`（多行加總，不是只讀第一行）；`scriptPath`（無 inline script）讀檔套同一規則；`resumeFromRunId` 單獨出現（無 script/scriptPath，真實用量 31%）**放行**——擋掉續跑會逼整個 workflow 從頭重來，燒更多 token，比不擋更糟（2026-09-03 第三輪 critic 抓到的 C-1）。N > **10**（非 Workflow 工具自己講的 15——操作者明訂上限更嚴，且要跟路徑 A 的硬上限一致，2026-09-03 第三輪 M-3）→ block 要求拆批。**明文限制**：`script`/`scriptPath` 兩態只驗證「有沒有誠實聲明」，不驗證聲明是否為真；`resumeFromRunId` 態完全沒有機械保護，且**尚未被真實 Workflow 呼叫驗證過**（驗證需要使用者明確 opt-in 多代理編排，這件事本身不能自己授權自己去測，否則就是重演促成這整個閘的那個違規）。
 
-**路徑 B — Workflow tool（背景/雲端執行，機械攔不到）**：`Workflow` 的 `agent()` fan-out 在背景執行，不經過本地 `PreToolUse`/`SubagentStart`，路徑 A 的閘對它無效（已查證，非推測）。唯一防線是程序紀律：
-1. 呼叫 `Workflow` 前，訊息裡必須先寫出「N 項 × M agent/項 = 預估總數」這個算式
-2. 預估總數 > 15（Workflow 工具自己的建議上限）時，優先改成分批（例如一次 5 項，看過品質再繼續），不整批一次性 fan out
-3. **這條沒有機械閘，是誠實承認的殘留風險**——不得假裝路徑 A 的 hook 也保護得到 Workflow，那是消音偵測器的樣態（見 §已知信任邊界）
+⚠️ **版本教訓（不要重複犯）**：
+- v1 掛在 `SubagentStart`——被外部 critic 覆審用真實 spawn 證實完全無效。
+- v2 改掛 `PreToolUse` 但只覆蓋 Agent tool，完全沒管 Workflow；matcher 未錨定誤擋真實存在的 `ListAgents`；per-turn 歸零可被多送一句話繞過。
+- v3 修完 v2 全部四條，但**只驗證了 Agent tool 路徑是真實 spawn，Workflow 路徑仍是合成 payload**——第三輪 critic 掃真實 transcript 找到 `Workflow` 有 3 種輸入形狀，`scriptPath+resumeFromRunId`（31% 真實用量）完全沒被 v3 的程式碼處理過，會變成無法滿足的永久 block；同時 v3 為了「檔案不要無限長」加的壓縮邏輯，**重新引入了 append-only 設計本來要消滅的 race**（20 並行實測掉 33-45%）。
+- 第三輪（現況）修完上述，且回歸測試套件本身也被 mutation test 驗證過（拔掉 guard 後測試真的會失敗，不是空測試）。
+- **這條教訓本身也適用於治理紀律，且套用了兩層**：① 同一份程式碼被同一個 reviewer 連續抓到兩輪問題時，第三次修正前必須先做不變量分析（R0「補丁判準」）；② **驗證程序本身也要接受同一套紀律**——「每項都用真實 spawn 驗證」這句話在 v3 寫下時是對 Agent 路徑講的真話，套用到 Workflow 路徑就是自我宣稱未經檢驗；發現即改寫，不維持錯的宣稱。
 
 ## 執行安全
 
