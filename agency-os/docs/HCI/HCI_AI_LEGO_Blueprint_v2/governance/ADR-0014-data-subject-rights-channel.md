@@ -10,7 +10,7 @@ HCI will model a `DataSubjectRequest` as a first-class, P0 domain record. It has
 
 ## Runtime gate
 
-`Projects/internal/hci30/database/` provides a synthetic-only local PostgreSQL skeleton for request, event, and target tables. It does not process real persons, establish a legal response deadline, implement bitemporal history (`HD-06` remains open), or prove production readiness.
+`Projects/internal/hci30/database/` provides a synthetic-only local PostgreSQL skeleton for request, event, and target tables. It does not process real persons, establish a legal response deadline, implement bitemporal history (`HD-06`, decided by `ADR-0017` same batch, gates still open — not built here), or prove production readiness.
 
 ## Consequences and rollback
 

@@ -7,7 +7,7 @@ Scope: HCI AI LEGO Blueprint v2 architecture only; ratifies the field/transition
 
 ## Context
 
-`10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:101-118` carries an unresolved `🔴 DECISION PENDING (HD-08)` block: without an explicit, ratified, field-by-field policy, individual implementers will each make ad hoc calls about which fields an LLM may set directly — "exactly what `16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md`'s own closing line warns against" (quoted at `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:101`). `22_OPEN_HUMAN_DECISIONS.md:59-64` (HD-08) records the same open question and recommends adopting Reviewer E's enumeration while reusing AI LEGO's existing A0-A4/R0-R4 gating machinery rather than inventing a parallel one.
+`10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:101-118` carried an unresolved `🔴 DECISION PENDING (HD-08)` block at drafting time (this ADR resolves it, and that section is now ✅ RESOLVED with a direct citation back here): without an explicit, ratified, field-by-field policy, individual implementers will each make ad hoc calls about which fields an LLM may set directly — "exactly what `16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md`'s own closing line warns against" (quoted at `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:101`). `22_OPEN_HUMAN_DECISIONS.md:59-64` (HD-08) records the same open question and recommends adopting Reviewer E's enumeration while reusing AI LEGO's existing A0-A4/R0-R4 gating machinery rather than inventing a parallel one.
 
 `09_AI_INTELLIGENCE_REVIEW.md:171-190` (finding C5) documents that no field-level classification exists anywhere in the 24 V1 blueprint documents — only general principles (`01_SYSTEM_CONSTITUTION.md` Invariant 2, `11_SECURITY_PRIVACY_GOVERNANCE.md`'s employment boundary) — and rates this High confidence, `requires_human_decision: YES`.
 
@@ -61,7 +61,7 @@ All five land at **Wave 1** (schema freeze), alongside ADR-0009/0010/0011/0015/0
 
 - `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-05 and every downstream HCI intelligence/public-intelligence/decision-flow chapter that already assumes this enumeration is adopted policy (`10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:118`) now has a ratified source to cite instead of an open decision.
 - HCI does not gain a second, HCI-only risk/gating vocabulary; every enforcement point must resolve through AI LEGO's existing R0-R4 `mandatory-gates.yaml` machinery.
-- This ADR does not resolve HD-06 (bitemporal scope) or HD-07 (crypto-shred erasure); the Evidence/Claim/Assessment/Decision tables named in gate 2 remain subject to those separate open decisions.
+- This ADR does not itself resolve HD-06 (bitemporal scope, `ADR-0017`) or HD-07 (crypto-shred erasure, `ADR-0018`) — both decided elsewhere, same batch, gates still open; the Evidence/Claim/Assessment/Decision tables named in gate 2 are subject to those ADRs' schemas once built.
 - This ADR does not authorize Organization-subject assessment (ADR-0011 governs that boundary) and does not weaken ADR-0015's identity-confirmation gate or ADR-0016's tenant RLS gate; it references and reuses both rather than superseding either.
 - Until gates 1-5 are implemented, this ADR is a ratified architecture decision, not an operative control — the same "principles ahead of enforcement" gap `12_RED_TEAM_FAILURE_ANALYSIS.md:519` identifies as V1's systemic defect applies to this policy too until its gates close.
 

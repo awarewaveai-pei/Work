@@ -12,7 +12,7 @@ Every tenant-owned HCI table must carry `tenant_id NOT NULL`, force PostgreSQL R
 
 The local synthetic schema and negative-test runner implement this pattern for the Wave 1 skeleton only. No portal integration, production database migration, or deployment is authorized by this ADR.
 
-## 🔴 OPEN DECISION - tenancy principal (raised 2026-09-02 by adversarial review)
+## 🟢 RESOLVED — tenancy principal (raised 2026-09-02 by adversarial review; resolved 2026-09-02 by `ADR-0033`, Option B-signed — see §Resolution at end of file. Analysis below kept verbatim: `ADR-0033` cites its specific lines.)
 
 RLS is only as strong as the identity it keys on. `hci.current_tenant_id()`
 resolves the tenant from the `role` GUC:
@@ -51,3 +51,7 @@ CI-blocking assertion.
 ## Rollback
 
 RLS may not be weakened in place. A future change needs a superseding ADR, adversarial test evidence, and a reviewed migration.
+
+## Resolution (2026-09-02)
+
+`ADR-0033-signed-tenant-context-principal.md` picks **Option B-signed** (a refinement of Option B above): one pooled login role `hci_app` replaces the per-tenant `hci_app_test_a`/`hci_app_test_b` roles, and tenancy is carried in a signed, HMAC-verified `SET LOCAL hci.tenant_ctx` token instead of the forgeable `role` GUC — closing the exact "missed `RESET ROLE`" and "SQL-injection re-tenants the session" failure modes described above. `RLS-ESCALATE-01..03` (the CI-blocking assertion this section required) is specified there. Gates are still **OPEN** — nothing above is runtime-verified until `ADR-0033`'s own gates land — but the *decision* itself is no longer pending; do not re-litigate it here. This section is appended, not inserted above, to avoid shifting the line numbers `ADR-0033` and other ADRs cite into the analysis above.

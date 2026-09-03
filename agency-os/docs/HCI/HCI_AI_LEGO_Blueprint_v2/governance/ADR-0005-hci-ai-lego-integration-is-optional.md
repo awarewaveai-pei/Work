@@ -13,7 +13,7 @@ The blueprint already states the integration boundary in prose but has never rat
 - `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:13-17` (§Independence requirement) enumerates the specific HCI workflows that must keep working when AI LEGO is unavailable — create/edit persons, create relationships, record interactions, admit evidence, view timelines, create manual assessments, create decisions, view historical data — and requires the converse: "AI LEGO must remain fully usable for non-HCI cognitive work."
 - `09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md:96-98` (§AI LEGO must not own) and `:100-102` (§HCI must not duplicate) draw the same peer boundary from the AI LEGO side.
 - `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md:135-139` schedules the adapter as its own Wave (Wave 10 — Optional AI LEGO integration, path `D:\Work\Projects\internal\hci30\integrations\cognitive-os\`), after every core-workflow Wave (Wave 1 domain foundation through Wave 9 enterprise readiness). Its acceptance line already reads "no direct DB, timeout/failure graceful, contract compatibility, AI results cannot self-admit as HCI facts, run references preserved, convergence != evidence confidence."
-- `ADR_INDEX.md:23` lists this exact topic as `ADR-0005 | HCI × AI LEGO integration is optional | ... | PLANNED | Not recorded` — the file has never existed.
+- `ADR_INDEX.md:23` listed this exact topic as `ADR-0005 | HCI × AI LEGO integration is optional | ... | PLANNED | Not recorded` at drafting time — the file had never existed. Both are now stale: the index row is `ACCEPTED` and this file exists, as of the same edit batch.
 
 The gap is not disagreement about the principle; every source document above already assumes it. The gap is that nothing here is a ratified ADR.
 

@@ -54,7 +54,7 @@ Wave 1 (Domain foundation) is unaffected — it need not encode any of the above
 - The Psychology and Self-reflection sections of `05_HCI30_INTELLIGENCE_METHODS.md` (`:52-53`, `:140`) may drop their `🔴 DECISION PENDING (HD-23)` markers once this ADR and its gates are cross-linked in; the prose recommendations already drafted there become the ratified content, not new content to write.
 - `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md` §Confidence display moves from "changed in V2, pending" to ratified: qualitative bands are the only confidence surface until Wave 11 delivers calibration evidence.
 - Any future method added to the catalog inherits `third_party_allowed=false` by default and the one-step evidence-grade-delta rule; neither can be silently bypassed by a new method definition without failing gate 1/2/5 above.
-- This ADR does not resolve `HD-04` (identity-match confirmation, ADR-0015), `HD-03` (data-subject rights, ADR-0014), or `HD-20` (regulatory market scope, still open) — a method with `third_party_allowed=true` in the future still needs those other gates satisfied independently.
+- This ADR does not itself decide `HD-04` (identity-match confirmation, `ADR-0015`), `HD-03` (data-subject rights, `ADR-0014`), or `HD-20` (regulatory market scope, `ADR-0012`, same batch — decided, gates still open) — a method with `third_party_allowed=true` in the future still needs those other gates satisfied independently.
 
 ## Verification and rollback
 

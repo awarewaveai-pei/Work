@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-09-03（續9）
+
+### HCI ADR 批次 27 篇：2 個背景 critic/db-expert 交叉覆審抓到的錯誤全部修完 + 自審再抓 1 個漏網
+
+**背景**：續前次（commit `6c744467c`）27 篇 ADR 批次落地後，用 2 個背景 agent（critic 型 + db-expert 型，各拿到全部 27 篇 + `ADR_INDEX.md` + 真實 schema 一次性覆審，非逐檔）做對抗式覆審。抓到系統性錯誤類別：ADR 互相引用／引用 `ADR_INDEX.md` 行號／引用 `17_REPOSITORY_LAYOUT_AND_PATHS.md`／引用 `Projects/internal/hci30/README.md` 時，大量用現在式聲稱「still PLANNED / still open / not yet decided / no runtime code exists」，但那些其實在同一批次已經決定，或 `Projects/internal/hci30/database/migrations/0001_wave1_synthetic_up.sql` 裡早就有真實 schema。另抓到 2 個真實 schema 形狀錯誤：`ADR-0006` 聲稱零 evidence/claim/assessment/trust_domain 表存在、Wave 4 才建 4 張獨立實體表——但真實 schema 在 Wave 1 就已經是單一多型表 `hci.subject_records`（`kind IN ('EVIDENCE','CLAIM','ASSESSMENT','TRUST_DOMAIN')`，`:116-126`）。`ADR-0030` gate 2 引用虛構表名 `case_engagement`／`data_subject_request`，真實/未來名稱是 `hci.cases`（ADR-0020）／`hci.data_subject_requests`（複數，已存在）。
+
+**操作者本輪明確指示**：一般狀況 agent 不超過 5 個，特殊狀況 6-10 個；`/codex-review` 到 9/6 前額度不足不能用。故本輪修正全程由本 session 直接 Read+Edit 完成，不開 Workflow/heavy fan-out；只在最後驗證階段開 1 個 critic agent（遠低於 5 個上限）。
+
+**[已修改]**（20 個檔案，純文件/引用修正，無 code 改動）：
+- `Projects/internal/hci30/README.md` — 修正「HD-06 through HD-10, HD-20, HD-21 remain open」為反映 27 個 ADR 已全部決定（decided ≠ implemented，gates 仍 open）
+- `ADR-0006` — 修正 4 處假表形狀聲稱，改為正確引用已存在的 `hci.subject_records` 多型表
+- `ADR-0002` — gate 3 修正 `hci_app` 誤稱為 `hci_app_test_a`/`hci_app_test_b`（真實 Wave 1 角色名）+ docker-context abort 行號 `:22`→`:22-23`
+- `ADR-0018` — 加回指向 `ADR-0022`（Wave 2 wrap-not-replace）的反向引用（gate 1 note + Consequences 新 bullet）
+- `ADR-0016` — 過期的「🔴 OPEN DECISION」標題改為「🟢 RESOLVED」+ 附加 `## Resolution` 段落指向 `ADR-0033`；用 append-only 手法保留原始行號 1-53 不變（5 個其他 ADR 精確引用那些行號）
+- `ADR-0021` — 6 處過期 HD-07/ADR-0016 tenancy「still open」聲稱改為「已決定，gates 仍 open」
+- `ADR-0013` — 3 處「HD-06/HD-10 neither decided」改為「已決定（ADR-0017/ADR-0020），schema 未建」
+- `ADR-0030` — gate 2/測試改用真實表名 `hci.cases`/`hci.data_subject_requests`；HD-20 過期引用修正
+- `ADR-0014`、`ADR-0019`、`ADR-0032` — HD-06/07/20 過期「remains open」修正
+- `ADR-0001`、`ADR-0003`、`ADR-0004`、`ADR-0005`、`ADR-0007`、`ADR-0008`、`ADR-0012`、`ADR-0023` — 共 ~15 處「`ADR_INDEX.md` still lists PLANNED」現在式錯誤改為過去式 + 註記「已在同批次更新為 ACCEPTED」
+- `ADR-0007` — 額外修正：Context 段落原本聲稱「HCI-30 未出過任何 runtime code」為假（Wave 1 schema/migration/test harness 真實存在），改為區分「application/API code 未出」vs「schema/test 已出」；gate 1 修正與 `ADR-0001`/`ADR-0002` 都引用的 `infra/local/compose.test.yml`（真實存在）的衝突——明確 exempt 該檔案；gate 數量「five」修正為實際的「six」
+- `ADR-0033` — 修正 `RLS-WRITE-01` 引用行號 `:33-36`→`:31-34`（對照真實 `wave1-negative-tests.sql`）
+
+**[驗證結果]**：
+1. **實測**：純文件修正，無可執行程式碼；每個 file:line 引用逐一用 `Grep`/`Read` 對照真實檔案（`ADR_INDEX.md`、`0001_wave1_synthetic_up.sql`、`wave1-negative-tests.sql`、`compose.test.yml`）驗證後才寫入，不是猜測
+   - REALTEST_WAIVED: DOC_ONLY -- 純 ADR 文件/引用修正，無 code/schema/腳本變更
+2. **Review（外部 critic 對抗覆審）**：`critic` subagent 連續 2 次 529 Overloaded（伺服器端問題，非本次修正的問題）；`/codex-review` 操作者本輪明確表示 9/6 前額度不足不可用——兩條 AGENTS.md 指定路徑均不可用時，依照既有 memory 準則（`feedback_self_review_when_oracle_down.md`）改做誠實書面自審，而非跳過。自審對照 5 個具體問題（新引入假聲稱？`ADR-0016` append-only 是否真的沒動到行號？`ADR-0007` gate 1 exempt 邏輯是否跟 `ADR-0001`/`ADR-0002` 的引用一致？殘留 stale claim？文法/邏輯斷裂？），逐項用 `Grep`/`sed` 對照真實檔案驗證，**抓到 1 個遺漏**：`ADR-0001:51`（Verification 段）仍用現在式聲稱「`ADR_INDEX.md` register still shows `PLANNED`」——`ADR_INDEX.md:19` 其實早已是 `ACCEPTED`，與本輪正在修的錯誤同一類別，只是漏在 Verification 段沒改到 Context 段。已修正。其餘 4 項自審對照後確認無誤（行號 1-53 逐行核對相符；`compose.test.yml` 確認無 `ports:` key；`ADR-0019`/`ADR-0030`/`ADR-0017`/`ADR-0018`/`ADR-0020`/`ADR-0022`/`ADR-0024`/`ADR-0033` 在 `ADR_INDEX.md` 逐一核對均為 `ACCEPTED`）。
+   - REVIEW_DONE: critic=Standard(2x 529 失敗，改自審) | verdict=pass(自審抓到 1 處後已修) | findings=1c/0m/0n
+3. **抓蟲**：`grep -rn "H1008"` 全庫確認無殘留誤用（僅 `ADR-0020` 正確引用碰撞史）；`grep` 確認 scripts/ 無硬編過期 README 文字；廣泛 sweep `"still PLANNED\|still open\|not yet decided"` 橫跨全部 33 個 ADR 檔案，處理完當下僅剩 `ADR-0031`（付款供應商，非本批次 18 個 HD 項目之一，真實仍未決）與 `ADR-0032` P0-04（信心校準模型，同樣不在本批次範圍）合理保留不動
+   - BUGHUNT_DONE: scope=agency-os,Projects/internal/hci30 | grep=H1008,still PLANNED,still open,not yet decided,PLANNED | hits=2(誤報排除後皆為合理保留項)
+4. **WORKLOG**：本條目
+
+**[剩餘風險]**：深層實作機制問題（append-only trigger 的 exemption 機制、`data_encryption_keys`/`hci.cases` 缺 `UNIQUE(tenant_id,id)`、`ADR-0017` bitemporal test 對 14-table schema 不可滿足、`hci_test.finish(51)` 跨 5+ ADR 的計數碰撞風險等）刻意延後，歸類為「真正動手寫 SQL 時的實作清單」而非「決策文件現在就要修的散文錯誤」——因為全部 27 個 ADR 的 gates 現況都是 `OPEN`，尚無任何 migration 落地，這個判斷屬於 R0「補丁 vs 治本」判準下的合理範圍收斂，非逃避。`ADR-0031`/`ADR-0032` 兩處保留的「still open」經確認屬於本批次範圍外的真實未決項，非漏改。
+
+**Rollback**: `git revert` 本次 commit；純文件變更，無 schema/服務影響。
+
 ## 2026-09-03（續8）
 
 ### VBC 複驗續7的 layer-4 charter 修正 + 補一個小缺口（test-hooks.sh 漏登記新測試檔）
