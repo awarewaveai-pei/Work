@@ -275,6 +275,54 @@ test('parity: Codex SubagentStart uses hook JSON and carries the same charter', 
   assert.doesNotMatch(r.stdout, /must-not-echo/);
 });
 
+test('parity: PreToolUse Agent spawn also carries the shared charter (2026-09-03 SubagentStart→PreToolUse migration)', () => {
+  // Real-spawn-confirmed 2026-09-03 (WORKLOG 續6-part-2): a genuine Agent-tool
+  // spawn quoted this charter block back verbatim from its own initial
+  // context. SubagentStart is kept wired too (other hosts may honor it) but
+  // real testing proved it never reaches THIS host at all -- PreToolUse
+  // ^Agent$ is the confirmed-working path, piggybacking on the same trigger
+  // point subagent-budget.js already proved fires reliably for real spawns.
+  const r = run('PreToolUse', {
+    tool_name: 'Agent',
+    tool_input: { description: 'test', prompt: 'test prompt' },
+    private_note: 'must-not-echo',
+  });
+  assert.equal(r.status, 0);
+  const output = JSON.parse(r.stdout);
+  assert.equal(output.hookSpecificOutput.hookEventName, 'PreToolUse');
+  assert.equal(output.hookSpecificOutput.permissionDecision, 'allow');
+  assert.match(output.hookSpecificOutput.additionalContext, /\[Subagent Charter\]/);
+  assert.match(output.hookSpecificOutput.additionalContext, /30-year, LEGO-like system/);
+  // subagent-budget's own info note shares the same matcher group and must
+  // still be present too -- this migration must not crowd it out.
+  assert.match(output.hookSpecificOutput.additionalContext, /\[Subagent Budget\]/);
+  assert.doesNotMatch(r.stdout, /must-not-echo/);
+});
+
+test('parity: PreToolUse for a non-Agent tool with no context still passes the original payload through unchanged', () => {
+  // Regression guard for the new isPreToolUseContext branch in runner.js:
+  // it must only activate when a rule actually returns context, never
+  // hijack the existing echo-passthrough contract other PreToolUse tests
+  // (and Claude Code's own "no opinion" default) rely on.
+  const payload = { tool_name: 'Read', tool_input: { file_path: 'README.md' } };
+  const r = run('PreToolUse', payload);
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, JSON.stringify(payload));
+});
+
+test('manifest: subagent-charter is wired to PreToolUse ^Agent$ (alongside subagent-budget) and still to SubagentStart', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(HOOKS_DIR, 'rules.manifest.json'), 'utf8'));
+  const agentGroup = (manifest.events.PreToolUse || []).find((g) => g.matcher === '^Agent$');
+  assert.ok(agentGroup, 'PreToolUse must have an ^Agent$ matcher group');
+  assert.ok(agentGroup.rules.includes('subagent-charter'), 'subagent-charter must be wired into the ^Agent$ group');
+  assert.ok(agentGroup.rules.includes('subagent-budget'), 'must not have displaced subagent-budget from the same group');
+  const subagentStartGroups = manifest.events.SubagentStart || [];
+  assert.ok(
+    subagentStartGroups.some((g) => (g.rules || []).includes('subagent-charter')),
+    'SubagentStart wiring is kept as a defense-in-depth fallback for hosts where it might work -- must not be removed'
+  );
+});
+
 test('parity: agent-dispatch-log writes jsonl for Agent tool', () => {
   const home = makeTmpHome();
   const tmp = makeTmpHome();

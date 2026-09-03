@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-09-03（續7）
+
+### Charter 注入第 4 層修好——SubagentStart→PreToolUse `^Agent$` 遷移，真實 spawn 複驗，`updatedInput` 路線已證實不通
+
+**背景**：續6 留下的殘留風險——三層修完後，charter 仍到不了真實 spawn 的 subagent，因為 `SubagentStart` 這個 host（Claude Desktop app）根本不觸發。操作者本來要把這個任務轉給同時在跑 subagent-budget round 3 的另一個 session，但那個 session 判斷這件事該由本 session 做（本 session 對這個問題有完整上下文），操作者回頭指示本 session 自己動手，並給出專業意見：比照 `subagent-budget.js` 已驗證的 `PreToolUse`(matcher `^Agent$`) 真實觸發點，把 charter 注入從 `SubagentStart` 搬過去。
+
+**動手前先查證，不假設**：`subagent-budget.js` 驗證過的是「PreToolUse 對真實 Agent spawn 100% 可靠觸發、可以 block」，但「把 charter 塞進 child 的 context」是完全不同的技術動作——block 只需要 exit 2，注入內容給還沒生出來的 child 理論上只能靠修改父層 Agent 呼叫本身的 `tool_input`（`updatedInput`）。web-researcher 查證官方文件 + GitHub issue（#39814、#44412，兩個獨立、都是 closed/duplicate，都明確指出 `tool_name === 'Agent'` 時 `updatedInput` 被靜默忽略——`prompt`/`model` 欄位改了也沒用，child 收到的還是原始值）：**這條路直接死路，官方文件本身沒有記載這個例外，只有兩個真實 repro 的 issue 佐證**。同一份查證也確認 PreToolUse 的 `additionalContext`（不同欄位）文件上是有支援的——但「這個 additionalContext 到底進到父層還是新生的 child」沒人驗證過，不能假設它能用，必須真實 spawn 測。
+
+**[已修改]**
+1. `mcp/claude-userlevel/hooks/runner.js`：新增 `isPreToolUseContext` 分支——`PreToolUse` 事件若有 rule 回傳 `context`，輸出結構化 `{hookSpecificOutput:{hookEventName:"PreToolUse", permissionDecision:"allow", additionalContext:...}}`（原本 PreToolUse 的 context 只會降級成 stderr warn，不會真的注入）；無 context 時完全不影響既有的 echo-passthrough 行為（新增 regression test 鎖住這個邊界）
+2. `mcp/claude-userlevel/hooks/rules.manifest.json`：`PreToolUse` 的 `^Agent$` 群組加入 `subagent-charter`（跟 `subagent-budget` 同組）；`SubagentStart` 的既有掛載**刻意保留**——其他 host（例如 terminal CLI）可能仍會觸發，屬防禦性冗餘，成本為零
+3. `tests/hooks/runner-parity.test.mjs`：新增 3 條——①真實 PreToolUse Agent payload 產出正確結構化 JSON 且含 charter+budget 兩個 rule 的 context ②非 Agent 工具、無 context 時 passthrough 行為不受影響（鎖住邊界）③manifest wiring 斷言（`^Agent$` 群組同時有 `subagent-charter` 與 `subagent-budget`，`SubagentStart` 仍保留掛載）
+
+**[驗證計畫]**
+1. 實測：①`node --test tests/hooks/*.test.mjs`（147 案例全綠）②合成 payload 手動呼叫 runner.js 確認 JSON 形狀正確、兩個 rule 的 context 都在③**真實 Agent spawn**——要求 spawn 出來的 subagent 回報是否在自己初始 context 看到 `[Subagent Charter]` 區塊，逐字引用回來，證實**完整命中**（見下方 REALTEST_EVIDENCE，這是本次任務的核心驗收標準，操作者兩次明確要求「不能只信合成 payload」）
+2. Review：critic/codex 依然不可用（同續6），沿用自我對抗覆審 + mutation test（見下）
+3. 抓蟲：`grep -rn "subagent-charter\|isPreToolUseContext\|PreToolUse.*Agent" agency-os scripts mcp tests` scope 涵蓋 agency-os/scripts/mcp/tests，確認無孤兒引用、`SubagentStart` 舊掛載沒被誤刪
+4. WORKLOG：本條目
+
+**REALTEST_EVIDENCE**: tool=Bash | cmd=`node --test tests/hooks/*.test.mjs` | exit=0 | 147 pass / 0 fail
+**REALTEST_EVIDENCE**: tool=Bash | cmd=手動呼叫部署後 `runner.js PreToolUse`（真實 Agent payload）| exit=0 | 產出 `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","additionalContext":"[Subagent Budget]...\n[Subagent Charter]..."}}`
+**REALTEST_EVIDENCE**: tool=Agent | cmd=真實 general-purpose subagent spawn，要求回報初始 context 是否含 `[Subagent Charter]` 並逐字引用 | exit=0 | **subagent 完整逐字引用了整段 charter**（含「30-year, LEGO-like system」字樣）——這是本次任務唯一的驗收判準，通過。副作用發現：同一段 additionalContext 也出現在父層（本 session）自己下一輪的 system-reminder 裡，屬 bonus 非問題
+**REVIEW_WAIVED**: NA -- 同續6，critic/codex 皆不可用；改用 mutation test：`runner.js`／`rules.manifest.json` 兩處修正各自還原至 `git show HEAD:<path>`（續6 merge commit 狀態，即修正前），對應測試分別失敗（runner.js 還原→1 條 fail；manifest 還原→2 條 fail，含 runner.js 那條連動失敗），復原後 147 全綠
+**BUGHUNT_DONE**: scope=agency-os,scripts,mcp,tests | grep=`subagent-charter\|isPreToolUseContext` | hits=SSOT(`mcp/claude-userlevel/`)+runtime(`.claude/hooks/`)鏡射+測試檔+本條 WORKLOG，各自預期位置，無孤兒；額外確認 `SubagentStart` 群組的 `subagent-charter` 掛載沒被本次改動誤刪（manifest wiring 測試已機械鎖定這點）
+
+**剩餘風險（如實列出）**：
+- Review 仍是自我對抗覆審代打，非獨立第三方；oracle 恢復後建議補跑
+- `updatedInput` 對 Agent tool 失效這件事本身是 Claude Code 的 upstream bug（issue 已 closed not-planned），不是本репo能修的，只能繞道；未來若 Anthropic 修復該欄位，`subagent-charter` 目前用的 PreToolUse `additionalContext` 路線仍然有效、不衝突，不需要再改
+- 同一份 additionalContext 目前會同時出現在父層與子層（見上方 bonus 發現）——重複顯示但無害，未特別去重，如果操作者覺得雜訊煩可以再優化
+
+**Rollback**: `git checkout -- mcp/claude-userlevel/hooks/runner.js mcp/claude-userlevel/hooks/rules.manifest.json tests/hooks/runner-parity.test.mjs`，再跑 `sync-claude-userlevel.ps1 -Mode merge` 把 runtime 沖回舊版（SubagentStart 掛載本來就沒動，rollback 後 charter 注入會回到續6之前的「完全不通」狀態）。
+
 ## 2026-09-03（續6）
 
 ### Subagent charter 注入死功能——修 3 層根因，第 4 層（host 從未觸發 SubagentStart）確認為已知平台限制，未修
@@ -30,7 +62,7 @@
 **BUGHUNT_DONE**: scope=agency-os,scripts,mcp,tests,.claude | grep=`HOOK_EVENTS\|SubagentStart\|SUBAGENT_CHARTER\|PLAIN_STDOUT_CONTEXT_EVENTS\|isContextEvent` | hits=29（全數為預期引用：SSOT/runtime 各一份鏡射、`.codex/agents/*.toml` 與 codex sync 腳本引用未搬動的 SSOT 路徑、`agency-os/WORKLOG.md` 續3 條目的歷史記述、session transcript 自動記錄——無孤兒、無過期宣告需要修正）
 
 **剩餘風險**：
-- 第 4 層（host 未觸發 `SubagentStart`）未修，charter 注入在 Claude Desktop app 環境目前仍是功能性死碼——僅程式碼層面正確，端到端未成功，需操作者決定是否要仿 `subagent-budget.js` 遷移機制
+- ~~第 4 層（host 未觸發 `SubagentStart`）未修~~——**已於同日續7修好**：遷移到 `PreToolUse ^Agent$`（比照 `subagent-budget.js` 已驗證的真實觸發點），真實 spawn 複驗成功，見續7條目
 - Review 步驟為自我對抗覆審 + mutation test 代打，非獨立第三方模型覆審；兩條 oracle 恢復可用後建議補跑一輪
 
 **Rollback**: `git checkout -- mcp/claude-userlevel/hooks/ mcp/claude-userlevel/manifest.json scripts/normalize-claude-settings.mjs scripts/sync-claude-userlevel.ps1 tests/hooks/runner-core.test.mjs`，刪除新增的 2 個測試檔，再跑 `sync-claude-userlevel.ps1 -Mode merge` 把 runtime 沖回舊版（`~/.claude/SUBAGENT_CHARTER.md` 需手動刪除，install 模式才會清理 extra）。

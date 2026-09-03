@@ -144,6 +144,23 @@ function main() {
     // no crash, no fail-open entry, charter simply never reached the
     // subagent. Extend this set if a future event needs the same treatment.
     const PLAIN_STDOUT_CONTEXT_EVENTS = new Set(['UserPromptSubmit']);
+    // PreToolUse is NOT a pure context event like the two above (a
+    // non-blocking call with no rule context must still pass through
+    // untouched — see the final fallback branch below), but per the
+    // official docs it DOES honor hookSpecificOutput.additionalContext when
+    // a rule returns one, alongside permissionDecision:"allow" (2026-09-03).
+    // CONFIRMED by a real Agent-tool spawn (2026-09-03, this host = Claude
+    // Desktop app): additionalContext returned from a PreToolUse ^Agent$
+    // rule is delivered into the freshly-spawned SUBAGENT's own context
+    // (the spawned agent quoted it back verbatim, unprompted) -- not just
+    // surfaced to the calling parent. This is the mechanism subagent-charter
+    // now rides on instead of SubagentStart (see rules.manifest.json), which
+    // real spawn testing separately proved never reaches this host at all.
+    // NOTE: unlike `updatedInput` (confirmed via two independent, closed
+    // Claude Code GitHub issues to be silently ignored for the Agent tool's
+    // own prompt field), additionalContext is NOT silently dropped here --
+    // don't conflate the two fields' reliability.
+    const isPreToolUseContext = event === 'PreToolUse';
     try {
       let payload;
       try { payload = JSON.parse(d); } catch (_) { payload = null; }
@@ -244,6 +261,20 @@ function main() {
       } else {
         for (const ln of contexts) process.stdout.write(ln + '\n');
       }
+      return;
+    }
+    if (isPreToolUseContext && contexts.length) {
+      // Structured JSON per the official contract — see the const above for
+      // why this differs from the plain-stderr-warn degrade path below.
+      // permissionDecision:"allow" is explicit: blocks already returned
+      // earlier via exit 2, so reaching here always means "let it proceed."
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'allow',
+          additionalContext: contexts.join('\n'),
+        },
+      }));
       return;
     }
     if (contexts.length) {

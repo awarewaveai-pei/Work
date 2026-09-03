@@ -17,7 +17,8 @@
       {
         "matcher": "^Agent$",
         "rules": [
-          "subagent-budget"
+          "subagent-budget",
+          "subagent-charter"
         ]
       },
       {
