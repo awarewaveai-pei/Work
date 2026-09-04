@@ -757,6 +757,36 @@ tier_1:
       as a repeated teaching example. Tier 1, mandated by the
       actively-running implementation slice, same category as the
       twenty-one entries above it.
+  twentythird_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-third Tier 1 entry, same
+    # additive-key rationale as the twenty-two entries above it.
+    method_id: "database_data.backup_restore_drill"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FIRST entry from
+      a new family, `database_data` (F21's own "資料庫／資料套件"). A
+      disclosed comparison drove this pick over the F19 "下一步"
+      candidate RTO/RPO: RTO/RPO's own F19 tool table row (L860) is a
+      thin, single-citation formula with no dedicated Atlas section
+      (confirmed by direct read: §11.43 Chaos Engineering jumps straight
+      to §11.44 STRIDE, an F20 method). Backup/Restore Drill's own F21
+      row (L905) ALSO has a dedicated §12.40 section (L3086-3100) with a
+      real 6-step numbered protocol, the same tier of citation strength
+      devops_sre.canary_deployment/chaos_engineering already established
+      -- and its own purpose line (L3090) directly names RTO/RPO as the
+      pass/fail bar it measures against, so building this method first
+      (with RTO/RPO's target numbers as caller-supplied input fields)
+      covers the stronger-grounded half of both concepts without
+      inventing structure for the thinner one. A standalone
+      devops_sre.rto_rpo contract remains open (OQ-BACKUPDRILL-2).
+    source: "methods/contracts/database_data.backup_restore_drill.contract.yaml (built same session as this entry, mints machine_id database_data.backup_restore_drill and opens the database_data family) + specs/cognitive/typed-objects/backup-restore-drill-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §12.40 is a dedicated section with
+      a real 6-step protocol, not itself cited elsewhere as a repeated
+      teaching example. Tier 1, mandated by the actively-running
+      implementation slice, same category as the twenty-two entries
+      above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

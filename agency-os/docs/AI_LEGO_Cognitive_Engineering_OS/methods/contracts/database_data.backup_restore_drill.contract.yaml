@@ -1,0 +1,243 @@
+$id: "ai-lego://methods/contracts/database_data.backup_restore_drill.contract.yaml"
+title: "Backup / Restore Drill Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-fifth Method Atlas slice, FIRST from the
+  `database_data` family (F21's own "資料庫／資料套件 (DB / Data Pack)")
+  -- a third pack this session opens, after F18's own "Software
+  Architecture Pack" and F19's own "DevOps／SRE／可靠性套件".
+  `family: database_data` transcribes method-inventory.yaml's own
+  category label ("F21 database-data", hyphen replaced with underscore
+  to satisfy `method.schema.yaml`'s own `^[a-z_]+$` pattern -- same class
+  of punctuation-forced substitution `devops_sre`'s own naming note
+  already disclosed).
+
+  A DELIBERATE comparison, disclosed rather than assumed: this session's
+  own F19 "下一步" list named `RTO/RPO` (F19 tool table row, L860) as an
+  unassessed candidate. Read BOTH `RTO/RPO`'s own row (thin, one
+  citation, same tier as `architecture.quality_attribute_scenario`) AND
+  `Backup/Restore Drill`'s own F21 row (L905) before choosing --
+  Backup/Restore Drill ALSO has a dedicated §12.40 section (L3086-3100)
+  with a real 6-step numbered protocol (select a real backup -> restore
+  to an isolated environment -> integrity/application checks -> time it
+  -> record issues -> produce evidence), the same tier of citation
+  strength `devops_sre.canary_deployment`/`devops_sre.chaos_engineering`
+  already established. `RTO/RPO` has no such dedicated section. §12.40's
+  own purpose line (L3090: "證明備份不是「檔案存在」，而是「可以在
+  RTO/RPO 內恢復成可用系統」" -- prove a backup is not just "a file
+  exists" but "restorable to a working system within RTO/RPO") directly
+  NAMES RTO/RPO as the pass/fail bar this drill measures against --
+  building this method first, with RTO/RPO's target numbers as its own
+  INPUT fields (not re-derived), covers the stronger-grounded half of
+  both concepts without inventing a second contract for the thinner one.
+  A standalone `devops_sre.rto_rpo` contract (how business-impact tiers
+  map to target numbers, F19's own L860 formula) remains a real,
+  separately-buildable candidate this contract does not claim to close --
+  see `open_questions.OQ-BACKUPDRILL-2`.
+
+  The purpose line's own combined "RTO/RPO" bar is a real, enforceable
+  invariant this contract enforces on the RTO half directly (Atlas's own
+  step 4 "計時" produces the measured duration that step is FOR): a
+  drill record cannot claim `status: passed` while
+  `actual_recovery_duration_seconds` exceeds `rto_target_seconds`, or
+  while `integrity_checks_passed` (Atlas's own step 3) is false.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Backup/Restore Drill row (L905): 'backup→isolated restore→integrity→RTO/RPO' -- CORRECTED post-critic-review from an initially mis-cited L902 (Data Contract's own row, an off-by-3 inherited from method-inventory.yaml's own line-number field, see OQ-BACKUPDRILL-3)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.40 備份還原演練（Backup / Restore Drill）(L3086-3100) -- purpose, 6-step protocol"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, RTO/RPO row (L860): read for comparison, NOT this contract's own citation -- see description"
+  - "methods/registry/method-inventory.yaml Backup/Restore Drill entry (L1267-1271): category 'F21 database-data', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-third
+  concrete entry. `id: database_data.backup_restore_drill` mints a new
+  machine_id and opens a new family (`database_data`), F21's own
+  category label with a punctuation substitution disclosed above.
+
+id: database_data.backup_restore_drill
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [VALIDATE, DECOMPOSE, MAP]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Same inferred triple every prior structured-protocol-
+# with-invariant contract this session built already uses
+# (devops_sre.canary_deployment/chaos_engineering/blue_green_deployment):
+# the 6-step protocol is DECOMPOSE (select/restore/check/time/record/
+# evidence as distinct steps), the outcome check against RTO/RPO and
+# integrity is VALIDATE, and the sequence itself is MAP.
+
+purpose:
+  - prove_a_backup_is_actually_restorable_to_a_working_system_within_its_recovery_targets
+inputs:
+  required: [BackupUnderTest]
+  optional: []
+outputs: [BackupRestoreDrillRecord]
+preconditions:
+  - "backup_id and restore_environment are both non-empty"
+  - "rto_target_seconds is strictly positive and finite"
+  - "if rpo_target_seconds is supplied, observed_data_age_seconds must also be supplied, and vice versa"
+  - "status:passed requires integrity_checks_passed:true AND actual_recovery_duration_seconds <= rto_target_seconds AND (rpo_target_seconds not supplied OR observed_data_age_seconds <= rpo_target_seconds)"
+  # The last precondition is directly implied by Atlas's own purpose
+  # line (L3090) -- "restorable within RTO/RPO" is the pass bar, not a
+  # separate claim from the drill's own steps 3-4. Same "raise before
+  # construction on a real, Atlas-implied structural rule" discipline
+  # every prior forbidden-state guard this session built already
+  # established.
+  #
+  # DELIBERATELY ONE-DIRECTIONAL (clarified post-critic-review): this
+  # precondition forbids status:passed when the criteria are not met. It
+  # does NOT require status:failed to be forbidden when the criteria ARE
+  # met -- a caller recording status:failed despite numbers that look
+  # fine is a legal, real operational judgment call (e.g. "the runbook
+  # itself had to be manually patched mid-drill to succeed, so we are
+  # calling this a fail regardless of the timer"), the same kind of
+  # honest disclosure Atlas's own step 5 ("記錄問題") exists to capture.
+  # An earlier draft of this method's own gate enforced BIDIRECTIONAL
+  # equivalence (status must always match the computed verdict exactly)
+  # -- a critic review caught that this rejected a legitimate
+  # conservative-failed record the contract text itself never forbade;
+  # fixed to match this one-directional reading, both in the builder
+  # (already one-directional) and the gate (was bidirectional, now
+  # matches).
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure root_cause.pareto.contract.yaml's own
+  # compilation_decisions already reasoned through: the real risk here
+  # is an operational-integrity risk (did the drill actually measure
+  # what it claims), not an evidence-citation risk over a narrative
+  # claim. Atlas's own step 6 ("產 Evidence") is what THIS record itself
+  # IS, not a separate evidence-citation obligation layered on top of it.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Backup/Restore Drill row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. RTO/RPO target
+# derivation (business impact -> tiers -> architecture, F19 L860) is a
+# real upstream candidate this contract's own inputs consume the OUTPUT
+# of, not a downstream chain -- see OQ-BACKUPDRILL-2.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free; the real restore performed
+  # during the drill happens in an ISOLATED environment by Atlas's own
+  # step 2 -- explicitly not production, same plan-vs-real-effect
+  # distinction every prior operational contract's own rollback field
+  # already draws.
+
+compilation_decisions:
+  - question: >
+      Atlas's purpose line (L3090) names RTO AND RPO together as one
+      combined bar ("在 RTO/RPO 內恢復") -- should this contract invent
+      a symmetric RPO-measurement step the 6-step protocol never
+      separately names (steps 3-4 explicitly cover integrity checks and
+      timing, both read naturally as RTO-side validation)?
+    decision: "RPO fields (rpo_target_seconds/observed_data_age_seconds) are OPTIONAL, not required -- the RTO half of the invariant is unconditional, the RPO half only applies when both fields are supplied."
+    reasoning: >
+      Atlas's own 6 steps give an explicit action for timing (step 4,
+      directly RTO) but no explicit distinct action for measuring data
+      staleness/age (RPO) -- "integrity checks" (step 3) is the closest
+      textual anchor and is ambiguous between "does the restored data
+      pass consistency checks" and "how stale is the restored data
+      relative to the incident". Forcing RPO fields to be required would
+      invent a 7th step Atlas's own numbered list does not contain.
+      Making them optional, with a real invariant when a caller DOES
+      supply both, keeps the contract honest about which half of the
+      L3090 purpose line the 6-step protocol text actually operationalizes
+      versus which half a caller must supply meaning for themselves --
+      same class of deliberate restraint `devops_sre.blue_green_deployment
+      .contract.yaml`'s own `blue_retained` field already disclosed for a
+      different sentence-parsing question.
+  - question: >
+      Should this contract also define `devops_sre.rto_rpo` (F19's own
+      row, business-impact -> tiers -> architecture -> drill) as a
+      second method in the same slice, since the purpose line ties them
+      together?
+    decision: "No -- built as a separate, deliberately deferred candidate (OQ-BACKUPDRILL-2), not built in this slice."
+    reasoning: >
+      RTO/RPO's own F19 row has no dedicated Atlas section (this
+      session's own F19 devops_sre entries jump from §11.43 Chaos
+      Engineering directly to §11.44 STRIDE, an F20 method -- confirmed
+      by direct read before writing this contract). Building it now
+      would mean inventing structure for a method Atlas itself gives
+      only a single table-row formula for, the same "don't invent what
+      isn't there" discipline this session's every Tier-1 contract
+      already applies. This contract instead consumes RTO/RPO's target
+      NUMBERS as its own caller-supplied input fields (`rto_target_seconds`/
+      `rpo_target_seconds`), which is all the drill protocol's own text
+      actually needs from that concept.
+
+open_questions:
+  - id: "OQ-BACKUPDRILL-1"
+    question: "id mints a machine_id method-inventory.yaml never carried, and opens a new family -- should method-inventory.yaml be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BACKUPDRILL-2"
+    question: >
+      `devops_sre.rto_rpo` (F19's own business-impact -> tiers ->
+      architecture -> drill formula) remains unbuilt -- if built later,
+      should its own output feed `rto_target_seconds`/
+      `rpo_target_seconds` here as a soft link (same
+      `related_slo_id`-class pattern `devops_sre.error_budget.contract
+      .yaml` already established for a different cross-method reference),
+      rather than leaving them as bare caller-supplied numbers?
+    owner: "operator, or whoever next builds devops_sre.rto_rpo"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BACKUPDRILL-3"
+    question: >
+      This contract's own first draft cited the Backup/Restore Drill
+      F21 table row as L902 (Data Contract's own row) -- a critic review
+      caught the off-by-3, traced to method-inventory.yaml's own `line`
+      field for this entry (L1268: `line: 902`) itself already being 3
+      lines short of the row's real position (L905) in the current Atlas
+      document. The same +3 pattern was independently observed on two
+      other entries this session already cited correctly by direct read
+      rather than by trusting the registry field (Error Budget:
+      inventory says 848, real row is L851; RTO/RPO: inventory says 857,
+      real row is L860) -- suggesting a systematic drift between
+      method-inventory.yaml's `line` field and the Atlas document's
+      current line numbers, not three independent typos. Should
+      method-inventory.yaml's `line` fields be re-derived from the
+      current document wholesale?
+    owner: "operator, or a future session auditing method-inventory.yaml's own line-number accuracy against the current Atlas document"
+    blocks: "nothing in this file's own validity (this contract's own citations are now direct-read-verified, not registry-trusted)"
+  - id: "OQ-BACKUPDRILL-4"
+    question: >
+      A record whose `rpo_target_seconds` AND `observed_data_age_seconds`
+      are BOTH removed after construction is, on the data alone,
+      indistinguishable from a record that never tracked RPO in the
+      first place -- no optional-pair design can detect "both fields
+      deleted together" from the remaining fields, since "absent" and
+      "deliberately not tracked" look identical. A critic review
+      confirmed the one-field-deleted case IS now caught (the pairing
+      re-derivation added post-review), but this two-field case remains
+      a real, structural limit of the optional-pair design itself, not
+      a bug in this contract's own enforcement. Should a future revision
+      add a required `rpo_tracked: bool` field (RPO fields required
+      together with it) to close this specific residual gap?
+    owner: "operator, or whoever next revises this contract's own RPO field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L905) and §12.40 (L3086-3100)
+    directly. Also read F19's own RTO/RPO row (L860) and confirmed
+    (via direct read of §11.40-§11.44) it has no dedicated protocol
+    section, before choosing to build Backup/Restore Drill first --
+    disclosed comparison, not assumed. Grepped `specs/` for "backup
+    restore"/"restore drill"/"RTO"/"RPO" before writing -- no duplicate
+    typed object found (the existing `staleness_slo` field in
+    `repository-contract.schema.yaml`, already noted by
+    `devops_sre.sli_slo.contract.yaml`'s own verification, is an
+    unrelated advisory field, re-confirmed distinct here). Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 6-step protocol and the
+    RTO/integrity half of the pass invariant are both directly grounded
+    in Atlas's own cited text; the optional RPO half and the decision not
+    to also build `devops_sre.rto_rpo` in this slice are both disclosed
+    compilation choices, not silent inventions -- see
+    compilation_decisions above.

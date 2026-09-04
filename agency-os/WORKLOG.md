@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-05（續38，同一 session：Cognitive OS 第二十五個 Method Atlas 切片 — `database_data.backup_restore_drill`，開第三個 pack `database_data`）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」）。0 agent（除 critic subagent review）。
+
+**選型（主動比較，非文件順序）**：F19「下一步」候選 RTO/RPO（F19 table L860）只有單一表格列引用，無專屬段落。讀完後轉查 F21「資料庫／資料套件」的 Backup/Restore Drill（F21 table L905）——**有**專屬段落 §12.40（L3086-3100，真 6 步驟編號協定），同 canary/chaos 等級的引用強度，且其 purpose 行（L3090）直接點名 RTO/RPO 是它的通過門檻。選擇先做根基較紮實的一方（Backup/Restore Drill），RTO/RPO 目標數字做成呼叫者提供的輸入欄位，不重造較薄弱的 RTO/RPO 本體（`OQ-BACKUPDRILL-2` 留待未來）。開第三個 pack `database_data`（F18 architecture、F19 devops_sre 之後）。
+
+**真不變量**：`status:passed` 要求 `integrity_checks_passed:true` 且 `actual_recovery_duration_seconds<=rto_target_seconds` 且（若追蹤 RPO）`observed_data_age_seconds<=rpo_target_seconds`——**單向**，`status:failed` 即使數字技術上達標仍合法（保守判斷的真實維運選擇，Atlas 原文從未禁止）。CLI 真跑兩次攻擊（RTO 超標、RPO 超標）皆確認被擋。
+
+**critic 真跑抓到 1 個 Critical + 3 個 Major**：
+1. **Critical**：gate 只重新推導 pass/fail 判定，沒有重新驗證 RPO 配對前置條件本身——只刪 `rpo_target_seconds` 或只刪 `observed_data_age_seconds`（留下另一個變成孤兒欄位）會被 gate 誤判成「沒追蹤 RPO」而放行，真實 RPO 失敗被藏起來。修法：把配對檢查也收進共用 predicate（`_rpo_pairing_is_valid`），builder 和 gate 兩邊呼叫同一份定義；schema 層加 `dependentRequired` 當第二層防護。**誠實揭露殘留限制**：兩個 RPO 欄位「一起」被刪除，在資料上與「本來就沒追蹤」無法區分——任何 optional-pair 設計都擋不住，寫進新開的 `OQ-BACKUPDRILL-4`（真正治本需要一個必填 `rpo_tracked: bool` 欄位，本次不做，只揭露）。
+2. **Major**：gate 做雙向等價檢查（status 必須永遠等於計算判定），比 contract 原文與 builder 本身都更嚴格——一個數字技術上達標、但操作者保守記為 `failed` 的合法記錄，會被自己的 gate 判 FAIL。Contract 原文只禁止「不達標卻宣稱 passed」，從未禁止反向。修正 gate 改單向，同 builder 語意一致；同時修正一個過度約束的既有測試（`test_hand_tampered_passed_record_relabelled_failed_also_fails_the_gate`，把未定案語意寫死成規格），改成證明保守 failed 合法。
+3. **Major**：Atlas 引用行號 off-by-3——contract 寫 L902（其實是 Data Contract 那一列），真正 Backup/Restore Drill 列在 L905。根因是 `method-inventory.yaml` 自己的 `line` 欄位本身就少 3（本 session 同樣命中過 Error Budget 848 vs 真實 851、RTO/RPO 857 vs 真實 860），非單一巧合筆誤，疑似系統性偏移，記錄為 `OQ-BACKUPDRILL-3`。6 處引用全部改為直讀驗證後的 L905/L860。
+4. **Major**：NaN 通過全部三層（`nan<0`、`nan>x` 在 Python 皆為 False，jsonschema 的 `minimum` 比較同樣被騙過）。修法：共用 `_is_finite_number` helper 補 `math.isfinite` 檢查，套用到所有時長/門檻欄位。
+另 5 個 Minor（非布林 `integrity_checks_passed` 因真值轉型騙過 gate、`issues_recorded` 傳字串被靜默拆成單字元、gate evidence 資訊不足以事後診斷、RPO 邊界 mutation 測試缺口、缺 slice 說明文件）+2 個 Nit（predicate 改 keyword-only 防參數順序誤植、CLI 攻擊驗證補上 RPO 路徑）全數修正。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.backup_restore_drill.contract.yaml`＋`specs/cognitive/typed-objects/backup-restore-drill-record.schema.yaml`（含 `dependentRequired`）＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentythird_concrete_entry`＋重新產生索引，行號引用全部修正。Product root 新增 `ai_lego/modules/database_data/__init__.py`（新 pack）＋`backup_restore_drill.py`（builder+2 個共用 predicate+2 gate，gate 改單向並重驗 RPO 配對）＋`ai_lego/apps/cli/run_backup_restore_drill_slice.py`（真實通過案例+RTO/RPO 雙攻擊驗證）＋`tests/unit/test_backup_restore_drill.py`（34 tests）＋`docs/TWENTYFIFTH_SLICE_DATABASE_DATA_BACKUP_RESTORE_DRILL.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2735→2744
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_backup_restore_drill_slice`（修正後）| exit=0 | result=`PASS database_data.backup_restore_drill: status=passed, actual_recovery_duration_seconds=2415.0, rto_target_seconds=3600.0, gates [provenance_required=PASS, pass_invariant=PASS], invariant_verified=True`（RTO+RPO 雙攻擊皆確認被擋）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_backup_restore_drill -v` | exit=0 | result=34 passed（19→34，新增 RPO 配對竄改回歸+雙向語意回歸+NaN/非布林/字串拆解等測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=63064 | result=**582 tests OK**（567→582，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，非自審）| verdict=fail(1 Critical)→fixed | findings=1c/3m/7minor（全數修正；1 項殘留限制誠實揭露為新 OQ 非隱藏，見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`database_data[.]backup_restore_drill\|BackupRestoreDrillRecord\|backup-restore-drill-record\|run_backup_restore_drill_slice\|_drill_would_pass` | hits=12（10 個真檔案+2 個 session log git-status 雜訊快照），無過期殘留；舊錯誤碼 `BACKUPDRILL_NEGATIVE_DURATION`／`BACKUPDRILL_NEGATIVE_DATA_AGE`（改名前）零殘留，確認改名乾淨
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-BACKUPDRILL-1`（無機器 id 列）、`OQ-BACKUPDRILL-2`（`devops_sre.rto_rpo` 本體未建）、`OQ-BACKUPDRILL-3`（method-inventory.yaml 行號疑似系統性 +3 偏移，未全面稽核）、`OQ-BACKUPDRILL-4`（RPO 兩欄一起刪除的殘留限制，誠實揭露非阻塞）。皆非阻塞。
+
 ## 2026-09-05（HCI30 ADR-0010 部分收尾——VBC 發現 gate 1 早已滿足，`CONSENT-RLS-01/02` 補齊既有兩張零測試表的覆蓋，第一次真跑無 bug）
 
 **觸發**：延續 HCI Wave 1 收尾工作，同一套 VBC 先查再動工的紀律。

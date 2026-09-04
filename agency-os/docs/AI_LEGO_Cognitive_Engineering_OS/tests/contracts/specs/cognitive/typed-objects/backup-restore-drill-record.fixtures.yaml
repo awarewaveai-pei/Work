@@ -1,0 +1,58 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/backup-restore-drill-record.schema.yaml"
+target_ref: ""
+description: "Exercises BackupRestoreDrillRecord's required fields and the status enum."
+
+valid:
+  - name: passed_drill_within_rto_no_rpo_tracking
+    instance:
+      id: "DRILL-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.backup_restore_drill"
+      backup_id: "BACKUP-2026-09-04-nightly"
+      restore_environment: "isolated-restore-staging"
+      integrity_checks_passed: true
+      rto_target_seconds: 3600
+      actual_recovery_duration_seconds: 2415
+      issues_recorded: []
+      status: passed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: failed_drill_exceeded_rto_with_issue
+    instance:
+      id: "DRILL-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.backup_restore_drill"
+      backup_id: "BACKUP-2026-09-04-nightly"
+      restore_environment: "isolated-restore-staging"
+      integrity_checks_passed: true
+      rto_target_seconds: 3600
+      actual_recovery_duration_seconds: 5100
+      issues_recorded: ["restore job queued 20 minutes before starting"]
+      status: failed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_actual_recovery_duration_seconds
+    instance:
+      id: "DRILL-2026-09-05-003"
+      version: "1.0.0"
+      backup_id: "x"
+      restore_environment: "x"
+      integrity_checks_passed: true
+      rto_target_seconds: 3600
+      issues_recorded: []
+      status: passed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "actual_recovery_duration_seconds is required -- Atlas's own step 4 (計時) output, missing here."
+  - name: invalid_status_enum_value
+    instance:
+      id: "DRILL-2026-09-05-004"
+      version: "1.0.0"
+      backup_id: "x"
+      restore_environment: "x"
+      integrity_checks_passed: true
+      rto_target_seconds: 3600
+      actual_recovery_duration_seconds: 100
+      issues_recorded: []
+      status: "partial"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "status is enum [passed, failed] -- 'partial' is not a member."

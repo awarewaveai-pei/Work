@@ -1,0 +1,115 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/backup-restore-drill-record.schema.yaml"
+title: Backup Restore Drill Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BackupRestoreDrillRecord` --
+  the declared `outputs` of `database_data.backup_restore_drill`'s
+  Method Contract. First `database_data`-family typed object. Atlas
+  §12.40's own 6-step protocol (L3086-3100: select a real backup ->
+  restore to an isolated environment -> integrity/application checks ->
+  time it -> record issues -> produce evidence) maps onto this schema's
+  required fields; the purpose line's own RTO/RPO bar (L3090) maps onto
+  the `status`/`actual_recovery_duration_seconds`/
+  `integrity_checks_passed` cross-field invariant (enforced at the
+  runtime layer, see method contract preconditions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Backup/Restore Drill row (L905) -- CORRECTED post-critic-review from an initially mis-cited L902, see contract's own OQ-BACKUPDRILL-3"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.40 備份還原演練（Backup / Restore Drill）(L3086-3100)"
+  - "methods/contracts/database_data.backup_restore_drill.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, backup_id, restore_environment, integrity_checks_passed, rto_target_seconds, actual_recovery_duration_seconds, issues_recorded, status, provenance]
+dependentRequired:
+  # Defense-in-depth for the RPO pairing precondition (method contract's own precondition 3): the runtime
+  # layer (ai_lego/modules/database_data/backup_restore_drill.py) is the primary enforcement, but a schema-layer
+  # signal means a record with exactly one of these two fields fails validation before it ever reaches the
+  # runtime gate -- added post-critic-review (was runtime-only in the first draft).
+  rpo_target_seconds: [observed_data_age_seconds]
+  observed_data_age_seconds: [rpo_target_seconds]
+properties:
+  id:
+    type: string
+    pattern: "^DRILL-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.backup_restore_drill"
+  backup_id:
+    type: string
+    minLength: 1
+    description: "Atlas L3094's own step 1: '選真實 backup' -- which real backup this drill exercised."
+  restore_environment:
+    type: string
+    minLength: 1
+    description: "Atlas L3095's own step 2: 'Restore 到隔離環境' -- explicitly isolated, not production."
+  integrity_checks_passed:
+    type: boolean
+    description: "Atlas L3096's own step 3: 'Integrity / application checks'."
+  rto_target_seconds:
+    type: number
+    exclusiveMinimum: 0
+    description: "The Recovery Time Objective this drill is measured against -- caller-supplied (see method contract compilation_decisions on why this is not re-derived from a separate RTO/RPO method)."
+  actual_recovery_duration_seconds:
+    type: number
+    minimum: 0
+    description: "Atlas L3097's own step 4: '計時' -- the measured wall-clock duration of the restore."
+  rpo_target_seconds:
+    type: number
+    exclusiveMinimum: 0
+    description: "OPTIONAL: the Recovery Point Objective (acceptable data-loss window) this drill is measured against. Atlas's 6-step protocol gives no explicit separate RPO-measurement step -- see method contract compilation_decisions."
+  observed_data_age_seconds:
+    type: number
+    minimum: 0
+    description: "OPTIONAL: how stale the restored data is relative to the incident/drill time. Required together with rpo_target_seconds -- cross-field pairing enforced at the runtime layer, not the schema layer."
+  issues_recorded:
+    type: array
+    default: []
+    items:
+      type: string
+      minLength: 1
+    description: "Atlas L3098's own step 5: '記錄問題' -- REQUIRED array (may be empty) so an absence of issues is an explicit disclosed finding, not an omitted field."
+  status:
+    enum: [passed, failed]
+    description: "Atlas's own purpose line (L3090, restorable within RTO/RPO) and step 3 (integrity) together forbid status:passed unless integrity_checks_passed:true AND actual_recovery_duration_seconds <= rto_target_seconds AND (rpo_target_seconds absent OR observed_data_age_seconds <= rpo_target_seconds) -- enforced at the runtime layer (ai_lego/modules/database_data/backup_restore_drill.py), not the schema layer. ONE-DIRECTIONAL: the reverse (status:failed while every criterion technically passes) is legal -- a caller's own conservative judgment call, not forbidden by Atlas's own text. NaN/inf on the numeric fields below are also rejected only at the runtime layer -- draft 2020-12 JSON Schema's own numeric `minimum`/`maximum` comparisons do not reliably exclude them (a known jsonschema-library behavior, not fixable at this schema layer alone)."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a drill record is a structured operational observation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A passed drill: integrity OK, restored within RTO, RPO not tracked"
+    value:
+      id: "DRILL-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.backup_restore_drill"
+      backup_id: "BACKUP-2026-09-04-nightly"
+      restore_environment: "isolated-restore-staging (no production network access)"
+      integrity_checks_passed: true
+      rto_target_seconds: 3600
+      actual_recovery_duration_seconds: 2415
+      issues_recorded: []
+      status: passed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A failed drill: restore exceeded RTO, one issue recorded"
+    value:
+      id: "DRILL-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.backup_restore_drill"
+      backup_id: "BACKUP-2026-09-04-nightly"
+      restore_environment: "isolated-restore-staging (no production network access)"
+      integrity_checks_passed: true
+      rto_target_seconds: 3600
+      actual_recovery_duration_seconds: 5100
+      issues_recorded: ["restore job queued 20 minutes before starting due to a snapshot-tool concurrency limit"]
+      status: failed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L905) and §12.40 (L3086-3100) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 6-step protocol is directly transcribed into the field set. The pass invariant is enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."
