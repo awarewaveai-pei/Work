@@ -1,0 +1,98 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml"
+target_ref: ""
+description: >
+  Exercises CausalDagAnalysis's required fields, the `nodes[]` minItems:2 /
+  `edges[]` minItems:1 guards, the closed 5-value `role` enum (Atlas
+  L1679's own causal-role vocabulary), per-edge provenance, and the
+  `acyclic_verified` const:true guarantee -- proven to actually reject
+  `false`.
+
+valid:
+  - name: atlas_worked_example_transcribed
+    instance:
+      id: "CDA-2026-09-04-001"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-001"
+      generated_by_method: "causal.dag"
+      nodes:
+        - {id: "N1", label: "brand awareness", role: CONFOUNDER}
+        - {id: "N2", label: "ad exposure", role: MEDIATOR}
+        - {id: "N3", label: "purchase", role: OUTCOME}
+        - {id: "N4", label: "price", role: TREATMENT}
+      edges:
+        - {from_node_id: "N1", to_node_id: "N2", provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}}
+        - {from_node_id: "N1", to_node_id: "N3", provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}}
+        - {from_node_id: "N2", to_node_id: "N3", provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED}, supporting_evidence_refs: ["E-601"]}
+        - {from_node_id: "N4", to_node_id: "N3", provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED}, supporting_evidence_refs: ["E-602"]}
+      acyclic_verified: true
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: minimal_two_node_one_edge_graph
+    instance:
+      id: "CDA-2026-09-04-002"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-002"
+      nodes:
+        - {id: "N1", label: "cause", role: TREATMENT}
+        - {id: "N2", label: "effect", role: OUTCOME}
+      edges:
+        - {from_node_id: "N1", to_node_id: "N2", provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED}, supporting_evidence_refs: ["E-701"]}
+      acyclic_verified: true
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: nodes_below_minitems_2
+    instance:
+      id: "CDA-2026-09-04-003"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-003"
+      nodes: [{id: "N1", label: "solo", role: OUTCOME}]
+      edges: []
+      acyclic_verified: true
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}
+    reason: "nodes has minItems: 2 -- a causal claim needs at least a cause and an effect; edges also has minItems: 1, both violated here."
+  - name: role_not_in_5_value_enum
+    instance:
+      id: "CDA-2026-09-04-004"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-004"
+      nodes:
+        - {id: "N1", label: "cause", role: "INSTRUMENT"}
+        - {id: "N2", label: "effect", role: OUTCOME}
+      edges:
+        - {from_node_id: "N1", to_node_id: "N2", provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}}
+      acyclic_verified: true
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}
+    reason: "role must be one of [TREATMENT, OUTCOME, CONFOUNDER, MEDIATOR, COLLIDER] (Atlas L1679's own vocabulary plus the two structural endpoints) -- 'INSTRUMENT' is not among them."
+  - name: acyclic_verified_false_is_refused_by_const
+    instance:
+      id: "CDA-2026-09-04-005"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-005"
+      nodes:
+        - {id: "N1", label: "A", role: TREATMENT}
+        - {id: "N2", label: "B", role: OUTCOME}
+      edges:
+        - {from_node_id: "N1", to_node_id: "N2", provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}}
+        - {from_node_id: "N2", to_node_id: "N1", provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}}
+      acyclic_verified: false
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}
+    reason: "acyclic_verified is const:true -- a record whose own edges form a cycle (N1->N2->N1) and that honestly reports false cannot validate as a CausalDagAnalysis at all (see schema's own compilation_decisions)."
+  - name: edge_missing_required_provenance
+    instance:
+      id: "CDA-2026-09-04-006"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-006"
+      nodes:
+        - {id: "N1", label: "A", role: TREATMENT}
+        - {id: "N2", label: "B", role: OUTCOME}
+      edges:
+        - {from_node_id: "N1", to_node_id: "N2"}
+      acyclic_verified: true
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED}
+    reason: "edges[].provenance is required -- each edge is its own causal hypothesis (Atlas L1683) and must carry its own provenance_record, missing here."

@@ -276,6 +276,32 @@ tier_1:
       -- Atlas §11.6 is a dedicated protocol section, not a
       repeatedly-cited-teaching-example. Tier 1, mandated by the actively-
       running implementation slice.
+  fourth_concrete_entry:
+    # NEW (2026-09-04, same session): fourth Tier 1 entry, same additive-key
+    # rationale as second_concrete_entry/third_concrete_entry.
+    method_id: "causal.dag"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Third of root_cause.fishbone.contract.yaml's four recommended_next
+      validation methods to gain a contract in this session (after
+      root_cause.five_whys and root_cause.pareto). Unlike those two, this
+      method's own family is `causal` (F11), not `root_cause` (F05) --
+      method-inventory.yaml files "Causal DAG" under "F11 causal"
+      (L691-696) -- chosen specifically to exercise a THIRD structural
+      shape (a graph: nodes with causal roles and directed edges) after
+      narrative (five_whys) and calculated-result (pareto). Also cited by
+      Atlas §14.1's own legal chain (L3548-3556,
+      "CauseHypothesisSet -> Evidence Search -> Causal DAG -> Validation ->
+      RootCauseAssessment") independent of the fishbone recommended_next
+      citation.
+    source: "methods/contracts/causal.dag.contract.yaml (built same session as this entry) + specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml (new output type) + ai_lego/compute/graph/dag.py (new deterministic cycle-detection compute module)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.21 has a real worked diagram but
+      no numbered usage-step protocol the way SS11.5/SS11.6/SS11.7 do, and it
+      is not itself cited elsewhere as a repeated teaching example. Tier 1,
+      mandated by the actively-running implementation slice, same category
+      as the three entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

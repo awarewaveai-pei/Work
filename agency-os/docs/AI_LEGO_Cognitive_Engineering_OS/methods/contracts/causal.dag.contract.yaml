@@ -1,0 +1,165 @@
+$id: "ai-lego://methods/contracts/causal.dag.contract.yaml"
+title: "Causal DAG Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as `root_cause.five_whys` and
+  `root_cause.pareto`). Third of `root_cause.fishbone.contract.yaml`'s four
+  `recommended_next` validation methods to gain a real contract, and the
+  first from a DIFFERENT family: `causal` (F11), not `root_cause` (F05) --
+  method-inventory.yaml's own "Causal DAG" entry (L691-696) is filed under
+  "F11 causal", and this contract's `id` (`causal.dag`) follows that family
+  directly rather than being force-fit into `root_cause.*`.
+
+  Atlas §11.21 (L1665-1687) gives this method a dedicated section: purpose,
+  a real worked mermaid diagram (brand awareness -> ad exposure -> purchase,
+  price -> purchase), and named benefits -- thinner than
+  root_cause.five_whys's/root_cause.pareto's numbered-step protocols (no
+  explicit procedure list), but stronger than evidence.triangulation's
+  single structural mention: a real, concrete worked example exists.
+
+  Structurally a THIRD shape for this session's slices: Fishbone/Five Whys
+  are narrative evidence-cited claims, Pareto is a CALCULATED_RESULT, and
+  Causal DAG is a GRAPH -- nodes (variables, each playing a causal ROLE:
+  treatment/outcome/confounder/mediator/collider) and directed edges
+  (causal hypotheses). Its own name asserts a structural property
+  (Directed ACYCLIC Graph) that is independently, mechanically verifiable --
+  the same "genuine compute, not narrative" discipline root_cause.pareto's
+  gate surface established, applied to graph structure instead of
+  arithmetic.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.21 因果有向無環圖（Causal DAG）(L1665-1687) -- purpose, worked diagram, benefits"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 legal chain, CauseHypothesisSet -> Evidence Search -> Causal DAG -> Validation -> RootCauseAssessment (L3548-3556) -- Causal DAG's position downstream of a CauseHypothesisSet"
+  - "methods/contracts/root_cause.fishbone.contract.yaml recommended_next (causal.dag named alongside root_cause.pareto/root_cause.five_whys/validation.experiment)"
+  - "specs/cognitive/typed-objects/root-cause-fact.schema.yaml legal_promotion_path.validation_methods_applied enum (causal.dag already named there)"
+  - "methods/registry/method-inventory.yaml 'Causal DAG' entry (F11 causal, L691-696, machine_id: causal.dag, has_contract: false prior to this file)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.21 gives a real, concrete worked
+  example plus named purpose/benefits -- direct transcription plus
+  low-risk, disclosed compilation choices (`cognitive_primitives` inferred,
+  same disclosed-inference class as the other Tier 1 root_cause-adjacent
+  contracts this session built). Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a fourth concrete
+  entry.
+
+id: causal.dag
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [MAP, RELATE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). Atlas L1679's own purpose ("明確表示因果假設、混淆因子、中介
+# 變數與 collider") is a MAP (lay out the variables) that RELATEs them via
+# directed causal edges, and the method's own name (Directed ACYCLIC
+# Graph) demands the result be VALIDATEd as genuinely acyclic -- all three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - represent_causal_hypotheses_as_a_directed_acyclic_graph
+# Atlas L1679 verbatim sense: explicitly represent causal hypotheses,
+# confounders, mediators and colliders (avoiding L1683's named risk of
+# writing correlation directly as causation).
+
+inputs:
+  required:
+    - CauseHypothesisSet
+  # Atlas §14.1's own legal chain (L3548-3556) places Causal DAG downstream
+  # of a CauseHypothesisSet, same position root_cause.five_whys and
+  # root_cause.pareto both occupy as fishbone's own recommended_next
+  # validation methods.
+
+outputs:
+  - CausalDagAnalysis
+# NEW output type (see typed-objects/causal-dag-analysis.schema.yaml).
+# Atlas gives this method's output no PascalCase name anywhere, same
+# honesty gap every other Tier 1 contract this session built already
+# disclosed.
+
+preconditions:
+  - "every edge references node ids that exist in the same graph"
+  - "the graph is genuinely acyclic (no directed cycle)"
+  # NEW, structurally necessary preconditions. The second one is not
+  # merely descriptive -- the method's own name IS the claim; a "Causal
+  # DAG" containing a cycle is not the thing it claims to be, the same
+  # class of self-contradicting-record risk
+  # five-whys-validation.schema.yaml's const:false failure-mode gates
+  # already close for a different method.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Every node/edge is a causal HYPOTHESIS until independently validated
+  # (Atlas L1683: avoid silently upgrading correlation to causation) --
+  # the same evidence-discipline shape root_cause.fishbone/strategy.swot
+  # already use, unlike root_cause.pareto's deliberate departure (that
+  # method's own risk was threshold assumption, not evidence omission;
+  # this one's risk genuinely IS unlabeled causal claims, so the flag is
+  # re-derived as true here, not copied blindly either way).
+
+forbidden_transition: []
+# Atlas §11.21 gives no explicit forbidden-transition worked example.
+# Same open-question class as root_cause.five_whys/root_cause.pareto.
+
+recommended_next:
+  - validation.experiment
+  # Atlas §14.1's own chain (L3548-3556): CauseHypothesisSet -> Evidence
+  # Search -> Causal DAG -> Validation -> RootCauseAssessment -- Causal DAG
+  # is followed by a Validation step; root_cause.fishbone.contract.yaml's
+  # own recommended_next independently already names validation.experiment
+  # as the 4th sibling method, so this edge is a citation of an already-
+  # established id, not a new invention.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses.
+
+open_questions:
+  - id: "OQ-CAUSALDAG-1"
+    question: >
+      `forbidden_transition` is left empty -- same open question class as
+      OQ-FIVEWHYS-1/OQ-PARETO-1.
+    owner: "operator, or a future review pass specifically checking Tier 1/2 contracts with no forbidden_transition example in Atlas"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CAUSALDAG-2"
+    question: >
+      `cognitive_primitives: [MAP, RELATE, VALIDATE]` is this file's own
+      inference, not a cited Atlas composition formula. Same open question
+      class as OQ-FIVEWHYS-2/OQ-PARETO-2.
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CAUSALDAG-3"
+    question: >
+      Atlas's own worked example (L1670-1676) has 4 nodes and 4 edges with
+      no explicit node-role labels in the diagram itself (roles --
+      confounder/mediator/collider -- are named in prose, L1679, not
+      attached to the specific diagram nodes). This contract's typed
+      object requires an explicit `role` per node (a Phase 3 compilation
+      choice, not itself Atlas-cited per-node). Should a future pass
+      re-derive the worked example's own node roles from the diagram's
+      structure (in-degree/out-degree pattern) instead of requiring the
+      caller to label them?
+    owner: "operator, or whoever next builds a causal-role-inference helper"
+    blocks: "nothing in this file's own validity -- the runtime module requires explicit roles, which is the more conservative (less invented) choice"
+
+verification:
+  method: >
+    Read Atlas §11.21 (L1665-1687) and §14.1's legal chain (L3542-3556)
+    directly at the cited lines. Cross-checked against
+    root_cause.fishbone.contract.yaml's own recommended_next and
+    root-cause-fact.schema.yaml's legal_promotion_path.validation_methods_applied
+    enum to confirm this contract's `id` matches the value both files
+    already reference. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `purpose`/`preconditions`/`outputs`'s
+    literal name are Phase 3 compilation, explicitly flagged as such above.
+    `quality.evidence_labeling_required: true` is a deliberately RE-DERIVED
+    (not copied) match to the pattern most other root_cause/strategy
+    contracts use -- see the field's own inline comment for why this
+    method's real risk profile actually calls for it, unlike
+    root_cause.pareto's deliberate departure.

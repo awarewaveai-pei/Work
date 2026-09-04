@@ -1,0 +1,215 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml"
+title: Causal DAG Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CausalDagAnalysis` -- the
+  declared `outputs` of `causal.dag`'s Method Contract
+  (methods/contracts/causal.dag.contract.yaml, `outputs:
+  [CausalDagAnalysis]`). A GRAPH, structurally unlike every sibling typed-
+  object schema in this directory (`CauseHypothesisSet`/`FiveWhysValidation`
+  are lists of narrative steps, `ParetoAnalysis` is a ranked list) --
+  nodes with causal ROLES and directed edges between them.
+
+  Field provenance -- Atlas §11.21 (L1665-1687):
+    * The worked mermaid diagram (L1670-1676: 品牌知名度 -> 廣告曝光,
+      品牌知名度 -> 購買, 廣告曝光 -> 購買, 價格 -> 購買) is transcribed
+      directly into this schema's `nodes[]`/`edges[]` shape -- a labeled
+      node set and a directed edge set, not a single flattened list.
+    * The purpose line (L1679: "明確表示因果假設、混淆因子、中介變數與
+      collider") names four variable roles this schema's `nodes[].role`
+      enum transcribes verbatim: a treated/exposure variable, an outcome,
+      a confounder, and a mediator/collider. `TREATMENT`/`OUTCOME` are
+      added as the two implicit endpoints Atlas's own example always
+      needs (a DAG about "purchase", L1673, has to name what plays the
+      outcome role) -- disclosed as compilation additions in
+      `compilation_decisions`, not presented as equally cited.
+    * The method's own name -- Directed ACYCLIC Graph -- is why
+      `acyclic_verified: true` is a HARD schema constant (`const: true`),
+      the same class of self-asserting structural guarantee
+      `five-whys-validation.schema.yaml`'s `const: false` failure-mode
+      gates already established for a different method: a record that is
+      not actually acyclic cannot legally claim to be a CausalDagAnalysis
+      at all.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.21 因果有向無環圖, worked diagram and purpose (L1665-1687)"
+  - "methods/contracts/causal.dag.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "ai_lego/compute/graph/dag.py (new deterministic cycle-detection compute this schema's acyclic_verified field records the result of)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: direct transcription of a
+  cited Atlas worked example plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: >
+      Should `nodes[].role` be a free-form string (matching
+      `cause-hypothesis-set.schema.yaml`'s deliberately free-form
+      `category`) or a closed enum?
+    decision: "Closed 5-value enum: TREATMENT, OUTCOME, CONFOUNDER, MEDIATOR, COLLIDER."
+    reasoning: >
+      Atlas L1679 names exactly these causal-role concepts (confounder,
+      mediator, collider) as the method's own defining vocabulary, plus
+      the two structurally necessary endpoints (treatment/exposure,
+      outcome) every worked causal-DAG example needs -- the same
+      "Atlas gives this method's own fixed vocabulary" reasoning
+      `swot-analysis.schema.yaml`'s `category` enum already used, contrast
+      Fishbone's deliberately open one.
+  - question: >
+      Should `acyclic_verified` be a free boolean the caller sets, or a
+      hard `const: true`?
+    decision: "const: true."
+    reasoning: >
+      A record claiming to be a `CausalDagAnalysis` that admits its own
+      graph has a cycle is not a Directed Acyclic Graph at all -- the
+      method's own name is the claim. Same reasoning
+      `five-whys-validation.schema.yaml`'s three `const: false`
+      failure-mode fields already established: the runtime module
+      (`ai_lego/modules/causal/dag.py`) is expected to raise BEFORE
+      constructing a cyclic graph's record, and this schema is the
+      second, independent enforcement layer.
+  - question: "Should edges carry their own provenance, or only the overall record?"
+    decision: "Per-edge provenance -- each edge IS a distinct causal hypothesis (Atlas L1683's own named risk: don't silently write correlation as causation)."
+    reasoning: >
+      A CausalDagAnalysis with 4 edges may have 4 differently-evidenced
+      causal claims (one directly observed, three inferred) -- collapsing
+      provenance to one record-level field would flatten exactly the
+      distinction Atlas L1683 warns against losing. Same per-item
+      provenance granularity `cause-hypothesis-set.schema.yaml#/hypotheses`
+      and `five-whys-validation.schema.yaml#/why_chain` both already use.
+
+type: object
+required: [id, version, cause_hypothesis_set_ref, nodes, edges, acyclic_verified, computation_provenance_ref, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CDA-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  cause_hypothesis_set_ref:
+    type: string
+    pattern: "^CHS-"
+    description: "Which CauseHypothesisSet this graph formalizes. Real $ref to the sibling type."
+    $ref: "ai-lego://specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml#/properties/id"
+
+  generated_by_method:
+    type: string
+    default: "causal.dag"
+
+  nodes:
+    type: array
+    minItems: 2
+    description: "Atlas's worked example (L1670-1676) has 4 nodes -- minItems:2 is the structural floor (a causal claim needs at least a cause and an effect)."
+    items:
+      type: object
+      required: [id, label, role]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this graph (e.g. CDA-001-N1)."
+        label:
+          type: string
+          description: "The variable's name, e.g. Atlas's own '品牌知名度' (brand awareness)."
+        role:
+          type: string
+          enum: [TREATMENT, OUTCOME, CONFOUNDER, MEDIATOR, COLLIDER]
+          description: "Atlas L1679's own named causal-role vocabulary plus the two structural endpoints every worked example needs. See compilation_decisions."
+
+  edges:
+    type: array
+    minItems: 1
+    description: "Directed causal-hypothesis edges. Atlas's worked example has 4 (L1670-1676)."
+    items:
+      type: object
+      required: [from_node_id, to_node_id, provenance]
+      properties:
+        from_node_id:
+          type: string
+        to_node_id:
+          type: string
+        provenance:
+          description: "Per-edge, per Atlas L1683's own named risk (correlation silently written as causation) -- see compilation_decisions."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory uses."
+
+  acyclic_verified:
+    const: true
+    description: "See compilation_decisions -- a record claiming to be a CausalDagAnalysis cannot admit its own graph has a cycle."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real cycle-detection function that verified acyclic_verified -- same convention pareto-analysis.schema.yaml already established for its own genuine-compute claim."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas's own worked example, transcribed: brand awareness as a confounder of ad exposure and purchase, price as a separate driver of purchase"
+    value:
+      id: "CDA-2026-09-04-001"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-001"
+      generated_by_method: "causal.dag"
+      nodes:
+        - {id: "CDA-2026-09-04-001-N1", label: "品牌知名度", role: CONFOUNDER}
+        - {id: "CDA-2026-09-04-001-N2", label: "廣告曝光", role: MEDIATOR}
+        - {id: "CDA-2026-09-04-001-N3", label: "購買", role: OUTCOME}
+        - {id: "CDA-2026-09-04-001-N4", label: "價格", role: TREATMENT}
+      edges:
+        - from_node_id: "CDA-2026-09-04-001-N1"
+          to_node_id: "CDA-2026-09-04-001-N2"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED, locked: null }
+        - from_node_id: "CDA-2026-09-04-001-N1"
+          to_node_id: "CDA-2026-09-04-001-N3"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED, locked: null }
+        - from_node_id: "CDA-2026-09-04-001-N2"
+          to_node_id: "CDA-2026-09-04-001-N3"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-601"]
+        - from_node_id: "CDA-2026-09-04-001-N4"
+          to_node_id: "CDA-2026-09-04-001-N3"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-602"]
+      acyclic_verified: true
+      computation_provenance_ref: "ai_lego.compute.graph.dag.is_acyclic"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-CAUSALDAGANALYSIS-1"
+    question: >
+      `nodes[].role`'s 5-value enum includes TREATMENT/OUTCOME as
+      compilation additions (not individually Atlas-cited per role name,
+      only as structural necessities every worked causal-DAG example
+      implies). Should a future pass replace them with Atlas-cited
+      terminology if a more specific mother-document phrase is ever found?
+    owner: "operator, or a future review pass specifically checking this schema's role vocabulary against a wider Atlas re-read"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.21 (L1665-1687) directly at the cited lines, including
+    the worked mermaid diagram's exact node labels and edges. Validated
+    against jsonschema Draft202012Validator (required fields present, id
+    pattern satisfied, role enum closed, acyclic_verified const:true
+    verified to actually reject false).
+  note: >
+    `nodes`/`edges` shape and the worked example's own node
+    labels/structure are transcribed verbatim from Atlas L1670-1676. The
+    5-value role enum, the const:true acyclic guarantee, and the
+    per-edge-provenance choice are Phase 3-class compilation decisions,
+    explicitly flagged above. No mother document was modified to produce
+    this file.

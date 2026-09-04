@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
+
+**觸發**：延續操作者「沒做完不要停」授權。0 agent。
+
+**選型與差異**：`causal.dag`（F11 causal，**第一個不屬於 root_cause／strategy 家族**的切片）——fishbone 4 個 `recommended_next` 驗證方法中第 3 個拿到真契約的（five_whys、pareto 已完成）。這次是第四種結構形狀：fishbone=清單生成、five_whys=敘事鏈、swot=四象限分類、pareto=排名計算，causal.dag=**圖**（節點帶因果角色＋有向邊）。方法自己的名字「Directed **Acyclic** Graph」本身就是一個可獨立機械驗證的結構性宣稱。
+
+**不變量**：`acyclic_verified` 做成 `const: true`（同 five_whys 的 3 個失敗模式 const:false 同一套雙層防護紀律）——runtime 在建構前用真演算法（three-color DFS）擋下有環圖，schema 層獨立再擋一次繞過 builder 的竄改記錄。`quality.evidence_labeling_required` 這次**重新推導回 true**（不是照抄 pareto 的 false，也不是照抄前三份的 true）——Atlas §11.21 自己的風險（把相關性直接寫成因果，L1683）真的就是證據紀律問題，跟 pareto 的門檻假設風險不同類，兩次判斷都各自從方法真實風險推出來，不是複製貼上。
+
+**演算法先獨立驗證**：`is_acyclic`／`find_cycle` 寫完先用 5 種已知圖形（菱形無環／自環／2-cycle／3-cycle／不連通無環）手動跑過確認正確，才接進方法層——不是「寫完就信任」。
+
+**[已修改]**：spec-root 新增 `methods/contracts/causal.dag.contract.yaml`（逐字引用 Atlas §11.21）＋ `specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml`＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.fourth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/graph/dag.py`（純圖演算法，零方法相依）；`ai_lego/modules/causal/dag.py`（builder＋兩個 gate）；`ai_lego/apps/cli/run_causal_dag_slice.py`（**第三次真的合法晉升成功**，第三種驗證方法、第三種情境資料集——訂閱流失分析）；`tests/unit/test_causal_dag.py`（17 tests，含 6 種圖形的演算法正確性驗證）；`docs/SIXTH_SLICE_CAUSAL_DAG.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2542→2554
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_causal_dag_slice` | exit=0 | result=第一次真跑就通過:`PASS causal.dag: 4 nodes, 3 edges, acyclic_verified=True, RootCauseFact RCF-CAUSALDAG-2026-09-04-001 legally promoted via ['causal.dag']`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_causal_dag -v` | exit=0 | ms=~1290 | result=17 passed（含菱形/自環/2-cycle/3-cycle/不連通 5 種圖形正確分類；有環圖在建構 CausalDagAnalysis 前就被擋下；手造 `acyclic_verified: false` 記錄被 schema 層獨立擋下；第三次端到端合法晉升鏈）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=234302 | result=**312 tests OK**（295→312，零回歸；`git diff --stat` 確認 fishbone.py 零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:DFS 遞迴對大圖是否有堆疊風險(本 session 全部是小型合成圖,同前五個切片的「本機合成範圍」限定一致,非隱藏風險);`nodes[].id` 重複時 adjacency 建構是否正確(用 set 收斂,同 CauseHypothesisSet 的 hypotheses id 處理方式一致,非新缺口);CLI 情境裡 N2(confounder)只指向 outcome 沒指向 treatment,嚴格因果推論術語上不是教科書級 confounder——**這是示範資料的敘事簡化，不是 schema/gate 的錯誤宣稱**（role 只是呼叫者自己標的 label,不是被驗證的結構關係,契約自己的 OQ-CAUSALDAG-3 已誠實揭露這點)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`causal[.]dag\|CausalDagAnalysis\|causal-dag-analysis\|compute[.]graph\|compute/graph\|modules[.]causal\|modules/causal` | hits=0 stale（LIVE 檔案命中皆為本次新增；`.ai/research/phase-0/*` 命中為凍結歷史快照,非本次修復範圍）
+
+**[剩餘風險]**：`forbidden_transition` 留空（`OQ-CAUSALDAG-1`）；`cognitive_primitives` 推論非引用（`OQ-CAUSALDAG-2`）；`TREATMENT`/`OUTCOME` 角色是補充非逐字引用（`OQ-CAUSALDAG-3`）；fishbone 的 4 個 recommended_next 現在 3 個是真的，只剩 `validation.experiment`——且它是目前唯一一個 Atlas 幾乎零獨立內容的（method-inventory.yaml 標「僅在 recommended_next 被引用」），比前三個難做，留給下一輪判斷。
+
+**[rollback]**：純新增檔案(除 spec-root 索引重新產生外，零既有檔案邏輯改動；fishbone.py 未動)，`git rm` 對應新檔即可完全復原。
+
 ## 2026-09-04（續17，同一 session：Cognitive OS 第五個 Method Atlas 切片 — `root_cause.pareto`，第二條真實驗證路徑＋跨模組閘重用）
 
 **觸發**：延續操作者「沒做完不要停」授權。0 agent。
