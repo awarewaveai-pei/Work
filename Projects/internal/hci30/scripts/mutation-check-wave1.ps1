@@ -211,6 +211,20 @@ $mutations = @(
   @{ id = 'drop-purpose-allowlist-check'
      sql = 'ALTER TABLE hci.cases DROP CONSTRAINT cases_purpose_allowlist;'
      expect = @('REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-09') }
+
+  # ADR-0001 gate 2 / ADR-0002 gate 1 (reused) / ADR-0005 gate 1 - 2026-09-05.
+  # The exact mutation both ADRs name for this gate.
+  @{ id = 'enable-dblink-extension'
+     sql = 'CREATE EXTENSION dblink;'
+     expect = @('ARCH-PEER-02') }
+
+  # ADR-0002 gate 3. A role name matching the naming convention a future
+  # cognitive-engineering-os integration would plausibly use. Cleaned up by
+  # Reset-Schema (not here) since roles outlive DROP SCHEMA - see that
+  # function's comment.
+  @{ id = 'create-cognitive-named-role'
+     sql = 'CREATE ROLE cognitive_os_reader NOLOGIN;'
+     expect = @('ARCH-PEER-02b') }
 )
 
 $project = "hcimut$PID"
@@ -247,6 +261,23 @@ function Get-FailedAssertions {
 }
 function Reset-Schema {
   if ((Invoke-SqlFile -Path $downMig)  -ne 0) { throw 'mutation harness: down migration failed' }
+  # Roles are cluster-wide and extensions are database-wide (not
+  # schema-wide), so DROP SCHEMA (the down migration above) never removes
+  # either - unlike every other mutation in this file, 'enable-dblink-
+  # extension' and 'create-cognitive-named-role' create objects that would
+  # otherwise persist into every mutation that runs after them in the same
+  # container lifetime, corrupting their baselines. Found for real, not
+  # reasoned about: the first run of this file after adding both mutations
+  # reported 'enable-dblink-extension' killed correctly, then
+  # 'create-cognitive-named-role' WEAK with ARCH-PEER-02 (not
+  # ARCH-PEER-02b) as the unexpected failure - the still-installed dblink
+  # extension from the PRIOR mutation, not the role this mutation actually
+  # adds. Defensive cleanup here (not inside either mutation's own SQL, which
+  # only runs once) keeps every Reset-Schema call - including the initial
+  # baseline run - starting from a truly clean cluster regardless of
+  # mutation order.
+  if ((Invoke-Sql -Sql 'DROP ROLE IF EXISTS cognitive_os_reader;') -ne 0) { throw 'mutation harness: role cleanup failed' }
+  if ((Invoke-Sql -Sql 'DROP EXTENSION IF EXISTS dblink;') -ne 0) { throw 'mutation harness: extension cleanup failed' }
   if ((Invoke-SqlFile -Path $upMig)    -ne 0) { throw 'mutation harness: 0001 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig2)   -ne 0) { throw 'mutation harness: 0002 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig3)   -ne 0) { throw 'mutation harness: 0003 up migration failed' }

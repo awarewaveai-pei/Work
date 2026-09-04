@@ -1,5 +1,66 @@
 # Worklog
 
+## 2026-09-05（HCI30 Wave 1 Peer-product boundary gates 收尾——ADR-0005 的 gate 1 判定跟 ADR-0001/0002 的 ARCH-PEER-02 重疊，合併不重造；mutation harness 自己的 role/extension 殘留 bug 真跑抓到並修）
+
+**觸發**：延續「繼續完美完成 HCI 系統」全權授權，接續前一輪收工時列出的下一候選——ADR-0005 的 `HCI-INDEP-SCHEMA-01`（跟 ADR-0001/0002 的 `ARCH-PEER-02` 重疊，2026-09-05 稍早 bughunt 記錄）。
+
+**[任務理解]**：讀畢 ADR-0001/ADR-0002/ADR-0005 全文，確認三份 ADR 對「無資料庫層耦合」畫的是同一條線，只是各自從不同角度命名 gate（ADR-0001 gate 2 = `ARCH-PEER-02`；ADR-0002 gate 1 明文reuse同一個；ADR-0005 gate 1 `HCI-INDEP-SCHEMA-01` 範圍是 `ARCH-PEER-02` 的子集）。目標：落地 `ARCH-PEER-01`（import 邊界，Node test）+ `ARCH-PEER-02`（DB 層耦合，SQL）+ `ARCH-PEER-02b`（憑證/網路隔離，SQL），一次滿足三份 ADR 的 Wave 1 gate，不重造。ADR-0005 gate 2（`HCI-INDEP-RUNTIME-01`）需要應用層才能跑，誠實判定目前不可實作。
+
+**[現況分析]**：`Projects/internal/hci30/` 目前只有 `database/`／`packages/contracts/`／`tests/unit/contracts/`，`domain/`／`intelligence/`／`api/`／`integrations/` 全部尚未建立——ARCH-PEER-01 要掃的目錄大多不存在，掃描邏輯必須對「目錄不存在」正確處理成 0 檔案而非報錯。
+
+**過程（真跑抓到 mutation harness 自己的 bug）**：
+1. `tests/architecture/peer-boundary.test.mjs`（純 Node，不需 Docker）：掃描 `domain/intelligence/public-intelligence/database/api` 找對 AI LEGO Cognitive OS 原始碼樹的字面引用，排除 `integrations/cognitive-os/`（唯一允許的橋接目錄，尚未建立）。因為沒有既有檔案可以「突變」來驗證偵測器真的會抓到違規，改寫**自我測試**：在 temp 目錄種一個真違規檔案，證明同一個偵測函式真的抓到它，並證明排除路徑不會反過來吃掉別處的真違規。真跑 `node --test`：2/2 通過。
+2. SQL 層 `ARCH-PEER-02`（fdw/dblink extension、foreign server、跨 schema FK、非預期 schema 四項）+ `ARCH-PEER-02b`（`pg_roles` 只能有 3 個已知角色 + PostgreSQL 內建，不得有 cognitive/lego 命名）：90 assertion 第一次真跑就全綠。
+3. Mutation-check 第一次真跑：`enable-dblink-extension` 正確殺死 `ARCH-PEER-02`，但下一個 `create-cognitive-named-role` 回報 **WEAK**——非預期失敗的是 `ARCH-PEER-02`（不是它自己該測的 `ARCH-PEER-02b`）。根因：role 是 cluster-wide、extension 是 database-wide，`Reset-Schema` 的 `DROP SCHEMA hci CASCADE` 兩者都清不掉——前一個 mutation 裝的 dblink extension 殘留，污染了下一個 mutation 的 baseline。修法：`Reset-Schema` 加 `DROP ROLE IF EXISTS`／`DROP EXTENSION IF EXISTS` 防禦性清理，不放進個別 mutation 的 SQL（因為那只執行一次，清不了「污染後面所有 mutation」這件事）。重跑：30/30 全殺。
+
+**[已修改]**：
+- `Projects/internal/hci30/tests/architecture/peer-boundary.test.mjs`（新）——ARCH-PEER-01，含非空跑自我測試
+- `Projects/internal/hci30/scripts/test-wave1-local.ps1`：接上新 node --test 呼叫
+- `Projects/internal/hci30/database/tests/wave1-negative-tests.sql`：88→90 assertion（`ARCH-PEER-02`／`ARCH-PEER-02b`）
+- `Projects/internal/hci30/scripts/mutation-check-wave1.ps1`：28→30 mutation + `Reset-Schema` 補 role/extension 防禦性清理
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0005-hci-ai-lego-integration-is-optional.md`：新增 §Implementation note（gate 1 合併說明、gate 2 判定不可實作理由）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR_INDEX.md`：ADR-0001/0002/0005 gate 狀態更新為 `SYNTHETIC GATE VERIFIED`（各自對應的 Wave 1 子集）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`：新增 Peer-product boundary 表格 + 執行證據
+- `agency-os/TASKS.md`：ADR-0005 待辦標記完成
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/architecture/peer-boundary.test.mjs` | exit=0 | result=2 tests, 2 pass（含非空跑自我測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/test-wave1-local.ps1`（最終版）| exit=0 | result=90 assertions, 0 failed + node test 一併通過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/mutation-check-wave1.ps1`（最終版）| exit=0 | result=All 30 mutations killed（第一次真跑抓到 harness 自己的殘留 bug，修正後重跑驗真）
+- REVIEW_DONE: critic=self(Standard，書面對抗自審，本輪未派額外 agent——無新 migration、風險低於前兩輪，且已有 30/30 mutation + node self-test 真實證據)| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`ARCH-PEER-0[12]b?\|HCI-INDEP-SCHEMA-01\|cognitive_os_reader\|peer-boundary.test.mjs\|88 assertion\|28/28` | hits=本次新增檔案自身 + 一處歷史敘述（ADR-0012 描述自己那輪 84→88 的變化，非過期宣稱）
+
+**[剩餘風險]**：ADR-0001 gate 3/4（`PEER-DEGRADE-01`／`PEER-REF-01`，Wave 10）、ADR-0001 gate 5／ADR-0002 gate 4（反向邊界，等 cognitive-engineering-os 有 runtime 才適用）、ADR-0005 gate 2（`HCI-INDEP-RUNTIME-01`，等應用層）皆維持 OPEN，非本輪範圍。
+
+**[rollback]**：`git revert` 本 commit 即可；純新增測試+文件，無 schema 變更。
+
+## 2026-09-05（續37，同一 session：Cognitive OS 第二十四個 Method Atlas 切片 — `devops_sre.error_budget`，第四次重用 `evaluate_statistical_gate`）
+
+**觸發**：延續操作者授權（「繼續完成 Cognitive OS Method Atlas 切片，從第 24 個開始」）。0 agent。
+
+**選型**：Error Budget（F19 tool table L851 公式列「1-SLO→budget→burn rate→release policy」+ Atlas §11.40 專屬段落，雙引用，F19 pack 第五個成員方法）。上一輪（續36）「下一步」已明列 Error Budget 為候選之一。
+
+**形狀判斷**：讀完 F19 五個既有成員（SLI/SLO、Canary、Chaos Engineering、Blue-Green）後發現 Error Budget 的公式列給出真正可計算管線（減法+除法+門檻判斷），不是敘事型操作規劃——比較後選擇比照 `root_cause.pareto`／`decision.ahp`／`decision.mcda` 的 CALCULATED_RESULT 紀律，而非同家族四個手足的敘事紀律。`evaluate_genuine_compute_gate` 第四次重用 `modules.research.gates.evaluate_statistical_gate`（前三次：pareto／ahp／mcda），零改動。
+
+**真不變量**：Atlas §11.40 第二條效益「Error budget burn 太快時自動降低 release risk」直接蘊含：`budget_exhausted:true`（計算出 `burn_rate>=1.0`）禁止 `release_policy:unrestricted`。CLI 真跑一次攻擊（over-budget 失敗率仍宣稱 unrestricted）確認被擋。
+
+**兩個揭露的編譯選擇（非暗自簡化）**：
+1. `slo_target_ratio` 做成全新數字欄位，**不**解析 `devops_sre.sli_slo` 自己的 `SliSloSet.indicators[].slo_target`——該欄位本來就是設計給人讀的自由文字（如「99.9% over 30 days」），硬解析等於發明 Atlas 從未給過的文字轉數字文法。`related_slo_id` 做成可選軟連結，只做可追溯性，不做強制交叉檢查（`OQ-ERRORBUDGET-2` 誠實留白）。
+2. `release_policy` 做成二值 enum（`unrestricted`/`frozen`）而非漸進量表——Atlas 效益文字雖然用「自動降低」這種聽起來連續的措辭，但整段沒給任何中間數字門檻；做分級量表會虛構 Atlas 未明示的政策，同 `root_cause.pareto` 拒絕發明 80/20 預設值的紀律一致。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.error_budget.contract.yaml`＋`specs/cognitive/typed-objects/error-budget-record.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentysecond_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/error_budget/budget.py`（純算術：`calculate_error_budget_ratio`／`calculate_burn_rate`，先手算驗證才接方法層）＋`ai_lego/modules/devops_sre/error_budget.py`（builder+exhausted-forbids-unrestricted 不變量+2 gate，第二個 gate 重用 `evaluate_statistical_gate`）＋`ai_lego/apps/cli/run_error_budget_slice.py`（真實健康budget案例+攻擊驗證）＋`tests/unit/test_error_budget.py`（18 tests：7 純算術+11 方法/gate，第一次跑全綠）＋`docs/TWENTYFOURTH_SLICE_DEVOPS_SRE_ERROR_BUDGET.md`。`modules/devops_sre/__init__.py` docstring 補第五租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2726→2735
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_error_budget_slice` | exit=0 | result=第一次真跑就通過（含 exhausted 不變量攻擊驗證）：`PASS devops_sre.error_budget: burn_rate=0.49999999999999956, budget_exhausted=False, release_policy=unrestricted, gates [genuine_compute=PASS, exhausted_forbids_unrestricted=PASS], exhausted_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_error_budget -v` | exit=0 | result=18 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=61581 | result=**537 tests OK**（519→537，零回歸；`git status`確認同批僅新增本切片自己 6 個新檔+`__init__.py`一行純增補）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked（未重新查額度，延續續36判定）。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n —— 自問：把 `release_policy` 做成二值是不是偷懶少建模一個漸進狀態（不是，Atlas 原文沒有任何中間數字，做分級才是無中生有）；`slo_target_ratio` 不重用 SliSloSet 是不是重複定義同概念（不是，`slo_target` 本身是自由文字設計，兩者是不同精度的表達，`related_slo_id` 已保留可追溯性且在 contract compilation_decisions 明文說明）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`devops_sre[.]error_budget\|ErrorBudgetRecord\|error-budget-record\|run_error_budget_slice\|compute[.]error_budget` | hits=全部本切片自己新檔案，無過期殘留、無跨檔命名衝突
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-ERRORBUDGET-1`（method-inventory.yaml 無機器 id 列）、`OQ-ERRORBUDGET-2`（`related_slo_id` 無執行期交叉檢查真的存在對應 SliSloSet）。皆非阻塞。
+
 ## 2026-09-05（HCI30 Wave 1 Regulatory market scope ADR-0012 gates 1/2 收尾——真跑先後抓到 db-expert 找到的 deny-list 真洞 + 2 個 trigger-順序誤判，全修並驗真）
 
 **觸發**：操作者「繼續完美完成 HCI 系統！全部同意核准，決定權都交給你」+ 「不准無效益派多個 agent」。延續前一輪 ADR-0020 收尾同一套紀律，挑下一個「已分析但沒落地」的 Wave 1 gate：ADR-0012（regulatory market scope，H1012/REG-NEG 系列，2026-09-05 稍早 bughunt 已記錄為待辦）。

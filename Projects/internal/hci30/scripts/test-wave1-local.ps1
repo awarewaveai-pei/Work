@@ -17,6 +17,12 @@ $sqlTests  = Join-Path $root 'database/tests/wave1-negative-tests.sql'
 node --test (Join-Path $root 'tests/unit/contracts/validate-request.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Request-policy validator tests failed.' }
 
+# ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
+# Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
+# available, same as the request-policy validator above.
+node --test (Join-Path $root 'tests/architecture/peer-boundary.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Peer-boundary architecture test failed.' }
+
 # Windows PowerShell 5.1 pipes native stdin as ASCII by default, which would
 # silently replace any non-ASCII byte in a .sql file with '?' and still exit 0.
 $OutputEncoding = New-Object System.Text.UTF8Encoding($false)

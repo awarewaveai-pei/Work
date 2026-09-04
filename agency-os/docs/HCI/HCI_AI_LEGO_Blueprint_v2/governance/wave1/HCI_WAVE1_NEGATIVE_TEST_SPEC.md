@@ -1,8 +1,8 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, and the Regulatory market scope addition are all real-Docker-verified, see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope section added and executed 2026-09-05)
-Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, and the Peer-product boundary addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope and Peer-product boundary sections added and executed 2026-09-05)
+Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
 ## Tenant adapter isolation
@@ -66,6 +66,16 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 | REG-NEG-08 | `purpose='vendor_risk_assessment'` | A gate that rejects everything is also broken - an allow-listed purpose is admitted | Succeeds |
 | REG-NEG-09 | Owner connection, excluded `purpose` | The purpose CHECK binds even a grant-bypassing connection | Rejected, `23514` |
 | REG-NEG-10a/10b | Attempt to create a `DE` tenant, then a `research_workflows` row against it | The "bulk-insert style" bypass ADR-0012 gate 3 named - no tenant exists to bind to | 10a rejected `23514`; 10b rejected `H1001` (the existing authorization gate fires first, before any FK check) |
+
+## Peer-product boundary *(new, ADR-0001/ADR-0002/ADR-0005, migration-free — Node test + SQL introspection)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| ARCH-PEER-01 | `tests/architecture/peer-boundary.test.mjs`, scans `domain/`, `intelligence/`, `public-intelligence/`, `database/`, `api/` | No file references AI LEGO Cognitive OS's source tree outside the (not-yet-built) `integrations/cognitive-os/` adapter | 0 violations; a planted fixture violation is independently proven to be caught (non-vacuity) |
+| ARCH-PEER-02 | Whole database | No `postgres_fdw`/`dblink` extension, no foreign server, no FK from schema `hci` crossing out of it, no schema besides `hci`/`hci_test`/PostgreSQL defaults — this is also ADR-0002 gate 1 (reused) and a strict superset of ADR-0005 gate 1 (`HCI-INDEP-SCHEMA-01`: no `NOT NULL` FK from a core table into a cognitive-os entity) | Introspection confirms all four |
+| ARCH-PEER-02b | Whole database, owner connection | Only the 3 known Wave 1 roles plus PostgreSQL built-ins exist; none match `cognitive`/`lego` (ADR-0002 gate 3, credential/network isolation) | Introspection confirms both |
+
+ADR-0005 gate 2 (`HCI-INDEP-RUNTIME-01`, a full core-lifecycle test with the adapter unreachable) is **not implemented** — it requires an actual application/API layer to exercise (create/edit person, record interaction, admit evidence, etc.), none of which exists yet at Wave 1 schema stage. Left `OPEN`, not faked.
 
 ## Test execution requirements
 
@@ -162,12 +172,34 @@ boolean expression fixed it for real, verified across all three rollback
 scenarios (narrow rollback + re-apply, run-twice idempotency, and rollback
 after the whole schema is already gone) with real Docker runs, all exit 0.
 
+**Execution evidence (2026-09-05, Peer-product boundary addition).**
+`tests/architecture/peer-boundary.test.mjs` (`node --test`, no Docker
+required, wired into `scripts/test-wave1-local.ps1` next to the existing
+request-policy validator) passed on the first real run, including its own
+non-vacuity self-test (plants a violation in a temp fixture directory,
+confirms the shared detector function flags it, confirms the
+`integrations/cognitive-os/` exclusion does not also hide a real violation
+elsewhere, cleans up). `scripts/test-wave1-local.ps1`'s SQL suite then ran
+green with `ARCH-PEER-01`/`02`/`02b` added: **90 assertions recorded, 0
+failed** (88 + 2 new). `scripts/mutation-check-wave1.ps1`'s first run of the
+two new mutations (`enable-dblink-extension`, `create-cognitive-named-role`)
+found a real bug in the harness itself, not the schema: roles are
+cluster-wide and extensions are database-wide, so `DROP SCHEMA hci CASCADE`
+(the down migration `Reset-Schema` uses between mutations) never removes
+either — `create-cognitive-named-role`'s run reported `ARCH-PEER-02` (not
+`ARCH-PEER-02b`) as the unexpected failure, because the dblink extension the
+PRIOR mutation installed was still present, corrupting this mutation's
+baseline. Fixed by adding explicit `DROP ROLE IF EXISTS`/`DROP EXTENSION IF
+EXISTS` cleanup to `Reset-Schema` itself, verified by re-running: both new
+mutations killed correctly on the corrected baseline.
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 28
+requires the suite to go red on exactly the assertions covering it; **all 30
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
-2026-09-04, + 2 Regulatory-scope mutations, 2026-09-05, covering every
-invariant listed above). This exists because the first version of this suite
+2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations,
+2026-09-05, covering every invariant listed above). This exists because the
+first version of this suite
 could not fail: four assertions caught their own failure signal with the same
 handler that caught the control's rejection (both SQLSTATE P0001). That
 defect was demonstrated, not merely argued - the original suite exits 0 with

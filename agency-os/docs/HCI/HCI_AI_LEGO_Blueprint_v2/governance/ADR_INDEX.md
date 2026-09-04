@@ -2,7 +2,7 @@
 
 Status: **MIXED REGISTER — only entries explicitly marked `ACCEPTED` below are approved decisions**
 Owner: HCI AI LEGO Blueprint v2
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-05 (Peer-boundary gates added)
 
 ## Purpose and state rules
 
@@ -56,11 +56,11 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 
 | ADR | Gate state | Required artifact-to-gate mapping |
 |---|---|---|
-| ADR-0001 | `SPECIFIED — RUNTIME OPEN` | `ARCH-PEER-01..02` (Wave 1), `PEER-DEGRADE-01`, `PEER-REF-01` (Wave 10): `Projects/internal/hci30/tests/architecture/`, `database/tests/wave1-negative-tests.sql` |
-| ADR-0002 | `SPECIFIED — RUNTIME OPEN` | Reuses `ADR-0001` gates 1–2 + new `ARCH-PEER-02b` (Wave 1, credential/network isolation): `database/tests/`, `scripts/test-wave1-local.ps1` |
+| ADR-0001 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1-2)` | `ARCH-PEER-01` (Node, `tests/architecture/peer-boundary.test.mjs`) + `ARCH-PEER-02` (SQL) — real-verified 2026-09-05 (node --test green incl. self-test; 90/90 SQL assertions, 30/30 mutations, see `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`); `PEER-DEGRADE-01`, `PEER-REF-01` (Wave 10) and `ARCH-PEER-03` (reverse direction, blocked on cognitive-engineering-os runtime existing) remain `OPEN` |
+| ADR-0002 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1,3)` | Reuses `ADR-0001`'s `ARCH-PEER-02` (gate 1) + new `ARCH-PEER-02b` (gate 3, credential/network isolation, SQL `pg_roles` check) — both real-verified 2026-09-05, same evidence as `ADR-0001` above; `PEER-REF-01` (gate 2, Wave 10) and `ARCH-PEER-05` (gate 4, reverse direction) remain `OPEN` |
 | ADR-0003 | `SPECIFIED — RUNTIME OPEN` | OpenAPI single-host constraint, negative routing smoke test, gateway logic-purity check, service-placement inventory row (Wave 3) |
 | ADR-0004 | `SPECIFIED — RUNTIME OPEN` | `TRUST-NEG-01..03`, `METHOD-CONTRACT-NEG-01`, `check-no-universal-trust-column.ps1` (Wave 1 / Wave 5) |
-| ADR-0005 | `SPECIFIED — RUNTIME OPEN` | Same `PEER-DEGRADE-01` gate as `ADR-0001` (Wave 10) |
+| ADR-0005 | `SYNTHETIC GATE VERIFIED (Wave 1 gate 1 only)` | Gate 1 (`HCI-INDEP-SCHEMA-01`, no hard schema dependency) closed by `ADR-0001`'s `ARCH-PEER-02` — a strict superset (blocks ANY FK crossing schema `hci`, not just `NOT NULL` ones into a cognitive-os entity specifically); no separate test needed, avoiding a duplicate mechanism for the same invariant. Gate 2 (`HCI-INDEP-RUNTIME-01`, full core-lifecycle test with the adapter unreachable) **not implemented** — genuinely blocked on an application/API layer that does not exist yet at Wave 1 schema stage, left `OPEN` rather than faked. Gates 3-4 (Wave 10) remain `OPEN`. |
 | ADR-0006 | `SPECIFIED — RUNTIME OPEN` | Ledger-separation architecture test + `EvidenceRef`-only crossing check (Wave 4/10) |
 | ADR-0007 | `SPECIFIED — RUNTIME OPEN` | `no-second-db-dsn.test.*` — amended per `ADR-0021` gate 6 to exempt a service literally named `hci-postgres` |
 | ADR-0008 | `SPECIFIED — RUNTIME OPEN` | Vendor-adapter isolation lint + `llm.reason` two-provider replaceability test (`18_LEGO_CONTRACT_AND_COMPONENT_TAXONOMY.md` §Vendor Replaceability) |

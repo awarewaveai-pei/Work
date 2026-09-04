@@ -522,7 +522,46 @@ SELECT hci_test.expect_sqlstate('REG-NEG-10b',
   'H1001');
 
 -- ---------------------------------------------------------------------------
+-- Peer-product database boundary (ADR-0001 gate 2 / ADR-0002 gate 1, reused;
+-- ADR-0005 gate 1 "no hard schema dependency" is a strict subset of this
+-- same check - any NOT NULL FK into a cognitive-os entity is necessarily a
+-- pg_constraint of type 'f' crossing schema hci, which ARCH-PEER-02 already
+-- forbids unconditionally). Owner section: this is a database-wide
+-- introspection check, not a tenant-role-scoped one, so it belongs with the
+-- other owner-run architecture assertions rather than under SET ROLE.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_true('ARCH-PEER-02',
+  $q$SELECT
+       NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname IN ('postgres_fdw','dblink'))
+       AND NOT EXISTS (SELECT 1 FROM pg_foreign_server)
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_constraint c
+         JOIN pg_class rel ON rel.oid = c.confrelid
+         JOIN pg_namespace refns ON refns.oid = rel.relnamespace
+         WHERE c.contype = 'f' AND c.connamespace = 'hci'::regnamespace AND refns.nspname <> 'hci'
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_namespace n
+         WHERE n.nspname NOT IN ('hci','hci_test','pg_catalog','public','information_schema')
+           AND n.nspname !~ '^pg_(toast|temp)'
+       )$q$,
+  'no database-level coupling to another product: no fdw/dblink extension, no foreign server, no FK from schema hci crossing out of it, no schema besides hci/hci_test/PostgreSQL defaults');
+
+-- ADR-0002 gate 3: credential/network isolation is the operational half of
+-- ARCH-PEER-02 - that gate proves no FK crosses the boundary, this one
+-- proves no shared login role could bypass RLS to cross it even without one.
+SELECT hci_test.expect_true('ARCH-PEER-02b',
+  $q$SELECT
+       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname ~* '(cognitive|lego)')
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_roles
+          WHERE rolname NOT IN ('hci_owner','hci_app_test_a','hci_app_test_b')
+            AND rolname !~ '^pg_'
+       )$q$,
+  'credential isolation: only the known Wave 1 roles plus PostgreSQL built-ins exist, none matching cognitive/lego');
+
+-- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(88);
+SELECT hci_test.finish(90);

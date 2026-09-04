@@ -50,6 +50,35 @@ No wave1/ design artifact for this adapter exists yet (unlike ADR-0009/0010/0011
    An integration-enablement flag (e.g. `cognitive_os_integration.enabled`) that defaults to `false`/absent, verified by a config-schema test.
    Test-id `HCI-INDEP-FAILOVER-01` simulates the adapter returning 5xx or timing out and asserts: (a) the calling Case/Evidence workflow completes or fails cleanly with no hang, matching `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md:139`'s "timeout/failure graceful" acceptance line; (b) no AI LEGO response is written directly into the `assessment` table — only into an Assessment Candidate state pending human review, per `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:45` ("This response does not automatically become HCI fact") and the admission-gate diagram at `10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:47-59`.
 
+## Implementation note (2026-09-05, gate 1 landed, gate 2 assessed as blocked)
+
+Recorded here rather than by editing the numbered gates above, which remain
+the historical decision record.
+
+- **Gate 1 (`HCI-INDEP-SCHEMA-01`) was not built as a separate mechanism.**
+  It asks for a test that fails if any Wave 1 migration declares a `NOT
+  NULL`/enforced FK from a core table into a cognitive-os-owned entity.
+  `ADR-0001` gate 2 (`ARCH-PEER-02`, `migrations/*`, real-Docker-verified
+  2026-09-05) already asserts something strictly broader: no `pg_constraint`
+  of type `f` anywhere in schema `hci` may reference a relation outside that
+  schema, `NOT NULL` or not, cognitive-os-specific or not. Any FK this gate
+  worries about is necessarily also a violation of that one. Building a
+  second, narrower test for the same invariant would be exactly the
+  duplicate-mechanism pattern this project's own anti-patch discipline
+  rejects (close the class once, not per-caller). `ARCH-PEER-02`'s own test
+  ID is what closes this gate; no `HCI-INDEP-SCHEMA-01`-named assertion
+  exists or is needed.
+- **Gate 2 (`HCI-INDEP-RUNTIME-01`) is genuinely not implementable yet, not
+  skipped.** It requires exercising the full core HCI lifecycle (create/edit
+  person, create relationship, record interaction, admit evidence, view
+  timeline, create manual assessment, create decision, plus the
+  DataSubjectRequest lifecycle) with the adapter unreachable. None of that
+  application/API surface exists at Wave 1 — this repo is schema-only so
+  far (`database/`, no `domain/`/`api/`). Recorded `OPEN`, to be built once
+  that surface exists, not faked against a database that has no application
+  layer to run "core use cases" through.
+- Gates 3-4 remain `OPEN`, unchanged, correctly scoped to Wave 10.
+
 ## Consequences
 
 - Every HCI deployment must be independently operable and sellable with the adapter switched off; product, sales, and infra planning may not assume Cognitive OS reachability as a precondition for HCI's own core value.
