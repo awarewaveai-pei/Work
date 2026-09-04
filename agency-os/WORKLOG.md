@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-04（續19，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
+
+**[任務理解]** 操作者問「CLAUDE.md／AGENTS.md 是幫助還是拖累」→ 指示「徹底研究後優化到最有效益、最正確的版本」。根本問題：兩檔每輪整份注入 prompt（合計 48.7 KB ≈ 20k+ tokens），其中約四成是事故敘事（日期＋輪次＋案例）、同一事實重複三處（主機邊界）、規則互相衝突到需要「優先序」段，且檔案自己承認「大檔案容易被漏讀」。這是「5 小時額度 20-30 分鐘燒光」的固定成本項之一（每輪先付 20k 才開始做事）。
+**[現況分析]** `git log -8`：最近 8 commits 全為 cognitive-os 切片，無同議題改動；上一次瘦身 `bfa017b`（2026-09-04 稍早）只搬了表格到 TOOL_TRIGGER_MAP，敘事仍在。機械依賴清查：`grep -rl "AGENTS.md\|CLAUDE.md" scripts/ mcp/claude-userlevel/hooks/ .claude/commands/` 共 39 檔，**全部只在訊息／註解裡提及檔名，沒有任何腳本解析 AGENTS.md 內文**；唯二必須保留的機械標記是 `doc-sync-automation.ps1:98` 的 `## Related Documents (Auto-Synced)` 起始 marker 與 `check-governance-docs-drift.ps1:204` 的 `_Last synced` footer（兩者原樣保留）。hooks 實體位置 `mcp/claude-userlevel/hooks/rules/`（原文寫 `.claude/hooks/rules/` 不存在）。
+**[已修改]**
+- `agency-os/docs/operations/AGENTS_APPENDIX.md`：新增 §「AGENTS.md 精簡前全文存檔」＋§「CLAUDE.md 精簡前全文存檔」——舊全文 `sed -n 1,353p` **逐字**搬入（僅標題各降一級；CLAUDE.md 首行 `@import` 加反引號避免被再次 import），auto-sync footer 位置不變。理由：repo 慣例是「搬到 APPENDIX 仍為強制」而非刪除，且外部文件 30+ 處 `AGENTS.md §舊段名` 引用靠同名標題可繼續解析。
+- `agency-os/AGENTS.md` 43,085 → 16,908 B（-61%）：重組為 §0 硬事實（主機／ClickHouse／部署／secrets／Trigger.dev／routing／自動化預設／監控／單機）→ §1 R0（七段＋四動作機械格式表＋補丁判準）→ §2 R4+VBC → §3 風險分級＋優先序 → §4 信任邊界＋oracle＋斷路器 → §5 context／扇出／重試 → §6 Auto-Repair → §7 工作流程＋DoD → §8 AO／Git／記憶／文件／編碼 → §9 語言。每條「做什麼＋為什麼」各一行，日期／輪次／案例全去，末尾 `§名` 指回 APPENDIX。
+- `CLAUDE.md` 5,582 → 3,615 B：只留 repo／機器層（R1／R2／MCP／Git／AO 觸發／遠端 hooks／drop-in／runbooks／目錄／換機）；主機邊界不再重複（改指 AGENTS.md §0）。
+- **實質規則修正（3 條，非純搬移，操作者可回滾）**：① R0 批准規則加「無人回覆的遠端自主 session → 七段寫進最終回覆／PR 描述即視為對齊，High-STOP 仍停」（本 session 即此情境，原文會讓代理卡死或違規二選一）；② Git 分支加「遠端 harness 指派分支 → 用該分支 + draft PR 不算違規」（同上，對齊實際運作）；③ 修正三處 stale 事實：公司桌機憑證善後已於 2026-08-15 結案（`TASKS.md:907`，原 CLAUDE.md 仍寫「見 TASKS.md 待辦」）；`audit-cp950-traps` 是 `scripts/*.ps1` 不是 hook；hooks SSOT 路徑改 `mcp/claude-userlevel/hooks/rules/`。
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純治理文件改動，無 code；R4 路徑驗證：新檔內全部反引號路徑與 markdown link 逐一 `[ -e ]` 檢查，僅 4 個「缺失」皆為執行期生成或刻意不進 git（`.agency-state/*.json|md` gitignored、`mcp/user-env.ps1` 各機本地、`YYYY-MM-DD` 佔位），與原文一致。
+- REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— 逐項自問：(m) 每輪必用的機械格式行（REALTEST/REVIEW/BUGHUNT/ORACLE 四種）是否全部保留原字串？逐一比對 `verify-closeout-completeness.ps1` 所驗格式，保留（此為 16.9 KB 壓不到 12 KB 的主因，刻意不砍）；`§名` 指標 12 個是否都對應 APPENDIX 真實標題？grep 逐一命中；code-fence 三檔皆 0 個（無配對問題）；auto-sync footer marker 三檔各恰 1 個。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`AGENTS\.md[ ]?§` | hits=31（外部引用舊段名；全部可在 APPENDIX 存檔區同名標題解析，AGENTS.md 檔頭已加一行指引；不逐一改寫——那是另一個 doc-sync 任務，且 `check-governance-docs-drift.ps1` 月巡會抓）
+- ORACLE_WAIVED: 無 source 檔 staged（ORACLE gate 只涵蓋 `$oracleExts`），且本 session 為遠端 container 無 `pwsh`／codex CLI。
+**[剩餘風險]** ① 兩條實質規則修正（遠端自主 session 的 R0 對齊方式、harness 分支例外）屬操作者裁量，若不同意直接 revert 該兩行；② `.claude/agents/n8n-engineer.md` 仍寫 `204.168.175.41`（已退租）、`scripts/ao-close.ps1:1275` 註解引用 CLAUDE.md 已不存在的「Commit Prefix」段——兩者不在本任務範圍，登記於此待另案；③ `doc-sync-automation.ps1` 需 Windows pwsh，本 container 無法重跑，Related Documents footer 時間戳維持 02:19:06，下次 AO-CLOSE 自動更新。
+**[rollback]** `git revert <本 commit>`；或只還原兩檔：`git checkout <本 commit>^ -- CLAUDE.md agency-os/AGENTS.md agency-os/docs/operations/AGENTS_APPENDIX.md`。
+- AUTO_TASK_DONE: CLAUDE.md + AGENTS.md 第二次瘦身（48.7 KB → 20.5 KB，-58%），舊全文逐字存 APPENDIX，3 條 stale 事實修正，2 條遠端 session 對齊規則。
+
 ## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
 
 **觸發**：延續操作者「沒做完不要停」授權。0 agent。
