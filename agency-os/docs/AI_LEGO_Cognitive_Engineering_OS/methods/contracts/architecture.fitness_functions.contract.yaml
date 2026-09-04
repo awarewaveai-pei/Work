@@ -1,0 +1,70 @@
+$id: "ai-lego://methods/contracts/architecture.fitness_functions.contract.yaml"
+title: "Architecture Fitness Functions Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Eighteenth Method Atlas slice, seventh from the
+  `architecture` family (F18's own "Software Architecture Pack") -- a
+  seventh member tool built, still not the whole pack.
+
+  Atlas's own F18 tool table (L823) gives this method a 3-stage pipeline:
+  "invariant→test/metric→CI gate", continuously and automatically
+  checking architecture invariants to prevent decay over time (the real,
+  widely-published "Fitness Function" pattern from Ford/Parsons/Kua's
+  Building Evolutionary Architectures). No dedicated §11.x section (same
+  thinner-citation tier as Quality Attribute Scenario/Dependency
+  Mapping), but the 3-stage pipeline is concrete and industry-standard
+  enough to ground directly.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Architecture Fitness Functions row (L823): 'invariant→test/metric→CI gate'"
+  - "methods/registry/method-inventory.yaml Architecture Fitness Functions entry (L1102-1106): category 'F18 architecture', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a sixteenth
+  concrete entry. `id: architecture.fitness_functions` mints a new
+  machine_id. `family: architecture` reused as-is.
+
+id: architecture.fitness_functions
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [VALIDATE, DECOMPOSE, MAP]
+purpose:
+  - continuously_and_automatically_verify_architecture_invariants
+inputs:
+  required: [ArchitectureUnderGovernance]
+  optional: []
+outputs: [FitnessFunctionSet]
+preconditions:
+  - "at least 1 fitness function supplied"
+  - "every fitness function names a real invariant, a concrete test_or_metric, and a ci_gate reference"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should ci_gate be a free-text description, or a structured reference (e.g. a CI job id)?"
+    decision: "Free text -- Atlas's own table row names the stage but gives no CI-system-specific worked example."
+    reasoning: "Same restraint every under-specified field in this session's other contracts already applies -- a structured CI-job-reference shape would invent a specific tooling integration Atlas never described."
+
+open_questions:
+  - id: "OQ-FITNESSFUNCTIONS-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F18 tool table row (L823) directly -- confirmed no
+    dedicated §11.x section exists. Grepped `specs/` for "fitness
+    function"/"architecture invariant" before writing -- no duplicate
+    typed object found. Validated against specs/cognitive/method.schema
+    .yaml with jsonschema.Draft202012Validator.
+  note: "No mother document was modified. The 3-stage pipeline is directly transcribed from Atlas's own table row."

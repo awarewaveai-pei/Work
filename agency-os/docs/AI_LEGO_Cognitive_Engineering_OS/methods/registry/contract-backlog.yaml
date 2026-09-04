@@ -586,6 +586,28 @@ tier_1:
       `architecture.quality_attribute_scenario`'s own thirteenth entry.
       Tier 1, mandated by the actively-running implementation slice, same
       category as the fourteen entries above it.
+  sixteenth_concrete_entry:
+    # NEW (2026-09-04, same session): sixteenth Tier 1 entry, same
+    # additive-key rationale as the fifteen entries above it.
+    method_id: "architecture.fitness_functions"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Seventh entry
+      from the `architecture` family, a seventh member tool of F18's own
+      pack built. No dedicated §11.x section (table row only, L823), but
+      the 3-stage pipeline ("invariant→test/metric→CI gate") is the real,
+      widely-published Fitness Function pattern (Ford/Parsons/Kua). The
+      example CLI run governs this codebase's own real invariants
+      (domain-layer import restriction, compute-to-modules dependency
+      direction) -- self-referential grounding, same class as
+      `architecture.adr`'s own real-ADR-practice example.
+    source: "methods/contracts/architecture.fitness_functions.contract.yaml (built same session as this entry, mints machine_id architecture.fitness_functions) + specs/cognitive/typed-objects/fitness-function-set.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: table-row-only citation, same tier as
+      the two entries above it. Tier 1, mandated by the actively-running
+      implementation slice, same category as the fifteen entries above
+      it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

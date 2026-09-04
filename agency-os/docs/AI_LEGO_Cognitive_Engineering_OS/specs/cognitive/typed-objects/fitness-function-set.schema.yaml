@@ -1,0 +1,64 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/fitness-function-set.schema.yaml"
+title: Fitness Function Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FitnessFunctionSet` -- the
+  declared `outputs` of `architecture.fitness_functions`'s Method
+  Contract. Seventh `architecture`-family typed object. Atlas's own
+  F18 table row (L823) 3-stage pipeline ("invariant→test/metric→CI gate")
+  maps directly onto each `functions[]` entry's 3 required fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Architecture Fitness Functions row (L823)"
+  - "methods/contracts/architecture.fitness_functions.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, architecture_under_governance, functions, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^FFS-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "architecture.fitness_functions"
+  architecture_under_governance:
+    type: string
+    minLength: 1
+  functions:
+    type: array
+    minItems: 1
+    description: "Atlas L823's own 3-stage pipeline, one function per invariant."
+    items:
+      type: object
+      required: [id, invariant, test_or_metric, ci_gate]
+      properties:
+        id: {type: string}
+        invariant: {type: string, minLength: 1, description: "The real architecture invariant being protected (e.g. 'no provider SDK in domain layer')."}
+        test_or_metric: {type: string, minLength: 1, description: "The concrete, automatable check."}
+        ci_gate: {type: string, minLength: 1, description: "Where this runs (free text -- no structured CI-tooling shape, see method contract compilation_decisions)."}
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a fitness function definition is structured architectural governance, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two real fitness functions -- a layering invariant and a dependency-direction invariant"
+    value:
+      id: "FFS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.fitness_functions"
+      architecture_under_governance: "ai_lego 套件"
+      functions:
+        - {id: "FF1", invariant: "domain 層不得直接 import 第三方 provider SDK", test_or_metric: "AST 掃描 core/domain/**，禁止 import 白名單外的套件", ci_gate: "pre-merge lint job"}
+        - {id: "FF2", invariant: "compute 層不得反向依賴 modules 層", test_or_metric: "靜態依賴圖檢查 compute/** 對 modules/** 的 import", ci_gate: "pre-merge architecture-check job"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas's F18 tool table row (L823) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 3-stage pipeline is directly transcribed. No mother document was modified."

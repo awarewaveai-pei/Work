@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-04（續31，同一 session：Cognitive OS 第十八個 Method Atlas 切片 — `architecture.fitness_functions`，自我指涉：治理規則管到本 codebase 自己）
+
+**觸發**：延續操作者授權。0 agent。
+
+**選型**：Architecture Fitness Functions（F18 表格列，invariant→test/metric→CI gate，業界真實 Ford/Parsons/Kua「Fitness Function」模式）。CLI 範例真的拿本 codebase 自己的兩條不變量當內容（domain 層禁止直接 import 第三方 provider SDK；compute 層不得反向依賴 modules 層）——自我指涉根基，同 ADR 切片用真實 ADR 實務當範例同一等級。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.fitness_functions.contract.yaml`＋`specs/cognitive/typed-objects/fitness-function-set.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.sixteenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/fitness_functions.py`（builder+2 gate）＋`ai_lego/apps/cli/run_fitness_functions_slice.py`（真實治理本 codebase 自己的兩條不變量）＋`tests/unit/test_fitness_functions.py`（7 tests 第一次跑全綠）＋`docs/EIGHTEENTH_SLICE_ARCHITECTURE_FITNESS_FUNCTIONS.md`。`modules/architecture/__init__.py` docstring 補第七租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_fitness_functions_slice` | exit=0 | result=第一次真跑就通過：`PASS architecture.fitness_functions: functions=2, gates [provenance_required=PASS, functions_complete=PASS]`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_fitness_functions -v` | exit=0 | ms=780 | result=7 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2671→2680
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=55343 | result=**471 tests OK**（464→471，零回歸；`git diff --stat` 對照 9 個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]fitness_functions\|FitnessFunctionSet\|fitness-function-set\|run_fitness_functions_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-FITNESSFUNCTIONS-1`（method-inventory.yaml 無機器 id 列）；`ci_gate` 為自由文字未結構化。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit。
+
 ## 2026-09-04（續30，同一 session：Cognitive OS 第十七個 Method Atlas 切片 — `architecture.dependency_mapping`，第三種圖形狀＋意外發現 EC §12 早就預留 `dependency-map.yaml` 擴充點）
 
 **觸發**：延續操作者授權。0 agent。

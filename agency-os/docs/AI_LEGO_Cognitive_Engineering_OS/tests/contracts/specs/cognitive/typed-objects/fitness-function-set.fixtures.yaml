@@ -1,0 +1,43 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/fitness-function-set.schema.yaml"
+target_ref: ""
+description: "Exercises FitnessFunctionSet's required fields and the functions[] minItems:1 guard."
+
+valid:
+  - name: two_layering_and_dependency_direction_invariants
+    instance:
+      id: "FFS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.fitness_functions"
+      architecture_under_governance: "ai_lego package"
+      functions:
+        - {id: "FF1", invariant: "domain layer must not import third-party provider SDKs", test_or_metric: "AST scan of core/domain/** for disallowed imports", ci_gate: "pre-merge lint job"}
+        - {id: "FF2", invariant: "compute layer must not depend on modules layer", test_or_metric: "static dependency graph check", ci_gate: "pre-merge architecture-check job"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_function
+    instance:
+      id: "FFS-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.fitness_functions"
+      architecture_under_governance: "payment service"
+      functions:
+        - {id: "FF1", invariant: "no secrets in source", test_or_metric: "gitleaks scan", ci_gate: "pre-commit hook"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: functions_below_minitems_1
+    instance:
+      id: "FFS-2026-09-04-003"
+      version: "1.0.0"
+      architecture_under_governance: "x"
+      functions: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "functions has minItems: 1 -- a set with zero fitness functions governs nothing."
+  - name: missing_required_ci_gate
+    instance:
+      id: "FFS-2026-09-04-004"
+      version: "1.0.0"
+      architecture_under_governance: "x"
+      functions:
+        - {id: "FF1", invariant: "x", test_or_metric: "x"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "functions[].ci_gate is required -- Atlas's own table row (L823) names it as the pipeline's own final stage, missing here."
