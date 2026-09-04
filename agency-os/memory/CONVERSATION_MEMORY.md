@@ -182,6 +182,15 @@
 - **2026-04-01 補充（雙機／筆電）**：使用者已表明**公司桌機基樁較完整、筆電要補**——在「雙機環境對齊」未勾選前，**每次 `AO-RESUME` 務必**提醒筆電完成 **§1.5.1**（MariaDB／PHP／WP-CLI／bootstrap）；MCP 工具庫存旁註見 **`docs/operations/cursor-mcp-and-plugin-inventory.md` §4**（強調非 MCP、不取代 Supabase）。
 - **2026-04-01 補充（環境 SSOT）**：「可驗證的完美環境」定義與指令見 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §6.2**；稽核腳本 **`scripts/machine-environment-audit.ps1`**（`-FetchOrigin`、選用 `-RunVerifyGates`、`-Strict`）。例行 **`npm ci` 目錄為 `lobster-factory\packages\workflows`**（根目錄無 package-lock，舊文件寫「在 lobster-factory 根 npm ci」為誤）。
 
+## Today (2026-09-04) — Cognitive OS 切片變成全真堆疊（Ollama + 8420 語音 + 三階段模型 coding）
+
+- **一句話**：研究切片的每個 AI 步驟第一次真的由模型產生，且每步都有「不存在／不逐字就拒收」的 gate；真跑三次被 gate 擋下（模型抄 code 當分類、第二 coder 引用不逐字、THEMES_V11 隱藏假設），全部修不變量，沒有放寬 gate。六個 commit 在 origin（`cbccaf03d`…`8894b5158`）。
+- **基礎設施**：Ollama 0.33.3 + `gemma3:4b`（免費、本機）；`ai_lego/platform/ai_execution/gateway.py` 兩個 provider（self-hosted Ollama／Anthropic BYOK，key 由呼叫端傳，不讀 env——`user-env.ps1` 刻意留空避免撞 Claude Code 訂閱），egress 規則用 repo 既有四值詞彙（不是 GPT 文件的新詞彙）。
+- **8420 重用**：`MeetingServiceTranscriber` 以檔案路徑載入 8420 的 `lib/transcribe.py`／`lib/diarize.py`；發現 8420 自己在本機早壞（speechbrain 1.1.0 `endswith("/inspect.py")` 在 Windows 永不成立 → 強制載入 k2）→ 升 1.1.1 釘進 requirements。
+- **產品判斷（對話結論，未落 ADR）**：賣本機授權（資料不離機）＋線上版同一份 code 換 provider；Ollama 只在本機版有意義；線上主機 `ks-aw-01` 無 GPU → STT/LLM 走 API 或按次租 GPU；名稱不能含 LEGO；GPT 那份 Universal AI Foundry 文件只取三樣（敏感度路由、App 不直打 provider、每次呼叫記 model/prompt/trace），其餘不蓋第二套平台。
+- **治理同日**：AGENTS.md 瘦身、ADR-024 spec-on-demand、`oracle-quota.ps1` 斷路器、`repeat-failure-guard.js`、RUNNABLE_DEMOS 登記表。oracle 全天撞額度 → 書面自審＋突變測試。
+- **下一步**：eval dataset＋換大模型比較；`--review interactive` 真人審；多講者真音檔；抽共用 speech package；9/7 後補 `/codex-review`。詳 `memory/daily/2026-09-04.md`、TASKS ⑥、WORKLOG 續4–續9。
+
 ## Confirmed Priorities
 1. 先建完整可複製框架，不做精簡版
 2. 補齊財務、人力外包、SOP、資安事件應變、客戶邊界管理
@@ -507,7 +516,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-09-02 14:30:03 UTC_
+_Last synced: 2026-09-04 02:19:06 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -590,6 +599,9 @@ _Last synced: 2026-09-02 14:30:03 UTC_
   **後續兩輪 stop-hook 打回**：自動 review 機制本身回傳無效 JSON（機制故障非發現問題）→ 補跑真實 `codex-oracle.ps1 review`，抓到 2 個真 finding（mirror 目錄未被檢查、「01-04 guides」數字範圍縮寫解不開）；第一版修法（教程式碼用「目錄+同名檔案」推測隱含關係）又被打回「undeclared drift pairs」——自己重新推演找到具體反例（矩陣資料裡一個散文用詞被誤 backtick 包住，推測邏輯會生出完全不相關的假配對），改成**撤掉推測邏輯，回頭把矩陣資料本身寫明確**（跟修「01-04 guides」同一個原則：資料不夠明確就修資料，不要教程式碼猜）。
 
   **剩餘未解**：dedicated 機仍未購買（同 08-15 未解項延續）；`memory/daily/2026-08-16.md`～`2026-08-23.md` 8 個 stub 未回填（AO-CLOSE 指示只補今日檔案，這是已知、非本次引入的缺口）；`scripts/ao-resume.ps1` 有 17 個既有的、跟今天工作無關的未受保護 git 輸出擷取點，已用 spawn_task 記錄成獨立任務（task_b82a2211）未動手修。
+
+
+
 
 
 
