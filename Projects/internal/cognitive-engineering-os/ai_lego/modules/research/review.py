@@ -123,6 +123,26 @@ def locked_code_from_review(review: dict[str, Any], code_id: str) -> dict[str, A
     }
 
 
+def locked_definition_from_review(review: dict[str, Any], definition_id: str) -> dict[str, Any] | None:
+    """The human-locked codebook DEFINITION from a review record, or ``None`` when the reviewer gave none
+    (a blank answer to ``DEFINITION_PROMPT``, or a REJECTed review, which never asks). A definition is the
+    reviewer's own analytic decision about what a label covers, not a claim about what is IN the source --
+    that distinction is why it locks as ``LOCKED_DECISION`` (``epistemic_type: DECISION``), never
+    ``LOCKED_FACT``, whatever ``locked_code_from_review`` decided for the code itself in the same review.
+    Fires independently of the code's own lock/edit/accept outcome: a typed definition is always a decision.
+    """
+    if not review.get("definition") or not review.get("result_label"):
+        return None
+    return {
+        "definition_id": definition_id,
+        "coder_id": "CODER-1",
+        "label": review["result_label"],
+        "definition": review["definition"],
+        "provenance": make_provenance("DECISION", "HUMAN_APPROVED", "LOCKED_DECISION"),
+        "human_action": review["action"],
+    }
+
+
 def fixture_review(suggested_labels: dict[str, str] | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     """Deterministic review path: lock the P1 suggestion as a SOURCE_FACT, edit the P2 suggestion.
 

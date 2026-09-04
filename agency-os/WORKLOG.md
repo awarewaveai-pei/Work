@@ -36,6 +36,26 @@
 
 **[剩餘風險]**：錨點非人類校準；slice 第二 coder 仍無定義（OQ-P5-9）；withdrawal 歸屬待人裁（OQ-P5-10）；仍無第二模型。**[rollback]**：`git revert`；`apply_codebook` 不傳 `definitions` 行為與 v2 相同，slice 零改動（`prompt_version` 記錄欄位變 v3 而已）。
 
+### 續13e：round 14 — 定義鎖成 LOCKED_DECISION（OQ-P5-9 provenance 徹底關閉，非 spec-root 問題）＋ §2.3 誠實留白（操作者「我同意核准你直接做」）
+
+**觸發**：操作者針對上一輪列出的兩個剩餘項「全部同意核准，你直接做」：① §2.3 人類對真實逐字稿校準；② 定義要不要進 `HumanCodeLocked`／spec-root 問題。**0 agent**。
+
+**① 查證後推翻自己上一輪的判斷**：round 12 寫「這是 spec-root 問題」沒有先查——`grep core/domain/provenance.py` 發現 `EPISTEMIC_TYPES` 早已含 `DECISION`、`LOCK_REQUIRES` 早已有 `LOCKED_DECISION: DECISION`（`.ai/proposals/022-locked-decision-definition-ec` 2026-08-30 已套進 spec-root EC，比 round 12 早了 5 天）。**不變量**：定義是審者對 label 邊界的分析判斷，不是對逐字稿內容的宣稱——這正是 EC 已定義的 `LOCKED_DECISION`（`epistemic_type: DECISION`）與 `LOCKED_FACT`（`epistemic_type: SOURCE_FACT`）的分野，不該是後者。新增 `locked_definition_from_review`（鏡射 `locked_code_from_review`）＋ `CodebookDefinitionLocked` 事件，不論該審核的 code 本身鎖／編輯／接受，只要審者真的打了定義就觸發（是否鎖 code 是另一件事）。`emit()` 的 `event_type` 本來就自由字串無 closed enum（`SecondCoderApplied`／`AxialCodingSuggested` 已有前例），確認不是新增高爆炸半徑路徑才動手。
+
+**② §2.3 人類對真實逐字稿校準——明確不做，不假裝**：這整個系統的誠實性機制（`anchor_origin`／`human_calibrated`／`maturity.note`）就是為了不讓任何 session 悄悄宣稱做了沒做的事。我不能捏造「人類校準」——沒有真實逐字稿、沒有真人類 coder，硬做只會產生一個內容是假的 `human_calibrated: True` 旗標，正是這套機制要防的失效模式本身。維持 `False`，在 PHASE5 doc 寫清楚原因並停在這裡，等真資料＋真人類 coder。
+
+**[已修改]**：`review.py`（`locked_definition_from_review`）；`run_research_slice.py`（import＋兩處 emit）；`tests/unit/test_review.py` +2；`tests/acceptance/test_research_slice_fixture_mode.py`（+json import，ledger 斷言擴充）；`PHASE5_RESEARCH_SLICE.md` §Round 14 + OQ-P5-9 fully closed + §2.3 誠實說明；`RUNNABLE_DEMOS.md`；`TASKS.md` ⑥。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_research_slice --transcription fixture --coding local-llm --runtime-dir %TEMP%\ai-lego-r14` | exit=0 | ms=~60000 | result=`all gates PASS`；ledger 一筆 `CodebookDefinitionLocked`（`definition_id=DEF-P2-001`、`provenance={epistemic_type:DECISION, authorship_state:HUMAN_APPROVED, locked:LOCKED_DECISION}`）；`DEF-P1-001` 正確未觸發（P1 是模型新建議，非審者自己寫的定義）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .` | exit=0 | ms=190601 | result=230 tests OK（228→230）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad/mutate_round14.py` | exit=0 | ms=~2000 | result=2/2 KILLED（鎖成 LOCKED_FACT/SOURCE_FACT 而非 LOCKED_DECISION/DECISION → 紅；無定義／無 label 仍回傳記錄 → 紅；還原綠）
+- REVIEW_DONE: critic=self(Standard, 書面對抗自審) | verdict=warn | findings=0c/1m/1n —— m1 `CodebookDefinitionLocked` 目前無下游消費者（同 round 12 `SecondCoderApplied` 的既有備註），純記錄用途；n1 §2.3 留白是本輪刻意結論不是缺口，PHASE5 doc 明確寫「不是我能關閉的」，避免未來 session 誤判成待辦
+- ORACLE_WAIVED: critic 429 至 2026-09-05 05:20、codex usage limit 至 2026-09-07 11:06；以 2 突變＋書面自審替代；併入既有「2026-09-07 後補跑」條目
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`definition要不要進|spec-root question|LOCKED_FACT.*spec-root|locked_definition_from_review|CodebookDefinitionLocked` | hits=7（本輪自身 5 個呼叫點 + WORKLOG/TASKS round 12 舊敘述保留為歷史記錄，不改；PHASE5 OQ-P5-9 行已更新為 fully closed）
+
+**[剩餘風險]**：`CodebookDefinitionLocked` 無下游 schema/消費者（記錄性質，同 round 12 `SecondCoderApplied` 前例）；§2.3 真人校準仍未做，且明確不由我做。**[rollback]**：`git revert`；新事件是新增 emit，不影響既有事件序列/replay。
+
 ### 續13d：round 13 — OQ-P5-10 用文獻裁決（不照抄模型），途中抓到自己過嚴的 `min_groups`（操作者「全部同意核准，決定權交給你」）
 
 **觸發**：操作者全權授權，決定 OQ-P5-10（round 11 遺留：axial 錨點 `emotional_exhaustion`+`withdrawal_from_others` 該不該併一組）。**0 agent**。

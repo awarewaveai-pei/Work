@@ -68,7 +68,7 @@ from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_f
 from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_categories, suggest_open_codes, suggest_themes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
-from ai_lego.modules.research.review import fixture_primary_review, fixture_review, locked_code_from_review, review_code_interactively, reviewed_codebook_definitions
+from ai_lego.modules.research.review import fixture_primary_review, fixture_review, locked_code_from_review, locked_definition_from_review, review_code_interactively, reviewed_codebook_definitions
 from ai_lego.modules.research.synthetic_fixtures import PROJECT_ID, SUGGESTED_LABEL, SYNTHETIC_CONSENT, SYNTHETIC_TRANSCRIPTS, expanded_synthetic_coder_judgments
 from ai_lego.platform.ai_execution.capability_resolver import CAPABILITY_RESOLUTION_BLOCKED, CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.ai_execution.current_state import build_current_state
@@ -381,7 +381,16 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         locked_code = locked_code_from_review(primary, "CODE-LOCKED-P1-001")
         ai_review = review_code_interactively("AI-SUG-2", "SRC-2", SYNTHETIC_TRANSCRIPTS[1]["quote"], suggested_labels.get("SRC-2", SUGGESTED_LABEL), config.input_fn, config.output_fn)
     emit(NORDBROOK.tenant_id, nord_aggregate, "HumanCodeLocked", locked_code, 22)
+    # Round 14 (OQ-P5-9 follow-up): a reviewer's typed definition is the reviewer's own DECISION about what a
+    # label covers, not a claim about the source -- it locks as LOCKED_DECISION independently of whether the
+    # code itself got locked, edited, or accepted (fires for either review, whenever a definition was given).
+    primary_definition = locked_definition_from_review(primary, "DEF-P1-001")
+    if primary_definition is not None:
+        emit(NORDBROOK.tenant_id, nord_aggregate, "CodebookDefinitionLocked", primary_definition, 22.1)
     emit(NORDBROOK.tenant_id, nord_aggregate, "AISuggestionReviewed", {"suggestion_id": ai_review["suggestion_id"], "action": ai_review["action"], "result_label": ai_review["result_label"]}, 23)
+    ai_review_definition = locked_definition_from_review(ai_review, "DEF-P2-001")
+    if ai_review_definition is not None:
+        emit(NORDBROOK.tenant_id, nord_aggregate, "CodebookDefinitionLocked", ai_review_definition, 23.05)
     # EC section 14 / MP section 8.5: the method implementation runs only through the Method Atlas gate (ADR-023
     # section Consequences 5) -- same `invoke` seam as capabilities, same guarantee.
     # Step 15.5 (local-llm only): coder 1's pending codes are the model's suggestions for the units no human handled

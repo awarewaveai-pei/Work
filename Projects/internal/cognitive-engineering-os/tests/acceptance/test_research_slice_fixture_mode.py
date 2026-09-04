@@ -1,3 +1,4 @@
+import json
 import shutil
 import tempfile
 import unittest
@@ -60,6 +61,14 @@ class FixtureModeAcceptanceTests(SliceCriteriaMixin, unittest.TestCase):
             events_text = "\n".join((runtime / "data" / "events" / "ledger.jsonl").read_text(encoding="utf-8").splitlines())
             self.assertNotIn("Mara Linden", events_text)
             self.assertNotIn("Elias Morgan", events_text)
+            # Round 14: the P1 lock ("l"->"y") got a definition ("checking work messages outside hours") ->
+            # CodebookDefinitionLocked fires as LOCKED_DECISION; the P2 edit ("e"->"n") got a blank definition
+            # ("") -> no event for it at all (a reviewer who typed nothing decided nothing to record).
+            definition_events = [json.loads(line) for line in (runtime / "data" / "events" / "ledger.jsonl").read_text(encoding="utf-8").splitlines() if json.loads(line)["event_type"] == "CodebookDefinitionLocked"]
+            self.assertEqual(len(definition_events), 1)
+            payload = definition_events[0]["payload"]
+            self.assertEqual(payload["definition"], "checking work messages outside hours")
+            self.assertEqual(payload["provenance"], {"epistemic_type": "DECISION", "authorship_state": "HUMAN_APPROVED", "locked": "LOCKED_DECISION"})
         finally:
             shutil.rmtree(runtime, ignore_errors=True)
 

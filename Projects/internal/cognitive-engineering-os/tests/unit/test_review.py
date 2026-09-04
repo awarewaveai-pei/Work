@@ -1,6 +1,7 @@
 import unittest
 
-from ai_lego.modules.research.review import DEFINITION_PROMPT, fixture_primary_review, fixture_review, review_code_interactively, reviewed_codebook_definitions
+from ai_lego.core.domain.provenance import provenance_is_valid
+from ai_lego.modules.research.review import DEFINITION_PROMPT, fixture_primary_review, fixture_review, locked_definition_from_review, review_code_interactively, reviewed_codebook_definitions
 from ai_lego.modules.research.synthetic_fixtures import CODEBOOK_DEFINITIONS, SUGGESTED_LABEL
 
 
@@ -79,6 +80,21 @@ class ReviewTests(unittest.TestCase):
         default_primary = fixture_primary_review()
         self.assertEqual(default_primary["definition"], CODEBOOK_DEFINITIONS[SUGGESTED_LABEL])
         self.assertNotIn("definition", locked)  # the ledger-bound locked code shape is unchanged
+
+    def test_locked_definition_from_review_locks_as_decision_never_as_source_fact(self):
+        # Round 14: a definition is the reviewer's own analytic decision about what a label covers, not a
+        # claim about the source -- LOCKED_DECISION / DECISION, never LOCKED_FACT / SOURCE_FACT, even though
+        # the SAME review locked its code as SOURCE_FACT (asserted_epistemic_type is irrelevant here).
+        default_primary = fixture_primary_review()
+        record = locked_definition_from_review(default_primary, "DEF-TEST-001")
+        self.assertEqual(record, {"definition_id": "DEF-TEST-001", "coder_id": "CODER-1", "label": SUGGESTED_LABEL, "definition": CODEBOOK_DEFINITIONS[SUGGESTED_LABEL], "provenance": {"epistemic_type": "DECISION", "authorship_state": "HUMAN_APPROVED", "locked": "LOCKED_DECISION"}, "human_action": "ACCEPT_AND_LOCK"})
+        self.assertTrue(provenance_is_valid(record["provenance"]))
+
+    def test_locked_definition_from_review_is_none_without_a_definition_or_a_kept_label(self):
+        no_definition = fixture_primary_review({"SRC-1": "models_own_label"})
+        self.assertIsNone(locked_definition_from_review(no_definition, "DEF-X"))
+        rejected = {"result_label": None, "definition": "should never happen but must not crash"}
+        self.assertIsNone(locked_definition_from_review(rejected, "DEF-Y"))
 
     def test_fixture_review_locks_a_source_fact(self):
         locked, suggestion = fixture_review()
