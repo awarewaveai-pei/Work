@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-09-04（續9，同一 session：selective prompt v2 — 三階段第一次全由模型完成並全過 gate）
+
+**觸發**：續8 真跑的觀察（4B 模型抄成員 code 當分類名）。**0 agent**；oracle 仍 block。
+
+**[已修改]**：`ai_coding.py`：`SELECTIVE_PROMPT_VERSION="selective-coding-v2"`（常數旁註明 v1 失敗原因）、system prompt 改為「只准填給定的分類名」、`build_selective_prompt` 只列分類名＋成員數；`tests/unit/test_grouping.py` 加 `test_selective_prompt_never_lists_member_code_labels` 回歸防線；`PHASE5_RESEARCH_SLICE.md` Round 8b、`RUNNABLE_DEMOS.md` 新列、`TASKS.md` ⑥。gate 一字未動。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_research_slice --transcription meeting-service --coding local-llm --runtime-dir %TEMP%\ai-lego-real-stack` | exit=0 | result=`PASS … 28/28 steps, all gates PASS`；axial `nighttime_work_habits`（3 codes）＋`emotional_impact_of_work`（1 code），0 拒收；selective（`prompt_version=selective-coding-v2`）`work_and_wellbeing` ← 兩個分類，`rejected=[]`、`unassigned=[]`，983 ms；`theme_set.themes` 單一主題、無 passthrough；`Kappa=0.66666667`，4 單元
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_grouping` | exit=0 | result=11/11；`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | ms=190589 | result=`Ran 190 tests OK`
+- REVIEW_DONE: critic=self | verdict=pass | findings=0c/0m/0n（prompt 文字改動，gate 不變；回歸測試釘住「prompt 不含成員 code」）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`selective-coding-v1|member codes` | hits=1（`ai_coding.py` 常數旁的歷史註解，刻意保留）
+- ORACLE_WAIVED: 斷路器仍 block；自審如上
+
+**[剩餘風險]**：分類／主題名跨模型不穩定、無 eval dataset（TASKS 下一刀）。**[rollback]**：`git revert`。
+
 ## 2026-09-04（續8，同一 session：axial／selective 由模型產生，成員 gate + pass-through；真跑抓到 4B 模型的層級混淆）
 
 ### coding 三階段全由模型產生；gate 在真跑中擋下「用 code 冒充分類」的主題，0 捏造

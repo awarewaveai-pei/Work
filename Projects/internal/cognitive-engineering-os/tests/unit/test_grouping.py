@@ -70,6 +70,16 @@ class SuggestGroupingTests(unittest.TestCase):
         self.assertEqual(len(gateway.calls), 1)
         self.assertEqual(out["unassigned"], ["late_night_updates"])
 
+    def test_selective_prompt_never_lists_member_code_labels(self):
+        """Regression guard for the 2026-09-04 real run: showing member codes made the 4B model copy them as theme
+        members, which the membership gate then (correctly) rejected wholesale. v2 shows names and counts only."""
+        from ai_lego.modules.research.ai_coding import build_selective_prompt
+
+        prompt = build_selective_prompt([{"category": "night_work_anxiety", "code_labels": ["after_hours_monitoring", "late_night_project_updates"]}])
+        self.assertIn("night_work_anxiety (2 codes)", prompt)
+        self.assertNotIn("after_hours_monitoring", prompt)
+        self.assertNotIn("late_night_project_updates", prompt)
+
     def test_empty_inputs_are_errors(self):
         with self.assertRaisesRegex(InvariantViolation, "AXIAL_NO_CODES"):
             suggest_categories(_StubGateway("[]"), "p", [], pii_guard=PiiLedgerGuard(), classification_tag="Confidential", trace_id="T")

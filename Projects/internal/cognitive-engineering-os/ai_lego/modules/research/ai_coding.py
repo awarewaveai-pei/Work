@@ -233,7 +233,10 @@ def apply_codebook(
 
 
 AXIAL_PROMPT_VERSION = "axial-coding-v1"
-SELECTIVE_PROMPT_VERSION = "selective-coding-v1"
+# v1 listed each category WITH its member code labels; on the first real run (2026-09-04, gemma3:4b) the model copied
+# those member codes as the theme members, so every member failed the category-membership gate and no theme
+# survived. v2 shows category names only (plus a member count), so there is no lower-level label to copy.
+SELECTIVE_PROMPT_VERSION = "selective-coding-v2"
 
 AXIAL_SYSTEM_PROMPT = (
     "You are assisting a qualitative researcher with AXIAL CODING (Strauss & Corbin). You are given the open codes "
@@ -245,10 +248,10 @@ AXIAL_SYSTEM_PROMPT = (
 
 SELECTIVE_SYSTEM_PROMPT = (
     "You are assisting a qualitative researcher with SELECTIVE CODING (Strauss & Corbin). You are given the "
-    "categories from axial coding (name + member codes). Integrate categories into a small number of core themes. "
-    "Rules: theme names are 2-5 lowercase words joined by underscores; list member categories by copying their "
-    "names EXACTLY; every category belongs to at most one theme; do not invent categories; respond with a JSON "
-    "array only, no commentary."
+    "CATEGORY NAMES from axial coding. Integrate categories into a small number of core themes. "
+    "Rules: theme names are 2-5 lowercase words joined by underscores; the \"categories\" array of each theme must "
+    "contain ONLY category names copied EXACTLY from the list you were given; every category belongs to at most one "
+    "theme; do not invent categories; respond with a JSON array only, no commentary."
 )
 
 
@@ -261,10 +264,11 @@ def build_axial_prompt(codes: list[dict[str, str]]) -> str:
 
 
 def build_selective_prompt(categories: list[dict[str, Any]]) -> str:
-    lines = ["Categories (name -- member codes):", ""]
+    """Category NAMES only (member count, never member labels) -- see SELECTIVE_PROMPT_VERSION for why."""
+    lines = ["Category names (each followed by how many open codes it groups):", ""]
     for category in categories:
-        lines.append(f"- {category['category']} -- {', '.join(category['code_labels'])}")
-    lines += ["", 'Return a JSON array of objects: [{"theme": "...", "categories": ["...", "..."]}]']
+        lines.append(f"- {category['category']} ({len(category['code_labels'])} codes)")
+    lines += ["", 'Return a JSON array of objects: [{"theme": "...", "categories": ["<category name>", "..."]}]']
     return "\n".join(lines)
 
 
