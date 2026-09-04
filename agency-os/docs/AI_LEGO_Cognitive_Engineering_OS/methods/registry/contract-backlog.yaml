@@ -861,6 +861,53 @@ tier_1:
       protocol section, thinner than several Tier 0 examples. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the twenty-four entries above it.
+  twentysixth_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-sixth Tier 1 entry, same
+    # additive-key rationale as the twenty-five entries above it.
+    method_id: "database_data.data_lineage"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SECOND entry
+      from the `database_data` family (F21), after
+      database_data.backup_restore_drill. Atlas gives two citations
+      with genuinely different vocabularies (F21 table row L901's own
+      6-stage formula vs §11.48's own dedicated-section 8-node flow
+      diagram, L2313-2322) -- disclosed as a divergence in specificity,
+      the diagram treated as authoritative. The benefit column's own
+      text (L2327: "一個數字可以回到原始來源") directly implies a real
+      invariant -- a node's own upstream chain must actually resolve to
+      a real SOURCE node, computed by genuine graph traversal
+      (ai_lego/compute/lineage/traversal.py), not caller-asserted, the
+      same discipline causal.dag's own acyclic verification already
+      established for a structurally analogous graph method. Due
+      diligence, CORRECTED post-critic-review (the original claim
+      overstated its own scope as "the full spec root" when it actually
+      searched only specs/**+methods/**, and misclassified 3 of 9 hits):
+      of the 9 files in that narrower, meaningful scope (where a typed
+      object would actually be defined), 6 are a Workflow execution-
+      lineage shape, 2 more are a separately distinct schema/document
+      VERSION-HISTORY lineage concept, and the 9th
+      (research.qualitative_coding's own "Dataset 有 lineage" gate
+      bullet) is satisfied by a single provenance_record -- a
+      genuinely different single-hop shape from this method's own
+      multi-stage chain. No duplicate found in any of the three. See
+      the contract's own description for the full corrected accounting
+      and two additional supporting (not competing) hits found on
+      review. A SECOND critic finding, unrelated to citations: the
+      first-draft `traces_to_source` implementation (a backward
+      per-node DFS) was order-dependent and could raise RecursionError
+      at scale -- rewritten as iterative forward reachability from the
+      SOURCE set, and a previously-absent duplicate-node-id guard was
+      added as a separate fix. See the contract's own
+      compilation_decisions for both.
+    source: "methods/contracts/database_data.data_lineage.contract.yaml (built same session as this entry, mints machine_id database_data.data_lineage) + specs/cognitive/typed-objects/data-lineage-record.schema.yaml (new output type) + ai_lego/compute/lineage/traversal.py (new compute module)"
+    note: >
+      Not placed under `tier_0`: §11.48 is a dedicated section with a
+      real flow diagram, not itself cited elsewhere as a repeated
+      teaching example. Tier 1, mandated by the actively-running
+      implementation slice, same category as the twenty-five entries
+      above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

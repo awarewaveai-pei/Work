@@ -1,0 +1,296 @@
+$id: "ai-lego://methods/contracts/database_data.data_lineage.contract.yaml"
+title: "Data Lineage Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-eighth Method Atlas slice, SECOND from
+  the `database_data` family (F21's own "資料庫／資料套件"), after
+  `database_data.backup_restore_drill` (twenty-fifth slice).
+
+  Atlas gives this method TWO citations with genuinely DIFFERENT
+  vocabularies, disclosed rather than silently reconciled: the F21 tool
+  table row (L901: "source→ingest→transform→dataset→model→artifact" --
+  6 stages) and the dedicated §11.48 section (L2309-2328), whose own
+  flow diagram (L2313-2322) gives an 8-node chain (Source→Ingest→
+  Transform→Dataset→AnalysisRun→Result→Claim→Paper/Decision). The first
+  4 stages agree (source/ingest/transform/dataset); the table row's
+  final two ("model/artifact") and the diagram's final four
+  ("AnalysisRun/Result/Claim/Paper-Decision") diverge -- the table row
+  reads as a compressed, generic summary and the dedicated section's
+  diagram as the fuller worked breakdown, the SAME relationship several
+  prior Tier 1 contracts this session found between a table-row formula
+  and its own dedicated section (e.g. `devops_sre.canary_deployment`'s
+  own two-citation pattern). This contract treats the DIAGRAM's own
+  8-stage list as authoritative for the `stage` enum, disclosing the
+  table row's shorter, divergent vocabulary rather than silently
+  picking one.
+
+  The purpose section's own second benefit bullet (L2327:
+  "一個數字可以回到原始來源" -- a number can trace back to its original
+  source) is a real, enforceable invariant this contract enforces: a
+  node cannot be considered part of a valid lineage record unless
+  FOLLOWING its own upstream references actually terminates at a real
+  `SOURCE` node -- not merely "claims an upstream", the same "real
+  compute, not a claim" discipline `causal.dag`'s own acyclic-
+  verification (a structurally analogous graph method, sixth slice)
+  already established for a different graph shape. (Not to be confused
+  with the F21 TABLE's own separate benefit column, whose text for this
+  row is "數字可追溯" -- a related but distinct string; the two are
+  cited separately below, not conflated.)
+
+  Due diligence applied before minting, CORRECTED after a critic
+  review caught both an over-broad scope claim and a misclassification
+  in the first draft: the original claim ("grepped the full spec root
+  for 'lineage', 9 hits, all read") actually searched only `specs/**`
+  and `methods/**` (where a typed-object concept would actually be
+  DEFINED), not the genuinely full spec root -- a true full-repo grep
+  returns 34 files, most incidental English-word mentions in mother
+  documents/proposals/research artifacts with no bearing on a
+  duplicate-concept question. Of the original 9 files in the narrower,
+  meaningful scope: SIX are a DIFFERENT concept (Workflow execution
+  lineage -- a forked branch/execution-history shape, e.g.
+  `specs/workflow/branch.schema.yaml`'s own "forked, isolated execution
+  lineage of a Workflow"): `knowledge-canvas.schema.yaml`,
+  `blast-radius-chain.schema.yaml`, `branch.schema.yaml`, and
+  `workflow-ir.schema.yaml`. TWO more are a THIRD, separately distinct
+  concept (schema/document VERSION-HISTORY lineage, not execution and
+  not data-flow): `status-codes.schema.yaml`'s own `design_lineage:`
+  field and `document-registry.schema.yaml`'s own "major-version
+  lineage number" -- the first draft wrongly folded both into the
+  "Workflow execution lineage" bucket. The ninth,
+  `research.qualitative_coding.contract.yaml`'s own "Dataset 有
+  lineage" gate bullet (L491), is satisfied by requiring a single
+  `governance/epistemic-label.schema.yaml#/provenance_record` on a
+  Dataset -- a genuinely different, single-hop shape (who asserted this
+  fact) from what this contract builds (a multi-stage transformation
+  CHAIN a piece of data actually passed through). A wider check (not
+  claimed as exhaustive) also found two files that SUPPORT, rather than
+  compete with, this contract: `policies/ai-execution/trusted-compute-
+  gate.policy.yaml` (L42, L51) names "dataset lineage" as an unmet
+  requirement for research-class citations, and
+  `.ai/research/phase-1/GAP_REGISTER.yaml`'s own `P1-GAP-AI-6` (L340,
+  L347) is a REGISTERED GAP describing exactly this absence ("特徵工程
+  產生的衍生欄位沒有 lineage 物件記錄來源公式" -- derived fields from
+  feature engineering have no lineage object recording their origin
+  formula) -- neither is a competing typed object; both are additional
+  evidence this method fills a real, previously-named gap rather than
+  duplicating an existing one.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Data Lineage row (L901): 'source→ingest→transform→dataset→model→artifact' / '數字可追溯'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.48 資料血緣／資料血統追蹤（Data Lineage）(L2309-2328) -- flow diagram (L2313-2322, 8-node chain), benefit bullets (L2326-2328)"
+  - "methods/registry/method-inventory.yaml 'Data Lineage' entry (L1247-1251): category 'F21 database-data', no machine_id -- this contract mints one"
+  - "specs/workflow/branch.schema.yaml, specs/execution/status-codes.schema.yaml (design_lineage), specs/governance/document-registry.schema.yaml (major-version lineage), research.qualitative_coding.contract.yaml L491 -- checked before minting, all genuinely different 'lineage' concepts, see description above"
+  - "policies/ai-execution/trusted-compute-gate.policy.yaml L42/L51 and .ai/research/phase-1/GAP_REGISTER.yaml P1-GAP-AI-6 (L340-347) -- supporting evidence this method fills a registered gap, not a duplicate"
+  - "ai_lego/compute/graph/dag.py -- the existing real-compute graph-traversal precedent (causal.dag, sixth slice) this contract's own quality discipline follows (engine/computation_provenance_ref/CALCULATED_RESULT)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-sixth
+  concrete entry. `id: database_data.data_lineage` mints a new
+  machine_id. `family: database_data` reused as-is from
+  `database_data.backup_restore_drill`.
+
+id: database_data.data_lineage
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [MAP, RELATE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). The flow diagram's own chain structure maps onto MAP
+# (building the stage sequence), each upstream_refs edge onto RELATE
+# (connecting a node to what it derives from), and the traces-to-source
+# check onto VALIDATE (confirming the chain actually resolves, not just
+# claims to). All three CANONICAL_KERNEL members.
+
+purpose:
+  - trace_a_piece_of_data_through_every_transformation_back_to_a_real_source
+inputs:
+  required:
+    - DatasetRef
+  optional: []
+  # Same free-text reference class every prior Tier 1 contract's own
+  # scope-limited input already uses -- no single existing typed object
+  # in this spec root is the universal "thing being traced."
+
+outputs:
+  - DataLineageRecord
+# NEW output type (see typed-objects/data-lineage-record.schema.yaml).
+# Same honesty gap every Tier 1 contract this session disclosed: Atlas
+# names no PascalCase output type for this method.
+
+preconditions:
+  - "every node id is unique within the record"
+  - "at least one node, and at least one node with stage:SOURCE"
+  - "every SOURCE-stage node has empty upstream_refs"
+  - "every non-SOURCE node's own COMPUTED traces_to_source result is true (see quality/genuine-compute discipline)"
+  # The FIRST precondition (unique ids) was added post-critic-review --
+  # the first draft had no guard against duplicate node ids anywhere
+  # (builder, gate, or schema). traces_to_source keys its own result by
+  # id, so a duplicate silently collapses to whichever node happened to
+  # be processed last -- a real orphan sharing an id with a valid decoy
+  # was certified traces_to_source:true at every layer, including
+  # schema validation, before this fix. The LAST precondition is
+  # directly implied by §11.48's own second benefit bullet (L2327) -- a
+  # node whose upstream chain does not actually resolve to a real
+  # SOURCE (an orphan, a dangling reference, or a cycle that never
+  # touches SOURCE) contradicts that stated benefit.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure root_cause.pareto/database_data
+  # .backup_restore_drill's own compilation_decisions already reasoned
+  # through: the real risk here is a structural-integrity risk (does
+  # the chain genuinely resolve), not an evidence-citation risk over a
+  # narrative claim.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Data Lineage row.
+
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling database_data
+  # contract's own rollback field already uses -- producing a lineage
+  # record has no described external side effect.
+
+compilation_decisions:
+  - question: >
+      The F21 table row's own 6-stage formula ("source→ingest→
+      transform→dataset→model→artifact") and §11.48's own 8-node flow
+      diagram ("Source→Ingest→Transform→Dataset→AnalysisRun→Result→
+      Claim→Paper/Decision") genuinely diverge after the shared first 4
+      stages -- which is authoritative for the `stage` enum?
+    decision: "The dedicated section's own 8-node flow diagram, not the table row's 6-stage formula."
+    reasoning: >
+      The dedicated section (§11.48) is a fuller worked example with a
+      real diagram, the same tier of grounding this session's own
+      dual-citation methods (e.g. devops_sre.canary_deployment)
+      consistently treat as authoritative over a compressed table-row
+      summary when the two diverge. The table row's own "model/
+      artifact" reads as a generic 2-word compression of the diagram's
+      own 4 more specific downstream stages (AnalysisRun/Result/Claim/
+      Paper-Decision), not a genuinely conflicting claim -- disclosed as
+      a divergence in specificity, not treated as a contradiction to
+      silently pick a side on without explanation.
+  - question: >
+      Should the chain be modeled as a STRICT linear sequence (mirroring
+      the diagram's own straight-line "flowchart LR" drawing, S→I→T→D→
+      A→R→C→P with no branching shown), or a general graph (nodes with
+      possibly multiple upstream_refs, allowing merges)?
+    decision: "A general graph -- each node's upstream_refs[] may name zero, one, or multiple prior nodes."
+    reasoning: >
+      Atlas's own diagram is ONE worked example of the concept, drawn as
+      a straight line because that is the simplest way to show 8 stages
+      -- it is not a rule that real data lineage never merges multiple
+      sources into one transform (a join of two datasets is a completely
+      ordinary, real-world lineage shape the diagram's own single
+      example does not rule out). Forcing strict linearity would
+      invent a constraint Atlas's own text never states; the general
+      graph shape is also what `traces_to_source`'s own "any upstream
+      path resolves" semantics is built for.
+  - question: >
+      Should the traces-to-source check be a caller-asserted boolean
+      field, or genuine deterministic compute?
+    decision: "Genuine compute (ai_lego/compute/lineage/traversal.py), same Trusted Compute discipline causal.dag's own acyclic_verified already established for a structurally analogous graph method."
+    reasoning: >
+      Atlas's own second benefit bullet (L2327) is a claim about what the
+      chain ACTUALLY resolves to, not what a caller believes it resolves
+      to -- an LLM "mentally tracing" a chain and asserting `traced:
+      true` is exactly the class of ungrounded claim Master Plan §39
+      (cited by every genuine-compute contract this session built)
+      warns against. A real graph traversal is cheap, deterministic, and
+      removes the ambiguity entirely -- see the next decision for why
+      the FIRST implementation of that traversal was not actually
+      deterministic despite the label.
+  - question: >
+      CRITIC-CAUGHT CORRECTION: the first draft implemented
+      `traces_to_source` as a backward, per-node DFS with memoization
+      (mirroring `causal.dag`'s own three-color DFS shape). A critic
+      review found this was NOT actually order-independent -- the exact
+      same graph could give different answers depending on `nodes[]`
+      list order, because the memoization could permanently record a
+      `False` that was only ever provisional (derived while cutting a
+      cycle on ONE particular traversal path), and its recursion depth
+      scaled with chain length, raising `RecursionError` on a
+      reverse-ordered chain of a few hundred nodes. A SEPARATE,
+      previously entirely absent guard also let duplicate node ids
+      silently collapse (`by_id = {n["id"]: n for n in nodes}` is
+      last-wins), certifying a genuine orphan as traced whenever it
+      shared an id with a valid decoy. How should these be fixed?
+    decision: >
+      Two independent fixes, not one: (1) rewrote `traces_to_source`
+      as ITERATIVE FORWARD REACHABILITY from the SOURCE set (a
+      work-list flood-fill, not a per-node backward DFS) -- provably
+      order-independent (a purely set-theoretic reachability property
+      of the graph) and needs no recursion at all. (2) added a
+      SEPARATE shared predicate, `_duplicate_node_ids`, checked by both
+      the builder (raises) and `evaluate_structural_integrity_gate`
+      (fails) BEFORE `traces_to_source` is ever called.
+    reasoning: >
+      The two bugs are unrelated and need unrelated fixes: fixing the
+      traversal algorithm's own order-dependence and recursion depth
+      does nothing about duplicate ids (the rewritten function still
+      assumes unique ids, disclosed explicitly in its own docstring),
+      and a duplicate-id guard does nothing about order-dependence. The
+      broader lesson this correction records: sharing a predicate
+      between a builder and its own gate (this session's own standing
+      discipline since WORKLOG continuation 37) removes DRIFT between
+      the two layers, but does NOT make either layer independently
+      correct if the shared predicate itself has a bug -- "recomputed
+      independently" and "computed correctly" are different claims, and
+      this contract's own `evaluate_structural_integrity_gate` genuinely
+      recomputing a wrong answer twice is exactly what happened before
+      this fix.
+
+open_questions:
+  - id: "OQ-DATALINEAGE-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-DATALINEAGE-2"
+    question: >
+      This contract does not model the diagram's own two DOWNSTREAM
+      benefit directions equally: `traces_to_source` only verifies
+      BACKWARD traceability (a Result can be traced back to its
+      Source). Atlas's own FIRST benefit bullet (L2326: "一個錯誤
+      source 可以反查影響哪些結果" -- an error at the source can be
+      traced FORWARD to see which results are impacted) is a genuinely
+      different query direction (forward impact analysis from a given
+      Source, not backward provenance from a given node) this
+      contract's own `traces_to_source` function does not compute --
+      it is answerable from the SAME graph data (walk upstream_refs in
+      reverse) but is not built here. Should a future revision add it?
+    owner: "operator, or whoever next needs forward impact-analysis queries over a real DataLineageRecord"
+    blocks: "nothing in this file's own validity -- the backward-traceability invariant this contract DOES enforce is unaffected"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L901) and §11.48 (L2309-2328,
+    including the exact flow diagram L2313-2322 and benefit bullets
+    L2326-2328) directly. Grepped specs/**+methods/** for "lineage"
+    before writing (9 hits, all read; NOT "the full spec root" -- a
+    critic-caught scope overstatement, corrected here and in
+    description above, which also corrects a 3-file misclassification
+    among those 9 hits). Read `ai_lego/compute/graph/dag.py` and
+    `causal.dag.contract.yaml` in full before modeling this method's own
+    genuine-compute discipline on that precedent -- a SECOND critic
+    review then found the resulting `traces_to_source` implementation
+    did not actually inherit `dag.py`'s own documented order-
+    independence guarantee; re-verified after the rewrite that it now
+    does (see compilation_decisions). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 8-stage chain and the
+    traces-to-source invariant are both directly grounded in Atlas's
+    own cited text. The decision to treat the dedicated section's
+    diagram as authoritative over the table row's shorter formula, the
+    general-graph (not strict-linear) shape, the decision to build
+    only backward (not forward) traceability, the iterative-forward-
+    reachability rewrite of the compute layer, and the added duplicate-
+    node-id guard are all disclosed compilation choices -- see
+    compilation_decisions above and OQ-DATALINEAGE-2.

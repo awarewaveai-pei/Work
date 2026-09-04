@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-05（續41，同一 session：Cognitive OS 第二十八個 Method Atlas 切片 — `database_data.data_lineage`，四個既有教訓都真的擋住了，critic 挖出第五種全新失守模式）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。
+
+**選型**：`database_data` 家族第二個成員。F21 table 列（L901，6 階段壓縮公式）+ §11.48 專屬段落（L2309-2328，8 節點流程圖 L2313-2322）雙引用，兩者字彙在前 4 階段一致、後段分歧（table「model/artifact」vs diagram「AnalysisRun/Result/Claim/Paper-Decision」），明文揭露以較豐富的 diagram 為準，不悄悄選邊。
+
+**真不變量**：diagram 自己第二條效益 bullet（L2327「一個數字可以回到原始來源」）直接蘊含：每個非 SOURCE 節點的上游鏈必須真的算得到一個 SOURCE，用真圖遍歷計算（`ai_lego/compute/lineage/traversal.py`），不是呼叫者自稱——同 causal.dag（6th slice）自己的 acyclic 驗證紀律。
+
+**本切片刻意主動套用前四輪教訓**（共用 predicate、真重算不信任已存值、逐行核對引用、下筆前全 spec-root 查重複概念）——**critic 真跑確認四個都真的擋住了，但挖出第五種全新失守模式**：
+1. **Critical**：node id 重複完全沒有任何防護（builder/gate/schema 皆無）——`traces_to_source` 用 id 當 key，重複 id 讓真孤兒節點悄悄疊在合法 decoy 的 `traces_to_source:true` 上，四層（含 schema validation）全部放行。修法：新增共用 predicate `_duplicate_node_ids`，builder raise、gate FAIL，兩處都在圖遍歷之前檔下。
+2. **Major**：第一版 `traces_to_source` 是逆向、逐節點 DFS，memoization 會把「切斷循環時的暫時性 False」永久記錄下來——**同一張圖換節點順序答案會不一樣**，直接違反契約自己引用的 causal.dag 前例（明文保證順序不影響結果）。
+3. **Major**：同一份遞迴實作在逆序輸入下幾百個節點就 `RecursionError`——真實 lineage 圖的正常規模。**2+3 用同一次改寫解決**：改成從 SOURCE 集合做迭代式正向可達性（flood-fill），順序無關、零遞迴。
+4. **Major**：契約自己「grepped 完整 spec root...9 命中全讀」的查重複宣稱誇大了範圍（實際只查了 specs/**+methods/**）且把 9 筆命中裡的 3 筆誤分類（其實是第三個獨立概念：schema/文件版本歷史型 lineage，不是 workflow 執行型 lineage）。三處（contract/schema/backlog）全部修正，另外查到 2 筆真正支持（非競爭）本方法的既有引用（一個治理政策要求+一個已登記的缺口記錄，剛好就是本方法要補的洞）。
+
+另修 4 個 Minor：gate 只重驗 builder 6 項防護裡的 4 項（漏 stage/description）已補齊；schema `required` 漏了 `engine`/`computation_provenance_ref`（跟自己引用的姊妹 schema 不一致）；builder 複製 5 個節點欄位只驗證 4 個（漏 provenance 本身）；CLI 的 gate 層攻擊驗證用弱 oracle（「隨便哪個 gate 掛了都算」而非釘死具體 gate+evidence，同一類「沒證明宣稱的東西」失守，另一個家族已犯過一次）。
+
+**本輪最重要的教訓**：共用 predicate 能消除 builder 與 gate 兩層之間的「漂移」（前四輪已學會的教訓），但**不代表共用的那個 predicate 本身就是對的**——「兩層各自獨立重算」跟「算得正確」是兩件事，本切片自己的 gate 曾經很忠實地把同一個錯答案重算了兩次。
+
+36 個測試（28→36，含 4 個順序無關性回歸測試+1000 節點逆序不炸 recursion 測試）全綠，671 tests 全套零回歸（663→671）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.data_lineage.contract.yaml`＋`specs/cognitive/typed-objects/data-lineage-record.schema.yaml`（`required` 補齊+id 唯一性揭露）＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentysixth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/lineage/traversal.py`（改寫成迭代式正向可達性，先手算驗證 7+ 已知圖形）＋`ai_lego/modules/database_data/data_lineage.py`（builder+3 gate+新增 `_duplicate_node_ids` 共用 predicate）＋`ai_lego/apps/cli/run_data_lineage_slice.py`（真實 merge 案例+雙層攻擊驗證，gate 層 assertion 改釘死具體 gate）＋`tests/unit/test_data_lineage.py`（36 tests）＋`docs/TWENTYEIGHTH_SLICE_DATABASE_DATA_DATA_LINEAGE.md`。`modules/database_data/__init__.py` docstring 補第二租戶。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2762→2771
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_data_lineage_slice`（修正後）| exit=0 | result=`PASS database_data.data_lineage: 4 nodes, gates [provenance_required=PASS, genuine_compute=PASS, structural_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_data_lineage -v` | exit=0 | result=36 passed（28→36）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=70024 | result=**671 tests OK**（663→671，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，非自審，127K tokens/33 tool uses）| verdict=fail(1 Critical, 2 Major)→fixed | findings=1c/2m/1m(citation)/4minor（全數修正；1 個引用宣稱範圍誇大額外算獨立 Major 一併計入）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`database_data[.]data_lineage\|DataLineageRecord\|data-lineage-record\|run_data_lineage_slice\|compute[.]lineage\|traces_to_source` | hits=10（全部本切片自己新檔案），無過期殘留；額外 grep `grepped the full spec root\|benefit column` 確認全庫僅本切片自己檔案已修正，其餘命中皆為姊妹契約自己正確的既有用法
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-DATALINEAGE-1`（無機器 id 列）、`OQ-DATALINEAGE-2`（只做反向追溯，正向影響分析未建）、`OQ-DATALINEAGERECORD-1`（upstream_refs 參照完整性+id 唯一性皆僅執行期防護，非 schema 層強制）。皆非阻塞。
+
 ## 2026-09-05（`git-commit-scope-guard.js` v5：heredoc commit 後面接一個無關指令會讓 pathspec 偵測抓錯行，真的擋下一個範圍完全正確的 commit——收工 System Foundry 審查修復時親身撞上，非 critic 找到）
 
 **觸發**：commit System Foundry 審查修復批次時，`git commit -m "$(cat <<'EOF' ... EOF)" -- <9 個檔案>` 之後照慣例接了一行 `git log --oneline -1` 確認 SHA，結果每次都被 `git-commit-scope-guard.js` 判定成「未經本 session `git add` 的檔案」擋下——即使那 9 個檔案全部都是我自己 `git add` 過的。

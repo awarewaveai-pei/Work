@@ -1,0 +1,198 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/data-lineage-record.schema.yaml"
+title: Data Lineage Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DataLineageRecord` -- the
+  declared `outputs` of `database_data.data_lineage`'s Method Contract
+  (methods/contracts/database_data.data_lineage.contract.yaml, `outputs:
+  [DataLineageRecord]`). A GRAPH shape -- nodes with typed stages,
+  connected by upstream_refs -- the same structural class
+  `causal-dag-analysis.schema.yaml` already established for a different
+  graph method (nodes with causal roles, connected by directed edges),
+  not a checklist, chain-of-narrative, or ranking.
+
+  Field provenance -- §11.48's own flow diagram (L2313-2322):
+    * The 8-node chain (Source→Ingest→Transform→Dataset→AnalysisRun→
+      Result→Claim→Paper/Decision) is transcribed verbatim as
+      `nodes[].stage`'s closed enum.
+    * §11.48's own second benefit bullet (L2327: "一個數字可以回到原始
+      來源") maps onto `traces_to_source` -- a COMPUTED, not caller-
+      asserted, boolean per node (same `engine`/
+      `computation_provenance_ref` pattern every CALCULATED_RESULT
+      typed object in this directory already uses). CORRECTED
+      post-critic-review: this is the flow diagram's own benefit
+      BULLET, not the F21 tool table's separate benefit COLUMN (whose
+      text for this row is "數字可追溯", a related but distinct
+      string) -- the two were conflated in this file's first draft.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.48 資料血緣／資料血統追蹤（Data Lineage）flow diagram (L2313-2322), benefit bullets (L2326-2328)"
+  - "methods/contracts/database_data.data_lineage.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml -- the engine/computation_provenance_ref/provenance shape this file's own computed field mirrors (same CALCULATED_RESULT class of typed object)"
+  - "specs/cognitive/typed-objects/error-budget-record.schema.yaml -- both engine AND computation_provenance_ref required there; this file's own required[] was missing both in its first draft (a critic-caught divergence from its own cited sibling pattern), fixed here"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+type: object
+required: [id, version, dataset_ref, nodes, engine, computation_provenance_ref, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DLR-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as red-team-challenge.schema.yaml's RTC- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "database_data.data_lineage"
+
+  dataset_ref:
+    type: string
+    minLength: 1
+    description: "Free-text reference to the dataset/number/claim this lineage record traces. Same scope-limited free-text pattern every prior Tier 1 contract's own scope-limited input already uses."
+
+  nodes:
+    type: array
+    minItems: 1
+    description: "§11.48's own 8-stage chain -- at least one node required (method contract precondition), and at least one must be stage:SOURCE (checked at the runtime layer, not expressible as a schema-only constraint over an array). Every node's own id is REQUIRED to be unique within this array -- also checked at the runtime layer, not schema-enforced (JSON Schema 2020-12 cannot express 'this array's own items each have a unique nested field value' without a verbose per-value contains construct, the same class of limit OQ-DATALINEAGERECORD-1 already discloses for upstream_refs referential integrity). A critic review found this uniqueness had NO guard anywhere in the first draft -- a duplicate id let a real orphan silently collapse onto a valid decoy's own traces_to_source:true."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, stage, description, upstream_refs, traces_to_source, provenance]
+      properties:
+        id:
+          type: string
+          description: "Local id, intended to be unique within this record (e.g. DLR-001-N1)."
+        stage:
+          type: string
+          enum: [SOURCE, INGEST, TRANSFORM, DATASET, ANALYSIS_RUN, RESULT, CLAIM, PAPER_OR_DECISION]
+          description: "§11.48's own 8-node flow diagram (L2315-2321), transcribed verbatim. PAPER_OR_DECISION transcribes the diagram's own combined 'Paper / Decision' node label (L2321) as a single value, not split into two -- disclosed, not silently invented."
+        description:
+          type: string
+          minLength: 1
+          description: "What this node actually is, in natural language (e.g. the specific source system, the specific transform applied)."
+        upstream_refs:
+          type: array
+          default: []
+          items:
+            type: string
+          description: "ids (within THIS record's own nodes[]) of the node(s) this one derives from. REQUIRED to be empty for stage:SOURCE (method contract precondition -- a source has no upstream by definition); may be empty, one, or multiple for any other stage (a general graph, not a forced strict-linear chain -- see method contract compilation_decisions)."
+        traces_to_source:
+          type: boolean
+          description: "COMPUTED, never caller-supplied: does following upstream_refs backward from this node actually terminate at a real stage:SOURCE node (ai_lego.compute.lineage.traversal.traces_to_source)? False for an orphan, a dangling upstream_ref, or a cycle that never touches SOURCE. Method contract precondition: every non-SOURCE node's own computed value here must be true."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every CALCULATED_RESULT typed object in this directory already uses -- genuine compute, never an LLM 'mental trace'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed every node's traces_to_source value, resolvable via importlib -- same convention modules/research/gates.py's evaluate_statistical_gate already checks."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A real 4-stage chain: a source dataset ingested, transformed, and landed, every node genuinely tracing back"
+    value:
+      id: "DLR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_lineage"
+      dataset_ref: "monthly_revenue_summary v2026-09"
+      nodes:
+        - id: "DLR-2026-09-05-001-N1"
+          stage: SOURCE
+          description: "客戶資料庫 orders 表格 2026-09 快照"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "DLR-2026-09-05-001-N2"
+          stage: INGEST
+          description: "nightly ETL job 拉取 orders 表格進資料倉儲"
+          upstream_refs: ["DLR-2026-09-05-001-N1"]
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "DLR-2026-09-05-001-N3"
+          stage: TRANSFORM
+          description: "按月彙總營收，套用退款調整規則"
+          upstream_refs: ["DLR-2026-09-05-001-N2"]
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "DLR-2026-09-05-001-N4"
+          stage: DATASET
+          description: "monthly_revenue_summary 最終資料集"
+          upstream_refs: ["DLR-2026-09-05-001-N3"]
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.lineage.traversal.traces_to_source"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "A merge: a Dataset with two real upstream Transforms, both tracing to their own Source"
+    value:
+      id: "DLR-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_lineage"
+      dataset_ref: "combined_customer_view"
+      nodes:
+        - id: "DLR-2026-09-05-002-N1"
+          stage: SOURCE
+          description: "CRM 系統客戶資料"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "DLR-2026-09-05-002-N2"
+          stage: SOURCE
+          description: "訂單系統客戶資料"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "DLR-2026-09-05-002-N3"
+          stage: TRANSFORM
+          description: "join CRM 與訂單系統資料"
+          upstream_refs: ["DLR-2026-09-05-002-N1", "DLR-2026-09-05-002-N2"]
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.lineage.traversal.traces_to_source"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-DATALINEAGERECORD-1"
+    question: >
+      `upstream_refs[]` is a soft reference (plain string, not schema-
+      validated to resolve to a real sibling node id) -- the schema
+      layer cannot express "this array's values must appear as some
+      other item's own id" without a verbose per-value construct, the
+      same class of limit `red-team-challenge.schema.yaml`'s own
+      OQ-REDTEAMCHALLENGE-1 already discloses for a structurally
+      similar cross-field constraint. Referential integrity (does every
+      upstream_ref actually resolve) is instead part of what
+      `traces_to_source` itself computes -- a dangling reference simply
+      makes that computed value false, rather than being caught as a
+      separate schema-layer error. Should a future revision add the
+      verbose construct anyway for a clearer error message?
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity -- the runtime layer (ai_lego/modules/database_data/data_lineage.py) enforces the real invariant regardless"
+
+verification:
+  method: >
+    Read §11.48's own flow diagram (L2313-2322) directly, including the
+    exact 8 node labels in order. Validated against jsonschema
+    Draft202012Validator.
+  note: >
+    The 8-stage enum is a direct, complete transcription of the
+    diagram's own node labels. `traces_to_source` is genuinely computed
+    (ai_lego/compute/lineage/traversal.py), never caller-asserted --
+    disclosed, not silently trusted. No mother document was modified.

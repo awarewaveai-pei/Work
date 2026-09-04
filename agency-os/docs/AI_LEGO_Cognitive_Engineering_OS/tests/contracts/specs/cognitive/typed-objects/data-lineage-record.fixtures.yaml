@@ -1,0 +1,82 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/data-lineage-record.schema.yaml"
+target_ref: ""
+description: "Exercises DataLineageRecord's required fields and the nodes[].stage enum."
+
+valid:
+  - name: four_stage_chain_all_traced
+    instance:
+      id: "DLR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_lineage"
+      dataset_ref: "monthly_revenue_summary"
+      nodes:
+        - id: "DLR-2026-09-05-001-N1"
+          stage: SOURCE
+          description: "orders table snapshot"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+        - id: "DLR-2026-09-05-001-N2"
+          stage: DATASET
+          description: "final aggregated dataset"
+          upstream_refs: ["DLR-2026-09-05-001-N1"]
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.lineage.traversal.traces_to_source"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+  - name: merge_two_sources_into_one_transform
+    instance:
+      id: "DLR-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_lineage"
+      dataset_ref: "combined_customer_view"
+      nodes:
+        - id: "DLR-2026-09-05-002-N1"
+          stage: SOURCE
+          description: "CRM data"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+        - id: "DLR-2026-09-05-002-N2"
+          stage: SOURCE
+          description: "orders system data"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+        - id: "DLR-2026-09-05-002-N3"
+          stage: TRANSFORM
+          description: "join of both sources"
+          upstream_refs: ["DLR-2026-09-05-002-N1", "DLR-2026-09-05-002-N2"]
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.lineage.traversal.traces_to_source"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_nodes
+    instance:
+      id: "DLR-2026-09-05-003"
+      version: "1.0.0"
+      dataset_ref: "x"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.lineage.traversal.traces_to_source"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "nodes is required with minItems 1 -- a lineage record with no nodes traces nothing."
+  - name: invalid_stage_enum_value
+    instance:
+      id: "DLR-2026-09-05-004"
+      version: "1.0.0"
+      dataset_ref: "x"
+      nodes:
+        - id: "DLR-2026-09-05-004-N1"
+          stage: "MODEL"
+          description: "x"
+          upstream_refs: []
+          traces_to_source: true
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.lineage.traversal.traces_to_source"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "stage is enum [SOURCE, INGEST, TRANSFORM, DATASET, ANALYSIS_RUN, RESULT, CLAIM, PAPER_OR_DECISION] -- 'MODEL' (the table-row's own divergent vocabulary) is not a member of the diagram's own enum."
