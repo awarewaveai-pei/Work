@@ -1,0 +1,280 @@
+$id: "ai-lego://capabilities/contracts/artifact.generate_research_paper.capability.yaml"
+title: "artifact.generate_research_paper -- Research Findings to Research Memo/Paper Artifact Capability Contract"
+status: ACTIVE
+
+description: >
+  Concrete instance of the `artifact.generate_research_paper` Capability --
+  the final node of MP §9's Workflow IR teaching example (L793-794, `ref:
+  artifact.generate_research_paper`, the one node MP writes with NO `input`
+  at all) and the final step of `recipes/validated/research-qualitative-v1.recipe.yaml`
+  ("Research Memo Artifact Generation", `input: [triangulated_findings,
+  interrater_reliability_result]`, `necessity: REQUIRED_BY_RISK`, `gate_ref:
+  research_integrity`). It is one of only two DOTTED capability ids in the
+  corpus (`capability-contract.schema.yaml` compilation_decisions: `cognitive.`
+  and `artifact.` are the two evidenced namespaces).
+
+  Pipeline position: MP §39 Research Mode ends "... → Citation Check →
+  Methodology Check → Research Integrity → Paper" (L1929-1963); MP §42
+  Research Integrity Engine lists what the produced package contains
+  (L2028-2050: Paper.pdf/.docx, data/, analysis/, code/, citations/,
+  provenance/, methodology/, reproduction.yaml); MP §56 names the five
+  research-paper Quality Gates such an artifact must pass (L2471-2477:
+  Research Integrity / Citation / Statistical / Methodology / Authorship);
+  MVP §3 step 20 (L86) scopes the Phase 5 output to a research MEMO ("Theme
+  Summary + Evidence Quotes + Triangulation 結果 + Kappa 統計").
+
+  This is the third of the three contracts `docs/adr/ADR-023-capability-
+  resolution-fail-closed.md` §Consequences 1 names, and the one that
+  mattered for executability: its Recipe `necessity` is `REQUIRED_BY_RISK`,
+  so while it had no contract the compiled plan was honestly
+  `executable: false`. With this file ACTIVE, the runtime's memo-writing step
+  must go through `CapabilityCatalog.invoke("artifact.generate_research_paper", ...)`
+  (the bypass declaration expires by design) and the plan-level
+  `CAPABILITY_RESOLUTION_BLOCKED` transition can be wired.
+
+  **What this file does NOT claim**: the Phase 5 runtime produces a MINIMAL
+  synthetic memo (claim sentence + evidence locator + Kappa + gate summary),
+  not the MP §42 reproducibility package. This contract's `output.type` is
+  the memo-level `ResearchMemoArtifact` the Recipe already names; the full
+  paper package is OQ-ARTIFACT-1.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L793-794) -- `ref: artifact.generate_research_paper`, the final IR node, written with no `input` (line numbers as of 2026-09-04)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §39 Research Mode (L1929-1963) -- Citation Check → Methodology Check → Research Integrity → Paper; pipeline position"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §42 Research Integrity Engine (L2028-2050) -- the full paper package contents (out of Phase 5 scope, see OQ-ARTIFACT-1)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §56 Quality Gate (L2471-2477) -- the five research-paper gates, by name"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §13.1 Sentence-level Provenance (L1005+) -- every sentence of the artifact traceable Sentence → Claim → Evidence → Source; grounds `quality.provenance_required` and `sentence_provenance_required`"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §37 Reproducible Research (L1841-1880) -- '論文中的數字可追' (every number in the paper traceable to Result → AnalysisRun → Code → Dataset → Source); grounds the InterRaterReliabilityResult input's CALCULATED_RESULT precondition"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 steps 19-22 (L85-88) -- Evidence Matrix; memo content; Human Review as Diff-not-overwrite; the five gates run per step 22"
+  - "recipes/validated/research-qualitative-v1.recipe.yaml -- step 'Research Memo Artifact Generation' (input, necessity REQUIRED_BY_RISK, gate_ref research_integrity) and `outputs[]` naming `ResearchMemoArtifact` (NEW_DESIGN, OQ-RQV1-3)"
+  - "methods/contracts/research.qualitative_coding.contract.yaml#/method_specific_gates -- the SSOT of the five gates' PASS/FAIL logic; this file cites, does not duplicate"
+  - "capabilities/contracts/run_statistics.capability.yaml#/output (InterRaterReliabilityResult) -- one of this file's two inputs"
+  - "methods/contracts/evidence.triangulation.contract.yaml#/outputs (TriangulatedFindingSet) -- the other input"
+  - "specs/domain/capability-contract.schema.yaml -- the schema this file's body is validated against (golden test 2c)"
+  - "docs/adr/ADR-023-capability-resolution-fail-closed.md §Consequences 1 -- the follow-up this file closes for the `artifact.generate_research_paper` ref"
+
+decided_by: >
+  No ADR governs this file's content: the id, pipeline position and gate
+  names are all mother-document text; the Recipe (authorized by MVP §4 L105
+  and ADR-014) already fixes the input list and necessity. ADR-023 named
+  this file as spec-root follow-up 1 without authoring it. The scope choice
+  (memo-level output now, full paper package later) is a compilation
+  decision below, mirroring MVP §3 step 20's own scoping.
+
+compilation_decisions:
+
+  - question: >
+      MP §9's node has no `input`; the Recipe's step declares
+      `[triangulated_findings, interrater_reliability_result]`. Which
+      typed-object names go in `input.type`?
+    decision: "`input: {type: [TriangulatedFindingSet, InterRaterReliabilityResult]}` -- the two Recipe inputs, resolved to the typed-object names their PRODUCING contracts already declare."
+    reasoning: >
+      `TriangulatedFindingSet` is `evidence.triangulation.contract.yaml#/outputs`;
+      `InterRaterReliabilityResult` is `run_statistics.capability.yaml#/output`.
+      Reusing the producers' own names (rather than inventing new ones) is
+      how the Recipe's data flow becomes type-checkable end to end (MP §8.4
+      "每個能力與 Method 都必須具有 Input / Output type"). MP §9's inputless
+      node is preserved as a legal IR shape by `workflow-ir.schema.yaml`
+      (its capability_node `input` is optional for exactly this node) --
+      that is an IR concern, not a reason for this CONTRACT to leave the
+      input untyped. ThemeSet / Evidence quotes (MVP step 20's other memo
+      content) are reached transitively through TriangulatedFindingSet's
+      provenance, not declared as separate inputs the Recipe does not list.
+
+  - question: >
+      MP §42 describes a full reproducibility package (Paper.pdf/.docx +
+      data/analysis/code/citations/provenance/methodology/reproduction.yaml);
+      MVP §3 step 20 describes a research MEMO. Which is `output.type`?
+    decision: "`output: {type: [ResearchMemoArtifact]}` -- the Recipe's own (NEW_DESIGN, OQ-RQV1-3) output name; the full package is OQ-ARTIFACT-1."
+    reasoning: >
+      This contract is versioned `1.0.0` for the Phase 5 Research Mode
+      slice, whose scope MVP §3 step 20 fixes at a memo. Promising the MP
+      §42 package in the contract while the only implementation writes a
+      memo would be a contract stronger than the code -- the class of
+      overclaim ADR-023's second review pass names ("guarantee sentences
+      stronger than the code"). A later `2.0.0` can widen `output.type`
+      when a paper-package implementation exists.
+
+  - question: >
+      Should `quality.method_specific_gate_required` be true, given
+      capability-contract.schema.yaml describes that field as specific to
+      `cognitive.execute_method`'s dispatch-to-a-Method semantics?
+    decision: "true -- because the Recipe step itself carries `gate_ref: research_integrity`, a Method-specific gate."
+    reasoning: >
+      The schema's own description leaves the field "a general optional
+      boolean rather than scoped narrowly to one capability id". Here the
+      Recipe binds this step to `research.qualitative_coding.contract.yaml#/
+      method_specific_gates.research_integrity` (the composite of the other
+      four MP §56 gates), so the artifact is not publishable unless that
+      Method-specific gate PASSes. Setting the flag makes the Recipe's
+      binding visible on the contract; the gate LOGIC stays on the method
+      contract (single source of truth, same restraint as run_statistics.capability.yaml).
+
+  - question: >
+      Should `preconditions` require the Kappa result to be a genuine
+      Trusted-Compute CALCULATED_RESULT?
+    decision: "Yes: `interrater_reliability_result.provenance.epistemic_type == CALCULATED_RESULT`."
+    reasoning: >
+      MP §37 (L1872-1880): every number in a paper must be traceable to a
+      real AnalysisRun; EC §39 forbids "LLM mentally calculates →
+      CALCULATED_RESULT". An artifact that quotes a Kappa value which did
+      not come through `run_statistics`' Trusted Compute path would launder
+      an unverified number into a research artifact -- exactly the failure
+      MP §42's Statistical Validation and MP §56's Statistical Gate exist to
+      stop. Stating it as a precondition puts the check BEFORE generation.
+
+  - question: >
+      Human Review (MVP §3 step 21; EC §57) rejects an AI theme grouping and
+      the system records a Diff, never an overwrite. Is that this
+      capability's concern?
+    decision: "Only as a rollback property: publication is supersession (a new CAS object), never mutation of a prior artifact or of any human-locked fact."
+    reasoning: >
+      The Diff-not-overwrite rule is enforced upstream (`research.qualitative_coding`'s
+      LOCKED_FACT handling, MP §11.3). This capability inherits it as
+      `rollback.side_effect_free_preferred: true` plus the `publication`
+      block: generating a new version never rewrites the old one, so
+      re-running after a human rejection is always safe.
+
+id: artifact.generate_research_paper
+version: "1.0.0"
+
+input:
+  type:
+    - TriangulatedFindingSet
+    - InterRaterReliabilityResult
+  # Producers: evidence.triangulation.contract.yaml#/outputs and
+  # run_statistics.capability.yaml#/output. Neither has a typed-objects
+  # schema file yet (OQ-TRIANGULATION-2, OQ-RSTAT-4) -- soft references.
+
+output:
+  type:
+    - ResearchMemoArtifact
+  # recipes/validated/research-qualitative-v1.recipe.yaml#/outputs (NEW_DESIGN,
+  # OQ-RQV1-3). Content per MVP §3 step 20 (L86): Theme Summary + Evidence
+  # Quotes + Triangulation result + Kappa statistic. Every sentence carries a
+  # specs/evidence/sentence-provenance.schema.yaml record (MP §13.1). The
+  # artifact is addressed by a Portable Artifact URI and stored in the
+  # tenant-scoped CAS like every other artifact (MP §59).
+
+preconditions:
+  - "interrater_reliability_result.provenance.epistemic_type == CALCULATED_RESULT"
+  - "method_specific_gates.statistical == PASS"
+  - "workflow.static_validation == PASS"
+  - "policy.validation == PASS"
+  # 1: MP §37 / EC §39 (compilation_decisions). 2: the Recipe's run_statistics
+  # step carries `gate_ref: statistical`; the artifact must not be generated
+  # from a statistically-failed run (MP §56 Statistical Gate precedes the
+  # Research Integrity composite). 3-4: MP §8.3's own generic executor checks
+  # that apply to a capability at the END of a compiled workflow.
+
+quality:
+  provenance_required: true
+  method_specific_gate_required: true
+  # provenance_required: the artifact and every sentence in it carry
+  # provenance (MP §13.1; MVP §3 step 19 Evidence Matrix). method_specific_
+  # gate_required: the Recipe binds this step to `gate_ref: research_integrity`
+  # -- see compilation_decisions; the gate logic lives on
+  # research.qualitative_coding.contract.yaml#/method_specific_gates.
+
+security:
+  external_ai: policy_controlled
+  # MP L725 convention. Drafting prose with an external model is allowed
+  # only via the AI Gateway (MP §7) under provider policy; the numbers and
+  # quotes in the artifact are NOT generated -- they are carried from typed,
+  # provenance-bearing inputs (see preconditions).
+
+rollback:
+  side_effect_free_preferred: true
+  # Generation writes a NEW artifact object; it never mutates a prior
+  # version, a source, or a human-locked fact (see publication below).
+
+# ---------------------------------------------------------------------------
+# ADDITIVE fields (legal: capability-contract.schema.yaml has no
+# additionalProperties:false; precedent: run_statistics.capability.yaml).
+# ---------------------------------------------------------------------------
+
+research_paper_gates:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §56 (L2471-2477)"
+  gates: [research_integrity, citation, statistical, methodology, authorship]
+  logic_owner: "methods/contracts/research.qualitative_coding.contract.yaml#/method_specific_gates"
+  binding: "recipes/validated/research-qualitative-v1.recipe.yaml step 'Research Memo Artifact Generation' -> gate_ref: research_integrity (the composite of the other four)"
+  note: >
+    Names transcribed from MP §56; PASS/FAIL conditions deliberately NOT
+    duplicated here (single source of truth on the method contract). The
+    runtime evaluates all five for real and a FAIL aborts before this
+    capability's output is published (Projects/internal/cognitive-engineering-os,
+    `test_gate_failure_aborts_before_any_downstream_artifact_is_written`).
+
+sentence_provenance_required: true
+# MP §13.1 (L1005+): Sentence → Claim → Evidence → Source → Timestamp. MVP §5
+# criterion 5 is the acceptance test of exactly this property for the memo's
+# claim sentence (locator derived from the real transcript segments).
+
+publication:
+  addressing: "specs/artifact/portable-uri.schema.yaml (MP §59)"
+  supersession_not_mutation: true
+  human_review: "MVP §3 step 21 / EC §57 -- a reviewer's Reject is recorded as a Diff against this artifact; the artifact itself and any LOCKED_FACT it quotes are never overwritten"
+
+worked_example:
+  source: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 steps 19-22 (L85-88)"
+  scenario: >
+    Nordbrook's remote-worker-burnout study: with two coders' ThemeSets
+    triangulated against the literature (TriangulatedFindingSet) and Cohen's
+    Kappa computed by Trusted Compute (InterRaterReliabilityResult,
+    CALCULATED_RESULT), `artifact.generate_research_paper` produces the
+    research memo: theme summary, evidence quotes with audio-timestamp
+    locators, triangulation result, Kappa with its confidence interval. The
+    five MP §56 gates run (step 22); the researcher rejects one AI theme
+    grouping and the system records a Diff (step 21). The Phase 5 runtime's
+    memo is the minimal instance of this: one claim sentence traceable to a
+    real second of audio, the Kappa line, and the gate summary.
+
+open_questions:
+  - id: "OQ-ARTIFACT-1"
+    question: >
+      MP §42 specifies a full reproducibility package (Paper.pdf/.docx,
+      data/, analysis/, code/, citations/, provenance/, methodology/,
+      reproduction.yaml). This 1.0.0 contract types the Phase 5 memo only.
+      Should a 2.0.0 widen `output.type` to a `ResearchPaperPackage` once
+      an implementation produces one, and does that need its own
+      typed-objects schema?
+    owner: "operator / a post-Phase-5 Research Mode extension"
+    blocks: "nothing in this file's own validity -- the memo is the scoped Phase 5 output per MVP §3 step 20"
+  - id: "OQ-ARTIFACT-2"
+    question: >
+      `ResearchMemoArtifact`, `TriangulatedFindingSet` and
+      `InterRaterReliabilityResult` are all soft-referenced typed-object
+      names without schema files (OQ-RQV1-3, OQ-TRIANGULATION-2,
+      OQ-RSTAT-4). Until they exist, MP §8.4's "不合法組合在執行前拒絕" is
+      enforced only at the contract-exists level (ADR-023), not at the
+      I/O-type level. Which typed-objects pass closes this for the research
+      chain as a whole?
+    owner: "operator, via a future typed-objects compilation pass"
+    blocks: "type-level rejection of illegal compositions; not this file's own validity"
+
+verification:
+  method: >
+    Read MP §9 (L749-800), §13.1 (L1005+), §37 (L1841-1880), §39
+    (L1929-1963), §42 (L2028-2050), §56 (L2451-2477) directly (line numbers
+    as of 2026-09-04). Read `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+    §3 steps 19-22 (L85-88) and §4 (L105). Read
+    `recipes/validated/research-qualitative-v1.recipe.yaml` in full (the
+    step, its `necessity`/`gate_ref`, and `outputs[]`). Read
+    `methods/contracts/{evidence.triangulation,research.qualitative_coding}.contract.yaml`
+    `outputs`/`method_specific_gates` and `capabilities/contracts/run_statistics.capability.yaml`
+    in full (input producers + style template). Read
+    `specs/workflow/workflow-ir.schema.yaml`'s capability_node `input`
+    description (why MP §9's inputless node is legal IR). Read the runtime's
+    `run_research_slice.py` memo-writing block to describe what the current
+    implementation actually produces. Validated against
+    `specs/domain/capability-contract.schema.yaml` via
+    `tests/run_golden_tests.py` check 2c -- 0 errors; `id` equals the
+    filename slug (dotted form, one dot, per the schema's `id` pattern).
+  note: >
+    No mother document or ADR was modified to produce this file. Grounded:
+    `id` and pipeline position (MP §9/§39), the five gate names (MP §56),
+    the provenance/traceability obligations (MP §13.1/§37), the memo scope
+    (MVP §3 step 20), the input list and necessity (Recipe). Designed
+    (flagged): the CALCULATED_RESULT precondition wording, the
+    `research_paper_gates`/`publication` additive blocks. Deliberately NOT
+    decided: the full paper package (OQ-ARTIFACT-1).

@@ -18,10 +18,9 @@ class WorkflowIrTests(unittest.TestCase):
         cls.contracts = SchemaContracts(cls.spec_root)
 
     def test_research_recipe_compiles_to_the_seven_step_ir_and_validates(self):
-        # The recipe's own prose says "8 steps"; its normative `steps:` block has 7
-        # (transcribe, coder 1, coder 2, literature_search, run_statistics,
-        # evidence.triangulation, artifact). The compiler follows the block, not
-        # the prose -- see OQ-P5-6 in docs/PHASE5_RESEARCH_SLICE.md.
+        # The recipe's normative `steps:` block has 7 nodes (transcribe, coder 1, coder 2, literature_search,
+        # run_statistics, evidence.triangulation, artifact); its prose was corrected to say so on 2026-09-04
+        # (OQ-P5-6). The compiler follows the block, never prose.
         ir = compile_recipe_to_workflow_ir(self.spec_root, "research-qualitative-v1", "R4")
         self.contracts.validate(WORKFLOW_IR, ir, "compiled IR")
         self.assertEqual(len(ir["nodes"]), 7)
@@ -59,9 +58,43 @@ class MethodResolverTests(unittest.TestCase):
         self.assertEqual(blocked["blocked"]["status"], METHOD_RESOLUTION_BLOCKED)
         self.assertIn("research.imaginary_method", blocked["blocked"]["reason"])
 
+    # --- ADR-023 Consequences 5: the per-invocation gate, mirror-image of the capability side -------------------------
+    def test_empty_catalog_blocks_the_invocation_and_never_reaches_the_implementation(self):
+        empty = MethodCatalog.empty("snapshot:no-method-contracts")
+        with self.assertRaisesRegex(InvariantViolation, "METHOD_RESOLUTION_BLOCKED.*research.qualitative_coding"):
+            empty.require("research.qualitative_coding")
+        reached = []
+        with self.assertRaisesRegex(InvariantViolation, "METHOD_RESOLUTION_BLOCKED"):
+            empty.invoke("research.qualitative_coding", lambda: reached.append("ran"))
+        self.assertEqual(reached, [], "a blocked invocation must not execute the implementation at all")
+        self.assertEqual(empty.invocations, [], "a blocked invocation must not be logged as an invocation")
+
+    def test_the_abstract_base_catalog_refuses_to_scan_instead_of_globbing_nothing(self):
+        from ai_lego.platform.ai_execution.contract_catalog import ContractCatalog
+
+        with self.assertRaisesRegex(InvariantViolation, "CONTRACT_CATALOG_ABSTRACT: ContractCatalog"):
+            ContractCatalog.from_spec_root(self.spec_root)
+        with self.assertRaisesRegex(InvariantViolation, ": no ACTIVE contract in catalog"):
+            ContractCatalog.empty("abstract").require("anything")
+
+    def test_live_catalog_invoke_calls_through_with_the_contract_descriptor_and_logs_only_what_ran(self):
+        live = MethodCatalog.from_spec_root(self.spec_root)
+        descriptor, value = live.invoke("research.qualitative_coding", lambda a, b: a * b, 6, 7)
+        self.assertEqual(value, 42)
+        self.assertEqual(descriptor["ref"], "research.qualitative_coding")
+        self.assertEqual(descriptor["path"], "methods/contracts/research.qualitative_coding.contract.yaml")
+        self.assertRegex(descriptor["content_sha256"], r"^[0-9a-f]{64}$")
+        with self.assertRaises(InvariantViolation):
+            live.invoke("research.imaginary_method", lambda: "never")
+        self.assertEqual([entry["ref"] for entry in live.invocations], ["research.qualitative_coding"])
+        self.assertRegex(live.label, r"^live:methods/contracts@[0-9a-f]{12}$")
+        self.assertNotIn(str(self.spec_root), live.label)
+
     def test_state_transitions_validate_and_skips_are_rejected_by_the_schema(self):
         self.contracts.validate(TRANSITION, state_transition(None, "RECEIVED", "2026-08-31T00:00:00Z", "EX-T"), "entry")
         self.contracts.validate(TRANSITION, state_transition("RISK_CLASSIFIED", "BLOCKED", "2026-08-31T00:00:20Z", "EX-T", METHOD_RESOLUTION_BLOCKED), "block")
+        # The capability-side block fires one primary state later (ADR-023 Decision 3); the schema accepts it as a side-state transition.
+        self.contracts.validate(TRANSITION, state_transition("METHODS_RESOLVED", "BLOCKED", "2026-08-31T00:00:21Z", "EX-T", "CAPABILITY_RESOLUTION_BLOCKED"), "capability block")
         with self.assertRaises(SchemaValidationError):
             self.contracts.validate(TRANSITION, state_transition("RECEIVED", "RISK_CLASSIFIED", "2026-08-31T00:00:01Z", "EX-T"), "skip")
         with self.assertRaises(SchemaValidationError):

@@ -1,0 +1,34 @@
+schema_id: "ai-lego://specs/execution/capability-resolution.schema.yaml"
+target_ref: "#/capability_resolution_request"
+description: >
+  Exercises the request shape: refs[] is required, non-empty, unique, and
+  every ref must satisfy capability-contract.schema.yaml#/properties/id's
+  bare-or-one-dot grammar (the same hard $ref workflow-ir.schema.yaml uses
+  for capability_node.ref).
+
+valid:
+  - name: research_recipe_four_refs
+    instance:
+      workflow_id: "research-qualitative-v1"
+      refs: [transcribe, literature_search, run_statistics, artifact.generate_research_paper]
+  - name: single_bare_ref_no_workflow_id
+    instance:
+      refs: [run_statistics]
+
+invalid:
+  - name: empty_refs
+    instance:
+      refs: []
+    reason: "refs has minItems: 1 -- a request that asks about nothing is not a resolution request (silence is not resolution)."
+  - name: duplicate_ref
+    instance:
+      refs: [transcribe, transcribe]
+    reason: "refs has uniqueItems: true; the runtime's capability_refs() de-duplicates in node order before building the request."
+  - name: ref_with_two_dots
+    instance:
+      refs: ["artifact.generate.research_paper"]
+    reason: "ref is a hard $ref into capability-contract.schema.yaml#/properties/id, pattern ^[a-z_]+(\\.[a-z_]+)?$ -- at most ONE dot-separated segment."
+  - name: missing_refs
+    instance:
+      workflow_id: "research-qualitative-v1"
+    reason: "refs is in the required list."

@@ -1,0 +1,358 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/execution/capability-resolution.schema.yaml"
+title: Capability Resolution — Workflow IR Capability Refs to Capability Catalog
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of the CAPABILITY side of the seam
+  `execution/method-resolution.schema.yaml` defines for METHODS: the stage
+  Master Plan §7 (L561-575) places in front of every capability call
+  (`Capability Request → Capability Resolver → Policy Engine → AI Gateway`)
+  and that MP §8.4 (L705-726) makes fail-closed ("不合法組合在執行前拒絕").
+  Three named shapes: `capability_resolution_request` (the capability refs
+  a compiled Workflow IR needs), `capability_resolution_result` (all-or-
+  nothing outcome, mirroring `method-resolution.schema.yaml#/method_resolution_result`
+  field-for-field, plus a machine-readable `unresolved`/`resolvable` split),
+  and `plan_executability` (the per-node verdict by the Recipe's own
+  `necessity` label, Atlas §14.3).
+
+  Closes `docs/adr/ADR-023-capability-resolution-fail-closed.md`
+  §Consequences 3 ("Either add `specs/execution/capability-resolution.schema.yaml`
+  or generalize `method-resolution.schema.yaml#/method_resolution_result` so
+  the runtime record can be schema-validated before it is persisted, as
+  every other record is"). The runtime shape it formalizes already exists
+  and is exercised by 122+ tests (`Projects/internal/cognitive-engineering-os/
+  ai_lego/platform/ai_execution/capability_resolver.py`); this file is a
+  transcription of that record into the spec root so the runtime validates
+  against it instead of carrying a `NEW_DESIGN` shape nobody else can check.
+
+  Companion to `status-codes.schema.yaml`'s `CAPABILITY_RESOLUTION_BLOCKED`
+  entry (registered 2026-09-04, same commit, ADR-023 §Consequences 2).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §7 AI Gateway (L561-575) -- Capability Request → Capability Resolver → Policy Engine → AI Gateway; resolution is a per-request stage (line numbers as of 2026-09-04)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.4 Typed LEGO (L705-726) -- '不合法組合在執行前拒絕'; a capability with no contract has no declared I/O type and is rejected before execution"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.3 (L3627-3634, via specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/necessity) -- REQUIRED_* blocks are policy-mandated and cannot be removed; RECOMMENDED/OPTIONAL may be omitted; the basis of plan_executability"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §10 (Execution State Machine) -- PLAN_COMPILED is the state a non-executable plan must not reach (ADR-023 §Decision 3)"
+  - "docs/adr/ADR-023-capability-resolution-fail-closed.md -- §Decision 1 (fail-closed, same 'registered' definition as methods), §Decision 2 (plan-time verdict), §Decision 5 (the runtime shape this file transcribes), §Consequences 3 (this file)"
+  - "specs/execution/method-resolution.schema.yaml#/method_resolution_result -- the METHOD-side sibling this file mirrors field-for-field (candidate_*/blocked) and deliberately does not generalize (see compilation_decisions)"
+  - "specs/execution/status-codes.schema.yaml -- CAPABILITY_RESOLUTION_BLOCKED registry entry (soft reference from `blocked.status`)"
+  - "specs/domain/capability-contract.schema.yaml#/properties/id -- the capability ref grammar every ref in this file hard-$refs"
+  - "specs/workflow/workflow-ir.schema.yaml -- capability_node.ref (same hard $ref) and capability_node.necessity (passthrough from the Recipe); the IR whose capability refs a request carries"
+  - "Projects/internal/cognitive-engineering-os/ai_lego/platform/ai_execution/capability_resolver.py -- `CapabilityCatalog.resolve()` and `plan_executability()`, the producer whose output this schema was transcribed from (read in full 2026-09-04)"
+
+decided_by: >
+  ADR-023 (ACCEPTED 2026-09-03) decided the fail-closed rule and the
+  plan-time verdict, and left the CHOICE between a new file and generalizing
+  `method-resolution.schema.yaml` to the spec-root maintainer (§Consequences
+  3). That choice is made here and recorded in `compilation_decisions`; it is
+  a Low-risk structural pick, not a new ADR-level ruling.
+
+compilation_decisions:
+
+  - question: >
+      ADR-023 §Consequences 3 offers two routes: a new file, or generalize
+      `method-resolution.schema.yaml#/method_resolution_result`. Which?
+    decision: "New file. `method-resolution.schema.yaml` is not modified."
+    reasoning: >
+      `method_resolution_result.blocked.status` is `const:
+      METHOD_RESOLUTION_BLOCKED` and its candidates are `candidate_methods[]`
+      with `method_id` hard-$ref'd to the METHOD id grammar (mandatory dot,
+      ADR-005b); a capability ref follows a DIFFERENT grammar (optional dot,
+      `capability-contract.schema.yaml`'s own decision) and a different
+      blocking signal. Generalizing would mean either loosening the method
+      side's const/id constraints (weakening an ACTIVE file's guarantees for
+      a sibling's convenience) or introducing a discriminator into a
+      900-line file whose 3 fixture files and one runtime consumer all
+      target the current shape. A sibling file with the SAME field names
+      (`candidate_*`, `blocked{status, reason}`) keeps the two
+      unifiable later (OQ-CAPRES-1) at zero cost today -- the smallest
+      blast radius, per R0.
+
+  - question: >
+      The runtime's `blocked` carries `unresolved[]` and `resolvable[]` on
+      top of method_resolution_result's `{status, reason}`. Transcribe
+      those, or keep parity with the method side?
+    decision: "Transcribe them, and make them REQUIRED inside `blocked`."
+    reasoning: >
+      ADR-023's first review pass found that a consumer could not tell WHICH
+      refs were the problem without re-parsing `reason` prose; the split is
+      the machine-readable fix and `plan_executability` is computed from it.
+      A `blocked` object with no `unresolved` list would be a block that
+      names nothing -- the "detector fires but says nothing" pattern. Hence
+      `unresolved` has `minItems: 1` and both lists are required.
+
+  - question: >
+      `method_resolution_result` leaves `blocked` OPTIONAL (default null).
+      Should `capability_resolution_result` require it to be present?
+    decision: "Yes: `blocked` is required and nullable -- an explicit `null` means resolved, absence is invalid."
+    reasoning: >
+      ADR-023's `plan_executability()` refuses a resolution that is silent
+      about a node (`CAPABILITY_PLAN_COVERAGE_MISMATCH`: "silence about a
+      node is not resolution of it"). The same principle applied to the
+      record itself: a producer must SAY whether it blocked. This is
+      stricter than the method side; the difference is disclosed, not
+      hidden, and is one of the things OQ-CAPRES-1's unification would have
+      to reconcile.
+
+  - question: >
+      Should `plan_executability`'s cross-field rules (a non-empty
+      `blocking` list forces `executable: false`; `fully_resolved: true`
+      forces both lists empty) be schema-enforced or prose?
+    decision: "Schema-enforced via `allOf`/`if`/`then` -- they are same-object shape constraints."
+    reasoning: >
+      Unlike `method-resolution.schema.yaml`'s §6.4 forcing rule (a
+      cross-object selection-algorithm behaviour it correctly left as
+      prose, OQ-mres-5), these rules relate fields of ONE record and JSON
+      Schema can express them. Leaving them as prose would let a producer
+      write `executable: true` next to a non-empty `blocking` list -- the
+      exact contradiction the runtime's verdict exists to prevent. Each
+      rule has an adversarial fixture case.
+
+  - question: >
+      Should `blocking[]`/`not_invocable[]` entries' `necessity` be
+      constrained to the REQUIRED_* / non-REQUIRED_* halves of the Recipe
+      enum respectively?
+    decision: "Yes -- `blocking[].necessity` must start with `REQUIRED_`; `not_invocable[].necessity` must be RECOMMENDED or OPTIONAL."
+    reasoning: >
+      That partition IS the definition of the two lists (Atlas §14.3 via
+      the runtime's `BLOCKING_NECESSITY_PREFIX`). `FORBIDDEN` (a legal
+      Recipe necessity) appears in neither: a FORBIDDEN step must not be in
+      a compiled plan at all, so it can never be an unresolved node of one
+      -- recorded in `constraints`, not silently allowed.
+
+# ---------------------------------------------------------------------------
+# Shared definitions
+# ---------------------------------------------------------------------------
+definitions:
+  capability_ref:
+    $ref: "ai-lego://specs/domain/capability-contract.schema.yaml#/properties/id"
+    description: >
+      A capability id in the bare-or-one-dot grammar capability-contract.schema.yaml
+      defines (`transcribe`, `run_statistics`, `artifact.generate_research_paper`).
+      Same hard $ref workflow-ir.schema.yaml uses for capability_node.ref.
+  node_verdict:
+    type: object
+    required: [ref, necessity]
+    properties:
+      ref:
+        $ref: "#/definitions/capability_ref"
+      label:
+        type: [string, "null"]
+        description: "The compiling Recipe step's label, if the IR node carried one (workflow-ir capability_node.label passthrough)."
+      necessity:
+        $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/necessity"
+        description: "The IR node's necessity (Recipe passthrough; RECOMMENDED when the node carried none, per recipe.schema.yaml's default)."
+
+# ---------------------------------------------------------------------------
+# Request: what the resolver is asked about
+# ---------------------------------------------------------------------------
+capability_resolution_request:
+  type: object
+  required: [refs]
+  description: >
+    The capability refs of one compiled Workflow IR, in node order,
+    de-duplicated (the runtime's `capability_refs(workflow_ir)`), plus the
+    IR id for traceability.
+  properties:
+    workflow_id:
+      type: string
+      description: "OPTIONAL. The Workflow IR's `id` these refs were taken from."
+    refs:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        $ref: "#/definitions/capability_ref"
+
+# ---------------------------------------------------------------------------
+# Result: all-or-nothing, like method_resolution_result
+# ---------------------------------------------------------------------------
+capability_resolution_result:
+  type: object
+  required: [candidate_capabilities, blocked]
+  description: >
+    Mirror of method-resolution.schema.yaml#/method_resolution_result for
+    capability refs: EITHER every ref resolved (candidate_capabilities lists
+    them all, blocked is null) OR at least one did not (candidate_capabilities
+    is empty, blocked names the unresolved refs). `blocked` is REQUIRED and
+    nullable -- see compilation_decisions.
+  properties:
+    candidate_capabilities:
+      type: array
+      items:
+        type: object
+        required: [ref]
+        properties:
+          ref:
+            $ref: "#/definitions/capability_ref"
+          rationale:
+            type: string
+            description: "Free text; the runtime writes the ACTIVE contract's path and version (e.g. 'ACTIVE contract capabilities/contracts/run_statistics.capability.yaml v1.0.0')."
+    blocked:
+      type: [object, "null"]
+      description: >
+        Null when every ref resolved. Otherwise the block record. `status`
+        is a soft reference (const, not a hard $ref -- status-codes.schema.yaml
+        entries are not individually anchored, same reasoning as
+        method_resolution_result.blocked) to execution/status-codes.schema.yaml's
+        CAPABILITY_RESOLUTION_BLOCKED entry.
+      required: [status, reason, unresolved, resolvable]
+      properties:
+        status: { type: string, const: "CAPABILITY_RESOLUTION_BLOCKED" }
+        reason: { type: string }
+        unresolved:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/definitions/capability_ref" }
+          description: "Refs with no ACTIVE contract in the catalog (missing file, missing id, or status != ACTIVE)."
+        resolvable:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/definitions/capability_ref" }
+          description: "Refs of the same request that DID have an ACTIVE contract -- reported so a consumer can see the split without re-deriving it."
+  allOf:
+    # A block empties the candidate list; a resolution fills it.
+    - if:
+        properties: { blocked: { type: object } }
+        required: [blocked]
+      then:
+        properties: { candidate_capabilities: { maxItems: 0 } }
+    - if:
+        properties: { blocked: { type: "null" } }
+        required: [blocked]
+      then:
+        properties: { candidate_capabilities: { minItems: 1 } }
+
+# ---------------------------------------------------------------------------
+# Plan executability: the per-node verdict by Recipe necessity (Atlas §14.3)
+# ---------------------------------------------------------------------------
+plan_executability:
+  type: object
+  required: [fully_resolved, executable, blocking, not_invocable]
+  description: >
+    Computed from a capability_resolution_result AND the Workflow IR it was
+    produced for (the runtime refuses a result that does not cover every
+    capability node of the IR -- CAPABILITY_PLAN_COVERAGE_MISMATCH -- a
+    cross-object rule this schema cannot express and records in
+    `constraints`). `executable` is false iff a REQUIRED_* capability node
+    is unresolved; `fully_resolved` is false iff any capability node is.
+    ADR-023 §Decision 3: a plan with `executable: false` MUST NOT reach
+    PLAN_COMPILED -- it transitions to BLOCKED with trigger_signal
+    CAPABILITY_RESOLUTION_BLOCKED.
+  properties:
+    fully_resolved:
+      type: boolean
+      description: "True iff every capability node of the IR resolved."
+    executable:
+      type: boolean
+      description: "True iff no REQUIRED_* capability node of the IR is unresolved (RECOMMENDED/OPTIONAL nodes may be omitted, Atlas §14.3)."
+    blocking:
+      type: array
+      uniqueItems: true
+      items:
+        allOf:
+          - $ref: "#/definitions/node_verdict"
+          - properties:
+              necessity: { type: string, pattern: "^REQUIRED_" }
+      description: "Unresolved nodes whose necessity is REQUIRED_BY_RISK / REQUIRED_BY_JURISDICTION / REQUIRED_BY_SECTOR -- each one alone makes the plan non-executable."
+    not_invocable:
+      type: array
+      uniqueItems: true
+      items:
+        allOf:
+          - $ref: "#/definitions/node_verdict"
+          - properties:
+              necessity: { type: string, enum: [RECOMMENDED, OPTIONAL] }
+      description: "Unresolved nodes whose necessity permits omission -- the plan may run, but these nodes can never be invoked (CapabilityCatalog.invoke raises)."
+  allOf:
+    # A non-empty blocking list forces executable: false.
+    - if:
+        properties: { blocking: { minItems: 1 } }
+        required: [blocking]
+      then:
+        properties: { executable: { const: false } }
+    # executable: true forces an empty blocking list (same rule, other direction, so neither field can lie alone).
+    - if:
+        properties: { executable: { const: true } }
+        required: [executable]
+      then:
+        properties: { blocking: { maxItems: 0 } }
+    # fully_resolved: true forces both lists empty.
+    - if:
+        properties: { fully_resolved: { const: true } }
+        required: [fully_resolved]
+      then:
+        properties:
+          blocking: { maxItems: 0 }
+          not_invocable: { maxItems: 0 }
+    # Any unresolved node forces fully_resolved: false.
+    - if:
+        anyOf:
+          - properties: { blocking: { minItems: 1 } }
+            required: [blocking]
+          - properties: { not_invocable: { minItems: 1 } }
+            required: [not_invocable]
+      then:
+        properties: { fully_resolved: { const: false } }
+
+constraints:
+  description: "Cross-object rules this file's JSON Schema blocks cannot express (same prose-constraints convention as result.schema.yaml / capability-contract.schema.yaml)."
+  rules:
+    - "capability_resolution_result MUST cover every capability node of the Workflow IR it was produced for: the union of candidate_capabilities[].ref, blocked.unresolved and blocked.resolvable equals the request's refs. The runtime enforces this as CAPABILITY_PLAN_COVERAGE_MISMATCH; a schema validating one record cannot see the IR."
+    - "A ref MUST NOT appear in both blocked.unresolved and blocked.resolvable (uniqueItems is per-list; the disjointness is cross-list)."
+    - "plan_executability.blocking ∪ not_invocable == the IR's capability nodes whose ref is in blocked.unresolved (one verdict per unresolved node, node order preserved). No node with necessity FORBIDDEN can appear in either list: a FORBIDDEN step must not be compiled into the plan at all."
+    - "Registration order (ADR-023 §Decision 1, contract_catalog.py): a ref resolves iff `capabilities/contracts/<ref>.capability.yaml` exists under the spec root, declares that `id`, and carries `status: ACTIVE`. A DRAFT contract is unresolved."
+    - "Per-invocation rule (ADR-023 §Decision 2): resolution at plan time does not replace resolution at invocation -- every capability implementation call goes through CapabilityCatalog.invoke, which re-resolves the ref and raises CAPABILITY_RESOLUTION_BLOCKED before the implementation runs."
+
+open_questions:
+  - id: "OQ-CAPRES-1"
+    question: >
+      This file and `method-resolution.schema.yaml#/method_resolution_result`
+      are deliberate mirrors with two disclosed differences (`blocked`
+      required-nullable here vs optional there; the `unresolved`/`resolvable`
+      split here only). Should a future revision unify them into one
+      `<kind>_resolution_result` with a discriminator, now that both shapes
+      have real producers and fixtures?
+    owner: "operator / a future spec-root revision pass, after the method side gains its own per-invocation gate (ADR-023 §Consequences 5)"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CAPRES-2"
+    question: >
+      EC §10 names METHODS_RESOLVED as a primary state but no
+      CAPABILITIES_RESOLVED; a capability block therefore fires between
+      METHODS_RESOLVED and PLAN_COMPILED with no primary state of its own.
+      Should a future EC revision (via the ADR-006 `.ai/proposals/` flow)
+      add one, or is the status-code + side-state mapping (ADR-019 Option
+      A) sufficient? See status-codes.schema.yaml OQ-STATUS-4.
+    owner: "operator, via a future EC revision proposal"
+    blocks: "nothing in this file's own validity -- the runtime records the block as a legal side-state transition today"
+
+verification:
+  method: >
+    Read MP §7 (L561-575) and §8.4 (L705-726), Atlas §14.3 via
+    recipe.schema.yaml's `necessity` field (L334-338), EC §10 via
+    execution-state-machine.schema.yaml (legal_primary_transitions, the
+    from_state/to_state if/then rules, and `trigger_signal`'s bare-string
+    design) directly. Read `method-resolution.schema.yaml` in full (all 930
+    lines, including `method_resolution_result` and the three fixture files
+    that target it) before deciding not to generalize it. Read
+    `capability_resolver.py` in full and transcribed `resolve()`'s and
+    `plan_executability()`'s exact output keys; the runtime now validates
+    both records against this file before persisting (`S["capability_resolution"]`,
+    `S["plan_executability"]` in run_research_slice.py). Three fixture files
+    under tests/contracts/specs/execution/ (request / result /
+    plan-executability) exercise every `required`, `const`, `minItems`,
+    `pattern`/`enum` and every `allOf`/`if`/`then` rule above with at least
+    one adversarial case each; `tests/run_golden_tests.py` check 1 runs
+    them and check 4 resolves every `$ref` in this file for real.
+  note: >
+    No mother document or ADR was modified to produce this file. Grounded:
+    the fail-closed rule (MP §7/§8.4, ADR-023), the necessity partition
+    (Atlas §14.3 via recipe.schema.yaml), the blocking signal name
+    (status-codes.schema.yaml), the field names (transcribed from the
+    running producer, not designed fresh). Designed (flagged): the
+    required-nullable `blocked` and the `unresolved`/`resolvable` split's
+    required-ness (both stricter than the method side, both disclosed in
+    compilation_decisions and OQ-CAPRES-1).

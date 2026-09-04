@@ -58,12 +58,23 @@ description: >
      research routinely triangulates interview findings against published
      literature).
 
-  3. **`run_statistics` is APPENDED after `evidence.triangulation`, per List
-     B's own literal order (MVP §3 step 16-17, L79-80)**, to close
-     P1-GAP-AI-2 (Trusted Compute) for the inter-rater reliability
+  3. **`run_statistics` is ADDED from List B (MVP §3 steps 16-17, L79-80)**,
+     to close P1-GAP-AI-2 (Trusted Compute) for the inter-rater reliability
      computation. List A has no equivalent step (its final node is
      `artifact.generate_research_paper` directly after triangulation) --
      this is a genuine List-B-only addition, not present in List A at all.
+     **Position (prose corrected 2026-09-04, OQ-P5-6)**: the normative
+     `steps:` block places it directly after Coder 2 and `literature_search`
+     and BEFORE `evidence.triangulation` -- the standard methodological
+     order (check coder agreement on raw coding output before synthesising
+     against literature), NOT MVP §3 step 16's literal prose order
+     (triangulation, then statistics). Earlier revisions of this prose said
+     the file "follows MVP's order literally" while the block did not; the
+     block is what the compiler and the runtime read
+     (`Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow/ir.py`),
+     so the prose is corrected to match the block, not the other way round.
+     Whether the block should instead be flipped back to MVP's literal order
+     is OQ-RQV1-2.
 
   4. **`research.qualitative_coding` is modeled as TWO separate steps (Coder
      1, Coder 2), not one**, because MVP's own scenario (§3 step 17, L80:
@@ -79,7 +90,11 @@ description: >
      this schema's existing, deliberately-flat-array design, not a schema
      gap this file needs to invent new syntax to work around.
 
-  Net result: **8 steps**, not 4 or 5 -- an honest superset that satisfies
+  Net result: **7 steps**, not 4 or 5 (count corrected 2026-09-04, OQ-P5-6:
+  the normative `steps:` block has always had 7 -- transcribe, Coder 1,
+  Coder 2, literature_search, run_statistics, evidence.triangulation,
+  artifact -- an earlier revision of this prose miscounted 8) -- an honest
+  superset that satisfies
   every constraint both source lists actually impose (List A's
   `evidence.triangulation` required-inputs contract; List B's real method/
   capability choices and statistical step), rather than silently discarding
@@ -295,7 +310,7 @@ outputs:
 open_questions:
   - id: "OQ-RQV1-1"
     question: >
-      This Recipe's 8-step union of List A and List B is this file's own
+      This Recipe's 7-step union of List A and List B is this file's own
       reconciliation choice, not a mother-document-stated design. Should a
       future review confirm this is the CORRECT reconciliation (as opposed
       to, e.g., dropping `literature_search` entirely and instead relaxing
@@ -307,18 +322,19 @@ open_questions:
   - id: "OQ-RQV1-2"
     question: >
       MVP's own literal walkthrough order (§3 step 16, L79) places
-      `run_statistics` AFTER `evidence.triangulation`, which this file
-      follows literally -- but standard qualitative-research practice
-      typically checks inter-rater reliability on RAW open-coding output
-      BEFORE further axial/selective synthesis and before triangulating
-      with literature (so a low-reliability coding scheme is caught early,
-      before downstream synthesis work is wasted on it). Should a future
-      revision of this Recipe (or of MVP_VERTICAL_SLICE_PLAN.md's own
-      walkthrough) reorder these two steps to match standard methodological
-      practice, given MVP's own text never states a rationale for this
-      specific ordering?
-    owner: "operator, or a future review pass once a real coding session exposes whether the literal MVP order causes wasted downstream work"
-    blocks: "nothing in this file's own validity -- this Recipe faithfully implements MVP's own stated order, not a silently 'corrected' one"
+      `run_statistics` AFTER `evidence.triangulation`; this file's normative
+      `steps:` block places it BEFORE (the standard qualitative-research
+      practice: check inter-rater reliability on RAW open-coding output
+      before further synthesis and before triangulating with literature, so
+      a low-reliability coding scheme is caught early). The prose above was
+      corrected 2026-09-04 to describe the block truthfully (OQ-P5-6; until
+      then it claimed the file followed MVP's order literally while the
+      block did not). Still open: should the block be flipped back to MVP's
+      literal order for fidelity, or should MVP_VERTICAL_SLICE_PLAN.md §3
+      step 16 be corrected to the methodologically standard order the block
+      already uses? MVP's own text never states a rationale for its ordering.
+    owner: "operator, or a future review pass once a real coding session exposes whether either order causes wasted downstream work"
+    blocks: "nothing in this file's own validity -- the block is what compiles; the runtime's unit tests pin the 7-node order (Projects/internal/cognitive-engineering-os/tests/unit/test_workflow_ir_and_resolver.py)"
   - id: "OQ-RQV1-3"
     question: >
       `ResearchMemoArtifact` (final step's conceptual output) has no

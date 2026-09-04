@@ -1,0 +1,92 @@
+schema_id: "ai-lego://specs/execution/capability-resolution.schema.yaml"
+target_ref: "#/plan_executability"
+description: >
+  Exercises the per-node verdict record and every one of its four
+  allOf/if/then cross-field rules: a non-empty blocking list forces
+  executable false; executable true forces blocking empty; fully_resolved
+  true forces both lists empty; any unresolved node forces fully_resolved
+  false. Also the necessity partition: blocking[] entries must be
+  REQUIRED_*, not_invocable[] entries must be RECOMMENDED/OPTIONAL
+  (FORBIDDEN in neither). Valid cases are the verdicts the Phase 5 runtime
+  emitted on 2026-09-03 (three contracts missing) and emits now (all four
+  contracts ACTIVE).
+
+valid:
+  - name: fully_resolved_and_executable
+    instance:
+      fully_resolved: true
+      executable: true
+      blocking: []
+      not_invocable: []
+  - name: pre_2026_09_04_spec_root_verdict
+    instance:
+      fully_resolved: false
+      executable: false
+      blocking:
+        - { ref: artifact.generate_research_paper, label: "Research Memo Artifact Generation", necessity: REQUIRED_BY_RISK }
+      not_invocable:
+        - { ref: transcribe, label: "Transcription", necessity: RECOMMENDED }
+        - { ref: literature_search, label: "Literature Search", necessity: RECOMMENDED }
+  - name: executable_but_not_fully_resolved
+    instance:
+      fully_resolved: false
+      executable: true
+      blocking: []
+      not_invocable:
+        - { ref: literature_search, label: null, necessity: OPTIONAL }
+
+invalid:
+  - name: blocking_non_empty_but_executable_true
+    instance:
+      fully_resolved: false
+      executable: true
+      blocking:
+        - { ref: artifact.generate_research_paper, necessity: REQUIRED_BY_RISK }
+      not_invocable: []
+    reason: "allOf rule 1/2: a non-empty blocking list forces executable: false (and executable: true forces blocking maxItems 0) -- a plan cannot claim to be executable while naming a REQUIRED_* node it cannot invoke."
+  - name: fully_resolved_true_with_not_invocable_entry
+    instance:
+      fully_resolved: true
+      executable: true
+      blocking: []
+      not_invocable:
+        - { ref: literature_search, necessity: RECOMMENDED }
+    reason: "allOf rule 3: fully_resolved: true forces not_invocable maxItems 0 -- an unresolved node, however optional, means the plan is not fully resolved."
+  - name: unresolved_node_but_fully_resolved_true
+    instance:
+      fully_resolved: true
+      executable: false
+      blocking:
+        - { ref: run_statistics, necessity: REQUIRED_BY_RISK }
+      not_invocable: []
+    reason: "allOf rule 4 (and rule 3): any entry in blocking or not_invocable forces fully_resolved: false."
+  - name: recommended_node_listed_as_blocking
+    instance:
+      fully_resolved: false
+      executable: false
+      blocking:
+        - { ref: transcribe, necessity: RECOMMENDED }
+      not_invocable: []
+    reason: "blocking[].necessity must match ^REQUIRED_ -- only REQUIRED_BY_RISK / _JURISDICTION / _SECTOR nodes block a plan (Atlas §14.3); a RECOMMENDED node belongs in not_invocable."
+  - name: required_node_listed_as_not_invocable
+    instance:
+      fully_resolved: false
+      executable: true
+      blocking: []
+      not_invocable:
+        - { ref: artifact.generate_research_paper, necessity: REQUIRED_BY_RISK }
+    reason: "not_invocable[].necessity is enum [RECOMMENDED, OPTIONAL]; hiding a REQUIRED_* node in the non-blocking list would let executable: true stand for a plan that is not executable."
+  - name: forbidden_necessity_in_either_list
+    instance:
+      fully_resolved: false
+      executable: true
+      blocking: []
+      not_invocable:
+        - { ref: transcribe, necessity: FORBIDDEN }
+    reason: "FORBIDDEN is a legal Recipe necessity but appears in neither list's allowed set: a FORBIDDEN step must not be compiled into the plan at all (constraints rule 3)."
+  - name: missing_not_invocable
+    instance:
+      fully_resolved: true
+      executable: true
+      blocking: []
+    reason: "required is [fully_resolved, executable, blocking, not_invocable]; both lists must be present (possibly empty) so a consumer never has to guess whether a missing list means 'none' or 'not computed'."

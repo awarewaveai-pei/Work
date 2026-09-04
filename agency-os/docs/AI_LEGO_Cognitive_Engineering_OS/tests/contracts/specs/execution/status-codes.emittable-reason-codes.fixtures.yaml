@@ -1,0 +1,30 @@
+schema_id: "ai-lego://specs/execution/status-codes.schema.yaml"
+target_ref: "#/reference_vocabulary/emittable_reason_codes/schema"
+description: >
+  Exercises the emittable reason-code enum (the vocabulary
+  execution/result.schema.yaml's `reason_code` hard-$refs, ADR-019). Added
+  2026-09-04 alongside the CAPABILITY_RESOLUTION_BLOCKED registration
+  (ADR-023 §Consequences 2) so that the registration is pinned mechanically:
+  deleting the code from the enum turns the first valid case red. The
+  invalid cases mark the enum's two boundaries: a NEW_PROPOSED code that no
+  producer emits is NOT in the emittable set, and NEEDS_HUMAN_REVIEW is a
+  side STATE, not a named cause.
+
+valid:
+  - name: capability_resolution_blocked_registered_2026_09_04
+    instance: "CAPABILITY_RESOLUTION_BLOCKED"
+  - name: method_resolution_blocked
+    instance: "METHOD_RESOLUTION_BLOCKED"
+  - name: offline_source_stale
+    instance: "OFFLINE_SOURCE_STALE"
+
+invalid:
+  - name: new_proposed_code_is_not_emittable
+    instance: "PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED"
+    reason: "status_codes[] entry with status NEW_PROPOSED_2026-08-29 -- proposed by MACHINE_READABLE_SPEC_PLAN.md §4, emitted by no producer, and per emittable_reason_codes.source deliberately excluded until a producer exists (contrast CAPABILITY_RESOLUTION_BLOCKED, status NEW_ACCEPTED_2026-09-04, which a real runtime emits)."
+  - name: side_state_is_not_a_reason
+    instance: "NEEDS_HUMAN_REVIEW"
+    reason: "emittable_reason_codes.source excludes NEEDS_HUMAN_REVIEW explicitly: it is one of EC §10's legal side states (the STATE a signal maps onto), not a named cause."
+  - name: deprecated_alias_is_not_emittable
+    instance: "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
+    reason: "duplicate_resolutions.method_atlas_unavailable makes this a deprecated alias of METHOD_RESOLUTION_BLOCKED; new producers emit the canonical name only."

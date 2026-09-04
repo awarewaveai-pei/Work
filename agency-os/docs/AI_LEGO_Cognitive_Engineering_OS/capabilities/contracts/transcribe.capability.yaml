@@ -1,0 +1,287 @@
+$id: "ai-lego://capabilities/contracts/transcribe.capability.yaml"
+title: "transcribe -- Audio/Video to Transcript Capability Contract"
+status: ACTIVE
+
+description: >
+  Concrete instance of the `transcribe` Capability -- the first name in every
+  capability list the Master Plan gives (§8.1 L626, §8.2 L650), the ONE
+  capability MP §8.4 (L710-711) types explicitly (`transcribe: AudioVideo →
+  Transcript`), the first node of MP §9's Workflow IR teaching example
+  (L775-777, `ref: transcribe`, `input: source.video`) and step 5 of the
+  Phase 5 Research Mode walkthrough (`docs/architecture/MVP_VERTICAL_SLICE_PLAN.md`
+  §3 L62: "`transcribe` capability 執行：`AudioVideo → Transcript`（含
+  Speaker Diarization）"). It is also the first step of MP §40's Qualitative
+  Research pipeline (L1965-1985: Interview Audio/Video → Transcription →
+  Speaker Diarization → Coding → ...).
+
+  This is the third real Capability Contract instance in the corpus (after
+  `specs/domain/capability-contract.schema.yaml#/worked_example`'s
+  `cognitive.execute_method` and `run_statistics.capability.yaml`), and the
+  first of the three `docs/adr/ADR-023-capability-resolution-fail-closed.md`
+  §Consequences 1 names as the spec-root follow-up that lets the runtime's
+  plan-level `CAPABILITY_RESOLUTION_BLOCKED` transition be wired: until this
+  file existed, the compiled `research-qualitative-v1` plan was honestly
+  recorded as `fully_resolved: false`, and the runtime performed transcription
+  OUTSIDE the capability plane (declared, self-expiring bypass). With this
+  file `status: ACTIVE`, that bypass declaration expires by design
+  (`CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED`) and the ingest transcription must
+  go through `CapabilityCatalog.invoke("transcribe", ...)` -- expected, not a
+  regression.
+
+  **What this file does NOT claim**: it types the contract, it does not
+  implement speech recognition or speaker diarization. The runtime's two
+  adapters (deterministic fixture transcript; offline faster-whisper Medium)
+  both emit alternating placeholder speaker labels and say so in every
+  segment (`NAIVE_ALTERNATING_SPEAKERS_PLACEHOLDER`) -- real diarization is a
+  future adapter, see `open_questions.OQ-TRANSCRIBE-1`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.1 (L626) / §8.2 (L650) -- `transcribe` named as a bare Capability id (line numbers as of 2026-09-04)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.4 Typed LEGO (L710-711) -- `transcribe: AudioVideo → Transcript`, the ONLY capability MP types explicitly; this file's `input.type`/`output.type` transcribe it verbatim"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L775-777) -- Workflow IR node `ref: transcribe`, `input: source.video`"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §5.2 Local / Offline (L419-430) -- 影片轉錄 / 語音辨識 must work fully offline; grounds `offline_capable_required` below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §1.3 (L224) -- '禁止每次重新上傳、重新轉錄、重新解析' (never re-transcribe on every use); grounds `rollback.side_effect_free_preferred` + the caching note"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §40 Qualitative Research (L1965-1985) -- Transcription → Speaker Diarization → Coding pipeline order; grounds `speaker_diarization` below and `research.qualitative_coding.contract.yaml`'s own precondition `transcript.status == normalized`"
+  - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 steps 5-8 (L62-65) -- transcribe (含 Speaker Diarization) → PII fields detected and classified Confidential/Restricted (MP §61) → per-subject DEK envelope → TranscriptGenerated; grounds `pii_handling` below"
+  - "specs/domain/capability-contract.schema.yaml -- the schema this file's body is validated against (golden test 2c)"
+  - "policies/privacy/pii-redaction.policy.yaml (ACTIVE) -- the redaction/pseudonymization policy the Transcript's detected PII fields are subject to before any ledger write"
+  - "docs/adr/ADR-023-capability-resolution-fail-closed.md §Consequences 1 -- the follow-up this file closes for the `transcribe` ref"
+  - "methods/contracts/research.qualitative_coding.contract.yaml#/inputs (required: Transcript) -- the downstream consumer of this file's output type"
+
+decided_by: >
+  No ADR governs this file's content: MP itself supplies the typed I/O
+  (§8.4 L710-711) and the pipeline position (§40), so there is nothing to
+  arbitrate. ADR-023 (ACCEPTED 2026-09-03) decided that capability
+  resolution is fail-closed and named this file as spec-root follow-up 1;
+  it did not author it. Everything below beyond `id`/`input`/`output` is a
+  Phase 3-style compilation decision recorded in `compilation_decisions`,
+  same discipline as `run_statistics.capability.yaml`.
+
+compilation_decisions:
+
+  - question: >
+      MP §8.4 writes `AudioVideo → Transcript`; the runtime's Transcriber
+      port accepts audio metadata (a decoded WAV plus `audio_sha256`,
+      `duration_seconds`) and returns a transcript with `text` + `segments`.
+      Should `input.type` be narrowed to `Audio`, or widened to name the
+      runtime's metadata shape?
+    decision: "`input: {type: [AudioVideo]}`, `output: {type: [Transcript]}` -- MP §8.4's literal names, unmodified."
+    reasoning: >
+      Same "literal transcription over invented convenience" discipline
+      `capability-contract.schema.yaml` applied to the `{type: [...]}`
+      nesting. `AudioVideo` is the ONLY typed-object name MP gives this
+      capability; the runtime's adapter-level metadata is an implementation
+      detail of one adapter, not a contract type. Neither name has a
+      `cognitive/typed-objects/*.schema.yaml` file yet -- soft reference,
+      same treatment as every other Capability/Method Contract in this
+      corpus (`run_statistics.capability.yaml` OQ-RSTAT-4).
+
+  - question: >
+      MVP §3 step 5 says "含 Speaker Diarization"; MP §40 lists Speaker
+      Diarization as a SEPARATE pipeline stage after Transcription. Is
+      diarization part of this capability's output, or a second capability?
+    decision: >
+      Part of this capability's OUTPUT (every Transcript segment carries a
+      `speaker` label), but with an explicit, machine-visible honesty flag:
+      a placeholder labelling MUST be marked as such, never presented as
+      diarization.
+    reasoning: >
+      MVP §3 step 5 (the concrete slice walkthrough) folds diarization into
+      the transcribe step; MP §40 (an architecture-level intent flow) draws
+      it as a separate box. The two are not in conflict -- one names the
+      capability, the other the pipeline stages inside it. Splitting a
+      second `diarize` capability would invent a name that appears nowhere
+      in the corpus (grep-confirmed 2026-09-04: `diarize`/`diarization` as
+      a capability id has zero hits; MP L1974 / MVP L62 only name the
+      concept). The honesty flag exists because the ONE real runtime today
+      emits alternating placeholders; a contract that silently let
+      placeholders pass as diarization would be the "detector goes silent"
+      pattern this repo's R0 discipline forbids.
+
+  - question: >
+      Should this contract carry the MVP §3 steps 6-8 PII obligations
+      (detect Confidential/Restricted fields, encrypt with the subject's DEK
+      before any ledger write), or leave them to `pii-redaction.policy.yaml`
+      and the ledger guard?
+    decision: >
+      Declare them as an ADDITIVE `pii_handling` block that NAMES the policy
+      and the invariant; do not restate the mechanism.
+    reasoning: >
+      A Transcript is the first artifact in the whole slice that can contain
+      a real person's name/employer/city (MVP L63). A capability contract
+      that omits this would let a future adapter emit plaintext PII into an
+      append-only ledger that has no delete API. Stating the invariant at
+      the contract level ("no detected PII value reaches the ledger in
+      plaintext") is the same declaration-vs-enforcement split
+      `capability-contract.schema.yaml` draws for `entitlement`: the
+      enforcement lives in the runtime's `PiiLedgerGuard` and in
+      `policies/privacy/pii-redaction.policy.yaml`; this file declares that
+      the capability is subject to it.
+
+  - question: >
+      Should `preconditions` include MP §8.3's four executor-side checks
+      (`method_atlas.loaded == true` etc.)?
+    decision: "Only `policy.validation == PASS` is carried over; the three Atlas/Method checks are not."
+    reasoning: >
+      `transcribe` dispatches to no Cognitive Method (it is a pure
+      capability, MP §8.1's own distinction: "Capability = 系統「能執行什麼」"
+      vs Method = "問題「應該如何思考」"), so `method_atlas.loaded`,
+      `method_contract.valid` and `workflow.static_validation` are not its
+      preconditions. `policy.validation == PASS` IS generic (MP §7's
+      `Policy Engine` stage sits in front of every capability request).
+      Added instead: `source.artifact_uri.resolved == true` (MVP §3 step 2,
+      the source must already be addressable as a Portable Artifact URI
+      before ingest).
+
+id: transcribe
+version: "1.0.0"
+
+input:
+  type:
+    - AudioVideo
+  # MP §8.4 L710-711, verbatim. Soft reference (no typed-objects schema file
+  # yet) -- see compilation_decisions and open_questions.OQ-TRANSCRIBE-2.
+
+output:
+  type:
+    - Transcript
+  # MP §8.4 L710-711, verbatim. The runtime instance MUST carry: `text`,
+  # `segments[]` (each with start/end seconds, `text`, `speaker`, and the
+  # diarization mode -- see `speaker_diarization` below), `transcription_mode`
+  # (which adapter produced it), and a `governance/epistemic-label.schema.yaml#/
+  # provenance_record` (enforced by `quality.provenance_required`).
+
+preconditions:
+  - "source.artifact_uri.resolved == true"
+  - "policy.validation == PASS"
+  # First: MVP §3 step 2 -- the AudioVideo source is already addressed by a
+  # Portable Artifact URI (specs/artifact/portable-uri.schema.yaml) and stored
+  # in the tenant-scoped CAS before transcription reads it. Second: MP §8.3's
+  # own generic executor check (L714-718 style), the one that applies to a
+  # capability that dispatches to no Method (see compilation_decisions).
+
+quality:
+  provenance_required: true
+  method_specific_gate_required: false
+  # provenance_required: every Transcript carries a provenance_record. The
+  # runtime today labels a real-STT transcript `EVIDENCE / AI_GENERATED` and a
+  # fixture transcript `EVIDENCE / SOURCE_QUOTATION`; whether machine
+  # transcription deserves its own authorship value is OQ-P5-3
+  # (Projects/internal/cognitive-engineering-os/docs/PHASE5_RESEARCH_SLICE.md),
+  # not decided here. method_specific_gate_required: false -- no Method is
+  # dispatched (compilation_decisions).
+
+security:
+  external_ai: policy_controlled
+  # MP L725 convention (the only evidenced value). Concretely for this
+  # capability: a cloud speech-to-text provider may be used ONLY under
+  # policies/provider/model-registry.policy.yaml + ai-gateway-fallback.policy.yaml
+  # and network-egress.yaml; MP §5.2 requires that a fully offline path exists
+  # regardless (see offline_capable_required).
+
+rollback:
+  side_effect_free_preferred: true
+  # Transcription is a pure derivation of an immutable CAS object: re-running
+  # it produces a new Transcript, it never mutates the source. MP §1.3 L224
+  # ("禁止每次重新上傳、重新轉錄、重新解析") is a CACHING requirement on the
+  # caller (keep the Transcript keyed by audio_sha256 + transcription_mode),
+  # not a side effect of this capability.
+
+# ---------------------------------------------------------------------------
+# ADDITIVE fields (legal: capability-contract.schema.yaml has no
+# additionalProperties:false; precedent: run_statistics.capability.yaml's
+# `trusted_compute_required` / `statistical_method`).
+# ---------------------------------------------------------------------------
+
+offline_capable_required: true
+# MP §5.2 (L419-430): "必須支援完全離線" and the list names 影片轉錄 and 語音辨識
+# explicitly. An implementation of this contract MUST offer an adapter that
+# runs with no network access; a cloud-only implementation does not satisfy
+# this contract. The runtime's OfflineFasterWhisperTranscriber (local model
+# cache, never downloads) is the current offline adapter; when its model is
+# absent it raises AdapterUnavailable and the caller skips VISIBLY -- it does
+# not silently degrade to the fixture.
+
+speaker_diarization:
+  required_in_output: true
+  placeholder_must_be_labelled: true
+  placeholder_label_convention: "NAIVE_ALTERNATING_SPEAKERS_PLACEHOLDER"
+  note: >
+    MVP §3 step 5 ("含 Speaker Diarization") + MP §40 (L1965-1985). Every
+    segment of the output Transcript carries a `speaker` value. Until a real
+    diarization adapter exists (OQ-TRANSCRIBE-1), the runtime emits
+    alternating placeholder speakers and MUST mark each segment with the
+    placeholder convention string so no downstream consumer (and no evidence
+    locator) can mistake a placeholder for recognised speaker identity.
+
+pii_handling:
+  policy: "policies/privacy/pii-redaction.policy.yaml"
+  classification_source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §61 (L2607+) -- Confidential / Restricted classification of detected personal-data fields"
+  invariant: >
+    Detected personal-data values in a Transcript (MVP §3 step 6: real name,
+    employer, city of residence) are classified per MP §61 and encrypted
+    under the data subject's own DEK (ADR-002 Option A; MVP §3 step 7)
+    BEFORE any event carrying them is appended to the ledger (MVP §3 step
+    8). No detected PII value may reach the append-only ledger in plaintext
+    -- the ledger has no delete API, so this is not recoverable after the
+    fact. Declared here; enforced by the runtime's ledger PII guard and the
+    envelope schema (specs/security/personal-data-envelope.schema.yaml).
+
+worked_example:
+  source: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §3 steps 1-8 (L55-65)"
+  scenario: >
+    Nordbrook Research Lab uploads three interview recordings (P1/P2/P3);
+    each is addressed by a Portable Artifact URI and stored in the
+    tenant-scoped CAS (steps 1-3). `transcribe` turns each AudioVideo source
+    into a Transcript with per-segment speaker labels (step 5); the
+    Transcript's detected PII fields are classified Confidential/Restricted
+    and envelope-encrypted under the subject's DEK (steps 6-7) before the
+    `TranscriptGenerated` event is written (step 8). P2's later GDPR
+    erasure (steps 24-26) destroys P2's DEK, leaving the event in place but
+    its PII fields permanently unreadable -- which only works because this
+    capability never let plaintext PII into the ledger in the first place.
+
+open_questions:
+  - id: "OQ-TRANSCRIBE-1"
+    question: >
+      No real speaker-diarization adapter exists; both runtime adapters emit
+      labelled alternating placeholders. Which local diarization model
+      (offline, per MP §5.2) should implement `speaker_diarization`, and
+      does the real adapter change the Transcript's provenance authorship
+      (OQ-P5-3)?
+    owner: "operator / next Phase 5 adapter pass; model choice is a vendor decision per feedback_no_chinese_ai (no PRC-vendor models)"
+    blocks: "nothing in this file's own validity -- the placeholder convention is a legal, honestly-labelled output today"
+  - id: "OQ-TRANSCRIBE-2"
+    question: >
+      `AudioVideo` and `Transcript` have no `cognitive/typed-objects/*.schema.yaml`
+      file (same gap as OQ-RSTAT-4 for RaterCodingSet/InterRaterReliabilityResult).
+      Should a future typed-objects pass add them, given that Transcript is
+      the required input of `research.qualitative_coding`?
+    owner: "operator, via a future typed-objects compilation pass"
+    blocks: "nothing in this file's own validity -- input/output.type are soft-reference bare string arrays per capability-contract.schema.yaml's own design"
+
+verification:
+  method: >
+    Read MP §8.1-8.4 (L604-724), §9 (L749-800), §5.2 (L419-430), §40
+    (L1965-1985) and L224 directly (line numbers as of 2026-09-04; note that
+    older sibling files cite pre-ADR-017 line numbers ~28 lines lower for
+    §8). Read `docs/architecture/MVP_VERTICAL_SLICE_PLAN.md` §3 steps 1-8
+    (L55-65). Read `specs/domain/capability-contract.schema.yaml` and
+    `capabilities/contracts/run_statistics.capability.yaml` in full as the
+    schema and the style template. Read `methods/contracts/research.qualitative_coding.contract.yaml#/inputs`
+    and `#/preconditions` (the downstream consumer). Read the runtime's
+    `ai_lego/modules/knowledge/ingest/transcription.py` in full to confirm
+    what the two real adapters actually emit (`transcription_mode`,
+    `segments[].speaker`, `segments[].diarization`) so this contract
+    describes real behaviour, not an aspiration. Validated against
+    `specs/domain/capability-contract.schema.yaml` via
+    `tests/run_golden_tests.py` check 2c -- 0 errors; `id` equals the
+    filename slug.
+  note: >
+    No mother document or ADR was modified to produce this file. Grounded:
+    `id`, `input.type`, `output.type` (MP §8.4 verbatim), pipeline position
+    (MP §40, MVP §3), offline requirement (MP §5.2), PII obligations (MVP §3
+    steps 6-8, MP §61). Designed (additive, flagged): the `speaker_diarization`
+    honesty block and the `pii_handling` invariant wording. The one thing
+    this file deliberately does not decide is the diarization adapter
+    (OQ-TRANSCRIBE-1).

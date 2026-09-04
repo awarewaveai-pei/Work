@@ -9,15 +9,23 @@ file exists and is ACTIVE", not "a name appears in a list".
 ``PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED`` is the Master Plan's wording for
 the same signal; ``specs/execution/status-codes.schema.yaml`` makes it a
 deprecated alias of the canonical ``METHOD_RESOLUTION_BLOCKED``.
+
+Two enforcement points, mirroring the capability side (ADR-023 §Consequences 5,
+closed 2026-09-04):
+
+* ``MethodCatalog.resolve(method_ids)`` -- the plan-time, all-or-nothing verdict
+  (an instance of ``method-resolution.schema.yaml#/method_resolution_result``).
+* ``MethodCatalog.require(method_id)`` / ``invoke(method_id, fn, ...)`` -- the
+  per-invocation gate inherited from ``ContractCatalog``: no method
+  implementation handed to ``invoke`` runs on an unregistered method id.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
-from ai_lego.platform.ai_execution.contract_catalog import catalog_label, is_active, scan_contract_files
+from ai_lego.platform.ai_execution.contract_catalog import ContractCatalog, is_active
 
 METHOD_RESOLUTION_BLOCKED = "METHOD_RESOLUTION_BLOCKED"
 DEPRECATED_ALIAS = "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
@@ -26,20 +34,12 @@ CONTRACT_GLOB = "*.contract.yaml"
 
 
 @dataclass(frozen=True)
-class MethodCatalog:
-    label: str
-    contracts: dict[str, dict[str, Any]]
-
-    @classmethod
-    def from_spec_root(cls, spec_root: Path) -> "MethodCatalog":
-        # Same "registered" definition as the capability catalog (contract_catalog.py) -- one scan, two resolvers.
-        # The label fingerprints the catalog's content; it never carries the host's absolute path into the ledger.
-        contracts = scan_contract_files(spec_root, CONTRACTS_DIR, CONTRACT_GLOB)
-        return cls(label=catalog_label(CONTRACTS_DIR, contracts), contracts=contracts)
-
-    @classmethod
-    def empty(cls, label: str) -> "MethodCatalog":
-        return cls(label=label, contracts={})
+class MethodCatalog(ContractCatalog):
+    # Same "registered" definition as the capability catalog (contract_catalog.py) -- one scan, two resolvers.
+    # The label fingerprints the catalog's content; it never carries the host's absolute path into the ledger.
+    CONTRACTS_DIR: ClassVar[str] = CONTRACTS_DIR
+    CONTRACT_GLOB: ClassVar[str] = CONTRACT_GLOB
+    BLOCKED_SIGNAL: ClassVar[str] = METHOD_RESOLUTION_BLOCKED
 
     def resolve(self, method_ids: list[str]) -> dict[str, Any]:
         """Instance of ``specs/execution/method-resolution.schema.yaml#/method_resolution_result``."""

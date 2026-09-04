@@ -1,0 +1,269 @@
+$id: "ai-lego://capabilities/contracts/literature_search.capability.yaml"
+title: "literature_search -- Research Question to Literature Set Capability Contract"
+status: ACTIVE
+
+description: >
+  Concrete instance of the `literature_search` Capability. Unlike
+  `transcribe`/`run_statistics`, this name does NOT appear in MP §8.1/§8.2's
+  capability lists (L612-662; the nearest listed name is `retrieve_evidence`,
+  L627/L652). Its only mother-document appearance is MP §9's Workflow IR
+  teaching example (L783-785: `ref: literature_search`, `input:
+  research.question`), whose next node `evidence.triangulation` consumes
+  `[themes, literature]` (L789-791). The corpus then made it REAL rather than
+  illustrative: `methods/contracts/evidence.triangulation.contract.yaml`
+  (ACTIVE) declares `inputs.required: [themes, literature]`, and
+  `recipes/validated/research-qualitative-v1.recipe.yaml` keeps a
+  `literature_search` step precisely so that required `literature` input is
+  fed (that file's reconciliation point 2). MP §39 Research Mode (L1929-1963)
+  supplies the pipeline position: Research Question → Literature Search →
+  Literature Matrix → Research Gap.
+
+  This is the second of the three contracts `docs/adr/ADR-023-capability-
+  resolution-fail-closed.md` §Consequences 1 names. Its Recipe `necessity` is
+  `RECOMMENDED`, so its absence never made the plan non-executable -- only
+  not fully resolved.
+
+  **What this file does NOT claim**: no runtime implementation performs a
+  literature search today (the Phase 5 slice records `literature_search` as
+  `not_performed`); this contract types what such an implementation must
+  honour, in particular EC §83's offline rule.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L783-785) -- `ref: literature_search`, `input: research.question`; the ONLY mother-document mention of this capability id (line numbers as of 2026-09-04)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L789-791) -- `evidence.triangulation` consuming `[themes, literature]`; the downstream consumer of this file's output"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §39 Research Mode (L1929-1963) -- Research Question → Literature Search → Literature Matrix → Research Gap; pipeline position"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §42 Research Integrity Engine (L2028-2050) -- Citation Verification / Retraction Check / Contradiction Detection; the quality obligations a returned literature item is subject to"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §8.2 (L652) -- `retrieve_evidence`, the listed capability this one is closest to but NOT identified with (see compilation_decisions + OQ-LITSEARCH-1)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §83 Offline Execution (L2522-2537) -- `OFFLINE_SOURCE_STALE`, '不得假裝最新'; grounds `offline_behaviour` below"
+  - "specs/execution/status-codes.schema.yaml -- OFFLINE_SOURCE_STALE registry entry (side state NEEDS_HUMAN_REVIEW)"
+  - "policies/ai-execution/network-egress.yaml (PARTIALLY_DEFINED) -- the egress allowlist any online literature source must be registered in"
+  - "methods/contracts/evidence.triangulation.contract.yaml#/inputs (required: [themes, literature]) -- why this capability is in the Recipe at all"
+  - "recipes/validated/research-qualitative-v1.recipe.yaml -- step 'Literature Search', `input: research.question`, `necessity: RECOMMENDED`"
+  - "specs/domain/capability-contract.schema.yaml -- the schema this file's body is validated against (golden test 2c)"
+  - "docs/adr/ADR-023-capability-resolution-fail-closed.md §Consequences 1 -- the follow-up this file closes for the `literature_search` ref"
+
+decided_by: >
+  No ADR governs this file's content. The capability exists in the corpus
+  because MP §9 names it and an ACTIVE method contract requires its output;
+  ADR-023 named this file as spec-root follow-up 1 without authoring it.
+  The one genuinely arguable point -- whether `literature_search` is a
+  distinct capability or an alias of MP §8.2's `retrieve_evidence` -- is NOT
+  decided here (OQ-LITSEARCH-1); this file keeps MP §9's literal id because
+  that is the id the Recipe, the Workflow IR schema's own worked example
+  and the runtime's compiled plan all use.
+
+compilation_decisions:
+
+  - question: >
+      MP §8.2 lists `retrieve_evidence`; MP §9 uses `literature_search`.
+      Same capability under two names (a duplicate to resolve, like
+      `status-codes.schema.yaml` did for METHOD_RESOLUTION_BLOCKED), or two
+      capabilities?
+    decision: "Author `literature_search` as its own contract; do NOT declare it an alias of `retrieve_evidence`. Recorded as OQ-LITSEARCH-1."
+    reasoning: >
+      A duplicate resolution needs evidence that both names denote the SAME
+      operation. `retrieve_evidence` (MP §8.2) sits among generic knowledge
+      operations (`normalize_document`, `verify_claim`) and reads as "pull
+      evidence from the tenant's own Knowledge/Evidence Graph" (MP §13);
+      `literature_search` (MP §9, §39) reads as "search published
+      literature for a research question" -- an external-source operation
+      with an offline-staleness obligation (EC §83) the internal one does
+      not have. That is a real semantic difference, not a naming slip, so
+      collapsing them would be the unverified "looks the same" merge this
+      corpus's R4 discipline forbids. Left open for an operator/ADR ruling.
+
+  - question: >
+      What are the input/output typed-object names? MP §9 gives `input:
+      research.question` (a dotted reference into the IR's data flow, not a
+      typed-object name) and the consumer names its input by the bare word
+      `literature`.
+    decision: "`input: {type: [ResearchQuestion]}`, `output: {type: [LiteratureSet]}` -- both NEW_DESIGN names, flagged."
+    reasoning: >
+      `capability-contract.schema.yaml#/properties/input/properties/type`
+      requires typed-object NAMES. MP §39's pipeline names the stage input
+      "Research Question" (L1936) -- `ResearchQuestion` is that phrase in
+      the corpus's PascalCase typed-object convention, not an invention.
+      For the output, `evidence.triangulation.contract.yaml` deliberately
+      kept MP's bare `literature` word and explains why it did not promote
+      it to PascalCase; this file, which PRODUCES the object, has to name
+      it, and follows the `EvidenceSet`/`TriangulatedFindingSet` `*Set`
+      convention already used by the adjacent method contracts. The
+      relationship is stated in `output` below and in OQ-LITSEARCH-2.
+
+  - question: >
+      A literature search normally needs the network; MP §5.2 requires the
+      whole system to work fully offline; EC §83 says offline execution
+      "不得假裝最新" and names `OFFLINE_SOURCE_STALE`. How does this
+      contract reconcile the three?
+    decision: >
+      Offline execution is LEGAL (against a locally cached/exported corpus)
+      but MUST emit `OFFLINE_SOURCE_STALE` on the result, which maps to
+      side state NEEDS_HUMAN_REVIEW per status-codes.schema.yaml -- the
+      human decides whether stale literature is acceptable for this
+      research question. Online execution MUST go through the network
+      egress allowlist.
+    reasoning: >
+      EC §83 (L2522-2537) is explicit and already registered as a status
+      code with a side-state mapping; this file only binds the capability
+      to it. Refusing offline execution outright would violate MP §5.2;
+      allowing it silently would violate EC §83's "不得假裝最新". The
+      egress obligation is EC §99 via `policies/ai-execution/network-egress.yaml`
+      (whose allowlist is PARTIALLY_DEFINED -- cited with its real status,
+      not assumed complete).
+
+  - question: >
+      Should this file define the `Literature Matrix` (MP §39's next stage)
+      or citation-verification logic (MP §42)?
+    decision: "No. Output stops at LiteratureSet; the matrix and the verification gates belong to their own Method/gate contracts."
+    reasoning: >
+      Same single-source-of-truth restraint `run_statistics.capability.yaml`
+      applied to MP §56's research-paper gates: the citation gate lives on
+      `research.qualitative_coding.contract.yaml#/method_specific_gates.citation`;
+      duplicating its logic here would create two sources of truth. This
+      file only requires that every returned item is citable
+      (`quality.provenance_required`) so that gate has something to check.
+
+id: literature_search
+version: "1.0.0"
+
+input:
+  type:
+    - ResearchQuestion
+  # NEW_DESIGN name for MP §39's "Research Question" stage input (L1936) and
+  # MP §9's `input: research.question` (L785). No typed-objects schema file
+  # yet -- soft reference (OQ-LITSEARCH-2).
+
+output:
+  type:
+    - LiteratureSet
+  # NEW_DESIGN name. This is the object that feeds the `literature` half of
+  # evidence.triangulation.contract.yaml#/inputs.required (MP §9 L789-791),
+  # which keeps MP's bare word by that file's own decision. Every item in the
+  # set MUST be citable (a resolvable citation record) and carry a
+  # provenance_record -- see quality and OQ-LITSEARCH-2.
+
+preconditions:
+  - "research_question.defined == true"
+  - "policy.validation == PASS"
+  - "network_egress.allowed == true OR offline_corpus.available == true"
+  # First: MP §39's pipeline order (Research Question precedes Literature
+  # Search, L1936-1938). Second: MP §8.3's generic executor check (MP §7
+  # Policy Engine stage). Third: EITHER an allow-listed egress route
+  # (policies/ai-execution/network-egress.yaml) OR a local corpus -- one of
+  # the two must hold, and which one held determines `offline_behaviour`.
+
+quality:
+  provenance_required: true
+  method_specific_gate_required: false
+  # provenance_required: each LiteratureSet item carries a provenance_record
+  # and a citation the MP §42 Citation Verification / Retraction Check can
+  # act on. method_specific_gate_required: false -- no Method is dispatched;
+  # the citation gate is evaluated downstream on the Method's outputs.
+
+security:
+  external_ai: policy_controlled
+  # MP L725 convention. An external literature API or an AI-assisted search
+  # provider is reachable only through policies/ai-execution/network-egress.yaml's
+  # allowlist and the AI Gateway (MP §7); no direct unrestricted network
+  # authority (EC §96, policies/ai-execution/tool-permissions.yaml).
+
+rollback:
+  side_effect_free_preferred: true
+  # Read-only retrieval: re-running produces a new LiteratureSet and never
+  # mutates the tenant's knowledge or any external system.
+
+# ---------------------------------------------------------------------------
+# ADDITIVE fields (legal: capability-contract.schema.yaml has no
+# additionalProperties:false; precedent: run_statistics.capability.yaml).
+# ---------------------------------------------------------------------------
+
+offline_behaviour:
+  status_code_when_offline: "OFFLINE_SOURCE_STALE"
+  status_code_registry: "specs/execution/status-codes.schema.yaml"
+  side_state: NEEDS_HUMAN_REVIEW
+  rule: >
+    EC §83 (L2522-2537): offline execution against a cached/exported corpus
+    is legal, but the result MUST carry OFFLINE_SOURCE_STALE and MUST NOT
+    present the corpus as current ("不得假裝最新"). Per status-codes.schema.yaml
+    that signal maps to NEEDS_HUMAN_REVIEW: a human decides whether stale
+    literature suffices for this research question. Freshness of the local
+    corpus is reported, not assumed.
+
+network_egress_policy: "policies/ai-execution/network-egress.yaml"
+# Online execution: every literature source domain must be on the egress
+# allowlist (EC §99). That policy's allowlist is PARTIALLY_DEFINED as of
+# 2026-09-04 (its own status line) -- an online literature source that is
+# not yet on the list is blocked, not tolerated.
+
+worked_example:
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L783-791) + recipes/validated/research-qualitative-v1.recipe.yaml step 'Literature Search'"
+  scenario: >
+    Nordbrook's remote-worker-burnout study: after two coders produce
+    ThemeSets from the interview transcripts, `literature_search` takes the
+    research question ("after-hours boundary erosion among remote workers")
+    and returns a LiteratureSet of citable published work. That set is the
+    `literature` input `evidence.triangulation` requires alongside `themes`;
+    without it the triangulation step would violate its own contract. If the
+    lab runs the study offline (MP §5.2), the LiteratureSet is drawn from the
+    local corpus and carries OFFLINE_SOURCE_STALE, and the researcher decides
+    whether to proceed or to refresh the corpus first.
+
+open_questions:
+  - id: "OQ-LITSEARCH-1"
+    question: >
+      Is `literature_search` a distinct capability from MP §8.2's
+      `retrieve_evidence` (internal Evidence Graph retrieval), or should a
+      future ADR declare one the canonical name and the other an alias, the
+      way status-codes.schema.yaml consolidated METHOD_RESOLUTION_BLOCKED?
+      This file argues they differ (external published sources with an
+      offline-staleness obligation vs internal tenant evidence) but does not
+      rule.
+    owner: "operator, via a future ADR or the Capability Registry design OQ-cc-1 anticipates"
+    blocks: "nothing in this file's own validity -- the Recipe, the Workflow IR worked example and the runtime all use this exact id today"
+  - id: "OQ-LITSEARCH-2"
+    question: >
+      `ResearchQuestion` and `LiteratureSet` are NEW_DESIGN typed-object
+      names with no `cognitive/typed-objects/*.schema.yaml` file, and
+      `LiteratureSet` is this file's PascalCase name for what
+      `evidence.triangulation.contract.yaml` deliberately keeps as MP's bare
+      word `literature`. Should a typed-objects pass add both schemas and
+      have the method contract reference `LiteratureSet` by name, or keep
+      the bare word on the consumer side?
+    owner: "operator, via a future typed-objects compilation pass (same batch as OQ-RSTAT-4 / OQ-TRANSCRIBE-2)"
+    blocks: "nothing in this file's own validity -- soft references are the corpus-wide convention today"
+  - id: "OQ-LITSEARCH-3"
+    question: >
+      No runtime implementation of this capability exists; the Phase 5
+      slice records it as `not_performed`. Which literature sources (and
+      which local corpus format for the offline path) should the first
+      implementation target?
+    owner: "operator / next Phase 5 slice extension"
+    blocks: "nothing in this file's own validity; it does block the Recipe's Literature Search step from ever being INVOKED (as opposed to resolved)"
+
+verification:
+  method: >
+    Read MP §8.1-8.2 (L612-662, confirming `literature_search` is absent
+    from both lists and `retrieve_evidence` present), §9 (L749-800), §39
+    (L1929-1963), §42 (L2028-2050) directly (line numbers as of 2026-09-04).
+    Read EC §83 in full (L2522-2537). Read `specs/execution/status-codes.schema.yaml`'s
+    OFFLINE_SOURCE_STALE entry and its side-state mapping. Read
+    `policies/ai-execution/network-egress.yaml` header (status
+    PARTIALLY_DEFINED) and `tool-permissions.yaml` header. Read
+    `methods/contracts/evidence.triangulation.contract.yaml#/inputs` and
+    its comment on why `literature` stays a bare word. Read
+    `recipes/validated/research-qualitative-v1.recipe.yaml` in full (the
+    step and reconciliation point 2). Read `specs/domain/capability-contract.schema.yaml`
+    and `run_statistics.capability.yaml` in full as schema and style
+    template. Grepped the full spec root for `literature_search` /
+    `retrieve_evidence` to confirm no other file already defines either.
+    Validated against `specs/domain/capability-contract.schema.yaml` via
+    `tests/run_golden_tests.py` check 2c -- 0 errors; `id` equals the
+    filename slug.
+  note: >
+    No mother document or ADR was modified to produce this file. Grounded:
+    `id` (MP §9), pipeline position (MP §39), the consumer relationship
+    (MP §9 + evidence.triangulation contract), the offline rule (EC §83 +
+    status-codes registry), the egress obligation (EC §99 policy file).
+    Designed (flagged): both typed-object names, the `offline_behaviour`
+    block's wording. Deliberately NOT decided: the retrieve_evidence
+    relationship (OQ-LITSEARCH-1).

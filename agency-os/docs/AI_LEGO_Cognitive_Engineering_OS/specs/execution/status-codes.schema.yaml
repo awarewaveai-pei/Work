@@ -22,6 +22,12 @@ description: >
   an informal shorthand for the canonical NEEDS_HUMAN_REVIEW, not a 10th signal.
   This file is the single source of truth; the mother documents reference it,
   they do not redefine these codes.
+  (4) 2026-09-04: registers CAPABILITY_RESOLUTION_BLOCKED — the capability-side
+  sibling of METHOD_RESOLUTION_BLOCKED that docs/adr/ADR-023-capability-
+  resolution-fail-closed.md decided (§Decision 1) and asked this file to
+  register (§Consequences 2); a real runtime already emits it. See the
+  `NEW_ACCEPTED_2026-09-04` entry below, the emittable_reason_codes update,
+  and OQ-STATUS-4.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §0.0 (L45-49, PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED — deprecated alias)"
@@ -41,6 +47,10 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §0.0.2 (L83, CONFLICT_REQUIRES_HUMAN_REVIEW — second, matching appearance)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §98 (L4198-4206, LEGAL_REVIEW_REQUIRED — second appearance, embedded in a 5-value enum)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §134 (L5258-5271, INTERPRETATION_REQUIRED — new finding, see open_questions.OQ-STATUS-3)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §7 AI Gateway (L561-575) / §8.4 Typed LEGO (L705-726, '不合法組合在執行前拒絕') — the fail-closed rule CAPABILITY_RESOLUTION_BLOCKED signals (line numbers as of 2026-09-04)"
+  - "docs/adr/ADR-023-capability-resolution-fail-closed.md §Decision 1-3, §Consequences 2 — the ruling that names CAPABILITY_RESOLUTION_BLOCKED and asks this file to register it"
+  - "specs/execution/capability-resolution.schema.yaml — the result record whose blocked.status is const CAPABILITY_RESOLUTION_BLOCKED (soft reference back to this file)"
+  - "Projects/internal/cognitive-engineering-os/ai_lego/platform/ai_execution/capability_resolver.py — the producer that emits CAPABILITY_RESOLUTION_BLOCKED (CapabilityCatalog.resolve / require / invoke)"
 
 decided_by: >
   No single ADR governs this file. docs/architecture/MACHINE_READABLE_SPEC_PLAN.md
@@ -95,14 +105,16 @@ reference_vocabulary:
       type: string
       enum: [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]
   emittable_reason_codes:
-    source: "status_codes[] entries with status: EXISTING_CONSOLIDATED, excluding NEEDS_HUMAN_REVIEW because it is a legal side state rather than a named signal"
-    values: [METHOD_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
+    source: "status_codes[] entries with status EXISTING_CONSOLIDATED or NEW_ACCEPTED_* (an ADR-accepted code that a real producer emits — CAPABILITY_RESOLUTION_BLOCKED, 2026-09-04), excluding NEEDS_HUMAN_REVIEW because it is a legal side state rather than a named signal, and excluding NEW_PROPOSED_* entries (proposed, no producer yet)"
+    values: [METHOD_RESOLUTION_BLOCKED, CAPABILITY_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
     # Referenceable vocabulary for execution/result.schema.yaml reason_code.
     # NEW_PROPOSED PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED is not emitted;
     # NEEDS_HUMAN_REVIEW is the side state, not a named cause.
+    # CAPABILITY_RESOLUTION_BLOCKED added 2026-09-04 (ADR-023 §Consequences 2);
+    # pinned by tests/contracts/specs/execution/status-codes.emittable-reason-codes.fixtures.yaml.
     schema:
       type: string
-      enum: [METHOD_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
+      enum: [METHOD_RESOLUTION_BLOCKED, CAPABILITY_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
 
 # ---------------------------------------------------------------------------
 # Duplicate resolution: METHOD_RESOLUTION_BLOCKED vs
@@ -218,6 +230,57 @@ status_codes:
         rule — not a human-judgment review gate, so BLOCKED (not
         NEEDS_HUMAN_REVIEW) fits best. Same family as DOCUMENT_RESOLUTION_BLOCKED,
         one boot step earlier in the same flow.
+
+  - name: CAPABILITY_RESOLUTION_BLOCKED
+    status: "NEW_ACCEPTED_2026-09-04"
+    canonical: true
+    accepted_by: "docs/adr/ADR-023-capability-resolution-fail-closed.md (ACCEPTED 2026-09-03) §Decision 1; registered here per its §Consequences 2. A third status value alongside EXISTING_CONSOLIDATED (mother-document code) and NEW_PROPOSED_* (plan-proposed, no producer): an ADR-accepted code that a real producer already emits."
+    resolves_finding: ["OQ-P5-1"]
+    appears_in:
+      - {file: "docs/adr/ADR-023-capability-resolution-fail-closed.md", section: "§Decision 1", line: 19, quote: "The blocking signal is `CAPABILITY_RESOLUTION_BLOCKED`, named per the existing `<Domain>_RESOLUTION_BLOCKED` family (`METHOD_`, `DOCUMENT_`)"}
+      - {file: "Projects/internal/cognitive-engineering-os/ai_lego/platform/ai_execution/capability_resolver.py", section: "module constant; CapabilityCatalog.resolve / require / invoke", line: 57, quote: "CAPABILITY_RESOLUTION_BLOCKED = \"CAPABILITY_RESOLUTION_BLOCKED\""}
+      - {file: "specs/execution/capability-resolution.schema.yaml", section: "capability_resolution_result.blocked.status", line: 203, quote: "const: \"CAPABILITY_RESOLUTION_BLOCKED\""}
+    trigger: >
+      Union of the three conditions the runtime's shared catalog scan and
+      resolver detect (ADR-023 §Decision 1, Projects/internal/cognitive-engineering-os/
+      ai_lego/platform/ai_execution/{contract_catalog,capability_resolver}.py):
+      a capability ref of the compiled Workflow IR has NO
+      `capabilities/contracts/<ref>.capability.yaml` under the read-only spec
+      root; OR the file exists but declares no `id` / a different `id` /
+      `status` other than ACTIVE (a DRAFT contract is unresolved); OR the
+      catalog cannot be loaded at all (CONTRACT_CATALOG_UNREADABLE /
+      CONTRACT_ID_DUPLICATE) — in every case while the plan or the request
+      needs that capability. Same shape as METHOD_RESOLUTION_BLOCKED's
+      "cannot be read / version unknown / content incomplete / cannot load"
+      union, one boot-flow step later.
+    required_action: >
+      MUST NOT run the capability implementation (MP §8.4 L726: "不合法組合
+      在執行前拒絕"; MP §7 L561-575: every Capability Request passes the
+      Capability Resolver before the AI Gateway) — the runtime's
+      CapabilityCatalog.invoke raises before the implementation is reached,
+      and nothing is logged for a blocked invocation. At plan time: a plan
+      with an unresolved REQUIRED_* capability node (Atlas §14.3 via
+      recipe.schema.yaml `necessity`) MUST NOT reach PLAN_COMPILED — it
+      transitions METHODS_RESOLVED → BLOCKED with this code as
+      `trigger_signal` (ADR-023 §Decision 3); unresolved RECOMMENDED/OPTIONAL
+      nodes are recorded in `plan_executability.not_invocable` and the plan
+      may proceed with those nodes omitted, never invoked. MUST NOT
+      improvise the capability from narrative or substitute a look-alike
+      implementation (same red line as METHOD_RESOLUTION_BLOCKED, MP L45 /
+      EC L726). Result record: specs/execution/capability-resolution.schema.yaml.
+    side_state_mapping:
+      value: BLOCKED
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: >
+        Hard mechanical prerequisite failure with an explicit no-workaround
+        rule — identical character to METHOD_RESOLUTION_BLOCKED and
+        DOCUMENT_RESOLUTION_BLOCKED (the two other members of the
+        `<Domain>_RESOLUTION_BLOCKED` family), not a human-judgment review
+        gate. ADR-019 Option A: the side state stays BLOCKED, this code is
+        the reason. No CAPABILITIES_RESOLVED primary state exists in EC §10
+        (see OQ-STATUS-4), so the block fires between METHODS_RESOLVED and
+        PLAN_COMPILED.
+    depends_on: "specs/domain/capability-contract.schema.yaml (what a contract is), capabilities/contracts/*.capability.yaml (the catalog), specs/execution/capability-resolution.schema.yaml (the result record)"
 
   - name: DOCUMENT_RESOLUTION_BLOCKED
     status: EXISTING_CONSOLIDATED
@@ -453,9 +516,47 @@ open_questions:
       resolved 2026-08-29 by
       specs/jurisdiction/conflict-of-laws-output.schema.yaml; that
       resolution does not touch this enum-vocabulary question).
+  - id: "OQ-STATUS-4"
+    new_finding: true
+    question: >
+      2026-09-04, surfaced by registering CAPABILITY_RESOLUTION_BLOCKED. EC
+      §10's 14-state primary sequence names METHODS_RESOLVED (the success
+      state METHOD_RESOLUTION_BLOCKED is the failure counterpart of) but
+      has NO capability counterpart — MP §7's Capability Resolver stage has
+      no primary state of its own, so a capability block can only fire
+      between METHODS_RESOLVED and PLAN_COMPILED, and
+      execution-state-machine.schema.yaml's `preconditions` block (which
+      lists only mother-document-specified gates, and therefore none for
+      PLAN_COMPILED) does not yet record ADR-023 §Decision 3's
+      "executable: false must not reach PLAN_COMPILED" rule. Two
+      candidate fixes, neither decided here: (a) an EC revision via the
+      ADR-006 `.ai/proposals/` flow adding a CAPABILITIES_RESOLVED primary
+      state between METHODS_RESOLVED and PLAN_COMPILED (a transition-graph
+      change, the cost ADR-019 warns about); (b) leave the graph alone
+      (ADR-019 Option A) and have execution-state-machine.schema.yaml's
+      next revision add a PLAN_COMPILED precondition citing ADR-023 as its
+      (non-mother-document) source. The runtime today records the block as
+      a legal METHODS_RESOLVED → BLOCKED side-state transition with this
+      code as trigger_signal, which the state-machine schema already
+      accepts. See also capability-resolution.schema.yaml OQ-CAPRES-2.
 
 verification:
-  method: "Read/Grep against all three mother documents and docs/architecture/MACHINE_READABLE_SPEC_PLAN.md; docs/adr/ADR-001~009 grepped for prior rulings on this duplicate (none found except incidental quotation in ADR-008)."
+  method: >
+    Read/Grep against all three mother documents and
+    docs/architecture/MACHINE_READABLE_SPEC_PLAN.md; docs/adr/ADR-001~009
+    grepped for prior rulings on this duplicate (none found except
+    incidental quotation in ADR-008). 2026-09-04 addition: read ADR-023 in
+    full, ADR-019 in full (Option A — closed side-state enum + reason_code —
+    is what the new entry's side_state_mapping follows), MP §7 (L561-575)
+    and §8.4 (L705-726) at the cited lines, the runtime's
+    capability_resolver.py / contract_catalog.py in full (the producer
+    whose trigger conditions the new entry transcribes), and
+    execution-state-machine.schema.yaml's from_state/to_state rules to
+    confirm METHODS_RESOLVED → BLOCKED is a legal transition today. The
+    emittable_reason_codes enum change is pinned by a new fixture file
+    (tests/contracts/specs/execution/status-codes.emittable-reason-codes.fixtures.yaml)
+    that turns red if the code is removed again; result.schema.yaml's
+    reason_code $ref picks the new value up without modification.
   note: >
     Every trigger/required_action quote above was re-read at its cited line in
     this session (not transcribed from verified-findings.yaml summaries alone).

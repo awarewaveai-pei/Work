@@ -1,0 +1,91 @@
+schema_id: "ai-lego://specs/execution/capability-resolution.schema.yaml"
+target_ref: "#/capability_resolution_result"
+description: >
+  Exercises the all-or-nothing result contract: `blocked` is REQUIRED and
+  nullable (explicit null = resolved; absence is invalid -- stricter than
+  method_resolution_result, see the schema's compilation_decisions), the
+  const CAPABILITY_RESOLUTION_BLOCKED status, the required non-empty
+  `unresolved` list inside a block, and the two allOf/if/then rules
+  (blocked object => candidate_capabilities empty; blocked null =>
+  candidate_capabilities non-empty). Valid cases are the two records the
+  Phase 5 runtime actually emits (`CapabilityCatalog.resolve`).
+
+valid:
+  - name: fully_resolved_four_refs
+    instance:
+      candidate_capabilities:
+        - { ref: transcribe, rationale: "ACTIVE contract capabilities/contracts/transcribe.capability.yaml v1.0.0" }
+        - { ref: literature_search, rationale: "ACTIVE contract capabilities/contracts/literature_search.capability.yaml v1.0.0" }
+        - { ref: run_statistics, rationale: "ACTIVE contract capabilities/contracts/run_statistics.capability.yaml v1.0.0" }
+        - { ref: artifact.generate_research_paper, rationale: "ACTIVE contract capabilities/contracts/artifact.generate_research_paper.capability.yaml v1.0.0" }
+      blocked: null
+  - name: blocked_with_split
+    instance:
+      candidate_capabilities: []
+      blocked:
+        status: "CAPABILITY_RESOLUTION_BLOCKED"
+        reason: "no ACTIVE contract in catalog live:capabilities/contracts@0123456789ab for: transcribe, artifact.generate_research_paper"
+        unresolved: [transcribe, artifact.generate_research_paper]
+        resolvable: [literature_search, run_statistics]
+  - name: blocked_everything_unresolved_empty_resolvable_is_legal
+    instance:
+      candidate_capabilities: []
+      blocked:
+        status: "CAPABILITY_RESOLUTION_BLOCKED"
+        reason: "empty catalog"
+        unresolved: [run_statistics]
+        resolvable: []
+
+invalid:
+  - name: blocked_key_absent
+    instance:
+      candidate_capabilities:
+        - { ref: run_statistics }
+    reason: "blocked is in the required list (required-nullable): a producer must SAY whether it blocked; omitting the key is not the same as null."
+  - name: blocked_with_wrong_status_const
+    instance:
+      candidate_capabilities: []
+      blocked:
+        status: "METHOD_RESOLUTION_BLOCKED"
+        reason: "wrong resolver's signal"
+        unresolved: [run_statistics]
+        resolvable: []
+    reason: "blocked.status is const CAPABILITY_RESOLUTION_BLOCKED (soft reference to status-codes.schema.yaml's entry); the method side's signal is a different code."
+  - name: blocked_but_candidates_non_empty
+    instance:
+      candidate_capabilities:
+        - { ref: run_statistics }
+      blocked:
+        status: "CAPABILITY_RESOLUTION_BLOCKED"
+        reason: "partial"
+        unresolved: [transcribe]
+        resolvable: [run_statistics]
+    reason: "allOf rule 1: a block empties candidate_capabilities (maxItems: 0) -- resolution is all-or-nothing, like methods; resolvable refs are reported in blocked.resolvable, not as candidates."
+  - name: blocked_with_empty_unresolved
+    instance:
+      candidate_capabilities: []
+      blocked:
+        status: "CAPABILITY_RESOLUTION_BLOCKED"
+        reason: "a block that names nothing"
+        unresolved: []
+        resolvable: [run_statistics]
+    reason: "blocked.unresolved has minItems: 1 -- a block record must name at least one unresolved ref (a detector that fires but says nothing is forbidden)."
+  - name: blocked_missing_resolvable
+    instance:
+      candidate_capabilities: []
+      blocked:
+        status: "CAPABILITY_RESOLUTION_BLOCKED"
+        reason: "no split"
+        unresolved: [transcribe]
+    reason: "blocked.required is [status, reason, unresolved, resolvable]; the resolvable list is required (may be empty, must be present)."
+  - name: resolved_with_empty_candidates
+    instance:
+      candidate_capabilities: []
+      blocked: null
+    reason: "allOf rule 2: blocked null requires candidate_capabilities minItems: 1 -- a result that blocks nothing and resolves nothing says nothing."
+  - name: candidate_ref_violates_id_grammar
+    instance:
+      candidate_capabilities:
+        - { ref: "Run-Statistics" }
+      blocked: null
+    reason: "candidate_capabilities[].ref is a hard $ref into capability-contract.schema.yaml#/properties/id (lowercase snake_case, at most one dot); uppercase and hyphen are rejected."

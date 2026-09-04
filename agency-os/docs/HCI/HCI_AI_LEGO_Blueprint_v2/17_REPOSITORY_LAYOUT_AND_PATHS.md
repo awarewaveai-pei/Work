@@ -124,24 +124,16 @@ D:\Work\Projects\internal\hci30\
 
 ## AI LEGO Cognitive Engineering OS
 
-```text
-D:\Work\Projects\internal\cognitive-engineering-os\
-│
-├── method-atlas\
-├── workflow\
-├── execution\
-├── authority\
-├── model-routing\
-├── verification\
-├── convergence\
-├── replay\
-├── rollback\
-├── handoff\
-├── jurisdiction\
-├── contracts\
-├── tests\
-└── docs\
-```
+The Cognitive Engineering OS's internal tree is **not** specified here. Its ACCEPTED source of truth is
+`D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\docs\architecture\REPOSITORY_ARCHITECTURE.md`
+(Status: ACCEPTED 2026-08-30, §Proposed Directory Tree: `/apps`, `/core`, `/modules`, `/cognitive`, `/ai`,
+`/compute`, `/platform`, `/data`, `/specs`, `/policies`, `/methods`, `/recipes`, `/infra`, …), and the landed
+runtime at `D:\Work\Projects\internal\cognitive-engineering-os\` (package `ai_lego`, ADR-022) follows that
+tree one level down. The 14-directory sketch this section used to carry (`method-atlas\`, `workflow\`,
+`execution\`, `authority\`, …) was a pre-acceptance draft that never matched the accepted layout; it was removed
+on 2026-09-04 rather than left as a second, contradicting picture (TASKS «Cognitive OS Phase 5 落地後續» ①).
+HCI integrates with that product only through `integrations\cognitive-os\` above and through versioned
+contracts — never by reaching into its tree.
 
 ## Existing mother-document location
 

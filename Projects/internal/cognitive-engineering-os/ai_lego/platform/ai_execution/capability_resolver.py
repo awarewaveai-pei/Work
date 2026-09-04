@@ -13,53 +13,46 @@ Governing text, both from the Master Plan:
   *before* execution, exactly as EC §14 rejects an unregistered method.
 
 This module is the runtime seam for both rules, mirroring
-``method_resolver.MethodCatalog``:
+``method_resolver.MethodCatalog`` (both are ``ContractCatalog`` subclasses):
 
 * ``CapabilityCatalog.resolve(refs)`` -- all-or-nothing, like methods: any ref
   without an ACTIVE contract blocks the whole request with
-  ``CAPABILITY_RESOLUTION_BLOCKED``.
+  ``CAPABILITY_RESOLUTION_BLOCKED``. The record is an instance of
+  ``specs/execution/capability-resolution.schema.yaml#/capability_resolution_result``.
 * ``CapabilityCatalog.require(ref)`` / ``invoke(ref, fn, ...)`` -- the
-  per-invocation gate. ``invoke`` resolves first and only then calls the
-  implementation, and it records every invocation it actually made in
-  ``invocations`` so a caller reports what was observed, not what it believes.
-  Scope of the guarantee, stated precisely: **no implementation handed to
-  ``invoke`` runs on an unresolved ref**. Code that performs capability-like
-  work without going through ``invoke`` (a caller's ingest port, a test
-  harness's own artifact) is outside this module's reach; such callers must
-  declare it -- the Phase 5 slice does, under
-  ``performed_outside_capability_plane``.
+  per-invocation gate (inherited). ``invoke`` resolves first and only then
+  calls the implementation, and it records every invocation it actually made
+  in ``invocations`` so a caller reports what was observed, not what it
+  believes. Scope of the guarantee, stated precisely: **no implementation
+  handed to ``invoke`` runs on an unresolved ref**. Code that performs
+  capability-like work without going through ``invoke`` is outside this
+  module's reach; such callers must declare it -- the Phase 5 slice's
+  ``OUTSIDE_CAPABILITY_PLANE`` mechanism (empty since 2026-09-04, when the
+  last two declared bypasses were re-homed behind ``invoke``).
 * ``plan_executability(workflow_ir, resolution)`` -- classifies the compiled
   IR's capability nodes by the Recipe's own ``necessity`` label (Atlas §14.3:
   ``REQUIRED_*`` blocks are policy-mandated and cannot be removed;
   ``RECOMMENDED``/``OPTIONAL`` may be omitted). A plan with an unresolved
-  ``REQUIRED_*`` capability node is not executable. The function refuses a
-  resolution that does not cover every capability node of the IR
-  (``CAPABILITY_PLAN_COVERAGE_MISMATCH``) -- an empty resolution must not read
-  as "fully resolved".
+  ``REQUIRED_*`` capability node is not executable and (ADR-023 §Decision 3,
+  wired 2026-09-04) transitions ``METHODS_RESOLVED -> BLOCKED`` instead of
+  reaching ``PLAN_COMPILED``. The function refuses a resolution that does not
+  cover every capability node of the IR (``CAPABILITY_PLAN_COVERAGE_MISMATCH``)
+  -- an empty resolution must not read as "fully resolved". The record is an
+  instance of ``capability-resolution.schema.yaml#/plan_executability``.
 
-Status-code naming: ``CAPABILITY_RESOLUTION_BLOCKED`` follows the
-``<Domain>_RESOLUTION_BLOCKED`` family that ``specs/execution/status-codes.schema.yaml``
-already uses for ``METHOD_`` and ``DOCUMENT_``. It is NOT yet registered in
-that file (a spec-root change, outside this runtime's write scope); today the
-runtime carries it in the ``signal`` field of the resolution ledger event, and
-will carry it as a state transition's ``trigger_signal`` once the plan-level
-BLOCKED transition is wired. There is likewise no
-``capability-resolution.schema.yaml`` yet, so the result record below is a
-runtime-defined shape (``NEW_DESIGN``) that mirrors
-``method-resolution.schema.yaml#/method_resolution_result`` field-for-field
-(``candidate_capabilities`` / ``blocked``), so the two can be unified by the
-spec-root maintainer without a runtime change. Both follow-ups are recorded in
-``docs/adr/ADR-023-capability-resolution-fail-closed.md``.
+Status code: ``CAPABILITY_RESOLUTION_BLOCKED`` is registered in
+``specs/execution/status-codes.schema.yaml`` (2026-09-04, ADR-023 §Consequences
+2) in the ``<Domain>_RESOLUTION_BLOCKED`` family with side-state mapping
+BLOCKED, and is a member of ``emittable_reason_codes``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, TypeVar
+from dataclasses import dataclass
+from typing import Any, ClassVar
 
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform.ai_execution.contract_catalog import catalog_label, is_active, scan_contract_files
+from ai_lego.platform.ai_execution.contract_catalog import ContractCatalog
 
 CAPABILITY_RESOLUTION_BLOCKED = "CAPABILITY_RESOLUTION_BLOCKED"
 CONTRACTS_DIR = "capabilities/contracts"
@@ -67,29 +60,15 @@ CONTRACT_GLOB = "*.capability.yaml"
 DEFAULT_NECESSITY = "RECOMMENDED"  # recipe.schema.yaml#/steps/items/necessity default
 BLOCKING_NECESSITY_PREFIX = "REQUIRED_"  # REQUIRED_BY_RISK / _BY_JURISDICTION / _BY_SECTOR (Atlas §14.3)
 
-T = TypeVar("T")
-
 
 @dataclass(frozen=True)
-class CapabilityCatalog:
-    label: str
-    contracts: dict[str, dict[str, Any]]
-    invocations: list[dict[str, Any]] = field(default_factory=list, compare=False, repr=False)
-
-    @classmethod
-    def from_spec_root(cls, spec_root: Path) -> "CapabilityCatalog":
-        contracts = scan_contract_files(spec_root, CONTRACTS_DIR, CONTRACT_GLOB)
-        return cls(label=catalog_label(CONTRACTS_DIR, contracts), contracts=contracts)
-
-    @classmethod
-    def empty(cls, label: str) -> "CapabilityCatalog":
-        return cls(label=label, contracts={})
-
-    def is_resolvable(self, ref: str) -> bool:
-        return is_active(self.contracts.get(ref))
+class CapabilityCatalog(ContractCatalog):
+    CONTRACTS_DIR: ClassVar[str] = CONTRACTS_DIR
+    CONTRACT_GLOB: ClassVar[str] = CONTRACT_GLOB
+    BLOCKED_SIGNAL: ClassVar[str] = CAPABILITY_RESOLUTION_BLOCKED
 
     def resolve(self, refs: list[str]) -> dict[str, Any]:
-        """Runtime mirror of ``method_resolution_result`` for capability refs (see module docstring).
+        """Instance of ``capability-resolution.schema.yaml#/capability_resolution_result``.
 
         All-or-nothing: one unresolved ref blocks the request. ``blocked`` carries
         the machine-readable split (``unresolved`` / ``resolvable``) so a caller
@@ -113,24 +92,6 @@ class CapabilityCatalog:
             ],
             "blocked": None,
         }
-
-    def require(self, ref: str) -> dict[str, Any]:
-        """Per-invocation gate (MP §7 'Capability Request'): the contract descriptor, or a raise. Never a fallback."""
-        if not self.is_resolvable(ref):
-            raise InvariantViolation(f"{CAPABILITY_RESOLUTION_BLOCKED}: no ACTIVE contract in catalog {self.label} for: {ref}")
-        return {"ref": ref, **self.contracts[ref]}
-
-    def invoke(self, ref: str, implementation: Callable[..., T], *args: Any, **kwargs: Any) -> tuple[dict[str, Any], T]:
-        """Resolve ``ref``, only then call ``implementation``, and log the invocation; returns ``(descriptor, result)``.
-
-        The callable is not reached on a blocked ref -- ``require`` raises first --
-        and nothing is logged for it: ``invocations`` holds only invocations that
-        actually ran.
-        """
-        descriptor = self.require(ref)
-        result = implementation(*args, **kwargs)
-        self.invocations.append(dict(descriptor))
-        return descriptor, result
 
 
 def covered_refs(resolution: dict[str, Any]) -> set[str]:

@@ -11,7 +11,10 @@ python3 tests/run_golden_tests.py
 
 ## What this suite checks
 
-`tests/run_golden_tests.py` runs four independent check families:
+`tests/run_golden_tests.py` runs the check families listed in its own module
+docstring (the SSOT for the current set — 2b/2c method+capability contract
+conformance and 5 search-content pack were added after this README's
+original four):
 
 1. **Schema conformance** — every `tests/contracts/**/*.fixtures.yaml` file
    drives positive (must validate) and negative (must fail validation)
@@ -37,7 +40,8 @@ need exactly one; a handful that define more than one named instance shape
 convention: mirror the schema's path under `tests/contracts/`, replacing
 `.schema.yaml`/`.yaml` with `.fixtures.yaml` (add a `.<shape>` infix before
 `.fixtures.yaml` when a file needs more than one target — see
-`method-resolution` and `status-codes` below for the two real cases).
+`method-resolution`, `status-codes` and `capability-resolution` below for
+the three real cases).
 
 ```yaml
 schema_id: "ai-lego://specs/execution/gate.schema.yaml"
@@ -99,7 +103,8 @@ sub-schema (see `specs/execution/risk-tier.schema.yaml`'s
 | `specs/execution/execution-state-machine.schema.yaml` | `#/state_transition_event` (added 2026-08-30; `audit.schema.yaml`, added the same day, validates at its own document root and is intentionally NOT listed here — see the "Files not listed" note above) |
 | `specs/execution/gate.schema.yaml` | `#/gate_result` |
 | `specs/execution/method-resolution.schema.yaml` | TWO fixtures needed: `#/method_resolution_request` and `#/method_resolution_result` |
-| `specs/execution/status-codes.schema.yaml` | TWO fixtures needed: `#/reference_vocabulary/legal_side_states/schema` and `#/reference_vocabulary/final_status/schema` |
+| `specs/execution/capability-resolution.schema.yaml` | THREE fixtures needed: `#/capability_resolution_request`, `#/capability_resolution_result` and `#/plan_executability` (added 2026-09-04, ADR-023 §Consequences 3) |
+| `specs/execution/status-codes.schema.yaml` | THREE fixtures needed: `#/reference_vocabulary/legal_side_states/schema`, `#/reference_vocabulary/final_status/schema` and `#/reference_vocabulary/emittable_reason_codes/schema` (the third added 2026-09-04 with the CAPABILITY_RESOLUTION_BLOCKED registration) |
 | `specs/jurisdiction/availability.schema.yaml` | `#/capability_availability` |
 | `specs/jurisdiction/pack.schema.yaml` | `#/jurisdiction_pack` |
 | `specs/security/key-vault-lifecycle.schema.yaml` | pick 2 of `#/definitions/{key_record,key_destruction_record,vault_restore_event,rollback_scenario,hmac_signing_key_policy,key_use}` — at minimum cover `key_record` and `key_destruction_record` (the crypto-shred erasure mechanism this file exists for) |

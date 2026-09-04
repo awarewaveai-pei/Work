@@ -28,7 +28,9 @@ recipe instance):
   2c. Capability contract instance conformance -- capabilities/contracts/*.capability.yaml
       (new 2026-08-30, Phase 5 Research Mode MVP slice: run_statistics /
       Cohen's Kappa inter-rater reliability, docs/architecture/
-      MVP_VERTICAL_SLICE_PLAN.md section 4) validate against
+      MVP_VERTICAL_SLICE_PLAN.md section 4; plus transcribe / literature_search /
+      artifact.generate_research_paper, 2026-09-04, ADR-023 section
+      Consequences 1 -- all four pinned by name) validate against
       specs/domain/capability-contract.schema.yaml. No separate INSTANCE-
       driving fixtures file (the schema itself is already fixture-tested by
       check 1, tests/contracts/specs/domain/capability-contract.fixtures.yaml)
@@ -272,12 +274,17 @@ def run_capability_contract_conformance():
     cap_validator = Draft202012Validator(cap_schema, registry=reg_c)
 
     cap_files = sorted(glob.glob(os.path.join(ROOT, "capabilities", "contracts", "*.capability.yaml")))
-    check(len(cap_files) >= 1, f"expected at least 1 capabilities/contracts/*.capability.yaml file (run_statistics, Phase 5 Research Mode slice), found {len(cap_files)}")
+    check(len(cap_files) >= 4, f"expected at least 4 capabilities/contracts/*.capability.yaml files (the research-qualitative-v1 Recipe's four capability refs, ADR-023 section Consequences 1), found {len(cap_files)}")
     # 2026-08-30 critic finding: a bare >=1 count does not pin WHICH file is
     # present -- deleting run_statistics.capability.yaml and adding any other
     # well-formed decoy capability would still pass silently.
     cap_basenames = {os.path.basename(p)[: -len(".capability.yaml")] for p in cap_files}
-    check("run_statistics" in cap_basenames, f"expected capabilities/contracts/run_statistics.capability.yaml specifically (Cohen's Kappa inter-rater reliability, Phase 5 Research Mode slice) among the {len(cap_files)} found, found {sorted(cap_basenames)}")
+    # 2026-09-04: every capability ref of recipes/validated/research-qualitative-v1.recipe.yaml
+    # is pinned by name (ADR-023 section Consequences 1). Deleting any one of them would otherwise
+    # pass the count check while silently flipping the runtime's plan verdict back to
+    # executable: false -- a "detector goes silent" regression.
+    for required in ("run_statistics", "transcribe", "literature_search", "artifact.generate_research_paper"):
+        check(required in cap_basenames, f"expected capabilities/contracts/{required}.capability.yaml specifically (research-qualitative-v1 capability ref, ADR-023 section Consequences 1) among the {len(cap_files)} found, found {sorted(cap_basenames)}")
     for p in cap_files:
         rel_p = os.path.relpath(p, ROOT)
         inst = load(p)

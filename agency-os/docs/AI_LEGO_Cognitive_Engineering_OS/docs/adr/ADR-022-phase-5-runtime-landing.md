@@ -57,7 +57,7 @@ This is the same round-3-unnecessary discipline AGENTS.md's own "同一 reviewer
 | No detected PII reaches the append-only ledger, for any subject | CLOSED | round 2; `PiiLedgerGuard` + `test_no_detected_pii_reaches_the_ledger_for_any_subject` |
 | Program Plan §11 / MVP plan §7 / OQ-3 / TASKS updated | CLOSED | round 1 commit |
 | HCI chapter 17 pointer to this root's internal layout | OPEN | edit deferred: file in flight in a paused session |
-| Capability-contract resolution fail-closed (OQ-P5-1) | CLOSED for the runtime (ADR-023, 2026-09-03); OPEN for the spec root | invocation gate + plan-time honest record live (`ai_lego/platform/ai_execution/capability_resolver.py`, 122 tests); the plan-level BLOCKED transition waits on the three missing `capabilities/contracts/*.capability.yaml` — ADR-023 §Consequences |
+| Capability-contract resolution fail-closed (OQ-P5-1) | CLOSED (runtime 2026-09-03, ADR-023; spec root + plan-level BLOCKED 2026-09-04) | invocation gate on every capability/method call + plan-time record + METHODS_RESOLVED → BLOCKED transition live (`ai_lego/platform/ai_execution/{contract_catalog,capability_resolver}.py`, `run_research_slice.py` step 13.5, 131 tests); the three `capabilities/contracts/*.capability.yaml`, the `CAPABILITY_RESOLUTION_BLOCKED` registration and `capability-resolution.schema.yaml` landed 2026-09-04 — ADR-023 §Required implementation gates (only Consequences 6 open) |
 | `REPOSITORY_ARCHITECTURE.md` tree deviations reconciled (OQ-P5-8) | OPEN | recorded honestly in Decision §2 above; next repository-architecture revision |
 
 ## Consequences
