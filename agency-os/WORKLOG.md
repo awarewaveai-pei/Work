@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-09-04（續，System Foundry v1.6：實際跑一次 configurator 示範給操作者看 + 加 launch.json）
+
+**觸發**：操作者問「所以是可以使用了嗎？怎麼使用？」——不只講解，實際跑一次證明。
+
+**[已修改]**：新增 `.claude/launch.json`，註冊 `system-foundry-configurator` 設定（`python scripts/serve_configurator.py --host 127.0.0.1 --port 8765`），之後可用 Browser 工具的 `preview_start` 一鍵啟動，不用每次手key指令。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash（preview_start 啟動）+ Chrome 截圖 | cmd=啟動 configurator，瀏覽器截圖確認 UI 正常渲染（121 題問卷、21 類別、18 個鎖定基本保障 badge、專案名稱欄位） | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=呼叫真實 `/api/catalog`+`/api/generate` HTTP endpoint（跟 `test_configurator_http_e2e.py` 同款做法），答 3 題（外部客戶使用/使用者帳號/向客戶收費）生成一個 demo 專案 | exit=0 | result=`modules=[commercial, core, identity, mobile]`, `blueprints_active=62/73`, `capabilities=22`；抽查 `docs/modules/commercial/MODULE_MANIFEST.json` 與 `docs/blueprint/14_SECURITY_ARCHITECTURE.md` 皆為真實生成內容（含 invariants、security_obligations、input digest），非空殼
+- 示範用的 `generated/demo-crm/` 產物已刪除（純示範用，不留在 repo；刪除過程遇到 Windows 檔案鎖延遲，重試後清乾淨，git status 確認無殘留）
+
+**[剩餘風險]**：無。`generated/` 目錄未加入 `.gitignore`（上一輪 critic s-1 建議過，判斷優先度低未處理）——若操作者之後常態使用 configurator 產生demo，建議之後補上，避免生成物意外被 git 追蹤。
+
+**Rollback**：`git rm .claude/launch.json`（純新增設定檔，無其他影響）。
+
 ## 2026-09-04（續，System Foundry v1.6：清掉最後 3 項已知缺口）
 
 ### `capabilities/catalog.json` 160 個空 description 全補 + G6 gap 補上 + `QUALITY_STRENGTH_MATRIX.md` 自評語氣改成誠實引用

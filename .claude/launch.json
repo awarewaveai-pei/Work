@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "system-foundry-configurator",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/serve_configurator.py",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8765",
+        "--output-root",
+        "agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generated"
+      ],
+      "port": 8765
+    }
+  ]
+}
