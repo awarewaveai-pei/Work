@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/architecture.quality_attribute_scenario.contract.yaml"
+title: "Quality Attribute Scenario Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Fifteenth Method Atlas slice, fourth from the
+  `architecture` family (F18's own "Software Architecture Pack") -- a
+  fourth member tool built, still not the whole pack.
+
+  Atlas's own F18 tool table (L822) gives this method a concrete 6-field
+  pipeline: "Source→Stimulus→Artifact→Environment→Response→Measure" --
+  the standard, widely-published Quality Attribute Scenario structure
+  (Bass/Clements/Kazman), turning a vague non-functional goal ("stable,
+  secure, fast") into a testable requirement. Unlike ATAM/ADR/Event
+  Storming, this method has NO dedicated §11.x section -- the table row
+  is its only Atlas citation, disclosed as thinner grounding than its F18
+  siblings, but the 6 field names are concrete and industry-standard
+  enough to ground a schema directly without invention.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Quality Attribute Scenario row (L822): 'Source→Stimulus→Artifact→Environment→Response→Measure'"
+  - "methods/registry/method-inventory.yaml Quality Attribute Scenario entry (L1097-1101): category 'F18 architecture', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a thirteenth
+  concrete entry. `id: architecture.quality_attribute_scenario` mints a
+  new machine_id. `family: architecture` reused as-is.
+
+id: architecture.quality_attribute_scenario
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [DECOMPOSE, ESTIMATE, VALIDATE]
+# INFERRED. Turning a vague quality goal into a measurable scenario is
+# DECOMPOSE (breaking "fast" into named stimulus/response fields) +
+# ESTIMATE (the Measure field's own numeric target) + VALIDATE (Atlas's
+# own benefit line, L823: '非功能需求可驗收' -- non-functional
+# requirements become acceptance-testable).
+
+purpose:
+  - turn_a_vague_quality_goal_into_a_testable_scenario
+inputs:
+  required: [QualityGoal]
+  optional: []
+outputs: [QualityAttributeScenario]
+preconditions:
+  - "all 6 fields (source, stimulus, artifact, environment, response, measure) supplied and non-empty"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning as this family's other members: a scenario is
+  # structured requirements engineering, not an empirical claim.
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the 6 fields be free text, or given internal sub-structure?"
+    decision: "Free text for all 6 -- Atlas's own table row gives only field names, no worked example of internal structure."
+    reasoning: >
+      Same restraint every under-specified field in this session's other
+      contracts already applies -- inventing sub-structure (e.g. a
+      closed enum for `environment`) would be presenting a guess as a
+      compiled fact.
+
+open_questions:
+  - id: "OQ-QAS-1"
+    question: "This method has no dedicated Atlas section, only a table row. Should a future pass look for a fuller worked example?"
+    owner: "operator, or whoever next reads Atlas for additional Quality Attribute Scenario content"
+    blocks: "nothing in this file's own validity -- the 6 field names are concrete and industry-standard even without a fuller citation"
+  - id: "OQ-QAS-2"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F18 tool table row (L822) directly -- confirmed no
+    dedicated §11.x section exists for this method (grepped
+    exhaustively). Grepped `specs/` for "quality attribute scenario"/
+    "stimulus"/"artifact" before writing -- no duplicate typed object
+    found. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All 6 fields are directly
+    transcribed from Atlas's own table row, the thinnest single-citation
+    grounding of any Tier 1 contract this session built -- disclosed
+    explicitly, not presented as equivalent to a dedicated section.

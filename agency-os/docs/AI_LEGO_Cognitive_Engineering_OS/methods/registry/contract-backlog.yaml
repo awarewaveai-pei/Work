@@ -515,6 +515,29 @@ tier_1:
       list with 2 worked examples, not itself cited elsewhere as a
       repeated teaching example. Tier 1, mandated by the actively-running
       implementation slice, same category as the eleven entries above it.
+  thirteenth_concrete_entry:
+    # NEW (2026-09-04, same session): thirteenth Tier 1 entry, same
+    # additive-key rationale as the twelve entries above it.
+    method_id: "architecture.quality_attribute_scenario"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Fourth entry
+      from the `architecture` family, a fourth member tool of F18's own
+      pack built. Unlike its three siblings, this method has NO dedicated
+      §11.x section -- only F18's own table row (L822: "Source→Stimulus→
+      Artifact→Environment→Response→Measure"), disclosed as the thinnest
+      single-citation grounding of any Tier 1 contract this session
+      built. The 6 field names are industry-standard (Bass/Clements/
+      Kazman Quality Attribute Scenarios) and concrete enough to ground
+      directly without invention.
+    source: "methods/contracts/architecture.quality_attribute_scenario.contract.yaml (built same session as this entry, mints machine_id architecture.quality_attribute_scenario) + specs/cognitive/typed-objects/quality-attribute-scenario.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: this is a table-row-only citation, the
+      thinnest in this file, disclosed explicitly rather than presented
+      as equivalent to a dedicated section. Tier 1, mandated by the
+      actively-running implementation slice, same category as the twelve
+      entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

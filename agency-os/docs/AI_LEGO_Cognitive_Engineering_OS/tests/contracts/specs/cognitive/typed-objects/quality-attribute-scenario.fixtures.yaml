@@ -1,0 +1,58 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/quality-attribute-scenario.schema.yaml"
+target_ref: ""
+description: "Exercises QualityAttributeScenario's 9 required fields (quality_goal + 6 Atlas-cited stage fields + id/version/provenance)."
+
+valid:
+  - name: latency_scenario_for_order_query_api
+    instance:
+      id: "QAS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.quality_attribute_scenario"
+      quality_goal: "fast"
+      source: "logged-in user"
+      stimulus: "issues an order-query request"
+      artifact: "order query API"
+      environment: "peak hours, 500 QPS"
+      response: "returns query result"
+      measure: "p99 latency < 300ms"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: security_scenario_for_login_endpoint
+    instance:
+      id: "QAS-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.quality_attribute_scenario"
+      quality_goal: "secure"
+      source: "malicious actor"
+      stimulus: "attempts credential stuffing"
+      artifact: "login endpoint"
+      environment: "public internet, no VPN"
+      response: "rate-limits and locks the account"
+      measure: "account locked within 5 failed attempts, alert fired within 1s"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_measure_field
+    instance:
+      id: "QAS-2026-09-04-003"
+      version: "1.0.0"
+      quality_goal: "fast"
+      source: "x"
+      stimulus: "x"
+      artifact: "x"
+      environment: "x"
+      response: "x"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "measure is required -- Atlas's own table row (L822) names it as the scenario's own final, testable-acceptance-criterion field, missing here."
+  - name: empty_string_stimulus_below_minlength_1
+    instance:
+      id: "QAS-2026-09-04-004"
+      version: "1.0.0"
+      quality_goal: "fast"
+      source: "x"
+      stimulus: ""
+      artifact: "x"
+      environment: "x"
+      response: "x"
+      measure: "x"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "stimulus has minLength: 1 -- an empty scenario field defeats the method's own purpose of making the goal concrete."

@@ -1,0 +1,83 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/quality-attribute-scenario.schema.yaml"
+title: Quality Attribute Scenario
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `QualityAttributeScenario` --
+  the declared `outputs` of `architecture.quality_attribute_scenario`'s
+  Method Contract. Fourth `architecture`-family typed object. All 6
+  fields transcribed directly from Atlas's own F18 tool table row (L822):
+  "Source→Stimulus→Artifact→Environment→Response→Measure" -- the thinnest
+  single-citation grounding of any typed object this session built (a
+  table row, not a dedicated section), disclosed as such in the method
+  contract.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Quality Attribute Scenario row (L822)"
+  - "methods/contracts/architecture.quality_attribute_scenario.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, quality_goal, source, stimulus, artifact, environment, response, measure, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^QAS-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "architecture.quality_attribute_scenario"
+  quality_goal:
+    type: string
+    minLength: 1
+    description: "The vague goal being turned into a scenario, e.g. 'fast', 'secure' (Atlas's own L823 examples)."
+  source:
+    type: string
+    minLength: 1
+    description: "Who/what triggers the stimulus."
+  stimulus:
+    type: string
+    minLength: 1
+    description: "The event that arrives."
+  artifact:
+    type: string
+    minLength: 1
+    description: "What part of the system is stimulated."
+  environment:
+    type: string
+    minLength: 1
+    description: "The condition under which the stimulus occurs."
+  response:
+    type: string
+    minLength: 1
+    description: "The activity undertaken as a result."
+  measure:
+    type: string
+    minLength: 1
+    description: "The measurable, testable acceptance criterion for the response."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a scenario is structured requirements engineering, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Turning 'fast' into a testable latency scenario"
+    value:
+      id: "QAS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.quality_attribute_scenario"
+      quality_goal: "fast"
+      source: "已登入使用者"
+      stimulus: "發出訂單查詢請求"
+      artifact: "訂單查詢 API"
+      environment: "尖峰時段，QPS 500"
+      response: "回傳查詢結果"
+      measure: "p99 延遲 < 300ms"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas's F18 tool table row (L822) directly. Validated against jsonschema Draft202012Validator."
+  note: "All 6 fields directly transcribed from the table row. No mother document was modified."
