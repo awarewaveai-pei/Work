@@ -1,0 +1,296 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/swot-analysis.schema.yaml"
+title: SWOT Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SWOTAnalysis` -- the second node
+  of the §14.1 type-compatibility chain
+  (`KnowledgeSet -> SWOT -> SWOTAnalysis -> TOWS -> StrategyOptions -> MCDA
+  -> DecisionCandidate -> HumanDecision`, Atlas L3536-3544). It is the
+  declared `outputs` of `strategy.swot`'s Method Contract
+  (methods/contracts/strategy.swot.contract.yaml, `outputs: [SWOTAnalysis]`)
+  and the type §14.1's own worked legal-chain example names as the method's
+  real output. This is the first typed-object schema built for a method
+  outside the `root_cause.fishbone` family -- written to prove the same
+  "read the mother document, transcribe what it actually says, flag what it
+  doesn't" discipline generalizes to a second method shape, not just a
+  second instance of the first one.
+
+  Field provenance -- Atlas §11.7 SWOT Analysis (L1324-1347) gives real,
+  literal structural content, same tier of grounding as
+  `problem-statement.schema.yaml`'s §12.2 citation:
+    * Purpose (L1326-1327): "把局勢分成內部 Strength/Weakness 與外部
+      Opportunity/Threat" (split the situation into internal Strength/
+      Weakness and external Opportunity/Threat) -- this is why `category`
+      below is a closed 4-value enum, unlike `cause-hypothesis-set.schema.yaml`'s
+      deliberately free-form `category`: Atlas explicitly tells Fishbone's
+      categories not to be forced into a fixed taxonomy (L1254), but gives
+      SWOT's four exactly here, by name, as the method's own defining split.
+    * Usage step 1 (L1331): "先取得證據，不要直接腦補" (get evidence first,
+      do not guess from thin air) -- the precondition
+      `strategy.swot.contract.yaml`'s `evidence_available == true` already
+      encodes; this schema's `provenance`/`supporting_evidence_refs` pair on
+      every factor is the same rule at the field level.
+    * Usage step 2 (L1332): "每個 factor 要有 geography、time、source"
+      (every factor must carry geography, time, source) -- transcribed
+      verbatim as three literal fields below, not paraphrased into
+      differently-named properties.
+    * Usage step 3 (L1333): "把內部與外部分開" (separate internal from
+      external) -- `is_internal` is DERIVED from `category`
+      (Strength/Weakness -> internal, Opportunity/Threat -> external) rather
+      than a second, independently-settable field: Atlas's own purpose line
+      already makes the internal/external split a function of which of the
+      four categories a factor belongs to, so a separate field could
+      silently disagree with the category and would be redundant, not
+      additive.
+    * Common misuse #4 (L1347): "沒有 Evidence 就寫『品牌強』『市場大』"
+      (writing "strong brand"/"large market" without evidence) -- the
+      contract's `quality.evidence_labeling_required: true`, enforced here
+      the same structural way `cause-hypothesis-set.schema.yaml` enforces
+      its own identical flag (an EVIDENCE-typed factor with no
+      `supporting_evidence_refs` is a mislabeled, unbacked claim).
+
+  What this schema deliberately does NOT try to mechanically enforce, per
+  R4 claim-before-verify honesty (see `open_questions`): common misuse #2
+  (L1345, "把「推出新產品」這種 action 當 Opportunity" -- treating an action
+  like "launch new product" as an Opportunity) and usage step 4 (L1334,
+  "把事實與策略分開" -- separate facts from strategy) are both semantic
+  judgments about a factor's own free-text `statement` -- no schema-level
+  structural check can distinguish an observation from a proposed action
+  without NLP this codebase does not have. This is the identical honesty
+  pattern `evidence.schema.yaml`'s own `open_questions` already applies to
+  its thinner-grounded fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.7 SWOT Analysis, purpose and usage steps 1-5 (L1324-1347)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 legal chain, KnowledgeSet->SWOT->SWOTAnalysis->TOWS (L3536-3544)"
+  - "methods/contracts/strategy.swot.contract.yaml (outputs, preconditions, quality, forbidden_transition -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file (genuinely new type, same class as
+  `problem-statement.schema.yaml`/`cause-hypothesis-set.schema.yaml`: direct
+  transcription of a cited Atlas section plus low-risk, disclosed
+  compilation choices, following the precedent those two files' own
+  `decided_by` fields set for this class of decision).
+
+compilation_decisions:
+  - question: >
+      Should `category` be a free-form string (matching
+      `cause-hypothesis-set.schema.yaml`'s `category`) or a closed enum?
+    decision: "Closed 4-value enum: STRENGTH, WEAKNESS, OPPORTUNITY, THREAT."
+    reasoning: >
+      Atlas L1327 names these four, by name, as the method's own defining
+      split -- unlike Fishbone's categories (L1254 explicitly forbids a
+      fixed taxonomy), SWOT's whole purpose IS this fixed four-way split.
+      Enum-ing it here is transcription, not invention; free-form would
+      silently permit a fifth "category" Atlas's own definition of the
+      method does not recognize.
+  - question: "Should `is_internal` be a stored field or derived from `category`?"
+    decision: "Derived (computed by the runtime builder, not stored on the schema instance as an independently-settable property)."
+    reasoning: >
+      Storing it separately would let a caller set `category: STRENGTH,
+      is_internal: false` -- a self-contradictory record the schema itself
+      cannot catch (JSON Schema has no native cross-field consistency
+      operator for this pairing without an `if`/`then` per enum value,
+      which for a fixed 2-way split of 4 values is exactly what a runtime
+      one-line lookup already gives for free). Kept out of the schema
+      entirely; `ai_lego`'s builder computes it when needed.
+  - question: >
+      Should `source` (Atlas's literal field name, L1332) be free text, or
+      should it be replaced by a hard `$ref` to `evidence/evidence.schema.yaml`?
+    decision: "Both, as two separate fields: literal `source` (free text, transcribed as Atlas names it) plus `supporting_evidence_refs` (soft reference to real Evidence record ids, same convention `cause-hypothesis-set.schema.yaml` already uses)."
+    reasoning: >
+      Atlas's own word is `source`, a single free-text mention (e.g. "2026
+      Gartner report") -- collapsing it directly into a hard $ref to a full
+      Evidence record would overstate how structured the source material
+      actually is. `supporting_evidence_refs` is kept as the SEPARATE,
+      already-precedented mechanism the `evidence_labeling_required` gate
+      checks (mirroring `cause-hypothesis-set.schema.yaml`'s identical
+      field), so the literal Atlas field and the gate-checkable field don't
+      have to be silently conflated into one overloaded property.
+
+type: object
+required: [id, version, knowledge_set_ref, factors]
+properties:
+
+  id:
+    type: string
+    pattern: "^SWOT-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  knowledge_set_ref:
+    type: string
+    description: >
+      Which KnowledgeSet this analysis was built from. Atlas §14.1 names
+      `KnowledgeSet` as SWOT's required input type (methods/contracts/
+      strategy.swot.contract.yaml `inputs.required: [KnowledgeSet]`) but no
+      mother document gives KnowledgeSet its own dedicated field-shape
+      section anywhere (contrast ProblemStatement's §12.2) -- per
+      `open_questions`, this schema does not invent one. A KnowledgeSet is
+      represented at the runtime layer as a non-empty list of real
+      `evidence/evidence.schema.yaml` records (already-ratified, Wave 4);
+      this field is a free-text label for that list (e.g. a run id), a soft
+      reference by design, not a hard $ref to a type this file does not
+      define.
+
+  generated_by_method:
+    type: string
+    default: "strategy.swot"
+    description: "Which method produced this analysis. Atlas names strategy.swot (§9/§11.7) as the canonical producer."
+
+  factors:
+    type: array
+    minItems: 1
+    description: "One or more SWOT factors, per Atlas §11.7 usage steps 2-3 (L1332-1333)."
+    items:
+      type: object
+      required: [id, category, statement, geography, time, source, provenance]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. SWOT-001-F1)."
+        category:
+          type: string
+          enum: [STRENGTH, WEAKNESS, OPPORTUNITY, THREAT]
+          description: "Atlas L1327's own four-way split. See compilation_decisions -- closed enum, not free-form."
+        statement:
+          type: string
+          description: "The factor itself, in natural language."
+        geography:
+          type: string
+          description: >
+            Atlas L1332 verbatim field name. Common misuse #3 (L1346, '對所有國家使用同一 SWOT' --
+            using the same SWOT for every country) is the reason this is
+            required, not optional: a factor with no geography cannot be
+            checked against that misuse at all.
+        time:
+          type: string
+          description: "Atlas L1332 verbatim field name. When this factor was observed/assessed (free-text or ISO timestamp -- Atlas gives no format)."
+        source:
+          type: string
+          description: "Atlas L1332 verbatim field name. See compilation_decisions for the source/supporting_evidence_refs split."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record
+            ids (already-ratified). Same convention
+            `cause-hypothesis-set.schema.yaml#/properties/hypotheses/items/properties/supporting_evidence_refs`
+            already uses -- required in practice by the
+            `evidence_labeling_required` gate whenever `provenance.epistemic_type == EVIDENCE`,
+            not by this schema itself (same split gates.py-style checks
+            already use elsewhere in this project).
+        provenance:
+          description: >
+            Atlas L1347's common misuse #4 (unevidenced factors) is what
+            `provenance`/`supporting_evidence_refs` together exist to catch.
+            Full provenance_record (not a narrow enum) -- same pattern
+            `cause-hypothesis-set.schema.yaml`'s `hypotheses[].provenance`
+            already uses.
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+# ---------------------------------------------------------------------------
+# Schema-level static rule (describes the TYPE, not per-instance data -- same
+# pattern as cause-hypothesis-set.schema.yaml's own top-level forbidden_transition,
+# sibling to `properties`, not nested inside it).
+# ---------------------------------------------------------------------------
+forbidden_transition:
+  description: >
+    Machine-checkable form of `strategy.swot.contract.yaml`'s own
+    `forbidden_transition` (`SWOTAnalysis -> AutomaticProductionDeployment`),
+    itself Atlas §14.1's verbatim illegal example (L3550-3552: `SWOT ->
+    AutomaticProductionDeployment`). A SWOTAnalysis MUST NOT be consumed
+    directly by any automated production-deployment action -- the legal
+    chain (L3536-3544) requires TOWS -> StrategyOptions -> MCDA ->
+    DecisionCandidate -> HumanDecision first. Unlike
+    `cause-hypothesis-set.schema.yaml`'s forbidden_transition (which guards
+    against skipping a validation STEP before reaching a sibling typed
+    object, RootCauseFact), this rule guards against an entirely different
+    hazard class: an AI-derived strategic analysis triggering an irreversible
+    real-world action with no human decision in the loop. There is
+    (deliberately) no `promotion`-style per-instance field on this schema
+    mirroring CauseHypothesisSet's -- the legal path here is FIVE further
+    methods (TOWS/StrategyOptions/MCDA/DecisionCandidate/HumanDecision), none
+    of which have contracts in this spec root yet, so recording partial
+    "progress toward promotion" on this object would overstate how far any
+    real chain has gotten. A future methods/contracts/strategy.tows.contract.yaml
+    (OQ-SWOT-1) is the natural place to add that per-instance field, once it
+    exists.
+  from: "SWOTAnalysis"
+  to_forbidden_target: "AutomaticProductionDeployment"
+  rule: "SWOTAnalysis -> AutomaticProductionDeployment (direct) is FORBIDDEN. Legal path: SWOTAnalysis -> TOWS -> StrategyOptions -> MCDA -> DecisionCandidate -> HumanDecision (Atlas L3536-3544)."
+
+examples:
+  - description: "A SWOT analysis with one factor per category, all evidence-backed"
+    value:
+      id: "SWOT-2026-09-04-001"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-001"
+      generated_by_method: "strategy.swot"
+      factors:
+        - id: "SWOT-2026-09-04-001-F1"
+          category: STRENGTH
+          statement: "既有客戶續約率連續三季維持在 92% 以上"
+          geography: "TW"
+          time: "2026-Q3"
+          source: "內部訂閱續約報表"
+          supporting_evidence_refs: ["E-101"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "SWOT-2026-09-04-001-F2"
+          category: THREAT
+          statement: "同區域出現兩家提供相同服務的新進入者"
+          geography: "TW"
+          time: "2026-Q3"
+          source: "市場情報簡報 2026-08"
+          supporting_evidence_refs: ["E-102"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-SWOTANALYSIS-1"
+    question: >
+      No mother document defines `KnowledgeSet`'s own field shape anywhere
+      (unlike ProblemStatement's dedicated §12.2 section). This file treats
+      it as a runtime-layer convention (a non-empty list of
+      `evidence/evidence.schema.yaml` records) rather than inventing a new
+      `typed-objects/knowledge-set.schema.yaml`. Should a future pass give
+      KnowledgeSet its own dedicated schema instead, the way ProblemStatement
+      has one?
+    owner: "operator, or whoever next touches strategy.swot's input side"
+    blocks: "nothing in this file's own validity -- knowledge_set_ref is a free-text soft reference either way"
+  - id: "OQ-SWOTANALYSIS-2"
+    question: >
+      Atlas common misuse #2 (L1345, action mistaken for Opportunity) and
+      usage step 4 (L1334, facts vs. strategy) are both semantic properties
+      of a factor's free-text `statement` this schema cannot mechanically
+      check. Should a future gate attempt a heuristic (e.g. flag statements
+      containing imperative/action verbs) despite the false-positive risk,
+      or is this permanently a human-review-only concern?
+    owner: "operator"
+    blocks: "nothing in this file's own validity -- both misuses remain real risks this schema does not claim to close"
+
+verification:
+  method: >
+    Read Atlas §11.7 (L1324-1347) and §14.1 (L3536-3552) directly at the
+    cited lines. Cross-checked every field against
+    `methods/contracts/strategy.swot.contract.yaml`'s own `preconditions`/
+    `quality`/`forbidden_transition` to confirm this type satisfies what the
+    method contract already promises. Validated against jsonschema
+    Draft202012Validator (required fields present, id pattern satisfied,
+    category enum closed per Atlas's own four-way split, forbidden_transition
+    present as a schema-level static rule).
+  note: >
+    `factors[].geography/time/source` transcribed verbatim from Atlas L1332.
+    `category`'s four values transcribed verbatim from Atlas L1327.
+    `forbidden_transition` transcribed verbatim from Atlas L3550-3552 and
+    `strategy.swot.contract.yaml`'s own identical field. The overall object
+    shape (id/version/factors[]/knowledge_set_ref) and the `is_internal`-is-
+    derived-not-stored choice are Phase 3-class compilation decisions,
+    explicitly flagged above, same as this file's two sibling schemas. No
+    mother document was modified to produce this file.

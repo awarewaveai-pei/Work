@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-04（續15，同一 session：Cognitive OS 第三個 Method Atlas 切片 — `strategy.swot`，操作者全權授權「沒做完不要停」）
+
+**觸發**：操作者核准 fishbone 切片後，明確全權授權：「我全部同意核准，需要決定的事都你決定⋯沒做完不要停」，重申 R0 全能規劃師身份與 30 年工程紀律。0 agent。
+
+**選型**：F08 的 `strategy.swot`——同批 2026-08-29 已核准 ACTIVE 契約，但輸出型別 `SWOTAnalysis` 在 `specs/cognitive/typed-objects/` 尚無 schema（只有 root-cause 那條鏈有）。這次跟 fishbone 不同：先做真正的 spec-root 型別設計工作，不是純 runtime 組裝。
+
+**不變量**：Atlas §11.7 給的是真實可引用內容（L1327 內部 Strength/Weakness vs 外部 Opportunity/Threat 的四分法；L1332 每個 factor 要 geography/time/source；L1347 沒證據不能寫「品牌強」）——新 schema 逐字引用，不臆測。`category` 刻意做成封閉 4 值 enum（跟 CauseHypothesisSet 刻意留白的 category 相反）：Atlas 明確給了 SWOT 的四分法本身，不像 Fishbone 明文禁止套死分類。forbidden_transition（`SWOT -> AutomaticProductionDeployment`，Atlas L3550-3552）是**不同危害類型**——不是型別晉升快捷方式，是「AI 分析直接觸發不可逆外部動作」，沒有實體型別可構造攔截；真正的閘是平台既有 `MethodCatalog` fail-closed 解析本來就擋住這類危害 id，必須雙向證明（現況擋 + 偽造 ACTIVE 契約後閘本身會報警，證明不是恆真）。
+
+**[已修改]**：spec-root 新增 `specs/cognitive/typed-objects/swot-analysis.schema.yaml`（逐字引用 Atlas §11.7/§14.1，`compilation_decisions`/`open_questions` 齊全，同既有 3 個 typed-object schema 裁決層級，不需 ADR）＋ `tests/contracts/specs/cognitive/typed-objects/swot-analysis.fixtures.yaml`（2 valid + 4 invalid）＋ 重新產生 `docs/architecture/SPEC_QUICKREF.md`。Product root 新增 `Projects/internal/cognitive-engineering-os/ai_lego/modules/strategy/__init__.py`＋`swot.py`（builders＋兩個 quality gate＋`assert_forbidden_deployment_path_blocked`）；`ai_lego/apps/cli/run_swot_slice.py`；`tests/unit/test_swot.py`（15 tests）；`docs/THIRD_SLICE_STRATEGY_SWOT.md`。**零改動**：`method_resolver.py`／`schema_contracts.py`／`event_ledger.py`／`ledger_guards.py`／`provenance.py`；新用到既有 `core/domain/evidence.py::evidence_record`（第一次在研究切片外重用）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=先偵測 1 個 STALE index 失敗（新 schema 未反映）→ 重新產生後 `ALL GOLDEN TESTS PASSED`，2510→2518（新增 fixture 6-8 筆檢查）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_swot_slice` | exit=0 | result=`PASS strategy.swot: 3 factors, gates [provenance_required=PASS, evidence_labeling_required=PASS], forbidden_deployment_path_blocked=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_swot -v` | exit=0 | ms=~680 | result=15 passed（schema 對真 `swot-analysis.schema.yaml` 驗證；`category` 非法值在建構時就擋、不留給 schema 事後抓；forbidden-deployment-path 雙向：現況真擋＋偽造 ACTIVE 契約的 rogue catalog 讓閘本身正確報警 `FORBIDDEN_TRANSITION_GUARD_DID_NOT_FIRE`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=203180 | result=**262 tests OK**（247→262，零回歸）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14 記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:`assert_forbidden_deployment_path_blocked` 是否對任何輸入都回報「擋住」而不實際檢查(不是,rogue-catalog mutation test 證明它會對真的合法解析報警);`evaluate_evidence_labeling_required_gate` 的 `epistemic_type=None` 分支是否誤判(不會,兩個 gate 分工同 fishbone 已驗證過的模式);CLI 是否在建立分析前就先驗證部署危害閘(是,順序刻意放在任何 factor 生成之前)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`modules.strategy\|modules/strategy\|run_swot_slice\|SWOT_PRECONDITION_FAILED\|SWOT_INVALID_CATEGORY\|strategy[.]swot\|swot-analysis` | hits=0 stale（全部命中皆為本次新增檔案自身；`.ai/proposals/025`／`026` 兩處歷史提案文件討論 `strategy.swot` 的 ID 文法裁決，與本次 runtime 新增無關，不需調解）
+
+**[剩餘風險]**：`KnowledgeSet` 仍無專屬 typed-object schema（`OQ-SWOTANALYSIS-1`）；SWOT 之後的合法鏈（TOWS→StrategyOptions→MCDA→DecisionCandidate→HumanDecision）五個方法皆無契約，本切片只證明「SWOT 本身能跑＋危險捷徑被擋」；「action 誤當 Opportunity」「事實與策略分開」兩個 Atlas 明文誤用無法機械檢查（`OQ-SWOTANALYSIS-2`，誠實留白non NLP）。
+
+**[rollback]**：純新增檔案(除 spec-root `SPEC_QUICKREF.md` 重新產生外，零既有檔案邏輯改動)，`git rm` 對應新檔即可完全復原。
+
 ## 2026-09-04（續14，新 session：Cognitive OS 第二個 Method Atlas 切片 — `root_cause.fishbone`，回應操作者「我要你全部做好」）
 
 **觸發**：操作者（怒）「繼續 Cognitive OS，去立刻全部做好，你他媽的搞了一個星期只做出一個語音轉文字的廢物」。先讀 `TASKS.md` 2026-09-04「Cognitive OS 從一個切片擴展成完整平台」條目：已同意的第一步是挑一個**新的、跟質化編碼不同形狀**的方法接進既有 `ai_lego` 框架，實測組裝要多久——這是驗證「LEGO 可組裝」承諾的關鍵測試，非本條目自己臨時決定的方向。0 agent（單一 artifact，主 agent 自己動手，符合 Agent 扇出治理）。

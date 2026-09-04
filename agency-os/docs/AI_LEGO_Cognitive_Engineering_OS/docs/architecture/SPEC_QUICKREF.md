@@ -38,6 +38,7 @@
 | `specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement_ref, hypotheses] properties[7] |
 | `specs/cognitive/typed-objects/problem-statement.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, content, provenance] properties[7] |
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
+| `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |
 | `specs/decision/decision.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, question, options, human_judgment_pending, provenance] properties[24] |
 | `specs/decision/reversal.schema.yaml` | ACTIVE | 1.0.0 | `#/definitions/multi_indicator_form`: type=object required=[indicators, thresholds, action] properties[4]<br>`#/definitions/single_indicator_form`: type=object required=[indicator, action] properties[5] |
 | `specs/domain/capability-contract.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, input, output] properties[10] |

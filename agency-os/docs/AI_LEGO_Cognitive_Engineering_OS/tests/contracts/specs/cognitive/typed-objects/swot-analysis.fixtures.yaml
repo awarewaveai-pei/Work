@@ -1,0 +1,98 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/swot-analysis.schema.yaml"
+target_ref: ""
+description: >
+  Exercises SWOTAnalysis's required fields, the `factors[]` minItems:1
+  guard, the closed 4-value `category` enum (Atlas L1327's internal/external
+  split -- unlike CauseHypothesisSet's deliberately free-form category),
+  each factor's required geography/time/source (Atlas L1332 verbatim) and
+  `provenance` (epistemic-label.schema.yaml's required
+  epistemic_type+authorship_state, reused rather than a narrow local enum),
+  and the `id` ^SWOT- pattern.
+
+valid:
+  - name: two_factors_internal_and_external_evidence_backed
+    instance:
+      id: "SWOT-2026-09-04-001"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-001"
+      generated_by_method: "strategy.swot"
+      factors:
+        - id: "SWOT-2026-09-04-001-F1"
+          category: STRENGTH
+          statement: "Existing customer renewal rate has held above 92% for three consecutive quarters."
+          geography: "TW"
+          time: "2026-Q3"
+          source: "internal subscription renewal report"
+          supporting_evidence_refs: ["E-101"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+        - id: "SWOT-2026-09-04-001-F2"
+          category: THREAT
+          statement: "Two new entrants offering the same service appeared in the same region."
+          geography: "TW"
+          time: "2026-Q3"
+          source: "market intelligence briefing 2026-08"
+          supporting_evidence_refs: ["E-102"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: AI_SUGGESTED }
+  - name: single_hypothesis_factor_no_evidence_refs_required_at_schema_level
+    instance:
+      id: "SWOT-2026-09-04-002"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-002"
+      factors:
+        - id: "SWOT-2026-09-04-002-F1"
+          category: OPPORTUNITY
+          statement: "A neighboring market's regulation opened up this quarter."
+          geography: "SG"
+          time: "2026-Q3"
+          source: "operator field note"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+
+invalid:
+  - name: factors_empty_array_violates_minitems
+    instance:
+      id: "SWOT-2026-09-04-003"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-003"
+      factors: []
+    reason: "factors has minItems: 1 (Atlas §11.7 usage steps 2-3 require at least one factor) -- an empty array is rejected."
+  - name: category_not_in_4_value_enum
+    instance:
+      id: "SWOT-2026-09-04-004"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-004"
+      factors:
+        - id: "SWOT-2026-09-04-004-F1"
+          category: "POLITICAL"
+          statement: "Some factor."
+          geography: "TW"
+          time: "2026-Q3"
+          source: "note"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "category must be one of [STRENGTH, WEAKNESS, OPPORTUNITY, THREAT] (Atlas L1327's own four-way internal/external split) -- 'POLITICAL' is not one of the four, unlike CauseHypothesisSet's deliberately free-form category."
+  - name: factor_missing_required_geography
+    instance:
+      id: "SWOT-2026-09-04-005"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-005"
+      factors:
+        - id: "SWOT-2026-09-04-005-F1"
+          category: WEAKNESS
+          statement: "Some factor."
+          time: "2026-Q3"
+          source: "note"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "geography is required (Atlas L1332 'every factor must have geography, time, source' -- the same misuse #3, using one SWOT for every country, this field exists to make checkable)."
+  - name: factor_provenance_missing_required_authorship_state
+    instance:
+      id: "SWOT-2026-09-04-006"
+      version: "1.0.0"
+      knowledge_set_ref: "KS-2026-09-04-006"
+      factors:
+        - id: "SWOT-2026-09-04-006-F1"
+          category: STRENGTH
+          statement: "Some factor."
+          geography: "TW"
+          time: "2026-Q3"
+          source: "note"
+          provenance: { epistemic_type: HYPOTHESIS }
+    reason: "factors[].provenance is a real hard $ref to epistemic-label.schema.yaml#/provenance_record, whose required list is [epistemic_type, authorship_state] -- authorship_state is missing here."
