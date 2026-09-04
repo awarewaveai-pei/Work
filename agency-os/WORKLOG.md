@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-05（`git-commit-scope-guard.js` v5：heredoc commit 後面接一個無關指令會讓 pathspec 偵測抓錯行，真的擋下一個範圍完全正確的 commit——收工 System Foundry 審查修復時親身撞上，非 critic 找到）
+
+**觸發**：commit System Foundry 審查修復批次時，`git commit -m "$(cat <<'EOF' ... EOF)" -- <9 個檔案>` 之後照慣例接了一行 `git log --oneline -1` 確認 SHA，結果每次都被 `git-commit-scope-guard.js` 判定成「未經本 session `git add` 的檔案」擋下——即使那 9 個檔案全部都是我自己 `git add` 過的。
+
+**[任務理解]**：`extractPathspecTail()` 對 heredoc 型態的 commit（本 repo唯一強制的多行寫法）有 fallback：commit segment 本身在 heredoc 開頭就被截斷（`-m "$(cat <<'EOF'` 這行），所以先前 v4 的寫法是「掃整個多行指令文字的最後一行」去找真正的 `-- <pathspec>`。這個假設在 commit 是整個 Bash 呼叫最後一件事時成立，但只要 commit 後面還接一個不相干的指令（例如確認 SHA 的 `git log`），「最後一行」就變成那個不相干指令，而不是 commit 自己的 pathspec 延續行——完全找不到 pathspec，退回全 index 比對，然後被另一 session 已 staged 的無關檔案擋下。
+
+**[現況分析]**：用臨時 debug instrumentation（`appendFileSync` 印 `ctx.cwd`／`pathspecTokens`／`isReal`／`commitSegment` 到暫存檔案，非 repo 內容）逐步定位，排除了兩個錯誤假設——① `ctx.cwd` 本身是對的（`D:\Work`，不是路徑解析問題）② 是 `extractPathspecTail` 的 fallback 邏輯本身把「掃最後一行」這個假設用錯地方，不是 `isRealPathspec()`／`gitDiffCachedNamesRaw()` 缺 `cwd` 參數（這兩個確實也缺，順手一起補，屬同類但非本次主因）。定位方式：先跑一個簡化 heredoc + 真的接一行 `echo` 的重現案例，印出 `commitSegment` 只到 `git commit -m "$(cat <<'EOF'"` 就斷了、`pathspecTokens: null`，確認 fallback 真的抓錯。
+
+**[方案比較]**：A（維持「掃整個文字最後一行」，只是換一種掃法：由後往前找第一個含 `--` 的行）vs B（精確定位 heredoc 實際結束的那一行 `EOF`，只取緊接在它後面、backslash-join 過的第一行）。選 B——A 會重新引入 v4 自己的 M4 修過的同一類問題（後面不相干指令自己的 `-- <file>` 被誤認成 commit 的），用新增的第二個測試案例（見下）直接證明 B 不會犯這個錯，A 會。
+
+**[已修改]**：
+1. `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js`（SSOT）＋同步部署到 `~/.claude/hooks/rules/git-commit-scope-guard.js`：
+   - `extractPathspecTail()` 的 heredoc fallback 改為：用 `RE_HEREDOC_OPEN` 抓到的實際 delimiter（例如 `EOF`）在**原始（未 backslash-join）**文字裡找到那一行，取它**之後**的內容、backslash-join、只取合併後的**第一行**去抓 `-- <pathspec>`——不是「最後一行」也不是「由後往前找」，精確對應 commit 呼叫真正的延續內容，不會被後面任何不相干指令干擾。
+   - `isRealPathspec()`／`gitDiffCachedNamesRaw()`／`gitDiffCachedNames()` 補上原本缺的 `cwd` 參數（`spawnSync` 呼叫沒有帶 `cwd`，跟這個檔案其餘所有函式一貫在意 cwd 正確性的風格不一致，雖非本次主因，屬同類缺口一併關閉）。
+2. `tests/hooks/runner-parity.test.mjs` — 新增 2 個測試：① heredoc commit 後面接一個不相干指令（`git log --oneline -1`），pathspec 仍要正確偵測、允許通過（本次真事故的直接重現）② 同形狀但 commit 本身**沒有** pathspec、後面不相干指令自己帶一個真實可驗證的 `-- <file>`，必須**仍然擋下**（方案 B 對 v4 M4 保護力的 heredoc 版驗證，方案 A 會在這裡失敗）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | 修前=既有 153 條全綠但新增的 2 條尚未存在；修後=**155 條全綠**（含新增的正反兩案例）
+- 真實重現：用 debug instrumentation 直接印出修前 `pathspecTokens: null`（heredoc + 後接指令案例），修後同一輸入正確抓到 `['agency-os/WORKLOG.md', 'agency-os/docs/.../manifest.json']` 等真實路徑
+- 真實回歸：原本被擋下的 System Foundry 審查修復 commit（9 個檔案），套用修好的 hook 後**一次通過**（無需改動 commit 指令本身，證明修的是 hook 不是繞過 hook）
+- REVIEW_DONE: critic=Quick（self-review；範圍限定在單一函式的行定位邏輯＋2 個附帶 `cwd` 補強，未額外找 critic subagent——理由：這個 repo 已有 155 條專門針對這批 hook 的既有回歸測試，是比一般 code review 更強的驗證形式；新增的 2 個測試分別覆蓋本次修法的正確行為與其可能引入的新錯誤形態，兩者都跑過）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`lines\[lines\.length - 1\]\|gitDiffCachedNamesRaw\(extraArgs\)` | hits=0（確認舊的「掃最後一行」寫法與缺 cwd 的舊函式簽名沒有殘留在其他檔案；`git-add-scope-tracker.js`／其餘 hook rule 檔案本身沒有共用這兩支函式，是各自獨立實作，不需要同步改）
+
+**[剩餘風險]**：低——155 條既有＋新增回歸測試全綠；`isRealPathspec`／`gitDiffCachedNames` 的 `cwd` 補強是防禦性關閉同類缺口，非本次事故的直接肇因，也已跑過完整測試套件確認無副作用。`~/.claude/hooks/rules/git-commit-scope-guard.js`（部署副本）不在 git 版控範圍內，無法一併 commit——已用 `diff` 確認與 SSOT 逐位元組相同，換機時仍走既有的 `scripts/sync-claude-userlevel.ps1` 流程同步，不受本次修法影響。
+
+**Rollback**：`git checkout -- mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js tests/hooks/runner-parity.test.mjs`（部署副本需另外用 SSOT 覆寫回舊版本）
+
 ## 2026-09-05（System Foundry v1.6 外部審查 4 項發現全修：manifest git-tracked-files 根治、schema $ref／additionalProperties／maxLength 三個靜默漏洞、test_selection_matrix.py ValueError 過度吞噬收窄；critic 二輪覆審再抓 13 個真發現全修）
 
 **觸發**：操作者貼上一份外部（非本 session）對 System Foundry v1.6 的審查報告，4 項發現：① Blocker——乾淨 checkout 無法通過 manifest gate（宣稱 311 個受保護檔，`HEAD` 只有 308 個非-manifest 檔，少 3 個：兩份 Ollama 文件＋`ao-resume-hook-fail.log`）② P1——README／assurance report 的 121 題/160 capabilities/24 modules/7,260 pairs 已過期，實際 154/192/32/11,781 ③ P1——`schema_runtime.py` 未實作 `$ref` 也未處理 schema 形式 `additionalProperties`，含非布林 answer＋`custom_requirements:[42]` 的無效輸入驗證回傳 `True` ④ P2——`test_selection_matrix.py` 把任何 pairwise/random `ValueError` 都當預期衝突吞掉，可能讓非衝突類 resolver 回歸未被判紅。操作者同批指示「100% 去處理好，不用停下來等我核准任何事」，比照本 repo `AGENTS.md` R0 既有的 Low/Medium 自主執行模式（High-STOP 除外，本次全部屬於本機 doc/script 修正，無一項觸線）。

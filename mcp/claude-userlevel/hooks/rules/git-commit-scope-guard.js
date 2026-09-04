@@ -199,21 +199,57 @@ function tailPathspecOf(text, shared) {
 // can never be confused by a LATER chained command's own `-- <file>` tail,
 // because the commit segment is already bounded to just this one git
 // invocation (chain-operator-split, see lib/shared.js
-// commandSegmentsBackslashJoined). Only fall back to scanning the full
-// multi-line text's last line when the commit segment itself is
-// structurally unclosed (an open heredoc), which is the ONE real case
-// where the true pathspec genuinely lives on a different segment.
+// commandSegmentsBackslashJoined). Only fall back to the heredoc-body scan
+// below when the commit segment itself is structurally unclosed (an open
+// heredoc), which is the ONE real case where the true pathspec genuinely
+// lives on a different segment.
+//
+// v5 (2026-09-05, found live troubleshooting a real blocked commit, not a
+// critic finding): the old fallback took `lines[lines.length - 1]` --
+// unconditionally the LAST line of the ENTIRE multi-line command text. This
+// repo's own real-world usage routinely appends a follow-up command after a
+// heredoc commit in the same Bash call (e.g. `git log --oneline -1` to
+// confirm the SHA, exactly what happened live) -- when that happens, "the
+// last line of the whole text" is that unrelated follow-up command, not the
+// commit's own `)" -- <pathspec>` continuation, so the real pathspec was
+// never found and every heredoc-style commit with anything after it fell
+// through to the full-index ownership check regardless of how correctly it
+// was scoped. Fixed to locate the heredoc's actual closing delimiter line
+// (captured by RE_HEREDOC_OPEN on the commit segment, e.g. `EOF`) in the RAW
+// text first, then look at only the SINGLE backslash-joined line
+// immediately after it -- not a blind last-line grab, and not a
+// search-anywhere-backwards either (which would reintroduce the exact
+// misattribution M4 above already closed: a later, unrelated command's own
+// `-- <file>` tail read as if it were this commit's).
 function extractPathspecTail(commitSegment, commandExpanded, shared) {
   const own = tailPathspecOf(commitSegment, shared);
   if (own) return own;
   if (!isOpenHeredoc(commitSegment)) return null;
-  const lines = String(shared.joinBackslashContinuations(commandExpanded)).split('\n').map((l) => l.trim()).filter(Boolean);
-  return tailPathspecOf(lines[lines.length - 1] || '', shared);
+  const heredocMatch = commitSegment.match(RE_HEREDOC_OPEN);
+  const delimiter = heredocMatch && heredocMatch[1];
+  if (!delimiter) return null;
+  const rawLines = String(commandExpanded).split('\n');
+  const closeIdx = rawLines.findIndex((l) => l.trim() === delimiter);
+  if (closeIdx === -1 || closeIdx === rawLines.length - 1) return null;
+  const continuation = shared.joinBackslashContinuations(rawLines.slice(closeIdx + 1).join('\n'));
+  return tailPathspecOf((continuation.split('\n')[0] || '').trim(), shared);
 }
 
-function isRealPathspec(tokens) {
+// v5 (2026-09-05, found live troubleshooting a real blocked commit, not a critic
+// finding): this spawnSync had no `cwd` -- it ran relative to the Node hook process's
+// OWN cwd (`process.cwd()`, captured once as `ctx.cwd` at ctx-construction time in
+// runner.js), which is NOT guaranteed to already be the repo the commit targets (the
+// whole rest of this file, and lib/shared.js's isSameDir()/hasCdElsewhere(), exists
+// specifically because ctx.cwd can't be assumed correct without checking -- this one
+// function skipped that and always trusted the ambient process cwd instead). A
+// same-repo, same-directory, git-verified-real pathspec silently failed
+// --error-unmatch here whenever the hook process's ambient cwd differed from the
+// repo, which routed EVERY such commit into the full-index ownership check below
+// instead of the fast, correct "this commit is scoped, nothing to compare" path --
+// not a false negative on an unsafe commit, but a false block on a safe one.
+function isRealPathspec(tokens, cwd) {
   try {
-    const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', ...tokens], { encoding: 'utf8', timeout: 10000 });
+    const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', ...tokens], { cwd, encoding: 'utf8', timeout: 10000 });
     return typeof r.status === 'number' && r.status === 0;
   } catch (_) {
     return false;
@@ -231,9 +267,16 @@ function isRealPathspec(tokens) {
 // so a large tracker degrades to slower, not silently absent.
 const PATHSPEC_CHUNK_SIZE = 100;
 
-function gitDiffCachedNamesRaw(extraArgs) {
+// v5: also missing `cwd` (same class as isRealPathspec above). A bare, pathspec-less
+// `git diff --cached --name-only` still works from any cwd inside the repo (git
+// discovers the root by walking up), which is why this half of the bug stayed hidden
+// -- but the PATHSPEC-scoped call this same function makes (`gitDiffCachedNames(['--',
+// ...tracked])` below, comparing "is this session's tracked set actually what's
+// staged") resolves those pathspecs relative to cwd exactly like isRealPathspec does,
+// so it has the identical latent failure mode once cwd is wrong.
+function gitDiffCachedNamesRaw(extraArgs, cwd) {
   try {
-    const r = spawnSync('git', ['diff', '--cached', '--name-only', '-z', ...(extraArgs || [])], { encoding: 'utf8', timeout: 10000 });
+    const r = spawnSync('git', ['diff', '--cached', '--name-only', '-z', ...(extraArgs || [])], { cwd, encoding: 'utf8', timeout: 10000 });
     if (r.error || typeof r.status !== 'number' || r.status !== 0) return null;
     return String(r.stdout || '').split('\0').filter(Boolean);
   } catch (_) {
@@ -241,14 +284,14 @@ function gitDiffCachedNamesRaw(extraArgs) {
   }
 }
 
-function gitDiffCachedNames(extraArgs) {
-  if (!extraArgs || extraArgs.length <= PATHSPEC_CHUNK_SIZE + 1) return gitDiffCachedNamesRaw(extraArgs);
+function gitDiffCachedNames(extraArgs, cwd) {
+  if (!extraArgs || extraArgs.length <= PATHSPEC_CHUNK_SIZE + 1) return gitDiffCachedNamesRaw(extraArgs, cwd);
   // extraArgs is `['--', ...paths]` when scoped — chunk the paths only.
   const [marker, ...paths] = extraArgs;
-  if (marker !== '--') return gitDiffCachedNamesRaw(extraArgs); // unexpected shape — don't guess
+  if (marker !== '--') return gitDiffCachedNamesRaw(extraArgs, cwd); // unexpected shape — don't guess
   const out = [];
   for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK_SIZE) {
-    const chunk = gitDiffCachedNamesRaw(['--', ...paths.slice(i, i + PATHSPEC_CHUNK_SIZE)]);
+    const chunk = gitDiffCachedNamesRaw(['--', ...paths.slice(i, i + PATHSPEC_CHUNK_SIZE)], cwd);
     if (chunk === null) return null; // any chunk failing -- fail open for the whole query
     out.push(...chunk);
   }
@@ -286,7 +329,7 @@ module.exports = {
       const tf = shared.getGitStageTrackerPath(ctx.sid);
       const tracked = shared.readTracker(tf);
       if (!tracked.length) return null;
-      const stillStaged = gitDiffCachedNames(['--', ...tracked]);
+      const stillStaged = gitDiffCachedNames(['--', ...tracked], ctx.cwd);
       if (stillStaged === null) return null; // fail open — don't touch tracker if we can't verify
       shared.writeTracker(tf, stillStaged);
       return null;
@@ -307,11 +350,11 @@ module.exports = {
     }
 
     const pathspecTokens = extractPathspecTail(commitSegment, ctx.commandExpanded, shared);
-    if (pathspecTokens && isRealPathspec(pathspecTokens)) {
+    if (pathspecTokens && isRealPathspec(pathspecTokens, ctx.cwd)) {
       return null; // real, git-verified pathspec — this commit is scoped, nothing to compare
     }
 
-    const allStaged = gitDiffCachedNames();
+    const allStaged = gitDiffCachedNames(undefined, ctx.cwd);
     if (allStaged === null) return null; // fail open — can't read git state
     if (!allStaged.length) return null;  // nothing staged; verify-gate-commit / dangerous-bash etc. own that case
 
@@ -334,7 +377,7 @@ module.exports = {
       };
     }
 
-    const covered = gitDiffCachedNames(['--', ...tracked]);
+    const covered = gitDiffCachedNames(['--', ...tracked], ctx.cwd);
     if (covered === null) return null; // fail open
     const coveredSet = new Set(covered);
     const unexpected = allStaged.filter((f) => !coveredSet.has(f));

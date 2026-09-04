@@ -757,6 +757,45 @@ test('git-commit-scope-guard: pathspec on the LAST LINE of a heredoc-style commi
   assert.equal(r.status, 0, r.stderr);
 });
 
+test('git-commit-scope-guard v5 fix: a heredoc-style commit\'s pathspec is still detected when a real, unrelated follow-up command comes AFTER it in the same Bash call (live incident 2026-09-05: `git log --oneline -1` after the commit made "last line of the whole text" find the wrong line, blocking a correctly-scoped commit)', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  const heredoc = [
+    'git commit -m "$(cat <<\'EOF\'',
+    'Multi-line commit message.',
+    'EOF',
+    ')" -- \\',
+    '  fileA.md',
+    'git log --oneline -1',
+  ].join('\n');
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: heredoc } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-commit-scope-guard v5 fix: the same trailing-follow-up shape does NOT let a LATER command\'s own `-- <file>` get misattributed to the commit (the heredoc-case analog of the v4 M4 fix)', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  // The commit itself has NO trailing pathspec (bare `)"`- so fileB.md is genuinely
+  // unscoped and must still be caught, even though a LATER line happens to contain a
+  // real, git-verifiable `-- fileA.md` tail on an unrelated command.
+  const heredoc = [
+    'git commit -m "$(cat <<\'EOF\'',
+    'Multi-line commit message.',
+    'EOF',
+    ')"',
+    'git log --oneline -1 -- fileA.md',
+  ].join('\n');
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: heredoc } }, { cwd: repo });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /fileB\.md/);
+});
+
 test('git-commit-scope-guard: empty tracker + staged content → WARN, not BLOCK', () => {
   const sid = freshSid('gcsg');
   const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
