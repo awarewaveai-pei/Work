@@ -48,6 +48,26 @@ try {
     # protection while leaving the danger. Nothing to guard here any more: only the paths
     # the caller names are staged, so a broken junction cannot become a mass deletion.
 
+    # 2026-09-05 (critic, in response to a live-reproduced concurrency bug): `git commit
+    # <pathspec>` is refused outright while a merge/cherry-pick/revert/rebase/stash-pop/am
+    # is unresolved (git-commit(1) EXAMPLES). Failing that here, before staging, gives an
+    # actionable error instead of a bare `fatal: cannot do a partial commit during a merge`
+    # after work is already staged. Mirrors the invariant-shaped check in ao-close.ps1
+    # (marker files UNION `git ls-files --unmerged`, not just MERGE_HEAD) since that script
+    # already found and fixed the narrower, path-shaped version of this same check twice.
+    $inProgressMarkers = @('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer')
+    $inProgress = @($inProgressMarkers | Where-Object {
+        $gp = (git rev-parse --git-path $_ 2>$null)
+        $gp -and (Test-Path -LiteralPath $gp.Trim())
+    })
+    $unmergedNow = @(git ls-files --unmerged | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($inProgress.Count -gt 0 -or $unmergedNow.Count -gt 0) {
+        throw "commit-checkpoint: refusing to run -- a merge/cherry-pick/revert/rebase/stash-pop/am operation is in progress in $WorkRoot. A scoped 'git commit -- <paths>' cannot complete until it is resolved or aborted."
+    }
+
+    # $Paths are file paths, not directories: a directory pathspec would stage/commit every
+    # dirty tracked file under it, including a concurrent session's, defeating the point of
+    # naming paths at all. Both current callers (.claude/commands/tomo.md) already pass files.
     foreach ($p in $Paths) {
         $full = Join-Path $WorkRoot $p
         if (-not (Test-Path -LiteralPath $full)) {
@@ -57,15 +77,22 @@ try {
             Write-Host "[dry-run] would: git add -- $p" -ForegroundColor Cyan
         } else {
             git add -- $p
+            if ($LASTEXITCODE -ne 0) {
+                throw "git add failed for '$p' (exit $LASTEXITCODE) -- possible index lock contention from a concurrent session"
+            }
         }
     }
 
     if ($DryRun) {
-        Write-Host "[dry-run] would: git commit -m <message>" -ForegroundColor Cyan
+        Write-Host "[dry-run] would: git commit -m <message> -- $($Paths -join ' ')" -ForegroundColor Cyan
         exit 0
     }
 
-    git diff --cached --quiet
+    # Scoped to $Paths, matching the pathspec the actual commit below uses (2026-09-05 fix):
+    # an unrelated file staged by a concurrent session must not affect this script's
+    # "nothing to commit" decision, and must not be scanned by the secret guard for a
+    # commit that will never include it.
+    git diff --cached --quiet -- $Paths
     if ($LASTEXITCODE -eq 0) {
         Write-Host "commit-checkpoint: nothing staged to commit (named paths had no changes)." -ForegroundColor Yellow
         exit 0
@@ -81,7 +108,7 @@ try {
         "recovery-codes",
         "\.key$"
     )
-    $staged = @(git diff --cached --name-only)
+    $staged = @(git diff --cached --name-only -- $Paths)
     foreach ($f in $staged) {
         foreach ($pat in $blocked) {
             if ($f -match $pat) {
@@ -90,7 +117,15 @@ try {
         }
     }
 
-    git commit -m $Message
+    # `git commit <pathspec>` reads the WORKING TREE for $Paths at commit time (not the
+    # index snapshot `git add` took above) -- confirm nothing external touched them in
+    # between, so the just-scanned $staged content is what actually gets committed.
+    git diff --quiet -- $Paths
+    if ($LASTEXITCODE -ne 0) {
+        throw "commit-checkpoint: working tree changed for one of `$Paths between staging and commit (concurrent write?) -- aborting instead of committing unscanned content. Re-run."
+    }
+
+    git commit -m $Message -- $Paths
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

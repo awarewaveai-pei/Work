@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-09-05（`commit-checkpoint.ps1` 修復 git commit 缺 pathspec 導致併發 session 互吃——2026-08-25 重寫只補了 add 端沒補 commit 端，critic 再抓出 3 個同類殘留缺口）
+
+**觸發**：使用者親身遇到並回報：`commit-checkpoint.ps1 -Paths @('agency-os/TASKS.md')` 產生了一個含 10 個檔案的 commit——本來預期的 TASKS.md 改動之外，混入 9 個另一併發 Cognitive OS session 的 error-budget 切片檔案（`Projects/internal/cognitive-engineering-os/` 下新 `.py`/`.yaml`/`.md`）。當時尚未 push，用 `git reset --soft HEAD~1` + 篩選 patch + `git apply --cached` 手動救回。
+
+**[任務理解]**：`scripts/commit-checkpoint.ps1:51-61` 的 `foreach ($p in $Paths) { git add -- $p }` 只 stage 呼叫者具名的路徑，但原 line 93 是裸 `git commit -m $Message`，沒有 pathspec 限制——共用 git index 下，若另一 session 已把自己的檔案 `git add` 進 index，這支 script 的 commit 會把它們一併掃進去。這正是 2026-08-25 重寫（`7251d14d2`）宣稱已解決的同一類問題（檔頭註解列出的 6 個歷史事故：49 檔誤刪 `0d63eb9`、12 檔 `853cd26a`、`mem_limit` 漂移 `35834a0d` 等）——重寫只拔掉了 `git add -A`（add 端），沒有把對稱的限制加到 `git commit`（commit 端），是同一個修復做了一半。
+
+**[現況分析]**：`.claude/commands/tomo.md:59` 是目前唯一存活呼叫者，固定傳 `-Paths @("agency-os/TASKS.md")`（單一檔案）；`.claude/commands/checkpoint.md:4` 呼叫時完全不傳 `-Paths`（該參數自 `7251d14d2` 起已是 Mandatory），這支命令文件本身已經過期會直接噴錯——與本次修復無關的獨立缺陷，已用 `spawn_task`（`task_c84bf5cc`）另案處理，不在本次範圍內修。
+
+**[風險清單]**：Low（純本機 script 邏輯修正，不碰 prod／deploy／密鑰；唯一存活呼叫路徑 `/tomo` 傳單一檔案，行為不受影響）。
+
+**[方案比較]**：A 只補 line 93 加 `-- $Paths`（最小）vs B 補 line 93 同時稽核其餘邏輯是否還有地方繼續用「整個 index」思考（完整）。選 B——critic round 1 review 證實 A 不夠：line 68（`git diff --cached --quiet`）與 line 84（`git diff --cached --name-only`，餵給密鑰掃描）修復前都還在讀整個共用 index，跟已改成只讀 `$Paths` 的 commit 語意不對稱，在同一個併發情境下會反向產生新問題（見下）。
+
+**[實作計畫→已完成]**：
+1. Line 93：`git commit -m $Message` → `git commit -m $Message -- $Paths`（核心修復，PowerShell array 對 native command 會自動展開成多個 argv，`--` 保護開頭為 `-` 的路徑）。
+2. Line 68：`git diff --cached --quiet` → 加 `-- $Paths`——否則另一 session 的無關 staged 檔案會讓「nothing to commit」判斷失準（該檔案存在只代表 index 非空，不代表 `$Paths` 有變更）。
+3. Line 84：`git diff --cached --name-only` → 加 `-- $Paths`——否則密鑰掃描（`.env`/`id_rsa`/`.pem`/`.key`/`recovery-codes` 等 pattern）會去檢查另一 session staged 的檔案，即使本次 commit 根本不含它，命中就整個 throw 擋下自己完全無關的 commit（critic 抓到的 self-inflicted DoS）。
+4. Line 59 `git add -- $p` 後補 `$LASTEXITCODE` 檢查——原本沒檢查，若另一 session 持有 `.git/index.lock`，`git add` 靜默失敗後腳本會走到 line 68 判斷 index 乾淨、印出「nothing to commit」exit 0，`/tomo` 誤以為已 commit，實際上 TASKS.md 從未進 git（critic 抓到的靜默假成功，屬本次要修的併發安全性同一類）。
+5. Commit 前新增 merge/cherry-pick/revert/rebase/stash-pop/am 進行中偵測（`$inProgressMarkers` union `git ls-files --unmerged`，鏡像 `ao-close.ps1:577-593` 已被 critic 兩輪抓出強化過的 invariant-shaped 寫法，非路徑枚舉）——`git commit <pathspec>` 在未解決的 merge 中會被 git 直接拒絕（`fatal: cannot do a partial commit during a merge`），若無此檢查操作者的退路是裸 `git commit`，等於重新打開本次要關的洞。
+6. Commit 前新增 `git diff --quiet -- $Paths`（worktree vs 剛才 stage 的 index）——`git commit <pathspec>` 讀的是 commit 當下的 working tree 而非 line 59 stage 的 index snapshot，兩者之間如果 `$Paths` 被外部再次寫入，密鑰掃描掃到的內容與實際被 commit 的內容會不一致；此檢查把這個 TOCTOU window 從「整個掃描到 commit 之間」收斂到接近零並且失敗要響亮。
+7. Dry-run 訊息（line 64）補上 `-- $($Paths -join ' ')`，原本印出的 pathspec 跟修復後的實際指令不一致。
+
+**[驗證計畫→已完成，四動作]**：
+- 實測：拋棄式 temp repo（`/d/tmp`，與 `D:\Work` 無關）真跑 6 個情境：①單一 path 排除另一 session staged 檔案，該檔案 commit 後仍留在 index ②多 path splat（`@('a.txt','b.txt')`）正確展開成兩個 argv、無關檔案仍被排除 ③另一 session staged 一個像密鑰的檔名（`id_rsa`）不再誤擋本次無關 commit ④`$Paths` 本身無變更但有無關 staged 檔案時「nothing to commit」正確 exit 0 而非誤判 ⑤刻意製造未解決 merge conflict，腳本在 staging 前就 throw 並給出可執行的錯誤訊息，而非中途噴 git fatal ⑥手動放 `.git/index.lock` 模擬 lock 競爭，`git add` 失敗後腳本 throw exit 1 而非靜默宣稱成功。
+- Review：critic round 1（agent `a7dfe87e492472448`）對原始一行修復做深度審查，抓到 3 個 Major/Minor 缺口（上述 2/3/4/5/6），已全部修復並重新真跑驗證。
+- 抓蟲：scope=agency-os,scripts,.claude | grep=`git commit -m \$Message`（原漏洞字串）→ hits=0（修復後檔案本身除外，已改為 `-- $Paths`）；grep=`commit-checkpoint\.ps1.*-Paths` → 確認 `.claude/commands/tomo.md:59` 是唯一存活呼叫者且只傳單一檔案，行為不受影響。
+- WORKLOG：本條目。
+
+[已修改]
+1. `scripts/commit-checkpoint.ps1` — line 93 加 `-- $Paths` pathspec（核心修復）；line 68／84 同步加 `-- $Paths`；line 59 `git add` 補 exit code 檢查；新增 merge-in-progress 偵測（鏡像 `ao-close.ps1` 已驗證過的 invariant-shaped 寫法）；新增 commit 前 working-tree-vs-index 一致性檢查；dry-run 訊息補 pathspec。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File commit-checkpoint.ps1（拋棄式 temp repo，6 個情境，見上）| exit=0/1（依情境預期）| ms=~15000
+- REVIEW_DONE: critic=Standard | verdict=pass（round 2，修復後）| findings=round 1 的 2 Major + 2 Minor 全數修復並重新真跑驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`git commit -m \$Message` | hits=0
+
+[剩餘風險]
+- `-Paths` 若未來呼叫者傳目錄而非檔案，仍會 stage/commit 該目錄下所有髒檔案，把本次修復的保證繞過去——目前兩個呼叫者（`tomo.md`／`checkpoint.md`）都只傳單一檔案，已在 script 內加註解說明但未做結構性擋（`Test-Path -PathType Leaf`），屬 critic 判定的低優先殘留項，非本次回歸。
+- `.claude/commands/checkpoint.md` 呼叫本 script 未傳 `-Paths`（自 `7251d14d2` 起已是 Mandatory 參數）會直接失敗——與本次修復無關的獨立既有缺陷，已 spawn_task（`task_c84bf5cc`）另案處理。
+- Windows PowerShell 5.1 對 native command 參數會剝除內嵌雙引號（`-m 'msg with "quotes"'` 實際到 git 變成不含引號），只影響 commit message 內容不影響 pathspec 正確性，`agency-os/docs/operations/AUDIT_REGISTRY.md:113` 已將此列為既有 Medium 風險，非本次引入。
+
+[rollback]
+`git revert` 本次 commit；`scripts/commit-checkpoint.ps1` 唯一存活呼叫者 `/tomo` 傳固定單一檔案，revert 後回到「commit 端無 pathspec」的併發風險原狀，需操作者知悉。
+
 ## 2026-09-05（HCI30 Wave 1 Peer-product boundary gates 收尾——ADR-0005 的 gate 1 判定跟 ADR-0001/0002 的 ARCH-PEER-02 重疊，合併不重造；mutation harness 自己的 role/extension 殘留 bug 真跑抓到並修）
 
 **觸發**：延續「繼續完美完成 HCI 系統」全權授權，接續前一輪收工時列出的下一候選——ADR-0005 的 `HCI-INDEP-SCHEMA-01`（跟 ADR-0001/0002 的 `ARCH-PEER-02` 重疊，2026-09-05 稍早 bughunt 記錄）。
