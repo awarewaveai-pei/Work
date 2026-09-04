@@ -181,5 +181,11 @@ ALTER TABLE hci.cases ADD CONSTRAINT cases_purpose_allowlist CHECK (
 -- ============================================================================
 --   H1012  (reserved, not raised) - excluded jurisdiction or purpose; see
 --          "Gate 3 disposition" above for why no trigger raises this today.
+--
+-- 2026-09-05: the growing SSOT for this whole list is now
+-- database/ERROR_CODE_REGISTRY.md - allocate the next code there, not by
+-- computing "next free" from this or any other migration's header comment
+-- (the practice that produced the two real H1008/H1009 collisions both
+-- ADR-0012 and ADR-0020 had to record and renumber around).
 
 COMMIT;

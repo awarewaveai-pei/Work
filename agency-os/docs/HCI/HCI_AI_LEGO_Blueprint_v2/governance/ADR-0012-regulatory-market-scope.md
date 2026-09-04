@@ -92,6 +92,13 @@ the historical decision record.
   and `governance/ADR_INDEX.md` carry the executed-and-verified evidence
   (84→88 assertions, 26→28 mutations across this ADR's two migration
   revisions, both real-Docker-verified).
+- **2026-09-05, error-code registry consolidated**: this ADR's own `H1008`
+  collision with `ADR-0017` (both independently computed "next free" and
+  landed on the same code, gate 3 above) is the incident that motivated
+  `Projects/internal/hci30/database/ERROR_CODE_REGISTRY.md`, the new SSOT
+  for every `H1xxx` code across this schema. `H1012`'s reserved-not-raised
+  status is recorded there now, not only in this ADR and the migration
+  header comment.
 
 ## Consequences
 

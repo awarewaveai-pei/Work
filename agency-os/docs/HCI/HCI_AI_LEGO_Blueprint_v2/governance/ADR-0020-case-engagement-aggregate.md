@@ -34,6 +34,16 @@ Runtime gates are **OPEN**. All land in `D:\Work\Projects\internal\hci30\databas
 5. **Wave 1 — `project_ref` non-FK proof (architecture test).** `CASE-PROJECTREF-01`: `information_schema.table_constraints` shows zero `FOREIGN KEY` constraints on `hci.cases.project_ref`; a synthetic fixture renames/drops a stand-in commercial `projects` row and asserts no `hci.cases` write fails — proving "never equal, references only" is enforced, not merely documented.
 6. **Wave 4 — consumer binding.** `CASE-REPLAY-01`: the replay path (`13_TESTING_REPLAY_ROLLBACK_AND_SRE.md:38`) reconstructs Evidence/Claim/Assessment/Decision rows filtered by one `case_id` only; a fixture with two Cases for the same Person asserts replaying Case A never returns Case B's rows — the mechanical proof that bounded replay is now satisfiable.
 
+## Implementation note (2026-09-05, error-code registry consolidated)
+
+Gate 2's `H1009` collision with `ADR-0018` (both independently computed
+"next free after `H1008`" and landed on the same code) is one of the two
+incidents that motivated
+`Projects/internal/hci30/database/ERROR_CODE_REGISTRY.md`, now the single
+SSOT for every `H1xxx` code in this schema. `H1010`/`H1011`'s allocation is
+recorded there, not only in this ADR and the migration header comment;
+future codes are claimed there first, not computed independently per-ADR.
+
 ## Consequences
 
 - `07:56`'s 🔴 `DECISION PENDING` block and `wave1/HCI_WAVE1_DOMAIN_ERD.md:24,32`'s conditional line must be updated to cite this ADR — as a separate documentation change, not made by this ADR.

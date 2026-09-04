@@ -22,6 +22,15 @@
 -- HZ = SQL/MED remote database access; H1 is free), so these never collide
 -- with an engine-raised condition.
 --
+-- 2026-09-05: this file's own list below stopped being the growing SSOT the
+-- moment a second migration (0002) started allocating codes independently -
+-- exactly that independence produced two real, separately-discovered
+-- collisions (ADR-0012/ADR-0017 both landed on H1008; ADR-0018/ADR-0020 both
+-- landed on H1009). The list below is frozen as a historical record of what
+-- this specific file's own content raises (H1001-H1007, all still accurate);
+-- the canonical, growing, cross-migration list - including H1008 onward -
+-- is now database/ERROR_CODE_REGISTRY.md. Allocate new codes there, not here.
+--
 --   H1001  tenant authorization is not ACTIVE / not currently valid
 --   H1002  data-subject-request lifecycle transition rejected
 --   H1003  append-only table mutation rejected (trigger layer)

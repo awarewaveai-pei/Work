@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-05（HCI30 錯誤碼 registry SSOT 治理缺口收尾——純文件整併，零 schema 變更）
+
+**觸發**：延續 HCI Wave 1 收尾工作，處理 2026-09-04 critic review 就已記錄、之前故意不塞進 commit 的已知治理缺口。
+
+**做了什麼**：新建 `Projects/internal/hci30/database/ERROR_CODE_REGISTRY.md` 作為 H1001-H1012 全部域錯誤碼的單一 SSOT——彙整過去兩次真實配號碰撞事故的完整歷史（H1008：ADR-0012 vs ADR-0017；H1009：ADR-0018 vs ADR-0020，皆因「各自獨立算 next free after 上一個已知碼」而互撞，靠 grep 巧合抓到才修正），逐碼列出意義/狀態（RAISED 或 RESERVED-NOT-RAISED）/實際 raise 位置/來源文件，並訂下維護規則（下一個配號者一律先讀這份檔案，不再各自計算）。`0001`/`0002`/`0003` 三個既有 migration 的 header comment 各加一行純註解指向新檔（不動任何 RAISE 邏輯或 SQL 行為），`ADR-0012`/`ADR-0020` 各補一段 Implementation note 交叉引用。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/ERROR_CODE_REGISTRY.md`（新）
+- `Projects/internal/hci30/database/migrations/000{1,2,3}_*_up.sql`：各加一行指標註解（純註解，零邏輯變更）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0012-regulatory-market-scope.md`、`ADR-0020-case-engagement-aggregate.md`：各補一段 Implementation note
+- `agency-os/TASKS.md`：該治理待辦標記完成
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/test-wave1-local.ps1`（純註解修改後重跑確認零影響）| exit=0 | result=102 assertions, 0 failed（跟修改前完全一致，證明純註解無行為變更）
+- REVIEW_DONE: critic=self(Standard，純文件整併，風險極低，未派 agent) | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`H1008\|H1009\|next free\|next-free` | hits=全部為本次新增/既有合理引用，無過期宣稱殘留
+
+**[剩餘風險]**：無新增風險（純文件工作）。ADR-0009/0010/0017/0018/0019/0021/0024/0025/0033 等 Wave 1 gate 仍全部 OPEN，待後續真落地。
+
+**[rollback]**：`git revert`；純新增文件+註解，零 schema 影響。
+
+
 ## 2026-09-05（HCI30 Wave 1 收尾——ADR-0011 VBC 純文件同步(零新碼) + ADR-0026 Source/Claim provenance 落地，真跑連續抓到 2 個真 bug + db-expert 抓到 2 個 Major）
 
 **觸發**：延續「一直做直到系統完美完成，需要決定的事我全部同意核准」全權授權。先做 VBC 快速檢查（ADR-0009/0010/0011 是否已經被既有程式碼滿足但沒同步文件），再挑一個新落地目標（ADR-0026）。

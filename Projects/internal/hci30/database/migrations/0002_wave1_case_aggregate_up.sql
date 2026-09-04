@@ -4,8 +4,11 @@
 -- database, before the fixtures/harness/negative-test files.
 --
 -- ============================================================================
--- Domain error-code registry extension (0001's registry is the SSOT list;
--- this comment documents the two codes this migration adds to it)
+-- Domain error-code registry extension. 2026-09-05: the SSOT for this list
+-- is now database/ERROR_CODE_REGISTRY.md, not 0001's header comment (which
+-- is frozen as a record of its own file's codes only, per that file's own
+-- 2026-09-05 note) - this block is kept as a historical record of what this
+-- specific file allocated, not as the place to look up "next free."
 -- ============================================================================
 --   H1010  case lifecycle transition rejected
 --   H1011  case is not OPEN/ACTIVE (research_workflows/subject_records insert
