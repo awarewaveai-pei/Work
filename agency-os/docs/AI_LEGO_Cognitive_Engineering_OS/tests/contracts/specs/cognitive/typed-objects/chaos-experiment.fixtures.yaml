@@ -1,0 +1,52 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/chaos-experiment.schema.yaml"
+target_ref: ""
+description: "Exercises ChaosExperiment's required fields and the status enum."
+
+valid:
+  - name: completed_experiment_recovered_as_hypothesized
+    instance:
+      id: "CHAOS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.chaos_engineering"
+      steady_state_hypothesis: "killing any one order-api replica keeps p99 latency under 500ms and error rate under 1%"
+      blast_radius: "staging only, one order-api replica"
+      injected_failure: "force-kill one order-api pod"
+      recovered_as_hypothesized: true
+      status: completed
+      findings: "load balancer removed the unhealthy target within 3 seconds, as hypothesized"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: stopped_experiment_did_not_recover
+    instance:
+      id: "CHAOS-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.chaos_engineering"
+      steady_state_hypothesis: "a single database connection drop is absorbed by the retry pool"
+      blast_radius: "staging only, one database connection"
+      injected_failure: "kill one pooled database connection"
+      recovered_as_hypothesized: false
+      status: stopped
+      findings: "no retry logic existed; requests failed until manual intervention -- experiment stopped immediately per protocol"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_blast_radius
+    instance:
+      id: "CHAOS-2026-09-04-003"
+      version: "1.0.0"
+      steady_state_hypothesis: "x"
+      injected_failure: "x"
+      recovered_as_hypothesized: true
+      status: completed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "blast_radius is required -- Atlas's own step 2 (L2213), missing here."
+  - name: invalid_status_enum_value
+    instance:
+      id: "CHAOS-2026-09-04-004"
+      version: "1.0.0"
+      steady_state_hypothesis: "x"
+      blast_radius: "x"
+      injected_failure: "x"
+      recovered_as_hypothesized: true
+      status: "in_progress"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "status is enum [completed, stopped] -- 'in_progress' is not a member."

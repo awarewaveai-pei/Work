@@ -38,7 +38,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_chaos_engineering_slice` | exit=0 | result=第一次真跑就通過（含 unrecovered 不變量攻擊驗證）：`PASS devops_sre.chaos_engineering: status=completed, recovered=True, gates [provenance_required=PASS, unrecovered_forbids_completed=PASS], unrecovered_invariant_verified=True`
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_chaos_engineering -v` | exit=0 | ms=813 | result=9 passed
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2708→2717
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | result=見同批次背景輸出（`git diff --stat` 對照共用檔案／兩個既有 devops_sre 模組／全部 8 個 architecture 模組確認全部零改動）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=60538 | result=**510 tests OK**（501→510，零回歸；`git diff --stat` 對照共用檔案／兩個既有 devops_sre 模組／全部 8 個 architecture 模組確認全部零改動）
 - ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n。
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`devops_sre[.]chaos_engineering\|ChaosExperiment\|chaos-experiment\|run_chaos_engineering_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
 

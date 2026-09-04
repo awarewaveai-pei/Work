@@ -1,0 +1,108 @@
+$id: "ai-lego://methods/contracts/devops_sre.chaos_engineering.contract.yaml"
+title: "Chaos Engineering Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-second Method Atlas slice, third from the
+  `devops_sre` family (F19's own "DevOps／SRE／可靠性套件") -- a third
+  member tool of that pack built.
+
+  Atlas §11.43 (L2207-2224) gives this method a dedicated section: a real
+  5-step numbered protocol ("建立 steady-state hypothesis → 限定 blast
+  radius → 注入特定 failure → 驗證系統是否自動恢復 → 不符合預期立即停
+  止"), the same tier of citation strength `root_cause.fishbone`/
+  `root_cause.five_whys` already established (a numbered protocol, not a
+  bare table row). Step 5's own "不符合預期立即停止" (stop immediately if
+  not as expected) is a real, enforceable invariant this contract
+  enforces: an experiment record claiming the system did NOT recover as
+  hypothesized must be marked `stopped`, never `completed` -- same
+  "raise before construction on a real, Atlas-implied structural rule"
+  discipline every prior forbidden-state guard this session built already
+  established.
+
+  This method's own `blast_radius` field is a DIFFERENT concept from
+  `specs/execution/blast-radius-chain.schema.yaml` (checked before
+  writing this contract, not assumed): that schema is this platform's own
+  tenant-isolation hierarchy governance (Tenant→Workspace→...→Capability,
+  ADR-003), a system-architecture concept; this method's blast radius is
+  the SCOPE OF A SINGLE CHAOS EXPERIMENT (Atlas's own L2213 sense --
+  "限定 blast radius", limiting how much of production a single failure
+  injection can affect), free text describing the experiment's own scope,
+  not a reference into that platform hierarchy.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.43 混沌工程（Chaos Engineering）(L2207-2224) -- 5-step protocol"
+  - "methods/registry/method-inventory.yaml Chaos Engineering entry (L1167-1171): category 'F19 devops-sre', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twentieth
+  concrete entry. `id: devops_sre.chaos_engineering` mints a new
+  machine_id. `family: devops_sre` reused as-is.
+
+id: devops_sre.chaos_engineering
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [CHALLENGE, VALIDATE, INFER]
+# INFERRED, not cited -- Atlas §4 (L192) cites a primitive formula for
+# only 5 methods, Chaos Engineering is not among them. CHALLENGE
+# (deliberately injecting failure to challenge the steady-state
+# hypothesis), VALIDATE (verifying automatic recovery), and INFER
+# (diagnosing why recovery did or did not happen) are confident
+# inferences directly matching the method's own 5-step protocol.
+
+purpose:
+  - deliberately_inject_controlled_failure_to_validate_system_resilience_hypotheses
+inputs:
+  required: [SteadyStateHypothesis, BlastRadiusScope, InjectedFailure]
+  optional: []
+outputs: [ChaosExperiment]
+preconditions:
+  - "steady_state_hypothesis, blast_radius, and injected_failure are all non-empty"
+  - "an experiment claiming recovered:false has status 'stopped', never 'completed'"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Chaos Engineering row.
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # The EXPERIMENT RECORD is side-effect-free; the real production fault
+  # injection it describes is outside this method's own scope (same
+  # distinction every prior operational-planning contract's own rollback
+  # field already draws, e.g. devops_sre.canary_deployment's own plan-vs-
+  # deployment distinction).
+
+compilation_decisions:
+  - question: "Is this method's own blast_radius field the same concept as the platform's own blast-radius-chain.schema.yaml (tenant isolation hierarchy)?"
+    decision: "No -- checked before writing, confirmed distinct (see description)."
+    reasoning: >
+      Grepped `specs/` for "chaos"/"steady state" before writing (found
+      nothing) and separately checked the platform's own
+      `blast-radius-chain.schema.yaml` on sight of the shared vocabulary
+      -- read its own description in full and confirmed it governs a
+      completely different concept (tenant/workspace/project isolation
+      layering, ADR-003) than Atlas §11.43's own sense (limiting a single
+      experiment's production impact). Disclosed explicitly rather than
+      silently assuming no conflict from a shared English phrase alone.
+
+open_questions:
+  - id: "OQ-CHAOS-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.43 (L2207-2224) directly. Grepped `specs/`
+    exhaustively for "chaos"/"steady state" before writing (0 hits) and
+    separately investigated the "blast radius" phrase's own other real
+    hit (`blast-radius-chain.schema.yaml`) rather than dismissing it as
+    noise -- confirmed distinct concept. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-step protocol is directly
+    transcribed from Atlas's own numbered list.

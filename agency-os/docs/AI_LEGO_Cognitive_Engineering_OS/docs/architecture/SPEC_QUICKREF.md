@@ -41,6 +41,7 @@
 | `specs/cognitive/typed-objects/canary-deployment-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, release_under_rollout, stages, outcome, provenance] properties[7] |
 | `specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, nodes, edges, acyclic_verified, computation_provenance_ref, provenance] properties[9] |
 | `specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement_ref, hypotheses] properties[7] |
+| `specs/cognitive/typed-objects/chaos-experiment.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, steady_state_hypothesis, blast_radius, injected_failure, recovered_as_hypothesized, status, provenance] properties[10] |
 | `specs/cognitive/typed-objects/dependency-map.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_mapping, nodes, edges, provenance] properties[7] |
 | `specs/cognitive/typed-objects/event-storming-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, domain_process_description, elements, relationships, provenance] properties[7] |
 | `specs/cognitive/typed-objects/fitness-function-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, architecture_under_governance, functions, provenance] properties[6] |

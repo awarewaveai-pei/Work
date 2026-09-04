@@ -1,0 +1,74 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/chaos-experiment.schema.yaml"
+title: Chaos Experiment
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ChaosExperiment` -- the
+  declared `outputs` of `devops_sre.chaos_engineering`'s Method Contract.
+  Third `devops_sre`-family typed object. Atlas §11.43's own 5-step
+  protocol maps onto this schema's required fields; step 5's own
+  "stop immediately if not as expected" maps onto the `status`/
+  `recovered_as_hypothesized` cross-field invariant (enforced at the
+  runtime layer, see method contract preconditions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.43 混沌工程（Chaos Engineering）(L2207-2224)"
+  - "methods/contracts/devops_sre.chaos_engineering.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, steady_state_hypothesis, blast_radius, injected_failure, recovered_as_hypothesized, status, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^CHAOS-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.chaos_engineering"
+  steady_state_hypothesis:
+    type: string
+    minLength: 1
+    description: "Atlas L2210's own step 1: what 'normal' looks like, stated as a testable hypothesis."
+  blast_radius:
+    type: string
+    minLength: 1
+    description: "Atlas L2213's own step 2: the deliberately limited scope of THIS experiment (not the platform's own tenant-isolation blast-radius-chain concept -- see method contract compilation_decisions for why these are distinct)."
+  injected_failure:
+    type: string
+    minLength: 1
+    description: "Atlas L2214's own step 3: the specific failure introduced."
+  recovered_as_hypothesized:
+    type: boolean
+    description: "Atlas L2215's own step 4: did the system recover automatically as the steady-state hypothesis predicted."
+  status:
+    enum: [completed, stopped]
+    description: "Atlas L2216's own step 5 ('不符合預期立即停止'): recovered_as_hypothesized:false forbids status:completed -- enforced at the runtime layer (ai_lego/modules/devops_sre/chaos_engineering.py), not the schema layer."
+  findings:
+    type: string
+    description: "Optional free-text notes on what the experiment revealed (e.g. a hidden dependency)."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a chaos experiment record is a structured operational observation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed experiment: killing one replica, system recovered as hypothesized"
+    value:
+      id: "CHAOS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.chaos_engineering"
+      steady_state_hypothesis: "殺掉任一個 order-api replica，p99 延遲不超過 500ms 且錯誤率不超過 1%"
+      blast_radius: "僅 staging 環境，僅 order-api 服務的其中一個 replica"
+      injected_failure: "強制終止一個 order-api pod"
+      recovered_as_hypothesized: true
+      status: completed
+      findings: "load balancer 在 3 秒內完成健康檢查移除，符合假設"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas §11.43 directly. Validated against jsonschema Draft202012Validator."
+  note: "The 5-step protocol is directly transcribed. The recovered-forbids-completed invariant is enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

@@ -679,6 +679,34 @@ tier_1:
       elsewhere as a repeated teaching example. Tier 1, mandated by the
       actively-running implementation slice, same category as the
       eighteen entries above it.
+  twentieth_concrete_entry:
+    # NEW (2026-09-04, same session): twentieth Tier 1 entry, same
+    # additive-key rationale as the nineteen entries above it.
+    method_id: "devops_sre.chaos_engineering"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Third entry from
+      the `devops_sre` family, a third member tool of F19's own pack
+      built. Atlas §11.43 is a dedicated section with a real 5-step
+      numbered protocol (steady-state hypothesis → limit blast radius →
+      inject failure → verify recovery → stop immediately if not as
+      expected), the same tier of citation strength root_cause.fishbone/
+      root_cause.five_whys already established. Step 5's own rule
+      directly implies a real invariant -- recovered_as_hypothesized:false
+      forbids status:completed. A real naming-collision check was
+      performed before writing: this method's own `blast_radius` field
+      shares vocabulary with `specs/execution/blast-radius-chain.schema
+      .yaml` (this platform's own tenant-isolation governance, ADR-003)
+      -- read in full and confirmed a genuinely distinct concept, not
+      assumed unrelated from the shared phrase alone.
+    source: "methods/contracts/devops_sre.chaos_engineering.contract.yaml (built same session as this entry, mints machine_id devops_sre.chaos_engineering) + specs/cognitive/typed-objects/chaos-experiment.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.43 is a dedicated section with
+      a real 5-step protocol, not itself cited elsewhere as a repeated
+      teaching example. Tier 1, mandated by the actively-running
+      implementation slice, same category as the nineteen entries above
+      it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
