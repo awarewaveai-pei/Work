@@ -467,6 +467,33 @@ tier_1:
       elsewhere as a repeated teaching example. Tier 1, mandated by the
       actively-running implementation slice, same category as the nine
       entries above it.
+  eleventh_concrete_entry:
+    # NEW (2026-09-04, same session): eleventh Tier 1 entry, same
+    # additive-key rationale as the ten entries above it.
+    method_id: "architecture.event_storming"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). Second entry from the
+      `architecture` family, a second member tool of F18's own 10-tool
+      pack built (after `architecture.adr`), still not the whole pack.
+      Chosen over its immediate neighbor DDD (Atlas §11.35) after reading
+      both: DDD gives six bare concept names with no worked pipeline;
+      Event Storming gives a real causal-flow notation ("Domain Event ←
+      Command ← Actor ← Policy ← External System → Aggregate／Read
+      Model", L2046-2052) that directly implies an enforceable structural
+      invariant (every domain_event traceable to a cause) -- the same
+      "read the diagram literally, enforce exactly what it implies"
+      discipline `causal.dag`'s own acyclicity check already established
+      for a different notation. This comparison is disclosed in the
+      contract's own description, not silently decided by document order.
+    source: "methods/contracts/architecture.event_storming.contract.yaml (built same session as this entry, mints machine_id architecture.event_storming) + specs/cognitive/typed-objects/event-storming-session.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.36 has a real causal-flow
+      notation, not itself cited elsewhere as a repeated teaching
+      example. Tier 1, mandated by the actively-running implementation
+      slice, same category as the ten entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

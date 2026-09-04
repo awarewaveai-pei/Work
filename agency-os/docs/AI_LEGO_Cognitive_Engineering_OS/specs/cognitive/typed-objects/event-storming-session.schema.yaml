@@ -1,0 +1,154 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/event-storming-session.schema.yaml"
+title: Event Storming Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `EventStormingSession` -- the
+  declared `outputs` of `architecture.event_storming`'s Method Contract
+  (methods/contracts/architecture.event_storming.contract.yaml, `outputs:
+  [EventStormingSession]`). The second `architecture`-family typed object
+  (after `ArchitectureDecisionRecord`), and this session's second typed
+  graph-shaped object (after `CausalDagAnalysis`) -- but a structurally
+  different graph: a fixed, closed 7-value element-type vocabulary
+  (domain_event/command/actor/policy/external_system/aggregate/
+  read_model) with one enforced invariant (no orphan domain events)
+  rather than a general acyclicity check over an open node-role set.
+
+  Field provenance -- Atlas §11.36 (L2042-2064)'s own causal-flow
+  notation ("Domain Event ← Command ← Actor ← Policy ← External System →
+  Aggregate／Read Model") maps onto `elements[]`'s `type` enum
+  (Aggregate/Read Model split into two distinct types -- see the method
+  contract's own compilation_decisions for why) and `relationships[]`'s
+  free-form `from_id`/`to_id` edges. The one structural invariant this
+  schema cannot itself express (every `domain_event` element must have at
+  least one incoming relationship) is a runtime, not schema, check -- see
+  `ai_lego/modules/architecture/event_storming.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.36 事件風暴法（Event Storming）, causal-flow notation (L2042-2064)"
+  - "methods/contracts/architecture.event_storming.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Should `relationships[]` carry a `relationship_type` field (e.g.
+      'issues', 'emits', 'triggers', 'updates') distinguishing WHY two
+      elements are connected, or just a bare `from_id`/`to_id` edge?
+    decision: "A bare from_id/to_id edge, with an optional free-text label -- no closed relationship_type enum."
+    reasoning: >
+      Same restraint the method contract's own compilation_decisions
+      already applies to relationship-type-pair legality: Atlas's own
+      notation gives a general causal READING (left-arrows mean 'caused
+      by', the right-arrow means 'leads to') but never names a closed set
+      of relationship VERBS the way, say, `causal-dag-analysis.schema
+      .yaml`'s own `role` enum names a closed set of NODE roles.
+      Inventing a `relationship_type` enum (issues/emits/triggers/...)
+      would be presenting a guess as a compiled fact. An optional free-
+      text `label` lets a caller record the relationship's own nature in
+      natural language without this schema pretending to have a closed,
+      Atlas-cited taxonomy for it.
+
+type: object
+required: [id, version, domain_process_description, elements, relationships, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ES-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling typed-object schema's own id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "architecture.event_storming"
+
+  domain_process_description:
+    type: string
+    minLength: 1
+    description: "The real process this session reconstructs -- the method contract's own required DomainProcessDescription input."
+
+  elements:
+    type: array
+    minItems: 1
+    description: "Atlas L2046-2052's own 6-notation, split into 7 element types (Aggregate/Read Model separated -- see method contract compilation_decisions)."
+    items:
+      type: object
+      required: [id, type, label]
+      properties:
+        id: {type: string}
+        type:
+          enum: [domain_event, command, actor, policy, external_system, aggregate, read_model]
+        label: {type: string}
+
+  relationships:
+    type: array
+    default: []
+    description: "Causal-flow edges between elements[] entries -- e.g. an actor issuing a command, a command handled by an aggregate, an aggregate emitting a domain event. See method contract preconditions for the one enforced structural invariant (no orphan domain_event elements)."
+    items:
+      type: object
+      required: [from_id, to_id]
+      properties:
+        from_id: {type: string}
+        to_id: {type: string}
+        label:
+          type: string
+          description: "Optional free-text description of the relationship's own nature (e.g. 'issues', 'emits') -- no closed relationship_type enum, see compilation_decisions."
+
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION for a genuine Event Storming reconstruction -- see method contract quality field reasoning for why this differs from the CALCULATED_RESULT/SIMULATED_RESULT/DECISION labels this session's other recent typed objects use."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A minimal but complete order-cancellation process reconstruction: actor issues a command, an aggregate handles it and emits an event, a policy reacts by triggering a follow-up command, and a read model is updated"
+    value:
+      id: "ES-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.event_storming"
+      domain_process_description: "客戶取消訂單的完整流程，含退款觸發"
+      elements:
+        - {id: "A1", type: actor, label: "客戶"}
+        - {id: "C1", type: command, label: "取消訂單"}
+        - {id: "AG1", type: aggregate, label: "Order"}
+        - {id: "E1", type: domain_event, label: "訂單已取消"}
+        - {id: "P1", type: policy, label: "訂單取消後自動觸發退款"}
+        - {id: "C2", type: command, label: "發起退款"}
+        - {id: "RM1", type: read_model, label: "客戶訂單歷史"}
+      relationships:
+        - {from_id: "A1", to_id: "C1", label: "issues"}
+        - {from_id: "C1", to_id: "AG1", label: "handled by"}
+        - {from_id: "AG1", to_id: "E1", label: "emits"}
+        - {from_id: "E1", to_id: "P1", label: "triggers"}
+        - {from_id: "P1", to_id: "C2", label: "issues"}
+        - {from_id: "E1", to_id: "RM1", label: "updates"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-EVENTSTORMINGSESSION-1"
+    question: >
+      `relationships[].label` is free text with no closed enum. Should a
+      future revision add a closed `relationship_type` taxonomy once a
+      worked Atlas example or operator requirement is found (same open
+      question the method contract's own OQ-EVENTSTORMING-1 already
+      raises for relationship-type-pair legality)?
+    owner: "operator, or whoever next needs stricter Event Storming graph validation"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.36 (L2042-2064) directly at the cited lines.
+    Cross-checked against methods/contracts/architecture.event_storming
+    .contract.yaml's own outputs/preconditions/quality. Validated against
+    jsonschema Draft202012Validator.
+  note: >
+    `elements[].type`'s 7-value enum and the causal-flow `relationships[]`
+    shape are transcribed from Atlas's own notation (L2046-2052), with the
+    Aggregate/Read-Model split disclosed as a compilation decision, not a
+    literal Atlas citation. No mother document was modified to produce
+    this file.

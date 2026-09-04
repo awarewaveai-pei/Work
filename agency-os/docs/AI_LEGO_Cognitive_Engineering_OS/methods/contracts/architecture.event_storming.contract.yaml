@@ -1,0 +1,231 @@
+$id: "ai-lego://methods/contracts/architecture.event_storming.contract.yaml"
+title: "Event Storming Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Thirteenth Method Atlas slice, second from the
+  `architecture` family (F18's own "Software Architecture Pack") -- a
+  second member tool of that same 10-tool pack built (after
+  `architecture.adr`), still not the whole pack's chain, same scoping
+  discipline the twelfth slice's own contract already applied.
+
+  Atlas §11.36 (L2042-2064) gives this method a compact but genuinely
+  structural notation -- not a bare concept list the way its neighboring
+  §11.35 (DDD) section is (six named concepts, zero worked pipeline or
+  element-relationship shape, disclosed below as the reason DDD was NOT
+  chosen for this slice instead):
+
+  ```text
+  Domain Event
+  ← Command
+  ← Actor
+  ← Policy
+  ← External System
+  → Aggregate / Read Model
+  ```
+
+  Read as a real causal-flow legend (standard Event Storming vocabulary,
+  corroborated by the fact that every one of these six element kinds is a
+  well-established, independently-documented notation in the wider
+  software industry, not an Atlas invention): a Domain Event is caused by
+  (`←`) a Command, which is in turn issued by an Actor, triggered by a
+  Policy's reactive rule, or triggered by an External System; a Domain
+  Event leads to (`→`) an Aggregate handling it or a Read Model being
+  updated. This is genuinely richer grounding than a bare concept list --
+  it directly implies a real structural invariant this contract enforces:
+  every Domain Event must be traceable to at least one causing element (no
+  orphan events), the same "raise before construction on a real, Atlas-
+  implied structural rule" discipline `causal.dag`'s own acyclicity check
+  already established for a different notation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.36 事件風暴法（Event Storming）(L2042-2064) -- purpose, 6-element causal-flow notation, benefits"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 軟體架構套件 tool table, Event Storming row (L816)"
+  - "methods/registry/method-inventory.yaml Event Storming entry (L1082-1085): category 'F18 architecture', no machine_id recorded -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.36 gives a compact but genuinely
+  structural notation (unlike its neighboring DDD section's bare concept
+  list) -- direct transcription plus low-risk, disclosed compilation
+  choices, same standard every Tier 1 contract this session built
+  applies. Registered in `methods/registry/contract-backlog.yaml`
+  `tier_1` as an eleventh concrete entry.
+
+  `id: architecture.event_storming` is a NEW machine_id (method-inventory
+  .yaml's own "Event Storming" entry, L1082-1085, carries no machine_id --
+  same situation `architecture.adr`'s own source entry was in before the
+  twelfth slice touched it). `family: architecture` is this method's own
+  SAME family as `architecture.adr` (F18's own "architecture" category
+  label, not re-derived, reused as-is). No competing machine_id form was
+  found for Event Storming anywhere in the corpus (grepped exhaustively).
+
+id: architecture.event_storming
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [DECOMPOSE, MAP, RELATE]
+# INFERRED, not cited -- Atlas §4 (L192) cites a primitive formula for
+# only 5 methods, Event Storming is not among them. DECOMPOSE (breaking a
+# process into discrete typed elements) and RELATE (the causal-flow arrows
+# connecting them) are confident inferences directly matching the
+# method's own notation; MAP (the workshop's own spatial/timeline
+# arrangement of sticky notes, Atlas's own L2046 sense) is included with
+# the same honesty tier as every other Tier 1 contract's own inferred
+# primitives.
+
+purpose:
+  - reconstruct_a_domain_process_as_a_traceable_chain_of_events_and_their_causes
+# Atlas L2046 verbatim sense: "以 Domain Event 為中心，讓 PM、工程、業務、
+# 營運快速建立共同 domain model" (centered on Domain Events, let PM,
+# engineering, business, and ops quickly build a shared domain model).
+
+inputs:
+  required:
+    - DomainProcessDescription
+  optional: []
+  # Atlas's own notation presupposes a real process being modeled -- a
+  # Event Storming session with no subject process to reconstruct would
+  # have nothing to place sticky notes about.
+
+outputs:
+  - EventStormingSession
+# NEW output type (see typed-objects/event-storming-session.schema.yaml).
+# Same honesty gap every Tier 1 contract this session disclosed: Atlas
+# names no PascalCase output type for this method.
+
+preconditions:
+  - "at least 1 domain_event element supplied"
+  - "every domain_event element has at least 1 incoming relationship (no orphan events -- Atlas's own arrow notation implies every event is caused by something)"
+  - "every relationship references two elements that are both present in the session's own elements list"
+  # The first is structurally necessary (a session about zero events
+  # reconstructs nothing). The second is the real structural invariant
+  # Atlas's own notation directly implies (see description). The third is
+  # a NEW, structurally necessary precondition -- same class every prior
+  # cross-field/cross-array contract this session built already
+  # discloses (e.g. challenge.red_team's own finding-dimension-must-be-
+  # examined check).
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: the record carries a provenance_record. Its own
+  # epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION (a
+  # workshop reconstruction of a real process is exactly that kind of
+  # claim, not a calculated/simulated result or a locked decision) --
+  # re-derived independently for this method's own subject matter, same
+  # discipline every prior contract's own quality-field derivation
+  # already applies. evidence_labeling_required is FALSE: Event Storming's
+  # own real risk (Atlas gives it no §22.3 gate row, so this is this
+  # contract's own re-derivation, not a citation) is structural
+  # incompleteness (orphan events, dangling relationships), already
+  # enforced via preconditions and gates below, not missing evidence
+  # citations for individual sticky notes -- a workshop reconstruction is
+  # itself a form of evidence-gathering, not a claim requiring separate
+  # evidence of its own.
+
+forbidden_transition: []
+# Atlas §22.3's own Method-specific Gate table (L4143-4155) does not
+# include an Event Storming row -- same honest absence
+# `architecture.adr.contract.yaml`'s own empty forbidden_transition
+# already discloses for its sibling F18 method.
+
+recommended_next: []
+# Atlas gives no explicit recommended_next citation for Event Storming
+# specifically (contrast Fishbone/Five Whys/Pareto's own explicit Atlas-
+# cited combos). F18's own recommended chain (L829-838) places "C4/DDD"
+# right after "Current-state Reconstruction", with Event Storming named
+# only in the tool TABLE, not the chain diagram itself -- left genuinely
+# empty rather than inventing a chain-position citation Atlas's own
+# diagram does not give this specific method.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- an EventStormingSession is a pure workshop-
+  # reconstruction record, no external side effects.
+
+compilation_decisions:
+  - question: >
+      Atlas's own notation names 6 element kinds (Domain Event, Command,
+      Actor, Policy, External System, Aggregate/Read Model -- the last
+      bundled as one arrow target). Should Aggregate and Read Model be
+      one element type or two?
+    decision: "Two separate element types (aggregate, read_model), not one bundled type."
+    reasoning: >
+      Atlas's own arrow notation bundles them with a slash
+      ("Aggregate／Read Model") purely as a compact NOTATION for 'a
+      Domain Event leads to one of these two kinds of downstream effect',
+      not as a claim that they are the same concept -- standard Event
+      Storming practice (corroborated by the method's own well-
+      established real-world vocabulary, the same class of external-
+      practice grounding `architecture.adr.contract.yaml`'s own `status`
+      field decision already used) treats Aggregates (the write-side
+      object handling commands and emitting events) and Read Models (the
+      query-side view built from events) as genuinely distinct concepts.
+      Splitting them into two element types is the more accurate, not the
+      more invented, choice.
+  - question: >
+      Should this contract enforce which SPECIFIC element-type-to-
+      element-type relationships are legal (e.g. "an Actor may only
+      relate to a Command, never directly to a Domain Event"), the way
+      `causal-dag-analysis.schema.yaml`'s own `role` enum implicitly
+      constrains causal-graph edges?
+    decision: "No -- only the single orphan-domain-event invariant is enforced. Relationship TYPE-pair legality is left unconstrained."
+    reasoning: >
+      Atlas's own notation gives a general causal-flow READING (events
+      are caused by upstream elements, and cause downstream ones) but no
+      exhaustive, worked table of every legal element-type-pair
+      combination -- inventing one (e.g. explicitly forbidding
+      Policy-to-Aggregate edges) would be presenting a guess as a
+      compiled fact, the same restraint `mcda-analysis.schema.yaml`'s own
+      single-`weights[]`-field decision and `computation.monte_carlo
+      .contract.yaml`'s own no-correlation-modeling decision already
+      apply to their own under-specified areas. The one invariant this
+      contract DOES enforce (no orphan domain events) is the single rule
+      Atlas's own notation unambiguously implies for every reading of the
+      arrows, not a specific pair-legality table.
+
+open_questions:
+  - id: "OQ-EVENTSTORMING-1"
+    question: >
+      Relationship type-pair legality (e.g. which element kinds may
+      legally relate to which others) is unconstrained beyond the single
+      orphan-domain-event invariant. Should a future revision add a full
+      legal-pairs table once a worked Atlas example or an operator's
+      explicit requirement is found?
+    owner: "operator, or whoever next needs stricter Event Storming graph validation"
+    blocks: "nothing in this file's own validity -- the orphan-event invariant is the one rule every reading of Atlas's own notation supports without further invention"
+  - id: "OQ-EVENTSTORMING-2"
+    question: >
+      `id: architecture.event_storming` mints a machine_id method-
+      inventory.yaml's own Event Storming entry (L1082-1085) never
+      carried. Should that entry be updated to record it, the same open
+      question every prior Tier 1 contract's own method-inventory.yaml
+      gap already raised and left unresolved?
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.36 (L2042-2064) directly at the cited lines, and its
+    neighboring §11.35 (DDD, L2020-2038) to confirm DDD's own weaker,
+    bare-concept-list grounding was the reason it was NOT chosen for this
+    slice instead (disclosed in this file's own description, not silently
+    decided). Grepped `specs/` and `methods/` exhaustively for "event
+    storm"/"domain event"/"bounded context" before writing -- found no
+    duplicate typed object (the "Bounded Context" hits in
+    `current-state.schema.yaml`/`change-plan.schema.yaml` are DDD-concept
+    references used as enum values in unrelated schemas, not an Event
+    Storming session's own shape). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 6-element notation (split into 7
+    element types per the Aggregate/Read-Model compilation_decision above)
+    is directly transcribed from Atlas's own arrow diagram (L2046-2052).
+    The orphan-domain-event invariant is a direct, defensible reading of
+    that same diagram, not an invention -- disclosed distinctly from the
+    unconstrained relationship-type-pair-legality scope limit in
+    compilation_decisions/open_questions.

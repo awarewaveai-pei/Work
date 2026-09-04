@@ -1,2 +1,3 @@
-"""F18 Software Architecture pack. First tenant: ``architecture.adr`` -- one member tool (Architecture Decision
-Record), not the whole 10-tool pack (see ``adr.py`` and the method contract's own scoping discipline)."""
+"""F18 Software Architecture pack. Tenants: ``architecture.adr`` (see ``adr.py``), ``architecture.event_storming``
+(see ``event_storming.py``) -- two of the 10-tool pack's member tools built, not the whole pack (see each method
+contract's own scoping discipline)."""

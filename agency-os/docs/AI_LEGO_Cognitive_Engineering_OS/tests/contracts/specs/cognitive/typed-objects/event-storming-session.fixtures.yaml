@@ -1,0 +1,71 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/event-storming-session.schema.yaml"
+target_ref: ""
+description: >
+  Exercises EventStormingSession's required fields, the `elements[]`
+  minItems:1 guard, the `type` 7-value enum (domain_event/command/actor/
+  policy/external_system/aggregate/read_model), and the `relationships[]`
+  edge shape.
+
+valid:
+  - name: order_cancellation_process_with_full_causal_chain
+    instance:
+      id: "ES-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.event_storming"
+      domain_process_description: "customer order cancellation, including refund trigger"
+      elements:
+        - {id: "A1", type: actor, label: "customer"}
+        - {id: "C1", type: command, label: "cancel order"}
+        - {id: "AG1", type: aggregate, label: "Order"}
+        - {id: "E1", type: domain_event, label: "order cancelled"}
+        - {id: "P1", type: policy, label: "auto-refund after cancellation"}
+        - {id: "C2", type: command, label: "initiate refund"}
+        - {id: "RM1", type: read_model, label: "customer order history"}
+      relationships:
+        - {from_id: "A1", to_id: "C1", label: "issues"}
+        - {from_id: "C1", to_id: "AG1", label: "handled by"}
+        - {from_id: "AG1", to_id: "E1", label: "emits"}
+        - {from_id: "E1", to_id: "P1", label: "triggers"}
+        - {from_id: "P1", to_id: "C2", label: "issues"}
+        - {from_id: "E1", to_id: "RM1", label: "updates"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_element_no_relationships
+    instance:
+      id: "ES-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.event_storming"
+      domain_process_description: "a bare external system trigger, no downstream modeled yet"
+      elements:
+        - {id: "X1", type: external_system, label: "payment gateway webhook"}
+      relationships: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: elements_below_minitems_1
+    instance:
+      id: "ES-2026-09-04-003"
+      version: "1.0.0"
+      domain_process_description: "x"
+      elements: []
+      relationships: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "elements has minItems: 1 -- a session with zero elements reconstructs nothing."
+  - name: invalid_element_type_enum_value
+    instance:
+      id: "ES-2026-09-04-004"
+      version: "1.0.0"
+      domain_process_description: "x"
+      elements:
+        - {id: "E1", type: "sticky_note", label: "x"}
+      relationships: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "elements[].type is enum [domain_event, command, actor, policy, external_system, aggregate, read_model] -- 'sticky_note' is not a member."
+  - name: missing_required_domain_process_description
+    instance:
+      id: "ES-2026-09-04-005"
+      version: "1.0.0"
+      elements:
+        - {id: "E1", type: domain_event, label: "x"}
+      relationships: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "domain_process_description is required -- the method contract's own required DomainProcessDescription input, missing here."
