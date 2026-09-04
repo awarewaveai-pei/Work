@@ -1,5 +1,51 @@
 # Worklog
 
+## 2026-09-05（續，System Foundry v1.6：問卷 UI 從「文字列表+要/不要按鈕」改成「點卡片直接選」）
+
+**觸發**：操作者傳了自己另一套系統（Lobster Factory Admin 的「部門選型」畫面）的截圖當範例，問「是不是改成需要的請選擇更好？類似這樣」。
+
+**判斷**：這純粹是前端呈現層改變——每張卡片預設「不要」，點擊切換成「要」，送出時的資料（每個 active 題目一個 boolean）跟舊版兩顆按鈕产生的資料完全等價，不需要動 kernel 的 YES/NO 二元限制、不需要動 `scripts/*.py` 任何後端邏輯、不需要動 schema。純 `configurator/{app.js,index.html,styles.css}` 三個檔案。
+
+**[已修改]**：
+- `configurator/app.js`：`render()` 改寫——每個分類渲染成 `.card-grid`，每題是一張可點擊卡片（點擊整張卡＝切換 answers[q.id]，不再需要兩顆按鈕）；未點擊的作用中題目預設 `false`（跟舊版使用者手動點「不要」產生的資料一模一樣，只是省去這一下多餘的點擊）；停用中的題目維持顯示但不可點擊灰階（保留 catalog 自己講的「Inactive questions are visible but not answerable」原則，沒有為了畫面乾淨就整個藏起來）；分類標題旁加「已選 N」小計；底部進度列從「已回答 X/Y」改成「已選擇 X 項功能（共 Y 項目前可選）」——原本「已回答」在新模型下沒有意義（每題永遠有值，不存在「未回答」狀態），改成有意義的「已選幾項」；「只看未完成」按鈕改成「只看已選擇」，同樣道理。
+- `configurator/styles.css`：新增 `.card-grid`／`.card`／`.card.selected`／`.card.inactive`／`.card-check` 等樣式（RWD grid，`auto-fill minmax(220px,1fr)`，選中＝綠色邊框+勾勾+淺綠底，跟操作者截圖的視覺語言接近），移除舊的 `.question`/`.choices`/`.choice` 規則。
+- `configurator/index.html`：兩個工具列按鈕文字與 id 同步更新（`顯示全部項目`／`只看已選擇`）。
+- `manifest.json`：`regenerate_integrity.py --write` 同步。
+
+**[驗證結果]**（真的在瀏覽器裡點過，不是只看程式碼）：
+- REALTEST_EVIDENCE: tool=Chrome | cmd=`preview_start` 重啟 configurator（前一個 process 還在跑 32 題擴充前的舊 catalog，`lru_cache` 沒吃到新資料，重啟後 `/api/catalog` 才回報正確的 153 題）→ 放大視窗高度到 2400px 後截圖（一般高度深捲動時這個 Browser pane 本身有渲染限制，換更高視窗規避，非我程式碼問題，用 DOM 層 `getBoundingClientRect` 交叉核對過真的只是截圖工具限制）| exit=0 | result=卡片格線正確渲染，含分類標題、已選計數、灰階停用態、跨題說明文字全部正常顯示
+- REALTEST_EVIDENCE: tool=Chrome | cmd=實際點擊「公司內部員工使用」卡片 | exit=0 | result=`class="card selected"`、checkmark 出現、分類計數「已選1」、底部進度「已選擇 1 項功能」全部連動更新
+- REALTEST_EVIDENCE: tool=Chrome | cmd=點擊「使用者帳號」卡片後截圖 | exit=0 | result=`active_when` 連動確認：03.帳號與成員類別底下原本灰階的 5 張卡（自行註冊/角色/邀請/SSO/客戶自管）即時從停用變成可點擊，證明依賴鏈邏輯在新 UI 下沒有壞
+- REALTEST_EVIDENCE: tool=Chrome | cmd=直接呼叫頁面內 `preview()` 函式（走真實 `/api/resolve`）| exit=0 | result=`狀態列顯示「驗證通過」`，確認新 UI 產生的 payload 格式後端仍然接受
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check configurator/app.js` | exit=0 | result=SYNTAX OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain + `python -m unittest discover -s tests` | 第一輪 `validate_manifest` 因忘記在改完 UI 後立刻 regenerate 而 FAIL（純粹是我流程順序問題，不是內容錯）→ 補跑 `regenerate_integrity.py --write` → 第二輪 exit=0 全綠
+
+**[剩餘風險]**：純前端改動，未涉及機器驗證腳本，故未派 critic（風險層級低、已用真實瀏覽器互動驗證覆蓋所有關鍵路徑：選取/取消/連動啟用/送出驗證）。截圖工具在這個 Browser pane 深捲動時會整片空白（已用 DOM 層 API 繞過，不影響驗證結論），這是環境限制，記錄起來避免下次浪費時間誤判是程式碼壞了。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/configurator agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/manifest.json`。
+
+## 2026-09-05（續35，同一 session：Cognitive OS 第二十二個 Method Atlas 切片 — `devops_sre.chaos_engineering`，主動查證共用詞彙非重複）
+
+**觸發**：延續操作者授權（「繼續完成」）。0 agent。
+
+**選型**：Chaos Engineering（Atlas §11.43 專屬段落，F19 pack 第三個成員方法）。5 步驟編號協定（建立 steady-state hypothesis→限定 blast radius→注入特定 failure→驗證是否自動恢復→不符合預期立即停止），同 fishbone/five_whys 等級的段落根基。步驟 5 直接蘊含真不變量：宣告 `recovered_as_hypothesized: false` 時 `status` 不能是 `completed`，CLI 真跑攻擊驗證。
+
+**主動查證共用詞彙非巧合放行**：本方法自己的 `blast_radius` 欄位跟既有 `specs/execution/blast-radius-chain.schema.yaml`（本平台自己的租戶隔離治理概念，ADR-003）共用「blast radius」詞彙。沒有因為 grep `chaos`/`steady state` 零命中就直接放行，而是額外把 `blast-radius-chain.schema.yaml` 全文讀過，確認是完全不同概念（平台架構治理 vs 單次實驗範圍）才動筆——寫進 contract compilation_decisions，非事後才想到。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.chaos_engineering.contract.yaml`＋`specs/cognitive/typed-objects/chaos-experiment.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentieth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/devops_sre/chaos_engineering.py`（builder+unrecovered-forbids-completed 不變量+2 gate）＋`ai_lego/apps/cli/run_chaos_engineering_slice.py`（真實完成實驗+攻擊驗證）＋`tests/unit/test_chaos_engineering.py`（9 tests 第一次跑全綠）＋`docs/TWENTYSECOND_SLICE_DEVOPS_SRE_CHAOS_ENGINEERING.md`。`modules/devops_sre/__init__.py` docstring 補第三租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_chaos_engineering_slice` | exit=0 | result=第一次真跑就通過（含 unrecovered 不變量攻擊驗證）：`PASS devops_sre.chaos_engineering: status=completed, recovered=True, gates [provenance_required=PASS, unrecovered_forbids_completed=PASS], unrecovered_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_chaos_engineering -v` | exit=0 | ms=813 | result=9 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2708→2717
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | result=見同批次背景輸出（`git diff --stat` 對照共用檔案／兩個既有 devops_sre 模組／全部 8 個 architecture 模組確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`devops_sre[.]chaos_engineering\|ChaosExperiment\|chaos-experiment\|run_chaos_engineering_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-CHAOS-1`（method-inventory.yaml 無機器 id 列）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit（全部新增檔案）。
+
 ## 2026-09-05（續，System Foundry v1.6：依操作者「國際企業應具備哪些功能」的要求，新增 7 個企業部門類別）
 
 **觸發**：操作者「行銷部門 客服部門 CRM ,圖文影製作, 社交媒體管理和其他的 還有 可以參考 https://app.aware-wave.com/onboard...就是你要想一間國際企也應該具備哪些功能」。嘗試瀏覽該參考頁面，`/onboard` 導向登入頁（`Lobster Factory Admin`），無帳密、依規定不輸入登入資訊——改用一般企業軟體知識自行設計，未能對照操作者實際產品現況，如實記錄此限制。
