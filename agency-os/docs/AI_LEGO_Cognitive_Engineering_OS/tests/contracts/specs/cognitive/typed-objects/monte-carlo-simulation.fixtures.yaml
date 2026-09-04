@@ -1,0 +1,159 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/monte-carlo-simulation.schema.yaml"
+target_ref: ""
+description: >
+  Exercises MonteCarloSimulation's required fields, the `input_distributions[]`
+  distribution_type discriminated union (normal/uniform/triangular, each
+  additionalProperties:false), the `combine_mode`/`engine` const guards,
+  the fixed P5/P50/P95 `outcome_distribution.percentiles` set, the fixed
+  95th-percentile `tail_risk`, the required `sensitivity_notes`
+  disclosure, and the top-level `additionalProperties: false`
+  no-certainty-claim enforcement (Atlas §22.3 L4153).
+
+valid:
+  - name: two_components_normal_and_triangular_with_success_threshold
+    instance:
+      id: "MC-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "computation.monte_carlo"
+      input_distributions:
+        - {id: "D1", label: "material cost", distribution_type: normal, params: {mean: 50000, std_dev: 8000}}
+        - {id: "D2", label: "labor cost", distribution_type: triangular, params: {min: 20000, mode: 30000, max: 45000}}
+      combine_mode: "sum"
+      random_seed: 42
+      num_runs: 10000
+      success_threshold: 90000
+      success_direction: at_most
+      success_probability: 0.6234
+      outcome_distribution:
+        mean: 80123.45
+        std_dev: 9876.54
+        percentiles:
+          - {p: 5, value: 65432.1}
+          - {p: 50, value: 79876.2}
+          - {p: 95, value: 96543.8}
+      tail_risk: {tail_percentile: 95, tail_value: 96543.8}
+      sensitivity_notes: "manually checked -- D1 std_dev dominates the P95 tail"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+  - name: single_uniform_input_no_success_criterion
+    instance:
+      id: "MC-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "computation.monte_carlo"
+      input_distributions:
+        - {id: "D1", label: "delay days", distribution_type: uniform, params: {min: 0, max: 10}}
+      combine_mode: "sum"
+      random_seed: 7
+      num_runs: 5000
+      success_probability: null
+      outcome_distribution:
+        mean: 5.01
+        std_dev: 2.89
+        percentiles:
+          - {p: 5, value: 0.52}
+          - {p: 50, value: 5.0}
+          - {p: 95, value: 9.48}
+      tail_risk: {tail_percentile: 95, tail_value: 9.48}
+      sensitivity_notes: "single input -- entire outcome variance attributable to D1 by construction"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: distribution_type_normal_missing_std_dev
+    instance:
+      id: "MC-2026-09-04-003"
+      version: "1.0.0"
+      input_distributions:
+        - {id: "D1", label: "x", distribution_type: normal, params: {mean: 1.0}}
+      combine_mode: "sum"
+      random_seed: 1
+      num_runs: 100
+      outcome_distribution: {mean: 1.0, std_dev: 0.1, percentiles: [{p: 5, value: 0.8}, {p: 50, value: 1.0}, {p: 95, value: 1.2}]}
+      tail_risk: {tail_percentile: 95, tail_value: 1.2}
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "the 'normal' branch of input_distributions[].oneOf requires params.std_dev -- missing here, and no other oneOf branch matches ('normal' distribution_type with a params shape lacking std_dev fails all three branches)."
+  - name: combine_mode_not_sum_is_refused_by_const
+    instance:
+      id: "MC-2026-09-04-004"
+      version: "1.0.0"
+      input_distributions:
+        - {id: "D1", label: "x", distribution_type: uniform, params: {min: 0, max: 1}}
+      combine_mode: "product"
+      random_seed: 1
+      num_runs: 100
+      outcome_distribution: {mean: 0.5, std_dev: 0.1, percentiles: [{p: 5, value: 0.1}, {p: 50, value: 0.5}, {p: 95, value: 0.9}]}
+      tail_risk: {tail_percentile: 95, tail_value: 0.9}
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "combine_mode is const 'sum' -- 'product' is refused, v1 supports no other combination mode (see method contract OQ-MONTECARLO-1)."
+  - name: num_runs_below_minimum_2
+    instance:
+      id: "MC-2026-09-04-005"
+      version: "1.0.0"
+      input_distributions:
+        - {id: "D1", label: "x", distribution_type: uniform, params: {min: 0, max: 1}}
+      combine_mode: "sum"
+      random_seed: 1
+      num_runs: 1
+      outcome_distribution: {mean: 0.5, std_dev: 0.0, percentiles: [{p: 5, value: 0.5}, {p: 50, value: 0.5}, {p: 95, value: 0.5}]}
+      tail_risk: {tail_percentile: 95, tail_value: 0.5}
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "num_runs has minimum: 2 -- a single draw cannot describe a distribution."
+  - name: tail_percentile_not_95_is_refused_by_const
+    instance:
+      id: "MC-2026-09-04-006"
+      version: "1.0.0"
+      input_distributions:
+        - {id: "D1", label: "x", distribution_type: uniform, params: {min: 0, max: 1}}
+      combine_mode: "sum"
+      random_seed: 1
+      num_runs: 100
+      outcome_distribution: {mean: 0.5, std_dev: 0.1, percentiles: [{p: 5, value: 0.1}, {p: 50, value: 0.5}, {p: 95, value: 0.9}]}
+      tail_risk: {tail_percentile: 90, tail_value: 0.85}
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "tail_risk.tail_percentile is const 95 -- Atlas's own worked example (L1880, 'P95 cost'), 90 is refused."
+  - name: missing_required_sensitivity_notes
+    instance:
+      id: "MC-2026-09-04-007"
+      version: "1.0.0"
+      input_distributions:
+        - {id: "D1", label: "x", distribution_type: uniform, params: {min: 0, max: 1}}
+      combine_mode: "sum"
+      random_seed: 1
+      num_runs: 100
+      outcome_distribution: {mean: 0.5, std_dev: 0.1, percentiles: [{p: 5, value: 0.1}, {p: 50, value: 0.5}, {p: 95, value: 0.9}]}
+      tail_risk: {tail_percentile: 95, tail_value: 0.9}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "sensitivity_notes is required -- Atlas §22.3's own required-verification column names Sensitivity, missing here."
+  - name: guaranteed_outcome_claim_refused_by_additional_properties_false
+    instance:
+      id: "MC-2026-09-04-008"
+      version: "1.0.0"
+      input_distributions:
+        - {id: "D1", label: "x", distribution_type: uniform, params: {min: 0, max: 1}}
+      combine_mode: "sum"
+      random_seed: 1
+      num_runs: 100
+      outcome_distribution: {mean: 0.5, std_dev: 0.1, percentiles: [{p: 5, value: 0.1}, {p: 50, value: 0.5}, {p: 95, value: 0.9}]}
+      tail_risk: {tail_percentile: 95, tail_value: 0.9}
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED}
+      guaranteed: true
+    reason: "additionalProperties: false refuses the smuggled 'guaranteed' key -- Atlas §22.3 (L4153) forbids this method's output from claiming a Guaranteed Outcome, same enforcement class red-team-challenge.schema.yaml/mcda-analysis.schema.yaml already established for sibling methods."

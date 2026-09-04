@@ -399,6 +399,42 @@ tier_1:
       reasoning `decision.ahp`'s own fifth-entry note already applies).
       Tier 1, mandated by the actively-running implementation slice, same
       category as the seven entries above it.
+  ninth_concrete_entry:
+    # NEW (2026-09-04, same session): ninth Tier 1 entry, same
+    # additive-key rationale as the eight entries above it.
+    method_id: "computation.monte_carlo"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). First entry from a family
+      that is NOT one of Atlas's own numbered F01-F24 categories --
+      method-inventory.yaml's own catalog row for this method labels its
+      category "computation (uncataloged in F01-F24)" verbatim, and Atlas
+      §3's own primitive-category table independently gives a matching
+      "F. Computation" row -- two citations for the family name, not one
+      invented. Atlas §22.3's Method-specific Gate table (L4153) gives
+      this method a directly-cited forbidden_transition ("Guaranteed
+      Outcome"), the THIRD Tier 1 entry in a row drawing from that same
+      table (after `challenge.red_team`'s L4152 row and `decision.mcda`'s
+      L4154 row). The first genuinely stochastic method this session
+      built -- reproducibility via a required random_seed satisfies
+      Trusted Compute, not an absence of randomness. Proactive spec-root
+      due-diligence performed BEFORE writing this contract found
+      `specs/governance/epistemic-label.schema.yaml`'s own SIMULATED_RESULT
+      epistemic_type (reserved, unused until this slice) and
+      `specs/decision/decision.schema.yaml`'s own deliberately-
+      unconstrained `simulations` field both anticipate this exact method
+      -- confirmed as an intended gap to fill, not a duplicate, the same
+      class of finding `decision.mcda`'s own eighth entry already made for
+      `decision.schema.yaml`'s `analyses` field.
+    source: "methods/contracts/computation.monte_carlo.contract.yaml (built same session as this entry, mints machine_id computation.monte_carlo) + specs/cognitive/typed-objects/monte-carlo-simulation.schema.yaml (new output type) + ai_lego/compute/montecarlo/simulation.py (new deterministic seeded-sampling compute module, hand-verified against known statistical facts: fixed-seed reproducibility, large-N normal convergence, uniform/triangular bounds, success-probability sanity)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.29 is a dedicated protocol
+      section with a real 5-node pipeline and 6-step usage protocol, not
+      itself cited elsewhere as a repeated teaching example. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the eight entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

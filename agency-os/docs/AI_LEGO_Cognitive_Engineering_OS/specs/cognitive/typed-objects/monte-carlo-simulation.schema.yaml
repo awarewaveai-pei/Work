@@ -1,0 +1,284 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/monte-carlo-simulation.schema.yaml"
+title: Monte Carlo Simulation
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MonteCarloSimulation` -- the
+  declared `outputs` of `computation.monte_carlo`'s Method Contract
+  (methods/contracts/computation.monte_carlo.contract.yaml, `outputs:
+  [MonteCarloSimulation]`). The file `specs/decision/decision.schema.yaml`'s
+  own deliberately-unconstrained `simulations` field (L377-380) anticipates
+  and was waiting for exactly this schema, the same relationship
+  `decision.schema.yaml`'s own `analyses` field already had to
+  `mcda-analysis.schema.yaml`.
+
+  Field provenance -- Atlas §11.29 (L1858-1883)'s own 5-node pipeline
+  ("Input Distributions -> Monte Carlo N Runs -> Outcome Distribution ->
+  {Success Probability, Sensitivity, Tail Risk}") and 6-step usage
+  protocol map onto this schema's fields (correlation/dependency modeling
+  and a general combination-formula engine are disclosed as NOT
+  implemented -- see `methods/contracts/computation.monte_carlo.contract
+  .yaml`'s own `compilation_decisions`/`open_questions` OQ-MONTECARLO-1/
+  OQ-MONTECARLO-2, this schema does not re-litigate that scope choice):
+    * `input_distributions[]` -- usage-protocol step 1.
+    * `combine_mode` -- how multiple input distributions become one
+      outcome; `sum` is the only v1-supported value.
+    * `random_seed` / `num_runs` -- usage-protocol steps 3/4. `random_seed`
+      is what makes this genuinely stochastic method still satisfy this
+      codebase's Trusted Compute reproducibility guarantee (same seed,
+      byte-for-byte same output).
+    * `outcome_distribution` -- usage-protocol step 5's own explicit
+      instruction ("輸出 distribution，而不是只輸出平均" -- output the
+      distribution, not just the mean): COMPUTED mean/std_dev plus P5/
+      P50/P95 percentiles, never a bare average.
+    * `success_probability`/`success_threshold`/`success_direction` --
+      the pipeline's "Success Probability" node, a caller-defined-
+      criterion optional trio (all three present, or all three absent --
+      an orphaned probability with no stated criterion is not
+      constructible, see the method contract's own compilation_decisions).
+    * `tail_risk` -- the pipeline's "Tail Risk" node, fixed at the 95th
+      percentile (Atlas's own worked example, L1880: "P95 cost").
+    * `sensitivity_notes` -- the pipeline's "Sensitivity" node,
+      DISCLOSURE-ONLY (same pattern `ahp-analysis.schema.yaml`/
+      `mcda-analysis.schema.yaml` already established for their
+      identically-named, identically-ungrounded stage).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.29 蒙地卡羅模擬（Monte Carlo Simulation）, 5-node pipeline + 6-step usage protocol (L1858-1883)"
+  - "methods/contracts/computation.monte_carlo.contract.yaml (outputs, preconditions, quality, forbidden_transition -- the method contract this type's shape must satisfy)"
+  - "ai_lego/compute/montecarlo/simulation.py (the real seeded-random-sampling compute this schema's `outcome_distribution` records the result of)"
+  - "specs/governance/epistemic-label.schema.yaml (SIMULATED_RESULT epistemic_type, L54 -- this schema's own `provenance.epistemic_type`, not CALCULATED_RESULT)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Atlas §22.3 (L4153) forbids this method's output from claiming
+      "Guaranteed Outcome" -- the same class of explicit governance rule
+      `red-team-challenge.schema.yaml`/`mcda-analysis.schema.yaml` already
+      enforce via top-level `additionalProperties: false`. Should
+      `MonteCarloSimulation` use the same structural enforcement?
+    decision: "Yes -- additionalProperties: false at the top level."
+    reasoning: >
+      Same reasoning both sibling schemas already document for their
+      identically-shaped rule: a permissive schema would silently allow a
+      caller to smuggle a certainty-claiming key (e.g. `guaranteed`,
+      `certain`) onto a record whose entire cited purpose is to represent
+      a DISTRIBUTION of possible outcomes, never a single guaranteed one.
+  - question: >
+      Should individual simulation outcome samples (potentially
+      thousands, one per run) be stored in this record?
+    decision: "No -- only summary statistics (mean, std_dev, percentiles) are stored, never the raw sample array."
+    reasoning: >
+      Atlas's own usage-protocol step 5 says to output "distribution，而不
+      是只輸出平均" (a distribution, not just a mean) -- satisfied by a
+      small, fixed set of summary statistics (mean, std_dev, P5/P50/P95),
+      not by persisting every individual draw. Storing thousands of raw
+      floats per record would bloat the typed-object store for no
+      analytical benefit this schema's own consumers (a Decision object's
+      `simulations[]` array, a human reviewer) need -- the summary
+      statistics are a complete, honest representation of "what the
+      distribution looks like" at the fidelity Atlas's own text asks for.
+
+type: object
+required: [id, version, input_distributions, combine_mode, random_seed, num_runs, outcome_distribution, tail_risk, sensitivity_notes, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^MC-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling typed-object schema's own id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "computation.monte_carlo"
+
+  input_distributions:
+    type: array
+    minItems: 1
+    description: "Atlas L1868 usage-protocol step 1: 'define input distributions'."
+    items:
+      oneOf:
+        - type: object
+          required: [id, label, distribution_type, params]
+          additionalProperties: false
+          properties:
+            id: {type: string}
+            label: {type: string}
+            distribution_type: {const: "normal"}
+            params:
+              type: object
+              required: [mean, std_dev]
+              additionalProperties: false
+              properties:
+                mean: {type: number}
+                std_dev: {type: number, exclusiveMinimum: 0}
+        - type: object
+          required: [id, label, distribution_type, params]
+          additionalProperties: false
+          properties:
+            id: {type: string}
+            label: {type: string}
+            distribution_type: {const: "uniform"}
+            params:
+              type: object
+              required: [min, max]
+              additionalProperties: false
+              properties:
+                min: {type: number}
+                max: {type: number}
+        - type: object
+          required: [id, label, distribution_type, params]
+          additionalProperties: false
+          properties:
+            id: {type: string}
+            label: {type: string}
+            distribution_type: {const: "triangular"}
+            params:
+              type: object
+              required: [min, mode, max]
+              additionalProperties: false
+              properties:
+                min: {type: number}
+                mode: {type: number}
+                max: {type: number}
+
+  combine_mode:
+    const: "sum"
+    description: "How multiple input_distributions become one outcome. Only 'sum' is supported in v1 -- see method contract compilation_decisions/OQ-MONTECARLO-1 for why no general formula-evaluation engine is built."
+
+  random_seed:
+    type: integer
+    description: "Atlas L1872 usage-protocol step 3. What makes this method's genuinely stochastic subject matter still satisfy Trusted Compute reproducibility -- same seed, byte-for-byte same outcome_distribution."
+
+  num_runs:
+    type: integer
+    minimum: 2
+    description: "Atlas L1874 usage-protocol step 4 ('run enough simulations'). No Atlas-cited minimum beyond the structural floor of 2 (fewer draws cannot describe a distribution) -- 'enough' is left to the caller, same class of undefined-by-Atlas threshold pareto-analysis.schema.yaml's own vital_few_threshold_percent already documents."
+
+  success_threshold:
+    type: number
+    description: "Optional. Present only together with success_direction and a non-null success_probability -- see method contract compilation_decisions for why these three are enforced as a package, not independently optional."
+
+  success_direction:
+    enum: [at_least, at_most]
+    description: "Whether success means the outcome is >= success_threshold or <= success_threshold."
+
+  success_probability:
+    type: ["number", "null"]
+    minimum: 0
+    maximum: 1
+    description: "Atlas L1866 pipeline node 'Success Probability' -- COMPUTED fraction of runs meeting success_threshold/success_direction. Null when no success criterion was supplied (a pure outcome-distribution run is still complete and valid)."
+
+  outcome_distribution:
+    type: object
+    required: [mean, std_dev, percentiles]
+    additionalProperties: false
+    description: "Atlas L1875 usage-protocol step 5: 'output a distribution, not just a mean'. COMPUTED from num_runs samples."
+    properties:
+      mean: {type: number}
+      std_dev: {type: number, minimum: 0}
+      percentiles:
+        type: array
+        minItems: 3
+        description: "Fixed at P5/P50/P95 -- a minimal, always-present set covering both a robust central estimate (P50) and both tails, not just the mean."
+        items:
+          type: object
+          required: [p, value]
+          additionalProperties: false
+          properties:
+            p: {enum: [5, 50, 95]}
+            value: {type: number}
+
+  tail_risk:
+    type: object
+    required: [tail_percentile, tail_value]
+    additionalProperties: false
+    description: "Atlas L1866 pipeline node 'Tail Risk', fixed at the 95th percentile -- Atlas's own worked example (L1880: 'P95 cost'), not an invented default (see method contract compilation_decisions)."
+    properties:
+      tail_percentile: {const: 95}
+      tail_value: {type: number}
+
+  sensitivity_notes:
+    type: string
+    minLength: 1
+    description: "Atlas L1877 usage-protocol step 6 AND §22.3's (L4153) required-verification column -- DISCLOSURE-ONLY, same pattern ahp-analysis.schema.yaml/mcda-analysis.schema.yaml already established for their identically-named stage."
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses. A seeded pseudo-random sequence is still deterministic compute -- see method contract compilation_decisions for the explicit disclosure of why this is not a contradiction."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed outcome_distribution -- same convention every genuine-compute typed object in this directory already establishes."
+
+  provenance:
+    description: "epistemic_type is expected to be SIMULATED_RESULT (not CALCULATED_RESULT) for a genuine Monte Carlo run -- the first typed object in this directory to use this label, distinct from the deterministic-single-value CALCULATED_RESULT every prior genuine-compute typed object here uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two independent cost components (normal + triangular), summed, with a success threshold, 10000 runs"
+    value:
+      id: "MC-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "computation.monte_carlo"
+      input_distributions:
+        - {id: "D1", label: "材料成本（美元）", distribution_type: normal, params: {mean: 50000, std_dev: 8000}}
+        - {id: "D2", label: "工時成本（美元）", distribution_type: triangular, params: {min: 20000, mode: 30000, max: 45000}}
+      combine_mode: "sum"
+      random_seed: 42
+      num_runs: 10000
+      success_threshold: 90000
+      success_direction: at_most
+      success_probability: 0.6234
+      outcome_distribution:
+        mean: 80123.45
+        std_dev: 9876.54
+        percentiles:
+          - {p: 5, value: 65432.1}
+          - {p: 50, value: 79876.2}
+          - {p: 95, value: 96543.8}
+      tail_risk: {tail_percentile: 95, tail_value: 96543.8}
+      sensitivity_notes: "材料成本（D1）std_dev 每增加 10% ，P95 上移約 800 美元；工時成本影響較小。人工檢查，非機械計算。"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.montecarlo.simulation.run_simulation"
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-MONTECARLOSIMULATION-1"
+    question: >
+      `outcome_distribution.percentiles` is fixed at exactly {P5, P50,
+      P95} with no way to request additional percentiles (e.g. P10, P90).
+      Should a future revision make the requested percentile set
+      caller-configurable?
+    owner: "operator, or whoever next needs a finer-grained percentile breakdown"
+    blocks: "nothing in this file's own validity -- P5/P50/P95 is a complete, Atlas-example-grounded minimal set"
+
+verification:
+  method: >
+    Read Atlas §11.29 (L1858-1883) directly at the cited lines.
+    Cross-checked against methods/contracts/computation.monte_carlo
+    .contract.yaml's own outputs/preconditions/quality/forbidden_transition
+    and ai_lego/compute/montecarlo/simulation.py's real seeded-sampling
+    compute (hand-verified against known statistical facts -- a
+    fixed-seed run's exact reproducibility, a large-N normal-distribution
+    sample's mean/std_dev convergence, and uniform/triangular bounds
+    respected -- before this schema was written). Validated against
+    jsonschema Draft202012Validator.
+  note: >
+    `input_distributions`/`random_seed`/`num_runs`/`outcome_distribution`/
+    `sensitivity_notes` field names and stage ordering are transcribed
+    from Atlas's own 5-node pipeline and 6-step usage protocol
+    (L1858-1883). The `additionalProperties: false` enforcement mirrors
+    `red-team-challenge.schema.yaml`/`mcda-analysis.schema.yaml`'s own
+    citation-grounded rule (Atlas §22.3, a third table row for a third
+    method). No mother document was modified to produce this file.

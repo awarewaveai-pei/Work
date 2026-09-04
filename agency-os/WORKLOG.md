@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-04（續24，同一 session：Cognitive OS 第十一個 Method Atlas 切片 — `computation.monte_carlo`，第一個跳出 F01-F24 編號的家族＋第一個真隨機方法）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`computation.monte_carlo`。Atlas §11.29 給了 5 節點 pipeline（Input Distributions→Monte Carlo N Runs→Outcome Distribution→{Success Probability, Sensitivity, Tail Risk}）＋ 具體 6 步驟使用方式＋效益文字明文舉出 P95 當範例。§22.3「Method-specific Gate」表 Monte Carlo 那一列（同一張表已為 red_team／mcda 提供根基）明文：「禁止直接輸出 Guaranteed Outcome｜必須補的驗證 Input Distribution + Sensitivity」——本 session 連續第三個有**明文引用**forbidden_transition 的 Tier 1 contract。
+
+**家族本身沒有 F 編號，誠實揭露而非硬塞**：`method-inventory.yaml` 對 Monte Carlo Simulation 的 catalog row 自己標注 `category: "computation (uncataloged in F01–F24)"`——Atlas 從未把這個方法收進 24 個編號家族任何一個。沒有硬塞進既有家族或發明無根據的新名字，`family: computation` 逐字轉錄該分類文字，且獨立對照 Atlas §3 primitive-category 表格自己的「F. Computation」列（Python/R/SQL/Stats/Simulation）——兩個獨立引用支撐同一個家族名，本 session 第一個跳出 F 編號的家族。
+
+**主動應用續21／續22／續23紀律，讀完 spec root 找到第二次「早就預留的擴充點」**：grep 全 spec root 找「monte carlo」/「probability distribution」/「simulation」/「SIMULATED_RESULT」，沒找到重複，但找到兩個等待被填的擴充點：`specs/governance/epistemic-label.schema.yaml` 的 `SIMULATED_RESULT` epistemic_type（11 值 enum 裡本來就有，此前 10 個切片全部用 `CALCULATED_RESULT`，這是本 session 第一次真正用到它）；`specs/decision/decision.schema.yaml` 的 `simulations[]` 欄位刻意留 `items:{}`，跟續23切片發現 `analyses[]` 早被 `decision.schema.yaml` 自己的 compilation_decisions 預告給 MCDA 是同一種情況。
+
+**不變量**：Monte Carlo 本身是隨機演算法，看起來跟本 codebase 的 Trusted Compute「`engine: local_python_deterministic_compute`」要求有張力——但沒有真正衝突：`random_seed` 是必填欄位，同一顆種子 = 逐位元組相同輸出，沿用 `reliability.py` 的 Kappa bootstrap CI 早就建立的 `random.Random(seed)` 慣例（本 session 第一次把這個模式從輔助計算升級成整個方法的主要輸出）。手算驗證直接證明：同種子兩次跑出逐位元組相同的結果字典，換種子則不同。真正的方法論不變量：Atlas 的 pipeline 只給「多個 input distributions → 一個 outcome distribution」的名稱，沒給任何組合公式——本 v1 只支援 `combine_mode: sum`（獨立不確定成本組件加總是真實常見的完整 Monte Carlo 用例，不是稻草人），不建一般化公式引擎（`eval()` 是安全紅線，自建安全運算式解析器則是沒有 Atlas 根基的範疇擴張）。Tail Risk 固定在第 95 百分位——這次不是發明預設值，是 Atlas 效益文字本身舉了「P95 cost」當具體範例（跟 Pareto 的 80/20 情況相反：Atlas 對 Pareto 是明文警告不要假設固定比例，對 Monte Carlo 是明文給了一個具體數字當範例）。
+
+**`sensitivity_notes` 揭露閘沒有重用 `evaluate_statistical_gate`**——刻意設計決定：那個閘硬編碼檢查 `epistemic_type == CALCULATED_RESULT`，用在 Monte Carlo 上會錯誤地讓每一筆誠實的模擬記錄都 FAIL（因為 Monte Carlo 該用 `SIMULATED_RESULT`）。寫了一個獨立、結構完全相同但檢查正確 epistemic_type 的閘，並用 mutation test 直接證明：把一筆合法記錄的 provenance 竄改成 `CALCULATED_RESULT` 後閘正確 FAIL——這是本 session 第一次「決定不重用」某個既有函式且用測試證明為什麼不能重用。
+
+**[已修改]**：spec-root 新增 `methods/contracts/computation.monte_carlo.contract.yaml`（逐字引用 Atlas §11.29＋§22.3 L4153＋§3 primitive 表格三個獨立引用）＋`specs/cognitive/typed-objects/monte-carlo-simulation.schema.yaml`（頂層 `additionalProperties:false`，`distribution_type` 判別式 `oneOf` 聯集 normal/uniform/triangular 各自封閉）＋對應 golden fixture（2 valid + 6 invalid）＋`contract-backlog.yaml` 新增 `tier_1.ninth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/montecarlo/simulation.py`（`run_simulation`，先用已知統計事實——固定種子重現性／不同種子分歧／大 N 常態分布收斂到真實 mean/std／uniform/triangular 邊界／success_probability 對照已知 50/50 情境——十項全部手算驗證通過才接進方法層）＋`ai_lego/modules/computation/monte_carlo.py`（builder＋確定性宣稱守門＋四個 gate）＋`ai_lego/apps/cli/run_monte_carlo_slice.py`（真實專案成本模擬：材料成本常態分布＋工時成本三角分布加總，含攻擊竄改驗證同 red_team／mcda CLI 手法）＋`tests/unit/test_monte_carlo.py`（23 tests，第一次跑就全綠，無需修正）＋`docs/ELEVENTH_SLICE_COMPUTATION_MONTE_CARLO.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "..."` 手算驗證 `run_simulation`（固定種子重現性／不同種子分歧／大N常態收斂／uniform-triangular邊界／success_probability對照已知50/50／4種錯誤路徑）| exit=0 | result=十項全部符合預期，才接進方法層
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_monte_carlo_slice` | exit=0 | result=第一次真跑就通過：`PASS computation.monte_carlo: mean=81547.5, P95=97419.9, success_probability=0.8122, gates [provenance_required=PASS, genuine_compute=PASS, sensitivity_disclosed=PASS, no_certainty_claim=PASS], no_certainty_claim_verified(runtime=True, schema=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_monte_carlo -v` | exit=0 | ms=1813 | result=23 passed，第一次跑就全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2602→2615
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=49193 | result=**410 tests OK**（387→410，零回歸；`git diff --stat` 對照 `reliability.py`／`provenance.py`／`method_resolver.py`／`schema_contracts.py`／`event_ledger.py`／`modules/decision/mcda.py`／`modules/decision/ahp.py`／`modules/research/gates.py` 八個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：隨機演算法真的滿足 Trusted Compute 的「確定性」要求嗎（是，已用真實雙跑同種子測試證明逐位元組相同輸出，不是空談）；`sensitivity_notes` 揭露閘不重用既有閘是不是偷懶（不是，已用 mutation test 具體證明重用會導致錯誤 FAIL，這是主動避免錯誤重用而非偷懶）；`family: computation` 沒有 F 編號算不算破壞既有慣例（不算，已在 contract 明文揭露為本 session 第一個跳出編號的家族，附兩個獨立引用佐證，不是靜默處理）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`computation[.]monte_carlo\|MonteCarloSimulation\|monte-carlo-simulation\|modules[.]computation\|compute/montecarlo\|compute\.montecarlo\|modules/computation` | hits=全部為本切片自己的新檔案、session log 雜訊、`__pycache__` 編譯產物、以及兩個 gitignored 自動產生狀態檔（另一個並行 session 的 `ao-resume-hook-last.json/.log`，正確反映新檔案存在，非過期殘留）——無任何非預期殘留引用
+
+**[剩餘風險]**：`OQ-MONTECARLO-1`（`combine_mode` 只支援 `sum`，未建公式引擎）；`OQ-MONTECARLO-2`（input distributions 間無相關性建模，僅獨立抽樣）；`OQ-MONTECARLO-3`（sensitivity 只驗證揭露非正確性）；`OQ-MONTECARLO-4`（機器 id 未回填 method-inventory.yaml，家族本身是否該正式升格為 F 編號留待操作者決定）。皆非阻塞，已誠實揭露於 contract 與 docs。**旁觀察（非本任務範圍）**：並行 session 的 `ao-resume-hook-last.json` 顯示 `capacity-LATEST.json` 回報 `ks-aw-01` 過去偵測到 1 次 OOM kill——該並行 session 自己的 AO-RESUME 流程已經看到這個訊號，不重複開工單，僅在此記錄以防遺漏。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（全部為新增檔案，回退零副作用）。
+
 ## 2026-09-04（續23，同一 session：Cognitive OS 第十個 Method Atlas 切片 — `decision.mcda`，AHP 的自然延伸＋首次跨家族重用評分函式）
 
 **觸發**：延續操作者授權，繼續自主推進。0 agent。

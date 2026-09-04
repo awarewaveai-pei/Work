@@ -1,0 +1,345 @@
+$id: "ai-lego://methods/contracts/computation.monte_carlo.contract.yaml"
+title: "Monte Carlo Simulation Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Eleventh Method Atlas slice, and the FIRST from a family
+  that is NOT one of Atlas's own numbered F01-F24 categories --
+  `methods/registry/method-inventory.yaml`'s own catalog row for this
+  method (L1437-1441) explicitly labels its `category` as "computation
+  (uncataloged in F01-F24)", not a synthetic label this contract invented.
+  `family: computation` transcribes that same word, and independently
+  matches Atlas §3's own primitive-category letter table (L146: "F.
+  Computation | 哪些必須真算？ | Python / R / SQL / Stats / Simulation") --
+  two independent citations for the same family name, disclosed together
+  rather than picking either alone.
+
+  Atlas §11.29 (L1858-1883) gives this method a dedicated section: purpose,
+  a real 5-node mermaid pipeline ("Input Distributions -> Monte Carlo N
+  Runs -> Outcome Distribution -> {Success Probability, Sensitivity, Tail
+  Risk}"), a concrete 6-step usage protocol (define input distributions;
+  check correlation/dependency; set a random seed; run enough simulations;
+  output a distribution, not just a mean; do sensitivity/tail analysis),
+  and named benefits that literally cite P95 as a worked example ("可回答
+  P(success)、P95 cost、loss tail", L1880). §22.3's own Method-specific
+  Gate table (L4153) gives this contract a directly-cited
+  forbidden_transition -- the SAME table that already grounded
+  `challenge.red_team.contract.yaml` (L4152) and
+  `decision.mcda.contract.yaml` (L4154), a third Tier 1 contract in a row
+  drawing from this table.
+
+  First method this session that is genuinely STOCHASTIC rather than
+  deterministic in its own subject matter -- yet still satisfies this
+  codebase's Trusted Compute discipline: a caller-supplied, schema-required
+  `random_seed` makes the entire run byte-for-byte reproducible (same seed,
+  same sequence of pseudo-random draws, same output), the same
+  `engine: local_python_deterministic_compute` guarantee every genuine-
+  compute typed object in this directory already carries -- "stochastic
+  subject matter" and "deterministic, reproducible COMPUTATION of that
+  subject matter" are not in tension; see `compilation_decisions` for the
+  explicit disclosure of why this is not a contradiction.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.29 蒙地卡羅模擬（Monte Carlo Simulation）(L1858-1883) -- purpose, 5-node pipeline, 6-step usage protocol, benefits (P95 cited example)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table, Monte Carlo row (L4153): 'Guaranteed Outcome｜Input Distribution + Sensitivity' -- this contract's forbidden_transition and quality gates"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §3 primitive-category table, row F (L146): 'Computation｜Python / R / SQL / Stats / Simulation' -- this contract's family name, second independent citation"
+  - "methods/registry/method-inventory.yaml Monte Carlo Simulation entry (L1437-1441): category 'computation (uncataloged in F01-F24)', no machine_id recorded -- this contract mints one"
+  - "specs/governance/epistemic-label.schema.yaml (SIMULATED_RESULT epistemic_type, L54) -- reserved, unused-until-this-slice provenance classification distinct from CALCULATED_RESULT"
+  - "specs/decision/decision.schema.yaml (`simulations` field, L377-380, deliberately unconstrained `items: {}`) -- the same class of anticipated-but-unfilled extension point `decision.schema.yaml`'s own `analyses` field already was for `decision.mcda.contract.yaml`"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.29 gives a complete pipeline, a
+  concrete usage protocol, and §22.3 gives an explicit, table-cited
+  forbidden-authority rule -- direct transcription plus low-risk,
+  disclosed compilation choices, same standard every Tier 1 contract this
+  session built applies. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a ninth concrete
+  entry.
+
+  `id: computation.monte_carlo` is a NEW machine_id (method-inventory.yaml's
+  own "Monte Carlo Simulation" entry, L1437-1441, carries no machine_id --
+  same situation every prior Tier 1 contract's own source method was in
+  before this session touched it). Minted following ADR-005b's
+  `<family>.<name>` bare-form grammar. `computation` is a NEW family for
+  this session (the first not matching an F-number label) -- justified by
+  TWO independent citations (method-inventory.yaml's own category text,
+  Atlas §3's own primitive-letter-table row), not invented. No competing
+  machine_id form was found for Monte Carlo anywhere in the corpus
+  (grepped exhaustively, same method every prior contract's own
+  verification note already establishes).
+
+id: computation.monte_carlo
+version: "1.0.0"
+family: computation
+
+cognitive_primitives: [ESTIMATE, SIMULATE, FORECAST]
+# INFERRED, not cited -- Atlas §4 (L192) cites a primitive formula for
+# only 5 methods (Fishbone, SCAMPER, SWOT, Scenario Planning, AHP); Monte
+# Carlo is not among them. SIMULATE is the one CANONICAL_KERNEL primitive
+# (§4, L177) whose name is a near-exact match for this method's own name
+# -- included with confidence. ESTIMATE (deriving input distribution
+# parameters) and FORECAST (projecting an outcome distribution forward)
+# are inferred from the method's own described purpose, same honesty tier
+# as `causal.dag`/`root_cause.five_whys`/`root_cause.pareto`/
+# `challenge.red_team`/`decision.mcda`'s own inferred fields.
+
+purpose:
+  - project_an_outcome_distribution_from_uncertain_inputs
+# Atlas L1861 verbatim sense: "當關鍵輸入都不是固定值時，用 probability
+# distributions 模擬大量可能結果" (when key inputs are not fixed values,
+# use probability distributions to simulate a large number of possible
+# outcomes).
+
+inputs:
+  required:
+    - InputDistributions
+    - RandomSeed
+    - NumRuns
+  optional:
+    - SuccessThreshold
+  # Atlas's own usage protocol (L1868-1877, steps 1/3/4) names input
+  # distributions, a random seed, and a sufficient run count as the real
+  # required inputs. SuccessThreshold is optional -- Atlas's own pipeline
+  # names "Success Probability" as one of three PARALLEL downstream
+  # outputs (alongside Sensitivity and Tail Risk, L1866), not a value
+  # every run must compute -- a caller running a pure "what does the
+  # outcome distribution look like" simulation with no defined success
+  # criterion is still a complete, valid Monte Carlo run.
+
+outputs:
+  - MonteCarloSimulation
+# NEW output type (see typed-objects/monte-carlo-simulation.schema.yaml).
+# Same honesty gap every Tier 1 contract this session disclosed: Atlas
+# names no PascalCase output type for this method.
+
+preconditions:
+  - "at least 1 input distribution supplied, each with a distribution_type-appropriate params object"
+  - "random_seed and num_runs are both present (num_runs >= 2)"
+  - "success_threshold and success_direction are supplied together or not at all"
+  # NEW, structurally necessary preconditions -- Atlas's own usage
+  # protocol names the concepts (steps 1/3/4) but gives no field-level
+  # precondition text, same class of structurally-necessary-but-not-
+  # literally-cited precondition every prior genuine-compute contract's
+  # own preconditions already establish (e.g. decision.ahp's "exactly
+  # n*(n-1)/2 pairwise comparisons", decision.mcda's "weights sum to
+  # 1.0").
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: the MonteCarloSimulation record itself carries a
+  # provenance_record with epistemic_type SIMULATED_RESULT -- a genuine-
+  # compute record, same class root_cause.pareto/decision.ahp/
+  # decision.mcda already established, but the FIRST to use
+  # SIMULATED_RESULT rather than CALCULATED_RESULT (see
+  # compilation_decisions for why these are genuinely different labels,
+  # not interchangeable). evidence_labeling_required is FALSE, re-derived
+  # independently for this method's own risk profile (same discipline
+  # every genuine-compute contract's own departure documents): this
+  # method's real risk (Atlas §22.3, L4153) is about UNAUTHORIZED
+  # CERTAINTY CLAIMS ("Guaranteed Outcome"), not about omitting evidence
+  # citations for individual input-distribution parameters -- enforced
+  # instead via `forbidden_transition` and the two quality gates below.
+
+forbidden_transition:
+  - "Guaranteed Outcome"
+# CITED, Atlas §22.3 L4153 verbatim: "Monte Carlo | 禁止直接輸出:
+# Guaranteed Outcome | 必須補的驗證: Input Distribution + Sensitivity".
+# The THIRD Tier 1 contract this session built with a directly
+# table-cited forbidden-authority rule (after challenge.red_team's L4152
+# row and decision.mcda's L4154 row, the same table). Enforced at the
+# typed-object layer by `monte-carlo-simulation.schema.yaml`'s own
+# `additionalProperties: false` (top level) plus
+# `ai_lego/modules/computation/monte_carlo.py::assert_no_certainty_claim`
+# (runtime, raise-before-construction) -- same two-layer belt-and-
+# suspenders discipline `challenge.red_team`/`decision.mcda` already
+# established, independently re-derived here for Monte Carlo's own cited
+# rule (a distinct blocklist -- "guaranteed"/"certain", not
+# "approved"/"decision" -- reflecting THIS method's own specific
+# forbidden claim, not copied wholesale from either sibling).
+
+recommended_next: []
+# Atlas §22.3's own "必須補的驗證" column names "Input Distribution +
+# Sensitivity" -- both are already PART OF this method's own required
+# fields/gates (input_distributions is required at construction;
+# sensitivity_notes is a required disclosure field, see
+# compilation_decisions), not a downstream method to chain into. Left
+# empty rather than inventing a next-method citation Atlas does not give.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- MonteCarloSimulation is a pure record, no
+  # external side effects (the simulation itself runs in-process, no
+  # network/filesystem/database write beyond this codebase's own
+  # standard runtime ledger).
+
+compilation_decisions:
+  - question: >
+      Monte Carlo's own subject matter is stochastic (random sampling from
+      probability distributions). Does that conflict with this codebase's
+      Trusted Compute discipline, which requires `engine:
+      local_python_deterministic_compute` on every genuine-compute typed
+      object?
+    decision: "No conflict -- a caller-supplied, schema-required random_seed makes the run fully reproducible."
+    reasoning: >
+      "Deterministic compute" in this codebase's own established sense
+      (see `reliability.py`'s percentile-bootstrap confidence interval,
+      the first prior module in this codebase to already combine
+      randomness with a fixed seed) means the COMPUTATION PROCEDURE is a
+      real, auditable algorithm -- not an LLM "mentally" producing a
+      plausible-looking number -- and, given the same inputs (including
+      the seed), always produces the exact same output. Python's
+      `random.Random(seed)` guarantees byte-for-byte reproducible pseudo-
+      random sequences for a fixed seed. `random_seed` is therefore a
+      REQUIRED field (see preconditions), not an optional nicety --
+      without it, two runs of the "same" simulation could not be proven
+      to have used the same procedure, undermining exactly the
+      reproducibility guarantee this codebase's Trusted Compute framing
+      exists to provide.
+  - question: >
+      Atlas's own pipeline names "Input Distributions" (plural) feeding a
+      single "Outcome Distribution" (singular) -- but gives zero worked
+      example of HOW multiple input distributions combine into one
+      outcome (e.g. is a total cost the sum of component costs? a
+      product? something else?).
+    decision: "v1 supports exactly one combine_mode: sum. No formula-evaluation engine is built."
+    reasoning: >
+      Building a general formula-evaluation engine (accepting an
+      arbitrary caller-supplied expression) would either require `eval()`
+      (a real security risk this codebase's own safety rules explicitly
+      forbid introducing) or a bespoke safe-expression parser -- genuine
+      scope creep Atlas's own bare pipeline-stage name does not license,
+      the same class of over-building this suite's `decided_by` sections
+      repeatedly flag as out of bounds (contrast AHP's own refusal to
+      invent a multi-level criteria hierarchy or a sensitivity formula).
+      Summing independent uncertain components (total project cost =
+      sum of cost-component distributions; total duration = sum of
+      task-duration distributions) is itself a real, common, complete
+      Monte Carlo use case -- not a strawman -- and is the ONLY
+      combination Atlas's own pipeline text could be read as
+      unambiguously implying without inventing additional structure.
+      `combine_mode` is still modeled as an enum (not a bare constant)
+      specifically so a future revision can add a second mode without a
+      breaking schema change. Disclosed as `OQ-MONTECARLO-1` below.
+  - question: >
+      Atlas's usage-protocol step 2 (L1870, "檢查 correlation /
+      dependency") names checking for correlated inputs. Should this
+      contract's v1 model correlated sampling (e.g. a covariance matrix)?
+    decision: "No -- all input distributions are sampled independently. Disclosed as a scope limit, not silently assumed."
+    reasoning: >
+      Same class of scope limit `decision.ahp.contract.yaml`'s own
+      OQ-AHP-1 (flat, not hierarchical, criteria) already applies: Atlas
+      names the CONCEPT (a step in the usage protocol) but gives zero
+      worked example, formula, or field shape for HOW correlation would
+      be modeled (a covariance matrix? rank correlation? copulas?) --
+      inventing one would be presenting a guess as a compiled fact.
+      Independent sampling is the simpler, more conservative (less
+      invented) choice, and is itself a complete, valid Monte Carlo
+      configuration (independence is the DEFAULT assumption in the vast
+      majority of introductory and applied Monte Carlo literature when no
+      dependency structure is specified). Disclosed as `OQ-MONTECARLO-2`.
+  - question: >
+      Atlas's own benefit line (L1880) explicitly cites "P95 cost" as a
+      worked tail-risk example. Should the tail percentile be a fixed
+      constant (95) or a caller-set, nullable field (the way
+      `pareto-analysis.schema.yaml`'s own `vital_few_threshold_percent`
+      is)?
+    decision: "Fixed at the 95th percentile."
+    reasoning: >
+      Genuinely different situation from Pareto's own 80/20 caution
+      (Atlas L1320 explicitly warns the real ratio is data-determined,
+      i.e. Atlas itself says NOT to hard-code a default): here, Atlas's
+      own text gives a CONCRETE WORKED VALUE (P95) as its own example of
+      what this method's tail-risk output looks like, not a caution
+      against assuming one. Fixing it at 95 is the more directly-cited
+      choice, not an invented default -- the same class of distinction
+      `ahp-analysis.schema.yaml`'s own compilation_decisions already
+      draws between Saaty's fixed, externally-published CR<=0.10
+      threshold and Pareto's caller-set one.
+  - question: >
+      Should `success_probability`, `success_threshold`, and
+      `success_direction` be three independent optional fields, or a
+      single grouped optional object?
+    decision: "Three independent optional fields, but enforced as a package by a precondition (all three present, or all three absent)."
+    reasoning: >
+      A `success_probability` number with no accompanying threshold/
+      direction would be an orphaned, uninterpretable value -- what
+      probability, of what event? The precondition (see above) prevents
+      that state from being constructible. Kept as three flat fields
+      rather than one nested object because every other optional-output
+      field in this session's typed objects (e.g. `ahp-analysis.schema
+      .yaml`'s `options`/`option_scores`/`ranking` trio) already uses the
+      flat-fields-plus-precondition pattern, not nested objects, for
+      consistency across the directory.
+
+open_questions:
+  - id: "OQ-MONTECARLO-1"
+    question: >
+      `combine_mode` supports only `sum` in this v1 -- no general formula-
+      evaluation engine is built (see compilation_decisions). Should a
+      future revision add a second combine_mode (e.g. `product`) or a
+      safe, sandboxed expression evaluator once a real worked Atlas
+      example or explicit operator requirement is found?
+    owner: "operator, or whoever next needs a non-additive outcome combination"
+    blocks: "nothing in this file's own validity -- sum is a complete, real Monte Carlo use case on its own"
+  - id: "OQ-MONTECARLO-2"
+    question: >
+      Input distributions are sampled independently in this v1 -- Atlas's
+      own usage-protocol step 2 (correlation/dependency check) is not
+      implemented at all. Should a future pass define a concrete
+      correlation-modeling approach (covariance matrix? rank correlation?)
+      once a worked example or formula is found or designed?
+    owner: "operator, or whoever next reads Atlas for additional Monte Carlo correlation-modeling content"
+    blocks: "nothing in this file's own validity -- independence is the conservative default, disclosed not assumed"
+  - id: "OQ-MONTECARLO-3"
+    question: >
+      `sensitivity_notes` (same disclosure-only pattern
+      `decision.mcda.contract.yaml`'s own OQ-MCDA-2 already applies to its
+      identically-named stage) enforces presence, not any particular
+      sensitivity methodology. Should a future pass define one concretely
+      for Monte Carlo specifically (e.g. one-at-a-time input perturbation
+      and re-run, re-ranking which input distribution most moves the P95
+      tail)?
+    owner: "operator, or whoever next reads Atlas for additional sensitivity-analysis content"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-MONTECARLO-4"
+    question: >
+      `id: computation.monte_carlo` mints a machine_id method-inventory
+      .yaml's own Monte Carlo Simulation entry (L1437-1441) never carried,
+      and `family: computation` is the first family this session opened
+      that does not correspond to an Atlas F01-F24 number. Should
+      method-inventory.yaml's own "computation (uncataloged in F01-F24)"
+      category label be formally promoted to an F-number, or left as-is?
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml / Atlas's own F-category taxonomy"
+    blocks: "nothing in this file's own validity -- consistent with (not a new departure from) how every prior Tier 1 contract's own method-inventory.yaml row was left unsynced"
+
+verification:
+  method: >
+    Read Atlas §11.29 (L1858-1883) and §22.3's Method-specific Gate table
+    Monte Carlo row (L4153) directly at the cited lines. Grepped `specs/`
+    and `methods/` exhaustively for "monte carlo"/"probability
+    distribution"/"simulation"/"SIMULATED_RESULT" before writing -- found
+    no duplicate typed object, but did find that
+    `specs/governance/epistemic-label.schema.yaml`'s own SIMULATED_RESULT
+    epistemic_type (L54) and `specs/decision/decision.schema.yaml`'s own
+    deliberately-unconstrained `simulations` field (L377-380) both
+    anticipate and were waiting for this exact method, the same class of
+    "found an anticipated extension point, not a duplicate" result
+    `decision.mcda.contract.yaml`'s own verification note already
+    documents for `decision.schema.yaml`'s `analyses` field. Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `forbidden_transition` is directly
+    table-cited (§22.3 L4153), not inferred -- the third Tier 1 contract
+    this session built with that property. `family: computation` is
+    doubly-cited (method-inventory.yaml's own category text AND Atlas
+    §3's primitive-letter table), disclosed as this session's first
+    non-F-number family rather than silently treated as ordinary. The
+    sum-only combine_mode, independent-sampling, and disclosure-only-
+    sensitivity scope limits are DISCLOSED narrowing decisions, not
+    silent omissions -- see compilation_decisions and open_questions.
