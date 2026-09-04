@@ -101,7 +101,7 @@ AUTO_TASK_DONE: Trigger workflows 完整 deploy — <trigger.dev deploy URL> —
 - Cloudflare BFM bypass runbook: `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md`
 - Deploy guide: `lobster-factory/infra/trigger/README.md` §7a
 - Task reference (env vars per task): `lobster-factory/infra/trigger/TASK_REFERENCE.md`
-- EU server: `204.168.175.41` (Helsinki hel1, Hetzner ID: 127972089)
+- Server: ks-aw-01 `145.239.195.47`（SSH `-p 58122 ubuntu`，sudo；原 EU `204.168.175.41` 已於 2026-08-31 整併退租）
 - Trigger dashboard: https://trigger.aware-wave.com
 - Project ref: `lobster-factory/packages/workflows/trigger.config.ts` → `project` field
 - CLI version: `lobster-factory/packages/workflows/package.json` → `trigger.dev` field (currently 4.4.6)

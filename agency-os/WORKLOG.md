@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-04（續21，同一遠端 session：清「另案」殘留 — 退租 IP 掃描修正、prod 部署閘補現役主機、pwsh 裝機、ao-close 註解）
+
+**[任務理解]** 操作者問「都完美處理完了嗎」——我前兩輪登記為另案的項目不能一直掛著。掃描後範圍比原登記大：退租 IP（`5.223.93.113`／`204.168.175.41`／`149.202.64.114`）仍出現在 65 個檔案；其中**代理會照做的**（`.claude/agents`、`.claude/commands`、腳本預設值、hook 正則）必須修，**歷史敘事**（handoffs／舊 runbook／WORKLOG／memory）保留。
+**[最重要發現]** `mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js:29` 的 ssh→prod 部署／重啟 BLOCK 正則只列兩個退租 IP，2026-08-31 整併後對現役 `145.239.195.47` **完全不擋**——偵測器啞了四天而 AO-RESUME 沒有任何訊號（正是 §R0 最惡樣態「系統宣稱與真實不符」）。
+**[已修改]**
+- `high-risk-bash-warn.js`：host 交替式加 `145\.239\.195\.47|ks-aw-01`（保留舊 IP，不可達無害）；`tests/hooks/runner-parity.test.mjs` 新增 `P4-1c`（live host 部署／systemctl restart／ssh-config 別名 `ks-aw-01` reboot → BLOCK；唯讀 `docker ps` → pass）。
+- `.claude/agents/`：devops-engineer、mainwp-engineer、supabase-engineer、n8n-engineer（含 frontmatter description）、incident-responder（主機表改單機＋刪除線舊主機）、trigger-deploy-agent、client-onboarding（4 條 ssh 指令）、AGENT_INDEX；`.claude/commands/command-plane-verify.md`；`.claude/SKILL_AND_COMMAND_INDEX.md`（sg/eu-reboot 標已取代）。SSH 一律 `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`（QUICKREF 橫幅正本），容器路徑不變（`/root/lobster-phase1`、`/root/n8n`、`/root/mainwp`）。`sg-reboot.md`／`eu-reboot.md` 的 `host:` 行保留（檔頭已 SUPERSEDED 重導）。
+- 腳本：`scripts/check-capacity-health.ps1`／`check-backup-health.ps1` 的 `$SgHost`/`$EuHost` 預設清空（body 已不用，只是簽章相容）；`agency-os/scripts/check-supabase-memory-monthly.ps1` wrapper 預設對齊 owner（owner 早已是 ks-aw-01，wrapper 只轉送 bound params，此為文件正確性）；`scripts/ao-close.ps1:1275` 註解不再引用已不存在的 CLAUDE.md 段。
+- `CLAUDE.md` 遠端段：加 container 裝 `pwsh` 的實測指令（Microsoft apt repo，7.6.5，約 1 分鐘），本 container 已裝。
+- WORKLOG 續20 [剩餘風險]①：修正我對 `claude -p` 的過度宣稱——deny 隨任一 settings 來源載入，repo 目錄內的 `claude -p` 同樣受保護。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=1 | ms=~4000 —— 153 案 152 過（+1 P4-1c 綠），唯一紅仍是 main 上同紅的 `git-commit-scope-guard POSIX cd`。突變：把正則的 `145\.239\.195\.47|ks-aw-01|` 拿掉 → P4-1c 紅（fail 2）→ 還原 → 綠（fail 1）。`pwsh` Parser.ParseFile 對 4 支改過的 `.ps1` 全 OK。`run-v3-governance-gates.mjs` PASSED。`pwsh -NoProfile -Command $PSVersionTable` → 7.6.5。
+- REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) `client-onboarding.md` 的 ssh 指令改 `ubuntu` 後，遠端 `echo >> /root/lobster-phase1/.env` 需要 sudo 才寫得進 root 目錄——已在該段加註「ubuntu 需 sudo」，指令本身留給執行者依 QUICKREF 加 `sudo`（不盲改成 `sudo sh -c` 以免破壞引號層）；n8n frontmatter description 仍在雙引號內、YAML 有效。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests,lobster-factory | grep=`204\.168\.175\.41\|5\.223\.93\.113\|149\.202\.64\.114` | hits=65 檔（修前）→ `.claude/` 剩 10 行全為刻意歷史／刪除線／SUPERSEDED 重導；其餘命中為歷史文件與 lobster-factory 基礎設施腳本，見下）
+- ORACLE_WAIVED: 本 container 無 codex CLI；以突變測試＋書面自審替代。
+**[剩餘風險／明確未做]** ① `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `SG_SSH_HOST` 預設仍 `5.223.93.113`：ks-aw-01 需 port 58122 + ubuntu，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數，改預設不夠、要動 next-admin 讀 env 的程式碼＋伺服器 `.env`，屬 Medium 且無法在此驗證，登記 `TASKS.md`；② `lobster-factory/infra/eu-backup/backup-eu-stack.sh`、`cf-origin-lockdown.sh` 的舊 IP 預設（EU stack 已退場、origin-lockdown 指令已 retired）不動；③ ~50 份歷史 docs／handoffs 含舊 IP，屬當時為真的敘述，不重寫；治理文件層由 `CURRENT_SERVICE_PLACEMENT.md` 與 QUICKREF 橫幅聲明現況。
+**[rollback]** `git revert` 本 commit。
+- AUTO_TASK_DONE: 退租 IP 清理（代理可執行層 12 檔）+ prod 部署閘補現役主機（突變驗證）+ pwsh 裝機指令入 CLAUDE.md + ao-close 註解 + 續20 風險宣稱修正。
+
 ## 2026-09-04（續20，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
 
 **[任務理解]** 操作者問「瘋狂派 subagents 有解決嗎」→ 回答「解一半」→ 操作者「你做最完美決定與處理」。不變量：**任何 fan-out 都必須經過 PreToolUse 可見的路徑**。Agent tool 滿足（`subagent-budget.js` 真實 spawn 驗證過）；Workflow tool 不滿足——`agent()` 在背景執行，hook 只能驗 `SUBAGENT-BUDGET-ESTIMATE` 自報值，動態爆量（腳本跑到一半才算出 N）防不了，`resumeFromRunId` 路徑更是零保護且從未真實驗證。證據：`reports/agent-dispatch/dispatch-20260903.jsonl` 當天只記到 6 個 agent，而事故是 99 個——記錄 hook 同樣看不到 Workflow 內部。
@@ -14,7 +33,7 @@
 - REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) deny 語法：Claude Code permission rule 裸工具名即整工具（同既有 `WebFetch` 慣例），未加 `(*)` 是刻意；`sync-claude-userlevel.ps1 -Mode merge` 對 `permissions.deny` 是 governed key 整組覆蓋（`:351`），template 加項即傳播；JSON 以 `json.dumps(indent=2, ensure_ascii=False)` 回寫，diff 僅 +3/-1 無整檔重排。
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests | grep=`SUBAGENT-BUDGET-ESTIMATE\|resumeFromRunId\|Workflow tool` | hits=3 stale（`AGENTS_APPENDIX.md` 存檔區的原文描述 Workflow 分支為現行防線——存檔區依定義不改；`subagent-budget.js` 檔頭註解仍以 Workflow 為主要路徑之一——保留為縱深防禦，行為未變，不需改）
 - ORACLE_WAIVED: 本 container 無 codex CLI／pwsh；以突變測試 + 書面自審替代（memory `feedback_self_review_when_oracle_down`）。
-**[剩餘風險]** ① deny 只在 Claude Code 生效，`claude -p` 另開 session 若載入不同 settings 不受保護（架構上本來就不在 hook 視野）；② 筆電需跑一次 `sync-claude-userlevel.ps1 -Mode merge` 才真的生效，遠端下個 session 起生效；③ 若日後真需要 Workflow，從 deny 移除 + 補一個能看見真實 spawn 的閘，不可只移除。
+**[剩餘風險]** ① deny 隨 settings 載入：工作站 user-level `~/.claude/settings.json`（template 同步）與 repo 內 `.claude/settings.local.json`（遠端）任一存在即生效，`claude -p` 在 repo 目錄內同樣受保護；唯一縫隙是遠端 container 在 repo 目錄**外**另開 session（無 user-level settings）——實務上不會發生；② 筆電需跑一次 `sync-claude-userlevel.ps1 -Mode merge` 才真的生效，遠端下個 session 起生效；③ 若日後真需要 Workflow，從 deny 移除 + 補一個能看見真實 spawn 的閘，不可只移除。
 **[rollback]** 從兩處 deny 清單移除 `"Workflow"`、刪 parity test 與 test-hooks 登記行。
 - AUTO_TASK_DONE: Workflow tool deny（template + 遠端生成器 + parity test 突變驗證）；瘋狂派 subagent 問題由「驗自報估計」升級為「路徑整個關閉」。
 

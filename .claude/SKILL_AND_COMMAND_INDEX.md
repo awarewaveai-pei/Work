@@ -45,8 +45,8 @@
 |---|---|---|
 | `/sg-deploy` | SSH 進 SG VPS 跑 `sg-deploy.sh` 部署 lobster-phase1 服務。 | [commands/sg-deploy.md](commands/sg-deploy.md) |
 | `/check-drift` | 對 SG production 跑 deploy drift checker 並回報。 | [commands/check-drift.md](commands/check-drift.md) |
-| `/sg-reboot` | 安全重啟 SG VPS（5.223.93.113），含 pre/post-flight 檢查。 | [commands/sg-reboot.md](commands/sg-reboot.md) |
-| `/eu-reboot` | 安全重啟 EU VPS（204.168.175.41），含 pre/post-flight 檢查。 | [commands/eu-reboot.md](commands/eu-reboot.md) |
+| `/sg-reboot` | **已被 `/ks-aw-01-reboot` 取代**（SG 5.223.93.113 已退租；指令僅重導）。 | [commands/sg-reboot.md](commands/sg-reboot.md) |
+| `/eu-reboot` | **已被 `/ks-aw-01-reboot` 取代**（EU 204.168.175.41 已退租；指令僅重導）。 | [commands/eu-reboot.md](commands/eu-reboot.md) |
 | `/auto-reboot-status` | 檢查 VPS auto-reboot 系統健康（B-Minimal，唯讀診斷）。 | [commands/auto-reboot-status.md](commands/auto-reboot-status.md) |
 | `/command-plane-verify` | 診斷 Telegram bot 為何沉默；跑 -Verify 並查 SG docker env。 | [commands/command-plane-verify.md](commands/command-plane-verify.md) |
 | `/phase4-check` | 手動觸發 Repair Center Phase 4 週檢（fallback 路徑）。 | [commands/phase4-check.md](commands/phase4-check.md) |

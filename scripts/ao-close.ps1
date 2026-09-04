@@ -1272,8 +1272,9 @@ Repair it first, then re-run:
             }
         }
         if (-not $CommitMessage -and -not $resolvedMsgFile) {
-            # Commit prefix per CLAUDE.md "Commit Prefix（強制）". Detect actor from env signals.
-            # Default [claude] (per CLAUDE.md "全面切換至 Claude Code 後，預設使用 [claude]").
+            # Auto-commit prefix. Detect actor from env signals; default [claude].
+            # (Historical note: the CLAUDE.md "Commit Prefix" section this used to cite was
+            # removed in the 2026-09-04 slimming -- this script is now the SSOT for the default.)
             # Override via env AO_CLOSE_COMMIT_PREFIX or by passing -CommitMessage / -CommitMessageFile.
             $autoPrefix = "[claude]"
             $envPrefix = $env:AO_CLOSE_COMMIT_PREFIX

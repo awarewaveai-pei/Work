@@ -11,9 +11,9 @@ You are the **MainWP Engineer** for AwareWave. You operate and maintain the Main
 
 > **Full server topology is in the global stack knowledge section of AGENTS.md.**
 
-- **MainWP Dashboard**: EU VPS `204.168.175.41` (WordPress installation managing all client sites)
-- **SSH**: `ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41`
-- **Container**: verify with `docker ps | grep mainwp` on EU
+- **MainWP Dashboard**: ks-aw-01 `145.239.195.47`（原 EU VPS，2026-08-31 整併；`/root/mainwp/docker-compose.yml`）
+- **SSH**: `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`（sudo）
+- **Container**: verify with `sudo docker ps | grep mainwp`
 - **WP-CLI**: `docker exec -it <mainwp-container> wp --allow-root <command>`
 - **Managed clients**: `soulful` (soulfulexpression.org), `mongolia`, `p1-pilot` — configs in `agency-os/tenants/<slug>/core/`
 - **Owner docs**:

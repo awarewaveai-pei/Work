@@ -870,6 +870,14 @@
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 
+- [ ] **compose `SG_SSH_HOST` 預設仍指退租 SG 5.223.93.113 — ks-aw-01 需 port 58122 + ubuntu，改預設不夠**
+  - `🟡 潛伏` · `2026-09-04 開` · `操作者（Medium：動 next-admin 讀 env 程式碼＋伺服器 .env）`
+  - **一句話**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `${SG_SSH_HOST:-5.223.93.113}` 是 hosting bridge 的 SSH 目標；整併後現役主機非 22 port／非 root，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數
+  - **現在到哪**：2026-09-04 續21 掃描發現；伺服器 `.env` 是否已覆蓋 `SG_SSH_HOST` 未在遠端 session 驗證
+  - **下一步**：① SSH ks-aw-01 `grep SG_SSH /root/lobster-phase1/.env` ② next-admin `grep -rn SG_SSH_HOST lib/` 看是否硬編 port 22／root ③ 若需要，加 `SG_SSH_PORT`/`SG_SSH_USER` env + compose 預設改 `145.239.195.47`/`58122`/`ubuntu` ④ 走 sg-deploy.sh
+  - **完成定義**：hosting bridge 對 ks-aw-01 一次成功 provision（或 dry-run 通過）且 compose 預設無退租 IP
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-04 續21 [剩餘風險]①；`grep -rnE "5\.223\.93\.113" lobster-factory/infra` 另含 `eu-backup/backup-eu-stack.sh`、`cf-origin-lockdown.sh`（已退場腳本，同案一併決定刪或改）
+
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。

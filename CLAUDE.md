@@ -38,6 +38,7 @@ SSOT `mcp/registry.template.json`，改後跑 `scripts/sync-mcp-config.ps1`。`~
 ## 遠端 session 機械閘自裝（Claude Code web）
 
 session 開始若無 `.claude/settings.local.json` → 立刻 `bash scripts/wire-remote-hooks.sh`（本 session 不生效，同 container 後續 session 生效；最好設為環境 setup script）。背景：2026-07-02 稽核發現遠端零機械閘。
+container 無 `pwsh` 時（AO-CLOSE／verify 腳本需要）：`curl -sSO https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb && dpkg -i packages-microsoft-prod.deb && apt-get update -qq && apt-get install -y -qq powershell`（2026-09-04 實測 7.6.5，約 1 分鐘；同樣建議進 setup script）。
 
 ## VPS drop-in 並行
 

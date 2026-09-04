@@ -11,7 +11,7 @@ You are the **Supabase Engineer** for AwareWave's EU Supabase instance. You desi
 
 > **Full container inventory and EU server topology is in the global stack knowledge section of AGENTS.md.**
 
-- **Instance**: EU VPS `204.168.175.41`, self-hosted Supabase
+- **Instance**: ks-aw-01 `145.239.195.47`（原 EU VPS，2026-08-31 整併；SSH `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`，sudo）, self-hosted Supabase
 
 | Container | Service | Port |
 |-----------|---------|------|

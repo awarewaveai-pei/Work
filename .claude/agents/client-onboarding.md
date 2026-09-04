@@ -115,22 +115,22 @@ Use when the agency controls the server credentials.
 $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\.ssh\<keyfile>"))
 $envLine = "SSH_KEY_<KEY_LABEL_UPPERCASE>=$b64"
 
-# Append to SG .env
-ssh -i "$HOME\.ssh\hetzner_trigger" root@5.223.93.113 "echo '$envLine' >> /root/lobster-phase1/.env"
+# Append to ks-aw-01 .env（原 SG，2026-08-31 整併；路徑 /root/lobster-phase1 不變，ubuntu 需 sudo）
+ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 "echo '$envLine' >> /root/lobster-phase1/.env"
 
 # Add to staging docker-compose.yml
-ssh -i "$HOME\.ssh\hetzner_trigger" root@5.223.93.113 `
+ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 `
   "sed -i 's|TRIGGER_ACCESS_TOKEN: \${TRIGGER_ACCESS_TOKEN:-}|TRIGGER_ACCESS_TOKEN: \${TRIGGER_ACCESS_TOKEN:-}\n      SSH_KEY_<KEY_LABEL_UPPERCASE>: \${SSH_KEY_<KEY_LABEL_UPPERCASE>:-}|' /root/lobster-phase1/docker-compose.yml"
 
 # Also add to repo docker-compose.yml (commit later)
 # lobster-factory/infra/hetzner-phase1-core/docker-compose.yml
 
 # Restart container to pick up env
-ssh -i "$HOME\.ssh\hetzner_trigger" root@5.223.93.113 \
+ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 \
   "cd /root/lobster-phase1 && docker compose up -d next-admin"
 
 # Verify
-ssh -i "$HOME\.ssh\hetzner_trigger" root@5.223.93.113 \
+ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 \
   "docker exec lobster-next-admin printenv | grep SSH_KEY"
 ```
 

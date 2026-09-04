@@ -26,7 +26,12 @@ const HIGH_RISK_PATTERNS = [
     // #1 high-consequence gap: 「部署」 trigger relied on Claude remembering
     // /check-drift → /verify → tsc → go-ahead). Read-only ssh (logs, cat,
     // health checks) is untouched — only mutating verbs match.
-    re: /^\s*(?:sudo\s+)?ssh\b[^\n]*(?:5\.223\.93\.113|204\.168\.175\.41)[^\n]*(?:sg-deploy|rollback-phase1|auto-deploy-next-admin|systemctl\s+(?:restart|stop)|docker[\s-]+compose\s+(?:down|stop|restart)|\breboot\b|\bshutdown\b)/im,
+    // 2026-09-04: host list was still the two retired Hetzner IPs after the
+    // 2026-08-31 consolidation onto ks-aw-01 (145.239.195.47) -- the gate
+    // silently stopped covering production. Retired IPs kept (unreachable,
+    // harmless); the live host + its hostname added. Retire this comment when
+    // the host list moves to a config file.
+    re: /^\s*(?:sudo\s+)?ssh\b[^\n]*(?:145\.239\.195\.47|ks-aw-01|5\.223\.93\.113|204\.168\.175\.41)[^\n]*(?:sg-deploy|rollback-phase1|auto-deploy-next-admin|systemctl\s+(?:restart|stop)|docker[\s-]+compose\s+(?:down|stop|restart)|\breboot\b|\bshutdown\b)/im,
     label: 'remote deploy/restart on production VPS — deploy flow first: /check-drift → /verify → tsc (if .ts changed) → operator go-ahead (AGENTS.md §部署流程觸發)',
   },
 ];
