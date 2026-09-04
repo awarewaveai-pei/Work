@@ -1,0 +1,76 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/canary-deployment-plan.schema.yaml"
+title: Canary Deployment Plan
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CanaryDeploymentPlan` -- the
+  declared `outputs` of `devops_sre.canary_deployment`'s Method Contract.
+  Second `devops_sre`-family typed object. Atlas §11.41's own 5-stage
+  rollout sequence (1%→5%→25%→50%→100%) maps onto `stages[]`'s
+  `traffic_percent` enum, and the "any unhealthy stage triggers rollback"
+  rule maps onto the `outcome`/`stages[].healthy` cross-field invariant
+  (enforced at the runtime layer, see method contract preconditions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.41 金絲雀部署（Canary Deployment）(L2161-2179)"
+  - "methods/contracts/devops_sre.canary_deployment.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, release_under_rollout, stages, outcome, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^CANARY-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.canary_deployment"
+  release_under_rollout:
+    type: string
+    minLength: 1
+  stages:
+    type: array
+    minItems: 1
+    description: "Atlas L2165-2170's own 5-stage sequence, one entry per traffic-percentage stage actually executed."
+    items:
+      type: object
+      required: [id, traffic_percent, healthy]
+      properties:
+        id: {type: string}
+        traffic_percent:
+          enum: [1, 5, 25, 50, 100]
+        healthy: {type: boolean}
+        metrics_summary:
+          type: string
+          description: "The metrics comparison Atlas's own sequence names between each stage (free text -- no structured metrics-system shape, Atlas gives no worked example)."
+  outcome:
+    enum: [completed, rolled_back, in_progress]
+    description: "Atlas L2172-2174's own rule: any unhealthy stage forbids 'completed' -- enforced at the runtime layer (ai_lego/modules/devops_sre/canary_deployment.py), not the schema layer."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a deployment plan is structured operational planning, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed rollout through all 5 healthy stages"
+    value:
+      id: "CANARY-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.canary_deployment"
+      release_under_rollout: "checkout-api v2.4.0"
+      stages:
+        - {id: "ST1", traffic_percent: 1, healthy: true, metrics_summary: "error rate 0.01%, latency p99 210ms"}
+        - {id: "ST2", traffic_percent: 5, healthy: true, metrics_summary: "error rate 0.01%, latency p99 205ms"}
+        - {id: "ST3", traffic_percent: 25, healthy: true, metrics_summary: "error rate 0.02%, latency p99 215ms"}
+        - {id: "ST4", traffic_percent: 50, healthy: true, metrics_summary: "error rate 0.02%, latency p99 208ms"}
+        - {id: "ST5", traffic_percent: 100, healthy: true, metrics_summary: "error rate 0.01%, latency p99 202ms"}
+      outcome: completed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas §11.41 directly. Validated against jsonschema Draft202012Validator."
+  note: "The 5-value traffic_percent enum is a direct, complete transcription of Atlas's own cited sequence. The unhealthy-forbids-completed invariant is enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

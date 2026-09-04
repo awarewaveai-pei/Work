@@ -1,0 +1,61 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/canary-deployment-plan.schema.yaml"
+target_ref: ""
+description: "Exercises CanaryDeploymentPlan's required fields, the stages[] minItems:1 guard, the 5-value traffic_percent enum, and the outcome enum."
+
+valid:
+  - name: completed_rollout_through_all_five_healthy_stages
+    instance:
+      id: "CANARY-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.canary_deployment"
+      release_under_rollout: "checkout-api v2.4.0"
+      stages:
+        - {id: "ST1", traffic_percent: 1, healthy: true, metrics_summary: "error rate 0.01%"}
+        - {id: "ST2", traffic_percent: 5, healthy: true, metrics_summary: "error rate 0.01%"}
+        - {id: "ST3", traffic_percent: 25, healthy: true, metrics_summary: "error rate 0.02%"}
+        - {id: "ST4", traffic_percent: 50, healthy: true, metrics_summary: "error rate 0.02%"}
+        - {id: "ST5", traffic_percent: 100, healthy: true, metrics_summary: "error rate 0.01%"}
+      outcome: completed
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: rolled_back_after_unhealthy_second_stage
+    instance:
+      id: "CANARY-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.canary_deployment"
+      release_under_rollout: "orders-api v1.9.0"
+      stages:
+        - {id: "ST1", traffic_percent: 1, healthy: true}
+        - {id: "ST2", traffic_percent: 5, healthy: false, metrics_summary: "error rate spiked to 3%"}
+      outcome: rolled_back
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: stages_below_minitems_1
+    instance:
+      id: "CANARY-2026-09-04-003"
+      version: "1.0.0"
+      release_under_rollout: "x"
+      stages: []
+      outcome: in_progress
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "stages has minItems: 1 -- a plan with zero stages describes no rollout."
+  - name: invalid_traffic_percent_enum_value
+    instance:
+      id: "CANARY-2026-09-04-004"
+      version: "1.0.0"
+      release_under_rollout: "x"
+      stages:
+        - {id: "ST1", traffic_percent: 10, healthy: true}
+      outcome: in_progress
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "stages[].traffic_percent is enum [1, 5, 25, 50, 100] -- 10 is not a member."
+  - name: invalid_outcome_enum_value
+    instance:
+      id: "CANARY-2026-09-04-005"
+      version: "1.0.0"
+      release_under_rollout: "x"
+      stages:
+        - {id: "ST1", traffic_percent: 1, healthy: true}
+      outcome: "paused"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "outcome is enum [completed, rolled_back, in_progress] -- 'paused' is not a member."

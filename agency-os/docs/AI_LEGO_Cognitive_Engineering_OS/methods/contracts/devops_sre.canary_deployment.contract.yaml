@@ -1,0 +1,81 @@
+$id: "ai-lego://methods/contracts/devops_sre.canary_deployment.contract.yaml"
+title: "Canary Deployment Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-first Method Atlas slice, second from the
+  `devops_sre` family (F19's own "DevOps／SRE／可靠性套件") -- a second
+  member tool of that pack built, after `devops_sre.sli_slo`.
+
+  Atlas §11.41 (L2161-2179) gives this method a dedicated section with a
+  concrete, closed 5-stage rollout sequence ("1% → 5% → 25% → 50% →
+  100%", each gated by a metrics comparison) and an explicit rule:
+  "任何階段 unhealthy: ROLLBACK" (any stage found unhealthy: ROLLBACK).
+  That rule is a real, enforceable invariant this contract enforces: a
+  plan cannot claim `outcome: completed` while any of its stages is
+  marked unhealthy -- unhealthy demands rollback, not silent continuation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.41 金絲雀部署／小流量漸進部署（Canary Deployment）(L2161-2179) -- 5-stage rollout sequence, unhealthy-triggers-rollback rule"
+  - "methods/registry/method-inventory.yaml Canary Deployment entry (L1152-1156): category 'F19 devops-sre', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a nineteenth
+  concrete entry. `id: devops_sre.canary_deployment` mints a new
+  machine_id. `family: devops_sre` reused as-is from `devops_sre.sli_slo`.
+
+id: devops_sre.canary_deployment
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [VALIDATE, DECOMPOSE, MAP]
+purpose:
+  - roll_out_a_new_version_to_real_traffic_incrementally_to_minimize_blast_radius
+inputs:
+  required: [ReleaseUnderRollout]
+  optional: []
+outputs: [CanaryDeploymentPlan]
+preconditions:
+  - "at least 1 stage supplied"
+  - "every stage's traffic_percent is one of the 5 Atlas-cited values (1, 5, 25, 50, 100)"
+  - "if any stage is unhealthy, the plan's overall outcome is 'rolled_back', never 'completed'"
+  # The third precondition is directly implied by Atlas's own rule
+  # (L2172-2174) -- the same "raise before construction on a real,
+  # Atlas-implied structural rule" discipline every prior forbidden-state
+  # guard this session built already established.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Canary Deployment row.
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # The PLAN record itself is side-effect-free; the real deployment
+  # rollback it may describe is outside this method's own scope (same
+  # distinction decision.mcda's own rollback field already draws between
+  # an analysis record and the decision it feeds).
+
+compilation_decisions:
+  - question: "Should traffic_percent be a closed 5-value enum, or a free numeric range?"
+    decision: "Closed 5-value enum (1, 5, 25, 50, 100) -- directly from Atlas's own cited sequence (L2165-2170)."
+    reasoning: "Atlas gives an exact, ordered 5-stage sequence, not a general range -- the same closed-enum-from-a-complete-cited-list treatment challenge.red_team's dimension enum and architecture.strangler_fig's status enum already apply."
+
+open_questions:
+  - id: "OQ-CANARY-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.41 (L2161-2179) directly. Grepped `specs/` for
+    "canary deployment"/"canary release" before writing -- no duplicate
+    typed object found. Validated against specs/cognitive/method.schema
+    .yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-stage sequence and the
+    unhealthy-triggers-rollback rule are both directly grounded in
+    Atlas's own cited text, not invented.
