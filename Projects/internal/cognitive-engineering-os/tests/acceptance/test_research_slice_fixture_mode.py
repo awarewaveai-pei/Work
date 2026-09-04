@@ -41,9 +41,10 @@ class FixtureModeAcceptanceTests(SliceCriteriaMixin, unittest.TestCase):
     def test_interactive_review_mode_reads_a_scripted_terminal_session(self):
         # AI-SUG-1: 'l' (lock the suggested label) -> 'y' (yes, this is a direct SOURCE_FACT quote).
         # AI-SUG-2: 'e' (edit) -> replacement label -> 'n' (do not lock the edited label).
+        # Round 12: each kept label is followed by a one-line codebook definition prompt (blank = none).
         runtime = Path(tempfile.mkdtemp(prefix="ai-lego-slice-interactive-"))
         try:
-            answers = iter(["l", "y", "e", "human_refined_label", "n"])
+            answers = iter(["l", "y", "checking work messages outside hours", "e", "human_refined_label", "n", ""])
             output: list[str] = []
             result = run_research_slice(SliceConfig(runtime_dir=runtime, review="interactive", input_fn=lambda _: next(answers), output_fn=output.append))
             locked = result["coding_outputs"]["coder_1"]["code_set"][0]

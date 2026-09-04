@@ -68,7 +68,7 @@ from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_f
 from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_categories, suggest_open_codes, suggest_themes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
-from ai_lego.modules.research.review import fixture_review, locked_code_from_review, review_code_interactively
+from ai_lego.modules.research.review import fixture_primary_review, fixture_review, locked_code_from_review, review_code_interactively, reviewed_codebook_definitions
 from ai_lego.modules.research.synthetic_fixtures import PROJECT_ID, SUGGESTED_LABEL, SYNTHETIC_CONSENT, SYNTHETIC_TRANSCRIPTS, expanded_synthetic_coder_judgments
 from ai_lego.platform.ai_execution.capability_resolver import CAPABILITY_RESOLUTION_BLOCKED, CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.ai_execution.current_state import build_current_state
@@ -373,6 +373,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     # Steps 14-15: human review. `quote` is always the source's own PII-free `quote` field -- never the raw transcript.
     if config.review == "fixture":
         locked_code, ai_review = fixture_review(suggested_labels or None)
+        primary = fixture_primary_review(suggested_labels or None)
     else:
         primary = review_code_interactively("AI-SUG-1", "SRC-1", SYNTHETIC_TRANSCRIPTS[0]["quote"], suggested_labels.get("SRC-1", SUGGESTED_LABEL), config.input_fn, config.output_fn)
         if primary["action"] != "ACCEPT_AND_LOCK":
@@ -396,10 +397,14 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         if not pending_ai_labels:
             raise InvariantViolation("OPEN_CODING_NO_PENDING_LABELS: the model produced no usable label for any un-reviewed unit")
         coder_one_final = {locked_code["source_id"]: locked_code["label"], **({ai_review["source_id"]: ai_review["result_label"]} if ai_review["result_label"] else {}), **pending_ai_labels}
-        codebook_pass = apply_codebook(gateway, DEFAULT_LOCAL_MODEL_PROFILE, units, sorted(set(coder_one_final.values())), pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:second-coder")
+        # Round 12 (OQ-P5-9): the codebook entry is label + the REVIEWER's definition (ai_coding round 11 / eval
+        # GC-CB-001: bare labels make the second coder guess between neighbours). Only labels the human reviewed and
+        # defined carry one; the model's un-reviewed pending labels are listed bare -- recorded as such, never invented.
+        codebook_definitions = reviewed_codebook_definitions([primary, ai_review])
+        codebook_pass = apply_codebook(gateway, DEFAULT_LOCAL_MODEL_PROFILE, units, sorted(set(coder_one_final.values())), pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:second-coder", definitions=codebook_definitions)
         if not codebook_pass["labels"]:
             raise InvariantViolation(f"SECOND_CODER_NO_ACCEPTED_LABELS: rejected={codebook_pass['rejected']} missing={codebook_pass['missing']}")
-        emit(NORDBROOK.tenant_id, nord_aggregate, "SecondCoderApplied", {"codebook": codebook_pass["codebook"], "labels": codebook_pass["labels"], "rejected": codebook_pass["rejected"], "missing": codebook_pass["missing"], "suggestion_source": codebook_pass["suggestion_source"]}, 23.3)
+        emit(NORDBROOK.tenant_id, nord_aggregate, "SecondCoderApplied", {"codebook": codebook_pass["codebook"], "definitions": codebook_definitions, "definitions_origin": "HUMAN_REVIEW" if codebook_definitions else "NONE", "labels": codebook_pass["labels"], "rejected": codebook_pass["rejected"], "missing": codebook_pass["missing"], "suggestion_source": codebook_pass["suggestion_source"]}, 23.3)
         write_json(runtime / "modules" / "research" / "second_coder_model_response.json", codebook_pass)
     # Step 15.7 (local-llm only): axial then selective coding by the model over BOTH coders' labels. Membership is
     # validated (a code/category the model names must exist); what the model leaves out stays visibly pending /

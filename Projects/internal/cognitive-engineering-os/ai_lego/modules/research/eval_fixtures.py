@@ -25,12 +25,12 @@ from __future__ import annotations
 
 from typing import Any
 
-# label -> definition. No ": " inside a definition (the prompt renders "- label: definition").
+from ai_lego.modules.research.synthetic_fixtures import CODEBOOK_DEFINITIONS
+
+# label -> definition. The four slice labels come from synthetic_fixtures.CODEBOOK_DEFINITIONS (one text per label,
+# shared with the slice's fixture reviewer since round 12); the two below are eval-only. No ": " inside a definition.
 EVAL_CODEBOOK_DEFINITIONS: dict[str, str] = {
-    "after_hours_monitoring": "the participant describes checking or watching work channels (email, chat, phone) outside working hours so as not to miss something; the act is looking, not rearranging plans",
-    "evening_planning_around_messages": "the participant describes arranging, avoiding or conditioning personal evening plans on work messages that might arrive; the act is planning, not the checking itself",
-    "emotional_exhaustion": "the participant describes feeling drained, empty or unable to care about work; energy depletion rather than thoughts, sleep or other people",
-    "late_night_rumination": "the participant describes repetitive, hard-to-stop thinking about work late in the day or at night, without saying that sleep itself was lost",
+    **CODEBOOK_DEFINITIONS,
     "sleep_disruption": "the participant describes sleep itself being lost or broken because of work; waking in the night, not falling asleep, or sleeping less",
     "withdrawal_from_others": "the participant describes pulling away from family, friends or social contact because work has used up their energy",
 }

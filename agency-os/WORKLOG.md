@@ -36,6 +36,22 @@
 
 **[剩餘風險]**：錨點非人類校準；slice 第二 coder 仍無定義（OQ-P5-9）；withdrawal 歸屬待人裁（OQ-P5-10）；仍無第二模型。**[rollback]**：`git revert`；`apply_codebook` 不傳 `definitions` 行為與 v2 相同，slice 零改動（`prompt_version` 記錄欄位變 v3 而已）。
 
+### 續13c：round 12 — 人審定義進 codebook（OQ-P5-9 關閉；操作者「直接繼續做」）
+
+**不變量**：codebook 條目＝label＋定義，定義是第一 coder 的話——只能出自人審步驟。關整類：`review_code_interactively` 每個保留的 label 後問一行定義（REJECT 不問），記錄進 review record `definition`；`reviewed_codebook_definitions` 收集後 slice 傳 `apply_codebook(definitions=)`、`SecondCoderApplied` 帶 `definitions`＋`definitions_origin`。fixture 審者只定義自己寫的 label；模型的 label 鎖定時**不捏定義**（`fixture_primary_review`）。`locked_code` ledger 形狀不動 → 不需重生 golden。**0 agent**。
+
+**[已修改]**：`review.py`（`DEFINITION_PROMPT`、`_normalise_definition`、`reviewed_codebook_definitions`、`fixture_primary_review`、review record `definition`）；`synthetic_fixtures.py` +`CODEBOOK_DEFINITIONS`（四 label 單一正本）；`eval_fixtures.py` 改為擴充它；`run_research_slice.py`（fixture 分支取 primary、傳 definitions、事件欄位）；`tests/unit/test_review.py` +2 並補定義答案；`tests/acceptance/test_research_slice_fixture_mode.py` 腳本補 2 個答案；`PHASE5_RESEARCH_SLICE.md` §Round 12 + OQ-P5-9 RESOLVED；`RUNNABLE_DEMOS.md`；`TASKS.md` ⑥。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_research_slice --transcription fixture --coding local-llm --runtime-dir %TEMP%\ai-lego-r12` | exit=0 | ms=~60000 | result=`all gates PASS`、`coder_two: model`；`second_coder_model_response.json` `codebook=[after_hours_monitoring, late_night_updates_night_thoughts, post_restructure_anxiety_checking, work_feeling_empty_exhaustion]`、`definitions_given=[after_hours_monitoring]`、`rejected=[]`；ledger `SecondCoderApplied.definitions_origin=HUMAN_REVIEW`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .` | exit=0 | ms=192598 | result=226 tests OK（224→226；第一次跑 acceptance 的 scripted interactive session `StopIteration`＝新定義題吃掉一個答案，補答案後綠——這正是「多一題」的真實副作用）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad/mutate_round12.py` | exit=0 | ms=~2000 | result=4/4 KILLED（收集規則放寬／定義保留 `: `／fixture 捏定義／REJECT 仍問定義 → 指名測試紅；還原綠）
+- REVIEW_DONE: critic=self(Standard, 書面對抗自審) | verdict=warn | findings=0c/2m/1n —— m1 定義未進 `HumanCodeLocked`／`locked_code`（避免 golden 重生），定義的 provenance 只在 `SecondCoderApplied`，是否該自成 LOCKED_FACT 留 spec-root；m2 fixture 模式下 4 個 label 只有 1 個有定義，eval 量到的效果（GC-CB-015 3/3）在 slice 只部分重現，docs 明寫；n1 `_normalise_definition` 把 `: ` 換成 ` - ` 是為 prompt 分隔符，測試釘住
+- ORACLE_WAIVED: 同續13（斷路器）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`fixture_review\(|review_code_interactively\(|SecondCoderApplied|EVAL_CODEBOOK_DEFINITIONS` | hits=10 call sites 全相容（`fixture_review` 回傳形狀不變；`review_code_interactively` 多一題→唯一 scripted acceptance 已補；`SecondCoderApplied` 只在 slice 產生、無 schema 消費者；eval 定義圖改為擴充 slice 正本，`test_eval_fixtures_are_consistent…` 綠）
+
+**[剩餘風險]**：定義 provenance 不在 locked code；真人 `--review interactive` 尚未跑過一輪。**[rollback]**：`git revert`；review record 多一個 key，舊消費者不讀它。
+
 ### 續13b：round 11b — 第一次 champion/challenger 真跑（操作者「我核准同意」→ `ollama pull llama3.1:8b`）
 
 **選型**：GPU 8 GB（RTX 5060 Laptop）；`gemma3:12b` 8.1 GB 會溢到 CPU，選 `llama3.1:8b`（Meta，4.9 GB，非中國廠商）。**0 agent**，無 code 改動。

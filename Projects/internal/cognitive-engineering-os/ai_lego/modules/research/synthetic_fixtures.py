@@ -75,6 +75,17 @@ CODER_TWO_LABELS: dict[str, str] = {
     "SRC-4": "late_night_rumination",
 }
 
+# Codebook DEFINITIONS the fixture reviewer knows for the labels it handles (round 12, OQ-P5-9). A codebook entry is
+# label + definition; the second coder is shown these so neighbouring labels are told apart by a stated criterion,
+# not by guessing from the name (the eval's GC-CB-001 finding). No ": " inside a definition (prompt renders
+# "- label: definition"). The eval's six-label codebook extends this map (eval_fixtures.EVAL_CODEBOOK_DEFINITIONS).
+CODEBOOK_DEFINITIONS: dict[str, str] = {
+    "after_hours_monitoring": "the participant describes checking or watching work channels (email, chat, phone) outside working hours so as not to miss something; the act is looking, not rearranging plans",
+    "evening_planning_around_messages": "the participant describes arranging, avoiding or conditioning personal evening plans on work messages that might arrive; the act is planning, not the checking itself",
+    "emotional_exhaustion": "the participant describes feeling drained, empty or unable to care about work; energy depletion rather than thoughts, sleep or other people",
+    "late_night_rumination": "the participant describes repetitive, hard-to-stop thinking about work late in the day or at night, without saying that sleep itself was lost",
+}
+
 # AI-suggested codes coder 1 has NOT reviewed yet (they stay AI_SUGGESTED).
 CODER_ONE_PENDING_AI_LABELS: dict[str, str] = {
     "SRC-3": "emotional_exhaustion",

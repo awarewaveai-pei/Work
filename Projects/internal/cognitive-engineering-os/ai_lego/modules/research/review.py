@@ -19,9 +19,14 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ai_lego.core.domain.provenance import make_provenance
-from ai_lego.modules.research.synthetic_fixtures import SUGGESTED_LABEL, SYNTHETIC_TRANSCRIPTS
+from ai_lego.modules.research.synthetic_fixtures import CODEBOOK_DEFINITIONS, SUGGESTED_LABEL, SYNTHETIC_TRANSCRIPTS
 
 ACTIONS = {"a": "ACCEPT", "e": "EDIT", "l": "ACCEPT_AND_LOCK", "r": "REJECT"}
+
+# Round 12 (OQ-P5-9): a review that keeps a label also asks the reviewer for a one-line DEFINITION of it. The
+# definition is the reviewer's own words for what the label covers; it becomes the codebook entry the second coder
+# is shown (ai_coding.apply_codebook definitions=...). Blank = the reviewer gave none, and the label is listed bare.
+DEFINITION_PROMPT = "One-line definition of this label for the codebook (what it covers; blank = none): "
 
 
 def review_code_interactively(
@@ -70,6 +75,9 @@ def review_code_interactively(
             action = "EDIT"
         else:
             action = "ACCEPT"
+        definition = None
+        if action != "REJECT":
+            definition = _normalise_definition(input_fn(DEFINITION_PROMPT))
         return {
             "suggestion_id": suggestion_id,
             "source_id": source_id,
@@ -79,7 +87,26 @@ def review_code_interactively(
             "result_label": result_label if action != "REJECT" else None,
             "locked": locked,
             "asserted_epistemic_type": asserted_epistemic_type,
+            "definition": definition,
         }
+
+
+def _normalise_definition(raw: str) -> str | None:
+    """One line, no ": " (the codebook prompt's own separator), None when blank."""
+    text = " ".join(raw.split())
+    return text.replace(": ", " - ") if text else None
+
+
+def reviewed_codebook_definitions(reviews: list[dict[str, Any]]) -> dict[str, str]:
+    """``{label: definition}`` from review records that kept a label AND gave a definition -- the reviewed part of the
+    codebook. Labels the reviewer did not define (or never saw: the model's pending labels) are absent, so the second
+    coder lists them bare; nothing is invented for them. Two reviews defining the same label keep the first."""
+    definitions: dict[str, str] = {}
+    for review in reviews:
+        label, definition = review.get("result_label"), review.get("definition")
+        if label and definition and label not in definitions:
+            definitions[label] = definition
+    return definitions
 
 
 def locked_code_from_review(review: dict[str, Any], code_id: str) -> dict[str, Any]:
@@ -106,17 +133,7 @@ def fixture_review(suggested_labels: dict[str, str] | None = None) -> tuple[dict
     was proposed next to what was decided.
     """
     suggested = suggested_labels or {}
-    primary_suggested = suggested.get("SRC-1", SUGGESTED_LABEL)
-    primary = {
-        "suggestion_id": "AI-SUG-1",
-        "source_id": "SRC-1",
-        "quote": SYNTHETIC_TRANSCRIPTS[0]["quote"],
-        "suggested_label": primary_suggested,
-        "action": "ACCEPT_AND_LOCK",
-        "result_label": primary_suggested,
-        "locked": True,
-        "asserted_epistemic_type": "SOURCE_FACT",
-    }
+    primary = fixture_primary_review(suggested_labels)
     locked = locked_code_from_review(primary, "CODE-LOCKED-P1-001")
     suggestion = {
         "suggestion_id": "AI-SUG-2",
@@ -127,5 +144,26 @@ def fixture_review(suggested_labels: dict[str, str] | None = None) -> tuple[dict
         "result_label": SUGGESTED_LABEL,
         "locked": False,
         "asserted_epistemic_type": None,
+        # The fixture reviewer's own definition of the label it typed (its replacement is a fixture label it knows).
+        "definition": CODEBOOK_DEFINITIONS.get(SUGGESTED_LABEL),
     }
     return locked, suggestion
+
+
+def fixture_primary_review(suggested_labels: dict[str, str] | None = None) -> dict[str, Any]:
+    """The fixture reviewer's P1 record (accept-and-lock the suggestion as a SOURCE_FACT). Its ``definition`` is the
+    fixture reviewer's own only when the locked label is one the fixture knows (``CODEBOOK_DEFINITIONS``); a model's
+    novel label is locked without a definition -- the fixture does not write prose for labels it did not author."""
+    suggested = suggested_labels or {}
+    primary_suggested = suggested.get("SRC-1", SUGGESTED_LABEL)
+    return {
+        "suggestion_id": "AI-SUG-1",
+        "source_id": "SRC-1",
+        "quote": SYNTHETIC_TRANSCRIPTS[0]["quote"],
+        "suggested_label": primary_suggested,
+        "action": "ACCEPT_AND_LOCK",
+        "result_label": primary_suggested,
+        "locked": True,
+        "asserted_epistemic_type": "SOURCE_FACT",
+        "definition": CODEBOOK_DEFINITIONS.get(primary_suggested),
+    }
