@@ -32,3 +32,13 @@ UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-00000
 UPDATE hci.cases SET status = 'CLOSED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000201';
 INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
   VALUES ('bbbbbbbb-0000-0000-0000-000000000200','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture');
+
+-- Source/SourceSnapshot provenance fixtures (ADR-0026). One source +
+-- snapshot per tenant, so RLS-CLAIM-01/SOURCE-RLS-01 have a real cross-
+-- tenant row to prove is invisible/unreferenceable, not an empty table.
+INSERT INTO hci.sources (id,tenant_id,source_ref) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000300','11111111-1111-1111-1111-111111111111','https://example.com/tenant-a-source'),
+  ('bbbbbbbb-0000-0000-0000-000000000300','22222222-2222-2222-2222-222222222222','https://example.com/tenant-b-source');
+INSERT INTO hci.source_snapshots (id,tenant_id,source_id,content_hash,snapshot_ref) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000301','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000300','sha256:synthetic-a','s3://synthetic/tenant-a/snap1'),
+  ('bbbbbbbb-0000-0000-0000-000000000301','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000300','sha256:synthetic-b','s3://synthetic/tenant-b/snap1');

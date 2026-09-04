@@ -1,8 +1,8 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, and the Peer-product boundary addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope and Peer-product boundary sections added and executed 2026-09-05)
-Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, and the Source provenance addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, and Source provenance sections added and executed 2026-09-05)
+Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
 ## Tenant adapter isolation
@@ -76,6 +76,26 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 | ARCH-PEER-02b | Whole database, owner connection | Only the 3 known Wave 1 roles plus PostgreSQL built-ins exist; none match `cognitive`/`lego` (ADR-0002 gate 3, credential/network isolation) | Introspection confirms both |
 
 ADR-0005 gate 2 (`HCI-INDEP-RUNTIME-01`, a full core-lifecycle test with the adapter unreachable) is **not implemented** — it requires an actual application/API layer to exercise (create/edit person, record interaction, admit evidence, etc.), none of which exists yet at Wave 1 schema stage. Left `OPEN`, not faked.
+
+## Source/Claim provenance *(new, ADR-0026, migration 0004)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| SOURCE-RLS-01 | Tenant B `Source` + `SourceSnapshot` | Tenant A must not see either | Not visible |
+| RLS-CLAIM-01 | Tenant A `Claim`, tenant B `Source` | A tenant-A corroboration edge cannot cite a tenant-B Source (composite FK) | Rejected, `23503` |
+| RLS-CLAIM-02 | Tenant A `Claim`, tenant A `Source` | A gate that rejects every `source_id` is also broken — the same shape against tenant A's own Source succeeds | Succeeds |
+| APPEND-ONLY-GRANT-05..08 | `source_snapshots`/`source_relationships`, app role | Grant layer never holds UPDATE/DELETE | Rejected, `42501` |
+| APPEND-ONLY-TRIGGER-03/04 | `source_snapshots`/`source_relationships`, owner connection | Trigger layer holds even for a connection bypassing grants | Rejected, `H1003` |
+| TRUNCATE-03-FK | `source_snapshots` | Referenced by `source_relationships.source_snapshot_id`, so PostgreSQL refuses the TRUNCATE before any trigger runs (mirrors `TRUNCATE-02-FK`) | Rejected, `0A000` |
+| TRUNCATE-04 | `source_relationships` | Not referenced by any FK, so the trigger fires directly (mirrors `TRUNCATE-01`) | Rejected, `H1003` |
+
+`hci.sources` (existing since 0001, previously with zero fixtures or tests)
+gets its first real coverage in this section via `CLAIM-FIXTURE-01`'s setup
+row and `SOURCE-RLS-01`/`RLS-CLAIM-01`. `DSR-CLAIM-DELETE-01` (ADR-0026 gate
+3) is **not implemented** — blocked on `ADR-0018`'s crypto-shredding
+mechanism landing first (no deletion path exists yet for `subject_records`-
+and-friends to test against). Correction/retraction of a corroboration edge
+is likewise blocked on `ADR-0017`'s `mark_superseded` mechanism.
 
 ## Test execution requirements
 
@@ -193,13 +213,41 @@ baseline. Fixed by adding explicit `DROP ROLE IF EXISTS`/`DROP EXTENSION IF
 EXISTS` cleanup to `Reset-Schema` itself, verified by re-running: both new
 mutations killed correctly on the corrected baseline.
 
+**Execution evidence (2026-09-05, Source provenance addition).**
+`migrations/0004_wave1_source_provenance_up.sql` added `hci.source_snapshots`
++ `hci.source_relationships`; `scripts/test-wave1-local.ps1` ran green on the
+**second** try: the first real run found `TRUNCATE-03`'s prediction wrong —
+`source_snapshots` is FK-referenced by `source_relationships.source_snapshot_id`,
+so PostgreSQL blocks the TRUNCATE at the FK layer (`0A000`) before any
+trigger runs, the same `TRUNCATE-02-FK` shape already documented for
+`subject_records`, not the `H1003` the test originally predicted. Renamed to
+`TRUNCATE-03-FK` with the corrected expectation. Final run: **102 assertions
+recorded, 0 failed** (90 + 12 new), plus a down/up reversibility pass.
+`scripts/mutation-check-wave1.ps1` then caught a genuine cross-migration
+coupling on its first run: the *pre-existing* `drop-typed-target-fk`
+mutation (2026-09-02) went WEAK, missing `TRUNCATE-02-FK` — 0004 added a
+*second* FK into `subject_records` (`source_relationships.claim_id`), so
+dropping only the older FK no longer removes every reference blocking that
+TRUNCATE. Fixed by narrowing `drop-typed-target-fk`'s own expectation to
+`TARGET-KIND-01b` only, and adding a new `drop-all-subject-records-referencing-fks`
+mutation that drops both FKs together to keep `TRUNCATE-02-FK` itself
+provably non-vacuous. A pre-commit db-expert review (real PG 15.8 probes, not
+reasoning alone) then found two Major gaps before commit: `retrieved_at` was
+still client-writable on the append-only `source_snapshots` ledger (fixed
+via the same column-list-`GRANT` pattern `data_subject_request_events.created_at`
+already uses) and `source_relationships(tenant_id, source_id)` had no index
+against its still-mutable `hci.sources` parent, which would have degraded
+every `DELETE FROM hci.sources` into a tenant-wide scan (fixed by adding the
+same index its sibling FK already has). Final re-run after both fixes:
+**102/102 assertions, 37/37 mutations killed.**
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 30
+requires the suite to go red on exactly the assertions covering it; **all 37
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
-2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations,
-2026-09-05, covering every invariant listed above). This exists because the
-first version of this suite
+2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
+Source-provenance mutations, 2026-09-05, covering every invariant listed
+above). This exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same
 handler that caught the control's rejection (both SQLSTATE P0001). That
 defect was demonstrated, not merely argued - the original suite exits 0 with

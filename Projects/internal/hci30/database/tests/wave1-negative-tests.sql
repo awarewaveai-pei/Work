@@ -406,6 +406,53 @@ SELECT hci_test.expect_success('REG-NEG-08',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
      VALUES ('aaaaaaaa-0000-0000-0000-000000000227','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','vendor_risk_assessment','R1','synthetic fixture')$q$);
 
+-- ---------------------------------------------------------------------------
+-- Source/SourceSnapshot provenance and corroboration graph (ADR-0026,
+-- HD-16). hci.sources itself has existed since 0001 but had zero fixtures
+-- or tests until this section - the fixtures file's two source/snapshot
+-- rows above exist specifically so this section has real cross-tenant data
+-- to prove is invisible/unreferenceable, not an empty-table false negative.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_success('CLAIM-FIXTURE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000302','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200')$q$);
+
+-- Read-side: tenant A must not see tenant B's Source or SourceSnapshot row -
+-- the same RLS mechanism protecting every other hci.* table (0001's
+-- declarative loop for hci.sources; this migration's manual wiring for
+-- hci.source_snapshots), exercised for the first time on these two tables.
+SELECT hci_test.expect_true('SOURCE-RLS-01',
+  $q$SELECT
+       NOT EXISTS (SELECT 1 FROM hci.sources WHERE id = 'bbbbbbbb-0000-0000-0000-000000000300')
+       AND NOT EXISTS (SELECT 1 FROM hci.source_snapshots WHERE id = 'bbbbbbbb-0000-0000-0000-000000000301')$q$,
+  'tenant B source and source_snapshot must not be visible to tenant A');
+
+-- Write-side (ADR-0026 gate 2's named test id): a tenant-A Claim cannot cite,
+-- derive from, or claim-as-original-source a tenant-B Source - the
+-- composite FK (tenant_id, source_id) makes this structurally impossible,
+-- the same "cannot even construct the row" guarantee CASE-OWNS-02 already
+-- proves for research_workflows/cases.
+SELECT hci_test.expect_sqlstate('RLS-CLAIM-01',
+  $q$INSERT INTO hci.source_relationships (id,tenant_id,claim_id,relationship_type,source_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000303','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000302','CITES','bbbbbbbb-0000-0000-0000-000000000300')$q$,
+  '23503');
+-- A gate that rejects every source_id is also broken: prove the same shape
+-- succeeds against tenant A's own source.
+SELECT hci_test.expect_success('RLS-CLAIM-02',
+  $q$INSERT INTO hci.source_relationships (id,tenant_id,claim_id,relationship_type,source_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000304','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000302','CITES','aaaaaaaa-0000-0000-0000-000000000300')$q$);
+
+-- Append-only, GRANT layer (mirrors APPEND-ONLY-GRANT-01..04 for
+-- subject_records/data_subject_request_events).
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-05',
+  $q$UPDATE hci.source_snapshots SET content_hash = 'mutated'$q$, '42501');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-06',
+  $q$DELETE FROM hci.source_snapshots$q$, '42501');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-07',
+  $q$UPDATE hci.source_relationships SET relationship_type = 'DERIVED_FROM'$q$, '42501');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-08',
+  $q$DELETE FROM hci.source_relationships$q$, '42501');
+
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
@@ -417,6 +464,10 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-01',
   $q$UPDATE hci.data_subject_request_events SET detail = 'mutated-by-owner'$q$, 'H1003');
 SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-02',
   $q$DELETE FROM hci.subject_records$q$, 'H1003');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-03',
+  $q$UPDATE hci.source_snapshots SET content_hash = 'mutated-by-owner'$q$, 'H1003');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-04',
+  $q$DELETE FROM hci.source_relationships$q$, 'H1003');
 
 -- TRUNCATE does not fire row-level triggers and is a separate privilege, so it
 -- is the one statement that would otherwise walk past both layers at once.
@@ -427,6 +478,18 @@ SELECT hci_test.expect_sqlstate('TRUNCATE-01',
 -- relabelled as trigger evidence: TRUNCATE-01 is what proves the trigger.
 SELECT hci_test.expect_sqlstate('TRUNCATE-02-FK',
   $q$TRUNCATE hci.subject_records$q$, '0A000');
+-- source_relationships has an FK to source_snapshots (source_snapshot_id) -
+-- the constraint blocks TRUNCATE hci.source_snapshots regardless of whether
+-- any row actually uses that column, exactly TRUNCATE-02-FK's shape (real
+-- Docker run corrected the original prediction here from H1003 to 0A000,
+-- the same "PostgreSQL refuses before any trigger runs" fact already
+-- documented for subject_records above). source_relationships itself is not
+-- referenced by any FK, so it alone reaches the trigger directly
+-- (TRUNCATE-01's shape).
+SELECT hci_test.expect_sqlstate('TRUNCATE-03-FK',
+  $q$TRUNCATE hci.source_snapshots$q$, '0A000');
+SELECT hci_test.expect_sqlstate('TRUNCATE-04',
+  $q$TRUNCATE hci.source_relationships$q$, 'H1003');
 
 -- hci.cases' owner-bypass layer (2026-09-04 critic review): the original
 -- migration gave hci.cases a grant layer only, unlike every other protected
@@ -564,4 +627,4 @@ SELECT hci_test.expect_true('ARCH-PEER-02b',
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(90);
+SELECT hci_test.finish(102);

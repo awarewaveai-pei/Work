@@ -37,6 +37,52 @@ Design artifacts do not yet exist for this decision; both design and runtime gat
 3. A deletion-completeness test proving a tenant's `DataSubjectRequest`-triggered deletion (ADR-0014) against its own `Claim`/`Source` leaves zero residual readable rows for that tenant and exactly zero effect on any other tenant's rows, since none reference it (test id: `DSR-CLAIM-DELETE-01`). Lands in **Wave 1**, gated on ADR-0014's Docker-backed execution evidence per `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md` §Wave 4 blocking precondition.
 4. If the optional byte-level dedup layer is built: a schema constraint/test proving the object-storage dedup table carries no `tenant_id` column and no foreign key from any `Claim`/`Assessment` table, only content-hash-keyed bytes referenced by per-tenant `SourceSnapshot.raw_snapshot_ref` (test id: `DEDUP-NO-TENANT-01`). This gate is conditional — it is only required if and when the optimization is actually pursued, and requires its own design review before that Wave's work starts; it does not block Wave 1 or Wave 6.
 
+## Implementation note (2026-09-05, gate 1-2 landed, gate 3 blocked)
+
+Recorded here rather than by editing the numbered gates above, which remain
+the historical decision record.
+
+- **Gate 1's own text is stale** ("Source and SourceSnapshot have no table
+  yet") relative to what `migrations/0001_wave1_synthetic_up.sql` actually
+  built: `hci.sources` (source_ref, `tenant_id NOT NULL`, already in the
+  tenant-isolation loop) has existed since 0001 and was already tenant-
+  scoped + RLS-forced — checked before assuming this gate needed a new
+  `sources` table (this project's "verify before conclude" discipline). What
+  was genuinely missing, and what `migrations/0004_wave1_source_provenance_up.sql`
+  adds: `hci.source_snapshots` (the hash+metadata pointer to one retrieval of
+  a Source) and `hci.source_relationships` (the corroboration graph —
+  `CITES`/`DERIVED_FROM`/`ORIGINAL_SOURCE` — named at
+  `06_HCI30_PUBLIC_INTELLIGENCE.md:175-179`). Both are tenant-scoped,
+  RLS-forced, and append-only (matching `hci.subject_records` rather than
+  `hci.sources`' pre-existing full-CRUD shape).
+- **Gate 2 landed as `RLS-CLAIM-01`** (write-side: a tenant-A Claim cannot
+  cite/derive-from/claim-as-original-source a tenant-B Source — composite FK
+  makes the row structurally impossible to construct) plus `SOURCE-RLS-01`
+  (read-side: tenant B's Source/SourceSnapshot rows are invisible to tenant
+  A). Real-Docker-verified as part of the full Wave 1 suite (102/102
+  assertions, 37/37 mutations, 2026-09-05 — see
+  `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`).
+- **Gate 3 (`DSR-CLAIM-DELETE-01`) is genuinely blocked, not skipped.** It
+  requires an actual deletion/erasure mechanism for `subject_records`-and-
+  friends, and none exists yet: `subject_records` is unconditionally
+  append-only (H1003 on any UPDATE/DELETE, no exception path), and the only
+  decided erasure mechanism (crypto-shredding) is `ADR-0018`, still
+  `SPECIFIED — RUNTIME OPEN`. Writing this test now would either be vacuous
+  or require inventing `ADR-0018`'s mechanism inline — left `OPEN`, tracked
+  as blocked on `ADR-0018` landing first.
+- **A real limitation surfaced during implementation, not anticipated by
+  this ADR's original text**: making `source_relationships` append-only (the
+  correct call for an evidentiary corroboration graph) means a `CITES` edge
+  asserted in error — e.g. pointing at a since-discredited citation — can
+  never be retracted or corrected under this design alone. Correction
+  requires `ADR-0017`'s `mark_superseded` mechanism (reserved as `H1008`,
+  not yet built). Tracked as blocked on `ADR-0017` landing, the same way
+  gate 3 is blocked on `ADR-0018`. These two new tables also enlarge the
+  eventual erasure surface `ADR-0018`'s crypto-shredding mechanism will need
+  to cover.
+- **Gate 4** (optional byte-dedup layer) remains out of scope, unchanged —
+  not pursued.
+
 ## Consequences
 
 - HCI has one ownership semantic for public-intelligence records — tenant-scoped, matching Evidence — closing the `07`/`06` field-list inconsistency HD-16 named.

@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-05（HCI30 Wave 1 收尾——ADR-0011 VBC 純文件同步(零新碼) + ADR-0026 Source/Claim provenance 落地，真跑連續抓到 2 個真 bug + db-expert 抓到 2 個 Major）
+
+**觸發**：延續「一直做直到系統完美完成，需要決定的事我全部同意核准」全權授權。先做 VBC 快速檢查（ADR-0009/0010/0011 是否已經被既有程式碼滿足但沒同步文件），再挑一個新落地目標（ADR-0026）。
+
+**ADR-0011（HCI Subject-Type Scope）——純文件同步，零新程式碼**：讀畢全文後對照現有 schema，發現三個 required gate 早在 2026-09-02 Wave 1 HD-03/04/05 slice 就已經滿足（`0001_wave1_synthetic_up.sql:118` 的 subject_type CHECK、`SUBJECT-NEG-01/02/03` 三個既有測試、`wave1/HCI_WAVE1_DOMAIN_ERD.md` 既有 ERD），只是 ADR-0011 本身是 2026-09-01 才單獨立檔，跟落地順序顛倒，`ADR_INDEX.md` 從未同步過。逐條 grep 驗證後補 §Implementation note + `ADR_INDEX.md` 狀態更新，不寫一行新 SQL。ADR-0009/0010 讀畢確認**不是**同類狀況（ADR-0010 的 CONSENT-NEG-01/02/03 只在 spec 文件裡列出，SQL 裡零命中，是真的沒做），列入後續候選不誤判。
+
+**ADR-0026（Claim/Source Tenant Ownership）——落地，過程連續抓到 3 個真問題**：
+- **VBC 先行**：ADR-0026 gate 1 原文宣稱「Source/SourceSnapshot 還沒有表」，查證後發現 `hci.sources` 早在 0001 就存在且已經 tenant-scoped+RLS——只是零 fixture 零測試。真正缺的是 `source_snapshots`、corroboration graph join table (`source_relationships`)。
+- **Migration 0004**：兩張新表皆 append-only（沿用 `hci.reject_update_delete()`）+ tenant-scoped RLS；`claim_id` 用既有 `data_subject_request_targets` 那套 typed-FK pattern 精確釘住必須是 `kind='CLAIM'` 的列。
+- **第一次真跑抓到**：`TRUNCATE-03` 預測錯——`source_snapshots` 被 `source_relationships.source_snapshot_id` FK 引用，PostgreSQL 在自己的 trigger 跑之前就先擋 TRUNCATE（跟既有 `TRUNCATE-02-FK` 同款），不是我原本猜的 H1003。改名 `TRUNCATE-03-FK` 修正期望值。
+- **Mutation-check 第一次真跑抓到**：既有（0001 就有、非本輪碰過）的 `drop-typed-target-fk` mutation 變 WEAK——0004 新增的 `source_relationships.claim_id` FK 也指向 `subject_records`，現在有兩個 FK 同時擋著 TRUNCATE，drop 掉其中一個不再改變結果。縮小該既有 mutation 的 expect list，另加一個「兩個 FK 一起 drop」的新 mutation 讓 TRUNCATE-02-FK 重新變成可證偽。
+- **db-expert 覆審**（第 4 次同類型審查，本輪仍抓到真東西非橡皮圖章）：2 個 Major——① `retrieved_at`（append-only ledger 的時間戳）在原始 GRANT 下 app role 可寫，違反 0001 自己訂的「時間戳不可由被稽核方選擇」規則，且比 0001 的案例更嚴重（append-only 永久無法訂正），改用 column-list GRANT 收回；② `source_relationships(tenant_id,source_id)` 缺 index，而 `hci.sources` 是可被 DELETE 的（跟其他 append-only 父表不同），真 EXPLAIN 證實會退化成全租戶掃描，補 index（跟手足 `source_snapshots_source_idx` 對齊）。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0004_wave1_source_provenance_{up,down}.sql`（新）
+- `Projects/internal/hci30/database/{fixtures,tests}/*`：102 assertion（90→102）
+- `Projects/internal/hci30/scripts/{test-wave1-local,mutation-check-wave1}.ps1`：37 mutation（30→37），含既有 mutation 的交叉耦合修正
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0011-hci-subject-type-scope.md`：新增 §Implementation note（VBC 發現，零新碼）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0026-claim-source-tenant-ownership.md`：新增 §Implementation note（gate 1 VBC 修正、gate 2 落地、gate 3 判定 blocked-on-ADR-0018、corroboration graph 訂正能力 blocked-on-ADR-0017）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR_INDEX.md`：ADR-0011/0026 狀態更新 + 修正 2 處過期的「90/90」計數殘留
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`：新增 Source/Claim provenance 表格 + 完整執行證據敘述
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/test-wave1-local.ps1`（最終版）| exit=0 | result=102 assertions, 0 failed + down/up 可逆性 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/mutation-check-wave1.ps1`（最終版）| exit=0 | result=All 37 mutations killed
+- REVIEW_DONE: critic=db-expert(Standard，第 4 次同類審查，含獨立 probe 容器實測 lock/EXPLAIN/grant) | verdict=fail(0 Critical/2 Major)→fixed | findings=0c/2m/6minor（M1/M2 全修；minor 3 項採納進註解，其餘 suggestion 級不採納）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`source_snapshots\|source_relationships\|RLS-CLAIM-01\|SOURCE-RLS-01\|90 assertion\|90/90\|30 mutation\|30/30` | hits=2 處真過期殘留（ADR_INDEX.md 兩處「90/90」計數）已修正，其餘皆本次新增檔案自身或歷史敘述
+
+**[剩餘風險]**：ADR-0026 gate 3（`DSR-CLAIM-DELETE-01`）blocked on ADR-0018；corroboration graph 訂正能力 blocked on ADR-0017；ADR-0009/0010 仍待真落地（非 VBC 可解，需要新程式碼）；ADR-0017/0018/0019/0021/0024/0025/0033 等 Wave 1 gate 全部維持 OPEN。
+
+**[rollback]**：`git revert`；db-expert 已對 down migration 做 5 種情境真實 round-trip 驗證，全數乾淨。
+
+
 ## 2026-09-05（`commit-checkpoint.ps1` 補上結構性擋目錄 pathspec——收尾早前同日修復留下的最後一項殘留風險，操作者直接點名要關）
 
 **觸發**：操作者針對早前同日 commit `8b92cdbde` 的 [剩餘風險] 逐字複述「`-Paths` 若未來呼叫者傳目錄而非檔案，仍會 stage/commit 該目錄下所有髒檔案」，要求關掉這項殘留。

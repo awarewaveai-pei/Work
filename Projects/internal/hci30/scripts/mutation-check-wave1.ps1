@@ -31,6 +31,7 @@ $upMig    = Join-Path $root 'database/migrations/0001_wave1_synthetic_up.sql'
 $downMig  = Join-Path $root 'database/migrations/0001_wave1_synthetic_down.sql'
 $upMig2   = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sql'
 $upMig3   = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_scope_up.sql'
+$upMig4   = Join-Path $root 'database/migrations/0004_wave1_source_provenance_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -75,9 +76,20 @@ $mutations = @(
 
   # Resolved from the catalog rather than hardcoded: PostgreSQL truncates
   # generated constraint names at 63 characters, and this one is longer.
+  #
+  # TRUNCATE-02-FK dropped from this mutation's expect list 2026-09-05 (real
+  # mutation-check run, not reasoning alone - it reported WEAK/missing when
+  # 0004 added hci.source_relationships.claim_id, a SECOND FK into
+  # subject_records). TRUNCATE hci.subject_records is blocked by "any FK
+  # anywhere referencing this table exists", not by this specific one - with
+  # two such FKs now, dropping only this one no longer changes that outcome.
+  # TRUNCATE-02-FK's own coverage (that subject_records is FK-blocked at all,
+  # not merely by this one specific FK) is instead exercised by
+  # 'drop-all-subject-records-referencing-fks' below, which drops both
+  # referencing FKs together.
   @{ id = 'drop-typed-target-fk'
      sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.data_subject_request_targets''::regclass AND contype = ''f'' AND array_length(conkey,1) = 3; EXECUTE format(''ALTER TABLE hci.data_subject_request_targets DROP CONSTRAINT %I'', c); END $$;'
-     expect = @('TARGET-KIND-01b','TRUNCATE-02-FK') }
+     expect = @('TARGET-KIND-01b') }
 
   @{ id = 'disable-rls-on-persons'
      sql = 'ALTER TABLE hci.persons NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.persons DISABLE ROW LEVEL SECURITY;'
@@ -225,6 +237,42 @@ $mutations = @(
   @{ id = 'create-cognitive-named-role'
      sql = 'CREATE ROLE cognitive_os_reader NOLOGIN;'
      expect = @('ARCH-PEER-02b') }
+
+  # ADR-0026 (Claim/Source tenant ownership, HD-16) - 2026-09-05.
+  @{ id = 'disable-rls-on-sources'
+     sql = 'ALTER TABLE hci.sources NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.sources DISABLE ROW LEVEL SECURITY;'
+     expect = @('SOURCE-RLS-01') }
+  @{ id = 'disable-rls-on-source-snapshots'
+     sql = 'ALTER TABLE hci.source_snapshots NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.source_snapshots DISABLE ROW LEVEL SECURITY;'
+     expect = @('SOURCE-RLS-01') }
+  # Proves TRUNCATE-02-FK is still load-bearing now that two independent FKs
+  # reference subject_records (data_subject_request_targets's typed FK, and
+  # this migration's own source_relationships.claim_id) - dropping either
+  # alone leaves the other still blocking TRUNCATE, so only dropping both
+  # together can turn it red. See 'drop-typed-target-fk' above for the run
+  # that found this coupling.
+  @{ id = 'drop-all-subject-records-referencing-fks'
+     sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.data_subject_request_targets''::regclass AND contype = ''f'' AND array_length(conkey,1) = 3; EXECUTE format(''ALTER TABLE hci.data_subject_request_targets DROP CONSTRAINT %I'', c); SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.source_relationships''::regclass AND contype = ''f'' AND confrelid = ''hci.subject_records''::regclass; EXECUTE format(''ALTER TABLE hci.source_relationships DROP CONSTRAINT %I'', c); END $$;'
+     expect = @('TARGET-KIND-01b','TRUNCATE-02-FK') }
+  @{ id = 'drop-source-relationships-ownership-fk'
+     sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO STRICT c FROM pg_constraint WHERE conrelid = ''hci.source_relationships''::regclass AND contype = ''f'' AND confrelid = ''hci.sources''::regclass; EXECUTE format(''ALTER TABLE hci.source_relationships DROP CONSTRAINT %I'', c); END $$;'
+     expect = @('RLS-CLAIM-01') }
+  @{ id = 'regrant-source-provenance-writes'
+     sql = 'GRANT UPDATE, DELETE ON hci.source_snapshots, hci.source_relationships TO hci_app_test_a;'
+     expect = @('APPEND-ONLY-GRANT-05','APPEND-ONLY-GRANT-06','APPEND-ONLY-GRANT-07','APPEND-ONLY-GRANT-08') }
+  @{ id = 'drop-source-provenance-triggers'
+     sql = 'DROP TRIGGER source_snapshots_append_only ON hci.source_snapshots; DROP TRIGGER source_relationships_append_only ON hci.source_relationships;'
+     expect = @('APPEND-ONLY-TRIGGER-03','APPEND-ONLY-TRIGGER-04') }
+  # Only source_relationships' guard is provable by TRUNCATE: source_snapshots
+  # is FK-referenced by source_relationships.source_snapshot_id, so
+  # TRUNCATE-03-FK is already blocked by that FK regardless of whether
+  # source_snapshots' own no_truncate trigger exists (the same reason
+  # subject_records' no_truncate trigger has no dedicated mutation either -
+  # TRUNCATE-02-FK is the FK layer, not the trigger layer, and TRUNCATE-01 is
+  # what proves the trigger for the one table that has none referencing it).
+  @{ id = 'drop-source-provenance-truncate-guards'
+     sql = 'DROP TRIGGER source_relationships_no_truncate ON hci.source_relationships;'
+     expect = @('TRUNCATE-04') }
 )
 
 $project = "hcimut$PID"
@@ -281,6 +329,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig)    -ne 0) { throw 'mutation harness: 0001 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig2)   -ne 0) { throw 'mutation harness: 0002 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig3)   -ne 0) { throw 'mutation harness: 0003 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig4)   -ne 0) { throw 'mutation harness: 0004 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

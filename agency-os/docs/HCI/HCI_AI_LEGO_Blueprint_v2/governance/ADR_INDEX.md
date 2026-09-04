@@ -2,7 +2,7 @@
 
 Status: **MIXED REGISTER — only entries explicitly marked `ACCEPTED` below are approved decisions**
 Owner: HCI AI LEGO Blueprint v2
-Last reviewed: 2026-09-05 (Peer-boundary gates added)
+Last reviewed: 2026-09-05 (Source provenance + subject-type-scope VBC check added)
 
 ## Purpose and state rules
 
@@ -56,7 +56,7 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 
 | ADR | Gate state | Required artifact-to-gate mapping |
 |---|---|---|
-| ADR-0001 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1-2)` | `ARCH-PEER-01` (Node, `tests/architecture/peer-boundary.test.mjs`) + `ARCH-PEER-02` (SQL) — real-verified 2026-09-05 (node --test green incl. self-test; 90/90 SQL assertions, 30/30 mutations, see `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`); `PEER-DEGRADE-01`, `PEER-REF-01` (Wave 10) and `ARCH-PEER-03` (reverse direction, blocked on cognitive-engineering-os runtime existing) remain `OPEN` |
+| ADR-0001 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1-2)` | `ARCH-PEER-01` (Node, `tests/architecture/peer-boundary.test.mjs`) + `ARCH-PEER-02` (SQL) — real-verified 2026-09-05 (node --test green incl. self-test; part of the 102/102 SQL assertions, 37/37 mutations Wave 1 suite total as of the Source-provenance addition, see `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`); `PEER-DEGRADE-01`, `PEER-REF-01` (Wave 10) and `ARCH-PEER-03` (reverse direction, blocked on cognitive-engineering-os runtime existing) remain `OPEN` |
 | ADR-0002 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1,3)` | Reuses `ADR-0001`'s `ARCH-PEER-02` (gate 1) + new `ARCH-PEER-02b` (gate 3, credential/network isolation, SQL `pg_roles` check) — both real-verified 2026-09-05, same evidence as `ADR-0001` above; `PEER-REF-01` (gate 2, Wave 10) and `ARCH-PEER-05` (gate 4, reverse direction) remain `OPEN` |
 | ADR-0003 | `SPECIFIED — RUNTIME OPEN` | OpenAPI single-host constraint, negative routing smoke test, gateway logic-purity check, service-placement inventory row (Wave 3) |
 | ADR-0004 | `SPECIFIED — RUNTIME OPEN` | `TRUST-NEG-01..03`, `METHOD-CONTRACT-NEG-01`, `check-no-universal-trust-column.ps1` (Wave 1 / Wave 5) |
@@ -66,7 +66,7 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0008 | `SPECIFIED — RUNTIME OPEN` | Vendor-adapter isolation lint + `llm.reason` two-provider replaceability test (`18_LEGO_CONTRACT_AND_COMPONENT_TAXONOMY.md` §Vendor Replaceability) |
 | ADR-0009 | `SPECIFIED — RUNTIME OPEN` | Mapping and compatibility/migration design: `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`; cross-tenant adapter negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0010 | `SPECIFIED — RUNTIME OPEN` | Three-record policy: `wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`; model/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; anti-conflation tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
-| ADR-0011 | `SPECIFIED — RUNTIME OPEN` | Subject table/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; Person-only negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
+| ADR-0011 | `SYNTHETIC GATE VERIFIED` | All 3 gates already satisfied by code that landed with the Wave 1 HD-03/04/05 slice before this ADR was filed as a separate document — found via a 2026-09-05 VBC check, not new work (see ADR-0011's own "Implementation note"): `migrations/0001_wave1_synthetic_up.sql:118` (`subject_type` CHECK), `SUBJECT-NEG-01/02/03` (real-Docker-verified, part of the 102/102-assertion Wave 1 suite), `wave1/HCI_WAVE1_DOMAIN_ERD.md:10-14,28-29,39` |
 | ADR-0012 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1/2)` | `hci.tenants.jurisdiction` deny-list + `hci.cases.purpose` allow-list (re-anchored per the ADR's own instruction, see its "Implementation note") — `Projects/internal/hci30/database/migrations/0003_wave1_regulatory_market_scope_up.sql`; Docker run green **88/88 assertions + 28/28 mutations killed**, 2026-09-05 (see `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` §Current state for the full account, incl. a real deny-list gap a db-expert review caught before commit); gate 3 (`H1012` trigger) deliberately not built — CHECK constraints alone proven to have no bypass, see ADR's Implementation note; Wave 6 (`CONTMON-PURPOSE-01`) and Wave 9 (market-expansion lock) remain `OPEN` |
 | ADR-0013 | `SPECIFIED — RUNTIME OPEN` | Kernel package (`Projects/shared/kernel`, semver) + per-product CI contract test against pinned version (Wave 3) |
 | ADR-0014 | `SYNTHETIC GATE VERIFIED` | Synthetic DSR schema/events/tests: `D:\Work\Projects\internal\hci30\database\`; suite green + mutation-checked 2026-09-02; no real-person processing |
@@ -81,7 +81,7 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0023 | `SPECIFIED — RUNTIME OPEN` | `docs/trust/CLAIMS_REGISTER.md`, `CLAIM-REG-01`, `CLAIM-GATE-01..04`, `CLAIM-PUB-01` (Wave 0) |
 | ADR-0024 | `SPECIFIED — RUNTIME OPEN` | `RESIDENCY-SCHEMA-01`, `docs/trust/RESIDENCY_TRIGGER_RECORD.md`, `RESIDENCY-INFRA-GATE-01..03` (Wave 0/1) |
 | ADR-0025 | `SPECIFIED — RUNTIME OPEN` | Reserved-name convention, `HCI-CRED-SCAN-01..03`, `BREAKGLASS-AGENT-01`, `PGAUDIT-AGENT-TAG-01` (Wave 1/2, blocks Wave 4) |
-| ADR-0026 | `SPECIFIED — RUNTIME OPEN` | `sources`/`source_snapshots` tables + RLS, `RLS-CLAIM-01`, `DSR-CLAIM-DELETE-01` (Wave 1) |
+| ADR-0026 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1-2)` | `hci.source_snapshots` + `hci.source_relationships` (append-only, tenant-scoped, RLS-forced) — `Projects/internal/hci30/database/migrations/0004_wave1_source_provenance_up.sql`; Docker run green **102/102 assertions + 37/37 mutations killed**, 2026-09-05, incl. `RLS-CLAIM-01`/`SOURCE-RLS-01` (see ADR's own "Implementation note" for the gate-1 VBC correction — `hci.sources` already existed since 0001); `DSR-CLAIM-DELETE-01` (gate 3) blocked on `ADR-0018` landing; correction of the corroboration graph blocked on `ADR-0017`; gate 4 (optional byte-dedup) out of scope |
 | ADR-0027 | `SPECIFIED — RUNTIME OPEN` | `CONTROL-SCHEMA-01`, `SANCTIONS-NEG-01/02`, `SCREEN-PROVIDER-VENDOR-01`, `SANCTIONS-SCREEN-01`, `CONTRACT-SCREEN-01` (Wave 1/3/6) |
 | ADR-0028 | `SPECIFIED — RUNTIME OPEN` | `EXPORT-THRESHOLD-CONFIG-01`, `SCHEMA-EXPORT-RELEASE-01`, `EXPORT-THRESHOLD-ENFORCE-01`, `EXPORT-DELAYED-RELEASE-01`, `EXPORT-AUDIT-IMMUTABLE-01` (Wave 2/3) |
 | ADR-0029 | `SPECIFIED — RUNTIME OPEN` | `fetch-runner-is-separate-service`, `wave6-no-bridge-route`, `-metadata-and-rfc1918-blocked`, `-dns-rebind-rejected`, `-ssrf-payload-corpus`, `-trigger-no-direct-fetch` (Wave 6, blocks Gate C) |

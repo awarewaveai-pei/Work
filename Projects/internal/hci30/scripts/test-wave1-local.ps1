@@ -10,6 +10,7 @@ $upMig     = Join-Path $root 'database/migrations/0001_wave1_synthetic_up.sql'
 $downMig   = Join-Path $root 'database/migrations/0001_wave1_synthetic_down.sql'
 $upMig2    = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sql'
 $upMig3    = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_scope_up.sql'
+$upMig4    = Join-Path $root 'database/migrations/0004_wave1_source_provenance_up.sql'
 $fixtures  = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness   = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests  = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -61,6 +62,7 @@ try {
   Invoke-SqlFile -Path $upMig    -Label 'migration 0001 up'
   Invoke-SqlFile -Path $upMig2   -Label 'migration 0002 up (case aggregate)'
   Invoke-SqlFile -Path $upMig3   -Label 'migration 0003 up (regulatory market scope)'
+  Invoke-SqlFile -Path $upMig4   -Label 'migration 0004 up (source provenance)'
   Invoke-SqlFile -Path $fixtures -Label 'synthetic fixtures'
   Invoke-SqlFile -Path $harness  -Label 'test harness'
   Invoke-SqlFile -Path $sqlTests -Label 'negative test suite'
@@ -70,19 +72,21 @@ try {
   # schema is the case that actually catches dependency mistakes.
   #
   # A single 'down' (0001_wave1_synthetic_down.sql) is sufficient here even
-  # though three migrations are now applied: it DROPs the whole hci schema,
-  # which removes everything 0002/0003 added along with everything 0001
-  # added, since all three live in the same schema. The rebuild afterwards
-  # must therefore re-apply all three up migrations, in order, to return to
-  # the same state this test run started from. (0002_wave1_case_aggregate_down.sql
-  # and 0003_wave1_regulatory_market_scope_down.sql exist for the narrower,
+  # though four migrations are now applied: it DROPs the whole hci schema,
+  # which removes everything 0002/0003/0004 added along with everything 0001
+  # added, since all four live in the same schema. The rebuild afterwards
+  # must therefore re-apply all four up migrations, in order, to return to
+  # the same state this test run started from. (0002_wave1_case_aggregate_down.sql,
+  # 0003_wave1_regulatory_market_scope_down.sql, and
+  # 0004_wave1_source_provenance_down.sql exist for the narrower,
   # not-exercised-here case of rolling back one migration alone against a
   # schema where the others stay applied.)
   Write-Host 'Verifying the migration is reversible...'
-  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001+0002+0003 together)'
+  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001+0002+0003+0004 together)'
   Invoke-SqlFile -Path $upMig   -Label 'migration 0001 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig2  -Label 'migration 0002 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig3  -Label 'migration 0003 up (clean rebuild after down)'
+  Invoke-SqlFile -Path $upMig4  -Label 'migration 0004 up (clean rebuild after down)'
 
   Write-Host 'HCI Wave 1 local suite PASSED.'
 }
