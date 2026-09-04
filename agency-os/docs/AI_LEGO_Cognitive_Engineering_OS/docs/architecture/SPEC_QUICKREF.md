@@ -37,6 +37,7 @@
 | `specs/cognitive/typed-method-result.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[execution_id, method_id, method_version, status, evaluated_at, provenance] properties[11]<br>`#/definitions/typed_output`: type=object required=[output_type, value] properties[4] |
 | `specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement_ref, hypotheses] properties[7] |
 | `specs/cognitive/typed-objects/five-whys-validation.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance] properties[9] |
+| `specs/cognitive/typed-objects/pareto-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, metric_name, dataset, ranking, threshold_status, engine, computation_provenance_ref, provenance] properties[13] |
 | `specs/cognitive/typed-objects/problem-statement.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, content, provenance] properties[7] |
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |

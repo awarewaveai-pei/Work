@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-09-04（續17，同一 session：Cognitive OS 第五個 Method Atlas 切片 — `root_cause.pareto`，第二條真實驗證路徑＋跨模組閘重用）
+
+**觸發**：延續操作者「沒做完不要停」授權。0 agent。
+
+**選型與差異**：`root_cause.pareto`（F05）——fishbone 的 4 個 `recommended_next` 驗證方法中第 2 個拿到真契約的（five_whys 是第 1 個）。刻意選它是因為形狀跟前三個 root_cause/strategy 切片都不同：fishbone/five_whys 都是「敘事型、引證據」的方法，Pareto 是**真計算結果**（CALCULATED_RESULT），跟 `research.qualitative_coding` 的 Cohen's Kappa 同一類（Master Plan §39：LLM 不可「心算」一個數字然後標成 CALCULATED_RESULT）。
+
+**不變量**：Atlas §11.6 明文警告「80/20 不是自然法則；真正比例由資料決定」——所以 `quality.evidence_labeling_required` **刻意設為 false**，不是照抄前三份契約的 true（那樣會誤判這個方法的真實風險）；`vital_few_threshold_percent` 無預設值，搭配 `threshold_status: OPERATOR_SET/OPERATOR_SET_PENDING`——這不是新發明，是直接重用 `qualitative_coding.py` 的 `saturation_assessment` 早就用過的同一個誠實模式（`threshold_data_units: null`）。
+
+**真正的收穫（跨模組閘重用）**：`evaluate_genuine_compute_gate` **直接呼叫 `modules.research.gates.evaluate_statistical_gate`，一行都沒改**——這個閘當初是為質化編碼的 Kappa 寫的，但它只檢查 `provenance`/`computation_provenance_ref`/`engine` 三個通用欄位，對 Pareto 的輸出一樣適用。測試直接比對兩邊呼叫結果完全一致（不是邏輯相似，是同一個函式物件），這是本次五個切片裡最強的「LEGO 真的能重用」證據。
+
+**[已修改]**：spec-root 新增 `methods/contracts/root_cause.pareto.contract.yaml`（逐字引用 Atlas §11.6）＋ `specs/cognitive/typed-objects/pareto-analysis.schema.yaml`＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.third_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/pareto/ranking.py`（純數學：`pareto_ranking`／`vital_few`，零方法相依）；`ai_lego/modules/root_cause/pareto.py`（builder＋兩個 gate，一個重用一個新寫）；`ai_lego/apps/cli/run_pareto_slice.py`（**第二次真的合法晉升成功**，用不同驗證方法、不同情境資料集，避免資料集看起來是為敘事量身訂做）；`tests/unit/test_pareto.py`（17 tests，含真實算術正確性驗證）；`docs/FIFTH_SLICE_ROOT_CAUSE_PARETO.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2530→2542
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_pareto_slice` | exit=0 | result=第一次真跑就通過:`PASS root_cause.pareto: vital_few=['CHS-PARETO-001-H1'], RootCauseFact RCF-PARETO-2026-09-04-001 legally promoted via ['root_cause.pareto']`（168/210=80.0% 剛好卡在門檻,只選出 1 個 vital-few hypothesis,數字跟情境敘述 210 件工單完全對得上）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_pareto -v` | exit=0 | ms=~660 | result=17 passed（含真實算術：排序/百分比/重複 id 加總/零與負值拒絕；`vital_few` 在門檻剛好跨過的那筆停止；genuine-compute 閘與 research.gates 原函式逐一比對結果完全一致；threshold-honesty 閘擋下「沒設門檻卻宣稱 vital-few」的竄改記錄）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=223919 | result=**295 tests OK**（278→295，零回歸；`git diff --stat` 確認 fishbone.py 與 research/gates.py 皆零改動，佐證上方「重用非改寫」的宣稱）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:平手 metric_value 排序穩定性是否影響正確性(不影響,Atlas 未規定 tie-break,Python sort 穩定);`generate_pareto_analysis` 的 `dataset`(原始) 與 `ranking`(計算後加總排序) 是否會混淆(不會,兩個獨立欄位,schema 自己的 compilation_decisions 已說明);CLI 情境資料集數字是否與敘述一致(核對168+27+15=210,與 problem_statement 的「210件」一致)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`root_cause[.]pareto\|ParetoAnalysis\|pareto-analysis\|compute[.]pareto\|compute/pareto` | hits=0 stale（LIVE 檔案命中皆為本次新增；`.ai/research/phase-0/*` 命中為凍結歷史快照,非本次修復範圍）
+
+**[剩餘風險]**：`forbidden_transition` 留空（`OQ-PARETO-1`，同 five_whys）；`cognitive_primitives` 是推論非引用（`OQ-PARETO-2`）；fishbone 的 4 個 recommended_next 現在 2 個是真的（causal.dag／validation.experiment 仍無契約）。
+
+**[rollback]**：純新增檔案(除 spec-root 索引重新產生外，零既有檔案邏輯改動；fishbone.py 與 research/gates.py 皆未動)，`git rm` 對應新檔即可完全復原。
+
 ## 2026-09-04（續16，同一 session：Cognitive OS 第四個 Method Atlas 切片 — `root_cause.five_whys`，補完 fishbone 留下的誠實缺口）
 
 **觸發**：延續操作者「沒做完不要停」授權，主動選擇回頭補強而非單純橫向擴廣度。0 agent。

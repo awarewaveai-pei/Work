@@ -249,6 +249,33 @@ tier_1:
       Tier 1 category as `research.qualitative_coding` above: mandated by
       what the currently-running implementation slice concretely needs
       next, not by Tier 0's citation-frequency criterion.
+  third_concrete_entry:
+    # NEW (2026-09-04, same session as second_concrete_entry): third method
+    # Atlas §22.3-style entry, same additive-key rationale as
+    # second_concrete_entry (avoid touching tests/run_golden_tests.py).
+    method_id: "root_cause.pareto"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same mandating chain as `second_concrete_entry` (root_cause.five_whys)
+      above: root_cause.fishbone.contract.yaml's own recommended_next names
+      root_cause.pareto as one of the 4 legal CauseHypothesisSet validation
+      methods, and root-cause-fact.schema.yaml's
+      legal_promotion_path.validation_methods_applied enum already named it.
+      Additionally, root_cause.five_whys.contract.yaml's OWN
+      recommended_next (Atlas §11.5 L1295-1296's cited chain "Fishbone →
+      Pareto → 5 Whys → Causal Validation") names root_cause.pareto as its
+      forward reference -- the second of the 4 fishbone recommended_next
+      methods to gain a contract in this session, chosen specifically to
+      exercise a structurally different (quantitative/CALCULATED_RESULT,
+      not narrative/evidence-cited) validation path for the same
+      CauseHypothesisSet chain.
+    source: "methods/contracts/root_cause.pareto.contract.yaml (built same session as this entry) + specs/cognitive/typed-objects/pareto-analysis.schema.yaml (new output type) + ai_lego/compute/pareto/ranking.py (new deterministic-compute module)"
+    note: >
+      Not placed under `tier_0`: same reasoning as `second_concrete_entry`
+      -- Atlas §11.6 is a dedicated protocol section, not a
+      repeatedly-cited-teaching-example. Tier 1, mandated by the actively-
+      running implementation slice.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

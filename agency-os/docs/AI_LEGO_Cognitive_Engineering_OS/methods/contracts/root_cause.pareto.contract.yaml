@@ -1,0 +1,178 @@
+$id: "ai-lego://methods/contracts/root_cause.pareto.contract.yaml"
+title: "Pareto Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as `root_cause.five_whys` and
+  `research.qualitative_coding`'s own Tier 1 entries -- not one of the
+  Tier 0 "repeatedly-cited-as-teaching-example" methods). Built as the
+  second of `root_cause.fishbone.contract.yaml`'s `recommended_next`
+  validation methods to gain a real contract (`root_cause.five_whys` was
+  the first, 2026-09-04 same session) -- both are named in
+  `root-cause-fact.schema.yaml`'s `legal_promotion_path.validation_methods_applied`
+  enum, and `five_whys` itself names `root_cause.pareto` as its own
+  `recommended_next` (Atlas §11.5 L1295-1296: "推薦搭配 Fishbone → Pareto →
+  5 Whys → Causal Validation" -- Pareto sits BEFORE Five Whys in that
+  worked chain, and is also independently useful as a second,
+  quantitative-not-narrative validation path for the SAME
+  CauseHypothesisSet).
+
+  Atlas §11.6 (L1300-1320) gives this method a full dedicated protocol
+  section -- purpose, a 5-step procedure, benefits, and an explicit caution
+  -- the same tier of grounding `root_cause.five_whys.contract.yaml`'s §11.5
+  citation used.
+
+  Structurally different from every prior root_cause-family contract in
+  this directory: Fishbone and Five Whys both produce NARRATIVE,
+  evidence-cited claims (a candidate cause statement, a why-chain).
+  Pareto produces a CALCULATED_RESULT -- real deterministic compute over
+  a dataset, the same class of artifact `research.qualitative_coding`'s
+  own Cohen's Kappa statistic is (Master Plan §39: an LLM must never
+  "mentally calculate" a value and label it CALCULATED_RESULT). This is
+  the first root_cause-family method whose `quality` flags and gate
+  surface are grounded in genuine-compute discipline rather than
+  evidence-citation discipline.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.6 柏拉圖分析／80/20 分析（Pareto Analysis）(L1300-1320) -- purpose, 5-step procedure, benefits, caution"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Pareto row (L436): 用途/使用方式/效益/禁止誤用"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 root_cause.fishbone's inputs.optional Dataset (L1005) -- this contract's own Dataset input instantiates that same named concept for the root_cause family"
+  - "methods/contracts/root_cause.five_whys.contract.yaml recommended_next (Atlas §11.5 L1295-1296, 'Fishbone → Pareto → 5 Whys → Causal Validation')"
+  - "specs/cognitive/typed-objects/root-cause-fact.schema.yaml legal_promotion_path.validation_methods_applied enum (root_cause.pareto already named there)"
+  - "methods/registry/method-inventory.yaml 'Pareto' entry (Atlas F05 root_cause, L435, machine_id: root_cause.pareto, has_contract: false prior to this file)"
+  - "ai_lego/compute/statistics/reliability.py + capabilities/contracts/run_statistics.capability.yaml -- the existing genuine-compute pattern this contract's quality discipline follows (engine/computation_provenance_ref/CALCULATED_RESULT)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.6 gives a complete, unambiguous
+  5-step protocol -- direct transcription plus low-risk, disclosed
+  compilation choices (`cognitive_primitives` inferred, same disclosed-inference
+  class as `root_cause.five_whys.contract.yaml`). Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a third concrete
+  entry, same justification class as `research.qualitative_coding` and
+  `root_cause.five_whys`.
+
+id: root_cause.pareto
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [GROUP, CALCULATE, PRIORITIZE]
+# INFERRED, not cited (Atlas §4's composition-formula examples, L187-191,
+# do not name Pareto). Atlas §11.6's own 5 steps map directly: step 2
+# "分類" is GROUP, step 4 "計算累積占比" is CALCULATE, step 5 "對前幾項做
+# RCA" (focus effort on the top few) is PRIORITIZE -- all three are
+# CANONICAL_KERNEL members, no extended token needed.
+
+purpose:
+  - identify_high_impact_categories_via_cumulative_ranking
+# Atlas L1303 verbatim sense: "找出少數造成大部分損失、事故、成本或抱怨的
+# 類別" (find the small number of categories causing most of the loss/
+# incidents/cost/complaints).
+
+inputs:
+  required:
+    - CauseHypothesisSet
+    - Dataset
+  # Dataset here instantiates root_cause.fishbone.contract.yaml's own
+  # `inputs.optional: [EvidenceSet, Dataset, StakeholderSet]` (Atlas L1005)
+  # -- for Pareto specifically it is REQUIRED, not optional, since the
+  # method's entire purpose is quantifying against real data (Atlas L1320
+  # caution: "80/20 不是自然法則；真正比例由資料決定" -- the ratio is
+  # data-determined, so there is no legitimate Pareto run without a
+  # dataset).
+
+outputs:
+  - ParetoAnalysis
+# NEW output type (see typed-objects/pareto-analysis.schema.yaml). Atlas
+# gives this method's output no PascalCase name anywhere, same honesty gap
+# root_cause.five_whys.contract.yaml disclosed for FiveWhysValidation.
+
+preconditions:
+  - "dataset is non-empty"
+  - "every dataset record's hypothesis_id is a member of cause_hypothesis_set.hypotheses[].id"
+  # NEW, structurally necessary preconditions (Atlas gives no literal
+  # precondition string for this method) -- same class of Phase-3 addition
+  # root_cause.five_whys.contract.yaml's own precondition already is.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: every ParetoAnalysis carries a provenance_record
+  # (epistemic_type: CALCULATED_RESULT -- a genuine compute result, same
+  # class ai_lego/compute/statistics/reliability.py's own output already
+  # uses). evidence_labeling_required is FALSE, not copied verbatim from
+  # Fishbone/SWOT/Five Whys: this method's real risk (Atlas L1320) is
+  # silently assuming an 80/20 threshold, not omitting evidence citations
+  # -- setting evidence_labeling_required: true here would misrepresent
+  # what this method's own mother-document caution actually warns against.
+  # See compilation_decisions.
+
+forbidden_transition: []
+# Atlas §11.6 gives no explicit forbidden-transition worked example for
+# this method (same as root_cause.five_whys.contract.yaml). Left genuinely
+# empty rather than invented. See open_questions.
+
+recommended_next:
+  - root_cause.five_whys
+  # Atlas §11.5's own 推薦搭配 (L1295-1296) places Pareto BEFORE Five Whys
+  # in the worked chain ("Fishbone → Pareto → 5 Whys → Causal Validation")
+  # -- recorded here as the forward edge of that same cited chain.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling root_cause contract in
+  # this directory already uses: a pure analysis/compute method with no
+  # described external side effect in any of the three mother documents.
+
+compilation_decisions:
+  - question: >
+      Should `quality.evidence_labeling_required` be true, copying the
+      other three root_cause-family contracts verbatim, or false?
+    decision: "False."
+    reasoning: >
+      Atlas's own named misuse for THIS method (L1320, '80/20 不是自然
+      法則；真正比例由資料決定') is about threshold assumption, not about
+      omitting evidence citations the way Fishbone (L1347) and Five Whys
+      (L1293) are. Copying evidence_labeling_required: true here would be
+      exactly the "same shape as the last three contracts because that's
+      the pattern" mistake this project's own R0 discipline (打補丁 /
+      pattern-matching without re-deriving the invariant) explicitly
+      warns against -- the flag's own schema description (method.schema.yaml
+      L271-276) is specifically about claims from an EvidenceSet input,
+      and Pareto's real input risk is a Dataset/threshold risk, a
+      genuinely different shape.
+
+open_questions:
+  - id: "OQ-PARETO-1"
+    question: >
+      `forbidden_transition` is left empty -- Atlas §11.6 gives this method
+      no explicit illegal-transition worked example. Same open question
+      class as OQ-FIVEWHYS-1.
+    owner: "operator, or a future review pass specifically checking Tier 1/2 contracts with no forbidden_transition example in Atlas"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-PARETO-2"
+    question: >
+      `cognitive_primitives: [GROUP, CALCULATE, PRIORITIZE]` is this file's
+      own inference, not a cited Atlas composition formula. Same open
+      question class as OQ-FIVEWHYS-2.
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.6 (L1300-1320) and the F05 tool table row (L436)
+    directly at the cited lines. Cross-checked against
+    `root_cause.five_whys.contract.yaml`'s own `recommended_next` and
+    `root-cause-fact.schema.yaml`'s `legal_promotion_path.validation_methods_applied`
+    enum to confirm this contract's `id` matches the value both files
+    already reference. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `purpose`/`preconditions`/`outputs`'s
+    literal name are Phase 3 compilation (structurally necessary, not
+    textually cited verbatim), explicitly flagged as such above. The
+    `evidence_labeling_required: false` choice is a deliberate DEPARTURE
+    from the pattern the three prior root_cause/strategy contracts in this
+    directory used, reasoned through rather than copied -- see
+    compilation_decisions.

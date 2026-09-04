@@ -1,0 +1,109 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/pareto-analysis.schema.yaml"
+target_ref: ""
+description: >
+  Exercises ParetoAnalysis's required fields, the `dataset[]`/`ranking[]`
+  minItems:1 guards, the threshold-honesty pair (`vital_few_threshold_percent`
+  nullable + `threshold_status` OPERATOR_SET|OPERATOR_SET_PENDING -- Atlas
+  L1320's own caution against a hard-coded 80/20 default), and the
+  genuine-compute fields (`engine` const, `computation_provenance_ref`
+  pattern).
+
+valid:
+  - name: two_category_ranking_threshold_explicitly_set
+    instance:
+      id: "PA-2026-09-04-001"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-001"
+      metric_name: "incident_count"
+      dataset:
+        - hypothesis_id: "CHS-2026-09-04-001-H1"
+          metric_value: 42
+        - hypothesis_id: "CHS-2026-09-04-001-H2"
+          metric_value: 8
+      ranking:
+        - hypothesis_id: "CHS-2026-09-04-001-H1"
+          metric_value: 42
+          share_of_total_percent: 84.0
+          cumulative_share_percent: 84.0
+        - hypothesis_id: "CHS-2026-09-04-001-H2"
+          metric_value: 8
+          share_of_total_percent: 16.0
+          cumulative_share_percent: 100.0
+      vital_few_threshold_percent: 80
+      threshold_status: OPERATOR_SET
+      vital_few_hypothesis_ids: ["CHS-2026-09-04-001-H1"]
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.pareto.ranking.pareto_ranking"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+  - name: threshold_pending_no_vital_few_computed
+    instance:
+      id: "PA-2026-09-04-002"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-002"
+      metric_name: "cost_usd"
+      dataset:
+        - hypothesis_id: "CHS-2026-09-04-002-H1"
+          metric_value: 100
+      ranking:
+        - hypothesis_id: "CHS-2026-09-04-002-H1"
+          metric_value: 100
+          share_of_total_percent: 100.0
+          cumulative_share_percent: 100.0
+      threshold_status: OPERATOR_SET_PENDING
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.pareto.ranking.pareto_ranking"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+
+invalid:
+  - name: dataset_empty_array_violates_minitems
+    instance:
+      id: "PA-2026-09-04-003"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-003"
+      metric_name: "incident_count"
+      dataset: []
+      ranking: []
+      threshold_status: OPERATOR_SET_PENDING
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.pareto.ranking.pareto_ranking"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+    reason: "dataset has minItems: 1 -- an empty dataset cannot produce a Pareto ranking (Atlas §11.6 requires at least one categorized record)."
+  - name: threshold_status_not_in_2_value_enum
+    instance:
+      id: "PA-2026-09-04-004"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-004"
+      metric_name: "incident_count"
+      dataset: [{hypothesis_id: "H1", metric_value: 1}]
+      ranking: [{hypothesis_id: "H1", metric_value: 1, share_of_total_percent: 100.0, cumulative_share_percent: 100.0}]
+      threshold_status: "ASSUMED_80_20"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.pareto.ranking.pareto_ranking"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+    reason: "threshold_status must be OPERATOR_SET or OPERATOR_SET_PENDING -- 'ASSUMED_80_20' is exactly the silently-assumed-ratio pattern Atlas L1320 warns against, and is not a legal enum value."
+  - name: engine_not_deterministic_compute_is_refused_by_const
+    instance:
+      id: "PA-2026-09-04-005"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-005"
+      metric_name: "incident_count"
+      dataset: [{hypothesis_id: "H1", metric_value: 1}]
+      ranking: [{hypothesis_id: "H1", metric_value: 1, share_of_total_percent: 100.0, cumulative_share_percent: 100.0}]
+      threshold_status: OPERATOR_SET_PENDING
+      engine: "llm_mental_arithmetic"
+      computation_provenance_ref: "ai_lego.compute.pareto.ranking.pareto_ranking"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+    reason: "engine is const 'local_python_deterministic_compute' (Master Plan §39: an LLM must never mentally calculate a value and label it CALCULATED_RESULT) -- 'llm_mental_arithmetic' is refused."
+  - name: computation_provenance_ref_outside_ai_lego_compute_namespace
+    instance:
+      id: "PA-2026-09-04-006"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-006"
+      metric_name: "incident_count"
+      dataset: [{hypothesis_id: "H1", metric_value: 1}]
+      ranking: [{hypothesis_id: "H1", metric_value: 1, share_of_total_percent: 100.0, cumulative_share_percent: 100.0}]
+      threshold_status: OPERATOR_SET_PENDING
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "some_other_module.pareto_ranking"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED }
+    reason: "computation_provenance_ref must start with 'ai_lego.compute.' -- a ref outside that namespace cannot be a genuine compute function this codebase owns."
