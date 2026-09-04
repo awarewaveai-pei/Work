@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-04（續，System Foundry v1.6：操作者實際點開 configurator 頁面後回報「一堆亂七八糟的」→ 修問卷說明 + 抓到真邏輯 bug）
+
+**觸發**：操作者實際打開 configurator 頁面操作後回報「你去檢查每個問題的邏輯, 還有選項解釋要讓人看得懂, 一堆亂七八糟的」——不是我自己猜的問題，是操作者親自用過發現的。
+
+**[現況分析]**：讀完 `questionnaires/catalog.json` 全部 121 題（非透過 Bash/python3 print，因 Windows 終端機 CP950 顯示會把 UTF-8 內容亂碼化，改用 Read 工具直接讀取確認檔案本身編碼正常）。寫腳本核對：**121 題裡 114 題 `description` 完全是空字串**，只有 7 題（Q-SCOPE-001~004、Q-CH-004/005、Q-ORG-001）原本就有說明——這就是操作者說的「亂七八糟」的根本原因：多數題目只有兩三個字的標籤（例如「多步驟狀態流程」「AI 可以修改系統資料」），沒有任何解釋。另外機械核對全部 `active_when` 交叉引用（0 個指向不存在的題目、0 個自我循環引用）時，抓到一個真的邏輯 bug：`Q-FUT-004`（未來計畫加入 AI 能力）的啟用條件檢查「所有 AI 子選項都答不要」，但漏了 `Q-AI-010`（語音 AI 互動）——代表如果使用者只選了語音 AI、其餘 AI 選項都不要，這題仍會被誤判為「目前沒有任何 AI 功能」而被錯誤詢問。
+
+**[已修改]**：
+- `questionnaires/catalog.json`：114 題全部補上白話說明（非技術背景的人看得懂，講清楚答「要」實際代表什麼、跟同類題目怎麼分辨），例如 04 類「多家公司使用」vs「公司底下有多個分公司」vs「集團/母子公司結構」這三題過去完全沒說明、語意重疊看起來很像，現在分別點出是「多租戶 SaaS」vs「單一公司內部分公司」vs「母子公司架構」三種不同概念。
+- 同一支腳本順手修正 `Q-FUT-004` 的 `active_when.all` 陣列，補上遺漏的 `{"question":"Q-AI-010","equals":false}`。
+- `manifest.json`：`regenerate_integrity.py --write` 同步雜湊。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`fill_question_descriptions.py`（斷言目標的 114 個空白題目 id 精確吻合、多一個少一個都會報錯中止）| exit=0 | result=`total=121 changed_descriptions=114 still_empty=0`，且腳本內建斷言確認 `Q-FUT-004` 修正前確實缺 `Q-AI-010`、修正後已補上
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain + `python -m unittest discover -s tests` | exit=0 | result=全綠，`test_selection_matrix` 窮舉 121 題 single + 7,260 對 pairwise 測試（5 個 rejected 不變）確認新增條件未破壞既有選型正確性
+- REALTEST_EVIDENCE: tool=Chrome | cmd=重啟 `serve_configurator.py`（原本跑著的 process 已被使用者關掉，非我修改後要求重啟）+ `get_page_text` 抓實際頁面內容 | exit=0 | result=確認每題標籤下方即時顯示新說明文字，操作者畫面上會直接看到
+
+**[剩餘風險]**：`Q-FUT-003`（未來計畫進入多國市場）是 20. 未來規劃類別裡唯一沒有 `active_when` 閘門的題目（其餘 4 題都會在使用者已經選了對應功能時自動停用），可能是刻意設計（多國市場比單純多語言/多幣別/多時區更廣，即使已有 Q-GLO-001~003 也可能還沒真的跨足其他國家市場），也可能是遺漏。因無法判斷操作者意圖故未動，留待確認。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/questionnaires/catalog.json agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/manifest.json`。
+
 ## 2026-09-04（續28，同一 session：Cognitive OS 第十五個 Method Atlas 切片 — `architecture.quality_attribute_scenario`，本 session 最薄的單一引用根基，誠實揭露）
 
 **觸發**：延續操作者授權。0 agent。

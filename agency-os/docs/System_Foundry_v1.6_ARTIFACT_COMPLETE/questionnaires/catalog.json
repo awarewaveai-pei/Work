@@ -174,7 +174,7 @@
       "id": "Q-CH-001",
       "category": "channels",
       "label": "瀏覽器操作介面",
-      "description": "",
+      "description": "使用者透過網頁瀏覽器操作系統（電腦或手機皆可），不需要另外安裝任何軟體。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -182,7 +182,7 @@
       "id": "Q-CH-002",
       "category": "channels",
       "label": "手機 App",
-      "description": "",
+      "description": "使用者需要在手機上安裝獨立的 App（iOS / Android），而不是只用瀏覽器。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -190,7 +190,7 @@
       "id": "Q-CH-003",
       "category": "channels",
       "label": "桌面應用程式",
-      "description": "",
+      "description": "使用者需要在電腦上安裝獨立的桌面軟體（Windows / macOS），而不是只用瀏覽器。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -214,7 +214,7 @@
       "id": "Q-ID-001",
       "category": "identity",
       "label": "使用者帳號",
-      "description": "",
+      "description": "使用者需要登入帳號才能使用系統，而不是完全公開、不需登入即可使用。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -222,7 +222,7 @@
       "id": "Q-ID-002",
       "category": "identity",
       "label": "使用者自行註冊",
-      "description": "",
+      "description": "使用者可以自己在網站或 App 上建立帳號，不需要由內部人員手動建立。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -234,7 +234,7 @@
       "id": "Q-ID-003",
       "category": "identity",
       "label": "不同使用者角色",
-      "description": "",
+      "description": "系統裡不同的人有不同的權限（例如一般使用者 vs 管理員），而不是所有登入者權限都一樣。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -246,7 +246,7 @@
       "id": "Q-ID-004",
       "category": "identity",
       "label": "管理員邀請成員",
-      "description": "",
+      "description": "有管理權限的人可以邀請其他人加入系統（例如邀請同事或客戶的員工），而不是只能自行註冊。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -258,7 +258,7 @@
       "id": "Q-ID-005",
       "category": "identity",
       "label": "企業 SSO",
-      "description": "",
+      "description": "企業客戶可以用他們自己公司既有的帳號系統（例如 Google Workspace、Microsoft 365）登入，不需要另外設定帳號密碼。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -270,7 +270,7 @@
       "id": "Q-ID-006",
       "category": "identity",
       "label": "客戶公司自行管理成員",
-      "description": "",
+      "description": "當一家客戶公司有多個員工使用系統時，該公司自己的管理者可以新增或移除自己員工的帳號，不需要你介入處理。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -290,7 +290,7 @@
       "id": "Q-ORG-002",
       "category": "organization",
       "label": "公司底下有多個分公司",
-      "description": "",
+      "description": "同一家公司內部有多個分公司或門市，資料可能需要分開管理或彙總查看。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -298,7 +298,7 @@
       "id": "Q-ORG-003",
       "category": "organization",
       "label": "集團 / 母子公司結構",
-      "description": "",
+      "description": "有母公司與子公司的組織架構，母公司可能需要查看或管理旗下多家子公司的資料。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -306,7 +306,7 @@
       "id": "Q-ORG-004",
       "category": "organization",
       "label": "不同公司共同參與同一案件 / 專案",
-      "description": "",
+      "description": "來自不同公司的人會一起參與同一個案件或專案，需要共同存取同一份資料。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -318,7 +318,7 @@
       "id": "Q-ORG-005",
       "category": "organization",
       "label": "跨公司共享指定資料",
-      "description": "",
+      "description": "不同公司之間需要主動分享特定資料給彼此查看，而不是完全互相隔離。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -330,7 +330,7 @@
       "id": "Q-DATA-001",
       "category": "records",
       "label": "客戶 / 聯絡人資料",
-      "description": "",
+      "description": "系統需要儲存客戶或聯絡人的基本資料，例如姓名、聯絡方式。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -338,7 +338,7 @@
       "id": "Q-DATA-002",
       "category": "records",
       "label": "公司 / 組織資料",
-      "description": "",
+      "description": "系統需要儲存公司或組織層級的資料，是整間公司的資訊，不是個人資料。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -346,7 +346,7 @@
       "id": "Q-DATA-003",
       "category": "records",
       "label": "產品 / 商品 / 服務資料",
-      "description": "",
+      "description": "系統需要管理你販售或提供的產品、商品或服務項目清單。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -354,7 +354,7 @@
       "id": "Q-DATA-004",
       "category": "records",
       "label": "訂單 / 交易資料",
-      "description": "",
+      "description": "系統需要記錄訂單、購買或交易紀錄。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -362,7 +362,7 @@
       "id": "Q-DATA-005",
       "category": "records",
       "label": "案件 / 專案資料",
-      "description": "",
+      "description": "系統需要管理有生命週期的案件或專案，例如客服案件、工程專案。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -370,7 +370,7 @@
       "id": "Q-DATA-006",
       "category": "records",
       "label": "合約 / 協議資料",
-      "description": "",
+      "description": "系統需要儲存正式的合約或協議文件與其條款。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -378,7 +378,7 @@
       "id": "Q-DATA-007",
       "category": "records",
       "label": "庫存 / 倉儲資料",
-      "description": "",
+      "description": "系統需要追蹤商品的庫存數量與倉儲位置。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -386,7 +386,7 @@
       "id": "Q-DATA-008",
       "category": "records",
       "label": "預約 / 行程資料",
-      "description": "",
+      "description": "系統需要管理預約時段或行程安排，例如診所掛號、場地預約。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -394,7 +394,7 @@
       "id": "Q-DATA-009",
       "category": "records",
       "label": "會計 / 財務紀錄",
-      "description": "",
+      "description": "系統需要記錄具備會計等級精確度的財務資料，例如收支明細、對帳紀錄。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -402,7 +402,7 @@
       "id": "Q-DATA-010",
       "category": "records",
       "label": "使用者產生內容",
-      "description": "",
+      "description": "使用者可以自己在系統裡建立內容，例如貼文、評論、上傳的作品，而不只是填寫固定表單。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -410,7 +410,7 @@
       "id": "Q-WF-001",
       "category": "workflow",
       "label": "多步驟狀態流程",
-      "description": "",
+      "description": "資料或案件會經歷一連串固定的狀態變化（例如「待審核→審核中→已核准」），系統需要追蹤目前處於哪個狀態。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -418,7 +418,7 @@
       "id": "Q-WF-002",
       "category": "workflow",
       "label": "審核流程",
-      "description": "",
+      "description": "某些操作需要先經過另一個人審核通過，才能真正生效。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -426,7 +426,7 @@
       "id": "Q-WF-003",
       "category": "workflow",
       "label": "需要兩人或多人共同批准",
-      "description": "",
+      "description": "審核不能只有一個人點頭同意，需要兩個以上的人都核准才算通過。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -438,7 +438,7 @@
       "id": "Q-WF-004",
       "category": "workflow",
       "label": "任務指派",
-      "description": "",
+      "description": "可以把工作項目指派給特定的人負責處理，並追蹤是誰負責。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -446,7 +446,7 @@
       "id": "Q-WF-005",
       "category": "workflow",
       "label": "留言 / 討論",
-      "description": "",
+      "description": "使用者可以針對某筆資料或案件留言討論，形成對話紀錄。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -454,7 +454,7 @@
       "id": "Q-WF-006",
       "category": "workflow",
       "label": "多人即時協作",
-      "description": "",
+      "description": "多個使用者可以同時編輯同一份內容，並即時看到彼此的變動，類似多人共同編輯文件。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -462,7 +462,7 @@
       "id": "Q-WF-007",
       "category": "workflow",
       "label": "排程 / 預約執行",
-      "description": "",
+      "description": "系統需要在指定的未來時間點自動執行某個動作，而不是等使用者手動觸發。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -470,7 +470,7 @@
       "id": "Q-WF-008",
       "category": "workflow",
       "label": "電子簽核 / 簽名",
-      "description": "",
+      "description": "文件需要具有法律效力的電子簽名，而不是只用一個「同意」按鈕。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -478,7 +478,7 @@
       "id": "Q-FILE-001",
       "category": "files",
       "label": "上傳一般文件",
-      "description": "",
+      "description": "使用者可以上傳文件檔案（例如 PDF、Word），系統負責儲存與提供下載。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -486,7 +486,7 @@
       "id": "Q-FILE-002",
       "category": "files",
       "label": "圖片",
-      "description": "",
+      "description": "使用者可以上傳圖片，系統可能需要處理縮圖、壓縮等。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -494,7 +494,7 @@
       "id": "Q-FILE-003",
       "category": "files",
       "label": "影片",
-      "description": "",
+      "description": "使用者可以上傳影片，系統可能需要處理轉檔、串流播放等。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -502,7 +502,7 @@
       "id": "Q-FILE-004",
       "category": "files",
       "label": "檔案版本管理",
-      "description": "",
+      "description": "同一份檔案被多次上傳或修改時，系統需要保留歷史版本，而不是只留最新的一份。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -526,7 +526,7 @@
       "id": "Q-FILE-005",
       "category": "files",
       "label": "分享下載連結",
-      "description": "",
+      "description": "可以產生一個連結，讓沒有帳號的人也能下載特定檔案。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -550,7 +550,7 @@
       "id": "Q-SR-001",
       "category": "search_reporting",
       "label": "全文搜尋",
-      "description": "",
+      "description": "使用者可以用關鍵字搜尋系統裡的內容，而不是只能用固定欄位篩選。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -558,7 +558,7 @@
       "id": "Q-SR-002",
       "category": "search_reporting",
       "label": "進階篩選",
-      "description": "",
+      "description": "使用者可以用多個條件組合篩選資料，例如日期區間加狀態加負責人。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -566,7 +566,7 @@
       "id": "Q-SR-003",
       "category": "search_reporting",
       "label": "Dashboard",
-      "description": "",
+      "description": "提供一個總覽畫面，用圖表或數字呈現關鍵指標，讓使用者一眼看到現況。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -574,7 +574,7 @@
       "id": "Q-SR-004",
       "category": "search_reporting",
       "label": "自訂報表",
-      "description": "",
+      "description": "使用者可以自己選擇欄位與條件，產生客製化報表，而不是只有系統內建的固定報表。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -582,7 +582,7 @@
       "id": "Q-SR-005",
       "category": "search_reporting",
       "label": "Excel / CSV 匯出",
-      "description": "",
+      "description": "使用者可以把資料匯出成 Excel 或 CSV 檔案，帶到其他工具繼續處理。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -590,7 +590,7 @@
       "id": "Q-SR-006",
       "category": "search_reporting",
       "label": "使用分析 / Analytics",
-      "description": "",
+      "description": "系統需要記錄並分析使用者的操作行為（例如哪些功能最常被使用），而不是只儲存業務資料本身。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -598,7 +598,7 @@
       "id": "Q-COM-001",
       "category": "commercial",
       "label": "向客戶收費",
-      "description": "",
+      "description": "這套系統是要販售、收費的產品，不是只給內部員工免費使用的工具。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -606,7 +606,7 @@
       "id": "Q-COM-002",
       "category": "commercial",
       "label": "訂閱制",
-      "description": "",
+      "description": "客戶是定期（例如每月或每年）持續付費使用，而不是一次性買斷。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -618,7 +618,7 @@
       "id": "Q-COM-003",
       "category": "commercial",
       "label": "不同方案 / Edition",
-      "description": "",
+      "description": "提供多種收費方案，例如基本版、進階版，不同方案能用的功能不同。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -630,7 +630,7 @@
       "id": "Q-COM-004",
       "category": "commercial",
       "label": "免費試用",
-      "description": "",
+      "description": "客戶可以先免費試用一段時間，之後才需要付費才能繼續使用。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -642,7 +642,7 @@
       "id": "Q-COM-005",
       "category": "commercial",
       "label": "依使用量計費",
-      "description": "",
+      "description": "收費金額會依客戶實際使用量計算，而不是固定金額。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -654,7 +654,7 @@
       "id": "Q-COM-006",
       "category": "commercial",
       "label": "授權碼 / License",
-      "description": "",
+      "description": "客戶需要輸入一組授權碼或序號才能啟用或使用系統，而不是單純登入帳號即可。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -666,7 +666,7 @@
       "id": "Q-PAY-001",
       "category": "payments",
       "label": "線上付款",
-      "description": "",
+      "description": "客戶可以直接在系統裡用信用卡等方式線上付款，而不是走匯款、支票等線下方式。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -678,7 +678,7 @@
       "id": "Q-PAY-002",
       "category": "payments",
       "label": "退款",
-      "description": "",
+      "description": "系統需要支援把已收款項退回給客戶。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -690,7 +690,7 @@
       "id": "Q-PAY-003",
       "category": "payments",
       "label": "部分退款",
-      "description": "",
+      "description": "退款金額可以只退一部分，而不是整筆全額退回。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -702,7 +702,7 @@
       "id": "Q-PAY-004",
       "category": "payments",
       "label": "發票 / Invoice",
-      "description": "",
+      "description": "系統需要自動產生正式的發票或收據給客戶。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -714,7 +714,7 @@
       "id": "Q-PAY-005",
       "category": "payments",
       "label": "稅務計算",
-      "description": "",
+      "description": "系統需要自動計算交易應課的稅額，例如營業稅。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -726,7 +726,7 @@
       "id": "Q-PAY-006",
       "category": "payments",
       "label": "保存付款方式供下次使用",
-      "description": "",
+      "description": "客戶的信用卡等付款方式可以被安全保存，下次購買不需要重新輸入。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -738,7 +738,7 @@
       "id": "Q-NOT-001",
       "category": "notifications",
       "label": "Email 通知",
-      "description": "",
+      "description": "系統需要主動寄送 Email 通知使用者，例如訂單狀態更新。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -746,7 +746,7 @@
       "id": "Q-NOT-002",
       "category": "notifications",
       "label": "SMS 通知",
-      "description": "",
+      "description": "系統需要主動發送簡訊通知使用者。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -754,7 +754,7 @@
       "id": "Q-NOT-003",
       "category": "notifications",
       "label": "App Push 通知",
-      "description": "",
+      "description": "系統需要透過手機 App 發送推播通知。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -762,7 +762,7 @@
       "id": "Q-NOT-004",
       "category": "notifications",
       "label": "系統內通知",
-      "description": "",
+      "description": "系統需要在畫面裡顯示通知（例如右上角的鈴鐺圖示），不需要寄到系統外。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -770,7 +770,7 @@
       "id": "Q-NOT-005",
       "category": "notifications",
       "label": "Webhook 通知其他系統",
-      "description": "",
+      "description": "系統裡發生特定事件時，需要自動通知客戶自己的其他系統，是系統對系統的技術性通知，不是給人看的訊息。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -778,7 +778,7 @@
       "id": "Q-INT-001",
       "category": "integrations",
       "label": "第三方 API 整合",
-      "description": "",
+      "description": "系統需要呼叫或串接其他公司提供的服務（例如地圖、簡訊發送等），泛指不屬於下面幾類特定整合的其他串接。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -786,7 +786,7 @@
       "id": "Q-INT-002",
       "category": "integrations",
       "label": "ERP 整合",
-      "description": "",
+      "description": "系統需要跟企業的 ERP（例如進銷存、生產管理系統）串接資料。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -794,7 +794,7 @@
       "id": "Q-INT-003",
       "category": "integrations",
       "label": "CRM 整合",
-      "description": "",
+      "description": "系統需要跟企業的 CRM（客戶關係管理系統）串接資料。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -802,7 +802,7 @@
       "id": "Q-INT-004",
       "category": "integrations",
       "label": "會計系統整合",
-      "description": "",
+      "description": "系統需要把交易資料同步到會計軟體，例如記帳或報稅系統。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -810,7 +810,7 @@
       "id": "Q-INT-005",
       "category": "integrations",
       "label": "外部身分供應商整合",
-      "description": "",
+      "description": "使用者登入時要透過外部服務驗證身分（例如用 Google／Facebook 帳號登入），而不是只用系統自己的帳號密碼。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -818,7 +818,7 @@
       "id": "Q-INT-006",
       "category": "integrations",
       "label": "外部檔案儲存服務",
-      "description": "",
+      "description": "檔案要存放在外部雲端儲存服務（例如 Google Drive、Dropbox），而不是只存在系統自己的儲存空間。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -826,7 +826,7 @@
       "id": "Q-INT-007",
       "category": "integrations",
       "label": "資料匯入 / 匯出介面",
-      "description": "",
+      "description": "需要提供正式、結構化的介面，讓外部系統定期批次匯入或匯出資料，而不是使用者手動上傳單一檔案。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -834,7 +834,7 @@
       "id": "Q-MOB-001",
       "category": "mobile_offline",
       "label": "沒有網路時仍可使用部分功能",
-      "description": "",
+      "description": "使用者在沒有網路連線時，仍需要能查看或操作部分資料，而不是完全無法使用。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -858,7 +858,7 @@
       "id": "Q-MOB-002",
       "category": "mobile_offline",
       "label": "恢復網路後自動同步",
-      "description": "",
+      "description": "離線時做的操作，等網路恢復後要自動同步回伺服器，不需要使用者手動重新輸入。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -870,7 +870,7 @@
       "id": "Q-MOB-003",
       "category": "mobile_offline",
       "label": "使用裝置相機",
-      "description": "",
+      "description": "App 需要呼叫手機相機拍照或掃描。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -882,7 +882,7 @@
       "id": "Q-MOB-004",
       "category": "mobile_offline",
       "label": "使用裝置定位",
-      "description": "",
+      "description": "App 需要取得使用者目前所在的地理位置。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -894,7 +894,7 @@
       "id": "Q-MOB-005",
       "category": "mobile_offline",
       "label": "掃描條碼 / QR Code",
-      "description": "",
+      "description": "App 需要掃描條碼或 QR Code 來辨識商品、票券等。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -906,7 +906,7 @@
       "id": "Q-GLO-001",
       "category": "globalization",
       "label": "多語言",
-      "description": "",
+      "description": "系統介面需要支援多種語言，讓使用者切換語言使用。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -914,7 +914,7 @@
       "id": "Q-GLO-002",
       "category": "globalization",
       "label": "多種幣別",
-      "description": "",
+      "description": "系統需要處理不只一種貨幣，例如同時支援台幣與美金交易。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -922,7 +922,7 @@
       "id": "Q-GLO-003",
       "category": "globalization",
       "label": "跨多個時區",
-      "description": "",
+      "description": "使用者分布在不同時區，系統顯示的時間需要依使用者所在時區調整。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -930,7 +930,7 @@
       "id": "Q-GLO-004",
       "category": "globalization",
       "label": "由右至左語言介面",
-      "description": "",
+      "description": "介面需要支援由右至左書寫的語言，例如阿拉伯文、希伯來文，版面配置需要鏡射。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -942,7 +942,7 @@
       "id": "Q-GLO-005",
       "category": "globalization",
       "label": "特定國家 / 區域資料必須留在當地",
-      "description": "",
+      "description": "因法規要求，特定國家或地區使用者的資料必須儲存在當地，不能傳輸到其他國家的伺服器。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -950,7 +950,7 @@
       "id": "Q-AI-001",
       "category": "ai",
       "label": "AI 問答助手",
-      "description": "",
+      "description": "系統提供一個像聊天機器人的 AI 助手，可以回答使用者的問題。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -958,7 +958,7 @@
       "id": "Q-AI-002",
       "category": "ai",
       "label": "AI 搜尋",
-      "description": "",
+      "description": "搜尋功能由 AI 理解使用者的自然語言問題，而不是只比對關鍵字。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -966,7 +966,7 @@
       "id": "Q-AI-003",
       "category": "ai",
       "label": "AI 摘要",
-      "description": "",
+      "description": "AI 自動把長篇內容（文件、對話等）整理成摘要重點。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -974,7 +974,7 @@
       "id": "Q-AI-004",
       "category": "ai",
       "label": "AI 產生內容",
-      "description": "",
+      "description": "AI 自動產生文字、圖片等新內容，例如自動寫文案、生成圖片，不只是整理既有內容。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -982,7 +982,7 @@
       "id": "Q-AI-005",
       "category": "ai",
       "label": "AI 自動分類",
-      "description": "",
+      "description": "AI 自動把資料歸類、貼標籤，不需要人工手動分類。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -990,7 +990,7 @@
       "id": "Q-AI-006",
       "category": "ai",
       "label": "AI 推薦 / 預測",
-      "description": "",
+      "description": "AI 根據資料自動給出推薦建議或預測結果，例如推薦商品、預測銷量。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -998,7 +998,7 @@
       "id": "Q-AI-007",
       "category": "ai",
       "label": "AI 可以修改系統資料",
-      "description": "",
+      "description": "AI 除了回答問題外，還可以直接新增或修改系統裡的正式資料，而不是只提供建議讓人來改——這會啟動額外的安全與人工監督機制。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1006,7 +1006,7 @@
       "id": "Q-AI-008",
       "category": "ai",
       "label": "AI 可以執行外部操作",
-      "description": "",
+      "description": "AI 可以代替使用者呼叫外部服務或系統執行動作（例如自動發信、下單），而不是只在系統內部操作。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1014,7 +1014,7 @@
       "id": "Q-AI-009",
       "category": "ai",
       "label": "多個 AI Agent 協作",
-      "description": "",
+      "description": "系統裡有多個 AI 角色互相合作完成一件事，而不是單一個 AI 獨立回答。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1022,7 +1022,7 @@
       "id": "Q-AI-010",
       "category": "ai",
       "label": "語音 AI 互動",
-      "description": "",
+      "description": "使用者可以用講話的方式跟系統互動（語音輸入或 AI 語音回覆），而不是只能打字。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1030,7 +1030,7 @@
       "id": "Q-MIG-001",
       "category": "migration",
       "label": "從既有系統遷移",
-      "description": "",
+      "description": "這套新系統是要取代你目前正在使用的舊系統，需要把舊資料搬過來。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1038,7 +1038,7 @@
       "id": "Q-MIG-002",
       "category": "migration",
       "label": "匯入歷史資料",
-      "description": "",
+      "description": "需要把過去累積的歷史資料一次性匯入新系統。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1046,7 +1046,7 @@
       "id": "Q-MIG-003",
       "category": "migration",
       "label": "新舊系統一段時間平行運作",
-      "description": "",
+      "description": "新舊系統會同時運作一段過渡期，而不是切換當天就完全停用舊系統。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1058,7 +1058,7 @@
       "id": "Q-MIG-004",
       "category": "migration",
       "label": "持續與舊系統同步資料",
-      "description": "",
+      "description": "在過渡期間，新舊系統的資料需要持續保持同步，不是只搬一次就結束。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1070,7 +1070,7 @@
       "id": "Q-MIG-005",
       "category": "migration",
       "label": "提供客戶完整資料匯出",
-      "description": "",
+      "description": "系統需要能讓客戶把自己的完整資料匯出帶走，例如未來要換系統時使用。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1078,7 +1078,7 @@
       "id": "Q-PORT-001",
       "category": "portals",
       "label": "公開網站 / 頁面",
-      "description": "",
+      "description": "系統需要對外公開的行銷網站或資訊頁面，任何人都能瀏覽，不需要登入。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1086,7 +1086,7 @@
       "id": "Q-PORT-002",
       "category": "portals",
       "label": "客戶自助入口",
-      "description": "",
+      "description": "客戶有專屬的登入入口，可以自己查詢或操作跟自己相關的資料，不需要透過你的員工代為處理。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1094,7 +1094,7 @@
       "id": "Q-PORT-003",
       "category": "portals",
       "label": "合作夥伴入口",
-      "description": "",
+      "description": "合作夥伴（供應商、經銷商等）有專屬的登入入口可以使用。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1102,7 +1102,7 @@
       "id": "Q-PORT-004",
       "category": "portals",
       "label": "可嵌入其他網站的元件",
-      "description": "",
+      "description": "系統的某個功能需要能以元件形式嵌入到別人的網站裡顯示。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1110,7 +1110,7 @@
       "id": "Q-REG-001",
       "category": "regulated",
       "label": "處理醫療 / 健康資料",
-      "description": "",
+      "description": "系統會儲存或處理病歷、健康狀況等醫療相關資料，這類資料通常有額外法規要求。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1118,7 +1118,7 @@
       "id": "Q-REG-002",
       "category": "regulated",
       "label": "系統結果直接影響金融 / 信用決策",
-      "description": "",
+      "description": "系統的計算或判斷結果會直接影響一個人能不能借到錢、貸款是否核准、信用評分等金融決策。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1126,7 +1126,7 @@
       "id": "Q-REG-003",
       "category": "regulated",
       "label": "主要使用者包含未成年人",
-      "description": "",
+      "description": "系統的使用者裡包含未滿 18 歲的未成年人，需要額外的保護措施。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1134,7 +1134,7 @@
       "id": "Q-REG-004",
       "category": "regulated",
       "label": "政府 / 公部門資料或流程",
-      "description": "",
+      "description": "系統會處理政府機關的資料或走政府規定的行政流程。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1142,7 +1142,7 @@
       "id": "Q-REG-005",
       "category": "regulated",
       "label": "生物辨識資料",
-      "description": "",
+      "description": "系統會蒐集指紋、臉部辨識等生物特徵資料。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1150,7 +1150,7 @@
       "id": "Q-REG-006",
       "category": "regulated",
       "label": "精確位置資料",
-      "description": "",
+      "description": "系統會記錄使用者精確到公尺等級的地理位置，而不是只知道大概城市。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1158,7 +1158,7 @@
       "id": "Q-REG-007",
       "category": "regulated",
       "label": "具有法律效力的正式紀錄",
-      "description": "",
+      "description": "系統產出的紀錄（例如合約、證書、正式文件）本身具有法律效力，不是內部參考用途。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1166,7 +1166,7 @@
       "id": "Q-IMP-001",
       "category": "business_impact",
       "label": "非上班時間也需要持續提供服務",
-      "description": "",
+      "description": "系統需要 24 小時全天候運作，不能只在上班時間服務、下班或半夜就可以停機維護。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1174,7 +1174,7 @@
       "id": "Q-IMP-002",
       "category": "business_impact",
       "label": "使用者需要看到即時更新",
-      "description": "",
+      "description": "資料一有變動，使用者要立刻看到最新狀態，不能接受幾分鐘後才更新的延遲。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1182,7 +1182,7 @@
       "id": "Q-IMP-003",
       "category": "business_impact",
       "label": "系統會處理不可重複執行的交易 / 動作",
-      "description": "",
+      "description": "某些操作一旦執行就不能重來，例如扣款、發送一次性通知，系統要特別小心避免重複執行。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1190,7 +1190,7 @@
       "id": "Q-IMP-004",
       "category": "business_impact",
       "label": "錯誤結果可能造成人身安全影響",
-      "description": "",
+      "description": "如果系統出錯，有可能真的造成人身安全上的傷害，不是只有金錢或體驗上的損失。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1198,7 +1198,7 @@
       "id": "Q-IMP-005",
       "category": "business_impact",
       "label": "錯誤結果可能造成直接金錢損失",
-      "description": "",
+      "description": "如果系統出錯，會直接造成使用者或公司金錢上的損失。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1206,7 +1206,7 @@
       "id": "Q-IMP-006",
       "category": "business_impact",
       "label": "系統操作可能產生法律效果",
-      "description": "",
+      "description": "在系統裡做的操作（例如簽核、確認）在法律上算數，可能產生合約義務等法律效果。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1214,7 +1214,7 @@
       "id": "Q-IMP-007",
       "category": "business_impact",
       "label": "使用量會有明顯尖峰時段",
-      "description": "",
+      "description": "使用量在特定時段會突然大幅增加，例如促銷活動或特定時間點，跟平常差異很大。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1222,7 +1222,7 @@
       "id": "Q-FUT-001",
       "category": "future",
       "label": "未來計畫增加手機 App",
-      "description": "",
+      "description": "目前不做手機 App，但已經確定未來會做，希望現在設計架構時就先考慮進去。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1234,7 +1234,7 @@
       "id": "Q-FUT-002",
       "category": "future",
       "label": "未來計畫提供多家公司使用",
-      "description": "",
+      "description": "目前只有單一公司使用，但未來確定會開放給多家公司使用，變成多租戶系統。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1246,7 +1246,7 @@
       "id": "Q-FUT-003",
       "category": "future",
       "label": "未來計畫進入多國市場",
-      "description": "",
+      "description": "目前只鎖定單一國家或語言市場，但未來確定會跨足其他國家市場。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1254,7 +1254,7 @@
       "id": "Q-FUT-004",
       "category": "future",
       "label": "未來計畫加入 AI 能力",
-      "description": "",
+      "description": "目前完全不打算做任何 AI 功能，但已經確定未來會加入 AI 能力。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1294,6 +1294,10 @@
           {
             "question": "Q-AI-009",
             "equals": false
+          },
+          {
+            "question": "Q-AI-010",
+            "equals": false
           }
         ]
       }
@@ -1302,7 +1306,7 @@
       "id": "Q-FUT-005",
       "category": "future",
       "label": "未來計畫提供對外 API",
-      "description": "",
+      "description": "目前不開放對外 API，但未來確定會提供給第三方或客戶系統串接。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
