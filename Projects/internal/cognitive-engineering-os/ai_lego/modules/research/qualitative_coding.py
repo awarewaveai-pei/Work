@@ -64,7 +64,17 @@ def _quote_for(source_id: str) -> str:
     return next(entry["quote"] for entry in SYNTHETIC_TRANSCRIPTS if entry["source_id"] == source_id)
 
 
-def assemble_coding_outputs(locked_code: dict[str, Any], ai_review: dict[str, Any], at: str) -> dict[str, Any]:
+def assemble_coding_outputs(
+    locked_code: dict[str, Any],
+    ai_review: dict[str, Any],
+    at: str,
+    *,
+    pending_ai_labels: dict[str, str] | None = None,
+    suggestion_source: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """``pending_ai_labels`` defaults to the synthetic fixture dict; a real model run passes its own
+    (``ai_coding.suggest_open_codes``) plus ``suggestion_source`` so each pending code records which model,
+    prompt version and trace produced it. The assembled shape is identical either way -- gates cannot tell."""
     reviewed = code_from_review(ai_review, "CODE-C1-002")
     coder_one: list[dict[str, Any]] = [locked_code]
     rejected: list[dict[str, Any]] = []
@@ -72,18 +82,20 @@ def assemble_coding_outputs(locked_code: dict[str, Any], ai_review: dict[str, An
         rejected.append({**ai_review, "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED")})
     else:
         coder_one.append(reviewed)
-    for index, (source_id, label) in enumerate(sorted(CODER_ONE_PENDING_AI_LABELS.items()), start=3):
-        coder_one.append(
-            {
-                "code_id": f"CODE-C1-{index:03d}",
-                "coder_id": "CODER-1",
-                "source_id": source_id,
-                "quote": _quote_for(source_id),
-                "label": label,
-                "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED"),
-                "human_action": None,
-            }
-        )
+    pending = CODER_ONE_PENDING_AI_LABELS if pending_ai_labels is None else pending_ai_labels
+    for index, (source_id, label) in enumerate(sorted(pending.items()), start=3):
+        code: dict[str, Any] = {
+            "code_id": f"CODE-C1-{index:03d}",
+            "coder_id": "CODER-1",
+            "source_id": source_id,
+            "quote": _quote_for(source_id),
+            "label": label,
+            "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED"),
+            "human_action": None,
+        }
+        if suggestion_source is not None:
+            code["suggestion_source"] = suggestion_source
+        coder_one.append(code)
     coder_two = [
         {
             "code_id": f"CODE-C2-{index:03d}",
@@ -140,7 +152,7 @@ def assemble_coding_outputs(locked_code: dict[str, Any], ai_review: dict[str, An
     }
     return {
         "stage_sequence": list(STAGE_SEQUENCE),
-        "coder_1": {"coder_id": "CODER-1", "code_set": coder_one},
+        "coder_1": {"coder_id": "CODER-1", "code_set": coder_one, "pending_labels_origin": "fixture" if pending_ai_labels is None else "model", "suggestion_source": suggestion_source},
         "coder_2": {"coder_id": "CODER-2-SYNTHETIC", "code_set": coder_two, "synthetic_fixture": True},
         "rejected": rejected,
         "category_set": category_set,

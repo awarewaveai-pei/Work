@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-04（續5，同一 session：切片第一次真的用模型產生 AI 建議 — `--coding local-llm`）
+
+### `ai_coding.py` + `qualitative_coding.py` 注入點 + CLI `--coding fixture|local-llm`：coder-1 的待審 code 由本機 `gemma3:4b` 讀遮罩逐字稿產生，evidence 不逐字就拒收
+
+**觸發**：操作者「該做什麼去做什麼 不要再問我」（接續「續4」的 Gateway）。**全程 0 個 agent**；oracle 兩個仍 block（斷路器），書面自審 + 突變測試。
+
+**[已修改]**：
+- `ai_lego/modules/research/ai_coding.py`（新，170 行）：`suggest_open_codes(gateway, profile, units, pii_guard=, classification_tag=, trace_id=)` → `{labels, accepted, rejected, missing, raw_text, suggestion_source}`。三條不變量各有測試：① prompt 送出前過同一個 `PiiLedgerGuard`（遮罩後單元文字放 ledger 既有豁免鍵 `redacted_transcript`，system prompt 與 frame 全檢——第一版把整段 prompt 全檢，被 P4 的「Reading」（城市＝動詞，fixture 刻意設的陷阱）擋下，查 `ledger_guards.EXEMPT_FIELDS` 後改成與 ledger 同一套契約，不是加新豁免）② `evidence_span` 必須是該單元的逐字子字串，否則 `FABRICATED_EVIDENCE`，label 不進 CodeSet ③ label 正規化為 `[a-z0-9_]{3,40}`，否則 `UNUSABLE_LABEL`。回應解析取第一個 JSON array（小模型會包 prose／code fence），沒有 array = 每個單元 `NO_JSON_ARRAY`，不猜。預設 registry `local-open-coding-v1` → `self-hosted` `gemma3:4b`（`champion_status: shadow`）。
+- `qualitative_coding.py`：`assemble_coding_outputs(..., pending_ai_labels=None, suggestion_source=None)` 只加 kwargs，預設路徑逐位元組不變；`coder_1` 多 `pending_labels_origin: fixture|model` 與 `suggestion_source`；模型產生的 code 各帶 `suggestion_source`。
+- `apps/cli/run_research_slice.py`：`CODING_MODES`、`SliceConfig.coding/local_model`、`--coding`／`--local-model`；`local-llm` 在任何副作用前先 `ollama_available()`，沒開 → `AdapterUnavailable`（exit 2，比照 SAPI）；Step 15.5 對「沒被人處理過的單元」（SRC-3、SRC-4）用 `redact_transcript` 後的真逐字稿呼叫模型，`classification_tag="Confidential"`，寫 `AISuggestionGenerated` 事件與 `modules/research/open_coding_model_response.json`；`adapters` 多 `coding_mode`／`open_coding_model`；`result["open_coding"]`。
+- `tests/unit/test_ai_coding.py`（新，15 個）；`tests/acceptance/test_research_slice_fixture_mode.py` adapters 期望值加兩鍵 + 斷言 fixture 路徑 `pending_labels_origin: fixture`。
+- `docs/PHASE5_RESEARCH_SLICE.md`（Adapters 表加 `OpenCoder` 列、Round 5 段、限制段改寫 coding stages）；`agency-os/docs/operations/RUNNABLE_DEMOS.md` 新增最上列。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_research_slice --coding local-llm --runtime-dir %TEMP%\ai-lego-llm-run` | exit=0 | ms≈45000 | result=`PASS … 28/28 steps, all gates PASS`，`adapters={... 'coding_mode': 'local-llm', 'open_coding_model': 'gemma3:4b'}`；模型真回：`SRC-3 → work_feeling_empty`（span「Some weeks I finish work feeling empty before I have even logged off.」逐字）、`SRC-4 → night_thinking_tomorrow`（逐字），rejected=[]、missing=[]，233/114 tokens，9188 ms；`slice_result.json` 的 `CODE-C1-003/004` 為 `AI_SUGGESTED` 且 `suggestion_source.model_identifier=gemma3:4b`；兩個新 label 無 axial 映射 → 誠實落 `CAT-pending_axial_review`／`THEME-3 pending_axial_review`，五個 method gate 仍全 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（第一版）| exit=0（印 FAIL） | result=`MODEL_INPUT_PII_GUARD_TRIPPED … (P4.city)` — guard 真的擋下，修法見上（與 ledger 同契約），非放寬
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ai_coding -v` | exit=0 | result=15/15（純函式，0.001s 合理，逐條列出）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | ms=33153 | result=`Ran 159 tests OK`（144→159；中途 `test_adapters_are_labelled_as_fixtures` 因 adapters 多兩鍵變紅，更新期望值後綠）
+- 突變測試：`ai_coding.py` 把 `or span.strip() not in by_id[source_id]` 換成 `or False` → `test_fabricated_evidence_is_rejected_not_accepted` FAIL（+1 error）；復原後 15/15 綠
+- REVIEW_DONE: critic=self（oracle 皆 block）| verdict=pass | findings=0c/2m/0n（2 個 medium 自抓自修：PII guard 第一版對遮罩文字過嚴、acceptance adapters 期望值）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`assemble_coding_outputs|CODER_ONE_PENDING_AI_LABELS|CODING_MODES|suggest_open_codes` + `無真 LLM|no real LLM|真 LLM 切片` | hits=見下方（call sites 只有 CLI 與 qualitative_coding 本身，簽名向後相容；RUNNABLE_DEMOS 舊列「無真 LLM」是歷史列，規則是加新列不改舊列；TASKS 條目已更新）
+- ORACLE_WAIVED: critic／codex 斷路器仍 block（至 9/5 05:20／9/7 11:06），未連線；書面自審 + 突變證據如上
+
+**[剩餘風險]**：① SRC-1／SRC-2 兩個人審單元的起始建議仍是 fixture `SUGGESTED_LABEL`，coder 2／axial／themes 仍 fixture——下一刀；② 只有 `gemma3:4b` 一個模型、一個 prompt 版本，沒有 eval dataset（MP §70）；③ `--coding local-llm` 未納入 `scripts/test-phase5-local.ps1`（runner 是 CI 路徑，刻意不依賴 Ollama）；④ 中文逐字稿品質未測（fixture 是英文）。
+
+**[rollback]**：`git revert` 本 commit；fixture 路徑本來就不經過新碼。
+
 ## 2026-09-04（續4，同一 session：真 LLM Gateway — Ollama 本機推理 + Anthropic 雲端，兩條路徑皆真測）
 
 ### 新增 `ai_lego/platform/ai_execution/gateway.py`：research.qualitative_coding 的 AI-suggested labels 第一次有真模型可呼叫

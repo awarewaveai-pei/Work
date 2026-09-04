@@ -65,6 +65,7 @@ from ai_lego.modules.knowledge.ingest.audio_fixtures import SyntheticToneAudioFa
 from ai_lego.modules.knowledge.ingest.pii import detect_synthetic_pii, redact_transcript
 from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, OfflineFasterWhisperTranscriber
 from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_from_transcript, reverse_trace
+from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, default_local_registry, suggest_open_codes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
 from ai_lego.modules.research.review import fixture_review, locked_code_from_review, review_code_interactively
@@ -72,6 +73,7 @@ from ai_lego.modules.research.synthetic_fixtures import PROJECT_ID, SUGGESTED_LA
 from ai_lego.platform.ai_execution.capability_resolver import CAPABILITY_RESOLUTION_BLOCKED, CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.ai_execution.current_state import build_current_state
 from ai_lego.platform.ai_execution.deletion import DeletionRequestBuilder
+from ai_lego.platform.ai_execution.gateway import AIGateway, ollama_available
 from ai_lego.platform.ai_execution.mandatory_gates import inject_mandatory_gates
 from ai_lego.platform.ai_execution.manifest import build_manifest, describe_git_source, manifest_documents
 from ai_lego.platform.ai_execution.method_resolver import DEPRECATED_ALIAS, METHOD_RESOLUTION_BLOCKED, MethodCatalog, state_transition
@@ -88,6 +90,9 @@ SLICE_RISK_TIER = "R4"  # subject DEK destruction is an irreversible R4 action (
 DELETION_AUTHORIZATION = "AUTH-SYNTHETIC-P2-ERASURE-A4"
 TRANSCRIPTION_MODES = ("fixture", "offline-stt")
 REVIEW_MODES = ("fixture", "interactive")
+# fixture = coder-1's pending AI labels come from synthetic_fixtures (deterministic, CI path);
+# local-llm = a real model behind AIGateway (Ollama on 127.0.0.1) proposes them from the REDACTED transcripts.
+CODING_MODES = ("fixture", "local-llm")
 GOAL_TEXT = "Code these interview transcripts for after-hours boundary themes and check inter-rater reliability between two coders."
 
 # Capability-like work this slice performs WITHOUT going through CapabilityCatalog.invoke -- declared, not hidden
@@ -127,6 +132,8 @@ class SliceConfig:
     runtime_dir: Path | None = None
     transcription: str = "fixture"
     review: str = "fixture"
+    coding: str = "fixture"
+    local_model: str = "gemma3:4b"
     reset: bool = True
     input_fn: Callable[[str], str] = field(default=input)
     output_fn: Callable[[str], Any] = field(default=print)
@@ -159,6 +166,16 @@ def write_research_memo(path: Path, memo: str) -> Path:
 def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     if config.review not in REVIEW_MODES:
         raise InvariantViolation(f"REVIEW_MODE_UNKNOWN: {config.review!r}")
+    if config.coding not in CODING_MODES:
+        raise InvariantViolation(f"CODING_MODE_UNKNOWN: {config.coding!r} (expected one of {CODING_MODES})")
+    gateway: AIGateway | None = None
+    if config.coding == "local-llm":
+        # Probed before any side effect, same as the SAPI adapter: an absent runtime is a visible UNAVAILABLE, never a
+        # silent fall-back to the fixture labels.
+        available, reason = ollama_available()
+        if not available:
+            raise AdapterUnavailable(f"OLLAMA_UNAVAILABLE: {reason}")
+        gateway = AIGateway(default_local_registry(config.local_model))
     spec_root = resolve_spec_root(config.spec_root)
     # ADR-023: the capability catalog is loaded FIRST, before any side effect (runtime dir, adapters, ingest), so that
     # a catalog problem (CONTRACT_ID_DUPLICATE / CONTRACT_CATALOG_UNREADABLE) or an expired bypass declaration stops
@@ -342,7 +359,33 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     emit(NORDBROOK.tenant_id, nord_aggregate, "AISuggestionReviewed", {"suggestion_id": ai_review["suggestion_id"], "action": ai_review["action"], "result_label": ai_review["result_label"]}, 23)
     # EC section 14 / MP section 8.5: the method implementation runs only through the Method Atlas gate (ADR-023
     # section Consequences 5) -- same `invoke` seam as capabilities, same guarantee.
-    coding_contract, coding_outputs = live.invoke("research.qualitative_coding", assemble_coding_outputs, locked_code, ai_review, clock.at(23.5))
+    # Step 15.5 (local-llm only): a real model proposes coder-1's pending open codes from the REDACTED transcripts of
+    # the units no human has handled yet (SRC-1 is human-locked, SRC-2 was just reviewed). The prompt passes the same
+    # PiiLedgerGuard as the ledger before it leaves the process; evidence must be verbatim or the label is rejected.
+    open_coding: dict[str, Any] | None = None
+    pending_ai_labels: dict[str, str] | None = None
+    if gateway is not None:
+        human_handled = {locked_code["source_id"], ai_review["source_id"]}
+        units = [
+            {"source_id": source["source_id"], "text": redact_transcript(source["transcription"]["text"], source["detected_pii"])}
+            for source in source_records
+            if source["source_id"] not in human_handled
+        ]
+        open_coding = suggest_open_codes(gateway, DEFAULT_LOCAL_MODEL_PROFILE, units, pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:open-coding")
+        if not open_coding["labels"]:
+            raise InvariantViolation(f"OPEN_CODING_NO_ACCEPTED_LABELS: model returned nothing usable -- rejected={open_coding['rejected']} missing={open_coding['missing']}")
+        pending_ai_labels = open_coding["labels"]
+        emit(NORDBROOK.tenant_id, nord_aggregate, "AISuggestionGenerated", {"labels": pending_ai_labels, "rejected": open_coding["rejected"], "missing": open_coding["missing"], "suggestion_source": open_coding["suggestion_source"]}, 23.2)
+        write_json(runtime / "modules" / "research" / "open_coding_model_response.json", open_coding)
+    coding_contract, coding_outputs = live.invoke(
+        "research.qualitative_coding",
+        assemble_coding_outputs,
+        locked_code,
+        ai_review,
+        clock.at(23.5),
+        pending_ai_labels=pending_ai_labels,
+        suggestion_source=None if open_coding is None else open_coding["suggestion_source"],
+    )
 
     # Steps 16 (plan/rollback/approval) + real recovery-plan and current-state records before each transition.
     transition("METHODS_RESOLVED", "PLAN_COMPILED", 24)
@@ -637,7 +680,8 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     result = {
         "synthetic_only": True,
         "runtime_dir": str(runtime),
-        "adapters": {"audio_mode": audio_factory.mode, "transcription_mode": transcriber.mode, "review_mode": config.review},
+        "adapters": {"audio_mode": audio_factory.mode, "transcription_mode": transcriber.mode, "review_mode": config.review, "coding_mode": config.coding, "open_coding_model": None if open_coding is None else open_coding["suggestion_source"]["model_identifier"]},
+        "open_coding": open_coding,
         "step_status": {str(step): "PASS" for step in range(1, 29)},
         "state_machine_final_state": "VERIFYING (release states are outside the local synthetic slice)",
         "source_event_count": len(source_records) + 2,
@@ -679,9 +723,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runtime-dir", type=Path, default=None, help=f"isolated output directory (default: {default_runtime_dir()})")
     parser.add_argument("--transcription", choices=TRANSCRIPTION_MODES, default="fixture", help="fixture = deterministic tone WAV + declared transcript; offline-stt = Windows SAPI speech + cached faster-whisper")
     parser.add_argument("--review", choices=REVIEW_MODES, default="fixture", help="fixture = deterministic Accept-and-Lock / Edit; interactive = terminal prompts")
+    parser.add_argument("--coding", choices=CODING_MODES, default="fixture", help="fixture = synthetic pending AI labels; local-llm = a real local model (Ollama) proposes them from redacted transcripts")
+    parser.add_argument("--local-model", default="gemma3:4b", help="Ollama model identifier used when --coding local-llm (must already be pulled)")
     parser.add_argument("--no-reset", action="store_true", help="reuse an existing (ownership-marked, empty) runtime directory instead of deleting it first")
     args = parser.parse_args(argv)
-    config = SliceConfig(spec_root=args.spec_root, runtime_dir=args.runtime_dir, transcription=args.transcription, review=args.review, reset=not args.no_reset)
+    config = SliceConfig(spec_root=args.spec_root, runtime_dir=args.runtime_dir, transcription=args.transcription, review=args.review, coding=args.coding, local_model=args.local_model, reset=not args.no_reset)
     try:
         result = run_research_slice(config)
     except AdapterUnavailable as error:

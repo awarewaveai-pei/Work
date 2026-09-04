@@ -21,7 +21,12 @@ class FixtureModeAcceptanceTests(SliceCriteriaMixin, unittest.TestCase):
         shutil.rmtree(cls.runtime, ignore_errors=True)
 
     def test_adapters_are_labelled_as_fixtures(self):
-        self.assertEqual(self.result["adapters"], {"audio_mode": "SYNTHETIC_TONE_WAV_STDLIB", "transcription_mode": "SYNTHETIC_FIXTURE_TRANSCRIPT", "review_mode": "fixture"})
+        self.assertEqual(
+            self.result["adapters"],
+            {"audio_mode": "SYNTHETIC_TONE_WAV_STDLIB", "transcription_mode": "SYNTHETIC_FIXTURE_TRANSCRIPT", "review_mode": "fixture", "coding_mode": "fixture", "open_coding_model": None},
+        )
+        self.assertIsNone(self.result["open_coding"])
+        self.assertEqual(self.result["coding_outputs"]["coder_1"]["pending_labels_origin"], "fixture")
 
     def test_runtime_dir_inside_spec_root_is_refused(self):
         from ai_lego import resolve_spec_root
