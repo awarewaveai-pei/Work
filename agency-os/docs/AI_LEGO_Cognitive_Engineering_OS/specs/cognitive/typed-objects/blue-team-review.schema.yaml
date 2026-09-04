@@ -1,0 +1,128 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/blue-team-review.schema.yaml"
+title: Blue Team Review
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BlueTeamReview` -- the
+  declared `outputs` of `challenge.blue_team`'s Method Contract
+  (methods/contracts/challenge.blue_team.contract.yaml, `outputs:
+  [BlueTeamReview]`). Same checklist-structured-improvement shape
+  `RedTeamChallenge`'s own checklist-structured-critique shape already
+  established for its sibling method, mirrored for the opposite
+  direction (strengthening, not attacking).
+
+  Field provenance -- Atlas §11.24 (L1739-1752):
+    * The 5-category improvement list (L1744-1748: controls, evidence,
+      fallback, monitoring, recovery) is transcribed as
+      `improvements[].category`'s closed enum.
+    * UNLIKE `red-team-challenge.schema.yaml`, this schema does NOT set
+      `additionalProperties: false` at the TOP level -- Atlas gives an
+      explicit no-final-authority rule (L1735) only for Red Team, not
+      for Blue Team; the method contract's own `compilation_decisions`
+      discloses why that structural lockdown is not mirrored here by
+      analogy (strengthened post-critic-review by §22.3's own closed
+      gate table, L4144-4155, which also omits Blue Team). The NESTED
+      `improvements[].items` object IS closed
+      (`additionalProperties: false`), added post-critic-review for a
+      different, unrelated reason: that item's own shape is fully
+      specified, so closing it catches typo'd keys (e.g. a missing
+      trailing "s" on `supporting_evidence_refs`) that would otherwise
+      validate silently with the real field left unpopulated.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.24 藍隊／藍隊防禦（Blue Team）(L1739-1752)"
+  - "methods/contracts/challenge.blue_team.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+type: object
+required: [id, version, proposal_ref, improvements, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^BTR-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as red-team-challenge.schema.yaml's RTC- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.blue_team"
+
+  proposal_ref:
+    type: string
+    description: "Free-text reference to the proposal/plan/analysis this review strengthens. Same scope-limited free-text pattern challenge.red_team.contract.yaml's own proposal_ref already uses, for the identical reason."
+
+  improvements:
+    type: array
+    minItems: 1
+    description: "Atlas L1744-1748's own 5-category improvement list -- at least one required (method contract precondition): a review that strengthens nothing did not actually steelman the proposal."
+    items:
+      type: object
+      additionalProperties: false
+      # Unlike the top-level object (deliberately permissive, see method contract compilation_decisions), each
+      # improvement item's own shape is fully specified and closed -- a real, low-cost gap this closes: a typo'd
+      # key (e.g. "supporting_evidence_ref" missing the trailing s) would otherwise validate silently and the
+      # real field would go unpopulated with no signal. Added post-critic-review; not present in the first draft.
+      required: [id, category, description, provenance]
+      properties:
+        id:
+          type: string
+          description: "Local id, intended to be unique within this review (e.g. BTR-001-I1) -- NOT schema-enforced (no uniqueItems on the parent array's id values), same disclosed non-enforcement red-team-challenge.schema.yaml's own sibling id field already carries."
+        category:
+          type: string
+          enum: [CONTROLS, EVIDENCE, FALLBACK, MONITORING, RECOVERY]
+          description: "Atlas L1744-1748's own 5-category list, transcribed verbatim (補 controls / 補 evidence / 補 fallback / 補 monitoring / 補 recovery)."
+        description:
+          type: string
+          minLength: 1
+          description: "The improvement itself, in natural language -- what was added or strengthened, and why."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: "OPTIONAL soft reference to real evidence/evidence.schema.yaml record ids. Not required (quality.evidence_labeling_required: false, see method contract) -- an improvement is a design addition, not a factual claim, but a caller may still cite grounding when relevant."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A blue-team pass over the same deployment proposal challenge.red_team's own example attacks: two improvements added"
+    value:
+      id: "BTR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.blue_team"
+      proposal_ref: "PROP-2026-09-04-001: 週末自動把所有客戶資料庫遷移到新機房"
+      improvements:
+        - id: "BTR-2026-09-05-001-I1"
+          category: FALLBACK
+          description: "加入明確 rollback 步驟：任何階段失敗立即回退到舊機房快照，並記錄觸發條件"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "BTR-2026-09-05-001-I2"
+          category: MONITORING
+          description: "遷移過程每 5 分鐘回報進度與健康狀態到值班頻道"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: >
+    Read Atlas §11.24 (L1739-1752) directly at the cited lines, including
+    the exact 5-category list. Validated against jsonschema
+    Draft202012Validator.
+  note: >
+    The 5-value category enum is transcribed verbatim from Atlas
+    L1744-1748. The deliberate absence of additionalProperties:false
+    (unlike this schema's own RedTeamChallenge sibling) is a disclosed
+    compilation choice, not an oversight -- see the method contract's
+    own compilation_decisions. No mother document was modified to
+    produce this file.

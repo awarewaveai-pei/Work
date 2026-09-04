@@ -1,0 +1,56 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/blue-team-review.schema.yaml"
+target_ref: ""
+description: "Exercises BlueTeamReview's required fields and the improvements[].category enum."
+
+valid:
+  - name: two_improvements_fallback_and_monitoring
+    instance:
+      id: "BTR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.blue_team"
+      proposal_ref: "PROP-2026-09-04-001"
+      improvements:
+        - id: "BTR-2026-09-05-001-I1"
+          category: FALLBACK
+          description: "加入明確 rollback 步驟"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+        - id: "BTR-2026-09-05-001-I2"
+          category: MONITORING
+          description: "遷移過程每 5 分鐘回報進度"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_improvement_with_evidence_ref
+    instance:
+      id: "BTR-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "challenge.blue_team"
+      proposal_ref: "PROP-2026-09-04-002"
+      improvements:
+        - id: "BTR-2026-09-05-002-I1"
+          category: EVIDENCE
+          description: "補上過去三次類似遷移的成功率數據"
+          supporting_evidence_refs: ["E-1"]
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: empty_improvements_array
+    instance:
+      id: "BTR-2026-09-05-003"
+      version: "1.0.0"
+      proposal_ref: "PROP-x"
+      improvements: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "improvements requires minItems 1 -- a review that strengthens nothing is empty here."
+  - name: invalid_category_enum_value
+    instance:
+      id: "BTR-2026-09-05-004"
+      version: "1.0.0"
+      proposal_ref: "PROP-x"
+      improvements:
+        - id: "BTR-2026-09-05-004-I1"
+          category: "TESTING"
+          description: "x"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "category is enum [CONTROLS, EVIDENCE, FALLBACK, MONITORING, RECOVERY] -- 'TESTING' is not a member."

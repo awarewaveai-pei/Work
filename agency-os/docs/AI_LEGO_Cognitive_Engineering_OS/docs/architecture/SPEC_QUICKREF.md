@@ -40,6 +40,7 @@
 | `specs/cognitive/typed-objects/atam-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, architecture_description, findings, provenance] properties[6] |
 | `specs/cognitive/typed-objects/backup-restore-drill-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, backup_id, restore_environment, integrity_checks_passed, rto_target_seconds, actual_recovery_duration_seconds, issues_recorded, status, provenance] properties[13] |
 | `specs/cognitive/typed-objects/blue-green-deployment-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, blue_environment, green_environment, green_verified, cutover_status, provenance] properties[9] |
+| `specs/cognitive/typed-objects/blue-team-review.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, improvements, provenance] properties[6] |
 | `specs/cognitive/typed-objects/canary-deployment-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, release_under_rollout, stages, outcome, provenance] properties[7] |
 | `specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, nodes, edges, acyclic_verified, computation_provenance_ref, provenance] properties[9] |
 | `specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement_ref, hypotheses] properties[7] |

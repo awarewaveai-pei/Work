@@ -787,6 +787,37 @@ tier_1:
       teaching example. Tier 1, mandated by the actively-running
       implementation slice, same category as the twenty-two entries
       above it.
+  twentyfourth_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-fourth Tier 1 entry, same
+    # additive-key rationale as the twenty-three entries above it.
+    method_id: "challenge.blue_team"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SECOND entry
+      from the `challenge` family (F12), directly closing half of
+      `challenge.red_team`'s own OQ-REDTEAM-1 (the "Independent Judge"
+      half of the same pairing remains unbuilt -- Atlas gives it no
+      machine_id or dedicated section anywhere, confirmed by grep before
+      writing). Atlas §11.24 gives this method a dedicated section:
+      purpose (steelman a proposal, not blindly endorse it) across a
+      5-category improvement list, and the explicit pairing "Blue Team →
+      Red Team → Independent Judge" already cited by its sibling
+      contract. The purpose line's own negation directly implies a real
+      invariant -- at least one improvement must be recorded, the same
+      "structurally necessary, at-least-one" precondition class Red
+      Team's own "at least one dimension examined" already established.
+      Disclosed restraint: does NOT mirror Red Team's own structural
+      no-final-authority lockdown (additionalProperties:false) by
+      analogy from the 3-step pairing -- Atlas gives that explicit rule
+      only for Red Team (L1735), and extending it here would be
+      inventing a rule for a method Atlas never states it for.
+    source: "methods/contracts/challenge.blue_team.contract.yaml (built same session as this entry, mints machine_id challenge.blue_team) + specs/cognitive/typed-objects/blue-team-review.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.24 is a dedicated section, not
+      itself cited elsewhere as a repeated teaching example. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the twenty-three entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

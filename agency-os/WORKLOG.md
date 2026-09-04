@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-05（續39，同一 session：Cognitive OS 第二十六個 Method Atlas 切片 — `challenge.blue_team`，關閉 `challenge.red_team` 自己 OQ-REDTEAM-1 的一半）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」）。0 agent（除 critic subagent review）。
+
+**選型**：`challenge` 家族第二個成員，直接關閉 9th slice `challenge.red_team` 自己留的 `OQ-REDTEAM-1`（Atlas §11.24 pairing「Blue Team → Red Team → Independent Judge」點名兩個未建方法之一）。Atlas §11.24 專屬段落（purpose+5 類改善清單）+ F12 table 自己的列（L645，含使用公式+效益欄），雙引用同 canary/chaos 等級。
+
+**真不變量**：一份記錄零改善項不算真的 steelman——Atlas purpose 行的否定句 + F12 table 效益欄「避免只破壞不改善」雙重佐證。**刻意不鏡射** red_team 自己的「無最終權威」結構鎖定（`additionalProperties:false`）——Atlas 明文只點名 Red Team（L1735），且 §22.3 封閉 gate 表（L4144-4155）同樣沒列 Blue Team，双重佐證支持不延伸。
+
+**critic 真跑抓到 2 個 Major + 5 個 Minor（無 Critical）**：
+1. **Major**：contract 自己的 verification 段落假宣稱「Independent Judge 除 pairing 那行外零命中」——R4 聲稱即驗證失守。實際 Atlas 給 Independent Judge 真的 F12 table 列（L646，含使用公式）+ flow diagram node（L659）+ recipe 提及（L3306）。修正兩處，OQ 從「能不能建」改成「要不要建」的範疇決策。
+2. **Major**：一個宣稱「證明與 red_team 刻意分歧」的測試，實際用 `AI_INFERENCE` 建構——red_team 自己的 gate 對這個輸入也會 PASS，零證明力。改用 `EVIDENCE` 標籤+無佐證 refs（真正會分岔的那一格），並新增一個測試真的跑 red_team 自己的 gate 對照確認會 FAIL。
+3. **Minor**：builder 的 category 複驗用 `item["category"]`（手工 dict 缺欄位會 KeyError 不是 InvariantViolation，CLI 的 `except InvariantViolation` 接不住）——突變測試證明刪掉這段複驗 12 tests 照樣全綠，是零覆蓋的死碼。改 `.get()` + 型別守衛，補 3 個測試。
+4. **Minor**：`evaluate_provenance_required_gate` 用 `item["id"]`，遇到非 dict 或缺 id 的項目直接崩潰不是 FAIL——正是 gate 存在的理由（接住竄改記錄）卻接不住。改 fail-closed；`at_least_one_improvement` gate 也補防護（`improvements` 被竄改成裸字串時 `len()` 會算成字元數而非改善數）。
+5. **Minor**：三處文件（contract/schema/module docstring）誤稱這條 precondition「跟 red_team 同一類」——實際是刻意加嚴（red_team 允許 `findings[]` 為空，blue_team 不允許 `improvements[]` 為空），已修正措辭。
+另補：缺 slice 文件（本條目一併補上）、`supporting_evidence_refs` 分支零測試覆蓋（補真斷言）、L1741 引用行號應為 L1742（3 處）。**採納一項建議**：`improvements[].items` 加 `additionalProperties:false`（頂層仍維持寬鬆，理由不變；巢狀 item 形狀已完全指定，關閉可擋 typo 欄位名靜默通過）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/challenge.blue_team.contract.yaml`＋`specs/cognitive/typed-objects/blue-team-review.schema.yaml`（含 nested `additionalProperties:false`）＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentyfourth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/challenge/blue_team.py`（builder+2 gate，fail-closed 對抗手工/竄改輸入）＋`ai_lego/apps/cli/run_blue_team_slice.py`（真實案例：直接回應 red_team 自己範例找到的 rollback 缺口）＋`tests/unit/test_blue_team.py`（20 tests）＋`docs/TWENTYSIXTH_SLICE_CHALLENGE_BLUE_TEAM.md`。`modules/challenge/__init__.py` docstring 補第二租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2744→2753（修正後未變，schema 收緊未動任何既有 fixture）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_blue_team_slice`（修正後）| exit=0 | result=`PASS challenge.blue_team: 2 improvements recorded, gates [provenance_required=PASS, at_least_one_improvement=PASS], invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_blue_team -v` | exit=0 | result=20 passed（12→20）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=64154 | result=**602 tests OK**（594→602，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，非自審）| verdict=fail(0 Critical, 2 Major)→fixed | findings=0c/2m/5minor（全數修正，2 個 nit 全採納含 1 項升級建議）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`challenge[.]blue_team\|BlueTeamReview\|blue-team-review\|run_blue_team_slice\|BLUETEAM_INVALID_IMPROVEMENT_SHAPE` | hits=全部本切片自己新檔案+TASKS/red_team 既有前向引用+session log 雜訊，無過期殘留
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-BLUETEAM-1`（無機器 id 列）、`OQ-BLUETEAM-2`（`challenge.independent_judge` 第三個 pairing 方法未建，Atlas 有真引用可建但範圍決定不建，非「無可建材料」）。皆非阻塞。
+
 ## 2026-09-05（System Foundry v1.6 configurator UI/UX 重做結案：端到端真實生成驗證 + 操作者確認精靈式流程不用做）
 
 **收尾動作**：操作者在 commit `d1fd3b51d` 之後追問「送出後真的能生成嗎」——先前的驗證只跑到 `/api/resolve`（純算，不寫檔），沒有真的按過「送出並生成」按鈕。這是合理的質疑，補做真實 e2e：瀏覽器實際點選「手機 App」／「手機 App 推播通知」／「向客戶收費」／「授權碼 / License」四張卡（涵蓋本批全部新功能：channel 拆題、commercial 分組），按「送出並生成」，讀回硬碟上 `generated/verify-newfeatures-*/`：`.foundry/intake/answers.json` 逐欄核對 `Q-CH-002=True`／`Q-NOT-003=True`／`Q-NOT-006=None`（未選桌面應用程式，正確保持未答而非誤判為 false）／`Q-COM-001=True`／`Q-COM-006=True`，且 `CAP-PUSH` 正確出現在 `docs/modules/notifications/` 九份模組文件裡——證明不只是畫面渲染對，「點擊→payload→rule engine→真的寫檔」整條路徑都通。測試用的兩個 `generated/verify-*` 資料夾已刪除，未留垃圾在 repo。

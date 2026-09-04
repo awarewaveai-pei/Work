@@ -1,0 +1,252 @@
+$id: "ai-lego://methods/contracts/challenge.blue_team.contract.yaml"
+title: "Blue Team Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-sixth Method Atlas slice, SECOND from the
+  `challenge` family (F12 -- "Challenge / Red Team / Risk"), directly
+  closing half of `challenge.red_team.contract.yaml`'s own
+  `OQ-REDTEAM-1` (the other half, "Independent Judge", is deliberately
+  NOT built here despite Atlas giving it a real F12 table row -- see
+  `open_questions.OQ-BLUETEAM-2` for why this is a scope decision, not a
+  "nothing to build from" claim, corrected after a critic review caught
+  the first draft's own verification section falsely claiming zero
+  Independent Judge hits).
+
+  Atlas §11.24 (L1739-1752) gives this method a dedicated section:
+  purpose (L1742: not blindly endorsing the original proposal, but
+  steelmanning it to its strongest version) across 5 named improvement
+  categories (L1744-1748: controls / evidence / fallback / monitoring /
+  recovery), and the explicit pairing "Blue Team → Red Team →
+  Independent Judge" (L1751) this contract's own sibling already cited.
+  A SECOND, independent citation: the F12 index table itself (L645)
+  gives Blue Team its own row with a usage formula
+  ("steelman→controls→evidence→monitoring") and a benefit column ("避免
+  只破壞不改善" -- avoid only-destroying-without-improving), the SAME
+  tier of dual table-row-plus-dedicated-section grounding several prior
+  Tier 1 contracts this session built already established. Still
+  thinner than Red Team's own §11.23 (a purpose statement plus a
+  5-item category list, not a numbered protocol) -- disclosed, not
+  overstated.
+
+  The purpose line's own negation ("不是盲目支持原方案" -- NOT blindly
+  endorsing the original proposal as-is) plus the F12 table's own
+  benefit column ("避免只破壞不改善") are TWO independent citations for
+  the same real, enforceable invariant this contract enforces: a review
+  that records ZERO improvements did not actually steelman anything.
+  This is a DELIBERATE TIGHTENING relative to `challenge.red_team`'s own
+  sibling precondition, not "the same class" as originally described (a
+  critic-caught mischaracterization) -- `RedTeamChallenge` explicitly
+  permits an EMPTY `findings[]` array (a dimension may be examined and
+  found clean), while `BlueTeamReview` requires at least one non-empty
+  `improvements[]` entry. The two methods' own real risks differ: an
+  empty Red Team pass is a legitimate "looked and found nothing"
+  result, but an empty Blue Team pass would contradict its own purpose
+  text outright (Atlas L1742's negation IS the method's reason to
+  exist), so the two preconditions are correctly asymmetric, not
+  copy-pasted.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Blue Team row (L645): 'steelman→controls→evidence→monitoring' / '避免只破壞不改善'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.24 藍隊／藍隊防禦（Blue Team）(L1739-1752) -- purpose (L1742), 5-category improvement list (L1744-1748), pairing (L1751)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 index row (L312): 'Challenge / Red Team / Risk | 我們可能錯在哪？' -- same family index challenge.red_team.contract.yaml already cites"
+  - "methods/contracts/challenge.red_team.contract.yaml OQ-REDTEAM-1 -- the open question this contract directly, partially closes"
+  - "methods/registry/method-inventory.yaml 'Blue Team' entry (L752-756): category 'F12 challenge', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-fourth
+  concrete entry. `id: challenge.blue_team` mints a new machine_id.
+  `family: challenge` reused as-is from `challenge.red_team`.
+
+id: challenge.blue_team
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [OPTIMIZE, VALIDATE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method, same gap challenge.red_team.contract.yaml's own
+# [CHALLENGE, INFER, EXPLAIN] already disclosed). OPTIMIZE is the
+# method's own defining action (Atlas L1742: steelman to the strongest
+# version); VALIDATE checks the proposal against the 5 named categories;
+# EXPLAIN articulates each improvement as a real, actionable addition
+# rather than a bare label. All three CANONICAL_KERNEL members
+# (specs/cognitive/primitive.schema.yaml's own 24-value enum).
+
+purpose:
+  - steelman_a_proposal_to_its_strongest_defensible_version
+# Atlas L1742 verbatim sense: not blindly supporting the original
+# proposal, but building it up to its strongest version across 5 named
+# categories (L1744-1748).
+
+inputs:
+  required:
+    - ProposalRef
+  # Same free-text reference class challenge.red_team.contract.yaml's
+  # own ProposalRef input already uses, for the identical reason: no
+  # single existing typed object in this spec root is the universal
+  # "thing being proposed."
+
+outputs:
+  - BlueTeamReview
+# NEW output type (see typed-objects/blue-team-review.schema.yaml). Same
+# honesty gap every Tier 1 contract this session disclosed: Atlas names
+# no PascalCase output type for this method.
+
+preconditions:
+  - "at least one improvement recorded"
+  # NEW, structurally necessary precondition. NOT "the same class" as
+  # challenge.red_team.contract.yaml's own "at least one dimension
+  # examined" -- corrected after a critic review caught that
+  # mischaracterization (RedTeamChallenge explicitly permits an empty
+  # findings[] array; BlueTeamReview does not permit an empty
+  # improvements[] array). This is a deliberate TIGHTENING, grounded in
+  # two independent citations: Atlas's own purpose line (L1742: NOT
+  # blindly endorsing the original) and the F12 table's own benefit
+  # column (L645: "避免只破壞不改善" -- avoid only-destroying-without-
+  # improving) -- a review that records zero improvements did not
+  # actually steelman anything, full stop, unlike Red Team's own
+  # legitimate "examined and found clean" outcome.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Deliberate departure from challenge.red_team's own
+  # evidence_labeling_required:true. Red Team's real risk is an
+  # unevidenced CLAIM OF FAILURE ("this is insecure") -- a finding that
+  # asserts a problem without grounding. Blue Team's own content is a
+  # proposed STRENGTHENING (add this control / this fallback), which is
+  # a design addition, not a factual claim about the world that needs
+  # evidence backing the way a Red Team finding or a Fishbone cause
+  # hypothesis does -- the same class of reasoning
+  # root_cause.pareto.contract.yaml's own compilation_decisions already
+  # applied when it departed from its own family's evidence-labeling
+  # default for a genuinely different real risk.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Blue Team row.
+
+recommended_next:
+  - challenge.red_team
+  # Atlas §11.24's own pairing (L1751: "Blue Team → Red Team →
+  # Independent Judge") gives this method's own forward edge directly --
+  # unlike challenge.red_team.contract.yaml's own recommended_next
+  # (empty, because at the time it was built neither Blue Team nor
+  # Independent Judge had a contract yet), this contract CAN cite it
+  # now that challenge.blue_team itself exists. "Independent Judge" is
+  # deliberately NOT cited here -- Atlas gives it no machine_id or
+  # dedicated section anywhere, so inventing one to complete the chain
+  # would be the same class of invention this session's every Tier 1
+  # contract already refuses (see OQ-BLUETEAM-2).
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference challenge.red_team.contract.yaml's
+  # own rollback field already uses -- producing a review record has no
+  # described external side effect.
+
+compilation_decisions:
+  - question: >
+      challenge.red_team.contract.yaml enforces Atlas's own explicit
+      no-final-authority rule (L1735) structurally, via
+      `additionalProperties: false` on its output schema, refusing any
+      hand-crafted verdict/approved-shaped key. The 3-step pairing
+      (L1751: "Blue Team → Red Team → Independent Judge") implies Blue
+      Team is ALSO not the final decision point -- should this contract
+      mirror that same structural lockdown on `BlueTeamReview` by
+      analogy?
+    decision: "No -- BlueTeamReview stays permissive (no additionalProperties:false lockdown, no forbidden-authority-key guard), with a nested-object closed shape added instead (see the schema's own note on improvements[].items)."
+    reasoning: >
+      Atlas gives an EXPLICIT sentence naming this exact rule only for
+      Red Team (L1735, verbatim). The 3-step pairing structure makes the
+      analogy tempting, but extending a rule Atlas states for one
+      specific method to a sibling method by structural inference --
+      rather than by a citable sentence -- is exactly the kind of
+      invention this session's every Tier 1 contract has consistently
+      refused to do (contrast `devops_sre.blue_green_deployment`'s own
+      `blue_retained` field, where the SAME sentence's second clause was
+      read as a recommended practice rather than silently promoted to a
+      hard rule).
+
+      A SECOND, INDEPENDENT piece of evidence found on critic review
+      (not present in this contract's first draft) makes this decision
+      considerably stronger than "Atlas just doesn't repeat the
+      sentence": §22.3's own Method-specific Gate table (L4144-4155) is
+      a CLOSED enumeration of methods whose output is forbidden from
+      asserting a final/authoritative result -- it lists exactly 10
+      methods (Fishbone, Persona, Scenario Planning, SWOT, AI Expert
+      Lens, LLM Arithmetic, Red Team, Monte Carlo, MCDA, Jurisdiction
+      Inference) and Red Team's own row (L4152: "Red Team | Final
+      Decision | Independent Judge / Human") is the direct machine-
+      readable form of the same L1735 rule this contract's sibling
+      already enforces structurally. Blue Team does NOT appear in this
+      table. Under expressio unius (naming some members of a class
+      implicitly excludes the rest), a closed gate table that names 10
+      specific methods and omits an 11th, adjacent, textually-paired
+      method is stronger evidence of deliberate exclusion than the mere
+      absence of a repeated sentence would be on its own.
+
+      If a future session finds or is given an explicit Atlas/ADR
+      statement that Blue Team also carries no final authority, this
+      decision should be revisited then -- not assumed now from the
+      pairing alone.
+
+open_questions:
+  - id: "OQ-BLUETEAM-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BLUETEAM-2"
+    question: >
+      CORRECTED (critic review caught this contract's first draft
+      falsely claiming "Independent Judge...zero hits anywhere in Atlas
+      beyond the L1751 pairing line" -- an R4 grep-before-claiming
+      failure): Atlas actually gives Independent Judge a real F12 table
+      row (L646: "依證據與規則裁決 | positions→evidence→criteria→
+      judgment→dissent | 避免多數決真理"), a node in the same §11.24
+      flow diagram (L659), and a position in the §13.4 Board-grade
+      Strategy Recipe (L3306: "→ Independent Judge"). This is
+      comparable citation density to several methods this session
+      already built full contracts for from a single table row alone
+      (e.g. devops_sre.error_budget's own F19 table row was its
+      strongest single citation). So the real open question is NOT "can
+      this be built" (it can -- Atlas gives a real usage formula) but
+      "should a future session build `challenge.independent_judge` as
+      the third leg of this pairing, completing what
+      challenge.red_team's own OQ-REDTEAM-1 asked for," and if so,
+      whether its own no-final-authority-style structural rule (Atlas
+      L4144-4155's own gate table has no Independent Judge row either,
+      but that table's whole POINT is escalation TO Independent Judge --
+      a different relationship to the table than Blue Team's own
+      absence from it) needs its own fresh analysis rather than copying
+      either sibling's.
+    owner: "operator, or whoever next builds challenge.independent_judge"
+    blocks: "nothing in this file's own validity -- challenge.red_team's own recommended_next still cannot cite it either, since neither sibling contract builds it"
+
+verification:
+  method: >
+    Read Atlas §11.24 (L1739-1752), the F12 tool table (L639-648,
+    including Blue Team's own L645 row and Independent Judge's own L646
+    row), the F12 index row (L312), the §11.24 flow diagram (L656-663),
+    the §13.4 recipe mention (L3306), and §22.3's own Method-specific
+    Gate table (L4144-4155) directly at the cited lines. A critic review
+    caught this contract's first draft falsely claiming "Independent
+    Judge...zero hits" from an incomplete grep -- re-verified all
+    citations above by direct read AFTER that correction, not by
+    trusting the first pass. Read `challenge.red_team.contract.yaml`
+    and `red-team-challenge.schema.yaml` in full before deciding NOT to
+    mirror the no-final-authority structural lockdown (see
+    compilation_decisions). Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-category improvement list
+    and the at-least-one-improvement invariant are both directly
+    grounded in Atlas's own cited text. The decision NOT to extend Red
+    Team's own explicit authority rule to this method by analogy is a
+    disclosed compilation choice, strengthened by the §22.3 closed-table
+    evidence found on review -- see compilation_decisions above. The
+    decision NOT to also build challenge.independent_judge in this slice
+    is a scope choice, not a "nothing to build from" claim -- see
+    OQ-BLUETEAM-2.
