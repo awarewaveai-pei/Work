@@ -1,0 +1,256 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/five-whys-validation.schema.yaml"
+title: Five Whys Validation
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FiveWhysValidation` -- the
+  declared `outputs` of `root_cause.five_whys`'s Method Contract
+  (methods/contracts/root_cause.five_whys.contract.yaml, `outputs:
+  [FiveWhysValidation]`). This is the concrete evidence record that lets
+  `cause-hypothesis-set.schema.yaml`'s `promotion.validation_methods_applied`
+  legitimately include `"root_cause.five_whys"` for real (rather than only in
+  a unit test's synthetic string) -- the runtime-side completion of the gap
+  `root_cause.fishbone.contract.yaml`'s own OQ-FISHBONE-1 named.
+
+  Field provenance -- Atlas §11.5 (L1262-1298) gives real, literal
+  structural content:
+    * The worked example (L1267-1279) is a literal chain of Why-steps
+      ("訂單取消率上升 → Why → 出貨延遲 → Why → 訂單等待人工確認 → Why →
+      庫存不同步 → Why → ERP 與電商沒有可靠事件整合 → 可驗證的根因候選")
+      -- transcribed directly into `why_chain[]`'s step/question/answer
+      shape below, not paraphrased into a differently-structured record.
+    * The four stop conditions (L1282-1287, "正確停止條件"): "原因可由組織
+      控制" (controllable by the organization), "有明確證據可以驗證" (clear
+      evidence to verify), "已找到 system/process mechanism" (found the
+      system/process mechanism), "再問只會進入過度抽象問題" (further
+      questioning would become overly abstract) -- transcribed verbatim as
+      the closed 4-value `stop_conditions_met` enum. The chain header itself
+      (L1281, "不是一定問五次" -- not necessarily exactly five questions)
+      is why `why_chain` has no fixed length constraint beyond `minItems: 1`.
+    * The three named failure modes (L1289-1293, "失敗模式"): "單一路徑過度
+      簡化多因問題" (a single path oversimplifies a multi-causal problem),
+      "把「人員不小心」當最終根因" (treating "human carelessness" as the
+      final root cause), "沒有數據仍自信宣告原因" (confidently declaring a
+      cause with no data) -- these are operationalized as `const: false`
+      schema constraints on `failure_mode_self_check`'s three boolean
+      fields, not merely documented: an instance that honestly records it
+      fell into one of these traps CANNOT validate as a
+      `FiveWhysValidation`. This is a stronger machine gate than any
+      existing typed-object schema in this directory uses -- Atlas frames
+      these as failure modes to avoid, not legitimate alternative outcomes,
+      so the schema enforces that framing structurally rather than leaving
+      it as prose a producer could silently ignore.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.5 五個為什麼／五問法, worked example, stop conditions, failure modes (L1262-1298)"
+  - "methods/contracts/root_cause.five_whys.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml#/properties/hypotheses (target_hypothesis_id references one of this set's own hypothesis ids)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision
+  `swot-analysis.schema.yaml`'s own `decided_by` field documents: direct
+  transcription of a cited, dedicated Atlas protocol section plus low-risk,
+  disclosed compilation choices.
+
+compilation_decisions:
+  - question: >
+      Should `stop_conditions_met` require exactly one value (a single
+      "reason we stopped"), or allow multiple?
+    decision: "Array, minItems: 1, of the 4-value closed enum -- multiple values legal."
+    reasoning: >
+      Atlas L1282-1287 presents four conditions as a checklist ("正確停止
+      條件"), not a single mutually-exclusive reason -- a real chain often
+      stops because BOTH the cause is controllable AND clear evidence
+      exists. Forcing a single value would misrepresent cases where several
+      conditions genuinely co-occur, the same reasoning
+      `cause-hypothesis-set.schema.yaml`'s `promotion.validation_methods_applied`
+      already applied to its own multi-value array (a set can legally be
+      validated by more than one recommended_next method).
+  - question: >
+      Should the three failure-mode flags be free booleans (the producer
+      self-attests either way) or hard-constrained to `false`?
+    decision: "const: false on all three -- an instance claiming any failure mode occurred does not validate."
+    reasoning: >
+      Atlas explicitly frames these as mistakes to avoid (失敗模式), not
+      legitimate alternative outcomes of a correctly-run Five Whys -- unlike
+      a gate result (which can legitimately be PASS or FAIL), there is no
+      Atlas-sanctioned "valid FiveWhysValidation that admits it fell into a
+      named failure mode." Enforcing this at the schema layer means a
+      record can never silently claim success while also honestly
+      documenting a known anti-pattern; the runtime module
+      (`ai_lego/modules/root_cause/five_whys.py`) is expected to refuse to
+      even construct such a record, and this schema is the second,
+      independent enforcement layer.
+  - question: "Should `why_chain[].step` be required to start at 1 and increase by exactly 1?"
+    decision: "step is a plain positive integer, no monotonicity constraint enforced by the schema itself."
+    reasoning: >
+      JSON Schema has no native ordered-sequence-integrity operator across
+      array items without a verbose `if`/`then` per index (the same
+      limitation `problem-statement.schema.yaml`'s own `status_transitions`
+      compilation_decision already accepted for its state-machine
+      guidance). Left as a runtime-layer invariant instead
+      (`ai_lego/modules/root_cause/five_whys.py`'s builder assigns steps
+      sequentially by construction) rather than an unenforceable schema
+      constraint that would give false confidence.
+
+type: object
+required: [id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^FWV-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  cause_hypothesis_set_ref:
+    type: string
+    pattern: "^CHS-"
+    description: "Which CauseHypothesisSet this validation was run against. Real $ref to the sibling type."
+    $ref: "ai-lego://specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml#/properties/id"
+
+  target_hypothesis_id:
+    type: string
+    description: >
+      Which specific `hypotheses[].id` within the referenced set is being
+      drilled into. Method contract precondition: this id must be a real
+      member of that set's hypotheses (checked by the runtime builder, not
+      by this schema -- a cross-object structural check, same class as
+      root-cause-fact.schema.yaml's own `promoted_hypothesis_id`).
+
+  generated_by_method:
+    type: string
+    default: "root_cause.five_whys"
+
+  why_chain:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L1281 verbatim: "不是一定問五次" (not necessarily exactly
+      five) -- no maxItems, no fixed length.
+    items:
+      type: object
+      required: [step, question, answer, provenance]
+      properties:
+        step:
+          type: integer
+          minimum: 1
+          description: "Position in the chain (1-indexed). See compilation_decisions -- monotonicity is a runtime, not schema, invariant."
+        question:
+          type: string
+          description: "The 'Why did X happen?' question at this step."
+        answer:
+          type: string
+          description: "The answer/cause identified at this step -- becomes the next step's X."
+        provenance:
+          description: "Every step must be evidence-labeled (method contract quality.evidence_labeling_required)."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+
+  stop_conditions_met:
+    type: array
+    minItems: 1
+    description: "Atlas L1282-1287's own checklist -- at least one condition must be recorded to justify stopping the chain."
+    items:
+      type: string
+      enum:
+        - CONTROLLABLE_BY_ORGANIZATION
+        - CLEAR_EVIDENCE_TO_VERIFY
+        - FOUND_SYSTEM_PROCESS_MECHANISM
+        - FURTHER_QUESTIONING_BECOMES_ABSTRACT
+
+  failure_mode_self_check:
+    type: object
+    description: "Atlas L1289-1293's three named failure modes, operationalized as hard const:false gates -- see compilation_decisions."
+    required: [single_path_oversimplifies_multi_causal_problem, human_carelessness_treated_as_final_cause, declared_without_data]
+    properties:
+      single_path_oversimplifies_multi_causal_problem:
+        const: false
+        description: "Atlas L1291: '單一路徑過度簡化多因問題。'"
+      human_carelessness_treated_as_final_cause:
+        const: false
+        description: "Atlas L1292: '把「人員不小心」當最終根因。'"
+      declared_without_data:
+        const: false
+        description: "Atlas L1293: '沒有數據仍自信宣告原因。'"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A five-whys chain validating one candidate cause, evidence-backed at every step"
+    value:
+      id: "FWV-2026-09-04-001"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-001"
+      target_hypothesis_id: "CHS-2026-09-04-001-H1"
+      generated_by_method: "root_cause.five_whys"
+      why_chain:
+        - step: 1
+          question: "為何訂單取消率上升？"
+          answer: "出貨延遲"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-401"]
+        - step: 2
+          question: "為何出貨延遲？"
+          answer: "訂單等待人工確認"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-402"]
+        - step: 3
+          question: "為何需要人工確認？"
+          answer: "庫存數量與 ERP 不同步"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-403"]
+        - step: 4
+          question: "為何庫存不同步？"
+          answer: "ERP 與電商系統缺乏即時庫存事件整合"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-404"]
+      stop_conditions_met: [CONTROLLABLE_BY_ORGANIZATION, CLEAR_EVIDENCE_TO_VERIFY, FOUND_SYSTEM_PROCESS_MECHANISM]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: false
+        declared_without_data: false
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-FIVEWHYSVALIDATION-1"
+    question: >
+      `failure_mode_self_check`'s three `const: false` fields mean a chain
+      that genuinely DID fall into a named failure mode cannot produce a
+      valid FiveWhysValidation record at all -- there is no schema-legal way
+      to represent "we tried, but this chain oversimplified a multi-causal
+      problem" as data. Is silently refusing to represent a failed run
+      (rather than recording it as a FAILED-status FiveWhysValidation) the
+      right choice, or should a future revision add a `status: succeeded |
+      failed_<mode>` field so failed attempts are recorded, not discarded?
+    owner: "operator, or whoever next needs to audit how many Five Whys attempts failed vs. succeeded"
+    blocks: "nothing in this file's own validity -- the runtime module is expected to raise before construction rather than attempt an invalid instance"
+
+verification:
+  method: >
+    Read Atlas §11.5 (L1262-1298) directly at the cited lines. Cross-checked
+    against methods/contracts/root_cause.five_whys.contract.yaml's own
+    outputs/preconditions/quality and cause-hypothesis-set.schema.yaml's
+    promotion field to confirm this type satisfies both. Validated against
+    jsonschema Draft202012Validator (required fields present, id pattern
+    satisfied, stop_conditions_met enum closed per Atlas's own 4-condition
+    checklist, failure_mode_self_check's three const:false constraints
+    verified to actually reject a true value).
+  note: >
+    `why_chain` shape, `stop_conditions_met`'s four values, and
+    `failure_mode_self_check`'s three named modes are all transcribed
+    verbatim from Atlas L1267-1293. The overall object shape (id/version/
+    cause_hypothesis_set_ref/target_hypothesis_id) and the const:false
+    enforcement choice are Phase 3-class compilation decisions, explicitly
+    flagged above. No mother document was modified to produce this file.

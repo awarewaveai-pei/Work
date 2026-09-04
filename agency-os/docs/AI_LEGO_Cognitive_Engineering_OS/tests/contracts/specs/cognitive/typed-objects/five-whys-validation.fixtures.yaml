@@ -1,0 +1,120 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/five-whys-validation.schema.yaml"
+target_ref: ""
+description: >
+  Exercises FiveWhysValidation's required fields, the `why_chain[]`
+  minItems:1 guard (no fixed length -- Atlas L1281 "not necessarily exactly
+  five"), the closed 4-value `stop_conditions_met` enum (Atlas L1282-1287),
+  and the three `failure_mode_self_check` const:false gates (Atlas
+  L1289-1293) -- the strongest structural enforcement any typed-object
+  schema in this directory uses, proven here to actually reject `true`.
+
+valid:
+  - name: four_step_chain_evidence_backed_all_conditions_met
+    instance:
+      id: "FWV-2026-09-04-001"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-001"
+      target_hypothesis_id: "CHS-2026-09-04-001-H1"
+      generated_by_method: "root_cause.five_whys"
+      why_chain:
+        - step: 1
+          question: "Why did the order cancellation rate increase?"
+          answer: "Shipping was delayed."
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+          supporting_evidence_refs: ["E-401"]
+        - step: 2
+          question: "Why was shipping delayed?"
+          answer: "Orders were waiting on manual confirmation."
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+      stop_conditions_met: [CONTROLLABLE_BY_ORGANIZATION, CLEAR_EVIDENCE_TO_VERIFY]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: false
+        declared_without_data: false
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+  - name: single_step_chain_stops_immediately_on_abstraction_condition
+    instance:
+      id: "FWV-2026-09-04-002"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-002"
+      target_hypothesis_id: "CHS-2026-09-04-002-H1"
+      why_chain:
+        - step: 1
+          question: "Why did the metric move?"
+          answer: "Root cause is already at the process-mechanism level."
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+      stop_conditions_met: [FOUND_SYSTEM_PROCESS_MECHANISM]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: false
+        declared_without_data: false
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+
+invalid:
+  - name: why_chain_empty_array_violates_minitems
+    instance:
+      id: "FWV-2026-09-04-003"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-003"
+      target_hypothesis_id: "CHS-2026-09-04-003-H1"
+      why_chain: []
+      stop_conditions_met: [CONTROLLABLE_BY_ORGANIZATION]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: false
+        declared_without_data: false
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED }
+    reason: "why_chain has minItems: 1 -- an empty chain validates nothing (Atlas §11.5 requires at least one Why step)."
+  - name: stop_conditions_not_in_4_value_enum
+    instance:
+      id: "FWV-2026-09-04-004"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-004"
+      target_hypothesis_id: "CHS-2026-09-04-004-H1"
+      why_chain:
+        - step: 1
+          question: "Why?"
+          answer: "Because."
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+      stop_conditions_met: ["RAN_OUT_OF_TIME"]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: false
+        declared_without_data: false
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "stop_conditions_met[] items must be one of Atlas's own 4 stop conditions (L1282-1287) -- 'RAN_OUT_OF_TIME' is not one of them."
+  - name: failure_mode_flag_true_is_refused_by_const_false
+    instance:
+      id: "FWV-2026-09-04-005"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-005"
+      target_hypothesis_id: "CHS-2026-09-04-005-H1"
+      why_chain:
+        - step: 1
+          question: "Why?"
+          answer: "It was human carelessness."
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+      stop_conditions_met: [CONTROLLABLE_BY_ORGANIZATION]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: true
+        declared_without_data: false
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "failure_mode_self_check.human_carelessness_treated_as_final_cause is const:false (Atlas L1292's named failure mode) -- a record that honestly admits this happened cannot validate as a FiveWhysValidation at all, by design (see schema's own compilation_decisions)."
+  - name: missing_required_target_hypothesis_id
+    instance:
+      id: "FWV-2026-09-04-006"
+      version: "1.0.0"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-006"
+      why_chain:
+        - step: 1
+          question: "Why?"
+          answer: "Because."
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+      stop_conditions_met: [CONTROLLABLE_BY_ORGANIZATION]
+      failure_mode_self_check:
+        single_path_oversimplifies_multi_causal_problem: false
+        human_carelessness_treated_as_final_cause: false
+        declared_without_data: false
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED }
+    reason: "target_hypothesis_id is required (which hypothesis within the referenced CauseHypothesisSet this chain is validating) -- missing here."

@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-04（續16，同一 session：Cognitive OS 第四個 Method Atlas 切片 — `root_cause.five_whys`，補完 fishbone 留下的誠實缺口）
+
+**觸發**：延續操作者「沒做完不要停」授權，主動選擇回頭補強而非單純橫向擴廣度。0 agent。
+
+**選型與差異**：`root_cause.five_whys`（F05）——這次**契約和輸出型別都不存在**（比 swot 更早期的狀態）。選它的理由：`root_cause.fishbone.contract.yaml` 自己的 `recommended_next` 點名它是能合法驗證 CauseHypothesisSet 的 4 個方法之一（`OQ-FISHBONE-1`），且 `root-cause-fact.schema.yaml` 的 `legal_promotion_path.validation_methods_applied` enum 早就把 `"root_cause.five_whys"` 列為合法值——寫這個方法能把 fishbone 切片留下的誠實缺口（「guard 擋得住直接晉升，但沒證明合法晉升會成功」）真正補上，而不是又橫向開一個新方法。Atlas §11.5 給這個方法一整個專屬小節（購用範例鏈、4 個停止條件、3 個失敗模式），比 evidence.triangulation 的單一結構引用紮實。
+
+**不變量**：Atlas §11.5 明列的 3 個失敗模式（單一路徑過度簡化多因問題／把人員不小心當最終根因／沒有數據仍自信宣告原因）是「不該發生的錯誤」，不是「合法的另一種結果」——因此在 schema 層做成 `const: false` 硬性約束（本目錄至今最強的結構化約束），並在 runtime 層再做一次獨立防護（belt-and-suspenders，同 fishbone 的 forbidden-transition 紀律）。其中 `declared_without_data` 刻意做成**真計算**（鏈上任何一步只要有一個 `supporting_evidence_refs` 就不觸發）而非讓呼叫者自報——呼叫者無法用假布林值騙過去；另外兩個 Atlas 沒給機械判準，誠實留白讓呼叫者自報（同 swot 的 OQ-SWOTANALYSIS-2 誠實限制）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/root_cause.five_whys.contract.yaml`（逐字引用 Atlas §11.5，`cognitive_primitives` 誠實標記為推論非引用）＋ `specs/cognitive/typed-objects/five-whys-validation.schema.yaml`（含 3 個 `const:false` 失敗模式閘）＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.second_concrete_entry`（刻意用新 key 而非把 `first_concrete_entry` 改成 list，避免動到 `run_golden_tests.py` 既有的 hard-coded 檢查）＋重新產生 `SPEC_QUICKREF.md`/`MOTHER_DOC_SECTION_INDEX.md`。Product root 新增 `ai_lego/modules/root_cause/five_whys.py`（builders＋兩個 quality gate＋雙層失敗模式防護）；`ai_lego/apps/cli/run_five_whys_slice.py`（**複用 fishbone.py 的 `record_validation_applied`／`attempt_promote_to_root_cause_fact` 完全零改動**，跑出本專案第一個真正合法晉升成功的 `RootCauseFact`）；`tests/unit/test_five_whys.py`（16 tests，含完整鏈端到端測試）；`docs/FOURTH_SLICE_ROOT_CAUSE_FIVE_WHYS.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2518→2530
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_five_whys_slice`（第一次真跑）| exit=1 | result=真抓到一個真 bug：`supporting_evidence_refs` 要求真 `^E-[0-9]+$` evidence id，草稿誤傳檔名字串，schema 立即擋下（`SCHEMA_VALIDATION_FAILED`）——改用真 `evidence.schema.yaml` 記錄後修正
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_five_whys_slice`（修正後）| exit=0 | result=`PASS root_cause.five_whys: RootCauseFact RCF-FIVEWHYS-2026-09-04-001 legally promoted from CHS-FIVEWHYS-2026-09-04-001 via ['root_cause.five_whys']`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_five_whys -v` | exit=0 | ms=~1860 | result=16 passed（含 `declared_without_data` 真計算證明、schema 層獨立擋下繞過 builder 的手造記錄、完整鏈端到端：CHS 建立→five_whys 驗證→fishbone 原班函式合法晉升→RootCauseFact 通過 schema）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=218685 | result=**278 tests OK**（262→278，零回歸）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14/續15 記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:`_compute_declared_without_data` 在 why_chain 為空時是否誤判(不會,空鏈在此函式被呼叫前就已被 `FIVEWHYS_EMPTY_CHAIN` 擋下);`record_validation_applied`/`attempt_promote_to_root_cause_fact` 重用是否真的零改動(是,`git diff` fishbone.py 為空);CLI 的兩個 evidence 記錄 id 是否與 why_chain 引用一致(是,E-501/E-502 逐一核對)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`root_cause[.]five_whys\|FiveWhysValidation\|five-whys-validation\|five_whys` | hits=0 stale（LIVE 檔案命中皆為本次新增；`.ai/research/phase-0/{method,architecture}-inventory.yaml` 命中為凍結歷史快照，檔頭明寫「REGISTERS what exists, nothing is fixed here」，非本次修復範圍，不需調解）
+
+**[剩餘風險]**：`root_cause.five_whys.contract.yaml` 的 `forbidden_transition` 刻意留空（Atlas §11.5 沒給對應範例，`OQ-FIVEWHYS-1`）；`cognitive_primitives` 是推論非引用（`OQ-FIVEWHYS-2`）；fishbone 的 4 個 recommended_next 方法現在只有 1 個是真的（pareto/causal.dag/validation.experiment 仍無契約）——鏈路「可行」已證明，不代表「每條路都有」。
+
+**[rollback]**：純新增檔案(除 spec-root 索引重新產生外，零既有檔案邏輯改動；fishbone.py 完全未動)，`git rm` 對應新檔即可完全復原。
+
 ## 2026-09-04（續15，同一 session：Cognitive OS 第三個 Method Atlas 切片 — `strategy.swot`，操作者全權授權「沒做完不要停」）
 
 **觸發**：操作者核准 fishbone 切片後，明確全權授權：「我全部同意核准，需要決定的事都你決定⋯沒做完不要停」，重申 R0 全能規劃師身份與 30 年工程紀律。0 agent。

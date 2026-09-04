@@ -1,0 +1,176 @@
+$id: "ai-lego://methods/contracts/root_cause.five_whys.contract.yaml"
+title: "Five Whys Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification methods/registry/
+  contract-backlog.yaml's own `research.qualitative_coding` Tier 1 entry
+  uses -- not one of the Tier 0 "repeatedly-cited-as-teaching-example"
+  methods). Built because `root_cause.fishbone.contract.yaml`'s own
+  `recommended_next` names `root_cause.five_whys` (OQ-FISHBONE-1) as one of
+  exactly 4 methods that can legally satisfy `CauseHypothesisSet`'s
+  `forbidden_transition` guard before promotion to `RootCauseFact` -- and
+  `typed-objects/root-cause-fact.schema.yaml`'s own
+  `legal_promotion_path.validation_methods_applied` enum already names
+  `root_cause.five_whys` as a legal value, written before this contract
+  existed. This file closes that gap: the second runtime slice
+  (`root_cause.fishbone`, 2026-09-04) could only PROVE the forbidden
+  transition is blocked; this contract is what lets a later slice complete
+  the chain for real.
+
+  Atlas §11.5 (L1262-1298) gives this method a full dedicated protocol
+  section -- purpose, a literal worked example chain, explicit stop
+  conditions, and named failure modes -- the same tier of grounding
+  `strategy.swot`'s §11.7 citation used, stronger than `evidence.triangulation`'s
+  single structural mention.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.5 五個為什麼／五問法（5 Whys）(L1262-1298) -- purpose, worked example chain, stop conditions, failure modes, recommended combo"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, 5 Whys row (L435): 用途/使用方式/效益/禁止誤用"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 LEGO Contract, root_cause.fishbone's forbidden_transition/recommended_next (L1009-1010, L1022-1026) -- the reason this contract needed to exist"
+  - "methods/contracts/root_cause.fishbone.contract.yaml OQ-FISHBONE-1 (the recorded gap this file closes)"
+  - "specs/cognitive/typed-objects/root-cause-fact.schema.yaml legal_promotion_path.validation_methods_applied enum (root_cause.five_whys already named there, written before this contract)"
+  - "methods/registry/method-inventory.yaml '5 Whys' entry (Atlas F05 root_cause, L434, machine_id: root_cause.five_whys, has_contract: false prior to this file)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.5 gives a complete, unambiguous
+  worked protocol (purpose, structural example, explicit stop conditions,
+  named failure modes) -- this is direct transcription plus low-risk,
+  disclosed compilation choices (primarily: `cognitive_primitives` is
+  INFERRED, since Atlas §4's composition-formula examples (L187-191) do not
+  name Five Whys among the 5 methods given an explicit formula there, same
+  situation `evidence.triangulation.contract.yaml` already disclosed for its
+  own method). Registered in `methods/registry/contract-backlog.yaml`
+  `tier_1` as a second concrete entry, same justification class as that
+  file's existing `research.qualitative_coding` entry (mandated by the
+  actively-running implementation slice, not Tier 0's teaching-example
+  criterion).
+
+id: root_cause.five_whys
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [QUESTION, CAUSE, VALIDATE]
+# INFERRED, not cited (see decided_by). Atlas §11.5's own purpose line
+# (L1265, "沿著原因鏈由症狀一路往可控制、可驗證的原因深入") is a repeated
+# QUESTION ("Why?") that chases a CAUSE and terminates only once VALIDATE's
+# own stop conditions (L1284-1287, "有明確證據可以驗證") are met -- all
+# three are CANONICAL_KERNEL members (specs/cognitive/primitive.schema.yaml),
+# no extended/out-of-kernel token needed, unlike root_cause.fishbone's own
+# CAUSE_HYPOTHESIS.
+
+purpose:
+  - validate_a_candidate_cause_into_a_verifiable_root_cause
+# Atlas L1265/L1278 verbatim sense: drill from symptom to a controllable,
+# evidence-verifiable cause ("可驗證的根因候選" -- a verifiable root-cause
+# candidate). Phase-3 compiled into a snake_case purpose id, same
+# transcription-not-invention discipline root_cause.fishbone.contract.yaml's
+# `purpose: [identify_candidate_causes]` already used.
+
+inputs:
+  required:
+    - CauseHypothesisSet
+  # Five Whys drills into ONE candidate cause already produced by Fishbone
+  # (or another root_cause-family method) -- it does not originate a cause
+  # from nothing. Atlas §11.5's own `推薦搭配` (L1295-1296, verbatim
+  # "Fishbone → Pareto → 5 Whys → Causal Validation") places it explicitly
+  # downstream of Fishbone, never as an entry point.
+
+outputs:
+  - FiveWhysValidation
+# NEW output type (this contract's own, not CauseHypothesisSet's sibling --
+# see typed-objects/five-whys-validation.schema.yaml). Atlas gives this
+# method's output no PascalCase name anywhere (same honesty gap
+# evidence.triangulation.contract.yaml disclosed for TriangulatedFindingSet);
+# named here following this directory's own PascalCase typed-object
+# convention.
+
+preconditions:
+  - "target_hypothesis_id is a member of cause_hypothesis_set.hypotheses[].id"
+  # Atlas gives no literal precondition string for this method (unlike
+  # Fishbone's cited `problem_statement.status == validated`, L1013) -- this
+  # is a NEW, structurally necessary precondition: Five Whys cannot drill
+  # into a hypothesis that does not exist in the set it claims to validate.
+  # Machine-checkable, low-risk, same class of Phase-3 addition
+  # cause-hypothesis-set.schema.yaml's own `promotion.ready_for_promotion`
+  # derived field is.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Atlas L1285 stop condition "有明確證據可以驗證" (clear evidence to
+  # verify) and failure mode L1293 "沒有數據仍自信宣告原因" (declaring a
+  # cause confidently without data) are the direct grounding for both flags
+  # -- the same two-flag `quality` shape root_cause.fishbone.contract.yaml
+  # and strategy.swot.contract.yaml both already use for their own
+  # evidence-discipline requirements.
+
+forbidden_transition: []
+# Atlas §11.5 gives no explicit forbidden-transition worked example for this
+# method (unlike Fishbone's L1019-1020 and SWOT's L3550-3552) -- left
+# genuinely empty rather than inventing one to match the other two
+# contracts' shape. See open_questions.
+
+recommended_next:
+  - root_cause.pareto
+  # Atlas §11.5's own `推薦搭配` (L1295-1296) names the chain
+  # "Fishbone → Pareto → 5 Whys → Causal Validation" -- Pareto sits BEFORE
+  # Five Whys in that chain, but is also independently named as a
+  # cross-check the same worked chain implies can follow (quantifying which
+  # of several candidate causes identified through repeated Five Whys runs
+  # actually accounts for most occurrences). root_cause.pareto has no
+  # contract yet (method-inventory.yaml L404, contract_status: pending) --
+  # disclosed as advisory metadata only, same as Fishbone's own
+  # recommended_next entries before this file existed.
+
+rollback:
+  side_effect_free: true
+  # No mother document states this explicitly for Five Whys specifically.
+  # Same low-risk-by-analogy inference strategy.swot.contract.yaml's
+  # identical field already used: a pure analysis/validation method with no
+  # described external side effect in any of the three mother documents.
+
+open_questions:
+  - id: "OQ-FIVEWHYS-1"
+    question: >
+      `forbidden_transition` is left empty -- Atlas §11.5 gives this method
+      no explicit illegal-transition worked example (unlike Fishbone/SWOT).
+      Should a future pass add one by analogy (e.g. "FiveWhysValidation ->
+      RootCauseFact" direct, skipping the CauseHypothesisSet.promotion step
+      this contract's own output is meant to satisfy), or is the absence
+      itself meaningful (Five Whys IS the validation step, so its own
+      output has nowhere further downstream to illegally shortcut to)?
+    owner: "operator, or a future review pass specifically checking Tier 1/2 contracts with no forbidden_transition example in Atlas"
+    blocks: "nothing in this file's own validity -- forbidden_transition is not a required field in method.schema.yaml"
+  - id: "OQ-FIVEWHYS-2"
+    question: >
+      `cognitive_primitives: [QUESTION, CAUSE, VALIDATE]` is this file's own
+      inference, not a cited Atlas composition formula (contrast
+      root_cause.fishbone's directly-cited "DECOMPOSE + GROUP +
+      CAUSE_HYPOTHESIS", Atlas §9 L996). Should a future pass over Atlas
+      §4 supersede this inference if a dedicated composition formula for
+      Five Whys is ever added there?
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity -- method.schema.yaml only requires cognitive_primitives be non-empty and members of the known vocabulary, both satisfied"
+
+verification:
+  method: >
+    Read Atlas §11.5 (L1262-1298) and the F05 tool table row (L435) directly
+    at the cited lines. Cross-checked against
+    `root_cause.fishbone.contract.yaml`'s own `recommended_next` and
+    `root-cause-fact.schema.yaml`'s `legal_promotion_path.validation_methods_applied`
+    enum to confirm this contract's `id` matches the value both files
+    already reference. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator (required fields present, id
+    pattern ^[a-z_]+\.[a-z_]+$ satisfied, version semver).
+  note: >
+    No mother document was modified. `purpose`/`preconditions`/`outputs`'s
+    literal name are Phase 3 compilation (structurally necessary, not
+    textually cited verbatim) and explicitly flagged as such above, same
+    class of disclosure `evidence.triangulation.contract.yaml` already
+    modeled for its own thinner-grounded fields -- this file's grounding is
+    stronger than that one (a full dedicated Atlas protocol section exists
+    here), but the same honesty discipline applies to every field that is
+    not a direct quotation.

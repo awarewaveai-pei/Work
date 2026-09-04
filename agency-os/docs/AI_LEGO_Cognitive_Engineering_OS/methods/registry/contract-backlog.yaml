@@ -215,6 +215,40 @@ tier_1:
       invoke) is the correct category once ADR-014 made a slice selection
       real. The general 15-25-entry Tier 1 backfill (Claude/Codex
       intersection exercise) remains a SEPARATE, still-open action item.
+  second_concrete_entry:
+    # NEW (2026-09-04): added as its own separate key rather than turning
+    # `first_concrete_entry` into a list, to avoid touching
+    # tests/run_golden_tests.py's existing check (L360-370), which asserts
+    # `first_concrete_entry` is a single mapping with
+    # method_id: research.qualitative_coding -- minimal blast radius, per
+    # this repo's own R0 discipline, over a structurally "cleaner" list
+    # refactor that would require editing the test runner itself.
+    method_id: "root_cause.five_whys"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      The actively-running Cognitive OS runtime slice (agency-os/TASKS.md
+      2026-09-04 "全部做好" item, third and fourth Method Atlas slices) --
+      specifically, methods/contracts/root_cause.fishbone.contract.yaml's
+      own recommended_next / OQ-FISHBONE-1, and
+      specs/cognitive/typed-objects/root-cause-fact.schema.yaml's
+      legal_promotion_path.validation_methods_applied enum, which already
+      named "root_cause.five_whys" as a legal value before this contract
+      existed to back it. Same mandating shape as
+      `first_concrete_entry` above (a method the actively-running slice
+      concretely needs), not Tier 0's teaching-example criterion.
+    source: "methods/contracts/root_cause.five_whys.contract.yaml (built same session as this entry) + specs/cognitive/typed-objects/five-whys-validation.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.5 gives this method a full
+      dedicated protocol section (not merely a teaching-example citation),
+      but Tier 0 group (b)'s own criterion is specifically "repeatedly cited
+      AS a worked LEGO/usage example across multiple mother-document
+      sections" (root_cause.fishbone/strategy.swot/evidence.triangulation's
+      own shared trait) -- Five Whys is Atlas's own subject-matter protocol,
+      not itself cited elsewhere as an example of something else. Same
+      Tier 1 category as `research.qualitative_coding` above: mandated by
+      what the currently-running implementation slice concretely needs
+      next, not by Tier 0's citation-frequency criterion.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
