@@ -165,6 +165,7 @@ Then output the **AO-RESUME 報告（§0–§8）** response:
 **1. 系統快照**
 輸出一張精簡狀態表（`| 項目 | 狀態 |`），一列一項，涵蓋：SG/EU 服務、Git 對齊、整體健康%、備份、VPS 自動重啟、Cloudflare、排程新鮮度、跨機 import。
 Source: ao-resume-hook-last.json log_tail + health check output.
+**可跑的 demo（2026-09-04 起 §1 必列一行，AGENTS.md DoD「Product work」列）**：讀 `agency-os/docs/operations/RUNNABLE_DEMOS.md` 最新一列，印「上次可跑的 demo：<指令>（<日期>，<結果一句>）」；檔案缺失或空表印「無登記的可跑 demo」。這是進度唯一看得見的面，不列 = 違規。
 非問題的 WARN（如 CF 規則=0 已用 LLAR 替代）必須當列註明「非問題 + 原因」，不可只丟一個 ⚠️。
 **雙層判讀（強制，小白可懂＋專家可學）**：每個 WARN／skip／非 100% 項採「**保留專業術語 + 並附白話**」雙層，**不可只留其一**：
 - 保留原始機器字串／術語（讓進階讀者直接對照、可 grep、可成長為專家）
@@ -354,3 +355,9 @@ Skip `SCHEMA.md` and `README.md`. Use the `Bash` tool with `rm`.
 
 If you forgot Step 3, the user is allowed to re-prompt with「你忘了寫 archive」—
 acknowledge the lapse and write the file immediately.
+
+## Related Documents (Auto-Synced)
+- `docs/operations/RUNNABLE_DEMOS.md`
+
+_Last synced: 2026-09-04 02:19:05 UTC_
+

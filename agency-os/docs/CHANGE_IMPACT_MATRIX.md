@@ -87,6 +87,8 @@
 | `docs/operations/BUG_HUNT_PROTOCOL.md` | `AGENTS.md`, `docs/operations/AUDIT_REGISTRY.md` |
 
 | `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/end-to-end-linkage-checklist.md`, `docs/architecture/decisions/ADR_INDEX.md` |
+| `docs/operations/AGENTS_APPENDIX.md` | `AGENTS.md`, `docs/operations/TOOL_TRIGGER_MAP.md`（2026-09-04 AGENTS.md 瘦身搬出的機制細節與歷史；改 AGENTS.md 對應指標段時同步） |
+| `docs/operations/RUNNABLE_DEMOS.md` | `AGENTS.md`（DoD「Product work」列）, `../.claude/commands/ao-resume.md`（§1 可跑的 demo 行） |
 
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新
@@ -104,5 +106,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-02 14:30:03 UTC_
+_Last synced: 2026-09-04 02:19:06 UTC_
 

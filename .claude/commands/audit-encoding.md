@@ -101,7 +101,7 @@ CP950 section's scope-boundary note on unencoded writes).
 - SSOT script: [scripts/audit-cp950-traps.ps1](../../scripts/audit-cp950-traps.ps1)
 - Helper: [scripts/_console-encoding-helpers.ps1](../../scripts/_console-encoding-helpers.ps1)
 - Registry: [agency-os/docs/operations/AUDIT_REGISTRY.md](../../agency-os/docs/operations/AUDIT_REGISTRY.md)
-- Rule: [agency-os/AGENTS.md](../../agency-os/AGENTS.md) §代理自動工具使用規則
+- Rule: [agency-os/docs/operations/TOOL_TRIGGER_MAP.md](../../agency-os/docs/operations/TOOL_TRIGGER_MAP.md) §代理自動工具使用規則（2026-09-04 自 AGENTS.md 搬入；AGENTS.md 只留指標）
 - Origin event (class 1, capture-trap): 2026-05-22 backfill-missed-daily.ps1 ate newlines in
   mojibake'd git log output (commits `e807984` → `52e97d6`)
 - Origin event (class 3, unencoded-raw-read): 2026-08-29 codex-oracle.ps1 irreversibly corrupted

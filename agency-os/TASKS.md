@@ -762,6 +762,7 @@
   - ④ 其餘 OQ-P5-2～5、7～8 見 `Projects/internal/cognitive-engineering-os/docs/PHASE5_RESEARCH_SLICE.md`。
   - **完成定義**：①② 落地並 commit；③ ✅ ADR-023；⑤ (a)-(d) 落地並 commit。**→ ✅ 全部達成 2026-09-04**；後續獨立待辦：ADR-023 §Consequences 6、OQ-P5-2～5、7～8（皆 ADR 級或下一輪 repository-architecture 修訂，不急）。
   - [ ] **【欠的 review｜2026-09-07 11:06 後才能做】** 對 commit `f2eb6cefa`（+ `e6f9e31a7`）補跑 `/codex-review`：2026-09-04 當天 critic 回 429 session limit、Codex 回 usage limit（reset 9/7 11:06），只做了書面自審 + 7 個突變（WORKLOG 2026-09-04 續2 `ORACLE_WAIVED`）。capture 檔在 `%TEMP%\oracle-capture-20260904-091506.diff`（含其他 session 的 62 檔改動，跑時要帶 scope 限制文字，或直接對 `git show f2eb6cefa` 的 26 檔審）。有 finding 才開新條目修。
+  - [ ] **【repo 衛生，2026-09-04 發現，本 session 未動】** ① `Projects/internal/hci30`（git index 小寫）vs 磁碟 `Projects/internal/HCI30/`（大寫）：Windows 同一目錄、git 兩條路徑；新檔 `HCI30/database/migrations/0002_wave1_case_aggregate_{up,down}.sql`（untracked）落在另一路徑，Linux checkout 會變兩個目錄。修法：HCI session 收工後把磁碟目錄改名回 `hci30`（內容不變）再 `git add` 那兩個 migration。② `~/.claude/worktrees/`（`D:\Work\.claude` 是 junction）有 5 個 Claude Code agent worktree 舊拷貝（`amazing-kalam-bfaae3` 972MB，branch 已 merge 進 main；另 3 個 detached HEAD，1 個未登記），grep 抓蟲全部重複命中。本 session 的 `git worktree` 指令被權限擋，需操作者跑：`git worktree remove --force .claude/worktrees/<name>` ×4 後 `git worktree prune`，最後刪 `unruffled-aryabhata/`。③ repo 根 3 個不明散檔 `t.sh`（8/29）、`e3`（9/3）、`agency-os/.._used.txt`（9/3）非本 session 所建、未讀內容，確認後刪或 `.gitignore`。
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
@@ -1405,5 +1406,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-03 14:30:03 UTC_
+_Last synced: 2026-09-04 02:19:06 UTC_
 

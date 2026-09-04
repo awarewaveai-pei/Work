@@ -237,6 +237,66 @@ test('parity: code-change-tracker tracks .ts edit + high-risk flag on auth path'
   fs.rmSync(trackerPathFor(sid), { force: true });
 });
 
+test('parity: code-change-tracker does NOT track scratch code files under os.tmpdir() (2026-09-04)', () => {
+  const sid = freshSid('pcct2');
+  const tmp = makeTmpHome();
+  const scratch = path.join(os.tmpdir(), `claude-scratch-${sid}`, 'edit_helper.py');
+  const r = run('PostToolUse', { session_id: sid, tool_name: 'Write', tool_input: { file_path: scratch } }, { cwd: tmp });
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stderr, /CODE FILE MODIFIED/);
+  assert.match(r.stderr, /scratch code file/);
+  assert.equal(readFileSafe(trackerPathFor(sid)), null);
+  // and an absolute path outside the temp dir is still tracked (no regression of the original rule)
+  const r2 = run('PostToolUse', { session_id: sid, tool_name: 'Write', tool_input: { file_path: '/x/lib/helper.py' } }, { cwd: tmp });
+  assert.equal(r2.status, 0);
+  assert.match(r2.stderr, /CODE FILE MODIFIED/);
+  assert.match(readFileSafe(trackerPathFor(sid)) || '', /helper\.py/);
+  fs.rmSync(trackerPathFor(sid), { force: true });
+});
+
+test('parity: repeat-failure-guard blocks the 3rd identical Bash command after 2 recorded failures (2026-09-04)', () => {
+  const sid = freshSid('prfg');
+  const tmp = makeTmpHome();
+  const cmd = 'python build.py --flag   value';
+  const stateFile = path.join(os.tmpdir(), `claude-bash-failures-${sid}.json`);
+  fs.rmSync(stateFile, { force: true });
+  // 1st and 2nd failure: recorded, never blocked
+  for (let i = 0; i < 2; i++) {
+    const f = run('PostToolUseFailure', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd }, error: 'Exit code 1' }, { cwd: tmp });
+    assert.equal(f.status, 0);
+  }
+  assert.match(fs.readFileSync(stateFile, 'utf8'), /"count": 2/);
+  // 3rd identical attempt (whitespace differs only) -> BLOCK
+  const pre = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'python build.py --flag value' } }, { cwd: tmp });
+  assert.equal(pre.status, 2);
+  assert.match(pre.stderr, /already failed 2x/);
+  // a different command is not blocked
+  const other = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'python build.py --flag value --verbose' } }, { cwd: tmp });
+  assert.equal(other.status, 0);
+  // the justified marker lets the identical command through
+  const just = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: '# RETRY-JUSTIFIED: dependency installed since\npython build.py --flag value' } }, { cwd: tmp });
+  assert.equal(just.status, 0);
+  assert.match(just.stderr, /RETRY-JUSTIFIED/);
+  // a success clears the entry, so the plain command is allowed again afterwards
+  const ok = run('PostToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd }, tool_response: { stdout: 'ok' } }, { cwd: tmp });
+  assert.equal(ok.status, 0);
+  const after = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd } }, { cwd: tmp });
+  assert.equal(after.status, 0);
+  fs.rmSync(stateFile, { force: true });
+});
+
+test('parity: repeat-failure-guard ignores a single failure and non-Bash tools', () => {
+  const sid = freshSid('prfg2');
+  const tmp = makeTmpHome();
+  const stateFile = path.join(os.tmpdir(), `claude-bash-failures-${sid}.json`);
+  fs.rmSync(stateFile, { force: true });
+  const f = run('PostToolUseFailure', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'ls /nope' }, error: 'Exit code 2' }, { cwd: tmp });
+  assert.equal(f.status, 0);
+  const pre = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'ls /nope' } }, { cwd: tmp });
+  assert.equal(pre.status, 0, 'one failure must not block');
+  fs.rmSync(stateFile, { force: true });
+});
+
 test('parity: accumulator (PostToolUse) → batch-format consumes at Stop under the SAME sid', () => {
   const sid = freshSid('pabf');
   const tmp = makeTmpHome();

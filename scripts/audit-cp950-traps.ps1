@@ -70,7 +70,7 @@
   Companion: scripts/_console-encoding-helpers.ps1 (the helper this tool checks for)
   Slash:     /audit-encoding (calls this tool with sensible defaults)
   Registry:  agency-os/docs/operations/AUDIT_REGISTRY.md (long-term audit record)
-  AGENTS.md: §代理自動工具使用規則 — Claude auto-runs this on Edit/Write of .ps1 files
+  TOOL_TRIGGER_MAP.md §代理自動工具使用規則（2026-09-04 自 AGENTS.md 搬入）— Claude auto-runs this on Edit/Write of .ps1 files
              containing capture patterns
 
   Default scan paths (kept explicit to avoid scanning node_modules / Backups):

@@ -51,6 +51,14 @@ recipe instance):
      found anywhere under specs/, policies/, methods/, recipes/validated/,
      and capabilities/contracts/ resolves to a real file and (if it carries
      a "#/..." JSON-pointer fragment) a real node within that file.
+  5. SearchContent architecture pack (ADR-021 D10, Gate H) -- see the
+     run_search_content_pack_check docstring below.
+  6. Generated spec indexes fresh -- tests/gen_spec_index.py --check must
+     report docs/architecture/{SPEC_QUICKREF,MOTHER_DOC_SECTION_INDEX}.md
+     identical to a fresh generation (ADR-024 Decision 2: cite mother
+     documents by section, look shapes up in the quick-ref; a stale index
+     is a detector that went quiet, so it fails the suite instead of
+     drifting silently the way hand-typed line numbers did).
 
 No mother document, ADR, or existing spec/policy file's normative content
 is modified by this file or by running it. Exit code 0 = all checks
@@ -464,6 +472,25 @@ def run_search_content_pack_check():
         failures.append(f"search_content_pack_check.{f}")
 
 
+# ---------------------------------------------------------------------------
+# 6. Generated spec indexes (ADR-024 Decision 2). Imports tests/gen_spec_index.py
+#    and runs its --check; the two generated markdown files must equal a fresh
+#    generation byte-for-byte. Regenerate with `python tests/gen_spec_index.py`.
+# ---------------------------------------------------------------------------
+def run_generated_index_freshness():
+    import importlib.util
+    spec_path = os.path.join(ROOT, "tests", "gen_spec_index.py")
+    try:
+        spec = importlib.util.spec_from_file_location("gen_spec_index", spec_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        rc = mod.main(["--check"])
+    except Exception as e:  # noqa: BLE001 -- same crash-isolation stance as family 5
+        failures.append(f"gen_spec_index --check: CRASHED -- {type(e).__name__}: {e}")
+        return
+    check(rc == 0, "generated spec indexes are STALE -- run `python tests/gen_spec_index.py` and commit docs/architecture/SPEC_QUICKREF.md + MOTHER_DOC_SECTION_INDEX.md")
+
+
 if __name__ == "__main__":
     run_schema_conformance()
     run_recipe_instance_conformance()
@@ -471,6 +498,7 @@ if __name__ == "__main__":
     run_capability_contract_conformance()
     run_registry_invariants()
     run_search_content_pack_check()
+    run_generated_index_freshness()
     run_ref_resolution_smoke()
 
     print(f"PASSED: {passed}")

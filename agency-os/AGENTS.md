@@ -125,19 +125,11 @@
 
 `scripts/codex-oracle.ps1` 保留在 repo 內但**降級為備援**：官方指令連續失敗（timeout/服務中斷）≥ 2 次時才退回用它（呼叫方式不變，見腳本內 `.EXAMPLE`）。
 
-**機械閘（2026-08-20 起，ORACLE gate）**：上面那條路由表本身**不是自動化** —— 它是文字規則，靠代理自覺。閘補的就是這個缺口：
+**機械閘（ORACLE gate）**：`codex-oracle.ps1`／`/codex-review` 把 review artifact 寫進 `agency-os/reports/oracle/`，`verify-closeout-completeness.ps1` 在 staged 含 source 檔時要求當日且晚於最後改檔的 artifact；刪除檔案改綁 `path@blob-hash`；豁免寫 `- ORACLE_WAIVED: <理由>`。時間戳／hash 設計理由與涵蓋副檔名 SSOT 見 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §ORACLE gate（2026-09-04 逐字搬移）。閘擋的是「忘記跑」，不是「finding 沒處理」。
 
-| 環節 | 機制 |
-|------|------|
-| 產證據 | `codex-oracle.ps1` 每次跑完把答案寫進 `agency-os/reports/oracle/YYYY-MM-DD-<mode>-<stamp>.md`（進 git，不刪）|
-| 驗證據（修改） | `verify-closeout-completeness.ps1` §ORACLE gate：staged 含 source 檔時，該目錄必須有**當日**且**時間戳晚於最後一次改檔**的 review artifact |
-| 驗證據（刪除） | 2026-08-24 改版：刪除的檔案沒有 mtime 可比對時間戳，改綁**內容**——artifact 記錄 `- deletions-reviewed: <path>@<blob-hash>`（git diff header 的 `index <hash>..0000000`），gate 對「目前真正 staged 的刪除」算出同一顆 hash，要求路徑+hash 精確相符才算確認；純路徑比對（舊格式 artifact）只在雙方都算不出 hash 時才當備援，避免同日「刪除→復原→改內容→再刪除」被舊記錄誤證（8 輪修正細節見 `WORKLOG.md` 2026-08-24 各 round 條目） |
-| 豁免 | 當日 WORKLOG 加 `- ORACLE_WAIVED: <理由>`（看得見，不可靜默省略）|
-| 涵蓋副檔名 | `$codeExts` + `.sql .yml .yaml .php .tf .tfvars` —— **刻意不共用 `$codeExts`**，因為那份清單同時驅動 REALTEST/DEBUG-TAG，放寬會靜默擴大三個不相干的閘。SSOT 在 `verify-closeout-completeness.ps1` `$oracleExts` |
+**驗證的形狀（2026-09-04，操作者指示；AI-LEGO 專案版在 ADR-024）**：程式碼以突變測試（故意拔掉 guard → 指名的測試變紅 → 還原變綠）為主要證據；每個 commit 一個 critic，深淺依 `.claude/commands/review.md` 的 tier；多代理只用在 auth／crypto／個資。文件與 YAML 規格不派 agent，用 golden test + 書面自審。外部 oracle 全部沒額度時不跳過 review：書面對抗自審 + 突變證據 + WORKLOG `ORACLE_WAIVED`（memory `feedback_self_review_when_oracle_down`）。
 
-修改的時間戳比對是刻意選的：oracle 讀的是**尚未 stage 的工作樹**，所以無法用 staged diff 內容直接綁定；「artifact 必須晚於它宣稱審過的檔案」是唯一可機器驗證的順序關係。它擋的是「早上審完、下午改了才 commit」（codex FINDING 1）。刪除則相反——檔案內容本身（git blob）在被刪前就已定案，反而可以做到比時間戳更精確的內容綁定，2026-08-24 那輪才改用 hash。
-
-**閘擋不到的**：artifact 存在 ≠ findings 被處理。這仍是操作紀律（見 §已知信任邊界）。閘關掉的只有「忘記跑」這個洞。
+**額度斷路器（操作者明訂 2026-09-04：撞到額度就馬上停，不要再連）**：任何 oracle 呼叫（critic subagent、`/codex-review`、`codex-oracle.ps1`）**之前**先跑 `scripts/oracle-quota.ps1 -Action check -Tool <codex|critic>`，exit 3 = 直接走 fallback，不連線、不「試一次看看」。呼叫回來若含 `429`／`rate_limit`／`session limit`／`usage limit`／`try again at`，**立刻**用回覆裡的重置時間跑 `-Action set -Tool <t> -Until "<時間>" -Reason "<原文>"`（沒給時間就 `-Hours 5`），同一 session 內不再碰同一工具；成功呼叫後 `-Action clear`。狀態檔 `%TEMP%\claude-oracle-quota.json` 全機共用（額度是帳號的，不是 session 的）。`/codex-review` 與 `/review` 的 Step 0 已寫死這個檢查。
 
 **同一 reviewer 對同一段程式碼連續回報 2 次 → 第 3 次修正前必須先做不變量分析（強制，2026-08-24 起）**：不能再逐點打補丁。寫一段「這一類問題的完整不變量是什麼」，確認這次修正是關掉整類問題還是只關掉這一個實例；只關掉實例要在 WORKLOG 明說並取得使用者同意才能繼續逐點修。**禁止**用「範圍夠小」「邏輯直接沿用前一輪」當理由跳過這一步——這正是 2026-08-24 ORACLE gate deletion 追蹤機制被同一顆 Codex 連續打回 8 輪的根因：每輪只修被指出的那一行，没有停下來問「這一類問題還有哪裡沒堵到」（完整案例見 `WORKLOG.md` 2026-08-24 round 1–8）。
 
@@ -178,18 +170,13 @@
 
 **路徑 B — Workflow tool**（matcher `^Workflow$`）：`agent()` 內部 fan-out 在背景執行，本閘看不到真實數量，改成**誠實聲明閘**——依真實輸入形狀分三態：`script`（inline 腳本）須含 `// SUBAGENT-BUDGET-ESTIMATE: <N>`（多行加總，不是只讀第一行）；`scriptPath`（無 inline script）讀檔套同一規則；`resumeFromRunId` 單獨出現（無 script/scriptPath，真實用量 31%）**放行**——擋掉續跑會逼整個 workflow 從頭重來，燒更多 token，比不擋更糟（2026-09-03 第三輪 critic 抓到的 C-1）。N > **10**（非 Workflow 工具自己講的 15——操作者明訂上限更嚴，且要跟路徑 A 的硬上限一致，2026-09-03 第三輪 M-3）→ block 要求拆批。**明文限制**：`script`/`scriptPath` 兩態只驗證「有沒有誠實聲明」，不驗證聲明是否為真；`resumeFromRunId` 態完全沒有機械保護，且**尚未被真實 Workflow 呼叫驗證過**（驗證需要使用者明確 opt-in 多代理編排，這件事本身不能自己授權自己去測，否則就是重演促成這整個閘的那個違規）。
 
-⚠️ **版本教訓（不要重複犯）**：
-- v1 掛在 `SubagentStart`——被外部 critic 覆審用真實 spawn 證實完全無效。
-- v2 改掛 `PreToolUse` 但只覆蓋 Agent tool，完全沒管 Workflow；matcher 未錨定誤擋真實存在的 `ListAgents`；per-turn 歸零可被多送一句話繞過。
-- v3 修完 v2 全部四條，但**只驗證了 Agent tool 路徑是真實 spawn，Workflow 路徑仍是合成 payload**——第三輪 critic 掃真實 transcript 找到 `Workflow` 有 3 種輸入形狀，`scriptPath+resumeFromRunId`（31% 真實用量）完全沒被 v3 的程式碼處理過，會變成無法滿足的永久 block；同時 v3 為了「檔案不要無限長」加的壓縮邏輯，**重新引入了 append-only 設計本來要消滅的 race**（20 並行實測掉 33-45%）。
-- 第三輪（現況）修完上述，且回歸測試套件本身也被 mutation test 驗證過（拔掉 guard 後測試真的會失敗，不是空測試）。
-- **這條教訓本身也適用於治理紀律，且套用了兩層**：① 同一份程式碼被同一個 reviewer 連續抓到兩輪問題時，第三次修正前必須先做不變量分析（R0「補丁判準」）；② **驗證程序本身也要接受同一套紀律**——「每項都用真實 spawn 驗證」這句話在 v3 寫下時是對 Agent 路徑講的真話，套用到 Workflow 路徑就是自我宣稱未經檢驗；發現即改寫，不維持錯的宣稱。
+⚠️ 版本教訓（v1 掛錯事件、v2 只管 Agent 不管 Workflow、v3 只驗證了一半）→ [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §Agent 扇出治理 — 版本教訓。一句話：同一份閘被同一 reviewer 連續抓兩輪 → 第三次修正前先做不變量分析，驗證程序本身也受同一紀律。
 
 **禁止樣態（操作者明訂，2026-09-03，機械閘擋不到的情況直接寫死規則）**：
 
 **禁止**：對一批 N 個項目（finding／ADR／檔案／任何清單）逐項各自配一個或多個 agent 處理或驗證（1:N 或 1:2N 映射）。這個寫法的 agent 總數會隨 N 線性放大，且 `subagent-budget.js` 的 Workflow 分支**擋不到**——真實數量是腳本執行到一半才算出來的（例如「5 個 reviewer 產出 47 個 finding」），呼叫 Workflow 那一刻根本不知道 N 是多少，事先聲明的 `SUBAGENT-BUDGET-ESTIMATE` 防不了這種動態爆量。
 
-**真實案例（2026-09-03，另一 session，Cognitive Engineering OS Phase 5 覆審）**：5 個 reviewer 產出 47 個 finding，設計成每個 finding 配 2 個 refuter 驗證 → 總數衝到 99 個 agent，94 個因 session limit 全部失敗，5 小時額度燒光。閘本身沒壞，是**腳本設計違反這條規則**。
+**真實案例**：2026-09-03 5 個 reviewer 產出 47 個 finding，每個 finding 配 2 個 refuter → 99 個 agent、94 個因 session limit 失敗、5 小時額度燒光（細節見 AGENTS_APPENDIX.md）。
 
 **正確做法（唯一允許的模式）**：
 1. 單一 artifact（一份文件／一段程式碼／一批相關修改）的**修改工作，自己動手做一次**，不分派給 agent
@@ -198,7 +185,16 @@
 
 **正面模板（操作者提供，2026-09-04）——agent 數量跟著「角色」走，不是跟著「項目數量」走**：一個 agent 負責理解問題、一個負責執行、一個負責找錯（critic）、一個提供獨立觀點，最後由使用者或一個整合 agent 收斂結果——固定 4-5 個，不因為任務裡有幾個 finding／幾個檔案就跟著長大。上面「99 個 agent」那個事故的根因，就是把「驗證」這個角色複製了 47 次（每個 finding 各配一份），把「按項目複製角色」跟「按角色分工」搞反了。判斷準則：派 agent 前先問「這是一個新角色，還是同一個角色的第 N 份拷貝？」——新角色可以加，同角色拷貝要嘛自己做、要嘛批次塞進固定小數量的 agent。
 
-**讀資料／理解問題階段：硬性上限 1 個 agent（操作者明訂，2026-09-04，比上面 ≤5/≤10 更嚴）**：正面模板把「理解問題」列為一個角色，這裡曾被誤讀成「可以按子系統拆成多個平行reader」——真實事故：一個 Workflow 派 9 個 agent、每個讀一個子系統，去理解一份 ~300 檔的文件樹，雖然是「按角色」不是「按項目」、也沒超過 ≤10 上限，操作者仍判定不合理，明訂**讀/理解/研究類任務，不管資料量多大，永遠只能 1 個 agent（或自己親自讀 Read/Glob/Grep），不准派多個平行reader**。理由：讀資料是取得資訊，不是需要多個獨立判斷視角，多個reader各自讀一部分再合併，本質上是重複的context載入，不是真平行；真正大型的讀取交給 Codex（`§跨模型oracle`既有路由，非額外開多個Claude agent）或自己讀，不開多顆Claude agent分攤。**這條蓋掉「理解」這個角色的例外**——4-5個角色模板裡的「理解」永遠是1個，不可再拆；「執行」階段（理解完、分派工作後）才適用≤5個agent的上限。**機械閘管不到這條**：`subagent-budget.js`只按數量擋，擋不到「這9個agent各自是不是在做同一件讀取工作」，此規則純靠紀律，如實記錄不誇大。
+**讀資料／理解問題：預設由主 agent 自己讀（操作者明訂 2026-09-04；同日第二版收緊）。** 第一版原文（「不管資料量多大，永遠只能 1 個 agent」與 9-reader 事故）見 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md)。現行規則：
+1. **預設：主 agent 用 Read／Grep／sed 範圍自己讀。** 要改的檔整檔讀；只確認一個事實用 grep；不為「了解一下」讀整份 900 行 schema（AI-LEGO 語料先查生成的 `SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md`）。理由：讀到的東西留在做決策的那個上下文裡，摘要的邊界就是問題的邊界。
+2. **例外 A，獨立驗證：** critic／oracle 可以讀，一個 commit 最多一個。它讀是為了不同觀點，不是替主 agent 讀。
+3. **例外 B，超過約 100KB 且不會去改的純調查：** 最多 1 個 agent 或走 Codex；產出必須寫進檔案並附 file:line，不是只回傳摘要，主上下文不背那些內容。
+4. **配套：** 讀完一批就 `/compact`；讀取結論先寫成 scratch 筆記檔，壓縮後事實還在。這是「主 agent 讀」不把 session 讀爆的前提。
+**機械閘管不到這條**：`subagent-budget.js` 只按數量擋，分不出 agent 在讀還是在做；純靠紀律，如實記錄。
+
+## 失敗重試紀律（操作者明訂 2026-09-04）
+
+**同一件事用同一種方式失敗兩次 = 停。** 第三次一模一樣的嘗試是違規，不是堅持。每次失敗先讀錯誤訊息找根因，換方法再試（實例：heredoc 報 EOF → 改寫檔再執行，不是再貼一次；hook 擋下 → 照閘訊息做，不是重送同一條；oracle 429 → 斷路器 + fallback，不是再連）。換了方法仍失敗第二次 → 問一題，說明兩種方法各自怎麼失敗。**機械閘**：`hooks/rules/repeat-failure-guard.js`（PreToolUse Bash）——同一條 Bash 指令文字在本 session 失敗 2 次後，第 3 次相同文字直接 BLOCK；真的需要重跑同一條（例如外部狀態已變）在首行加 `# RETRY-JUSTIFIED: <什麼變了>`。閘只認「一字不差的同一條指令」，換了方式就不會被擋。
 
 ## 執行安全
 
@@ -227,16 +223,7 @@ Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME
 - `sg-deploy.sh` 內建：npm test gate → docker healthcheck → HTTP smoke check → 失敗自動 rollback
 - npm test 失敗時先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查原因
 
-**新部署路徑強制清單（SOP）** — 每次新增可部署服務時，必須同時完成以下 6 項：
-
-| # | 項目 | 說明 |
-|---|------|------|
-| 1 | **Unit test gate** | 在 `sg-deploy.sh` 加入 `npm test`；失敗 → abort |
-| 2 | **Docker healthcheck** | `docker-compose.yml` 必須有 `healthcheck:`；sg-deploy Step 6 等待 healthy |
-| 3 | **HTTP smoke check** | sg-deploy Step 7 `_smoke_check` 加入新端點 curl 驗證 |
-| 4 | **Rollback 指令** | `DEPLOY_ROLLBACK_RUNBOOK.md` 補充對應回滾步驟 |
-| 5 | **Notification** | Slack/Telegram 通知涵蓋 SUCCESS/FAIL/SMOKE_WARN |
-| 6 | **Typecheck gate** | `package.json` 加 `"typecheck": "tsc --noEmit"` + sg-deploy 加 `npm run typecheck` + `.github/workflows/<service>-typecheck.yml` |
+**新部署路徑強制清單（SOP，6 項：unit test gate／docker healthcheck／HTTP smoke／rollback 指令／notification／typecheck gate）** → [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §新部署路徑強制清單（2026-09-04 逐字搬移）。新增可部署服務時 6 項缺一不可。
 
 ## Lobster Factory 操作規則（所有 Agent 強制）
 
@@ -253,50 +240,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 ## 代理自動工具使用規則（Claude 主動執行）
 
-以下列的是「使用者說了某句話 → 觸發」。流程完成後自動接續的下一步（deploy 完成後跑 smoke、governance 文件改完後 doc-sync 等）不重複列在這裡，見下方 §Claude 工作自觸發規則（2026-08-24 去重：兩表曾各自維護同一批列，改為單一正本）。
-
-| 觸發情境 | 立即執行 |
-|---------|---------|
-| 使用者提到「改外觀 / 改顏色 / 改主題 / theme / 字體 / 側欄樣式 / 換配色 / 外觀不對 / appearance」 | **先讀** [`app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md)（外觀系統 SSOT：哪個檔改什麼 + 改完怎麼上線）。**禁止**臆測哪個檔；90% 調整只碰 `lib/theme/tokens.ts` 或 `app/tools/theme/page.tsx` |
-| 使用者問某段時間的 Slack / Telegram / 告警 / incident | `scripts/fetch-external-signals.ps1 -From ... -To ...`（無時區預設 CST/UTC+8）|
-| AO-RESUME digest `since_utc` 比需要範圍早 > 2 小時 | 補跑 `/signals -From <需要起點>` |
-| AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腳本）|
-| AO-RESUME／使用者問「Trigger.dev 慢」「EU 卡卡的」「ClickHouse 又爆了嗎」 | 讀 `reports/status/clickhouse-LATEST.md`，於 §1 系統快照點名 verdict（🟢/🟡/🔴）。**要同時看兩類訊號，不可只看資料比**：① **結果面** system/app 資料比（2026-08-15 事故時 345:1）② **機制面** 失敗的 merge 數／stalled merges／單一分區 part 數／最寬系統表欄數／merge 記憶體預算是否生效。2026-08-25 第 5 次事故證明**光看資料比會漏**：merge 失敗時 part 不被消耗，資料量反而停在低點，該次燒了 3 天 CPU 100% 而資料比只有 8.3x（門檻 5x），偵測器在數學上不可能升到 🔴。🟡/🔴 → 檢查 `override.xml` 的產生源設定是否被還原；**禁止**用「調高 mem_limit / 清資料」了事 —— 那正是前三次復發的原因，`max_server_memory_usage` 現由 `validate-config.ps1` 機械鎖定 |
-| AO-RESUME／使用者問「CI 過了嗎」「build 綠的嗎」「Actions 有沒有壞」 | 讀 `reports/status/ci-LATEST.md`，於 §1 系統快照點名 verdict（🟢/🟡/🔴）。🔴 = 某個 workflow 已**連續紅 ≥3 次或 ≥7 天**——那不是 flake，是一道閘已經關掉那麼久了（2026-08-15 起 `Trigger infra config guard` 紅了 4 次 10 天沒人發現，直接促成第 5 次 ClickHouse 事故）。**BLIND SPOT 字樣 = `gh` 讀不到，一律當未驗證不當健康** |
-| AO-RESUME／使用者問「機器夠不夠用」「記憶體/硬碟還好嗎」「ks-aw-01 撐得住嗎」「要不要再買一台」 | 讀 `reports/status/capacity-LATEST.md`，於 §1 系統快照點名三台 verdict（🟢/🟡/🔴）。**ks-aw-01 門檻刻意最嚴（記憶體 60%／硬碟 60%）**——它是 64GB 買來裝 128GB 規劃的整併目標，這支檢查就是操作者選擇「不砍範圍、改用監控補償」的那個補償本體；它啞了等於規格缺口無人管理。**不可只看 % used**：報告同時給 PSI stall 時間、OOM 次數（vmstat + journal 取大值）、swap、容器重啟數——85% 可能只是可回收的 page cache，70% 也可能正在 thrash。**`blind spots` 非空 = 某個維度這輪沒量到，一律 WARN 不當 PASS**。硬碟高但 `reclaimable` 也高 = docker 垃圾，不是真的滿 |
-| 使用者問 Cloudflare 設定是否正常 | `scripts/check-cloudflare-security.ps1` |
-| `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | ① curl inbox/digest 確認 403/401 類型；② `secrets-vault.ps1 -Action import-user-env`；③ 更新 `OPS_INBOX_INGEST_TOKEN` 到 User registry；④ 重跑確認 ok。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
-| EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config`）且 bad request % > 50 | SSH EU 確認；若持續 → Cloudflare WAF PATCH API 追加 block rule；curl 實測 403。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
-| next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
-| 訊息含 reboot 訊號（`needs reboot` / `重啟` 等）且含 `ks-aw-01`／`145.239.195.47` | 先讀 `reports/status/auto-reboot-LATEST.md`（verdict 🟢/🟡/🔴）。< 16h → auto-reboot 自動處理，不主動跑指令。≥ 16h 或非 🟢 → escalate 手動 `/ks-aw-01-reboot`（High risk，等 go-ahead）。AO-RESUME 時必點名 verdict。換機期間流程僅見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`。 |
-| 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| **🔧 機械閘**：`hooks/rules/code-change-tracker.js` 修改 .ps1 時自動提示。立即執行 `/audit-encoding --file <該檔絕對路徑>`（exit 0=放行；exit 1=fix：wrap capture site 或加 AUDIT_REGISTRY 豁免）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
-| 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`hooks/rules/verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。**critic 連續失敗（529/逾時）≥ 2 次 → 改用 `.\scripts\codex-oracle.ps1 -Mode review -Context "<改動說明>"` 當替代 oracle，不再重試同一個失效工具**（2026-08-24：critic 該 session 連續 6 次 529，codex-oracle.ps1 更新至最新版後正常運作；§跨模型 oracle 分工表本就把 Review 動作歸給 Codex，兩者是同一件事的兩條路徑，不是互斥）。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
-| 任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化 / class-by-class 相關問題或情境 | 先讀 [`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)（方法 SSOT，5-tier 觸發 + 9-step playbook + KPI）+ [`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)（狀態 SSOT）再回答，不靠常識 / 不臨機自創流程 |
-| 操作者說「apply audit」／「apply the patches」／「套用 audit」／「把 audit 修一修」／「處理好所有的事」並指涉一份 `agency-os/reports/audit/*.md`（或可從 WORKLOG / AUDIT_REGISTRY 推得最近未 apply 的 logic audit）| **立即執行 `/apply-audit <report-path>`**：強制 §Patch Errata fold-in 在改 code 前 + 跨檔抓蟲 catch-up（grep callsites of new symbols across `lobster-factory/`、`agency-os/`）+ 4-action verify per patch + AUDIT_REGISTRY 🔴 TRACKED → 🔴 FIXED 含 commit hash + WORKLOG entry 含 R0+R4 4 動作。**禁止**：跳過 Errata 折回直接 apply（2026-05-23 三次 push-back 的根因）；Medium-High 風險 patch（prod deploy script / auth / DB migration）沒操作者明示 OK 就 apply。詳：[`.claude/commands/apply-audit.md`](../.claude/commands/apply-audit.md) |
-| 操作者說 `/tomo <hint>` | secret check → context 抽取 → 6 段 packet → 直接寫 `handoffs/` + TASKS + WORKLOG → commit + push（無 propose 確認）。詳見 [`.claude/commands/tomo.md`](../.claude/commands/tomo.md) |
-| **部署流程觸發**：使用者說「部署」/「deploy」/「推上去」/「可以上了」/「上線」 | ① `/check-drift` 確認 drift 清零 ② `/verify` 確認 build gate 通過 ③ 若有 `.ts/.tsx` 改動先在本機跑 `npx tsc --noEmit` ④ 三者 pass 才**提議**（不自動）`/sg-deploy`，等明示 go-ahead。**🔧 機械閘**（2026-07-02）：`hooks/rules/high-risk-bash-warn.js` BLOCK ssh→prod VPS 的 sg-deploy/systemctl restart/docker down/reboot，首行 `# CONFIRMED-HIGH-RISK:` 解鎖 |
-| 使用者問「系統狀態」/「是否健康」/「health」/「有沒有問題」 | 跑 `/health`；若回報 `sync_check: FAIL` → 接著跑 `/sync-check` |
-| MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync`。使用者主動問「vault/密鑰/secret 不見了/API key 哪裡找」同此路由。**🔧 機械閘**（2026-07-02）：`hooks/rules/mcp-health.js` 於 401/403 失敗時自動附 `/vault-status` 路由提示 |
-| 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
-| 使用者提到「搬站」/「換主機」/「機器買好了」/「二手 Hetzner」/「soulful 搬」/「Hostinger 到期」/給一個新主機 IP | **先讀 [`tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`](tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md)**（步驟／切換／回滾 SSOT），再依 §0.5 → §3 → §4 → §5 → §6 執行。**硬死線 2026-11-12**（Hostinger hosting 不續約）。**禁止**：不讀 runbook 就開始建機或搬檔；重做已完成項（CF zone 14 筆已建、nameserver 已切、信箱 mail-tester 10/10、EU 三份備份 769 MB、還原演練 Drill #1 PASS）|
-| 使用者提到「一鍵架站」/「自動開站」/「provision」/「租主機」/「Hetzner 開機」/要在 app.aware-wave.com 加建站按鈕 | **先讀 [`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)**：「租 Hetzner 主機+day-1 硬化+DNS」**已寫好且真機驗證通過（2026-06-06）**，核心函式 `packages/workflows/src/provision/provisionClient.ts`。**直接呼叫，禁止重寫**。嵌進 app = 加 API route 呼叫 `provisionClient()`（雙觸發設計）。違反樣態：重新實作租機/cloud-init/secretStore 邏輯（已存在且驗過）。 |
-| 使用者提到「app.aware-wave」/「onboarding」/「建站」/「佈建」/「企業佈建」/「ops-console」/「做 Stage N」/「繼續（上次那個建站的）」 | **先讀 [`docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`](docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md) 的「🚀 開工必讀（按順序）」7 步**（藍圖+最新真相+程式+活資料），讀完即完全掌握狀況再動工。這份是 5 階段總藍圖 SSOT（Stage 0 建站引擎已驗；現況/下一步以該檔 §2/§3 為準）。**禁止**：不讀 plan 就臆測卡點；重寫已存在的站層/機層；碰 Tarot（另一 AI 處理）。 |
-| 使用者要規劃／設計一個新的、需要長期維護的系統或專案治理架構（新產品線、新治理框架、`docs/HCI` 等尚未有既有 governance 的新建置；不含 `D:\Work` 既有子系統的日常任務）| **先讀 [`docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`](docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md)**（通用治理建置 SOP；§1 明定何時適用/何時不划算，不是所有專案都要套；§2-9 文件治理層＋§10-17 單一任務執行層，涵蓋規劃閘／來源路由／四動作驗證／不變量／風險分級／交接協議／機械檢查）。**禁止**：對週末原型或一次性小改動套用全套流程（§1 排除）；把 §10-17 誤當成本 repo 還要另外遵守的新規則——那些內容本就是從這份 `AGENTS.md` 的 R0／R4／風險分級抽出來的通用版，`D:\Work` 直接用這份原版即可 |
-| Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
-| 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **🔧 機械閘**（2026-07-02）：`hooks/rules/vbc-reminder.js` 於 UserPromptSubmit 偵測語境自動注入 VBC 提醒。**VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
-| 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
-| 使用者要任何測試：「跑 QA/找 bug/上線前測試」「幫我測/瀏覽器/Chrome/e2e」「截圖/效能」 | QA 結構化報告 → `/qa-review`；真瀏覽器 e2e（登入態/Canvas/React state）→ `browser-test` skill（先 `list_connected_browsers`）；smoke/完整/截圖/perf → `/playwright smoke\|qa\|screenshot <url>\|perf` |
-| Repair Center 告警（`/api/ops/repairs/health` 回 503 / `ok: false` / Phase 4 失敗）| 跑 `/phase4-check`；若持續失敗 → 讀 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
-| AO-RESUME 且今日 TASKS 含部署相關任務 | 在 §7 下一步點名今日 deploy flow：`/check-drift` → `/verify` → go-ahead → `/sg-deploy` → `/playwright smoke` |
-| 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`）；問「任務/還有什麼/今天要做哪些」→ `/tasks` 列 open 待辦 |
-| 編輯 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| **🔧 機械閘**：`hooks/rules/auto-repair-guard.js` 首次 BLOCK 並列出 4 步前置檢查（閘訊息即完整清單），照做後 re-issue 通過；路徑與步驟 SSOT 在該 rules 檔 |
-| 使用者說「grill me」/「問爆我」/「逼我想清楚」/「壓力測試計畫」/「對齊一下設計」 | 有 codebase 相關 → `grill-with-docs` skill（同時更新 CONTEXT.md + ADR）；純概念層 → `grill-me` skill。**Claude 自覺同觸發**：需求有歧義/多可能詮釋時，先 grill 再實作。**禁止**：直接開始實作而不確認需求 |
-| 使用者說「TDD」/「寫測試」/「test-first」/「測試先行」/「red-green-refactor」 | 跑 `tdd` skill（整個紅綠重構流程，含垂直切片 + REALTEST_EVIDENCE 要求）。**Claude 自覺同觸發**：開寫新 feature 而未先寫 test → 停下改走 TDD，禁止先寫全部 impl 再補 test |
-| 使用者說「做個原型」/「prototype」/「先試試看」/「試幾個設計」/「讓我玩一下」 | 跑 `prototype` skill（依問題類型路由：邏輯問題→LOGIC.md；UI→UI.md）。**Claude 自覺同觸發**：feature 出現 2+ 架構方向無法靠分析裁決 → 提議 prototype 驗證 |
-| 使用者說「架構改善」/「重構機會」/「模組太分散」/「很難測試」/「run improve-codebase」 | 跑 `improve-codebase-architecture` skill（探索 → HTML 報告 → grilling loop）。**Claude 自覺同觸發**：發現 shallow module（介面與實作一樣複雜）|
-| 使用者說「token 太多」/「caveman」/「be brief」/「壓縮一下」/「less tokens」 | 跑 `/caveman`（持續生效直到 "stop caveman"）|
-| 讀 code 時碰到完全陌生的模組區段、不知道 caller 是誰 | 主動跑 `/zoom-out`（不問使用者，直接輸出模組地圖） |
-| 使用者說「diagnose」/「debug this」/「一直報錯」/「找不到 bug」/「六段 debug」 | 跑 `diagnose` skill（6 段結構化 loop；複雜 root-cause 時 skill 內部 defer `debugger` agent）。**Claude 自覺同觸發**：debug 第一假說失敗或難複現 → 切 diagnose，不繼續猜 |
+使用者說了某句話 → 立即執行的對照表（約 40 列）→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §代理自動工具使用規則（2026-09-04 逐字搬移；流程完成後自動接續的下一步在同檔 §Claude 工作自觸發規則）。**每次任務開始，若使用者句子命中該表任一觸發語，先照表做。** 機械閘（🔧）不受搬移影響，仍由 hooks 強制。
 
 ### 核心行為規則：宣告執行，不詢問
 
@@ -315,16 +259,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 **步驟 2 — 分類任務類型，預載對應工具**
 
-| 任務類型 | 判斷條件 | 預載 |
-|---------|---------|------|
-| Infrastructure | VPS / Docker / nginx / 服務異常 | `incident-responder` triage → runbook |
-| Code change | 新增 / 修改 / 重構程式碼 | 見步驟 3 |
-| Client site | soulful / WP / 客戶相關 | `/client-status` 先確認 → `wordpress-*` agent |
-| Database | schema / migration / query / 資料 | `db-expert` 先審 → `supabase-engineer`（如涉 Supabase）|
-| Security | auth / RLS / permission / 漏洞 | `critic` → `vuln-verifier` |
-| Data/Analytics | PostHog / funnel / 轉換率 | `posthog-analyst` |
-| Technical decision | 工具選型 / 架構 / A vs B | `/decide` |
-| System health | 健康 / 監控 / 是否正常 | `/health` → `/smoke-test` |
+→ 任務類型 → 預載工具的對照表搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §任務類型預載表（2026-09-04 逐字搬移）。
 
 **步驟 3 — Code change 的複雜度判斷**
 
@@ -337,42 +272,11 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 ### Claude 工作自觸發規則（不依賴使用者輸入）
 
-這是最重要的一張表。**觸發條件是 Claude 自己在做什麼，與使用者說什麼無關。**
-
-| Claude 正在做的事 | 自動執行 |
-|----------------|---------|
-| 要實作跨 3+ 模組 / 新功能設計 | 先召喚 `planner` agent 拆任務，再實作 |
-| 讀 code 時發現 bug / 異常行為 / 邏輯錯誤 | 召喚 `debugger` agent 系統性追根因 |
-| 改動 auth/RLS/金流、DB schema/migration、Supabase、n8n、nginx/docker-compose/Dockerfile、WP 外掛主題路徑 | **🔧 機械閘**：`hooks/rules/file-path-router.js` 按路徑自動 BLOCK 並指路（7 類別）。照閘指示召喚對應 agent；**不可省**：auth 類改完 `critic` → Critical/High 再 `vuln-verifier`；DB 改前 `db-expert`；nginx/docker 先讀 `safe-infra-patch.sh` + 改後立即 health check（§Auto-Repair 紅線）|
-| 改動 wp-bridge 外掛 code（`lobster-factory/packages/wp-bridge-plugin/`）並要讓操作者拿到 → bump `AWBRIDGE_VERSION`（header+define 兩處）+ 通過 R0 後 **自動跑 `bash scripts/release-wp-bridge.sh`**（無需詢問），回報 Release URL。**核心坑**：外掛發佈正本是 `awarewaveai-pei/aware-wave-wp-bridge`（push tag `v*` → Action 出 zip）**不是 Work**；只 push Work ≠ 發版。詳 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md` / `.claude/commands/wp-bridge-release.md` |
-| 改動 `.ts/.tsx` 任何檔案 | 完成前 `npx tsc --noEmit` 必綠（**🔧** `batch-format.js` Stop 時自動跑）；型別錯誤不得宣告完成 |
-| 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（**🔧** verify-gate 三件套硬擋未驗證 commit）|
-| critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
-| 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks）| 改後跑 `/doc-sync`；若同時改了 `.claude/commands/` `.claude/agents/` `.claude/skills/` → 跑 `/sync-check` |
-| 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit（tree 乾淨時靜默跳過）|
-| 準備 sg-deploy 前 | 自動跑 `/check-drift` + `/verify` + `tsc --noEmit`（有 ts 改動時）|
-| sg-deploy 完成後 | 自動跑 `/playwright smoke` |
-| wp-maintenance safe-update 完成後 | 自動跑 `/playwright client <slug>` |
-| 讀 log / SSH 進 VPS 看到 error / 異常 | 召喚 `incident-responder` 先 triage，再決定 runbook |
-| 發現問題需要 web 查規格 / API 文件 | 召喚 `web-researcher`，不靠訓練資料猜 |
-| 需要做技術選型 / 架構決策 | 召喚 `decision-intelligence`（`/decide`），不靠直覺推薦 |
+這是最重要的一張表，觸發條件是 Claude 自己在做什麼。→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §Claude 工作自觸發規則（2026-09-04 逐字搬移）。三條不查表也要記得的：改 `.ts/.tsx` 完成前 `npx tsc --noEmit` 必綠；完成任何 code 改動跑 `/verify-recent`；改 governance 文件後跑 `/doc-sync`。
 
 ### 工作類型 → Agent/Tool 路由表
 
-| 使用者描述的工作 | 自動使用 |
-|--------------|---------|
-| VPS / Docker / nginx 問題 / container crash | `devops-engineer` agent |
-| 前端頁面 / UI 設計 / landing page / component | `frontend-designer` agent |
-| 10+ 檔案重構 / rename / 搬移 | `refactor-specialist` agent |
-| 框架升級 / 套件 major version bump | `migration-engineer` agent |
-| MainWP 連不上 / child site 斷線 | `mainwp-engineer` agent |
-| WP 客戶備份 / 更新 / MainWP sync | `wordpress-maintenance-agent` agent |
-| PostHog 數據 / funnel / 轉換率 / feature flag | `posthog-analyst` agent |
-| 陌生 repo / 第一次接觸這個 codebase | `onboarder` agent |
-| 策略 / 要不要做 X / 紅藍隊壓力測試 | `strategy-review` skill |
-| 新功能需求拆解 / 要加什麼功能 | `feature-plan` skill |
-
-→ 完整路由表見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
+→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §工作類型 → Agent/Tool 路由表（2026-09-04 逐字搬移）。
 
 ### Subagent 交接協議（強制）
 
@@ -403,26 +307,11 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 | **Technical decision** | 決策記錄在 `reports/decisions/` + 使用者確認接受結論 |
 | **Research / 調研** | 具體答案（非「可能是」）+ 來源引用（URL 或 file:line）+ 結論寫進 WORKLOG |
 | **System health 確認** | 所有 smoke check PASS（或 WARN 項已解釋）+ WORKLOG 記錄時間與結果 |
+| **Product work（可跑的東西）** | 一條操作者能自己執行的指令 + 它的輸出，登記進 `docs/operations/RUNNABLE_DEMOS.md`（AO-RESUME §1 每次列最新一列）+ 上面對應類型的條件。gate 表格全 CLOSED 不算完成（2026-09-04，ADR-024） |
 
 ### 問題症狀 → Runbook 路由表
 
-| 症狀 / 告警 | 立即讀取的 Runbook |
-|-----------|----------------|
-| 網站 502 / 回應極慢 / OOM / container restart loop | `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
-| 可疑 process / 不明高 CPU / crypto miner 跡象 | `runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md` |
-| 未授權存取 / credentials 外洩 / 安全事件 | `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` |
-| Telegram bot 沉默 / command plane 無回應 | `runbooks/COMMAND_PLANE_TELEGRAM_SILENCE_RUNBOOK.md` |
-| Uptime Kuma 監控壞了 / 誤報 / 設定錯誤 | `runbooks/UPTIME-KUMA-MONITOR-FIX.md` |
-| Trigger.dev deploy 失敗 / Cloudflare BFM 問題 | `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md` |
-| Codex 設定錯誤 / MCP 連不上 | `runbooks/CODEX-CONFIG-ERRORS-FIXES.md` |
-| 要新增週期性健康檢查 | `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` |
-| Cloudflare WAF 規則 / scanner 攻擊 / DDoS | `runbooks/CLOUDFLARE-WAF-SETUP.md` |
-| VPS reboot 訊號 + 16h 未處理 | `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
-| 雲端排程報告沒更新 / Telegram 排程警報 / routine source 漂移 / 週報月報 stale | `runbooks/自動排程監控與手機Telegram警報-維護手冊.md` |
-| EU/SG 搬機 / 上 dedicated 主機 / 備份策略 / RAID / 災難還原 / Cloud→Dedicated 遷移 | `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` |
-| 換更便宜機器 / KS-6 / KS-7 / 整機轉移 ks-aw-01 / 月租退出權 | `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md` |
-
-MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
+→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §問題症狀 → Runbook 路由表（2026-09-04，AGENTS.md 瘦身；內容逐字搬移未改）。看到症狀先查該表再讀 runbook。
 
 ## Session 啟動順序（每次都做）
 
@@ -434,10 +323,7 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 **機器前提（2026-08-12 更新）**：**目前僅個人筆電一台**（操作者已離職，公司桌機退場）。環境仍以「repo 共用 + 各機獨立 env/vault」處理 —— 這個設計**不因單機而改**，將來加機器即可直接用；跨機 import 回報「無其他機器較新匯出」是正常狀態。
 
 **AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回 AO-RESUME 報告（§0–§8）；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
-`ao-resume.ps1` 同時自動執行 `scripts/check-smoke-tests.ps1`（application-layer smoke：n8n MCP + Repair Center health + 客戶網站健康 + n8n workflow 失敗 + **客戶站外寄信失敗**）→ 寫 `reports/status/smoke-LATEST.json` → Claude 在 §1 系統快照回報。使用者不需要記得跑 `/smoke-test`。  
-`client_mail` 檢查的存在理由：soulful 的 FluentSMTP 曾指向不接受連線的 `pop.hostinger.com:587`，`wp_mail()` 從 2026-08-03 到 2026-08-16 全部靜默失敗無人察覺。**外掛自帶的失敗通知本身也走 `wp_mail`，警報與被監控的通道一起死**，故監控必須來自站外。  
-**判讀 smoke 結果（2026-08-17 起）**：`smoke-LATEST.json` 自帶 `overall` 與 `blind_spots` 兩個欄位，**直接讀，不要自己心算**。`blind_spots` 非空 = 某個關鍵偵測器這輪「什麼都沒量到」（SSH 掛了 / 金鑰不見 / 解析失敗），此時 `overall` 一律 WARN —— 因為「偵測器啞了」不可以長得像「一切正常」，那正是 2026-08-03 事故的形狀。`client_mail` 除了近 7 天失敗數，另查**距上次成功寄信天數**（門檻 `-MailQuietDayLimit`，預設 10）：只數失敗無法分辨「健康」與「已壞但還沒人用到」。門檻**必須低於 14** —— FluentSMTP 的 `log_saved_interval_days=14` 每日清舊日誌，設 14 以上該分支永遠觸發不到。  
-每 30 天自動執行月度五項檢查（warn-only，2026-08-24 訂正：原文寫「三項」但 `ao-resume.ps1` 早就是四項，今天再加第五項）：`monthly-system-review.ps1` / `check-supabase-memory-monthly.ps1` / `check-governance-docs-drift.ps1`（4 份核心治理文件一致性）/ `refresh-cf-origin-ips.ps1` / `check-change-impact-matrix-drift.ps1`（`docs/CHANGE_IMPACT_MATRIX.md` 全部 ~85 條關係的 mtime 漂移，不只 4 份核心文件）。結果寫 `reports/`，Claude 在 §1 回報。
+`ao-resume.ps1` 同時自動跑 smoke（`scripts/check-smoke-tests.ps1` → `reports/status/smoke-LATEST.json`）與每 30 天的月度五項檢查；**判讀規則**（`overall`／`blind_spots` 直接讀不心算、`client_mail` 為何要站外監控、`-MailQuietDayLimit` 必須 < 14）見 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §AO-RESUME 判讀規則（2026-09-04 逐字搬移）。
 
 **AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.claude/commands/ao-close.md`。
 
@@ -468,15 +354,17 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 
 ## Related Documents (Auto-Synced)
 - `docs/CHANGE_IMPACT_MATRIX.md`
+- `docs/operations/AGENTS_APPENDIX.md`
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/operations/new-doc-linkage-checklist.md`
+- `docs/operations/RUNNABLE_DEMOS.md`
 - `docs/operations/system-guard-and-notification.md`
 - `docs/operations/system-operation-sop.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-03 16:05:12 UTC_
+_Last synced: 2026-09-04 02:19:06 UTC_
 

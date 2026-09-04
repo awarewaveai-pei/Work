@@ -11,7 +11,8 @@
           "verify-gate-commit",
           "high-risk-bash-warn",
           "git-add-scope-tracker",
-          "git-commit-scope-guard"
+          "git-commit-scope-guard",
+          "repeat-failure-guard"
         ]
       },
       {
@@ -62,7 +63,8 @@
         "rules": [
           "audit-log",
           "git-add-scope-tracker",
-          "git-commit-scope-guard"
+          "git-commit-scope-guard",
+          "repeat-failure-guard"
         ]
       },
       {
@@ -87,6 +89,12 @@
         "matcher": "^mcp__",
         "rules": [
           "mcp-health"
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "rules": [
+          "repeat-failure-guard"
         ]
       }
     ],

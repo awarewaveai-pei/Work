@@ -1,5 +1,13 @@
 Run a code review on all files changed since the last commit, with depth scaled to change size and sensitivity.
 
+## Step 0 — Quota circuit breaker (2026-09-04, operator: 撞到額度就停)
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/oracle-quota.ps1 -Action check -Tool critic
+```
+
+Exit 3 = the critic subagent is recorded as BLOCKED (HTTP 429 session limit) until the printed time: do not spawn it; go to `/codex-review` (which runs its own Step 0 for Codex) or, if that is blocked too, to the written self-review + mutation evidence with `ORACLE_WAIVED` in WORKLOG. If the critic you do spawn fails with `429` / `rate_limit` / `session limit`, run `scripts/oracle-quota.ps1 -Action set -Tool critic -Until "<reset time in the error>" -Reason "<verbatim>"` (no time → `-Hours 5`) **immediately and do not spawn a second critic**.
+
 ## Step 1 — Collect changed files and size
 
 ```bash

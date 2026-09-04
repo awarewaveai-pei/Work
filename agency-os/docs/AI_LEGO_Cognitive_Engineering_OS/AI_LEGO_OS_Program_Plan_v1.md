@@ -192,3 +192,5 @@ Source directive 中所有根路徑（`/.ai/`、`/specs/`、`/policies/`、`/met
 ## 13. 本文件變更管理
 
 Semantic Version；任何修改走 R0（[任務理解]…[驗證計畫] 全套）；phase status 更新屬 Low-risk 例行維護可直接改，其餘段落改動需說明理由。歷史由 git 保存。
+
+**Post-Phase-5 規則（2026-09-04，`docs/adr/ADR-024-spec-on-demand-and-verification-shape.md`）**：§10 的 Phase 0–2 禁令是歷史，不改；它缺的另一半由 ADR-024 補上——規格按需求才寫（first-consumer rule）、規格散文上限與 §章節引用（行號由生成的 `docs/architecture/MOTHER_DOC_SECTION_INDEX.md` 提供）、每條工作線只有一個狀態正本（Phase 5 切片 = `Projects/internal/cognitive-engineering-os/docs/PHASE5_RESEARCH_SLICE.md`，本檔 §11 那一列只是指標，數字允許過期）、驗證形狀。

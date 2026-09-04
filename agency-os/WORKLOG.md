@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-09-04（續3，同一 session：操作者「把所有你說要改的全部去改好」— 治理與工具批次）
+
+### AGENTS.md 瘦身 + ADR-024（spec-on-demand）+ 生成索引 + 額度斷路器 + 重複失敗閘 + 三支工具腳本 + 可跑 demo 登記表
+
+**觸發**：操作者連續四問（進度為何慢、之前計畫是否多餘、§10 禁令要不要改、還有什麼該優化）後說「把所有你說要改的 全部去改好」；中途再加兩條：「撞到額度就馬上停不要再連，可不可以設時間」「做失敗還一直用同一種方式重試很多次很愚笨」。**全程 0 個 agent**（唯一想派的 critic 被自己新寫的斷路器規則擋掉，正確）。
+
+**[已修改]**（治理 4、AI-LEGO 6、hooks 3、scripts 4、commands 4、memory 2）：
+- `agency-os/AGENTS.md` 483→363 行、66KB→43KB（每輪注入約省 1/3；沒到我先前說的 5–10 倍，因為 R0／R4／風險分級本體就是核心，留著）：五張查表逐字搬到 `docs/operations/TOOL_TRIGGER_MAP.md` 新節 §AGENTS.md 觸發與路由正本（觸發語表、任務類型預載表、自觸發表、工作類型→Agent、症狀→Runbook；後者取代該檔舊 Runbooks 表），六段機制細節與歷史逐字搬到新檔 `docs/operations/AGENTS_APPENDIX.md`（AO-RESUME 判讀規則、新部署路徑 SOP、扇出治理版本教訓與真實案例、讀資料規則第一版原文、ORACLE gate 細節）；AGENTS.md 每處留一行指標。hooks／scripts／commands 引用的段落名（§跨模型 oracle、§操作風險分級、§Auto-Repair 紅線、§Trigger.dev、§部署規則、§Agent 扇出治理、§已知信任邊界、§抓蟲、§快速續接）全部保留，腳本內斷言。
+- AGENTS.md 三條新規則：**讀資料**改為「預設主 agent 自己讀 + 例外 A（獨立驗證 1 個 critic）+ 例外 B（>100KB 純調查最多 1 agent 或 Codex，產出寫檔）+ 配套（讀完 /compact、scratch 筆記）」；**驗證的形狀**（突變測試為主、每 commit 一個 critic 按 tier、auth/crypto/個資才多代理、文件不派 agent）；**額度斷路器**與 **§失敗重試紀律**（同一件事同一方式失敗兩次 = 停；第三次一模一樣是違規）。DoD 加「Product work（可跑的東西）」列。
+- `docs/adr/ADR-024-spec-on-demand-and-verification-shape.md`（ACCEPTED）+ `ADR_INDEX.md` 列 + Program Plan §13 指標：規格按需求才寫（first-consumer rule，未消費者標 DORMANT 不刪）、規格散文上限、母文件只以 §章節引用、每條工作線一個狀態正本、驗證形狀。§10 歷史不改。
+- `tests/gen_spec_index.py` 生成 `docs/architecture/SPEC_QUICKREF.md`（55+ 份 schema 的 `$id`／shape／required 速查）與 `MOTHER_DOC_SECTION_INDEX.md`（三母文件 § → 行號，跳過 code fence）；`run_golden_tests.py` 新 family 6 `--check` 驗新鮮（2508→2509）。
+- hooks（SSOT `mcp/claude-userlevel/hooks/`，已 `sync-claude-userlevel.ps1 -Mode merge` 部署）：`code-change-tracker.js` 不再追蹤 `os.tmpdir()` 下的 scratch 腳本（今天 14 個待驗檔有 11 個是）；新 `repeat-failure-guard.js`（PreToolUse／PostToolUse／PostToolUseFailure Bash）：同一條 Bash 指令文字失敗 2 次後第 3 次相同文字 BLOCK，`# RETRY-JUSTIFIED:` 首行放行、成功即清；manifest 三處接線；parity test +3。
+- scripts：`oracle-quota.ps1`（check／set／clear，狀態檔 `%TEMP%\claude-oracle-quota.json` 全機共用；已記入今天真實的兩個 block：critic 至 9/5 05:20、Codex 至 9/7 11:06）；`verify-clear.ps1`（/verify-recent Step 4，不含 `git commit` 字樣）；`git-stage-hunks.py`（共用工作樹只 stage 自己 hunk 的配方腳本化）。
+- commands：`/codex-review` 與 `/review` 加 Step 0 斷路器檢查 + 撞額度即 `set` 不重試；`/verify-recent` Step 4 指向腳本；`/ao-resume` §1 必列「上次可跑的 demo」。
+- `docs/operations/RUNNABLE_DEMOS.md` 新表（首兩列 = Phase 5 runner／CLI）；`change-impact-map.json`／`CHANGE_IMPACT_MATRIX.md` 登記兩份新文件（登記腳本 `-Targets` 由 bash 傳逗號字串會被當成單一 target，手修）；`docs/DOCS_INDEX.md` 由 doc-sync 更新；HCI ch.17 見上一條目。
+- memory：`feedback_commit_gate_and_heredoc_friction.md` 新增；`MEMORY.md` 索引。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | ms=21026 | result=全套 node:test 綠，含新 `code-change-tracker does NOT track scratch code files under os.tmpdir()` 與 `repeat-failure-guard blocks the 3rd identical Bash command after 2 recorded failures`（第一版紅：RETRY-JUSTIFIED 那行改變了指令 hash 找不到失敗紀錄——自己的測試抓到自己的設計漏洞，改為 hash 前剝掉 marker 行後綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec root）| exit=0 | ms=2160 | result=`PASSED: 2509`（family 6 生成索引新鮮）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/oracle-quota.ps1 -Action check/set/set/check` 真實循環 | exit=0/0/0/3 | result=兩個真 block 記入，`check` 回 exit 3「DO NOT CONNECT」
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/audit-cp950-traps.ps1 -Path scripts/{verify-clear,oracle-quota}.ps1` | exit=0 | result=CLEAN（verify-clear 第一版被抓到 `(git rev-parse …)` 原生捕捉點，改用 `$PSScriptRoot` 推 repo root 後 CLEAN）；`verify-clear.ps1 -WhatIf` 真跑列出 tracker 內容
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sync-claude-userlevel.ps1 -Mode merge`／`check-claude-sync.ps1`／`doc-sync-automation.ps1 -AutoDetect` | exit=0/0/0 | result=RESULT PASS、Result PASS、閉環報告 `reports/closeout/closeout-20260904-101906.md`
+- REVIEW_DONE: critic=self（斷路器記錄兩條 oracle 皆 blocked，依新規則不連線；自審：AGENTS 每個切點逐一 grep 讀回、保留段落名腳本斷言、hook 兩條新規則各有突變式 parity test）| verdict=warn→pass | findings=0c/0m/3n（3 nit 全修：repeat-failure-guard hash 漏洞、verify-clear 捕捉點、登記腳本 Targets 傳參）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,lobster-factory/docs | grep=`AGENTS.md §代理自動工具使用規則|§Claude 工作自觸發|§工作類型|§問題症狀|§新部署路徑|§任務到達協議|AGENTS.md 觸發表` | hits=3（排除 gitignored `agency-os/Backups/` 舊快照 45 筆）：`scripts/audit-cp950-traps.ps1:73` 與 `.claude/commands/audit-encoding.md:104` 指向搬走的段落 → 已改指 TOOL_TRIGGER_MAP.md；`TASKS.md:474`「AGENTS.md 觸發表」是未來工作備註，經 AGENTS.md 指標可達，保留
+- ORACLE_WAIVED: critic（429 至 9/5 05:20）與 Codex（usage limit 至 9/7 11:06）皆由 `scripts/oracle-quota.ps1 -Action check` 回 exit 3，依 AGENTS.md §額度斷路器不連線；書面自審如上。9/7 後對本批 commit 補跑 `/codex-review`（TASKS 已有欠的 review 條目，範圍擴到本批）。
+
+**[剩餘風險]**：① AGENTS.md 仍 43KB，再瘦要動 R0 本體，未動；② `repeat-failure-guard` 只認一字不差的指令，同意思換寫法不擋（刻意，避免誤擋）；③ 每 session 一個 WORKLOG 檔未做（三支閘腳本都 parse `WORKLOG.md`，另開任務）；④ `register-new-governance-doc.ps1` 從 bash 傳 `-Targets a,b` 會變單一字串、且 StrictMode 下 `$LASTEXITCODE` 未定義報錯（已手修結果，腳本本身未改，記 TASKS）；⑤ doc-sync 順手更新了其他 session 髒檔的 `_Last synced` 行，未 stage，留給 AO-CLOSE；⑥ repo 衛生三項（HCI30 大小寫、5 個舊 worktree、3 個散檔）記在 TASKS 待操作者。
+
+**[rollback]**：`git revert` 本 commit 後跑 `sync-claude-userlevel.ps1 -Mode merge` 還原 `~/.claude/hooks`；`%TEMP%\claude-oracle-quota.json` 與 `claude-bash-failures-*.json` 為暫存狀態，刪除即可。
+- AUTO_TASK_DONE: 操作者「全部去改好」批次落地——AGENTS.md 瘦身三分之一並加三條新規則、ADR-024、生成索引 + golden family 6、額度斷路器、重複失敗閘、verify-clear／git-stage-hunks／oracle-quota 三支腳本、RUNNABLE_DEMOS 登記表；hooks 全綠已部署；未做：每 session WORKLOG 檔、真 LLM 切片（等 Ollama／GPU 答覆）。
+
 ## 2026-09-04（續，System Foundry v1.6 內容填實：55 份空殼樣板寫成真規則 + critic 抓到的機器層錯位全修）
 
 ### 把 commercial(15)/engineering(16)/assurance(11)/methodology(13) 共 55 份「只有骨架沒有規則」的樣板文件寫成真內容

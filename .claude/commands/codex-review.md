@@ -1,5 +1,13 @@
 Run the standard cross-model oracle review for R0 [驗證計畫] Review 動作 (AGENTS.md §跨模型 oracle, primary entry point since 2026-08-30). This command exists so two things are never left to memory: the two mandatory focus-text additions in Step 2, and the capture-before-review sequencing in Step 1.5 (2026-08-30 rewrite, closing a critic Critical finding — see Step 1.5's own note).
 
+## Step 0 — Quota circuit breaker (2026-09-04, operator: 撞到額度就停)
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/oracle-quota.ps1 -Action check -Tool codex
+```
+
+Exit 3 = Codex is recorded as BLOCKED until the printed time: **stop here**, do not run Step 2 at all, write `- ORACLE_WAIVED: codex quota blocked until <time> (scripts/oracle-quota.ps1)` in today's WORKLOG and do the written self-review + mutation evidence instead (memory `feedback_self_review_when_oracle_down`). Exit 0 = continue.
+
 ## Step 1 — Estimate size
 
 ```bash
@@ -37,6 +45,8 @@ If that path doesn't exist (plugin reinstalled under a different marketplace/ver
 (Swap `--wait` for `--background` per Step 1's size call — same `Bash({..., run_in_background: true})` pattern `/codex:adversarial-review`'s own command file uses.)
 
 Return the command's output verbatim to the user for this turn, same as `/codex:adversarial-review`'s own contract — do not paraphrase, summarize, or fix anything it reports.
+
+**If the output contains `usage limit` / `rate limit` / `429` / `try again at`:** immediately record the breaker with the reset time from the message (`scripts/oracle-quota.ps1 -Action set -Tool codex -Until "<parsed time>" -Reason "<verbatim>"`; no time in the message → `-Hours 5`), then go straight to the fallback below. **Do not retry Codex in this session.** The `codex-oracle.ps1` fallback uses the same Codex quota, so on a quota error skip it too.
 
 Note: Step 1.5's capture and this step's own diff collection run moments apart, not atomically — a change to the working tree in between (another concurrent session's auto-commit, for example) could make them diverge slightly. This is the same class of imperfection `codex-oracle.ps1` has always had; it is a real but small residual gap, not a regression from Step 1.5 not existing.
 

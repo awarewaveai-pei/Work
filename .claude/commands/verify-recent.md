@@ -99,6 +99,8 @@ Remove-Item -LiteralPath $tf -Force -ErrorAction SilentlyContinue
 Write-Host "verify-recent: tracker cleared. git commit is unblocked."
 ```
 
+或等價地跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-clear.ps1`（列出釋放的檔再刪 tracker；repo 外的 scratch 腳本另列）。**必須在一條不含 `git commit` 的指令裡做**：`verify-gate-commit.js` 在 PreToolUse 就擋整條指令，把清除跟 commit 寫在同一條會一起被擋（2026-09-04 實例）。
+
 ## `--ack "reason"` variant (atomic helper)
 
 Do NOT inline the clear-and-log here — call the atomic helper via absolute repo-root path:
