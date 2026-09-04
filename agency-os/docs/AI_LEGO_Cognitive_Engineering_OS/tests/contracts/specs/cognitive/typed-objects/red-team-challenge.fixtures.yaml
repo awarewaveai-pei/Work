@@ -1,0 +1,78 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/red-team-challenge.schema.yaml"
+target_ref: ""
+description: >
+  Exercises RedTeamChallenge's required fields, the `dimensions_examined[]`
+  minItems:1 guard (`findings[]` may legitimately be empty), the closed
+  11-value dimension enum (Atlas §11.23's own checklist), and --
+  critically -- `additionalProperties: false` at both the top level and
+  per-finding, operationalizing Atlas's own no-final-authority rule
+  (L1735): proven to actually refuse a smuggled `approved`/`verdict` key,
+  not just a schema this test file trusts by assertion.
+
+valid:
+  - name: two_dimensions_one_finding_one_clean
+    instance:
+      id: "RTC-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.red_team"
+      proposal_ref: "PROP-2026-09-04-001: weekend automated migration of all customer databases"
+      dimensions_examined: [SECURITY, OPERATIONS]
+      findings:
+        - id: "RTC-2026-09-04-001-F1"
+          dimension: OPERATIONS
+          description: "migration plan names no rollback procedure or trigger condition for a partial failure"
+          severity: "high"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: dimension_examined_with_zero_findings
+    instance:
+      id: "RTC-2026-09-04-002"
+      version: "1.0.0"
+      proposal_ref: "PROP-2026-09-04-002"
+      dimensions_examined: [PRIVACY]
+      findings: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: dimensions_examined_empty_array_violates_minitems
+    instance:
+      id: "RTC-2026-09-04-003"
+      version: "1.0.0"
+      proposal_ref: "PROP-2026-09-04-003"
+      dimensions_examined: []
+      findings: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "dimensions_examined has minItems: 1 -- a challenge that examined nothing did not red-team anything (Atlas §11.23's 11-item checklist is what this method is for)."
+  - name: dimension_not_in_11_value_enum
+    instance:
+      id: "RTC-2026-09-04-004"
+      version: "1.0.0"
+      proposal_ref: "PROP-2026-09-04-004"
+      dimensions_examined: ["VIBES"]
+      findings: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "dimensions_examined[] items must be one of Atlas's own 11 named dimensions -- 'VIBES' is not among them."
+  - name: smuggled_top_level_approved_key_refused_by_additionalproperties_false
+    instance:
+      id: "RTC-2026-09-04-005"
+      version: "1.0.0"
+      proposal_ref: "PROP-2026-09-04-005"
+      dimensions_examined: [LOGIC]
+      findings: []
+      approved: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "additionalProperties: false at the top level -- Atlas L1735's own rule ('Red Team has no final authority, may only output a challenge artifact') is enforced structurally; a smuggled 'approved' key is refused, not silently accepted."
+  - name: smuggled_per_finding_verdict_key_refused
+    instance:
+      id: "RTC-2026-09-04-006"
+      version: "1.0.0"
+      proposal_ref: "PROP-2026-09-04-006"
+      dimensions_examined: [SECURITY]
+      findings:
+        - id: "RTC-2026-09-04-006-F1"
+          dimension: SECURITY
+          description: "x"
+          verdict: "REJECTED"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "additionalProperties: false also applies per-finding -- a verdict smuggled onto an individual finding is just as much an authority claim as one on the record's own top level."

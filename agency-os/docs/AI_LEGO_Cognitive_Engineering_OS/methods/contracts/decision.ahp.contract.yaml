@@ -1,0 +1,216 @@
+$id: "ai-lego://methods/contracts/decision.ahp.contract.yaml"
+title: "Analytic Hierarchy Process (AHP) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Seventh Method Atlas slice, and the FIRST from the
+  `decision` family (F16) -- every prior slice this session was either
+  `root_cause` (F05), `strategy` (F08), or `causal` (F11); this is a
+  standalone decision method, not chained off a `CauseHypothesisSet`.
+
+  Atlas §11.31 (L1910-1939) gives this method a dedicated section: purpose,
+  a real 7-stage pipeline ("Goal -> Criteria hierarchy -> Pairwise
+  comparisons -> Weight calculation -> Consistency Ratio -> Option scoring
+  -> Sensitivity"), benefits, and named limitations. Stronger than
+  `causal.dag`'s grounding in one specific way: Atlas §4 (L192) directly
+  CITES this method's own primitive composition -- "AHP = COMPARE + WEIGHT
+  + PRIORITIZE + DECIDE" -- one of only 5 methods anywhere in Atlas given
+  that treatment (alongside Fishbone, SCAMPER, SWOT, Scenario Planning),
+  the same tier of citation quality `root_cause.fishbone.contract.yaml`'s
+  and `strategy.swot.contract.yaml`'s own `cognitive_primitives` fields
+  already have -- unlike every other Tier 1 contract this session built
+  (`root_cause.five_whys`/`root_cause.pareto`/`causal.dag`), whose
+  primitives were all disclosed inferences.
+
+  Structurally the SECOND genuine-compute method this session built (after
+  `root_cause.pareto`), but mathematically richer: pairwise-comparison
+  matrix construction, geometric-mean weight derivation, and Saaty's own
+  published consistency-ratio check (Saaty, 1980) -- not a simple ranked
+  sum.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.31 層級分析法（AHP）(L1910-1939) -- purpose, 7-stage pipeline, benefits, limitations"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §4 (L192, 'AHP = COMPARE + WEIGHT + PRIORITIZE + DECIDE') -- the literal cited primitive composition this file's cognitive_primitives transcribes, not inferred"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, AHP row (L764): '層級分析法推權重｜pairwise→weights→consistency→score｜權重更一致'"
+  - "methods/registry/method-inventory.yaml 'AHP' entry (F16 decision, L997-1001) -- no machine_id recorded there; this contract mints one, see decided_by"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.31 gives a complete, unambiguous
+  7-stage pipeline and, uniquely among this session's Tier 1 contracts, a
+  directly cited primitive composition (§4 L192) -- direct transcription
+  plus low-risk, disclosed compilation choices. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a fifth concrete
+  entry.
+
+  `id: decision.ahp` is a NEW machine_id (method-inventory.yaml's own "AHP"
+  entry, L997-1001, carries no machine_id -- unlike root_cause.fishbone,
+  root_cause.five_whys, root_cause.pareto and causal.dag, all of which had
+  a machine_id already recorded before this session touched them). Minted
+  here following ADR-005b's `<family>.<name>` bare-form grammar, using
+  `decision` as the family -- the exact string method-inventory.yaml's own
+  "F16 decision" category label already uses, the same low-risk
+  family-naming convention `root_cause`/`strategy`/`causal` all already
+  follow (their family values are each that exact F-number's category
+  label, unmodified). No competing machine_id form was found for AHP
+  anywhere in the corpus (grepped exhaustively).
+
+id: decision.ahp
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, WEIGHT, PRIORITIZE, DECIDE]
+# CITED VERBATIM, Atlas §4 L192: "AHP = COMPARE + WEIGHT + PRIORITIZE +
+# DECIDE". Unlike every other Tier 1 contract this session built, this is
+# a direct transcription, not an inference -- all four are
+# CANONICAL_KERNEL members.
+
+purpose:
+  - derive_criteria_weights_via_pairwise_comparison
+# Atlas L1916 verbatim sense: "當 criteria 權重難以直接設定時，用
+# pairwise comparison 推導權重" (when criteria weights are hard to set
+# directly, use pairwise comparison to derive them).
+
+inputs:
+  required:
+    - Goal
+    - Criteria
+    - PairwiseComparisons
+  optional:
+    - Options
+    - OptionScores
+  # Atlas's own pipeline (L1920-1928) names Goal, Criteria hierarchy, and
+  # Pairwise comparisons as the method's real required inputs; Option
+  # scoring is a LATER pipeline stage that requires Options/OptionScores
+  # but a caller may legitimately run AHP purely to derive criteria
+  # weights without yet having options to score (the weights are still a
+  # complete, valid AHP output on their own) -- hence optional, not
+  # required.
+
+outputs:
+  - AhpAnalysis
+# NEW output type (see typed-objects/ahp-analysis.schema.yaml). Same
+# honesty gap every Tier 1 contract this session disclosed: Atlas names no
+# PascalCase output type for this method.
+
+preconditions:
+  - "exactly n*(n-1)/2 pairwise comparisons supplied for n criteria (one direction per pair, reciprocal derived)"
+  - "every comparison value is on Saaty's 1/9-9 scale"
+  # NEW, structurally necessary preconditions, transcribing Saaty's own
+  # published method (cited via the F16 tool table's own 'pairwise→
+  # weights→consistency→score' usage description, L764) rather than
+  # inventing arbitrary input validation.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: the AhpAnalysis record itself carries a
+  # provenance_record (epistemic_type: CALCULATED_RESULT for the computed
+  # weights/consistency/ranking -- same genuine-compute class
+  # root_cause.pareto.contract.yaml already established).
+  # evidence_labeling_required is FALSE, same reasoning
+  # root_cause.pareto.contract.yaml's identical departure already
+  # documents: this method's real risk (Atlas L1938, "權重仍然是
+  # judgment，不是客觀真理" -- weights are still judgment, not objective
+  # truth) is about the LIMITS of pairwise-judgment-derived weights, not
+  # about omitting evidence citations -- re-derived independently for this
+  # method's own risk profile, not copied from either the pareto or the
+  # fishbone/swot/causal.dag precedent.
+
+forbidden_transition: []
+# Atlas §11.31 gives no explicit forbidden-transition worked example.
+# Same open-question class as every other Tier 1 contract this session
+# built.
+
+recommended_next: []
+# Atlas §11.31 names no recommended_next method for AHP specifically
+# (contrast Fishbone/Five Whys/Pareto, which all have an explicit
+# Atlas-cited combo). Left genuinely empty rather than inventing one.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses.
+
+compilation_decisions:
+  - question: >
+      Should `Criteria hierarchy` (Atlas's own literal pipeline-stage name,
+      implying a MULTI-LEVEL tree of criteria and sub-criteria) be modeled
+      as a real hierarchy, or a flat list?
+    decision: "Flat list of criteria for this contract's v1 scope."
+    reasoning: >
+      Atlas names the stage but gives no worked multi-level example
+      anywhere (contrast the worked single-level pairwise-comparison
+      structure implicit in 'Weight calculation → Consistency Ratio').
+      Multi-level AHP (hierarchical weight aggregation across sub-criteria)
+      is a real, well-known extension of the base method, but building it
+      without ANY Atlas-cited worked example would be inventing scope
+      Atlas never asked for. Disclosed as a scope limit in
+      open_questions, not silently narrowed.
+  - question: >
+      Should the "Sensitivity" pipeline stage (Atlas's own 7th and final
+      named stage) be implemented in this contract's v1?
+    decision: "No -- not implemented, disclosed as an open question."
+    reasoning: >
+      Atlas names the stage (L1927) but gives it zero worked detail
+      anywhere (no formula, no worked example, unlike every other stage in
+      this same pipeline). Per this codebase's R4 claim-before-verify
+      discipline, inventing a full sensitivity-analysis algorithm from a
+      bare stage NAME would be exactly the kind of unearned/fabricated
+      scope this project's governance exists to prevent -- the same
+      standard `evidence.triangulation.contract.yaml`'s own thin-grounding
+      disclosure already applied to its own under-specified fields.
+
+open_questions:
+  - id: "OQ-AHP-1"
+    question: >
+      `Criteria hierarchy` is treated as a flat list, not a real multi-level
+      tree (Atlas's own pipeline-stage name implies hierarchy). Should a
+      future revision add real hierarchical criteria (sub-criteria nested
+      under top-level criteria, with weight aggregation across levels)?
+    owner: "operator, or whoever next needs multi-level AHP"
+    blocks: "nothing in this file's own validity -- flat is the more conservative (less invented) choice, and is itself a complete, valid AHP use case (Saaty's own original worked examples are frequently single-level)"
+  - id: "OQ-AHP-2"
+    question: >
+      The 'Sensitivity' pipeline stage (Atlas L1927) is not implemented at
+      all in this session's runtime -- Atlas gives it a name but zero
+      worked detail. Should a future pass define what sensitivity analysis
+      concretely means here (e.g. how much would a criterion weight need
+      to shift before the top-ranked option changes) once a real worked
+      example or formula is found or designed?
+    owner: "operator, or whoever next reads Atlas for additional AHP sensitivity-analysis content"
+    blocks: "nothing in this file's own validity -- the 6 other pipeline stages are each real and independently gated"
+  - id: "OQ-AHP-3"
+    question: >
+      `id: decision.ahp` mints a machine_id method-inventory.yaml's own AHP
+      entry never carried. Should method-inventory.yaml's L997-1001 entry
+      be updated to record this new machine_id, the way its sibling
+      root_cause.fishbone/five_whys/pareto/causal.dag entries already
+      carry one? Per this session's own established precedent
+      (contract-backlog.yaml's OQ at L159-168), method-inventory.yaml's
+      per-citation rows are treated as a SEPARATE registry with its own
+      update cadence, not retroactively synced -- so this file does not
+      update that registry, consistent with (not a new departure from)
+      how root_cause.fishbone's own contract landing left its
+      method-inventory.yaml row unsynced too.
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.31 (L1910-1939) and §4's own primitive-composition
+    citation (L192) directly at the cited lines. Grepped
+    method-inventory.yaml and both mother documents exhaustively for any
+    existing AHP machine_id (none found) before minting `decision.ahp`.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives` is the
+    strongest-grounded field in this file (directly cited, not inferred).
+    `purpose`/`preconditions`/`outputs`'s literal names are Phase 3
+    compilation, explicitly flagged. The flat-criteria and
+    no-sensitivity-implementation scope limits are DISCLOSED narrowing
+    decisions, not silent omissions -- see compilation_decisions and
+    open_questions.

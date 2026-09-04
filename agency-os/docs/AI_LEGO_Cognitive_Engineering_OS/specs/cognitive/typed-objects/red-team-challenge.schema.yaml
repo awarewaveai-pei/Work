@@ -1,0 +1,176 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/red-team-challenge.schema.yaml"
+title: Red Team Challenge
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RedTeamChallenge` -- the
+  declared `outputs` of `challenge.red_team`'s Method Contract
+  (methods/contracts/challenge.red_team.contract.yaml, `outputs:
+  [RedTeamChallenge]`). A sixth structural shape this session: not a
+  chain, a ranking, a graph, a comparison matrix, or a monitoring rule --
+  a CHECKLIST-STRUCTURED CRITIQUE across a closed, Atlas-cited set of
+  attack dimensions.
+
+  Field provenance -- Atlas §11.23 (L1715-1736):
+    * The 11-item checklist (L1720-1732: Assumptions, Logic, Missing
+      variables, Counterexamples, Security, Privacy, Legal, Culture,
+      Operations, Statistical validity, Overconfidence) is transcribed
+      verbatim as `dimensions_examined[]`'s and `findings[].dimension`'s
+      closed enum.
+    * The explicit authority rule (L1735, verbatim: "Red Team 沒有 final
+      authority，只能輸出 challenge artifact") is why this schema sets
+      `additionalProperties: false` at the top level -- the single
+      strongest structural enforcement any typed-object schema in this
+      directory uses. Every other schema in this directory (SWOT,
+      CauseHypothesisSet, FiveWhysValidation, ParetoAnalysis,
+      CausalDagAnalysis, AhpAnalysis, ReversalCriteriaSet) permits
+      additional properties by omission -- this is the FIRST to forbid
+      them outright, specifically because Atlas gives THIS method an
+      explicit rule about what its output may never represent (a verdict,
+      an approval, a final decision) that a permissive schema would not
+      structurally enforce. Proven by mutation test: an instance carrying
+      an extra `approved: true` key is refused, not silently accepted.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.23 紅隊／紅隊檢驗（Red Team）, 11-item checklist and no-final-authority rule (L1715-1736)"
+  - "methods/contracts/challenge.red_team.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Should `additionalProperties: false` be applied at the top level
+      only, or also on `findings[]` items?
+    decision: "Both levels."
+    reasoning: >
+      A verdict/approval field smuggled onto an individual finding (e.g.
+      `findings[0].approved_despite_this: true`) would be just as much a
+      violation of Atlas's no-final-authority rule as one on the record's
+      own top level -- the rule is about what the CHALLENGE ARTIFACT as a
+      whole may represent, not only its outermost shape.
+  - question: >
+      Should `severity` be a closed enum (e.g. CRITICAL/MAJOR/MINOR), matching
+      common code-review conventions, or left as free text?
+    decision: "Free text, optional."
+    reasoning: >
+      Atlas §11.23 gives no severity scale for this method anywhere --
+      inventing a 3-tier (or N-tier) enum here would be presenting a guess
+      as a compiled fact, the same failure mode this suite's `decided_by`
+      sections repeatedly flag as out of bounds (contrast
+      `pareto-analysis.schema.yaml`'s deliberately-undefaulted threshold,
+      a structurally similar "don't invent a scale Atlas doesn't give"
+      choice). A future method-specific severity taxonomy, if Atlas or an
+      ADR ever supplies one, can tighten this field later without breaking
+      existing records (loosening a free string to an enum is the safe
+      direction; the reverse is not).
+
+type: object
+additionalProperties: false
+required: [id, version, proposal_ref, dimensions_examined, findings, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^RTC-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.red_team"
+
+  proposal_ref:
+    type: string
+    description: "Free-text reference to the proposal/plan/analysis this challenge attacks. See the method contract's own reasoning for why this stays a free-text reference rather than a hard $ref to one arbitrarily-chosen type."
+
+  dimensions_examined:
+    type: array
+    minItems: 1
+    description: "Atlas L1720-1732's own 11-item checklist -- which dimensions this run actually examined (method contract precondition: at least one)."
+    items:
+      type: string
+      enum: [ASSUMPTIONS, LOGIC, MISSING_VARIABLES, COUNTEREXAMPLES, SECURITY, PRIVACY, LEGAL, CULTURE, OPERATIONS, STATISTICAL_VALIDITY, OVERCONFIDENCE]
+
+  findings:
+    type: array
+    description: "Zero or more findings -- a dimension may legitimately be examined and found clean, so this array may be empty even when dimensions_examined is not."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, dimension, description, provenance]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this challenge (e.g. RTC-001-F1)."
+        dimension:
+          type: string
+          enum: [ASSUMPTIONS, LOGIC, MISSING_VARIABLES, COUNTEREXAMPLES, SECURITY, PRIVACY, LEGAL, CULTURE, OPERATIONS, STATISTICAL_VALIDITY, OVERCONFIDENCE]
+          description: "Same 11-value enum as dimensions_examined[] (duplicated, not YAML-anchored -- this repo's golden-test YAML loader does not support merge-key aliases, verified 2026-09-04). Must be a member of dimensions_examined (method-layer invariant, checked by ai_lego/modules/challenge/red_team.py, not this schema -- a cross-field consistency check JSON Schema 2020-12 cannot express directly here)."
+        description:
+          type: string
+          description: "The finding itself, in natural language -- what could go wrong, and why."
+        severity:
+          type: string
+          description: "Optional free text. See compilation_decisions for why this is not a closed enum."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory uses."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A red-team pass over a deployment proposal: two dimensions examined, one real finding, one clean"
+    value:
+      id: "RTC-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.red_team"
+      proposal_ref: "PROP-2026-09-04-001: 週末自動把所有客戶資料庫遷移到新機房"
+      dimensions_examined: [SECURITY, OPERATIONS]
+      findings:
+        - id: "RTC-2026-09-04-001-F1"
+          dimension: OPERATIONS
+          description: "遷移計畫沒有寫明失敗時的 rollback 步驟與觸發條件"
+          severity: "high -- no described recovery path if the migration fails partway"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-REDTEAMCHALLENGE-1"
+    question: >
+      `findings[].dimension` must be a member of `dimensions_examined[]` --
+      enforced by the runtime module, not this schema (JSON Schema 2020-12
+      cannot natively express "this array item's enum value must appear in
+      that sibling array" without a verbose per-value `if`/`then`
+      construct). Should a future revision add that construct despite its
+      verbosity, or is the runtime-layer check sufficient?
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/challenge/red_team.py enforces this at construction time"
+
+verification:
+  method: >
+    Read Atlas §11.23 (L1715-1736) directly at the cited lines, including
+    the exact 11-item checklist and the no-final-authority rule's exact
+    wording. Validated against jsonschema Draft202012Validator, including a
+    real mutation check that `additionalProperties: false` actually
+    refuses an instance carrying an extra `approved`/`verdict`-shaped key.
+  note: >
+    The 11-value dimension enum is transcribed verbatim from Atlas
+    L1720-1732. `additionalProperties: false` operationalizes Atlas's own
+    L1735 rule structurally rather than leaving it as an unenforced
+    convention -- the strongest such enforcement in this directory,
+    explicitly disclosed as a deliberate departure from every sibling
+    schema's default permissiveness, not an oversight. No mother document
+    was modified to produce this file.

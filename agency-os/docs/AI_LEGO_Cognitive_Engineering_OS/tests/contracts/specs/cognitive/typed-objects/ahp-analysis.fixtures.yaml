@@ -1,0 +1,115 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/ahp-analysis.schema.yaml"
+target_ref: ""
+description: >
+  Exercises AhpAnalysis's required fields, the `criteria[]`/
+  `criteria_weights[]` minItems:2 guards, the Saaty 1/9-9 scale bound on
+  pairwise comparison values, the fixed `consistent` derivation (CR <=
+  0.10), and the genuine-compute fields (`engine` const,
+  `computation_provenance_ref` pattern).
+
+valid:
+  - name: three_criteria_perfectly_consistent_with_ranked_options
+    instance:
+      id: "AHP-2026-09-04-001"
+      version: "1.0.0"
+      goal: "choose next quarter's priority"
+      criteria:
+        - {id: "C1", label: "revenue potential"}
+        - {id: "C2", label: "engineering feasibility"}
+        - {id: "C3", label: "strategic fit"}
+      pairwise_comparisons:
+        - {criterion_a_id: "C1", criterion_b_id: "C2", value: 2.0}
+        - {criterion_a_id: "C1", criterion_b_id: "C3", value: 4.0}
+        - {criterion_a_id: "C2", criterion_b_id: "C3", value: 2.0}
+      criteria_weights:
+        - {criterion_id: "C1", weight: 0.5714}
+        - {criterion_id: "C2", weight: 0.2857}
+        - {criterion_id: "C3", weight: 0.1429}
+      consistency_ratio: 0.0
+      consistent: true
+      options:
+        - {id: "O1", label: "option A"}
+      option_scores:
+        - {option_id: "O1", criterion_id: "C1", score: 0.8}
+        - {option_id: "O1", criterion_id: "C2", score: 0.5}
+        - {option_id: "O1", criterion_id: "C3", score: 0.2}
+      ranking:
+        - {option_id: "O1", weighted_score: 0.62857143}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+  - name: two_criteria_no_options_yet_weight_derivation_only
+    instance:
+      id: "AHP-2026-09-04-002"
+      version: "1.0.0"
+      goal: "derive weights only"
+      criteria:
+        - {id: "C1", label: "cost"}
+        - {id: "C2", label: "quality"}
+      pairwise_comparisons:
+        - {criterion_a_id: "C1", criterion_b_id: "C2", value: 0.5}
+      criteria_weights:
+        - {criterion_id: "C1", weight: 0.3333}
+        - {criterion_id: "C2", weight: 0.6667}
+      consistency_ratio: 0.0
+      consistent: true
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: criteria_below_minitems_2
+    instance:
+      id: "AHP-2026-09-04-003"
+      version: "1.0.0"
+      goal: "x"
+      criteria: [{id: "C1", label: "solo"}]
+      pairwise_comparisons: []
+      criteria_weights: [{criterion_id: "C1", weight: 1.0}]
+      consistency_ratio: 0.0
+      consistent: true
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "criteria has minItems: 2 -- a pairwise comparison needs at least two criteria to compare; pairwise_comparisons also has minItems: 1, both violated here."
+  - name: comparison_value_outside_saaty_scale
+    instance:
+      id: "AHP-2026-09-04-004"
+      version: "1.0.0"
+      goal: "x"
+      criteria: [{id: "C1", label: "a"}, {id: "C2", label: "b"}]
+      pairwise_comparisons: [{criterion_a_id: "C1", criterion_b_id: "C2", value: 15.0}]
+      criteria_weights: [{criterion_id: "C1", weight: 0.5}, {criterion_id: "C2", weight: 0.5}]
+      consistency_ratio: 0.0
+      consistent: true
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "pairwise_comparisons[].value must be in Saaty's [1/9, 9] scale -- 15.0 exceeds the maximum."
+  - name: engine_not_deterministic_compute_is_refused_by_const
+    instance:
+      id: "AHP-2026-09-04-005"
+      version: "1.0.0"
+      goal: "x"
+      criteria: [{id: "C1", label: "a"}, {id: "C2", label: "b"}]
+      pairwise_comparisons: [{criterion_a_id: "C1", criterion_b_id: "C2", value: 1.0}]
+      criteria_weights: [{criterion_id: "C1", weight: 0.5}, {criterion_id: "C2", weight: 0.5}]
+      consistency_ratio: 0.0
+      consistent: true
+      engine: "llm_mental_arithmetic"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "engine is const 'local_python_deterministic_compute' -- 'llm_mental_arithmetic' is refused, same guarantee pareto-analysis.schema.yaml already enforces."
+  - name: missing_required_consistent_field
+    instance:
+      id: "AHP-2026-09-04-006"
+      version: "1.0.0"
+      goal: "x"
+      criteria: [{id: "C1", label: "a"}, {id: "C2", label: "b"}]
+      pairwise_comparisons: [{criterion_a_id: "C1", criterion_b_id: "C2", value: 1.0}]
+      criteria_weights: [{criterion_id: "C1", weight: 0.5}, {criterion_id: "C2", weight: 0.5}]
+      consistency_ratio: 0.0
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "consistent is required -- Saaty's CR<=0.10 acceptance verdict must always accompany consistency_ratio, missing here."

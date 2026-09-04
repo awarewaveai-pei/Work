@@ -302,6 +302,76 @@ tier_1:
       is not itself cited elsewhere as a repeated teaching example. Tier 1,
       mandated by the actively-running implementation slice, same category
       as the three entries above it.
+  fifth_concrete_entry:
+    # NEW (2026-09-04, same session): fifth Tier 1 entry, same additive-key
+    # rationale as the four entries above it.
+    method_id: "decision.ahp"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). First entry from the
+      `decision` family (F16), not root_cause/strategy/causal --
+      deliberately chosen to open a NEW family after four consecutive
+      root_cause-chain-adjacent entries, and because Atlas §4 (L192)
+      directly cites this method's own primitive composition ("AHP =
+      COMPARE + WEIGHT + PRIORITIZE + DECIDE"), the strongest primitive
+      grounding of any Tier 1 entry in this file (the other four all
+      disclosed inferred primitives).
+    source: "methods/contracts/decision.ahp.contract.yaml (built same session as this entry, mints machine_id decision.ahp -- method-inventory.yaml's own AHP entry carries none) + specs/cognitive/typed-objects/ahp-analysis.schema.yaml (new output type) + ai_lego/compute/ahp/weights.py (new deterministic Saaty-method compute module, hand-verified against a known-consistent case)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.31 is a dedicated protocol
+      section, not itself a repeatedly-cited teaching example (contrast
+      Fishbone/SWOT, which Atlas cites AS worked examples elsewhere in the
+      document). Tier 1, mandated by the actively-running implementation
+      slice, same category as the four entries above it.
+  sixth_concrete_entry:
+    # NEW (2026-09-04, same session): sixth Tier 1 entry, same additive-key
+    # rationale as the five entries above it.
+    method_id: "learning.reversal_criteria"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). First entry from the
+      `learning` family (F17), opened deliberately to exercise a fifth
+      structural shape (a monitoring rule -- indicator/condition/action/
+      owner -- not a chain, ranking, graph, or comparison matrix). Atlas
+      §11.33 gives this method a REAL worked YAML example (L1980-1985),
+      the strongest literal-example grounding of any Tier 1 entry in this
+      file.
+    source: "methods/contracts/learning.reversal_criteria.contract.yaml (built same session as this entry, mints machine_id learning.reversal_criteria) + specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml (new output type) + ai_lego/compute/monitoring/triggers.py (new deterministic consecutive-threshold compute module)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.33 is a dedicated protocol
+      section with a real worked example, not itself cited elsewhere as a
+      repeated teaching example. Tier 1, mandated by the actively-running
+      implementation slice, same category as the five entries above it.
+  seventh_concrete_entry:
+    # NEW (2026-09-04, same session): seventh Tier 1 entry, same
+    # additive-key rationale as the six entries above it.
+    method_id: "challenge.red_team"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). First entry from the
+      `challenge` family (F12), deliberately chosen to exercise a sixth
+      structural shape (a checklist-structured critique across a closed,
+      Atlas-cited attack-dimension enum) and to operationalize Atlas's own
+      explicit no-final-authority rule (L1735) as a hard schema
+      constraint (`additionalProperties: false`) -- the strongest
+      structural enforcement of any Tier 1 entry in this file. Full spec-
+      root due-diligence for conceptual duplicates was performed BEFORE
+      writing this contract (the corrected invariant from the same
+      session's `learning.reversal_criteria` fix, applied proactively) --
+      see the contract's own `verification.method`.
+    source: "methods/contracts/challenge.red_team.contract.yaml (built same session as this entry, mints machine_id challenge.red_team) + specs/cognitive/typed-objects/red-team-challenge.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.23 is a dedicated protocol
+      section with a real 11-item checklist and an explicit rule, not
+      itself cited elsewhere as a repeated teaching example. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the six entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

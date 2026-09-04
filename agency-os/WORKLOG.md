@@ -1,6 +1,101 @@
 # Worklog
 
-## 2026-09-04（續21，同一遠端 session：清「另案」殘留 — 退租 IP 掃描修正、prod 部署閘補現役主機、pwsh 裝機、ao-close 註解）
+## 2026-09-04（續22，同一 session：Cognitive OS 第九個 Method Atlas 切片 — `challenge.red_team`，第六種結構形狀＋顯式權限規則）
+
+**觸發**：延續操作者授權（"繼續做下一個切片（你決定）" 兩次），繼續自主推進。0 agent。
+
+**選型**：`challenge.red_team`（F12，新家族）。Atlas §11.23 給了本 session 至今**唯一一條明確治理規則**（不只是流程或範例）：L1735 逐字「Red Team 沒有 final authority，只能輸出 challenge artifact」。第六種結構形狀：不是清單／敘事鏈／分類／排名／圖／矩陣／監控規則，是**checklist 結構化的批判**——11 個固定維度（ASSUMPTIONS/LOGIC/MISSING_VARIABLES/COUNTEREXAMPLES/SECURITY/PRIVACY/LEGAL/CULTURE/OPERATIONS/STATISTICAL_VALIDITY/OVERCONFIDENCE）逐一檢查，每個 finding 綁定其中一個維度。
+
+**主動應用續21修正學到的紀律**：寫任何程式碼前先 grep 全 spec root 找「red team」/「challenge artifact」及所有 schema 標題裡的「challenge」/「critique」/「finding」/「dissent」，不是只 grep 本 session 自造的名稱。結果：3 個既有檔案（`rigor-level.schema.yaml`/`gate.schema.yaml`/`change-plan.schema.yaml`）只把 Red Team 當成不透明的 checklist 項目／gate id／方法名稱引用，沒有任何一個定義 Red Team finding 或 challenge artifact 實際內容——確認無重複。另外 `docs/architecture/REPOSITORY_ARCHITECTURE.md` L148-149 自己列出的 `/cognitive/methods/{...}` 家族清單本來就包含 `challenge`，與本 session 命名選擇獨立吻合。
+
+**不變量**：Atlas L1735 的規則不是「最好不要」，是「絕對不行」——所以這是本 session 第一個把 `additionalProperties: false` 用到頂層＋逐 finding 兩層的 typed-object schema（其餘 8 個切片的 schema 都預設允許額外欄位）。兩層獨立強制：`assert_no_authority_claim` 在建構前就擋（拒絕任何帶 `approved`/`verdict`/`final_decision`/`authorized`/`decision`/`outcome` 的記錄），`additionalProperties:false` 獨立擋掉繞過 builder 直接手造字典的攻擊——CLI 真的跑了一次竄改攻擊（在合法記錄的複本上偷塞 `approved: true`），確認兩層都各自擋下，不是只信任其中一層。另一個不變量：finding 的 `dimension` 必須是這次真的檢查過的 `dimensions_examined` 成員之一——JSON Schema 無法原生表達「這個陣列項目的值必須出現在另一個陣列裡」，所以是 runtime cross-field 檢查，不是 schema 檢查。
+
+**[已修改]**：spec-root 新增 `methods/contracts/challenge.red_team.contract.yaml`（逐字引用 Atlas §11.23 11 項 checklist 與權限規則）＋`specs/cognitive/typed-objects/red-team-challenge.schema.yaml`（頂層與 findings[] 皆 `additionalProperties:false`）＋對應 golden fixture（2 valid + 4 invalid，含 2 個證明拒絕塞入 `approved`/`verdict` 的案例）＋`contract-backlog.yaml` 新增 `tier_1.seventh_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/challenge/__init__.py`＋`ai_lego/modules/challenge/red_team.py`（builder＋跨欄位一致性檢查＋權限守門＋三個 gate）＋`ai_lego/apps/cli/run_red_team_slice.py`（真跑一次攻擊並確認兩層獨立擋下）＋`tests/unit/test_red_team.py`（16 tests，修正一個自己的測試設計 bug：finding 維度與宣告的 `dimensions_examined` 不一致，被自己正要驗證的跨欄位檢查正確擋下）＋`docs/NINTH_SLICE_CHALLENGE_RED_TEAM.md`。
+
+**過程中抓到一個真實工具鏈 bug**：schema 初稿用 YAML anchor/alias（`&dimension_enum`/`<<: *dimension_enum`）避免重複 11 值 enum 兩次。純 `yaml.safe_load` 驗證通過，但 spec root 自己的 `tests/run_golden_tests.py` 用更嚴格的 loader，不支援 merge-key tag，第一次真的跑就報錯。修法：把 enum 逐字寫兩次（附註解說明原因），不是靜默改掉不解釋。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_red_team_slice` | exit=0 | result=第一次真跑就通過：`PASS challenge.red_team: 2 dimensions examined, 1 finding, gates [provenance_required=PASS, evidence_labeling_required=PASS, no_final_authority_claim=PASS], no_final_authority_verified(runtime=True, schema=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_red_team -v` | exit=0 | result=16 passed（修正 1 個測試設計 bug 後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2579→2590（含修正 YAML merge-key 相容性問題）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=263439 | result=**365 tests OK**（349→365，零回歸；`git diff --stat` 對照 fishbone.py／method_resolver.py／schema_contracts.py／event_ledger.py／provenance.py 五個共用檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：兩層權限守門是否真的獨立（是，已用真實竄改攻擊分別驗證兩層各自擋下，不是只讀程式碼推論）；`additionalProperties:false` 這麼嚴格的約束會不會誤傷合法用法（不會，`severity` 與 `supporting_evidence_refs` 皆為可選欄位，已用 zero-findings clean-pass 案例證明合法用法暢通）；本次是否也有跟續21同類的既有 schema 重複風險（已主動先查，見上方「選型」段落，確認無重複）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`challenge[.]red_team\|RedTeamChallenge\|red-team-challenge\|modules[.]challenge\|modules/challenge` | hits=全部為本切片自己的新檔案（spec root 與 product root）、session log 雜訊（.claude/bash-commands.log、session transcript）、`__pycache__` 編譯產物、以及第八切片文件裡對本切片的正向交叉引用——無任何過期或非預期殘留引用
+
+**[剩餘風險]**：`OQ-REDTEAM-1`（recommended_next 空白——Atlas §11.24 提到「Blue Team → Red Team → Independent Judge」配對，但 `challenge.blue_team` 與 Independent Judge 都還沒有 machine_id）；`OQ-REDTEAM-3`（cognitive_primitives 為推論非引用，與其餘 7/9 個切片同一誠實等級）；`OQ-REDTEAMCHALLENGE-1`（維度一致性檢查是 runtime 而非 schema 層不變量，已記錄原因）。皆非阻塞，已誠實揭露於 contract 與 docs。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（新增檔案、無任何既有檔案被修改，回退零副作用）。
+
+## 2026-09-04（續21，同一 session：修正第八個切片的真實 schema 重複——`reversal-criteria-set.schema.yaml` v1.0.0→v1.1.0）
+
+**觸發**：為第九個切片（`challenge.red_team`）做命名衝突查核時（同 `decision.ahp` 那次 `modules/decision` 命名巧合查證的紀律延伸），讀 `specs/decision/decision.schema.yaml` 過程中意外發現：`specs/decision/reversal.schema.yaml`（2026-08-29,上個 session 建的,早於本 session）**早就定義了跟續20 `ReversalCriteriaSet` 完全相同的概念**——indicator/condition/action/owner,同一個 Atlas §11.33 引用出處——而且做得更嚴謹（調和了 Atlas bilingual-policy／Atlas §11.33／EC §88 三種互相衝突的形狀,還關閉了追蹤中的 `CROSS-T-12` 重複定義發現）。續20 的 v1.0.0 等於重新製造了 `reversal.schema.yaml` 存在的目的正要防止的「同一概念 N 種互不相容形狀」問題。
+
+**根因**：本 session 的 BUGHUNT 紀律只 grep 自己新造的符號名稱,抓不到「同一概念、不同命名」的既有 schema——這是本 session 稽核方法本身的盲點,不是單一疏忽。已核對本 session 其餘 5 個新 schema（SWOT／Five Whys／Pareto／Causal DAG／AHP）對照全部既有 spec 檔案標題,確認皆無同類重複——Reversal Criteria 之所以特殊,是因為它是一個橫跨三份母文件獨立描述的治理概念,上一個 session 才會特地建一份整合 schema。
+
+**修法**：不是保留兩份定義,是把 `reversal-criteria-set.schema.yaml` 改成用 `allOf` **內嵌**既有 `decision/reversal.schema.yaml#/definitions/single_indicator_form`（`indicator`/`condition`/`action`/`owner`,取代自創的 `condition_description`),本檔案唯一真正新增的東西（`structured_rule`——機械可判定的門檻擴充,既有 schema 沒提供)保留為額外的 allOf 分支。`reversal.schema.yaml` 自己的 `generality_note` 早就明文歡迎這種內嵌重用方式。同步修正 method contract 裡「Decision 沒有 schema」的錯誤宣稱（`specs/decision/decision.schema.yaml` 早就 ACTIVE)。
+
+**[已修改]**：`specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml`（v1.0.0→v1.1.0,allOf 內嵌既有 schema)＋對應 golden fixture（欄位名修正＋新增 2 個測試案例)＋`methods/contracts/learning.reversal_criteria.contract.yaml`（修正 `OQ-REVERSALCRITERIA-1` 與 compilation_decisions 的錯誤宣稱)＋`ai_lego/modules/learning/reversal_criteria.py`（`condition_description`→`condition`)＋`tests/unit/test_reversal_criteria.py`（新增 `SchemaConsolidationTests` 2 個回歸防護測試，防止這個錯誤再次發生)＋`docs/EIGHTH_SLICE_LEARNING_REVERSAL_CRITERIA.md`（誠實記錄整個發現與修正過程,不是事後蓋掉)＋重新產生 spec-root 索引。CLI 與其餘測試因為呼叫是位置參數而非關鍵字參數,零改動即可正常運作。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python3 驗證 allOf 組合(乾淨實例通過、空 owner 被擋、缺 condition/threshold 被內嵌 schema 的 anyOf 擋下、既有 schema 獨立驗證正常)| exit=0 | result=4 項全部符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_reversal_criteria_slice`（修正後重跑)| exit=0 | result=`PASS learning.reversal_criteria: 2 criteria, gates [provenance_required=PASS, actionable=PASS], trigger dip-case=False, trigger crossing-case=True, qualitative-criterion-evaluable=None`——與修正前結果一致,證明修正未改變真實行為
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_reversal_criteria -v` | exit=0 | ms=~1300 | result=**21 passed**（19 原有＋2 新回歸防護測試)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/run_golden_tests.py`（spec root)| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2576→2579
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root,含修正後全套回歸)| exit=0 | ms=253000 | result=**349 tests OK**（347→349,零回歸；`git diff --stat` 確認 fishbone.py 零改動)
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄,未變)。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:allOf 組合是否真的同時套用兩層約束(是,已用 python 實測空 owner 與缺 condition 各自被對應層擋下);修正是否影響 CLI 真實行為(沒有,重跑結果與修正前逐字相同);本 session 其餘 5 個新 schema 是否也有同類重複風險(已系統性核對全部既有 schema 標題,確認皆無)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`condition_description` | hits=0（確認舊欄位名沒有任何殘留引用)
+
+**[剩餘風險]**：無新增風險——這是收斂而非擴張。`OQ-REVERSALCRITERIASET-2`（新開)：`structured_rule` 是否該提案成 `decision/reversal.schema.yaml` 自己的正式欄位而非只活在本檔案的 allOf 擴充裡,留給操作者或下一個真的需要它的場景決定。
+
+**[rollback]**：`git revert` 本次修正即可退回 v1.0.0（不建議,因為 v1.0.0 是真實重複定義)；更安全的 rollback 是保留修正,只在需要時個別調整 allOf 分支。
+
+## 2026-09-04（續20，同一 session：Cognitive OS 第八個 Method Atlas 切片 — `learning.reversal_criteria`，第五種結構形狀＋監控規則）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`learning.reversal_criteria`（F17，新家族）。Atlas §11.33 給了本 session 至今**最強的字面範例根基**——不是圖表或散文描述，是一段完整可直接轉譯的 YAML worked example（`indicator: CAC / condition: "> 300 USD for 3 consecutive months" / action: re_review / owner: growth_lead`）。第五種結構形狀：不是清單／敘事鏈／分類／排名／圖／矩陣，是**監控規則**——定義一次、之後要反覆對真實觀測值重新檢查，是本 session 唯一「產出後還要被持續檢驗」而非一次性驗證完就定案的方法。
+
+**不變量**：Atlas 條件欄位（`> 300 USD for 3 consecutive months`）恰好是可機械判定的簡單門檻，但真實世界的 reversal criteria 常常是無法量化的質性判斷——所以 `condition_description`（Atlas 原字，永遠必填）與可選的 `structured_rule`（operator/threshold/consecutive_periods）分開存放，不強迫每個 criterion 都套上假結構。`action`/`owner` 兩個欄位空白時等於「裝飾用的規則,沒有真正約束力」——Atlas 自己點名的效益（防組織因面子拒絕改方向）完全仰賴這兩個欄位真的有內容，所以 builder 建構時擋一次、`evaluate_actionable_gate` 又獨立重新檢查一次（mutation test 證明:繞過 builder 直接竄改記錄一樣會被閘擋下,不是只信任 builder 跑過就算數）。觸發判定回傳 `None`（不是 `False`）代表「這條規則本來就沒有可機械檢查的結構」——跟「檢查過了但還沒觸發」必須能區分,不能用同一個假值混在一起。
+
+**[已修改]**：spec-root 新增 `methods/contracts/learning.reversal_criteria.contract.yaml`（逐字引用 Atlas §11.33，含完整 worked YAML example）＋ `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml`＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.sixth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/monitoring/triggers.py`（連續期間門檻判定,純函式,先用 5 種已知案例驗證正確才接進方法層）；`ai_lego/modules/learning/reversal_criteria.py`（builder＋觸發評估＋兩個 gate）；`ai_lego/apps/cli/run_reversal_criteria_slice.py`（同一次跑同時示範「有觸發」與「沒觸發」兩種真實案例）；`tests/unit/test_reversal_criteria.py`（19 tests，第一次跑就全綠，無需修正）；`docs/EIGHTH_SLICE_LEARNING_REVERSAL_CRITERIA.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2565→2576
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_reversal_criteria_slice` | exit=0 | result=第一次真跑就通過:`PASS learning.reversal_criteria: 2 criteria, gates [provenance_required=PASS, actionable=PASS], trigger dip-case=False, trigger crossing-case=True, qualitative-criterion-evaluable=None`——三種案例（有觸發／被中斷未觸發／質性條件不可判定）結果全部符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_reversal_criteria -v` | exit=0 | ms=~700 | result=19 passed（第一次跑就全綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=250319 | result=**347 tests OK**（328→347，零回歸；`git diff --stat` 確認 fishbone.py 零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:`modules/learning/` 是否也像 `modules/decision/` 一樣撞到 REPOSITORY_ARCHITECTURE.md 的裁決(不會,查證過該文件明文把 research/business/learning/brainstorm 四個列為「應保留為 vertical」,不在應移除清單內,bughunt grep 也確認零命中);`structured_rule` 為 `None` 時 `evaluate_criterion_trigger` 是否誤判為 False(不會,回傳 `None` 並有專屬測試驗證與 False 可區分);連續期間視窗不足時是否會誤判為觸發(不會,`len(observations) < consecutive_periods` 明確回傳 False,不是拋錯或預設 True)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`learning[.]reversal_criteria\|ReversalCriteriaSet\|reversal-criteria-set\|compute[.]monitoring\|compute/monitoring\|modules[.]learning\|modules/learning` | hits=0 stale（全部命中皆為本次新增檔案自身；額外核對 REPOSITORY_ARCHITECTURE.md 零命中,確認這次沒有重演 decision 那次的命名衝突）
+
+**[剩餘風險]**：`DecisionRef` 是自由文字參照非硬 `$ref`（`Decision` 物件本身尚無 schema，`OQ-REVERSALCRITERIA-1`）；本方法只定義規則＋判定門檻是否跨過，不執行「重新審查」動作本身（Atlas 對下游動作零細節，`OQ-REVERSALCRITERIA-2`）；`cognitive_primitives` 推論非引用（`OQ-REVERSALCRITERIA-3`）。
+
+**[rollback]**：純新增檔案(除 spec-root 索引重新產生外，零既有檔案邏輯改動)，`git rm` 對應新檔即可完全復原。
+
+## 2026-09-04（續19，同一 session：Cognitive OS 第七個 Method Atlas 切片 — `decision.ahp`，新家族＋真實 bughunt 抓到跨文件命名衝突）
+
+**觸發**：六個切片 push 完成後，操作者被問「下一步」，回「你做最完美的決定」——全權維持。0 agent。
+
+**選型**：`decision.ahp`（F16，**第一個不掛在 CauseHypothesisSet 鏈下的獨立決策方法**）。Atlas §4（L192）直接引用這個方法的 primitive composition「AHP = COMPARE + WEIGHT + PRIORITIZE + DECIDE」——本 session 所有 Tier 1 契約裡根基最強的一個（five_whys/pareto/causal.dag 的 primitives 都是推論，這個是逐字引用）。
+
+**真的抓到一個跨文件衝突（commit 前）**：bughunt grep 新符號時，`docs/architecture/REPOSITORY_ARCHITECTURE.md`（ACCEPTED 2026-08-30，操作者當時明示核准）命中——該文件明文裁決「`/modules/decision` 應移除，併入 `/core/domain/decision`」（Decision 是 Shared Kernel 物件,不需要獨立 vertical）。我新寫的 `ai_lego/modules/decision/ahp.py` 路徑撞名。查證後確認：**不是真牴觸,是命名巧合**——該文件裁決的是 Master Plan §80 候選清單裡「Decision 物件本身的 engine」,我寫的是 Atlas Method Family（F16 決策**技巧**如 AHP/MCDA）,同一份文件自己在上一節已裁決 Atlas 對 Method System 擁有 authoritative source 地位。兩者是不同東西撞了同一個資料夾名字。在同一 commit 內修：於 REPOSITORY_ARCHITECTURE.md 該表格後補一段精確澄清（不改動原裁決本身),`ahp.py` docstring 加對應指標,避免未來讀者誤判為牴觸。
+
+**不變量**：Consistency Ratio 不是裝飾——`ai_lego/compute/ahp/weights.py` 先用 3 個已知案例手算驗證：完全一致案例（真實權重比 4:2:1）算出精確 [4/7,2/7,1/7]、CR=0；輕微不一致案例 CR 略高於 0 但 <0.1；**循環偏好案例**（A>B>C>A 皆強度 9）權重平均法算出來看似「中立」的 [0.33,0.33,0.33],但 CR=6.13——這正是 Consistency Ratio 存在的理由：權重平均本身騙不出矛盾,CR 才抓得到。`evaluate_genuine_compute_gate` 第二次重用 `research.gates.evaluate_statistical_gate`（pareto 是第一次）——第三個方法家族靠同一個閘。
+
+**[已修改]**：spec-root 新增 `methods/contracts/decision.ahp.contract.yaml`（逐字引用 Atlas §11.31/§4，新鑄 machine_id `decision.ahp`——method-inventory.yaml 的 AHP 條目本來沒有）＋ `specs/cognitive/typed-objects/ahp-analysis.schema.yaml`＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.fifth_concrete_entry`＋重新產生索引＋`docs/architecture/REPOSITORY_ARCHITECTURE.md` 澄清段落（上述衝突修正）。Product root 新增 `ai_lego/compute/ahp/weights.py`（純 Saaty 演算法,零方法相依）；`ai_lego/modules/decision/ahp.py`（builder＋三個 gate,一個重用兩個新寫）；`ai_lego/apps/cli/run_ahp_slice.py`；`tests/unit/test_ahp.py`（16 tests，過程中抓到並修正自己一個真實測試設計 bug——巧合平手案例斷言了特定贏家）；`docs/SEVENTH_SLICE_DECISION_AHP.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2554→2565
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_ahp_slice` | exit=0 | result=第一次真跑就通過，權重與手算驗證完全一致:`PASS decision.ahp: weights=[('C1', 0.5714), ('C2', 0.2857), ('C3', 0.1429)], CR=0.0, consistent=True, ...`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ahp -v` | exit=0（首次 exit=1，1 個測試因巧合平手案例斷言特定贏家而 FAIL，修正測試資料後全綠）| ms=~650 | result=16 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=244954 | result=**328 tests OK**（312→328，零回歸；`git diff --stat` 確認 fishbone.py／research/gates.py 皆零改動，`git diff` 確認 REPOSITORY_ARCHITECTURE.md 純新增無刪除行）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:REPOSITORY_ARCHITECTURE.md 的澄清是否動到原裁決本身(沒有,只是在表格後新增段落,原表格文字一字未改);`evaluate_consistency_gate` 是否會被「誠實回報 consistent:false」繞過(不會,兩個 mutation test 都驗證過:竄改成 true 會被抓、誠實回報 false 也一樣 FAIL,閘本來就是要擋住不一致的分析被下游採信,無論呼叫者怎麼標記);CR 門檻 0.10 是否該像 Pareto 的門檻一樣留給 caller 設(不該,schema 自己的 compilation_decisions 已論證兩者是不同類別的門檻——Pareto 門檻因 Atlas 明文警告才留白,AHP 的 0.10 是外部已發表方法論常數)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`decision[.]ahp\|AhpAnalysis\|ahp-analysis\|compute[.]ahp\|compute/ahp\|modules[.]decision\|modules/decision` | hits=1 真實命中並已修（`docs/architecture/REPOSITORY_ARCHITECTURE.md` 命名衝突,見上）；其餘命中皆本次新增檔案自身或不相關的凍結快照
+
+**[剩餘風險]**：「Sensitivity」（Atlas 7 階段管線最後一階）完全未實作——Atlas 對它零細節,強做即臆測（`OQ-AHP-2`）；Criteria hierarchy 是扁平非多層（`OQ-AHP-1`）；method-inventory.yaml 的 AHP 條目未回填新鑄的 machine_id（`OQ-AHP-3`，同 fishbone 先例的既定作法一致）。
+
+**[rollback]**：除 `REPOSITORY_ARCHITECTURE.md` 新增澄清段落與 spec-root 索引重新產生外，零既有檔案邏輯改動（該澄清段落本身也是純新增,`git diff` 不含任何刪除行）。`git rm` 對應新檔即可完全復原。
+
+## 2026-09-04（續25，同一遠端 session：清「另案」殘留 — 退租 IP 掃描修正、prod 部署閘補現役主機、pwsh 裝機、ao-close 註解）
 
 **[任務理解]** 操作者問「都完美處理完了嗎」——我前兩輪登記為另案的項目不能一直掛著。掃描後範圍比原登記大：退租 IP（`5.223.93.113`／`204.168.175.41`／`149.202.64.114`）仍出現在 65 個檔案；其中**代理會照做的**（`.claude/agents`、`.claude/commands`、腳本預設值、hook 正則）必須修，**歷史敘事**（handoffs／舊 runbook／WORKLOG／memory）保留。
 **[最重要發現]** `mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js:29` 的 ssh→prod 部署／重啟 BLOCK 正則只列兩個退租 IP，2026-08-31 整併後對現役 `145.239.195.47` **完全不擋**——偵測器啞了四天而 AO-RESUME 沒有任何訊號（正是 §R0 最惡樣態「系統宣稱與真實不符」）。
@@ -9,7 +104,7 @@
 - `.claude/agents/`：devops-engineer、mainwp-engineer、supabase-engineer、n8n-engineer（含 frontmatter description）、incident-responder（主機表改單機＋刪除線舊主機）、trigger-deploy-agent、client-onboarding（4 條 ssh 指令）、AGENT_INDEX；`.claude/commands/command-plane-verify.md`；`.claude/SKILL_AND_COMMAND_INDEX.md`（sg/eu-reboot 標已取代）。SSH 一律 `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`（QUICKREF 橫幅正本），容器路徑不變（`/root/lobster-phase1`、`/root/n8n`、`/root/mainwp`）。`sg-reboot.md`／`eu-reboot.md` 的 `host:` 行保留（檔頭已 SUPERSEDED 重導）。
 - 腳本：`scripts/check-capacity-health.ps1`／`check-backup-health.ps1` 的 `$SgHost`/`$EuHost` 預設清空（body 已不用，只是簽章相容）；`agency-os/scripts/check-supabase-memory-monthly.ps1` wrapper 預設對齊 owner（owner 早已是 ks-aw-01，wrapper 只轉送 bound params，此為文件正確性）；`scripts/ao-close.ps1:1275` 註解不再引用已不存在的 CLAUDE.md 段。
 - `CLAUDE.md` 遠端段：加 container 裝 `pwsh` 的實測指令（Microsoft apt repo，7.6.5，約 1 分鐘），本 container 已裝。
-- WORKLOG 續20 [剩餘風險]①：修正我對 `claude -p` 的過度宣稱——deny 隨任一 settings 來源載入，repo 目錄內的 `claude -p` 同樣受保護。
+- WORKLOG 續24 [剩餘風險]①：修正我對 `claude -p` 的過度宣稱——deny 隨任一 settings 來源載入，repo 目錄內的 `claude -p` 同樣受保護。
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=1 | ms=~4000 —— 153 案 152 過（+1 P4-1c 綠），唯一紅仍是 main 上同紅的 `git-commit-scope-guard POSIX cd`。突變：把正則的 `145\.239\.195\.47|ks-aw-01|` 拿掉 → P4-1c 紅（fail 2）→ 還原 → 綠（fail 1）。`pwsh` Parser.ParseFile 對 4 支改過的 `.ps1` 全 OK。`run-v3-governance-gates.mjs` PASSED。`pwsh -NoProfile -Command $PSVersionTable` → 7.6.5。
 - REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) `client-onboarding.md` 的 ssh 指令改 `ubuntu` 後，遠端 `echo >> /root/lobster-phase1/.env` 需要 sudo 才寫得進 root 目錄——已在該段加註「ubuntu 需 sudo」，指令本身留給執行者依 QUICKREF 加 `sudo`（不盲改成 `sudo sh -c` 以免破壞引號層）；n8n frontmatter description 仍在雙引號內、YAML 有效。
@@ -19,9 +114,9 @@
 **[補記：操作者要求在遠端跑 `sync-claude-userlevel.ps1 -Mode merge`]** 不能在這裡跑。① 它的目標是**執行那台機器**的 `~/.claude/`，本 container 的 `~/.claude` 不是筆電的；② 腳本是 Windows-only：`$env:USERPROFILE`（Linux 為 null → `Cannot bind argument to parameter 'Path'`）與 `Join-Path ... 'mcp\claude-userlevel'` 反斜線字面量。用 `USERPROFILE=$HOME` 強行跑 `-Mode dry-run` 會回 `RESULT: PASS`，但 target 顯示 `/root\.claude\SUBAGENT_CHARTER.md`——反斜線是檔名的一部分，merge 會在 `/root` 下寫出帶反斜線的垃圾檔而非真 settings。**dry-run 在錯的平台上回 PASS 是 fail-open 偵測器**（同 §已知信任邊界）；遠端 container 不需要它（`wire-remote-hooks.sh` 已覆蓋），故不移植，只記錄。筆電上執行：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sync-claude-userlevel.ps1 -Mode merge`，預期輸出含 `permissions.deny` drift → 套用，`RESULT: PASS`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=USERPROFILE=$HOME pwsh -NoProfile -File scripts/sync-claude-userlevel.ps1 -Mode dry-run -MonorepoRootOverride /home/user/Work | exit=0 | ms=~3000 —— 輸出 `target=/root\.claude\SUBAGENT_CHARTER.md`（反斜線字面量），證明不可在 Linux 執行 merge。
 **[rollback]** `git revert` 本 commit。
-- AUTO_TASK_DONE: 退租 IP 清理（代理可執行層 12 檔）+ prod 部署閘補現役主機（突變驗證）+ pwsh 裝機指令入 CLAUDE.md + ao-close 註解 + 續20 風險宣稱修正。
+- AUTO_TASK_DONE: 退租 IP 清理（代理可執行層 12 檔）+ prod 部署閘補現役主機（突變驗證）+ pwsh 裝機指令入 CLAUDE.md + ao-close 註解 + 續24 風險宣稱修正。
 
-## 2026-09-04（續20，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
+## 2026-09-04（續24，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
 
 **[任務理解]** 操作者問「瘋狂派 subagents 有解決嗎」→ 回答「解一半」→ 操作者「你做最完美決定與處理」。不變量：**任何 fan-out 都必須經過 PreToolUse 可見的路徑**。Agent tool 滿足（`subagent-budget.js` 真實 spawn 驗證過）；Workflow tool 不滿足——`agent()` 在背景執行，hook 只能驗 `SUBAGENT-BUDGET-ESTIMATE` 自報值，動態爆量（腳本跑到一半才算出 N）防不了，`resumeFromRunId` 路徑更是零保護且從未真實驗證。證據：`reports/agent-dispatch/dispatch-20260903.jsonl` 當天只記到 6 個 agent，而事故是 99 個——記錄 hook 同樣看不到 Workflow 內部。
 **[方案]** A 改 Workflow 分支做腳本靜態分析（擋 `.map(`→`agent(`）：誤擋多、仍是啟發式；B **`permissions.deny` 整個關閉 Workflow tool**：不變量直接成立，本 repo 正面模板是固定 4-5 角色走 Agent tool，Workflow 的並行收益換不回失控風險。選 B。
@@ -39,7 +134,7 @@
 **[rollback]** 從兩處 deny 清單移除 `"Workflow"`、刪 parity test 與 test-hooks 登記行。
 - AUTO_TASK_DONE: Workflow tool deny（template + 遠端生成器 + parity test 突變驗證）；瘋狂派 subagent 問題由「驗自報估計」升級為「路徑整個關閉」。
 
-## 2026-09-04（續19，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
+## 2026-09-04（續23，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
 
 **[任務理解]** 操作者問「CLAUDE.md／AGENTS.md 是幫助還是拖累」→ 指示「徹底研究後優化到最有效益、最正確的版本」。根本問題：兩檔每輪整份注入 prompt（合計 48.7 KB ≈ 20k+ tokens），其中約四成是事故敘事（日期＋輪次＋案例）、同一事實重複三處（主機邊界）、規則互相衝突到需要「優先序」段，且檔案自己承認「大檔案容易被漏讀」。這是「5 小時額度 20-30 分鐘燒光」的固定成本項之一（每輪先付 20k 才開始做事）。
 **[現況分析]** `git log -8`：最近 8 commits 全為 cognitive-os 切片，無同議題改動；上一次瘦身 `bfa017b`（2026-09-04 稍早）只搬了表格到 TOOL_TRIGGER_MAP，敘事仍在。機械依賴清查：`grep -rl "AGENTS.md\|CLAUDE.md" scripts/ mcp/claude-userlevel/hooks/ .claude/commands/` 共 39 檔，**全部只在訊息／註解裡提及檔名，沒有任何腳本解析 AGENTS.md 內文**；唯二必須保留的機械標記是 `doc-sync-automation.ps1:98` 的 `## Related Documents (Auto-Synced)` 起始 marker 與 `check-governance-docs-drift.ps1:204` 的 `_Last synced` footer（兩者原樣保留）。hooks 實體位置 `mcp/claude-userlevel/hooks/rules/`（原文寫 `.claude/hooks/rules/` 不存在）。
@@ -58,7 +153,6 @@
 **[CI 修正（PR #18 gate 紅）]** `doc_integrity`（`lobster-factory/scripts/validate-doc-integrity.mjs`）以檔案所在目錄解析相對連結。兩類壞連結同一根因「檔案搬進 `docs/operations/` 但連結仍以 `agency-os/` 為基準」：① 本次 APPENDIX 逐字存檔區 16 條（我造成）；② `TOOL_TRIGGER_MAP.md` 13 條，**main 已紅**（今早 `bfa017b` 搬檔時遺留，用 `git worktree add origin/main` 跑同一閘證實），無現成修正 PR，屬同類小修，一併在本 PR 修。只改連結路徑不改文字（`docs/operations/X` → `X`；`../.claude/` → `../../../.claude/`；`../lobster-factory/` → `../../../lobster-factory/`；`tenants/` → `../../tenants/`；`../runbooks/` → `../../../runbooks/`）。
 - REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/run-v3-governance-gates.mjs | exit=0 | ms=~600 —— 修前同指令 `Blocking governance check failed: doc_integrity`（29 條 broken_link），修後 `V3 governance gates PASSED`；另以 `[ -e dir/link ]` 逐條驗兩檔全部 `.md` 連結目標存在，0 缺。
 - AUTO_TASK_DONE: CLAUDE.md + AGENTS.md 第二次瘦身（48.7 KB → 20.5 KB，-58%），舊全文逐字存 APPENDIX，3 條 stale 事實修正，2 條遠端 session 對齊規則。
-
 ## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
 
 **觸發**：延續操作者「沒做完不要停」授權。0 agent。
