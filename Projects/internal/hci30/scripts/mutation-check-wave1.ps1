@@ -29,6 +29,7 @@ $db = 'hci_wave1_synthetic'
 $compose  = Join-Path $root 'infra/local/compose.test.yml'
 $upMig    = Join-Path $root 'database/migrations/0001_wave1_synthetic_up.sql'
 $downMig  = Join-Path $root 'database/migrations/0001_wave1_synthetic_down.sql'
+$upMig2   = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -103,6 +104,89 @@ $mutations = @(
   @{ id = 'weaken-subject-type-check'
      sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.subject_records''::regclass AND contype = ''c'' AND pg_get_constraintdef(oid) LIKE ''%subject_type%''; EXECUTE format(''ALTER TABLE hci.subject_records DROP CONSTRAINT %I'', c); END $$;'
      expect = @('SUBJECT-NEG-02') }
+
+  # ADR-0020 (Case/Engagement aggregate, HD-10) gate 2's explicitly-required
+  # mutation: dropping the whole lifecycle trigger removes both its INSERT
+  # branch (2026-09-04: was CASE-LIFECYCLE-TRIGGER-01's own protection) and
+  # its CLOSED-immutability branch (CASE-CLOSED-IMMUTABLE-01), in addition to
+  # the original UPDATE-side FSM. Without the trigger at all, closed_at is
+  # never auto-set, so CASE-LIFECYCLE-02's UPDATE now also fails the table's
+  # own bidirectional CHECK ((status='CLOSED') = (closed_at IS NOT NULL)) -
+  # the CHECK constraint independently backstops the missing trigger here,
+  # which is why CASE-LIFECYCLE-02 (an expect_success) is in this mutation's
+  # expected-failure list even though the trigger, not the CHECK, is what is
+  # actually being removed. CASE-LIFECYCLE-01 is unaffected: OPEN->ACTIVE
+  # never touches closed_at either way.
+  @{ id = 'drop-case-lifecycle-trigger'
+     sql = 'DROP TRIGGER cases_lifecycle ON hci.cases;'
+     expect = @('CASE-LIFECYCLE-02','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-03','CASE-LIFECYCLE-04','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-TRIGGER-01') }
+
+  # Gate 2's "no direct UPDATE privilege on closed_at" is a grant-layer
+  # control independent of the trigger above; this proves it is load-bearing
+  # on its own, the same defense-in-depth reasoning already applied to
+  # append-only tables elsewhere in this schema.
+  @{ id = 'regrant-case-closed-at'
+     sql = 'GRANT UPDATE (closed_at) ON hci.cases TO hci_app_test_a;'
+     expect = @('CASE-CLOSEDAT-DIRECT-01') }
+
+  # ADR-0020 gate 4's explicitly-required mutation, split in two (2026-09-04
+  # critic review): the original single mutation dropped both triggers at
+  # once, so dropping only the subject_records half was structurally
+  # invisible to the suite - CASE-CLOSED-GUARD-01 alone was enough to kill it.
+  @{ id = 'drop-case-closed-guard-workflows'
+     sql = 'DROP TRIGGER research_workflows_require_open_or_active_case ON hci.research_workflows;'
+     expect = @('CASE-CLOSED-GUARD-01') }
+  @{ id = 'drop-case-closed-guard-subjects'
+     sql = 'DROP TRIGGER subject_records_require_open_or_active_case ON hci.subject_records;'
+     expect = @('CASE-CLOSED-GUARD-02') }
+
+  # Gate 3's ownership-binding FK, resolved from the catalog like
+  # 'drop-typed-target-fk' above: PostgreSQL truncates generated composite FK
+  # names, so the constraint name is not a fixed literal.
+  @{ id = 'drop-case-ownership-fk'
+     sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.research_workflows''::regclass AND contype = ''f'' AND confrelid = ''hci.cases''::regclass; EXECUTE format(''ALTER TABLE hci.research_workflows DROP CONSTRAINT %I'', c); END $$;'
+     expect = @('CASE-OWNS-02') }
+
+  # 2026-09-04 critic review (C1/C2/M1/M2/M5 fixes) - new invariants below.
+
+  # 'status' was originally in the INSERT grant, letting the app role INSERT
+  # directly into ACTIVE/CLOSED. Proves the withholding is load-bearing on
+  # its own, same reasoning as regrant-created-at-column.
+  @{ id = 'regrant-case-status'
+     sql = 'GRANT INSERT (status) ON hci.cases TO hci_app_test_a;'
+     expect = @('CASE-LIFECYCLE-05') }
+  @{ id = 'regrant-case-opened-at'
+     sql = 'GRANT INSERT (opened_at) ON hci.cases TO hci_app_test_a;'
+     expect = @('CASE-OPENEDAT-01') }
+
+  # case_id's immutability trigger (C2): without it, an already-bound
+  # research_workflows row could be repointed onto a different case via a
+  # plain UPDATE, including a CLOSED one, bypassing the terminal-state guard
+  # entirely (the guard only ever fires BEFORE INSERT).
+  @{ id = 'drop-case-ownership-immutable-trigger'
+     sql = 'DROP TRIGGER research_workflows_case_immutable ON hci.research_workflows;'
+     expect = @('CASE-OWNS-03') }
+
+  # Only the CLOSED-immutability IF block is removed here (not the whole
+  # trigger, which 'drop-case-lifecycle-trigger' above already covers) so this
+  # mutation isolates that one invariant rather than reproducing a broader
+  # mutation's failure set.
+  @{ id = 'weaken-case-closed-immutable'
+     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_case_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF TG_OP = ''INSERT'' THEN IF NEW.status <> ''OPEN'' THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; RETURN NEW; END IF; IF NEW.status IS DISTINCT FROM OLD.status THEN IF NOT ((OLD.status = ''OPEN'' AND NEW.status = ''ACTIVE'') OR (OLD.status = ''ACTIVE'' AND NEW.status = ''CLOSED'')) THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; IF NEW.status = ''CLOSED'' THEN NEW.closed_at := now(); END IF; END IF; RETURN NEW; END $fn$;'
+     expect = @('CASE-CLOSED-IMMUTABLE-01') }
+
+  # M2: hci.cases originally had the grant layer only. These reuse
+  # hci.reject_update_delete(), so a break-glass/table-owner session could
+  # previously DELETE or TRUNCATE a case with no reaction at either layer.
+  @{ id = 'drop-case-no-delete-trigger'
+     sql = 'DROP TRIGGER cases_no_delete ON hci.cases;'
+     expect = @('CASE-NODELETE-TRIGGER-01') }
+
+  # M5: hci.cases had a tenant_isolation policy from creation, but nothing in
+  # the suite would previously have gone red if it were dropped.
+  @{ id = 'disable-rls-on-cases'
+     sql = 'ALTER TABLE hci.cases NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.cases DISABLE ROW LEVEL SECURITY;'
+     expect = @('RLS-LEAK-03') }
 )
 
 $project = "hcimut$PID"
@@ -139,7 +223,8 @@ function Get-FailedAssertions {
 }
 function Reset-Schema {
   if ((Invoke-SqlFile -Path $downMig)  -ne 0) { throw 'mutation harness: down migration failed' }
-  if ((Invoke-SqlFile -Path $upMig)    -ne 0) { throw 'mutation harness: up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig)    -ne 0) { throw 'mutation harness: 0001 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig2)   -ne 0) { throw 'mutation harness: 0002 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

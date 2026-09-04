@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-09-05（HCI30 Wave 1 Case/Engagement aggregate ADR-0020 gate 收尾——真跑抓到 2 個真實 gate bypass + 1 個 trigger 順序 bug，全修並驗真）
+
+**觸發**：操作者「繼續完成 HCI 系統！我全部同意核准，需要決定的事都你決定」，全權架構師模式。上一個（已暫停）session 已寫好但未跑過的 `0002_wave1_case_aggregate_{up,down}.sql`（ADR-0020 Case/Engagement aggregate）是最接近完成、風險最低的下一步——完成閉環而非另開新工作。
+
+**[任務理解]**：Wave 1 schema 已寫好但因 Docker Desktop 當機從未真的跑過（`HCI_WAVE1_NEGATIVE_TEST_SPEC.md` 誠實標記 PENDING）。目標：真跑驗證、抓出真實問題、修好、閉環收尾，不是「全部完成 HCI 系統」（10 Wave／33 ADR 是數月工程量，一輪做不完，誠實範圍界定）。
+
+**[現況分析]**：`git log -10` 無並行衝突。讀畢全部改動檔案（migration 157→270 行、tests、mutation-check、fixtures、ADR-0020 全文）。Docker 確認可用（`docker info` exit=0）。
+
+**過程（真跑抓到的，不是紙上審查）**：
+1. 第一次真跑 65 assertion + 19 mutation 前，先派 1 個 critic agent 覆審（未跑 Docker 前的書面對抗審查）：抓到 **2 個真實 gate bypass**（C1：`status` 留在 INSERT grant，app role 可直接 INSERT 進 ACTIVE/CLOSED 跳過整個狀態機，且製造「CLOSED 但 closed_at IS NULL」的稽核紀錄；C2：`research_workflows.case_id` 是普通可 UPDATE 欄位，terminal-state guard 只在 INSERT 觸發，可事後把 workflow 改指到 CLOSED case）+ 5 個結構性缺口（M1 fail-open 狀態檢查、M2 `hci.cases` 缺 DELETE/TRUNCATE trigger 層、M3 CLOSED case 其他欄位可無限改寫無稽核痕跡、M4 `subject_records` 半邊 terminal-guard 零測試覆蓋、M5 `hci.cases` 自己的 RLS 從未被任何測試證明）。全部修入 migration，assertion 65→75、mutation 19→26。
+2. 修完後第一次真跑 Docker（`test-wave1-local.ps1`）：3 個斷言變紅（`RLS-WRITE-01`／`CASE-OWNS-01`／`CASE-OWNS-02`，全部誤報 `H1011`）——critic 書面審查沒抓到的**第二類真問題**：新 trigger 在 NOT NULL 約束、複合 FK、以及該列自己的 RLS WITH CHECK 之前就先開火，而它自己對 `hci.cases` 的查詢本身又被 RLS 過濾，導致 NULL/不存在/跨租戶的 `case_id` 全部被誤判成「case 不是 open/active」，蓋掉本該出現的 `23502`/`23503`/`42501`。修法：把邏輯拆成「先解析 case 是否在本租戶內可見，不可見就靜默放行讓下游正確的檢查接手；只有真的在本租戶內可見時才套 fail-closed 邏輯」，migration 內完整記錄 attempt 1/2/3 三版演進與各自錯在哪裡。
+3. 修完後第二次真跑：75/75 assertion、可逆性 pass 全綠。
+4. `mutation-check-wave1.ps1`：26/26 全殺（含 5 個既有 mutation 因新增測試而更新 expect list，全部靠真跑輸出核對，未憑推理硬猜）。
+5. 派 1 個 db-expert agent 覆審 lock/相容性/rollback（`.claude` hook 對 DB migration 路徑強制要求）：無 Critical；抓到 3 個 Major 全是「註解講錯理由」與「缺 lock_timeout」，皆已修——(a) 空表 NOT NULL 的正確理由是「非空表直接 23502 失敗」不是「比較慢」；(b) 整檔 `BEGIN/COMMIT` 從第 39 行到第 268 行持有 4 張表的鎖，原本 header 完全沒提，已補 `SET LOCAL lock_timeout='3s'`（repo 既有慣例，`lobster-factory` 0058/0060 已用過）+ header 說明；(c) `case_id` 缺索引（`ADR-0020` 自陳目的是 bound replay，之後必然要查「某 case 底下所有 work」）+ down migration 兩處缺 `IF EXISTS`（0001 已 down 後單獨跑 0002 down 會炸，probe 容器實測 exit 3→修完 exit 0，我自己也額外真跑一次獨立驗證確認）。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_up.sql`：C1/C2/M1-M5 全修 + db-expert 3 項（lock_timeout、註解修正、2 個新索引），270 行
+- `Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_down.sql`：2 處補 `IF EXISTS`
+- `Projects/internal/hci30/database/fixtures/0001_synthetic.sql`：CLOSED fixture 改走真實 OPEN→ACTIVE→CLOSED 三步（原本用 owner bypass 直接種 CLOSED，現在連 fixture 本身都是 lifecycle trigger 的正向證據）
+- `Projects/internal/hci30/database/tests/wave1-negative-tests.sql`：65→75 assertion
+- `Projects/internal/hci30/scripts/mutation-check-wave1.ps1`：19→26 mutation
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`：PENDING→真實證據，完整記錄兩輪真跑發現與修法
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR_INDEX.md`：ADR-0020 gate `SPECIFIED — RUNTIME OPEN` → `SYNTHETIC GATE VERIFIED (Wave 1 scope)`，`CASE-REPLAY-01`（Wave 4）維持 OPEN
+- `agency-os/TASKS.md`：新增 M6（錯誤碼 registry SSOT 治理缺口）待辦，故意不塞進本次 commit（critic 原話：另開項目，不要補丁收尾）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/test-wave1-local.ps1`（最終版）| exit=0 | result=75 assertions, 0 failed + down/up 可逆性 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/mutation-check-wave1.ps1`（最終版）| exit=0 | result=All 26 mutations killed
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 verify script：0001 up→0002 up→0001 down（整個 schema drop）→0002 down 單獨跑 | exit=0（db-expert 修前實測為 exit=3）| result=down migration idempotency 修正確認
+- REVIEW_DONE: critic=Standard | verdict=fail→fixed | findings=2c/5m/5minor（C1/C2/M1-M5 全修，m1-m5 部分採納部分記錄為已知取捨）
+- REVIEW_DONE: critic=db-expert(Standard) | verdict=warn→fixed | findings=0c/3m/6minor（M1-M3 全修：lock_timeout、註解修正、索引補齊、down migration IF EXISTS；m4-m9/suggestion 級記錄不採納，理由見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`H1010\|H1011\|ADR-0020\|research_workflows_case_idx\|subject_records_case_idx\|lock_timeout\|65 assertion\|19 mutation\|H1012\|REG-NEG\|HCI-INDEP-SCHEMA-01` | hits=本次改動零過期宣稱殘留；額外發現 `H1012`／`REG-NEG-*`／`HCI-INDEP-SCHEMA-01` 全 repo 零命中——ADR-0005/ADR-0012 承諾的 mutation 從未落地（`ADR_INDEX.md` 本就誠實標 OPEN，非新增過期宣稱，已記 TASKS 待辦）
+
+**[剩餘風險]**：Wave 1 之後（Wave 2-10：Postgres 物理隔離、金鑰輪替、AI credential 隔離、bulk-export 防護、fetch worker 隔離、entitlement 計費…）仍是 `SPECIFIED — RUNTIME OPEN`，application/API 層完全未動工，數月工程量誠實未壓縮成一次 session。M6 錯誤碼 registry 治理缺口獨立記錄未修。
+
+**[rollback]**：`git revert` 本 commit 即可；DB 層面 `0002_wave1_case_aggregate_down.sql` 已驗證可逆（byte-exact，db-expert `pg_dump -s` 比對）。
+
 ## 2026-09-04（續33，同一 session：Cognitive OS 第二十個 Method Atlas 切片 — `devops_sre.sli_slo`，開第二個 pack＋明文記錄一次「決定不做」的判斷）
 
 **觸發**：延續操作者授權。0 agent。

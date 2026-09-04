@@ -2,7 +2,7 @@
 
 Status: **MIXED REGISTER — only entries explicitly marked `ACCEPTED` below are approved decisions**
 Owner: HCI AI LEGO Blueprint v2
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-04
 
 ## Purpose and state rules
 
@@ -75,7 +75,7 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0017 | `SPECIFIED — RUNTIME OPEN` | `BITEMP-WINDOW-01`, `-REASON-01`, `-CROSSTENANT-01`, `-SUPERSEDE-01/02`, `-IMMUTABLE-01`, `-CLOCK-01`, `-ASOF-01`, `-SCOPE-01`, `EXPLAIN-ASOF-01` (Wave 1/4) |
 | ADR-0018 | `SPECIFIED — RUNTIME OPEN` | `CRYPTO-KEYGRANT-01`, `-KEYREQ-01`, `-SCOPE-01`, `-CROSSTENANT-KEYREF-01`, `-TOMBSTONE-01/02`, `-WRITE-01`, `-ROUNDTRIP-01`, `-READ-TOMBSTONED-01`, `-ERASURE-01/02/METADATA-01`, `-NOEXTERNAL-01` (Wave 1/4) |
 | ADR-0019 | `SPECIFIED — RUNTIME OPEN` | `wave1/HCI_FIELD_AUTHOR_CLASS_POLICY.md` + `NEG-HD08-01..04` (Wave 1) |
-| ADR-0020 | `SPECIFIED — RUNTIME OPEN` | `CASE-SCHEMA-01`, `CASE-LIFECYCLE-01..04`, `CASE-OWNS-01/02`, `CASE-CLOSED-GUARD-01`, `CASE-PROJECTREF-01`, `CASE-REPLAY-01` (Wave 1/4) |
+| ADR-0020 | `SYNTHETIC GATE VERIFIED (Wave 1 scope)` | Wave 1 gates verified: `CASE-SCHEMA-01`, `CASE-LIFECYCLE-*`, `CASE-CLOSED-IMMUTABLE-01`, `CASE-OWNS-01/02/03`, `CASE-CLOSED-GUARD-01/02`, `CASE-PROJECTREF-01/02`, `RLS-LEAK-03`, plus owner-bypass trigger-layer proof (`CASE-LIFECYCLE-TRIGGER-01`, `CASE-NODELETE-TRIGGER-01`) — `Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_up.sql`; Docker run green **75/75 assertions + 26/26 mutations killed**, 2026-09-04 (first Docker run at 65/19 found and fixed 2 real gate bypasses + 5 structural gaps via critic review, then a further trigger-ordering bug the critic review did not catch — full account in `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` §Current state); `CASE-REPLAY-01` (Wave 4, replay/rollback) still `OPEN` — not in scope of this migration |
 | ADR-0021 | `SPECIFIED — RUNTIME OPEN` | Dedicated `hci-postgres` compose service/volume, `ARCH-DB-03`, dedicated credentials/backup/resource limits, `ADR-0007` reconciliation (Wave 1/2, blocks Wave 4) |
 | ADR-0022 | `SPECIFIED — RUNTIME OPEN` | `KEY-RUNBOOK-EXISTS-01`, `SCHEMA-KEK-01`, `KEY-ROT-01`, `KEY-COMPROMISE-DRILL-01` (Wave 2, blocks Wave 4) |
 | ADR-0023 | `SPECIFIED — RUNTIME OPEN` | `docs/trust/CLAIMS_REGISTER.md`, `CLAIM-REG-01`, `CLAIM-GATE-01..04`, `CLAIM-PUB-01` (Wave 0) |
