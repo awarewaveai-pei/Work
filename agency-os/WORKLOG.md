@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-05（HCI30 ADR-0017 gate 4 落地：BITEMP-SCOPE-01 scope fence，migration 0006）
+
+**觸發**：延續操作者標準授權，接續同日稍早 commit `5395e0f14`（ADR-0017 gates 1-3）的下一步——gate 4 是該次 commit 明確記錄的「刻意分開一個 migration」follow-up，非新任務。
+
+**[已修改]**：
+- 新增 `Projects/internal/hci30/database/migrations/0006_wave1_bitemporal_scope_fence_{up,down}.sql`：對 11 張既有 tenant-owned 表（`persons`/`tenant_authorizations`/`subject_lawful_basis_records`/`sources`/`source_terms_records`/`research_workflows`/`data_subject_requests`/`data_subject_request_targets`/`identity_candidates`/`identity_verifications`/`source_relationships`）補 `created_at timestamptz NOT NULL DEFAULT now()`，INSERT/UPDATE 兩個 grant 都窄化排除該欄位。`app_tenant_bindings` 雖有 `tenant_id` 欄位但明確排除（基礎設施 role→tenant 對照表，0001 起就未授權給 app role，非 domain data）。
+- `database/tests/wave1-negative-tests.sql`：新增 `BITEMP-SCOPE-01`（owner 端 `information_schema` 通用查詢，機械驗證 bitemporal 欄位不外流+其餘表都有時間戳）+ `CREATEDAT-SCOPE-01/02`（代表性驗證 grant 窄化是 load-bearing，非窮舉 11 張表）。131 assertion（128→131）。
+- `database/fixtures/0001_synthetic.sql` 同批修正（見下）。
+- `scripts/test-wave1-local.ps1`／`scripts/mutation-check-wave1.ps1`：接入 migration 0006，58 mutation（54→58）。
+
+**真跑抓到的兩個真問題**（皆先用工具找出範圍，不是等失敗才修）：
+1. **位置式 INSERT 會被新欄位打斷**：grep 找出 fixtures/tests 裡 5 張表（`persons`/`tenant_authorizations`/`data_subject_requests`/`identity_candidates`/`identity_verifications`）共用 `INSERT INTO hci.<table> VALUES (...)`（無欄位清單）的舊寫法——新增 trailing column 後這些語句的欄位數會跟 VALUES 數量對不上，直接炸。動工前先 grep 全部命中，統一改成明確欄位清單，而非讓 Docker 失敗後才逐一修。
+2. **mutation-check 抓到一個連帶命中**：`drop-scope-fence-created-at`（拿掉 `persons.created_at`）除了讓 `BITEMP-SCOPE-01` 正確翻紅，也連帶讓 `CREATEDAT-SCOPE-01/02` 翻紅——這兩個測試自己的 SQL 直接點名該欄位，欄位不存在時錯誤碼變成 `42703`（column does not exist）而非預期的 `42501`（insufficient privilege），同樣「被拒絕，但代碼錯」該算 FAIL。補進該 mutation 的 expect list。
+
+**為何本輪未送 db-expert 覆審**：gate 4 沿用的是 gate 2 已經真跑驗證過的既有模式（`REVOKE INSERT/UPDATE` + 明確欄位清單 `GRANT`，跟 0001 的 `data_subject_request_events.created_at`、0004 的 `source_snapshots.retrieved_at` 同一形狀），沒有引入任何新機制——不像 gate 2 的 escape-hatch 換了 4 次設計。改用真跑 narrow rollback 兩次（獨立跑一次 `0006_down`；再接著重新套用 `0006_up` 驗證乾淨可重入）取代覆審，因為這條 rollback 路徑此前從未被 harness 自動跑過（`test-wave1-local.ps1` 的 reversibility pass 只跑整包 `0001_down`）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=`HCI Wave 1 negative suite: 131 assertion(s) recorded, 0 failed`，第一次真跑就過（含 migration 0006 的 forward path + 整包 reversibility pass）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 58 mutations killed. The Wave 1 negative suite is non-vacuous.`（第一次跑到 1 個 WEAK，修正 expect list 後複驗全綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=真跑 `0006_wave1_bitemporal_scope_fence_down.sql`（獨立容器，1-6 全部 up 完後執行）| exit=0；緊接著重新套用 `0006_up` | exit=0——narrow rollback 路徑此前從未真跑過，本輪首次驗證
+- REVIEW_DONE: critic=Waived（理由見上，沿用已審過的既有模式；兩個真問題皆由真跑+grep 抓到並修正，非略過驗證）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`0006_wave1_bitemporal_scope_fence\|BITEMP-SCOPE-01\|CREATEDAT-SCOPE` | hits=全部本輪自己新增的引用，無過期殘留
+- WORKLOG: 本條目
+
+**[剩餘風險]**：低。gate 5（Wave 4 `EXPLAIN-ASOF-01`）OPEN，等應用層存在才可能驗證，非本輪範圍。ADR-0017 五個 gate 中四個現已關閉。
+
+**[rollback]**：`0006_wave1_bitemporal_scope_fence_down.sql`（窄回滾，本輪真跑兩次確認可用）；或 `0001_wave1_synthetic_down.sql`（整包 DROP SCHEMA，含 0002-0006 全部）。
+
 ## 2026-09-05（續41，同一 session：Cognitive OS 第二十八個 Method Atlas 切片 — `database_data.data_lineage`，四個既有教訓都真的擋住了，critic 挖出第五種全新失守模式）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。

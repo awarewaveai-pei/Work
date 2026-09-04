@@ -68,7 +68,7 @@ SELECT hci_test.expect_success('CONSENT-NEG-04b',
      ('aaaaaaaa-0000-0000-0000-000000000102','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000200')$q$);
 
 SELECT hci_test.expect_success('CONSENT-NEG-05a',
-  $q$INSERT INTO hci.tenant_authorizations VALUES
+  $q$INSERT INTO hci.tenant_authorizations (id,tenant_id,status,expires_at) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000103','11111111-1111-1111-1111-111111111111','ACTIVE',NULL)$q$);
 
 SELECT hci_test.expect_success('CONSENT-NEG-05b',
@@ -93,12 +93,12 @@ SELECT hci_test.expect_sqlstate('CONSENT-NEG-05e',
 -- Data-subject-request lifecycle (HD-03)
 -- ---------------------------------------------------------------------------
 SELECT hci_test.expect_sqlstate('DSR-LIFECYCLE-01',
-  $q$INSERT INTO hci.data_subject_requests VALUES
+  $q$INSERT INTO hci.data_subject_requests (id,tenant_id,person_id,request_type,status) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000106','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CORRECTION','IN_REVIEW')$q$,
   'H1002');
 
 SELECT hci_test.expect_success('DSR-LIFECYCLE-02',
-  $q$INSERT INTO hci.data_subject_requests VALUES
+  $q$INSERT INTO hci.data_subject_requests (id,tenant_id,person_id,request_type,status) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000107','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CORRECTION','RECEIVED')$q$);
 
 SELECT hci_test.expect_sqlstate('DSR-LIFECYCLE-03',
@@ -151,11 +151,11 @@ SELECT hci_test.expect_success('TARGET-KIND-02',
 -- Identity confirmation admission (HD-04), guarded on both sides
 -- ---------------------------------------------------------------------------
 SELECT hci_test.expect_success('IDENTITY-NEG-01a',
-  $q$INSERT INTO hci.identity_candidates VALUES
+  $q$INSERT INTO hci.identity_candidates (id,tenant_id,person_id,match_state) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000112','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CANDIDATE')$q$);
 
 SELECT hci_test.expect_success('IDENTITY-NEG-01b',
-  $q$INSERT INTO hci.identity_verifications VALUES
+  $q$INSERT INTO hci.identity_verifications (id,tenant_id,candidate_id,method,evidence_ref) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000113','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000112','LLM','synthetic-confidence')$q$);
 
 SELECT hci_test.expect_sqlstate('IDENTITY-NEG-01c',
@@ -163,7 +163,7 @@ SELECT hci_test.expect_sqlstate('IDENTITY-NEG-01c',
   'H1004');
 
 SELECT hci_test.expect_success('IDENTITY-NEG-02a',
-  $q$INSERT INTO hci.identity_verifications VALUES
+  $q$INSERT INTO hci.identity_verifications (id,tenant_id,candidate_id,method,evidence_ref) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000114','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000112','HUMAN','synthetic-human-check')$q$);
 
 SELECT hci_test.expect_success('IDENTITY-NEG-02b',
@@ -182,7 +182,7 @@ SELECT hci_test.expect_sqlstate('IDENTITY-NEG-04',
 -- Field mutability matrix (migration header): what may change, and when
 -- ---------------------------------------------------------------------------
 SELECT hci_test.expect_sqlstate('NONEMPTY-01',
-  $q$INSERT INTO hci.identity_verifications VALUES
+  $q$INSERT INTO hci.identity_verifications (id,tenant_id,candidate_id,method,evidence_ref) VALUES
      ('aaaaaaaa-0000-0000-0000-000000000115','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000112','HUMAN','')$q$,
   '23514');
 
@@ -193,7 +193,7 @@ SELECT hci_test.expect_sqlstate('IDENTITY-NEG-05',
   'H1007');
 
 SELECT hci_test.expect_success('PERSON-02',
-  $q$INSERT INTO hci.persons VALUES
+  $q$INSERT INTO hci.persons (id,tenant_id,display_label) VALUES
      ('aaaaaaaa-0000-0000-0000-0000000000a2','11111111-1111-1111-1111-111111111111','Synthetic A2')$q$);
 
 -- The gate must block the silent path without blocking the legitimate one.
@@ -632,6 +632,21 @@ SELECT hci_test.expect_true('BITEMP-VIEWRLS-01',
        AND NOT EXISTS (SELECT 1 FROM hci.decisions_current WHERE id = 'bbbbbbbb-0000-0000-0000-000000000600')$q$,
   'security_invoker views must not leak tenant B rows to tenant A');
 
+-- ADR-0017 gate 4: created_at is withheld from both INSERT and UPDATE on the
+-- eleven scope-fence tables (migration 0006), matching the "ledger clock
+-- must not be client-chosen" rule already proven for the other server-
+-- assigned timestamps in this schema. Representative coverage on
+-- hci.persons (the pattern is structurally identical across all eleven -
+-- the mutation-check equivalents below cover a second table for the same
+-- reason APPEND-ONLY-GRANT-0x covers a representative set, not every table).
+SELECT hci_test.expect_sqlstate('CREATEDAT-SCOPE-01',
+  $q$INSERT INTO hci.persons (id,tenant_id,display_label,created_at)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000700','11111111-1111-1111-1111-111111111111','clock probe','2020-01-01T00:00:00Z')$q$,
+  '42501');
+SELECT hci_test.expect_sqlstate('CREATEDAT-SCOPE-02',
+  $q$UPDATE hci.persons SET created_at = now() WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$q$,
+  '42501');
+
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
@@ -812,8 +827,50 @@ SELECT hci_test.expect_true('ARCH-PEER-02b',
        )$q$,
   'credential isolation: only the known Wave 1 roles plus PostgreSQL built-ins exist, none matching cognitive/lego');
 
+-- ADR-0017 gate 4: BITEMP-SCOPE-01, the machine form of Decision item 2 -
+-- "no valid_*/system_* bitemporal columns may be populated outside
+-- subject_records/decisions, and every other tenant-owned table carries
+-- exactly one server-assigned insertion-timestamp column." Two independent
+-- checks, both against information_schema (no hardcoded table list to go
+-- stale as new tables are added): (1) valid_from/system_recorded_at exist
+-- on no BASE TABLE except the two named; (2) every other BASE TABLE that has
+-- its own tenant_id column also has at least one NOT NULL timestamptz column
+-- defaulting to now() - the generic form of "created_at", matching that a
+-- domain-appropriate name (opened_at, retrieved_at) satisfies this too
+-- (ADR-0017:24). app_tenant_bindings is excluded by name even though it has
+-- a tenant_id column - see migration 0006's own header for why (it is
+-- infrastructure, never granted to the application roles at all, not domain
+-- data in the sense this gate is about).
+SELECT hci_test.expect_true('BITEMP-SCOPE-01',
+  $q$
+  SELECT
+    NOT EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      JOIN information_schema.tables t
+        ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+      WHERE c.table_schema = 'hci' AND c.column_name IN ('valid_from','system_recorded_at')
+        AND c.table_name NOT IN ('subject_records','decisions')
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM information_schema.tables t
+      WHERE t.table_schema = 'hci' AND t.table_type = 'BASE TABLE'
+        AND t.table_name NOT IN ('subject_records','decisions','app_tenant_bindings')
+        AND EXISTS (
+          SELECT 1 FROM information_schema.columns c
+          WHERE c.table_schema = 'hci' AND c.table_name = t.table_name AND c.column_name = 'tenant_id'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns c2
+          WHERE c2.table_schema = 'hci' AND c2.table_name = t.table_name
+            AND c2.data_type = 'timestamp with time zone' AND c2.is_nullable = 'NO'
+            AND c2.column_default LIKE 'now()%'
+        )
+    )
+  $q$,
+  'bitemporal columns confined to subject_records/decisions; every other tenant-owned table carries a server-assigned insertion timestamp');
+
 -- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(128);
+SELECT hci_test.finish(131);

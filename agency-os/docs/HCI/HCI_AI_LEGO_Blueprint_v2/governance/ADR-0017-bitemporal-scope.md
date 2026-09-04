@@ -50,13 +50,14 @@ ADR-0020's `hci.cases` (already committed and real-Docker-verified before
 this ADR's own implementation started). The real migration is
 `0005_wave1_bitemporal_history_up.sql`.
 
-**Gates 1-3 (columns/constraints, supersession trigger, canonical reads) —
-DONE**, real-Docker-verified after an independent db-expert review pass found
-3 Critical + 6 Major issues in the first landed version and all were fixed
-and re-verified before this note was written: `test-wave1-local.ps1` green
-at **128/128** assertions (up from 104), `mutation-check-wave1.ps1` green at
-**54/54** mutations killed (up from 39), including 15 new/revised mutations
-targeting this migration specifically. `hci.subject_records` carries the six
+**Gates 1-4 (columns/constraints, supersession trigger, canonical reads,
+scope fence) — DONE**, real-Docker-verified. Gates 1-3 went through an
+independent db-expert review pass that found 3 Critical + 6 Major issues in
+the first landed version, all fixed and re-verified before this note was
+written; gate 4 landed the same day reusing the now-proven pattern, first
+run green. Combined: `test-wave1-local.ps1` green at **131/131** assertions
+(up from 104), `mutation-check-wave1.ps1` green at **58/58** mutations
+killed (up from 39). `hci.subject_records` carries the six
 bitemporal columns; a new `hci.decisions` table carries the same shape plus a
 minimal `outcome`/`rationale`/`case_id` shape (outcome enum sourced verbatim
 from `04_HCI30_PRODUCT_SPEC.md`'s Decision output values - full Decision
@@ -152,16 +153,40 @@ matches the schema's existing two-layer pattern
 (`APPEND-ONLY-GRANT-0x`/`APPEND-ONLY-TRIGGER-0x`) rather than deviating from
 it.
 
-**Gate 4 (scope fence, `BITEMP-SCOPE-01`) — deferred to a separate
-migration**, not built here. It requires retrofitting a server-assigned
-insertion-timestamp column onto eleven other pre-existing tenant-owned tables
-that currently carry none (`persons`, `tenant_authorizations`,
+**Gate 4 (scope fence, `BITEMP-SCOPE-01`) — DONE**, landed the same day in a
+separate migration (`0006_wave1_bitemporal_scope_fence_up.sql`) as
+originally planned - a distinct blast radius from the bitemporal mechanism
+itself (eleven unrelated pre-existing tables' grants), matching this schema's
+own one-cohesive-concern-per-migration convention (`0002`/`0003`/`0004`/
+`0005`). Retrofits a server-assigned `created_at timestamptz NOT NULL DEFAULT
+now()` onto the eleven tenant-owned tables that previously carried no
+insertion-timestamp column at all (`persons`, `tenant_authorizations`,
 `subject_lawful_basis_records`, `sources`, `source_terms_records`,
 `research_workflows`, `data_subject_requests`, `data_subject_request_targets`,
-`identity_candidates`, `identity_verifications`, `source_relationships`) -
-a distinct blast radius from the bitemporal mechanism itself, and this
-schema's own convention (`0002`/`0003`/`0004`) is one cohesive concern per
-migration. Tracked in `TASKS.md`, not silently dropped.
+`identity_candidates`, `identity_verifications`, `source_relationships`),
+withheld from both the INSERT and UPDATE grant on each (matching gate 2's
+own "the ledger's own clock must not be something the audited party can
+choose" rule - `created_at` needs the same protection against being silently
+rewritten after the fact as it does against being chosen at insert).
+`app_tenant_bindings` is explicitly excluded despite having its own
+`tenant_id` column: it is infrastructure (a role->tenant mapping never
+granted to the application roles at all, `0001:281-282`), not domain data in
+the sense Decision item 2 means. `BITEMP-SCOPE-01` queries
+`information_schema` generically (no hardcoded table list to go stale) for
+both halves of the rule: no `valid_from`/`system_recorded_at` outside
+`subject_records`/`decisions`, and every other tenant-owned table has at
+least one `NOT NULL` server-assigned `timestamptz` column. Real-Docker
+verified: **131/131 assertions, 58/58 mutations killed**, first run green on
+both the full and narrow-rollback (0006_down, run twice - once alone, once
+followed by a clean re-apply) paths - no repeat of gate 2's earlier design
+churn, because this gate reuses an already-proven pattern rather than
+inventing a new mechanism. A handful of pre-existing bare positional
+`INSERT ... VALUES` statements (no column list) against `persons`,
+`tenant_authorizations`, `data_subject_requests`, `identity_candidates`, and
+`identity_verifications` in the fixtures/test files were converted to
+explicit column lists as part of this migration - not optional cleanup, a
+correctness requirement: a positional insert breaks the moment a new
+trailing column appears, which is exactly what this migration does.
 
 **Gate 5 (Wave 4 consumer binding, `EXPLAIN-ASOF-01`) — out of scope**, as
 gate 4 already was for prior ADRs at this stage: no application layer exists

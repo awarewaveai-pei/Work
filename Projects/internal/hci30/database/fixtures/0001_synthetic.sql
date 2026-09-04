@@ -9,8 +9,8 @@ INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES
   ('11111111-1111-1111-1111-111111111111','tenant-a','US'),
   ('22222222-2222-2222-2222-222222222222','tenant-b','US');
 INSERT INTO hci.app_tenant_bindings VALUES ('hci_app_test_a', '11111111-1111-1111-1111-111111111111'), ('hci_app_test_b', '22222222-2222-2222-2222-222222222222');
-INSERT INTO hci.persons VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','11111111-1111-1111-1111-111111111111','Synthetic A'), ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','22222222-2222-2222-2222-222222222222','Synthetic B');
-INSERT INTO hci.tenant_authorizations VALUES ('aaaaaaaa-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','ACTIVE',NULL), ('aaaaaaaa-0000-0000-0000-000000000010','11111111-1111-1111-1111-111111111111','REVOKED',NULL), ('bbbbbbbb-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222','REVOKED',NULL);
+INSERT INTO hci.persons (id,tenant_id,display_label) VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','11111111-1111-1111-1111-111111111111','Synthetic A'), ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','22222222-2222-2222-2222-222222222222','Synthetic B');
+INSERT INTO hci.tenant_authorizations (id,tenant_id,status,expires_at) VALUES ('aaaaaaaa-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','ACTIVE',NULL), ('aaaaaaaa-0000-0000-0000-000000000010','11111111-1111-1111-1111-111111111111','REVOKED',NULL), ('bbbbbbbb-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222','REVOKED',NULL);
 
 -- Case/Engagement aggregate fixtures (ADR-0020). One OPEN case per tenant so
 -- research_workflows/subject_records tests have a valid case_id to bind to;

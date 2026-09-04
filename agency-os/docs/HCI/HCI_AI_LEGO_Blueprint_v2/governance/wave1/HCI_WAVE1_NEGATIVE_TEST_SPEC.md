@@ -1,7 +1,7 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, and the Bitemporal history addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history section added and executed 2026-09-05)
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, the Bitemporal history addition, and the Bitemporal scope fence addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history and Bitemporal scope fence sections added and executed 2026-09-05)
 Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026, ADR-0017
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
@@ -162,13 +162,55 @@ in the same migration file before commit; the `BITEMP-VIEWRLS-01`,
 `APPEND-ONLY-TRIGGER-05`, and `TRUNCATE-05` rows in the table above are that
 review's direct product, not part of the original gate 1-3 plan.
 
-`BITEMP-SCOPE-01` (gate 4, the architecture fence requiring every other
-tenant-owned table to carry exactly one server-assigned insertion-timestamp
-column) is **not implemented** in this migration — deferred to a follow-up
-migration, tracked in `TASKS.md`, since it touches eleven unrelated
-pre-existing tables' grants rather than the bitemporal mechanism itself.
 `EXPLAIN-ASOF-01` (gate 5, Wave 4) remains `OPEN` — no application layer
 exists yet to bind.
+
+## Bitemporal scope fence *(new, ADR-0017 gate 4, migration 0006)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| BITEMP-SCOPE-01 | Owner-run `information_schema` introspection | (a) `valid_from`/`system_recorded_at` exist on no table outside `subject_records`/`decisions`; (b) every other tenant-owned table (`app_tenant_bindings` excluded by name — infrastructure, not domain data, never granted to app roles at all) has ≥1 `NOT NULL` server-assigned `timestamptz` column | Predicate true |
+| CREATEDAT-SCOPE-01 | App-role INSERT naming `hci.persons.created_at` | Server-assigned clock, same mechanism as `BITEMP-CLOCK-0x` — representative of all 11 scope-fence tables, not exhaustive | Rejected, `42501` |
+| CREATEDAT-SCOPE-02 | App-role `UPDATE hci.persons SET created_at` | `created_at` withheld from UPDATE too, not just INSERT | Rejected, `42501` |
+
+Retrofits `created_at timestamptz NOT NULL DEFAULT now()` onto the eleven
+tenant-owned tables that previously carried no insertion-timestamp column at
+all (`persons`, `tenant_authorizations`, `subject_lawful_basis_records`,
+`sources`, `source_terms_records`, `research_workflows`,
+`data_subject_requests`, `data_subject_request_targets`,
+`identity_candidates`, `identity_verifications`, `source_relationships`),
+withheld from both INSERT and UPDATE grants on each - matching gate 2's own
+"the ledger's own clock must not be something the audited party can choose"
+rule extended to also cover silent rewriting after the fact.
+
+A real, mechanical side effect surfaced converting this: several pre-existing
+bare positional `INSERT hci.<table> VALUES (...)` statements (no column
+list) in the fixtures and test files - against `persons`,
+`tenant_authorizations`, `data_subject_requests`, `identity_candidates`, and
+`identity_verifications` - would have broken the instant `created_at` became
+a new trailing column (`column count mismatch`). Converted to explicit
+column lists before running, not discovered by letting the run fail first,
+since a repo-wide grep found every instance ahead of time.
+
+Real-Docker verified: first run green on both `test-wave1-local.ps1`
+(**131/131 assertions**, including migration 0006 in both the forward and
+the full-schema reversibility pass) and `mutation-check-wave1.ps1`
+(**58/58 mutations killed**, including one real collateral-hit correction -
+dropping `persons.created_at` to prove `BITEMP-SCOPE-01` also broke
+`CREATEDAT-SCOPE-01/02` themselves, since their own SQL names the column
+directly; added to that mutation's expect list rather than treated as a
+separate mutation). The narrow-rollback path (`0006_wave1_bitemporal_scope_fence_down.sql`,
+not exercised by the harness's own reversibility pass, which only drops the
+whole schema via `0001_down`) was run manually, twice - once alone against a
+populated 0001-0006 schema, once followed by a clean re-application of
+`0006_up` - both exit 0. No design churn this round, unlike gate 2: this
+gate reuses an already-proven grant-narrowing pattern (0001's
+`data_subject_request_events.created_at`, 0004's
+`source_snapshots.retrieved_at`) rather than inventing a new mechanism, and
+a db-expert review was judged unnecessary for that reason - the real bugs
+this gate did surface (positional INSERTs, the collateral-hit mutation) were
+both caught by grep and real execution respectively, the same disciplines
+applied throughout this file.
 
 ## Test execution requirements
 
@@ -420,14 +462,32 @@ mutation pair widened to all four views. Final run after both review cycles:
 **128/128 assertions, 54/54 mutations killed**. Full narrative in the
 migration file's own header comment and in ADR-0017's "Implementation note".
 
+**Execution evidence (2026-09-05, Bitemporal scope fence addition).** ADR-0017
+gate 4, migration `0006_wave1_bitemporal_scope_fence_up.sql`: `created_at`
+retrofitted onto the eleven previously-timestamp-less tenant-owned tables,
+withheld from both INSERT and UPDATE grants, plus `BITEMP-SCOPE-01`'s
+generic `information_schema` introspection check. First real run green on
+both the forward path and both rollback paths (narrow `0006_down`, run twice;
+whole-schema `0001_down`) - no design churn, reusing gate 2's now-proven
+grant-narrowing pattern rather than inventing a new mechanism, so no
+db-expert review was requested for this addition. One real mutation
+collateral hit, found and fixed on the first `mutation-check` run: dropping
+`persons.created_at` also breaks `CREATEDAT-SCOPE-01/02` (their own SQL
+names the column, so it fails at `42703` instead of the `42501` they assert)
+- added to that mutation's expect list. Final tally after gates 1-4
+together: **131/131 assertions, 58/58 mutations killed** (128 + 3 new
+assertions, 54 + 4 new mutations). Full narrative in the migration file's
+own header comment and in ADR-0017's "Implementation note".
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 54
+requires the suite to go red on exactly the assertions covering it; **all 58
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
 Source-provenance mutations + 2 Consent-class mutations + 15 Bitemporal-
 history mutations (7 landed pre-review + 6 added by the db-expert review pass
-+ 2 added by a second critic review of the harness scripts themselves),
++ 2 added by a second critic review of the harness scripts themselves) + 4
+Bitemporal-scope-fence mutations,
 2026-09-05, covering every invariant listed above). This
 exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same

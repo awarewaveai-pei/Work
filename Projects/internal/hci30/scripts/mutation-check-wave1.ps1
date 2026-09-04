@@ -33,6 +33,7 @@ $upMig2   = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sq
 $upMig3   = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_scope_up.sql'
 $upMig4   = Join-Path $root 'database/migrations/0004_wave1_source_provenance_up.sql'
 $upMig5   = Join-Path $root 'database/migrations/0005_wave1_bitemporal_history_up.sql'
+$upMig6   = Join-Path $root 'database/migrations/0006_wave1_bitemporal_scope_fence_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -383,6 +384,29 @@ $mutations = @(
   @{ id = 'disable-security-invoker-views'
      sql = 'ALTER VIEW hci.evidence_current SET (security_invoker = false); ALTER VIEW hci.claims_current SET (security_invoker = false); ALTER VIEW hci.assessments_current SET (security_invoker = false); ALTER VIEW hci.decisions_current SET (security_invoker = false);'
      expect = @('BITEMP-VIEWRLS-01') }
+
+  # ADR-0017 gate 4 (Bitemporal scope fence, migration 0006) - 2026-09-05.
+  # CREATEDAT-SCOPE-01/02 join this mutation's expect list (real run):
+  # dropping the column outright makes their own INSERT/UPDATE statements
+  # (which name created_at explicitly) fail with 42703 "column does not
+  # exist" instead of the 42501 they assert - still rejected, wrong reason,
+  # correctly flips to FAIL, same reasoning as every other collateral-hit
+  # case already documented in this file.
+  @{ id = 'drop-scope-fence-created-at'
+     sql = 'ALTER TABLE hci.persons DROP COLUMN created_at;'
+     expect = @('BITEMP-SCOPE-01','CREATEDAT-SCOPE-01','CREATEDAT-SCOPE-02') }
+  # Proves the check's OTHER half - a bitemporal column populated outside
+  # subject_records/decisions must also be caught, not just a missing
+  # created_at.
+  @{ id = 'add-stray-bitemporal-column'
+     sql = 'ALTER TABLE hci.persons ADD COLUMN valid_from timestamptz;'
+     expect = @('BITEMP-SCOPE-01') }
+  @{ id = 'regrant-createdat-scope-insert'
+     sql = 'GRANT INSERT ON hci.persons TO hci_app_test_a;'
+     expect = @('CREATEDAT-SCOPE-01') }
+  @{ id = 'regrant-createdat-scope-update'
+     sql = 'GRANT UPDATE ON hci.persons TO hci_app_test_a;'
+     expect = @('CREATEDAT-SCOPE-02') }
 )
 
 $project = "hcimut$PID"
@@ -441,6 +465,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig3)   -ne 0) { throw 'mutation harness: 0003 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig4)   -ne 0) { throw 'mutation harness: 0004 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig5)   -ne 0) { throw 'mutation harness: 0005 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig6)   -ne 0) { throw 'mutation harness: 0006 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }
