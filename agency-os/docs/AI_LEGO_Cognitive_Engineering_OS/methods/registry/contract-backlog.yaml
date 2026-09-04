@@ -302,6 +302,29 @@ tier_1:
       is not itself cited elsewhere as a repeated teaching example. Tier 1,
       mandated by the actively-running implementation slice, same category
       as the three entries above it.
+  fifth_concrete_entry:
+    # NEW (2026-09-04, same session): fifth Tier 1 entry, same additive-key
+    # rationale as the four entries above it.
+    method_id: "decision.ahp"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). First entry from the
+      `decision` family (F16), not root_cause/strategy/causal --
+      deliberately chosen to open a NEW family after four consecutive
+      root_cause-chain-adjacent entries, and because Atlas §4 (L192)
+      directly cites this method's own primitive composition ("AHP =
+      COMPARE + WEIGHT + PRIORITIZE + DECIDE"), the strongest primitive
+      grounding of any Tier 1 entry in this file (the other four all
+      disclosed inferred primitives).
+    source: "methods/contracts/decision.ahp.contract.yaml (built same session as this entry, mints machine_id decision.ahp -- method-inventory.yaml's own AHP entry carries none) + specs/cognitive/typed-objects/ahp-analysis.schema.yaml (new output type) + ai_lego/compute/ahp/weights.py (new deterministic Saaty-method compute module, hand-verified against a known-consistent case)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.31 is a dedicated protocol
+      section, not itself a repeatedly-cited teaching example (contrast
+      Fishbone/SWOT, which Atlas cites AS worked examples elsewhere in the
+      document). Tier 1, mandated by the actively-running implementation
+      slice, same category as the four entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

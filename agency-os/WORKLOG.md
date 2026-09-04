@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-09-04（續19，同一 session：Cognitive OS 第七個 Method Atlas 切片 — `decision.ahp`，新家族＋真實 bughunt 抓到跨文件命名衝突）
+
+**觸發**：六個切片 push 完成後，操作者被問「下一步」，回「你做最完美的決定」——全權維持。0 agent。
+
+**選型**：`decision.ahp`（F16，**第一個不掛在 CauseHypothesisSet 鏈下的獨立決策方法**）。Atlas §4（L192）直接引用這個方法的 primitive composition「AHP = COMPARE + WEIGHT + PRIORITIZE + DECIDE」——本 session 所有 Tier 1 契約裡根基最強的一個（five_whys/pareto/causal.dag 的 primitives 都是推論，這個是逐字引用）。
+
+**真的抓到一個跨文件衝突（commit 前）**：bughunt grep 新符號時，`docs/architecture/REPOSITORY_ARCHITECTURE.md`（ACCEPTED 2026-08-30，操作者當時明示核准）命中——該文件明文裁決「`/modules/decision` 應移除，併入 `/core/domain/decision`」（Decision 是 Shared Kernel 物件,不需要獨立 vertical）。我新寫的 `ai_lego/modules/decision/ahp.py` 路徑撞名。查證後確認：**不是真牴觸,是命名巧合**——該文件裁決的是 Master Plan §80 候選清單裡「Decision 物件本身的 engine」,我寫的是 Atlas Method Family（F16 決策**技巧**如 AHP/MCDA）,同一份文件自己在上一節已裁決 Atlas 對 Method System 擁有 authoritative source 地位。兩者是不同東西撞了同一個資料夾名字。在同一 commit 內修：於 REPOSITORY_ARCHITECTURE.md 該表格後補一段精確澄清（不改動原裁決本身),`ahp.py` docstring 加對應指標,避免未來讀者誤判為牴觸。
+
+**不變量**：Consistency Ratio 不是裝飾——`ai_lego/compute/ahp/weights.py` 先用 3 個已知案例手算驗證：完全一致案例（真實權重比 4:2:1）算出精確 [4/7,2/7,1/7]、CR=0；輕微不一致案例 CR 略高於 0 但 <0.1；**循環偏好案例**（A>B>C>A 皆強度 9）權重平均法算出來看似「中立」的 [0.33,0.33,0.33],但 CR=6.13——這正是 Consistency Ratio 存在的理由：權重平均本身騙不出矛盾,CR 才抓得到。`evaluate_genuine_compute_gate` 第二次重用 `research.gates.evaluate_statistical_gate`（pareto 是第一次）——第三個方法家族靠同一個閘。
+
+**[已修改]**：spec-root 新增 `methods/contracts/decision.ahp.contract.yaml`（逐字引用 Atlas §11.31/§4，新鑄 machine_id `decision.ahp`——method-inventory.yaml 的 AHP 條目本來沒有）＋ `specs/cognitive/typed-objects/ahp-analysis.schema.yaml`＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.fifth_concrete_entry`＋重新產生索引＋`docs/architecture/REPOSITORY_ARCHITECTURE.md` 澄清段落（上述衝突修正）。Product root 新增 `ai_lego/compute/ahp/weights.py`（純 Saaty 演算法,零方法相依）；`ai_lego/modules/decision/ahp.py`（builder＋三個 gate,一個重用兩個新寫）；`ai_lego/apps/cli/run_ahp_slice.py`；`tests/unit/test_ahp.py`（16 tests，過程中抓到並修正自己一個真實測試設計 bug——巧合平手案例斷言了特定贏家）；`docs/SEVENTH_SLICE_DECISION_AHP.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2554→2565
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_ahp_slice` | exit=0 | result=第一次真跑就通過，權重與手算驗證完全一致:`PASS decision.ahp: weights=[('C1', 0.5714), ('C2', 0.2857), ('C3', 0.1429)], CR=0.0, consistent=True, ...`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ahp -v` | exit=0（首次 exit=1，1 個測試因巧合平手案例斷言特定贏家而 FAIL，修正測試資料後全綠）| ms=~650 | result=16 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=244954 | result=**328 tests OK**（312→328，零回歸；`git diff --stat` 確認 fishbone.py／research/gates.py 皆零改動，`git diff` 確認 REPOSITORY_ARCHITECTURE.md 純新增無刪除行）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:REPOSITORY_ARCHITECTURE.md 的澄清是否動到原裁決本身(沒有,只是在表格後新增段落,原表格文字一字未改);`evaluate_consistency_gate` 是否會被「誠實回報 consistent:false」繞過(不會,兩個 mutation test 都驗證過:竄改成 true 會被抓、誠實回報 false 也一樣 FAIL,閘本來就是要擋住不一致的分析被下游採信,無論呼叫者怎麼標記);CR 門檻 0.10 是否該像 Pareto 的門檻一樣留給 caller 設(不該,schema 自己的 compilation_decisions 已論證兩者是不同類別的門檻——Pareto 門檻因 Atlas 明文警告才留白,AHP 的 0.10 是外部已發表方法論常數)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`decision[.]ahp\|AhpAnalysis\|ahp-analysis\|compute[.]ahp\|compute/ahp\|modules[.]decision\|modules/decision` | hits=1 真實命中並已修（`docs/architecture/REPOSITORY_ARCHITECTURE.md` 命名衝突,見上）；其餘命中皆本次新增檔案自身或不相關的凍結快照
+
+**[剩餘風險]**：「Sensitivity」（Atlas 7 階段管線最後一階）完全未實作——Atlas 對它零細節,強做即臆測（`OQ-AHP-2`）；Criteria hierarchy 是扁平非多層（`OQ-AHP-1`）；method-inventory.yaml 的 AHP 條目未回填新鑄的 machine_id（`OQ-AHP-3`，同 fishbone 先例的既定作法一致）。
+
+**[rollback]**：除 `REPOSITORY_ARCHITECTURE.md` 新增澄清段落與 spec-root 索引重新產生外，零既有檔案邏輯改動（該澄清段落本身也是純新增,`git diff` 不含任何刪除行）。`git rm` 對應新檔即可完全復原。
+
 ## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
 
 **觸發**：延續操作者「沒做完不要停」授權。0 agent。

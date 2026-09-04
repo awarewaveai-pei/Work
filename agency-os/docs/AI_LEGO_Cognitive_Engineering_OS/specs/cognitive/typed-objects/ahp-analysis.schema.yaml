@@ -1,0 +1,276 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/ahp-analysis.schema.yaml"
+title: AHP Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AhpAnalysis` -- the declared
+  `outputs` of `decision.ahp`'s Method Contract
+  (methods/contracts/decision.ahp.contract.yaml, `outputs: [AhpAnalysis]`).
+  A second genuine-compute typed object (after `ParetoAnalysis`), but
+  structurally richer: a pairwise-comparison MATRIX and a derived
+  consistency check, not a simple ranked list.
+
+  Field provenance -- Atlas §11.31 (L1910-1939)'s own 7-stage pipeline
+  ("Goal -> Criteria hierarchy -> Pairwise comparisons -> Weight
+  calculation -> Consistency Ratio -> Option scoring -> Sensitivity") maps
+  directly onto this schema's fields, five of the seven stages
+  (Sensitivity and multi-level Criteria hierarchy are disclosed as NOT
+  implemented -- see `methods/contracts/decision.ahp.contract.yaml`'s own
+  `compilation_decisions`/`open_questions` OQ-AHP-1/OQ-AHP-2, this schema
+  does not re-litigate that scope choice):
+    * `criteria[]` -- the (flat) Criteria hierarchy stage.
+    * `pairwise_comparisons[]` -- caller-supplied, one direction per pair
+      (Saaty 1-9 scale); the reciprocal direction is derived by
+      `ai_lego/compute/ahp/weights.py`, never separately stored, so the
+      record cannot carry a self-contradicting pair.
+    * `criteria_weights[]` -- the Weight calculation stage's own computed
+      output (normalized row-geometric-mean method).
+    * `consistency_ratio`/`consistent` -- the Consistency Ratio stage.
+      Saaty's own published acceptance threshold (CR <= 0.10) is why
+      `consistent` is a SEPARATE, explicit boolean rather than left for a
+      caller to derive by comparing `consistency_ratio` against a number
+      they'd have to already know -- same "don't make the threshold
+      implicit" reasoning `pareto-analysis.schema.yaml`'s own
+      `threshold_status` field applies, though here the threshold itself
+      (0.10) is a fixed, externally-published constant (Saaty 1980), not a
+      caller-set one -- an important difference, disclosed in
+      `compilation_decisions`.
+    * `ranking[]` -- the Option scoring stage's own computed output,
+      present only when `options`/`option_scores` were supplied (Atlas's
+      own pipeline treats scoring as downstream of, not required for, a
+      complete weight-derivation run).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.31 層級分析法（AHP）, 7-stage pipeline (L1910-1939)"
+  - "methods/contracts/decision.ahp.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "ai_lego/compute/ahp/weights.py (the real Saaty-method compute this schema's computed fields record the result of)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Should `consistency_ratio`'s acceptance threshold (0.10) be a
+      caller-set, nullable field the way `pareto-analysis.schema.yaml`'s
+      `vital_few_threshold_percent` is (Atlas's own 80/20 caution, L1320,
+      explicitly forbids a hard-coded default there)?
+    decision: "No -- 0.10 is hard-coded as the `consistent` field's derivation rule, not left caller-nullable."
+    reasoning: >
+      These are genuinely different situations, not a contradiction: the
+      Pareto 80/20 ratio is Atlas's OWN caution against assuming a
+      domain-specific business threshold ('真正比例由資料決定' -- the real
+      ratio is data-determined, i.e. it legitimately varies by problem).
+      Saaty's CR <= 0.10 threshold is a FIXED, externally-published
+      mathematical acceptance criterion for THIS SPECIFIC METHOD's own
+      internal coherence check (not a business decision a caller should
+      set per-run) -- the standard, universally-cited AHP threshold since
+      Saaty (1980), the same class of external, non-negotiable citation
+      `reliability.py`'s Landis & Koch (1977) Kappa interpretation bands
+      already use. Treating it as caller-nullable would misrepresent it as
+      a business judgment call it is not.
+  - question: "Should pairwise_comparisons store both directions of each pair, or only the caller-supplied one?"
+    decision: "Only the caller-supplied direction; the reciprocal is a compute-layer detail, never persisted."
+    reasoning: >
+      Storing both would let a caller (or a hand-edited record) supply
+      directions that are NOT true reciprocals of each other -- silently
+      corrupting the matrix in a way this schema could not catch (JSON
+      Schema cannot express 'field X equals 1/field Y' across array
+      items). Keeping only the single caller-supplied direction per pair
+      makes the reciprocal-consistency property structurally impossible to
+      violate in the STORED record, even though the compute layer must
+      still derive the reciprocal internally to build the matrix.
+
+type: object
+required: [id, version, goal, criteria, pairwise_comparisons, criteria_weights, consistency_ratio, consistent, engine, computation_provenance_ref, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^AHP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.ahp"
+
+  goal:
+    type: string
+    description: "Atlas L1921 pipeline stage 1: 'Goal'. Free text -- the decision this AHP run is deriving weights/a ranking for."
+
+  criteria:
+    type: array
+    minItems: 2
+    description: "Atlas L1922 'Criteria hierarchy' -- flat list in this v1 scope (see compilation_decisions in the method contract, OQ-AHP-1)."
+    items:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+
+  pairwise_comparisons:
+    type: array
+    minItems: 1
+    description: "Atlas L1923 'Pairwise comparisons' -- exactly n*(n-1)/2 entries for n criteria, one direction per pair (see compilation_decisions)."
+    items:
+      type: object
+      required: [criterion_a_id, criterion_b_id, value]
+      properties:
+        criterion_a_id:
+          type: string
+        criterion_b_id:
+          type: string
+        value:
+          type: number
+          minimum: 0.1111111111111111
+          maximum: 9
+          description: "Saaty's 1-9 scale (or its reciprocal down to 1/9): how many times more important criterion_a_id is than criterion_b_id."
+
+  criteria_weights:
+    type: array
+    minItems: 2
+    description: "Atlas L1924 'Weight calculation' -- COMPUTED output, normalized to sum to 1.0."
+    items:
+      type: object
+      required: [criterion_id, weight]
+      properties:
+        criterion_id:
+          type: string
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+
+  consistency_ratio:
+    type: number
+    minimum: 0
+    description: "Atlas L1925 'Consistency Ratio' -- Saaty's CR, COMPUTED from the pairwise matrix and its own derived weights."
+
+  consistent:
+    type: boolean
+    description: "True iff consistency_ratio <= 0.10 (Saaty 1980's own published acceptance threshold). See compilation_decisions for why this is fixed, not caller-nullable."
+
+  options:
+    type: array
+    default: []
+    description: "Atlas L1926 'Option scoring' input side -- optional (a complete AHP run may stop at weight derivation)."
+    items:
+      type: object
+      required: [id, label]
+      properties:
+        id: {type: string}
+        label: {type: string}
+
+  option_scores:
+    type: array
+    default: []
+    description: "Caller-supplied per-criterion, per-option raw scores (0-1) feeding the ranking computation."
+    items:
+      type: object
+      required: [option_id, criterion_id, score]
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        score: {type: number, minimum: 0, maximum: 1}
+
+  ranking:
+    type: array
+    default: []
+    description: "Atlas L1926 'Option scoring' output -- COMPUTED, sorted descending by weighted_score. Empty when options/option_scores were not supplied."
+    items:
+      type: object
+      required: [option_id, weighted_score]
+      properties:
+        option_id: {type: string}
+        weighted_score: {type: number, minimum: 0}
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value ai_lego/compute/statistics/reliability.py and ai_lego/compute/pareto/ranking.py already use -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed criteria_weights -- same convention pareto-analysis.schema.yaml already established."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine AHP run -- same design choice pareto-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A perfectly consistent 3-criteria AHP run (weights exactly 4:2:1), two options scored"
+    value:
+      id: "AHP-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "decision.ahp"
+      goal: "選擇下一季優先投入的產品方向"
+      criteria:
+        - {id: "C1", label: "營收潛力"}
+        - {id: "C2", label: "工程可行性"}
+        - {id: "C3", label: "策略契合度"}
+      pairwise_comparisons:
+        - {criterion_a_id: "C1", criterion_b_id: "C2", value: 2.0}
+        - {criterion_a_id: "C1", criterion_b_id: "C3", value: 4.0}
+        - {criterion_a_id: "C2", criterion_b_id: "C3", value: 2.0}
+      criteria_weights:
+        - {criterion_id: "C1", weight: 0.5714}
+        - {criterion_id: "C2", weight: 0.2857}
+        - {criterion_id: "C3", weight: 0.1429}
+      consistency_ratio: 0.0
+      consistent: true
+      options:
+        - {id: "O1", label: "方案 A"}
+        - {id: "O2", label: "方案 B"}
+      option_scores:
+        - {option_id: "O1", criterion_id: "C1", score: 0.8}
+        - {option_id: "O1", criterion_id: "C2", score: 0.5}
+        - {option_id: "O1", criterion_id: "C3", score: 0.2}
+        - {option_id: "O2", criterion_id: "C1", score: 0.3}
+        - {option_id: "O2", criterion_id: "C2", score: 0.9}
+        - {option_id: "O2", criterion_id: "C3", score: 0.9}
+      ranking:
+        - {option_id: "O1", weighted_score: 0.62857143}
+        - {option_id: "O2", weighted_score: 0.55714286}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ahp.weights.geometric_mean_weights"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-AHPANALYSIS-1"
+    question: >
+      `ranking[]` has no schema-level constraint tying it to `options[]`
+      (e.g. every option must appear exactly once) -- left as a runtime
+      invariant (`ai_lego/modules/decision/ahp.py`'s builder computes it
+      directly from `option_scores`, so it cannot legally diverge in
+      practice) rather than an unenforceable schema constraint. Should a
+      future revision add a cross-field check once gate.schema.yaml gains
+      richer cross-array validation support?
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.31 (L1910-1939) directly at the cited lines.
+    Cross-checked against methods/contracts/decision.ahp.contract.yaml's
+    own outputs/preconditions/quality and
+    ai_lego/compute/ahp/weights.py's real Saaty-method compute (hand-
+    verified against a known perfectly-consistent 4:2:1 weight-ratio case
+    before this schema was written). Validated against jsonschema
+    Draft202012Validator.
+  note: >
+    `criteria`/`pairwise_comparisons`/`criteria_weights`/
+    `consistency_ratio`/`ranking` field names and stage ordering are
+    transcribed from Atlas's own 7-stage pipeline (L1920-1928). The
+    `consistent` boolean's fixed 0.10 threshold is Saaty's own published
+    external methodology, not this codebase's invention -- disclosed
+    distinctly from Pareto's caller-set-threshold pattern in
+    compilation_decisions. No mother document was modified to produce this
+    file.
