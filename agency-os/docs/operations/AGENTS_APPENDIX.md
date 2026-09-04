@@ -97,7 +97,7 @@
 
 ## AGENTS.md 精簡前全文存檔（2026-09-04 第二次瘦身，逐字）
 
-> 2026-09-04 第二次瘦身：`agency-os/AGENTS.md` 由 43 KB 壓到每輪只留規則本體，**原全文逐字存於本節**（標題各降一級，其餘一字未改），含理由、案例、日期與措辭，**仍是強制內容**。精簡版每條末尾的「§名」指回本節對應標題。`CLAUDE.md` 舊版全文見下一節。
+> 2026-09-04 第二次瘦身：`agency-os/AGENTS.md` 由 43 KB 壓到每輪只留規則本體，**原全文逐字存於本節**（標題各降一級；markdown 連結相對路徑改以本檔所在 `docs/operations/` 為基準，否則 `validate-doc-integrity` 閘擋；其餘一字未改），含理由、案例、日期與措辭，**仍是強制內容**。精簡版每條末尾的「§名」指回本節對應標題。`CLAUDE.md` 舊版全文見下一節。
 
 ﻿# AGENTS.md - Agency Operating Rules
 
@@ -226,7 +226,7 @@
 
 `scripts/codex-oracle.ps1` 保留在 repo 內但**降級為備援**：官方指令連續失敗（timeout/服務中斷）≥ 2 次時才退回用它（呼叫方式不變，見腳本內 `.EXAMPLE`）。
 
-**機械閘（ORACLE gate）**：`codex-oracle.ps1`／`/codex-review` 把 review artifact 寫進 `agency-os/reports/oracle/`，`verify-closeout-completeness.ps1` 在 staged 含 source 檔時要求當日且晚於最後改檔的 artifact；刪除檔案改綁 `path@blob-hash`；豁免寫 `- ORACLE_WAIVED: <理由>`。時間戳／hash 設計理由與涵蓋副檔名 SSOT 見 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §ORACLE gate（2026-09-04 逐字搬移）。閘擋的是「忘記跑」，不是「finding 沒處理」。
+**機械閘（ORACLE gate）**：`codex-oracle.ps1`／`/codex-review` 把 review artifact 寫進 `agency-os/reports/oracle/`，`verify-closeout-completeness.ps1` 在 staged 含 source 檔時要求當日且晚於最後改檔的 artifact；刪除檔案改綁 `path@blob-hash`；豁免寫 `- ORACLE_WAIVED: <理由>`。時間戳／hash 設計理由與涵蓋副檔名 SSOT 見 [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md) §ORACLE gate（2026-09-04 逐字搬移）。閘擋的是「忘記跑」，不是「finding 沒處理」。
 
 **驗證的形狀（2026-09-04，操作者指示；AI-LEGO 專案版在 ADR-024）**：程式碼以突變測試（故意拔掉 guard → 指名的測試變紅 → 還原變綠）為主要證據；每個 commit 一個 critic，深淺依 `.claude/commands/review.md` 的 tier；多代理只用在 auth／crypto／個資。文件與 YAML 規格不派 agent，用 golden test + 書面自審。外部 oracle 全部沒額度時不跳過 review：書面對抗自審 + 突變證據 + WORKLOG `ORACLE_WAIVED`（memory `feedback_self_review_when_oracle_down`）。
 
@@ -271,7 +271,7 @@
 
 **路徑 B — Workflow tool**（matcher `^Workflow$`）：`agent()` 內部 fan-out 在背景執行，本閘看不到真實數量，改成**誠實聲明閘**——依真實輸入形狀分三態：`script`（inline 腳本）須含 `// SUBAGENT-BUDGET-ESTIMATE: <N>`（多行加總，不是只讀第一行）；`scriptPath`（無 inline script）讀檔套同一規則；`resumeFromRunId` 單獨出現（無 script/scriptPath，真實用量 31%）**放行**——擋掉續跑會逼整個 workflow 從頭重來，燒更多 token，比不擋更糟（2026-09-03 第三輪 critic 抓到的 C-1）。N > **10**（非 Workflow 工具自己講的 15——操作者明訂上限更嚴，且要跟路徑 A 的硬上限一致，2026-09-03 第三輪 M-3）→ block 要求拆批。**明文限制**：`script`/`scriptPath` 兩態只驗證「有沒有誠實聲明」，不驗證聲明是否為真；`resumeFromRunId` 態完全沒有機械保護，且**尚未被真實 Workflow 呼叫驗證過**（驗證需要使用者明確 opt-in 多代理編排，這件事本身不能自己授權自己去測，否則就是重演促成這整個閘的那個違規）。
 
-⚠️ 版本教訓（v1 掛錯事件、v2 只管 Agent 不管 Workflow、v3 只驗證了一半）→ [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §Agent 扇出治理 — 版本教訓。一句話：同一份閘被同一 reviewer 連續抓兩輪 → 第三次修正前先做不變量分析，驗證程序本身也受同一紀律。
+⚠️ 版本教訓（v1 掛錯事件、v2 只管 Agent 不管 Workflow、v3 只驗證了一半）→ [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md) §Agent 扇出治理 — 版本教訓。一句話：同一份閘被同一 reviewer 連續抓兩輪 → 第三次修正前先做不變量分析，驗證程序本身也受同一紀律。
 
 **禁止樣態（操作者明訂，2026-09-03，機械閘擋不到的情況直接寫死規則）**：
 
@@ -286,7 +286,7 @@
 
 **正面模板（操作者提供，2026-09-04）——agent 數量跟著「角色」走，不是跟著「項目數量」走**：一個 agent 負責理解問題、一個負責執行、一個負責找錯（critic）、一個提供獨立觀點，最後由使用者或一個整合 agent 收斂結果——固定 4-5 個，不因為任務裡有幾個 finding／幾個檔案就跟著長大。上面「99 個 agent」那個事故的根因，就是把「驗證」這個角色複製了 47 次（每個 finding 各配一份），把「按項目複製角色」跟「按角色分工」搞反了。判斷準則：派 agent 前先問「這是一個新角色，還是同一個角色的第 N 份拷貝？」——新角色可以加，同角色拷貝要嘛自己做、要嘛批次塞進固定小數量的 agent。
 
-**讀資料／理解問題：預設由主 agent 自己讀（操作者明訂 2026-09-04；同日第二版收緊）。** 第一版原文（「不管資料量多大，永遠只能 1 個 agent」與 9-reader 事故）見 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md)。現行規則：
+**讀資料／理解問題：預設由主 agent 自己讀（操作者明訂 2026-09-04；同日第二版收緊）。** 第一版原文（「不管資料量多大，永遠只能 1 個 agent」與 9-reader 事故）見 [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md)。現行規則：
 1. **預設：主 agent 用 Read／Grep／sed 範圍自己讀。** 要改的檔整檔讀；只確認一個事實用 grep；不為「了解一下」讀整份 900 行 schema（AI-LEGO 語料先查生成的 `SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md`）。理由：讀到的東西留在做決策的那個上下文裡，摘要的邊界就是問題的邊界。
 2. **例外 A，獨立驗證：** critic／oracle 可以讀，一個 commit 最多一個。它讀是為了不同觀點，不是替主 agent 讀。
 3. **例外 B，超過約 100KB 且不會去改的純調查：** 最多 1 個 agent 或走 Codex；產出必須寫進檔案並附 file:line，不是只回傳摘要，主上下文不背那些內容。
@@ -313,25 +313,25 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 
 ### AwareWave Stack 伺服器邊界（**不可混用**）
 
-**單機現況（2026-08-31 起）**：SG + EU 已全數整併至 `ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）。前任 `149.202.64.114` 已於 2026-08-31 在 OVH Manager 終止；更早的 `5.223.93.113`（SG）/ `204.168.175.41`（EU）亦已刪除退租——**部署/維運一律對 `145.239.195.47` 操作**，沒有可用回滾主機。容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本，頂部有橫幅）。
-**搬機 / 上 dedicated / 整機轉移唯一正本**：[`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)（備份、切換、收尾與活性入口掃描；換機時只讀本份）。
+**單機現況（2026-08-31 起）**：SG + EU 已全數整併至 `ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）。前任 `149.202.64.114` 已於 2026-08-31 在 OVH Manager 終止；更早的 `5.223.93.113`（SG）/ `204.168.175.41`（EU）亦已刪除退租——**部署/維運一律對 `145.239.195.47` 操作**，沒有可用回滾主機。容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)（拓樸唯一正本，頂部有橫幅）。
+**搬機 / 上 dedicated / 整機轉移唯一正本**：[`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../../../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)（備份、切換、收尾與活性入口掃描；換機時只讀本份）。
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
 Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1`（各機由 `mcp/user-env.template.ps1` 生成，不進 git）/ env）；key names 在 `mcp/user-env.template.ps1`；**禁止硬編**。
 
 **部署規則（強制）**：
-- ⚠️ **「SG」= `ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）**。前任 `149.202.64.114` 與舊 SG/EU 主機皆已退場，**SSH 過去會直接連線失敗；務必先確認連的是 `145.239.195.47`**。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md) 頂部橫幅。
+- ⚠️ **「SG」= `ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）**。前任 `149.202.64.114` 與舊 SG/EU 主機皆已退場，**SSH 過去會直接連線失敗；務必先確認連的是 `145.239.195.47`**。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md) 頂部橫幅。
 - 部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull；本腳本在目標機本機執行，不含 SSH 邏輯，SSH 到哪台機純看操作者/代理自己下的指令）
 - `sg-deploy.sh` 內建：npm test gate → docker healthcheck → HTTP smoke check → 失敗自動 rollback
 - npm test 失敗時先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查原因
 
-**新部署路徑強制清單（SOP，6 項：unit test gate／docker healthcheck／HTTP smoke／rollback 指令／notification／typecheck gate）** → [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §新部署路徑強制清單（2026-09-04 逐字搬移）。新增可部署服務時 6 項缺一不可。
+**新部署路徑強制清單（SOP，6 項：unit test gate／docker healthcheck／HTTP smoke／rollback 指令／notification／typecheck gate）** → [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md) §新部署路徑強制清單（2026-09-04 逐字搬移）。新增可部署服務時 6 項缺一不可。
 
 ### Lobster Factory 操作規則（所有 Agent 強制）
 
 - **Routing 三件套（同一 PR 必須同步）**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md`
 - **自動化安全預設**：DB 寫入預設 OFF（`LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 預設 off（`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）；自動 remediation 預設 OFF（`AUTO_REMEDIATE_ENABLED=true` + `AUTO_REMEDIATE_SERVICE_WHITELIST=<逗號分隔 compose service>` 兩者都設才生效，空白名單 = 全不匹配；目錄 SSOT：next-admin `lib/repair-center/remediations/`，四段契約 precheck→execute→healthcheck→rollback）
 - **Trigger.dev 憑證（不可互換）**：`tr_pat_*` = CLI deploy（`TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（`TRIGGER_ACCESS_TOKEN`）
-- 監控分工：SG endpoint-alert 打本機端口（避免 hairpin timeout）；EU Uptime Kuma 負責 public reachability。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)
+- 監控分工：SG endpoint-alert 打本機端口（避免 hairpin timeout）；EU Uptime Kuma 負責 public reachability。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)
 
 ### 語言與輸出
 
@@ -341,7 +341,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 ### 代理自動工具使用規則（Claude 主動執行）
 
-使用者說了某句話 → 立即執行的對照表（約 40 列）→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §代理自動工具使用規則（2026-09-04 逐字搬移；流程完成後自動接續的下一步在同檔 §Claude 工作自觸發規則）。**每次任務開始，若使用者句子命中該表任一觸發語，先照表做。** 機械閘（🔧）不受搬移影響，仍由 hooks 強制。
+使用者說了某句話 → 立即執行的對照表（約 40 列）→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md) §代理自動工具使用規則（2026-09-04 逐字搬移；流程完成後自動接續的下一步在同檔 §Claude 工作自觸發規則）。**每次任務開始，若使用者句子命中該表任一觸發語，先照表做。** 機械閘（🔧）不受搬移影響，仍由 hooks 強制。
 
 #### 核心行為規則：宣告執行，不詢問
 
@@ -360,7 +360,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 **步驟 2 — 分類任務類型，預載對應工具**
 
-→ 任務類型 → 預載工具的對照表搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §任務類型預載表（2026-09-04 逐字搬移）。
+→ 任務類型 → 預載工具的對照表搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md) §任務類型預載表（2026-09-04 逐字搬移）。
 
 **步驟 3 — Code change 的複雜度判斷**
 
@@ -373,11 +373,11 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 #### Claude 工作自觸發規則（不依賴使用者輸入）
 
-這是最重要的一張表，觸發條件是 Claude 自己在做什麼。→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §Claude 工作自觸發規則（2026-09-04 逐字搬移）。三條不查表也要記得的：改 `.ts/.tsx` 完成前 `npx tsc --noEmit` 必綠；完成任何 code 改動跑 `/verify-recent`；改 governance 文件後跑 `/doc-sync`。
+這是最重要的一張表，觸發條件是 Claude 自己在做什麼。→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md) §Claude 工作自觸發規則（2026-09-04 逐字搬移）。三條不查表也要記得的：改 `.ts/.tsx` 完成前 `npx tsc --noEmit` 必綠；完成任何 code 改動跑 `/verify-recent`；改 governance 文件後跑 `/doc-sync`。
 
 #### 工作類型 → Agent/Tool 路由表
 
-→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §工作類型 → Agent/Tool 路由表（2026-09-04 逐字搬移）。
+→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md) §工作類型 → Agent/Tool 路由表（2026-09-04 逐字搬移）。
 
 #### Subagent 交接協議（強制）
 
@@ -412,11 +412,11 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.claude/command
 
 #### 問題症狀 → Runbook 路由表
 
-→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) §問題症狀 → Runbook 路由表（2026-09-04，AGENTS.md 瘦身；內容逐字搬移未改）。看到症狀先查該表再讀 runbook。
+→ 正本搬到 [`docs/operations/TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md) §問題症狀 → Runbook 路由表（2026-09-04，AGENTS.md 瘦身；內容逐字搬移未改）。看到症狀先查該表再讀 runbook。
 
 ### Session 啟動順序（每次都做）
 
-SSOT：[`.claude/commands/ao-resume.md`](../.claude/commands/ao-resume.md)。  
+SSOT：[`.claude/commands/ao-resume.md`](../../../.claude/commands/ao-resume.md)。  
 Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hook-last.json` → AO-RESUME 報告（§0–§8）輸出。兩者不一致時以各自 SSOT 為準。
 
 ### AO-RESUME / AO-CLOSE 快速續接
@@ -424,7 +424,7 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 **機器前提（2026-08-12 更新）**：**目前僅個人筆電一台**（操作者已離職，公司桌機退場）。環境仍以「repo 共用 + 各機獨立 env/vault」處理 —— 這個設計**不因單機而改**，將來加機器即可直接用；跨機 import 回報「無其他機器較新匯出」是正常狀態。
 
 **AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回 AO-RESUME 報告（§0–§8）；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
-`ao-resume.ps1` 同時自動跑 smoke（`scripts/check-smoke-tests.ps1` → `reports/status/smoke-LATEST.json`）與每 30 天的月度五項檢查；**判讀規則**（`overall`／`blind_spots` 直接讀不心算、`client_mail` 為何要站外監控、`-MailQuietDayLimit` 必須 < 14）見 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md) §AO-RESUME 判讀規則（2026-09-04 逐字搬移）。
+`ao-resume.ps1` 同時自動跑 smoke（`scripts/check-smoke-tests.ps1` → `reports/status/smoke-LATEST.json`）與每 30 天的月度五項檢查；**判讀規則**（`overall`／`blind_spots` 直接讀不心算、`client_mail` 為何要站外監控、`-MailQuietDayLimit` 必須 < 14）見 [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md) §AO-RESUME 判讀規則（2026-09-04 逐字搬移）。
 
 **AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.claude/commands/ao-close.md`。
 
@@ -531,7 +531,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 
 ##### 伺服器邊界（**不可混用**）
 
-**現況（2026-08-31 起）**：SG + EU 已全數整併到單機 **`ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）**。前任 `149.202.64.114` 已在 OVH Manager 顯示 Terminated；更早的 `5.223.93.113`（SG）/ `204.168.175.41`（EU）也已刪除退租。**任何部署/操作都只能 SSH 至 `145.239.195.47`**，不存在回退到前任主機的路徑。容器細節見 AGENTS.md §AwareWave Stack、拓樸橫幅見 [`AWAREWAVE_STACK_QUICKREF.md`](agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md)。
+**現況（2026-08-31 起）**：SG + EU 已全數整併到單機 **`ks-aw-01`（`145.239.195.47`，SSH `-p 58122`）**。前任 `149.202.64.114` 已在 OVH Manager 顯示 Terminated；更早的 `5.223.93.113`（SG）/ `204.168.175.41`（EU）也已刪除退租。**任何部署/操作都只能 SSH 至 `145.239.195.47`**，不存在回退到前任主機的路徑。容器細節見 AGENTS.md §AwareWave Stack、拓樸橫幅見 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)。
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
 詳細操作規則（Routing 三件套 / 自動化安全預設 / Auto-Repair 紅線 / Trigger.dev 憑證 / 其他 SSOT）見 AGENTS.md §Lobster Factory 操作規則 及 §Auto-Repair 紅線。

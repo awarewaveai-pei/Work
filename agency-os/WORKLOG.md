@@ -16,6 +16,8 @@
 - ORACLE_WAIVED: 無 source 檔 staged（ORACLE gate 只涵蓋 `$oracleExts`），且本 session 為遠端 container 無 `pwsh`／codex CLI。
 **[剩餘風險]** ① 兩條實質規則修正（遠端自主 session 的 R0 對齊方式、harness 分支例外）屬操作者裁量，若不同意直接 revert 該兩行；② `.claude/agents/n8n-engineer.md` 仍寫 `204.168.175.41`（已退租）、`scripts/ao-close.ps1:1275` 註解引用 CLAUDE.md 已不存在的「Commit Prefix」段——兩者不在本任務範圍，登記於此待另案；③ `doc-sync-automation.ps1` 需 Windows pwsh，本 container 無法重跑，Related Documents footer 時間戳維持 02:19:06，下次 AO-CLOSE 自動更新。
 **[rollback]** `git revert <本 commit>`；或只還原兩檔：`git checkout <本 commit>^ -- CLAUDE.md agency-os/AGENTS.md agency-os/docs/operations/AGENTS_APPENDIX.md`。
+**[CI 修正（PR #18 gate 紅）]** `doc_integrity`（`lobster-factory/scripts/validate-doc-integrity.mjs`）以檔案所在目錄解析相對連結。兩類壞連結同一根因「檔案搬進 `docs/operations/` 但連結仍以 `agency-os/` 為基準」：① 本次 APPENDIX 逐字存檔區 16 條（我造成）；② `TOOL_TRIGGER_MAP.md` 13 條，**main 已紅**（今早 `bfa017b` 搬檔時遺留，用 `git worktree add origin/main` 跑同一閘證實），無現成修正 PR，屬同類小修，一併在本 PR 修。只改連結路徑不改文字（`docs/operations/X` → `X`；`../.claude/` → `../../../.claude/`；`../lobster-factory/` → `../../../lobster-factory/`；`tenants/` → `../../tenants/`；`../runbooks/` → `../../../runbooks/`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/run-v3-governance-gates.mjs | exit=0 | ms=~600 —— 修前同指令 `Blocking governance check failed: doc_integrity`（29 條 broken_link），修後 `V3 governance gates PASSED`；另以 `[ -e dir/link ]` 逐條驗兩檔全部 `.md` 連結目標存在，0 缺。
 - AUTO_TASK_DONE: CLAUDE.md + AGENTS.md 第二次瘦身（48.7 KB → 20.5 KB，-58%），舊全文逐字存 APPENDIX，3 條 stale 事實修正，2 條遠端 session 對齊規則。
 
 ## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
