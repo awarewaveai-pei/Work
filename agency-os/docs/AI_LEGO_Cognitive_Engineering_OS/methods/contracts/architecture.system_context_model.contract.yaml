@@ -1,0 +1,112 @@
+$id: "ai-lego://methods/contracts/architecture.system_context_model.contract.yaml"
+title: "C4 Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Sixteenth Method Atlas slice, fifth from the
+  `architecture` family (F18's own "Software Architecture Pack") -- a
+  fifth member tool built, still not the whole pack.
+
+  Atlas §11.34 (L1996-2018) gives this method a dedicated section: a
+  4-level hierarchy ("System Context → Container → Component → Code
+  必要時"), used to communicate the same architecture at a depth
+  appropriate to the audience. Atlas gives the 4 LEVEL NAMES but no
+  internal field structure for what belongs inside any one level -- the
+  same class of "named stages, no internal shape" citation
+  `decision.ahp.contract.yaml`'s own flat-criteria decision already
+  handled for a different method's own under-specified stage.
+
+  `id`/`family` naming note: the method's own real-world name is "C4
+  Model", but `method.schema.yaml`'s own `id`/`family` pattern
+  (`^[a-z_]+\.[a-z_]+$`) admits no digits -- the "4" cannot appear.
+  `architecture.system_context_model` names the method by its own top
+  level instead (the same level the method starts from, per its own
+  L2003 benefit: understanding a system's context first). This is a
+  forced substitution disclosed explicitly, not a silent rename -- no
+  prior Tier 1 contract in this session needed one (grepped every
+  existing `id:` line, confirmed none contains a digit).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.34 C4 架構模型（C4 Model）(L1996-2018) -- 4-level hierarchy"
+  - "methods/registry/method-inventory.yaml C4 Model entry (L1072-1076): category 'F18 architecture', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against, including the id/family pattern that forced the naming substitution above"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a fourteenth
+  concrete entry. `id: architecture.system_context_model` mints a new
+  machine_id (the digit-free substitute for "c4_model", see description).
+  `family: architecture` reused as-is.
+
+id: architecture.system_context_model
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [DECOMPOSE, MAP, EXPLAIN]
+# INFERRED. DECOMPOSE (breaking one system into 4 nested depth levels),
+# MAP (Atlas's own L2003 benefit: '避免一開始就跳進 class/file patch 而
+# 失去 system context' -- placing detail within a larger map), EXPLAIN
+# (Atlas L2001's own purpose: quick understanding of an existing system).
+
+purpose:
+  - communicate_one_architecture_at_multiple_depths_for_different_audiences
+inputs:
+  required: [SystemUnderDocumentation]
+  optional: []
+outputs: [SystemContextModel]
+preconditions:
+  - "at least 1 container supplied"
+  - "every component references a container_id present in containers"
+  - "every code element (if any) references a component_id present in components"
+  # NEW, structurally necessary preconditions -- Atlas's own hierarchy
+  # (System Context -> Container -> Component -> Code) directly implies
+  # each lower level belongs to exactly one element of the level above
+  # it; not literally spelled out as a field-level rule, same class of
+  # structurally-necessary-but-not-literally-cited precondition every
+  # prior contract's own preconditions already establish.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should 'Code' be required, given Atlas's own qualifier '必要時' (when necessary)?"
+    decision: "Optional -- code[] defaults to empty."
+    reasoning: "Atlas's own text explicitly marks this level as conditional, not always present -- the only level of the 4 given that qualifier."
+  - question: "What internal fields belong to a Container/Component/Code element, beyond id and label?"
+    decision: "Only id + label -- no further internal structure (e.g. no 'technology' or 'responsibilities' sub-fields)."
+    reasoning: >
+      Atlas's own §11.34 gives 4 level NAMES with zero worked example of
+      what data lives inside one level's element -- inventing richer
+      per-element fields (technology stack, responsibilities, etc., all
+      real C4-practice conventions) would be presenting a guess as a
+      compiled fact, the same restraint `mcda-analysis.schema.yaml`'s own
+      single-`weights[]`-field decision already applies to its own
+      under-specified area.
+
+open_questions:
+  - id: "OQ-SYSTEMCONTEXTMODEL-1"
+    question: "Container/Component/Code elements carry only id+label. Should a future revision add richer per-element fields (technology, responsibilities) once a worked Atlas example is found?"
+    owner: "operator, or whoever next needs richer C4 element metadata"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-SYSTEMCONTEXTMODEL-2"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.34 (L1996-2018) directly. Grepped `specs/`
+    exhaustively for "C4 model"/"system context"/"container"+"component"
+    before writing -- no duplicate typed object found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator
+    (caught and fixed the digit-in-id schema violation before this file
+    was finalized -- see description for the naming substitution this
+    forced).
+  note: >
+    No mother document was modified. The 4-level hierarchy is directly
+    transcribed; per-element field minimalism (id+label only) is a
+    disclosed narrowing decision, not a silent omission.

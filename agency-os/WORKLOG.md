@@ -1,6 +1,28 @@
 # Worklog
 
-## 2026-09-04（續，System Foundry v1.6：操作者實際點開 configurator 頁面後回報「一堆亂七八糟的」→ 修問卷說明 + 抓到真邏輯 bug）
+## 2026-09-04（續29，同一 session：Cognitive OS 第十六個 Method Atlas 切片 — `architecture.system_context_model`（真實名稱 C4 Model），machine_id schema 數字限制第一次真的擋下命名）
+
+**觸發**：延續操作者授權。0 agent。
+
+**選型**：C4 Model（Atlas §11.34 專屬段落，4 層架構：System Context→Container→Component→Code必要時）。**第一次真的撞到 schema 限制**：`method.schema.yaml` 的 `id`/`family` pattern `^[a-z_]+\.[a-z_]+$` 不允許數字，`architecture.c4_model` 驗證直接報錯（本 session 逐項檢查過先前 13 個機器 id 全部無數字）。沒有繞過 schema，改用方法自己的頂層名稱命名：`architecture.system_context_model`，contract description 明文揭露這是被迫替代命名，非靜默改名。
+
+Container/Component/Code 之間的親子參照關係（結構必要但非逐字引用）作為不變量雙層強制：CLI 真跑攻擊（建構參照不存在 container 的 component）確認被擋。Code 層依 Atlas 原文「必要時」明文設為可選。每層元素只留 id+label，未發明業界真實 C4 慣例常見的 technology/responsibilities 等欄位（誠實克制）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.system_context_model.contract.yaml`＋`specs/cognitive/typed-objects/system-context-model.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.fourteenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/system_context_model.py`（builder+hierarchy-integrity 不變量+2 gate）＋`ai_lego/apps/cli/run_system_context_model_slice.py`（真實 3 層模型+攻擊驗證）＋`tests/unit/test_system_context_model.py`（9 tests 第一次跑全綠）＋`docs/SIXTEENTH_SLICE_ARCHITECTURE_SYSTEM_CONTEXT_MODEL.md`。`modules/architecture/__init__.py` docstring 補第五租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_system_context_model_slice` | exit=0 | result=第一次真跑就通過（含 integrity 不變量攻擊驗證）：`PASS architecture.system_context_model: containers=1, components=1, code=0, gates [provenance_required=PASS, hierarchy_integrity=PASS], integrity_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_system_context_model -v` | exit=0 | ms=812 | result=9 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2653→2662
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=54280 | result=**454 tests OK**（445→454，零回歸；`git diff --stat` 對照 7 個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n —— 逐項自問：改名是否算偷偷改動 Atlas 內容（不算，contract description 與 WORKLOG 皆明文揭露原因，真實方法內容 4 層結構逐字保留）；每層只留 id+label 會不會漏掉真實需求（不會，Atlas 本身沒給任何內部欄位範例，多做就是發明）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]system_context_model\|SystemContextModel\|system-context-model\|run_system_context_model_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-SYSTEMCONTEXTMODEL-1`（元素只有 id+label，未含真實 C4 慣例常見欄位）；`OQ-SYSTEMCONTEXTMODEL-2`（method-inventory.yaml 無機器 id 列）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit。
+
+## 2026-09-04（續,System Foundry v1.6：操作者實際點開 configurator 頁面後回報「一堆亂七八糟的」→ 修問卷說明 + 抓到真邏輯 bug）
 
 **觸發**：操作者實際打開 configurator 頁面操作後回報「你去檢查每個問題的邏輯, 還有選項解釋要讓人看得懂, 一堆亂七八糟的」——不是我自己猜的問題，是操作者親自用過發現的。
 

@@ -1,0 +1,90 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/system-context-model.schema.yaml"
+title: System Context Model
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SystemContextModel` (the real-
+  world method is "C4 Model"; the type name follows the digit-free
+  machine_id substitution `architecture.system_context_model.contract
+  .yaml`'s own description already discloses). Fifth `architecture`-family
+  typed object. Atlas §11.34's own 4-level hierarchy ("System Context →
+  Container → Component → Code 必要時") maps onto `containers[]`/
+  `components[]`/`code[]`, each referencing its own parent level by id --
+  a structurally-necessary cross-reference, not a literal Atlas citation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.34 C4 架構模型（C4 Model）(L1996-2018)"
+  - "methods/contracts/architecture.system_context_model.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, system_context, containers, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^SCM-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "architecture.system_context_model"
+  system_context:
+    type: string
+    minLength: 1
+    description: "Atlas L1999's own top level: the system and its external actors/systems, in prose."
+  containers:
+    type: array
+    minItems: 1
+    description: "Atlas L2000 'Container' level."
+    items:
+      type: object
+      required: [id, label]
+      properties:
+        id: {type: string}
+        label: {type: string}
+  components:
+    type: array
+    default: []
+    description: "Atlas L2000 'Component' level -- each belongs to a container."
+    items:
+      type: object
+      required: [id, container_id, label]
+      properties:
+        id: {type: string}
+        container_id: {type: string}
+        label: {type: string}
+  code:
+    type: array
+    default: []
+    description: "Atlas L2000 'Code' level, explicitly marked optional by Atlas's own '必要時' (when necessary) -- each belongs to a component."
+    items:
+      type: object
+      required: [id, component_id, label]
+      properties:
+        id: {type: string}
+        component_id: {type: string}
+        label: {type: string}
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a system-context reconstruction is structured architectural documentation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A minimal 3-level model: one container, one component inside it, no code level (Atlas's own optional qualifier exercised)"
+    value:
+      id: "SCM-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.system_context_model"
+      system_context: "訂單服務，外部使用者透過網頁下單，串接第三方金流"
+      containers:
+        - {id: "CT1", label: "Order API"}
+      components:
+        - {id: "CP1", container_id: "CT1", label: "OrderController"}
+      code: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas §11.34 directly. Validated against jsonschema Draft202012Validator."
+  note: "The 4-level hierarchy is transcribed; the container_id/component_id cross-references are a structurally-necessary addition, not a literal citation. No mother document was modified."

@@ -538,6 +538,31 @@ tier_1:
       as equivalent to a dedicated section. Tier 1, mandated by the
       actively-running implementation slice, same category as the twelve
       entries above it.
+  fourteenth_concrete_entry:
+    # NEW (2026-09-04, same session): fourteenth Tier 1 entry, same
+    # additive-key rationale as the thirteen entries above it.
+    method_id: "architecture.system_context_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Fifth entry from
+      the `architecture` family, a fifth member tool of F18's own pack
+      built. Real-world method name is "C4 Model" (Atlas §11.34,
+      L1996-2018, a dedicated section giving a 4-level hierarchy). First
+      time this session's own machine_id minting hit a real schema
+      constraint mid-slice: `method.schema.yaml`'s own id/family pattern
+      (`^[a-z_]+\.[a-z_]+$`) admits no digits, so "c4_model" is
+      unbuildable -- the method was named by its own top level instead
+      (`architecture.system_context_model`), disclosed explicitly in the
+      contract's own description as a forced substitution, not a silent
+      rename.
+    source: "methods/contracts/architecture.system_context_model.contract.yaml (built same session as this entry, mints machine_id architecture.system_context_model) + specs/cognitive/typed-objects/system-context-model.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.34 is a dedicated section with
+      a real 4-level hierarchy, not itself cited elsewhere as a repeated
+      teaching example. Tier 1, mandated by the actively-running
+      implementation slice, same category as the thirteen entries above
+      it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

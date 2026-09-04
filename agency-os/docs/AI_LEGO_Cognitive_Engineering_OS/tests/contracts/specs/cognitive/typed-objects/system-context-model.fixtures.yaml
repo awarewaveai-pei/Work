@@ -1,0 +1,43 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/system-context-model.schema.yaml"
+target_ref: ""
+description: "Exercises SystemContextModel's required fields, the containers[] minItems:1 guard, and the optional components[]/code[] levels."
+
+valid:
+  - name: minimal_container_and_component_no_code
+    instance:
+      id: "SCM-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.system_context_model"
+      system_context: "order service, external users place orders via web, integrates a third-party payment gateway"
+      containers:
+        - {id: "CT1", label: "Order API"}
+      components:
+        - {id: "CP1", container_id: "CT1", label: "OrderController"}
+      code: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: system_context_only_no_components
+    instance:
+      id: "SCM-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.system_context_model"
+      system_context: "high-level view only, not yet decomposed"
+      containers:
+        - {id: "CT1", label: "Monolith"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: containers_below_minitems_1
+    instance:
+      id: "SCM-2026-09-04-003"
+      version: "1.0.0"
+      system_context: "x"
+      containers: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "containers has minItems: 1 -- a model with zero containers has nothing below the system-context level."
+  - name: missing_required_system_context
+    instance:
+      id: "SCM-2026-09-04-004"
+      version: "1.0.0"
+      containers: [{id: "CT1", label: "x"}]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "system_context is required -- Atlas's own top level (L1999), missing here."
