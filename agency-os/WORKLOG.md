@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-04（續，System Foundry v1.6 內容填實：55 份空殼樣板寫成真規則 + critic 抓到的機器層錯位全修）
+
+### 把 commercial(15)/engineering(16)/assurance(11)/methodology(13) 共 55 份「只有骨架沒有規則」的樣板文件寫成真內容
+
+**觸發**：操作者「Commit 並繼續進行建置系統」→ 確認範圍是「只做 System_Foundry 本身，把架構做好之後可以套用各行各業」（不是水電工程客戶專案，操作者當場明確要求不准再提）。依上一條目的完成度盤點，這 55 份文件（見 2026-09-04 稍早條目「讀懂並歸檔 System_Foundry_v1.6」）在骨架下完全沒有實質規則，只是同一份母模板換 Required Scope 關鍵詞。
+
+**方法**：先派 4 個角色式 background agent（commercial/engineering/assurance/methodology 各一），全部撞上帳號層級 session rate limit（`resets 5:20am Asia/Taipei`）中斷——1 個（commercial）在中斷前完成 4/15、1 個（assurance）完成 1/11（`30_YEAR_REPLACEMENT_TEST.md`），另外 2 個（engineering／methodology）完全沒寫（連 exemplar 都還在讀）。**操作者當場再次強調「不准一次無效益的派出多個agents」**——判斷：既然 agent 額度已經打中限制、且已經有具體任務指令與範例文件可以直接沿用，改成自己在主 session 內直接讀+寫剩下 51 份，全程 0 個 agent，逐份用既有「好文件」（各目錄自己的已完成範例）校準文風後寫入。
+
+**[已修改] 內容填實**：commercial/ 15 份全部（我寫 11 份 + 先前 agent 完成的 4 份）、engineering/ 16 份（terse 敘述體，對齊既有 4 份好文件）、assurance/ 11 份（10 份我寫 + 先前 agent 的 1 份）、methodology/ 13 份（00→14 編號序列，Purpose 中文 + Sequencing + Required Fields + Gate 結構，對齊既有 01/06）。每份都是真的 MUST/MUST NOT 規則、具體機制、跨檔案交叉引用，不是換關鍵字的空殼。
+
+**[已修改] Critic 覆審抓到並全修的問題**（1 個 critic agent，操作者明確要求下的唯一必要 agent，讀完全部 55 份 + 引用到的 kernel/governance/runtime 檔案 + 機器 registry，親自跑過套件驗證腳本）：
+- 🔴 **C-1（最嚴重）**：我幫 methodology 00→14 發明的 Gate 編號（依檔名數字 G0-G14）跟 `runtime/stage-gates.yaml` 真正的機器 gate registry（G0_INTAKE_COMPLETE...G13_RELEASE_CLOSED_LOOP）完全對不上——G14 根本不存在（只到 G13），且 G2/G3/G7/G8/G10/G11/G13 這些編號在真正 registry 裡代表完全不同的意思（例：真正 G2 是「既有系統根因分析」不是「需求發現」）。讀 `runtime/stage-gates.yaml` + `bootstrap/NEW_SYSTEM_INTAKE.yaml` 拿到真正定義後，逐份重新對應：00→G0_INTAKE_COMPLETE（補上原本漏掉的 profile/archetype/human_system_applicability 三個必要欄位）、01→G1（未動，本來就對）、02/03/07/08/13 明確標註「沒有自己專屬的機器 gate」、04→G4_DOMAIN_STABLE、05→G5_OPTIONS_COMPARED（補上原本漏掉的 failure_modes 欄位）、09+10+11 三份共同滿足 G7_FALSIFICATION_COMPLETE（不是各自一個編號）、12→G8_ASSURANCE_READY（補齊 control_evidence_matrix/golden_contract_tests/counterfactual_shadow_validation_if_applicable）、14→G9_HUMAN_APPROVED。13 移除自封的 G13 標籤（真正 G13 是完全不同、更後面的「release closed loop」概念），改為純內部收斂檢查。
+- 🔴 **C-2**：`make verify` 當下其實是紅的（`registries/kernel.yaml`... 不，是 `commercial/EDITION_ARCHITECTURE.md` hash drift）——因為 critic 覆審期間我又手動修過一次交叉引用路徑但沒重跑 `regenerate_integrity.py --write`。修完全部問題後重新 `--write` 並重跑全鏈確認真的綠。
+- 🟠 Major：`kernel/09_AUTHORITY_AND_AUTONOMY_CONTRACT.md` 被 2 份文件（`assurance/30_YEAR_REPLACEMENT_TEST.md`、`assurance/ASSURANCE_CASE_STANDARD.md`）誤引用為「獨立性規範」出處——該檔案內容其實是 A0-A4 授權等級，跟獨立性無關；真正出處是 `kernel/04_SUBAGENT_INHERITANCE.md`（違反框架自己的 Evidence Law，已修正 2 處）。`commercial/EDITION_ARCHITECTURE.md` 宣稱 zero-forks 規則「被整個框架廣泛引用」，實際上是這次 session 才新造的詞，只有 2 處引用（已改措辭為誠實描述）。`methodology/13_CONVERGENCE_STANDARD.md` 的 gate 失敗清單漏了 `DISAGREEMENT`（前段文字明講不可放行，gate 清單卻沒列）——已修（連同 C-1 一起重寫該檔）。
+- 🟡 Minor（10 項全修）：expand/migrate/contract 這套遷移序列在 4 個檔案裡各自用不同、簡化版本的階段名稱稱呼，跟框架自己 `engineering/DOMAIN_ARCHITECTURE_STANDARD.md` 禁止「同一詞彙兩種意思」的規則自相矛盾——已改為全部只引用 `engineering/MIGRATION_STANDARD.md`（並在該檔案本身明確標註 7 階段跟 `kernel/03_CHANGE_CONTRACT.md` 5 階段的對應關係），不再各自簡寫。`commercial/LICENSE_ARCHITECTURE.md` 引用 `CUSTOMER_EXIT_STANDARD.md` 一條不存在的「禁止用不給匯出當籌碼」規則——已在 `CUSTOMER_DATA_OWNERSHIP.md` 新增這條真的規則並改正引用來源。`commercial/ENTERPRISE_STANDARD.md` 一句 MUST 語句邏輯反了（"No X MUST be Y" 讀起來變成「不要求 X 是 Y」而非禁止）——已改成 MUST NOT。`assurance/30_YEAR_REPLACEMENT_TEST.md`（先前中斷 agent 寫的）用同目錄內部裸檔名連結，跟本目錄其餘檔案的 `assurance/` 前綴慣例不一致——已統一補上前綴。`governance/EXCEPTION_STANDARD.md` 被 2 處誤用在不該用的地方（帳務對帳誤差、版本升級變更）——已分別改指向真正合適的機制（追蹤事件、`engineering/COMPATIBILITY_DEPRECATION_STANDARD.md`）。`methodology/09/12/13` 三份對「檢查範圍是哪些步驟」的敘述互相打架（"02–08" vs "01–11" vs "01-12"）——已統一改成不寫死數字範圍的敘述。`methodology/05_ARCHITECTURE_OPTIONS.md` 沒有把 `06_EXPERT_COUNCIL_STANDARD.md` 列進下游，是整條 00→14 鏈唯一的斷點——已補上。`methodology/13_CONVERGENCE_STANDARD.md` 是全部 15 份方法論文件裡唯一漏掉 `## Required Scope` 段落的——已補回。
+- 🔵 Suggestion（2 項全採納）：`engineering/DEVOPS_STANDARD.md` 與 `engineering/RELEASE_ENGINEERING_STANDARD.md` 職責邊界沒說清楚（兩者都提到 artifact immutability/rollback）——補一句歸屬說明。`commercial/EDITION_ARCHITECTURE.md`「exactly one running codebase」用詞不精確（跟 private deployment 多實例並存的事實有語意衝突）——改措辭為「one codebase」並說明多實例是複製不是分岔。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=Python 腳本機械抽取全部 55 份文件裡的 `` `path` `` 交叉引用（含 critic 修正後新增的 15 條），逐一核對檔案是否存在 | exit=0 | result=`70 個唯一路徑，0 個缺漏`（第一輪抓到 1 個寫錯目錄的引用，已修正）
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain（`validate_versions.py`~`validate_manifest.py`）+ `python -m unittest discover -s tests` | 内容填實後、critic 修正前、critic 修正後共跑三輪 | 前兩輪 exit=0 全綠（含 C-2 那次的例外，發現當下已知原因並在下一輪修復），最後一輪 12 步 + 29 tests 全部 exit=0/OK
+- REVIEW_DONE: critic=Standard（1 個 agent，讀全部 55 份新內容 + 引用到的既有 kernel/governance/runtime 檔案 + 親自跑套件驗證腳本核對「make verify 仍綠」的前提是否為真）| verdict=warn（2 Critical + 4 Major + 10 Minor + 2 Suggestion）→ 全部 18 項修正後直接以上方逐條記錄取代重跑 critic（機械覆核已證實全綠，多派一次 critic agent 對已修正的文件內容做二次主觀覆審不符合操作者「聰明智慧使用 agent」的要求）
+- BUGHUNT_DONE: scope=agency-os,scripts,agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE | grep=`G14\b\|^G[0-9]* fails\|kernel/09.*independen` | hits=1（`methodology/01_CURRENT_STATE_AUDIT.md:35` 的 `G1 fails`——這是原本就正確、本次未動的既有檔案，非殘留錯誤）
+
+**[剩餘風險]**：`06_EXPERT_COUNCIL_STANDARD.md` 概念上對應 `runtime/stage-gates.yaml` 的 `G6_ENGINEERING_REVIEWED`，但該檔案本次未動（屬「已經很好、不要碰」範圍），故 G6 目前沒有任何 methodology 文件明確認領——這是 critic 覆審範圍內看到但未要求修的既有缺口，留給操作者決定是否要開新任務處理；`capabilities/catalog.json` 空描述、`QUALITY_STRENGTH_MATRIX.md` 自評用語兩項（上一條目已記錄）仍未處理。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE`。
+
 ## 2026-09-04（續2，同一 session：Cognitive OS Phase 5 spec-root 後續一次做完）
 
 ### Cognitive OS：ADR-023 §Consequences 1–5 全數落地（3 份 capability contract + `CAPABILITY_RESOLUTION_BLOCKED` 登記 + `capability-resolution.schema.yaml` + plan-level BLOCKED 接線 + method 側 invoke 閘）+ TASKS ①②（HCI ch.17 指標、recipe prose）

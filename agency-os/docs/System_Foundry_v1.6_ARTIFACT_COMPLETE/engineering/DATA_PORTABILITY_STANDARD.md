@@ -1,40 +1,7 @@
 # Data Portability Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Customers own their data (`commercial/CUSTOMER_DATA_OWNERSHIP.md`) and MUST be able to get it out in a usable form on demand.
 
-## Required Scope
-- export
-- import
-- checksums
-- attachments
-- version migration
-- tenant transfer
+Required: a documented export format (machine-readable, e.g. structured JSON/CSV, not a rendered PDF only), completeness guarantee (export covers all customer-owned data, not a curated subset), checksums or equivalent integrity verification on exported bundles, attachment/binary-asset inclusion (not just metadata rows), a defined procedure for exporting across a version migration so old exports remain interpretable, and a defined procedure for exporting a specific tenant's slice out of a shared multi-tenant store without leaking other tenants' data.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+An export request MUST have a stated maximum turnaround time. A "we can technically query the database" capability is not portability; portability requires a self-service or support-initiated export path that a non-engineer can trigger and verify.

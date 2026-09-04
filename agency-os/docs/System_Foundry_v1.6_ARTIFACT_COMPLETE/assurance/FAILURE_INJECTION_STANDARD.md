@@ -1,39 +1,7 @@
 # Failure Injection Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Resilience claims are unproven until the failure they claim to survive has actually been injected and observed — a documented failover procedure never exercised is a hypothesis, not a control.
 
-## Required Scope
-- scenario
-- detection
-- containment
-- recovery
-- RTO/RPO evidence
+Required failure classes to rehearse on a defined cadence: dependency/provider outage (`engineering/PROVIDER_RESILIENCE_STANDARD.md`), data corruption or partial write, network partition between services, and resource exhaustion (CPU/memory/connection pool). Each exercise MUST record: detection time (did monitoring catch it before a human did), containment (did the failure stay bounded to its expected blast radius), recovery time against the stated RTO/RPO (`engineering/SRE_STANDARD.md`), and any data-integrity check performed after recovery.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+A failure-injection exercise that reveals a gap MUST produce a tracked remediation item, not just a "good learning" writeup with no follow-through. Exercises MUST run against an environment realistic enough that passing means something — an exercise against a toy environment with no real dependencies is insufficient evidence for a production resilience claim.

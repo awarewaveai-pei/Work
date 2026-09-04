@@ -1,42 +1,7 @@
 # SRE Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Reliability is a measured, budgeted property, not an aspiration; every service with a user-facing SLA MUST have defined SLIs/SLOs before it is treated as production-critical.
 
-## Required Scope
-- SLI
-- SLO
-- RTO
-- RPO
-- error budget
-- incident
-- DR
-- game day
+Required: Service Level Indicators (SLI) that reflect actual user experience, Service Level Objectives (SLO) with a defined error budget and a documented consequence when the budget is exhausted (feature freeze, incident-response escalation), stated Recovery Time Objective (RTO) and Recovery Point Objective (RPO) per critical service, an on-call rotation with a defined incident-response process, blameless postmortems for incidents above a defined severity, and periodic disaster-recovery exercises ("game days") that actually exercise failover, not tabletop-only discussion.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+Error budgets MUST gate feature velocity, not just be reported and ignored. Disaster-recovery capability claimed but never rehearsed (`assurance/RESTORE_VERIFICATION.md`, `assurance/FAILURE_INJECTION_STANDARD.md`) MUST be treated as unproven, not as a passing control.

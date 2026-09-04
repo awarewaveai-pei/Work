@@ -1,40 +1,7 @@
 # Security Architecture Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+New attack surface MUST NOT ship without a threat model; "we'll secure it later" is a rejected plan, not a deferred task.
 
-## Required Scope
-- threat model
-- trust boundaries
-- least privilege
-- crypto
-- secrets
-- supply chain
+Required: an explicit trust-boundary diagram identifying where untrusted input enters the system, least-privilege as the default posture for every service/credential (`engineering/IAM_STANDARD.md`), approved cryptographic primitives and key-management procedure (no home-rolled crypto), secrets sourced from a secrets manager at runtime and never committed to source control, dependency and supply-chain scanning as a release gate (`engineering/SUPPLY_CHAIN_SECURITY_STANDARD.md`), and an incident-response linkage so a detected vulnerability has a defined path to triage and remediation.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+Security review MUST happen before new externally-reachable surface ships, not as a post-hoc audit. A security exception (accepting a known risk) MUST follow `governance/EXCEPTION_STANDARD.md` with a mandatory expiry — it MUST NOT become permanent by default through inattention.

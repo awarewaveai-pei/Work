@@ -1,40 +1,7 @@
 # API Architecture Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Every public API is a compatibility surface (`engineering/COMPATIBILITY_DEPRECATION_STANDARD.md`) and MUST be designed as such from the first version, not hardened retroactively.
 
-## Required Scope
-- OpenAPI
-- auth
-- idempotency
-- pagination
-- errors
-- versioning
+Required: an explicit versioning scheme (URI/header/media-type), documented backward-compatibility policy, authentication/authorization boundary per `engineering/IAM_STANDARD.md`, idempotency keys for all mutating endpoints, a stable error taxonomy (machine-readable code plus human message, never a bare string), pagination contract for any list endpoint, documented rate limits and their signaling (headers/status codes), and deprecation signaling (sunset headers or equivalent) ahead of any breaking removal.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+Mutating endpoints MUST NOT silently double-apply on retry. Error responses MUST NOT leak internal implementation details (stack traces, raw DB errors) to external callers.

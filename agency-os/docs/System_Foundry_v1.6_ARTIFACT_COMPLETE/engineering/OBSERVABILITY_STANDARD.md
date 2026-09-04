@@ -1,40 +1,7 @@
 # Observability Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+A system MUST be debuggable in production from its own telemetry, without requiring a code change to add visibility after an incident.
 
-## Required Scope
-- logs
-- metrics
-- traces
-- request IDs
-- audit
-- alerts
+Required: structured (not free-text-only) logs correlated by a request/trace id propagated across every service a request touches, metrics covering the golden signals (latency, traffic, errors, saturation) at minimum, distributed tracing for cross-service requests, an audit-event stream distinct from operational logs for security/compliance-relevant actions, and alerts defined on user-visible symptoms (error rate, latency) rather than only on internal causes (CPU, queue depth) so on-call is paged for things that actually matter to users.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+Dashboards MUST be defined as code and versioned alongside the service, not hand-built and undocumented in a vendor UI. Every alert MUST link to a runbook; an alert with no runbook is a false-positive risk waiting to erode on-call trust.

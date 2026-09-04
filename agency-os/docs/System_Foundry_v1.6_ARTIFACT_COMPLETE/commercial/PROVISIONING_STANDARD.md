@@ -1,42 +1,22 @@
 # Provisioning Standard
 
 ## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Define what must happen, reliably and idempotently, at the moment a customer signs up, upgrades, or otherwise triggers automated resource/tenant creation — this is the commercial layer's most failure-sensitive automated path.
 
-## Required Scope
-- trial
-- subscribe
-- provision
-- configure
-- activate
-- upgrade
-- suspend
-- cancel
+## Idempotent Provisioning
+1. Every provisioning action (trial start, subscribe, tenant creation, upgrade-triggered resource allocation) MUST be idempotent against a caller-supplied or derived request key. A retried or duplicated provisioning request MUST NOT create duplicate tenants/resources.
+2. Provisioning MUST be resumable: if it fails partway, retrying MUST continue from a known state, not restart destructively or leave orphaned partial resources.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
+## Sequenced Lifecycle Events
+3. Provisioning steps (trial -> subscribe -> configure -> activate -> upgrade -> suspend -> cancel) MUST each map to a `commercial/CUSTOMER_LIFECYCLE.md` transition; provisioning MUST NOT create tenant/resource state that lifecycle doesn't know about.
+4. Activation MUST NOT be signaled to the customer until all required provisioning steps are durably complete — no "partial success" reported as success (mirrors `experience/ERROR_RECOVERY_OPERATOR_SAFETY_STANDARD.md`).
 
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
+## Rollback on Partial Failure
+5. A failed provisioning attempt MUST roll back or clearly mark as failed any resources it partially created, within a bounded time, so failed attempts don't silently consume quota or leak billable resources.
+6. Rollback of provisioning MUST NOT be a manual, undocumented cleanup process — it MUST be an automated or explicitly runbooked path per `engineering/ROLLBACK_STANDARD.md`.
 
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+## Provisioning SLA
+7. Each provisioning action MUST have a stated maximum expected completion time; provisioning that exceeds it MUST raise a visible operational alert, not fail silently while the customer waits indefinitely.
+
+## Suspend and Cancel
+8. Suspend and cancel provisioning actions MUST be as reliable and idempotent as create/activate — a suspend that fails halfway MUST NOT leave a customer both billed and blocked, or neither.

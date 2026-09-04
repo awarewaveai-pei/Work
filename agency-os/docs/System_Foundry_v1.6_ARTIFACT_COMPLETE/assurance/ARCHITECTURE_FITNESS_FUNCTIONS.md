@@ -1,39 +1,7 @@
 # Architecture Fitness Functions Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+An architectural characteristic that is only checked at design time will drift; a fitness function makes it a continuously, automatically re-checked property.
 
-## Required Scope
-- CI rules
-- dependency rules
-- schema rules
-- security rules
-- drift detection
+Required rule families: dependency-direction rules (e.g. domain code must not import infrastructure code), schema/contract rules (generated artifacts match their declared schema — this framework's own `scripts/validate_*.py` chain is a live example), security rules (no plaintext secret patterns, no disallowed dependency licenses), and drift-detection rules (declared inventory matches actual filesystem/registry state, as `scripts/validate_manifest.py` does for this package).
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+Every fitness function MUST run in CI, not only locally. A fitness function that would fail MUST NOT be silently skipped or have its threshold quietly loosened to make the build pass — loosening a fitness function is itself a governed change requiring the same review as the rule it weakens.

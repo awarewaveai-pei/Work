@@ -1,39 +1,7 @@
 # Restore Verification Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+A backup is unproven until a real restore has actually been performed from it — "the backup job exited 0" is evidence the backup ran, not evidence it is restorable.
 
-## Required Scope
-- backup inventory
-- restore
-- frequency
-- integrity
-- evidence
+Required: a maintained inventory of what is backed up and at what cadence, a restore rehearsal performed on a defined periodic cadence (not only after an incident forces it), integrity verification after restore (data is checked for correctness/completeness, not just "the restore command completed"), and recorded restore-time evidence compared against the stated RTO (`engineering/SRE_STANDARD.md`).
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+A restore rehearsal MUST target an environment isolated from production so the rehearsal itself cannot cause an incident. Any backup whose restore has never been rehearsed MUST be treated as unverified and reported as such, not silently assumed to work because the backup step succeeds.

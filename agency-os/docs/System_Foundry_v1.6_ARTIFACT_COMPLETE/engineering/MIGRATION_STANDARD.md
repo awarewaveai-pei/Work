@@ -1,41 +1,7 @@
 # Migration Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Every breaking change to schema, contract, or stored data format MUST follow the expand-contract sequence (`kernel/03_CHANGE_CONTRACT.md`'s non-overridable `EXPAND -> DUAL COMPATIBILITY -> MIGRATE -> VALIDATE -> CONTRACT`); flag-day breaking replacement is prohibited. This standard is the canonical, stricter 7-stage expansion of those 5 — every other document in this package that mentions expand/migrate/contract MUST reference this file by name rather than re-listing or re-abbreviating its own version of the stage list.
 
-## Required Scope
-- expand
-- dual compatibility
-- backfill
-- validate
-- cutover
-- observe
-- contract
+Required sequence, each stage with an explicit go/no-go criterion before proceeding: (1) **expand** — add the new shape alongside the old, additive only; (2) **dual compatibility** — both old and new consumers/producers work; (3) **backfill** (the concrete mechanism of kernel's "MIGRATE") — populate the new shape for existing data, resumable and idempotent; (4) **validate** — prove old and new shapes agree on a defined sample or in full; (5) **cutover** — switch primary read/write path to the new shape, with a rehearsed rollback to dual-compatibility available; (6) **observe** — a defined bake period monitoring for regressions before proceeding; (7) **contract** — remove the old shape only after the observe period passes with no rollback triggered.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+A migration MUST NOT skip stages under schedule pressure. Rollback from any stage back to the previous stage MUST be rehearsed, not merely assumed possible (`engineering/ROLLBACK_STANDARD.md`).

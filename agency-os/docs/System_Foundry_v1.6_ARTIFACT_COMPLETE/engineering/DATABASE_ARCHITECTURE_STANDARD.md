@@ -1,41 +1,7 @@
 # Database Architecture Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+Schema is a compatibility surface with an owner per table/collection; no service may write to a table it does not own.
 
-## Required Scope
-- ERD
-- constraints
-- indexes
-- partitioning
-- history
-- retention
-- restore
+Required: an entity-relationship model kept current with the live schema, explicit constraints (foreign keys, uniqueness, check constraints) enforced at the database layer rather than assumed in application code, indexing strategy reviewed against actual query patterns, partitioning/sharding strategy stated for tables expected to grow unbounded, an explicit retention policy per data category, and a documented, periodically-rehearsed restore procedure (`assurance/RESTORE_VERIFICATION.md`).
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+Schema changes MUST follow the sequence in `engineering/MIGRATION_STANDARD.md`; a destructive schema change (drop column/table) MUST NOT ship in the same release that stops using it. History/audit data required for compliance MUST NOT be deletable by the same path that deletes live operational data.

@@ -1,39 +1,7 @@
 # Independent Review Standard
 
-## Purpose
-定義 System Foundry 在此領域的最低可重用標準。
+A review is only "independent" if the reviewer did not design the thing being reviewed and has no incentive to wave it through — a self-review or a rubber-stamp from the same team does not satisfy this standard for anything above the lowest risk tier.
 
-## Required Scope
-- separate reviewer
-- evidence
-- conflicts
-- findings
-- disposition
+Required: the reviewer MUST be a different individual (or, for the highest-risk changes, a different team) than the author (`kernel/04_SUBAGENT_INHERITANCE.md` independence-of-roles requirement), the review MUST cover the actual surrounding context of the change, not only the diff in isolation, findings MUST be recorded with severity and an explicit disposition (fixed, accepted-with-expiry, disputed-and-escalated), and conflicts of interest (reviewer has a stake in the outcome) MUST be disclosed and, where material, disqualifying.
 
-## Mandatory Questions
-- Why is this required?
-- Current state?
-- Target state?
-- Evidence?
-- Alternatives?
-- Failure mode?
-- Exact path?
-- Migration?
-- Test?
-- Rollback?
-- Expected result?
-
-## Output Contract
-```text
-WHAT
-WHY
-WHERE
-DEPENDENCIES
-RISK
-TEST
-ROLLBACK
-EXPECTED RESULT
-```
-
-## Evidence States
-VERIFIED / INFERRED / ASSUMED / UNKNOWN / DISPUTED
+A review that produces zero findings on a nontrivial change is not automatically evidence of quality — it MUST be distinguishable from "the reviewer did not look closely," for example by the reviewer stating what was specifically checked. Rubber-stamping (approving without evidence of having read the change) is a rejected practice, not a time-saving shortcut.
