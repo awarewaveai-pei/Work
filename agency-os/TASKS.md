@@ -761,6 +761,7 @@
   - ✅ ⑤ **2026-09-04 完成 (a)-(d) + ADR-023 §Consequences 5**：(a) 三份 contract 落地（皆引真實母文件段落，未決項留各檔 OQ）、golden 2c 逐名釘四檔；(b) `CAPABILITY_RESOLUTION_BLOCKED` 以新狀態值 `NEW_ACCEPTED_2026-09-04` 登記、進 `emittable_reason_codes`、fixture 釘死、OQ-STATUS-4 記 EC §10 無 CAPABILITIES_RESOLVED 狀態；(c) 選新檔 `capability-resolution.schema.yaml`（不泛化 method-resolution，理由在檔內），3 份 fixture；(d) plan-level BLOCKED 接進 slice——**PRIMARY_PATH 決定：合併，不模擬第二次 BLOCKED**，capability block 是對 live catalog 的真 guard，用突變測試證明（拔掉 REQUIRED_BY_RISK contract → METHODS_RESOLVED→BLOCKED 中止、無下游；拔掉 RECOMMENDED → 記錄、續跑）；落地當天 bypass 閘如預期逼轉錄與 memo 改走 `invoke`，`OUTSIDE_CAPABILITY_PLANE` 清空、機制保留；順手做 §Consequences 5（`ContractCatalog` 共用 `require`/`invoke`，method 兩次執行也走閘）。131 tests（64+34+33）、golden 2508、7 個突變各自變紅後還原。**剩**：ADR-023 §Consequences 6（manifest `capability_execution_log`）。
   - ④ 其餘 OQ-P5-2～5、7～8 見 `Projects/internal/cognitive-engineering-os/docs/PHASE5_RESEARCH_SLICE.md`。
   - **完成定義**：①② 落地並 commit；③ ✅ ADR-023；⑤ (a)-(d) 落地並 commit。**→ ✅ 全部達成 2026-09-04**；後續獨立待辦：ADR-023 §Consequences 6、OQ-P5-2～5、7～8（皆 ADR 級或下一輪 repository-architecture 修訂，不急）。
+  - [ ] **【欠的 review｜2026-09-07 11:06 後才能做】** 對 commit `f2eb6cefa`（+ `e6f9e31a7`）補跑 `/codex-review`：2026-09-04 當天 critic 回 429 session limit、Codex 回 usage limit（reset 9/7 11:06），只做了書面自審 + 7 個突變（WORKLOG 2026-09-04 續2 `ORACLE_WAIVED`）。capture 檔在 `%TEMP%\oracle-capture-20260904-091506.diff`（含其他 session 的 62 檔改動，跑時要帶 scope 限制文字，或直接對 `git show f2eb6cefa` 的 26 檔審）。有 finding 才開新條目修。
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
