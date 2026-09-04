@@ -54,14 +54,19 @@
 --
 -- Gate 3 (DSR-CLAIM-DELETE-01, a deletion-completeness test) is NOT
 -- attempted here. It requires an actual deletion/erasure mechanism for
--- subject_records-and-friends, and none exists yet: subject_records is
--- unconditionally append-only (0001's append_only category, H1003 on any
--- UPDATE/DELETE with no exception path), and the only decided erasure
--- mechanism (crypto-shredding, ADR-0018) is still SPECIFIED - RUNTIME OPEN,
--- not built. Writing a test against a deletion path that does not exist
--- would either be vacuous or would require inventing an erasure mechanism
--- ADR-0018 already owns - left OPEN, tracked as blocked on ADR-0018 landing
--- first, not faked.
+-- subject_records-and-friends: subject_records is unconditionally
+-- append-only (0001's append_only category, H1003 on any UPDATE/DELETE with
+-- no exception path). 2026-09-05 update: ADR-0018's Wave 1 core
+-- (hci.tombstone_evidence(), migrations/0007_wave1_crypto_shredding_up.sql)
+-- has since landed, but the DSR-lifecycle wiring that would let a real
+-- 'DELETION' data_subject_request drive erasure (ADR-0018 gate 5,
+-- hci.record_erasure()) is still Wave 4, not built - so this table's own
+-- gate 3 remains genuinely blocked, just on a narrower remaining piece than
+-- when this comment was first written. Writing a test against a deletion
+-- path that is not yet wired to the DSR lifecycle it is supposed to fire
+-- from would either be vacuous or would require inventing ADR-0018 gate 5
+-- inline, which is that gate's own decision to make - left OPEN, tracked as
+-- blocked on ADR-0018 gate 5 landing, not faked.
 --
 -- Lock behavior (2026-09-05 db-expert review, verified against a real PG
 -- 15.8 probe, not just reasoned about): the two FK-bearing CREATE TABLEs

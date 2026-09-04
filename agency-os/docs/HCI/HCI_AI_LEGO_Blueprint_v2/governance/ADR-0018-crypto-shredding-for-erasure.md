@@ -36,6 +36,84 @@ Runtime gates are **OPEN**. All land in `D:\Work\Projects\internal\hci30\databas
 5. **Wave 4 — erasure is one function wired to the existing DSR lifecycle, not a manual admin action.** `hci.record_erasure(request_id uuid)` fires only when the linked `hci.data_subject_requests.request_type = 'DELETION'` transitions to `'RESOLVED'` (the existing `enforce_dsr_transition` trigger, `:134-160`, is unchanged and still owns that transition). For every `hci.data_subject_request_targets` row for that `request_id` whose `target_kind` is `EVIDENCE` or `CLAIM` (`:171-176`, already typed against `subject_records(tenant_id, id, kind)`): set the referenced `hci.data_encryption_keys.key_material = NULL, destroyed_at = now()`, call `hci.tombstone_evidence(target_id)` (gate 3), then insert one `hci.data_subject_request_events` row per target with `event_type = 'ERASURE_RECORDED'` (already an allowed value, `:167`) via the existing restricted-column `INSERT` grant (`:343-344`). Tests: `CRYPTO-ERASURE-01` (a `RESOLVED` `DELETION` request with one `EVIDENCE` target → key `key_material` NULL, `tombstoned_at` set, exactly one `ERASURE_RECORDED` event for that target), `CRYPTO-ERASURE-02` (calling `hci.record_erasure()` on a request not yet `RESOLVED` → rejected, no key or row touched — erasure cannot bypass DSR review), `CRYPTO-ERASURE-METADATA-01` (after erasure, the `subject_records` row, its `tenant_id`/`person_id`/`kind`/`created_at`/any ADR-0017 `supersedes_id` lineage, and its history in `data_subject_request_targets` all remain queryable — only content and key are gone).
 6. **Wave 1 — no external key path (architecture test).** `CRYPTO-NOEXTERNAL-01`: `pg_extension` in the target database carries no network-capable extension (`dblink`, `postgres_fdw`, `http`, or equivalent), and `pg_proc.prosrc` for every function in the `hci` schema contains no call to one. This is the machine form of "key material never leaves PostgreSQL in Wave 1" and the fence a future KMS-adapter ADR would explicitly have to move.
 
+## Implementation note (2026-09-05, Wave 1 gates 1-3 and 6 landed; gates 4-5 remain Wave 4 as this ADR's own text specifies)
+
+Recorded here rather than editing the numbered gates above, which remain
+the historical decision record.
+
+**Migration number.** Gate 1's text says "Migration `0003` adds...", and
+other line references throughout this ADR cite `0001_wave1_synthetic_up.sql`
+line numbers that have since shifted - both stale relative to the migration
+numbering actually finalized (`0003` is ADR-0012's regulatory market scope,
+already committed before this ADR's implementation began). The real
+migration is `0007_wave1_crypto_shredding_up.sql`.
+
+**Gates 1, 2, 3, 6 — DONE**, real-Docker-verified: `test-wave1-local.ps1`
+green at **141/141** assertions (up from 131), `mutation-check-wave1.ps1`
+green at **63/63** mutations killed (up from 58), first real run green on
+both the forward path and the narrow-rollback path (`0007_down`, run twice
+manually - once alone against a populated 0001-0007 schema, once followed by
+a clean re-application of `0007_up` - the harness's own reversibility pass
+only exercises the whole-schema `0001_down`).
+
+**Gate 3's escape hatch reuses gate 2's mechanism, not a new one.**
+`hci.reject_update_delete()` gained a second shape clause, structurally
+identical to the first (`system_superseded_at`, ADR-0017): `tombstoned_at`
+moving `NULL` -> `NOT NULL`, every other column byte-identical, executed by
+a role that is a member of the table owner. `hci.tombstone_evidence()` -
+like `hci.mark_superseded()` - is `SECURITY DEFINER` with `REVOKE ALL ...
+FROM PUBLIC` applied (this migration's own draft got this right the first
+time, unlike `0005`'s first draft, precisely because the pattern was already
+established and copied rather than re-derived). This is exactly what
+`ADR-0017`'s own migration header (`0005_wave1_bitemporal_history_up.sql:1-100`)
+anticipated: "the shape here is specific to `system_superseded_at`, so that
+future migration needs its own shape clause... in the same function, not a
+copy of this file's rejected designs."
+
+**`hci.tombstone_evidence()` is not app-role-callable at Wave 1**, matching
+`hci.mark_superseded()`'s own posture - it is meant to be called by
+`hci.record_erasure()` (gate 5, Wave 4, not built here). `CRYPTO-TOMBSTONE-02`
+is tested by calling it directly as owner, simulating what that future
+caller will do.
+
+**A real retrofit, not a design change.** Gate 2's `CHECK
+(kind NOT IN ('EVIDENCE','CLAIM') OR encryption_key_ref IS NOT NULL)` applies
+retroactively to every existing `EVIDENCE`/`CLAIM` `subject_records` row
+anywhere in the Wave 1 suite - roughly 19 pre-existing insert sites across
+fixtures and the negative-test file, none of which had ever needed a key
+before this ADR. Fixed by provisioning a small, reused set of synthetic keys
+per tenant in fixtures (the ADR's own gate 2 does not require one key per
+row - no `UNIQUE` constraint is in its gate list - so reuse across unrelated
+tests is schema-legal, not a shortcut) and adding `encryption_key_ref` to
+each affected insert's column list. Real execution caught the one thing
+grep-before-running could not: the pre-existing `drop-append-only-triggers`
+mutation (removes `subject_records_append_only` entirely) collaterally
+un-killed the new `CRYPTO-TOMBSTONE-SHAPE-01` assertion (with no trigger at
+all, the "wrong shape still rejected" owner-run UPDATE just succeeds) -
+added to that mutation's expect list, the same collateral-hit pattern
+already documented repeatedly elsewhere in this test suite.
+
+**No db-expert review requested for this gate**, for the same reason gate 4
+skipped one: `hci.tombstone_evidence()` and its shape clause are a direct,
+unmodified reuse of gate 2's already-reviewed mechanism (same `REVOKE ALL`,
+same jsonb-diff-plus-role-membership check), not a new design the way gate
+2's escape hatch itself was. Self-review focused on the specific issue
+classes that review found last time (missing `REVOKE`, down-migration
+correctness, collateral mutation hits) and a second real narrow-rollback run
+- consistent with the level of scrutiny actually warranted by "reusing a
+proven pattern" versus "inventing a new one."
+
+**Gates 4-5 remain Wave 4**, per this ADR's own explicit gate-text labeling
+- not built here. VBC note: gate 5's own mechanics (`hci.record_erasure()`
+touching only `hci.data_encryption_keys` and calling `hci.tombstone_evidence()`,
+both of which exist after gates 1-3) do not strictly require gate 4's real
+payload column to exist first, but the ADR's own gate 4/5 sequencing appears
+to be a considered product choice - "erasure" is not a meaningful concept to
+test against a row that never held real content through the proper write
+path - rather than an oversight, so it is respected here rather than built
+past on a technical loophole. Recorded for whoever picks up gate 5 next, not
+silently worked around.
+
 ## Consequences
 
 - `07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` §Immutability vs. Erasure (`:138-140`) loses its 🔴 DECISION PENDING marker; the `encryption_key_ref`/`tombstoned_at` columns already sketched at `:126-127` are now a specified design, not a placeholder.

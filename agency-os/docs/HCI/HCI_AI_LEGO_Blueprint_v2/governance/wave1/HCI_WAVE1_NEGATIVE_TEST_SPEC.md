@@ -1,8 +1,8 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, the Bitemporal history addition, and the Bitemporal scope fence addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history and Bitemporal scope fence sections added and executed 2026-09-05)
-Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026, ADR-0017
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, the Bitemporal history addition, the Bitemporal scope fence addition, and the Crypto-shredding addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history, Bitemporal scope fence, and Crypto-shredding sections added and executed 2026-09-05)
+Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026, ADR-0017, ADR-0018
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
 ## Tenant adapter isolation
@@ -211,6 +211,51 @@ a db-expert review was judged unnecessary for that reason - the real bugs
 this gate did surface (positional INSERTs, the collateral-hit mutation) were
 both caught by grep and real execution respectively, the same disciplines
 applied throughout this file.
+
+## Crypto-shredding for erasure *(new, ADR-0018 gates 1/2/3/6, migration 0007)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| CRYPTO-KEYGRANT-01 | Owner-run `information_schema.role_table_grants` query | Application roles hold zero grants on `hci.data_encryption_keys` — no SELECT, no anything | Predicate true |
+| CRYPTO-KEYREQ-01 | App-role `EVIDENCE` insert, `encryption_key_ref` explicit `NULL` | Key required for `EVIDENCE`/`CLAIM` (`subject_records_key_required_for_evidence_claim`) | Rejected, `23514` |
+| CRYPTO-SCOPE-01 | App-role `ASSESSMENT` insert with a non-null `encryption_key_ref` | Key forbidden outside `EVIDENCE`/`CLAIM` (`subject_records_key_scoped_to_evidence_claim`) | Rejected, `23514` |
+| CRYPTO-CROSSTENANT-KEYREF-01 | Tenant A row, `encryption_key_ref` = a real tenant-B key | Composite `(tenant_id, encryption_key_ref)` FK rejects a genuine cross-tenant reference | Rejected, `23503` |
+| CRYPTO-TOMBSTONE-01 | App-role `UPDATE ... SET tombstoned_at` | Application role holds zero UPDATE grant on `subject_records` at all — never reaches the trigger (ADR text's gate 3 predicted `H1003`; corrected the same way `BITEMP-IMMUTABLE-01` was) | Rejected, `42501` |
+| CRYPTO-TOMBSTONE-SETUP / -02-SETUP / -02 | Owner-run, dedicated row, `hci.tombstone_evidence()` called twice | Second call on an already-tombstoned row | Succeeds / Succeeds / Rejected, `H1009` |
+| CRYPTO-TOMBSTONE-SHAPE-01 | Owner-run `UPDATE` touching `tombstoned_at` AND another column together | The effect-based shape check requires nothing else changed, not merely that `tombstoned_at` changed | Rejected, `H1003` |
+| CRYPTO-NOEXTERNAL-01 | Owner-run `pg_extension`/`pg_proc.prosrc` introspection | No network-capable extension installed (`dblink`/`postgres_fdw`/`http`); no `hci` function body calls one | Predicate true |
+
+`hci.tombstone_evidence()`'s escape hatch is not a new mechanism: it reuses
+`hci.reject_update_delete()`'s effect-based authorization (ADR-0017,
+`0005_wave1_bitemporal_history_up.sql`), extended with a second, structurally
+identical shape clause for `tombstoned_at` instead of a second design. No
+db-expert review was requested for this reason - the same judgment call
+gate 4 (bitemporal scope fence) already made for the same reason. A real
+retrofit was required regardless: gate 2's `CHECK` requiring
+`encryption_key_ref` on every `EVIDENCE`/`CLAIM` row applies retroactively to
+~19 pre-existing insert sites across fixtures and this file that had never
+needed a key before - fixed by provisioning a small, reused set of synthetic
+keys per tenant, not one key per row (the ADR's own gate 2 does not require
+that - no `UNIQUE` constraint is in its gate list). Real execution caught
+one collateral hit the retrofit itself could not: the pre-existing
+`drop-append-only-triggers` mutation removes `subject_records_append_only`
+entirely, which also un-kills `CRYPTO-TOMBSTONE-SHAPE-01` (no trigger, no
+rejection of any shape) - added to that mutation's expect list. First real
+run green on both `test-wave1-local.ps1` (**141/141 assertions**) and
+`mutation-check-wave1.ps1` (**63/63 mutations killed**, after the one
+collateral-hit fix), including a manually-run narrow-rollback cycle for
+`0007_down` (not exercised by the harness's own reversibility pass).
+
+Gates 4-5 (mediated write/read once a real payload column exists;
+`hci.record_erasure()` wired to the DSR lifecycle) remain **Wave 4**, per the
+ADR's own explicit gate-text labeling - not built here. VBC note: gate 5's
+own mechanics do not strictly require gate 4's payload column to exist
+first (it only touches `hci.data_encryption_keys` and calls
+`hci.tombstone_evidence()`, both already built), but the sequencing reads as
+a considered product choice rather than an oversight - "erasure" is not a
+meaningful concept to test against a row that never held real content
+through the proper write path - so it is respected here rather than built
+past on a technical loophole.
 
 ## Test execution requirements
 
@@ -479,15 +524,37 @@ together: **131/131 assertions, 58/58 mutations killed** (128 + 3 new
 assertions, 54 + 4 new mutations). Full narrative in the migration file's
 own header comment and in ADR-0017's "Implementation note".
 
+**Execution evidence (2026-09-05, Crypto-shredding addition).** ADR-0018
+gates 1/2/3/6, migration `0007_wave1_crypto_shredding_up.sql`:
+`hci.data_encryption_keys` (zero grants), `encryption_key_ref`/`tombstoned_at`
+on `subject_records`, `hci.tombstone_evidence()` (reusing gate 2's
+effect-based `reject_update_delete()` shape-clause mechanism, not a new
+design), and the no-external-key-path introspection check. First real run
+green on the forward path (**141/141 assertions**); one real collateral hit
+on the first `mutation-check` run - the pre-existing `drop-append-only-triggers`
+mutation also un-kills `CRYPTO-TOMBSTONE-SHAPE-01` once
+`subject_records_append_only` is gone entirely - added to that mutation's
+expect list, **63/63 mutations killed** after the fix. Both narrow-rollback
+paths (`0007_down` alone; `0007_down` then a clean `0007_up` re-application)
+run manually, exit 0 - not exercised by the harness's own reversibility
+pass. No db-expert review requested, matching gate 4's own reasoning: the
+escape hatch reuses an already-reviewed mechanism rather than inventing one.
+A genuine retrofit was required regardless - gate 2's key-required `CHECK`
+applies to ~19 pre-existing `EVIDENCE`/`CLAIM` insert sites across fixtures
+and this file - fixed with a small, reused set of synthetic per-tenant keys
+(the ADR's own gate 2 does not require one key per row). Full narrative in
+the migration file's own header comment and in ADR-0018's "Implementation
+note".
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 58
+requires the suite to go red on exactly the assertions covering it; **all 63
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
 Source-provenance mutations + 2 Consent-class mutations + 15 Bitemporal-
 history mutations (7 landed pre-review + 6 added by the db-expert review pass
 + 2 added by a second critic review of the harness scripts themselves) + 4
-Bitemporal-scope-fence mutations,
+Bitemporal-scope-fence mutations + 5 Crypto-shredding mutations,
 2026-09-05, covering every invariant listed above). This
 exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same

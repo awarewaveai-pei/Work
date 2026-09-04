@@ -12,6 +12,20 @@ INSERT INTO hci.app_tenant_bindings VALUES ('hci_app_test_a', '11111111-1111-111
 INSERT INTO hci.persons (id,tenant_id,display_label) VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','11111111-1111-1111-1111-111111111111','Synthetic A'), ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','22222222-2222-2222-2222-222222222222','Synthetic B');
 INSERT INTO hci.tenant_authorizations (id,tenant_id,status,expires_at) VALUES ('aaaaaaaa-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','ACTIVE',NULL), ('aaaaaaaa-0000-0000-0000-000000000010','11111111-1111-1111-1111-111111111111','REVOKED',NULL), ('bbbbbbbb-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222','REVOKED',NULL);
 
+-- Crypto-shredding key fixtures (ADR-0018 gate 2). subject_records now
+-- requires encryption_key_ref for every EVIDENCE/CLAIM row
+-- (subject_records_key_required_for_evidence_claim), so every existing
+-- EVIDENCE/CLAIM insert throughout fixtures/tests needs a real key to
+-- reference. Two per tenant, reused across the many unrelated tests whose
+-- own subject is something else entirely (identity, DSR lifecycle, etc.) -
+-- the ADR's gate 2 does not require one key per row (no UNIQUE constraint
+-- is in its own gate list), only that the reference be valid, so reuse here
+-- is schema-legal, not a shortcut around the actual control.
+INSERT INTO hci.data_encryption_keys (id,tenant_id) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000800','11111111-1111-1111-1111-111111111111'),
+  ('aaaaaaaa-0000-0000-0000-000000000801','11111111-1111-1111-1111-111111111111'),
+  ('bbbbbbbb-0000-0000-0000-000000000800','22222222-2222-2222-2222-222222222222');
+
 -- Case/Engagement aggregate fixtures (ADR-0020). One OPEN case per tenant so
 -- research_workflows/subject_records tests have a valid case_id to bind to;
 -- one pre-CLOSED tenant-A case for the terminal-state-guard test
@@ -65,9 +79,13 @@ INSERT INTO hci.source_terms_records (id,tenant_id,source_id,terms_ref) VALUES
 -- assessments_current's security_invoker asserted but never once actually
 -- exercised cross-tenant - "all four views share one code shape" was an
 -- assumption, not a checked fact).
+-- EVIDENCE/CLAIM rows carry encryption_key_ref (ADR-0018 gate 2, tenant-B
+-- key fixture above); ASSESSMENT correctly carries none (the scope-fence
+-- CHECK forbids it there).
+INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000500','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800'),
+  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800');
 INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id) VALUES
-  ('bbbbbbbb-0000-0000-0000-000000000500','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200'),
-  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200'),
   ('bbbbbbbb-0000-0000-0000-000000000502','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','ASSESSMENT','bbbbbbbb-0000-0000-0000-000000000200');
 -- One real tenant-B hci.decisions row (RLS-LEAK-04 / BITEMP-VIEWRLS-01),
 -- mirroring the subject_records row directly above.

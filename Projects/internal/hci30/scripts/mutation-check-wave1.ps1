@@ -34,6 +34,7 @@ $upMig3   = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_sc
 $upMig4   = Join-Path $root 'database/migrations/0004_wave1_source_provenance_up.sql'
 $upMig5   = Join-Path $root 'database/migrations/0005_wave1_bitemporal_history_up.sql'
 $upMig6   = Join-Path $root 'database/migrations/0006_wave1_bitemporal_scope_fence_up.sql'
+$upMig7   = Join-Path $root 'database/migrations/0007_wave1_crypto_shredding_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -68,11 +69,21 @@ $mutations = @(
      # TRIGGER, which rejects with H1003 instead of the 42501 the assertion
      # names - still rejected, wrong code, correctly flips to FAIL here, same
      # reasoning already documented above for the original four.
-     expect = @('APPEND-ONLY-GRANT-01','APPEND-ONLY-GRANT-02','APPEND-ONLY-GRANT-03','APPEND-ONLY-GRANT-04','BITEMP-IMMUTABLE-01') }
+     # CRYPTO-TOMBSTONE-01 (ADR-0018) joined 2026-09-05 for the identical
+     # reason: it also UPDATEs subject_records.tombstoned_at as app role -
+     # with UPDATE regranted, the shape check still rejects it (app role is
+     # not a member of hci_owner), but now via H1003, not the 42501 named.
+     expect = @('APPEND-ONLY-GRANT-01','APPEND-ONLY-GRANT-02','APPEND-ONLY-GRANT-03','APPEND-ONLY-GRANT-04','BITEMP-IMMUTABLE-01','CRYPTO-TOMBSTONE-01') }
 
+  # CRYPTO-TOMBSTONE-SHAPE-01 (ADR-0018) joined 2026-09-05: with
+  # subject_records_append_only gone entirely, its owner-run
+  # tombstoned_at+case_id UPDATE has nothing left to reject it, and
+  # unexpectedly succeeds - the same collateral-hit reasoning already
+  # documented for BITEMP-IMMUTABLE-01/CRYPTO-TOMBSTONE-01 elsewhere in this
+  # file, just via the missing trigger instead of a restored grant.
   @{ id = 'drop-append-only-triggers'
      sql = 'DROP TRIGGER data_subject_request_events_append_only ON hci.data_subject_request_events; DROP TRIGGER subject_records_append_only ON hci.subject_records;'
-     expect = @('APPEND-ONLY-TRIGGER-01','APPEND-ONLY-TRIGGER-02') }
+     expect = @('APPEND-ONLY-TRIGGER-01','APPEND-ONLY-TRIGGER-02','CRYPTO-TOMBSTONE-SHAPE-01') }
 
   @{ id = 'drop-identity-evidence-gate'
      sql = 'DROP TRIGGER identity_candidates_require_evidence ON hci.identity_candidates;'
@@ -234,9 +245,12 @@ $mutations = @(
 
   # ADR-0001 gate 2 / ADR-0002 gate 1 (reused) / ADR-0005 gate 1 - 2026-09-05.
   # The exact mutation both ADRs name for this gate.
+  # CRYPTO-NOEXTERNAL-01 (ADR-0018) joined 2026-09-05: it also checks for
+  # dblink specifically (broader list, plus a prosrc scan), so installing it
+  # flips that assertion red too, alongside ARCH-PEER-02's own reason.
   @{ id = 'enable-dblink-extension'
      sql = 'CREATE EXTENSION dblink;'
-     expect = @('ARCH-PEER-02') }
+     expect = @('ARCH-PEER-02','CRYPTO-NOEXTERNAL-01') }
 
   # ADR-0002 gate 3. A role name matching the naming convention a future
   # cognitive-engineering-os integration would plausibly use. Cleaned up by
@@ -407,6 +421,26 @@ $mutations = @(
   @{ id = 'regrant-createdat-scope-update'
      sql = 'GRANT UPDATE ON hci.persons TO hci_app_test_a;'
      expect = @('CREATEDAT-SCOPE-02') }
+
+  # ADR-0018 (Crypto-shredding for erasure, HD-07) - 2026-09-05.
+  @{ id = 'grant-key-table-select'
+     sql = 'GRANT SELECT ON hci.data_encryption_keys TO hci_app_test_a;'
+     expect = @('CRYPTO-KEYGRANT-01') }
+  @{ id = 'drop-key-required-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_key_required_for_evidence_claim;'
+     expect = @('CRYPTO-KEYREQ-01') }
+  @{ id = 'drop-key-scope-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_key_scoped_to_evidence_claim;'
+     expect = @('CRYPTO-SCOPE-01') }
+  @{ id = 'drop-key-ref-tenant-fk'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_key_ref_fk;'
+     expect = @('CRYPTO-CROSSTENANT-KEYREF-01') }
+  # Removes only the tombstoned_at branch's "nothing else changed" clause -
+  # the system_superseded_at branch (0005) is untouched, so this cannot be
+  # confused with any bitemporal-history mutation above.
+  @{ id = 'weaken-tombstone-shape-check'
+     sql = 'CREATE OR REPLACE FUNCTION hci.reject_update_delete() RETURNS trigger LANGUAGE plpgsql AS $fn$ DECLARE o jsonb; n jsonb; BEGIN IF TG_OP = ''UPDATE'' THEN o := to_jsonb(OLD); n := to_jsonb(NEW); IF o ? ''system_superseded_at'' AND o->>''system_superseded_at'' IS NULL AND n->>''system_superseded_at'' IS NOT NULL AND (o - ''system_superseded_at'') = (n - ''system_superseded_at'') AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), ''MEMBER'') THEN RETURN NEW; END IF; IF o ? ''tombstoned_at'' AND o->>''tombstoned_at'' IS NULL AND n->>''tombstoned_at'' IS NOT NULL AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), ''MEMBER'') THEN RETURN NEW; END IF; END IF; RAISE EXCEPTION USING ERRCODE = ''H1003'', MESSAGE = format(''%s.%s is append-only (%s rejected)'', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP); END $fn$;'
+     expect = @('CRYPTO-TOMBSTONE-SHAPE-01') }
 )
 
 $project = "hcimut$PID"
@@ -466,6 +500,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig4)   -ne 0) { throw 'mutation harness: 0004 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig5)   -ne 0) { throw 'mutation harness: 0005 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig6)   -ne 0) { throw 'mutation harness: 0006 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig7)   -ne 0) { throw 'mutation harness: 0007 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

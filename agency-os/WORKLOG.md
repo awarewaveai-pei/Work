@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-05（HCI30 ADR-0018 crypto-shredding Wave 1 gates 1/2/3/6 落地，migration 0007，沿用 ADR-0017 已審過的 escape-hatch 機制）
+
+**觸發**：延續操作者標準授權，接續同日稍早 commit `3a555b7f8`（ADR-0017 gate 4）的下一步——佇列裡下一個 ADR，選 ADR-0018 因為它明確依賴剛建立的 `reject_update_delete()` effect-based 機制，上下文銜接成本最低。
+
+**[已修改]**：
+- 新增 `Projects/internal/hci30/database/migrations/0007_wave1_crypto_shredding_{up,down}.sql`：`hci.data_encryption_keys`（app role 零 GRANT）+ `subject_records.encryption_key_ref`/`tombstoned_at`（對稱 CHECK：EVIDENCE/CLAIM 必填、其餘禁填）+ `hci.tombstone_evidence()`。
+- `database/tests/wave1-negative-tests.sql`：新增 `CRYPTO-KEYGRANT-01`/`-KEYREQ-01`/`-SCOPE-01`/`-CROSSTENANT-KEYREF-01`/`-TOMBSTONE-01/02`/`-TOMBSTONE-SHAPE-01`/`-NOEXTERNAL-01`（10 個新斷言，131→141）；**retrofit 既有約 19 個 EVIDENCE/CLAIM insert**（RLS-WRITE-01、SUBJECT-NEG-01a/02/03、CASE-CLOSED-GUARD-02、CLAIM-FIXTURE-01、全部 BITEMP-* 相關）補 `encryption_key_ref`。
+- `database/fixtures/0001_synthetic.sql`：新增每租戶 2-3 把 synthetic key fixture，retrofit fixture 裡的 EVIDENCE/CLAIM 列。
+- `database/ERROR_CODE_REGISTRY.md`：H1009 從 `RESERVED, NOT RAISED` 改標 `RAISED`。
+- `scripts/test-wave1-local.ps1`／`scripts/mutation-check-wave1.ps1`：接入 migration 0007，58→63 mutation（5 新增 + 2 個既有 mutation 的 expect list 更新）。
+
+**gate 3 escape hatch：不是新設計，是延伸 ADR-0017 gate 2 已審過的機制**——`tombstone_evidence()` 需要 UPDATE `subject_records.tombstoned_at` 越過同一個 append-only trigger，跟 `mark_superseded()` 當初面對的問題完全一樣。`reject_update_delete()` 多加一組結構相同的 shape clause（`tombstoned_at` NULL→NOT NULL、其餘欄位不變、執行者是 table owner 成員），不是重新發明機制；`tombstone_evidence()` 第一版就正確做了 `REVOKE ALL FROM PUBLIC`（不像 0005 第一版漏掉——這正是「沿用已驗證模式」相對「重新設計」的實際差異：同一類錯誤不會在複製既有正確作法時重犯）。這個延伸正是 ADR-0017 自己的 migration 0005 header 早就預告的：「the shape here is specific to system_superseded_at, so that future migration needs its own shape clause... in the same function」。
+
+**真 retrofit，非設計變更**：gate 2 的「EVIDENCE/CLAIM 必須有 encryption_key_ref」CHECK 對整個 Wave 1 測試套件裡所有既有 EVIDENCE/CLAIM insert 全部回溯生效——約 19 個呼叫點，橫跨 fixtures 與 negative-tests 檔案，此前完全不需要這個欄位。解法：每租戶補一小組重用的 synthetic key（ADR 本身 gate 2 沒要求一列一鑰——gate list 裡沒有 UNIQUE 約束），逐一在每個既有 insert 補上 encryption_key_ref。動工前先 grep 找出全部 19 個命中點再統一修，而非讓 Docker 逐一失敗後才修。
+
+**真跑抓到的一個連帶命中**：既有的 `drop-append-only-triggers` mutation（整個拿掉 `subject_records_append_only` trigger）除了原本要證明的 `APPEND-ONLY-TRIGGER-01/02` 之外，也連帶讓新測試 `CRYPTO-TOMBSTONE-SHAPE-01`（owner 執行同時改 tombstoned_at + 另一欄位，應仍被 shape check 擋下）失守——沒有 trigger 就沒有任何東西能拒絕它。補進該 mutation 的 expect list。同一輪也把 `regrant-append-only-writes` 和 `enable-dblink-extension` 兩個既有 mutation 的 expect list 補上 `CRYPTO-TOMBSTONE-01`/`CRYPTO-NOEXTERNAL-01`（同款連帶命中，模式跟本輪稍早 ADR-0017 系列完全一致）。
+
+**為何本輪未送 db-expert 覆審**：`hci.tombstone_evidence()` 的機制是 gate 2 已經被完整覆審過的機制的直接複製（同一個 REVOKE、同一個 jsonb-diff-plus-role-membership shape check），不是像 gate 2 本身當初那樣的全新設計——跟 gate 4（scope fence）判定不需要覆審的理由完全一樣。改用真跑 narrow rollback 兩次（獨立跑一次 `0007_down`；再接著重新套用 `0007_up` 驗證乾淨可重入）取代覆審。
+
+**gate 4/5（Wave 4）VBC 查證**：gate 5（`hci.record_erasure()`）自己的機制其實只碰 `hci.data_encryption_keys` 和呼叫 `hci.tombstone_evidence()`，兩者 gate 1/3 都已存在——技術上不嚴格依賴 gate 4（真實 payload 欄位）先存在。但 ADR 原文明確把 gate 4/5 都標為 Wave 4，讀起來像是刻意的產品判斷（對一列從未透過正規寫入路徑真的存過內容的「銷毀」談不上有意義），不是疏漏——尊重原文排序，不用技術漏洞繞過去做，記錄下來留給接手 gate 5 的下一輪。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=`HCI Wave 1 negative suite: 141 assertion(s) recorded, 0 failed`，第一次真跑就過（forward path + 整包 reversibility pass）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 63 mutations killed. The Wave 1 negative suite is non-vacuous.`（第一次跑到 1 個 WEAK，修正 expect list 後複驗全綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=真跑 `0007_wave1_crypto_shredding_down.sql`（獨立容器，0001-0007 全部 up 完後執行）| exit=0；緊接著重新套用 `0007_up` | exit=0——narrow rollback 路徑此前從未真跑過，本輪首次驗證
+- REVIEW_DONE: critic=Waived（理由見上，沿用已審過的既有機制；真問題由真跑+grep 抓到並修正，非略過驗證）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`0007_wave1_crypto_shredding\|tombstone_evidence\|H1009\|encryption_key_ref\|ADR-0018.*(RUNTIME OPEN\|not built)` | hits=30 總計；1 個真過期殘留抓到並修正（`migrations/0004_wave1_source_provenance_up.sql:60` 宣稱 ADR-0018「still SPECIFIED - RUNTIME OPEN, not built」已過期，改為說明 gate 3 已建、DSR-CLAIM-DELETE-01 現在改卡在 gate 5 而非整個 ADR）；其餘命中皆為歷史決策快照引用（H1009 配號衝突紀錄、ADR-0022 對 ADR-0018 gate 2 shape 的既有交叉引用），語意未變、不用回頭改；`worklog-excerpt.md`（自動快照）不手動改
+- WORKLOG: 本條目
+
+**[剩餘風險]**：低。gate 4/5（Wave 4）OPEN，等應用層/真實 payload 欄位存在才可能驗證，非本輪範圍。ADR-0018 六個 gate 中四個現已關閉。
+
+**[rollback]**：`0007_wave1_crypto_shredding_down.sql`（窄回滾，本輪真跑兩次確認可用，含空狀態守衛拒絕在已有銷毀紀錄時執行）；或 `0001_wave1_synthetic_down.sql`（整包 DROP SCHEMA，含 0002-0007 全部）。
+
 ## 2026-09-05（HCI30 ADR-0017 gate 4 落地：BITEMP-SCOPE-01 scope fence，migration 0006）
 
 **觸發**：延續操作者標準授權，接續同日稍早 commit `5395e0f14`（ADR-0017 gates 1-3）的下一步——gate 4 是該次 commit 明確記錄的「刻意分開一個 migration」follow-up，非新任務。

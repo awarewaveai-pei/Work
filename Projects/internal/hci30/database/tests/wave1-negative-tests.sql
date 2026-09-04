@@ -29,29 +29,29 @@ SELECT hci_test.expect_true('RLS-LEAK-02',
   'tenant registry must not enumerate other tenants');
 
 SELECT hci_test.expect_sqlstate('RLS-WRITE-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
-     VALUES ('bbbbbbbb-0000-0000-0000-000000000009','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('bbbbbbbb-0000-0000-0000-000000000009','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800')$q$,
   '42501');
 
 -- ---------------------------------------------------------------------------
 -- Person-only subject boundary (SUBJECT-NEG-01..03)
 -- ---------------------------------------------------------------------------
 SELECT hci_test.expect_success('SUBJECT-NEG-01a',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000101','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200')$q$);
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000101','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$);
 
 SELECT hci_test.expect_true('SUBJECT-NEG-01b',
   $q$SELECT subject_type = 'PERSON' FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000101'$q$,
   'omitted subject_type must default deterministically to PERSON');
 
 SELECT hci_test.expect_sqlstate('SUBJECT-NEG-02',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,subject_type,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000002','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','ORGANIZATION','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,subject_type,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000002','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','ORGANIZATION','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23514');
 
 SELECT hci_test.expect_sqlstate('SUBJECT-NEG-03',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,subject_id,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000003','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,subject_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000003','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23514');
 
 -- ---------------------------------------------------------------------------
@@ -359,8 +359,8 @@ SELECT hci_test.expect_sqlstate('CASE-CLOSED-GUARD-01',
 -- CASE-CLOSED-GUARD-01 alone, so dropping only the subject_records trigger
 -- was previously invisible to the suite).
 SELECT hci_test.expect_sqlstate('CASE-CLOSED-GUARD-02',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000218','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000201')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000218','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000201','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   'H1011');
 
 -- project_ref is opaque (gate 5): no FK exists on it, and an arbitrary value
@@ -414,8 +414,8 @@ SELECT hci_test.expect_success('REG-NEG-08',
 -- to prove is invisible/unreferenceable, not an empty-table false negative.
 -- ---------------------------------------------------------------------------
 SELECT hci_test.expect_success('CLAIM-FIXTURE-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000302','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200')$q$);
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000302','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$);
 
 -- Read-side: tenant A must not see tenant B's Source or SourceSnapshot row -
 -- the same RLS mechanism protecting every other hci.* table (0001's
@@ -484,16 +484,16 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-08',
 -- (provenance) / 400s (consent).
 -- ---------------------------------------------------------------------------
 SELECT hci_test.expect_sqlstate('BITEMP-WINDOW-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,valid_from,valid_to)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000500','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','2026-01-02T00:00:00Z','2026-01-01T00:00:00Z')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,valid_from,valid_to,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000500','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','2026-01-02T00:00:00Z','2026-01-01T00:00:00Z','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23514');
 
 -- References SUBJECT-NEG-01a's row ('...101', tenant A, EVIDENCE) as a real
 -- same-tenant supersedes_id target, so the FK is satisfied and only the
 -- reason-required CHECK is under test.
 SELECT hci_test.expect_sqlstate('BITEMP-REASON-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000501','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000501','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23514');
 
 -- Blank is not a reason (db-expert review, 2026-09-05 - matching 0001:66-68's
@@ -501,16 +501,16 @@ SELECT hci_test.expect_sqlstate('BITEMP-REASON-01',
 -- an empty string satisfies "IS NOT NULL" but not the intent, and until this
 -- CHECK existed it silently passed BITEMP-REASON-01's own gate.
 SELECT hci_test.expect_sqlstate('BITEMP-REASON-02',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000507','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101','')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000507','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101','','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23514');
 
 -- Targets a REAL tenant-B row (fixtures: 'bbbbbbbb-...-500') so this proves
 -- the composite FK rejects a genuine cross-tenant reference, not merely an
 -- id that does not exist anywhere.
 SELECT hci_test.expect_sqlstate('BITEMP-CROSSTENANT-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000502','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000500','cross-tenant probe')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000502','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000500','cross-tenant probe','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23503');
 
 SELECT hci_test.expect_sqlstate('BITEMP-IMMUTABLE-01',
@@ -518,27 +518,27 @@ SELECT hci_test.expect_sqlstate('BITEMP-IMMUTABLE-01',
   '42501');
 
 SELECT hci_test.expect_sqlstate('BITEMP-CLOCK-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,system_recorded_at)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000506','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','2020-01-01T00:00:00Z')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,system_recorded_at,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000506','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','2020-01-01T00:00:00Z','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '42501');
 -- Both server-assigned columns need their own assertion (critic review):
 -- withholding system_recorded_at alone does not prove system_superseded_at
 -- is withheld too - a row "born already superseded" would be invisible to
 -- every _current/_as_of read while still sitting in the base table.
 SELECT hci_test.expect_sqlstate('BITEMP-CLOCK-01b',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,system_superseded_at)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000508','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200',now())$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,system_superseded_at,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000508','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200',now(),'aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '42501');
 
 -- Predecessor A ('...503') and successor B ('...504'): B's insert fires
 -- hci.mark_superseded() (AFTER INSERT), which must set A's
 -- system_superseded_at to B's own system_recorded_at.
 SELECT hci_test.expect_success('BITEMP-SUPERSEDE-SETUP-A',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000503','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200')$q$);
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000503','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$);
 SELECT hci_test.expect_success('BITEMP-SUPERSEDE-SETUP-B',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000504','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000503','correction test')$q$);
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000504','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000503','correction test','aaaaaaaa-0000-0000-0000-000000000801')$q$);
 
 SELECT hci_test.expect_true('BITEMP-SUPERSEDE-01',
   $q$SELECT (SELECT system_superseded_at FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000503')
@@ -558,8 +558,8 @@ SELECT hci_test.expect_true('BITEMP-SUPERSEDE-01',
 -- with the constraint gone, this same assertion's actual SQLSTATE flips to
 -- H1008, which is why that mutation's expected failure is this test ID.
 SELECT hci_test.expect_sqlstate('BITEMP-SUPERSEDE-02',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000505','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000503','second correction attempt')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000505','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000503','second correction attempt','aaaaaaaa-0000-0000-0000-000000000800')$q$,
   '23505');
 
 -- "What was known at T" (gate 3). Uses each row's OWN system_recorded_at as
@@ -645,6 +645,35 @@ SELECT hci_test.expect_sqlstate('CREATEDAT-SCOPE-01',
   '42501');
 SELECT hci_test.expect_sqlstate('CREATEDAT-SCOPE-02',
   $q$UPDATE hci.persons SET created_at = now() WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$q$,
+  '42501');
+
+-- ---------------------------------------------------------------------------
+-- Crypto-shredding for erasure (ADR-0018 gate 2). Gate 1 (key-table grant
+-- isolation) and gate 6 (no-external-key-path) are owner-run introspection,
+-- with the other owner-run architecture assertions below.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_sqlstate('CRYPTO-KEYREQ-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000900','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200',NULL)$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('CRYPTO-SCOPE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000901','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','ASSESSMENT','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$,
+  '23514');
+-- Targets a REAL tenant-B key (fixtures: 'bbbbbbbb-...-800'), same reasoning
+-- as BITEMP-CROSSTENANT-01: proves the composite FK rejects a genuine
+-- cross-tenant reference, not merely a key id that does not exist anywhere.
+SELECT hci_test.expect_sqlstate('CRYPTO-CROSSTENANT-KEYREF-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000902','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800')$q$,
+  '23503');
+-- ADR text's gate 3 predicted H1003 for a direct app-role UPDATE attempt;
+-- real behaviour matches BITEMP-IMMUTABLE-01's own already-documented
+-- correction - subject_records holds zero UPDATE grant for the application
+-- role at all (unchanged since 0001), so the attempt never reaches the
+-- trigger to begin with.
+SELECT hci_test.expect_sqlstate('CRYPTO-TOMBSTONE-01',
+  $q$UPDATE hci.subject_records SET tombstoned_at = now() WHERE id = 'aaaaaaaa-0000-0000-0000-000000000101'$q$,
   '42501');
 
 RESET ROLE;
@@ -869,8 +898,63 @@ SELECT hci_test.expect_true('BITEMP-SCOPE-01',
   $q$,
   'bitemporal columns confined to subject_records/decisions; every other tenant-owned table carries a server-assigned insertion timestamp');
 
+-- ADR-0018 gate 1: the application roles hold zero grant of any kind on
+-- hci.data_encryption_keys - the default-deny state IS the control, not RLS
+-- (see migration 0007's own header for why RLS is deliberately omitted here).
+SELECT hci_test.expect_true('CRYPTO-KEYGRANT-01',
+  $q$SELECT NOT EXISTS (
+       SELECT 1 FROM information_schema.role_table_grants
+       WHERE table_schema = 'hci' AND table_name = 'data_encryption_keys'
+         AND grantee IN ('hci_app_test_a','hci_app_test_b')
+     )$q$,
+  'application roles hold zero grants on hci.data_encryption_keys');
+
+-- ADR-0018 gate 3: hci.tombstone_evidence() is not app-role-callable at Wave
+-- 1 (matching hci.mark_superseded()'s own PUBLIC-revoked posture) - it is
+-- meant to be called by hci.record_erasure() (Wave 4, gate 5, not built
+-- here), so tested directly as owner, simulating what that future caller
+-- will do. A dedicated row (not one reused from an earlier section) avoids
+-- any doubt about interference with already-recorded assertion outcomes.
+SELECT hci_test.expect_success('CRYPTO-TOMBSTONE-SETUP',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000903','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800')$q$);
+SELECT hci_test.expect_success('CRYPTO-TOMBSTONE-02-SETUP',
+  $q$SELECT hci.tombstone_evidence('aaaaaaaa-0000-0000-0000-000000000903')$q$);
+SELECT hci_test.expect_sqlstate('CRYPTO-TOMBSTONE-02',
+  $q$SELECT hci.tombstone_evidence('aaaaaaaa-0000-0000-0000-000000000903')$q$,
+  'H1009');
+
+-- The effect-based shape check (0005's design, extended by 0007) does not
+-- merely check "did tombstoned_at change" - it requires NOTHING else
+-- changed too. An UPDATE that changes tombstoned_at AND another column
+-- together must still be rejected, even run as owner: this is the
+-- "wrong shape" proof BITEMP-IMMUTABLE-01 never exercised for
+-- system_superseded_at either (it only ever tested app-role/grant-layer
+-- rejection) - the 'weaken-tombstone-shape-check' mutation below is what
+-- proves this assertion is load-bearing, not merely descriptive.
+SELECT hci_test.expect_sqlstate('CRYPTO-TOMBSTONE-SHAPE-01',
+  $q$UPDATE hci.subject_records SET tombstoned_at = now(), case_id = 'aaaaaaaa-0000-0000-0000-000000000201'
+     WHERE id = 'aaaaaaaa-0000-0000-0000-000000000101'$q$,
+  'H1003');
+
+-- ADR-0018 gate 6: the machine form of "key material never leaves
+-- PostgreSQL in Wave 1". Broader than ARCH-PEER-02 (which checks dblink/
+-- postgres_fdw for peer-product isolation, a different ADR's reason) - adds
+-- 'http' and, new here, a prosrc scan proving no hci function body calls a
+-- network-capable primitive by name, not just that no such extension is
+-- installed.
+SELECT hci_test.expect_true('CRYPTO-NOEXTERNAL-01',
+  $q$SELECT
+      NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname IN ('dblink','postgres_fdw','http'))
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'hci' AND p.prosrc ~* '(dblink|http_get|http_post|pg_read_server_files|program\s)'
+      )
+  $q$,
+  'no network-capable extension installed; no hci function body calls one');
+
 -- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(131);
+SELECT hci_test.finish(141);
