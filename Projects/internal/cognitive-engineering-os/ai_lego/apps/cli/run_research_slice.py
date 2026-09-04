@@ -63,7 +63,7 @@ from ai_lego.errors import AdapterUnavailable, InvariantViolation
 from ai_lego.modules.knowledge.erasure import erase_subject_source_media
 from ai_lego.modules.knowledge.ingest.audio_fixtures import SyntheticToneAudioFactory, WindowsSapiSpeechAudioFactory
 from ai_lego.modules.knowledge.ingest.pii import detect_synthetic_pii, redact_transcript
-from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, OfflineFasterWhisperTranscriber
+from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, MeetingServiceTranscriber, OfflineFasterWhisperTranscriber, meeting_service_availability
 from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_from_transcript, reverse_trace
 from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, default_local_registry, suggest_open_codes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
@@ -88,7 +88,9 @@ TASK_ID = "TASK-PHASE5-SYNTHETIC-001"
 RECIPE_ID = "research-qualitative-v1"
 SLICE_RISK_TIER = "R4"  # subject DEK destruction is an irreversible R4 action (EC section 8)
 DELETION_AUTHORIZATION = "AUTH-SYNTHETIC-P2-ERASURE-A4"
-TRANSCRIPTION_MODES = ("fixture", "offline-stt")
+# meeting-service = real spoken audio (Windows SAPI) -> GPU faster-whisper + real pyannote diarization, reusing the
+# operator's meeting-service libs; the only mode whose speaker labels are not placeholders.
+TRANSCRIPTION_MODES = ("fixture", "offline-stt", "meeting-service")
 REVIEW_MODES = ("fixture", "interactive")
 # fixture = coder-1's pending AI labels come from synthetic_fixtures (deterministic, CI path);
 # local-llm = a real model behind AIGateway (Ollama on 127.0.0.1) proposes them from the REDACTED transcripts.
@@ -153,6 +155,14 @@ def select_adapters(transcription_mode: str) -> tuple[Any, Any]:
         if not available:
             raise AdapterUnavailable(f"SAPI_UNAVAILABLE: {reason}")
         return WindowsSapiSpeechAudioFactory(), OfflineFasterWhisperTranscriber()
+    if transcription_mode == "meeting-service":
+        available, reason = WindowsSapiSpeechAudioFactory.availability()
+        if not available:
+            raise AdapterUnavailable(f"SAPI_UNAVAILABLE: {reason}")
+        available, reason = meeting_service_availability()
+        if not available:
+            raise AdapterUnavailable(f"MEETING_SERVICE_UNAVAILABLE: {reason}")
+        return WindowsSapiSpeechAudioFactory(), MeetingServiceTranscriber(log=lambda message: print(f"[meeting-service] {message}", file=sys.stderr))
     raise InvariantViolation(f"TRANSCRIPTION_MODE_UNKNOWN: {transcription_mode!r} (expected one of {TRANSCRIPTION_MODES})")
 
 
@@ -271,7 +281,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
                 "transcription_mode": source["transcription"]["transcription_mode"],
                 "audio_mode": source["transcription"]["audio_mode"],
                 "audio_sha256": source["transcription"]["audio_sha256"],
-                "naive_diarization": source["transcription"]["segments"][0]["diarization"],
+                "diarization": source["transcription"]["segments"][0]["diarization"],  # placeholder label in fixture/offline-stt, real pyannote label in meeting-service
                 "capability_ref": source["transcribe_contract"]["ref"],
                 "capability_version": source["transcribe_contract"]["version"],
                 "contract_path": source["transcribe_contract"]["path"],
@@ -721,7 +731,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--spec-root", type=Path, default=None, help="read-only canonical spec root (default: the repo's AI_LEGO_Cognitive_Engineering_OS docs dir, or $AI_LEGO_SPEC_ROOT)")
     parser.add_argument("--runtime-dir", type=Path, default=None, help=f"isolated output directory (default: {default_runtime_dir()})")
-    parser.add_argument("--transcription", choices=TRANSCRIPTION_MODES, default="fixture", help="fixture = deterministic tone WAV + declared transcript; offline-stt = Windows SAPI speech + cached faster-whisper")
+    parser.add_argument("--transcription", choices=TRANSCRIPTION_MODES, default="fixture", help="fixture = deterministic tone WAV + declared transcript; offline-stt = Windows SAPI speech + cached faster-whisper (CPU, placeholder speakers); meeting-service = SAPI speech + GPU faster-whisper + real pyannote diarization via the meeting-service libs")
     parser.add_argument("--review", choices=REVIEW_MODES, default="fixture", help="fixture = deterministic Accept-and-Lock / Edit; interactive = terminal prompts")
     parser.add_argument("--coding", choices=CODING_MODES, default="fixture", help="fixture = synthetic pending AI labels; local-llm = a real local model (Ollama) proposes them from redacted transcripts")
     parser.add_argument("--local-model", default="gemma3:4b", help="Ollama model identifier used when --coding local-llm (must already be pulled)")

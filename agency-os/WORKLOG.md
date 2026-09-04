@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-04（續6，同一 session：真講者分離 — `--transcription meeting-service` 重用 8420 的 lib，順手抓到 8420 自己壞掉的根因）
+
+### `MeetingServiceTranscriber`：SAPI 真語音 → GPU whisper large-v3 → pyannote 3.1 真講者 → gemma3 open coding，全真堆疊 28/28
+
+**觸發**：操作者「該做什麼去做什麼 不要再問我」＋先前「我之前有做一個語言轉文字的工具 (8420)」。**全程 0 個 agent**；oracle 仍 block（斷路器），書面自審＋突變測試。
+
+**[已修改]**：
+- `ai_lego/modules/knowledge/ingest/transcription.py`：新 `MeetingServiceTranscriber`（mode `MEETING_SERVICE_FASTER_WHISPER_GPU_PYANNOTE_3_1`）、`load_meeting_service_lib`（以檔案路徑載入 `lib/transcribe.py`／`lib/diarize.py` 到私有模組名，不 `import lib`——`lib` 太泛用不可信任 `sys.path`）、`meeting_service_availability`（檔案＋import＋`HF_TOKEN` 存在，永不印 token）、`map_diarized_segment`（`?`／缺 speaker → `SPEAKER_UNRESOLVED`＋`PYANNOTE_NO_SPEECH_REGION_MATCH`，不折進真講者；`speaker_inference: direct|overlap|proximity`）。只重用 `pick_device`／`preflight`／`diarize`，whisper 呼叫自己做——8420 的 `transcribe()` 寫死 `language="zh"`，本切片 fixture 是英文，language 必須是 adapter 參數。預設路徑 `REPO_ROOT/lobster-factory/.../meeting-service`，`AI_LEGO_MEETING_SERVICE_DIR` 可覆寫。
+- `apps/cli/run_research_slice.py`：`TRANSCRIPTION_MODES` 加 `meeting-service`（SAPI 可用性＋meeting-service 可用性都先探，缺一 `UNAVAILABLE`）；`--transcription` help 更新。
+- `tests/unit/test_meeting_service_transcriber.py`（新，8 個：segment 映射三條路徑、unresolved 不變量、可用性理由、by-path 載入與私有模組名、env 覆寫）。
+- **`lobster-factory/.../meeting-service/requirements.txt`**：釘 `speechbrain==1.1.1`（含根因註解）。這是跨產品改動，理由：8420 自己在這台機器上早就壞了（見驗證），修的是它的 bug，不是為我方便。
+- `docs/PHASE5_RESEARCH_SLICE.md`（Adapters 表加 Transcriber 真 adapter 列、Round 6 段、講者限制改寫）；`RUNNABLE_DEMOS.md` 最上列；`TASKS.md` ⑥ 更新；memory `project_meeting_to_ppt_pipeline.md` 加第 9 坑＋第二消費者、`MEMORY.md` 索引。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_research_slice --transcription meeting-service --coding local-llm --runtime-dir %TEMP%\ai-lego-real-stack`（第一次）| exit=1（印 FAIL）| result=`MEETING_SERVICE_DIARIZATION_FAILED: SRC-1.wav: Lazy import of LazyModule(... speechbrain.integrations.k2_fsa) failed`；whisper 段已過（CUDA DLL 3 個目錄註冊、preflight 15.0s）
+- 根因追查（不是 pyannote、不是 k2）：standalone 重現 `Pipeline.from_pretrained` 同樣炸；traceback 呼叫端 = lightning `_restricted_classmethod` 的 `inspect.stack()` → `inspect.getmodule` 對 `sys.modules` 每個值 `hasattr(__file__)` → speechbrain LazyModule 強制載入；讀 `speechbrain/utils/importutils.py` L60-120：防護條件 `importer_frame.filename.endswith("/inspect.py")`，Windows 是 `\inspect.py` 永不成立；所有相關套件（pyannote 4.0.7、speechbrain 1.1.0、lightning 2.6.5、torch 2.11.0+cu128）dist-info 都是 2026-08-17 裝的（無漂移，是原本就會炸的組合）；WebFetch speechbrain releases：v1.1.1（2024-08-27）「Windows-incompatible python's inspect file guard in LazyModule」PR #3065
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pip install speechbrain==1.1.1` 後同上指令 | exit=0 | result=`PASS … 28/28 steps, all gates PASS`；`adapters={'audio_mode': 'WINDOWS_SAPI_SPEECH_WAV', 'transcription_mode': 'MEETING_SERVICE_FASTER_WHISPER_GPU_PYANNOTE_3_1', 'review_mode': 'fixture', 'coding_mode': 'local-llm', 'open_coding_model': 'gemma3:4b'}`；四檔皆 `cuda/float16 large-v3`、`en` p=1.0、pyannote `device=cuda` 載入 2.3–4.3 s、每檔「偵測到 1 位講者 / 3 個語音區段」「標籤來源：直接 2–3 / 其餘 0」；`transcriptions.json` 每段 `SPEAKER_A`／`direct`／`PYANNOTE_SPEAKER_DIARIZATION_3_1`，`diarization_summary={'speakers': ['A'], 'overlap_sec': 0.0, 'turns': 1}`；SRC-2 文字為 `[REDACTED_AFTER_SUBJECT_ERASURE]`（P2 抹除流程照常）；open coding `SRC-3 → work_feeling_empty`、`SRC-4 → updates_night_thinking`，0 rejected，13672 ms；Kappa 0.75 不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_meeting_service_transcriber -v` | exit=0 | result=8/8
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | ms=163259 | result=`Ran 167 tests OK`（159→167）
+- 突變測試：`map_diarized_segment` 的 `unresolved = not label or label == "?"` 換成 `unresolved = False` → `test_unplaceable_segment_is_unresolved_never_folded_into_a_speaker` FAIL；復原後 8/8 綠
+- REVIEW_DONE: critic=self（oracle 皆 block）| verdict=pass | findings=0c/1m/1n（medium：log 走 cp950 stderr 亂碼 → demo 指令加 `PYTHONIOENCODING=utf-8`，memory 第 8 坑早寫過，這次真的踩到；nit：語言寫死 zh 的重用邊界，改為只重用三個函式）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory/infra/hetzner-phase1-core/apps/meeting-service | grep=`TRANSCRIPTION_MODES|DIARIZATION_PLACEHOLDER|select_adapters|alternating placeholders|speechbrain` | hits=見下（docs 的「placeholder」聲稱已改寫；`README.md` 仍未提 speechbrain 釘版原因——requirements.txt 註解已載明，README 不重複）
+- ORACLE_WAIVED: critic／codex 斷路器仍 block（至 9/5 05:20／9/7 11:06）；書面自審＋突變證據如上
+
+**[剩餘風險]**：① 每檔單一 SAPI 聲音 → 講者分離只驗到「1 位」，多講者路徑（overlap／proximity／unresolved）只有單元測試覆蓋，沒有真音檔；② 抽共用 package 未做（第二消費者已出現，HCI ch.17 觸發點，記 TASKS）；③ `speechbrain==1.1.1` 是系統 Python 環境變更，8420 若在別台機器重裝要靠 requirements.txt 的新釘版；④ large-v3 + pyannote + gemma 同時駐留 8GB VRAM 這次沒 OOM，長音檔未測。
+
+**[rollback]**：`git revert` 本 commit；`pip install speechbrain==1.1.0` 可還原環境（但會讓 8420 diarization 回到必炸狀態，不建議）。
+
 ## 2026-09-04（續5，同一 session：切片第一次真的用模型產生 AI 建議 — `--coding local-llm`）
 
 ### `ai_coding.py` + `qualitative_coding.py` 注入點 + CLI `--coding fixture|local-llm`：coder-1 的待審 code 由本機 `gemma3:4b` 讀遮罩逐字稿產生，evidence 不逐字就拒收

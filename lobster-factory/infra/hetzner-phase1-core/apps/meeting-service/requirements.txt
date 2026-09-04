@@ -9,6 +9,11 @@ av==18.1.0
 # 講者分離
 pyannote.audio==4.0.7
 scikit-learn==1.9.0
+# pyannote 的 transitive 依賴，原本沒釘。1.1.0 的 LazyModule 防護用 endswith("/inspect.py") 判斷呼叫者，
+# Windows 路徑是反斜線所以永遠不生效 → lightning/torch 的 inspect 掃 sys.modules 時強制載入 k2_fsa → 沒裝 k2 就
+# ImportError，整個 Pipeline.from_pretrained 炸掉（2026-09-04 在 cognitive-engineering-os 重用本 lib 時抓到）。
+# 1.1.1 上游修正（speechbrain PR #3065「Windows-incompatible python's inspect file guard in LazyModule」）。
+speechbrain==1.1.1
 
 # CUDA 執行庫（Windows 需 os.add_dll_directory 手動註冊，見 lib/transcribe.py）
 nvidia-cublas-cu12
