@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-04（續，System Foundry v1.6：操作者追問 01/04/09/11 四塊「很怪」，實際讀規則檔分析後修正 + 抓到第二個真邏輯 bug）
+
+**觸發**：操作者具體點名「01. 使用對象和04. 公司與組織 就很怪 你思考看看」「09. 商業模式 不是全部要或是不要...自用/賣公司集團/上網開放訂閱或買點數」「11. 通知 App Push 通知 應該要有哪些APP」「有些東西是否應該直接可以選擇?」。
+
+**[現況分析]**：讀 `rules/question-rules.json`（121 條規則全讀）、`rules/conflict-rules.json`（5 條）、`bootstrap/SYSTEM_ARCHETYPES.yaml`、`scripts/configurator_engine.py:105`（profile 自動判斷邏輯）後確認：
+1. `Q-SCOPE-002/003`（外部客戶/合作夥伴使用）跟 `Q-ORG-001`（多家公司使用）在規則引擎裡完全獨立（各自對應 `CAP-CUSTOMER-USERS`/`CAP-PARTNER-USERS` vs `CAP-MULTI-TENANT`，零 conflict-rule 或衍生關係），但實務上 B2B 情境下兩者高度相關——問題不是邏輯錯，是**題目之間的關聯完全沒說明**，使用者自己要在腦中兜起來，這就是「很怪」的根本原因。
+2. `profile`（standard/commercial/enterprise）跟 `archetype` 其實已經會自動從答案推導（`configurator_engine.py:105`），操作者要的「自用/賣企業集團/開放訂閱買點數」三種情境系統本來就分辨得出來，只是**使用者完全看不到這個推導邏輯**，商業模式那六題（COM-001~006）彼此獨立呈現、沒有情境對照。
+3. `Q-NOT-003`（App Push 通知）**確認是真的邏輯漏洞**：完全沒有 `active_when`，不管有沒有選手機 App／桌面應用程式都會問，跟 `Q-MOB-003~005`（相機/定位/掃碼）正確綁定 `Q-CH-002` 的既有模式不一致。
+4. 對「有些東西是否應該直接可以選擇」的回覆：不建議打破二元制——`kernel/13_CONFIGURATION_COMPILER_CONTRACT.md` 明文 NON_OVERRIDABLE 要求所有使用者問題必須是純 YES/NO，這是整套「121 題窮舉 7,260 對組合測試」可驗證性的地基，貿然加入多選/分類題會讓這套驗證機制整個作廢；但「感覺像選擇」可以靠說明文字互相參照做到，不需要動架構。
+
+**[已修改]**：
+- `questionnaires/catalog.json`：
+  - `Q-NOT-003` 補上 `active_when: any(Q-CH-002=true, Q-CH-003=true)`，修正真邏輯漏洞。
+  - `Q-SCOPE-002/003`、`Q-ORG-001/002/003`、04 類別說明、`Q-COM-001/002/005/006`、09 類別說明：改寫成互相參照的說明文字，明確點出「外部客戶/夥伴」跟「多家公司使用」是同一件事的下一層細節、「多家公司使用」跟「集團/母子公司結構」的方向差異（前者=你的客戶是誰、後者=你自己的組織架構）、商業模式六題各自對應「自用/賣斷企業集團/開放訂閱買點數」哪種情境。
+- `tests/fixtures/selection/all_no.json`：`active_answer_count` 92→91（`Q-NOT-003` 在 ALL-NO 情境下變成非啟用，這是修正後的正確行為，不是新 bug；`current_capabilities`/`modules`/`profile`/`criticality` 皆核對過不變後才更新這個欄位，不是照抄新值蓋過去）。
+- `manifest.json`：`regenerate_integrity.py --write` 同步。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain + `python -m unittest discover -s tests` | 第一輪 `test_selection_matrix` FAIL（`golden selection drift: all_no.json`，預期中的黃金測資過時，非新 bug）→ 手動核對 `current_capabilities`/`modules`/`profile`/`criticality` 四欄不變、只有 `active_answer_count` 92→91 後更新 fixture → 第二輪 exit=0 全綠，`pairwise_rejected` 5→6（多一組因新 gate 而正確被拒絕的組合，符合預期）
+- REVIEW_WAIVED: NA — 純文案/資料修正 + 1 個明確的 active_when 新增，範圍與風險不足以再派 critic agent
+
+**[剩餘風險]**：操作者同時提出「行銷/客服/CRM/圖文影製作/社交媒體管理」等企業級功能模組擴充需求（含參考 app.aware-wave.com/onboard），屬於獨立、更大範圍的題庫擴充工作，本條目不含，另開處理。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/questionnaires/catalog.json agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/tests/fixtures/selection/all_no.json agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/manifest.json`。
+
 ## 2026-09-04（續32，同一 session：Cognitive OS 第十九個 Method Atlas 切片 — `architecture.strangler_fig`，誠實揭露不強制階段順序）
 
 **觸發**：延續操作者授權。0 agent。

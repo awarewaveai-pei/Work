@@ -32,7 +32,7 @@
       "id": "organization",
       "order": 4,
       "title": "公司與組織",
-      "description": "公司、分公司、集團與跨公司合作"
+      "description": "延續上一類「誰會使用」，這裡問的是這些使用者所屬的公司彼此之間資料要不要隔離、你自己公司內部的組織結構長什麼樣子"
     },
     {
       "id": "records",
@@ -62,7 +62,7 @@
       "id": "commercial",
       "order": 9,
       "title": "商業模式",
-      "description": "收費、方案、訂閱與授權"
+      "description": "收費、方案、訂閱與授權。下面每題各自獨立、可以自由組合，不是單選一種模式——例如「自用工具」全部答不要即可；「賣斷給企業/集團」通常是收費+授權碼，不一定要訂閱；「開放上網訂閱或用點數」通常是收費+訂閱制或依使用量計費。哪些題目對應哪種情境，各題說明裡會標註。"
     },
     {
       "id": "payments",
@@ -150,7 +150,7 @@
       "id": "Q-SCOPE-002",
       "category": "scope",
       "label": "外部客戶使用",
-      "description": "客戶會直接登入或操作系統。",
+      "description": "客戶會直接登入或操作系統。如果你的客戶本身是「別家公司」（不是一般消費者個人），後面 04. 公司與組織 的「多家公司使用」通常也要答要——那題問的是「這些不同客戶公司的資料需不需要彼此隔離」，是同一件事的下一層細節，不是重複發問。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -158,7 +158,7 @@
       "id": "Q-SCOPE-003",
       "category": "scope",
       "label": "外部合作夥伴使用",
-      "description": "供應商、承包商、經銷商或合作方會直接使用。",
+      "description": "供應商、承包商、經銷商或合作方會直接使用。這些合作方通常也是不同公司，若彼此資料需要隔離，後面 04. 公司與組織 的「多家公司使用」也會相關。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -282,7 +282,7 @@
       "id": "Q-ORG-001",
       "category": "organization",
       "label": "多家公司使用",
-      "description": "不同公司或組織會擁有自己的使用者或資料。",
+      "description": "承接 01. 使用對象的答案往下問一層：如果你在「外部客戶使用」或「外部合作夥伴使用」答了要，這些不同的客戶／合作方公司，彼此的資料是否需要完全隔離（甲公司看不到乙公司的東西）？這題答要，代表系統要做成「多租戶」架構。如果只有內部員工使用（沒有外部客戶/夥伴），但公司集團內部各子公司仍要資料分開，也算要——請一併參考下面「集團/母子公司結構」。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -290,7 +290,7 @@
       "id": "Q-ORG-002",
       "category": "organization",
       "label": "公司底下有多個分公司",
-      "description": "同一家公司內部有多個分公司或門市，資料可能需要分開管理或彙總查看。",
+      "description": "這題問的是「你自己」這一家公司內部的分公司或門市結構（跟上面「多家公司使用」問的『你的客戶/合作方是不是多家公司』是不同方向），資料可能需要分開管理或彙總查看。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -298,7 +298,7 @@
       "id": "Q-ORG-003",
       "category": "organization",
       "label": "集團 / 母子公司結構",
-      "description": "有母公司與子公司的組織架構，母公司可能需要查看或管理旗下多家子公司的資料。",
+      "description": "有母公司與子公司的組織架構，母公司可能需要查看或管理旗下多家子公司的資料——這是「你自己」的集團內部結構，即使完全沒有外部客戶（只有內部員工使用），只要旗下子公司資料要分開管理，這題也算要。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -598,7 +598,7 @@
       "id": "Q-COM-001",
       "category": "commercial",
       "label": "向客戶收費",
-      "description": "這套系統是要販售、收費的產品，不是只給內部員工免費使用的工具。",
+      "description": "這套系統是要販售、收費的產品，不是只給內部員工免費使用的工具。純自用（只給公司內部員工用、不對外收費）請答不要，下面商業模式與付款相關題目會自動略過。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -606,7 +606,7 @@
       "id": "Q-COM-002",
       "category": "commercial",
       "label": "訂閱制",
-      "description": "客戶是定期（例如每月或每年）持續付費使用，而不是一次性買斷。",
+      "description": "客戶是定期（例如每月或每年）持續付費使用，而不是一次性買斷。適合「開放上網讓人訂閱使用」的情境；如果是賣斷給企業/集團一次性授權，這題通常答不要、改答下面的「授權碼/License」。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -642,7 +642,7 @@
       "id": "Q-COM-005",
       "category": "commercial",
       "label": "依使用量計費",
-      "description": "收費金額會依客戶實際使用量計算，而不是固定金額。",
+      "description": "收費金額會依客戶實際使用量計算，而不是固定金額（例如買點數、依用量扣款），適合「開放上網讓人自助使用、依用量或點數收費」的情境。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -654,7 +654,7 @@
       "id": "Q-COM-006",
       "category": "commercial",
       "label": "授權碼 / License",
-      "description": "客戶需要輸入一組授權碼或序號才能啟用或使用系統，而不是單純登入帳號即可。",
+      "description": "客戶需要輸入一組授權碼或序號才能啟用或使用系統，而不是單純登入帳號即可，適合「一次性賣斷給企業或集團」的情境，可以跟訂閱制分開、不需要兩個都要。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -754,9 +754,21 @@
       "id": "Q-NOT-003",
       "category": "notifications",
       "label": "App Push 通知",
-      "description": "系統需要透過手機 App 發送推播通知。",
+      "description": "系統需要透過手機 App 或桌面應用程式發送推播通知（沒有 App／桌面程式就沒有推播通知的管道，所以這題只在你選了 02. 使用介面裡的手機 App 或桌面應用程式時才會出現）。",
       "answer_type": "boolean",
-      "required_when_active": true
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-CH-002",
+            "equals": true
+          },
+          {
+            "question": "Q-CH-003",
+            "equals": true
+          }
+        ]
+      }
     },
     {
       "id": "Q-NOT-004",
