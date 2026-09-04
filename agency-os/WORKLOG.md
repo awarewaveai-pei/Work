@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-04（續27，同一 session：Cognitive OS 第十四個 Method Atlas 切片 — `architecture.atam`，重用「findings+封閉enum」形狀而非程式碼）
+
+**觸發**：延續操作者授權（操作者對進度過慢/耗token表達不滿，明確回覆「繼續做直到系統完成」，之後加快節奏、精簡文件密度但驗證強度不降）。0 agent。
+
+**選型**：`architecture.atam`（F18 pack 第三個成員方法）。Atlas §11.38 給 4 個 finding 類別（Sensitivity Point/Tradeoff Point/Risk/Non-risk）+ 2 個 worked example（加密強度 vs latency；Cache vs 一致性複雜度），足以直接封閉成 4 值 enum。`AtamAnalysis` 結構上直接對應 `RedTeamChallenge`（findings + 封閉 category enum）——這次是重用**形狀**，不是重用程式碼，兩者主題完全無關（架構取捨 vs 資安批判）。無 forbidden_transition（§22.3 表無 ATAM 列）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.atam.contract.yaml`＋`specs/cognitive/typed-objects/atam-analysis.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twelfth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/atam.py`（builder+2 gate）＋`ai_lego/apps/cli/run_atam_slice.py`（Atlas 原文兩個 worked example）＋`tests/unit/test_atam.py`（8 tests 第一次跑全綠）＋`docs/FOURTEENTH_SLICE_ARCHITECTURE_ATAM.md`。`modules/architecture/__init__.py` docstring 補第三租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_atam_slice` | exit=0 | result=第一次真跑就通過：`PASS architecture.atam: findings=[('F1','tradeoff_point'),('F2','risk')], gates [provenance_required=PASS, findings_present=PASS]`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_atam -v` | exit=0 | ms=762 | result=8 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2635→2644
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=51577 | result=**438 tests OK**（430→438，零回歸；`git diff --stat` 對照 5 個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked（同續14起）。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]atam\|AtamAnalysis\|atam-analysis\|modules/architecture/atam\|run_atam_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-ATAM-1`（method-inventory.yaml 無機器 id 列）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit。
+
 ## 2026-09-04（續，System Foundry v1.6：實際跑一次 configurator 示範給操作者看 + 加 launch.json）
 
 **觸發**：操作者問「所以是可以使用了嗎？怎麼使用？」——不只講解，實際跑一次證明。

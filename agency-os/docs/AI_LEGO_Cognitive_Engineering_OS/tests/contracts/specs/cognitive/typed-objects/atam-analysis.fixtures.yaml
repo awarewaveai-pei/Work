@@ -1,0 +1,41 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/atam-analysis.schema.yaml"
+target_ref: ""
+description: "Exercises AtamAnalysis's required fields, the findings[] minItems:1 guard, and the 4-value category enum."
+
+valid:
+  - name: encryption_latency_tradeoff_and_cache_consistency_risk
+    instance:
+      id: "ATAM-2026-09-04-001"
+      version: "1.0.0"
+      architecture_description: "API layer encryption strength and cache strategy decision"
+      findings:
+        - {id: "F1", category: tradeoff_point, description: "stronger encryption improves security but raises latency"}
+        - {id: "F2", category: risk, description: "cache improves performance but adds consistency complexity"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_non_risk_finding
+    instance:
+      id: "ATAM-2026-09-04-002"
+      version: "1.0.0"
+      architecture_description: "logging pipeline change"
+      findings:
+        - {id: "F1", category: non_risk, description: "log format change has no downstream consumer impact"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: zero_findings_below_minitems_1
+    instance:
+      id: "ATAM-2026-09-04-003"
+      version: "1.0.0"
+      architecture_description: "x"
+      findings: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "findings has minItems: 1 -- an ATAM analysis with zero findings surfaces nothing."
+  - name: invalid_category_enum_value
+    instance:
+      id: "ATAM-2026-09-04-004"
+      version: "1.0.0"
+      architecture_description: "x"
+      findings:
+        - {id: "F1", category: "concern", description: "x"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "findings[].category is enum [sensitivity_point, tradeoff_point, risk, non_risk] -- 'concern' is not a member."

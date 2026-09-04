@@ -1,0 +1,99 @@
+$id: "ai-lego://methods/contracts/architecture.atam.contract.yaml"
+title: "Architecture Tradeoff Analysis Method (ATAM) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Fourteenth Method Atlas slice, third from the
+  `architecture` family (F18's own "Software Architecture Pack") -- a
+  third member tool built, still not the whole pack.
+
+  Atlas §11.38 (L2097-2119) names ATAM's own 4 finding categories
+  (Sensitivity Point / Tradeoff Point / Risk / Non-risk) plus two worked
+  examples ("加密強度提升安全，但提高 latency"; "Cache 提高 performance，
+  但增加一致性複雜度") -- concrete enough to ground a closed 4-value
+  finding-category enum directly, the same class of citation strength
+  `challenge.red_team`'s own 11-value dimension enum already had.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.38 架構權衡分析法（ATAM）(L2097-2119) -- purpose, 4 finding categories, 2 worked examples"
+  - "methods/registry/method-inventory.yaml ATAM entry (L1092-1096): category 'F18 architecture', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twelfth concrete
+  entry. `id: architecture.atam` mints a new machine_id (none existed).
+  `family: architecture` reused as-is from `architecture.adr`/
+  `architecture.event_storming`, its own established family.
+
+id: architecture.atam
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [COMPARE, CHALLENGE, DECIDE]
+# INFERRED, not cited. Atlas's own benefit line (L2116, "特別適合『最穩定、
+# 安全、可維護』這種多目標同時存在的架構決策") is a multi-objective
+# tradeoff read directly onto COMPARE/CHALLENGE/DECIDE.
+
+purpose:
+  - systematically_surface_architecture_sensitivity_tradeoff_and_risk_points
+# Atlas L2100 verbatim sense: "系統化找架構的 Sensitivity Point/Tradeoff
+# Point/Risk/Non-risk".
+
+inputs:
+  required:
+    - ArchitectureDescription
+  optional: []
+
+outputs:
+  - AtamAnalysis
+# NEW output type. Same honesty gap every Tier 1 contract this session
+# disclosed: Atlas names no PascalCase output type for this method.
+
+preconditions:
+  - "at least 1 finding supplied"
+  - "every finding's category is one of the 4 Atlas-cited values"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same as architecture.event_storming's own reasoning: a tradeoff
+  # finding is itself a form of structured analysis, not an empirical
+  # claim requiring separate evidence citation.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no ATAM row -- same honest absence
+# architecture.adr/architecture.event_storming's own empty
+# forbidden_transition already discloses.
+
+recommended_next: []
+# No Atlas-cited next method specifically for ATAM.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the 4 finding categories be a closed enum, or free text?"
+    decision: "Closed 4-value enum (sensitivity_point, tradeoff_point, risk, non_risk)."
+    reasoning: >
+      Atlas §11.38 names exactly these 4 categories with no hint of a
+      5th -- the same closed-enum-from-a-complete-cited-list treatment
+      `challenge.red_team`'s own 11-value dimension enum already applies.
+
+open_questions:
+  - id: "OQ-ATAM-1"
+    question: "id: architecture.atam mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.38 (L2097-2119) directly. Grepped `specs/` for "ATAM"/
+    "sensitivity point"/"tradeoff point" before writing -- only hit was
+    an unrelated enum member in change-plan.schema.yaml (a decision-
+    method-name reference, not a duplicate typed object). Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-value category enum is
+    directly transcribed from Atlas's own cited list.
