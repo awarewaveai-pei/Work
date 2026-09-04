@@ -1,0 +1,103 @@
+$id: "ai-lego://methods/contracts/devops_sre.sli_slo.contract.yaml"
+title: "SLI / SLO / SLA Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twentieth Method Atlas slice, FIRST from the
+  `devops_sre` family (F19's own "DevOps／SRE／可靠性套件" -- a second
+  pack this session opens, after F18's own "Software Architecture Pack").
+  `family: devops_sre` transcribes method-inventory.yaml's own category
+  label ("F19 devops-sre", hyphen replaced with underscore to satisfy
+  `method.schema.yaml`'s own `^[a-z_]+$` pattern -- same class of digit/
+  punctuation-forced substitution `architecture.system_context_model`'s
+  own naming note already disclosed for "C4 Model").
+
+  Atlas §11.39 (L2120-2140) gives this method a dedicated section: 5
+  named user-visible metric types (Availability, Latency, Correctness,
+  Durability, Freshness) and an explicit precedence principle -- "先
+  SLI，再 SLO；只有商務需要才 SLA" (SLI first, then SLO; SLA only when
+  commercially required). That principle is a real, enforceable
+  invariant: an indicator claiming `sla_required: true` must actually
+  carry SLA terms, not just the bare intent.
+
+  A tenth F18 member, "Architecture Trade-off Matrix" (L825: "criteria→
+  weights→options→risk/sensitivity"), was DELIBERATELY NOT built as its
+  own slice before this one -- checked and found structurally identical
+  to `decision.mcda`'s own already-built pipeline (criteria/weights/
+  options/normalized-score/sensitivity), applied to the specific domain
+  of comparing candidate architectures. Building a second schema for the
+  same computational shape would be exactly the kind of same-concept-
+  different-name duplication this session's own `learning.reversal_criteria`
+  correction (WORKLOG continuation 21) already taught it to check for
+  BEFORE writing, not after -- disclosed here as a deliberate skip, not
+  an oversight (a caller needing this exact use case can already invoke
+  `decision.mcda` directly with architecture options as its `options[]`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.39 服務指標／服務目標／服務等級協議（SLI / SLO / SLA）(L2120-2140) -- 5 metric types, SLI-then-SLO-then-SLA precedence principle"
+  - "methods/registry/method-inventory.yaml SLI/SLO/SLA entry (L1122-1126): category 'F19 devops-sre', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as an eighteenth
+  concrete entry. `id: devops_sre.sli_slo` mints a new machine_id and
+  opens a new family (`devops_sre`), F19's own category label with a
+  punctuation substitution disclosed above.
+
+id: devops_sre.sli_slo
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [ESTIMATE, VALIDATE, MAP]
+purpose:
+  - turn_a_vague_reliability_goal_into_measurable_user_visible_service_targets
+inputs:
+  required: [ServiceUnderMeasurement]
+  optional: []
+outputs: [SliSloSet]
+preconditions:
+  - "at least 1 indicator supplied"
+  - "every indicator's metric_type is one of the 5 Atlas-cited values"
+  - "every indicator with sla_required:true carries non-empty sla_terms"
+  # The third precondition is directly implied by Atlas's own principle
+  # (L2138: SLA only when commercially necessary) -- an indicator that
+  # DECLARES an SLA requirement without stating its terms has not
+  # actually satisfied that principle, only gestured at it.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas §22.3's own gate table has no SLI/SLO/SLA row.
+recommended_next: []
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should metric_type be a closed enum, or free text?"
+    decision: "Closed 5-value enum (availability, latency, correctness, durability, freshness) -- directly from Atlas's own cited list (L2126-2132)."
+    reasoning: "Atlas names exactly these 5 in a numbered list with no hint of a 6th -- same closed-enum-from-complete-cited-list treatment challenge.red_team's dimension enum already applies."
+
+open_questions:
+  - id: "OQ-SLISLO-1"
+    question: "id mints a machine_id method-inventory.yaml never carried, and opens a new family -- should method-inventory.yaml be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.39 (L2120-2140) directly. Also read F18's
+    "Architecture Trade-off Matrix" table row (L825) and
+    `decision.mcda.contract.yaml`/`mcda-analysis.schema.yaml` in full
+    before deciding NOT to build it as a separate slice -- confirmed
+    structurally identical pipeline shape (criteria/weights/options/
+    score/sensitivity), not a coincidental resemblance. Grepped `specs/`
+    for "SLI"/"SLO"/"service level indicator" before writing -- only hit
+    was an unrelated advisory `staleness_slo` field in
+    `repository-contract.schema.yaml`, not a duplicate typed object.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-value metric-type enum and
+    the SLA-requires-terms invariant are both directly grounded in
+    Atlas's own cited text, not invented.

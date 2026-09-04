@@ -631,6 +631,32 @@ tier_1:
       the three entries above it. Tier 1, mandated by the actively-
       running implementation slice, same category as the sixteen entries
       above it.
+  eighteenth_concrete_entry:
+    # NEW (2026-09-04, same session): eighteenth Tier 1 entry, same
+    # additive-key rationale as the seventeen entries above it.
+    method_id: "devops_sre.sli_slo"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FIRST entry from
+      a new family, `devops_sre` (F19's own "DevOps／SRE／可靠性套件"),
+      the second Atlas pack this session opens after F18 (8/10 members
+      built). Atlas §11.39 is a dedicated section: 5 named metric types
+      and an explicit precedence principle ("SLI first, then SLO; SLA
+      only when commercially required") that directly implies a real
+      invariant -- an indicator declaring sla_required:true must carry
+      non-empty sla_terms. F18's own tenth member, "Architecture
+      Trade-off Matrix" (L825), was checked and found structurally
+      identical to `decision.mcda`'s own pipeline -- deliberately NOT
+      built as a separate slice, disclosed in this contract's own
+      description as a duplicate-avoidance decision, not an oversight.
+    source: "methods/contracts/devops_sre.sli_slo.contract.yaml (built same session as this entry, mints machine_id devops_sre.sli_slo, opens new family devops_sre) + specs/cognitive/typed-objects/sli-slo-set.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.39 is a dedicated section with
+      a real 5-value cited list and an explicit precedence principle, not
+      itself cited elsewhere as a repeated teaching example. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the seventeen entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

@@ -1,0 +1,43 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/sli-slo-set.schema.yaml"
+target_ref: ""
+description: "Exercises SliSloSet's required fields, the indicators[] minItems:1 guard, and the 5-value metric_type enum."
+
+valid:
+  - name: latency_no_sla_and_availability_with_sla
+    instance:
+      id: "SLO-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.sli_slo"
+      service_under_measurement: "Checkout API"
+      indicators:
+        - {id: "IND1", metric_type: latency, sli_description: "p99 response time", slo_target: "p99 < 300ms over a 30-day rolling window", sla_required: false}
+        - {id: "IND2", metric_type: availability, sli_description: "successful request ratio", slo_target: "99.9% over a 30-day rolling window", sla_required: true, sla_terms: "10% monthly bill credit if below 99.5%"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_freshness_indicator
+    instance:
+      id: "SLO-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.sli_slo"
+      service_under_measurement: "Analytics dashboard"
+      indicators:
+        - {id: "IND1", metric_type: freshness, sli_description: "data lag behind source", slo_target: "p99 lag < 5 minutes", sla_required: false}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: indicators_below_minitems_1
+    instance:
+      id: "SLO-2026-09-04-003"
+      version: "1.0.0"
+      service_under_measurement: "x"
+      indicators: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "indicators has minItems: 1 -- a set with zero indicators measures nothing."
+  - name: invalid_metric_type_enum_value
+    instance:
+      id: "SLO-2026-09-04-004"
+      version: "1.0.0"
+      service_under_measurement: "x"
+      indicators:
+        - {id: "IND1", metric_type: "throughput", sli_description: "x", slo_target: "x", sla_required: false}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "indicators[].metric_type is enum [availability, latency, correctness, durability, freshness] -- 'throughput' is not a member."

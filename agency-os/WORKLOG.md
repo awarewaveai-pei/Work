@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-04（續33，同一 session：Cognitive OS 第二十個 Method Atlas 切片 — `devops_sre.sli_slo`，開第二個 pack＋明文記錄一次「決定不做」的判斷）
+
+**觸發**：延續操作者授權。0 agent。
+
+**選型**：SLI/SLO/SLA（Atlas §11.39 專屬段落，F19「DevOps／SRE／可靠性套件」第一個成員方法，本 session 開的第二個 pack，F18 之後）。5 值 metric type（Availability/Latency/Correctness/Durability/Freshness）+ 明確優先順序原則「先 SLI，再 SLO；只有商務需要才 SLA」，直接蘊含真不變量：宣告 `sla_required: true` 的指標必須真的有 `sla_terms`，CLI 真跑攻擊驗證。
+
+**開 F19 之前，先明文記錄一次「決定不做」**：F18 第十個成員「Architecture Trade-off Matrix」（criteria→weights→options→risk/sensitivity）查證後確認跟 `decision.mcda` 既有 pipeline 結構完全相同，只是套用在「比較候選架構」這個特定領域。沒有為同一計算形狀建第二份 schema——這正是續21（reversal_criteria）修正教的「寫之前先查同概念，不是寫完才查」紀律的延伸應用：這次用在「要不要開新 slice」的決策本身，不只是「寫 schema 前查重複」。決定寫進 contract description，非事後才想到。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.sli_slo.contract.yaml`＋`specs/cognitive/typed-objects/sli-slo-set.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.eighteenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/devops_sre/__init__.py`／`sli_slo.py`（builder+SLA-terms 不變量+2 gate，新開 `devops_sre` 家族）＋`ai_lego/apps/cli/run_sli_slo_slice.py`（真實 Checkout API 2 指標+攻擊驗證）＋`tests/unit/test_sli_slo.py`（10 tests 第一次跑全綠）＋`docs/TWENTIETH_SLICE_DEVOPS_SRE_SLI_SLO.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_sli_slo_slice` | exit=0 | result=第一次真跑就通過（含 SLA-terms 不變量攻擊驗證）：`PASS devops_sre.sli_slo: indicators=2, gates [provenance_required=PASS, sla_terms_present=PASS], sla_terms_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_sli_slo -v` | exit=0 | ms=836 | result=10 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2689→2698
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=58128 | result=**491 tests OK**（481→491，零回歸；`git diff --stat` 對照共用檔案與全部 8 個既有 architecture 家族模組確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n —— 逐項自問：跳過 Architecture Trade-off Matrix 是否真的查證過而非猜測（是，已讀完 `decision.mcda.contract.yaml`／`mcda-analysis.schema.yaml` 全文才下判斷，非只看標題像）；新開 `devops_sre` 家族命名是否有根據（是，逐字轉錄 method-inventory.yaml 自己的 category 標籤，連字號改底線純屬 schema pattern 限制，同 C4 命名替代同一類）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`devops_sre[.]sli_slo\|SliSloSet\|sli-slo-set\|run_sli_slo_slice\|modules/devops_sre` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-SLISLO-1`（method-inventory.yaml 無機器 id 列，也沒有 `devops_sre` 家族記錄）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit（全部新增檔案）。
+
 ## 2026-09-04（續，System Foundry v1.6：操作者追問 01/04/09/11 四塊「很怪」，實際讀規則檔分析後修正 + 抓到第二個真邏輯 bug）
 
 **觸發**：操作者具體點名「01. 使用對象和04. 公司與組織 就很怪 你思考看看」「09. 商業模式 不是全部要或是不要...自用/賣公司集團/上網開放訂閱或買點數」「11. 通知 App Push 通知 應該要有哪些APP」「有些東西是否應該直接可以選擇?」。

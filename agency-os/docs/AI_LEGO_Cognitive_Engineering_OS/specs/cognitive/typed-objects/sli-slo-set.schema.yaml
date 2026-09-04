@@ -1,0 +1,78 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/sli-slo-set.schema.yaml"
+title: SLI/SLO Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SliSloSet` -- the declared
+  `outputs` of `devops_sre.sli_slo`'s Method Contract. First
+  `devops_sre`-family typed object. Atlas §11.39's own 5-value metric
+  type list and SLI-then-SLO-then-SLA precedence principle (L2138) map
+  onto `indicators[]`'s `metric_type` enum and the `sla_required`/
+  `sla_terms` pairing.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.39 服務指標／服務目標／服務等級協議（SLI / SLO / SLA）(L2120-2140)"
+  - "methods/contracts/devops_sre.sli_slo.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, service_under_measurement, indicators, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^SLO-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.sli_slo"
+  service_under_measurement:
+    type: string
+    minLength: 1
+  indicators:
+    type: array
+    minItems: 1
+    description: "Atlas L2120-2140's own SLI->SLO->(optional SLA) structure, one entry per user-visible metric."
+    items:
+      type: object
+      required: [id, metric_type, sli_description, slo_target, sla_required]
+      properties:
+        id: {type: string}
+        metric_type:
+          enum: [availability, latency, correctness, durability, freshness]
+        sli_description:
+          type: string
+          minLength: 1
+          description: "The Service Level Indicator -- what is actually measured."
+        slo_target:
+          type: string
+          minLength: 1
+          description: "The Service Level Objective -- the target value for the SLI (e.g. '99.9% over 30 days')."
+        sla_required:
+          type: boolean
+          description: "Atlas's own principle (L2138): SLA only when commercially necessary."
+        sla_terms:
+          type: string
+          description: "Required non-empty when sla_required is true (see method contract preconditions) -- a runtime, not schema, cross-field check."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- an SLI/SLO definition is structured reliability engineering, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A latency SLI/SLO with no SLA, and an availability SLI/SLO with a commercial SLA"
+    value:
+      id: "SLO-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.sli_slo"
+      service_under_measurement: "Checkout API"
+      indicators:
+        - {id: "IND1", metric_type: latency, sli_description: "p99 API 回應時間", slo_target: "p99 < 300ms，30 天滾動窗口", sla_required: false}
+        - {id: "IND2", metric_type: availability, sli_description: "成功請求比例", slo_target: "99.9% 可用性，30 天滾動窗口", sla_required: true, sla_terms: "低於 99.5% 時客戶可申請當月帳單 10% 折讓"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas §11.39 directly. Validated against jsonschema Draft202012Validator."
+  note: "The 5-value metric-type enum is a direct, complete transcription of Atlas's own cited list. The sla_required/sla_terms pairing invariant is enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."
