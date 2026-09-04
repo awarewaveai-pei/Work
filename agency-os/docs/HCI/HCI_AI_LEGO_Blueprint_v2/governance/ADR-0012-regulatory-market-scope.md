@@ -40,6 +40,59 @@ Runtime gates are **OPEN**. Each names its artifact, test, and Wave.
 6. **Market-expansion lock — Wave 9.** Loosening or removing the gate-1/gate-2 `CHECK` constraints to admit an EU/EEA/UK jurisdiction or an excluded purpose requires a superseding ADR that also lands the conformity/FCRA program items named in REG-01 and SEC-01 Alternative B; this mirrors the existing precondition at `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md:131` ("confirm the `HD-20` regulatory-scope decision before pursuing EU/regulated-industry Enterprise deals"). Editing either `CHECK` in place without a superseding ADR is the specific failure this ADR exists to block.
 7. **Index registration — done.** `governance/ADR_INDEX.md:30` listed ADR-0012 as `PLANNED` at drafting time, topic "Regulatory market scope," source `11_SECURITY_PRIVACY_GOVERNANCE.md (HD-20)`; the index has since been updated in the same batch to `ACCEPTED` with a `SPECIFIED — RUNTIME OPEN` gate-state row for items 1-6.
 
+## Implementation note (2026-09-05, gates 1-4 landed)
+
+Recorded here rather than by editing the numbered gates above, which remain
+the historical decision record.
+
+- **Gate 1 tightened, not loosened.** The deny-list regex as literally
+  written above (`GB` but not `UK`; no `CH`; no `EL`) shipped with a real gap:
+  `'UK'` is the more common free-text spelling of the United Kingdom, `CH`
+  (Switzerland, EFTA, revFADP in force since 2023-09-01) was omitted despite
+  this ADR's own context citing "EU/EEA/UK" scope, and `EL` is the EU's own
+  nomenclature for Greece alongside `GR`. A 2026-09-05 db-expert review of
+  the implementing migration caught this before merge. `migrations/0003_wave1_regulatory_market_scope_up.sql`
+  implements the corrected list (`EU, EEA, GB, UK, CH` plus all 27 EU members
+  including both `GR` and `EL`, plus `IS, LI, NO`), normalized via
+  `upper(btrim(jurisdiction)) NOT IN (...)` rather than the regex form above
+  (case- and whitespace-insensitive by construction, and line-by-line
+  diffable against ISO-3166 rather than parsed out of an alternation). This
+  is a **tightening** of the deny-list (closing gaps, not opening any), so
+  gate 6's "loosening requires a superseding ADR" restriction does not apply;
+  it is recorded here as a correction to this ADR's own text rather than
+  silently diverging from it.
+- **Gate 2 re-anchored onto `hci.cases.purpose`**, exactly as gate 2's own
+  text instructed once `hci.cases` landed (`ADR-0020`, `migrations/0002_wave1_case_aggregate_up.sql`,
+  2026-09-05) — not a second, parallel `purpose` column on
+  `tenant_authorizations`. The five named allow-list values are implemented
+  verbatim; the ADR's own "..." was not expanded with invented values.
+- **Gate 3 (the `H1012` trigger) was not implemented.** Under the as-built,
+  Case-anchored design, gates 1 and 2 are plain `CHECK` constraints on
+  `hci.tenants` and `hci.cases` respectively. A `CHECK` constraint is
+  validated unconditionally on every write to its own table — there is no
+  insert path, including one made as the table owner, that bypasses it — so
+  there is nothing left for a defense-in-depth trigger on
+  `hci.research_workflows` to catch that the `CHECK` constraints have not
+  already caught at the moment the referenced tenant/case row was created.
+  This claim is not merely argued: `REG-NEG-09` proves the `CHECK` binds even
+  an owner-privilege (grant-bypassing) connection, and `REG-NEG-10a`/`10b`
+  prove the specific "bulk-insert path" gate 3 was originally written to
+  defend against — a `research_workflows` row cannot be admitted against an
+  excluded-jurisdiction tenant, because gate 1 already stopped that tenant
+  from ever being created. `H1012` remains reserved in the migration's error
+  registry comment but is never raised by any trigger.
+- **Gate 4 shipped two mutations, not three** (`drop-jurisdiction-check`,
+  `drop-purpose-allowlist-check` in `scripts/mutation-check-wave1.ps1`) —
+  there is no `H1012` trigger to drop, per the gate 3 disposition above.
+- **Actual test IDs**: `REG-NEG-01/02/03` (jurisdiction, as gate 1 named),
+  `REG-NEG-04..08` (purpose, as gate 2 named), plus `REG-NEG-09` (gate 2
+  owner-bypass proof), `REG-NEG-10a/10b` (gate 1 bulk-insert-path proof),
+  `REG-NEG-11/12` (jurisdiction `'UK'` and lowercase `'de'` — added during
+  the same review that found the deny-list gap). `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`
+  and `governance/ADR_INDEX.md` carry the executed-and-verified evidence
+  (84→88 assertions, 26→28 mutations across this ADR's two migration
+  revisions, both real-Docker-verified).
+
 ## Consequences
 
 - V1 has one machine-checked jurisdiction boundary and one machine-checked purpose boundary; a tenant or authorization cannot silently enter either excluded class through the ordinary write path once gates 1-4 land.

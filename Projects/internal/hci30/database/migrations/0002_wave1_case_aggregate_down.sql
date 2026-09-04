@@ -8,6 +8,7 @@
 -- both live in the same schema. This file exists for the narrower case: a
 -- reviewed rollback of 0002 alone, per ADR-0020's own rollback section.
 BEGIN;
+SET LOCAL lock_timeout = '3s';
 
 DROP TRIGGER IF EXISTS subject_records_require_open_or_active_case ON hci.subject_records;
 DROP TRIGGER IF EXISTS research_workflows_require_open_or_active_case ON hci.research_workflows;

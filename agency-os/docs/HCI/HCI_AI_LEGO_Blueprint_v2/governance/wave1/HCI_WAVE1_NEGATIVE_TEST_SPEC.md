@@ -1,8 +1,8 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — both the HD-03/04/05 slice and the Case/Engagement addition are real-Docker-verified, see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04)
-Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, and the Regulatory market scope addition are all real-Docker-verified, see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope section added and executed 2026-09-05)
+Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
 ## Tenant adapter isolation
@@ -54,6 +54,18 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 | CASE-LIFECYCLE-TRIGGER-01 | Owner connection (bypasses grants) | INSERT directly with `status='ACTIVE'` | Rejected, `H1010` (trigger layer, not just the grant) |
 | CASE-NODELETE-TRIGGER-01 | Owner connection, childless case | `DELETE` attempted | Rejected, `H1003` (trigger layer, not just the grant) |
 | CASE-PROJECTREF-02 | `project_ref` set to an arbitrary, non-existent value | Write is accepted regardless | Succeeds (proves the column is opaque, not validated) |
+
+## Regulatory market scope *(new, ADR-0012, migration 0003)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| REG-NEG-01/02/03 | Owner INSERT into `hci.tenants` with `jurisdiction` `DE`/`FR`/`GB` | Excluded EU/EEA/UK jurisdiction rejected | Rejected, `23514` |
+| REG-NEG-11 | `jurisdiction='UK'` | The common free-text UK spelling is also denied, not just `GB` | Rejected, `23514` |
+| REG-NEG-12 | `jurisdiction='de'` (lowercase) | Denial is case-insensitive | Rejected, `23514` |
+| REG-NEG-04..07 | `hci.cases` insert with `purpose` `employment_screening`/`credit_decisioning`/`housing_tenant_screening`/`insurance_underwriting` | Consumer-reporting-adjacent purposes rejected | Rejected, `23514` |
+| REG-NEG-08 | `purpose='vendor_risk_assessment'` | A gate that rejects everything is also broken - an allow-listed purpose is admitted | Succeeds |
+| REG-NEG-09 | Owner connection, excluded `purpose` | The purpose CHECK binds even a grant-bypassing connection | Rejected, `23514` |
+| REG-NEG-10a/10b | Attempt to create a `DE` tenant, then a `research_workflows` row against it | The "bulk-insert style" bypass ADR-0012 gate 3 named - no tenant exists to bind to | 10a rejected `23514`; 10b rejected `H1001` (the existing authorization gate fires first, before any FK check) |
 
 ## Test execution requirements
 
@@ -118,16 +130,49 @@ down/up reversibility pass over a populated schema
 (`0001_wave1_synthetic_down.sql` drops both migrations' objects together;
 rebuild re-applies `0001` then `0002` in order).
 
+**Execution evidence (2026-09-05, Regulatory market scope addition).**
+`scripts/test-wave1-local.ps1` ran green against real PostgreSQL 15.8 in
+Docker with migration `0003_wave1_regulatory_market_scope_up.sql` applied
+after `0001`+`0002` on the first try: **84 assertions recorded, 0 failed**
+(75 + 9 new `REG-NEG-*`). A pre-Docker db-expert review then found one real
+gate-content bug before commit — the jurisdiction deny-list denied `GB` but
+not the more common free-text spelling `UK`, and was missing `CH`
+(Switzerland/EFTA) and `EL` (the EU's own alternate code for Greece), despite
+the migration's own comment claiming "UK/EFTA" coverage — plus several
+migration-hygiene issues (rollback file not re-runnable, a `SELECT INTO`
+without `STRICT`, stale evidence claims). Fixing the deny-list and adding
+`REG-NEG-10a/10b` (the actual "bulk-insert-style" bypass ADR-0012 gate 3
+named) and `REG-NEG-11/12` (the `UK`/lowercase cases) raised the suite to
+**88 assertions**; the real Docker run then caught a second, familiar-shaped
+bug — `REG-NEG-10b` expected `23503` (FK violation) but the existing
+`research_workflows_require_active_authorization` trigger (2026-09-02, fires
+before any FK check) correctly reports `H1001` first, since no authorization
+row can belong to a tenant that was never created. Fixed by correcting the
+expected SQLSTATE, not the schema — same "trigger fires before constraints"
+lesson `0002_wave1_case_aggregate_up.sql`'s hardening pass already
+documented, this time surfaced by an *existing*, unrelated trigger rather
+than a new one. Final run: **88 assertions recorded, 0 failed**, plus a
+down/up reversibility pass. The rollback-file fix itself needed two real
+Docker attempts to land: a first fix (`to_regclass('hci.cases')` in place of
+`'hci'::regnamespace`) still raised `3F000` against a dropped schema, because
+PostgreSQL does not guarantee a SQL `AND`'s right operand (here, a regclass
+cast inside an `EXISTS` subquery) is skipped just because the left operand is
+false; nesting two separate PL/pgSQL `IF` statements instead of one combined
+boolean expression fixed it for real, verified across all three rollback
+scenarios (narrow rollback + re-apply, run-twice idempotency, and rollback
+after the whole schema is already gone) with real Docker runs, all exit 0.
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 26
+requires the suite to go red on exactly the assertions covering it; **all 28
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
-2026-09-04, covering every invariant listed above). This exists because the
-first version of this suite could not fail: four assertions caught their own
-failure signal with the same handler that caught the control's rejection
-(both SQLSTATE P0001). That defect was demonstrated, not merely argued - the
-original suite exits 0 with the authorization, DSR-lifecycle, append-only, and
-identity-confirmation triggers physically dropped from the schema.
+2026-09-04, + 2 Regulatory-scope mutations, 2026-09-05, covering every
+invariant listed above). This exists because the first version of this suite
+could not fail: four assertions caught their own failure signal with the same
+handler that caught the control's rejection (both SQLSTATE P0001). That
+defect was demonstrated, not merely argued - the original suite exits 0 with
+the authorization, DSR-lifecycle, append-only, and identity-confirmation
+triggers physically dropped from the schema.
 
 Portal-adapter tests (TENANT-ADAPTER-NEG-01..03) remain excluded from this local
 skeleton. Passing these tests is a statement about the synthetic schema only. It

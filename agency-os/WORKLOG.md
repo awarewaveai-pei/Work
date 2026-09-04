@@ -1,5 +1,45 @@
 # Worklog
 
+## 2026-09-05（HCI30 Wave 1 Regulatory market scope ADR-0012 gates 1/2 收尾——真跑先後抓到 db-expert 找到的 deny-list 真洞 + 2 個 trigger-順序誤判，全修並驗真）
+
+**觸發**：操作者「繼續完美完成 HCI 系統！全部同意核准，決定權都交給你」+ 「不准無效益派多個 agent」。延續前一輪 ADR-0020 收尾同一套紀律，挑下一個「已分析但沒落地」的 Wave 1 gate：ADR-0012（regulatory market scope，H1012/REG-NEG 系列，2026-09-05 稍早 bughunt 已記錄為待辦）。
+
+**[任務理解]**：ADR-0012 gates 1-4 全 `SPECIFIED — RUNTIME OPEN`，V1 尚未有 EU/EEA/UK 司法管轄與 employment/credit/housing/insurance 用途的機械排除閘。目標：落地 gate 1（jurisdiction deny-list）+ gate 2（purpose allow-list），真跑驗證，不做全部 6 個 gate（gate 5/6/7 是 Wave 6/9 範圍或已完成）。
+
+**[現況分析]**：讀畢 ADR-0012 全文（gate 2 明文指示「當 hci.cases 落地後必須重新錨定在 Case 而非 tenant_authorizations」——上一輪 ADR-0020 剛好已經落地 hci.cases，故直接照做）。
+
+**過程（兩輪真跑，兩輪都抓到東西）**：
+1. 設計階段判斷 gate 3（H1012 trigger）在 Case-anchored 設計下是多餘的——CHECK constraint 本身無繞過路徑（無論 bulk-insert 或 owner bypass），此判斷未經 agent 驗證，靠自己論證+之後的真測試證明。
+2. 第一輪真跑（84 assertion，未經 db-expert 審查前）全綠、mutation 全殺。
+3. 派 1 個 db-expert agent 審查（.claude hook 對 DB migration 強制要求）：抓到 **1 個真 Critical**——jurisdiction deny-list 漏 `UK`（`GB` 有但更常見的 `UK` 拼法沒有）、漏 `CH`（瑞士/EFTA）、漏 `EL`（EU 官方對希臘的另一種代碼），而註解卻宣稱涵蓋「UK/EFTA」——這個洞跟 ADR-0012 文件本身的原文一字不差（先寫進 ADR 的人也漏了），修 schema 同時修 ADR。另抓到 down migration 兩處非冪等（`'hci'::regnamespace` 對已刪除的 schema 會炸、`ADD CONSTRAINT` 沒有 IF NOT EXISTS 等價機制）、`SELECT INTO` 缺 `STRICT`、migration 註解宣稱 REG-NEG-09 證明的東西跟測試實際做的不符、文件未同步。全部修入。
+4. 修完後真跑 `ADD COLUMN DEFAULT+CHECK` 是否比純 DEFAULT 慢的宣稱：自己開一個獨立 probe 容器實測（20 萬列），純 DEFAULT 2ms、DEFAULT+CHECK 30ms，relfilenode 兩者皆不變（無 rewrite，但有 validating scan）——db-expert 自己都說「未經 probe 驗證，勿直接寫入」，照做驗證後才寫進 header。
+5. 第二輪真跑（88 assertion，含新增 REG-NEG-10/11/12）：**又抓到 1 個真 bug**——`REG-NEG-10b` 預期 `23503`（FK violation），實際拿到 `H1001`。根因：`research_workflows_require_active_authorization`（既有、非本次新增的 trigger）依字母序比 FK 更早開火，對一個從未存在過的 tenant，授權查詢天生找不到匹配列 → 先報 H1001。修法：改測試期望值為 H1001，並在既有 `drop-authorization-trigger` mutation 補上這條新斷言的依賴關係。
+6. down migration 的 idempotency 修正本身也需要兩輪真跑：第一次用 `to_regclass('hci.cases')` 取代 `'hci'::regnamespace`，理論上該解決但真跑對「schema 已被刪除」情境**仍然炸**——PostgreSQL 的 SQL `AND` 不保證右運算元（EXISTS 子查詢裡的 regclass cast）在左運算元為 false 時被跳過。改用巢狀 PL/pgSQL `IF` 陳述式（不是單一 SQL 布林表達式）才真的短路成功，三種情境（narrow rollback+重跑、run-twice idempotency、schema 已刪除後）全部真跑 exit=0 才收尾。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0003_wave1_regulatory_market_scope_up.sql`（新）——jurisdiction deny-list（`upper(btrim())NOT IN`正規化形式）+ purpose allow-list（重新錨定在 hci.cases）+ gate 3 disposition 完整記錄，含兩次真跑修正的 attempt 1/2/3 記錄
+- `Projects/internal/hci30/database/migrations/0003_wave1_regulatory_market_scope_down.sql`（新）——含 nested-IF 修正，含資料遺失警告（jurisdiction 值不可逆保留）
+- `Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_down.sql`——補 `SET LOCAL lock_timeout`（db-expert 指出上一輪也漏了）
+- `Projects/internal/hci30/database/{fixtures,tests}/*`：fixtures 明確欄位清單+jurisdiction='US'；tests 88 assertion（75→84→88，含 UK/de/bulk-insert-path 測試）
+- `Projects/internal/hci30/scripts/mutation-check-wave1.ps1`：19→26→28 mutation
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0012-regulatory-market-scope.md`：新增 §Implementation note（deny-list 修正、gate 2 重新錨定、gate 3 disposition、實際 test ID 清單）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR_INDEX.md`：ADR-0012 gate `SPECIFIED — RUNTIME OPEN` → `SYNTHETIC GATE VERIFIED (Wave 1 gates 1/2)`
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`：新增 Regulatory market scope 表格 + 完整執行證據敘述
+- `agency-os/TASKS.md`：ADR-0012 待辦標記完成；新增 ADR-0005（HCI-INDEP-SCHEMA-01，跟 ADR-0001/0002 的 ARCH-PEER-02 重疊，應合併不重造）為下一個候選
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/test-wave1-local.ps1`（最終版）| exit=0 | result=88 assertions, 0 failed + down/up 可逆性 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/mutation-check-wave1.ps1`（最終版）| exit=0 | result=All 28 mutations killed
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 verify script：0001+0002+0003 up → 0003 down（窄回滾）→ 0003 down 再跑（idempotency）→ 0003 up 再套用 → 0001 down（整schema drop）→ 0003 down（schema 已消失情境）| exit=0 全通過（第一版 nested-IF 修正前，最後一個情境曾 exit=3，已修正並重跑驗真）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 probe 容器：`ALTER TABLE ... ADD COLUMN DEFAULT` vs `ADD COLUMN DEFAULT+CHECK`（20 萬列）| result=2ms vs 30ms，relfilenode 皆不變（驗證 db-expert 的「無 rewrite 但有 validating scan」宣稱後才寫進文件）
+- REVIEW_DONE: critic=db-expert(Standard) | verdict=fail(1 Critical)→fixed | findings=1c/6m/6minor（deny-list 漏碼全修；down migration 冪等性、STRICT、文件同步全修；suggestion 級部分採納）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`tenants_jurisdiction_denylist\|cases_purpose_allowlist\|REG-NEG-1[012]` | hits=0（僅本次新增檔案自身，無外部殘留）；另 grep `84 assertion\|75 assertion` 等舊計數字串 | hits=0（無過期宣稱殘留）
+
+**[剩餘風險]**：gate 5（Wave 6 Continuous Monitoring purpose reuse）、gate 6（Wave 9 market-expansion lock）維持 OPEN，非本輪範圍。ADR-0005 的 `HCI-INDEP-SCHEMA-01`（與 ADR-0001/0002 的 `ARCH-PEER-02` 重疊）仍未落地，已記 TASKS 為下一候選。
+
+**[rollback]**：`git revert` 本 commit；DB 層 `0003_..._down.sql` 已在三種情境下真跑驗證可逆。
+
+
 ## 2026-09-05（續36，同一 session：Cognitive OS 第二十三個 Method Atlas 切片 — `devops_sre.blue_green_deployment`，誠實區分「硬規則」與「建議實務」）
 
 **觸發**：延續操作者授權（「繼續完成」）。0 agent。操作者中途要求「做一個段落停下來，我要 clear」——本切片收尾後即停，並在回覆中附上下一輪 session 的接續指示。

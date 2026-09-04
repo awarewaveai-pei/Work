@@ -263,7 +263,7 @@ SELECT hci_test.expect_true('RLS-LEAK-03',
 -- grant to set it explicitly, so every case is born OPEN via the DEFAULT.
 SELECT hci_test.expect_success('CASE-LIFECYCLE-SETUP-01',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000210','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic lifecycle case','R1','synthetic fixture')$q$);
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000210','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
 
 SELECT hci_test.expect_success('CASE-LIFECYCLE-01',
   $q$UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000210'$q$);
@@ -291,7 +291,7 @@ SELECT hci_test.expect_sqlstate('CASE-CLOSED-IMMUTABLE-01',
 -- the OPEN->CLOSED skip needs its own case rather than reusing that one.
 SELECT hci_test.expect_success('CASE-LIFECYCLE-SETUP-02',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000211','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic lifecycle case 2','R1','synthetic fixture')$q$);
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000211','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
 
 SELECT hci_test.expect_sqlstate('CASE-LIFECYCLE-04',
   $q$UPDATE hci.cases SET status = 'CLOSED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000211'$q$,
@@ -312,11 +312,11 @@ SELECT hci_test.expect_sqlstate('CASE-CLOSEDAT-DIRECT-01',
 -- being implied by the trigger's own INSERT-branch check.
 SELECT hci_test.expect_sqlstate('CASE-LIFECYCLE-05',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context,status)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000216','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic fixture','R0','synthetic fixture','OPEN')$q$,
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000216','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R0','synthetic fixture','OPEN')$q$,
   '42501');
 SELECT hci_test.expect_sqlstate('CASE-OPENEDAT-01',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context,opened_at)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000217','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic fixture','R0','synthetic fixture',now())$q$,
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000217','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R0','synthetic fixture',now())$q$,
   '42501');
 
 -- Ownership binding (gate 3): every research_workflows row needs a case_id,
@@ -340,7 +340,7 @@ SELECT hci_test.expect_sqlstate('CASE-OWNS-02',
 -- frozen even when both the old and new case are otherwise valid.
 SELECT hci_test.expect_success('CASE-OWNS-03-SETUP',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000220','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic repoint-target case','R1','synthetic fixture')$q$);
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000220','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
 SELECT hci_test.expect_sqlstate('CASE-OWNS-03',
   $q$UPDATE hci.research_workflows SET case_id = 'aaaaaaaa-0000-0000-0000-000000000220' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000102'$q$,
   'H1007');
@@ -376,7 +376,35 @@ SELECT hci_test.expect_true('CASE-PROJECTREF-01',
 
 SELECT hci_test.expect_success('CASE-PROJECTREF-02',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context,project_ref)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000215','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic project-ref case','R0','synthetic fixture','nonexistent-project-xyz-999')$q$);
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000215','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R0','synthetic fixture','nonexistent-project-xyz-999')$q$);
+
+-- ---------------------------------------------------------------------------
+-- Regulatory market scope (ADR-0012, HD-20) - purpose allow-list, re-anchored
+-- onto hci.cases.purpose per ADR-0012:36 (see migration 0003's header for the
+-- full re-anchoring rationale: hci.cases.purpose did not exist when the ADR
+-- was written and is now the natural home for this check).
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_sqlstate('REG-NEG-04',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000223','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','employment_screening','R1','synthetic fixture')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-05',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000224','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','credit_decisioning','R1','synthetic fixture')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-06',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000225','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','housing_tenant_screening','R1','synthetic fixture')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-07',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000226','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','insurance_underwriting','R1','synthetic fixture')$q$,
+  '23514');
+-- A gate that rejects everything is also broken (same discipline as
+-- CONSENT-NEG-04b): prove an allow-listed purpose is actually admitted.
+SELECT hci_test.expect_success('REG-NEG-08',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000227','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','vendor_risk_assessment','R1','synthetic fixture')$q$);
 
 RESET ROLE;
 
@@ -408,19 +436,93 @@ SELECT hci_test.expect_sqlstate('TRUNCATE-02-FK',
 -- privileges bypass grants entirely.
 SELECT hci_test.expect_sqlstate('CASE-LIFECYCLE-TRIGGER-01',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context,status)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000221','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic fixture','R0','synthetic fixture','ACTIVE')$q$,
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000221','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R0','synthetic fixture','ACTIVE')$q$,
   'H1010');
 
 SELECT hci_test.expect_success('CASE-NODELETE-TRIGGER-SETUP-01',
   $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000222','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','synthetic fixture, no children',
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000222','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence',
              'R0','synthetic fixture')$q$);
 SELECT hci_test.expect_sqlstate('CASE-NODELETE-TRIGGER-01',
   $q$DELETE FROM hci.cases WHERE id = 'aaaaaaaa-0000-0000-0000-000000000222'$q$,
   'H1003');
 
 -- ---------------------------------------------------------------------------
+-- Regulatory market scope (ADR-0012, HD-20) - jurisdiction deny-list. Owner
+-- section: the app role has SELECT-only on hci.tenants (0001:371, tenants are
+-- provisioned out-of-band, not self-service), so these can only be exercised
+-- as the owner - which doubles as proof the CHECK binds even a connection
+-- that bypasses every grant, unlike the grant-only protections elsewhere in
+-- this schema.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_sqlstate('REG-NEG-01',
+  $q$INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES ('cccccccc-0000-0000-0000-000000000001','tenant-de','DE')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-02',
+  $q$INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES ('cccccccc-0000-0000-0000-000000000002','tenant-fr','FR')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-03',
+  $q$INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES ('cccccccc-0000-0000-0000-000000000003','tenant-gb','GB')$q$,
+  '23514');
+-- 2026-09-05 db-expert review: 'GB' alone left the more common free-text
+-- spelling 'UK' untested (and, before the fix, unblocked - see 0003's
+-- header). Also proves the upper(btrim(...)) normalization, not just the
+-- literal list: lowercase input must still be denied.
+SELECT hci_test.expect_sqlstate('REG-NEG-11',
+  $q$INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES ('cccccccc-0000-0000-0000-000000000004','tenant-uk','UK')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-12',
+  $q$INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES ('cccccccc-0000-0000-0000-000000000005','tenant-de-lower','de')$q$,
+  '23514');
+
+-- REG-NEG-09 is the real-Docker proof behind migration 0003's "Gate 3
+-- disposition" comment for its OWNER-BYPASS half: a CHECK constraint (unlike
+-- a GRANT or a trigger that could in principle be dropped or a role that
+-- could in principle bypass grants) is validated unconditionally on every
+-- write to its own table, including one made as the table owner. There is no
+-- connection, privilege level, or insert path that reaches a row violating
+-- this CHECK - which is exactly why no defense-in-depth trigger is needed the
+-- way DELETE/TRUNCATE needed cases_no_delete/cases_no_truncate above (grants
+-- alone do not stop an owner-level DELETE; this CHECK alone already stops an
+-- owner-level insert). This specific assertion exercises gate 2 (purpose);
+-- REG-NEG-10 below exercises the same claim for gate 1 (jurisdiction) via the
+-- specific "bulk-insert style" path ADR-0012:37 named.
+SELECT hci_test.expect_sqlstate('REG-NEG-09',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000228','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','employment_screening','R1','synthetic fixture, owner bypass attempt')$q$,
+  '23514');
+
+-- REG-NEG-10: the actual "bulk-insert style" bypass ADR-0012:37 named -
+-- attempting to admit a research_workflows row against an excluded-
+-- jurisdiction tenant. 10a confirms (again, with its own fresh id so this
+-- test does not depend on REG-NEG-01 having run first) that such a tenant
+-- cannot exist at all; 10b then attempts the research_workflows insert
+-- against that same, never-created tenant_id.
+--
+-- Expects H1001, not 23503 (real-Docker result, not the FK violation this
+-- comment originally predicted before running it): research_workflows'
+-- BEFORE-INSERT triggers fire in alphabetical order (already relied on
+-- elsewhere in this file, e.g. CASE-CLOSED-GUARD-01's comment), and
+-- 'research_workflows_require_active_authorization' ('...require_a...',
+-- 0001:114) sorts before 'research_workflows_require_open_or_active_case'
+-- ('...require_o...', 0002:213) - both fire before any constraint (FK
+-- included) is ever checked. No tenant_authorization row can have
+-- tenant_id = the never-created tenant, so that trigger's own NOT EXISTS
+-- check fails first and raises H1001, before the FK on tenant_id even gets a
+-- chance to fire. This is a stronger result than the FK alone would have
+-- been: TWO independent, pre-existing gates (the authorization check and the
+-- tenant FK) both block this specific bypass attempt redundantly, not just
+-- the one this test set out to exercise.
+SELECT hci_test.expect_sqlstate('REG-NEG-10a',
+  $q$INSERT INTO hci.tenants (id,slug,jurisdiction) VALUES ('cccccccc-0000-0000-0000-000000000006','tenant-de-bulk','DE')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('REG-NEG-10b',
+  $q$INSERT INTO hci.research_workflows (id,tenant_id,tenant_authorization_id,case_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000229','cccccccc-0000-0000-0000-000000000006','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000200')$q$,
+  'H1001');
+
+-- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(75);
+SELECT hci_test.finish(88);

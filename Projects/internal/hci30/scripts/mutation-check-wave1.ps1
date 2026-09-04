@@ -30,6 +30,7 @@ $compose  = Join-Path $root 'infra/local/compose.test.yml'
 $upMig    = Join-Path $root 'database/migrations/0001_wave1_synthetic_up.sql'
 $downMig  = Join-Path $root 'database/migrations/0001_wave1_synthetic_down.sql'
 $upMig2   = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sql'
+$upMig3   = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_scope_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -45,7 +46,12 @@ if ($LASTEXITCODE -ne 0 -or $dockerEndpoint -notmatch '^(npipe|unix)://') { thro
 $mutations = @(
   @{ id = 'drop-authorization-trigger'
      sql = 'DROP TRIGGER research_workflows_require_active_authorization ON hci.research_workflows;'
-     expect = @('CONSENT-NEG-04a','CONSENT-NEG-05e') }
+     # REG-NEG-10b joined this mutation's expect list 2026-09-05: it expects
+     # H1001 specifically (not merely "rejected"), and H1001 is this exact
+     # trigger. Without it, 10b's insert reaches the tenant_id FK instead and
+     # gets 23503 - still rejected, but not the SQLSTATE the assertion names,
+     # so it (correctly) flips to FAIL under this mutation too.
+     expect = @('CONSENT-NEG-04a','CONSENT-NEG-05e','REG-NEG-10b') }
 
   @{ id = 'drop-dsr-lifecycle-trigger'
      sql = 'DROP TRIGGER data_subject_requests_lifecycle ON hci.data_subject_requests;'
@@ -187,6 +193,24 @@ $mutations = @(
   @{ id = 'disable-rls-on-cases'
      sql = 'ALTER TABLE hci.cases NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.cases DISABLE ROW LEVEL SECURITY;'
      expect = @('RLS-LEAK-03') }
+
+  # ADR-0012 (Regulatory market scope, HD-20) gate 1/2 - 2026-09-05. Only two
+  # mutations, not the three the ADR's gate 4 originally asked for: there is
+  # no H1012 trigger to drop (see 0003's "Gate 3 disposition" comment for why
+  # it was never built), so only the two CHECK constraints are mutation-
+  # covered here.
+  # Constraint name hardcoded, not resolved via LIKE (2026-09-05 db-expert
+  # review): the constraint is explicitly named in 0003_up.sql specifically so
+  # this mutation - and any future one - has a stable target; a LIKE lookup
+  # with a non-STRICT SELECT INTO would silently pick an arbitrary match (and
+  # drop the wrong constraint) the moment a second CHECK mentioning
+  # 'jurisdiction' is ever added to this table.
+  @{ id = 'drop-jurisdiction-check'
+     sql = 'ALTER TABLE hci.tenants DROP CONSTRAINT tenants_jurisdiction_denylist;'
+     expect = @('REG-NEG-01','REG-NEG-02','REG-NEG-03','REG-NEG-10a','REG-NEG-11','REG-NEG-12') }
+  @{ id = 'drop-purpose-allowlist-check'
+     sql = 'ALTER TABLE hci.cases DROP CONSTRAINT cases_purpose_allowlist;'
+     expect = @('REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-09') }
 )
 
 $project = "hcimut$PID"
@@ -225,6 +249,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $downMig)  -ne 0) { throw 'mutation harness: down migration failed' }
   if ((Invoke-SqlFile -Path $upMig)    -ne 0) { throw 'mutation harness: 0001 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig2)   -ne 0) { throw 'mutation harness: 0002 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig3)   -ne 0) { throw 'mutation harness: 0003 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

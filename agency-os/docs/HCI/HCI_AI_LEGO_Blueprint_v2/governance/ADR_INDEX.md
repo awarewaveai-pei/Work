@@ -2,7 +2,7 @@
 
 Status: **MIXED REGISTER — only entries explicitly marked `ACCEPTED` below are approved decisions**
 Owner: HCI AI LEGO Blueprint v2
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-05
 
 ## Purpose and state rules
 
@@ -67,7 +67,7 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0009 | `SPECIFIED — RUNTIME OPEN` | Mapping and compatibility/migration design: `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`; cross-tenant adapter negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0010 | `SPECIFIED — RUNTIME OPEN` | Three-record policy: `wave1/HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md`; model/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; anti-conflation tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
 | ADR-0011 | `SPECIFIED — RUNTIME OPEN` | Subject table/constraint design: `wave1/HCI_WAVE1_DOMAIN_ERD.md`; Person-only negative tests: `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` |
-| ADR-0012 | `SPECIFIED — RUNTIME OPEN` | Jurisdiction/purpose-attestation gate + DB CHECK rejecting excluded purposes (Wave 1/6) |
+| ADR-0012 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1/2)` | `hci.tenants.jurisdiction` deny-list + `hci.cases.purpose` allow-list (re-anchored per the ADR's own instruction, see its "Implementation note") — `Projects/internal/hci30/database/migrations/0003_wave1_regulatory_market_scope_up.sql`; Docker run green **88/88 assertions + 28/28 mutations killed**, 2026-09-05 (see `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` §Current state for the full account, incl. a real deny-list gap a db-expert review caught before commit); gate 3 (`H1012` trigger) deliberately not built — CHECK constraints alone proven to have no bypass, see ADR's Implementation note; Wave 6 (`CONTMON-PURPOSE-01`) and Wave 9 (market-expansion lock) remain `OPEN` |
 | ADR-0013 | `SPECIFIED — RUNTIME OPEN` | Kernel package (`Projects/shared/kernel`, semver) + per-product CI contract test against pinned version (Wave 3) |
 | ADR-0014 | `SYNTHETIC GATE VERIFIED` | Synthetic DSR schema/events/tests: `D:\Work\Projects\internal\hci30\database\`; suite green + mutation-checked 2026-09-02; no real-person processing |
 | ADR-0015 | `SYNTHETIC GATE VERIFIED` | Synthetic identity-verification constraint/tests: `D:\Work\Projects\internal\hci30\database\`; both-sided evidence guard, mutation-checked 2026-09-02; no production pipeline |
