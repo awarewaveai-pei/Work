@@ -74,14 +74,33 @@ purpose:
 inputs:
   required:
     - DecisionRef
-  # NEW DESIGN. Atlas's own worked example (L1980-1985) monitors "a
-  # decision" but no mother document gives `Decision` its own typed-object
-  # field shape anywhere in this spec root yet (docs/architecture/
-  # REPOSITORY_ARCHITECTURE.md rules Decision belongs at
-  # `/core/domain/decision` as a Shared Kernel object, but that schema is
-  # not yet built). This contract therefore requires only a free-text
-  # reference to the decision being monitored, not a hard $ref to a type
-  # that does not exist yet -- see open_questions.
+  # NEW DESIGN. CORRECTED 2026-09-04 (found in the same session, before
+  # this contract's own commit had propagated further): `Decision` DOES
+  # already have a real, ratified typed-object schema in this spec root
+  # (specs/decision/decision.schema.yaml, built 2026-08-29, an earlier
+  # session) -- an earlier draft of this comment incorrectly claimed no
+  # such schema existed. `DecisionRef` is STILL kept as a free-text
+  # reference rather than a hard $ref, but for a different, still-valid
+  # reason: this method's own scope is producing criteria that could be
+  # ATTACHED TO a Decision record's own `reversal_conditions` array (Atlas
+  # §16.2 L3812), not constructing, loading, or mutating a full Decision
+  # record itself -- requiring the whole object as an input would overstate
+  # what this method actually consumes. See open_questions (corrected).
+
+# CORRECTION (2026-09-04, found in the same session): this method's output
+# type (typed-objects/reversal-criteria-set.schema.yaml) originally
+# re-derived its own indicator/condition/action/owner fields directly from
+# Atlas L1980-1985 without first checking whether an existing spec-root
+# schema already covered this exact concept. It does:
+# specs/decision/reversal.schema.yaml (2026-08-29) already resolves this
+# precise shape, reconciling three competing mother-document forms and
+# closing verified-findings.yaml's own tracked CROSS-T-12 duplicate-
+# definition finding. Fixed by embedding that schema's own
+# single_indicator_form via allOf rather than re-deriving it a second
+# time -- see reversal-criteria-set.schema.yaml's own description for the
+# full correction record. This contract's own fields below
+# (purpose/preconditions/quality) are unaffected by the fix; only the
+# OUTPUT TYPE's internal field shape changed.
 
 outputs:
   - ReversalCriteriaSet
@@ -136,11 +155,15 @@ compilation_decisions:
       typed object keep it as free text only, or also support a
       structured, mechanically-evaluable rule?
     decision: >
-      Both: `condition_description` (free text, Atlas's own literal
-      format, always required) plus an OPTIONAL `structured_rule`
-      (operator/threshold/consecutive_periods) a caller may additionally
-      supply when the condition is mechanically simple, like Atlas's own
-      example genuinely is.
+      Both: `condition` (free text, Atlas's own literal format AND the
+      same field name `specs/decision/reversal.schema.yaml`'s own
+      `single_indicator_form` already uses -- CORRECTED 2026-09-04 from an
+      earlier draft's invented `condition_description` name, see that
+      schema's own description for the full duplicate-definition fix)
+      plus an OPTIONAL `structured_rule` (operator/threshold/
+      consecutive_periods) a caller may additionally supply when the
+      condition is mechanically simple, like Atlas's own example genuinely
+      is.
     reasoning: >
       Collapsing to free-text-only would forgo real, testable compute this
       specific worked example clearly supports (a real threshold-crossing
@@ -155,14 +178,21 @@ compilation_decisions:
 open_questions:
   - id: "OQ-REVERSALCRITERIA-1"
     question: >
-      `DecisionRef` is a free-text reference, not a hard $ref to a real
-      `Decision` typed object, because `/core/domain/decision`
-      (docs/architecture/REPOSITORY_ARCHITECTURE.md's own ruling for where
-      the Decision Shared Kernel object belongs) has not been built as a
-      real schema in this spec root yet. Should a future session build
-      that schema and upgrade this contract's input to a real $ref?
-    owner: "operator, or whoever next builds specs/domain/decision.schema.yaml"
-    blocks: "nothing in this file's own validity -- a free-text reference is the more conservative (less invented) choice"
+      CORRECTED 2026-09-04: `specs/decision/decision.schema.yaml` already
+      exists and is ACTIVE (built 2026-08-29) -- an earlier draft of this
+      question incorrectly claimed no Decision schema existed anywhere in
+      this spec root. The real open question is narrower: should
+      `DecisionRef` be upgraded from a free-text reference to a hard
+      `^DEC-` id-pattern reference (matching `decision.schema.yaml#/properties/id`'s
+      own `^DEC-` pattern), or a full `$ref` to that schema, now that it is
+      known to exist? Left as free text for now because this method's own
+      scope produces criteria meant to be ATTACHED TO a Decision's
+      `reversal_conditions` array (Atlas §16.2 L3812), not to construct or
+      load a full Decision record -- a full $ref would require this
+      method to also consume/validate the entire Decision object it has no
+      other use for.
+    owner: "operator, or whoever next wires this method's output into a real Decision record's reversal_conditions array"
+    blocks: "nothing in this file's own validity -- a free-text reference remains schema-legal either way"
   - id: "OQ-REVERSALCRITERIA-2"
     question: >
       This method's own scope stops at DEFINING criteria and (per the

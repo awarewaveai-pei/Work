@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-04（續21，同一 session：修正第八個切片的真實 schema 重複——`reversal-criteria-set.schema.yaml` v1.0.0→v1.1.0）
+
+**觸發**：為第九個切片（`challenge.red_team`）做命名衝突查核時（同 `decision.ahp` 那次 `modules/decision` 命名巧合查證的紀律延伸），讀 `specs/decision/decision.schema.yaml` 過程中意外發現：`specs/decision/reversal.schema.yaml`（2026-08-29,上個 session 建的,早於本 session）**早就定義了跟續20 `ReversalCriteriaSet` 完全相同的概念**——indicator/condition/action/owner,同一個 Atlas §11.33 引用出處——而且做得更嚴謹（調和了 Atlas bilingual-policy／Atlas §11.33／EC §88 三種互相衝突的形狀,還關閉了追蹤中的 `CROSS-T-12` 重複定義發現）。續20 的 v1.0.0 等於重新製造了 `reversal.schema.yaml` 存在的目的正要防止的「同一概念 N 種互不相容形狀」問題。
+
+**根因**：本 session 的 BUGHUNT 紀律只 grep 自己新造的符號名稱,抓不到「同一概念、不同命名」的既有 schema——這是本 session 稽核方法本身的盲點,不是單一疏忽。已核對本 session 其餘 5 個新 schema（SWOT／Five Whys／Pareto／Causal DAG／AHP）對照全部既有 spec 檔案標題,確認皆無同類重複——Reversal Criteria 之所以特殊,是因為它是一個橫跨三份母文件獨立描述的治理概念,上一個 session 才會特地建一份整合 schema。
+
+**修法**：不是保留兩份定義,是把 `reversal-criteria-set.schema.yaml` 改成用 `allOf` **內嵌**既有 `decision/reversal.schema.yaml#/definitions/single_indicator_form`（`indicator`/`condition`/`action`/`owner`,取代自創的 `condition_description`),本檔案唯一真正新增的東西（`structured_rule`——機械可判定的門檻擴充,既有 schema 沒提供)保留為額外的 allOf 分支。`reversal.schema.yaml` 自己的 `generality_note` 早就明文歡迎這種內嵌重用方式。同步修正 method contract 裡「Decision 沒有 schema」的錯誤宣稱（`specs/decision/decision.schema.yaml` 早就 ACTIVE)。
+
+**[已修改]**：`specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml`（v1.0.0→v1.1.0,allOf 內嵌既有 schema)＋對應 golden fixture（欄位名修正＋新增 2 個測試案例)＋`methods/contracts/learning.reversal_criteria.contract.yaml`（修正 `OQ-REVERSALCRITERIA-1` 與 compilation_decisions 的錯誤宣稱)＋`ai_lego/modules/learning/reversal_criteria.py`（`condition_description`→`condition`)＋`tests/unit/test_reversal_criteria.py`（新增 `SchemaConsolidationTests` 2 個回歸防護測試，防止這個錯誤再次發生)＋`docs/EIGHTH_SLICE_LEARNING_REVERSAL_CRITERIA.md`（誠實記錄整個發現與修正過程,不是事後蓋掉)＋重新產生 spec-root 索引。CLI 與其餘測試因為呼叫是位置參數而非關鍵字參數,零改動即可正常運作。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python3 驗證 allOf 組合(乾淨實例通過、空 owner 被擋、缺 condition/threshold 被內嵌 schema 的 anyOf 擋下、既有 schema 獨立驗證正常)| exit=0 | result=4 項全部符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_reversal_criteria_slice`（修正後重跑)| exit=0 | result=`PASS learning.reversal_criteria: 2 criteria, gates [provenance_required=PASS, actionable=PASS], trigger dip-case=False, trigger crossing-case=True, qualitative-criterion-evaluable=None`——與修正前結果一致,證明修正未改變真實行為
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_reversal_criteria -v` | exit=0 | ms=~1300 | result=**21 passed**（19 原有＋2 新回歸防護測試)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/run_golden_tests.py`（spec root)| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2576→2579
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root,含修正後全套回歸)| exit=0 | ms=253000 | result=**349 tests OK**（347→349,零回歸；`git diff --stat` 確認 fishbone.py 零改動)
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄,未變)。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:allOf 組合是否真的同時套用兩層約束(是,已用 python 實測空 owner 與缺 condition 各自被對應層擋下);修正是否影響 CLI 真實行為(沒有,重跑結果與修正前逐字相同);本 session 其餘 5 個新 schema 是否也有同類重複風險(已系統性核對全部既有 schema 標題,確認皆無)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`condition_description` | hits=0（確認舊欄位名沒有任何殘留引用)
+
+**[剩餘風險]**：無新增風險——這是收斂而非擴張。`OQ-REVERSALCRITERIASET-2`（新開)：`structured_rule` 是否該提案成 `decision/reversal.schema.yaml` 自己的正式欄位而非只活在本檔案的 allOf 擴充裡,留給操作者或下一個真的需要它的場景決定。
+
+**[rollback]**：`git revert` 本次修正即可退回 v1.0.0（不建議,因為 v1.0.0 是真實重複定義)；更安全的 rollback 是保留修正,只在需要時個別調整 allOf 分支。
+
 ## 2026-09-04（續20，同一 session：Cognitive OS 第八個 Method Atlas 切片 — `learning.reversal_criteria`，第五種結構形狀＋監控規則）
 
 **觸發**：延續操作者授權，繼續自主推進。0 agent。

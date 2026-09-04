@@ -30,6 +30,7 @@ from ai_lego.modules.learning.reversal_criteria import (
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
 
 REVERSAL_CRITERIA_SET_SCHEMA = "ai-lego://specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml"
+DECISION_REVERSAL_SINGLE_FORM = "ai-lego://specs/decision/reversal.schema.yaml#/definitions/single_indicator_form"
 
 
 def _structured_criterion():
@@ -73,6 +74,28 @@ class TriggerComputeTests(unittest.TestCase):
     def test_invalid_consecutive_periods_is_refused(self):
         with self.assertRaisesRegex(InvariantViolation, "TRIGGER_INVALID_CONSECUTIVE_PERIODS"):
             consecutive_threshold_triggered([1, 2, 3], ">", 1, 0)
+
+
+class SchemaConsolidationTests(unittest.TestCase):
+    """Regression guard for the 2026-09-04 duplicate-schema correction: reversal_criterion() must build an
+    instance of decision/reversal.schema.yaml's own single_indicator_form (field names indicator/condition/
+    action/owner), not a competing, independently-invented shape. See reversal-criteria-set.schema.yaml's own
+    description for the full correction record."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.contracts = SchemaContracts(resolve_spec_root())
+
+    def test_a_built_criterion_stripped_to_its_base_fields_validates_against_the_canonical_reversal_schema(self):
+        criterion = _structured_criterion()
+        base_fields = {k: v for k, v in criterion.items() if k in {"indicator", "condition", "action", "owner"}}
+        self.contracts.validate(DECISION_REVERSAL_SINGLE_FORM, base_fields, "criterion base fields")
+
+    def test_field_is_named_condition_not_condition_description(self):
+        """The retired v1.0.0 name, kept as an explicit regression guard so this mistake cannot silently return."""
+        criterion = _structured_criterion()
+        self.assertIn("condition", criterion)
+        self.assertNotIn("condition_description", criterion)
 
 
 class SpecConformanceTests(unittest.TestCase):

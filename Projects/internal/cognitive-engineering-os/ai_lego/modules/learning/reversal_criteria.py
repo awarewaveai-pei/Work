@@ -9,6 +9,17 @@ committed action + accountable owner, Atlas §11.33's own worked YAML
 example, L1980-1985), meant to be evaluated over time against real
 observations via ``ai_lego/compute/monitoring/triggers.py``, not produced
 once and left static.
+
+Builds instances of ``typed-objects/reversal-criteria-set.schema.yaml``,
+whose ``criteria[]`` items EMBED the already-ratified
+``specs/decision/reversal.schema.yaml#/definitions/single_indicator_form``
+(``indicator``/``condition``/``action``/``owner``) rather than a
+competing, independently-invented shape -- corrected 2026-09-04, same
+session, after a later read of ``specs/decision/decision.schema.yaml``
+surfaced that this exact concept already had a canonical schema this
+module's first draft had not checked for. ``reversal_criterion()``'s own
+``condition`` parameter is named to match that embedded schema's field
+name directly, not a locally-invented synonym.
 """
 
 from __future__ import annotations
@@ -36,14 +47,17 @@ def structured_rule(op: str, threshold: float, consecutive_periods: int) -> dict
 def reversal_criterion(
     criterion_id: str,
     indicator: str,
-    condition_description: str,
+    condition: str,
     action: str,
     owner: str,
     provenance: dict[str, Any],
     *,
     rule: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """One item of ``typed-objects/reversal-criteria-set.schema.yaml#/properties/criteria``.
+    """One item of ``typed-objects/reversal-criteria-set.schema.yaml#/properties/criteria`` -- an instance of
+    ``specs/decision/reversal.schema.yaml#/definitions/single_indicator_form`` (field names ``indicator``/
+    ``condition``/``action``/``owner`` match that embedded schema directly) plus this method's own ``id``/
+    ``structured_rule`` additions.
 
     ``action``/``owner`` are validated non-empty at construction time
     (method contract precondition: a criterion with no accountable owner
@@ -56,7 +70,7 @@ def reversal_criterion(
     record: dict[str, Any] = {
         "id": criterion_id,
         "indicator": indicator,
-        "condition_description": condition_description,
+        "condition": condition,
         "action": action,
         "owner": owner,
         "provenance": provenance,

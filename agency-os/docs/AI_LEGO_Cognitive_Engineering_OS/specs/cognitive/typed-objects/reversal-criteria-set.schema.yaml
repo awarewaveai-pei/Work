@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml"
 title: Reversal Criteria Set
-version: "1.0.0"
+version: "1.1.0"
 status: ACTIVE
 
 description: >
@@ -14,59 +14,105 @@ description: >
   meant to be evaluated over time against real observations, not produced
   once and left static.
 
-  Field provenance -- Atlas §11.33 (L1971-1995) gives a REAL worked YAML
-  example (L1980-1985), transcribed directly:
+  **CORRECTION (2026-09-04, v1.1.0, found and fixed in the same session,
+  not a later session)**: v1.0.0 of this file independently re-derived the
+  indicator/condition/action/owner shape directly from Atlas §11.33
+  (L1980-1985) without first checking whether this exact concept already
+  had a canonical schema elsewhere in the spec root. It did:
+  `specs/decision/reversal.schema.yaml` (built 2026-08-29, an earlier
+  session) already resolves this precise concept -- and resolves it more
+  rigorously than v1.0.0 did, reconciling THREE competing mother-document
+  shapes (Atlas's bilingual-policy array example, Atlas §11.33's own
+  single-object form, and Execution Contract §88's plural-array form) via
+  a `oneOf` of `multi_indicator_form`/`single_indicator_form`, and closing
+  `verified-findings.yaml`'s own tracked CROSS-T-12 duplicate-definition
+  finding in the process. v1.0.0's `condition_description`/`indicator`/
+  `action`/`owner` fields were a duplicate, incompatible re-derivation of
+  exactly what `decision/reversal.schema.yaml#/definitions/single_indicator_form`
+  already defines (field names `condition`/`indicator`/`action`/`owner`) --
+  this is precisely the "N incompatible shapes for one concept" failure
+  mode `reversal.schema.yaml` itself already exists to prevent, and v1.0.0
+  would have reintroduced it. Found via a later, unrelated read of
+  `specs/decision/decision.schema.yaml` (while investigating the
+  `decision.ahp` naming-collision question, see
+  `docs/architecture/REPOSITORY_ARCHITECTURE.md`'s own 2026-09-04 note) --
+  not caught by this session's own BUGHUNT grep sweeps, which only searched
+  for this session's OWN new symbol names, not for pre-existing schemas
+  covering the same real-world concept under different names. See
+  `compilation_decisions` for the fix and the corrected invariant this
+  session is now applying going forward: grep the FULL spec root
+  (`specs/**`, not just `specs/cognitive/typed-objects/`) for the concept
+  itself, not just for this session's own chosen names, before minting any
+  new typed object.
 
-  ```yaml
-  reversal:
-    indicator: CAC
-    condition: "> 300 USD for 3 consecutive months"
-    action: re_review
-    owner: growth_lead
-  ```
-
-  `indicator`/`condition_description`/`action`/`owner` are this schema's
-  own field names for exactly those four values, unchanged. `structured_rule`
-  is a compilation addition (see `compilation_decisions` in the method
-  contract) letting a caller ALSO supply a mechanically-evaluable form of
-  the same condition when it is genuinely a simple threshold, like Atlas's
-  own worked example is (">300 for 3 consecutive [periods]" is exactly
-  `{operator: ">", threshold: 300, consecutive_periods: 3}`).
+  v1.1.0 fixes this by EMBEDDING `decision/reversal.schema.yaml`'s own
+  `single_indicator_form` (via `allOf`) for the indicator/condition-or-
+  threshold/action/owner core, rather than re-defining those four fields.
+  This file's only genuinely NEW contribution is what
+  `reversal.schema.yaml` does not provide and this session's method
+  actually needs: a local per-criterion `id`, per-criterion `provenance`,
+  the optional machine-evaluable `structured_rule` sidecar (a real
+  additive extension `reversal.schema.yaml`'s own `generality_note`
+  explicitly anticipates other schemas embedding it and adding to it), and
+  the `decision_ref` + overall `provenance` wrapper.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.33 決策反轉條件, worked YAML example (L1971-1995)"
   - "methods/contracts/learning.reversal_criteria.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
   - "ai_lego/compute/monitoring/triggers.py (the real compute this schema's structured_rule field records the result of when evaluated)"
+  - "specs/decision/reversal.schema.yaml (the canonical schema for the indicator/condition/action/owner shape itself, embedded here via allOf rather than re-derived -- see description's 2026-09-04 correction)"
 
 decided_by: >
   No ADR governs this file. Same class of decision every sibling typed-
-  object schema in this directory documents.
+  object schema in this directory documents. The v1.0.0 -> v1.1.0
+  consolidation itself is a Low-risk compilation correction (embedding an
+  existing ratified schema instead of a competing re-derivation preserves
+  strictly more consistency, not a new semantic policy), same bar
+  `decision/reversal.schema.yaml`'s own `oneOf`-vs-force-fit decision used.
 
 compilation_decisions:
   - question: >
-      Should `owner` and `action` be free strings, or should this schema
-      enforce they are non-empty at the schema layer (via `minLength`)?
-    decision: "minLength: 1 on both."
+      (2026-09-04 correction) Now that `decision/reversal.schema.yaml` is
+      known to already define this exact indicator/condition/action/owner
+      shape, should this file keep its own independent field definitions,
+      or embed the existing schema?
+    decision: >
+      Embed via `allOf: [{$ref: ".../reversal.schema.yaml#/definitions/single_indicator_form"}, {this file's own id/provenance/structured_rule/owner-required additions}]`.
     reasoning: >
-      Atlas's own named benefit for this method (L1990, "防組織因面子拒絕
-      改方向" -- prevents the organization refusing to change course to
-      save face) depends entirely on the criterion being genuinely
-      enforceable: a reversal criterion with an empty owner or action is
-      decorative, not a real commitment. Same "the record must actually do
-      the thing its own name claims" discipline `causal-dag-analysis.schema.yaml`'s
-      `acyclic_verified: const true` already established for a different
-      method -- here expressed as a minLength floor rather than a const,
-      since owner/action are legitimately free text, not a fixed value.
-  - question: "Should structured_rule be required, matching Atlas's own worked example (which happens to be structured)?"
-    decision: "Optional."
+      `reversal.schema.yaml`'s own `generality_note` explicitly invites
+      exactly this: "Any schema in this project that carries a decision...
+      may embed this file... as an array item when multiple independently-
+      actioned criteria are possible" -- this file's `criteria[]` is
+      precisely that case. Re-deriving the same four fields under
+      different names (this file's abandoned v1.0.0 `condition_description`
+      vs. the canonical `condition`) would have been the exact "no single
+      authoritative shape" problem CROSS-T-12 already tracks as CONFIRMED,
+      reintroduced by this session rather than closed by it.
+  - question: >
+      `single_indicator_form` makes `owner` OPTIONAL (Atlas's own bilingual-
+      policy array example, L53-60, has no owner field at all). Should this
+      file's embedding keep `owner` optional, matching the base schema
+      exactly, or require it?
+    decision: "Required, via this file's own additional allOf branch (`required: [owner]`)."
     reasoning: >
-      Atlas's own example is mechanically simple, but real reversal
-      criteria are frequently qualitative judgment calls with no clean
-      numeric threshold (e.g. 'if the platform team escalates twice in one
-      quarter'). Requiring structure would force every caller to either
-      invent a false numeric proxy or leave the field meaninglessly
-      populated -- forbidden by this codebase's own R4 discipline against
-      fabricating structure Atlas doesn't ask for.
+      `learning.reversal_criteria.contract.yaml`'s own precondition (every
+      criterion names a non-empty owner) is grounded specifically in Atlas
+      §11.33's version of this method (L1994, `owner: growth_lead` present
+      -- not the bilingual-policy example's ownerless array form, a
+      DIFFERENT mother-document usage of the same base schema). Tightening
+      `owner` to required for THIS method's own output is layering a
+      stricter, method-specific constraint on top of the shared base
+      schema's own deliberately looser one -- `allOf` composition is
+      exactly the JSON Schema mechanism for that, not a fork of the base
+      schema.
+  - question: "Should owner/action get a minLength:1 floor, matching v1.0.0's own reasoning?"
+    decision: "Yes, added via this file's own allOf branch (the base schema's own properties stay bare `type: string`, unmodified)."
+    reasoning: >
+      Same reasoning v1.0.0 already gave (Atlas's own named benefit --
+      preventing face-saving refusal to change course -- depends on a
+      genuinely non-empty, enforceable owner/action) is still valid; only
+      WHERE the constraint lives changed (this file's own additive branch,
+      not a redefinition of the base schema's properties).
 
 type: object
 required: [id, version, decision_ref, criteria, provenance]
@@ -87,60 +133,61 @@ properties:
   decision_ref:
     type: string
     description: >
-      Free-text reference to the decision this set monitors -- no hard
-      $ref, because `Decision` (docs/architecture/REPOSITORY_ARCHITECTURE.md's
-      own Shared Kernel ruling) has no real schema in this spec root yet.
-      See the method contract's OQ-REVERSALCRITERIA-1.
+      Free-text reference to the `Decision` (specs/decision/decision.schema.yaml,
+      already ACTIVE -- corrected 2026-09-04; v1.0.0 of this file
+      incorrectly claimed no Decision schema existed in this spec root at
+      all, see description) this set monitors. Kept as a free-text `id`
+      reference (not a hard `$ref` to the full Decision object) because
+      this method's own scope is producing criteria that COULD be attached
+      to a Decision record's own `reversal_conditions` array, not
+      constructing or mutating a Decision record itself -- see
+      OQ-REVERSALCRITERIA-1 (corrected) in the method contract.
 
   criteria:
     type: array
     minItems: 1
-    description: "One or more monitoring rules. Atlas's own worked example (L1980-1985) is a single criterion; multiple criteria per decision is a natural, undisclosed-as-invented extension (an array, not a forced single object)."
+    description: "One or more monitoring rules. Each item embeds decision/reversal.schema.yaml's own single_indicator_form -- see compilation_decisions."
     items:
-      type: object
-      required: [id, indicator, condition_description, action, owner, provenance]
-      properties:
-        id:
-          type: string
-          description: "Local id, unique within this set (e.g. RCS-001-C1)."
-        indicator:
-          type: string
-          description: "Atlas L1981 verbatim field name -- e.g. 'CAC' in the worked example."
-        condition_description:
-          type: string
-          description: "Atlas L1982 verbatim field ('condition'), renamed condition_description to avoid colliding with structured_rule's own machine-checkable 'condition'. Free text, always required -- e.g. '> 300 USD for 3 consecutive months'."
-        structured_rule:
-          type: ["object", "null"]
-          default: null
-          description: "Optional machine-evaluable form of condition_description. See compilation_decisions."
-          required: [operator, threshold, consecutive_periods]
+      allOf:
+        - $ref: "ai-lego://specs/decision/reversal.schema.yaml#/definitions/single_indicator_form"
+        - type: object
+          required: [id, owner, provenance]
           properties:
-            operator:
+            id:
               type: string
-              enum: [">", "<", ">=", "<=", "=="]
-            threshold:
-              type: number
-            consecutive_periods:
-              type: integer
-              minimum: 1
-              description: "Atlas's own worked example: '3 consecutive months' -- how many most-recent observations must all satisfy the comparison."
-        action:
-          type: string
-          minLength: 1
-          description: "Atlas L1983 verbatim field name -- e.g. 're_review' in the worked example. See compilation_decisions for the minLength floor."
-        owner:
-          type: string
-          minLength: 1
-          description: "Atlas L1984 verbatim field name -- e.g. 'growth_lead' in the worked example. See compilation_decisions for the minLength floor."
-        provenance:
-          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+              description: "Local id, unique within this set (e.g. RCS-001-C1). Not part of the base reversal.schema.yaml shape, which relies on array position for identity when embedded directly in decision.schema.yaml."
+            owner:
+              type: string
+              minLength: 1
+              description: "Tightened to required + non-empty for this method's own output -- see compilation_decisions. The base schema's own `owner` property (unmodified) stays optional/bare-string for its other consumers."
+            action:
+              type: string
+              minLength: 1
+              description: "Non-empty floor -- see compilation_decisions."
+            structured_rule:
+              type: ["object", "null"]
+              default: null
+              description: "Optional machine-evaluable form of condition/threshold. NOT part of decision/reversal.schema.yaml -- a genuine additive extension this method's own compute layer (ai_lego/compute/monitoring/triggers.py) needs and the base schema does not provide."
+              required: [operator, threshold, consecutive_periods]
+              properties:
+                operator:
+                  type: string
+                  enum: [">", "<", ">=", "<=", "=="]
+                threshold:
+                  type: number
+                consecutive_periods:
+                  type: integer
+                  minimum: 1
+                  description: "Atlas's own worked example: '3 consecutive months' -- how many most-recent observations must all satisfy the comparison."
+            provenance:
+              $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
 
   provenance:
     description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
     $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
 
 examples:
-  - description: "Atlas's own worked example, transcribed, plus a second qualitative (unstructured) criterion"
+  - description: "Atlas's own worked example, transcribed via the embedded base schema, plus a second qualitative (unstructured) criterion"
     value:
       id: "RCS-2026-09-04-001"
       version: "1.0.0"
@@ -149,14 +196,14 @@ examples:
       criteria:
         - id: "RCS-2026-09-04-001-C1"
           indicator: "CAC"
-          condition_description: "> 300 USD for 3 consecutive months"
+          condition: "> 300 USD for 3 consecutive months"
           structured_rule: {operator: ">", threshold: 300, consecutive_periods: 3}
           action: "re_review"
           owner: "growth_lead"
           provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
         - id: "RCS-2026-09-04-001-C2"
           indicator: "客服團隊升級投訴次數"
-          condition_description: "單一季度內平台團隊升級投訴達兩次"
+          condition: "單一季度內平台團隊升級投訴達兩次"
           structured_rule: null
           action: "escalate_to_leadership_review"
           owner: "product_lead"
@@ -172,18 +219,32 @@ open_questions:
       fire"), or does that belong on a separate typed object entirely
       (an evaluation-event record, not the criteria definition itself)?
     owner: "operator, or whoever next wires this method's structured_rule evaluation into a real monitoring pipeline"
-    blocks: "nothing in this file's own validity -- ai_lego/modules/learning/reversal_criteria.py's evaluate_criterion function returns a fresh verdict each call rather than mutating this record"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/learning/reversal_criteria.py's evaluate_criterion_trigger function returns a fresh verdict each call rather than mutating this record"
+  - id: "OQ-REVERSALCRITERIASET-2"
+    question: >
+      Should `structured_rule` be proposed as a real additive field ON
+      `decision/reversal.schema.yaml` itself (so every consumer of that
+      schema gains machine-evaluable rules, not just this method's own
+      wrapper), rather than living only in this file's own allOf extension?
+    owner: "operator, or whoever next needs structured_rule outside this method's own output"
+    blocks: "nothing in this file's own validity -- the allOf composition works correctly either way"
 
 verification:
   method: >
-    Read Atlas §11.33 (L1971-1995) directly at the cited lines, including
-    the worked YAML example's exact field names and values. Validated
-    against jsonschema Draft202012Validator (required fields present, id
-    pattern satisfied, owner/action minLength enforced, structured_rule's
-    operator enum closed).
+    Read Atlas §11.33 (L1971-1995) directly at the cited lines. Read
+    `specs/decision/reversal.schema.yaml` and `specs/decision/decision.schema.yaml`
+    in full (2026-09-04, this session, after v1.0.0 had already been
+    committed) and confirmed the exact field-shape overlap described above.
+    Validated the corrected v1.1.0 against jsonschema Draft202012Validator,
+    including a real allOf composition check (the embedded base schema's
+    own `anyOf: [condition, threshold]` plus this file's own additional
+    required/minLength constraints all apply correctly to the same
+    instance).
   note: >
-    `indicator`/`condition_description`/`action`/`owner` are transcribed
-    verbatim from Atlas's own worked example field names and values
-    (L1980-1985). `structured_rule` and the minLength enforcement are
-    Phase 3-class compilation decisions, explicitly flagged above. No
-    mother document was modified to produce this file.
+    v1.0.0's `indicator`/`condition_description`/`action`/`owner` field
+    definitions are RETIRED in favor of embedding
+    `decision/reversal.schema.yaml#/definitions/single_indicator_form`.
+    `structured_rule` and the minLength enforcement remain this file's own
+    genuine additions, now clearly separated from the base shape via
+    `allOf` rather than redefined alongside it. No mother document was
+    modified to produce this file.
