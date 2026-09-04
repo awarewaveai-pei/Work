@@ -1,0 +1,166 @@
+$id: "ai-lego://methods/contracts/devops_sre.error_budget.contract.yaml"
+title: "Error Budget Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-fourth Method Atlas slice, fifth from the
+  `devops_sre` family (F19's own "DevOps／SRE／可靠性套件") -- a fifth
+  member tool of that pack built, after `devops_sre.sli_slo`,
+  `devops_sre.canary_deployment`, `devops_sre.chaos_engineering`, and
+  `devops_sre.blue_green_deployment`.
+
+  Atlas gives this method TWO independent citations, not one: the F19
+  tool table row (L851: "1-SLO→budget→burn rate→release policy") gives a
+  real, computable 4-step pipeline; §11.40 (L2148-2159) gives a dedicated
+  section with purpose and 3 benefit bullets. The second benefit bullet
+  (L2156: "Error budget burn 太快時自動降低 release risk" -- burn too
+  fast, automatically lower release risk) is a real, enforceable
+  invariant this contract enforces: a record whose computed burn rate has
+  reached or exceeded the budget (`budget_exhausted: true`) cannot claim
+  `release_policy: unrestricted`.
+
+  Structurally closer to `root_cause.pareto`/`decision.ahp`/
+  `decision.mcda` than to its own `devops_sre` siblings: `error_budget_
+  ratio` and `burn_rate` are CALCULATED_RESULT -- real deterministic
+  compute (`ai_lego/compute/error_budget/budget.py`), not a narrative
+  claim a caller asserts. This is the first `devops_sre`-family contract
+  built on genuine-compute discipline rather than evidence/operational-
+  planning discipline -- `quality.evidence_labeling_required` is
+  therefore false, the same departure `root_cause.pareto.contract.yaml`'s
+  own `compilation_decisions` already reasoned through for the identical
+  class of method.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Error Budget row (L851): '1-SLO→budget→burn rate→release policy'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.40 錯誤預算（Error Budget）(L2148-2159) -- purpose, 3 benefit bullets"
+  - "methods/registry/method-inventory.yaml Error Budget entry (L1127-1131): category 'F19 devops-sre', no machine_id -- this contract mints one"
+  - "methods/contracts/root_cause.pareto.contract.yaml -- the evidence_labeling_required:false precedent this contract's own quality flags reuse the reasoning of, not the content of"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-second
+  concrete entry. `id: devops_sre.error_budget` mints a new machine_id.
+  `family: devops_sre` reused as-is.
+
+id: devops_sre.error_budget
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [CALCULATE, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula naming
+# this method). Atlas's own L851 formula maps directly: "1-SLO→budget→
+# burn rate" is CALCULATE, checking burn rate against the budget is
+# VALIDATE, and setting release_policy from that check is DECIDE --
+# DECIDE is a real kernel member, already cited (not inferred) by
+# decision.ahp.contract.yaml's own "AHP = COMPARE + WEIGHT + PRIORITIZE +
+# DECIDE" (Atlas §4 L192).
+
+purpose:
+  - convert_a_reliability_target_into_a_spendable_failure_budget_that_gates_release_risk
+inputs:
+  required: [ServiceUnderMeasurement]
+  optional: []
+outputs: [ErrorBudgetRecord]
+preconditions:
+  - "slo_target_ratio is strictly between 0 and 1 (exclusive both ends)"
+  - "observed_failure_rate is between 0 and 1 inclusive"
+  - "budget_exhausted:true (computed: burn_rate >= 1.0) forbids release_policy:unrestricted"
+  # The third precondition is directly implied by Atlas's own benefit
+  # text (L2156) -- same "raise before construction on a real,
+  # Atlas-implied structural rule" discipline every prior forbidden-state
+  # guard in this family already established.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same departure root_cause.pareto.contract.yaml's own
+  # compilation_decisions already reasoned through for an identical class
+  # of method: the real risk here is a computation-integrity risk (is
+  # burn_rate genuinely computed, not "mentally calculated" by an LLM),
+  # not an evidence-citation risk. Copying evidence_labeling_required:
+  # true from the four narrative/operational-planning devops_sre
+  # siblings would misrepresent what this method's own real risk is.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Error Budget row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method within the F19
+# pack, same as its four sibling devops_sre entries.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free; the real release-policy
+  # enforcement it may describe is outside this method's own scope --
+  # same plan-vs-real-effect distinction every prior operational
+  # devops_sre contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      SliSloSet (devops_sre.sli_slo's own output) already has an
+      `indicators[].slo_target` field -- should ErrorBudgetRecord consume
+      that directly instead of defining its own `slo_target_ratio`?
+    decision: "No -- ErrorBudgetRecord defines its own numeric slo_target_ratio; an OPTIONAL related_slo_id field links back to a SliSloSet for traceability, nothing more."
+    reasoning: >
+      `sli-slo-set.schema.yaml`'s own `indicators[].slo_target` is
+      deliberately free text (e.g. "99.9% over 30 days") -- it was built
+      to carry a human-readable target expression, not a machine-parseable
+      ratio. Parsing that string here would mean silently inventing a
+      text-to-number grammar Atlas never specifies (percentages, rolling
+      windows, and unit conventions all vary by author). Requiring a
+      fresh, explicit `slo_target_ratio: float` input keeps this
+      contract's own compute honest -- the caller states the number
+      being budgeted against directly, and `related_slo_id` (optional)
+      preserves the link to a real SliSloSet without forcing a fragile
+      text-parsing dependency between two independently-evolving typed
+      objects.
+  - question: >
+      Atlas's own benefit text (L2156-2157) describes TWO effects of a
+      fast burn rate -- "自動降低 release risk" (auto-lower release
+      risk) and, in the next bullet, avoiding both "永遠不能改" (never
+      allowed to change) and "隨便改" (change carelessly) -- should
+      `release_policy` be a continuous/3+-value scale to capture a
+      gradual "lowered risk" rather than a hard binary?
+    decision: "Binary enum [unrestricted, frozen], gated by a single threshold (budget_exhausted: burn_rate >= 1.0)."
+    reasoning: >
+      Atlas gives no numeric intermediate threshold anywhere in this
+      section (no "restrict releases at 80% burn" or similar) -- inventing
+      graduated tiers would be fabricating a policy Atlas never states,
+      the same discipline `root_cause.pareto.contract.yaml`'s own refusal
+      to invent an 80/20 default already established for a sibling
+      caution. The one genuinely Atlas-implied threshold is full
+      exhaustion (the budget is gone), which this contract enforces; a
+      caller who wants graduated throttling can express intermediate
+      `release_policy` values as a future extension without breaking this
+      contract's own binary invariant, but this contract does not invent
+      that scale itself.
+
+open_questions:
+  - id: "OQ-ERRORBUDGET-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ERRORBUDGET-2"
+    question: >
+      `related_slo_id` is a soft, unenforced text link to a SliSloSet id
+      (no hard $ref to a specific indicator, see compilation_decisions
+      above) -- should a future revision add a runtime cross-check that
+      the referenced SliSloSet actually exists and contains a matching
+      indicator, the way root_cause.pareto's dataset precondition checks
+      against a real CauseHypothesisSet?
+    owner: "operator, or whoever next wires ErrorBudgetRecord into a real cross-method chain with devops_sre.sli_slo"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L851) and §11.40 (L2148-2159)
+    directly. Read root_cause.pareto.contract.yaml and decision.ahp
+    .contract.yaml in full before reusing their evidence_labeling_required
+    reasoning and DECIDE primitive citation respectively -- not copied
+    blind. Grepped `specs/` for "error budget"/"burn rate" before writing
+    -- no duplicate typed object found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-step formula and the
+    burn-too-fast benefit text are both directly grounded in Atlas's own
+    cited text. `slo_target_ratio` as a fresh numeric field (rather than
+    parsing SliSloSet's free-text slo_target) and the binary
+    `release_policy` enum are both disclosed compilation choices, not
+    silent inventions -- see compilation_decisions above.

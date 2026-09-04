@@ -1,0 +1,67 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/error-budget-record.schema.yaml"
+target_ref: ""
+description: "Exercises ErrorBudgetRecord's required fields and the release_policy enum."
+
+valid:
+  - name: healthy_budget_unrestricted
+    instance:
+      id: "EB-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.error_budget"
+      related_slo_id: "SLO-2026-09-04-001"
+      service_under_measurement: "Checkout API"
+      slo_target_ratio: 0.999
+      observed_failure_rate: 0.0005
+      error_budget_ratio: 0.001
+      burn_rate: 0.5
+      budget_exhausted: false
+      release_policy: unrestricted
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.error_budget.budget.calculate_burn_rate"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+  - name: exhausted_budget_frozen
+    instance:
+      id: "EB-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.error_budget"
+      service_under_measurement: "Checkout API"
+      slo_target_ratio: 0.999
+      observed_failure_rate: 0.002
+      error_budget_ratio: 0.001
+      burn_rate: 2.0
+      budget_exhausted: true
+      release_policy: frozen
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.error_budget.budget.calculate_burn_rate"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_burn_rate
+    instance:
+      id: "EB-2026-09-05-003"
+      version: "1.0.0"
+      service_under_measurement: "x"
+      slo_target_ratio: 0.999
+      observed_failure_rate: 0.0005
+      error_budget_ratio: 0.001
+      budget_exhausted: false
+      release_policy: unrestricted
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.error_budget.budget.calculate_burn_rate"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "burn_rate is required -- this method's own computed core output, missing here."
+  - name: invalid_release_policy_enum_value
+    instance:
+      id: "EB-2026-09-05-004"
+      version: "1.0.0"
+      service_under_measurement: "x"
+      slo_target_ratio: 0.999
+      observed_failure_rate: 0.0005
+      error_budget_ratio: 0.001
+      burn_rate: 0.5
+      budget_exhausted: false
+      release_policy: "throttled"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.error_budget.budget.calculate_burn_rate"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "release_policy is enum [unrestricted, frozen] -- 'throttled' is not a member (see method contract compilation_decisions for why this is binary, not graduated)."

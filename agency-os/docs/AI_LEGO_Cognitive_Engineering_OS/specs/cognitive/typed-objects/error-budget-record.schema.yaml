@@ -1,0 +1,119 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/error-budget-record.schema.yaml"
+title: Error Budget Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ErrorBudgetRecord` -- the
+  declared `outputs` of `devops_sre.error_budget`'s Method Contract.
+  Fifth `devops_sre`-family typed object, and the first one whose core
+  fields are CALCULATED_RESULT (real deterministic compute via
+  `ai_lego/compute/error_budget/budget.py`), not a narrative or
+  operational-planning claim the way its four sibling typed objects in
+  this directory are. Atlas §11.40's own formula (F19 tool table L851:
+  "1-SLO→budget→burn rate→release policy") maps onto `slo_target_ratio`
+  (caller-supplied) -> `error_budget_ratio`/`burn_rate` (computed) ->
+  `release_policy` (gated). The burn-too-fast benefit text (L2156) maps
+  onto the `budget_exhausted`/`release_policy` cross-field invariant
+  (enforced at the runtime layer, see method contract preconditions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Error Budget row (L851)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.40 錯誤預算（Error Budget）(L2148-2159)"
+  - "methods/contracts/devops_sre.error_budget.contract.yaml"
+  - "specs/cognitive/typed-objects/pareto-analysis.schema.yaml -- the engine/computation_provenance_ref/provenance shape this file's own top-level fields mirror (same CALCULATED_RESULT class of typed object)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, service_under_measurement, slo_target_ratio, observed_failure_rate, error_budget_ratio, burn_rate, budget_exhausted, release_policy, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^EB-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.error_budget"
+  service_under_measurement:
+    type: string
+    minLength: 1
+    description: "Same named concept devops_sre.sli_slo's own SliSloSet.service_under_measurement already carries -- what this budget is measured against."
+  related_slo_id:
+    type: string
+    pattern: "^SLO-"
+    description: "OPTIONAL soft link to a devops_sre.sli_slo SliSloSet.id for traceability -- not a hard $ref, and not runtime-cross-checked to exist (see method contract compilation_decisions and OQ-ERRORBUDGET-2)."
+  slo_target_ratio:
+    type: number
+    exclusiveMinimum: 0
+    exclusiveMaximum: 1
+    description: "Atlas L851 step 1's own 'SLO', as an explicit numeric ratio (e.g. 0.999 for 99.9%) -- caller-supplied, NEVER parsed from SliSloSet's own free-text slo_target field (see method contract compilation_decisions)."
+  observed_failure_rate:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "The actual measured failure ratio over the caller's own measurement window -- caller-supplied."
+  error_budget_ratio:
+    type: number
+    exclusiveMinimum: 0
+    exclusiveMaximum: 1
+    description: "COMPUTED, never caller-supplied: 1 - slo_target_ratio (ai_lego.compute.error_budget.budget.calculate_error_budget_ratio)."
+  burn_rate:
+    type: number
+    minimum: 0
+    description: "COMPUTED, never caller-supplied: observed_failure_rate / error_budget_ratio (ai_lego.compute.error_budget.budget.calculate_burn_rate). 1.0 means the budget is exactly fully consumed; values above 1.0 mean it is exceeded."
+  budget_exhausted:
+    type: boolean
+    description: "COMPUTED: burn_rate >= 1.0. Cross-checked against release_policy at the runtime layer, not the schema layer -- see method contract preconditions."
+  release_policy:
+    enum: [unrestricted, frozen]
+    description: "budget_exhausted:true forbids release_policy:unrestricted -- enforced at the runtime layer (ai_lego/modules/devops_sre/error_budget.py), not the schema layer. Binary, not graduated -- see method contract compilation_decisions for why."
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every CALCULATED_RESULT typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'."
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed burn_rate, resolvable via importlib -- same convention modules/research/gates.py's evaluate_statistical_gate already checks."
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine error-budget run -- the full 11-value enum remains legal at the schema layer, enforced at the gate layer instead."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A healthy budget (burn rate under 1.0), release policy unrestricted"
+    value:
+      id: "EB-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.error_budget"
+      related_slo_id: "SLO-2026-09-04-001"
+      service_under_measurement: "Checkout API"
+      slo_target_ratio: 0.999
+      observed_failure_rate: 0.0005
+      error_budget_ratio: 0.001
+      burn_rate: 0.5
+      budget_exhausted: false
+      release_policy: unrestricted
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.error_budget.budget.calculate_burn_rate"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "An exhausted budget (burn rate at 2x), release policy frozen"
+    value:
+      id: "EB-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.error_budget"
+      service_under_measurement: "Checkout API"
+      slo_target_ratio: 0.999
+      observed_failure_rate: 0.002
+      error_budget_ratio: 0.001
+      burn_rate: 2.0
+      budget_exhausted: true
+      release_policy: frozen
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.error_budget.budget.calculate_burn_rate"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas's F19 tool table row (L851) and §11.40 (L2148-2159) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 4-step formula is directly transcribed into the field pipeline. The exhausted-forbids-unrestricted invariant is enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

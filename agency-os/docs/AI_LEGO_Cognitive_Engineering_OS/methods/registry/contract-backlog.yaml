@@ -730,6 +730,33 @@ tier_1:
       a real sequencing rule, not itself cited elsewhere as a repeated
       teaching example. Tier 1, mandated by the actively-running
       implementation slice, same category as the twenty entries above it.
+  twentysecond_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-second Tier 1 entry, same
+    # additive-key rationale as the twenty-one entries above it.
+    method_id: "devops_sre.error_budget"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Fifth entry from
+      the `devops_sre` family, a fifth member tool of F19's own pack
+      built. Atlas gives this method two independent citations: the F19
+      tool table row (L851: "1-SLO→budget→burn rate→release policy") and
+      a dedicated §11.40 section (L2148-2159). The second benefit bullet
+      (L2156: burn too fast automatically lowers release risk) directly
+      implies a real invariant -- budget_exhausted:true (computed:
+      burn_rate >= 1.0) forbids release_policy:unrestricted. Structurally
+      different from its four devops_sre siblings: error_budget_ratio and
+      burn_rate are CALCULATED_RESULT, real deterministic compute
+      (ai_lego/compute/error_budget/budget.py), reusing
+      modules.research.gates.evaluate_statistical_gate UNCHANGED (a
+      fourth reuse, after root_cause.pareto/decision.ahp/decision.mcda).
+    source: "methods/contracts/devops_sre.error_budget.contract.yaml (built same session as this entry, mints machine_id devops_sre.error_budget) + specs/cognitive/typed-objects/error-budget-record.schema.yaml (new output type) + ai_lego/compute/error_budget/budget.py (new compute module)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.40 is a dedicated section plus
+      an independent tool-table formula row, not itself cited elsewhere
+      as a repeated teaching example. Tier 1, mandated by the
+      actively-running implementation slice, same category as the
+      twenty-one entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
