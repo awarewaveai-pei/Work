@@ -52,6 +52,7 @@
 | `specs/cognitive/typed-objects/red-team-challenge.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, dimensions_examined, findings, provenance] properties[7] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
+| `specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, legacy_system_under_migration, seams, slices, provenance] properties[7] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |
 | `specs/cognitive/typed-objects/system-context-model.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_context, containers, provenance] properties[8] |
 | `specs/decision/decision.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, question, options, human_judgment_pending, provenance] properties[24] |

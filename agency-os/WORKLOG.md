@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-04（續32，同一 session：Cognitive OS 第十九個 Method Atlas 切片 — `architecture.strangler_fig`，誠實揭露不強制階段順序）
+
+**觸發**：延續操作者授權。0 agent。
+
+**選型**：Strangler Fig Pattern（F18 表格列，seam→small slice→verify→expand→retire old，業界真實 Fowler 漸進替換模式）。每個 slice 參照真實 seam（結構必要跨欄位參照，同 C4/system_context_model 的 container/component 參照同一等級），CLI 真跑攻擊（建構參照不存在 seam 的 slice）確認被擋。**刻意不強制階段順序**：`status` 是單一封閉 enum 快照（planned/verified/expanded/retired），不是強制狀態機——Atlas 沒給任何 transition-history 形狀可驗證「有沒有跳過某階段」，發明一個會是編造沒引用支撐的結構，contract 明文揭露這是範圍限制非疏漏。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.strangler_fig.contract.yaml`＋`specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.seventeenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/strangler_fig.py`（builder+seam-integrity 不變量+2 gate）＋`ai_lego/apps/cli/run_strangler_fig_slice.py`（真實遷移計畫+攻擊驗證）＋`tests/unit/test_strangler_fig.py`（10 tests 第一次跑全綠）＋`docs/NINETEENTH_SLICE_ARCHITECTURE_STRANGLER_FIG.md`。`modules/architecture/__init__.py` docstring 補第八租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_strangler_fig_slice` | exit=0 | result=第一次真跑就通過（含 seam-integrity 不變量攻擊驗證）：`PASS architecture.strangler_fig: seams=1, slices=2, gates [provenance_required=PASS, slice_seam_integrity=PASS], seam_integrity_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_strangler_fig -v` | exit=0 | ms=870 | result=10 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2680→2689
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=59421 | result=**481 tests OK**（471→481，零回歸；`git diff --stat` 對照 10 個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]strangler_fig\|StranglerFigPlan\|strangler-fig-plan\|run_strangler_fig_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-STRANGLERFIG-1`（階段順序未強制）；`OQ-STRANGLERFIG-2`（method-inventory.yaml 無機器 id 列）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit。
+
 ## 2026-09-04（續31，同一 session：Cognitive OS 第十八個 Method Atlas 切片 — `architecture.fitness_functions`，自我指涉：治理規則管到本 codebase 自己）
 
 **觸發**：延續操作者授權。0 agent。

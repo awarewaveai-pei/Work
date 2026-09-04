@@ -1,0 +1,50 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml"
+target_ref: ""
+description: "Exercises StranglerFigPlan's required fields, the seams[]/slices[] minItems:1 guards, and the 4-value status enum."
+
+valid:
+  - name: one_seam_two_slices_different_stages
+    instance:
+      id: "SFP-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.strangler_fig"
+      legacy_system_under_migration: "legacy order monolith"
+      seams:
+        - {id: "S1", label: "order query API"}
+      slices:
+        - {id: "SL1", seam_id: "S1", label: "order query moved to new service", status: expanded}
+        - {id: "SL2", seam_id: "S1", label: "order creation moved to new service", status: planned}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_retired_slice
+    instance:
+      id: "SFP-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.strangler_fig"
+      legacy_system_under_migration: "legacy auth service"
+      seams:
+        - {id: "S1", label: "login endpoint"}
+      slices:
+        - {id: "SL1", seam_id: "S1", label: "login moved to new auth service", status: retired}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: seams_below_minitems_1
+    instance:
+      id: "SFP-2026-09-04-003"
+      version: "1.0.0"
+      legacy_system_under_migration: "x"
+      seams: []
+      slices: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "seams has minItems: 1 -- a plan with zero seams has no insertion point for new code."
+  - name: invalid_status_enum_value
+    instance:
+      id: "SFP-2026-09-04-004"
+      version: "1.0.0"
+      legacy_system_under_migration: "x"
+      seams:
+        - {id: "S1", label: "x"}
+      slices:
+        - {id: "SL1", seam_id: "S1", label: "x", status: "in_progress"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "slices[].status is enum [planned, verified, expanded, retired] -- 'in_progress' is not a member."

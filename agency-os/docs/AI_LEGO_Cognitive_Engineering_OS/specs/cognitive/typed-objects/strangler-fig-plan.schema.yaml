@@ -1,0 +1,81 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml"
+title: Strangler Fig Plan
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StranglerFigPlan` -- the
+  declared `outputs` of `architecture.strangler_fig`'s Method Contract.
+  Eighth `architecture`-family typed object. Each `slices[]` entry
+  references a real `seams[]` entry (a structurally-necessary parent
+  reference, same class `system-context-model.schema.yaml`'s own
+  container/component cross-reference already established), and carries
+  a `status` snapshot matching Atlas's own stage names -- not an
+  enforced state machine, see the method contract's own
+  compilation_decisions for why.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Strangler Fig Pattern row (L824)"
+  - "methods/contracts/architecture.strangler_fig.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, legacy_system_under_migration, seams, slices, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^SFP-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "architecture.strangler_fig"
+  legacy_system_under_migration:
+    type: string
+    minLength: 1
+  seams:
+    type: array
+    minItems: 1
+    description: "Atlas L824's own 'seam' stage -- points where new code can be inserted alongside the legacy system."
+    items:
+      type: object
+      required: [id, label]
+      properties:
+        id: {type: string}
+        label: {type: string}
+  slices:
+    type: array
+    minItems: 1
+    description: "Atlas L824's own 'small slice→verify→expand→retire old' stages, one entry per migration slice."
+    items:
+      type: object
+      required: [id, seam_id, label, status]
+      properties:
+        id: {type: string}
+        seam_id: {type: string}
+        label: {type: string}
+        status:
+          enum: [planned, verified, expanded, retired]
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a migration plan is structured architectural planning, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "One seam, two slices at different stages"
+    value:
+      id: "SFP-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.strangler_fig"
+      legacy_system_under_migration: "舊版訂單系統（monolith）"
+      seams:
+        - {id: "S1", label: "訂單查詢 API"}
+      slices:
+        - {id: "SL1", seam_id: "S1", label: "訂單查詢改走新服務", status: expanded}
+        - {id: "SL2", seam_id: "S1", label: "訂單建立改走新服務", status: planned}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas's F18 tool table row (L824) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 5-stage pipeline is transcribed as a snapshot status enum, not an enforced sequence -- disclosed, not silently unenforced. No mother document was modified."

@@ -1,0 +1,88 @@
+$id: "ai-lego://methods/contracts/architecture.strangler_fig.contract.yaml"
+title: "Strangler Fig Pattern Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Nineteenth Method Atlas slice, eighth from the
+  `architecture` family (F18's own "Software Architecture Pack") -- an
+  eighth member tool built, still not the whole pack.
+
+  Atlas's own F18 tool table (L824) gives this method a 5-stage pipeline:
+  "seam→small slice→verify→expand→retire old", the real, widely-known
+  Strangler Fig migration pattern (Fowler) for replacing a legacy system
+  incrementally rather than a big-bang rewrite. No dedicated §11.x
+  section, but the pipeline's own stages map directly onto a real
+  cross-reference structure: each migration slice belongs to a real,
+  named seam -- the same class of structurally-necessary parent reference
+  `architecture.system_context_model`'s own container/component
+  cross-reference already established.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Strangler Fig Pattern row (L824): 'seam→small slice→verify→expand→retire old'"
+  - "methods/registry/method-inventory.yaml Strangler Fig Pattern entry (L1107-1111): category 'F18 architecture', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a seventeenth
+  concrete entry. `id: architecture.strangler_fig` mints a new machine_id.
+  `family: architecture` reused as-is.
+
+id: architecture.strangler_fig
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+purpose:
+  - replace_a_legacy_system_incrementally_by_seam_rather_than_a_big_bang_rewrite
+inputs:
+  required: [LegacySystemUnderMigration]
+  optional: []
+outputs: [StranglerFigPlan]
+preconditions:
+  - "at least 1 seam supplied"
+  - "at least 1 slice supplied, each referencing a real seam_id"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should each slice's status enforce Atlas's own stage ORDER (verify before expand before retire old) as a state-machine transition guard?"
+    decision: "No -- status is a single closed-enum snapshot field (planned/verified/expanded/retired), not a transition-guarded state machine."
+    reasoning: >
+      Atlas's own pipeline names a real stage sequence but gives no
+      transition-log or history shape to validate skipped stages
+      against -- a single snapshot record cannot detect 'was this slice
+      ever actually verified before being marked expanded' without
+      inventing an audit-trail structure Atlas never describes. Same
+      restraint every under-specified pipeline stage in this session's
+      other contracts already applies (e.g. neither AHP's nor MCDA's own
+      Sensitivity stage is enforced as a computed check). The enum's own
+      4 values are still ordered to match Atlas's own stage names,
+      disclosed as a snapshot, not an enforced sequence.
+
+open_questions:
+  - id: "OQ-STRANGLERFIG-1"
+    question: "Should a future revision add a transition-history shape (e.g. status_history[]) to actually enforce Atlas's own stage order, once a worked example or operator requirement is found?"
+    owner: "operator, or whoever next needs enforced migration-stage ordering"
+    blocks: "nothing in this file's own validity -- a snapshot status is a complete, honest v1"
+  - id: "OQ-STRANGLERFIG-2"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F18 tool table row (L824) directly -- confirmed no
+    dedicated §11.x section exists. Grepped `specs/` for "strangler
+    fig"/"seam"+"legacy" before writing -- no duplicate typed object
+    found. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-stage pipeline is directly
+    transcribed as a snapshot status enum, not an enforced state machine
+    -- disclosed as a scope limit, not a silent omission.
