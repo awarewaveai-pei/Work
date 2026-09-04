@@ -1,6 +1,6 @@
 ﻿# staging 站三層對帳（SG 檔案 / MariaDB / Supabase wp_sites）
 
-- generated: 2026-08-29T00:20:15Z
+- generated: 2026-09-03T16:52:27Z
 - verdict: **WARN**
 - staging 磁碟用量: 0 MB
 - 孤兒總數: 0（complete: 0）

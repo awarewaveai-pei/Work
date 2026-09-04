@@ -1,6 +1,6 @@
 {
-    "generatedAt":  "2026-09-03T04:46:20.7941593Z",
-    "overall":  "PASS",
+    "generatedAt":  "2026-09-04T14:41:07.6180834Z",
+    "overall":  "FAIL",
     "fatal":  false,
     "fatalReason":  "",
     "policy":  {
@@ -29,41 +29,41 @@
                                    "ok":  true,
                                    "error":  "",
                                    "mem_total_kb":  131877056,
-                                   "mem_avail_kb":  117768556,
-                                   "mem_used_kb":  14108500,
-                                   "mem_used_pct":  10.7,
-                                   "swap_used_pct":  9.4,
+                                   "mem_avail_kb":  119357424,
+                                   "mem_used_kb":  12519632,
+                                   "mem_used_pct":  9.5,
+                                   "swap_used_pct":  2.2,
                                    "psi_mem_some":  0,
                                    "psi_mem_full":  0,
                                    "psi_io_some":  0,
-                                   "psi_cpu_some":  7.75,
-                                   "oom_vmstat":  0,
-                                   "oom_journal":  0,
+                                   "psi_cpu_some":  7.12,
+                                   "oom_vmstat":  1,
+                                   "oom_journal":  1,
                                    "disk_total_kb":  981183088,
-                                   "disk_used_kb":  88546168,
+                                   "disk_used_kb":  91263408,
                                    "disk_pct":  10,
                                    "inode_pct":  4,
                                    "containers_running":  42,
                                    "containers_total":  42,
                                    "containers_unhealthy":  0,
-                                   "restarts":  "",
+                                   "restarts":  "trigger-webapp(1)",
                                    "restarts_measured":  true,
                                    "docker_present":  true,
-                                   "top_mem":  "trigger-webapp=2.473GiB postiz=1.217GiB soulful-wp=946.3MiB soulful-db=620.3MiB supabase-kong=471MiB trigger-clickhouse=466MiB",
+                                   "top_mem":  "postiz=1.23GiB soulful-wp=967.7MiB soulful-db=800.3MiB trigger-webapp=759.2MiB supabase-kong=474.6MiB trigger-clickhouse=457MiB",
                                    "reclaimable":  "Images=677.4MB (1%),Containers=0B (0%),Local Volumes=183.5MB (0%),Build Cache=0B",
                                    "cpu_cores":  32,
-                                   "load1":  1.02,
-                                   "uptime_days":  2
+                                   "load1":  10.95,
+                                   "uptime_days":  4
                                }
               },
     "verdicts":  {
                      "ks-aw-01":  {
-                                      "level":  0,
+                                      "level":  2,
                                       "blind":  [
 
                                                 ],
                                       "reasons":  [
-
+                                                      "OOM kills observed: 1 (vmstat=1, journal=1)"
                                                   ]
                                   }
                  },

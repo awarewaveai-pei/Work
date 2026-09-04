@@ -536,10 +536,9 @@ ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
 詳細操作規則（Routing 三件套 / 自動化安全預設 / Auto-Repair 紅線 / Trigger.dev 憑證 / 其他 SSOT）見 AGENTS.md §Lobster Factory 操作規則 及 §Auto-Repair 紅線。
 
-
 ## Related Documents (Auto-Synced)
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-09-04 02:19:06 UTC_
+_Last synced: 2026-09-04 14:48:33 UTC_
 

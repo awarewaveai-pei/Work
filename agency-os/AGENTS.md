@@ -1,4 +1,4 @@
-# AGENTS.md - Agency Operating Rules
+﻿# AGENTS.md - Agency Operating Rules
 
 > **精簡版（2026-09-04 第二次瘦身）**。本檔經 `CLAUDE.md` 首行 `@agency-os/AGENTS.md` 每輪整份注入 prompt，只留每輪都要用的規則。條文末尾的 `§名` 指向 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md)（理由、案例、機制細節與**精簡前逐字全文**，仍為強制）；觸發語／路由／hooks 清單在 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)。規則寫法：一行「做什麼」＋至多一行「為什麼」；事故敘事一律進 APPENDIX 或 WORKLOG，不進本檔。其他文件引用 `AGENTS.md §舊段名` 時，到 APPENDIX「精簡前全文存檔」找同名標題。
 
@@ -119,5 +119,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-04 02:19:06 UTC_
+_Last synced: 2026-09-04 14:48:33 UTC_
 
