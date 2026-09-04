@@ -1238,6 +1238,230 @@
       "module": "core",
       "requires": [],
       "description": "Automated tests cover the system's critical paths and are periodically proven non-vacuous."
+    },
+    {
+      "id": "CAP-EMAIL-MARKETING",
+      "name": "電子郵件行銷",
+      "module": "marketing",
+      "requires": [],
+      "description": "系統需要主動寄送行銷/推廣性質的電子郵件給名單。"
+    },
+    {
+      "id": "CAP-CAMPAIGNS",
+      "name": "行銷活動管理",
+      "module": "marketing",
+      "requires": [],
+      "description": "規劃、追蹤行銷活動的預算、時程與成效。"
+    },
+    {
+      "id": "CAP-LEAD-GEN",
+      "name": "名單蒐集與資格認定",
+      "module": "marketing",
+      "requires": [],
+      "description": "透過表單/著陸頁蒐集潛在客戶名單並判斷其成交可能性。"
+    },
+    {
+      "id": "CAP-MARKETING-AUTOMATION",
+      "name": "行銷自動化流程",
+      "module": "marketing",
+      "requires": [],
+      "description": "依名單行為自動觸發後續行銷訊息序列。"
+    },
+    {
+      "id": "CAP-AB-TESTING",
+      "name": "行銷內容 A/B 測試",
+      "module": "marketing",
+      "requires": [],
+      "description": "同時跑兩個版本的行銷頁面或郵件並比較成效。"
+    },
+    {
+      "id": "CAP-SEGMENTATION",
+      "name": "名單分眾／受眾區隔",
+      "module": "marketing",
+      "requires": [],
+      "description": "把行銷名單依條件分組、針對不同群體發送不同內容。"
+    },
+    {
+      "id": "CAP-TICKETING",
+      "name": "客服工單系統",
+      "module": "customer_service",
+      "requires": [],
+      "description": "客戶問題建成工單、追蹤處理進度與負責人。"
+    },
+    {
+      "id": "CAP-LIVE-CHAT",
+      "name": "即時線上客服對話",
+      "module": "customer_service",
+      "requires": [],
+      "description": "客戶可在網站/App 裡即時打字跟客服對話。"
+    },
+    {
+      "id": "CAP-KNOWLEDGE-BASE",
+      "name": "知識庫／常見問題自助查詢",
+      "module": "customer_service",
+      "requires": [],
+      "description": "客戶可自助查詢常見問題解答，不需真人客服回覆。"
+    },
+    {
+      "id": "CAP-SLA-TRACKING",
+      "name": "客服回應時效追蹤",
+      "module": "customer_service",
+      "requires": [],
+      "description": "追蹤工單回應/解決時效並對超時提出警示。"
+    },
+    {
+      "id": "CAP-CSAT",
+      "name": "客服滿意度調查",
+      "module": "customer_service",
+      "requires": [],
+      "description": "服務結束後詢問客戶滿意度並記錄評分。"
+    },
+    {
+      "id": "CAP-CALL-CENTER",
+      "name": "電話客服／客服中心整合",
+      "module": "customer_service",
+      "requires": [],
+      "description": "透過電話或客服中心系統（自動撥號、通話錄音）處理客戶問題。"
+    },
+    {
+      "id": "CAP-SALES-PIPELINE",
+      "name": "銷售機會／商機管道管理",
+      "module": "sales",
+      "requires": [],
+      "description": "追蹤每個潛在客戶目前的銷售階段，形成銷售管道。"
+    },
+    {
+      "id": "CAP-SALES-PERFORMANCE",
+      "name": "業務團隊績效與配額追蹤",
+      "module": "sales",
+      "requires": [],
+      "description": "追蹤業務人員的業績達成率與配額目標。"
+    },
+    {
+      "id": "CAP-INTERACTION-HISTORY",
+      "name": "客戶互動歷程紀錄",
+      "module": "sales",
+      "requires": [],
+      "description": "集中記錄每次跟客戶的通話、開會、寄信互動歷程。"
+    },
+    {
+      "id": "CAP-SALES-FORECAST",
+      "name": "銷售預測與漏斗分析",
+      "module": "sales",
+      "requires": [],
+      "description": "根據銷售管道現況預測未來可能成交金額。"
+    },
+    {
+      "id": "CAP-GRAPHIC-DESIGN",
+      "name": "圖文設計素材製作",
+      "module": "content",
+      "requires": [],
+      "description": "產出行銷/品牌用的圖文設計素材。"
+    },
+    {
+      "id": "CAP-VIDEO-PRODUCTION",
+      "name": "影片製作與剪輯",
+      "module": "content",
+      "requires": [],
+      "description": "產出行銷或教學用的影片內容，包含拍攝剪輯後製。"
+    },
+    {
+      "id": "CAP-DAM",
+      "name": "品牌素材庫／數位資產管理",
+      "module": "content",
+      "requires": [],
+      "description": "集中管理品牌素材的版本與使用權限（數位資產管理）。"
+    },
+    {
+      "id": "CAP-CONTENT-APPROVAL",
+      "name": "內容審核與品牌一致性把關",
+      "module": "content",
+      "requires": [],
+      "description": "內容對外發布前需經品牌/法遵審核通過。"
+    },
+    {
+      "id": "CAP-SOCIAL-SCHEDULING",
+      "name": "社群貼文排程與發佈",
+      "module": "social",
+      "requires": [],
+      "description": "預先排定貼文內容並自動發佈到社群平台。"
+    },
+    {
+      "id": "CAP-SOCIAL-MULTI-PLATFORM",
+      "name": "多社群平台集中管理",
+      "module": "social",
+      "requires": [],
+      "description": "同時管理多個社群平台帳號，集中操作。"
+    },
+    {
+      "id": "CAP-SOCIAL-ENGAGEMENT",
+      "name": "社群留言／私訊集中回覆",
+      "module": "social",
+      "requires": [],
+      "description": "集中查看並回覆各社群平台的留言/私訊。"
+    },
+    {
+      "id": "CAP-SOCIAL-ANALYTICS",
+      "name": "社群成效分析報表",
+      "module": "social",
+      "requires": [],
+      "description": "追蹤社群貼文的觸及、互動、轉換成效數據。"
+    },
+    {
+      "id": "CAP-HR-RECORDS",
+      "name": "員工基本資料管理",
+      "module": "hr",
+      "requires": [],
+      "description": "儲存員工基本人事資料，是其他人資功能的基礎。"
+    },
+    {
+      "id": "CAP-RECRUITMENT",
+      "name": "招募與應徵者追蹤",
+      "module": "hr",
+      "requires": [],
+      "description": "管理職缺、應徵者履歷與面試進度。"
+    },
+    {
+      "id": "CAP-ATTENDANCE",
+      "name": "請假與出勤管理",
+      "module": "hr",
+      "requires": [],
+      "description": "員工請假與出勤狀況記錄。"
+    },
+    {
+      "id": "CAP-PERFORMANCE-REVIEW",
+      "name": "績效考核",
+      "module": "hr",
+      "requires": [],
+      "description": "定期對員工進行績效評核並留下紀錄。"
+    },
+    {
+      "id": "CAP-PAYROLL",
+      "name": "薪資處理",
+      "module": "hr",
+      "requires": [],
+      "description": "計算或處理員工薪資。"
+    },
+    {
+      "id": "CAP-PROCUREMENT",
+      "name": "採購申請與簽核",
+      "module": "procurement",
+      "requires": [],
+      "description": "員工提出採購需求並經核准流程。"
+    },
+    {
+      "id": "CAP-VENDOR-MGMT",
+      "name": "供應商資料管理",
+      "module": "procurement",
+      "requires": [],
+      "description": "建立並管理供應商清單與其資格、評鑑資料。"
+    },
+    {
+      "id": "CAP-CONTRACT-RENEWAL",
+      "name": "合約到期與續約提醒",
+      "module": "procurement",
+      "requires": [],
+      "description": "採購/供應商合約到期前主動提醒續約或終止。"
     }
   ]
 }

@@ -1212,6 +1212,326 @@
       "defer": [
         "CAP-PUBLIC-API"
       ]
+    },
+    {
+      "id": "RULE-Q-MKT-001",
+      "when": {
+        "question": "Q-MKT-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-EMAIL-MARKETING"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKT-002",
+      "when": {
+        "question": "Q-MKT-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-CAMPAIGNS"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKT-003",
+      "when": {
+        "question": "Q-MKT-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-LEAD-GEN"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKT-004",
+      "when": {
+        "question": "Q-MKT-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-MARKETING-AUTOMATION"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKT-005",
+      "when": {
+        "question": "Q-MKT-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-AB-TESTING"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKT-006",
+      "when": {
+        "question": "Q-MKT-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-SEGMENTATION"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-001",
+      "when": {
+        "question": "Q-CS-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-TICKETING"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-002",
+      "when": {
+        "question": "Q-CS-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-LIVE-CHAT"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-003",
+      "when": {
+        "question": "Q-CS-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-KNOWLEDGE-BASE"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-004",
+      "when": {
+        "question": "Q-CS-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-SLA-TRACKING"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-005",
+      "when": {
+        "question": "Q-CS-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-CSAT"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-006",
+      "when": {
+        "question": "Q-CS-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-CALL-CENTER"
+      ]
+    },
+    {
+      "id": "RULE-Q-CRM-001",
+      "when": {
+        "question": "Q-CRM-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-SALES-PIPELINE"
+      ]
+    },
+    {
+      "id": "RULE-Q-CRM-002",
+      "when": {
+        "question": "Q-CRM-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SALES-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "RULE-Q-CRM-003",
+      "when": {
+        "question": "Q-CRM-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-INTERACTION-HISTORY"
+      ]
+    },
+    {
+      "id": "RULE-Q-CRM-004",
+      "when": {
+        "question": "Q-CRM-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-SALES-FORECAST"
+      ]
+    },
+    {
+      "id": "RULE-Q-CONTENT-001",
+      "when": {
+        "question": "Q-CONTENT-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-GRAPHIC-DESIGN"
+      ]
+    },
+    {
+      "id": "RULE-Q-CONTENT-002",
+      "when": {
+        "question": "Q-CONTENT-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-VIDEO-PRODUCTION"
+      ]
+    },
+    {
+      "id": "RULE-Q-CONTENT-003",
+      "when": {
+        "question": "Q-CONTENT-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-DAM"
+      ]
+    },
+    {
+      "id": "RULE-Q-CONTENT-004",
+      "when": {
+        "question": "Q-CONTENT-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-CONTENT-APPROVAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-SOC-001",
+      "when": {
+        "question": "Q-SOC-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-SOCIAL-SCHEDULING"
+      ]
+    },
+    {
+      "id": "RULE-Q-SOC-002",
+      "when": {
+        "question": "Q-SOC-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SOCIAL-MULTI-PLATFORM"
+      ]
+    },
+    {
+      "id": "RULE-Q-SOC-003",
+      "when": {
+        "question": "Q-SOC-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-SOCIAL-ENGAGEMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-SOC-004",
+      "when": {
+        "question": "Q-SOC-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-SOCIAL-ANALYTICS"
+      ]
+    },
+    {
+      "id": "RULE-Q-HR-001",
+      "when": {
+        "question": "Q-HR-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-HR-RECORDS"
+      ]
+    },
+    {
+      "id": "RULE-Q-HR-002",
+      "when": {
+        "question": "Q-HR-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-RECRUITMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-HR-003",
+      "when": {
+        "question": "Q-HR-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-ATTENDANCE"
+      ]
+    },
+    {
+      "id": "RULE-Q-HR-004",
+      "when": {
+        "question": "Q-HR-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-PERFORMANCE-REVIEW"
+      ]
+    },
+    {
+      "id": "RULE-Q-HR-005",
+      "when": {
+        "question": "Q-HR-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-PAYROLL"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROC-001",
+      "when": {
+        "question": "Q-PROC-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-PROCUREMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROC-002",
+      "when": {
+        "question": "Q-PROC-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-VENDOR-MGMT"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROC-003",
+      "when": {
+        "question": "Q-PROC-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-CONTRACT-RENEWAL"
+      ]
     }
   ]
 }

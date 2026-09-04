@@ -1,5 +1,64 @@
 # Worklog
 
+## 2026-09-05（續，System Foundry v1.6：依操作者「國際企業應具備哪些功能」的要求，新增 7 個企業部門類別）
+
+**觸發**：操作者「行銷部門 客服部門 CRM ,圖文影製作, 社交媒體管理和其他的 還有 可以參考 https://app.aware-wave.com/onboard...就是你要想一間國際企也應該具備哪些功能」。嘗試瀏覽該參考頁面，`/onboard` 導向登入頁（`Lobster Factory Admin`），無帳密、依規定不輸入登入資訊——改用一般企業軟體知識自行設計，未能對照操作者實際產品現況，如實記錄此限制。
+
+**[方案比較]**：以「國際企業常見但目前 121 題完全沒有涵蓋」為準則，新增 7 個類別共 32 題（不是無限擴張——HR/採購也一併加入，因為操作者說「你要想一間國際企也應該具備哪些功能」，小公司本來就可以整類別都答不要跳過，符合 kernel 的『只問合法產品/商業選擇』原則，不算過度設計）：
+- 21. 行銷（Q-MKT-001~006）：Email 行銷、活動管理、名單開發、行銷自動化、A/B測試、名單分眾
+- 22. 客服（Q-CS-001~006）：工單系統、即時對話、知識庫、SLA追蹤、滿意度調查、電話客服
+- 23. 銷售與CRM（Q-CRM-001~004）：銷售管道、業務績效、互動歷程、銷售預測——刻意跟既有 `CAP-CRM`（12.外部整合類的「CRM整合」，接外部軟體）分開，這是系統內建銷售管理功能
+- 24. 內容與素材製作（Q-CONTENT-001~004）：圖文設計、影片製作、數位資產管理、內容審核
+- 25. 社交媒體管理（Q-SOC-001~004）：排程發佈、多平台管理、留言集中回覆、成效分析
+- 26. 人力資源（Q-HR-001~005）：員工資料、招募、出勤、考核、薪資
+- 27. 採購與供應商（Q-PROC-001~003）：採購簽核、供應商管理、合約續約提醒
+
+每題從一開始就寫好白話說明（吸取上次「114 題空白說明」的教訓，這次沒有留空），刻意互相參照容易混淆的既有題目（例如「採購申請」說明點出跟客戶訂單方向相反）。
+
+**[已修改]**：
+- `questionnaires/catalog.json`：+32 題、+7 類別（`custom` 類別 order 從 21 順移到 28）
+- `capabilities/catalog.json`：+32 個新能力（各自帶完整 description，對應到 7 個新模組）
+- `rules/question-rules.json`：+32 條規則（各新題目對應唯一能力，跟現有 121 題同款 1:1 模式）
+- `generation/module-manifests.json`：+7 個新模組（`marketing`/`customer_service`/`sales`/`content`/`social`/`hr`/`procurement`），各自 `paths` + `activated_by`
+- `generation/module-obligations.json`：+7 個新模組的 purpose/invariants/security/tests/operations/recovery（例如 `hr` 模組明確要求「薪資試算需可從留存的出缺勤/薪酬輸入重現」「非人資人員不得讀取薪酬欄位」，`sales` 模組要求「同一時間商機只能有一個管線階段、有完整可稽核的轉換歷程」）
+- `tests/fixtures/selection/all_no.json`：`active_answer_count` 91→108（新增題目在全部不要情境下有 17 題仍然啟用不被閘門擋掉，其餘因 active_when 保持非啟用；`current_capabilities`/`modules` 核對後確認不變）
+- `tests/fixtures/selection/all_yes.json`：全欄位重新產生（`current_capabilities` 160→192、`modules` 24→31、`active_answer_count` 117→149，7 個新模組全數出現在 ALL-YES 結果裡）
+- `tests/test_artifact_generation.py`：兩處寫死的 `160`/`24` 更新為 `192`/`31`
+- `manifest.json`：`regenerate_integrity.py --write` 同步（kernel 未動，digest 不變）
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=新增腳本本身斷言（新增的 32 個能力/規則/模組 id 均不得與既有重複，斷言失敗會直接中止腳本）| exit=0 | result=`questionnaires: +32... total=153` `capabilities: +32... total=192` `question-rules: +32... total=153` `module-manifests: +7 modules` `module-obligations: +7... total=32`
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain + `python -m unittest discover -s tests -v` | 第一輪 2 處預期中的黃金測資/寫死數字過時（`test_selection_matrix` all_no drift、`test_artifact_generation` 160/24 斷言）→ 逐一核對新數值來源後更新 → 第二輪 exit=0 全綠，29/29 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`test_selection_matrix.py` 最終輸出 | result=`questions=153 single=153 pairwise_valid=11622 pairwise_rejected=6 random=1000 modules=32 blueprints=73 all_yes_caps=192`——153 題窮舉 11,628 對組合測試全數跑過，73 節藍圖不受影響
+- BUGHUNT_DONE: scope=agency-os,scripts,agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE | grep=獨立指令核對 `capabilities/catalog.json`／`questionnaires/catalog.json` 兩檔案空白 description 數量 | hits=0（192 個能力、153 題問卷，這次從建立時就寫好說明，沒有重蹈上次「先建立空殼再回頭補」的覆轍）
+
+**[剩餘風險]**：
+- 未能實際比對操作者自己的 app.aware-wave.com/onboard 現況（登入牆擋住，未輸入帳密），這 7 個新類別是依通用企業軟體知識設計，不是照該產品現況逐項比對出的缺口清單。
+- `generation/blueprint-map.json`（73 節藍圖的 `any_modules` 條件）未新增這 7 個新模組的專屬對應——目前 21 個非 `always:true` 的節（例如 `13_EVENT_ARCHITECTURE.md`、`65_PROVIDER_RESILIENCE.md`）不會因為選了行銷/客服等新模組而被標記為特別相關，只會維持既有模組觸發的 ACTIVE/NOT_APPLICABLE 判斷。這不影響正確性（新模組仍會拿到自己的 10 件式產物包），只是 73 節裡沒有新模組專屬的細節放大鏡，留給操作者判斷是否需要。
+- 操作者同時提出「讓客戶輸入一段話或選產業，AI 幫忙自動勾選」的功能構想——判斷為獨立、更大範圍的新功能（範本式/AI輔助式兩層），本條目不含，已在對話中說明建議做法但未動工。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE`。
+
+## 2026-09-05（續34，同一 session：Cognitive OS 第二十一個 Method Atlas 切片 — `devops_sre.canary_deployment`，5 階段流量遞增+不健康強制回滾不變量）
+
+**觸發**：延續操作者授權（「繼續完成」）。0 agent。中途操作者插話：Cognitive OS 要架在子網域 `cognitive.aware-wave.com`——已存記憶（`project_cognitive_os_subdomain_target.md`），部署本身是 High risk（DNS/prod deploy）需要先釐清範圍（API／文件瀏覽器／dashboard）+ 明示 go-ahead，本切片建置屬純本機 repo 工作不受影響，繼續進行。
+
+**選型**：Canary Deployment（Atlas §11.41 專屬段落，F19 pack 第二個成員方法）。明確封閉 5 階段流量遞增序列（1%→5%→25%→50%→100%）+ 明文規則「任何階段 unhealthy: ROLLBACK」，直接蘊含真不變量：宣告 `outcome: completed` 時不能有任何 unhealthy 階段，CLI 真跑攻擊驗證。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.canary_deployment.contract.yaml`＋`specs/cognitive/typed-objects/canary-deployment-plan.schema.yaml`＋fixture（2 valid+3 invalid）＋`contract-backlog.yaml` 新增 `tier_1.nineteenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/devops_sre/canary_deployment.py`（builder+unhealthy-forbids-completed 不變量+2 gate）＋`ai_lego/apps/cli/run_canary_deployment_slice.py`（真實 5 階段完成部署+攻擊驗證）＋`tests/unit/test_canary_deployment.py`（10 tests 第一次跑全綠）＋`docs/TWENTYFIRST_SLICE_DEVOPS_SRE_CANARY_DEPLOYMENT.md`。`modules/devops_sre/__init__.py` docstring 補第二租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_canary_deployment_slice` | exit=0 | result=第一次真跑就通過（含 unhealthy 不變量攻擊驗證）：`PASS devops_sre.canary_deployment: stages=5, outcome=completed, gates [provenance_required=PASS, unhealthy_forbids_completed=PASS], unhealthy_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_canary_deployment -v` | exit=0 | ms=811 | result=10 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2698→2708
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=85442 | result=**501 tests OK**（491→501，零回歸；`git diff --stat` 對照共用檔案／`devops_sre.sli_slo`／全部 8 個 architecture 家族模組確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`devops_sre[.]canary_deployment\|CanaryDeploymentPlan\|canary-deployment-plan\|run_canary_deployment_slice` | hits=全部本切片自己新檔案+session log 雜訊，無過期殘留
+
+**[剩餘風險]**：`OQ-CANARY-1`（method-inventory.yaml 無機器 id 列）；`metrics_summary` 為自由文字未結構化。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit（全部新增檔案）。
+
 ## 2026-09-05（HCI30 Wave 1 Case/Engagement aggregate ADR-0020 gate 收尾——真跑抓到 2 個真實 gate bypass + 1 個 trigger 順序 bug，全修並驗真）
 
 **觸發**：操作者「繼續完成 HCI 系統！我全部同意核准，需要決定的事都你決定」，全權架構師模式。上一個（已暫停）session 已寫好但未跑過的 `0002_wave1_case_aggregate_{up,down}.sql`（ADR-0020 Case/Engagement aggregate）是最接近完成、風險最低的下一步——完成閉環而非另開新工作。

@@ -608,6 +608,157 @@
       "recovery": [
         "No implementation begins until rollback/compensation implications are recorded."
       ]
+    },
+    "content": {
+      "purpose": "Produce, version, and govern brand/marketing content assets (graphics, video) distinct from general user-uploaded files.",
+      "invariants": [
+        "A published brand asset has a traceable approval record before external use.",
+        "Asset versioning preserves prior approved versions, not just the latest.",
+        "Digital asset management does not become a second source of truth for files already owned by the files module."
+      ],
+      "security": [
+        "Asset access/download follows the same authorization model as other stored files."
+      ],
+      "tests": [
+        "Approval-workflow gating is contract-tested (unapproved assets cannot be marked published)."
+      ],
+      "operations": [
+        "Content production throughput and pending-approval backlog are observable."
+      ],
+      "recovery": [
+        "Approved asset history is included in backup scope."
+      ]
+    },
+    "customer_service": {
+      "purpose": "Provide ticketing, live support, and self-service channels for resolving customer issues with tracked SLAs.",
+      "invariants": [
+        "Every support interaction is attributable to a ticket or logged conversation.",
+        "SLA clocks pause/resume deterministically on defined status transitions.",
+        "Customer satisfaction data is linked to the resolved ticket it measures."
+      ],
+      "security": [
+        "Support agents access only the customer data scoped to their assigned tickets/tenant.",
+        "Call/chat transcripts follow the same data-residency rules as other customer data."
+      ],
+      "tests": [
+        "SLA breach detection is tested against clock-pause edge cases.",
+        "Ticket assignment/escalation paths are contract-tested."
+      ],
+      "operations": [
+        "SLA compliance rate and ticket backlog are observable.",
+        "Escalation paths have a defined on-call linkage."
+      ],
+      "recovery": [
+        "An abandoned live-chat session preserves the transcript up to disconnect.",
+        "Ticket data is included in backup scope."
+      ]
+    },
+    "hr": {
+      "purpose": "Manage employee records, recruitment, attendance, performance, and payroll as an internal operations function.",
+      "invariants": [
+        "Payroll calculations are reproducible from stored attendance/compensation inputs at a stated point in time.",
+        "An employee record's sensitive fields (compensation, performance review content) follow least-privilege access distinct from general staff directory visibility.",
+        "Attendance/leave state changes are auditable with actor and timestamp."
+      ],
+      "security": [
+        "HR data is among the most sensitive personal data categories in the system and follows the strictest access controls.",
+        "Payroll processing is not triggerable by any role other than explicitly authorized HR/finance staff."
+      ],
+      "tests": [
+        "Payroll calculation is tested against golden known-input/known-output fixtures.",
+        "Access-control tests confirm non-HR staff cannot read compensation data."
+      ],
+      "operations": [
+        "Payroll run success/failure is observable and alerted."
+      ],
+      "recovery": [
+        "Payroll and attendance history is included in backup scope with restore verification given its regulatory sensitivity."
+      ]
+    },
+    "marketing": {
+      "purpose": "Plan, execute, and measure marketing campaigns and lead generation without becoming the system of record for finalized customer/commercial data.",
+      "invariants": [
+        "Marketing leads are distinct from qualified sales opportunities until explicitly converted.",
+        "Unsubscribe/consent state is authoritative and checked before every send.",
+        "Campaign attribution data is reproducible from stored event history."
+      ],
+      "security": [
+        "Marketing sends respect consent/opt-out state from customer data ownership records.",
+        "Recipient lists are not exportable outside authorized roles."
+      ],
+      "tests": [
+        "Unsubscribe suppression is enforced in send tests.",
+        "Segmentation queries are covered by contract tests."
+      ],
+      "operations": [
+        "Campaign send volume and bounce/complaint rates are observable.",
+        "Automation sequences have a kill switch."
+      ],
+      "recovery": [
+        "A paused/failed automation sequence resumes without duplicate sends.",
+        "Campaign data is included in backup scope."
+      ]
+    },
+    "procurement": {
+      "purpose": "Manage purchase requisition approval, vendor records, and contract renewal tracking distinct from customer-facing commercial modules.",
+      "invariants": [
+        "A purchase requisition cannot become an approved purchase order without a recorded approval matching authority thresholds.",
+        "Vendor records maintain a single canonical status (active/suspended/terminated) referenced by all procurement activity.",
+        "Contract renewal reminders are computed from the contract's actual stored expiry date, never a manually re-entered date."
+      ],
+      "security": [
+        "Purchase approval authority follows the same authority model as other high-impact actions."
+      ],
+      "tests": [
+        "Approval-threshold enforcement is contract-tested (a requisition above a role's authority cannot self-approve)."
+      ],
+      "operations": [
+        "Pending approval backlog and upcoming contract renewals are observable/alertable."
+      ],
+      "recovery": [
+        "Procurement and vendor records are included in backup scope."
+      ]
+    },
+    "sales": {
+      "purpose": "Track sales opportunities, pipeline stages, and forecasting, distinct from marketing leads and from external CRM integrations.",
+      "invariants": [
+        "An opportunity has exactly one pipeline stage at a time with a full auditable transition history.",
+        "Forecast figures are always reproducible from current pipeline state, never a manually-edited number.",
+        "Sales performance metrics attribute to the actual owning rep, not whoever last touched the record."
+      ],
+      "security": [
+        "Pipeline/opportunity data visibility follows role and territory assignment, not blanket access."
+      ],
+      "tests": [
+        "Pipeline stage transition rules are contract-tested.",
+        "Forecast calculation is tested against known pipeline snapshots."
+      ],
+      "operations": [
+        "Pipeline health (stage aging, conversion rate) is observable."
+      ],
+      "recovery": [
+        "Opportunity and interaction history is included in backup scope and restore-tested."
+      ]
+    },
+    "social": {
+      "purpose": "Schedule, publish, and monitor content across external social media platforms, and centralize engagement replies.",
+      "invariants": [
+        "A scheduled post's target platform and credentials are validated before the scheduled send time, not only at creation.",
+        "Social engagement replies are attributable to the responding staff member.",
+        "Social analytics figures are reproducible from stored platform API responses, not recomputed estimates presented as fact."
+      ],
+      "security": [
+        "Social platform credentials/tokens sit behind an owned adapter boundary per platform, never hardcoded per integration."
+      ],
+      "tests": [
+        "Scheduled-post failure (expired token, platform API error) has a tested retry/alert path."
+      ],
+      "operations": [
+        "Post delivery failures and engagement volume are observable."
+      ],
+      "recovery": [
+        "A failed scheduled post is retried or surfaced as a failure, never silently dropped."
+      ]
     }
   }
 }

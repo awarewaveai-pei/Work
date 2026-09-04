@@ -377,6 +377,101 @@
       ]
     },
     {
+      "id": "content",
+      "paths": [
+        "packages/content",
+        "tests/contract/content"
+      ],
+      "activated_by": [
+        "CAP-CONTENT-APPROVAL",
+        "CAP-DAM",
+        "CAP-GRAPHIC-DESIGN",
+        "CAP-VIDEO-PRODUCTION"
+      ]
+    },
+    {
+      "id": "customer_service",
+      "paths": [
+        "packages/customer-service",
+        "tests/contract/customer-service"
+      ],
+      "activated_by": [
+        "CAP-CALL-CENTER",
+        "CAP-CSAT",
+        "CAP-KNOWLEDGE-BASE",
+        "CAP-LIVE-CHAT",
+        "CAP-SLA-TRACKING",
+        "CAP-TICKETING"
+      ]
+    },
+    {
+      "id": "hr",
+      "paths": [
+        "packages/hr",
+        "tests/contract/hr"
+      ],
+      "activated_by": [
+        "CAP-ATTENDANCE",
+        "CAP-HR-RECORDS",
+        "CAP-PAYROLL",
+        "CAP-PERFORMANCE-REVIEW",
+        "CAP-RECRUITMENT"
+      ]
+    },
+    {
+      "id": "marketing",
+      "paths": [
+        "packages/marketing",
+        "tests/contract/marketing"
+      ],
+      "activated_by": [
+        "CAP-AB-TESTING",
+        "CAP-CAMPAIGNS",
+        "CAP-EMAIL-MARKETING",
+        "CAP-LEAD-GEN",
+        "CAP-MARKETING-AUTOMATION",
+        "CAP-SEGMENTATION"
+      ]
+    },
+    {
+      "id": "procurement",
+      "paths": [
+        "packages/procurement",
+        "tests/contract/procurement"
+      ],
+      "activated_by": [
+        "CAP-CONTRACT-RENEWAL",
+        "CAP-PROCUREMENT",
+        "CAP-VENDOR-MGMT"
+      ]
+    },
+    {
+      "id": "sales",
+      "paths": [
+        "packages/sales",
+        "tests/contract/sales"
+      ],
+      "activated_by": [
+        "CAP-INTERACTION-HISTORY",
+        "CAP-SALES-FORECAST",
+        "CAP-SALES-PERFORMANCE",
+        "CAP-SALES-PIPELINE"
+      ]
+    },
+    {
+      "id": "social",
+      "paths": [
+        "packages/social",
+        "tests/contract/social"
+      ],
+      "activated_by": [
+        "CAP-SOCIAL-ANALYTICS",
+        "CAP-SOCIAL-ENGAGEMENT",
+        "CAP-SOCIAL-MULTI-PLATFORM",
+        "CAP-SOCIAL-SCHEDULING"
+      ]
+    },
+    {
       "id": "custom",
       "paths": [
         "extensions/custom"

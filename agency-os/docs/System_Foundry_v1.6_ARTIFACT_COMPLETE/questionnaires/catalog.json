@@ -131,8 +131,50 @@
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
-      "id": "custom",
+      "id": "marketing",
       "order": 21,
+      "title": "行銷",
+      "description": "行銷活動、名單開發與行銷自動化——跟「商業模式」不同：這裡是取得/培養客戶的手段，不是收費方式"
+    },
+    {
+      "id": "customer_service",
+      "order": 22,
+      "title": "客服",
+      "description": "客戶問題的受理、追蹤與處理，不是銷售或行銷"
+    },
+    {
+      "id": "sales_crm",
+      "order": 23,
+      "title": "銷售與客戶關係管理",
+      "description": "業務團隊追蹤商機、客戶互動與業績——注意跟 12. 外部整合 的「CRM 整合」不同：那題是接外部 CRM 軟體，這裡是系統本身內建銷售管理功能"
+    },
+    {
+      "id": "content_production",
+      "order": 24,
+      "title": "內容與素材製作",
+      "description": "團隊自己產出的行銷/品牌內容（設計、影片），不是使用者上傳的檔案"
+    },
+    {
+      "id": "social_media",
+      "order": 25,
+      "title": "社交媒體管理",
+      "description": "對外社群平台的排程發佈、集中回覆與成效追蹤"
+    },
+    {
+      "id": "hr",
+      "order": 26,
+      "title": "人力資源",
+      "description": "員工資料、招募、出勤、考核與薪資——內部營運功能，不是客戶/使用者相關"
+    },
+    {
+      "id": "procurement",
+      "order": 27,
+      "title": "採購與供應商",
+      "description": "公司對外採購與供應商管理，跟客戶端的訂單/交易資料方向相反"
+    },
+    {
+      "id": "custom",
+      "order": 28,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -1324,6 +1366,386 @@
       "active_when": {
         "question": "Q-CH-004",
         "equals": false
+      }
+    },
+    {
+      "id": "Q-MKT-001",
+      "category": "marketing",
+      "label": "電子郵件行銷",
+      "description": "系統需要主動寄送行銷/推廣性質的電子郵件給名單，例如電子報、促銷通知（跟 11. 通知 的交易型通知信是不同性質，那是「你的訂單成立了」，這是「來看看新品」）。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MKT-002",
+      "category": "marketing",
+      "label": "行銷活動管理",
+      "description": "需要規劃、追蹤行銷活動的預算、時程與成效，例如某次促銷活動花了多少錢、帶來多少訂單。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MKT-003",
+      "category": "marketing",
+      "label": "名單蒐集與資格認定",
+      "description": "需要透過表單、著陸頁蒐集潛在客戶名單，並判斷這個名單有沒有真的可能成交（區分「隨便留信箱的人」跟「真的想買的人」）。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MKT-004",
+      "category": "marketing",
+      "label": "行銷自動化流程",
+      "description": "潛在客戶有特定行為（例如點了某封信）時，系統自動觸發後續的行銷訊息序列，不需要人工一封一封發。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-MKT-001",
+            "equals": true
+          },
+          {
+            "question": "Q-MKT-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-MKT-005",
+      "category": "marketing",
+      "label": "行銷內容 A/B 測試",
+      "description": "需要同時跑兩個版本的行銷頁面或郵件，比較哪個版本效果較好。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-MKT-001",
+            "equals": true
+          },
+          {
+            "question": "Q-MKT-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-MKT-006",
+      "category": "marketing",
+      "label": "名單分眾／受眾區隔",
+      "description": "需要把名單依條件分組（例如依產業、購買紀錄），針對不同群體發送不同內容。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-MKT-001",
+            "equals": true
+          },
+          {
+            "question": "Q-MKT-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-CS-001",
+      "category": "customer_service",
+      "label": "客服工單系統",
+      "description": "客戶的問題會被建成一張張工單，追蹤處理進度與負責人，而不是靠信件、聊天紀錄零散處理。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CS-002",
+      "category": "customer_service",
+      "label": "即時線上客服對話",
+      "description": "客戶可以在網站或 App 裡即時打字跟客服對話，而不是只能寄信等回覆。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CS-003",
+      "category": "customer_service",
+      "label": "知識庫／常見問題自助查詢",
+      "description": "客戶可以自己查詢常見問題的解答，不需要每次都要真人客服回覆。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CS-004",
+      "category": "customer_service",
+      "label": "客服回應時效追蹤",
+      "description": "需要追蹤客服工單多久內第一次回覆、多久內解決，並對超時提出警示（SLA）。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-CS-005",
+      "category": "customer_service",
+      "label": "客服滿意度調查",
+      "description": "問題處理完後會詢問客戶對這次服務滿不滿意，並記錄評分。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-CS-001",
+            "equals": true
+          },
+          {
+            "question": "Q-CS-002",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-CS-006",
+      "category": "customer_service",
+      "label": "電話客服／客服中心整合",
+      "description": "客服需要透過電話或客服中心系統（例如自動撥號、通話錄音）處理客戶問題。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CRM-001",
+      "category": "sales_crm",
+      "label": "銷售機會／商機管道管理",
+      "description": "業務需要追蹤每個潛在客戶目前談到哪個階段（例如已接觸→報價中→已成交），形成一條銷售管道。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CRM-002",
+      "category": "sales_crm",
+      "label": "業務團隊績效與配額追蹤",
+      "description": "需要追蹤每個業務人員的業績達成率、配額目標。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CRM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-CRM-003",
+      "category": "sales_crm",
+      "label": "客戶互動歷程紀錄",
+      "description": "每次跟客戶的通話、開會、寄信紀錄都要能在同一個地方看到完整歷程，而不是分散在不同業務的信箱裡。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CRM-004",
+      "category": "sales_crm",
+      "label": "銷售預測與漏斗分析",
+      "description": "需要根據目前銷售管道的狀態，預測未來一段時間可能成交的金額。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CRM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-CONTENT-001",
+      "category": "content_production",
+      "label": "圖文設計素材製作",
+      "description": "系統或團隊需要產出行銷/品牌用的圖文設計素材（海報、banner、社群圖卡等），不只是使用者自己上傳的檔案。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CONTENT-002",
+      "category": "content_production",
+      "label": "影片製作與剪輯",
+      "description": "需要產出行銷或教學用的影片內容，包含拍攝、剪輯、後製。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CONTENT-003",
+      "category": "content_production",
+      "label": "品牌素材庫／數位資產管理",
+      "description": "所有品牌素材（Logo、字型、範本、已核准的圖文影音）需要集中管理版本與使用權限，而不是散落在不同人的電腦裡。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-CONTENT-001",
+            "equals": true
+          },
+          {
+            "question": "Q-CONTENT-002",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-CONTENT-004",
+      "category": "content_production",
+      "label": "內容審核與品牌一致性把關",
+      "description": "產出的內容在對外發布前，需要經過品牌或法遵角度審核通過才能發佈。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-CONTENT-001",
+            "equals": true
+          },
+          {
+            "question": "Q-CONTENT-002",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-SOC-001",
+      "category": "social_media",
+      "label": "社群貼文排程與發佈",
+      "description": "可以預先寫好貼文內容，排定時間自動發佈到社群平台，不需要當下手動貼。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SOC-002",
+      "category": "social_media",
+      "label": "多社群平台集中管理",
+      "description": "同時管理多個社群平台的帳號（例如 Facebook、Instagram、LINE），不需要分別登入各平台操作。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SOC-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-SOC-003",
+      "category": "social_media",
+      "label": "社群留言／私訊集中回覆",
+      "description": "各平台上使用者的留言、私訊可以集中在同一個地方查看並回覆，不用逐一登入每個平台。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-SOC-004",
+      "category": "social_media",
+      "label": "社群成效分析報表",
+      "description": "需要追蹤社群貼文的觸及、互動、轉換等成效數據。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-SOC-001",
+            "equals": true
+          },
+          {
+            "question": "Q-SOC-003",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-HR-001",
+      "category": "hr",
+      "label": "員工基本資料管理",
+      "description": "系統需要儲存員工的基本人事資料（職稱、部門、到職日等），是後面請假/考核/薪資功能的基礎。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-HR-002",
+      "category": "hr",
+      "label": "招募與應徵者追蹤",
+      "description": "需要管理職缺、應徵者履歷與面試進度。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-HR-003",
+      "category": "hr",
+      "label": "請假與出勤管理",
+      "description": "員工可以在系統裡請假，系統記錄出勤狀況。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-HR-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-HR-004",
+      "category": "hr",
+      "label": "績效考核",
+      "description": "定期對員工進行績效評核並留下紀錄。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-HR-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-HR-005",
+      "category": "hr",
+      "label": "薪資處理",
+      "description": "系統需要計算或處理員工薪資（不只是記錄出缺勤，是真的算錢發薪）。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-HR-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PROC-001",
+      "category": "procurement",
+      "label": "採購申請與簽核",
+      "description": "員工提出採購需求，需要經過核准流程才能真的採購——這是「公司花錢買東西」，跟客戶的訂單（公司收錢賣東西）方向相反。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PROC-002",
+      "category": "procurement",
+      "label": "供應商資料管理",
+      "description": "需要建立並管理供應商清單與其資格、評鑑資料。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PROC-003",
+      "category": "procurement",
+      "label": "合約到期與續約提醒",
+      "description": "採購或供應商合約快到期時，系統要主動提醒，避免忘記續約或忘記終止。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-PROC-002",
+            "equals": true
+          },
+          {
+            "question": "Q-DATA-006",
+            "equals": true
+          }
+        ]
       }
     }
   ]

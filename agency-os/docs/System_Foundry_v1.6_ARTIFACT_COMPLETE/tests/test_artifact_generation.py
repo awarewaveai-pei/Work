@@ -8,8 +8,8 @@ import test_selection_matrix as matrix
 class ArtifactGenerationTests(unittest.TestCase):
     def test_all_yes_materializes_complete_standard_modules_and_blueprint(self):
         a=matrix.complete({},True); p=resolve({'name':'all-yes-unit'},a,[])
-        self.assertEqual(len(p['current_capabilities']),160)
-        self.assertEqual(len(p['modules']),24)
+        self.assertEqual(len(p['current_capabilities']),192)
+        self.assertEqual(len(p['modules']),31)
         with tempfile.TemporaryDirectory() as td:
             out=generate(p,a,[],td)
             self.assertEqual(len(list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))),EXPECTED_BLUEPRINT_COUNT)
