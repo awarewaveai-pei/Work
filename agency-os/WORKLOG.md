@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-04（續23，同一 session：Cognitive OS 第十個 Method Atlas 切片 — `decision.mcda`，AHP 的自然延伸＋首次跨家族重用評分函式）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`decision.mcda`（F16，`decision` 家族第二個成員，延伸 `decision.ahp`）——第九切片文件與 TASKS.md「下一步」都已點名此為候選。Atlas §11.32 給了 8 節點 pipeline（Options→Criteria→Weights→Normalize→Score→Sensitivity→Stakeholder Views→Human Decision），且 §22.3「Method-specific Gate」表（同一張表已為 red_team 的 no-final-authority 規則提供根基）MCDA 那一列明文：「禁止直接輸出 Automatic Authority｜必須補的驗證 Human Judgment + Sensitivity」——本 session 第二個有**明文引用**（非推論）forbidden_transition 的 Tier 1 contract。
+
+**主動應用續21／續22學到的紀律**：寫程式碼前先讀完整個 `specs/decision/`。結果不只是「沒重複」，而是找到一個**既有 schema 早就預留的擴充點**：`decision.schema.yaml`（上個 session 建）的 `analyses[]` 欄位刻意留 `items: {}`（不限制形狀），且它自己的 `compilation_decisions`（OQ-DECISION-2）逐字寫：「更豐富的欄位形狀屬於未來一份真正定義它的 MCDA-specific schema，不屬於這個基礎 Decision 型別」——`decision.mcda.contract.yaml` 與 `mcda-analysis.schema.yaml` 就是那份被預告的檔案，不是重複 `Decision` 本身（`MCDAAnalysis` 是餵進 `Decision.analyses[]` 的候選，永遠不取代 `Decision`）。
+
+**不變量**：Atlas 對 MCDA 給了兩個獨立引用（§11.32 流程圖：Weights 在 Normalize 之前；F16 表格：normalize→weights），兩者對五個實質階段一致，只有 Weights/Normalize 順序不同——本 contract 沒有默默選一個引用不提，而是明文揭露這是**呈現順序差異，非形狀衝突**（加權和模型裡正規化與加權是互相獨立、可交換的運算），並選擇「先正規化」的工程理由：讓 `normalize_scores` 能在完全不依賴任何特定權重組的情況下獨立單元測試，同本 session 每個真計算切片一致的「先手算驗證純函式，再接進方法層」紀律。真正的方法論不變量：AHP 與 MCDA 都以加權和排名收尾，但 Atlas 只給 AHP 一個「怎麼推導權重」的技法（pairwise comparison），MCDA 完全沒有——這才是兩個方法真正的差異（MCDA 接受任何來源的權重，AHP 專門生產一組），不是省略。呼叫者若想用 AHP 推導的權重餵進 MCDA，現有程式碼零改動就做得到（`geometric_mean_weights` 算完直接傳進 `generate_mcda_analysis` 的 `weights` 參數）。`Sensitivity` 階段延續 AHP 的誠實留白（Atlas 只給名稱零公式）——但 §22.3 把 Sensitivity 列為 MCDA 明文必須補的驗證項目之一，所以本 contract 比 AHP 多做一步：`sensitivity_notes` 改為**必填**欄位，`evaluate_sensitivity_disclosed_gate` 檢查「有沒有揭露」而非「揭露內容是否正確」——誠實地只做結構性存在檢查，不發明公式。
+
+**首次跨家族重用評分函式（非只是驗證閘）**：Score 階段直接重用 `ai_lego.compute.ahp.weights.rank_options`——讀過其實作後確認完全不含 AHP 專屬邏輯（純 `dict[str,float]` 權重 + `{option_id,criterion_id,score}` 列表 → 排序結果），本 session 第一次跨方法家族重用的是「真計算評分函式」而非只是像 `evaluate_statistical_gate` 那樣的驗證閘（該閘本身這次是第四次被不同家族重用：research→pareto→ahp→mcda）。是否該把 `rank_options` 搬到「家族中立」的新模組也認真考慮過並否決：搬遷會動到 `decision.ahp` 已出貨、`git diff --stat` 零改動已驗證過的模組，純粹為了程式碼組織偏好，違反本 session「最小爆炸半徑」的既有紀律；另寫一份近乎重複的函式也被否決——重複已手算驗證過的計算程式碼，比一次跨家族 import 更糟。
+
+**[已修改]**：spec-root 新增 `methods/contracts/decision.mcda.contract.yaml`（逐字引用 Atlas §11.32＋F16 表格 L768＋§22.3 L4154 三個獨立引用）＋`specs/cognitive/typed-objects/mcda-analysis.schema.yaml`（頂層 `additionalProperties:false`，同 red_team 的執法強度）＋對應 golden fixture（2 valid + 5 invalid）＋`contract-backlog.yaml` 新增 `tier_1.eighth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/mcda/scoring.py`（`normalize_scores` 方向感知 min-max 正規化，先用 3 種已知案例——混合方向／打平的 criterion／三選項全 minimize——手算驗證正確才接進方法層；`validate_weights_sum_to_one`）＋`ai_lego/modules/decision/mcda.py`（builder＋自動權限守門＋四個 gate；`rank_options` 從 `compute/ahp/weights.py` 直接 import，零改動）＋`ai_lego/apps/cli/run_mcda_slice.py`（真實自建 vs 外包決策，含攻擊竄改驗證，同 red_team CLI 手法）＋`tests/unit/test_mcda.py`（22 tests，第一次跑就全綠，無需修正）＋`docs/TENTH_SLICE_DECISION_MCDA.md`。`ai_lego/modules/decision/__init__.py` docstring 補上 mcda 租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "..."` 手算驗證 `normalize_scores`（3 種已知案例：混合方向／打平 criterion／三選項全 minimize）＋`validate_weights_sum_to_one` | exit=0 | result=全部與手算數值逐位吻合，才接進方法層
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_mcda_slice` | exit=0 | result=第一次真跑就通過：`PASS decision.mcda: ranking=[{'option_id': 'O2', 'weighted_score': 0.7}, {'option_id': 'O1', 'weighted_score': 0.3}], gates [provenance_required=PASS, genuine_compute=PASS, sensitivity_disclosed=PASS, no_automatic_authority_claim=PASS], no_automatic_authority_verified(runtime=True, schema=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_mcda -v` | exit=0 | ms=1378 | result=22 passed，第一次跑就全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2590→2602
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=48885 | result=**387 tests OK**（365→387，零回歸；`git diff --stat` 對照 `compute/ahp/weights.py`／`modules/decision/ahp.py`／`modules/research/gates.py`／`modules/challenge/red_team.py`／method_resolver.py／schema_contracts.py／event_ledger.py／provenance.py 八個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：跨家族重用 `rank_options` 是否真的零改動且無 AHP 專屬耦合（是，`git diff --stat` 確認零改動，且已讀過該函式實作確認純泛型加權和邏輯）；`sensitivity_notes` 只驗證存在不驗證正確性算不算自欺（不算，contract 與 schema 皆明文揭露這是 disclosure-only，與 AHP 的完全不實作互相呼應而非矛盾）；Weights/Normalize 順序引用衝突是否被誠實揭露而非默默選邊（是，已在 contract description 與 compilation_decisions 兩處明文說明數學上可交換、選擇順序的工程理由）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`decision[.]mcda\|MCDAAnalysis\|mcda-analysis\|modules[.]mcda\|compute/mcda\|compute\.mcda\|modules/decision/mcda` | hits=全部為本切片自己的新檔案、session log 雜訊、`__pycache__` 編譯產物、以及兩個 gitignored 自動產生狀態檔（`doc-sync-state.json`／`closeout-*.md`，正確反映新檔案存在，非過期殘留）——無任何非預期殘留引用
+
+**[剩餘風險]**：`OQ-MCDA-1`（單一 `weights[]` 而非多 stakeholder profile 陣列——Atlas 效益文字提到但零欄位形狀，已揭露）；`OQ-MCDA-2`（sensitivity 只驗證揭露非正確性，同 AHP 的 OQ-AHP-2 同類留白）；`OQ-MCDA-3`（機器 id 未回填 method-inventory.yaml，同 AHP 的 OQ-AHP-3 同類留白）。皆非阻塞，已誠實揭露於 contract 與 docs。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（新增檔案、`modules/decision/__init__.py` docstring 純增補是唯一觸碰既有檔案處，回退零副作用）。
+
 ## 2026-09-04（續22，同一 session：Cognitive OS 第九個 Method Atlas 切片 — `challenge.red_team`，第六種結構形狀＋顯式權限規則）
 
 **觸發**：延續操作者授權（"繼續做下一個切片（你決定）" 兩次），繼續自主推進。0 agent。
@@ -95,7 +122,7 @@
 
 **[rollback]**：除 `REPOSITORY_ARCHITECTURE.md` 新增澄清段落與 spec-root 索引重新產生外，零既有檔案邏輯改動（該澄清段落本身也是純新增,`git diff` 不含任何刪除行）。`git rm` 對應新檔即可完全復原。
 
-## 2026-09-04（續25，同一遠端 session：清「另案」殘留 — 退租 IP 掃描修正、prod 部署閘補現役主機、pwsh 裝機、ao-close 註解）
+## 2026-09-04（續26，同一遠端 session：清「另案」殘留 — 退租 IP 掃描修正、prod 部署閘補現役主機、pwsh 裝機、ao-close 註解）
 
 **[任務理解]** 操作者問「都完美處理完了嗎」——我前兩輪登記為另案的項目不能一直掛著。掃描後範圍比原登記大：退租 IP（`5.223.93.113`／`204.168.175.41`／`149.202.64.114`）仍出現在 65 個檔案；其中**代理會照做的**（`.claude/agents`、`.claude/commands`、腳本預設值、hook 正則）必須修，**歷史敘事**（handoffs／舊 runbook／WORKLOG／memory）保留。
 **[最重要發現]** `mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js:29` 的 ssh→prod 部署／重啟 BLOCK 正則只列兩個退租 IP，2026-08-31 整併後對現役 `145.239.195.47` **完全不擋**——偵測器啞了四天而 AO-RESUME 沒有任何訊號（正是 §R0 最惡樣態「系統宣稱與真實不符」）。
@@ -104,7 +131,7 @@
 - `.claude/agents/`：devops-engineer、mainwp-engineer、supabase-engineer、n8n-engineer（含 frontmatter description）、incident-responder（主機表改單機＋刪除線舊主機）、trigger-deploy-agent、client-onboarding（4 條 ssh 指令）、AGENT_INDEX；`.claude/commands/command-plane-verify.md`；`.claude/SKILL_AND_COMMAND_INDEX.md`（sg/eu-reboot 標已取代）。SSH 一律 `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`（QUICKREF 橫幅正本），容器路徑不變（`/root/lobster-phase1`、`/root/n8n`、`/root/mainwp`）。`sg-reboot.md`／`eu-reboot.md` 的 `host:` 行保留（檔頭已 SUPERSEDED 重導）。
 - 腳本：`scripts/check-capacity-health.ps1`／`check-backup-health.ps1` 的 `$SgHost`/`$EuHost` 預設清空（body 已不用，只是簽章相容）；`agency-os/scripts/check-supabase-memory-monthly.ps1` wrapper 預設對齊 owner（owner 早已是 ks-aw-01，wrapper 只轉送 bound params，此為文件正確性）；`scripts/ao-close.ps1:1275` 註解不再引用已不存在的 CLAUDE.md 段。
 - `CLAUDE.md` 遠端段：加 container 裝 `pwsh` 的實測指令（Microsoft apt repo，7.6.5，約 1 分鐘），本 container 已裝。
-- WORKLOG 續24 [剩餘風險]①：修正我對 `claude -p` 的過度宣稱——deny 隨任一 settings 來源載入，repo 目錄內的 `claude -p` 同樣受保護。
+- WORKLOG 續25 [剩餘風險]①：修正我對 `claude -p` 的過度宣稱——deny 隨任一 settings 來源載入，repo 目錄內的 `claude -p` 同樣受保護。
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=1 | ms=~4000 —— 153 案 152 過（+1 P4-1c 綠），唯一紅仍是 main 上同紅的 `git-commit-scope-guard POSIX cd`。突變：把正則的 `145\.239\.195\.47|ks-aw-01|` 拿掉 → P4-1c 紅（fail 2）→ 還原 → 綠（fail 1）。`pwsh` Parser.ParseFile 對 4 支改過的 `.ps1` 全 OK。`run-v3-governance-gates.mjs` PASSED。`pwsh -NoProfile -Command $PSVersionTable` → 7.6.5。
 - REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) `client-onboarding.md` 的 ssh 指令改 `ubuntu` 後，遠端 `echo >> /root/lobster-phase1/.env` 需要 sudo 才寫得進 root 目錄——已在該段加註「ubuntu 需 sudo」，指令本身留給執行者依 QUICKREF 加 `sudo`（不盲改成 `sudo sh -c` 以免破壞引號層）；n8n frontmatter description 仍在雙引號內、YAML 有效。
@@ -114,9 +141,9 @@
 **[補記：操作者要求在遠端跑 `sync-claude-userlevel.ps1 -Mode merge`]** 不能在這裡跑。① 它的目標是**執行那台機器**的 `~/.claude/`，本 container 的 `~/.claude` 不是筆電的；② 腳本是 Windows-only：`$env:USERPROFILE`（Linux 為 null → `Cannot bind argument to parameter 'Path'`）與 `Join-Path ... 'mcp\claude-userlevel'` 反斜線字面量。用 `USERPROFILE=$HOME` 強行跑 `-Mode dry-run` 會回 `RESULT: PASS`，但 target 顯示 `/root\.claude\SUBAGENT_CHARTER.md`——反斜線是檔名的一部分，merge 會在 `/root` 下寫出帶反斜線的垃圾檔而非真 settings。**dry-run 在錯的平台上回 PASS 是 fail-open 偵測器**（同 §已知信任邊界）；遠端 container 不需要它（`wire-remote-hooks.sh` 已覆蓋），故不移植，只記錄。筆電上執行：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sync-claude-userlevel.ps1 -Mode merge`，預期輸出含 `permissions.deny` drift → 套用，`RESULT: PASS`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=USERPROFILE=$HOME pwsh -NoProfile -File scripts/sync-claude-userlevel.ps1 -Mode dry-run -MonorepoRootOverride /home/user/Work | exit=0 | ms=~3000 —— 輸出 `target=/root\.claude\SUBAGENT_CHARTER.md`（反斜線字面量），證明不可在 Linux 執行 merge。
 **[rollback]** `git revert` 本 commit。
-- AUTO_TASK_DONE: 退租 IP 清理（代理可執行層 12 檔）+ prod 部署閘補現役主機（突變驗證）+ pwsh 裝機指令入 CLAUDE.md + ao-close 註解 + 續24 風險宣稱修正。
+- AUTO_TASK_DONE: 退租 IP 清理（代理可執行層 12 檔）+ prod 部署閘補現役主機（突變驗證）+ pwsh 裝機指令入 CLAUDE.md + ao-close 註解 + 續25 風險宣稱修正。
 
-## 2026-09-04（續24，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
+## 2026-09-04（續25，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
 
 **[任務理解]** 操作者問「瘋狂派 subagents 有解決嗎」→ 回答「解一半」→ 操作者「你做最完美決定與處理」。不變量：**任何 fan-out 都必須經過 PreToolUse 可見的路徑**。Agent tool 滿足（`subagent-budget.js` 真實 spawn 驗證過）；Workflow tool 不滿足——`agent()` 在背景執行，hook 只能驗 `SUBAGENT-BUDGET-ESTIMATE` 自報值，動態爆量（腳本跑到一半才算出 N）防不了，`resumeFromRunId` 路徑更是零保護且從未真實驗證。證據：`reports/agent-dispatch/dispatch-20260903.jsonl` 當天只記到 6 個 agent，而事故是 99 個——記錄 hook 同樣看不到 Workflow 內部。
 **[方案]** A 改 Workflow 分支做腳本靜態分析（擋 `.map(`→`agent(`）：誤擋多、仍是啟發式；B **`permissions.deny` 整個關閉 Workflow tool**：不變量直接成立，本 repo 正面模板是固定 4-5 角色走 Agent tool，Workflow 的並行收益換不回失控風險。選 B。
@@ -134,7 +161,7 @@
 **[rollback]** 從兩處 deny 清單移除 `"Workflow"`、刪 parity test 與 test-hooks 登記行。
 - AUTO_TASK_DONE: Workflow tool deny（template + 遠端生成器 + parity test 突變驗證）；瘋狂派 subagent 問題由「驗自報估計」升級為「路徑整個關閉」。
 
-## 2026-09-04（續23，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
+## 2026-09-04（續24，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
 
 **[任務理解]** 操作者問「CLAUDE.md／AGENTS.md 是幫助還是拖累」→ 指示「徹底研究後優化到最有效益、最正確的版本」。根本問題：兩檔每輪整份注入 prompt（合計 48.7 KB ≈ 20k+ tokens），其中約四成是事故敘事（日期＋輪次＋案例）、同一事實重複三處（主機邊界）、規則互相衝突到需要「優先序」段，且檔案自己承認「大檔案容易被漏讀」。這是「5 小時額度 20-30 分鐘燒光」的固定成本項之一（每輪先付 20k 才開始做事）。
 **[現況分析]** `git log -8`：最近 8 commits 全為 cognitive-os 切片，無同議題改動；上一次瘦身 `bfa017b`（2026-09-04 稍早）只搬了表格到 TOOL_TRIGGER_MAP，敘事仍在。機械依賴清查：`grep -rl "AGENTS.md\|CLAUDE.md" scripts/ mcp/claude-userlevel/hooks/ .claude/commands/` 共 39 檔，**全部只在訊息／註解裡提及檔名，沒有任何腳本解析 AGENTS.md 內文**；唯二必須保留的機械標記是 `doc-sync-automation.ps1:98` 的 `## Related Documents (Auto-Synced)` 起始 marker 與 `check-governance-docs-drift.ps1:204` 的 `_Last synced` footer（兩者原樣保留）。hooks 實體位置 `mcp/claude-userlevel/hooks/rules/`（原文寫 `.claude/hooks/rules/` 不存在）。

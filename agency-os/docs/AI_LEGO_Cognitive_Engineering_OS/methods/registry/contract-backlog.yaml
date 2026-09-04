@@ -372,6 +372,33 @@ tier_1:
       itself cited elsewhere as a repeated teaching example. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the six entries above it.
+  eighth_concrete_entry:
+    # NEW (2026-09-04, same session): eighth Tier 1 entry, same
+    # additive-key rationale as the seven entries above it.
+    method_id: "decision.mcda"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). Second entry from the
+      `decision` family (F16), extending `decision.ahp` -- the natural
+      next step both `challenge.red_team`'s own docs and TASKS.md's
+      Cognitive OS master item named as a candidate. Atlas §22.3's
+      Method-specific Gate table (L4154) gives this method a directly-
+      cited forbidden_transition ("Automatic Authority"), the second Tier
+      1 entry with that property (after `challenge.red_team`'s own L4152
+      row on the SAME table). Proactive spec-root due-diligence performed
+      BEFORE writing this contract found `specs/decision/decision.schema.yaml`
+      already anticipates this exact extension point (its own
+      OQ-DECISION-2 names "a future MCDA-specific ... schema" verbatim) --
+      confirmed as the intended gap to fill, not a duplicate.
+    source: "methods/contracts/decision.mcda.contract.yaml (built same session as this entry, mints machine_id decision.mcda) + specs/cognitive/typed-objects/mcda-analysis.schema.yaml (new output type) + ai_lego/compute/mcda/scoring.py (new deterministic min-max-normalization compute module, hand-verified against 3 known cases) -- Score stage reuses ai_lego/compute/ahp/weights.py::rank_options UNCHANGED, the first cross-family reuse of a scoring function (not just a validation gate) in this file's history"
+    note: >
+      Not placed under `tier_0`: Atlas §11.32 is a dedicated protocol
+      section, not itself a repeatedly-cited teaching example (same
+      reasoning `decision.ahp`'s own fifth-entry note already applies).
+      Tier 1, mandated by the actively-running implementation slice, same
+      category as the seven entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

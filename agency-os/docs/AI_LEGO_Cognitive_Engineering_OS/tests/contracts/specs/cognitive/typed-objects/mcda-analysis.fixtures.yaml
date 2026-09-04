@@ -1,0 +1,156 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/mcda-analysis.schema.yaml"
+target_ref: ""
+description: >
+  Exercises MCDAAnalysis's required fields, the `options[]` minItems:2 /
+  `criteria[]` minItems:1 / `weights[]` minItems:1 guards, the
+  `direction` enum, the genuine-compute fields (`engine` const,
+  `computation_provenance_ref` pattern), the required `sensitivity_notes`
+  disclosure, and the top-level `additionalProperties: false`
+  no-automatic-authority enforcement (Atlas §22.3 L4154).
+
+valid:
+  - name: two_options_three_criteria_mixed_direction_clear_winner
+    instance:
+      id: "MCDA-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "decision.mcda"
+      options:
+        - {id: "O1", label: "build in-house"}
+        - {id: "O2", label: "outsource"}
+      criteria:
+        - {id: "C1", label: "cost (USD)", direction: minimize}
+        - {id: "C2", label: "time to launch (1-10)", direction: maximize}
+        - {id: "C3", label: "long-term maintainability (1-10)", direction: maximize}
+      raw_scores:
+        - {option_id: "O1", criterion_id: "C1", raw_value: 80000}
+        - {option_id: "O1", criterion_id: "C2", raw_value: 4}
+        - {option_id: "O1", criterion_id: "C3", raw_value: 9}
+        - {option_id: "O2", criterion_id: "C1", raw_value: 50000}
+        - {option_id: "O2", criterion_id: "C2", raw_value: 8}
+        - {option_id: "O2", criterion_id: "C3", raw_value: 5}
+      weights:
+        - {criterion_id: "C1", weight: 0.4}
+        - {criterion_id: "C2", weight: 0.3}
+        - {criterion_id: "C3", weight: 0.3}
+      normalized_scores:
+        - {option_id: "O1", criterion_id: "C1", normalized_value: 0.0}
+        - {option_id: "O1", criterion_id: "C2", normalized_value: 0.0}
+        - {option_id: "O1", criterion_id: "C3", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C2", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C3", normalized_value: 0.0}
+      ranking:
+        - {option_id: "O2", weighted_score: 0.7}
+        - {option_id: "O1", weighted_score: 0.3}
+      sensitivity_notes: "manually checked -- rank flips only if C1 weight drops below 0.25; otherwise stable"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+  - name: tied_criterion_all_options_score_1_on_it
+    instance:
+      id: "MCDA-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "decision.mcda"
+      options:
+        - {id: "O1", label: "vendor A"}
+        - {id: "O2", label: "vendor B"}
+      criteria:
+        - {id: "C1", label: "compliance (all vendors identical)", direction: maximize}
+        - {id: "C2", label: "price (USD)", direction: minimize}
+      raw_scores:
+        - {option_id: "O1", criterion_id: "C1", raw_value: 5}
+        - {option_id: "O2", criterion_id: "C1", raw_value: 5}
+        - {option_id: "O1", criterion_id: "C2", raw_value: 100}
+        - {option_id: "O2", criterion_id: "C2", raw_value: 200}
+      weights:
+        - {criterion_id: "C1", weight: 0.5}
+        - {criterion_id: "C2", weight: 0.5}
+      normalized_scores:
+        - {option_id: "O1", criterion_id: "C1", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}
+        - {option_id: "O1", criterion_id: "C2", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C2", normalized_value: 0.0}
+      ranking:
+        - {option_id: "O1", weighted_score: 1.0}
+        - {option_id: "O2", weighted_score: 0.5}
+      sensitivity_notes: "C1 draws no distinction between vendors (tied); ranking is entirely driven by C2"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: options_below_minitems_2
+    instance:
+      id: "MCDA-2026-09-04-003"
+      version: "1.0.0"
+      options: [{id: "O1", label: "solo"}]
+      criteria: [{id: "C1", label: "x", direction: maximize}]
+      raw_scores: [{option_id: "O1", criterion_id: "C1", raw_value: 1}]
+      weights: [{criterion_id: "C1", weight: 1.0}]
+      normalized_scores: [{option_id: "O1", criterion_id: "C1", normalized_value: 1.0}]
+      ranking: [{option_id: "O1", weighted_score: 1.0}]
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "options has minItems: 2 -- a decision-comparison method needs at least two options to rank; ranking also has minItems: 2, both violated here."
+  - name: invalid_direction_enum_value
+    instance:
+      id: "MCDA-2026-09-04-004"
+      version: "1.0.0"
+      options: [{id: "O1", label: "a"}, {id: "O2", label: "b"}]
+      criteria: [{id: "C1", label: "x", direction: "higher_is_better"}]
+      raw_scores: [{option_id: "O1", criterion_id: "C1", raw_value: 1}, {option_id: "O2", criterion_id: "C1", raw_value: 2}]
+      weights: [{criterion_id: "C1", weight: 1.0}]
+      normalized_scores: [{option_id: "O1", criterion_id: "C1", normalized_value: 0.0}, {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}]
+      ranking: [{option_id: "O2", weighted_score: 1.0}, {option_id: "O1", weighted_score: 0.0}]
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "criteria[].direction is enum [maximize, minimize] -- 'higher_is_better' is not a member."
+  - name: engine_not_deterministic_compute_is_refused_by_const
+    instance:
+      id: "MCDA-2026-09-04-005"
+      version: "1.0.0"
+      options: [{id: "O1", label: "a"}, {id: "O2", label: "b"}]
+      criteria: [{id: "C1", label: "x", direction: maximize}]
+      raw_scores: [{option_id: "O1", criterion_id: "C1", raw_value: 1}, {option_id: "O2", criterion_id: "C1", raw_value: 2}]
+      weights: [{criterion_id: "C1", weight: 1.0}]
+      normalized_scores: [{option_id: "O1", criterion_id: "C1", normalized_value: 0.0}, {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}]
+      ranking: [{option_id: "O2", weighted_score: 1.0}, {option_id: "O1", weighted_score: 0.0}]
+      sensitivity_notes: "n/a"
+      engine: "llm_mental_arithmetic"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "engine is const 'local_python_deterministic_compute' -- 'llm_mental_arithmetic' is refused, same guarantee ahp-analysis.schema.yaml already enforces."
+  - name: missing_required_sensitivity_notes
+    instance:
+      id: "MCDA-2026-09-04-006"
+      version: "1.0.0"
+      options: [{id: "O1", label: "a"}, {id: "O2", label: "b"}]
+      criteria: [{id: "C1", label: "x", direction: maximize}]
+      raw_scores: [{option_id: "O1", criterion_id: "C1", raw_value: 1}, {option_id: "O2", criterion_id: "C1", raw_value: 2}]
+      weights: [{criterion_id: "C1", weight: 1.0}]
+      normalized_scores: [{option_id: "O1", criterion_id: "C1", normalized_value: 0.0}, {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}]
+      ranking: [{option_id: "O2", weighted_score: 1.0}, {option_id: "O1", weighted_score: 0.0}]
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+    reason: "sensitivity_notes is required -- Atlas §22.3's own required-verification column names Sensitivity, missing here."
+  - name: automatic_authority_claim_refused_by_additional_properties_false
+    instance:
+      id: "MCDA-2026-09-04-007"
+      version: "1.0.0"
+      options: [{id: "O1", label: "a"}, {id: "O2", label: "b"}]
+      criteria: [{id: "C1", label: "x", direction: maximize}]
+      raw_scores: [{option_id: "O1", criterion_id: "C1", raw_value: 1}, {option_id: "O2", criterion_id: "C1", raw_value: 2}]
+      weights: [{criterion_id: "C1", weight: 1.0}]
+      normalized_scores: [{option_id: "O1", criterion_id: "C1", normalized_value: 0.0}, {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}]
+      ranking: [{option_id: "O2", weighted_score: 1.0}, {option_id: "O1", weighted_score: 0.0}]
+      sensitivity_notes: "n/a"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED}
+      approved: true
+    reason: "additionalProperties: false refuses the smuggled 'approved' key -- Atlas §22.3 (L4154) forbids this method's output from claiming Automatic Authority, same enforcement class red-team-challenge.schema.yaml's own additionalProperties:false already established for a sibling method."
