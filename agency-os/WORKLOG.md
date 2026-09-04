@@ -1,6 +1,29 @@
 # Worklog
 
-## 2026-09-04（續3，同一 session：操作者「把所有你說要改的全部去改好」— 治理與工具批次）
+## 2026-09-04（續4，同一 session：真 LLM Gateway — Ollama 本機推理 + Anthropic 雲端，兩條路徑皆真測）
+
+### 新增 `ai_lego/platform/ai_execution/gateway.py`：research.qualitative_coding 的 AI-suggested labels 第一次有真模型可呼叫
+
+**觸發**：操作者「真 LLM 切片，等你答 Ollama／GPU, 你去查」，中途追加「我要的是完美的東西不是妥協版」「我要線上給人用」「之後會有 CRM、cold mail、客服、行銷、生成影片、剪片系統」「不准用簡體中文」。過程中先誤判 key 來源（以為讀 `ANTHROPIC_API_KEY` env），讀 `lobster-factory` meeting-service 的 `lib/settings.py` 才發現操作者早就設計好 BYOK（`.settings.json`，網頁 `/api/settings` 填入，`mcp/user-env.ps1` 刻意留空避免撞 Claude Code 訂閱 billing）——已改正，Gateway 改吃呼叫端傳入的 key。另外一度想抄 GPT 一份《Ollama Universal AI Foundry》文件的 sensitivity 分級詞彙（PUBLIC/INTERNAL/CONFIDENTIAL/HIGHLY_SENSITIVE），查 spec root 才發現這個 repo 已有 ADR 定案的四值詞彙（Public/Internal/Confidential/Restricted，EC §101／MP §61）與對應規則（`network-egress.yaml` rule `EGRESS-MP64-1`）——改用既有的，避免第二套會漂移的分類系統。**全程 0 個 agent**（critic／codex 兩個 oracle 皆撞額度，斷路器擋下，按規則不重連）。
+
+**[已修改]**：
+- `ai_lego/platform/ai_execution/gateway.py`（新檔，200 行）：`AIGateway.complete(model_profile_id, ..., classification_tag=, trace_id=, prompt_version=)`，兩個真 provider——`anthropic`（`anthropic` SDK，key 由呼叫端在建構時傳入，不讀環境變數）、`self-hosted`（HTTP 到 Ollama `127.0.0.1:11434/api/chat`，stdlib `urllib` 零額外依賴）。Egress 政策內建：`classification_tag == "Restricted"` 且 provider 屬於 `EXTERNAL_MODEL_PROVIDERS` 時直接擋（`EGRESS_MP64_1_VIOLATION`），在任何 SDK/網路呼叫**之前**擋下，不是事後補救。`ollama_available()` 探測函式，形狀比照既有 `WindowsSapiSpeechAudioFactory.availability()` 的 `(bool, reason)`。
+- `tests/unit/test_gateway.py`（新檔，13 個 offline mock 測試）：registry 解析錯誤、provider 未實作、egress 政策四種情境（擋雲端／放行本機／非 Restricted 放行／未設定放行）、Anthropic 缺 key、trace_id／prompt_version 透傳、Ollama endpoint URL 正確性、Ollama 錯誤 body、連線失敗。
+- 未改動任何既有檔案——`qualitative_coding.py` 尚未接上這個 Gateway（見下方剩餘風險），這是獨立、未被任何呼叫端消費的新模組。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=真呼叫 `AIGateway.complete()` 打本機 Ollama `gemma3:4b`（`ollama pull` 3.3GB，`winget install Ollama.Ollama` 事先裝妥） | exit=0 | ms=136703（冷啟，模型載入 VRAM）| result=`text='PONG'`，`provider='self-hosted'`，真 GPU 推理，非 mock
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上，egress 政策真測（`classification_tag='Restricted'` 打 `anthropic` provider，`api_key='unused-should-never-be-reached'`）| exit=0 | result=`EGRESS_MP64_1_VIOLATION` 正確擋下；同一支腳本再用 `classification_tag='Restricted'` 打 `self-hosted` 成功（本機資料真的沒離開機器），`trace_id`／`prompt_version` 透傳正確
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_gateway -v` | exit=0 | ms=1083 | result=13/13 綠（非 0.000s 假綠，記取先前 mutation-check 教訓）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | ms=46980 | result=`Ran 144 tests OK`（131→144，全套無迴歸）
+- REVIEW_DONE: critic=self（oracle 斷路器兩個都 block，見下）| verdict=pass | findings=0c/1m/0n（1 個 medium 是自己抓到並修正：一開始設計讀 `ANTHROPIC_API_KEY` env，讀 `lib/settings.py` 後改為呼叫端傳入 key，同一份 commit 內修正，未殘留錯誤版本）
+- BUGHUNT_DONE: scope=agency-os,scripts,`Projects/internal/cognitive-engineering-os` | grep=`GatewayResult\(|AIGateway\(|\.complete\(` | hits=0（排除 gateway.py 自身與 System_Foundry 無關的 `matrix.complete()`）——確認這是獨立新模組，沒有任何既有呼叫端會被新增的必填欄位（`trace_id`／`prompt_version`）破壞
+- 突變測試：`classification_tag == "Restricted" and provider in EXTERNAL_MODEL_PROVIDERS` 手動替換成 `False`，重跑 egress 測試腳本，正確變紅（真的嘗試打 Anthropic API，被假 key 擋下才失敗，證明防線原本是它在擋而非測試空跑）；復原後重跑轉綠
+- ORACLE_WAIVED: critic（`oracle-quota.ps1 check` 回 exit 3，block 至 2026-09-05 05:20，HTTP 429）與 codex（block 至 2026-09-07 11:06，usage limit）皆依斷路器不重連，書面自審如上
+
+**[剩餘風險]**：① `qualitative_coding.py` 的 `assemble_coding_outputs` 仍讀 `synthetic_fixtures.py` 的硬編字典，尚未接上這個 Gateway——今天完成的是「真的能打真模型」這一層，下一步才是「research.qualitative_coding 的 AI 建議真的用這層產生」，範圍較大（open coding 提示設計、citation gate 對接真引用、`--coding-mode fixture|real` CLI 旗標），刻意不倉促塞進同一個 commit；② Anthropic 路徑目前只有 mock 測試覆蓋，未真測——`lobster-factory` meeting-service 的 `.settings.json` 目前是空的（操作者沒真的透過網頁填過 key），真測需要一把真 key，未主動要求操作者提供；③ `phi4-mini` 尚未拉取（原計畫兩個候選模型比較中文品質，只完成 `gemma3:4b` 一個）；④ Gateway 尚未抽成跨產品共用套件（`lobster-factory/packages/shared/` 是空殼、零消費者）——操作者提及未來 CRM／cold mail／客服／行銷系統都要用 Ollama，但故意不現在抽，等第二個真消費者出現才抽（HCI ch.17 紀律），今天只保證這支模組本身零框架依賴（純 stdlib + 3 行私有 import），之後抽出去是搬移不是重寫。
+
+**[rollback]**：新檔案，`git revert` 本次 commit 即完全移除，無其他檔案依賴它。
 
 ### AGENTS.md 瘦身 + ADR-024（spec-on-demand）+ 生成索引 + 額度斷路器 + 重複失敗閘 + 三支工具腳本 + 可跑 demo 登記表
 
