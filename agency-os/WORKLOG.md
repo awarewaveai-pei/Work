@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-09-04（續25，同一 session：Cognitive OS 第十二個 Method Atlas 切片 — `architecture.adr`，第一個結構化文件形狀＋第一個源自真實實務而非 Atlas 引用的欄位）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`architecture.adr`（F18「軟體架構套件」10 工具 pack 裡的其中一個成員方法，非整個 pack）。Atlas §11.37 給了 11 節完整 markdown 模板（Context/Decision/Alternatives Considered/Security-Privacy/Data Impact/Operational Impact/Compatibility/Migration/Rollback/Validation/Revisit-Reversal Conditions）＋ F18 自己的表格列給了獨立第二個引用（壓縮版：Context→Decision→Alternatives→Impacts→Migration→Rollback→Revisit，兩者一致，只是表格版把三類 Impact 合併成一詞、省略 Validation）。選它的額外理由：**本 repo 自己就在真實使用 ADR**（`docs/architecture/decisions/ADR_INDEX.md`），是少數能對照真實實務而非純 Atlas 文字練習的切片。
+
+**F18 是 pack，本次只做其中一個成員方法，不是整個 pack**：本 session 稍早（第十切片附近）已在 TASKS.md 明文記下「F18/F19/F20 等在 Atlas 裡本身是 pack，量級不同於單一方法，屆時另外評估」——這次沒有誤讀成「pack 家族完全不能碰」，而是確認 ADR 本身有獨立可定址的協定（雙引用，非只掛在 pack 表格列），跟先前每個切片對自己 `recommended_next` 只做一步、不做整條鏈的紀律一致。
+
+**第一個源自真實實務而非 Atlas 引用的欄位**：`status`（proposed/accepted/superseded/deprecated）——Atlas §11.37 模板完全沒有這個欄位，但沒有它的 ADR 記錄回答不了 ADR 實務最基本的問題「這個決策現在還算數嗎」，本 repo 自己的 `ADR_INDEX.md` 就是靠這個問題運作。沒有偷偷當成 Atlas 給的東西處理，contract 的 `compilation_decisions` 明文標注這是本 session 至今第一個「理由是真實實務、不是母文件引用」的欄位。
+
+**第一個結構化文件形狀**：不是計算、不是圖、不是排名、不是 checklist、不是監控規則——是 11 個固定順序的自由文字段落。Atlas §22.3 表沒有 ADR 這一列，所以沒有 forbidden_transition 可引用，也是本 session 第一個沒有雙層權限守門的方法（誠實留空，不硬套 red_team／mcda／monte_carlo 的模式）。builder 是本 session寫過最簡單的一個：沒有計算層，只有前置條件檢查（status enum、至少 1 個 alternative）+ 兩個 gate。
+
+**真的查了一次疑似編碼 bug，結果不是 bug**：CLI 第一次真跑，終端機印出的中文標題亂碼。沒有假設是資料損毀，直接檢查原始位元組（source .py 檔案與執行後寫出的 JSON 結果檔，皆用 `rb` 模式讀取，不透過 `print()` 迴路）——兩邊都是正確的 UTF-8（`\xe8\xa8\x82\xe5\x96\xae...` = 訂單...）。用 `PYTHONIOENCODING=utf-8` 重跑後終端機顯示乾淨——證實是這個 session 終端機本身的 Windows 主控台編碼頁顯示假象，不是本 codebase 的資料完整性問題。這正是 `reference_cjk_bash_cron_encoding.md` 記憶條目講的「驗證用 python 讀原始位元組，不要信任終端機回顯」紀律，這次是即時應用而非事後才想到。
+
+**抓蟲過程額外查到一個巧合命名，非重複**：`.ai/research/phase-0/architecture-inventory.yaml:671` 早就有一個欄位路徑字串 `"architecture.adr_refs"`（一份 manifest 欄位清單裡的一項，意思是「architecture 群組底下的 adr_refs 欄位」，跟本次新造的 Method Atlas machine_id `architecture.adr` 純屬字面前綴巧合——manifest 欄位 vs 方法 id 是不同種類的東西，非重複，已查證並如實記錄而非靜默略過。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.adr.contract.yaml`（逐字引用 Atlas §11.37 完整模板＋F18 表格列兩個獨立引用）＋`specs/cognitive/typed-objects/architecture-decision-record.schema.yaml`（12 個必填欄位：11 個 Atlas 引用段落 + `status`）＋對應 golden fixture（2 valid + 3 invalid）＋`contract-backlog.yaml` 新增 `tier_1.tenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/__init__.py`／`adr.py`（builder＋兩個 gate，無計算層）＋`ai_lego/apps/cli/run_adr_slice.py`（真實形狀 ADR：POD 履約走 native 不走外掛決策）＋`tests/unit/test_adr.py`（10 tests，第一次跑就全綠，無需修正）＋`docs/TWELFTH_SLICE_ARCHITECTURE_ADR.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_adr_slice` | exit=0 | result=第一次真跑就通過：`PASS architecture.adr: title='POD 訂單履約走 native 架構，不走 WooCommerce 外掛', status=accepted, alternatives_considered=2, gates [provenance_required=PASS, alternatives_considered_required=PASS]`（前置已用 raw bytes 確認來源檔與輸出 JSON 皆為正確 UTF-8，終端機亂碼純屬顯示假象）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_adr -v` | exit=0 | ms=766 | result=10 passed，第一次跑就全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2615→2625
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=49785 | result=**420 tests OK**（410→420，零回歸；`git diff --stat` 對照 `provenance.py`／`method_resolver.py`／`schema_contracts.py`／`event_ledger.py` 四個共用檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：pack 家族的既有 TASKS.md 警語是否被正確理解為「不做整條鏈」而非「不能碰」（是，已在本條目與 contract 本身明文對照 recommended_next 分階段紀律）；`status` 欄位沒有 Atlas 引用是否構成偷渡（不算，contract compilation_decisions 已明文標注來源是真實實務非 Atlas，是本 session 第一個這樣做的欄位，非默默處理）；亂碼是否真的查證過而非假設沒事（是，已用原始位元組雙重確認源檔與輸出檔，非只看終端機回顯）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]adr\|ArchitectureDecisionRecord\|architecture-decision-record\|modules[.]architecture\|modules/architecture` | hits=本切片自己的新檔案、session log 雜訊（含另一個並行 session 的 Workflow 執行紀錄，字面命中「architecture」一詞但與本切片無關）、`__pycache__` 編譯產物，額外查到一個巧合命名（`architecture.adr_refs`，manifest 欄位非方法 id，已查證非重複）——無任何真正的過期或非預期殘留引用
+
+**[剩餘風險]**：`OQ-ADR-1`（alternatives_considered 只是字串陣列非結構化物件）；`OQ-ADR-2`（recommended_next 留空，F18 鏈中相鄰的 Threat Model／Rehearsal 皆無 machine_id）；`OQ-ADR-3`（method-inventory.yaml 完全沒有 ADR 這一列，比先前任何切片的登錄缺口都大）。皆非阻塞，已誠實揭露於 contract 與 docs。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（全部為新增檔案，回退零副作用）。
+
 ## 2026-09-04（續24，同一 session：Cognitive OS 第十一個 Method Atlas 切片 — `computation.monte_carlo`，第一個跳出 F01-F24 編號的家族＋第一個真隨機方法）
 
 **觸發**：延續操作者授權，繼續自主推進。0 agent。

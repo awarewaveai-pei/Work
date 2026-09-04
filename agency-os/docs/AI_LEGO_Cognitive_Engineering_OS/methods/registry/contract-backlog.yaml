@@ -435,6 +435,38 @@ tier_1:
       itself cited elsewhere as a repeated teaching example. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the eight entries above it.
+  tenth_concrete_entry:
+    # NEW (2026-09-04, same session): tenth Tier 1 entry, same
+    # additive-key rationale as the nine entries above it.
+    method_id: "architecture.adr"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above (mandated by the
+      actively-running implementation slice). First entry from the
+      `architecture` family (F18's own "Software Architecture Pack") --
+      ONE member tool of that 10-tool pack built, not the whole pack's
+      chain, the same scoping discipline every prior slice's own
+      recommended_next already applied. ADR has its own individually-
+      addressable protocol cited TWICE independently of the pack framing
+      (§11.37's own dedicated 11-section template, L2066-2094, and F18's
+      own compact table row, L816). The first typed object this session
+      builds for a structured DOCUMENT template rather than a
+      computation, graph, ranking, checklist, or monitoring rule -- no
+      genuine-compute fields, no forbidden-authority guard (Atlas's own
+      §22.3 table has no ADR row). Self-referential grounding: this
+      repository itself already practices ADRs operationally
+      (`docs/architecture/decisions/ADR_INDEX.md`). The `status` field is
+      the FIRST field in this session's history sourced from real
+      operating practice rather than an Atlas citation, disclosed
+      explicitly as such in the contract's own compilation_decisions.
+    source: "methods/contracts/architecture.adr.contract.yaml (built same session as this entry, mints machine_id architecture.adr) + specs/cognitive/typed-objects/architecture-decision-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.37 is a dedicated protocol
+      section with a complete 11-section template, not itself cited
+      elsewhere as a repeated teaching example. Tier 1, mandated by the
+      actively-running implementation slice, same category as the nine
+      entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

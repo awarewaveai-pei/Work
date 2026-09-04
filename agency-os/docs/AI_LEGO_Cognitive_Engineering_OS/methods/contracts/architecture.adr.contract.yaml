@@ -1,0 +1,264 @@
+$id: "ai-lego://methods/contracts/architecture.adr.contract.yaml"
+title: "Architecture Decision Record (ADR) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Twelfth Method Atlas slice, first from the `architecture`
+  family (F18 -- Atlas's own "Software Architecture Pack", L813-838).
+
+  F18 is explicitly a PACK -- a 10-tool table (C4, DDD, Event Storming,
+  ADR, ATAM, Quality Attribute Scenario, Architecture Fitness Functions,
+  Strangler Fig, Architecture Trade-off Matrix, Dependency Mapping) sharing
+  one recommended chain. This session's own TASKS.md already disclosed
+  packs (F18/F19/F20) as "a different scale than a single method, to be
+  evaluated separately" -- this contract builds exactly ONE member tool
+  (ADR), not the pack's full 10-tool chain, the same scoping discipline
+  every prior slice already applied to its own recommended_next (e.g.
+  `root_cause.fishbone` never built the whole promotion chain in one
+  slice). ADR has its own individually-addressable, TWICE-cited protocol
+  independent of the pack framing: §11.37's own dedicated section
+  (L2066-2094) gives an 11-section markdown template (Context / Decision /
+  Alternatives Considered / Security-Privacy / Data Impact / Operational
+  Impact / Compatibility / Migration / Rollback / Validation / Revisit-
+  Reversal Conditions), and F18's own table row (L816) independently
+  compacts it to "Context→Decision→Alternatives→Impacts→Migration→
+  Rollback→Revisit" -- both citations agree on the same core sequence, the
+  table row simply bundles the three impact-categories (Security/Privacy,
+  Data, Operational) into one word ("Impacts") and omits Validation. This
+  contract keeps §11.37's fuller 11-section template (the more detailed,
+  more concrete of the two), disclosed the same way `decision.mcda`'s own
+  two-citation Weights/Normalize order disclosure already handled a
+  similar table-vs-full-section compaction difference.
+
+  Unlike every prior Tier 1 contract this session built, this method is
+  neither genuine-compute nor a forbidden-authority-guarded checklist --
+  it is a structured DOCUMENT template, the first of that shape this
+  session builds. Self-referential grounding: this repository itself
+  already practices ADRs operationally (`docs/architecture/decisions/
+  ADR_INDEX.md`, referenced throughout `agency-os/AGENTS.md`'s own
+  long-term operating discipline section) -- a real, already-in-use
+  artifact type, not a purely synthetic Atlas exercise.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.37 架構決策紀錄（Architecture Decision Record / ADR）(L2066-2094) -- purpose, 11-section template, benefits"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 軟體架構套件 tool table, ADR row (L816): 'Context→Decision→Alternatives→Impacts→Migration→Rollback→Revisit' -- second, independent compact-form citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F-category table (L318): 'F18 | Software Architecture | 架構如何長期演化？'"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content (the irony of that sentence, for a contract
+  ABOUT ADRs, is noted and not smoothed over). Atlas §11.37 gives a
+  complete, unambiguous 11-section template, corroborated by a second,
+  independent compact-form citation on F18's own table row -- direct
+  transcription plus low-risk, disclosed compilation choices, same
+  standard every Tier 1 contract this session built applies. Registered
+  in `methods/registry/contract-backlog.yaml` `tier_1` as a tenth
+  concrete entry.
+
+  `id: architecture.adr` is a NEW machine_id. Unlike every prior Tier 1
+  contract's own source method, `method-inventory.yaml` carries NO row at
+  all for ADR (not even an "uncataloged" one like Monte Carlo's own
+  L1437-1441 row) -- grepped exhaustively, confirmed absent, disclosed as
+  a bigger inventory gap than any prior slice found (`OQ-ADR-3`).
+  `family: architecture` transcribes F18's own short pack name ("Software
+  Architecture"), the same convention `computation` already used for F18's
+  sibling pack's own primitive-table label. `adr` (not the full
+  `architecture_decision_record`) follows Atlas's own parenthetical
+  abbreviation (L2066: "Architecture Decision Record／ADR") and this
+  repository's own real, already-established naming convention (its ADR
+  files are literally numbered `NNN-title.md`, never spelled out in full).
+
+id: architecture.adr
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [DECIDE, EXPLAIN, REFLECT]
+# INFERRED, not cited -- Atlas §4 (L192) cites a primitive formula for
+# only 5 methods, ADR is not among them. DECIDE (the record's whole
+# subject is a decision already made) and EXPLAIN (Atlas L2068's own
+# purpose statement: preserve WHY, not just the code outcome) are
+# confident inferences; REFLECT (the record exists specifically to be
+# re-read 30 years later, Atlas's own L2091 benefit) is included with
+# slightly less confidence than the other two, same honesty tier as every
+# other Tier 1 contract's own inferred primitives.
+
+purpose:
+  - preserve_the_rationale_behind_a_significant_architecture_decision
+# Atlas L2068 verbatim sense: "保存「為什麼這樣設計」，而不只是保存 code
+# 結果" (preserve WHY it was designed this way, not just the code outcome).
+
+inputs:
+  required:
+    - DecisionContext
+    - AlternativesConsidered
+  optional: []
+  # Atlas's own template's first two sections (Context, then Decision
+  # itself, which this contract treats as the METHOD'S OWN OUTPUT rather
+  # than an input -- an ADR without a context or without having
+  # considered alternatives would not be a genuine ADR, just an
+  # unexplained assertion; Atlas's own §11.37 purpose statement (L2068)
+  # is explicitly ABOUT preserving alternatives-aware rationale, not bare
+  # outcomes).
+
+outputs:
+  - ArchitectureDecisionRecord
+# NEW output type (see typed-objects/architecture-decision-record.schema
+# .yaml). Same honesty gap every Tier 1 contract this session disclosed:
+# Atlas names no PascalCase output type for this method.
+
+preconditions:
+  - "at least 1 alternative_considered entry supplied (an ADR with zero considered alternatives is an unexplained assertion, not a decision record)"
+  - "status is one of the four values named by this repository's own real ADR practice (see compilation_decisions)"
+  # The first precondition is a structurally-necessary reading of Atlas's
+  # own purpose statement (L2068), same class of not-literally-cited-but-
+  # structurally-required precondition every genuine-compute contract's
+  # own preconditions already establish. The second is disclosed
+  # separately below (compilation_decisions) as sourced from this
+  # repository's own real practice, not Atlas.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: the record carries a provenance_record with
+  # epistemic_type DECISION -- the SECOND typed object this session uses
+  # a previously-reserved-but-unused epistemic_type for (after
+  # computation.monte_carlo's own first use of SIMULATED_RESULT). DECISION
+  # is the exact label `specs/decision/decision.schema.yaml`'s own
+  # description explicitly names as existing "specifically because Master
+  # Plan's original §83 vocabulary had 'no DECISION concept to lock in the
+  # first place'" -- an ArchitectureDecisionRecord IS a concrete instance
+  # of that concept. evidence_labeling_required is FALSE: an ADR's own
+  # subject matter is HUMAN JUDGMENT about tradeoffs (Atlas's own §11.38
+  # ATAM section, immediately following this one, names exactly this kind
+  # of Sensitivity-Point/Tradeoff-Point reasoning) -- it is not an
+  # empirical claim requiring evidence citation the way a Fishbone cause
+  # hypothesis or a Red Team finding is; the whole point of the
+  # `alternatives_considered` field is to record REASONING, not evidence.
+
+forbidden_transition: []
+# Atlas §22.3's own Method-specific Gate table (L4143-4155) does not
+# include an ADR row -- unlike challenge.red_team/decision.mcda/
+# computation.monte_carlo, this method has no directly-cited forbidden-
+# authority rule. Left genuinely empty rather than inventing one, same
+# class of honest absence `decision.ahp.contract.yaml`'s own empty
+# forbidden_transition already discloses.
+
+recommended_next: []
+# F18's own recommended chain (L829-838: Current-state Reconstruction ->
+# C4/DDD -> Quality Attribute Scenarios -> Architecture Options -> ATAM ->
+# Threat Model -> ADR -> Rehearsal -> Canary/Blue-Green -> Verify ->
+# Rollback Window/Close) places ADR mid-chain, but every neighboring
+# method (Threat Model, Rehearsal, Canary/Blue-Green) has no machine_id
+# anywhere in this spec root (grepped, confirmed absent) -- same
+# unresolvable-citation situation `decision.mcda.contract.yaml`'s own
+# empty recommended_next already handled for a schema-constrained-to-
+# machine-ids field. Disclosed as `OQ-ADR-2`.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- an ArchitectureDecisionRecord is a pure
+  # document record, no external side effects from its own construction
+  # (the architecture change it describes may have side effects, but that
+  # is downstream of this method's own scope, same distinction
+  # decision.mcda's own rollback field already draws between the
+  # analysis record and the decision it feeds).
+
+compilation_decisions:
+  - question: >
+      Atlas's own §11.37 template groups "Security / Privacy", "Data
+      Impact", and "Operational Impact" as three SEPARATE sections, while
+      F18's own compact table row bundles them into one word ("Impacts").
+      Keep three fields, or collapse to one?
+    decision: "Keep three separate fields (security_privacy_impact, data_impact, operational_impact), following §11.37's fuller template."
+    reasoning: >
+      Same reasoning `decision.mcda.contract.yaml`'s own two-citation
+      disclosure already applies when one citation is fuller than the
+      other: §11.37 is a dedicated protocol section with the complete,
+      unambiguous field list; the F18 table row is a deliberately
+      compact SUMMARY of the same content for a 10-row comparison table,
+      not a competing, narrower spec. Collapsing to match the summary
+      would throw away real structure the fuller citation actually gives.
+  - question: >
+      Should `alternatives_considered` be free text (Atlas's own template
+      shows it as a bare markdown heading, no internal field structure),
+      or a structured array?
+    decision: "A minimally-structured array of free-text strings, one per alternative -- not a richer {alternative, reason_rejected} object shape."
+    reasoning: >
+      Same class of restraint `mcda-analysis.schema.yaml`'s own
+      single-`weights[]`-field decision already applies: Atlas's own
+      template gives this section zero internal structure, so inventing
+      a `{alternative, reason_rejected}` pair shape would be presenting a
+      guess as a compiled fact. An array of strings is the smallest
+      structural step up from "one undifferentiated blob of prose" that
+      still lets a caller/validator confirm more than one alternative was
+      genuinely considered (this contract's own precondition above) --
+      not a new field shape Atlas never showed.
+  - question: >
+      Atlas's own §11.37 template names no `status` field (proposed /
+      accepted / superseded / ...), yet real ADR practice (including this
+      repository's own, per `docs/architecture/decisions/ADR_INDEX.md`)
+      universally tracks one. Should this contract add it anyway?
+    decision: "Yes -- status is a required field with a 4-value enum (proposed, accepted, superseded, deprecated), sourced from real practice, not Atlas."
+    reasoning: >
+      This is the FIRST field in this session's history added on the
+      strength of REAL, already-operating practice in this repository
+      itself rather than an Atlas citation or a structurally-necessary
+      precondition -- disclosed explicitly as such, not silently
+      presented as if Atlas named it. Justified because an ADR record
+      with no status is not actually usable the way this repository's own
+      real ADR_INDEX.md already uses status (deciding whether a decision
+      is still in force) -- omitting it would produce a typed object that
+      cannot represent this method's own most basic real-world governance
+      question ("is this decision still active?"). The 4-value enum
+      (not a richer state machine) is the minimal set this repository's
+      own real ADR_INDEX.md practice already needs.
+
+open_questions:
+  - id: "OQ-ADR-1"
+    question: >
+      `alternatives_considered` is an array of free-text strings, not a
+      structured `{alternative, reason_rejected}` shape. Should a future
+      revision add that structure once a real worked Atlas example is
+      found, or an operator explicitly wants per-alternative rejection
+      reasons queryable as their own field?
+    owner: "operator, or whoever next needs per-alternative rejection reasons as a first-class field"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ADR-2"
+    question: >
+      F18's own recommended chain places ADR between a Threat Model step
+      and a Rehearsal step, but neither has a machine_id anywhere in this
+      spec root. Should `recommended_next` be populated once those
+      neighboring methods are built?
+    owner: "operator, or whoever next builds Threat Model / Rehearsal as their own Method Atlas slices"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ADR-3"
+    question: >
+      `method-inventory.yaml` carries no row at all for ADR (not even an
+      "uncataloged" one) -- a bigger registry gap than any prior Tier 1
+      contract's own source method had. Should a row be added there for
+      completeness?
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity -- consistent with (not a new departure from) how every prior Tier 1 contract's own method-inventory.yaml gap was left unaddressed"
+
+verification:
+  method: >
+    Read Atlas §11.37 (L2066-2094) and F18's own table row (L816)
+    directly at the cited lines. Grepped `specs/` exhaustively for
+    "ADR"/"Architecture Decision Record" before writing -- confirmed no
+    existing typed-object schema models an ADR record's own shape (the
+    many "ADR" hits found are all either this repository's OWN naming-
+    convention ADRs, cited by number in unrelated contracts' `decided_by`
+    sections, or the ubiquitous "No ADR governs this file" disclaimer
+    every sibling schema in this directory already carries -- neither is
+    a duplicate of what this contract builds). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 11-section field list is
+    directly transcribed from Atlas's own template (L2066-2094), doubly
+    corroborated by F18's own compact table row. `status` is the first
+    field in this session's history sourced from real operating practice
+    rather than an Atlas citation -- disclosed explicitly in
+    compilation_decisions, not silently presented as Atlas-given.

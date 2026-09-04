@@ -1,0 +1,211 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/architecture-decision-record.schema.yaml"
+title: Architecture Decision Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ArchitectureDecisionRecord` --
+  the declared `outputs` of `architecture.adr`'s Method Contract
+  (methods/contracts/architecture.adr.contract.yaml, `outputs:
+  [ArchitectureDecisionRecord]`). The first typed object this session
+  builds for a structured DOCUMENT template rather than a computation,
+  graph, ranking, or checklist -- and the first grounded partly in this
+  repository's own real, already-operating practice (its `status` field)
+  rather than solely in an Atlas citation.
+
+  Field provenance -- Atlas §11.37 (L2066-2094)'s own 11-section markdown
+  template maps directly onto eleven of this schema's own fields:
+  `context`, `decision`, `alternatives_considered[]`,
+  `security_privacy_impact`, `data_impact`, `operational_impact`,
+  `compatibility`, `migration`, `rollback`, `validation`,
+  `revisit_reversal_conditions`. `status` is the twelfth field, sourced
+  from real ADR practice (see the method contract's own
+  compilation_decisions), not from Atlas.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.37 架構決策紀錄（Architecture Decision Record / ADR）, 11-section template (L2066-2094)"
+  - "methods/contracts/architecture.adr.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "docs/architecture/decisions/ADR_INDEX.md (this repository's own real ADR practice -- the source for `status`, disclosed as non-Atlas-cited)"
+
+decided_by: >
+  No ADR governs this file (same noted irony the method contract's own
+  `decided_by` already flags). Same class of decision every sibling
+  typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Should this schema use `additionalProperties: false`, the way
+      `red-team-challenge.schema.yaml`/`mcda-analysis.schema.yaml`/
+      `monte-carlo-simulation.schema.yaml` all do for their own Atlas
+      §22.3-cited forbidden-authority rules?
+    decision: "No -- this schema permits additional properties (the default, unset)."
+    reasoning: >
+      Those three sibling schemas each enforce a citation-grounded rule
+      about what the record must NEVER claim (a final decision, automatic
+      authority, a guaranteed outcome). Atlas gives `architecture.adr` no
+      equivalent forbidden-claim citation (its own §22.3 table has no ADR
+      row -- see the method contract's own empty `forbidden_transition`).
+      Applying `additionalProperties: false` here anyway would be
+      importing an enforcement pattern with no grounding for THIS
+      method, the same "don't apply a rule just because a sibling has
+      one" discipline this suite already follows elsewhere (e.g.
+      `decision.ahp`'s own empty `forbidden_transition`, not borrowed
+      from `challenge.red_team`'s populated one).
+  - question: >
+      `alternatives_considered` is an array of free-text strings. Should
+      it have a `minItems` constraint matching the method contract's own
+      precondition ("at least 1 alternative_considered entry supplied")?
+    decision: "Yes -- minItems: 1."
+    reasoning: >
+      The method contract's own precondition is structurally necessary
+      (see that file's own reasoning: an ADR recording zero considered
+      alternatives is an unexplained assertion, not a decision record).
+      Enforcing it at the schema layer, not only at the builder layer,
+      matches the "structural check independent of the builder" pattern
+      every prior slice's own belt-and-suspenders enforcement already
+      establishes -- though unlike the forbidden-authority rules, this is
+      a plain `minItems` constraint, not a two-layer guard, because there
+      is no plausible hand-crafted-bypass risk here the way there is for
+      an authority claim (nothing is being actively hidden or smuggled;
+      a caller who supplies zero alternatives is simply under-specifying,
+      not attacking the record's own integrity guarantee).
+
+type: object
+required: [id, version, title, status, context, decision, alternatives_considered, security_privacy_impact, data_impact, operational_impact, compatibility, migration, rollback, validation, revisit_reversal_conditions, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ADR-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling typed-object schema's own id prefix -- also matches this repository's own real ADR file-naming convention (numbered, ADR-prefixed)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "architecture.adr"
+
+  title:
+    type: string
+    minLength: 1
+    description: "The decision's own short name -- e.g. this repository's own real ADR files each carry one (their filename's own trailing words)."
+
+  status:
+    enum: [proposed, accepted, superseded, deprecated]
+    description: "NOT Atlas-cited -- sourced from this repository's own real ADR practice (docs/architecture/decisions/ADR_INDEX.md). See method contract compilation_decisions for why this field exists despite Atlas's own template naming no such field."
+
+  context:
+    type: string
+    minLength: 1
+    description: "Atlas L2069 template section 1: 'Context'."
+
+  decision:
+    type: string
+    minLength: 1
+    description: "Atlas L2070 template section 2: 'Decision'."
+
+  alternatives_considered:
+    type: array
+    minItems: 1
+    description: "Atlas L2071 template section 3: 'Alternatives Considered'. An array of free-text strings, not a richer per-alternative object shape -- see method contract compilation_decisions for why."
+    items:
+      type: string
+      minLength: 1
+
+  security_privacy_impact:
+    type: string
+    minLength: 1
+    description: "Atlas L2072 template section 4: 'Security / Privacy'."
+
+  data_impact:
+    type: string
+    minLength: 1
+    description: "Atlas L2073 template section 5: 'Data Impact'."
+
+  operational_impact:
+    type: string
+    minLength: 1
+    description: "Atlas L2074 template section 6: 'Operational Impact'."
+
+  compatibility:
+    type: string
+    minLength: 1
+    description: "Atlas L2075 template section 7: 'Compatibility'."
+
+  migration:
+    type: string
+    minLength: 1
+    description: "Atlas L2076 template section 8: 'Migration'."
+
+  rollback:
+    type: string
+    minLength: 1
+    description: "Atlas L2077 template section 9: 'Rollback'."
+
+  validation:
+    type: string
+    minLength: 1
+    description: "Atlas L2078 template section 10: 'Validation'."
+
+  revisit_reversal_conditions:
+    type: string
+    minLength: 1
+    description: "Atlas L2079 template section 11: 'Revisit / Reversal Conditions'."
+
+  provenance:
+    description: "epistemic_type is expected to be DECISION for a genuine ADR -- the second typed object in this directory to use a previously-reserved-but-unused epistemic_type (after monte-carlo-simulation.schema.yaml's own first use of SIMULATED_RESULT)."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A real-shaped ADR: choosing native fulfillment over a WooCommerce plugin (same class of decision this repository's own real ADR-008 already made)"
+    value:
+      id: "ADR-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.adr"
+      title: "POD 訂單履約走 native 架構，不走 WooCommerce 外掛"
+      status: accepted
+      context: "多客戶／多平台需求成長，app 本身定位是操作台而非商店本體，既有外掛方案耦合單一平台且難以擴充。"
+      decision: "新客戶一律走 native fulfillment pipeline；既有客戶不強制遷移。"
+      alternatives_considered:
+        - "維持 WooCommerce 外掛方案，接受單平台限制"
+        - "自建 adapter 層同時支援外掛與 native，複雜度換取相容性"
+      security_privacy_impact: "訂單資料不再經過第三方外掛儲存層，降低資料外洩面。"
+      data_impact: "訂單 schema 需要一次性遷移腳本，既有客戶資料不動。"
+      operational_impact: "新增一條獨立 pipeline 需要維運，短期維運成本上升。"
+      compatibility: "既有外掛客戶不受影響，向前相容。"
+      migration: "新客戶直接走 native；既有客戶維持現狀，無強制遷移時程。"
+      rollback: "native pipeline 若出問題，個別客戶可退回外掛方案（一次性、非自動）。"
+      validation: "上線後追蹤前 3 個 native 客戶的訂單成功率與人工介入率。"
+      revisit_reversal_conditions: "若 native pipeline 維運成本超過外掛方案 2 倍，重新評估。"
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-ARCHITECTUREDECISIONRECORD-1"
+    question: >
+      `status` transitions (e.g. accepted -> superseded) have no
+      schema-level lifecycle constraint (nothing stops a record from
+      being constructed directly in `superseded` state, or prevents an
+      out-of-band external process from flipping the field without
+      recording why). Should a future revision add a `superseded_by`
+      cross-reference field or a transition-guard the way
+      `decision.schema.yaml`'s own `locked`/`epistemic_type` pairing is
+      guarded?
+    owner: "operator, or whoever next needs to track WHY a decision was superseded, not just THAT it was"
+    blocks: "nothing in this file's own validity -- a bare status enum is a complete, honest v1"
+
+verification:
+  method: >
+    Read Atlas §11.37 (L2066-2094) directly at the cited lines.
+    Cross-checked against methods/contracts/architecture.adr.contract
+    .yaml's own outputs/preconditions/quality. Validated against
+    jsonschema Draft202012Validator.
+  note: >
+    Eleven of this schema's twelve fields are directly transcribed from
+    Atlas's own template section headings (L2066-2094), in the same
+    order. `status` is disclosed explicitly as sourced from this
+    repository's own real ADR practice, not Atlas -- the first field in
+    this session's history to be justified that way rather than by a
+    mother-document citation. No mother document was modified to produce
+    this file.

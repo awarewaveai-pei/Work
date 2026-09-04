@@ -1,0 +1,107 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/architecture-decision-record.schema.yaml"
+target_ref: ""
+description: >
+  Exercises ArchitectureDecisionRecord's required fields (all eleven
+  Atlas-cited template sections plus the non-Atlas `status` field), the
+  `alternatives_considered[]` minItems:1 guard, and the `status` enum.
+
+valid:
+  - name: accepted_decision_two_alternatives_considered
+    instance:
+      id: "ADR-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.adr"
+      title: "POD fulfillment goes native, not via WooCommerce plugin"
+      status: accepted
+      context: "multi-client, multi-platform growth; app is an ops console, not the storefront itself"
+      decision: "new clients use the native fulfillment pipeline by default"
+      alternatives_considered:
+        - "keep the WooCommerce plugin, accept single-platform limitation"
+        - "build an adapter layer supporting both plugin and native"
+      security_privacy_impact: "order data no longer passes through a third-party plugin storage layer"
+      data_impact: "one-time migration script needed; existing client data untouched"
+      operational_impact: "one more pipeline to operate; short-term ops cost increase"
+      compatibility: "existing plugin clients unaffected, forward-compatible"
+      migration: "new clients go native directly; existing clients stay as-is, no forced timeline"
+      rollback: "individual clients can fall back to the plugin path (one-time, not automatic)"
+      validation: "track order success rate and manual-intervention rate for the first 3 native clients"
+      revisit_reversal_conditions: "if native ops cost exceeds 2x the plugin path, re-evaluate"
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+  - name: proposed_decision_single_alternative
+    instance:
+      id: "ADR-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.adr"
+      title: "switch primary datastore"
+      status: proposed
+      context: "current store cannot meet the new latency requirement"
+      decision: "not yet finalized -- proposal under review"
+      alternatives_considered:
+        - "stay on the current store, accept the latency ceiling"
+      security_privacy_impact: "no change expected"
+      data_impact: "full migration required"
+      operational_impact: "new on-call runbook needed"
+      compatibility: "breaking change for one downstream consumer"
+      migration: "phased, service by service"
+      rollback: "keep the old store running in parallel for one release cycle"
+      validation: "p99 latency under the new target for 7 consecutive days"
+      revisit_reversal_conditions: "revisit if migration cost exceeds the original estimate by 50%"
+      provenance: {epistemic_type: DECISION, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: zero_alternatives_considered_below_minitems_1
+    instance:
+      id: "ADR-2026-09-04-003"
+      version: "1.0.0"
+      title: "x"
+      status: accepted
+      context: "x"
+      decision: "x"
+      alternatives_considered: []
+      security_privacy_impact: "x"
+      data_impact: "x"
+      operational_impact: "x"
+      compatibility: "x"
+      migration: "x"
+      rollback: "x"
+      validation: "x"
+      revisit_reversal_conditions: "x"
+      provenance: {epistemic_type: DECISION, authorship_state: AI_GENERATED}
+    reason: "alternatives_considered has minItems: 1 -- an ADR recording zero considered alternatives is an unexplained assertion, not a decision record."
+  - name: invalid_status_enum_value
+    instance:
+      id: "ADR-2026-09-04-004"
+      version: "1.0.0"
+      title: "x"
+      status: "draft"
+      context: "x"
+      decision: "x"
+      alternatives_considered: ["x"]
+      security_privacy_impact: "x"
+      data_impact: "x"
+      operational_impact: "x"
+      compatibility: "x"
+      migration: "x"
+      rollback: "x"
+      validation: "x"
+      revisit_reversal_conditions: "x"
+      provenance: {epistemic_type: DECISION, authorship_state: AI_GENERATED}
+    reason: "status is enum [proposed, accepted, superseded, deprecated] -- 'draft' is not a member."
+  - name: missing_required_rollback_section
+    instance:
+      id: "ADR-2026-09-04-005"
+      version: "1.0.0"
+      title: "x"
+      status: accepted
+      context: "x"
+      decision: "x"
+      alternatives_considered: ["x"]
+      security_privacy_impact: "x"
+      data_impact: "x"
+      operational_impact: "x"
+      compatibility: "x"
+      migration: "x"
+      validation: "x"
+      revisit_reversal_conditions: "x"
+      provenance: {epistemic_type: DECISION, authorship_state: AI_GENERATED}
+    reason: "rollback is required -- one of Atlas's own 11 cited template sections (L2077), missing here."
