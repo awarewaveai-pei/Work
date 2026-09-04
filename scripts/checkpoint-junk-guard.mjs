@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // Unstage shell-artifact junk from the git index. Called by
-// scripts/commit-checkpoint.ps1 between `git add -A` and the commit.
+// scripts/ao-close.ps1, immediately after its `git add -A` -- the only blind
+// staging left in the repo since commit-checkpoint.ps1 dropped `git add -A`
+// and blind staging entirely in the 2026-08-25 redesign (see that script's
+// own header comment).
 //
 // Why Node and not PowerShell (critic 2026-07-02 finding 3): under git's
 // default core.quotePath=true, non-ASCII staged names reach PowerShell as

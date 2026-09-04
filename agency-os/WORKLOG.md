@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-05（`/checkpoint` 命令文件與腳本簽名脫節 + `checkpoint-junk-guard.mjs` 呼叫者註解過期，收尾同日 `commit-checkpoint.ps1` 修復時 spawn 出的獨立任務 task_c84bf5cc）
+
+**根本問題**：2026-08-25 `commit-checkpoint.ps1` 重寫（`7251d14d2`）把 `-Message`／`-Paths` 改成 Mandatory、拔掉 `git add -A`，但 `.claude/commands/checkpoint.md:4` 呼叫時仍完全不傳這兩個參數——依文件操作 `/checkpoint` 會卡在 PowerShell mandatory-parameter 互動提示，非靜默失敗。同時 `scripts/checkpoint-junk-guard.mjs:2-3` 的檔頭註解仍寫「Called by commit-checkpoint.ps1 between `git add -A` and the commit」，但同一次重寫已把該 guard 的唯一存活呼叫點移到 `scripts/ao-close.ps1:1202`（緊接它自己的 `git add -A` 之前）——純文件過期，非死碼、不需重接線。
+
+**已修改**：
+- `.claude/commands/checkpoint.md` — 改為指示先列出本 session 實際改動的路徑、寫一行訊息，再帶 `-Message`／`-Paths` 呼叫腳本，與 mandatory 簽名對齊（比照 `.claude/commands/tomo.md:59` 既有模式）
+- `scripts/checkpoint-junk-guard.mjs:2-5` — 檔頭註解改為正確指向 `ao-close.ps1`
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check scripts/checkpoint-junk-guard.mjs && node scripts/checkpoint-junk-guard.mjs` | exit=0 | ms=~200 | result=語法通過，`no junk staged`（預期無垃圾可清）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File <scratch>/test-checkpoint-dryrun.ps1`（內容＝checkpoint.md 修後文件的確切呼叫型態，`-Message`＋`-Paths @(...)` 兩個剛改的檔案，`-DryRun`）| exit=0 | ms=~300 | result=三行 `[dry-run] would: git add / git commit` 皆正確列出兩個目標路徑，證明文件與腳本簽名現在一致
+- REVIEW_DONE: critic=self（純文件字串修正 + 已用 Read 讀回兩檔確認修改內容，無邏輯分支；範圍小於觸發 subagent critic 的門檻）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`commit-checkpoint\.ps1 between\|junk-guard.*commit-checkpoint` | hits=0（無其他檔案殘留同一過期敘述；`commit-checkpoint.ps1` 內部 3 處 `git add -A` 字串皆為說明「已移除」的正確歷史敘述，非新增聲稱）
+
+**剩餘風險**：無新風險——純文件/註解修正，無邏輯變更；`/checkpoint` 命令本身尚未有人以修後版本實際跑過一次真實（非 dry-run）commit，下次有人執行時才是第一次端到端驗證。
+
+**Rollback**：`git checkout -- .claude/commands/checkpoint.md scripts/checkpoint-junk-guard.mjs`
+
 ## 2026-09-05（`commit-checkpoint.ps1` 修復 git commit 缺 pathspec 導致併發 session 互吃——2026-08-25 重寫只補了 add 端沒補 commit 端，critic 再抓出 3 個同類殘留缺口）
 
 **觸發**：使用者親身遇到並回報：`commit-checkpoint.ps1 -Paths @('agency-os/TASKS.md')` 產生了一個含 10 個檔案的 commit——本來預期的 TASKS.md 改動之外，混入 9 個另一併發 Cognitive OS session 的 error-budget 切片檔案（`Projects/internal/cognitive-engineering-os/` 下新 `.py`/`.yaml`/`.md`）。當時尚未 push，用 `git reset --soft HEAD~1` + 篩選 patch + `git apply --cached` 手動救回。
