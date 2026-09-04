@@ -39,6 +39,134 @@ Runtime gates are **OPEN**. All land in `D:\Work\Projects\internal\hci30\databas
 4. **Wave 1 — scope fence (architecture test).** `BITEMP-SCOPE-01` queries `information_schema.columns` and fails if `valid_from`/`system_recorded_at` exist on any `hci.*` table outside the four, or if any other tenant-owned table lacks `created_at`. This is the machine form of Decision item 2.
 5. **Wave 4 — consumer binding.** `EXPLAIN-ASOF-01`: the explainability read for a Decision resolves its Evidence/Claim/Assessment through `<table>_as_of(decision.system_recorded_at)`, never through `_current`, so the "Evidence used" list (`19:23-27`) is what was known when the Decision was recorded.
 
+## Implementation note (2026-09-05, gates 1-3 landed; gate 4 deferred to a follow-up migration; gate 5 out of scope)
+
+Recorded here rather than editing the numbered gates above, which remain the
+historical decision record.
+
+**Migration number.** Gate 1's text says "Migration `0002` adds..." - stale
+relative to the migration numbering actually finalized once `0002` became
+ADR-0020's `hci.cases` (already committed and real-Docker-verified before
+this ADR's own implementation started). The real migration is
+`0005_wave1_bitemporal_history_up.sql`.
+
+**Gates 1-3 (columns/constraints, supersession trigger, canonical reads) —
+DONE**, real-Docker-verified after an independent db-expert review pass found
+3 Critical + 6 Major issues in the first landed version and all were fixed
+and re-verified before this note was written: `test-wave1-local.ps1` green
+at **128/128** assertions (up from 104), `mutation-check-wave1.ps1` green at
+**54/54** mutations killed (up from 39), including 15 new/revised mutations
+targeting this migration specifically. `hci.subject_records` carries the six
+bitemporal columns; a new `hci.decisions` table carries the same shape plus a
+minimal `outcome`/`rationale`/`case_id` shape (outcome enum sourced verbatim
+from `04_HCI30_PRODUCT_SPEC.md`'s Decision output values - full Decision
+workflow semantics are explicitly out of scope here, left to whichever ADR
+resolves `HD-19`/`HD-21`). `hci.mark_superseded()` and the four `_current`
+views / `_as_of()` functions are built and generic across both tables.
+
+**The escape-hatch mechanism actually shipped is NOT what gate 2's text
+implies.** Three designs were tried and rejected - by a standalone probe, by
+running the real migration, and finally by an independent security review -
+before landing on a fourth:
+1. A session-local GUC flag, checked inside a modified
+   `reject_update_delete()` - rejected by a standalone probe before writing
+   any migration code: any role can forge an arbitrary custom GUC with a
+   bare `SET`, so this would have let the application role bypass
+   append-only enforcement entirely, not just the schema's own internal
+   write.
+2. `ALTER TABLE ... DISABLE/ENABLE TRIGGER` inside `mark_superseded()` -
+   passed the same standalone probe, but broke on the first real end-to-end
+   migration run with PostgreSQL error `55006` ("cannot ALTER TABLE because
+   it is being used by active queries in this session"): `mark_superseded()`
+   fires as an `AFTER INSERT` trigger ON THE SAME TABLE it then needs to
+   `ALTER`, and `ALTER TABLE` cannot run reentrant against a relation with an
+   open query in the same session. The standalone probe never hit this
+   because it called the function directly, with no enclosing `INSERT` on
+   the same table - exactly why this had to be caught by running the real
+   migration, not by trusting the isolated probe.
+3. A lazily-created, per-session `pg_temp.hci_supersession_lock` table (one
+   column, `id uuid PRIMARY KEY`), owned by `hci_owner` with no grant to the
+   application roles - passed **118/118 real assertions and 45/45 mutations**
+   before an independent db-expert review (requested before commit, not
+   after) rejected it for a real, demonstrated hole: `pg_temp` is not
+   actually owner-exclusive. PostgreSQL grants every role holding the
+   database's `TEMPORARY` privilege (`PUBLIC` by default, never revoked here)
+   full rights, including `CREATE`, on its own session's temp schema; since
+   `SET ROLE` shares one session's `pg_temp` across every role switch
+   (exactly how this project's own test harness runs), an application role
+   could run `CREATE TEMP TABLE hci_supersession_lock (id uuid PRIMARY KEY)`
+   itself BEFORE `mark_superseded()`'s lazy `CREATE TEMP TABLE IF NOT EXISTS`
+   ever ran, and that `IF NOT EXISTS` would silently adopt the attacker's
+   table. Same forgeability class as design 1 (GUC), not a new one - "any
+   role can plant the session-local marker checked to grant the exception" -
+   just moved from a config parameter to a temp relation. Also caught by the
+   same review: the SECURITY DEFINER `mark_superseded()` function had no
+   `REVOKE ALL ... FROM PUBLIC` (0001's own `hci.current_tenant_id()`
+   established this as the convention, and this migration's first draft
+   missed it), a real `2BP01` bug in the narrow-rollback down migration
+   (`DROP FUNCTION` before the `DROP TRIGGER` that depends on it, never once
+   actually executed before the review since `test-wave1-local.ps1`'s
+   reversibility pass only exercises `0001_down`'s whole-schema drop), plus
+   6 Major findings (concurrency-unsafe `now()` on the ledger clock,
+   cross-tenant existence oracle in a non-tenant-scoped `UNIQUE`, blank
+   `corrected_reason` passing its own guard, zero test coverage on
+   `hci.decisions`' own RLS/append-only/`security_invoker` controls, and
+   more) - full report and every fix cross-referenced in the migration
+   file's own header and inline comments.
+4. **What actually shipped**: `hci.reject_update_delete()` authorizes an
+   `UPDATE` by what it DOES, not by any session-local marker a role could
+   plant. It lets the `UPDATE` through only when `system_superseded_at`
+   moved `NULL` -> `NOT NULL`, every other column is byte-identical
+   (`jsonb`-minus-key comparison of `OLD`/`NEW`), and `current_user` is a
+   member of the table's owning role (`pg_has_role(..., relowner,
+   'MEMBER')`). There is no carrier for a forged bypass - nothing is
+   planted, checked, or trusted across statements - and `mark_superseded()`
+   no longer needs a lock table, `DISABLE TRIGGER`, or any escape-hatch
+   scaffolding at all; it performs its `UPDATE` directly. Verified for real,
+   not just reasoned about: with a deliberately-granted future-scenario
+   column-restricted `UPDATE` privilege simulated on a live probe, an
+   application-role `UPDATE` crafted to match the exact shape
+   `mark_superseded()` produces was still rejected with `H1003`, because
+   that role is not a member of `hci_owner`. Full narrative in the migration
+   file's own header comment
+   (`migrations/0005_wave1_bitemporal_history_up.sql:1-100`).
+
+**`H1008` is real but not primary.** `BITEMP-SUPERSEDE-02` (second attempt to
+supersede an already-superseded predecessor) is rejected by
+`subject_records_supersedes_unique` (`UNIQUE(tenant_id, supersedes_id)` -
+tenant-scoped per a db-expert review finding that a bare `UNIQUE(supersedes_id)`
+let a foreign tenant use the constraint as a cross-tenant existence oracle,
+gate 1) at
+`23505`, before `mark_superseded()`'s own "already superseded" check
+(`H1008`) ever runs - the `UNIQUE` constraint structurally guarantees at most
+one row can ever reference a given predecessor as `supersedes_id`, so the
+`H1008` branch inside `mark_superseded()` is unreachable while that
+constraint stands. It is kept as defense-in-depth, not dead code: the
+`drop-supersedes-unique-constraint` mutation proves it - with the `UNIQUE`
+constraint gone, the same test's real SQLSTATE flips from `23505` to `H1008`.
+`BITEMP-IMMUTABLE-01` similarly resolved to `42501` (grant layer), not the
+gate 2 text's stated `H1003` (trigger layer): the application role holds zero
+`UPDATE` grant on `subject_records` at all (unchanged since `0001`), so a
+direct `UPDATE` attempt never reaches the trigger to begin with - this
+matches the schema's existing two-layer pattern
+(`APPEND-ONLY-GRANT-0x`/`APPEND-ONLY-TRIGGER-0x`) rather than deviating from
+it.
+
+**Gate 4 (scope fence, `BITEMP-SCOPE-01`) — deferred to a separate
+migration**, not built here. It requires retrofitting a server-assigned
+insertion-timestamp column onto eleven other pre-existing tenant-owned tables
+that currently carry none (`persons`, `tenant_authorizations`,
+`subject_lawful_basis_records`, `sources`, `source_terms_records`,
+`research_workflows`, `data_subject_requests`, `data_subject_request_targets`,
+`identity_candidates`, `identity_verifications`, `source_relationships`) -
+a distinct blast radius from the bitemporal mechanism itself, and this
+schema's own convention (`0002`/`0003`/`0004`) is one cohesive concern per
+migration. Tracked in `TASKS.md`, not silently dropped.
+
+**Gate 5 (Wave 4 consumer binding, `EXPLAIN-ASOF-01`) — out of scope**, as
+gate 4 already was for prior ADRs at this stage: no application layer exists
+yet to bind an explainability read to `_as_of()`.
+
 ## Consequences
 
 - `07 §Assessment versioning` fields (`07:144`) stay as method/policy provenance; `valid_until` is subsumed by `valid_to` and must not be reintroduced as a parallel axis.

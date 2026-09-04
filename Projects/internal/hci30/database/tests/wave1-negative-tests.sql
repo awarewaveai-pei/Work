@@ -476,6 +476,162 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-07',
 SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-08',
   $q$DELETE FROM hci.source_relationships$q$, '42501');
 
+-- ---------------------------------------------------------------------------
+-- Bitemporal history (ADR-0017 gates 1-3). Uses tenant A's existing OPEN
+-- case (aaaaaaaa-...-200, fixtures) and person 'aaaaaaaa-aaaa-...'. ID block
+-- 500-506 (subject_records) / 600-601 (decisions) is the first unused block
+-- in this file, following the same per-topic-block convention as 300s
+-- (provenance) / 400s (consent).
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_sqlstate('BITEMP-WINDOW-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,valid_from,valid_to)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000500','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','2026-01-02T00:00:00Z','2026-01-01T00:00:00Z')$q$,
+  '23514');
+
+-- References SUBJECT-NEG-01a's row ('...101', tenant A, EVIDENCE) as a real
+-- same-tenant supersedes_id target, so the FK is satisfied and only the
+-- reason-required CHECK is under test.
+SELECT hci_test.expect_sqlstate('BITEMP-REASON-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000501','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101')$q$,
+  '23514');
+
+-- Blank is not a reason (db-expert review, 2026-09-05 - matching 0001:66-68's
+-- own stated lesson about evidentiary free text elsewhere in this schema):
+-- an empty string satisfies "IS NOT NULL" but not the intent, and until this
+-- CHECK existed it silently passed BITEMP-REASON-01's own gate.
+SELECT hci_test.expect_sqlstate('BITEMP-REASON-02',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000507','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101','')$q$,
+  '23514');
+
+-- Targets a REAL tenant-B row (fixtures: 'bbbbbbbb-...-500') so this proves
+-- the composite FK rejects a genuine cross-tenant reference, not merely an
+-- id that does not exist anywhere.
+SELECT hci_test.expect_sqlstate('BITEMP-CROSSTENANT-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000502','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000500','cross-tenant probe')$q$,
+  '23503');
+
+SELECT hci_test.expect_sqlstate('BITEMP-IMMUTABLE-01',
+  $q$UPDATE hci.subject_records SET valid_to = now() WHERE id = 'aaaaaaaa-0000-0000-0000-000000000101'$q$,
+  '42501');
+
+SELECT hci_test.expect_sqlstate('BITEMP-CLOCK-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,system_recorded_at)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000506','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','2020-01-01T00:00:00Z')$q$,
+  '42501');
+-- Both server-assigned columns need their own assertion (critic review):
+-- withholding system_recorded_at alone does not prove system_superseded_at
+-- is withheld too - a row "born already superseded" would be invisible to
+-- every _current/_as_of read while still sitting in the base table.
+SELECT hci_test.expect_sqlstate('BITEMP-CLOCK-01b',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,system_superseded_at)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000508','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200',now())$q$,
+  '42501');
+
+-- Predecessor A ('...503') and successor B ('...504'): B's insert fires
+-- hci.mark_superseded() (AFTER INSERT), which must set A's
+-- system_superseded_at to B's own system_recorded_at.
+SELECT hci_test.expect_success('BITEMP-SUPERSEDE-SETUP-A',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000503','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200')$q$);
+SELECT hci_test.expect_success('BITEMP-SUPERSEDE-SETUP-B',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000504','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000503','correction test')$q$);
+
+SELECT hci_test.expect_true('BITEMP-SUPERSEDE-01',
+  $q$SELECT (SELECT system_superseded_at FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000503')
+         = (SELECT system_recorded_at FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000504')$q$,
+  'predecessor system_superseded_at must equal successor system_recorded_at');
+
+-- No forks: a second attempt to supersede the SAME already-superseded
+-- predecessor must be rejected, not silently accepted as a second successor.
+-- Real-Docker correction (2026-09-05): predicted H1008 (mark_superseded's own
+-- "predecessor already superseded" check), got 23505 instead -
+-- subject_records_supersedes_unique (UNIQUE(tenant_id, supersedes_id), gate 1) rejects
+-- the duplicate supersedes_id value at INSERT time, before the AFTER INSERT
+-- trigger that would raise H1008 ever runs. H1008 is not dead code even
+-- though this specific test cannot reach it - it is defense-in-depth for a
+-- schema where that UNIQUE constraint were ever weakened, and the
+-- 'drop-supersedes-unique-constraint' mutation below proves exactly that:
+-- with the constraint gone, this same assertion's actual SQLSTATE flips to
+-- H1008, which is why that mutation's expected failure is this test ID.
+SELECT hci_test.expect_sqlstate('BITEMP-SUPERSEDE-02',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000505','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000503','second correction attempt')$q$,
+  '23505');
+
+-- "What was known at T" (gate 3). Uses each row's OWN system_recorded_at as
+-- the natural T boundary rather than a hardcoded literal, since neither A's
+-- nor B's exact clock value is known ahead of time.
+SELECT hci_test.expect_true('BITEMP-ASOF-01',
+  $q$SELECT
+       (SELECT array_agg(id ORDER BY id) FROM hci.evidence_as_of((SELECT system_recorded_at FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000503')) WHERE id IN ('aaaaaaaa-0000-0000-0000-000000000503','aaaaaaaa-0000-0000-0000-000000000504'))
+         = ARRAY['aaaaaaaa-0000-0000-0000-000000000503']::uuid[]
+       AND (SELECT array_agg(id ORDER BY id) FROM hci.evidence_as_of((SELECT system_recorded_at FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000504')) WHERE id IN ('aaaaaaaa-0000-0000-0000-000000000503','aaaaaaaa-0000-0000-0000-000000000504'))
+         = ARRAY['aaaaaaaa-0000-0000-0000-000000000504']::uuid[]
+       AND (SELECT array_agg(id ORDER BY id) FROM hci.evidence_current WHERE id IN ('aaaaaaaa-0000-0000-0000-000000000503','aaaaaaaa-0000-0000-0000-000000000504'))
+         = ARRAY['aaaaaaaa-0000-0000-0000-000000000504']::uuid[]
+  $q$,
+  'as_of(A.system_recorded_at) returns only A; as_of(B.system_recorded_at) returns only B; _current returns only B');
+
+-- Same mechanism (hci.mark_superseded is generic across tables), proven
+-- against hci.decisions specifically so gate 1/2's "Decision" coverage is
+-- real, not inferred from subject_records alone.
+SELECT hci_test.expect_success('BITEMP-DECISION-01',
+  $q$INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000600','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','PAUSE','synthetic rationale')$q$);
+SELECT hci_test.expect_success('BITEMP-DECISION-02',
+  $q$INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale,supersedes_id,corrected_reason)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000601','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','PROCEED','synthetic rationale, revised','aaaaaaaa-0000-0000-0000-000000000600','initial pause was overly cautious')$q$);
+SELECT hci_test.expect_true('BITEMP-DECISION-03',
+  $q$SELECT (SELECT system_superseded_at FROM hci.decisions WHERE id = 'aaaaaaaa-0000-0000-0000-000000000600')
+         = (SELECT system_recorded_at FROM hci.decisions WHERE id = 'aaaaaaaa-0000-0000-0000-000000000601')$q$,
+  'mark_superseded must work generically for hci.decisions too, not only hci.subject_records');
+SELECT hci_test.expect_true('BITEMP-DECISION-04',
+  $q$SELECT (SELECT array_agg(id ORDER BY id) FROM hci.decisions_current WHERE id IN ('aaaaaaaa-0000-0000-0000-000000000600','aaaaaaaa-0000-0000-0000-000000000601'))
+         = ARRAY['aaaaaaaa-0000-0000-0000-000000000601']::uuid[]$q$,
+  'decisions_current must show only the successor');
+
+-- hci.decisions (gate 1/2) had zero RLS/append-only/security_invoker
+-- coverage of its own until a db-expert review pointed out that disabling
+-- RLS, dropping either trigger, or turning off security_invoker on the
+-- views would leave 118/118 green - the happy-path BITEMP-DECISION-0x tests
+-- above never exercise any of these controls. Mirrors the equivalent,
+-- already-established coverage for hci.cases (RLS-LEAK-03) and
+-- subject_records/source_snapshots/source_relationships
+-- (APPEND-ONLY-GRANT/TRIGGER-0x, TRUNCATE-0x).
+SELECT hci_test.expect_true('RLS-LEAK-04',
+  $q$SELECT NOT EXISTS (SELECT 1 FROM hci.decisions WHERE id = 'bbbbbbbb-0000-0000-0000-000000000600')$q$,
+  'tenant B decision must not be visible to tenant A');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-09',
+  $q$UPDATE hci.decisions SET outcome = 'EXIT'$q$, '42501');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-10',
+  $q$DELETE FROM hci.decisions$q$, '42501');
+SELECT hci_test.expect_sqlstate('BITEMP-CLOCK-02',
+  $q$INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale,system_recorded_at)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000602','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','PAUSE','clock probe','2020-01-01T00:00:00Z')$q$,
+  '42501');
+SELECT hci_test.expect_sqlstate('BITEMP-CLOCK-02b',
+  $q$INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale,system_superseded_at)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000603','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','PAUSE','clock probe',now())$q$,
+  '42501');
+
+-- security_invoker=true on the four canonical-read views was asserted but
+-- never actually proven: every prior BITEMP assertion ran only as tenant A
+-- against tenant A's own rows, so a dropped security_invoker would have
+-- changed nothing observable. This is the first real cross-tenant probe
+-- through them - all four, not just two (critic review: "all four views
+-- share one code shape" was an assumption the original two-view version of
+-- this test never actually checked).
+SELECT hci_test.expect_true('BITEMP-VIEWRLS-01',
+  $q$SELECT NOT EXISTS (SELECT 1 FROM hci.evidence_current WHERE id = 'bbbbbbbb-0000-0000-0000-000000000500')
+       AND NOT EXISTS (SELECT 1 FROM hci.claims_current WHERE id = 'bbbbbbbb-0000-0000-0000-000000000501')
+       AND NOT EXISTS (SELECT 1 FROM hci.assessments_current WHERE id = 'bbbbbbbb-0000-0000-0000-000000000502')
+       AND NOT EXISTS (SELECT 1 FROM hci.decisions_current WHERE id = 'bbbbbbbb-0000-0000-0000-000000000600')$q$,
+  'security_invoker views must not leak tenant B rows to tenant A');
+
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
@@ -491,6 +647,12 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-03',
   $q$UPDATE hci.source_snapshots SET content_hash = 'mutated-by-owner'$q$, 'H1003');
 SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-04',
   $q$DELETE FROM hci.source_relationships$q$, 'H1003');
+-- hci.decisions' trigger layer: targets '...600', already superseded by
+-- '...601' above - reject_update_delete()'s shape check only lets through an
+-- UPDATE that touches system_superseded_at and nothing else, so an UPDATE to
+-- 'outcome' is rejected regardless of the row's current supersession state.
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-05',
+  $q$UPDATE hci.decisions SET outcome = 'EXIT' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000600'$q$, 'H1003');
 
 -- TRUNCATE does not fire row-level triggers and is a separate privilege, so it
 -- is the one statement that would otherwise walk past both layers at once.
@@ -513,6 +675,10 @@ SELECT hci_test.expect_sqlstate('TRUNCATE-03-FK',
   $q$TRUNCATE hci.source_snapshots$q$, '0A000');
 SELECT hci_test.expect_sqlstate('TRUNCATE-04',
   $q$TRUNCATE hci.source_relationships$q$, 'H1003');
+-- hci.decisions is not referenced by any FK, so it reaches the trigger
+-- directly (TRUNCATE-01/04's shape, not TRUNCATE-02/03-FK's).
+SELECT hci_test.expect_sqlstate('TRUNCATE-05',
+  $q$TRUNCATE hci.decisions$q$, 'H1003');
 
 -- hci.cases' owner-bypass layer (2026-09-04 critic review): the original
 -- migration gave hci.cases a grant layer only, unlike every other protected
@@ -650,4 +816,4 @@ SELECT hci_test.expect_true('ARCH-PEER-02b',
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(104);
+SELECT hci_test.finish(128);

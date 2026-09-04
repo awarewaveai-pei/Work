@@ -32,6 +32,7 @@ $downMig  = Join-Path $root 'database/migrations/0001_wave1_synthetic_down.sql'
 $upMig2   = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sql'
 $upMig3   = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_scope_up.sql'
 $upMig4   = Join-Path $root 'database/migrations/0004_wave1_source_provenance_up.sql'
+$upMig5   = Join-Path $root 'database/migrations/0005_wave1_bitemporal_history_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -60,7 +61,13 @@ $mutations = @(
 
   @{ id = 'regrant-append-only-writes'
      sql = 'GRANT UPDATE, DELETE ON hci.data_subject_request_events, hci.subject_records TO hci_app_test_a;'
-     expect = @('APPEND-ONLY-GRANT-01','APPEND-ONLY-GRANT-02','APPEND-ONLY-GRANT-03','APPEND-ONLY-GRANT-04') }
+     # BITEMP-IMMUTABLE-01 joined this mutation's expect list 2026-09-05 (ADR-
+     # 0017 landing): it UPDATEs hci.subject_records too, so restoring the
+     # table-level UPDATE grant lets it reach the still-present append-only
+     # TRIGGER, which rejects with H1003 instead of the 42501 the assertion
+     # names - still rejected, wrong code, correctly flips to FAIL here, same
+     # reasoning already documented above for the original four.
+     expect = @('APPEND-ONLY-GRANT-01','APPEND-ONLY-GRANT-02','APPEND-ONLY-GRANT-03','APPEND-ONLY-GRANT-04','BITEMP-IMMUTABLE-01') }
 
   @{ id = 'drop-append-only-triggers'
      sql = 'DROP TRIGGER data_subject_request_events_append_only ON hci.data_subject_request_events; DROP TRIGGER subject_records_append_only ON hci.subject_records;'
@@ -283,6 +290,99 @@ $mutations = @(
   @{ id = 'disable-rls-on-source-terms-records'
      sql = 'ALTER TABLE hci.source_terms_records NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.source_terms_records DISABLE ROW LEVEL SECURITY;'
      expect = @('CONSENT-RLS-02') }
+
+  # ADR-0017 (Bitemporal scope, HD-06) - 2026-09-05. Constraint names below
+  # are explicit (0005 migration, post-db-expert-review) rather than resolved
+  # via pg_constraint LIKE matching: subject_records_reason_paired and
+  # _reason_nonblank both matched the original LIKE '%corrected_reason%'
+  # pattern once the single reason-required CHECK split into two, which
+  # would have made an INTO STRICT resolver error "more than one row" - named
+  # constraints avoid that class of fragility outright.
+  @{ id = 'drop-bitemporal-window-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_valid_window;'
+     expect = @('BITEMP-WINDOW-01') }
+  @{ id = 'drop-bitemporal-reason-paired-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_reason_paired;'
+     expect = @('BITEMP-REASON-01') }
+  @{ id = 'drop-bitemporal-reason-nonblank-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_reason_nonblank;'
+     expect = @('BITEMP-REASON-02') }
+  # Without the composite (tenant_id, supersedes_id) FK, the cross-tenant
+  # INSERT no longer fails at 23503 - it reaches hci.mark_superseded(),
+  # whose UPDATE ... WHERE tenant_id = <A> AND id = <tenant B's row> matches
+  # zero rows (that exact combination never exists), so it raises H1008
+  # instead. Still rejected, wrong code, correctly flips to FAIL.
+  @{ id = 'drop-supersedes-tenant-fk'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_supersedes_fk;'
+     expect = @('BITEMP-CROSSTENANT-01') }
+  # Column-level, not table-level (critic review): 0005's INSERT grant on
+  # subject_records withholds BOTH system_recorded_at and
+  # system_superseded_at, but a single table-level regrant proved only the
+  # first was load-bearing - the second could have been silently un-withheld
+  # and no assertion would have caught it. Split into one mutation per
+  # withheld column, matching this file's own established one-mutation-per-
+  # withheld-column convention (regrant-created-at-column, regrant-case-
+  # opened-at, etc.).
+  @{ id = 'regrant-subject-records-recorded-at'
+     sql = 'GRANT INSERT (system_recorded_at) ON hci.subject_records TO hci_app_test_a;'
+     expect = @('BITEMP-CLOCK-01') }
+  @{ id = 'regrant-subject-records-superseded-at'
+     sql = 'GRANT INSERT (system_superseded_at) ON hci.subject_records TO hci_app_test_a;'
+     expect = @('BITEMP-CLOCK-01b') }
+  # ADR-0017 gate 3's explicitly-required mutation ("dropping mark_superseded
+  # must turn BITEMP-ASOF-01 and BITEMP-SUPERSEDE-01 red"). Real-Docker run
+  # additionally kills the decisions-side tests, since hci.mark_superseded()
+  # is the one generic function driving both tables - broader than the ADR
+  # text anticipated, not narrower, so nothing here weakens that requirement.
+  # BITEMP-SUPERSEDE-02 (23505) and BITEMP-SUPERSEDE-SETUP-B (INSERT succeeds
+  # regardless of whether the AFTER trigger later fires) are unaffected -
+  # both are independent of this trigger, per the file's own comment there.
+  @{ id = 'drop-mark-superseded-triggers'
+     sql = 'DROP TRIGGER subject_records_mark_superseded ON hci.subject_records; DROP TRIGGER decisions_mark_superseded ON hci.decisions;'
+     expect = @('BITEMP-SUPERSEDE-01','BITEMP-ASOF-01','BITEMP-DECISION-03','BITEMP-DECISION-04') }
+  # Proves BITEMP-SUPERSEDE-02's real rejection path (subject_records_
+  # supersedes_unique, gate 1's UNIQUE(tenant_id, supersedes_id)) is load-bearing, AND
+  # that hci.mark_superseded()'s own H1008 "already superseded" check is not
+  # dead code: without this UNIQUE constraint, the second supersession
+  # attempt reaches the trigger and gets H1008 instead of 23505 - still
+  # rejected, wrong code, correctly flips to FAIL. See the test's own comment
+  # in wave1-negative-tests.sql for the real-Docker discovery this documents.
+  @{ id = 'drop-supersedes-unique-constraint'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_supersedes_unique;'
+     expect = @('BITEMP-SUPERSEDE-02') }
+
+  # hci.decisions' own RLS/append-only/security_invoker coverage (db-expert
+  # review, 2026-09-05): the BITEMP-DECISION-0x happy-path tests never
+  # exercised any of these controls, so 118/118 stayed green under every one
+  # of the six mutations below before this review pass added the tests they
+  # kill.
+  @{ id = 'regrant-decisions-writes'
+     sql = 'GRANT UPDATE, DELETE ON hci.decisions TO hci_app_test_a;'
+     expect = @('APPEND-ONLY-GRANT-09','APPEND-ONLY-GRANT-10') }
+  @{ id = 'drop-decisions-append-only-trigger'
+     sql = 'DROP TRIGGER decisions_append_only ON hci.decisions;'
+     expect = @('APPEND-ONLY-TRIGGER-05') }
+  @{ id = 'drop-decisions-no-truncate'
+     sql = 'DROP TRIGGER decisions_no_truncate ON hci.decisions;'
+     expect = @('TRUNCATE-05') }
+  @{ id = 'regrant-decisions-recorded-at'
+     sql = 'GRANT INSERT (system_recorded_at) ON hci.decisions TO hci_app_test_a;'
+     expect = @('BITEMP-CLOCK-02') }
+  @{ id = 'regrant-decisions-superseded-at'
+     sql = 'GRANT INSERT (system_superseded_at) ON hci.decisions TO hci_app_test_a;'
+     expect = @('BITEMP-CLOCK-02b') }
+  # Kills both RLS-LEAK-04 (direct table read) and BITEMP-VIEWRLS-01's
+  # decisions_current half: security_invoker on the view only matters if the
+  # base table's own RLS is enabled to begin with.
+  @{ id = 'disable-rls-on-decisions'
+     sql = 'ALTER TABLE hci.decisions NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.decisions DISABLE ROW LEVEL SECURITY;'
+     expect = @('RLS-LEAK-04','BITEMP-VIEWRLS-01') }
+  # All four views, not just two (critic review): BITEMP-VIEWRLS-01 now
+  # checks all four, so all four must be mutated together to prove none of
+  # them is silently exempt from the "one code shape" assumption.
+  @{ id = 'disable-security-invoker-views'
+     sql = 'ALTER VIEW hci.evidence_current SET (security_invoker = false); ALTER VIEW hci.claims_current SET (security_invoker = false); ALTER VIEW hci.assessments_current SET (security_invoker = false); ALTER VIEW hci.decisions_current SET (security_invoker = false);'
+     expect = @('BITEMP-VIEWRLS-01') }
 )
 
 $project = "hcimut$PID"
@@ -340,6 +440,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig2)   -ne 0) { throw 'mutation harness: 0002 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig3)   -ne 0) { throw 'mutation harness: 0003 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig4)   -ne 0) { throw 'mutation harness: 0004 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig5)   -ne 0) { throw 'mutation harness: 0005 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

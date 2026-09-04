@@ -1,8 +1,8 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, and the Consent-class RLS addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05)
-Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, and the Bitemporal history addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history section added and executed 2026-09-05)
+Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026, ADR-0017
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
 ## Tenant adapter isolation
@@ -97,7 +97,78 @@ row and `SOURCE-RLS-01`/`RLS-CLAIM-01`. `DSR-CLAIM-DELETE-01` (ADR-0026 gate
 3) is **not implemented** — blocked on `ADR-0018`'s crypto-shredding
 mechanism landing first (no deletion path exists yet for `subject_records`-
 and-friends to test against). Correction/retraction of a corroboration edge
-is likewise blocked on `ADR-0017`'s `mark_superseded` mechanism.
+was blocked on `ADR-0017`'s `mark_superseded` mechanism landing — that
+mechanism now exists (below), but `hci.source_relationships` itself was not
+given a `supersedes_id`/bitemporal shape by this migration (out of scope: the
+ADR names Evidence/Claim/Assessment/Decision specifically, not the
+corroboration graph), so this specific limitation is unchanged.
+
+## Bitemporal history *(new, ADR-0017, migration 0005)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| BITEMP-WINDOW-01 | `subject_records` INSERT, `valid_to < valid_from` | Valid-time window CHECK | Rejected, `23514` |
+| BITEMP-REASON-01 | `subject_records` INSERT, `supersedes_id` set, no `corrected_reason` | Reason-required CHECK (pairing) | Rejected, `23514` |
+| BITEMP-REASON-02 | `subject_records` INSERT, `supersedes_id` set, `corrected_reason=''` | Reason-required CHECK (non-blank; added by db-expert review — blank passed the pairing check alone) | Rejected, `23514` |
+| BITEMP-CROSSTENANT-01 | Tenant A row, `supersedes_id` = a real tenant-B row | Composite `(tenant_id, supersedes_id)` FK rejects a genuine cross-tenant reference | Rejected, `23503` |
+| BITEMP-IMMUTABLE-01 | App-role `UPDATE ... SET valid_to` | Application role holds zero UPDATE grant on `subject_records` at all (unchanged since 0001) — never reaches the trigger | Rejected, `42501` (ADR text's gate 2 predicted `H1003`; real-Docker run corrected this — see ADR-0017's own "Implementation note") |
+| BITEMP-CLOCK-01 | App-role INSERT naming `system_recorded_at` | Server-assigned clock, same mechanism as `APPEND-ONLY-GRANT-0x` | Rejected, `42501` |
+| BITEMP-CLOCK-02 | Same, against `hci.decisions` | Same control, second table (db-expert review found this table had zero clock-forgery coverage) | Rejected, `42501` |
+| BITEMP-SUPERSEDE-SETUP-A/B | Predecessor A, successor B (`supersedes_id=A`) | Both inserts succeed | Succeeds |
+| BITEMP-SUPERSEDE-01 | After setup A/B | `hci.mark_superseded()` sets A's `system_superseded_at` to B's `system_recorded_at` | Predicate true |
+| BITEMP-SUPERSEDE-02 | Second attempt to supersede A | No forks | Rejected, `23505` (`subject_records_supersedes_unique`, gate 1's `UNIQUE(tenant_id, supersedes_id)` — tenant-scoped per a db-expert review finding, see below) — this is the primary path, not gate 2's `H1008`; `H1008` is real defense-in-depth, proven reachable by the `drop-supersedes-unique-constraint` mutation, see ADR-0017's own "Implementation note" for the full real-Docker discovery |
+| BITEMP-ASOF-01 | A/B from setup | `<table>_as_of(T)`/`<table>_current` return the right row at each boundary | Predicate true |
+| BITEMP-VIEWRLS-01 | Tenant A queries `evidence_current`/`decisions_current` for a real tenant-B row | `security_invoker=true` actually enforces RLS through the view (db-expert review found this was asserted but never once actually exercised cross-tenant) | Predicate true (not visible) |
+| BITEMP-DECISION-01..04 | New `hci.decisions` table, same predecessor/successor shape | `hci.mark_superseded()` is generic across both bitemporal tables, not subject_records-only | Succeeds / predicate true |
+| RLS-LEAK-04 | Tenant B `hci.decisions` row | Tenant A must not see it (db-expert review: `hci.decisions` had zero RLS coverage of its own) | Not visible |
+| APPEND-ONLY-GRANT-09/10 | `hci.decisions`, app role | Grant layer never holds UPDATE/DELETE (db-expert review: zero coverage) | Rejected, `42501` |
+| APPEND-ONLY-TRIGGER-05 | `hci.decisions`, owner connection | Trigger layer holds even for a connection bypassing grants (db-expert review: zero coverage) | Rejected, `H1003` |
+| TRUNCATE-05 | `hci.decisions` | Not referenced by any FK, trigger fires directly (db-expert review: zero coverage) | Rejected, `H1003` |
+
+`hci.mark_superseded()`'s escape hatch (letting a schema-owned write past the
+shared `hci.reject_update_delete()` append-only trigger) went through THREE
+rejected designs before landing on an effect-based authorization check — full
+narrative in the migration file's own header comment
+(`migrations/0005_wave1_bitemporal_history_up.sql:1-100`) and in ADR-0017's
+"Implementation note". Two genuine bugs were found only by running the real
+migration end to end, not by review or the standalone probe that preceded
+writing any migration code: PostgreSQL error `55006` (`ALTER TABLE` cannot
+run reentrant against a relation with an active query in the same session —
+design 1), and `42P01` (a combined `AND`-ed boolean does not guarantee its
+`EXISTS` subquery is skipped before being parsed/planned when the referenced
+relation does not exist yet — design 2, fixed with nested PL/pgSQL `IF`
+statements, the same fix pattern as the `0001` down-migration idempotency bug
+earlier in this project). Design 2's fixed form (a lazily-created, per-
+session `pg_temp.hci_supersession_lock` temp table) then passed 118/118 real
+assertions and 45/45 mutations before an independent db-expert review,
+requested before commit, found it forgeable by the application role - `pg_temp`
+is not owner-exclusive, so a role could plant its own copy of the lock table
+before the legitimate one was ever created. The design that actually shipped
+authorizes an `UPDATE` by what it changes (`system_superseded_at` moving
+`NULL`->`NOT NULL`, nothing else, executed by a role that is a member of the
+table owner) rather than by any session-local marker a role could plant -
+verified for real against a simulated future scenario (a deliberately-granted
+column-restricted `UPDATE` privilege), where a shape-matching forgery attempt
+from the application role was still rejected with `H1003`. The same review
+pass also found 3 Critical + 6 Major issues beyond the escape hatch itself
+(missing `REVOKE ALL ... FROM PUBLIC` on the `SECURITY DEFINER` function, a
+narrow-rollback down migration that had never once been run and would have
+failed with `2BP01`, a concurrency-unsafe `now()` on the ledger clock, a
+cross-tenant existence oracle in a non-tenant-scoped `UNIQUE`, a blank
+`corrected_reason` passing its own guard, and zero test/mutation coverage of
+`hci.decisions`' own RLS/append-only/`security_invoker` controls) - all fixed
+in the same migration file before commit; the `BITEMP-VIEWRLS-01`,
+`BITEMP-REASON-02`, `BITEMP-CLOCK-02`, `RLS-LEAK-04`, `APPEND-ONLY-GRANT-09/10`,
+`APPEND-ONLY-TRIGGER-05`, and `TRUNCATE-05` rows in the table above are that
+review's direct product, not part of the original gate 1-3 plan.
+
+`BITEMP-SCOPE-01` (gate 4, the architecture fence requiring every other
+tenant-owned table to carry exactly one server-assigned insertion-timestamp
+column) is **not implemented** in this migration — deferred to a follow-up
+migration, tracked in `TASKS.md`, since it touches eleven unrelated
+pre-existing tables' grants rather than the bitemporal mechanism itself.
+`EXPLAIN-ASOF-01` (gate 5, Wave 4) remains `OPEN` — no application layer
+exists yet to bind.
 
 ## Test execution requirements
 
@@ -255,14 +326,110 @@ green on the first try: **104 assertions recorded, 0 failed** (102 + 2 new),
 blocked on a claim-admission application workflow that does not exist yet
 (same disposition as `ADR-0005` gate 2 and `ADR-0026` gate 3) — not faked.
 
+**Execution evidence (2026-09-05, Bitemporal history addition).** New
+migration `0005_wave1_bitemporal_history_up.sql` (ADR-0017 gates 1-3):
+bitemporal columns on `hci.subject_records`, a new `hci.decisions` table,
+`hci.mark_superseded()`, and 4 `_current` views/`_as_of()` functions. Unlike
+every prior addition to this file, this one did NOT go green on the first
+real run — two genuine bugs surfaced, both by running the real migration end
+to end, neither by review or the standalone privilege probe that preceded
+writing any migration code:
+
+1. `55006` — the first escape-hatch design (`ALTER TABLE ... DISABLE/ENABLE
+   TRIGGER` inside `mark_superseded()`) passed a standalone five-scenario
+   probe cleanly, then failed the instant it ran as a real `AFTER INSERT`
+   trigger on the same table it tried to `ALTER` ("being used by active
+   queries in this session"). Replaced with a lazily-created, per-session
+   `pg_temp.hci_supersession_lock` temp table.
+2. `42P01` — `to_regclass('pg_temp.hci_supersession_lock') IS NOT NULL AND
+   EXISTS (...)` as one combined boolean threw "relation does not exist" the
+   first time the lock table hadn't been created yet in a session; the `AND`
+   does not guarantee the `EXISTS` subquery is skipped before being
+   parsed/planned. Fixed with nested PL/pgSQL `IF` statements — the same fix
+   pattern already used for the `0001` down-migration idempotency bug earlier
+   in this project, re-encountered rather than newly discovered.
+
+The mutation check caught a third real issue that was not a bug so much as a
+wrong prediction: `BITEMP-SUPERSEDE-02` was written expecting `H1008`
+(gate 2's stated code for "predecessor already superseded"), but real
+execution showed `23505` (gate 1's `UNIQUE(supersedes_id)` constraint fires
+first, before `mark_superseded()`'s own check ever runs) — corrected in the
+test, with `H1008` kept as real, mutation-proven defense-in-depth rather than
+removed as dead code. First real run after all three corrections: **118/118
+assertions, 45/45 mutations killed** (104 + 14 new assertions, 39 + 6 new
+mutations).
+
+**That 118/45-green version was then independently reviewed (db-expert
+subagent, requested before commit) and found to have 3 Critical + 6 Major
+issues** the real-execution passes above had no way to catch, because none of
+them made an assertion fail - they were either untested surface (`hci.decisions`'
+own RLS/append-only/`security_invoker` controls had zero coverage of their
+own) or a real security hole in code that happened to behave correctly for
+every input the test suite actually sent it:
+
+- The design 3 escape hatch (a `pg_temp` lock table, see ADR-0017's
+  "Implementation note" for the full mechanism) was **forgeable by the
+  application role**: `pg_temp` is not owner-exclusive - any role holding the
+  database's `TEMPORARY` privilege (`PUBLIC` by default) can create its own
+  table there, and a role could pre-create `hci_supersession_lock` before
+  `mark_superseded()`'s lazy `CREATE TABLE IF NOT EXISTS` ever ran, silently
+  hijacking it. Same forgeability class as the GUC design gate 2 already
+  rejected once, rediscovered in a different carrier.
+- `hci.mark_superseded()`, a `SECURITY DEFINER` function, had no `REVOKE ALL
+  ... FROM PUBLIC` - `0001`'s own `hci.current_tenant_id()` established this
+  as the convention and this migration's first draft missed it.
+- The narrow-rollback down migration had never actually been run once before
+  the review (`test-wave1-local.ps1`'s reversibility pass only exercises
+  `0001_down`'s whole-schema drop) and would have failed immediately with
+  PostgreSQL `2BP01` - `DROP FUNCTION hci.mark_superseded()` was ordered
+  before `DROP TRIGGER subject_records_mark_superseded`, which depends on it.
+- Six Major findings: `now()` (transaction-start time, not wall-clock) on the
+  ledger's own clock columns is concurrency-unsafe and can produce a false
+  `23514`; a bare `UNIQUE(supersedes_id)` let a different tenant use the
+  constraint as a cross-tenant existence oracle (`23505` vs `23503` leaks
+  state RLS was supposed to hide); `corrected_reason = ''` satisfied its own
+  "reason required" CHECK; and `hci.decisions`' RLS/append-only/
+  `security_invoker` protections were real but had exactly zero assertions
+  or mutations exercising any of them - `118/118` was true but did not mean
+  what it appeared to mean for that table.
+
+All 3 Critical + 6 Major were fixed in the same migration file before commit,
+not deferred: `hci.reject_update_delete()` was redesigned from a side-channel
+lock into an effect-based check (authorizes an `UPDATE` by what it changes -
+`system_superseded_at` `NULL`->`NOT NULL`, nothing else, executed by a role
+that is a member of the table owner - rather than by any plantable flag),
+which also eliminated the temp-table forgery hole structurally rather than
+patching it; `mark_superseded()` gained its `REVOKE`; the down migration
+gained the missing `DROP TRIGGER` (and was then actually run, narrowly, for
+the first time); `system_recorded_at`/`system_superseded_at` moved to
+`clock_timestamp()`; the `UNIQUE` constraint became tenant-scoped; blank
+`corrected_reason` got its own CHECK; and 7 new assertions plus 6 new
+mutations gave `hci.decisions` the same real coverage every other protected
+table in this schema already had. That review-and-fix cycle reached
+126/126 assertions, 52/52 mutations killed - then, before commit, a second
+independent critic review of the two harness scripts themselves (required by
+this project's commit gate for any logic change) found the withholding of
+`system_superseded_at` from the application role's INSERT grant had never
+been independently proven load-bearing (only its sibling column
+`system_recorded_at` had a dedicated assertion+mutation), plus three stale
+comments still describing the pre-review `UNIQUE(supersedes_id)` shape and a
+`security_invoker` mutation that only touched 2 of the 4 canonical-read
+views. Fixed the same way: 2 more assertions (`BITEMP-CLOCK-01b`/`02b`), 2
+more mutations (column-level, not table-level), and the view-RLS test/
+mutation pair widened to all four views. Final run after both review cycles:
+**128/128 assertions, 54/54 mutations killed**. Full narrative in the
+migration file's own header comment and in ADR-0017's "Implementation note".
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 39
+requires the suite to go red on exactly the assertions covering it; **all 54
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
-Source-provenance mutations + 2 Consent-class mutations, 2026-09-05,
-covering every invariant listed above). This exists because the first
-version of this suite
+Source-provenance mutations + 2 Consent-class mutations + 15 Bitemporal-
+history mutations (7 landed pre-review + 6 added by the db-expert review pass
++ 2 added by a second critic review of the harness scripts themselves),
+2026-09-05, covering every invariant listed above). This
+exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same
 handler that caught the control's rejection (both SQLSTATE P0001). That
 defect was demonstrated, not merely argued - the original suite exits 0 with

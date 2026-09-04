@@ -37,10 +37,13 @@
 --
 -- Correction of the corroboration graph is not possible under this design,
 -- and that is a real, undischarged limitation, not an oversight to gloss
--- over: source_relationships is append-only with no supersession mechanism
--- (ADR-0017's mark_superseded is reserved, H1008, but not built - see
--- 0002:14-16), so a CITES edge asserted in error - e.g. pointing at a since-
--- discredited citation - can never be retracted or corrected, only ever
+-- over: source_relationships is append-only with no supersession mechanism.
+-- 2026-09-05 update: ADR-0017's hci.mark_superseded()/H1008 landed
+-- (migrations/0005_wave1_bitemporal_history_up.sql), but this table was not
+-- given a supersedes_id/bitemporal shape by that migration - the ADR names
+-- Evidence/Claim/Assessment/Decision specifically, not the corroboration
+-- graph - so a CITES edge asserted in error - e.g. pointing at a since-
+-- discredited citation - can still never be retracted or corrected, only ever
 -- added around. Left this way for the same reason gate 3 below is left open
 -- rather than built against a mechanism that does not exist yet: building a
 -- correction path here would mean inventing ADR-0017's mechanism inline,

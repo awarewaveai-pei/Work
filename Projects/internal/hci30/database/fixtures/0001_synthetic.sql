@@ -54,3 +54,22 @@ INSERT INTO hci.subject_lawful_basis_records (id,tenant_id,person_id,basis) VALU
 INSERT INTO hci.source_terms_records (id,tenant_id,source_id,terms_ref) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000401','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000300','https://example.com/tenant-a-source/terms'),
   ('bbbbbbbb-0000-0000-0000-000000000401','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000300','https://example.com/tenant-b-source/terms');
+
+-- Bitemporal (ADR-0017) fixtures: one real tenant-B subject_records row, so
+-- BITEMP-CROSSTENANT-01 (tenant A referencing it as supersedes_id) proves the
+-- composite FK rejects a genuine cross-tenant reference, not merely an id
+-- that does not exist anywhere. Also doubles as RLS-LEAK / BITEMP-VIEWRLS-01
+-- fixture data.
+-- Three kinds, not just EVIDENCE (critic review: BITEMP-VIEWRLS-01 originally
+-- only probed evidence_current/decisions_current, leaving claims_current/
+-- assessments_current's security_invoker asserted but never once actually
+-- exercised cross-tenant - "all four views share one code shape" was an
+-- assumption, not a checked fact).
+INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000500','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200'),
+  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200'),
+  ('bbbbbbbb-0000-0000-0000-000000000502','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','ASSESSMENT','bbbbbbbb-0000-0000-0000-000000000200');
+-- One real tenant-B hci.decisions row (RLS-LEAK-04 / BITEMP-VIEWRLS-01),
+-- mirroring the subject_records row directly above.
+INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000600','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000200','PROCEED','synthetic fixture rationale - tenant B');

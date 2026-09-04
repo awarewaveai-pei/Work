@@ -10,7 +10,7 @@ HCI will model a `DataSubjectRequest` as a first-class, P0 domain record. It has
 
 ## Runtime gate
 
-`Projects/internal/hci30/database/` provides a synthetic-only local PostgreSQL skeleton for request, event, and target tables. It does not process real persons, establish a legal response deadline, implement bitemporal history (`HD-06`, decided by `ADR-0017` same batch, gates still open — not built here), or prove production readiness.
+`Projects/internal/hci30/database/` provides a synthetic-only local PostgreSQL skeleton for request, event, and target tables. It does not process real persons, establish a legal response deadline, or prove production readiness. Bitemporal history (`HD-06`, decided by `ADR-0017` same batch) landed Wave 1 gates 1-3 on 2026-09-05 (`migrations/0005_wave1_bitemporal_history_up.sql`) — not built here, in `ADR-0017`'s own migration instead; this DSR channel's correction lineage does not yet reference it (that wiring belongs to whichever future work connects `data_subject_requests` corrections to a `supersedes_id` chain).
 
 ## Consequences and rollback
 

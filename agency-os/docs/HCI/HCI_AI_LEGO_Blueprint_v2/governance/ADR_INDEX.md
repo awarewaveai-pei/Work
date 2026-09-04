@@ -2,7 +2,7 @@
 
 Status: **MIXED REGISTER — only entries explicitly marked `ACCEPTED` below are approved decisions**
 Owner: HCI AI LEGO Blueprint v2
-Last reviewed: 2026-09-05 (Source provenance + subject-type-scope VBC check added)
+Last reviewed: 2026-09-05 (ADR-0017 bitemporal scope gates 1-3 landed)
 
 ## Purpose and state rules
 
@@ -72,7 +72,7 @@ For any material change, start with `HCI_CHANGE_PROPOSAL_TEMPLATE.md`, attach th
 | ADR-0014 | `SYNTHETIC GATE VERIFIED` | Synthetic DSR schema/events/tests: `D:\Work\Projects\internal\hci30\database\`; suite green + mutation-checked 2026-09-02; no real-person processing |
 | ADR-0015 | `SYNTHETIC GATE VERIFIED` | Synthetic identity-verification constraint/tests: `D:\Work\Projects\internal\hci30\database\`; both-sided evidence guard, mutation-checked 2026-09-02; no production pipeline |
 | ADR-0016 | `SYNTHETIC GATE VERIFIED` | Forced RLS/non-owner test-role runner: `D:\Work\Projects\internal\hci30\`; Docker run green **51/51 assertions + 15/15 mutations killed**, 2026-09-02 (updated from the earlier 38/9 baseline after the Wave 1 hardening pass — see `WORKLOG.md` 2026-09-02); tenancy-principal mechanism resolved by `ADR-0033`, still `OPEN` at runtime |
-| ADR-0017 | `SPECIFIED — RUNTIME OPEN` | `BITEMP-WINDOW-01`, `-REASON-01`, `-CROSSTENANT-01`, `-SUPERSEDE-01/02`, `-IMMUTABLE-01`, `-CLOCK-01`, `-ASOF-01`, `-SCOPE-01`, `EXPLAIN-ASOF-01` (Wave 1/4) |
+| ADR-0017 | `SYNTHETIC GATE VERIFIED (Wave 1 gates 1-3)` | `hci.subject_records` bitemporal columns + new `hci.decisions` table + `hci.mark_superseded()` (effect-based authorization, not a GUC, ALTER-TABLE-DISABLE, or temp-table lock — three rejected designs documented in the migration's own header, the third caught by an independent db-expert review before commit) + 4 `_current` views/`_as_of()` functions — `Projects/internal/hci30/database/migrations/0005_wave1_bitemporal_history_up.sql`; Docker run green **128/128 assertions + 54/54 mutations killed**, 2026-09-05 (2 real bugs found by real execution + 3 Critical/6 Major found by db-expert review, all fixed and re-verified — see ADR's own "Implementation note"); gate 4 (`BITEMP-SCOPE-01`, scope-fence retrofit onto 11 other tables) deferred to a follow-up migration, tracked in `TASKS.md`; gate 5 (`EXPLAIN-ASOF-01`, Wave 4) out of scope, no application layer yet |
 | ADR-0018 | `SPECIFIED — RUNTIME OPEN` | `CRYPTO-KEYGRANT-01`, `-KEYREQ-01`, `-SCOPE-01`, `-CROSSTENANT-KEYREF-01`, `-TOMBSTONE-01/02`, `-WRITE-01`, `-ROUNDTRIP-01`, `-READ-TOMBSTONED-01`, `-ERASURE-01/02/METADATA-01`, `-NOEXTERNAL-01` (Wave 1/4) |
 | ADR-0019 | `SPECIFIED — RUNTIME OPEN` | `wave1/HCI_FIELD_AUTHOR_CLASS_POLICY.md` + `NEG-HD08-01..04` (Wave 1) |
 | ADR-0020 | `SYNTHETIC GATE VERIFIED (Wave 1 scope)` | Wave 1 gates verified: `CASE-SCHEMA-01`, `CASE-LIFECYCLE-*`, `CASE-CLOSED-IMMUTABLE-01`, `CASE-OWNS-01/02/03`, `CASE-CLOSED-GUARD-01/02`, `CASE-PROJECTREF-01/02`, `RLS-LEAK-03`, plus owner-bypass trigger-layer proof (`CASE-LIFECYCLE-TRIGGER-01`, `CASE-NODELETE-TRIGGER-01`) — `Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_up.sql`; Docker run green **75/75 assertions + 26/26 mutations killed**, 2026-09-04 (first Docker run at 65/19 found and fixed 2 real gate bypasses + 5 structural gaps via critic review, then a further trigger-ordering bug the critic review did not catch — full account in `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` §Current state); `CASE-REPLAY-01` (Wave 4, replay/rollback) still `OPEN` — not in scope of this migration |
