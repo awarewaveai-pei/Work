@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-09-04（續22，同一 session：Cognitive OS 第九個 Method Atlas 切片 — `challenge.red_team`，第六種結構形狀＋顯式權限規則）
+
+**觸發**：延續操作者授權（"繼續做下一個切片（你決定）" 兩次），繼續自主推進。0 agent。
+
+**選型**：`challenge.red_team`（F12，新家族）。Atlas §11.23 給了本 session 至今**唯一一條明確治理規則**（不只是流程或範例）：L1735 逐字「Red Team 沒有 final authority，只能輸出 challenge artifact」。第六種結構形狀：不是清單／敘事鏈／分類／排名／圖／矩陣／監控規則，是**checklist 結構化的批判**——11 個固定維度（ASSUMPTIONS/LOGIC/MISSING_VARIABLES/COUNTEREXAMPLES/SECURITY/PRIVACY/LEGAL/CULTURE/OPERATIONS/STATISTICAL_VALIDITY/OVERCONFIDENCE）逐一檢查，每個 finding 綁定其中一個維度。
+
+**主動應用續21修正學到的紀律**：寫任何程式碼前先 grep 全 spec root 找「red team」/「challenge artifact」及所有 schema 標題裡的「challenge」/「critique」/「finding」/「dissent」，不是只 grep 本 session 自造的名稱。結果：3 個既有檔案（`rigor-level.schema.yaml`/`gate.schema.yaml`/`change-plan.schema.yaml`）只把 Red Team 當成不透明的 checklist 項目／gate id／方法名稱引用，沒有任何一個定義 Red Team finding 或 challenge artifact 實際內容——確認無重複。另外 `docs/architecture/REPOSITORY_ARCHITECTURE.md` L148-149 自己列出的 `/cognitive/methods/{...}` 家族清單本來就包含 `challenge`，與本 session 命名選擇獨立吻合。
+
+**不變量**：Atlas L1735 的規則不是「最好不要」，是「絕對不行」——所以這是本 session 第一個把 `additionalProperties: false` 用到頂層＋逐 finding 兩層的 typed-object schema（其餘 8 個切片的 schema 都預設允許額外欄位）。兩層獨立強制：`assert_no_authority_claim` 在建構前就擋（拒絕任何帶 `approved`/`verdict`/`final_decision`/`authorized`/`decision`/`outcome` 的記錄），`additionalProperties:false` 獨立擋掉繞過 builder 直接手造字典的攻擊——CLI 真的跑了一次竄改攻擊（在合法記錄的複本上偷塞 `approved: true`），確認兩層都各自擋下，不是只信任其中一層。另一個不變量：finding 的 `dimension` 必須是這次真的檢查過的 `dimensions_examined` 成員之一——JSON Schema 無法原生表達「這個陣列項目的值必須出現在另一個陣列裡」，所以是 runtime cross-field 檢查，不是 schema 檢查。
+
+**[已修改]**：spec-root 新增 `methods/contracts/challenge.red_team.contract.yaml`（逐字引用 Atlas §11.23 11 項 checklist 與權限規則）＋`specs/cognitive/typed-objects/red-team-challenge.schema.yaml`（頂層與 findings[] 皆 `additionalProperties:false`）＋對應 golden fixture（2 valid + 4 invalid，含 2 個證明拒絕塞入 `approved`/`verdict` 的案例）＋`contract-backlog.yaml` 新增 `tier_1.seventh_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/challenge/__init__.py`＋`ai_lego/modules/challenge/red_team.py`（builder＋跨欄位一致性檢查＋權限守門＋三個 gate）＋`ai_lego/apps/cli/run_red_team_slice.py`（真跑一次攻擊並確認兩層獨立擋下）＋`tests/unit/test_red_team.py`（16 tests，修正一個自己的測試設計 bug：finding 維度與宣告的 `dimensions_examined` 不一致，被自己正要驗證的跨欄位檢查正確擋下）＋`docs/NINTH_SLICE_CHALLENGE_RED_TEAM.md`。
+
+**過程中抓到一個真實工具鏈 bug**：schema 初稿用 YAML anchor/alias（`&dimension_enum`/`<<: *dimension_enum`）避免重複 11 值 enum 兩次。純 `yaml.safe_load` 驗證通過，但 spec root 自己的 `tests/run_golden_tests.py` 用更嚴格的 loader，不支援 merge-key tag，第一次真的跑就報錯。修法：把 enum 逐字寫兩次（附註解說明原因），不是靜默改掉不解釋。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_red_team_slice` | exit=0 | result=第一次真跑就通過：`PASS challenge.red_team: 2 dimensions examined, 1 finding, gates [provenance_required=PASS, evidence_labeling_required=PASS, no_final_authority_claim=PASS], no_final_authority_verified(runtime=True, schema=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_red_team -v` | exit=0 | result=16 passed（修正 1 個測試設計 bug 後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2579→2590（含修正 YAML merge-key 相容性問題）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=263439 | result=**365 tests OK**（349→365，零回歸；`git diff --stat` 對照 fishbone.py／method_resolver.py／schema_contracts.py／event_ledger.py／provenance.py 五個共用檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：兩層權限守門是否真的獨立（是，已用真實竄改攻擊分別驗證兩層各自擋下，不是只讀程式碼推論）；`additionalProperties:false` 這麼嚴格的約束會不會誤傷合法用法（不會，`severity` 與 `supporting_evidence_refs` 皆為可選欄位，已用 zero-findings clean-pass 案例證明合法用法暢通）；本次是否也有跟續21同類的既有 schema 重複風險（已主動先查，見上方「選型」段落，確認無重複）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`challenge[.]red_team\|RedTeamChallenge\|red-team-challenge\|modules[.]challenge\|modules/challenge` | hits=全部為本切片自己的新檔案（spec root 與 product root）、session log 雜訊（.claude/bash-commands.log、session transcript）、`__pycache__` 編譯產物、以及第八切片文件裡對本切片的正向交叉引用——無任何過期或非預期殘留引用
+
+**[剩餘風險]**：`OQ-REDTEAM-1`（recommended_next 空白——Atlas §11.24 提到「Blue Team → Red Team → Independent Judge」配對，但 `challenge.blue_team` 與 Independent Judge 都還沒有 machine_id）；`OQ-REDTEAM-3`（cognitive_primitives 為推論非引用，與其餘 7/9 個切片同一誠實等級）；`OQ-REDTEAMCHALLENGE-1`（維度一致性檢查是 runtime 而非 schema 層不變量，已記錄原因）。皆非阻塞，已誠實揭露於 contract 與 docs。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（新增檔案、無任何既有檔案被修改，回退零副作用）。
+
 ## 2026-09-04（續21，同一 session：修正第八個切片的真實 schema 重複——`reversal-criteria-set.schema.yaml` v1.0.0→v1.1.0）
 
 **觸發**：為第九個切片（`challenge.red_team`）做命名衝突查核時（同 `decision.ahp` 那次 `modules/decision` 命名巧合查證的紀律延伸），讀 `specs/decision/decision.schema.yaml` 過程中意外發現：`specs/decision/reversal.schema.yaml`（2026-08-29,上個 session 建的,早於本 session）**早就定義了跟續20 `ReversalCriteriaSet` 完全相同的概念**——indicator/condition/action/owner,同一個 Atlas §11.33 引用出處——而且做得更嚴謹（調和了 Atlas bilingual-policy／Atlas §11.33／EC §88 三種互相衝突的形狀,還關閉了追蹤中的 `CROSS-T-12` 重複定義發現）。續20 的 v1.0.0 等於重新製造了 `reversal.schema.yaml` 存在的目的正要防止的「同一概念 N 種互不相容形狀」問題。

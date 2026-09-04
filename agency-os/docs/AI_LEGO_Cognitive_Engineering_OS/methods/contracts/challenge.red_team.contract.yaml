@@ -1,0 +1,188 @@
+$id: "ai-lego://methods/contracts/challenge.red_team.contract.yaml"
+title: "Red Team Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Ninth Method Atlas slice, and the FIRST from the
+  `challenge` family (F12 -- "Challenge / Red Team / Risk", Atlas index
+  L312: "我們可能錯在哪？").
+
+  Atlas §11.23 (L1715-1736) gives this method a dedicated section: purpose,
+  an 11-item named checklist of attack dimensions (Assumptions / Logic /
+  Missing variables / Counterexamples / Security / Privacy / Legal /
+  Culture / Operations / Statistical validity / Overconfidence), and --
+  the single most consequential governance sentence found in any Tier 1
+  contract this session built -- an explicit authority-limiting RULE
+  (L1735, verbatim): "Red Team 沒有 final authority，只能輸出 challenge
+  artifact" (Red Team has no final authority; it may only output a
+  challenge artifact). This is not advisory language, it is a hard
+  constraint on what this method's own output type is legally allowed to
+  represent -- enforced structurally in
+  `typed-objects/red-team-challenge.schema.yaml` via `additionalProperties:
+  false` (no verdict/approved/final_decision field can even be added to an
+  instance) rather than left as an unenforced convention, the same
+  discipline `causal-dag-analysis.schema.yaml`'s `acyclic_verified: const
+  true` and `five-whys-validation.schema.yaml`'s failure-mode `const:
+  false` fields already established for other methods' own explicit rules.
+
+  Due diligence applied before minting (2026-09-04 correction lesson, same
+  session): grepped the full spec root for "red team"/"redteam"/"challenge
+  artifact" and every schema title for "challenge"/"critique"/"finding"/
+  "dissent" before writing this contract. Three files DO mention Red Team
+  (`specs/cognitive/rigor-level.schema.yaml`'s board-grade dimension list,
+  `specs/execution/gate.schema.yaml`'s `high_risk` catalog `red_team` gate
+  id, `specs/execution/change-plan.schema.yaml`'s review-method enum) --
+  all three reference Red Team BY NAME as an opaque checklist item/gate/
+  method-name, none defines what a Red Team FINDING or CHALLENGE ARTIFACT
+  actually contains. No duplicate found; this contract and its output type
+  are the first place that shape is defined.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.23 紅隊／紅隊檢驗（Red Team）(L1715-1736) -- purpose, 11-item checklist, no-final-authority rule"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.24 藍隊／藍隊防禦（Blue Team）(L1739-1752) -- 'Blue Team → Red Team → Independent Judge' pairing"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 index row (L312): 'Challenge / Red Team / Risk | 我們可能錯在哪？'"
+  - "specs/execution/gate.schema.yaml high_risk catalog (L264, red_team gate id -- opaque reference, not this method's own output shape)"
+  - "methods/registry/method-inventory.yaml 'Red Team' entry (F12 challenge, L747-751) -- no machine_id recorded there; this contract mints one, see decided_by"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.23 gives a real, complete checklist
+  and an explicit authority rule -- direct transcription plus low-risk,
+  disclosed compilation choices. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a seventh concrete
+  entry.
+
+id: challenge.red_team
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [CHALLENGE, INFER, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). CHALLENGE is the method's own defining action (Atlas L1718:
+# actively attack a proposal); INFER identifies missing variables and
+# counterexamples the proposal's own authors did not surface; EXPLAIN
+# articulates each finding as a real, actionable challenge artifact rather
+# than a bare label. All three CANONICAL_KERNEL members.
+
+purpose:
+  - attack_a_proposal_across_named_risk_dimensions
+# Atlas L1718 verbatim sense: actively attack a proposal as an attacker,
+# competitor, critic, or the most pessimistic failure scenario, across the
+# 11 named dimensions.
+
+inputs:
+  required:
+    - ProposalRef
+  # NEW DESIGN, same class of scope-limited free-text reference
+  # `learning.reversal_criteria.contract.yaml`'s `DecisionRef` already
+  # uses: this method challenges A PROPOSAL (which may or may not be a
+  # `Decision` record, a `SWOTAnalysis`, an `AhpAnalysis`, a plan, or
+  # anything else with content worth attacking) -- no single existing
+  # typed object in this spec root is the universal "thing being
+  # proposed," so a free-text reference is the honest, non-inventing
+  # choice rather than a hard $ref to one arbitrarily-chosen type.
+
+outputs:
+  - RedTeamChallenge
+# NEW output type (see typed-objects/red-team-challenge.schema.yaml). Same
+# honesty gap every Tier 1 contract this session disclosed: Atlas names no
+# PascalCase output type for this method.
+
+preconditions:
+  - "at least one dimension examined"
+  # NEW, structurally necessary precondition. Atlas's own 11-item checklist
+  # (L1720-1732) is what this method is FOR -- a challenge artifact that
+  # examined zero dimensions did not actually red-team anything. Findings
+  # themselves may legitimately be zero (a dimension can be examined and
+  # found clean), but at least one dimension must have been looked at.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # provenance_required: every finding and the overall record carry a
+  # provenance_record. evidence_labeling_required: true -- re-derived (not
+  # copied) for this method's own real risk: an unevidenced Red Team
+  # finding ("this is insecure") is exactly as dangerous as an unevidenced
+  # Fishbone cause hypothesis -- a claim of failure without grounding is
+  # still an ungrounded claim, same class of risk `root_cause.fishbone`'s
+  # and `causal.dag`'s identical flag already covers, genuinely applicable
+  # here too (unlike `root_cause.pareto`'s deliberate departure, where the
+  # real risk was threshold assumption, not evidence omission).
+
+forbidden_transition: []
+# Atlas §11.23 gives no explicit forbidden-transition WORKED EXAMPLE in
+# the §14.1 diagram style -- but see the authority rule (L1735) enforced
+# structurally in the output schema instead of as a named transition here
+# (there is no sibling "FinalAuthority" typed object to forbid transitioning
+# TO -- the rule is "this type can never assert authority," not "this type
+# must not become that other type," a different shape than Fishbone's or
+# SWOT's forbidden_transition). See open_questions.
+
+recommended_next: []
+# Atlas §11.24 names a real pairing ("Blue Team → Red Team → Independent
+# Judge") but gives neither `challenge.blue_team` nor an "Independent
+# Judge" method its own machine_id or contract anywhere in this spec root
+# yet -- disclosed in open_questions rather than inventing ids for methods
+# not yet built.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a challenge artifact has no
+  # described external side effect.
+
+open_questions:
+  - id: "OQ-REDTEAM-1"
+    question: >
+      Atlas §11.24's own pairing ("Blue Team → Red Team → Independent
+      Judge") names two methods with no contract or machine_id anywhere in
+      this spec root (`challenge.blue_team`, and an "Independent Judge"
+      method Atlas gives no explicit id for at all). Should a future
+      session build either, completing the pairing this method's own
+      `recommended_next` currently cannot cite?
+    owner: "operator, or whoever next builds the Blue Team / Independent Judge methods"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-REDTEAM-2"
+    question: >
+      This contract's `forbidden_transition` is empty by a genuinely
+      different reasoning than every other Tier 1 contract's empty one
+      (see the field's own inline comment) -- Atlas's no-final-authority
+      rule (L1735) is enforced as a structural property of the OUTPUT
+      TYPE itself (no verdict field exists to assert), not as a named
+      illegal transition between two sibling types. Is this the right
+      mechanism, or should a future revision of method.schema.yaml gain a
+      dedicated field for "this method's output can never carry authority"
+      as its own first-class concept, generalizing beyond this one method?
+    owner: "operator, or whoever next builds a method.schema.yaml revision"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-REDTEAM-3"
+    question: >
+      `cognitive_primitives: [CHALLENGE, INFER, EXPLAIN]` is this file's
+      own inference, not a cited Atlas composition formula. Same open
+      question class as every other Tier 1 contract's inferred
+      primitives.
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.23 (L1715-1736), §11.24 (L1739-1752), and the F12 index
+    row (L312) directly at the cited lines. Grepped the FULL spec root
+    (specs/**, methods/**) for "red team"/"redteam"/"challenge artifact"
+    and every schema title for conceptual overlap (challenge/critique/
+    finding/dissent/risk) BEFORE writing this contract -- the corrected
+    invariant from the 2026-09-04 reversal-criteria-set.schema.yaml
+    duplicate-definition fix, applied here proactively rather than found
+    after the fact. Three incidental Red Team NAME references found
+    (rigor-level.schema.yaml, gate.schema.yaml, change-plan.schema.yaml),
+    none defining this method's own output shape -- see description.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 11-item checklist and the
+    no-final-authority rule are transcribed verbatim from Atlas L1720-1735.
+    `purpose`/`preconditions`'s literal names and the ProposalRef
+    free-text-reference scope limit are Phase 3-class compilation
+    decisions, explicitly flagged above.

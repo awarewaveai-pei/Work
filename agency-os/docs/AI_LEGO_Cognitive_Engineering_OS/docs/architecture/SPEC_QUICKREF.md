@@ -41,6 +41,7 @@
 | `specs/cognitive/typed-objects/five-whys-validation.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance] properties[9] |
 | `specs/cognitive/typed-objects/pareto-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, metric_name, dataset, ranking, threshold_status, engine, computation_provenance_ref, provenance] properties[13] |
 | `specs/cognitive/typed-objects/problem-statement.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, content, provenance] properties[7] |
+| `specs/cognitive/typed-objects/red-team-challenge.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, dimensions_examined, findings, provenance] properties[7] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |
