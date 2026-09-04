@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-09-04（續7，同一 session：AI 建議全由模型產生 + 模型第二 coder 套 codebook + 真實單元 Kappa）
+
+### coding 階段最後的 fixture 建議拔掉；第一次真跑被 methodology gate 擋下，抓到 THEMES_V11 的隱藏耦合
+
+**觸發**：操作者「該做什麼去做什麼 不要再問我」。**全程 0 個 agent**；oracle 仍 block，書面自審＋兩個突變測試。
+
+**[已修改]**：
+- `gateway.py`：`complete(..., seed=, temperature=)`；Ollama 走 `options`，Anthropic 只轉 temperature（無 seed，docstring 明寫）。
+- `ai_coding.py`：`apply_codebook`／`validate_codebook_response`／`build_codebook_prompt`（第二 coder：codebook 列表＋單元，label 必須在 codebook 內 `LABEL_NOT_IN_CODEBOOK`，evidence 逐字，`seed=20260904`、`temperature=0.0`，PII guard 同 open coding 的契約）。
+- `review.py`：`fixture_review(suggested_labels=None)`——P1 鎖模型建議，P2 的人審 EDIT 明顯覆寫模型建議；兩種 review 路徑的記錄都多 `suggested_label`。
+- `qualitative_coding.py`：`assemble_coding_outputs(..., coder_two_labels=, coder_two_source=)`——有給就是 `CODER-2-MODEL`（AI_SUGGESTION／AI_SUGGESTED、`human_action=None`、`coder_kind: model`），沒給維持 `CODER-2-SYNTHETIC`；**主題不變量**：v11 主題若底下沒有任何存在的分類就不發出（原本會發出 `category_ids=[]` 的空主題）。
+- `run_research_slice.py`：open coding 移到人審之前（step 13.8，全部四個單元）；step 15.5 coder 2 = `apply_codebook`（codebook = 鎖定 label＋審後 label＋pending labels）、`SecondCoderApplied` 事件、`second_coder_model_response.json`；Kappa 在 local-llm 模式用兩位 coder 共同單元的真實判斷（<2 單元 → `KAPPA_INSUFFICIENT_UNITS`），`statistics.judgment_source`；`adapters.coder_two`、`result["second_coder"]`。
+- `tests/unit/test_second_coder.py`（新，12 個）；`tests/acceptance/test_research_slice_fixture_mode.py` 期望值加 `coder_two`／`second_coder`／`judgment_source`。
+- `docs/PHASE5_RESEARCH_SLICE.md`（Round 7 段、coding／statistics 限制改寫）；`RUNNABLE_DEMOS.md` 最上列；`TASKS.md` ⑥。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_research_slice --transcription meeting-service --coding local-llm --runtime-dir %TEMP%\ai-lego-real-stack`（第一次）| exit=1 | result=`FAIL: METHOD_GATE_FAILED: research_integrity, methodology`——模型建議（4/4，0 拒收）與 codebook pass 都成功，倒在 `THEMES_V11` 的 `emotional_exhaustion` 主題底下分類全消失 → 空主題 → gate 正確擋；修不變量後：
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上 | exit=0 | result=`PASS … 28/28 steps, all gates PASS`；`adapters={... 'coding_mode': 'local-llm', 'open_coding_model': 'gemma3:4b', 'coder_two': 'model'}`；open codes `SRC-1 checking_after_dinner_messages / SRC-2 planning_around_urgent_messages / SRC-3 feeling_empty_after_work / SRC-4 late_night_project_updates`（0 拒收，7250 ms）；codebook pass：**SRC-1 被 `FABRICATED_EVIDENCE` 拒收**（模型 span 非逐字，gate 真的做事）、SRC-2 `checking_after_dinner_messages`（與人審 EDIT 的 `after_hours_monitoring` 不一致）、SRC-3／SRC-4 一致（3125 ms）；`coder_2.coder_id=CODER-2-MODEL` 三個 code 全 `AI_SUGGESTED`；`Kappa=0.57142857 CI95=[0.0, 1.0]`，`coding_unit_count=3`，`judgment_source=REAL_UNITS:SRC-2,SRC-3,SRC-4`，Landis-Koch moderate；themes `boundary_erosion`＋`pending_axial_review`
+- （中間一次 run 從 `D:\Work` 執行 → `No module named ai_lego` 空跑 exit=1，不算證據，已從產品根目錄重跑）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_second_coder` | exit=0 | result=12/12
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | ms=185898 | result=`Ran 179 tests OK`（167→179；中途 acceptance adapters 期望值紅→更新後綠）
+- 突變測試 ①：`validate_codebook_response` 的 `if entry["label"] not in allowed:` → `if False:` → `test_label_outside_codebook_is_rejected_even_with_good_evidence` FAIL；復原綠。② `assemble_coding_outputs` 的 `if not category_ids:` → `if False:` → `test_v11_theme_whose_categories_never_materialised_is_absent_not_empty` FAIL；復原綠
+- REVIEW_DONE: critic=self（oracle 皆 block）| verdict=pass | findings=0c/1m/0n（medium 由真跑抓到：空主題耦合，已修不變量）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`CODER-2-SYNTHETIC|SUGGESTED_LABEL|expanded_synthetic_coder_judgments|second coder|48 synthetic units` | hits=見上（docs 兩處「coder 2／48 units 是 fixture」的聲稱已改寫；`test_gates.py`／`test_reliability.py` 用 48 單元是測 Kappa 演算法本身，正確）
+- ORACLE_WAIVED: critic／codex 斷路器仍 block；書面自審＋兩個突變證據如上
+
+**[剩餘風險]**：① 人審在 fixture review 模式是固定決策，模型建議被「人」接受或覆寫的行為是腳本寫死的（`--review interactive` 才是真人）；② 分類（`CATEGORY_OF_LABEL`）與主題仍 fixture，模型新 label 全落 `pending_axial_review`，主題層幾乎沒有內容——下一刀；③ 3 個單元的 Kappa CI [0,1] 統計上沒有說服力，只證明管線是真的；④ gemma3:4b 對 SRC-1 的 evidence 非逐字被拒，代表小模型的 evidence 品質是真實限制，換模型（registry 一行）即可比較。
+
+**[rollback]**：`git revert` 本 commit；fixture 路徑逐位元組不變。
+
 ## 2026-09-04（續6，同一 session：真講者分離 — `--transcription meeting-service` 重用 8420 的 lib，順手抓到 8420 自己壞掉的根因）
 
 ### `MeetingServiceTranscriber`：SAPI 真語音 → GPU whisper large-v3 → pyannote 3.1 真講者 → gemma3 open coding，全真堆疊 28/28

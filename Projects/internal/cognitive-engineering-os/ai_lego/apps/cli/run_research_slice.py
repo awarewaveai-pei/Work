@@ -65,7 +65,7 @@ from ai_lego.modules.knowledge.ingest.audio_fixtures import SyntheticToneAudioFa
 from ai_lego.modules.knowledge.ingest.pii import detect_synthetic_pii, redact_transcript
 from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, MeetingServiceTranscriber, OfflineFasterWhisperTranscriber, meeting_service_availability
 from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_from_transcript, reverse_trace
-from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, default_local_registry, suggest_open_codes
+from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_open_codes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
 from ai_lego.modules.research.review import fixture_review, locked_code_from_review, review_code_interactively
@@ -356,37 +356,51 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     else:
         emit(NORDBROOK.tenant_id, nord_aggregate, "CapabilitiesResolved", capability_record, 21.5)
 
+    # Step 13.8 (local-llm only): a real model proposes open codes for EVERY unit from the REDACTED transcripts, before
+    # any human sees a suggestion. The prompt passes the same PiiLedgerGuard as the ledger before it leaves the process;
+    # evidence must be verbatim or the label is rejected. In fixture mode the suggestions are the fixture constants.
+    open_coding: dict[str, Any] | None = None
+    suggested_labels: dict[str, str] = {}
+    if gateway is not None:
+        units = [{"source_id": source["source_id"], "text": redact_transcript(source["transcription"]["text"], source["detected_pii"])} for source in source_records]
+        open_coding = suggest_open_codes(gateway, DEFAULT_LOCAL_MODEL_PROFILE, units, pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:open-coding")
+        if not open_coding["labels"]:
+            raise InvariantViolation(f"OPEN_CODING_NO_ACCEPTED_LABELS: model returned nothing usable -- rejected={open_coding['rejected']} missing={open_coding['missing']}")
+        suggested_labels = open_coding["labels"]
+        emit(NORDBROOK.tenant_id, nord_aggregate, "AISuggestionGenerated", {"labels": suggested_labels, "rejected": open_coding["rejected"], "missing": open_coding["missing"], "suggestion_source": open_coding["suggestion_source"]}, 21.8)
+        write_json(runtime / "modules" / "research" / "open_coding_model_response.json", open_coding)
+
     # Steps 14-15: human review. `quote` is always the source's own PII-free `quote` field -- never the raw transcript.
     if config.review == "fixture":
-        locked_code, ai_review = fixture_review()
+        locked_code, ai_review = fixture_review(suggested_labels or None)
     else:
-        primary = review_code_interactively("AI-SUG-1", "SRC-1", SYNTHETIC_TRANSCRIPTS[0]["quote"], SUGGESTED_LABEL, config.input_fn, config.output_fn)
+        primary = review_code_interactively("AI-SUG-1", "SRC-1", SYNTHETIC_TRANSCRIPTS[0]["quote"], suggested_labels.get("SRC-1", SUGGESTED_LABEL), config.input_fn, config.output_fn)
         if primary["action"] != "ACCEPT_AND_LOCK":
             raise InvariantViolation("INTERACTIVE_LOCK_REQUIRED: the slice needs one explicit ACCEPT_AND_LOCK for the human-locked fact")
         locked_code = locked_code_from_review(primary, "CODE-LOCKED-P1-001")
-        ai_review = review_code_interactively("AI-SUG-2", "SRC-2", SYNTHETIC_TRANSCRIPTS[1]["quote"], SUGGESTED_LABEL, config.input_fn, config.output_fn)
+        ai_review = review_code_interactively("AI-SUG-2", "SRC-2", SYNTHETIC_TRANSCRIPTS[1]["quote"], suggested_labels.get("SRC-2", SUGGESTED_LABEL), config.input_fn, config.output_fn)
     emit(NORDBROOK.tenant_id, nord_aggregate, "HumanCodeLocked", locked_code, 22)
     emit(NORDBROOK.tenant_id, nord_aggregate, "AISuggestionReviewed", {"suggestion_id": ai_review["suggestion_id"], "action": ai_review["action"], "result_label": ai_review["result_label"]}, 23)
     # EC section 14 / MP section 8.5: the method implementation runs only through the Method Atlas gate (ADR-023
     # section Consequences 5) -- same `invoke` seam as capabilities, same guarantee.
-    # Step 15.5 (local-llm only): a real model proposes coder-1's pending open codes from the REDACTED transcripts of
-    # the units no human has handled yet (SRC-1 is human-locked, SRC-2 was just reviewed). The prompt passes the same
-    # PiiLedgerGuard as the ledger before it leaves the process; evidence must be verbatim or the label is rejected.
-    open_coding: dict[str, Any] | None = None
+    # Step 15.5 (local-llm only): coder 1's pending codes are the model's suggestions for the units no human handled
+    # (SRC-1 locked, SRC-2 reviewed); coder 2 is a SECOND, independent model pass that applies coder 1's reviewed
+    # codebook to every unit (different prompt, fixed seed, temperature 0). Agreement between two coders is only
+    # meaningful against a shared codebook -- a second pass inventing its own labels would measure vocabulary, not
+    # coding. In fixture mode coder 2 stays the synthetic human stand-in.
     pending_ai_labels: dict[str, str] | None = None
+    codebook_pass: dict[str, Any] | None = None
     if gateway is not None:
         human_handled = {locked_code["source_id"], ai_review["source_id"]}
-        units = [
-            {"source_id": source["source_id"], "text": redact_transcript(source["transcription"]["text"], source["detected_pii"])}
-            for source in source_records
-            if source["source_id"] not in human_handled
-        ]
-        open_coding = suggest_open_codes(gateway, DEFAULT_LOCAL_MODEL_PROFILE, units, pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:open-coding")
-        if not open_coding["labels"]:
-            raise InvariantViolation(f"OPEN_CODING_NO_ACCEPTED_LABELS: model returned nothing usable -- rejected={open_coding['rejected']} missing={open_coding['missing']}")
-        pending_ai_labels = open_coding["labels"]
-        emit(NORDBROOK.tenant_id, nord_aggregate, "AISuggestionGenerated", {"labels": pending_ai_labels, "rejected": open_coding["rejected"], "missing": open_coding["missing"], "suggestion_source": open_coding["suggestion_source"]}, 23.2)
-        write_json(runtime / "modules" / "research" / "open_coding_model_response.json", open_coding)
+        pending_ai_labels = {sid: label for sid, label in suggested_labels.items() if sid not in human_handled}
+        if not pending_ai_labels:
+            raise InvariantViolation("OPEN_CODING_NO_PENDING_LABELS: the model produced no usable label for any un-reviewed unit")
+        coder_one_final = {locked_code["source_id"]: locked_code["label"], **({ai_review["source_id"]: ai_review["result_label"]} if ai_review["result_label"] else {}), **pending_ai_labels}
+        codebook_pass = apply_codebook(gateway, DEFAULT_LOCAL_MODEL_PROFILE, units, sorted(set(coder_one_final.values())), pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:second-coder")
+        if not codebook_pass["labels"]:
+            raise InvariantViolation(f"SECOND_CODER_NO_ACCEPTED_LABELS: rejected={codebook_pass['rejected']} missing={codebook_pass['missing']}")
+        emit(NORDBROOK.tenant_id, nord_aggregate, "SecondCoderApplied", {"codebook": codebook_pass["codebook"], "labels": codebook_pass["labels"], "rejected": codebook_pass["rejected"], "missing": codebook_pass["missing"], "suggestion_source": codebook_pass["suggestion_source"]}, 23.3)
+        write_json(runtime / "modules" / "research" / "second_coder_model_response.json", codebook_pass)
     coding_contract, coding_outputs = live.invoke(
         "research.qualitative_coding",
         assemble_coding_outputs,
@@ -395,6 +409,8 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         clock.at(23.5),
         pending_ai_labels=pending_ai_labels,
         suggestion_source=None if open_coding is None else open_coding["suggestion_source"],
+        coder_two_labels=None if codebook_pass is None else codebook_pass["labels"],
+        coder_two_source=None if codebook_pass is None else codebook_pass["suggestion_source"],
     )
 
     # Steps 16 (plan/rollback/approval) + real recovery-plan and current-state records before each transition.
@@ -407,10 +423,25 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     transition("APPROVED", "EXECUTING", 24.3)
 
     # Steps 16-18 continued: Trusted Compute statistics (never LLM mental arithmetic); champion v11 theme set.
-    coder_one, coder_two = expanded_synthetic_coder_judgments()
+    # Fixture mode: 48 balanced synthetic judgments. local-llm mode: the REAL per-unit judgments of coder 1 (after
+    # human review) vs the model second coder, aligned by source_id -- few units, honestly reported as such
+    # (`coding_unit_count`); the Kappa threshold stays OPERATOR_SET_PENDING either way.
+    if codebook_pass is None:
+        coder_one, coder_two = expanded_synthetic_coder_judgments()
+        kappa_input = "SYNTHETIC_48_UNITS"
+    else:
+        by_source_c1 = {code["source_id"]: code["label"] for code in coding_outputs["coder_1"]["code_set"]}
+        by_source_c2 = {code["source_id"]: code["label"] for code in coding_outputs["coder_2"]["code_set"]}
+        shared_units = sorted(set(by_source_c1) & set(by_source_c2))
+        if len(shared_units) < 2:
+            raise InvariantViolation(f"KAPPA_INSUFFICIENT_UNITS: {len(shared_units)} unit(s) coded by both coders")
+        coder_one = [by_source_c1[sid] for sid in shared_units]
+        coder_two = [by_source_c2[sid] for sid in shared_units]
+        kappa_input = f"REAL_UNITS:{','.join(shared_units)}"
     # MP §7: the Capability Request passes the resolver BEFORE the implementation runs -- an unresolved ref raises here,
     # so there is no path on which uncontracted compute produces a CALCULATED_RESULT.
     run_statistics_contract, statistics = capabilities.invoke("run_statistics", interrater_reliability_result, coder_one, coder_two)
+    statistics = {**statistics, "judgment_source": kappa_input}
     emit(NORDBROOK.tenant_id, nord_aggregate, "StatisticsCalculated", statistics, 24.5)
     method_execution_log.append(
         {
@@ -690,8 +721,9 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     result = {
         "synthetic_only": True,
         "runtime_dir": str(runtime),
-        "adapters": {"audio_mode": audio_factory.mode, "transcription_mode": transcriber.mode, "review_mode": config.review, "coding_mode": config.coding, "open_coding_model": None if open_coding is None else open_coding["suggestion_source"]["model_identifier"]},
+        "adapters": {"audio_mode": audio_factory.mode, "transcription_mode": transcriber.mode, "review_mode": config.review, "coding_mode": config.coding, "open_coding_model": None if open_coding is None else open_coding["suggestion_source"]["model_identifier"], "coder_two": "synthetic_fixture" if codebook_pass is None else "model"},
         "open_coding": open_coding,
+        "second_coder": codebook_pass,
         "step_status": {str(step): "PASS" for step in range(1, 29)},
         "state_machine_final_state": "VERIFYING (release states are outside the local synthetic slice)",
         "source_event_count": len(source_records) + 2,

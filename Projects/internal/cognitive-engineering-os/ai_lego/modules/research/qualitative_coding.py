@@ -71,6 +71,8 @@ def assemble_coding_outputs(
     *,
     pending_ai_labels: dict[str, str] | None = None,
     suggestion_source: dict[str, Any] | None = None,
+    coder_two_labels: dict[str, str] | None = None,
+    coder_two_source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """``pending_ai_labels`` defaults to the synthetic fixture dict; a real model run passes its own
     (``ai_coding.suggest_open_codes``) plus ``suggestion_source`` so each pending code records which model,
@@ -96,19 +98,39 @@ def assemble_coding_outputs(
         if suggestion_source is not None:
             code["suggestion_source"] = suggestion_source
         coder_one.append(code)
-    coder_two = [
-        {
-            "code_id": f"CODE-C2-{index:03d}",
-            "coder_id": "CODER-2-SYNTHETIC",
-            "source_id": source_id,
-            "quote": _quote_for(source_id),
-            "label": label,
-            "provenance": make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL"),
-            "human_action": "ORIGINAL",
-            "synthetic_fixture": True,
-        }
-        for index, (source_id, label) in enumerate(sorted(CODER_TWO_LABELS.items()), start=1)
-    ]
+    if coder_two_labels is None:
+        # Synthetic stand-in for an independent second HUMAN coder; flagged so the authorship gate knows.
+        coder_two_id = "CODER-2-SYNTHETIC"
+        coder_two = [
+            {
+                "code_id": f"CODE-C2-{index:03d}",
+                "coder_id": coder_two_id,
+                "source_id": source_id,
+                "quote": _quote_for(source_id),
+                "label": label,
+                "provenance": make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL"),
+                "human_action": "ORIGINAL",
+                "synthetic_fixture": True,
+            }
+            for index, (source_id, label) in enumerate(sorted(CODER_TWO_LABELS.items()), start=1)
+        ]
+    else:
+        # A real second pass by a model applying coder 1's codebook: an AI coder, labelled as one (AI_SUGGESTION /
+        # AI_SUGGESTED, no human action), never presented as a human coder.
+        coder_two_id = "CODER-2-MODEL"
+        coder_two = [
+            {
+                "code_id": f"CODE-C2-{index:03d}",
+                "coder_id": coder_two_id,
+                "source_id": source_id,
+                "quote": _quote_for(source_id),
+                "label": label,
+                "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED"),
+                "human_action": None,
+                "suggestion_source": coder_two_source,
+            }
+            for index, (source_id, label) in enumerate(sorted(coder_two_labels.items()), start=1)
+        ]
 
     all_codes = coder_one + coder_two
     categories: dict[str, dict[str, Any]] = {}
@@ -122,10 +144,17 @@ def assemble_coding_outputs(
     category_set = sorted(categories.values(), key=lambda item: item["category_id"])
 
     themes = []
-    for index, (theme_label, category_labels) in enumerate(THEMES_V11, start=1):
-        category_ids = [f"CAT-{label}" for label in category_labels if f"CAT-{label}" in {c["category_id"] for c in category_set}]
+    present_category_ids = {c["category_id"] for c in category_set}
+    for theme_label, category_labels in THEMES_V11:
+        category_ids = [f"CAT-{label}" for label in category_labels if f"CAT-{label}" in present_category_ids]
+        if not category_ids:
+            # A theme with no category under it is not a theme (selective coding builds on axial coding; the
+            # methodology gate rejects a theme whose codes are not reachable through its categories). The v11
+            # champion's theme list was written against the fixture labels; when real coders produce other
+            # labels, a v11 theme whose categories never materialised is simply absent -- not emitted empty.
+            continue
         code_ids = [code_id for category in category_set if category["category_id"] in category_ids for code_id in category["code_ids"]]
-        themes.append({"theme_id": f"THEME-{index}", "label": theme_label, "category_ids": category_ids, "code_ids": code_ids, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")})
+        themes.append({"theme_id": f"THEME-{len(themes) + 1}", "label": theme_label, "category_ids": category_ids, "code_ids": code_ids, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")})
     if PENDING_CATEGORY in categories:
         themes.append(
             {
@@ -153,7 +182,7 @@ def assemble_coding_outputs(
     return {
         "stage_sequence": list(STAGE_SEQUENCE),
         "coder_1": {"coder_id": "CODER-1", "code_set": coder_one, "pending_labels_origin": "fixture" if pending_ai_labels is None else "model", "suggestion_source": suggestion_source},
-        "coder_2": {"coder_id": "CODER-2-SYNTHETIC", "code_set": coder_two, "synthetic_fixture": True},
+        "coder_2": {"coder_id": coder_two_id, "code_set": coder_two, "synthetic_fixture": coder_two_labels is None, "coder_kind": "synthetic_fixture" if coder_two_labels is None else "model", "suggestion_source": coder_two_source},
         "rejected": rejected,
         "category_set": category_set,
         "theme_set": {"prompt_version": 11, "themes": themes},

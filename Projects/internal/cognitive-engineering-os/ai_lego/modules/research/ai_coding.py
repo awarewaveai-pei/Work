@@ -145,6 +145,93 @@ def validate_open_coding_response(raw_text: str, units: list[dict[str, str]]) ->
     return {"labels": {sid: entry["label"] for sid, entry in accepted.items()}, "accepted": accepted, "rejected": rejected, "missing": missing}
 
 
+CODEBOOK_PROMPT_VERSION = "apply-codebook-v1"
+
+CODEBOOK_SYSTEM_PROMPT = (
+    "You are an independent second coder in a qualitative study. You are given a CODEBOOK (the allowed code labels, "
+    "already agreed by the first coder) and interview units. For each unit choose exactly ONE label FROM THE CODEBOOK "
+    "that best fits, and quote the exact words that justify it. "
+    "Rules: label must be copied exactly from the codebook; evidence_span must be copied VERBATIM from the unit text; "
+    "do not invent new labels; one object per unit; respond with a JSON array only, no commentary."
+)
+
+
+def build_codebook_prompt(units: list[dict[str, str]], codebook: list[str]) -> str:
+    lines = ["Codebook (allowed labels):", ""]
+    lines += [f"- {label}" for label in codebook]
+    lines += ["", "Units (each has an id and the redacted unit text):", ""]
+    for unit in units:
+        lines.append(f"[{unit['source_id']}] {unit['text']}")
+    lines += ["", 'Return a JSON array of objects: [{"source_id": "...", "label": "...", "evidence_span": "..."}]']
+    return "\n".join(lines)
+
+
+def validate_codebook_response(raw_text: str, units: list[dict[str, str]], codebook: list[str]) -> dict[str, Any]:
+    """Like ``validate_open_coding_response`` plus one more gate: the label must be IN the codebook
+    (``LABEL_NOT_IN_CODEBOOK``). A second coder who invents labels is not measuring agreement with the first."""
+    base = validate_open_coding_response(raw_text, units)
+    allowed = set(codebook)
+    labels: dict[str, str] = {}
+    accepted: dict[str, dict[str, str]] = {}
+    rejected = list(base["rejected"])
+    for source_id, entry in base["accepted"].items():
+        if entry["label"] not in allowed:
+            rejected.append({"source_id": source_id, "reason": "LABEL_NOT_IN_CODEBOOK", "raw": entry})
+            continue
+        labels[source_id] = entry["label"]
+        accepted[source_id] = entry
+    by_id = {unit["source_id"] for unit in units}
+    missing = [sid for sid in by_id if sid not in accepted and not any(r.get("source_id") == sid for r in rejected)]
+    return {"labels": labels, "accepted": accepted, "rejected": rejected, "missing": sorted(missing)}
+
+
+def apply_codebook(
+    gateway: AIGateway,
+    model_profile_id: str,
+    units: list[dict[str, str]],
+    codebook: list[str],
+    *,
+    pii_guard: Any,
+    classification_tag: str,
+    trace_id: str,
+    seed: int = 20260904,
+) -> dict[str, Any]:
+    """Second-coder pass: assign one codebook label per unit with verbatim evidence. Deterministic ``seed`` +
+    temperature 0 so the pass is reproducible; a different seed than any first-coder call keeps it independent."""
+    if not units:
+        raise InvariantViolation("CODEBOOK_NO_UNITS: nothing to code")
+    if not codebook:
+        raise InvariantViolation("CODEBOOK_EMPTY: a second coder needs the first coder's reviewed labels")
+    system = CODEBOOK_SYSTEM_PROMPT
+    prompt = build_codebook_prompt(units, sorted(codebook))
+    frame = build_codebook_prompt([{"source_id": unit["source_id"], "text": ""} for unit in units], sorted(codebook))
+    try:
+        pii_guard("ModelInput:apply_codebook", {"system": system, "prompt_frame": frame, "redacted_transcript": [unit["text"] for unit in units]})
+    except InvariantViolation as error:
+        raise InvariantViolation(f"MODEL_INPUT_PII_GUARD_TRIPPED: refusing to send a prompt carrying detected PII to a model ({error})") from error
+    result = gateway.complete(model_profile_id, system=system, prompt=prompt, classification_tag=classification_tag, trace_id=trace_id, prompt_version=CODEBOOK_PROMPT_VERSION, seed=seed, temperature=0.0)
+    validated = validate_codebook_response(result.text, units, sorted(codebook))
+    return {
+        **validated,
+        "codebook": sorted(codebook),
+        "raw_text": result.text,
+        "suggestion_source": {
+            "provider": result.provider,
+            "model_identifier": result.model_identifier,
+            "model_profile_id": result.model_profile_id,
+            "prompt_version": result.prompt_version,
+            "trace_id": result.trace_id,
+            "seed": seed,
+            "temperature": 0.0,
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+            "latency_ms": result.latency_ms,
+            "classification_tag": classification_tag,
+            "provenance": make_provenance("AI_SUGGESTION", "AI_SUGGESTED"),
+        },
+    }
+
+
 def suggest_open_codes(
     gateway: AIGateway,
     model_profile_id: str,

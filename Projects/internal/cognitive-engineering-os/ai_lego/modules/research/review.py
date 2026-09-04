@@ -74,6 +74,7 @@ def review_code_interactively(
             "suggestion_id": suggestion_id,
             "source_id": source_id,
             "quote": quote,
+            "suggested_label": suggested_label,
             "action": action,
             "result_label": result_label if action != "REJECT" else None,
             "locked": locked,
@@ -95,14 +96,24 @@ def locked_code_from_review(review: dict[str, Any], code_id: str) -> dict[str, A
     }
 
 
-def fixture_review() -> tuple[dict[str, Any], dict[str, Any]]:
-    """Deterministic review path: lock the P1 quote as a SOURCE_FACT, edit the P2 suggestion."""
+def fixture_review(suggested_labels: dict[str, str] | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Deterministic review path: lock the P1 suggestion as a SOURCE_FACT, edit the P2 suggestion.
+
+    ``suggested_labels`` (``{source_id: label}``) is what the AI proposed -- the fixture constant by default, a real
+    model's open codes under ``--coding local-llm``. The human decisions are the fixture's: P1 accepted-and-locked
+    as suggested; P2 edited to ``SUGGESTED_LABEL`` (the reviewer's own replacement, so a model suggestion for SRC-2
+    is visibly overridden, not silently adopted). Both records keep ``suggested_label`` so the ledger shows what
+    was proposed next to what was decided.
+    """
+    suggested = suggested_labels or {}
+    primary_suggested = suggested.get("SRC-1", SUGGESTED_LABEL)
     primary = {
         "suggestion_id": "AI-SUG-1",
         "source_id": "SRC-1",
         "quote": SYNTHETIC_TRANSCRIPTS[0]["quote"],
+        "suggested_label": primary_suggested,
         "action": "ACCEPT_AND_LOCK",
-        "result_label": SUGGESTED_LABEL,
+        "result_label": primary_suggested,
         "locked": True,
         "asserted_epistemic_type": "SOURCE_FACT",
     }
@@ -111,6 +122,7 @@ def fixture_review() -> tuple[dict[str, Any], dict[str, Any]]:
         "suggestion_id": "AI-SUG-2",
         "source_id": "SRC-2",
         "quote": SYNTHETIC_TRANSCRIPTS[1]["quote"],
+        "suggested_label": suggested.get("SRC-2", SUGGESTED_LABEL),
         "action": "EDIT",
         "result_label": SUGGESTED_LABEL,
         "locked": False,
