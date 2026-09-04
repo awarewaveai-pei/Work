@@ -50,7 +50,9 @@ was never updated to reflect it.
    positive), `SUBJECT-NEG-02` (`subject_type='ORGANIZATION'` rejected,
    `23514`), `SUBJECT-NEG-03` (a compatibility `subject_id` conflicting with
    `person_id` rejected, `23514`) — all three real-Docker-verified as part of
-   the full Wave 1 suite (102/102 assertions as of 2026-09-05, see
+   the full Wave 1 suite (this exact count has already gone stale once here
+   before — see `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md` for the current
+   assertion/mutation totals rather than a number copied into this file, see
    `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`).
 
 `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`'s own test table additionally lists

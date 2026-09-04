@@ -427,6 +427,29 @@ SELECT hci_test.expect_true('SOURCE-RLS-01',
        AND NOT EXISTS (SELECT 1 FROM hci.source_snapshots WHERE id = 'bbbbbbbb-0000-0000-0000-000000000301')$q$,
   'tenant B source and source_snapshot must not be visible to tenant A');
 
+-- ---------------------------------------------------------------------------
+-- Consent-class separation (ADR-0010, HD-02). hci.subject_lawful_basis_records
+-- and hci.source_terms_records have existed since 0001 with zero fixtures or
+-- tests until now - the same situation hci.sources was in before ADR-0026's
+-- pass. CONSENT-NEG-01 (bare `consent` payload rejected) is proven at the
+-- application-request-validation layer, not SQL - see
+-- tests/unit/contracts/validate-request.test.mjs's 'rejects bare consent'
+-- case, run by scripts/test-wave1-local.ps1 in the same suite as this file.
+-- CONSENT-NEG-02/03 (an application flow may not treat tenant authorization
+-- or source terms AS data-subject consent) are NOT implemented here: proving
+-- that requires an actual claim-admission workflow to exercise, and none
+-- exists yet at Wave 1 schema stage - left OPEN rather than faked, same
+-- disposition as ADR-0005 gate 2 and ADR-0026 gate 3. What this section does
+-- prove at the schema layer: both tables are real, populated, and
+-- tenant-isolated, not merely designed-on-paper.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_true('CONSENT-RLS-01',
+  $q$SELECT NOT EXISTS (SELECT 1 FROM hci.subject_lawful_basis_records WHERE id = 'bbbbbbbb-0000-0000-0000-000000000400')$q$,
+  'tenant B lawful-basis record must not be visible to tenant A');
+SELECT hci_test.expect_true('CONSENT-RLS-02',
+  $q$SELECT NOT EXISTS (SELECT 1 FROM hci.source_terms_records WHERE id = 'bbbbbbbb-0000-0000-0000-000000000401')$q$,
+  'tenant B source-terms record must not be visible to tenant A');
+
 -- Write-side (ADR-0026 gate 2's named test id): a tenant-A Claim cannot cite,
 -- derive from, or claim-as-original-source a tenant-B Source - the
 -- composite FK (tenant_id, source_id) makes this structurally impossible,
@@ -627,4 +650,4 @@ SELECT hci_test.expect_true('ARCH-PEER-02b',
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(102);
+SELECT hci_test.finish(104);

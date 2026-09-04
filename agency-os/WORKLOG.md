@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-05（HCI30 ADR-0010 部分收尾——VBC 發現 gate 1 早已滿足，`CONSENT-RLS-01/02` 補齊既有兩張零測試表的覆蓋，第一次真跑無 bug）
+
+**觸發**：延續 HCI Wave 1 收尾工作，同一套 VBC 先查再動工的紀律。
+
+**做了什麼**：讀畢 ADR-0010 全文，VBC 查證發現 gate 1（三分記錄資料模型：tenant_authorization／data-subject consent／source terms-of-use，互不可替代）早在 2026-09-02 Wave 1 HD-03/04/05 slice 就已經滿足——`hci.tenant_authorizations`／`hci.subject_lawful_basis_records`／`hci.source_terms_records` 三張獨立表格從 0001 就存在，只是後兩張表零 fixture 零測試（跟 `hci.sources` 在 ADR-0026 之前的狀況一模一樣）。補上 `CONSENT-RLS-01`（`subject_lawful_basis_records` 跨租戶不可見）+ `CONSENT-RLS-02`（`source_terms_records` 跨租戶不可見），無新 migration、無新 trigger——純 fixture+測試對已存在、已受 RLS 保護的表格。同時把既有 `validate-request.test.mjs` 的 bare-consent 拒絕測試正式登記為 `CONSENT-NEG-01`（原本只是一個沒有 ID 的 JS test，現在跟 SQL 套件的命名慣例對齊）。`CONSENT-NEG-02/03`（防止 tenant authorization 或 source terms 被應用層誤當成 data-subject consent）誠實判定為 OPEN——這需要一個目前還不存在的 claim-admission 工作流程才能驗證，跟 ADR-0005 gate 2、ADR-0026 gate 3 同一種處置，不硬做假測試。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/fixtures/0001_synthetic.sql`：補兩張表各 2 筆 fixture（tenant A/B 各一）
+- `Projects/internal/hci30/database/tests/wave1-negative-tests.sql`：104 assertion（102→104）
+- `Projects/internal/hci30/scripts/mutation-check-wave1.ps1`：39 mutation（37→39）
+- `Projects/internal/hci30/tests/unit/contracts/validate-request.test.mjs`：既有測試正式登記為 `CONSENT-NEG-01`（純註解交叉引用）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0010-consent-entity-scope.md`：新增 §Implementation note
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0011-hci-subject-type-scope.md`：修正第二次過期的斷言計數殘留，改為指向 spec 文件而非寫死數字（根治未來再次過期）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR_INDEX.md`：ADR-0010 狀態更新
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`：Consent-class separation 表格逐列標註實作狀態 + 執行證據
+- `agency-os/TASKS.md`：ADR-0010 部分完成項登記
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/test-wave1-local.ps1` | exit=0 | result=104 assertions, 0 failed（第一次真跑就過，無 bug）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/mutation-check-wave1.ps1` | exit=0 | result=All 39 mutations killed（第一次真跑就過）
+- REVIEW_DONE: critic=self(Standard，無新 migration/trigger，風險低，未派 agent) | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`CONSENT-RLS-0[12]\|subject_lawful_basis_records\|source_terms_records\|102 assertion\|37 mutation` | hits=1 處真過期殘留（ADR-0011 第二次出現同類過期計數，已修正並改為指向活文件根治）
+
+**[剩餘風險]**：`CONSENT-NEG-02/03` blocked on 應用層；ADR-0009（tenant/org adapter）仍待真落地；ADR-0017/0018/0019/0021/0024/0025/0033 等 Wave 1 gate 全部維持 OPEN。
+
+**[rollback]**：`git revert`；純新增 fixture/測試+文件，無 schema 變更。
+
+
 ## 2026-09-05（HCI30 錯誤碼 registry SSOT 治理缺口收尾——純文件整併，零 schema 變更）
 
 **觸發**：延續 HCI Wave 1 收尾工作，處理 2026-09-04 critic review 就已記錄、之前故意不塞進 commit 的已知治理缺口。

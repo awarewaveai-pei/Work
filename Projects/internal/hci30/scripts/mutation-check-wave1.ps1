@@ -273,6 +273,16 @@ $mutations = @(
   @{ id = 'drop-source-provenance-truncate-guards'
      sql = 'DROP TRIGGER source_relationships_no_truncate ON hci.source_relationships;'
      expect = @('TRUNCATE-04') }
+
+  # ADR-0010 (Consent-class separation, HD-02) - 2026-09-05. Both tables use
+  # 0001's declarative loop's generated policy name ('tenant_isolation'), same
+  # as every other table in that loop.
+  @{ id = 'disable-rls-on-subject-lawful-basis-records'
+     sql = 'ALTER TABLE hci.subject_lawful_basis_records NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.subject_lawful_basis_records DISABLE ROW LEVEL SECURITY;'
+     expect = @('CONSENT-RLS-01') }
+  @{ id = 'disable-rls-on-source-terms-records'
+     sql = 'ALTER TABLE hci.source_terms_records NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.source_terms_records DISABLE ROW LEVEL SECURITY;'
+     expect = @('CONSENT-RLS-02') }
 )
 
 $project = "hcimut$PID"

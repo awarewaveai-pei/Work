@@ -1,7 +1,7 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, and the Source provenance addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, and Source provenance sections added and executed 2026-09-05)
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, and the Consent-class RLS addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05)
 Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
@@ -17,10 +17,12 @@ Scope: Required acceptance tests before the respective runtime gates can close. 
 
 | ID | Setup | Must prove | Expected result |
 |---|---|---|---|
-| CONSENT-NEG-01 | API/storage request uses bare `consent` | Generic record is rejected | Validation error; no record persists |
-| CONSENT-NEG-02 | Tenant authorization exists but no subject lawful-basis record | UI/workflow attempts to claim subject consent | Claim denied; status remains `UNASSESSED` |
-| CONSENT-NEG-03 | Source terms exist but no subject lawful-basis record | Workflow attempts to use source permission as consent | Denied; source terms remain source-scoped only |
-| CONSENT-NEG-04 | No tenant authorization | Research workflow starts | Denied before collection/processing |
+| CONSENT-NEG-01 *(implemented, Node)* | API/storage request uses bare `consent` | Generic record is rejected | Validation error; no record persists — `tests/unit/contracts/validate-request.test.mjs`, not SQL |
+| CONSENT-NEG-02 *(OPEN — needs a claim-admission workflow that does not exist yet)* | Tenant authorization exists but no subject lawful-basis record | UI/workflow attempts to claim subject consent | Claim denied; status remains `UNASSESSED` |
+| CONSENT-NEG-03 *(OPEN — same blocker as CONSENT-NEG-02)* | Source terms exist but no subject lawful-basis record | Workflow attempts to use source permission as consent | Denied; source terms remain source-scoped only |
+| CONSENT-NEG-04 *(implemented as `CONSENT-NEG-04a/04b` + `CONSENT-NEG-05a..e`, SQL)* | No tenant authorization | Research workflow starts | Denied before collection/processing |
+| CONSENT-RLS-01 *(new, 2026-09-05)* | Tenant B `subject_lawful_basis_records` row | Tenant A must not see it | Not visible |
+| CONSENT-RLS-02 *(new, 2026-09-05)* | Tenant B `source_terms_records` row | Tenant A must not see it | Not visible |
 
 ## Person-only subject boundary
 
@@ -241,13 +243,26 @@ every `DELETE FROM hci.sources` into a tenant-wide scan (fixed by adding the
 same index its sibling FK already has). Final re-run after both fixes:
 **102/102 assertions, 37/37 mutations killed.**
 
+**Execution evidence (2026-09-05, Consent-class RLS addition).**
+`hci.subject_lawful_basis_records` and `hci.source_terms_records` (existed
+since 0001, zero fixtures or tests until now) got `CONSENT-RLS-01/02`
+tenant-isolation coverage, and `tests/unit/contracts/validate-request.test.mjs`'s
+existing `'rejects bare consent'` test was formally cross-referenced as
+`CONSENT-NEG-01`. No new migration, no new triggers — fixtures + tests only
+against already-existing, already-RLS-protected tables. First real run
+green on the first try: **104 assertions recorded, 0 failed** (102 + 2 new),
+**39/39 mutations killed** (37 + 2 new). `CONSENT-NEG-02/03` remain `OPEN`,
+blocked on a claim-admission application workflow that does not exist yet
+(same disposition as `ADR-0005` gate 2 and `ADR-0026` gate 3) — not faked.
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 37
+requires the suite to go red on exactly the assertions covering it; **all 39
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
-Source-provenance mutations, 2026-09-05, covering every invariant listed
-above). This exists because the first version of this suite
+Source-provenance mutations + 2 Consent-class mutations, 2026-09-05,
+covering every invariant listed above). This exists because the first
+version of this suite
 could not fail: four assertions caught their own failure signal with the same
 handler that caught the control's rejection (both SQLSTATE P0001). That
 defect was demonstrated, not merely argued - the original suite exits 0 with

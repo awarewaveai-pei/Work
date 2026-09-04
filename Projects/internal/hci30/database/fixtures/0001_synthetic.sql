@@ -42,3 +42,15 @@ INSERT INTO hci.sources (id,tenant_id,source_ref) VALUES
 INSERT INTO hci.source_snapshots (id,tenant_id,source_id,content_hash,snapshot_ref) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000301','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000300','sha256:synthetic-a','s3://synthetic/tenant-a/snap1'),
   ('bbbbbbbb-0000-0000-0000-000000000301','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000300','sha256:synthetic-b','s3://synthetic/tenant-b/snap1');
+
+-- Lawful-basis / source-terms fixtures (ADR-0010). Both tables have existed
+-- since 0001 with zero fixtures or tests until now - same situation
+-- hci.sources was in before the 2026-09-05 ADR-0026 pass gave it coverage.
+-- One row per tenant so CONSENT-RLS-01/02 have a real cross-tenant row to
+-- prove is invisible, not an empty-table false negative.
+INSERT INTO hci.subject_lawful_basis_records (id,tenant_id,person_id,basis) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000400','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','synthetic fixture basis - tenant A'),
+  ('bbbbbbbb-0000-0000-0000-000000000400','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','synthetic fixture basis - tenant B');
+INSERT INTO hci.source_terms_records (id,tenant_id,source_id,terms_ref) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000401','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000300','https://example.com/tenant-a-source/terms'),
+  ('bbbbbbbb-0000-0000-0000-000000000401','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000300','https://example.com/tenant-b-source/terms');
