@@ -898,6 +898,18 @@
   - **完成定義**：hosting bridge 對 ks-aw-01 一次成功 provision（或 dry-run 通過）且 compose 預設無退租 IP
   - **證據**：`agency-os/WORKLOG.md` 2026-09-04 續26 [剩餘風險]①；`grep -rnE "5\.223\.93\.113" lobster-factory/infra` 另含 `eu-backup/backup-eu-stack.sh`、`cf-origin-lockdown.sh`（已退場腳本，同案一併決定刪或改）
 
+- [ ] **System Foundry v1.6 configurator 問卷 UI/UX 全面重做（操作者評「很差」，前次修法不夠深）**
+  - `🟡 潛伏` · `2026-09-05 開` · `操作者`
+  - **一句話**：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 的 121→153 題問卷，操作者實際點過卡片式 UI 後回報「UI/UX 很差，而且 27 大項的順序沒有邏輯」，且指名 01/04/09/11 四項「之前的說明文字修法沒有真的解決」。
+  - **現在到哪**：已讀完 `questionnaires/catalog.json` 的 `categories` 陣列（`order` 1–28，`Read` offset 12 limit 128），**尚未寫入任何改動**，是乾淨斷點。已確認的結論（不用重查）：
+    1. `01.使用對象`(scope) 與 `04.公司與組織`(organization) 概念上高度相關但被拆成兩個分開的類別，中間隔了 channels/identity——之前只加了互相參照的說明文字（commit `d2b5988de`），操作者認為不夠，要**結構性合併**成一個類別。
+    2. `09.商業模式`(commercial) 6 題目前是攤平的獨立 checkbox，沒有視覺分組對應「自用／賣企業集團／開放上網訂閱或點數」三種情境——同樣是加了文字說明（`d2b5988de`）不夠，要**真的分組**（例如卡片網格內加小標題分段，而非純文字提示）。
+    3. `11.通知` 的 `Q-NOT-003`（App Push 通知）**已經修好** `active_when: any(Q-CH-002, Q-CH-003)`（commit `d2b5988de`，`questionnaires/catalog.json` 內搜尋 `Q-NOT-003`）——操作者這次重提可能只是複述舊清單，需要**先確認**是否還有新訴求（例如想細分「哪個平台各自要不要推播」而非單一題目套用全部已選平台），不要照抄 §1/§2 的模式直接開工。
+    4. 「27 大項順序沒邏輯」是新問題（之前沒處理過）：現有順序是 21 個原始類別 + 7 個企業部門類別（marketing/customer_service/sales_crm/content_production/social_media/hr/procurement）直接接在後面，是產生順序不是使用者敘事順序。已想好一版新排序邏輯（WHO 使用者是誰 → WHAT 核心資料/流程 → 商業模式與收費 → 客戶關係與成長(含新7部門插入這裡而非尾端) → 溝通與外部整合 → 內部營運HR/採購 → 技術平台能力(mobile/i18n/AI/migration) → 風險與治理(regulated/business_impact) → 未來規劃/其他)，尚未套用。
+  - **下一步**：① 先問操作者 §3 是否有新訴求，避免重工 ② 執行分類合併：`Q-ORG-*` 系列的 `"category"` 欄位從 `"organization"` 改成 `"scope"`，刪除 `categories` 陣列裡的 `organization` 條目，`scope` 條目的 `title`/`description` 改寫成涵蓋兩者 ③ 全部 27（合併後 26）個類別的 `order` 依上述新邏輯重新編號（一次性改完，不要分批） ④ `configurator/app.js` 的 `render()` 加一層可選的題目分組（例如題目物件加 `"group"` 欄位，同類別內依 group 分段渲染小標題），先用在 09.商業模式 ⑤ 更大的 UX 決定：操作者截圖範例是 Step 1/2/3 帶進度條的精靈式流程，不是單頁滾動——評估是否要把 `app.js` 從「一頁全部類別」改成「一次一個類別＋上一步/下一步」，這是本任務最大的一塊，動工前建議先跟操作者確認範圍（是否真的要做精靈式，還是先把合併+排序+分組做完看效果） ⑥ 每次資料結構改動後照舊流程：`python scripts/regenerate_integrity.py --write` → 12 步 verify chain + `unittest` 全綠 → 真實瀏覽器點過（`preview_start` name=`system-foundry-configurator`）→ WORKLOG → commit（注意這個 repo 是共用 git index，commit 前用 pathspec 限定只 commit自己的檔案，見 `agency-os/WORKLOG.md` 2026-09-05 多筆先例）。
+  - **完成定義**：操作者實際操作過重新設計後的 configurator，明確表示 UI/UX 跟排序問題已解決（不是我單方面判斷），且 12 步 verify chain 全綠。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-04/05 多筆 System Foundry 條目（搜尋「System Foundry v1.6」）；相關 commit `d069a0080`(55份內容)、`f837dd90e`(3個缺口)、`717b57742`(7部門)、`046758978`(卡片UI)；操作者原話「你的UI/UX 很差, 而且27大項的順序沒有邏輯」。
+
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。
