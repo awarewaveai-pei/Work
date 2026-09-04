@@ -431,6 +431,20 @@ test('P4-1: ssh to prod VPS running sg-deploy → BLOCK; ACK passes; read-only s
   assert.equal(ro.status, 0, 'read-only ssh must pass');
 });
 
+test('P4-1c: ssh to the LIVE host ks-aw-01 (145.239.195.47, -p 58122, ubuntu+sudo) running deploy/restart → BLOCK; read-only passes', () => {
+  // 2026-09-04: the host alternation still listed only the two retired Hetzner
+  // IPs after the 2026-08-31 consolidation, so production had no gate at all.
+  const b = run('PreToolUse', { session_id: freshSid('p4c'), tool_name: 'Bash', tool_input: { command: "ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47 'sudo bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin'" } });
+  assert.equal(b.status, 2, 'deploy on the live host must BLOCK');
+  assert.match(b.stderr, /deploy flow first/);
+  const restart = run('PreToolUse', { session_id: freshSid('p4c'), tool_name: 'Bash', tool_input: { command: 'ssh -p 58122 ubuntu@145.239.195.47 sudo systemctl restart nginx' } });
+  assert.equal(restart.status, 2, 'systemctl restart on the live host must BLOCK');
+  const byName = run('PreToolUse', { session_id: freshSid('p4c'), tool_name: 'Bash', tool_input: { command: 'ssh ks-aw-01 sudo reboot' } });
+  assert.equal(byName.status, 2, 'ssh-config alias ks-aw-01 must BLOCK too');
+  const ro = run('PreToolUse', { session_id: freshSid('p4c'), tool_name: 'Bash', tool_input: { command: "ssh -p 58122 ubuntu@145.239.195.47 'docker ps'" } });
+  assert.equal(ro.status, 0, 'read-only ssh to the live host must pass');
+});
+
 test('P4-1b: ssh prod systemctl restart → BLOCK; non-prod IP → pass', () => {
   const b = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: 'ssh root@204.168.175.41 systemctl restart n8n' } });
   assert.equal(b.status, 2);

@@ -60,8 +60,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$SgHost = "5.223.93.113",
-    [string]$EuHost = "204.168.175.41",
+    [string]$SgHost = "",   # retired 2026-08-31 (was 5.223.93.113); kept for signature compat, unused
+    [string]$EuHost = "",   # retired 2026-08-31 (was 204.168.175.41); kept for signature compat, unused
     [string]$KsAw01Host = "145.239.195.47",
     [string]$SshUser = "root",
     [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),

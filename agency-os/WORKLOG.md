@@ -122,6 +122,64 @@
 
 **[rollback]**：除 `REPOSITORY_ARCHITECTURE.md` 新增澄清段落與 spec-root 索引重新產生外，零既有檔案邏輯改動（該澄清段落本身也是純新增,`git diff` 不含任何刪除行）。`git rm` 對應新檔即可完全復原。
 
+## 2026-09-04（續26，同一遠端 session：清「另案」殘留 — 退租 IP 掃描修正、prod 部署閘補現役主機、pwsh 裝機、ao-close 註解）
+
+**[任務理解]** 操作者問「都完美處理完了嗎」——我前兩輪登記為另案的項目不能一直掛著。掃描後範圍比原登記大：退租 IP（`5.223.93.113`／`204.168.175.41`／`149.202.64.114`）仍出現在 65 個檔案；其中**代理會照做的**（`.claude/agents`、`.claude/commands`、腳本預設值、hook 正則）必須修，**歷史敘事**（handoffs／舊 runbook／WORKLOG／memory）保留。
+**[最重要發現]** `mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js:29` 的 ssh→prod 部署／重啟 BLOCK 正則只列兩個退租 IP，2026-08-31 整併後對現役 `145.239.195.47` **完全不擋**——偵測器啞了四天而 AO-RESUME 沒有任何訊號（正是 §R0 最惡樣態「系統宣稱與真實不符」）。
+**[已修改]**
+- `high-risk-bash-warn.js`：host 交替式加 `145\.239\.195\.47|ks-aw-01`（保留舊 IP，不可達無害）；`tests/hooks/runner-parity.test.mjs` 新增 `P4-1c`（live host 部署／systemctl restart／ssh-config 別名 `ks-aw-01` reboot → BLOCK；唯讀 `docker ps` → pass）。
+- `.claude/agents/`：devops-engineer、mainwp-engineer、supabase-engineer、n8n-engineer（含 frontmatter description）、incident-responder（主機表改單機＋刪除線舊主機）、trigger-deploy-agent、client-onboarding（4 條 ssh 指令）、AGENT_INDEX；`.claude/commands/command-plane-verify.md`；`.claude/SKILL_AND_COMMAND_INDEX.md`（sg/eu-reboot 標已取代）。SSH 一律 `ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47`（QUICKREF 橫幅正本），容器路徑不變（`/root/lobster-phase1`、`/root/n8n`、`/root/mainwp`）。`sg-reboot.md`／`eu-reboot.md` 的 `host:` 行保留（檔頭已 SUPERSEDED 重導）。
+- 腳本：`scripts/check-capacity-health.ps1`／`check-backup-health.ps1` 的 `$SgHost`/`$EuHost` 預設清空（body 已不用，只是簽章相容）；`agency-os/scripts/check-supabase-memory-monthly.ps1` wrapper 預設對齊 owner（owner 早已是 ks-aw-01，wrapper 只轉送 bound params，此為文件正確性）；`scripts/ao-close.ps1:1275` 註解不再引用已不存在的 CLAUDE.md 段。
+- `CLAUDE.md` 遠端段：加 container 裝 `pwsh` 的實測指令（Microsoft apt repo，7.6.5，約 1 分鐘），本 container 已裝。
+- WORKLOG 續25 [剩餘風險]①：修正我對 `claude -p` 的過度宣稱——deny 隨任一 settings 來源載入，repo 目錄內的 `claude -p` 同樣受保護。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=1 | ms=~4000 —— 153 案 152 過（+1 P4-1c 綠），唯一紅仍是 main 上同紅的 `git-commit-scope-guard POSIX cd`。突變：把正則的 `145\.239\.195\.47|ks-aw-01|` 拿掉 → P4-1c 紅（fail 2）→ 還原 → 綠（fail 1）。`pwsh` Parser.ParseFile 對 4 支改過的 `.ps1` 全 OK。`run-v3-governance-gates.mjs` PASSED。`pwsh -NoProfile -Command $PSVersionTable` → 7.6.5。
+- REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) `client-onboarding.md` 的 ssh 指令改 `ubuntu` 後，遠端 `echo >> /root/lobster-phase1/.env` 需要 sudo 才寫得進 root 目錄——已在該段加註「ubuntu 需 sudo」，指令本身留給執行者依 QUICKREF 加 `sudo`（不盲改成 `sudo sh -c` 以免破壞引號層）；n8n frontmatter description 仍在雙引號內、YAML 有效。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests,lobster-factory | grep=`204\.168\.175\.41\|5\.223\.93\.113\|149\.202\.64\.114` | hits=65 檔（修前）→ `.claude/` 剩 10 行全為刻意歷史／刪除線／SUPERSEDED 重導；其餘命中為歷史文件與 lobster-factory 基礎設施腳本，見下）
+- ORACLE_WAIVED: 本 container 無 codex CLI；以突變測試＋書面自審替代。
+**[剩餘風險／明確未做]** ① `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `SG_SSH_HOST` 預設仍 `5.223.93.113`：ks-aw-01 需 port 58122 + ubuntu，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數，改預設不夠、要動 next-admin 讀 env 的程式碼＋伺服器 `.env`，屬 Medium 且無法在此驗證，登記 `TASKS.md`；② `lobster-factory/infra/eu-backup/backup-eu-stack.sh`、`cf-origin-lockdown.sh` 的舊 IP 預設（EU stack 已退場、origin-lockdown 指令已 retired）不動；③ ~50 份歷史 docs／handoffs 含舊 IP，屬當時為真的敘述，不重寫；治理文件層由 `CURRENT_SERVICE_PLACEMENT.md` 與 QUICKREF 橫幅聲明現況。
+**[補記：操作者要求在遠端跑 `sync-claude-userlevel.ps1 -Mode merge`]** 不能在這裡跑。① 它的目標是**執行那台機器**的 `~/.claude/`，本 container 的 `~/.claude` 不是筆電的；② 腳本是 Windows-only：`$env:USERPROFILE`（Linux 為 null → `Cannot bind argument to parameter 'Path'`）與 `Join-Path ... 'mcp\claude-userlevel'` 反斜線字面量。用 `USERPROFILE=$HOME` 強行跑 `-Mode dry-run` 會回 `RESULT: PASS`，但 target 顯示 `/root\.claude\SUBAGENT_CHARTER.md`——反斜線是檔名的一部分，merge 會在 `/root` 下寫出帶反斜線的垃圾檔而非真 settings。**dry-run 在錯的平台上回 PASS 是 fail-open 偵測器**（同 §已知信任邊界）；遠端 container 不需要它（`wire-remote-hooks.sh` 已覆蓋），故不移植，只記錄。筆電上執行：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sync-claude-userlevel.ps1 -Mode merge`，預期輸出含 `permissions.deny` drift → 套用，`RESULT: PASS`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=USERPROFILE=$HOME pwsh -NoProfile -File scripts/sync-claude-userlevel.ps1 -Mode dry-run -MonorepoRootOverride /home/user/Work | exit=0 | ms=~3000 —— 輸出 `target=/root\.claude\SUBAGENT_CHARTER.md`（反斜線字面量），證明不可在 Linux 執行 merge。
+**[rollback]** `git revert` 本 commit。
+- AUTO_TASK_DONE: 退租 IP 清理（代理可執行層 12 檔）+ prod 部署閘補現役主機（突變驗證）+ pwsh 裝機指令入 CLAUDE.md + ao-close 註解 + 續25 風險宣稱修正。
+
+## 2026-09-04（續25，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
+
+**[任務理解]** 操作者問「瘋狂派 subagents 有解決嗎」→ 回答「解一半」→ 操作者「你做最完美決定與處理」。不變量：**任何 fan-out 都必須經過 PreToolUse 可見的路徑**。Agent tool 滿足（`subagent-budget.js` 真實 spawn 驗證過）；Workflow tool 不滿足——`agent()` 在背景執行，hook 只能驗 `SUBAGENT-BUDGET-ESTIMATE` 自報值，動態爆量（腳本跑到一半才算出 N）防不了，`resumeFromRunId` 路徑更是零保護且從未真實驗證。證據：`reports/agent-dispatch/dispatch-20260903.jsonl` 當天只記到 6 個 agent，而事故是 99 個——記錄 hook 同樣看不到 Workflow 內部。
+**[方案]** A 改 Workflow 分支做腳本靜態分析（擋 `.map(`→`agent(`）：誤擋多、仍是啟發式；B **`permissions.deny` 整個關閉 Workflow tool**：不變量直接成立，本 repo 正面模板是固定 4-5 角色走 Agent tool，Workflow 的並行收益換不回失控風險。選 B。
+**[已修改]**
+- `mcp/claude-userlevel/settings.template.json`：`permissions.deny` 首項加 `"Workflow"` + `_deny_workflow_comment` 說明（README §加新 deny 規則流程：改 template → commit → 各機 `sync-claude-userlevel.ps1 -Mode merge`）。
+- `scripts/wire-remote-hooks.sh`：生成的 `settings.local.json` 加同一 deny（遠端 container 不讀 template，必須鏡像）。本 container 已 `--force` 重生，下個 session 生效。
+- `tests/hooks/settings-deny-parity.test.mjs`（新）+ `scripts/test-hooks.sh` 登記：兩個來源各一條測試；生成器測試在 tmp 目錄跑真實腳本，不碰真 `.claude/`。
+- `agency-os/AGENTS.md` §5、`mcp/claude-userlevel/README.md`：規則與清單同步。`subagent-budget.js` Workflow 分支**保留**為縱深防禦（deny 未同步到某機時仍有聲明閘）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=1 | ms=~4000 —— 152 案 151 過；唯一紅 `git-commit-scope-guard v4 fix m1`（POSIX bare `cd`）在 `git worktree add origin/main` 上同樣紅（96/97），與本次無關、另案。突變測試：template 移除 `Workflow` → 測試 1 紅、測試 2 綠；生成器 deny 清空 → 測試 2 紅、測試 1 綠；還原 → 2/2 綠。`bash scripts/wire-remote-hooks.sh --force` 後 `settings.local.json` `permissions.deny == ['Workflow']`。
+- REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) deny 語法：Claude Code permission rule 裸工具名即整工具（同既有 `WebFetch` 慣例），未加 `(*)` 是刻意；`sync-claude-userlevel.ps1 -Mode merge` 對 `permissions.deny` 是 governed key 整組覆蓋（`:351`），template 加項即傳播；JSON 以 `json.dumps(indent=2, ensure_ascii=False)` 回寫，diff 僅 +3/-1 無整檔重排。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests | grep=`SUBAGENT-BUDGET-ESTIMATE\|resumeFromRunId\|Workflow tool` | hits=3 stale（`AGENTS_APPENDIX.md` 存檔區的原文描述 Workflow 分支為現行防線——存檔區依定義不改；`subagent-budget.js` 檔頭註解仍以 Workflow 為主要路徑之一——保留為縱深防禦，行為未變，不需改）
+- ORACLE_WAIVED: 本 container 無 codex CLI／pwsh；以突變測試 + 書面自審替代（memory `feedback_self_review_when_oracle_down`）。
+**[剩餘風險]** ① deny 隨 settings 載入：工作站 user-level `~/.claude/settings.json`（template 同步）與 repo 內 `.claude/settings.local.json`（遠端）任一存在即生效，`claude -p` 在 repo 目錄內同樣受保護；唯一縫隙是遠端 container 在 repo 目錄**外**另開 session（無 user-level settings）——實務上不會發生；② 筆電需跑一次 `sync-claude-userlevel.ps1 -Mode merge` 才真的生效，遠端下個 session 起生效；③ 若日後真需要 Workflow，從 deny 移除 + 補一個能看見真實 spawn 的閘，不可只移除。
+**[rollback]** 從兩處 deny 清單移除 `"Workflow"`、刪 parity test 與 test-hooks 登記行。
+- AUTO_TASK_DONE: Workflow tool deny（template + 遠端生成器 + parity test 突變驗證）；瘋狂派 subagent 問題由「驗自報估計」升級為「路徑整個關閉」。
+
+## 2026-09-04（續24，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
+
+**[任務理解]** 操作者問「CLAUDE.md／AGENTS.md 是幫助還是拖累」→ 指示「徹底研究後優化到最有效益、最正確的版本」。根本問題：兩檔每輪整份注入 prompt（合計 48.7 KB ≈ 20k+ tokens），其中約四成是事故敘事（日期＋輪次＋案例）、同一事實重複三處（主機邊界）、規則互相衝突到需要「優先序」段，且檔案自己承認「大檔案容易被漏讀」。這是「5 小時額度 20-30 分鐘燒光」的固定成本項之一（每輪先付 20k 才開始做事）。
+**[現況分析]** `git log -8`：最近 8 commits 全為 cognitive-os 切片，無同議題改動；上一次瘦身 `bfa017b`（2026-09-04 稍早）只搬了表格到 TOOL_TRIGGER_MAP，敘事仍在。機械依賴清查：`grep -rl "AGENTS.md\|CLAUDE.md" scripts/ mcp/claude-userlevel/hooks/ .claude/commands/` 共 39 檔，**全部只在訊息／註解裡提及檔名，沒有任何腳本解析 AGENTS.md 內文**；唯二必須保留的機械標記是 `doc-sync-automation.ps1:98` 的 `## Related Documents (Auto-Synced)` 起始 marker 與 `check-governance-docs-drift.ps1:204` 的 `_Last synced` footer（兩者原樣保留）。hooks 實體位置 `mcp/claude-userlevel/hooks/rules/`（原文寫 `.claude/hooks/rules/` 不存在）。
+**[已修改]**
+- `agency-os/docs/operations/AGENTS_APPENDIX.md`：新增 §「AGENTS.md 精簡前全文存檔」＋§「CLAUDE.md 精簡前全文存檔」——舊全文 `sed -n 1,353p` **逐字**搬入（僅標題各降一級；CLAUDE.md 首行 `@import` 加反引號避免被再次 import），auto-sync footer 位置不變。理由：repo 慣例是「搬到 APPENDIX 仍為強制」而非刪除，且外部文件 30+ 處 `AGENTS.md §舊段名` 引用靠同名標題可繼續解析。
+- `agency-os/AGENTS.md` 43,085 → 16,908 B（-61%）：重組為 §0 硬事實（主機／ClickHouse／部署／secrets／Trigger.dev／routing／自動化預設／監控／單機）→ §1 R0（七段＋四動作機械格式表＋補丁判準）→ §2 R4+VBC → §3 風險分級＋優先序 → §4 信任邊界＋oracle＋斷路器 → §5 context／扇出／重試 → §6 Auto-Repair → §7 工作流程＋DoD → §8 AO／Git／記憶／文件／編碼 → §9 語言。每條「做什麼＋為什麼」各一行，日期／輪次／案例全去，末尾 `§名` 指回 APPENDIX。
+- `CLAUDE.md` 5,582 → 3,615 B：只留 repo／機器層（R1／R2／MCP／Git／AO 觸發／遠端 hooks／drop-in／runbooks／目錄／換機）；主機邊界不再重複（改指 AGENTS.md §0）。
+- **實質規則修正（3 條，非純搬移，操作者可回滾）**：① R0 批准規則加「無人回覆的遠端自主 session → 七段寫進最終回覆／PR 描述即視為對齊，High-STOP 仍停」（本 session 即此情境，原文會讓代理卡死或違規二選一）；② Git 分支加「遠端 harness 指派分支 → 用該分支 + draft PR 不算違規」（同上，對齊實際運作）；③ 修正三處 stale 事實：公司桌機憑證善後已於 2026-08-15 結案（`TASKS.md:907`，原 CLAUDE.md 仍寫「見 TASKS.md 待辦」）；`audit-cp950-traps` 是 `scripts/*.ps1` 不是 hook；hooks SSOT 路徑改 `mcp/claude-userlevel/hooks/rules/`。
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純治理文件改動，無 code；R4 路徑驗證：新檔內全部反引號路徑與 markdown link 逐一 `[ -e ]` 檢查，僅 4 個「缺失」皆為執行期生成或刻意不進 git（`.agency-state/*.json|md` gitignored、`mcp/user-env.ps1` 各機本地、`YYYY-MM-DD` 佔位），與原文一致。
+- REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— 逐項自問：(m) 每輪必用的機械格式行（REALTEST/REVIEW/BUGHUNT/ORACLE 四種）是否全部保留原字串？逐一比對 `verify-closeout-completeness.ps1` 所驗格式，保留（此為 16.9 KB 壓不到 12 KB 的主因，刻意不砍）；`§名` 指標 12 個是否都對應 APPENDIX 真實標題？grep 逐一命中；code-fence 三檔皆 0 個（無配對問題）；auto-sync footer marker 三檔各恰 1 個。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`AGENTS\.md[ ]?§` | hits=31（外部引用舊段名；全部可在 APPENDIX 存檔區同名標題解析，AGENTS.md 檔頭已加一行指引；不逐一改寫——那是另一個 doc-sync 任務，且 `check-governance-docs-drift.ps1` 月巡會抓）
+- ORACLE_WAIVED: 無 source 檔 staged（ORACLE gate 只涵蓋 `$oracleExts`），且本 session 為遠端 container 無 `pwsh`／codex CLI。
+**[剩餘風險]** ① 兩條實質規則修正（遠端自主 session 的 R0 對齊方式、harness 分支例外）屬操作者裁量，若不同意直接 revert 該兩行；② `.claude/agents/n8n-engineer.md` 仍寫 `204.168.175.41`（已退租）、`scripts/ao-close.ps1:1275` 註解引用 CLAUDE.md 已不存在的「Commit Prefix」段——兩者不在本任務範圍，登記於此待另案；③ `doc-sync-automation.ps1` 需 Windows pwsh，本 container 無法重跑，Related Documents footer 時間戳維持 02:19:06，下次 AO-CLOSE 自動更新。
+**[rollback]** `git revert <本 commit>`；或只還原兩檔：`git checkout <本 commit>^ -- CLAUDE.md agency-os/AGENTS.md agency-os/docs/operations/AGENTS_APPENDIX.md`。
+**[CI 修正（PR #18 gate 紅）]** `doc_integrity`（`lobster-factory/scripts/validate-doc-integrity.mjs`）以檔案所在目錄解析相對連結。兩類壞連結同一根因「檔案搬進 `docs/operations/` 但連結仍以 `agency-os/` 為基準」：① 本次 APPENDIX 逐字存檔區 16 條（我造成）；② `TOOL_TRIGGER_MAP.md` 13 條，**main 已紅**（今早 `bfa017b` 搬檔時遺留，用 `git worktree add origin/main` 跑同一閘證實），無現成修正 PR，屬同類小修，一併在本 PR 修。只改連結路徑不改文字（`docs/operations/X` → `X`；`../.claude/` → `../../../.claude/`；`../lobster-factory/` → `../../../lobster-factory/`；`tenants/` → `../../tenants/`；`../runbooks/` → `../../../runbooks/`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/run-v3-governance-gates.mjs | exit=0 | ms=~600 —— 修前同指令 `Blocking governance check failed: doc_integrity`（29 條 broken_link），修後 `V3 governance gates PASSED`；另以 `[ -e dir/link ]` 逐條驗兩檔全部 `.md` 連結目標存在，0 缺。
+- AUTO_TASK_DONE: CLAUDE.md + AGENTS.md 第二次瘦身（48.7 KB → 20.5 KB，-58%），舊全文逐字存 APPENDIX，3 條 stale 事實修正，2 條遠端 session 對齊規則。
 ## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
 
 **觸發**：延續操作者「沒做完不要停」授權。0 agent。

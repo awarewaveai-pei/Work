@@ -13,7 +13,7 @@ Read the output:
 - `URL match: MISMATCH` → re-register: `.\scripts\configure-telegram-webhook.ps1`
 - `Last error: 400 Bad Request` → secret mismatch between Telegram and server, go to Step 3
 
-## Step 2 — Docker env check (requires SSH to SG: 5.223.93.113)
+## Step 2 — Docker env check (requires SSH to ks-aw-01: `-p 58122 ubuntu@145.239.195.47`, sudo)
 
 ```bash
 docker inspect lobster-next-admin --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'TELEGRAM|COMMAND_PLANE'

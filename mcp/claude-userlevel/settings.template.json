@@ -15,6 +15,7 @@
       "Bash(pwsh *)"
     ],
     "deny": [
+      "Workflow",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(gh pr merge *)",
@@ -41,7 +42,8 @@
       "${USERPROFILE}",
       "${MONOREPO_ROOT}",
       "\\tmp"
-    ]
+    ],
+    "_deny_workflow_comment": "Workflow (multi-agent orchestration tool) is denied outright: its agent() fan-out runs in the background where PreToolUse hooks cannot see it, so subagent-budget.js can only check a self-declared estimate. 2026-09-03 incident: 99 agents from one Workflow, 5-hour quota gone in 30 min. Fixed 4-5 role agents via the Agent tool cover every governed pattern (AGENTS.md section 5). Mirror: scripts/wire-remote-hooks.sh."
   },
   "hooks": {
     "_comment": "Portable governance hooks run through ONE runner (hooks/runner.js); the event→rules wiring lives in hooks/rules.manifest.json — never enumerate hooks here. Only machine-level PowerShell automations (AO-RESUME trigger, post-push deploy) are wired directly.",
