@@ -1,0 +1,47 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/blue-green-deployment-plan.schema.yaml"
+target_ref: ""
+description: "Exercises BlueGreenDeploymentPlan's required fields and the cutover_status enum."
+
+valid:
+  - name: verified_cut_over_with_blue_retained
+    instance:
+      id: "BLUEGREEN-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.blue_green_deployment"
+      blue_environment: "v2.3.1 production"
+      green_environment: "v2.4.0, fully deployed to an isolated environment"
+      green_verified: true
+      cutover_status: cut_over
+      blue_retained: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: not_yet_cut_over_still_verifying
+    instance:
+      id: "BLUEGREEN-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.blue_green_deployment"
+      blue_environment: "v2.3.1 production"
+      green_environment: "v2.4.0, deployment in progress"
+      green_verified: false
+      cutover_status: not_cut_over
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_green_environment
+    instance:
+      id: "BLUEGREEN-2026-09-04-003"
+      version: "1.0.0"
+      blue_environment: "x"
+      green_verified: false
+      cutover_status: not_cut_over
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "green_environment is required -- Atlas's own L2191 definition, missing here."
+  - name: invalid_cutover_status_enum_value
+    instance:
+      id: "BLUEGREEN-2026-09-04-004"
+      version: "1.0.0"
+      blue_environment: "x"
+      green_environment: "x"
+      green_verified: true
+      cutover_status: "in_progress"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "cutover_status is enum [not_cut_over, cut_over] -- 'in_progress' is not a member."

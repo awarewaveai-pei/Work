@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-05（續36，同一 session：Cognitive OS 第二十三個 Method Atlas 切片 — `devops_sre.blue_green_deployment`，誠實區分「硬規則」與「建議實務」）
+
+**觸發**：延續操作者授權（「繼續完成」）。0 agent。操作者中途要求「做一個段落停下來，我要 clear」——本切片收尾後即停，並在回覆中附上下一輪 session 的接續指示。
+
+**選型**：Blue-Green Deployment（Atlas §11.42 專屬段落，F19 pack 第四個成員方法）。Blue=現行生產、Green=新版本，明文排序規則「Green 完整部署與驗證後才切流量」直接蘊含真不變量：`cutover_status: cut_over` 時 `green_verified` 必須為 true，CLI 真跑攻擊驗證。
+
+**誠實拆解一句話裡的兩個不同層級主張**：Atlas 原句「Green 完整部署與驗證後才切流量；Blue 保留作快速 fallback」其實是兩個獨立主張——前半句是硬規則（已強制），後半句「Blue 保留」讀起來是建議實務非強制規則，`blue_retained` 因此做成可選欄位不強制為 true（保留立即退役 Blue 這個較不保守但真實存在的維運選擇），沒有把整句話一律當成同一強度的規則。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.blue_green_deployment.contract.yaml`＋`specs/cognitive/typed-objects/blue-green-deployment-plan.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentyfirst_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/devops_sre/blue_green_deployment.py`（builder+cutover-requires-verification 不變量+2 gate）＋`ai_lego/apps/cli/run_blue_green_deployment_slice.py`（真實已驗證切流量案例+攻擊驗證）＋`tests/unit/test_blue_green_deployment.py`（9 tests 第一次跑全綠）＋`docs/TWENTYTHIRD_SLICE_DEVOPS_SRE_BLUE_GREEN_DEPLOYMENT.md`。`modules/devops_sre/__init__.py` docstring 補第四租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_blue_green_deployment_slice` | exit=0 | result=第一次真跑就通過（含 cutover 不變量攻擊驗證）：`PASS devops_sre.blue_green_deployment: cutover_status=cut_over, green_verified=True, gates [provenance_required=PASS, cutover_requires_verification=PASS], cutover_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_blue_green_deployment -v` | exit=0 | ms=789 | result=9 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2717→2726
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=61435 | result=**519 tests OK**（510→519，零回歸；`git diff --stat` 對照共用檔案／三個既有 devops_sre 模組／全部 8 個 architecture 模組確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n —— 自問：把「Blue 保留 fallback」不當硬規則是不是偷懶少做一個不變量（不是，Atlas 原句結構本身就是兩個不同強度主張，把建議實務硬套成強制規則才是過度延伸，已在 contract compilation_decisions 明文說明判準）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`devops_sre[.]blue_green_deployment\|BlueGreenDeploymentPlan\|blue-green-deployment-plan\|run_blue_green_deployment_slice` | hits=全部本切片自己新檔案+session log 雜訊+並行 session 的 gitignored ao-resume-hook 狀態檔（正確反映新檔案存在），無過期殘留
+
+**[剩餘風險]**：`OQ-BLUEGREEN-1`（method-inventory.yaml 無機器 id 列）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit（全部新增檔案）。
+
 ## 2026-09-05（續，System Foundry v1.6：問卷 UI 從「文字列表+要/不要按鈕」改成「點卡片直接選」）
 
 **觸發**：操作者傳了自己另一套系統（Lobster Factory Admin 的「部門選型」畫面）的截圖當範例，問「是不是改成需要的請選擇更好？類似這樣」。

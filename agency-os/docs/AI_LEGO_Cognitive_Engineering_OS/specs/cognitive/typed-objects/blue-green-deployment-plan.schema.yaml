@@ -1,0 +1,69 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/blue-green-deployment-plan.schema.yaml"
+title: Blue-Green Deployment Plan
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BlueGreenDeploymentPlan` --
+  the declared `outputs` of `devops_sre.blue_green_deployment`'s Method
+  Contract. Fourth `devops_sre`-family typed object. Atlas §11.42's own
+  verify-before-cutover rule maps onto the `green_verified`/
+  `cutover_status` cross-field invariant (enforced at the runtime layer,
+  see method contract preconditions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.42 藍綠部署（Blue–Green Deployment）(L2188-2205)"
+  - "methods/contracts/devops_sre.blue_green_deployment.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, blue_environment, green_environment, green_verified, cutover_status, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^BLUEGREEN-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.blue_green_deployment"
+  blue_environment:
+    type: string
+    minLength: 1
+    description: "Atlas L2191's own 'Blue = Current Production'."
+  green_environment:
+    type: string
+    minLength: 1
+    description: "Atlas L2191's own 'Green = New Version'."
+  green_verified:
+    type: boolean
+    description: "Atlas L2192-2193's own precondition: Green fully deployed and verified before traffic cutover."
+  cutover_status:
+    enum: [not_cut_over, cut_over]
+    description: "cut_over requires green_verified:true -- enforced at the runtime layer (ai_lego/modules/devops_sre/blue_green_deployment.py), not the schema layer."
+  blue_retained:
+    type: boolean
+    description: "Atlas L2193's own recommended practice (not a hard rule -- see method contract compilation_decisions): Blue kept as a fast fallback."
+
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a deployment plan is structured operational planning, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A verified, cut-over deployment with Blue retained as fallback"
+    value:
+      id: "BLUEGREEN-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.blue_green_deployment"
+      blue_environment: "v2.3.1 生產環境"
+      green_environment: "v2.4.0 新版本，已完整部署至獨立環境"
+      green_verified: true
+      cutover_status: cut_over
+      blue_retained: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas §11.42 directly. Validated against jsonschema Draft202012Validator."
+  note: "The Blue/Green definitions and verify-before-cutover rule are directly transcribed. The cutover invariant is enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

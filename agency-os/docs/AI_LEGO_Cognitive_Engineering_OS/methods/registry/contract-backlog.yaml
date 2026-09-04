@@ -707,6 +707,29 @@ tier_1:
       teaching example. Tier 1, mandated by the actively-running
       implementation slice, same category as the nineteen entries above
       it.
+  twentyfirst_concrete_entry:
+    # NEW (2026-09-04, same session): twenty-first Tier 1 entry, same
+    # additive-key rationale as the twenty entries above it.
+    method_id: "devops_sre.blue_green_deployment"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Fourth entry
+      from the `devops_sre` family, a fourth member tool of F19's own
+      pack built. Atlas §11.42 is a dedicated section: Blue/Green
+      definitions and an explicit sequencing rule (Green fully deployed
+      and verified before traffic cutover) that directly implies a real
+      invariant -- cutover_status:cut_over requires green_verified:true.
+      Disclosed restraint: the sentence's second clause (Blue retained as
+      fallback) is modeled as an optional field, not a forced rule, since
+      it reads as a recommended practice rather than a hard requirement
+      the way the verify-before-cutover clause does.
+    source: "methods/contracts/devops_sre.blue_green_deployment.contract.yaml (built same session as this entry, mints machine_id devops_sre.blue_green_deployment) + specs/cognitive/typed-objects/blue-green-deployment-plan.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas §11.42 is a dedicated section with
+      a real sequencing rule, not itself cited elsewhere as a repeated
+      teaching example. Tier 1, mandated by the actively-running
+      implementation slice, same category as the twenty entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

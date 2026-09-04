@@ -1,0 +1,94 @@
+$id: "ai-lego://methods/contracts/devops_sre.blue_green_deployment.contract.yaml"
+title: "Blue-Green Deployment Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-third Method Atlas slice, fourth from the
+  `devops_sre` family (F19's own "DevOps／SRE／可靠性套件") -- a fourth
+  member tool of that pack built.
+
+  Atlas §11.42 (L2188-2205) gives this method a dedicated section: Blue
+  = current production, Green = new version, and an explicit sequencing
+  rule -- "Green 完整部署與驗證後才切流量；Blue 保留作快速 fallback"
+  (Green is fully deployed and verified BEFORE traffic cutover; Blue is
+  kept as a fast fallback). That rule is a real, enforceable invariant
+  this contract enforces: a plan cannot claim `cutover_status: cut_over`
+  while `green_verified` is false -- same "raise before construction on
+  a real, Atlas-implied structural rule" discipline every prior
+  forbidden-state guard this session built already established.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.42 藍綠部署（Blue–Green Deployment）(L2188-2205) -- Blue/Green definitions, verify-before-cutover sequencing rule"
+  - "methods/registry/method-inventory.yaml Blue–Green Deployment entry (L1157-1161): category 'F19 devops-sre', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-first
+  concrete entry. `id: devops_sre.blue_green_deployment` mints a new
+  machine_id. `family: devops_sre` reused as-is.
+
+id: devops_sre.blue_green_deployment
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [VALIDATE, DECOMPOSE, MAP]
+purpose:
+  - deploy_and_verify_a_new_version_fully_before_switching_production_traffic
+inputs:
+  required: [BlueEnvironment, GreenEnvironment]
+  optional: []
+outputs: [BlueGreenDeploymentPlan]
+preconditions:
+  - "blue_environment and green_environment are both non-empty"
+  - "cutover_status:cut_over requires green_verified:true"
+  # The second precondition is directly implied by Atlas's own rule
+  # (L2192-2193) -- traffic cutover is legal only after Green has been
+  # fully deployed and verified, not before.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Blue-Green Deployment row.
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # The PLAN record itself is side-effect-free; the real cutover it
+  # describes is outside this method's own scope (same distinction every
+  # prior operational-planning contract's own rollback field already
+  # draws, e.g. devops_sre.canary_deployment's own plan-vs-deployment
+  # distinction).
+
+compilation_decisions:
+  - question: "Should 'Blue retained as fast fallback' (Atlas's own second half of L2193) be enforced as a schema-level invariant too?"
+    decision: "No -- modeled as a boolean field (blue_retained), not enforced as a hard rule."
+    reasoning: >
+      Atlas's own sentence structure gives TWO distinct claims: cutover
+      only after verification (a real precondition, directly enforced --
+      see above) and Blue is KEPT for fast fallback (a recommended
+      PRACTICE, not phrased as a hard rule the way the verify-before-
+      cutover sequencing is). Retiring Blue immediately after a
+      successful cutover is a real, if less cautious, operational choice
+      some teams do make -- forcing blue_retained:true would be
+      overstepping what Atlas's own text actually mandates versus
+      merely recommends.
+
+open_questions:
+  - id: "OQ-BLUEGREEN-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.42 (L2188-2205) directly. Grepped `specs/` for "blue
+    green"/"blue-green" before writing -- only hit was an unrelated
+    example-strategy bullet in `risk-tier.schema.yaml` (L96), not a
+    duplicate typed object. Validated against specs/cognitive/method
+    .schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The verify-before-cutover invariant
+    is directly grounded in Atlas's own cited text; the blue-retained-as-
+    fallback field is modeled as optional practice, not a forced rule --
+    disclosed as a deliberate reading of the sentence's two distinct
+    claims, not a silent narrowing.
