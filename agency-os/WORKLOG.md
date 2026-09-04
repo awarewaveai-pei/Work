@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 configurator UI/UX 重做結案：端到端真實生成驗證 + 操作者確認精靈式流程不用做）
+
+**收尾動作**：操作者在 commit `d1fd3b51d` 之後追問「送出後真的能生成嗎」——先前的驗證只跑到 `/api/resolve`（純算，不寫檔），沒有真的按過「送出並生成」按鈕。這是合理的質疑，補做真實 e2e：瀏覽器實際點選「手機 App」／「手機 App 推播通知」／「向客戶收費」／「授權碼 / License」四張卡（涵蓋本批全部新功能：channel 拆題、commercial 分組），按「送出並生成」，讀回硬碟上 `generated/verify-newfeatures-*/`：`.foundry/intake/answers.json` 逐欄核對 `Q-CH-002=True`／`Q-NOT-003=True`／`Q-NOT-006=None`（未選桌面應用程式，正確保持未答而非誤判為 false）／`Q-COM-001=True`／`Q-COM-006=True`，且 `CAP-PUSH` 正確出現在 `docs/modules/notifications/` 九份模組文件裡——證明不只是畫面渲染對，「點擊→payload→rule engine→真的寫檔」整條路徑都通。測試用的兩個 `generated/verify-*` 資料夾已刪除，未留垃圾在 repo。
+
+操作者隨後確認：先前「Step 精靈式流程要不要做，看效果再說」的觀察期結束，**明確決定不用做**——單頁滾動＋本批合併/分組/重排即為最終形態。`TASKS.md` 該任務條目自 `[ ]` 改為 `[x]` 結案，記錄完成定義已達成（操作者實測生成流程無異議＋明確表態精靈式不做＋12 步 verify chain 全綠）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Browser | cmd=真實點擊 4 張卡片＋`generateBtn.click()`（`preview_start name=system-foundry-configurator`） | 結果=`生成完成`，`Modules 4；Blueprint ACTIVE 64/73；Current capabilities 22`
+- REALTEST_EVIDENCE: tool=Bash | cmd=讀回 `generated/verify-newfeatures-*/.foundry/intake/answers.json` 並逐欄斷言 5 個關鍵題目值 | 結果=全部與瀏覽器點擊動作一致，`Q-NOT-006` 正確保持 `None`（channel 未選，未被強制填 false）
+- REVIEW_WAIVED: NA -- 純驗證動作＋文件收尾，無新程式碼變更
+- BUGHUNT_WAIVED: NA -- 同上，本輪無程式碼改動
+- WORKLOG：本條目 + `TASKS.md` 任務狀態同步改 `[x]`
+
+**[剩餘風險]**：無新增。
+
+**Rollback**：`git checkout -- agency-os/TASKS.md`（本條目本身是歷史記錄，不回滾）。
+
 ## 2026-09-05（續38，同一 session：Cognitive OS 第二十五個 Method Atlas 切片 — `database_data.backup_restore_drill`，開第三個 pack `database_data`）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」）。0 agent（除 critic subagent review）。
