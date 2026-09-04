@@ -73,6 +73,9 @@ def assemble_coding_outputs(
     suggestion_source: dict[str, Any] | None = None,
     coder_two_labels: dict[str, str] | None = None,
     coder_two_source: dict[str, Any] | None = None,
+    category_of_label: dict[str, str] | None = None,
+    themes_v11: list[tuple[str, list[str]]] | None = None,
+    grouping_source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """``pending_ai_labels`` defaults to the synthetic fixture dict; a real model run passes its own
     (``ai_coding.suggest_open_codes``) plus ``suggestion_source`` so each pending code records which model,
@@ -133,36 +136,55 @@ def assemble_coding_outputs(
         ]
 
     all_codes = coder_one + coder_two
+    # Axial map and v11 theme list: the fixture constants by default, a model's (``ai_coding.suggest_categories`` /
+    # ``suggest_themes``) when supplied. Both paths obey the same two invariants: a code with no category lands in the
+    # honest PENDING_CATEGORY (never guessed), and a category no theme claims passes through as its own theme
+    # (never dropped, never merged) -- so every code is reachable from exactly one theme via exactly one category,
+    # which is what the methodology gate checks.
+    axial_map = CATEGORY_OF_LABEL if category_of_label is None else category_of_label
+    theme_list = THEMES_V11 if themes_v11 is None else themes_v11
+    grouping_provenance = make_provenance("AI_INFERENCE", "AI_SUGGESTED")
     categories: dict[str, dict[str, Any]] = {}
     for code in all_codes:
-        category_label = CATEGORY_OF_LABEL.get(code["label"], PENDING_CATEGORY)
+        category_label = axial_map.get(code["label"], PENDING_CATEGORY)
         category = categories.setdefault(
             category_label,
-            {"category_id": f"CAT-{category_label}", "label": category_label, "code_ids": [], "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")},
+            {"category_id": f"CAT-{category_label}", "label": category_label, "code_ids": [], "provenance": grouping_provenance},
         )
         category["code_ids"].append(code["code_id"])
+    if grouping_source is not None:
+        for category in categories.values():
+            category["suggestion_source"] = grouping_source
     category_set = sorted(categories.values(), key=lambda item: item["category_id"])
 
     themes = []
     present_category_ids = {c["category_id"] for c in category_set}
-    for theme_label, category_labels in THEMES_V11:
-        category_ids = [f"CAT-{label}" for label in category_labels if f"CAT-{label}" in present_category_ids]
+    covered_category_ids: set[str] = set()
+    for theme_label, category_labels in theme_list:
+        category_ids = [f"CAT-{label}" for label in category_labels if f"CAT-{label}" in present_category_ids and f"CAT-{label}" not in covered_category_ids]
         if not category_ids:
             # A theme with no category under it is not a theme (selective coding builds on axial coding; the
-            # methodology gate rejects a theme whose codes are not reachable through its categories). The v11
-            # champion's theme list was written against the fixture labels; when real coders produce other
-            # labels, a v11 theme whose categories never materialised is simply absent -- not emitted empty.
+            # methodology gate rejects a theme whose codes are not reachable through its categories). A theme list
+            # written against labels that never materialised in this run is simply absent -- not emitted empty.
             continue
+        covered_category_ids.update(category_ids)
         code_ids = [code_id for category in category_set if category["category_id"] in category_ids for code_id in category["code_ids"]]
-        themes.append({"theme_id": f"THEME-{len(themes) + 1}", "label": theme_label, "category_ids": category_ids, "code_ids": code_ids, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")})
-    if PENDING_CATEGORY in categories:
+        theme: dict[str, Any] = {"theme_id": f"THEME-{len(themes) + 1}", "label": theme_label, "category_ids": category_ids, "code_ids": code_ids, "provenance": grouping_provenance}
+        if grouping_source is not None:
+            theme["suggestion_source"] = grouping_source
+        themes.append(theme)
+    for category in category_set:
+        if category["category_id"] in covered_category_ids:
+            continue
+        # Pass-through: a category no theme integrated stays visible as its own theme, labelled by the category.
         themes.append(
             {
                 "theme_id": f"THEME-{len(themes) + 1}",
-                "label": PENDING_CATEGORY,
-                "category_ids": [f"CAT-{PENDING_CATEGORY}"],
-                "code_ids": categories[PENDING_CATEGORY]["code_ids"],
-                "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED"),
+                "label": category["label"],
+                "category_ids": [category["category_id"]],
+                "code_ids": list(category["code_ids"]),
+                "provenance": grouping_provenance,
+                "selective_status": "UNTHEMED_PASSTHROUGH",
             }
         )
 
@@ -185,7 +207,7 @@ def assemble_coding_outputs(
         "coder_2": {"coder_id": coder_two_id, "code_set": coder_two, "synthetic_fixture": coder_two_labels is None, "coder_kind": "synthetic_fixture" if coder_two_labels is None else "model", "suggestion_source": coder_two_source},
         "rejected": rejected,
         "category_set": category_set,
-        "theme_set": {"prompt_version": 11, "themes": themes},
+        "theme_set": {"prompt_version": 11, "themes": themes, "grouping_origin": "fixture" if category_of_label is None and themes_v11 is None else "model", "suggestion_source": grouping_source},
         "saturation_assessment": saturation_assessment,
     }
 

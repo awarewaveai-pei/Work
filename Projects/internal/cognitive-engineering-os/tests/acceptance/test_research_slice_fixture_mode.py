@@ -23,8 +23,10 @@ class FixtureModeAcceptanceTests(SliceCriteriaMixin, unittest.TestCase):
     def test_adapters_are_labelled_as_fixtures(self):
         self.assertEqual(
             self.result["adapters"],
-            {"audio_mode": "SYNTHETIC_TONE_WAV_STDLIB", "transcription_mode": "SYNTHETIC_FIXTURE_TRANSCRIPT", "review_mode": "fixture", "coding_mode": "fixture", "open_coding_model": None, "coder_two": "synthetic_fixture"},
+            {"audio_mode": "SYNTHETIC_TONE_WAV_STDLIB", "transcription_mode": "SYNTHETIC_FIXTURE_TRANSCRIPT", "review_mode": "fixture", "coding_mode": "fixture", "open_coding_model": None, "coder_two": "synthetic_fixture", "grouping": "fixture"},
         )
+        self.assertIsNone(self.result["axial"])
+        self.assertEqual(self.result["coding_outputs"]["theme_set"]["grouping_origin"], "fixture")
         self.assertIsNone(self.result["open_coding"])
         self.assertIsNone(self.result["second_coder"])
         self.assertEqual(self.result["statistics"]["judgment_source"], "SYNTHETIC_48_UNITS")

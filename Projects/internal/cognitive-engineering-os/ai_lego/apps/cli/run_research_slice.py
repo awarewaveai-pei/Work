@@ -65,7 +65,7 @@ from ai_lego.modules.knowledge.ingest.audio_fixtures import SyntheticToneAudioFa
 from ai_lego.modules.knowledge.ingest.pii import detect_synthetic_pii, redact_transcript
 from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, MeetingServiceTranscriber, OfflineFasterWhisperTranscriber, meeting_service_availability
 from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_from_transcript, reverse_trace
-from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_open_codes
+from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_categories, suggest_open_codes, suggest_themes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
 from ai_lego.modules.research.review import fixture_review, locked_code_from_review, review_code_interactively
@@ -401,6 +401,24 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             raise InvariantViolation(f"SECOND_CODER_NO_ACCEPTED_LABELS: rejected={codebook_pass['rejected']} missing={codebook_pass['missing']}")
         emit(NORDBROOK.tenant_id, nord_aggregate, "SecondCoderApplied", {"codebook": codebook_pass["codebook"], "labels": codebook_pass["labels"], "rejected": codebook_pass["rejected"], "missing": codebook_pass["missing"], "suggestion_source": codebook_pass["suggestion_source"]}, 23.3)
         write_json(runtime / "modules" / "research" / "second_coder_model_response.json", codebook_pass)
+    # Step 15.7 (local-llm only): axial then selective coding by the model over BOTH coders' labels. Membership is
+    # validated (a code/category the model names must exist); what the model leaves out stays visibly pending /
+    # pass-through in assemble_coding_outputs -- never guessed into a group.
+    axial: dict[str, Any] | None = None
+    selective: dict[str, Any] | None = None
+    if gateway is not None:
+        quote_of = {entry["source_id"]: entry["quote"] for entry in SYNTHETIC_TRANSCRIPTS}
+        label_quotes: dict[str, str] = {}
+        for source_id, label in {**(codebook_pass["labels"] if codebook_pass else {}), **coder_one_final}.items():
+            label_quotes.setdefault(label, quote_of[source_id])
+        codes_for_axial = [{"label": label, "quote": quote} for label, quote in sorted(label_quotes.items())]
+        axial = suggest_categories(gateway, DEFAULT_LOCAL_MODEL_PROFILE, codes_for_axial, pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:axial")
+        emit(NORDBROOK.tenant_id, nord_aggregate, "AxialCodingSuggested", {"categories": axial["categories"], "rejected": axial["rejected"], "unassigned": axial["unassigned"], "suggestion_source": axial["suggestion_source"]}, 23.35)
+        write_json(runtime / "modules" / "research" / "axial_model_response.json", axial)
+        if axial["categories"]:
+            selective = suggest_themes(gateway, DEFAULT_LOCAL_MODEL_PROFILE, axial["categories"], pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:selective")
+            emit(NORDBROOK.tenant_id, nord_aggregate, "SelectiveCodingSuggested", {"themes": [{"theme": t, "categories": c} for t, c in selective["themes"]], "rejected": selective["rejected"], "unassigned": selective["unassigned"], "suggestion_source": selective["suggestion_source"]}, 23.4)
+            write_json(runtime / "modules" / "research" / "selective_model_response.json", selective)
     coding_contract, coding_outputs = live.invoke(
         "research.qualitative_coding",
         assemble_coding_outputs,
@@ -411,6 +429,9 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         suggestion_source=None if open_coding is None else open_coding["suggestion_source"],
         coder_two_labels=None if codebook_pass is None else codebook_pass["labels"],
         coder_two_source=None if codebook_pass is None else codebook_pass["suggestion_source"],
+        category_of_label=None if axial is None else axial["category_of_label"],
+        themes_v11=None if axial is None else (selective["themes"] if selective is not None else []),
+        grouping_source=None if axial is None else {"axial": axial["suggestion_source"], "selective": None if selective is None else selective["suggestion_source"]},
     )
 
     # Steps 16 (plan/rollback/approval) + real recovery-plan and current-state records before each transition.
@@ -460,9 +481,11 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     emit(NORDBROOK.tenant_id, nord_aggregate, "ThemeSetProduced", {"prompt_version": 11, "themes": themes_v11}, 25)
 
     # Step 21: human reviews an AI grouping suggestion and rejects it; the system records a Diff, never an overwrite.
+    theme_labels_v11 = [theme["label"] for theme in themes_v11]
     theme_grouping_diff = {
         "theme_id": themes_v11[0]["theme_id"] if themes_v11 else None,
-        "ai_proposed": "merge boundary_erosion and emotional_exhaustion into one theme",
+        # The rejected proposal names the run's actual themes (fixture: boundary_erosion + emotional_exhaustion), not a literal.
+        "ai_proposed": f"merge {' and '.join(theme_labels_v11[:2])} into one theme" if len(theme_labels_v11) >= 2 else f"merge {theme_labels_v11[0] if theme_labels_v11 else 'the theme set'} with a new theme",
         "human_decision": "REJECTED",
         "diff": "kept as two separate themes; category membership unchanged",
         "provenance": make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL"),
@@ -721,9 +744,11 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     result = {
         "synthetic_only": True,
         "runtime_dir": str(runtime),
-        "adapters": {"audio_mode": audio_factory.mode, "transcription_mode": transcriber.mode, "review_mode": config.review, "coding_mode": config.coding, "open_coding_model": None if open_coding is None else open_coding["suggestion_source"]["model_identifier"], "coder_two": "synthetic_fixture" if codebook_pass is None else "model"},
+        "adapters": {"audio_mode": audio_factory.mode, "transcription_mode": transcriber.mode, "review_mode": config.review, "coding_mode": config.coding, "open_coding_model": None if open_coding is None else open_coding["suggestion_source"]["model_identifier"], "coder_two": "synthetic_fixture" if codebook_pass is None else "model", "grouping": "fixture" if axial is None else "model"},
         "open_coding": open_coding,
         "second_coder": codebook_pass,
+        "axial": axial,
+        "selective": selective,
         "step_status": {str(step): "PASS" for step in range(1, 29)},
         "state_machine_final_state": "VERIFYING (release states are outside the local synthetic slice)",
         "source_event_count": len(source_records) + 2,

@@ -232,6 +232,154 @@ def apply_codebook(
     }
 
 
+AXIAL_PROMPT_VERSION = "axial-coding-v1"
+SELECTIVE_PROMPT_VERSION = "selective-coding-v1"
+
+AXIAL_SYSTEM_PROMPT = (
+    "You are assisting a qualitative researcher with AXIAL CODING (Strauss & Corbin). You are given the open codes "
+    "(label + the participant words behind each). Group codes that describe the same underlying phenomenon into "
+    "categories. Rules: category names are 2-5 lowercase words joined by underscores; list member codes by copying "
+    "their labels EXACTLY; every code belongs to at most one category; do not invent codes; a code you cannot place "
+    "may be left out; respond with a JSON array only, no commentary."
+)
+
+SELECTIVE_SYSTEM_PROMPT = (
+    "You are assisting a qualitative researcher with SELECTIVE CODING (Strauss & Corbin). You are given the "
+    "categories from axial coding (name + member codes). Integrate categories into a small number of core themes. "
+    "Rules: theme names are 2-5 lowercase words joined by underscores; list member categories by copying their "
+    "names EXACTLY; every category belongs to at most one theme; do not invent categories; respond with a JSON "
+    "array only, no commentary."
+)
+
+
+def build_axial_prompt(codes: list[dict[str, str]]) -> str:
+    lines = ["Open codes (label -- participant words):", ""]
+    for code in codes:
+        lines.append(f"- {code['label']} -- \"{code['quote']}\"")
+    lines += ["", 'Return a JSON array of objects: [{"category": "...", "code_labels": ["...", "..."]}]']
+    return "\n".join(lines)
+
+
+def build_selective_prompt(categories: list[dict[str, Any]]) -> str:
+    lines = ["Categories (name -- member codes):", ""]
+    for category in categories:
+        lines.append(f"- {category['category']} -- {', '.join(category['code_labels'])}")
+    lines += ["", 'Return a JSON array of objects: [{"theme": "...", "categories": ["...", "..."]}]']
+    return "\n".join(lines)
+
+
+def validate_grouping_response(raw_text: str, group_key: str, members_key: str, allowed_members: list[str]) -> dict[str, Any]:
+    """Shared validator for axial (codes -> categories) and selective (categories -> themes) responses.
+
+    A member that is not one of ``allowed_members`` is rejected (``UNKNOWN_MEMBER`` -- the model named a code or
+    category that does not exist); a member claimed twice keeps its first group (``DUPLICATE_MEMBER``); a group
+    whose name cannot be normalised or that ends up empty is dropped (``UNUSABLE_GROUP`` / ``EMPTY_GROUP``).
+    ``unassigned`` lists the allowed members no surviving group claimed -- reported, never guessed into a group.
+    """
+    allowed = set(allowed_members)
+    items = extract_json_array(raw_text)
+    if items is None:
+        return {"groups": [], "member_of": {}, "rejected": [{"reason": "NO_JSON_ARRAY"}], "unassigned": sorted(allowed)}
+    groups: list[dict[str, Any]] = []
+    member_of: dict[str, str] = {}
+    rejected: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            rejected.append({"reason": "NOT_AN_OBJECT", "raw": item})
+            continue
+        name = normalise_label(item.get(group_key))
+        if name is None:
+            rejected.append({"reason": "UNUSABLE_GROUP", "raw": item})
+            continue
+        raw_members = item.get(members_key)
+        members: list[str] = []
+        for member in raw_members if isinstance(raw_members, list) else []:
+            if not isinstance(member, str) or member not in allowed:
+                rejected.append({"reason": "UNKNOWN_MEMBER", "group": name, "raw": member})
+                continue
+            if member in member_of:
+                rejected.append({"reason": "DUPLICATE_MEMBER", "group": name, "raw": member, "kept_in": member_of[member]})
+                continue
+            member_of[member] = name
+            members.append(member)
+        if not members:
+            rejected.append({"reason": "EMPTY_GROUP", "group": name, "raw": item})
+            continue
+        existing = next((g for g in groups if g[group_key] == name), None)
+        if existing is not None:
+            existing[members_key].extend(members)
+        else:
+            groups.append({group_key: name, members_key: members})
+    unassigned = sorted(allowed - set(member_of))
+    return {"groups": groups, "member_of": member_of, "rejected": rejected, "unassigned": unassigned}
+
+
+def _grouping_source(result: Any, *, classification_tag: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "provider": result.provider,
+        "model_identifier": result.model_identifier,
+        "model_profile_id": result.model_profile_id,
+        "prompt_version": result.prompt_version,
+        "trace_id": result.trace_id,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "latency_ms": result.latency_ms,
+        "classification_tag": classification_tag,
+        "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED"),
+        **(extra or {}),
+    }
+
+
+def suggest_categories(gateway: AIGateway, model_profile_id: str, codes: list[dict[str, str]], *, pii_guard: Any, classification_tag: str, trace_id: str, seed: int = 20260905) -> dict[str, Any]:
+    """Axial coding by a model: ``codes`` = ``[{label, quote}]`` (quotes are the sources' PII-free quote fields).
+    Returns ``category_of_label`` (the ``CATEGORY_OF_LABEL`` shape), the groups, rejections and unassigned codes."""
+    if not codes:
+        raise InvariantViolation("AXIAL_NO_CODES: nothing to group")
+    labels = sorted({code["label"] for code in codes})
+    system, prompt = AXIAL_SYSTEM_PROMPT, build_axial_prompt(codes)
+    # Same guard contract as open coding: the quotes are the sources' PII-free `quote` fields (the only text the
+    # reviewer ever sees, see review.py), i.e. redacted body text -- they travel under the ledger's exempt key
+    # because the fixture's own trap (a city that is also a verb: "Reading project updates") lives in them; the
+    # system prompt and the frame (labels, instructions) are checked in full.
+    frame = build_axial_prompt([{"label": code["label"], "quote": ""} for code in codes])
+    try:
+        pii_guard("ModelInput:axial_coding", {"system": system, "prompt_frame": frame, "redacted_transcript": [code["quote"] for code in codes]})
+    except InvariantViolation as error:
+        raise InvariantViolation(f"MODEL_INPUT_PII_GUARD_TRIPPED: refusing to send a prompt carrying detected PII to a model ({error})") from error
+    result = gateway.complete(model_profile_id, system=system, prompt=prompt, classification_tag=classification_tag, trace_id=trace_id, prompt_version=AXIAL_PROMPT_VERSION, seed=seed, temperature=0.0)
+    validated = validate_grouping_response(result.text, "category", "code_labels", labels)
+    return {
+        "category_of_label": validated["member_of"],
+        "categories": validated["groups"],
+        "rejected": validated["rejected"],
+        "unassigned": validated["unassigned"],
+        "raw_text": result.text,
+        "suggestion_source": _grouping_source(result, classification_tag=classification_tag, extra={"seed": seed, "temperature": 0.0}),
+    }
+
+
+def suggest_themes(gateway: AIGateway, model_profile_id: str, categories: list[dict[str, Any]], *, pii_guard: Any, classification_tag: str, trace_id: str, seed: int = 20260906) -> dict[str, Any]:
+    """Selective coding by a model: ``categories`` = ``[{category, code_labels}]``. Returns ``themes`` as
+    ``[(theme_label, [category_labels])]`` (the ``THEMES_V11`` shape), rejections and unassigned categories."""
+    if not categories:
+        raise InvariantViolation("SELECTIVE_NO_CATEGORIES: nothing to integrate")
+    names = sorted({category["category"] for category in categories})
+    system, prompt = SELECTIVE_SYSTEM_PROMPT, build_selective_prompt(categories)
+    try:
+        pii_guard("ModelInput:selective_coding", {"system": system, "prompt": prompt})
+    except InvariantViolation as error:
+        raise InvariantViolation(f"MODEL_INPUT_PII_GUARD_TRIPPED: refusing to send a prompt carrying detected PII to a model ({error})") from error
+    result = gateway.complete(model_profile_id, system=system, prompt=prompt, classification_tag=classification_tag, trace_id=trace_id, prompt_version=SELECTIVE_PROMPT_VERSION, seed=seed, temperature=0.0)
+    validated = validate_grouping_response(result.text, "theme", "categories", names)
+    return {
+        "themes": [(group["theme"], list(group["categories"])) for group in validated["groups"]],
+        "rejected": validated["rejected"],
+        "unassigned": validated["unassigned"],
+        "raw_text": result.text,
+        "suggestion_source": _grouping_source(result, classification_tag=classification_tag, extra={"seed": seed, "temperature": 0.0}),
+    }
+
+
 def suggest_open_codes(
     gateway: AIGateway,
     model_profile_id: str,

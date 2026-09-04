@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-09-04（續8，同一 session：axial／selective 由模型產生，成員 gate + pass-through；真跑抓到 4B 模型的層級混淆）
+
+### coding 三階段全由模型產生；gate 在真跑中擋下「用 code 冒充分類」的主題，0 捏造
+
+**觸發**：操作者「該做什麼去做什麼 不要再問我」。**全程 0 個 agent**；oracle 仍 block，書面自審＋突變測試。
+
+**[已修改]**：
+- `ai_coding.py`：`suggest_categories`／`suggest_themes`／`build_axial_prompt`／`build_selective_prompt`／`validate_grouping_response`（共用：`UNKNOWN_MEMBER`／`DUPLICATE_MEMBER`／`EMPTY_GROUP`／`UNUSABLE_GROUP`／`NO_JSON_ARRAY`，`unassigned` 只回報不猜）；axial 的 PII guard payload 比照 open coding（quote 是 PII-free 正文走豁免鍵、frame 全檢）。
+- `qualitative_coding.py`：`assemble_coding_outputs(..., category_of_label=, themes_v11=, grouping_source=)`；兩條不變量兩路徑共用：無分類的 code → `pending_axial_review`；無主題的分類 → pass-through 主題（`selective_status: UNTHEMED_PASSTHROUGH`）；主題不重複認領分類；`theme_set.grouping_origin`。
+- `run_research_slice.py`：step 15.7 axial → selective（`AxialCodingSuggested`／`SelectiveCodingSuggested` 事件、兩個 JSON），step 21 拒絕分組敘述改為由真實主題標籤推導，`adapters.grouping`、`result["axial"|"selective"]`。
+- `tests/unit/test_grouping.py`（新，10 個）；acceptance 期望值加 `grouping`／`axial`／`grouping_origin`；`docs/PHASE5_RESEARCH_SLICE.md`（Round 8）；`RUNNABLE_DEMOS.md`；`TASKS.md` ⑥。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_research_slice --transcription meeting-service --coding local-llm --runtime-dir %TEMP%\ai-lego-real-stack`（第一次）| exit=1 | result=`MODEL_INPUT_PII_GUARD_TRIPPED … (P4.city)` on `ModelInput:axial_coding`——quote 含「Reading」陷阱；改為與 open coding 同一 guard 契約後：
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上 | exit=0 | result=`PASS … 28/28 steps, all gates PASS`；`adapters={... 'coder_two': 'model', 'grouping': 'model'}`；axial：`night_work_anxiety` ← after_hours_monitoring／checking_post_dinner_messages／late_night_project_updates，`emotional_exhaustion` ← feeling_empty_before_leaving（4/4 歸類，0 拒收，1703 ms）；selective：模型回的兩個主題成員全是 code 標籤而非分類名 → 6 條 `UNKNOWN_MEMBER`＋2 條 `EMPTY_GROUP`，`unassigned=[emotional_exhaustion, night_work_anxiety]`，0 主題被接受（1609 ms）；`theme_set.themes` = 兩個 `UNTHEMED_PASSTHROUGH` 主題（分類原樣保留）；`theme_grouping_diff.ai_proposed="merge emotional_exhaustion and night_work_anxiety into one theme"`；`Kappa=0.66666667 CI95=[0.0, 1.0]`，`coding_unit_count=4`，`judgment_source=REAL_UNITS:SRC-1,SRC-2,SRC-3,SRC-4`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_grouping` | exit=0 | result=10/10（中途兩個測試前提錯誤自修：fixture 路徑本無 pending 分類；guard 是精確子字串比對，PII 進 frame 的測試改用會逐字出現的值）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | ms=189228 | result=`Ran 189 tests OK`（179→189）
+- 突變測試：`validate_grouping_response` 拿掉 `or member not in allowed` → `test_member_that_does_not_exist_is_rejected_not_invented` FAIL；復原後綠
+- REVIEW_DONE: critic=self（oracle 皆 block）| verdict=pass | findings=0c/1m/1n（medium：axial guard payload 首版全檢被 fixture 陷阱擋，改同契約；nit：step 21 的硬編敘述改推導）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`THEMES_V11|CATEGORY_OF_LABEL|boundary_erosion and emotional_exhaustion|pending_axial_review` | hits=見上（CLI 硬編敘述已改；fixture 常數仍是預設路徑的正本，正確保留）
+- ORACLE_WAIVED: critic／codex 斷路器仍 block；書面自審＋突變證據如上
+
+**[剩餘風險]**：① selective prompt v1 讓 4B 模型混淆層級（列了成員 code 它就抄 code）——下一刀 v2 + eval，不靠放寬 gate；② 分類名由模型自訂，跨 run 不穩定（seed 固定但模型換就變），沒有 codebook 版本控管；③ 人審決策仍 fixture 腳本；④ Kappa 4 單元 CI [0,1]。
+
+**[rollback]**：`git revert` 本 commit；fixture 路徑內容不變（theme_set 多兩個描述鍵）。
+
 ## 2026-09-04（續7，同一 session：AI 建議全由模型產生 + 模型第二 coder 套 codebook + 真實單元 Kappa）
 
 ### coding 階段最後的 fixture 建議拔掉；第一次真跑被 methodology gate 擋下，抓到 THEMES_V11 的隱藏耦合
