@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-04（Docker Desktop crash-loop recovery hardening + Trigger supervisor repair）
+
+**觸發／根因**：Docker Desktop 4.71.0 在非正常 backend 結束後遺留 AF_UNIX reparse-point sockets，造成下次啟動 cleanup crash loop。資料盤 `docker_data.vhdx` 與 volumes 未受損。另 `trigger-supervisor` 把本機 shared-volume token 送到 `.env` 覆寫後的公開 `trigger.aware-wave.com`，而不是同一 Compose project 的 Webapp；公開端不持有本機 token 對應的 DB 記錄，故持續 401/restart。比對本機 token 的 raw／trim SHA-256 與本機 DB hash 均一致，排除 token 損毀。
+
+**不變量**：supervisor 的 worker token 只能送往擁有該 token hash 的控制平面；容器內控制流不能借用對外 public-origin 變數。Docker runtime socket cleanup 只能在 Desktop/backend 未運行時進行，且必須是可逆 rename，絕不能碰 WSL data disk、volumes、containers 或設定。
+
+**[已修改]**：`lobster-factory/infra/trigger/docker-compose.yml` 的 supervisor 改用獨立 `TRIGGER_SUPERVISOR_API_URL`（預設 `http://webapp:3000`）；新增 `scripts/docker-desktop-runtime-preflight.ps1`（只隔離含 reparse-point 的 `Docker/run` 與 `docker-secrets-engine` runtime 目錄）；建立目前使用者登入觸發的 `Docker Desktop Runtime Preflight` 排程。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=`docker compose ... up -d --no-deps --force-recreate supervisor` | exit=0 | ms=14200 | result=僅重建 supervisor，`running|healthy|0`；未重建 DB／volumes。
+- REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=`docker inspect` + `psql WorkerInstance` + fresh log window | exit=0 | ms=7300 | result=supervisor API 為 `http://webapp:3000`、bootstrap worker instance 已建立、fresh window token/connection errors=0、supervisor `running|healthy`。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`winget upgrade Docker.DockerDesktop` + Docker daemon readiness probe | exit=0 | ms=~60000 | result=Docker Desktop 4.71.0→4.89.0、Engine 29.7.2；`docker_data.vhdx` 升級前後皆為 14822670336 bytes，Docker daemon 可用。
+- REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`docker-desktop-runtime-preflight.ps1` + `Start-ScheduledTask` | exit=0 | ms=6100 | result=Docker 運行中回報 safe no-op；排程回傳 `LastTaskResult=0`。
+- REVIEW_DONE: critic=self(Standard) | verdict=pass | findings=0c/0m/1n — login guard 無法攔截使用者在排程觸發前手動啟動 Desktop 的極小 race；它會在偵測到任何 Docker 進程時 fail-safe no-op，且 Docker AutoStart 維持 false。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude/commands,.claude/agents,lobster-factory | grep=`TRIGGER_SUPERVISOR_API_URL|docker-desktop-runtime-preflight|TRIGGER_API_URL: ${TRIGGER_API_URL:-http://webapp:3000}` | hits=3 expected（Compose 實作 1、Worklog 證據 2），無 stale coupling。
+
+**[剩餘風險]**：Docker Desktop 未來版本仍可能有不同的 runtime bug；guard 只針對已驗證的 stale reparse-point 類型，保留 archive 而不自動刪除，避免資料遺失。**[rollback]**：Compose 可還原單一行（會重現公開 URL 耦合）；preflight 排程可刪除、腳本可移除；Docker 原地升級不做 downgrade，以避免再次破壞既有資料面。
+
 ## 2026-09-04（續13，新 session：Cognitive OS round 11 — golden 6→32、GC-CB-001 錨點裁決、codebook 定義）
 
 **觸發**：操作者「繼續 Cognitive OS round 11. pick up from TASKS ⑥」。⑥ 的下一刀清單裡不需操作者決定的兩項：golden 補到 ≥30、`GC-CB-001` 錨點對還是模型對（champion/challenger 需第二模型，本機只有 gemma3:4b，不做）。**0 agent**；oracle 兩者仍在斷路器（`oracle-quota.ps1 check` critic/codex 皆 exit 3）。

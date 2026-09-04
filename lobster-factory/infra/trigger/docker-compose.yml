@@ -325,7 +325,9 @@ services:
     environment:
       TRIGGER_WORKER_TOKEN: ${TRIGGER_WORKER_TOKEN:-file:///home/node/shared/worker_token}
       MANAGED_WORKER_SECRET: ${MANAGED_WORKER_SECRET}
-      TRIGGER_API_URL: ${TRIGGER_API_URL:-http://webapp:3000}
+      # The supervisor must authenticate against this Compose project's Webapp.
+      # TRIGGER_API_URL can be the public origin and therefore a different authority.
+      TRIGGER_API_URL: ${TRIGGER_SUPERVISOR_API_URL:-http://webapp:3000}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://webapp:3000/otel}
       TRIGGER_WORKLOAD_API_DOMAIN: supervisor
       TRIGGER_WORKLOAD_API_PORT_EXTERNAL: "8020"
