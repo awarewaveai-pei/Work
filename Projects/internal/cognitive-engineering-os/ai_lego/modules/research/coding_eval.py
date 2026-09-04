@@ -63,6 +63,7 @@ from ai_lego.modules.research.eval_fixtures import (
     EVAL_CATEGORY_OF_LABEL,
     EVAL_CODEBOOK,
     EVAL_CODEBOOK_DEFINITIONS,
+    EVAL_MUST_NOT_SHARE_PAIRS,
     EVAL_TRANSCRIPTS,
     slice_definitions,
 )
@@ -72,7 +73,10 @@ METHOD_ID = "research.qualitative_coding"
 DATASET_ID = "research.qualitative_coding.coding-stages"
 # 1.1.0 (round 10): adversarial expectations are substring checks so a paraphrased obedience is caught too.
 # 1.2.0 (round 11): golden 6 -> 32 (12 eval-only synthetic units, codebook definitions, per-unit anchors); no case changed or removed.
-DATASET_VERSION = "1.2.0"
+# 1.3.0 (round 13): OQ-P5-10 decided by citation (not by matching either eval model) -- emotional_exhaustion and
+# withdrawal_from_others split into separate axial categories; GC-AX-002/GC-AX-004 updated to the corrected map
+# and gain a must_not_share_group assertion for the pair the decision explicitly separates.
+DATASET_VERSION = "1.3.0"
 DATASETS = ("golden", "regression", "adversarial", "privacy", "safety")
 STAGES = ("open_coding", "apply_codebook", "axial", "selective")
 PROMPT_VERSIONS = {"open_coding": OPEN_CODING_PROMPT_VERSION, "apply_codebook": CODEBOOK_PROMPT_VERSION, "axial": AXIAL_PROMPT_VERSION, "selective": SELECTIVE_PROMPT_VERSION}
@@ -192,10 +196,10 @@ def build_dataset() -> dict[str, Any]:
         {"case_id": "GC-CB-015", "dataset": "golden", "stage": "apply_codebook", "input": {"units": units, "codebook": codebook, "definitions": slice_definitions()}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": dict(CODER_TWO_LABELS)}, "source": "round 11 decision on GC-CB-001: the anchor stands (checking messages = monitoring; planning evenings = SRC-2); this twin adds definitions to the same codebook"},
         *[{"case_id": f"GC-CB-{16 + i:03d}", "dataset": "golden", "stage": "apply_codebook", "input": {"units": [_unit(units, sid)], "codebook": codebook, "definitions": slice_definitions()}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": {sid: CODER_TWO_LABELS[sid]}}, "source": f"synthetic_fixtures.CODER_TWO_LABELS[{sid}] with the four-label codebook and definitions, one unit per prompt"} for i, sid in enumerate(sorted(CODER_TWO_LABELS))],
         # Axial over the eval codes: pairs that share a category (derived from EVAL_CATEGORY_OF_LABEL) must land together.
-        {"case_id": "GC-AX-002", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes()}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, tuple(EVAL_CODEBOOK))}, "source": "eval_fixtures.EVAL_CATEGORY_OF_LABEL: six codes, three neighbour pairs, each pair together"},
+        {"case_id": "GC-AX-002", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes()}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, tuple(EVAL_CODEBOOK)), "must_not_share_group": EVAL_MUST_NOT_SHARE_PAIRS}, "source": "eval_fixtures.EVAL_CATEGORY_OF_LABEL (OQ-P5-10, round 13): the theoretically correct structure is 4 categories -- boundary_erosion(2), emotional_exhaustion(1), social_withdrawal(1), night_intrusion(2) -- but min_groups stays a loose not-one-blob floor (2); category COUNT is coder discretion, only the pairwise share/not-share claims are the decided invariant"},
         {"case_id": "GC-AX-003", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes(("after_hours_monitoring", "evening_planning_around_messages", "late_night_rumination", "sleep_disruption"))}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, ("after_hours_monitoring", "evening_planning_around_messages", "late_night_rumination", "sleep_disruption"))}, "source": "eval_fixtures: boundary_erosion vs night_intrusion codes -- two categories, not one"},
-        {"case_id": "GC-AX-004", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes(("emotional_exhaustion", "withdrawal_from_others", "after_hours_monitoring", "evening_planning_around_messages"))}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, ("emotional_exhaustion", "withdrawal_from_others", "after_hours_monitoring", "evening_planning_around_messages"))}, "source": "eval_fixtures: depletion vs boundary_erosion codes -- two categories, not one"},
-        {"case_id": "GC-SE-002", "dataset": "golden", "stage": "selective", "input": {"categories": _categories_of(EVAL_CATEGORY_OF_LABEL)}, "expect": {"zero_unknown_member": True, "min_groups": 1, "unassigned_max": 0}, "source": "eval_fixtures: the three eval categories all placed under a theme, none invented"},
+        {"case_id": "GC-AX-004", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes(("emotional_exhaustion", "withdrawal_from_others", "after_hours_monitoring", "evening_planning_around_messages"))}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, ("emotional_exhaustion", "withdrawal_from_others", "after_hours_monitoring", "evening_planning_around_messages")), "must_not_share_group": EVAL_MUST_NOT_SHARE_PAIRS}, "source": "eval_fixtures (OQ-P5-10, round 13): emotional_exhaustion and social_withdrawal MUST be apart (MBI exhaustion vs. depersonalization; matches synthetic_fixtures.CATEGORY_OF_LABEL's existing precedent); min_groups stays a loose not-one-blob floor, category count is coder discretion"},
+        {"case_id": "GC-SE-002", "dataset": "golden", "stage": "selective", "input": {"categories": _categories_of(EVAL_CATEGORY_OF_LABEL)}, "expect": {"zero_unknown_member": True, "min_groups": 1, "unassigned_max": 0}, "source": "eval_fixtures (round 13: four categories after OQ-P5-10): all placed under a theme, none invented"},
         # ---- Regression: past real failure modes, permanent (TEST_EVAL_STRATEGY section 5) ------------------------
         {"case_id": "RG-SE-001", "dataset": "regression", "stage": "selective", "input": {"categories": [{"category": "night_work_anxiety", "code_labels": ["after_hours_monitoring", "checking_post_dinner_messages", "late_night_project_updates"]}, {"category": "emotional_exhaustion", "code_labels": ["feeling_empty_before_leaving"]}]}, "expect": {"zero_unknown_member": True, "min_groups": 1}, "source": "round 8 (selective-coding-v1): gemma3:4b copied member code labels as theme members -> every member UNKNOWN_MEMBER, 0 themes; fixed by prompt v2"},
         {"case_id": "RG-CB-001", "dataset": "regression", "stage": "apply_codebook", "input": {"units": [_unit(units, "SRC-1")], "codebook": ["after_hours_monitoring", "checking_after_dinner_messages", "feeling_empty_after_work", "late_night_project_updates", "planning_around_urgent_messages"]}, "expect": {"all_units_accepted": True}, "source": "round 7: the second coder's span for SRC-1 was not verbatim (FABRICATED_EVIDENCE) -- the gate held; this case tracks whether the model still does it"},
@@ -386,6 +390,11 @@ def evaluate_assertions(case: dict[str, Any], obs: dict[str, Any], forbidden: di
         member_of = {m: g for g, members in obs["groups"].items() for m in members}
         failures = [pair for pair in expect["must_share_group"] if not (pair[0] in member_of and all(member_of.get(m) == member_of[pair[0]] for m in pair))]
         record("must_share_group", not failures, {"not_together": failures, "member_of": member_of})
+    if "must_not_share_group" in expect:
+        member_of = {m: g for g, members in obs["groups"].items() for m in members}
+        # A pair not placed at all cannot violate "not together" -- the positive claim is about groups the model DID form.
+        violations = [pair for pair in expect["must_not_share_group"] if pair[0] in member_of and pair[1] in member_of and member_of[pair[0]] == member_of[pair[1]]]
+        record("must_not_share_group", not violations, {"wrongly_together": violations, "member_of": member_of})
     if "group_names_must_not_be" in expect:
         hits = sorted(set(obs["groups"]) & set(expect["group_names_must_not_be"]))
         record("group_names_must_not_be", not hits, hits)

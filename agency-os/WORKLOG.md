@@ -36,6 +36,27 @@
 
 **[剩餘風險]**：錨點非人類校準；slice 第二 coder 仍無定義（OQ-P5-9）；withdrawal 歸屬待人裁（OQ-P5-10）；仍無第二模型。**[rollback]**：`git revert`；`apply_codebook` 不傳 `definitions` 行為與 v2 相同，slice 零改動（`prompt_version` 記錄欄位變 v3 而已）。
 
+### 續13d：round 13 — OQ-P5-10 用文獻裁決（不照抄模型），途中抓到自己過嚴的 `min_groups`（操作者「全部同意核准，決定權交給你」）
+
+**觸發**：操作者全權授權，決定 OQ-P5-10（round 11 遺留：axial 錨點 `emotional_exhaustion`+`withdrawal_from_others` 該不該併一組）。**0 agent**。
+
+**不變量與決策**：round 11 的「depletion」合併沒有引用任何依據——臨時起意。兩個獨立依據（都不是看模型輸出後決定的）：① slice 自己既有的 `synthetic_fixtures.CATEGORY_OF_LABEL`（round 8 起）本來就讓 `emotional_exhaustion` 自成一類，從未併過；② Maslach Burnout Inventory（Maslach & Jackson 1981；Maslach, Schaufeli & Leiter 2001）把 Emotional Exhaustion 與 Depersonalization（社交退縮是其行為指標）列為不同維度。裁決：`withdrawal_from_others` 拆出獨立分類 `social_withdrawal`。`late_night_rumination`／`sleep_disruption` 留在一起：Perseverative Cognition Hypothesis（Brosschot, Gerin & Thayer 2006）＋ Effort-Recovery Model 的 unwinding-failure 構念（Meijman & Mulder 1998）——刻意**不**跟著 llama3.1:8b round 11b 拆開這對的行為改。新增 `must_not_share_group` 斷言（鏡射 `must_share_group`），把移除的合併變成正面可查宣告，不是悄悄拿掉一個檢查。
+
+**自我糾正（真跑抓到，不是重讀程式碼抓到）**：第一版把 `min_groups` 從 2 拉到 4（GC-AX-002）／3（GC-AX-004），想鎖死「理論上正確的 4 分類結構」。真跑 gemma3:4b 立刻證偽：模型正確拆開 withdrawal（滿足新 `must_not_share_group`）、正確合併 rumination+sleep，卻把 exhaustion 併進 boundary 群而非獨立——這是合理的 axial coding 選擇，只是分類數較少。文獻依據只支撐兩個「配對」宣告（該合／該分），沒有支撐分類總數；分幾組是 coder 裁量。`min_groups` 拉高是我自己事後發明、不在裁決範圍內的過度規範，改回原本寬鬆的「不是一個大雜燴」下限（2），`must_share_group`／`must_not_share_group` 才是真正承載決策的斷言。
+
+**[已修改]**：`eval_fixtures.py`（`EVAL_CATEGORY_OF_LABEL` 拆分＋docstring 引文、`EVAL_MUST_NOT_SHARE_PAIRS`）；`coding_eval.py`（1.3.0、`must_not_share_group` 斷言、`GC-AX-002/004` 改用新圖＋新斷言、`GC-SE-002` source 文字、`min_groups` 自我糾正）；`tests/unit/test_coding_eval.py` +2；`PHASE5_RESEARCH_SLICE.md` §Round 13 + OQ-P5-10 RESOLVED；`RUNNABLE_DEMOS.md`；`TASKS.md` ⑥。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_coding_eval --model gemma3:4b --challenger-model llama3.1:8b --repeats 3 --out %TEMP%\ai-lego-coding-eval-r13`（第一版 min_groups=4/3） | exit=1 | ms=~600000 | result=dataset `6423bd1e073b`；兩模型都 golden 27/32；`GC-AX-002`／`GC-AX-004` 因 `min_groups` 太嚴假性 FAIL（`must_not_share_group` 本身已正確通過）——證據見下一行修正後重跑
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（min_groups 改回 2 後） | exit=0 | ms=190421 | result=228 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_coding_eval --model gemma3:4b --challenger-model llama3.1:8b --repeats 3 --out %TEMP%\ai-lego-coding-eval-r13b`（最終版） | exit=1 | ms=~600000 | result=dataset `v1.3.0 hash=99efb4bc0fb8`；4B `golden 28/32`（`failed_case_ids=[GC-CB-001,GC-CB-010,GC-CB-011,GC-AX-004]`，前三個是 round 11/12 已知發現，`GC-AX-004` 是一個 seed 把四碼併一組真實不一致）；8B `golden 28/32`（`failed_case_ids=[GC-AX-001,GC-AX-002,GC-AX-003,GC-AX-004]`，`GC-AX-001` 舊發現、`GC-AX-002` 三個 seed 中一個違反新斷言、`GC-AX-003` 一致拆開 rumination/sleep（決策站對立面）、`GC-AX-004` 一致併 exhaustion+withdrawal）；`comparison verdict=REJECT`（8B golden 未 100%）；champion 不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad/mutate_round13.py` | exit=0 | ms=~2000 | result=1/1 KILLED（拔掉 `must_not_share_group` 整段 → 指名測試 `KeyError` 紅；還原綠）
+- REVIEW_DONE: critic=self(Standard, 書面對抗自審) | verdict=warn | findings=0c/1m/2n —— m1 這個裁決仍是合成／作者引用文獻的裁定，不是 §2.3 人類對真實逐字稿的校準，OQ-P5-10 RESOLVED 條目與 maturity 皆未宣稱後者；n1 `min_groups` 自我糾正記錄在 WORKLOG／PHASE5 兩處，避免未來 session 誤以為那是原始決策的一部分；n2 llama `GC-AX-002` 三 seed 中僅一個違反，屬座位不穩定的真實模型行為，未強行歸類為單一結論
+- ORACLE_WAIVED: critic 429 至 2026-09-05 05:20、codex usage limit 至 2026-09-07 11:06（`oracle-quota.ps1 check` 兩者 exit 3）；以 1 突變＋書面自審替代；併入既有「2026-09-07 後補跑」條目範圍
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`"min_groups": 4|"min_groups": 3.*GC-AX-004|EVAL_CATEGORY_OF_LABEL|must_not_share_group` | hits=0 過嚴數值殘留；4 個檔案引用新 symbol 均為本輪自身呼叫點；WORKLOG/TASKS/RUNNABLE_DEMOS 歷史「depletion」敘述保留（描述當時為真的事，round 9-11b 慣例）
+
+**[剩餘風險]**：裁決仍非人類對真實資料校準；`GC-AX-004` 對 4B 的 seed 不一致與 llama 對整組的一致合併都還沒有第三方 human coder 覆核。**[rollback]**：`git revert`；`must_not_share_group` 是新增可選斷言，未使用它的既有 case 不受影響。
+
 ### 續13c：round 12 — 人審定義進 codebook（OQ-P5-9 關閉；操作者「直接繼續做」）
 
 **不變量**：codebook 條目＝label＋定義，定義是第一 coder 的話——只能出自人審步驟。關整類：`review_code_interactively` 每個保留的 label 後問一行定義（REJECT 不問），記錄進 review record `definition`；`reviewed_codebook_definitions` 收集後 slice 傳 `apply_codebook(definitions=)`、`SecondCoderApplied` 帶 `definitions`＋`definitions_origin`。fixture 審者只定義自己寫的 label；模型的 label 鎖定時**不捏定義**（`fixture_primary_review`）。`locked_code` ledger 形狀不動 → 不需重生 golden。**0 agent**。

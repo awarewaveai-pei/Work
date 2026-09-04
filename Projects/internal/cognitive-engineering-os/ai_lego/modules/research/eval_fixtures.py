@@ -18,7 +18,23 @@ on others. The anchor is right -- checking is monitoring; arranging one's evenin
 sentence -- and the model's error is not random: a codebook of bare labels asks the second coder to infer each
 label's boundary from its name, and two neighbouring labels are then separable only by guessing. A codebook in
 qualitative coding is label + definition + boundary; the definitions below are written so that each pair of
-neighbours (monitoring/planning, rumination/sleep, exhaustion/withdrawal) is told apart by an explicit criterion.
+neighbours (monitoring/planning, rumination/sleep) is told apart by an explicit criterion.
+
+Why the axial category map splits exhaustion from withdrawal (the OQ-P5-10 decision, round 13): round 11 first
+merged ``emotional_exhaustion`` and ``withdrawal_from_others`` into one "depletion" category with no citation --
+an ad hoc call. Two independent grounds say that was wrong, and neither comes from reading what either eval
+model produced: (1) the SLICE'S OWN precedent (``synthetic_fixtures.CATEGORY_OF_LABEL``, in place since round 8
+and asserted by ``GC-AX-001``) already keeps ``emotional_exhaustion`` as its own category, never merged; (2) the
+Maslach Burnout Inventory (Maslach & Jackson 1981; Maslach, Schaufeli & Leiter 2001, *Annual Review of
+Psychology*) treats Emotional Exhaustion and Depersonalization -- of which social withdrawal is a behavioural
+marker -- as two DISTINCT dimensions. ``withdrawal_from_others`` therefore gets its own category
+(``social_withdrawal``), consistent with both.
+
+``late_night_rumination`` and ``sleep_disruption`` stay together under ``night_intrusion``: the Perseverative
+Cognition Hypothesis (Brosschot, Gerin & Thayer 2006, *Journal of Psychosomatic Research*) and the
+Effort-Recovery Model's "unwinding failure" construct (Meijman & Mulder 1998) treat work-related rumination and
+disrupted sleep as one recovery-failure phenomenon, not two -- this is independent of, and does not change to
+match, ``llama3.1:8b``'s round-11b split of the same pair (that FAIL stands as a real model finding).
 """
 
 from __future__ import annotations
@@ -41,11 +57,15 @@ SLICE_CODEBOOK_LABELS = ("after_hours_monitoring", "evening_planning_around_mess
 EVAL_CATEGORY_OF_LABEL: dict[str, str] = {
     "after_hours_monitoring": "boundary_erosion",
     "evening_planning_around_messages": "boundary_erosion",
-    "emotional_exhaustion": "depletion",
-    "withdrawal_from_others": "depletion",
+    "emotional_exhaustion": "emotional_exhaustion",  # own category, matching synthetic_fixtures.CATEGORY_OF_LABEL's precedent
+    "withdrawal_from_others": "social_withdrawal",  # MBI depersonalization is a distinct dimension from exhaustion (OQ-P5-10)
     "late_night_rumination": "night_intrusion",
     "sleep_disruption": "night_intrusion",
 }
+
+# The one pair OQ-P5-10 explicitly decided must NOT land in the same axial category (the eval's positive claim
+# that a plausible-looking merge is wrong, not just an assertion that was quietly dropped).
+EVAL_MUST_NOT_SHARE_PAIRS: list[list[str]] = [["emotional_exhaustion", "withdrawal_from_others"]]
 
 # Each unit: the identity frame the PII pipeline expects, then ONE sentence whose anchor is unambiguous under the
 # definitions above. ``quote`` is the sentence alone (the PII-free text axial coding is shown).

@@ -12,7 +12,7 @@ from typing import Any, Callable
 from ai_lego.core.support import canonical_json, sha256_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research import coding_eval as ce
-from ai_lego.modules.research.eval_fixtures import EVAL_ANCHOR_LABELS, EVAL_CATEGORY_OF_LABEL, EVAL_CODEBOOK, EVAL_CODEBOOK_DEFINITIONS, EVAL_TRANSCRIPTS
+from ai_lego.modules.research.eval_fixtures import EVAL_ANCHOR_LABELS, EVAL_CATEGORY_OF_LABEL, EVAL_CODEBOOK, EVAL_CODEBOOK_DEFINITIONS, EVAL_MUST_NOT_SHARE_PAIRS, EVAL_TRANSCRIPTS
 from ai_lego.modules.research.synthetic_fixtures import CATEGORY_OF_LABEL, CODER_TWO_LABELS, SYNTHETIC_TRANSCRIPTS
 
 ANCHORS = {**CODER_TWO_LABELS, **EVAL_ANCHOR_LABELS}
@@ -146,6 +146,11 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(len(EVAL_TRANSCRIPTS), 12)
         self.assertEqual(set(EVAL_ANCHOR_LABELS.values()), set(EVAL_CODEBOOK))
         self.assertEqual(set(EVAL_CATEGORY_OF_LABEL), set(EVAL_CODEBOOK))
+        # OQ-P5-10 (round 13): four categories, not three -- exhaustion and withdrawal are split, deliberately.
+        self.assertEqual(len(set(EVAL_CATEGORY_OF_LABEL.values())), 4)
+        self.assertEqual(EVAL_CATEGORY_OF_LABEL["emotional_exhaustion"], "emotional_exhaustion")
+        self.assertNotEqual(EVAL_CATEGORY_OF_LABEL["emotional_exhaustion"], EVAL_CATEGORY_OF_LABEL["withdrawal_from_others"])
+        self.assertEqual(EVAL_MUST_NOT_SHARE_PAIRS, [["emotional_exhaustion", "withdrawal_from_others"]])
         self.assertEqual(set(EVAL_CODEBOOK_DEFINITIONS), set(EVAL_CODEBOOK))
         for label in EVAL_CODEBOOK:
             self.assertEqual(sum(1 for a in EVAL_ANCHOR_LABELS.values() if a == label), 2, label)
@@ -212,6 +217,27 @@ class AssertionTests(unittest.TestCase):
         by_name = lambda out: {a["assertion"]: a["pass"] for a in out}  # noqa: E731
         self.assertFalse(by_name(ce.evaluate_assertions(self.cases["GC-AX-001"], split, self.forbidden))["must_share_group"])
         self.assertTrue(by_name(ce.evaluate_assertions(self.cases["GC-AX-001"], together, self.forbidden))["must_share_group"])
+
+    def test_must_not_share_group_fails_when_the_oq_p5_10_pair_is_merged_and_passes_when_apart(self):
+        # GC-AX-004: boundary_erosion(2) + emotional_exhaustion(1) + social_withdrawal(1), and exhaustion/withdrawal
+        # must NOT land together (OQ-P5-10: MBI treats them as distinct dimensions; matches the slice's own precedent).
+        case = self.cases["GC-AX-004"]
+        self.assertEqual(case["expect"]["must_not_share_group"], EVAL_MUST_NOT_SHARE_PAIRS)
+        merged = self._obs(groups={"boundary_erosion": ["after_hours_monitoring", "evening_planning_around_messages"], "psychological_impact": ["emotional_exhaustion", "withdrawal_from_others"]})
+        apart = self._obs(groups={"boundary_erosion": ["after_hours_monitoring", "evening_planning_around_messages"], "emotional_exhaustion": ["emotional_exhaustion"], "social_withdrawal": ["withdrawal_from_others"]})
+        by_name = lambda out: {a["assertion"]: a["pass"] for a in out}  # noqa: E731
+        merged_result = by_name(ce.evaluate_assertions(case, merged, self.forbidden))
+        self.assertFalse(merged_result["must_not_share_group"])
+        self.assertTrue(merged_result["must_share_group"])  # the boundary pair is still together -- only the new claim fails
+        self.assertTrue(by_name(ce.evaluate_assertions(case, apart, self.forbidden))["must_not_share_group"])
+
+    def test_must_not_share_group_ignores_a_pair_the_model_left_unplaced(self):
+        # Neither member was grouped at all -- not a violation, just nothing to assert about (mirrors must_share_group's
+        # own "call_was_made" gate: an unassigned pair cannot be judged "wrongly together").
+        case = self.cases["GC-AX-004"]
+        obs = self._obs(groups={"boundary_erosion": ["after_hours_monitoring", "evening_planning_around_messages"]}, unassigned=["emotional_exhaustion", "withdrawal_from_others"])
+        out = {a["assertion"]: a["pass"] for a in ce.evaluate_assertions(case, obs, self.forbidden)}
+        self.assertTrue(out["must_not_share_group"])
 
     def test_privacy_prompt_check_catches_an_unredacted_unit_and_ignores_the_city_word(self):
         raw = SYNTHETIC_TRANSCRIPTS[0]["speech_text"]
