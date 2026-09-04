@@ -1,0 +1,82 @@
+$id: "ai-lego://methods/contracts/architecture.dependency_mapping.contract.yaml"
+title: "Dependency Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Seventeenth Method Atlas slice, sixth from the
+  `architecture` family (F18's own "Software Architecture Pack") -- a
+  sixth member tool built, still not the whole pack.
+
+  Atlas's own F18 tool table (L826) gives this method a 4-stage pipeline:
+  "nodes→edges→critical dependency→fallback", finding cross-service/
+  vendor/data dependencies to reduce hidden single points of failure. No
+  dedicated §11.x section (same thinner-citation tier
+  `architecture.quality_attribute_scenario.contract.yaml`'s own source
+  already disclosed for a sibling method), but the pipeline's own final
+  two stages directly imply a real, enforceable invariant: every edge
+  marked a critical dependency must specify a fallback -- the arrow
+  sequence itself reads "critical dependency THEN fallback", not
+  "critical dependency, optionally fallback".
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Dependency Mapping row (L826): 'nodes→edges→critical dependency→fallback'"
+  - "methods/registry/method-inventory.yaml Dependency Mapping entry (L1117-1121): category 'F18 architecture', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a fifteenth
+  concrete entry. `id: architecture.dependency_mapping` mints a new
+  machine_id. `family: architecture` reused as-is.
+
+id: architecture.dependency_mapping
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [MAP, RELATE, DECOMPOSE]
+purpose:
+  - surface_hidden_single_points_of_failure_across_service_vendor_and_data_dependencies
+inputs:
+  required: [SystemUnderMapping]
+  optional: []
+outputs: [DependencyMap]
+preconditions:
+  - "at least 1 node and 1 edge supplied"
+  - "every edge marked is_critical carries a non-empty fallback"
+  # The fallback requirement is directly implied by Atlas's own arrow
+  # sequence (critical dependency -> fallback), not inferred from
+  # nothing -- same class of "read the diagram literally, enforce what
+  # it implies" discipline causal.dag's acyclicity check and
+  # architecture.event_storming's orphan-event check already established.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should node_type be a closed enum, or free text?"
+    decision: "Closed 3-value enum (service, vendor, data) -- directly from Atlas's own purpose phrase (L826: 跨服務/供應商/資料依賴)."
+    reasoning: "Atlas names exactly these 3 categories in its own purpose text -- the same closed-enum-from-cited-list treatment challenge.red_team's dimension enum already applies, just from a purpose phrase rather than a numbered list."
+
+open_questions:
+  - id: "OQ-DEPENDENCYMAPPING-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should that registry be updated?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F18 tool table row (L826) directly -- confirmed no
+    dedicated §11.x section exists (grepped exhaustively). Grepped
+    `specs/` for "dependency mapping"/"critical dependency"/"single point
+    of failure" before writing -- no duplicate typed object found.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All fields directly transcribed
+    from Atlas's own table row and purpose phrase; the fallback-required-
+    for-critical-edges invariant is a direct reading of the arrow
+    sequence, not an invention.

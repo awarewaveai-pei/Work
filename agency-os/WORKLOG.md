@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-04（續30，同一 session：Cognitive OS 第十七個 Method Atlas 切片 — `architecture.dependency_mapping`，第三種圖形狀＋意外發現 EC §12 早就預留 `dependency-map.yaml` 擴充點）
+
+**觸發**：延續操作者授權。0 agent。
+
+**選型**：Dependency Mapping（F18 表格列，無專屬段落：nodes→edges→critical dependency→fallback）。管線最後兩階段直接蘊含真不變量：每條標記 critical 的邊必須有 fallback——CLI 真跑攻擊（建構無 fallback 的 critical 邊）確認被擋。本 session 第三種圖形狀（前兩種：causal.dag 的因果角色圖、event_storming 的固定 7 值詞彙圖），這次無環狀限制（依賴圖現實中常見循環）、節點類型只 3 值（service/vendor/data，直接取自 Atlas 目的文字本身，非發明）。
+
+**意外發現（非本次目標，抓蟲時查到）**：`AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md` §12 自己就列了 `dependency-map.yaml` 是 Current State Reconstruction 的 10 個子產出檔之一，`specs/execution/current-state.schema.yaml` 明文寫「records which were produced...WITHOUT REDEFINING their internal shape」——EC §12 早就預留這個檔案的內部形狀給未來人補上。本次 `DependencyMap` typed object 就是那個被預告但一直沒填的形狀，同續23（MCDA/`decision.schema.yaml`）與續24（Monte Carlo/`decision.schema.yaml`）同一類「找到早就等待的擴充點」發現，這是第三次。另外 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/schemas/dependency-map.schema.json` 也叫「Dependency Map」，查證後確認是完全不同專案（`$id: system-foundry.local`，另一個 session 今天稍早建的，純屬命名巧合，非重複）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.dependency_mapping.contract.yaml`＋`specs/cognitive/typed-objects/dependency-map.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.fifteenth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/dependency_mapping.py`（builder+fallback 不變量+2 gate）＋`ai_lego/apps/cli/run_dependency_mapping_slice.py`（真實結帳流程依賴圖+攻擊驗證）＋`tests/unit/test_dependency_mapping.py`（10 tests 第一次跑全綠）＋`docs/SEVENTEENTH_SLICE_ARCHITECTURE_DEPENDENCY_MAPPING.md`。`modules/architecture/__init__.py` docstring 補第六租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_dependency_mapping_slice` | exit=0 | result=第一次真跑就通過（含 fallback 不變量攻擊驗證）：`PASS architecture.dependency_mapping: nodes=3, edges=2, gates [provenance_required=PASS, critical_edges_have_fallback=PASS], fallback_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_dependency_mapping -v` | exit=0 | ms=771 | result=10 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2662→2671
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=54060 | result=**464 tests OK**（454→464，零回歸；`git diff --stat` 對照 8 個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: critic/codex 仍 quota-blocked。REVIEW_DONE: critic=self（Standard）| verdict=pass | findings=0c/0m/0n —— 逐項自問：System Foundry 的同名 schema 是否真的無關（是，`$id` 命名空間完全不同，另一個並行 session 今天稍早建的，查過內容確認是不同專案）；EC §12 的擴充點發現是否過度延伸解讀（不算，`current-state.schema.yaml` 自己的註解逐字寫「WITHOUT REDEFINING their internal shape」，是明確的延遲決定非我的推測）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]dependency_mapping\|DependencyMap\|dependency-map\|run_dependency_mapping_slice` | hits=本切片自己新檔案、EC §12／`current-state.schema.yaml` 的既有預留欄位提及（已查證非重複,是早就等待的擴充點）、System Foundry 同名巧合（已查證不同專案）、session log 雜訊——無任何過期或非預期殘留引用
+
+**[剩餘風險]**：`OQ-DEPENDENCYMAPPING-1`（method-inventory.yaml 無機器 id 列）；fallback 不變量僅 runtime 層強制，非 schema 層（JSON Schema 無法原生表達「當 sibling 欄位為 true 才必填」，已誠實揭露非發明繞過）。非阻塞。
+
+**[rollback]**：`git revert` 本次 commit。
+
 ## 2026-09-04（續29，同一 session：Cognitive OS 第十六個 Method Atlas 切片 — `architecture.system_context_model`（真實名稱 C4 Model），machine_id schema 數字限制第一次真的擋下命名）
 
 **觸發**：延續操作者授權。0 agent。

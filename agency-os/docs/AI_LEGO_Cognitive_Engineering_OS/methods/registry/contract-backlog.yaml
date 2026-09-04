@@ -563,6 +563,29 @@ tier_1:
       teaching example. Tier 1, mandated by the actively-running
       implementation slice, same category as the thirteen entries above
       it.
+  fifteenth_concrete_entry:
+    # NEW (2026-09-04, same session): fifteenth Tier 1 entry, same
+    # additive-key rationale as the fourteen entries above it.
+    method_id: "architecture.dependency_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. Sixth entry from
+      the `architecture` family, a sixth member tool of F18's own pack
+      built. No dedicated §11.x section (table row only, L826), but the
+      pipeline's own final two stages ("critical dependency→fallback")
+      directly imply a real, enforceable invariant -- every edge marked
+      critical must carry a non-empty fallback. Third graph-shaped typed
+      object this session builds (after `causal.dag`/
+      `architecture.event_storming`), structurally distinct from both:
+      no acyclicity requirement, a 3-value node-type enum drawn from
+      Atlas's own purpose phrase rather than a numbered list.
+    source: "methods/contracts/architecture.dependency_mapping.contract.yaml (built same session as this entry, mints machine_id architecture.dependency_mapping) + specs/cognitive/typed-objects/dependency-map.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: table-row-only citation, same tier as
+      `architecture.quality_attribute_scenario`'s own thirteenth entry.
+      Tier 1, mandated by the actively-running implementation slice, same
+      category as the fourteen entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

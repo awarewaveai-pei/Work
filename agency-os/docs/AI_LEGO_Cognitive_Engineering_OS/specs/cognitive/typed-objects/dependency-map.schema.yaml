@@ -1,0 +1,85 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/dependency-map.schema.yaml"
+title: Dependency Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DependencyMap` -- the
+  declared `outputs` of `architecture.dependency_mapping`'s Method
+  Contract. Sixth `architecture`-family typed object, third graph-shaped
+  typed object this session builds (after `CausalDagAnalysis` and
+  `EventStormingSession`) -- but structurally distinct from both: no
+  acyclicity requirement (dependency graphs are commonly cyclic in
+  practice), no fixed 7-value node vocabulary, just a 3-value
+  service/vendor/data node type and a required-fallback-for-critical-
+  edges invariant directly implied by Atlas's own arrow sequence.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Dependency Mapping row (L826)"
+  - "methods/contracts/architecture.dependency_mapping.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, system_under_mapping, nodes, edges, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^DEPMAP-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "architecture.dependency_mapping"
+  system_under_mapping:
+    type: string
+    minLength: 1
+  nodes:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [id, node_type, label]
+      properties:
+        id: {type: string}
+        node_type:
+          enum: [service, vendor, data]
+        label: {type: string}
+  edges:
+    type: array
+    minItems: 1
+    description: "Atlas L826's own 'edges→critical dependency→fallback' -- every is_critical:true edge requires a non-empty fallback (see method contract preconditions)."
+    items:
+      type: object
+      required: [from_id, to_id, is_critical]
+      properties:
+        from_id: {type: string}
+        to_id: {type: string}
+        is_critical: {type: boolean}
+        fallback:
+          type: string
+          description: "Required (non-empty) when is_critical is true -- a runtime, not schema, cross-field check (JSON Schema cannot express 'required iff sibling field is true' across this shape without a conditional this suite reserves for cases with a worked Atlas example)."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a dependency map is structured architectural documentation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A service depending on a critical third-party payment vendor (with a fallback) and a non-critical data source"
+    value:
+      id: "DEPMAP-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.dependency_mapping"
+      system_under_mapping: "訂單結帳流程"
+      nodes:
+        - {id: "N1", node_type: service, label: "Checkout API"}
+        - {id: "N2", node_type: vendor, label: "第三方金流"}
+        - {id: "N3", node_type: data, label: "商品庫存快照"}
+      edges:
+        - {from_id: "N1", to_id: "N2", is_critical: true, fallback: "切換備援金流供應商，SLA 內完成"}
+        - {from_id: "N1", to_id: "N3", is_critical: false}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas's F18 tool table row (L826) directly. Validated against jsonschema Draft202012Validator."
+  note: "The fallback-required-for-critical-edges invariant is enforced at the runtime layer (ai_lego/modules/architecture/dependency_mapping.py), not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

@@ -1,0 +1,53 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/dependency-map.schema.yaml"
+target_ref: ""
+description: "Exercises DependencyMap's required fields, the nodes[]/edges[] minItems:1 guards, and the 3-value node_type enum."
+
+valid:
+  - name: critical_vendor_dependency_with_fallback_and_noncritical_data_edge
+    instance:
+      id: "DEPMAP-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.dependency_mapping"
+      system_under_mapping: "checkout flow"
+      nodes:
+        - {id: "N1", node_type: service, label: "Checkout API"}
+        - {id: "N2", node_type: vendor, label: "third-party payment gateway"}
+        - {id: "N3", node_type: data, label: "inventory snapshot"}
+      edges:
+        - {from_id: "N1", to_id: "N2", is_critical: true, fallback: "switch to backup payment vendor within SLA"}
+        - {from_id: "N1", to_id: "N3", is_critical: false}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: single_noncritical_edge_no_fallback_needed
+    instance:
+      id: "DEPMAP-2026-09-04-002"
+      version: "1.0.0"
+      generated_by_method: "architecture.dependency_mapping"
+      system_under_mapping: "reporting pipeline"
+      nodes:
+        - {id: "N1", node_type: service, label: "Report Generator"}
+        - {id: "N2", node_type: data, label: "analytics warehouse"}
+      edges:
+        - {from_id: "N1", to_id: "N2", is_critical: false}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: nodes_below_minitems_1
+    instance:
+      id: "DEPMAP-2026-09-04-003"
+      version: "1.0.0"
+      system_under_mapping: "x"
+      nodes: []
+      edges: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "nodes has minItems: 1 -- a map with zero nodes maps nothing."
+  - name: invalid_node_type_enum_value
+    instance:
+      id: "DEPMAP-2026-09-04-004"
+      version: "1.0.0"
+      system_under_mapping: "x"
+      nodes:
+        - {id: "N1", node_type: "database", label: "x"}
+      edges:
+        - {from_id: "N1", to_id: "N1", is_critical: false}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "nodes[].node_type is enum [service, vendor, data] -- 'database' is not a member."
