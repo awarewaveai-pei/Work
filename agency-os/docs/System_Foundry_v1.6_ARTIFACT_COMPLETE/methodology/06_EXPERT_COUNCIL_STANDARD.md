@@ -49,3 +49,6 @@ EXPECTED RESULT
 
 ## Independence
 The final assurance approver cannot be the sole author of the design being assured.
+
+## Gate
+`G6_ENGINEERING_REVIEWED` (`runtime/stage-gates.yaml`) requires expert coverage of: security, data, iam, sre, observability, testing, migration, rollback, supply_chain, compatibility, provider_resilience, human_factors_if_applicable, accessibility_globalization_if_applicable, explainability_if_applicable. It fails when a required domain has no expert coverage, or when human/accessibility/explainability factors are silently skipped instead of explicitly marked not-applicable.

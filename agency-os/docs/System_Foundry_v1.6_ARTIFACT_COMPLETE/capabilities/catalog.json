@@ -6,21 +6,21 @@
       "name": "24x7 Business Requirement",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "The system must operate continuously with no acceptable downtime window."
     },
     {
       "id": "CAP-ACCOUNTING",
       "name": "Accounting Integration",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system integrates with external accounting software."
     },
     {
       "id": "CAP-AI",
       "name": "AI Runtime",
       "module": "ai",
       "requires": [],
-      "description": ""
+      "description": "Foundational AI/ML runtime integration point that every other AI-driven capability depends on."
     },
     {
       "id": "CAP-AI-CLASSIFY",
@@ -29,7 +29,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "Automated classification/categorization of content or records using AI."
     },
     {
       "id": "CAP-AI-EXTERNAL",
@@ -38,7 +38,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "AI-initiated actions that reach outside the system, calling external APIs/services on the system's behalf."
     },
     {
       "id": "CAP-AI-GENERATE",
@@ -47,7 +47,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "AI-generated content (text, images, or structured output) production."
     },
     {
       "id": "CAP-AI-RECOMMEND",
@@ -56,7 +56,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "AI-driven recommendations or suggestions surfaced to users."
     },
     {
       "id": "CAP-AI-SEARCH",
@@ -65,7 +65,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "AI-augmented search with semantic/natural-language query understanding over system content."
     },
     {
       "id": "CAP-AI-SUMMARY",
@@ -74,7 +74,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "AI-generated summarization of documents, records, or conversations."
     },
     {
       "id": "CAP-AI-VOICE",
@@ -83,7 +83,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "Voice-based AI interaction: speech-to-text, text-to-speech, or voice assistants."
     },
     {
       "id": "CAP-AI-WRITE",
@@ -92,35 +92,35 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "AI actions that create or modify system state, as opposed to read-only AI use."
     },
     {
       "id": "CAP-ANALYTICS",
       "name": "Analytics",
       "module": "analytics",
       "requires": [],
-      "description": ""
+      "description": "Aggregated usage/business analytics computed over system data."
     },
     {
       "id": "CAP-ANON-PUBLIC",
       "name": "Anonymous Public Access",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "Some content or functionality is accessible to anonymous, unauthenticated visitors."
     },
     {
       "id": "CAP-APPROVAL",
       "name": "Approval Workflow",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "Actions can require a defined approval step before taking effect."
     },
     {
       "id": "CAP-BARCODE",
       "name": "Barcode / QR",
       "module": "mobile",
       "requires": [],
-      "description": ""
+      "description": "The mobile app can scan barcodes and QR codes."
     },
     {
       "id": "CAP-BG-SYNC",
@@ -129,35 +129,35 @@
       "requires": [
         "CAP-OFFLINE"
       ],
-      "description": ""
+      "description": "The client synchronizes queued changes in the background once connectivity resumes."
     },
     {
       "id": "CAP-BIOMETRIC",
       "name": "Biometric Data",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system processes biometric data, triggering heightened privacy and security obligations."
     },
     {
       "id": "CAP-BOOKING",
       "name": "Booking / Schedule Records",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Scheduling/booking records are a core domain entity."
     },
     {
       "id": "CAP-CAMERA",
       "name": "Camera",
       "module": "mobile",
       "requires": [],
-      "description": ""
+      "description": "The mobile app can access the device camera."
     },
     {
       "id": "CAP-CLI",
       "name": "CLI Interface",
       "module": "cli",
       "requires": [],
-      "description": ""
+      "description": "A command-line interface for operating the system."
     },
     {
       "id": "CAP-COEXISTENCE",
@@ -166,35 +166,35 @@
       "requires": [
         "CAP-LEGACY-MIGRATION"
       ],
-      "description": ""
+      "description": "The new system and a legacy system run in parallel during a migration transition period."
     },
     {
       "id": "CAP-COMMENTS",
       "name": "Comments / Discussion",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "Users can add comments or discussion threads to records."
     },
     {
       "id": "CAP-COMMERCIAL",
       "name": "Commercial Product",
       "module": "commercial",
       "requires": [],
-      "description": ""
+      "description": "The system is sold and monetized as a commercial product, the foundation for billing, editions, and licensing."
     },
     {
       "id": "CAP-CONTRACTS",
       "name": "Contracts",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Contracts are a core domain entity managed by the system."
     },
     {
       "id": "CAP-CRM",
       "name": "CRM Integration",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system integrates with external CRM software."
     },
     {
       "id": "CAP-CROSS-TENANT-COLLAB",
@@ -203,7 +203,7 @@
       "requires": [
         "CAP-MULTI-TENANT"
       ],
-      "description": ""
+      "description": "Users from different organizations can collaborate within the same system."
     },
     {
       "id": "CAP-CROSS-TENANT-SHARE",
@@ -212,49 +212,49 @@
       "requires": [
         "CAP-MULTI-TENANT"
       ],
-      "description": ""
+      "description": "Content can be explicitly shared across organization boundaries."
     },
     {
       "id": "CAP-CUSTOMER-DATA",
       "name": "Customer Records",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Customer records are a core domain entity."
     },
     {
       "id": "CAP-CUSTOMER-EXPORT",
       "name": "Customer Data Export",
       "module": "migration",
       "requires": [],
-      "description": ""
+      "description": "Customers can export their own data out of the system."
     },
     {
       "id": "CAP-CUSTOMER-PORTAL",
       "name": "Customer Portal",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "Customers have a dedicated self-service portal."
     },
     {
       "id": "CAP-CUSTOMER-USERS",
       "name": "Customer Users",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "Customers have their own user accounts distinct from internal staff."
     },
     {
       "id": "CAP-DASHBOARD",
       "name": "Dashboard",
       "module": "analytics",
       "requires": [],
-      "description": ""
+      "description": "Visual dashboards summarizing key metrics for users."
     },
     {
       "id": "CAP-DESKTOP",
       "name": "Desktop App",
       "module": "desktop",
       "requires": [],
-      "description": ""
+      "description": "A native desktop application."
     },
     {
       "id": "CAP-EDITIONS",
@@ -263,56 +263,56 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "Multiple product editions (e.g. Free/Pro/Enterprise) differentiated by entitlements, per commercial/EDITION_ARCHITECTURE.md."
     },
     {
       "id": "CAP-EMAIL",
       "name": "Email Notifications",
       "module": "notifications",
       "requires": [],
-      "description": ""
+      "description": "The system sends email notifications."
     },
     {
       "id": "CAP-EMBED",
       "name": "Embeddable Widget",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "The system's functionality can be embedded in a third-party page via a widget."
     },
     {
       "id": "CAP-ERP",
       "name": "ERP Integration",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system integrates with external ERP software."
     },
     {
       "id": "CAP-ESIGN",
       "name": "Electronic Signing",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "The system supports legally-binding electronic signatures."
     },
     {
       "id": "CAP-EXPORT",
       "name": "Data Export",
       "module": "analytics",
       "requires": [],
-      "description": ""
+      "description": "Ability to export data out of the system in a structured, reusable format."
     },
     {
       "id": "CAP-EXT-STORAGE",
       "name": "External Storage",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system integrates with external file storage providers."
     },
     {
       "id": "CAP-EXTERNAL-API",
       "name": "Third-party API Integration",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system calls third-party APIs as part of its own functionality."
     },
     {
       "id": "CAP-FILE-VERSION",
@@ -321,133 +321,133 @@
       "requires": [
         "CAP-FILES"
       ],
-      "description": ""
+      "description": "Uploaded files and documents are versioned with history."
     },
     {
       "id": "CAP-FILES",
       "name": "Document Upload",
       "module": "files",
       "requires": [],
-      "description": ""
+      "description": "Users can upload and store documents/files."
     },
     {
       "id": "CAP-FILTERS",
       "name": "Advanced Filtering",
       "module": "search",
       "requires": [],
-      "description": ""
+      "description": "Users can apply advanced filters when browsing or searching data."
     },
     {
       "id": "CAP-FINANCIAL-DECISION",
       "name": "Financial Decision",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system makes or materially influences a financial decision about a person."
     },
     {
       "id": "CAP-FINANCIAL-IMPACT",
       "name": "Financial Impact",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "A failure of this system would have direct financial consequences for users or the business."
     },
     {
       "id": "CAP-FINANCIAL-RECORDS",
       "name": "Financial Records",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Financial records are a core domain entity requiring accounting-grade integrity."
     },
     {
       "id": "CAP-GEOLOCATION",
       "name": "Precise Geolocation",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system collects or uses precise geolocation data."
     },
     {
       "id": "CAP-GOV",
       "name": "Government Context",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system operates in a government/public-sector context with associated compliance obligations."
     },
     {
       "id": "CAP-GROUP",
       "name": "Group / Parent-child Organization",
       "module": "tenant",
       "requires": [],
-      "description": ""
+      "description": "Organizations can be grouped into a parent-child hierarchy for a group commercial relationship, per commercial/GROUP_STANDARD.md."
     },
     {
       "id": "CAP-HEALTH-DATA",
       "name": "Health Data",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system processes health-related personal data."
     },
     {
       "id": "CAP-HISTORICAL-IMPORT",
       "name": "Historical Import",
       "module": "migration",
       "requires": [],
-      "description": ""
+      "description": "Historical data can be bulk-imported from a prior system."
     },
     {
       "id": "CAP-I18N",
       "name": "Multiple Languages",
       "module": "globalization",
       "requires": [],
-      "description": ""
+      "description": "The system supports multiple languages and locales."
     },
     {
       "id": "CAP-IDENTITY",
       "name": "Identity",
       "module": "identity",
       "requires": [],
-      "description": ""
+      "description": "Users have a managed identity in the system, the foundation for authentication and authorization."
     },
     {
       "id": "CAP-IDP",
       "name": "External Identity Provider",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system delegates identity to an external identity provider."
     },
     {
       "id": "CAP-IMAGES",
       "name": "Images",
       "module": "files",
       "requires": [],
-      "description": ""
+      "description": "The system handles image upload, storage, and processing."
     },
     {
       "id": "CAP-IMPORT-EXPORT",
       "name": "Import / Export Interface",
       "module": "integrations",
       "requires": [],
-      "description": ""
+      "description": "The system provides a structured interface for bulk import/export with external systems."
     },
     {
       "id": "CAP-INAPP-NOTIFY",
       "name": "In-app Notifications",
       "module": "notifications",
       "requires": [],
-      "description": ""
+      "description": "The system shows in-app notifications."
     },
     {
       "id": "CAP-INTERNAL-USERS",
       "name": "Internal Users",
       "module": "identity",
       "requires": [],
-      "description": ""
+      "description": "The system has internal/staff user accounts distinct from external customers."
     },
     {
       "id": "CAP-INVENTORY",
       "name": "Inventory",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Inventory/stock is a core domain entity tracked by the system."
     },
     {
       "id": "CAP-INVITES",
@@ -456,7 +456,7 @@
       "requires": [
         "CAP-IDENTITY"
       ],
-      "description": ""
+      "description": "Users can be invited to join via an invitation flow."
     },
     {
       "id": "CAP-INVOICES",
@@ -465,14 +465,14 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "The system generates invoices for billable transactions."
     },
     {
       "id": "CAP-LEGACY-MIGRATION",
       "name": "Legacy Migration",
       "module": "migration",
       "requires": [],
-      "description": ""
+      "description": "The system is being migrated from an existing legacy system."
     },
     {
       "id": "CAP-LEGACY-SYNC",
@@ -481,21 +481,21 @@
       "requires": [
         "CAP-LEGACY-MIGRATION"
       ],
-      "description": ""
+      "description": "Data stays synchronized between the legacy system and the new system during migration."
     },
     {
       "id": "CAP-LEGAL-IMPACT",
       "name": "Legal Impact",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "A failure of this system would have legal consequences."
     },
     {
       "id": "CAP-LEGAL-RECORD",
       "name": "Legal-effect Records",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system creates records with legal effect, such as contracts, signatures, or official filings."
     },
     {
       "id": "CAP-LICENSE",
@@ -504,28 +504,28 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "Signed, verifiable license grants govern access, including offline validation, per commercial/LICENSE_ARCHITECTURE.md."
     },
     {
       "id": "CAP-LOCATION",
       "name": "Location",
       "module": "mobile",
       "requires": [],
-      "description": ""
+      "description": "The mobile app can access device location."
     },
     {
       "id": "CAP-MINORS",
       "name": "Minor Users",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "The system may have users who are minors, triggering additional protection obligations."
     },
     {
       "id": "CAP-MOBILE",
       "name": "Mobile App",
       "module": "mobile",
       "requires": [],
-      "description": ""
+      "description": "A native mobile application."
     },
     {
       "id": "CAP-MULTI-AGENT",
@@ -534,7 +534,7 @@
       "requires": [
         "CAP-AI"
       ],
-      "description": ""
+      "description": "Multiple cooperating AI agents coordinate on a task rather than a single model call."
     },
     {
       "id": "CAP-MULTI-APPROVAL",
@@ -543,14 +543,14 @@
       "requires": [
         "CAP-APPROVAL"
       ],
-      "description": ""
+      "description": "An approval can require sign-off from multiple parties."
     },
     {
       "id": "CAP-MULTI-CURRENCY",
       "name": "Multiple Currencies",
       "module": "globalization",
       "requires": [],
-      "description": ""
+      "description": "The system supports multiple currencies."
     },
     {
       "id": "CAP-MULTI-TENANT",
@@ -559,28 +559,28 @@
       "requires": [
         "CAP-IDENTITY"
       ],
-      "description": ""
+      "description": "The system serves multiple independent organizations from one shared deployment."
     },
     {
       "id": "CAP-NONREPEATABLE",
       "name": "Non-repeatable Transactions",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "The system performs actions that cannot be safely retried or repeated, such as irreversible transactions."
     },
     {
       "id": "CAP-OFFLINE",
       "name": "Offline Operation",
       "module": "offline",
       "requires": [],
-      "description": ""
+      "description": "The client can operate without an active network connection."
     },
     {
       "id": "CAP-ORDERS",
       "name": "Orders / Transactions",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Orders or transactions are a core domain entity."
     },
     {
       "id": "CAP-ORG-ADMIN",
@@ -589,21 +589,21 @@
       "requires": [
         "CAP-IDENTITY"
       ],
-      "description": ""
+      "description": "Organization admins can manage users within their own organization."
     },
     {
       "id": "CAP-ORG-DATA",
       "name": "Organization Records",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Organization-level records are a core domain entity."
     },
     {
       "id": "CAP-ORG-HIERARCHY",
       "name": "Organization Hierarchy",
       "module": "tenant",
       "requires": [],
-      "description": ""
+      "description": "Organizations have an internal hierarchical structure such as departments or sub-units."
     },
     {
       "id": "CAP-PARTIAL-REFUND",
@@ -612,21 +612,21 @@
       "requires": [
         "CAP-REFUNDS"
       ],
-      "description": ""
+      "description": "Refunds can be issued for a partial amount of a payment."
     },
     {
       "id": "CAP-PARTNER-PORTAL",
       "name": "Partner Portal",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "Business partners have a dedicated self-service portal."
     },
     {
       "id": "CAP-PARTNER-USERS",
       "name": "Partner Users",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "Partners have their own user accounts distinct from customers and internal staff."
     },
     {
       "id": "CAP-PAYMENTS",
@@ -635,56 +635,56 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "The system accepts online payments."
     },
     {
       "id": "CAP-PRODUCTS",
       "name": "Product / Service Catalog",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "A product or service catalog is a core domain entity."
     },
     {
       "id": "CAP-PROJECTS",
       "name": "Cases / Projects",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "Cases or projects are a core domain entity with their own lifecycle."
     },
     {
       "id": "CAP-PUBLIC-API",
       "name": "Public API",
       "module": "api",
       "requires": [],
-      "description": ""
+      "description": "A publicly documented, externally callable API surface."
     },
     {
       "id": "CAP-PUBLIC-PAGES",
       "name": "Public Pages",
       "module": "portals",
       "requires": [],
-      "description": ""
+      "description": "The system serves public, unauthenticated marketing or informational pages."
     },
     {
       "id": "CAP-PUSH",
       "name": "Push Notifications",
       "module": "notifications",
       "requires": [],
-      "description": ""
+      "description": "The system sends mobile or browser push notifications."
     },
     {
       "id": "CAP-REALTIME",
       "name": "Realtime Business Requirement",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "The system has a hard real-time or near-real-time latency requirement."
     },
     {
       "id": "CAP-REALTIME-COLLAB",
       "name": "Realtime Collaboration",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "Multiple users can collaborate on the same content simultaneously in real time."
     },
     {
       "id": "CAP-REFUNDS",
@@ -693,21 +693,21 @@
       "requires": [
         "CAP-PAYMENTS"
       ],
-      "description": ""
+      "description": "The system can issue refunds for a completed payment."
     },
     {
       "id": "CAP-REPORTS",
       "name": "Reports",
       "module": "analytics",
       "requires": [],
-      "description": ""
+      "description": "Generated, shareable reports derived from system data."
     },
     {
       "id": "CAP-RESIDENCY",
       "name": "Data Residency",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "Data must be stored and processed within a specific geographic or legal boundary."
     },
     {
       "id": "CAP-ROLES",
@@ -716,7 +716,7 @@
       "requires": [
         "CAP-IDENTITY"
       ],
-      "description": ""
+      "description": "A role-based permission model governs what users can do."
     },
     {
       "id": "CAP-RTL",
@@ -725,14 +725,14 @@
       "requires": [
         "CAP-I18N"
       ],
-      "description": ""
+      "description": "The UI supports right-to-left language layouts."
     },
     {
       "id": "CAP-SAFETY-IMPACT",
       "name": "Safety Impact",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "A failure of this system could cause physical harm."
     },
     {
       "id": "CAP-SAVED-PAYMENT",
@@ -741,21 +741,21 @@
       "requires": [
         "CAP-PAYMENTS"
       ],
-      "description": ""
+      "description": "Customers can securely save a payment method for future use."
     },
     {
       "id": "CAP-SCHEDULING",
       "name": "Scheduling",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "The system manages scheduled events or appointments."
     },
     {
       "id": "CAP-SEARCH",
       "name": "Full-text Search",
       "module": "search",
       "requires": [],
-      "description": ""
+      "description": "The system provides full-text search over its content."
     },
     {
       "id": "CAP-SELF-REG",
@@ -764,28 +764,28 @@
       "requires": [
         "CAP-IDENTITY"
       ],
-      "description": ""
+      "description": "Users can self-register an account without an invitation."
     },
     {
       "id": "CAP-SHARE-LINKS",
       "name": "Share Links",
       "module": "files",
       "requires": [],
-      "description": ""
+      "description": "Files can be shared via a scoped, revocable link."
     },
     {
       "id": "CAP-SMS",
       "name": "SMS Notifications",
       "module": "notifications",
       "requires": [],
-      "description": ""
+      "description": "The system sends SMS notifications."
     },
     {
       "id": "CAP-SPIKY-LOAD",
       "name": "Spiky Load",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "The system must handle highly variable, bursty traffic patterns."
     },
     {
       "id": "CAP-SSO",
@@ -794,14 +794,14 @@
       "requires": [
         "CAP-IDENTITY"
       ],
-      "description": ""
+      "description": "Enterprise customers can authenticate via their own identity provider (SSO), per commercial/ENTERPRISE_STANDARD.md."
     },
     {
       "id": "CAP-STATE-WORKFLOW",
       "name": "State Workflow",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "Records move through an explicit, enforced state machine."
     },
     {
       "id": "CAP-SUBSCRIPTION",
@@ -810,14 +810,14 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "A recurring subscription-based commercial relationship with customers."
     },
     {
       "id": "CAP-TASKS",
       "name": "Task Assignment",
       "module": "workflow",
       "requires": [],
-      "description": ""
+      "description": "Work can be assigned as discrete tasks to specific users."
     },
     {
       "id": "CAP-TAX",
@@ -826,14 +826,14 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "The system calculates applicable tax on transactions."
     },
     {
       "id": "CAP-TIMEZONES",
       "name": "Multiple Time Zones",
       "module": "globalization",
       "requires": [],
-      "description": ""
+      "description": "The system correctly handles multiple time zones."
     },
     {
       "id": "CAP-TRIAL",
@@ -842,14 +842,14 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "A time- or usage-bounded trial period before paid commitment."
     },
     {
       "id": "CAP-UGC",
       "name": "User-generated Content",
       "module": "domain",
       "requires": [],
-      "description": ""
+      "description": "The system stores and serves user-generated content."
     },
     {
       "id": "CAP-USAGE-METERING",
@@ -858,28 +858,28 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": ""
+      "description": "Usage is measured and attributed for billing and entitlement purposes."
     },
     {
       "id": "CAP-VIDEO",
       "name": "Video",
       "module": "files",
       "requires": [],
-      "description": ""
+      "description": "The system handles video upload, storage, and playback."
     },
     {
       "id": "CAP-WEB",
       "name": "Web UI",
       "module": "web",
       "requires": [],
-      "description": ""
+      "description": "A browser-based web application."
     },
     {
       "id": "CAP-WEBHOOK",
       "name": "Outbound Webhooks",
       "module": "notifications",
       "requires": [],
-      "description": ""
+      "description": "The system delivers outbound webhook events to external subscribers."
     },
     {
       "id": "DER-AI-AUDIT",
@@ -888,7 +888,7 @@
       "requires": [
         "FOUND-AUDIT"
       ],
-      "description": ""
+      "description": "Every AI action is recorded in the audit trail once any AI capability is selected."
     },
     {
       "id": "DER-AI-AUTHORITY",
@@ -897,14 +897,14 @@
       "requires": [
         "CAP-AI-WRITE"
       ],
-      "description": ""
+      "description": "AI write actions are gated by an explicit authority/permission check before execution."
     },
     {
       "id": "DER-AI-HUMAN",
       "name": "AI Human Oversight",
       "module": "ai",
       "requires": [],
-      "description": ""
+      "description": "A human reviews or can override AI write actions before or after they take effect."
     },
     {
       "id": "DER-AI-IDEMPOTENCY",
@@ -913,7 +913,7 @@
       "requires": [
         "FOUND-ROLLBACK"
       ],
-      "description": ""
+      "description": "AI-initiated actions are idempotent and safely retryable without duplicate side effects."
     },
     {
       "id": "DER-AI-TOOLS",
@@ -922,7 +922,7 @@
       "requires": [
         "CAP-AI-WRITE"
       ],
-      "description": ""
+      "description": "AI write actions are restricted to an explicit, bounded set of callable tools/functions."
     },
     {
       "id": "DER-BILLING-LIFECYCLE",
@@ -931,14 +931,14 @@
       "requires": [
         "CAP-SUBSCRIPTION"
       ],
-      "description": ""
+      "description": "Subscription state changes drive billing lifecycle events such as invoicing and dunning."
     },
     {
       "id": "DER-COMPLIANCE-RESEARCH",
       "name": "Current Compliance Research",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "Current regulatory requirements for the applicable compliance context must be actively researched, not assumed."
     },
     {
       "id": "DER-DEVICE-REVOCATION",
@@ -947,7 +947,7 @@
       "requires": [
         "CAP-OFFLINE"
       ],
-      "description": ""
+      "description": "An offline-capable device's access can be remotely revoked."
     },
     {
       "id": "DER-ENTITLEMENT",
@@ -956,7 +956,7 @@
       "requires": [
         "CAP-SUBSCRIPTION"
       ],
-      "description": ""
+      "description": "Subscription state determines the customer's active entitlement set, per commercial/ENTITLEMENT_STANDARD.md."
     },
     {
       "id": "DER-FILE-AUTHZ",
@@ -965,7 +965,7 @@
       "requires": [
         "FOUND-SECURITY"
       ],
-      "description": ""
+      "description": "Access to any stored file is checked against an explicit authorization rule, never inferred from a guessable URL."
     },
     {
       "id": "DER-FILE-INTEGRITY",
@@ -974,21 +974,21 @@
       "requires": [
         "FOUND-DATA-INTEGRITY"
       ],
-      "description": ""
+      "description": "File content integrity and lifecycle, including versioning and deletion, is tracked and verifiable."
     },
     {
       "id": "DER-HUMAN-OVERSIGHT",
       "name": "Meaningful Human Oversight",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "A human must meaningfully review and can override high-impact automated decisions."
     },
     {
       "id": "DER-INDEPENDENT-ASSURANCE",
       "name": "Independent Assurance",
       "module": "reliability",
       "requires": [],
-      "description": ""
+      "description": "High-impact functionality requires assurance from a reviewer independent of its designer."
     },
     {
       "id": "DER-OFFLINE-CRYPTO",
@@ -998,7 +998,7 @@
         "CAP-OFFLINE",
         "FOUND-SECURITY"
       ],
-      "description": ""
+      "description": "Data cached for offline use is encrypted at rest on the device."
     },
     {
       "id": "DER-PAYMENT-ADAPTER",
@@ -1007,7 +1007,7 @@
       "requires": [
         "CAP-PAYMENTS"
       ],
-      "description": ""
+      "description": "Payment processing sits behind an owned adapter boundary, not a direct dependency on one payment provider's SDK."
     },
     {
       "id": "DER-PAYMENT-IDEMPOTENCY",
@@ -1017,7 +1017,7 @@
         "CAP-PAYMENTS",
         "FOUND-ROLLBACK"
       ],
-      "description": ""
+      "description": "Payment charge attempts are idempotent and cannot double-charge on retry."
     },
     {
       "id": "DER-PAYMENT-RECON",
@@ -1027,14 +1027,14 @@
         "CAP-PAYMENTS",
         "FOUND-AUDIT"
       ],
-      "description": ""
+      "description": "Payments are reconciled against the payment provider's ledger on a schedule."
     },
     {
       "id": "DER-POLICY-FRESHNESS",
       "name": "External Policy Freshness",
       "module": "compliance",
       "requires": [],
-      "description": ""
+      "description": "External regulatory/policy facts this system depends on are tracked for staleness against a freshness SLA."
     },
     {
       "id": "DER-PROMPT-SECURITY",
@@ -1043,7 +1043,7 @@
       "requires": [
         "FOUND-SECURITY"
       ],
-      "description": ""
+      "description": "Prompts and AI context are protected against injection and untrusted-input attacks."
     },
     {
       "id": "DER-SESSION",
@@ -1053,7 +1053,7 @@
         "CAP-IDENTITY",
         "FOUND-SECURITY"
       ],
-      "description": ""
+      "description": "Session tokens and credentials are protected against theft, fixation, and replay."
     },
     {
       "id": "DER-SYNC-CONFLICT",
@@ -1063,7 +1063,7 @@
         "CAP-BG-SYNC",
         "FOUND-DATA-INTEGRITY"
       ],
-      "description": ""
+      "description": "Conflicting concurrent edits made offline are detected and resolved deterministically on sync."
     },
     {
       "id": "DER-TENANT-AUDIT",
@@ -1073,7 +1073,7 @@
         "CAP-MULTI-TENANT",
         "FOUND-AUDIT"
       ],
-      "description": ""
+      "description": "Audit records are scoped and attributable to the correct tenant."
     },
     {
       "id": "DER-TENANT-AUTHZ",
@@ -1082,7 +1082,7 @@
       "requires": [
         "CAP-MULTI-TENANT"
       ],
-      "description": ""
+      "description": "Authorization checks are tenant-scoped, preventing cross-tenant access by default."
     },
     {
       "id": "DER-TENANT-ISOLATION",
@@ -1091,7 +1091,7 @@
       "requires": [
         "CAP-MULTI-TENANT"
       ],
-      "description": ""
+      "description": "Tenant data is isolated such that one tenant cannot read or affect another tenant's data."
     },
     {
       "id": "DER-TENANT-OBS",
@@ -1101,7 +1101,7 @@
         "CAP-MULTI-TENANT",
         "FOUND-OBSERVABILITY"
       ],
-      "description": ""
+      "description": "Observability data (logs/metrics/traces) is tenant-scoped and queryable per tenant."
     },
     {
       "id": "DER-TENANT-RECOVERY",
@@ -1111,133 +1111,133 @@
         "CAP-MULTI-TENANT",
         "FOUND-BACKUP"
       ],
-      "description": ""
+      "description": "Backup and restore operations can be performed safely for a single tenant without affecting others."
     },
     {
       "id": "FOUND-AUDIT",
       "name": "Critical Action Audit",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Every critical or high-impact action is recorded in an immutable audit trail."
     },
     {
       "id": "FOUND-BACKUP",
       "name": "Backup & Recovery",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Data is backed up on a defined schedule with a documented retention policy."
     },
     {
       "id": "FOUND-BLAST-RADIUS",
       "name": "Minimum Blast Radius",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Changes are scoped to the minimum ownership boundary needed, never used to justify duplication or bypassing controls."
     },
     {
       "id": "FOUND-DATA-INTEGRITY",
       "name": "Data Integrity",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Data consistency and correctness invariants are enforced, not merely assumed."
     },
     {
       "id": "FOUND-DEPENDENCY",
       "name": "Dependency Integrity",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Dependencies, internal and external, are tracked and their integrity verified."
     },
     {
       "id": "FOUND-ERROR",
       "name": "Error Handling",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Errors are handled explicitly with a defined taxonomy, never silently swallowed."
     },
     {
       "id": "FOUND-EVIDENCE",
       "name": "Evidence & Traceability",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Factual claims about system behavior are backed by traceable, verifiable evidence."
     },
     {
       "id": "FOUND-INCIDENT",
       "name": "Incident / Recovery Readiness",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "The system has a defined incident detection and recovery process."
     },
     {
       "id": "FOUND-LIFECYCLE",
       "name": "Lifecycle / Deprecation",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Deprecation and end-of-life of any surface follows a documented lifecycle process."
     },
     {
       "id": "FOUND-MIGRATION-SAFETY",
       "name": "Migration Safety",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Schema, data, and contract changes follow a safe, reversible migration sequence."
     },
     {
       "id": "FOUND-OBSERVABILITY",
       "name": "Observability",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "The system emits structured logs, metrics, and traces sufficient to debug it in production."
     },
     {
       "id": "FOUND-RELEASE",
       "name": "Release Verification",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Every release is backed by verifiable evidence, including tests, approvals, and a rollback plan, before shipping."
     },
     {
       "id": "FOUND-RESTORE-VERIFY",
       "name": "Restore Verification",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Backup restore capability is periodically rehearsed and proven, not just assumed."
     },
     {
       "id": "FOUND-ROLLBACK",
       "name": "Rollback / Compensation",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Every change has a rehearsed rollback path across every layer it touches."
     },
     {
       "id": "FOUND-SECRETS",
       "name": "Secret Protection",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Secrets are stored and accessed via a secrets manager, never hardcoded or logged."
     },
     {
       "id": "FOUND-SECURITY",
       "name": "Security Baseline",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "A baseline security posture of least privilege, encryption, and secure defaults is enforced."
     },
     {
       "id": "FOUND-SUPPLY-CHAIN",
       "name": "Supply-chain Security",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Dependencies and build artifacts are scanned and their provenance tracked."
     },
     {
       "id": "FOUND-TESTING",
       "name": "Testing",
       "module": "core",
       "requires": [],
-      "description": ""
+      "description": "Automated tests cover the system's critical paths and are periodically proven non-vacuous."
     }
   ]
 }

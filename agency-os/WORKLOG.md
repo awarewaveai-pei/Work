@@ -1,5 +1,54 @@
 # Worklog
 
+## 2026-09-04（續，System Foundry v1.6：清掉最後 3 項已知缺口）
+
+### `capabilities/catalog.json` 160 個空 description 全補 + G6 gap 補上 + `QUALITY_STRENGTH_MATRIX.md` 自評語氣改成誠實引用
+
+**觸發**：操作者對上一條目列出的「已知未處理」三項再次「都去處理好」。全程 0 個 agent（純資料填寫 + 2 個小型加註編輯，判斷不需要派 critic：機械式資料填寫用程式斷言自證，教義性編輯範圍極小）。
+
+**[已修改]**：
+- `capabilities/catalog.json`：實際盤點後發現是 **160 個**（不是先前估計的「約115個」）能力節點 description 全空，非「幾乎全空」。寫一支腳本（`fill_capability_descriptions.py`，跑在 scratchpad，不入庫）建立 160 個 id→description 對照表逐一填入，每條都是基於能力 id/name/module/requires 依賴關係寫的一句話描述，多條直接點名它在 55 份新規則文件裡對應的具體標準（例：`CAP-SSO` 點名 `commercial/ENTERPRISE_STANDARD.md`、`CAP-EDITIONS` 點名 `commercial/EDITION_ARCHITECTURE.md`）。腳本本身斷言「必須剛好覆蓋全部 160 個 id、不多不少」，跑完再用獨立指令確認 0 筆空值。
+- `methodology/06_EXPERT_COUNCIL_STANDARD.md`：只加一個 `## Gate` 段落點名 `G6_ENGINEERING_REVIEWED`（`runtime/stage-gates.yaml` 真正定義），不動這份檔案原本已經很好的其餘內容——補上上一條目 critic 覆審後留下的唯一已知缺口（00→14 除 06 外全部認領了自己的機器 gate 或明講沒有）。
+- `QUALITY_STRENGTH_MATRIX.md`：標題錯誤版本號 `v1.4`→`v1.6`；新增「Evidence Basis」段落誠實框定——全部 VERY STRONG 評級是自評，不是獨立驗證（呼應框架自己 `01_SYSTEM_FOUNDRY_CONSTITUTION.md` 禁止「把 Expert Agreement 當 Evidence」），把「今天這個 session 真的重跑過 12 步 verify chain 三次 + critic 獨立重跑過同一套驗證」列為唯一可獨立核對的具體證據，並明確區分「機器可驗證的結構完整性」與「文件內容品質」兩者評級基礎不同、後者仍待 `assurance/INDEPENDENT_REVIEW_STANDARD.md` 等級的獨立審查。沒有動任何一個既有 VERY_STRONG 標籤本身——沒有證據可以判斷哪一項該降級，只補證據來源框架。
+
+**[未動、刻意保留]**：這次工作階段發現 repo 根目錄多了 2 個未追蹤新檔案（`Ollama_Universal_AI_Foundry_Architecture_v1.0.md`、`recipes/ollama_Universal_AI_Foundry_Architecture_v1.0.md`）——非本次任務產出，判斷是另一並行 session 寫入，未讀取、未納入本次 commit、未刪除，留給該檔案的作者或操作者自行處理。操作者已明確指示「別的session的東西都不要去碰」。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`fill_capability_descriptions.py`（斷言 id 集合精確相等 + 填完後獨立 `python3 -c` 二次確認 empty=0）| exit=0 | result=`total=160 changed=160 still_empty=0`
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain + `python -m unittest discover -s tests` | exit=0 | result=全綠（`validate_configurator`／`validate_artifact_generation` 皆回報 `capabilities=160`，確認結構未被填值過程破壞）
+- BUGHUNT_DONE: scope=agency-os,scripts,agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE | grep=機械抽取 `06_EXPERT_COUNCIL_STANDARD.md` + `QUALITY_STRENGTH_MATRIX.md` 內全部 `` `path` `` 交叉引用逐一核對存在 | hits=0（3 個路徑全部存在）
+- REVIEW_WAIVED: NA — 純資料填寫（程式斷言自證）+ 2 處小型加註編輯（未動既有規則內容），風險層級與範圍不足以再派 critic agent，符合操作者「聰明智慧使用 agent」的要求
+
+**[剩餘風險]**：無新增；三項已知缺口皆已處理完畢。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE`。
+
+## 2026-09-04（續26，同一 session：Cognitive OS 第十三個 Method Atlas 切片 — `architecture.event_storming`，主動比較兩個相鄰方法根基後選擇較紮實者）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`architecture.event_storming`（F18 pack 第二個成員方法，非整個 pack）。這次沒有照文件順序直接做緊接在 ADR 之前的鄰居 DDD（§11.35），而是先兩個都讀完再比較：DDD 只給 6 個裸概念名稱（Ubiquitous Language/Subdomain/Bounded Context/Context Map/Aggregate/Domain Event），零 pipeline、零欄位形狀；Event Storming（§11.36）給了真的因果流向記號「Domain Event ← Command ← Actor ← Policy ← External System → Aggregate／Read Model」——這個記號直接蘊含一條可執行的不變量（每個 domain_event 都必須能追溯到至少一個成因，不能憑空出現），同 causal.dag 對圖表的「照字面讀、只強制圖表真的蘊含的東西」紀律一致。這個比較過程明文寫進 contract 的 description，不是暗自選了 Event Storming 就算了。
+
+**記號蘊含的不變量，不只是詞彙表**：把箭頭記號當成因果流向圖讀（Domain Event 被 Command/Actor/Policy/External System 觸發；Domain Event 導向 Aggregate 或 Read Model）直接蘊含一條真的、可執行的規則：session 裡每個 `domain_event` element 都必須有至少一個 incoming relationship——沒有任何東西指向它的 domain_event 違反了記號本身「每個事件都被某件事觸發」的讀法。CLI 真的跑了一次攻擊：嘗試建構一個沒有任何 incoming relationship 的 domain_event，確認被擋下。
+
+**拆開一個記號裡綁在一起的元素，誠實揭露是詮釋非發明**：Atlas 記號用斜線把 Aggregate／Read Model 綁在同一個箭頭目標，純粹是記號空間節省寫法。schema 拆成兩個獨立 element type（`aggregate`／`read_model`），根據是業界標準、獨立存在的 Event Storming 真實詞彙（同第十二切片 `status` 欄位那種「外部真實實務佐證」等級），明文揭露這是詮釋一個壓縮記號，不是逐字 Atlas 引用。
+
+**克制沒有超出記號能撐住的範圍**：跟 orphan-event 不變量（記號的每一種讀法都蘊含）不同，Atlas 沒有給任何一張「哪些 element type 可以合法連到哪些 element type」的完整表（Policy 能不能直接連到 Read Model？Atlas 沒說）。沒有發明一張完整合法性表，只強制記號明確蘊含的那一條規則，relationship 的類型配對合法性留白，已誠實揭露而非默默發明或默默遺忘。
+
+**[已修改]**：spec-root 新增 `methods/contracts/architecture.event_storming.contract.yaml`（逐字引用 Atlas §11.36＋F18 表格列）＋`specs/cognitive/typed-objects/event-storming-session.schema.yaml`（7 值封閉 element type enum，自由形式因果流向邊）＋對應 golden fixture（2 valid + 3 invalid）＋`contract-backlog.yaml` 新增 `tier_1.eleventh_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/architecture/event_storming.py`（builder：3 個前置條件 + orphan-event 不變量 + 兩個 gate）＋`ai_lego/apps/cli/run_event_storming_slice.py`（真實訂單取消流程，7 種 element type 全用到＋攻擊驗證）＋`tests/unit/test_event_storming.py`（10 tests，第一次跑就全綠）＋`docs/THIRTEENTH_SLICE_ARCHITECTURE_EVENT_STORMING.md`。`ai_lego/modules/architecture/__init__.py` docstring 補上第二個租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_event_storming_slice` | exit=0 | result=第一次真跑就通過（含 orphan 不變量攻擊驗證）：`PASS architecture.event_storming: elements=7, relationships=6, gates [provenance_required=PASS, no_orphan_domain_events=PASS], orphan_invariant_verified=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_event_storming -v` | exit=0 | ms=767 | result=10 passed，第一次跑就全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2625→2635
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=54435 | result=**430 tests OK**（420→430，零回歸；`git diff --stat` 對照 `provenance.py`／`method_resolver.py`／`schema_contracts.py`／`event_ledger.py`／`modules/architecture/adr.py` 五個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：選 Event Storming 而非 DDD 是不是真的比較過根基還是隨便挑（是真的比較過，兩份 Atlas 段落都讀完，比較結果寫進 contract description）；orphan-event 不變量是不是記號真的蘊含還是自己加的規則（是記號真的蘊含，箭頭本身就是「被什麼觸發」的讀法，非新增規則）；relationship 類型配對合法性留白會不會其實該做（不該，Atlas 沒給表格，做了就是發明，已誠實留白並記錄開放問題）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`architecture[.]event_storming\|EventStormingSession\|event-storming-session\|modules/architecture/event_storming\|run_event_storming_slice` | hits=全部為本切片自己的新檔案、session log 雜訊、`__pycache__` 編譯產物、以及並行 session 的 gitignored `ao-resume-hook-last.json/.log`（正確反映新檔案存在）——無任何過期或非預期殘留引用
+
+**[剩餘風險]**：`OQ-EVENTSTORMING-1`／`OQ-EVENTSTORMINGSESSION-1`（relationship 類型配對合法性未強制，僅自由文字 label）；`OQ-EVENTSTORMING-2`（機器 id 未回填 method-inventory.yaml）。皆非阻塞，已誠實揭露於 contract 與 docs。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（新增檔案為主，`modules/architecture/__init__.py` docstring 純增補是唯一觸碰既有檔案處，回退零副作用）。
+
 ## 2026-09-04（續25，同一 session：Cognitive OS 第十二個 Method Atlas 切片 — `architecture.adr`，第一個結構化文件形狀＋第一個源自真實實務而非 Atlas 引用的欄位）
 
 **觸發**：延續操作者授權，繼續自主推進。0 agent。
