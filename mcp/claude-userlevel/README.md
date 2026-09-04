@@ -52,7 +52,7 @@ project-level commands 在 repo 開啟時優先；user-level 作為不開 repo �
 **強制覆蓋（overwriteKeys）**：
 - `autoUpdatesChannel`（"latest"）
 - `theme`（"light"）
-- `permissions.deny`（git push --force / -f / gh pr merge / git checkout -b / git switch -c / git switch --create / git branch — CLAUDE.md 強制分支保護）
+- `permissions.deny`（`Workflow` 整個工具 — 其 fan-out 對 PreToolUse 不可見，2026-09-03 99-agent 事故；git push --force / -f / gh pr merge / git checkout -b / git switch -c / git switch --create / git branch — CLAUDE.md 強制分支保護）。遠端鏡像：`scripts/wire-remote-hooks.sh`；`tests/hooks/settings-deny-parity.test.mjs` 守兩邊一致
 - `permissions.additionalDirectories`（用 `${USERPROFILE}` `${MONOREPO_ROOT}` 變數展開）
 - `hooks` 段（薄接線：每個 event 呼叫 ~/.claude/hooks/runner.js；規則清單在 rules.manifest.json）
 

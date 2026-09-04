@@ -14,6 +14,7 @@
 #                                         (tiers, marker, sliding window, ListAgents non-match)
 #   tests/hooks/normalize-claude-settings.test.mjs — HOOK_EVENTS coverage (all 11 events)
 #   tests/hooks/subagent-charter-rule.test.mjs — charter rule success/fail-open/defensive-ctx paths
+#   tests/hooks/settings-deny-parity.test.mjs — Workflow tool denied on both settings sources (template + remote generator)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -29,4 +30,4 @@ else
   exit 127
 fi
 
-"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs

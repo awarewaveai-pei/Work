@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-04（續20，同一遠端 session：Workflow tool 整個 deny — 關掉「瘋狂派 subagent」這一類，不再只驗自報估計）
+
+**[任務理解]** 操作者問「瘋狂派 subagents 有解決嗎」→ 回答「解一半」→ 操作者「你做最完美決定與處理」。不變量：**任何 fan-out 都必須經過 PreToolUse 可見的路徑**。Agent tool 滿足（`subagent-budget.js` 真實 spawn 驗證過）；Workflow tool 不滿足——`agent()` 在背景執行，hook 只能驗 `SUBAGENT-BUDGET-ESTIMATE` 自報值，動態爆量（腳本跑到一半才算出 N）防不了，`resumeFromRunId` 路徑更是零保護且從未真實驗證。證據：`reports/agent-dispatch/dispatch-20260903.jsonl` 當天只記到 6 個 agent，而事故是 99 個——記錄 hook 同樣看不到 Workflow 內部。
+**[方案]** A 改 Workflow 分支做腳本靜態分析（擋 `.map(`→`agent(`）：誤擋多、仍是啟發式；B **`permissions.deny` 整個關閉 Workflow tool**：不變量直接成立，本 repo 正面模板是固定 4-5 角色走 Agent tool，Workflow 的並行收益換不回失控風險。選 B。
+**[已修改]**
+- `mcp/claude-userlevel/settings.template.json`：`permissions.deny` 首項加 `"Workflow"` + `_deny_workflow_comment` 說明（README §加新 deny 規則流程：改 template → commit → 各機 `sync-claude-userlevel.ps1 -Mode merge`）。
+- `scripts/wire-remote-hooks.sh`：生成的 `settings.local.json` 加同一 deny（遠端 container 不讀 template，必須鏡像）。本 container 已 `--force` 重生，下個 session 生效。
+- `tests/hooks/settings-deny-parity.test.mjs`（新）+ `scripts/test-hooks.sh` 登記：兩個來源各一條測試；生成器測試在 tmp 目錄跑真實腳本，不碰真 `.claude/`。
+- `agency-os/AGENTS.md` §5、`mcp/claude-userlevel/README.md`：規則與清單同步。`subagent-budget.js` Workflow 分支**保留**為縱深防禦（deny 未同步到某機時仍有聲明閘）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=1 | ms=~4000 —— 152 案 151 過；唯一紅 `git-commit-scope-guard v4 fix m1`（POSIX bare `cd`）在 `git worktree add origin/main` 上同樣紅（96/97），與本次無關、另案。突變測試：template 移除 `Workflow` → 測試 1 紅、測試 2 綠；生成器 deny 清空 → 測試 2 紅、測試 1 綠；還原 → 2/2 綠。`bash scripts/wire-remote-hooks.sh --force` 後 `settings.local.json` `permissions.deny == ['Workflow']`。
+- REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/1m/0n —— (m) deny 語法：Claude Code permission rule 裸工具名即整工具（同既有 `WebFetch` 慣例），未加 `(*)` 是刻意；`sync-claude-userlevel.ps1 -Mode merge` 對 `permissions.deny` 是 governed key 整組覆蓋（`:351`），template 加項即傳播；JSON 以 `json.dumps(indent=2, ensure_ascii=False)` 回寫，diff 僅 +3/-1 無整檔重排。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests | grep=`SUBAGENT-BUDGET-ESTIMATE\|resumeFromRunId\|Workflow tool` | hits=3 stale（`AGENTS_APPENDIX.md` 存檔區的原文描述 Workflow 分支為現行防線——存檔區依定義不改；`subagent-budget.js` 檔頭註解仍以 Workflow 為主要路徑之一——保留為縱深防禦，行為未變，不需改）
+- ORACLE_WAIVED: 本 container 無 codex CLI／pwsh；以突變測試 + 書面自審替代（memory `feedback_self_review_when_oracle_down`）。
+**[剩餘風險]** ① deny 只在 Claude Code 生效，`claude -p` 另開 session 若載入不同 settings 不受保護（架構上本來就不在 hook 視野）；② 筆電需跑一次 `sync-claude-userlevel.ps1 -Mode merge` 才真的生效，遠端下個 session 起生效；③ 若日後真需要 Workflow，從 deny 移除 + 補一個能看見真實 spawn 的閘，不可只移除。
+**[rollback]** 從兩處 deny 清單移除 `"Workflow"`、刪 parity test 與 test-hooks 登記行。
+- AUTO_TASK_DONE: Workflow tool deny（template + 遠端生成器 + parity test 突變驗證）；瘋狂派 subagent 問題由「驗自報估計」升級為「路徑整個關閉」。
+
 ## 2026-09-04（續19，遠端 session：CLAUDE.md + AGENTS.md 第二次瘦身 — 48.7 KB → 20.5 KB，規則本體不減、敘事全搬 APPENDIX）
 
 **[任務理解]** 操作者問「CLAUDE.md／AGENTS.md 是幫助還是拖累」→ 指示「徹底研究後優化到最有效益、最正確的版本」。根本問題：兩檔每輪整份注入 prompt（合計 48.7 KB ≈ 20k+ tokens），其中約四成是事故敘事（日期＋輪次＋案例）、同一事實重複三處（主機邊界）、規則互相衝突到需要「優先序」段，且檔案自己承認「大檔案容易被漏讀」。這是「5 小時額度 20-30 分鐘燒光」的固定成本項之一（每輪先付 20k 才開始做事）。
