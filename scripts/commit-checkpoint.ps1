@@ -65,13 +65,18 @@ try {
         throw "commit-checkpoint: refusing to run -- a merge/cherry-pick/revert/rebase/stash-pop/am operation is in progress in $WorkRoot. A scoped 'git commit -- <paths>' cannot complete until it is resolved or aborted."
     }
 
-    # $Paths are file paths, not directories: a directory pathspec would stage/commit every
+    # $Paths must be files, not directories: a directory pathspec would stage/commit every
     # dirty tracked file under it, including a concurrent session's, defeating the point of
-    # naming paths at all. Both current callers (.claude/commands/tomo.md) already pass files.
+    # naming paths at all. 2026-09-05: enforced structurally, not just documented in this
+    # comment -- both current callers (.claude/commands/tomo.md) already pass files, so this
+    # closes the residual gap without changing behavior for any real caller.
     foreach ($p in $Paths) {
         $full = Join-Path $WorkRoot $p
         if (-not (Test-Path -LiteralPath $full)) {
             throw "Path not found: $p"
+        }
+        if (Test-Path -LiteralPath $full -PathType Container) {
+            throw "commit-checkpoint: '$p' is a directory -- -Paths only accepts individual files. Name each file explicitly."
         }
         if ($DryRun) {
             Write-Host "[dry-run] would: git add -- $p" -ForegroundColor Cyan

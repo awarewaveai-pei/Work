@@ -1,5 +1,59 @@
 # Worklog
 
+## 2026-09-05（`commit-checkpoint.ps1` 補上結構性擋目錄 pathspec——收尾早前同日修復留下的最後一項殘留風險，操作者直接點名要關）
+
+**觸發**：操作者針對早前同日 commit `8b92cdbde` 的 [剩餘風險] 逐字複述「`-Paths` 若未來呼叫者傳目錄而非檔案，仍會 stage/commit 該目錄下所有髒檔案」，要求關掉這項殘留。
+
+**[任務理解]**：早前修復只在 `scripts/commit-checkpoint.ps1:68-70`（舊行號）留註解說明「`-Paths` 是檔案不是目錄」，未做結構性擋——critic round 1 review 已指出這是可選項而非必要項（現有兩個呼叫者都只傳檔案），但操作者現在要求把它從「約定」升級為「不變量」。
+
+**[已修改]**：`scripts/commit-checkpoint.ps1` foreach 迴圈內，`Test-Path -LiteralPath $full` 存在性檢查後加 `Test-Path -LiteralPath $full -PathType Container` 判斷，命中即 throw，不進 staging。
+
+**[驗證計畫→已完成，四動作]**：
+- 實測：拋棄式 temp repo（含 `subdir/nested.txt`）—— 傳單一檔案／含子目錄下檔案的路徑仍正常 commit；傳 `-Paths @('subdir')`（目錄）exit 1 且 throw 明確訊息，`git status` 確認 `subdir/nested.txt` 完全未被 staged。
+- Review：純結構性加一個 `Test-Path -PathType Container` 判斷分支，無其他邏輯改動，範圍小於觸發 subagent critic 門檻，自審：不影響任何現有呼叫者行為（`tomo.md`／`checkpoint.md` 皆只傳檔案）。
+- 抓蟲：scope=agency-os,scripts,.claude | grep=`commit-checkpoint\.ps1.*-Paths` | hits=2（`tomo.md:59`／`checkpoint.md:8`，皆傳檔案非目錄，不受影響）。
+- WORKLOG：本條目。
+
+[已修改]
+1. `scripts/commit-checkpoint.ps1` — `-Paths` 目錄項目結構性拒絕（`Test-Path -PathType Container` throw），關閉 `8b92cdbde` 留下的最後一項殘留風險。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File commit-checkpoint.ps1（拋棄式 temp repo，含子目錄）| exit=0（檔案）/1（目錄，預期）| ms=~5000
+- REVIEW_WAIVED: NA -- 單一 Test-Path 分支新增，無邏輯改動，已用 Read 讀回確認
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`commit-checkpoint\.ps1.*-Paths` | hits=2（僅有的兩個呼叫者皆傳檔案，行為不受影響）
+
+[剩餘風險] 無新增；`8b92cdbde` 條目列出的其餘項目（`checkpoint.md` 已修、PowerShell 5.1 引號剝除為既有已知風險）維持原狀。
+
+[rollback] `git revert` 本次 commit（單一檔案單一區塊變更）。
+
+## 2026-09-05（System Foundry v1.6 configurator UI/UX 重做第一批：01+04 合併、09 真分組、Q-NOT-003 依平台拆題、27→27 大項重排）
+
+**根本問題**：操作者實際點過卡片式 UI 後回報「UI/UX 很差，而且 27 大項的順序沒有邏輯」，並指名 4 項舊修法（`d2b5988de`）不夠：01.使用對象／04.公司與組織該結構性合併而非只加互相參照文字；09.商業模式 6 題該真分組而非純文字提示；11.通知 `Q-NOT-003` 重提需先確認是否有新訴求；27 大項順序是「產生順序」不是「使用者敘事順序」。
+
+**開工前先問**（避免重工，`agency-os/TASKS.md` 斷點本身就寫了這一步）：Q-NOT-003 → 操作者要求**細分平台**（手機 App／桌面應用程式各自一題，而非單一題套所有已選平台）；27 大項重排完後要不要順便做操作者截圖那種 Step 精靈式流程 → 操作者選**先不做，看效果再說**，範圍留在本次的合併/分組/重排。
+
+**[現況分析]**：`questionnaires/catalog.json`（154→153 題前、28→27 類別）是唯一 SSOT，`validate_configurator.py` 只驗證 `question.category` 存在於 `categories` 集合、`active_when` 引用可解析、capability/rule 依賴圖——不檢查 `order` 連續性或類別數量，所以合併/重排在結構上安全。Grep 確認 `"organization"`／`Q-ORG-*` 只在 `questionnaires/catalog.json`、`rules/question-rules.json`、`scripts/configurator_engine.py`、`tests/` 內以**題目 ID**（非 category id）被引用，`capabilities/catalog.json`／`generation/module-obligations.json` 裡的「organization」字樣只是 capability 名稱文字巧合，不是 category 引用——合併只需要改 5 個 `Q-ORG-*` 的 `category` 欄位，不用碰題目 ID 本身。`CAP-PUSH` capability 本來就是「mobile or browser push」通用描述，拆題後兩題共用同一 capability 沒有語意衝突。額外抓到 5 處描述文字裡的**類別序號硬編碼**（`04. 公司與組織`／`01. 使用對象`／`02. 使用介面`／`11. 通知`／`12. 外部整合`）——這正是「27 大項一改順序全部跟著錯」的根因之一，這次順手把 5 處全部改成純標題引用（不帶數字），從根本消除重排時序號漂移這個 bug class，不只是修完這次的排序。
+
+**[方案比較]**：09.商業模式分組 A（把 6 題實際搬動陣列順序來분群）vs B（題目留原位＋新增 `q.group` 欄位＋`app.js render()` 依 `cat.groups` 定義的順序做二次排序後分桶渲染）。選 B——不改變題目 ID／陣列既有位置語意，`app.js` 的分組邏輯是舊行為的嚴格超集（沒有 `cat.groups` 的類別完全不受影響，維持逐字元相同渲染），風險最小。
+
+**[已修改]**：
+- `questionnaires/catalog.json` — ① `scope`＋`organization` 合併成單一 `scope`（標題「使用對象與組織」，5 個 `Q-ORG-*` 題目 `category` 改指向 `scope`）② `commercial` 類別新增 `groups:[enterprise,subscription,general]`，`Q-COM-002/004/005→subscription`、`Q-COM-006→enterprise`、`Q-COM-003→general` ③ `Q-NOT-003` 改為僅綁定手機 App（`active_when: Q-CH-002`），新增 `Q-NOT-006` 桌面應用程式推播（`active_when: Q-CH-003`）④ 5 處類別序號硬編碼描述文字改純標題引用 ⑤ 27 個類別（合併後 28→27）依「WHO 使用者→WHAT 核心資料/流程→商業模式→客戶關係與成長（7部門拆分：客服/行銷/銷售/內容/社群近客戶端、HR/採購近內部營運）→溝通與外部整合→內部營運→技術平台能力→風險與治理→未來規劃」重新編號 `order` 1–27
+- `rules/question-rules.json` — 新增 `RULE-Q-NOT-006`，`require: [CAP-PUSH]`（跟既有 `RULE-Q-NOT-003` 共用同一 capability，語意對稱）
+- `configurator/app.js` `render()` — 新增類別內依 `cat.groups`/`q.group` 分桶渲染子標題（`<h3 class="group-title">`）的邏輯；沒有宣告 `groups` 的類別 `groupIdx` 恆為 0、單一 bucket、無子標題，行為與修改前逐字元相同
+- `configurator/styles.css` — 新增 `.group-title` 樣式
+- `manifest.json` — `python scripts/regenerate_integrity.py --write` 重算受影響檔案 hash（`kernel/*.md` 未變動，`kernel_digest` 不變，`registries/kernel.yaml`／`runtime/agent-roles.yaml` 這次未被觸發改寫）
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests`（`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE`） | exit=0 | ms=~2147 | result=29 tests OK（含 `test_manifest_passes`／`test_deterministic_plan`／`test_questionnaire_digest_stable`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_configurator.py` | exit=0 | result=`CONFIGURATOR VALIDATION: PASS questions=154 capabilities=192 modules=32`
+- REALTEST_EVIDENCE: tool=Browser（`preview_start name=system-foundry-configurator`，重啟撿起新檔——`configurator_engine.load()` 有 `@lru_cache`，舊 process 會回舊資料，這是本次過程中真的踩到的一個小坑）| cmd=真點擊「手機 App」channel 卡片 → DOM 讀回「手機 App 推播通知」active／「桌面應用程式推播通知」仍 inactive → 點擊推播卡片 → 點「驗證」→ POST `/api/resolve` | 結果=`驗證通過`，`使用者選擇 2，自動衍生 0，Baseline 18`，證明整條路徑（UI click→payload→後端 rule engine→CAP-PUSH 衍生）真的跑通，不是只改了 JSON 沒接到後端。另用 DOM 讀回確認 08.商業模式類別內三個子標題（適合賣斷給企業／集團、適合開放上網訂閱或用點數、通用方案設定）依序渲染、01.使用對象與組織已看到合併後 9 題連續呈現且描述文字已無殘留序號
+- REVIEW_DONE: critic=Quick（self-review，純資料結構調整＋一段新渲染邏輯，`validate_configurator.py` 是這個系統自己的 schema/rule-graph 完整性 oracle，等同結構面已有機械 review；`app.js` 分組渲染邏輯人工覆核過"沒有 groups 的類別完全不受影響"這個不變量）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Q-NOT-003\b` | hits=5（`WORKLOG.md`/`TASKS.md` 舊敘述描述修改前的正確歷史事實，不需改；`Water_Electrical_MEP_ALL_LATEST_2026-09-03/.../core-foundry-answers*.json` 是另一個已生成專案的**凍結歷史答案快照**，記錄的是舊 schema 下的合法回答，不是本次題庫的即時引用，不動）。另 grep `"category": "organization"` scope 同上，hits=0（確認合併後沒有殘留孤兒引用）
+
+**[剩餘風險]**：低——本次只做「合併＋分組＋重排＋拆題」，不含操作者已表態暫緩的 Step 精靈式流程重做（`TASKS.md` 該任務條目維持開啟，等操作者實際玩過這批修改後再決定要不要做精靈式）；`app.js` 的分組渲染只在 09.商業模式啟用，其餘 26 類別未使用，尚未有除了本次 09 以外的第二個真實案例驗證分組邏輯的泛用性。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/{questionnaires/catalog.json,rules/question-rules.json,configurator/app.js,configurator/styles.css,manifest.json}`
+
 ## 2026-09-05（`/checkpoint` 命令文件與腳本簽名脫節 + `checkpoint-junk-guard.mjs` 呼叫者註解過期，收尾同日 `commit-checkpoint.ps1` 修復時 spawn 出的獨立任務 task_c84bf5cc）
 
 **根本問題**：2026-08-25 `commit-checkpoint.ps1` 重寫（`7251d14d2`）把 `-Message`／`-Paths` 改成 Mandatory、拔掉 `git add -A`，但 `.claude/commands/checkpoint.md:4` 呼叫時仍完全不傳這兩個參數——依文件操作 `/checkpoint` 會卡在 PowerShell mandatory-parameter 互動提示，非靜默失敗。同時 `scripts/checkpoint-junk-guard.mjs:2-3` 的檔頭註解仍寫「Called by commit-checkpoint.ps1 between `git add -A` and the commit」，但同一次重寫已把該 guard 的唯一存活呼叫點移到 `scripts/ao-close.ps1:1202`（緊接它自己的 `git add -A` 之前）——純文件過期，非死碼、不需重接線。
