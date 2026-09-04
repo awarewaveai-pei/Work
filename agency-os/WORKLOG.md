@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-04（續14，新 session：Cognitive OS 第二個 Method Atlas 切片 — `root_cause.fishbone`，回應操作者「我要你全部做好」）
+
+**觸發**：操作者（怒）「繼續 Cognitive OS，去立刻全部做好，你他媽的搞了一個星期只做出一個語音轉文字的廢物」。先讀 `TASKS.md` 2026-09-04「Cognitive OS 從一個切片擴展成完整平台」條目：已同意的第一步是挑一個**新的、跟質化編碼不同形狀**的方法接進既有 `ai_lego` 框架，實測組裝要多久——這是驗證「LEGO 可組裝」承諾的關鍵測試，非本條目自己臨時決定的方向。0 agent（單一 artifact，主 agent 自己動手，符合 Agent 扇出治理）。
+
+**選型**：F05 根因分析的 `root_cause.fishbone`。理由：① `methods/contracts/root_cause.fishbone.contract.yaml` 與其三個 typed-object schema（ProblemStatement／CauseHypothesisSet／RootCauseFact）**上個 session（2026-08-29）已核准 ACTIVE**，選它不需重開 spec-root 治理（ADR 級工作），符合本條目「測組裝速度」的範圍，不是「順便把 spec 也寫了」；② 形狀刻意跟質化編碼不同：單步生成＋硬性 forbidden_transition 型別邊界，無 coder-agreement 迴圈、無 Kappa、無 eval harness、不需 AI 模型呼叫。
+
+**不變量**：Fishbone 只能產生 CauseHypothesisSet，不能直接產生 RootCauseFact（Atlas §9 forbidden_transition、§11.4 L1267）——這條規則必須是程式碼層真閘（呼叫即拋錯,不是文件敘述),且必須雙向證明:直接晉升被擋、記錄過驗證方法後晉升成功。contract 自己的 `quality` 區塊（`provenance_required`／`evidence_labeling_required`）是唯一該做的 gate 面,不多做、不少做。
+
+**[已修改]**：新增 `Projects/internal/cognitive-engineering-os/ai_lego/modules/root_cause/__init__.py`＋`fishbone.py`（builders＋兩個 quality gate＋forbidden-transition guard）；`ai_lego/apps/cli/run_fishbone_slice.py`（端到端可跑 CLI）；`tests/unit/test_fishbone.py`（17 tests，schema 對真 spec-root 驗證＋mutation-style）；`docs/SECOND_SLICE_ROOT_CAUSE_FISHBONE.md`（狀態/證據/誠實邊界，仿 `PHASE5_RESEARCH_SLICE.md` 格式）。**零改動**：`method_resolver.py`／`schema_contracts.py`／`event_ledger.py`／`ledger_guards.py`／`provenance.py`（證明重用,不是重寫）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_fishbone_slice` | exit=0 | ms=~1000 | result=`PASS root_cause.fishbone: 3 hypotheses, gates [provenance_required=PASS, evidence_labeling_required=PASS], forbidden_transition_blocked=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_fishbone -v` | exit=0 | ms=~650 | result=17 passed（schema 對真 `typed-objects/*.schema.yaml` 驗證；`MethodCatalog` 零改動即解析／invoke `root_cause.fishbone`；forbidden-transition 雙向：直接晉升拋 `FORBIDDEN_TRANSITION_BLOCKED`,含「validation_methods_applied 非空但 ready_for_promotion 未同步」的不一致紀錄同樣被擋；`record_validation_applied` 後合法晉升成功且輸出通過 `root-cause-fact.schema.yaml`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .` | exit=0 | ms=199027 | result=**247 tests OK**（230→247,零回歸;含既有 offline-STT/meeting-service 套件全過)
+- ORACLE_WAIVED: `scripts/oracle-quota.ps1 -Action check -Tool critic` exit=3（429 blocked until 2026-09-05 05:20）、`-Tool codex` exit=3（usage limit until 2026-09-07 11:06）——斷路器擋下,未連線。以書面對抗自審＋既有 mutation 證據替代（`feedback_self_review_when_oracle_down`）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:provenance=None／epistemic_type=None 兩個 falsy-guard 路徑是否會誤判(不會,兩個 gate 分工正確且不互相掩蓋);forbidden-transition 是否只信任 caller 自算的 `ready_for_promotion`(不是,guard 同時檢查 `validation_methods_applied` 非空,已用 stale-flag 測試證明);CLI 是否偽造未實作方法的驗證紀錄(沒有,`OQ-FISHBONE-1` 誠實記錄四個 recommended_next 方法皆無 contract,slice 停在 forbidden-transition 證明處,不假造)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`modules.root_cause\|modules/root_cause\|run_fishbone_slice\|FISHBONE_PRECONDITION_FAILED\|FORBIDDEN_TRANSITION_BLOCKED\|root_cause[.]fishbone` | hits=0 stale（全部命中皆為本次新增檔案自身;`TASKS.md`/`PHASE5_RESEARCH_SLICE.md` 事前 grep 確認零既有提及,無需調解舊敘述）
+
+**[剩餘風險]**：只證明了「第二個形狀能重用框架」,不代表其餘 ~35 個方法同等快——F18/F19/F20 等在 Atlas 裡本身是「pack」(多工具套件),量級不同,不能線性外推。CauseHypothesisSet→RootCauseFact 的合法路徑(root_cause.five_whys 等 4 個 recommended_next 方法)仍無 contract,故 CLI 只證明「擋得住」,不含「跑得完整鏈」——這是誠實留白,寫進了 `SECOND_SLICE_ROOT_CAUSE_FISHBONE.md`,不是遺漏。EC §10 14-state 執行機被刻意排除在本切片外(`build_current_state` 的 EC §11 維度文字是質化編碼專用,硬套會是偽造紀錄),留待未來把該函式改參數化再重用。
+
+**[rollback]**：純新增檔案(除 `TASKS.md`/`WORKLOG.md` 外零既有檔案改動),`git rm` 三個新檔＋還原 TASKS.md 對應段落即可完全復原,無需 revert 既有邏輯。
+
 ## 2026-09-04（Docker Desktop crash-loop recovery hardening + Trigger supervisor repair）
 
 **觸發／根因**：Docker Desktop 4.71.0 在非正常 backend 結束後遺留 AF_UNIX reparse-point sockets，造成下次啟動 cleanup crash loop。資料盤 `docker_data.vhdx` 與 volumes 未受損。另 `trigger-supervisor` 把本機 shared-volume token 送到 `.env` 覆寫後的公開 `trigger.aware-wave.com`，而不是同一 Compose project 的 Webapp；公開端不持有本機 token 對應的 DB 記錄，故持續 401/restart。比對本機 token 的 raw／trim SHA-256 與本機 DB hash 均一致，排除 token 損毀。
