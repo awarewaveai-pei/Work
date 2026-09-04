@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-09-04（續10，同一 session：最小收工 + `git-stage-hunks.py` 漏 pathspec 的真實事故修正）
+
+**觸發**：操作者選「不跑 ao-close.ps1，只寫記憶」。寫 `memory/daily/2026-09-04.md` 與 `CONVERSATION_MEMORY.md` Today 段後，用 `scripts/git-stage-hunks.py` 只提交自己的 hunk——腳本的 `git commit` 沒帶 pathspec，把另一個 session 已 stage 的兩個 hci30 migration 檔一起掃進 commit（`fbc31e0e5`，未推）。`git reset --soft HEAD~1` 後改用帶 pathspec 的 commit 重做（`aff7fa1c4`，已推），另一個 session 的 staged 檔原樣留在 index。
+
+**[已修改]**：`scripts/git-stage-hunks.py`：commit 改為 `git commit -F <msg> -- <file> <extra...>`（註解記事故）。memory `reference_shared_worktree_partial_staging.md` 補「push 被拒且共用 index 有他人 staged 檔」的暫時 worktree 推送法。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile scripts/git-stage-hunks.py && python scripts/git-stage-hunks.py --help` | exit=0 | result=SYNTAX_OK、help 正常；事故本身即真實案例（腳本原版把 2 個外來 staged 檔掃進 commit，`git show --stat` 可證），修正後的路徑等同本條目手動執行的 `git commit -F … -- <files>`（`aff7fa1c4` 只含 2 個 memory 檔）
+- REVIEW_DONE: critic=self | verdict=pass | findings=0c/1m/0n（medium 即本事故）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`git-stage-hunks` | hits=見指令輸出（memory 檔與 commands 提到腳本用法，語意不變）
+- ORACLE_WAIVED: 斷路器仍 block
+
+**[剩餘風險]**：腳本的 `git add <file>` 仍會讓 commit-scope hook 只認這個 session 的 add；其他 session 的 staged 檔現在不會被掃進，但也不會被警告。**[rollback]**：`git revert`。
+
 ## 2026-09-04（續9，同一 session：selective prompt v2 — 三階段第一次全由模型完成並全過 gate）
 
 **觸發**：續8 真跑的觀察（4B 模型抄成員 code 當分類名）。**0 agent**；oracle 仍 block。

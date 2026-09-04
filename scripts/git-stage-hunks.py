@@ -93,7 +93,10 @@ def main():
     print(f"staged {kept} hunk(s) of {args.file}: {staged or '(index unchanged?)'}")
 
     if args.commit_file:
-        result = run("git", "commit", "-F", args.commit_file, check=False)
+        # Pathspec-scoped on purpose: the shared index may hold ANOTHER session's staged files (2026-09-04: two
+        # hci30 migrations got swept into a memory commit before this line existed). Only the file whose hunks we
+        # staged plus --extra paths go into the commit; everything else stays staged for whoever staged it.
+        result = run("git", "commit", "-F", args.commit_file, "--", args.file, *args.extra, check=False)
         sys.stdout.write((result.stdout or b"").decode("utf-8", "replace"))
         if result.returncode != 0:
             sys.stderr.write((result.stderr or b"").decode("utf-8", "replace"))
