@@ -6,9 +6,21 @@ from configurator_engine import ROOT,load,eval_condition
 def main():
     errors=[]; catalog=load('questionnaires/catalog.json'); cats={c['id'] for c in catalog['categories']}; qids=[q['id'] for q in catalog['questions']]; qset=set(qids)
     if len(qids)!=len(qset): errors.append('duplicate question id')
+    # category.groups sub-headers (app.js render()): every group needs a non-empty title and a
+    # unique id, and every question's `group` must resolve to a group its own category declared --
+    # a dangling/misspelled q.group silently degrades to "ungrouped" in the UI with no error (the
+    # single actual defect a 2026-09-05 critic review found in this feature).
+    group_ids_by_cat={}
+    for c in catalog['categories']:
+        gids=[g['id'] for g in c.get('groups',[])]
+        if len(gids)!=len(set(gids)): errors.append(c['id']+': duplicate group id')
+        for g in c.get('groups',[]):
+            if not g.get('title','').strip(): errors.append(c['id']+': group '+g.get('id','?')+' missing title')
+        group_ids_by_cat[c['id']]=set(gids)
     for q in catalog['questions']:
         if q['category'] not in cats: errors.append(q['id']+': unknown category')
         if q.get('answer_type')!='boolean': errors.append(q['id']+': non-binary answer type')
+        if q.get('group') and q['group'] not in group_ids_by_cat.get(q['category'],set()): errors.append(q['id']+': unknown group '+q['group'])
         def refs(c):
             if not c:return []
             if 'question'in c:return [c['question']]

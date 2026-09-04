@@ -13,8 +13,8 @@
     {
       "id": "scope",
       "order": 1,
-      "title": "使用對象",
-      "description": "誰會直接使用或存取這套系統"
+      "title": "使用對象與組織",
+      "description": "誰會直接使用或存取這套系統，以及這些使用者所屬的公司彼此之間資料要不要隔離、你自己公司內部的組織結構長什麼樣子。"
     },
     {
       "id": "channels",
@@ -29,82 +29,96 @@
       "description": "產品層級的帳號、邀請與企業登入需求"
     },
     {
-      "id": "organization",
-      "order": 4,
-      "title": "公司與組織",
-      "description": "延續上一類「誰會使用」，這裡問的是這些使用者所屬的公司彼此之間資料要不要隔離、你自己公司內部的組織結構長什麼樣子"
-    },
-    {
       "id": "records",
-      "order": 5,
+      "order": 4,
       "title": "核心資料",
       "description": "系統需要管理哪些主要業務資料"
     },
     {
       "id": "workflow",
-      "order": 6,
+      "order": 5,
       "title": "流程與協作",
       "description": "審核、任務、狀態、協作與簽核"
     },
     {
       "id": "files",
-      "order": 7,
+      "order": 6,
       "title": "檔案與媒體",
       "description": "使用者需要處理哪些檔案或媒體能力"
     },
     {
       "id": "search_reporting",
-      "order": 8,
+      "order": 7,
       "title": "搜尋與報表",
       "description": "搜尋、報表、分析與資料輸出"
     },
     {
       "id": "commercial",
-      "order": 9,
+      "order": 8,
       "title": "商業模式",
-      "description": "收費、方案、訂閱與授權。下面每題各自獨立、可以自由組合，不是單選一種模式——例如「自用工具」全部答不要即可；「賣斷給企業/集團」通常是收費+授權碼，不一定要訂閱；「開放上網訂閱或用點數」通常是收費+訂閱制或依使用量計費。哪些題目對應哪種情境，各題說明裡會標註。"
+      "description": "收費、方案、訂閱與授權。下面每題各自獨立、可以自由組合，不是單選一種模式——例如「自用工具」全部答不要即可；「賣斷給企業/集團」通常是收費+授權碼，不一定要訂閱；「開放上網訂閱或用點數」通常是收費+訂閱制或依使用量計費。哪些題目對應哪種情境，各題說明裡會標註。",
+      "groups": [
+        {
+          "id": "enterprise",
+          "title": "適合賣斷給企業／集團"
+        },
+        {
+          "id": "subscription",
+          "title": "適合開放上網訂閱或用點數"
+        },
+        {
+          "id": "general",
+          "title": "通用方案設定"
+        }
+      ]
     },
     {
       "id": "payments",
-      "order": 10,
+      "order": 9,
       "title": "付款與帳務",
       "description": "實際金流、退款、發票與稅務"
     },
     {
-      "id": "notifications",
+      "id": "marketing",
+      "order": 10,
+      "title": "行銷",
+      "description": "行銷活動、名單開發與行銷自動化——跟「商業模式」不同：這裡是取得/培養客戶的手段，不是收費方式"
+    },
+    {
+      "id": "customer_service",
       "order": 11,
+      "title": "客服",
+      "description": "客戶問題的受理、追蹤與處理，不是銷售或行銷"
+    },
+    {
+      "id": "sales_crm",
+      "order": 12,
+      "title": "銷售與客戶關係管理",
+      "description": "業務團隊追蹤商機、客戶互動與業績——注意跟「外部整合」的「CRM 整合」不同：那題是接外部 CRM 軟體，這裡是系統本身內建銷售管理功能"
+    },
+    {
+      "id": "content_production",
+      "order": 13,
+      "title": "內容與素材製作",
+      "description": "團隊自己產出的行銷/品牌內容（設計、影片），不是使用者上傳的檔案"
+    },
+    {
+      "id": "social_media",
+      "order": 14,
+      "title": "社交媒體管理",
+      "description": "對外社群平台的排程發佈、集中回覆與成效追蹤"
+    },
+    {
+      "id": "notifications",
+      "order": 15,
       "title": "通知",
       "description": "系統主動通知使用者或其他系統"
     },
     {
       "id": "integrations",
-      "order": 12,
+      "order": 16,
       "title": "外部整合",
       "description": "和既有服務、供應商或企業系統連接"
-    },
-    {
-      "id": "mobile_offline",
-      "order": 13,
-      "title": "行動與離線",
-      "description": "行動裝置、現場作業與離線能力"
-    },
-    {
-      "id": "globalization",
-      "order": 14,
-      "title": "多國與在地化",
-      "description": "語言、幣別、時區與資料所在地"
-    },
-    {
-      "id": "ai",
-      "order": 15,
-      "title": "AI 與自動化",
-      "description": "AI 輔助、生成、決策與代理操作"
-    },
-    {
-      "id": "migration",
-      "order": 16,
-      "title": "既有系統與資料遷移",
-      "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "portals",
@@ -113,68 +127,62 @@
       "description": "客戶、合作夥伴與公開入口"
     },
     {
-      "id": "regulated",
-      "order": 18,
-      "title": "特殊資料與產業",
-      "description": "會觸發額外治理或法規研究的領域事實"
-    },
-    {
-      "id": "business_impact",
-      "order": 19,
-      "title": "營運影響",
-      "description": "描述業務本身的運作方式與影響，不是選工程技術"
-    },
-    {
-      "id": "future",
-      "order": 20,
-      "title": "未來規劃",
-      "description": "目前不做，但已確定希望未來具備的產品能力"
-    },
-    {
-      "id": "marketing",
-      "order": 21,
-      "title": "行銷",
-      "description": "行銷活動、名單開發與行銷自動化——跟「商業模式」不同：這裡是取得/培養客戶的手段，不是收費方式"
-    },
-    {
-      "id": "customer_service",
-      "order": 22,
-      "title": "客服",
-      "description": "客戶問題的受理、追蹤與處理，不是銷售或行銷"
-    },
-    {
-      "id": "sales_crm",
-      "order": 23,
-      "title": "銷售與客戶關係管理",
-      "description": "業務團隊追蹤商機、客戶互動與業績——注意跟 12. 外部整合 的「CRM 整合」不同：那題是接外部 CRM 軟體，這裡是系統本身內建銷售管理功能"
-    },
-    {
-      "id": "content_production",
-      "order": 24,
-      "title": "內容與素材製作",
-      "description": "團隊自己產出的行銷/品牌內容（設計、影片），不是使用者上傳的檔案"
-    },
-    {
-      "id": "social_media",
-      "order": 25,
-      "title": "社交媒體管理",
-      "description": "對外社群平台的排程發佈、集中回覆與成效追蹤"
-    },
-    {
       "id": "hr",
-      "order": 26,
+      "order": 18,
       "title": "人力資源",
       "description": "員工資料、招募、出勤、考核與薪資——內部營運功能，不是客戶/使用者相關"
     },
     {
       "id": "procurement",
-      "order": 27,
+      "order": 19,
       "title": "採購與供應商",
       "description": "公司對外採購與供應商管理，跟客戶端的訂單/交易資料方向相反"
     },
     {
+      "id": "mobile_offline",
+      "order": 20,
+      "title": "行動與離線",
+      "description": "行動裝置、現場作業與離線能力"
+    },
+    {
+      "id": "globalization",
+      "order": 21,
+      "title": "多國與在地化",
+      "description": "語言、幣別、時區與資料所在地"
+    },
+    {
+      "id": "ai",
+      "order": 22,
+      "title": "AI 與自動化",
+      "description": "AI 輔助、生成、決策與代理操作"
+    },
+    {
+      "id": "migration",
+      "order": 23,
+      "title": "既有系統與資料遷移",
+      "description": "舊系統、歷史資料與平行運作"
+    },
+    {
+      "id": "regulated",
+      "order": 24,
+      "title": "特殊資料與產業",
+      "description": "會觸發額外治理或法規研究的領域事實"
+    },
+    {
+      "id": "business_impact",
+      "order": 25,
+      "title": "營運影響",
+      "description": "描述業務本身的運作方式與影響，不是選工程技術"
+    },
+    {
+      "id": "future",
+      "order": 26,
+      "title": "未來規劃",
+      "description": "目前不做，但已確定希望未來具備的產品能力"
+    },
+    {
       "id": "custom",
-      "order": 28,
+      "order": 27,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -192,7 +200,7 @@
       "id": "Q-SCOPE-002",
       "category": "scope",
       "label": "外部客戶使用",
-      "description": "客戶會直接登入或操作系統。如果你的客戶本身是「別家公司」（不是一般消費者個人），後面 04. 公司與組織 的「多家公司使用」通常也要答要——那題問的是「這些不同客戶公司的資料需不需要彼此隔離」，是同一件事的下一層細節，不是重複發問。",
+      "description": "客戶會直接登入或操作系統。如果你的客戶本身是「別家公司」（不是一般消費者個人），後面「多家公司使用」通常也要答要——那題問的是「這些不同客戶公司的資料需不需要彼此隔離」，是同一件事的下一層細節，不是重複發問。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -200,7 +208,7 @@
       "id": "Q-SCOPE-003",
       "category": "scope",
       "label": "外部合作夥伴使用",
-      "description": "供應商、承包商、經銷商或合作方會直接使用。這些合作方通常也是不同公司，若彼此資料需要隔離，後面 04. 公司與組織 的「多家公司使用」也會相關。",
+      "description": "供應商、承包商、經銷商或合作方會直接使用。這些合作方通常也是不同公司，若彼此資料需要隔離，後面「多家公司使用」也會相關。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -322,15 +330,15 @@
     },
     {
       "id": "Q-ORG-001",
-      "category": "organization",
+      "category": "scope",
       "label": "多家公司使用",
-      "description": "承接 01. 使用對象的答案往下問一層：如果你在「外部客戶使用」或「外部合作夥伴使用」答了要，這些不同的客戶／合作方公司，彼此的資料是否需要完全隔離（甲公司看不到乙公司的東西）？這題答要，代表系統要做成「多租戶」架構。如果只有內部員工使用（沒有外部客戶/夥伴），但公司集團內部各子公司仍要資料分開，也算要——請一併參考下面「集團/母子公司結構」。",
+      "description": "承接上面「誰會使用」的答案往下問一層：如果你在「外部客戶使用」或「外部合作夥伴使用」答了要，這些不同的客戶／合作方公司，彼此的資料是否需要完全隔離（甲公司看不到乙公司的東西）？這題答要，代表系統要做成「多租戶」架構。如果只有內部員工使用（沒有外部客戶/夥伴），但公司集團內部各子公司仍要資料分開，也算要——請一併參考下面「集團/母子公司結構」。",
       "answer_type": "boolean",
       "required_when_active": true
     },
     {
       "id": "Q-ORG-002",
-      "category": "organization",
+      "category": "scope",
       "label": "公司底下有多個分公司",
       "description": "這題問的是「你自己」這一家公司內部的分公司或門市結構（跟上面「多家公司使用」問的『你的客戶/合作方是不是多家公司』是不同方向），資料可能需要分開管理或彙總查看。",
       "answer_type": "boolean",
@@ -338,7 +346,7 @@
     },
     {
       "id": "Q-ORG-003",
-      "category": "organization",
+      "category": "scope",
       "label": "集團 / 母子公司結構",
       "description": "有母公司與子公司的組織架構，母公司可能需要查看或管理旗下多家子公司的資料——這是「你自己」的集團內部結構，即使完全沒有外部客戶（只有內部員工使用），只要旗下子公司資料要分開管理，這題也算要。",
       "answer_type": "boolean",
@@ -346,7 +354,7 @@
     },
     {
       "id": "Q-ORG-004",
-      "category": "organization",
+      "category": "scope",
       "label": "不同公司共同參與同一案件 / 專案",
       "description": "來自不同公司的人會一起參與同一個案件或專案，需要共同存取同一份資料。",
       "answer_type": "boolean",
@@ -358,7 +366,7 @@
     },
     {
       "id": "Q-ORG-005",
-      "category": "organization",
+      "category": "scope",
       "label": "跨公司共享指定資料",
       "description": "不同公司之間需要主動分享特定資料給彼此查看，而不是完全互相隔離。",
       "answer_type": "boolean",
@@ -654,7 +662,8 @@
       "active_when": {
         "question": "Q-COM-001",
         "equals": true
-      }
+      },
+      "group": "subscription"
     },
     {
       "id": "Q-COM-003",
@@ -666,7 +675,8 @@
       "active_when": {
         "question": "Q-COM-001",
         "equals": true
-      }
+      },
+      "group": "general"
     },
     {
       "id": "Q-COM-004",
@@ -678,7 +688,8 @@
       "active_when": {
         "question": "Q-COM-001",
         "equals": true
-      }
+      },
+      "group": "subscription"
     },
     {
       "id": "Q-COM-005",
@@ -690,7 +701,8 @@
       "active_when": {
         "question": "Q-COM-001",
         "equals": true
-      }
+      },
+      "group": "subscription"
     },
     {
       "id": "Q-COM-006",
@@ -702,7 +714,8 @@
       "active_when": {
         "question": "Q-COM-001",
         "equals": true
-      }
+      },
+      "group": "enterprise"
     },
     {
       "id": "Q-PAY-001",
@@ -795,21 +808,25 @@
     {
       "id": "Q-NOT-003",
       "category": "notifications",
-      "label": "App Push 通知",
-      "description": "系統需要透過手機 App 或桌面應用程式發送推播通知（沒有 App／桌面程式就沒有推播通知的管道，所以這題只在你選了 02. 使用介面裡的手機 App 或桌面應用程式時才會出現）。",
+      "label": "手機 App 推播通知",
+      "description": "系統需要透過手機 App 發送推播通知（沒有 App 就沒有這個管道，所以這題只在你選了「使用介面」裡的手機 App 時才會出現）。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "any": [
-          {
-            "question": "Q-CH-002",
-            "equals": true
-          },
-          {
-            "question": "Q-CH-003",
-            "equals": true
-          }
-        ]
+        "question": "Q-CH-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-NOT-006",
+      "category": "notifications",
+      "label": "桌面應用程式推播通知",
+      "description": "系統需要透過桌面應用程式發送推播通知（沒有桌面應用程式就沒有這個管道，所以這題只在你選了「使用介面」裡的桌面應用程式時才會出現）。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CH-003",
+        "equals": true
       }
     },
     {
@@ -1372,7 +1389,7 @@
       "id": "Q-MKT-001",
       "category": "marketing",
       "label": "電子郵件行銷",
-      "description": "系統需要主動寄送行銷/推廣性質的電子郵件給名單，例如電子報、促銷通知（跟 11. 通知 的交易型通知信是不同性質，那是「你的訂單成立了」，這是「來看看新品」）。",
+      "description": "系統需要主動寄送行銷/推廣性質的電子郵件給名單，例如電子報、促銷通知（跟「通知」類別的交易型通知信是不同性質，那是「你的訂單成立了」，這是「來看看新品」）。",
       "answer_type": "boolean",
       "required_when_active": true
     },

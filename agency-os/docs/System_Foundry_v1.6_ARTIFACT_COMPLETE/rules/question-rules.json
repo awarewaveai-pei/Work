@@ -642,6 +642,16 @@
       ]
     },
     {
+      "id": "RULE-Q-NOT-006",
+      "when": {
+        "question": "Q-NOT-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-PUSH"
+      ]
+    },
+    {
       "id": "RULE-Q-NOT-004",
       "when": {
         "question": "Q-NOT-004",
