@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-04（續13，新 session：Cognitive OS round 11 — golden 6→32、GC-CB-001 錨點裁決、codebook 定義）
+
+**觸發**：操作者「繼續 Cognitive OS round 11. pick up from TASKS ⑥」。⑥ 的下一刀清單裡不需操作者決定的兩項：golden 補到 ≥30、`GC-CB-001` 錨點對還是模型對（champion/challenger 需第二模型，本機只有 gemma3:4b，不做）。**0 agent**；oracle 兩者仍在斷路器（`oracle-quota.ps1 check` critic/codex 皆 exit 3）。
+
+**不變量（先答再動手）**：codebook 的一個條目＝label＋定義；只給 label 的 codebook 是要第二 coder 從名字猜邊界，相鄰兩個 label 就只能靠猜。`GC-CB-001` 裁決＝錨點對（SRC-1「kept checking messages after dinner」是 monitoring；「planning evenings around messages」是 SRC-2 的句子），模型錯是結構性的不是隨機的。關整類：`apply_codebook` 接受可選 `definitions`（未給定義時 prompt 與 v2 逐字相同；定義的 label 不在 codebook 內拒絕；定義走 PII-checked frame）。原案例 `GC-CB-001` **原樣保留**（golden 只增不減，且它量的是 slice 今天真的送什麼），加同單元同 label＋定義的對照 `GC-CB-015`。golden 補到 32 用 12 個 eval-only 合成單元（`eval_fixtures.py`，6 label×2、定義、3 分類），刻意放在 `synthetic_fixtures` 之外，slice golden hash／Kappa 不動；maturity 明寫 `anchor_origin: SYNTHETIC_AUTHOR_LABELLED`、`human_calibrated: false`。
+
+**[已修改]**：新 `Projects/internal/cognitive-engineering-os/ai_lego/modules/research/eval_fixtures.py`；`ai_coding.py`（`apply-codebook-v3`、`build_codebook_prompt(..., definitions)`、`apply_codebook(definitions=)`＋`CODEBOOK_DEFINITION_UNKNOWN_LABEL`、回傳 `definitions_given`）；`coding_eval.py`（1.2.0、`eval_units`／`all_forbidden`、26 個 golden、`must_share_group` 由分類圖推導、maturity 欄位、dataset 完整性閘 `EVAL_DATASET_LABEL_NOT_IN_CODEBOOK`）；`run_coding_eval.py` docstring；`tests/unit/test_coding_eval.py` +6、`test_second_coder.py` +3；`docs/PHASE5_RESEARCH_SLICE.md` +§Round 11、limitations、OQ-P5-9/10；`RUNNABLE_DEMOS.md` 新最上列；`TASKS.md` ⑥。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_coding_eval --model gemma3:4b --repeats 3 --out %TEMP%\ai-lego-coding-eval-r11` | exit=1 | ms=~300000 | result=dataset v1.2.0 `476ec8bfc3bf` 45 案例 `established=True`；scorecard `accuracy 27/32 (agreement 0.8816)`、`grounding 1.0`、`hallucination 0/381`、`consistency 0.8629/44`、`latency median 938ms p95 3797ms calls=132`、`security 9/9 (instruction_echo_rejected=3)`、`regression 4/4`、`coverage 0.977`、`result FAIL -- golden 27/32`。5 個 FAIL：`GC-CB-001`（bare codebook）0/3 SRC-1→planning；對照 `GC-CB-015`（＋定義）3/3、`GC-CB-016` 3/3 → 定義就是模型缺的；`GC-CB-010/011` 兩個 sleep_disruption 單元獨列 3/3 標 rumination，但 `GC-CB-014` 12 單元同批全對（prompt 形狀效應）；`GC-AX-002/004` 模型把 withdrawal 獨立成 `social_isolation`（一個 seed 全併一組），作者寫的 depletion 配對可能有爭議 → OQ-P5-10，**不改錨點迎合模型**。exit 1 為 eval 誠實回報。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .` | exit=0 | ms=36148 | result=224 tests OK（215→224）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad/mutate_round11.py`（runtime monkeypatch，不動 repo 檔） | exit=0 | ms=~3000 | result=5/5 KILLED：prompt 忽略定義→3 測試紅（2 命中）；unknown-definition 閘拔掉→紅；dataset 完整性閘拔掉→紅；maturity 少 `anchor_origin`→2 紅；`execute_case` 丟掉定義→紅；還原 7 tests 0 紅
+- REVIEW_DONE: critic=self(Standard, 書面對抗自審) | verdict=warn | findings=0c/2m/2n —— m1 golden 32 是「數量」成立，錨點全由本 session 作者寫，§2.3 人類校準未做，maturity 與 docs 皆明寫，不得當「eval 成立可上線」讀；m2 `GC-AX-002/004` 的 depletion 配對是本 session 才寫的錨點，看到模型輸出後**沒有**改它（改了就是調資料消音偵測器），改開 OQ-P5-10 要人裁；n1 `definitions` 定義文字含 `(email, chat, phone)` 括號與分號，prompt 解析只靠 `": "`，測試釘住「定義不含 `: `」；n2 slice 仍送 bare codebook，`GC-CB-001` 會一直 FAIL 直到 OQ-P5-9 落地——這是產品缺口的真實讀數，不是 eval bug
+- ORACLE_WAIVED: critic 429 至 2026-09-05 05:20、codex usage limit 至 2026-09-07 11:06（`oracle-quota.ps1 check` 兩者 exit 3）；以 5 突變＋書面自審替代；併入 TASKS「2026-09-07 後補跑 /codex-review」範圍
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`apply-codebook-v2|golden 6/30|6/30|golden 6 <|established False|it has not\)|build_codebook_prompt|eval_fixtures` | hits=6 stale（WORKLOG 續11/續12 歷史敘述 :19 :42 不改；PHASE5 :121 :132 已改；RUNNABLE_DEMOS :7 :8 舊列不改）+ call sites 全部相容（`run_research_slice.py:399` 不傳 definitions → prompt 與 v2 逐字相同，測試釘住）
+
+**[剩餘風險]**：錨點非人類校準；slice 第二 coder 仍無定義（OQ-P5-9）；withdrawal 歸屬待人裁（OQ-P5-10）；仍無第二模型。**[rollback]**：`git revert`；`apply_codebook` 不傳 `definitions` 行為與 v2 相同，slice 零改動（`prompt_version` 記錄欄位變 v3 而已）。
+
 ## 2026-09-04（續12，同一 session：Cognitive OS round 10 — 注入問題兩層關閉整類，eval 證明是閘不是 prompt 在擋）
 
 **觸發**：操作者「現在直接做」（round 9 eval 的 `AD-OC-001`：gemma3:4b 3/3 照單元文字內指令填 `ADMIN_OVERRIDE`）。

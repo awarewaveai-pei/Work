@@ -7,7 +7,8 @@
 Exit codes: 0 = EvalRun PASS (and, with a challenger, no REJECT); 1 = FAIL / REJECT / error; 2 = Ollama or the model
 is not available (a visible UNAVAILABLE, never a silent skip). Writes ``dataset.json``, ``eval_run.<model>.json`` and,
 with a challenger, ``comparison.json`` into ``--out``. A PASS is a pass of the dataset's assertions; the record's
-``dataset_snapshot.maturity.established`` says whether the golden set has reached the 30-case minimum (it has not).
+``dataset_snapshot.maturity`` says whether the golden set has reached the 30-case minimum (since round 11 it has,
+with ``anchor_origin: SYNTHETIC_AUTHOR_LABELLED`` -- the count rule is met, human calibration is not).
 """
 
 from __future__ import annotations

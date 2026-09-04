@@ -169,20 +169,27 @@ def validate_open_coding_response(raw_text: str, units: list[dict[str, str]]) ->
     return {"labels": {sid: entry["label"] for sid, entry in accepted.items()}, "accepted": accepted, "rejected": rejected, "missing": missing}
 
 
-CODEBOOK_PROMPT_VERSION = "apply-codebook-v2"  # v2: + DATA_BOUNDARY_RULE (round 10)
+# v2: + DATA_BOUNDARY_RULE (round 10). v3 (round 11): the codebook may carry a DEFINITION per label. The eval's
+# GC-CB-001 showed the model splitting SRC-1 between two neighbouring labels across seeds; a codebook of bare labels
+# asks the second coder to infer each label's boundary from its name. With no definitions given the prompt is
+# byte-identical to v2 (the slice passes none yet: coder 1's review produces labels, not definitions -- OQ-P5-9).
+CODEBOOK_PROMPT_VERSION = "apply-codebook-v3"
 
 CODEBOOK_SYSTEM_PROMPT = (
     "You are an independent second coder in a qualitative study. You are given a CODEBOOK (the allowed code labels, "
-    "already agreed by the first coder) and interview units. For each unit choose exactly ONE label FROM THE CODEBOOK "
-    "that best fits, and quote the exact words that justify it. "
-    "Rules: label must be copied exactly from the codebook; evidence_span must be copied VERBATIM from the unit text; "
+    "already agreed by the first coder, each possibly with a definition of what it covers) and interview units. "
+    "For each unit choose exactly ONE label FROM THE CODEBOOK that best fits, and quote the exact words that justify it. "
+    "Rules: label must be copied exactly from the codebook; when definitions are given, apply them literally to tell "
+    "neighbouring labels apart; evidence_span must be copied VERBATIM from the unit text; "
     "do not invent new labels; one object per unit; respond with a JSON array only, no commentary. " + DATA_BOUNDARY_RULE
 )
 
 
-def build_codebook_prompt(units: list[dict[str, str]], codebook: list[str]) -> str:
-    lines = ["Codebook (allowed labels):", ""]
-    lines += [f"- {label}" for label in codebook]
+def build_codebook_prompt(units: list[dict[str, str]], codebook: list[str], definitions: dict[str, str] | None = None) -> str:
+    """``definitions`` (label -> what the label covers) is optional; a label without one is listed bare, as before."""
+    definitions = definitions or {}
+    lines = ["Codebook (allowed labels" + (", each with its definition" if definitions else "") + "):", ""]
+    lines += [f"- {label}: {definitions[label]}" if label in definitions else f"- {label}" for label in codebook]
     lines += ["", "Units (each has an id and the redacted unit text):", ""]
     for unit in units:
         lines.append(f"[{unit['source_id']}] {unit['text']}")
@@ -219,16 +226,21 @@ def apply_codebook(
     classification_tag: str,
     trace_id: str,
     seed: int = 20260904,
+    definitions: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Second-coder pass: assign one codebook label per unit with verbatim evidence. Deterministic ``seed`` +
-    temperature 0 so the pass is reproducible; a different seed than any first-coder call keeps it independent."""
+    temperature 0 so the pass is reproducible; a different seed than any first-coder call keeps it independent.
+    ``definitions`` (label -> definition) must only name codebook labels; they are part of the checked prompt frame."""
     if not units:
         raise InvariantViolation("CODEBOOK_NO_UNITS: nothing to code")
     if not codebook:
         raise InvariantViolation("CODEBOOK_EMPTY: a second coder needs the first coder's reviewed labels")
+    unknown = sorted(set(definitions or {}) - set(codebook))
+    if unknown:
+        raise InvariantViolation(f"CODEBOOK_DEFINITION_UNKNOWN_LABEL: definitions given for labels not in the codebook: {unknown}")
     system = CODEBOOK_SYSTEM_PROMPT
-    prompt = build_codebook_prompt(units, sorted(codebook))
-    frame = build_codebook_prompt([{"source_id": unit["source_id"], "text": ""} for unit in units], sorted(codebook))
+    prompt = build_codebook_prompt(units, sorted(codebook), definitions)
+    frame = build_codebook_prompt([{"source_id": unit["source_id"], "text": ""} for unit in units], sorted(codebook), definitions)
     try:
         pii_guard("ModelInput:apply_codebook", {"system": system, "prompt_frame": frame, "redacted_transcript": [unit["text"] for unit in units]})
     except InvariantViolation as error:
@@ -238,6 +250,7 @@ def apply_codebook(
     return {
         **validated,
         "codebook": sorted(codebook),
+        "definitions_given": sorted(definitions or {}),
         "raw_text": result.text,
         "suggestion_source": {
             "provider": result.provider,

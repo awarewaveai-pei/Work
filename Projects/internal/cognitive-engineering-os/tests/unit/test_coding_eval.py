@@ -12,7 +12,10 @@ from typing import Any, Callable
 from ai_lego.core.support import canonical_json, sha256_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research import coding_eval as ce
-from ai_lego.modules.research.synthetic_fixtures import CODER_TWO_LABELS, SYNTHETIC_TRANSCRIPTS
+from ai_lego.modules.research.eval_fixtures import EVAL_ANCHOR_LABELS, EVAL_CATEGORY_OF_LABEL, EVAL_CODEBOOK, EVAL_CODEBOOK_DEFINITIONS, EVAL_TRANSCRIPTS
+from ai_lego.modules.research.synthetic_fixtures import CATEGORY_OF_LABEL, CODER_TWO_LABELS, SYNTHETIC_TRANSCRIPTS
+
+ANCHORS = {**CODER_TWO_LABELS, **EVAL_ANCHOR_LABELS}
 
 
 @dataclass
@@ -49,7 +52,8 @@ def _unit_text(prompt: str, sid: str) -> str:
 
 
 def _codebook(prompt: str) -> list[str]:
-    return [line[2:] for line in prompt.split("Units")[0].splitlines() if line.startswith("- ")]
+    # "- label" (bare) or "- label: definition" (round 11); definitions never contain ": ".
+    return [line[2:].split(": ", 1)[0] for line in prompt.split("Units")[0].splitlines() if line.startswith("- ")]
 
 
 def _axial_labels(prompt: str) -> list[str]:
@@ -61,9 +65,9 @@ def _category_names(prompt: str) -> list[str]:
 
 
 def perfect_script() -> dict[str, Callable[[str, int | None], str]]:
-    """A model that does exactly what the prompts ask: verbatim spans, codebook labels per CODER_TWO_LABELS, the
-    fixture grouping, one theme over every category, and ignores every injected instruction."""
-    boundary = {"after_hours_monitoring", "evening_planning_around_messages"}
+    """A model that does exactly what the prompts ask: verbatim spans, codebook labels per the anchors
+    (CODER_TWO_LABELS + EVAL_ANCHOR_LABELS), the fixture grouping, one theme over every category, and ignores every
+    injected instruction."""
 
     def open_coding(prompt: str, _seed: int | None) -> str:
         items = []
@@ -78,7 +82,7 @@ def perfect_script() -> dict[str, Callable[[str, int | None], str]]:
         items = []
         for sid in _unit_ids(prompt):
             text = _unit_text(prompt, sid)
-            label = CODER_TWO_LABELS.get(sid, allowed[0])
+            label = ANCHORS.get(sid, allowed[0])
             if label not in allowed:
                 label = allowed[0]
             items.append({"source_id": sid, "label": label, "evidence_span": text.split(". ", 2)[-1].split(".")[0]})
@@ -88,7 +92,7 @@ def perfect_script() -> dict[str, Callable[[str, int | None], str]]:
         labels = _axial_labels(prompt)
         groups: dict[str, list[str]] = {}
         for label in labels:
-            groups.setdefault("boundary_erosion" if label in boundary else f"cat_{label}", []).append(label)
+            groups.setdefault(EVAL_CATEGORY_OF_LABEL.get(label, CATEGORY_OF_LABEL.get(label, f"cat_{label}")), []).append(label)
         return json.dumps([{"category": name, "code_labels": members} for name, members in groups.items()])
 
     def selective(prompt: str, _seed: int | None) -> str:
@@ -114,16 +118,56 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual({c["stage"] for c in cases}, set(ce.STAGES))
         self.assertTrue(all(c["expect"] and c["source"] for c in cases))
 
-    def test_dataset_hash_is_stable_and_maturity_is_honest_about_the_30_case_minimum(self):
+    def test_dataset_hash_is_stable_and_maturity_states_the_count_rule_and_the_anchor_origin(self):
         a, b = ce.build_dataset(), ce.build_dataset()
         self.assertEqual(a["hash"], b["hash"])
-        self.assertFalse(a["maturity"]["established"])
-        self.assertLess(a["maturity"]["golden_cases"], ce.MINIMUM_GOLDEN_CASES)
-        self.assertIn("not an established Eval", a["maturity"]["note"])
+        self.assertTrue(a["maturity"]["established"])
+        self.assertGreaterEqual(a["maturity"]["golden_cases"], ce.MINIMUM_GOLDEN_CASES)
+        self.assertEqual(a["maturity"]["anchor_origin"], "SYNTHETIC_AUTHOR_LABELLED")
+        self.assertFalse(a["maturity"]["human_calibrated"])
+        self.assertIn("SYNTHETIC_AUTHOR_LABELLED", a["maturity"]["note"])
+        # A selection below the minimum is still reported as not established (the run's maturity is the SELECTION's).
+        below = ce.dataset_maturity([c for c in a["cases"] if c["stage"] == "open_coding"])
+        self.assertFalse(below["established"])
+        self.assertIn("not an established Eval", below["note"])
+
+    def test_golden_set_only_grew_every_round_9_case_is_still_present_unchanged_in_shape(self):
+        cases = {c["case_id"]: c for c in ce.build_dataset()["cases"]}
+        for case_id in ("GC-OC-001", "GC-OC-002", "GC-OC-003", "GC-CB-001", "GC-AX-001", "GC-SE-001"):
+            self.assertEqual(cases[case_id]["dataset"], "golden")
+        # GC-CB-001 keeps the bare codebook; its round-11 twin adds definitions to the SAME units and labels.
+        self.assertNotIn("definitions", cases["GC-CB-001"]["input"])
+        twin = cases["GC-CB-015"]["input"]
+        self.assertEqual((twin["units"], twin["codebook"]), (cases["GC-CB-001"]["input"]["units"], cases["GC-CB-001"]["input"]["codebook"]))
+        self.assertEqual(set(twin["definitions"]), set(twin["codebook"]))
+        self.assertEqual(cases["GC-CB-015"]["expect"]["expected_labels"], cases["GC-CB-001"]["expect"]["expected_labels"])
+
+    def test_eval_fixtures_are_consistent_with_their_codebook_and_pass_the_slice_redaction(self):
+        self.assertEqual(len(EVAL_TRANSCRIPTS), 12)
+        self.assertEqual(set(EVAL_ANCHOR_LABELS.values()), set(EVAL_CODEBOOK))
+        self.assertEqual(set(EVAL_CATEGORY_OF_LABEL), set(EVAL_CODEBOOK))
+        self.assertEqual(set(EVAL_CODEBOOK_DEFINITIONS), set(EVAL_CODEBOOK))
+        for label in EVAL_CODEBOOK:
+            self.assertEqual(sum(1 for a in EVAL_ANCHOR_LABELS.values() if a == label), 2, label)
+            self.assertNotIn(": ", EVAL_CODEBOOK_DEFINITIONS[label])
+        units, forbidden = ce.eval_units()
+        self.assertTrue(all(u["text"].startswith("My name is [NAME]. I work for [EMPLOYER] in [CITY]. ") for u in units))
+        self.assertEqual(len(forbidden), 36)
+        for unit in units:
+            self.assertEqual(ce.pii_findings(unit["text"], forbidden), [], unit["source_id"])
+        # every apply_codebook case names only labels its own codebook contains (dataset integrity gate)
+        for case in ce.build_dataset()["cases"]:
+            if case["stage"] == "apply_codebook":
+                self.assertTrue(set(case["expect"].get("expected_labels", {}).values()) <= set(case["input"]["codebook"]), case["case_id"])
+
+    def test_dataset_integrity_gate_refuses_a_definition_or_anchor_outside_the_codebook(self):
+        bad = {"case_id": "X", "dataset": "golden", "stage": "apply_codebook", "input": {"units": [], "codebook": ["a_b_c"], "definitions": {"z_z_z": "…"}}, "expect": {"all_units_accepted": True}, "source": "t"}
+        with self.assertRaisesRegex(InvariantViolation, "EVAL_DATASET_LABEL_NOT_IN_CODEBOOK"):
+            ce._check_dataset([bad])
 
     def test_no_case_input_carries_a_raw_name_or_employer_except_the_declared_frame_trip_case(self):
         dataset = ce.build_dataset()
-        _, forbidden = ce.fixture_units()
+        forbidden = ce.all_forbidden()
         for case in dataset["cases"]:
             if case["expect"].get("expect_guard_trip"):
                 continue
@@ -187,17 +231,51 @@ class AssertionTests(unittest.TestCase):
 
 
 class RunEvalTests(unittest.TestCase):
-    def test_perfect_model_passes_every_case_yet_the_eval_is_not_established(self):
+    def test_perfect_model_passes_every_case_and_the_record_states_the_anchor_origin(self):
         record = _run(perfect_script())
         self.assertEqual(record["result"], {"status": "PASS", "reasons": []})
         self.assertEqual(record["metrics"]["accuracy"]["rate"], 1.0)
+        self.assertEqual(record["metrics"]["accuracy"]["cases"], 32)
         self.assertEqual(record["metrics"]["security"]["rate"], 1.0)
         self.assertEqual(record["metrics"]["hallucination"]["rate"], 0.0)
         self.assertEqual(record["metrics"]["grounding"]["rate"], 1.0)
         self.assertEqual(record["metrics"]["consistency"]["rate"], 1.0)
         self.assertEqual(record["metrics"]["faithfulness"]["status"], "NOT_MEASURED")
-        self.assertFalse(record["dataset_snapshot"]["maturity"]["established"])
+        self.assertTrue(record["dataset_snapshot"]["maturity"]["established"])
+        self.assertEqual(record["dataset_snapshot"]["maturity"]["anchor_origin"], "SYNTHETIC_AUTHOR_LABELLED")
         self.assertEqual(record["ai"]["prompt_versions"]["selective"], ce.SELECTIVE_PROMPT_VERSION)
+
+    def test_definitions_reach_the_model_prompt_only_for_cases_that_carry_them(self):
+        gateway = _ScriptedGateway(perfect_script())
+        ce.run_eval(gateway, "p", REGISTRY_ENTRY, repeats=1, now=CLOCK, datasets=("golden",), stages=("apply_codebook",))
+        prompts = [c["prompt"] for c in gateway.calls]
+        with_definitions = [p for p in prompts if "each with its definition" in p]
+        bare = [p for p in prompts if "each with its definition" not in p]
+        self.assertEqual(len(bare), 1)  # GC-CB-001 only
+        self.assertEqual(len(with_definitions), 18)  # 12 per-unit + all-twelve + GC-CB-015 + 4 per-slice-unit
+        self.assertIn(f"- after_hours_monitoring: {EVAL_CODEBOOK_DEFINITIONS['after_hours_monitoring']}", with_definitions[0])
+        self.assertNotIn(":", bare[0].split("Units")[0].replace("Codebook (allowed labels):", ""))
+
+    def test_a_model_that_confuses_the_two_boundary_labels_fails_the_anchored_cases_not_the_structural_ones(self):
+        script = perfect_script()
+        base = script[ce.CODEBOOK_PROMPT_VERSION]
+
+        def swaps_neighbours(prompt: str, seed: int | None) -> str:
+            items = json.loads(base(prompt, seed))
+            for item in items:
+                if item["label"] == "after_hours_monitoring":
+                    item["label"] = "evening_planning_around_messages"
+            return json.dumps(items)
+
+        script[ce.CODEBOOK_PROMPT_VERSION] = swaps_neighbours
+        record = ce.run_eval(_ScriptedGateway(script), "p", REGISTRY_ENTRY, repeats=1, now=CLOCK, datasets=("golden",), stages=("apply_codebook",))
+        failed = set(record["metrics"]["accuracy"]["failed_case_ids"])
+        # every case whose expected labels include after_hours_monitoring, and nothing else
+        expected_failures = {c["case_id"] for c in ce.build_dataset()["cases"] if c["stage"] == "apply_codebook" and c["dataset"] == "golden" and "after_hours_monitoring" in c["expect"].get("expected_labels", {}).values()}
+        self.assertEqual(failed, expected_failures)
+        self.assertIn("GC-CB-001", failed)
+        self.assertIn("GC-CB-015", failed)
+        self.assertEqual(record["metrics"]["hallucination"]["rate"], 0.0)  # a wrong-but-in-codebook label is not a hallucination
 
     def test_frame_trip_case_makes_no_call_and_the_call_is_counted_nowhere(self):
         gateway = _ScriptedGateway(perfect_script())
@@ -327,7 +405,7 @@ class CompareTests(unittest.TestCase):
         text = ce.format_scorecard(_run(perfect_script(), repeats=1))
         for name in ("accuracy", "grounding", "faithfulness", "consistency", "hallucination", "latency", "cost", "security", "regression"):
             self.assertIn(name, text)
-        self.assertIn("False (golden", text)
+        self.assertIn("True (golden 32/30)", text)
         self.assertIn("result", text)
 
 

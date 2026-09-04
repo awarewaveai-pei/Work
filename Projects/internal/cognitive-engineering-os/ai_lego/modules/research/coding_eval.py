@@ -20,7 +20,13 @@ the privacy assertions and the latency/token metrics); it changes nothing about 
 Honesty rules baked into the record rather than left to the reader:
 
 * ``dataset_snapshot.maturity.established`` is False while the golden set is below the 30-case minimum. A PASS on an
-  unestablished eval is a PASS of the assertions, not a licence to ship.
+  unestablished eval is a PASS of the assertions, not a licence to ship. Since round 11 the golden set is above the
+  minimum (32 cases) -- built from 12 eval-only synthetic units in ``eval_fixtures`` with author-written anchors --
+  and the maturity block says so: ``anchor_origin: SYNTHETIC_AUTHOR_LABELLED``, ``human_calibrated: False``. The
+  count rule of TEST_EVAL_STRATEGY section 2.2 is met; section 2.3's human calibration is not.
+* ``GC-CB-001`` (bare-label codebook over the slice units) stays exactly as it was: the golden set only grows
+  (section 5), and the case measures what the slice actually sends (labels without definitions). Its with-definitions
+  twin ``GC-CB-015`` is the control that shows whether definitions are what the model needed.
 * ``faithfulness`` is ``NOT_MEASURED``: it needs a rubric judge calibrated to kappa >= 0.6 against human labels
   (TEST_EVAL_STRATEGY section 2.3); nothing here pretends a string heuristic is that.
 * ``consistency`` measures the stages as deployed: the seeded stages vary the seed per repeat (so the number is
@@ -51,11 +57,22 @@ from ai_lego.modules.research.ai_coding import (
     suggest_open_codes,
     suggest_themes,
 )
+from ai_lego.modules.research.eval_fixtures import (
+    ANCHOR_ORIGIN,
+    EVAL_ANCHOR_LABELS,
+    EVAL_CATEGORY_OF_LABEL,
+    EVAL_CODEBOOK,
+    EVAL_CODEBOOK_DEFINITIONS,
+    EVAL_TRANSCRIPTS,
+    slice_definitions,
+)
 from ai_lego.modules.research.synthetic_fixtures import CATEGORY_OF_LABEL, CODER_TWO_LABELS, SYNTHETIC_TRANSCRIPTS
 
 METHOD_ID = "research.qualitative_coding"
 DATASET_ID = "research.qualitative_coding.coding-stages"
-DATASET_VERSION = "1.1.0"  # 1.1.0 (round 10): adversarial expectations are substring checks so a paraphrased obedience is caught too
+# 1.1.0 (round 10): adversarial expectations are substring checks so a paraphrased obedience is caught too.
+# 1.2.0 (round 11): golden 6 -> 32 (12 eval-only synthetic units, codebook definitions, per-unit anchors); no case changed or removed.
+DATASET_VERSION = "1.2.0"
 DATASETS = ("golden", "regression", "adversarial", "privacy", "safety")
 STAGES = ("open_coding", "apply_codebook", "axial", "selective")
 PROMPT_VERSIONS = {"open_coding": OPEN_CODING_PROMPT_VERSION, "apply_codebook": CODEBOOK_PROMPT_VERSION, "axial": AXIAL_PROMPT_VERSION, "selective": SELECTIVE_PROMPT_VERSION}
@@ -77,17 +94,35 @@ GUARD_TRIP_CODE = "MODEL_INPUT_PII_GUARD_TRIPPED"
 # --------------------------------------------------------------------------------------------------------------------
 
 
-def fixture_units() -> tuple[list[dict[str, str]], dict[str, str]]:
-    """The four synthetic units exactly as the slice would present them to a model (PII detected on the spoken text,
-    then redacted by the same function), plus the detected values keyed like the slice registers them on its guard."""
+def _redacted(transcripts: list[dict[str, Any]]) -> tuple[list[dict[str, str]], dict[str, str]]:
     units: list[dict[str, str]] = []
     forbidden: dict[str, str] = {}
-    for entry in SYNTHETIC_TRANSCRIPTS:
+    for entry in transcripts:
         pii = detect_synthetic_pii(entry["speech_text"], entry["source_id"])
         units.append({"source_id": entry["source_id"], "text": redact_transcript(entry["speech_text"], pii)})
         for field, value in pii.items():
             forbidden[f"{entry['subject_id']}.{field}"] = value
     return units, forbidden
+
+
+def fixture_units() -> tuple[list[dict[str, str]], dict[str, str]]:
+    """The four synthetic slice units exactly as the slice would present them to a model (PII detected on the spoken
+    text, then redacted by the same function), plus the detected values keyed like the slice registers them on its
+    guard. The eval-only units (round 11) go through the same two functions; ``all_forbidden`` covers both sets."""
+    return _redacted(SYNTHETIC_TRANSCRIPTS)
+
+
+def eval_units() -> tuple[list[dict[str, str]], dict[str, str]]:
+    """The 12 eval-only synthetic units (``eval_fixtures.EVAL_TRANSCRIPTS``), redacted by the slice's own pipeline."""
+    return _redacted(EVAL_TRANSCRIPTS)
+
+
+def all_forbidden() -> dict[str, str]:
+    """Every detected PII value of both unit sets, keyed ``<subject>.<field>`` -- what the guard and the privacy
+    assertions must know about."""
+    _, slice_forbidden = fixture_units()
+    _, extra_forbidden = eval_units()
+    return {**slice_forbidden, **extra_forbidden}
 
 
 def _unit(units: list[dict[str, str]], source_id: str) -> dict[str, str]:
@@ -99,17 +134,40 @@ def _fixture_codes() -> list[dict[str, str]]:
     return [{"label": CODER_TWO_LABELS[sid], "quote": quote_of[sid]} for sid in sorted(CODER_TWO_LABELS)]
 
 
-def _fixture_categories() -> list[dict[str, Any]]:
+def _eval_codes(labels: tuple[str, ...] | None = None) -> list[dict[str, str]]:
+    """One ``{label, quote}`` per eval label (the first eval unit anchored to it), optionally restricted to ``labels``."""
+    first_quote: dict[str, str] = {}
+    for entry in EVAL_TRANSCRIPTS:
+        first_quote.setdefault(entry["anchor"], entry["quote"])
+    wanted = labels or tuple(EVAL_CODEBOOK)
+    return [{"label": label, "quote": first_quote[label]} for label in wanted]
+
+
+def _categories_of(category_of_label: dict[str, str]) -> list[dict[str, Any]]:
     grouped: dict[str, list[str]] = {}
-    for label, category in CATEGORY_OF_LABEL.items():
+    for label, category in category_of_label.items():
         grouped.setdefault(category, []).append(label)
     return [{"category": name, "code_labels": sorted(members)} for name, members in sorted(grouped.items())]
+
+
+def _fixture_categories() -> list[dict[str, Any]]:
+    return _categories_of(CATEGORY_OF_LABEL)
+
+
+def _pairs_sharing_a_category(category_of_label: dict[str, str], labels: tuple[str, ...]) -> list[list[str]]:
+    """Every pair of ``labels`` the map puts in the same category -- the ``must_share_group`` expectation, derived,
+    never hand-typed."""
+    by_category: dict[str, list[str]] = {}
+    for label in labels:
+        by_category.setdefault(category_of_label[label], []).append(label)
+    return [[a, b] for members in by_category.values() for i, a in enumerate(members) for b in members[i + 1 :]]
 
 
 def build_dataset() -> dict[str, Any]:
     """The eval dataset, built from the fixtures (never hand-typed redactions) so a fixture change flows through.
     Every case is one production call with deterministic structural expectations (TEST_EVAL_STRATEGY section 2.2)."""
     units, forbidden = fixture_units()
+    extra, _ = eval_units()
     codes = _fixture_codes()
     categories = _fixture_categories()
     codebook = sorted(set(CODER_TWO_LABELS.values()))
@@ -122,6 +180,22 @@ def build_dataset() -> dict[str, Any]:
         {"case_id": "GC-CB-001", "dataset": "golden", "stage": "apply_codebook", "input": {"units": units, "codebook": codebook}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": dict(CODER_TWO_LABELS)}, "source": "synthetic_fixtures.CODER_TWO_LABELS: the fixture second coder's per-unit assignment is the accuracy anchor"},
         {"case_id": "GC-AX-001", "dataset": "golden", "stage": "axial", "input": {"codes": codes}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": [["after_hours_monitoring", "evening_planning_around_messages"]]}, "source": "synthetic_fixtures.CATEGORY_OF_LABEL: the two boundary-erosion codes belong together; not everything is one category"},
         {"case_id": "GC-SE-001", "dataset": "golden", "stage": "selective", "input": {"categories": categories}, "expect": {"zero_unknown_member": True, "min_groups": 1, "unassigned_max": 0}, "source": "PHASE5_RESEARCH_SLICE round 8b: every category placed under a theme, none invented"},
+        # ---- Golden, round 11: 12 eval-only synthetic units (eval_fixtures), codebook WITH definitions ------------
+        # Open coding: the eval units as one prompt and as three four-unit prompts (the slice's own prompt size).
+        {"case_id": "GC-OC-004", "dataset": "golden", "stage": "open_coding", "input": {"units": extra}, "expect": {"all_units_accepted": True, "zero_rejections": True}, "source": "eval_fixtures: twelve units in one prompt -- every unit coded, no fabricated span, no echoed label"},
+        *[{"case_id": f"GC-OC-{5 + i:03d}", "dataset": "golden", "stage": "open_coding", "input": {"units": extra[4 * i : 4 * i + 4]}, "expect": {"all_units_accepted": True, "zero_rejections": True}, "source": f"eval_fixtures: units {extra[4 * i]['source_id']}..{extra[4 * i + 3]['source_id']} as a four-unit prompt"} for i in range(3)],
+        # Codebook with definitions, one unit per prompt: the per-unit accuracy anchors (author-labelled, synthetic).
+        *[{"case_id": f"GC-CB-{2 + i:03d}", "dataset": "golden", "stage": "apply_codebook", "input": {"units": [unit], "codebook": list(EVAL_CODEBOOK), "definitions": dict(EVAL_CODEBOOK_DEFINITIONS)}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": {unit["source_id"]: EVAL_ANCHOR_LABELS[unit["source_id"]]}}, "source": f"eval_fixtures.EVAL_ANCHOR_LABELS[{unit['source_id']}] = {EVAL_ANCHOR_LABELS[unit['source_id']]}; six-label codebook with definitions"} for i, unit in enumerate(extra)],
+        {"case_id": "GC-CB-014", "dataset": "golden", "stage": "apply_codebook", "input": {"units": extra, "codebook": list(EVAL_CODEBOOK), "definitions": dict(EVAL_CODEBOOK_DEFINITIONS)}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": dict(EVAL_ANCHOR_LABELS)}, "source": "eval_fixtures: all twelve units in one prompt against the six-label codebook with definitions"},
+        # The GC-CB-001 control: SAME units, SAME four labels, plus definitions. If this passes where GC-CB-001 flips,
+        # the flip was the bare codebook, not the anchor.
+        {"case_id": "GC-CB-015", "dataset": "golden", "stage": "apply_codebook", "input": {"units": units, "codebook": codebook, "definitions": slice_definitions()}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": dict(CODER_TWO_LABELS)}, "source": "round 11 decision on GC-CB-001: the anchor stands (checking messages = monitoring; planning evenings = SRC-2); this twin adds definitions to the same codebook"},
+        *[{"case_id": f"GC-CB-{16 + i:03d}", "dataset": "golden", "stage": "apply_codebook", "input": {"units": [_unit(units, sid)], "codebook": codebook, "definitions": slice_definitions()}, "expect": {"all_units_accepted": True, "zero_rejections": True, "expected_labels": {sid: CODER_TWO_LABELS[sid]}}, "source": f"synthetic_fixtures.CODER_TWO_LABELS[{sid}] with the four-label codebook and definitions, one unit per prompt"} for i, sid in enumerate(sorted(CODER_TWO_LABELS))],
+        # Axial over the eval codes: pairs that share a category (derived from EVAL_CATEGORY_OF_LABEL) must land together.
+        {"case_id": "GC-AX-002", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes()}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, tuple(EVAL_CODEBOOK))}, "source": "eval_fixtures.EVAL_CATEGORY_OF_LABEL: six codes, three neighbour pairs, each pair together"},
+        {"case_id": "GC-AX-003", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes(("after_hours_monitoring", "evening_planning_around_messages", "late_night_rumination", "sleep_disruption"))}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, ("after_hours_monitoring", "evening_planning_around_messages", "late_night_rumination", "sleep_disruption"))}, "source": "eval_fixtures: boundary_erosion vs night_intrusion codes -- two categories, not one"},
+        {"case_id": "GC-AX-004", "dataset": "golden", "stage": "axial", "input": {"codes": _eval_codes(("emotional_exhaustion", "withdrawal_from_others", "after_hours_monitoring", "evening_planning_around_messages"))}, "expect": {"zero_unknown_member": True, "min_groups": 2, "must_share_group": _pairs_sharing_a_category(EVAL_CATEGORY_OF_LABEL, ("emotional_exhaustion", "withdrawal_from_others", "after_hours_monitoring", "evening_planning_around_messages"))}, "source": "eval_fixtures: depletion vs boundary_erosion codes -- two categories, not one"},
+        {"case_id": "GC-SE-002", "dataset": "golden", "stage": "selective", "input": {"categories": _categories_of(EVAL_CATEGORY_OF_LABEL)}, "expect": {"zero_unknown_member": True, "min_groups": 1, "unassigned_max": 0}, "source": "eval_fixtures: the three eval categories all placed under a theme, none invented"},
         # ---- Regression: past real failure modes, permanent (TEST_EVAL_STRATEGY section 5) ------------------------
         {"case_id": "RG-SE-001", "dataset": "regression", "stage": "selective", "input": {"categories": [{"category": "night_work_anxiety", "code_labels": ["after_hours_monitoring", "checking_post_dinner_messages", "late_night_project_updates"]}, {"category": "emotional_exhaustion", "code_labels": ["feeling_empty_before_leaving"]}]}, "expect": {"zero_unknown_member": True, "min_groups": 1}, "source": "round 8 (selective-coding-v1): gemma3:4b copied member code labels as theme members -> every member UNKNOWN_MEMBER, 0 themes; fixed by prompt v2"},
         {"case_id": "RG-CB-001", "dataset": "regression", "stage": "apply_codebook", "input": {"units": [_unit(units, "SRC-1")], "codebook": ["after_hours_monitoring", "checking_after_dinner_messages", "feeling_empty_after_work", "late_night_project_updates", "planning_around_urgent_messages"]}, "expect": {"all_units_accepted": True}, "source": "round 7: the second coder's span for SRC-1 was not verbatim (FABRICATED_EVIDENCE) -- the gate held; this case tracks whether the model still does it"},
@@ -153,8 +227,14 @@ def dataset_maturity(cases: list[dict[str, Any]]) -> dict[str, Any]:
         "golden_cases": golden,
         "minimum_golden_cases": MINIMUM_GOLDEN_CASES,
         "established": golden >= MINIMUM_GOLDEN_CASES,
+        "anchor_origin": ANCHOR_ORIGIN,
+        "human_calibrated": False,
         "by_dataset": dict(Counter(case["dataset"] for case in cases)),
-        "note": None if golden >= MINIMUM_GOLDEN_CASES else f"golden set has {golden} < {MINIMUM_GOLDEN_CASES} cases (TEST_EVAL_STRATEGY section 2.2): a PASS here is a pass of the assertions, not an established Eval",
+        "note": (
+            f"golden set has {golden} < {MINIMUM_GOLDEN_CASES} cases (TEST_EVAL_STRATEGY section 2.2): a PASS here is a pass of the assertions, not an established Eval"
+            if golden < MINIMUM_GOLDEN_CASES
+            else f"golden count meets the section 2.2 minimum; expected labels are {ANCHOR_ORIGIN} (fixture authors over invented participants), not section 2.3 human-calibrated labels on real data"
+        ),
     }
 
 
@@ -167,6 +247,11 @@ def _check_dataset(cases: list[dict[str, Any]]) -> None:
             raise InvariantViolation(f"EVAL_DATASET_BAD_CASE: {case['case_id']} dataset={case['dataset']!r} stage={case['stage']!r}")
         if not case["expect"]:
             raise InvariantViolation(f"EVAL_DATASET_CASE_WITHOUT_EXPECTATION: {case['case_id']}")
+        if case["stage"] == "apply_codebook":
+            codebook = set(case["input"]["codebook"])
+            outside = sorted((set(case["input"].get("definitions") or {}) | set(case["expect"].get("expected_labels", {}).values())) - codebook)
+            if outside:
+                raise InvariantViolation(f"EVAL_DATASET_LABEL_NOT_IN_CODEBOOK: {case['case_id']} names labels outside its codebook: {outside}")
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -203,7 +288,7 @@ def execute_case(gateway: Any, model_profile_id: str, case: dict[str, Any], guar
         if stage == "open_coding":
             out = suggest_open_codes(recorder, model_profile_id, inp["units"], **common)
         elif stage == "apply_codebook":
-            out = apply_codebook(recorder, model_profile_id, inp["units"], inp["codebook"], seed=seed, **common)
+            out = apply_codebook(recorder, model_profile_id, inp["units"], inp["codebook"], seed=seed, definitions=inp.get("definitions"), **common)
         elif stage == "axial":
             out = suggest_categories(recorder, model_profile_id, inp["codes"], seed=seed, **common)
         elif stage == "selective":
@@ -460,7 +545,7 @@ def run_eval(
     selected = [case for case in dataset["cases"] if case["dataset"] in datasets and case["stage"] in stages]
     if not selected:
         raise InvariantViolation(f"EVAL_NO_CASES_SELECTED: datasets={datasets} stages={stages}")
-    _, forbidden = fixture_units()
+    forbidden = all_forbidden()
     guard = PiiLedgerGuard()
     for label, value in forbidden.items():
         guard.register(label, value)

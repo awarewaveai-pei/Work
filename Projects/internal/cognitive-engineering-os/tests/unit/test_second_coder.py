@@ -41,6 +41,14 @@ class CodebookValidationTests(unittest.TestCase):
         prompt = build_codebook_prompt(UNITS, CODEBOOK)
         self.assertLess(prompt.index("- after_hours_monitoring"), prompt.index("[SRC-3]"))
 
+    def test_prompt_without_definitions_is_the_bare_v2_shape_and_with_definitions_renders_label_colon_definition(self):
+        bare = build_codebook_prompt(UNITS, CODEBOOK)
+        self.assertIn("Codebook (allowed labels):\n\n- after_hours_monitoring\n- emotional_exhaustion\n", bare)
+        defined = build_codebook_prompt(UNITS, CODEBOOK, {"emotional_exhaustion": "feeling drained or empty"})
+        self.assertIn("Codebook (allowed labels, each with its definition):", defined)
+        self.assertIn("\n- emotional_exhaustion: feeling drained or empty\n", defined)
+        self.assertIn("\n- after_hours_monitoring\n", defined)  # a label without a definition stays bare
+
 
 class ApplyCodebookTests(unittest.TestCase):
     def test_second_pass_is_seeded_temperature_zero_and_recorded(self):
@@ -51,6 +59,27 @@ class ApplyCodebookTests(unittest.TestCase):
         self.assertEqual(out["labels"], {"SRC-3": "emotional_exhaustion", "SRC-4": "late_night_rumination"})
         self.assertEqual(out["suggestion_source"]["seed"], 7)
         self.assertEqual(out["codebook"], sorted(CODEBOOK))
+
+    def test_definitions_travel_in_the_checked_frame_and_are_recorded(self):
+        gateway = _StubGateway('[{"source_id":"SRC-3","label":"emotional_exhaustion","evidence_span":"feeling empty"}]')
+        out = apply_codebook(gateway, "p", UNITS, CODEBOOK, pii_guard=PiiLedgerGuard(), classification_tag="Confidential", trace_id="T:3", definitions={"emotional_exhaustion": "feeling drained or empty"})
+        self.assertIn("- emotional_exhaustion: feeling drained or empty", gateway.calls[0]["prompt"])
+        self.assertEqual(out["definitions_given"], ["emotional_exhaustion"])
+        self.assertEqual(out["labels"], {"SRC-3": "emotional_exhaustion"})
+
+    def test_a_definition_for_a_label_outside_the_codebook_is_refused_before_any_call(self):
+        gateway = _StubGateway("[]")
+        with self.assertRaisesRegex(InvariantViolation, "CODEBOOK_DEFINITION_UNKNOWN_LABEL"):
+            apply_codebook(gateway, "p", UNITS, CODEBOOK, pii_guard=PiiLedgerGuard(), classification_tag="Confidential", trace_id="T", definitions={"not_a_label": "x"})
+        self.assertEqual(gateway.calls, [])
+
+    def test_a_definition_carrying_detected_pii_trips_the_guard_before_any_call(self):
+        guard = PiiLedgerGuard()
+        guard.register("P9.name", "Zelda Quorn")
+        gateway = _StubGateway("[]")
+        with self.assertRaisesRegex(InvariantViolation, "MODEL_INPUT_PII_GUARD_TRIPPED"):
+            apply_codebook(gateway, "p", UNITS, CODEBOOK, pii_guard=guard, classification_tag="Confidential", trace_id="T", definitions={"emotional_exhaustion": "what Zelda Quorn said"})
+        self.assertEqual(gateway.calls, [])
 
     def test_empty_codebook_is_an_error(self):
         with self.assertRaisesRegex(InvariantViolation, "CODEBOOK_EMPTY"):
