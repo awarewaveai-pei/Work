@@ -1,0 +1,66 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml"
+target_ref: ""
+description: "Exercises IndependentJudgeRuling's required fields and the four independently-optional output branches."
+
+valid:
+  - name: full_ruling_all_four_branches_present
+    instance:
+      id: "IJR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.independent_judge"
+      proposal_ref: "PROP-2026-09-04-001"
+      positions_considered:
+        - id: "IJR-2026-09-05-001-P1"
+          description: "Red Team finding: no rollback plan"
+          source_ref: "RTC-2026-09-04-001-F1"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+        - id: "IJR-2026-09-05-001-P2"
+          description: "Blue Team improvement: added rollback + monitoring"
+          source_ref: "BTR-2026-09-05-001-I1"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      criteria_used:
+        - "every high-severity Red Team finding must have a matching Blue Team improvement"
+        - "approval still requires stated reversal conditions"
+      judgment: "approve, conditional on rollback/monitoring being in place"
+      minority_opinion: "one dissent: prefer a weekday execution window"
+      unknowns: []
+      reversal_conditions:
+        - "if rollback actually triggers, pause all future weekend migrations pending root cause"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+  - name: minimal_unanimous_ruling_no_optional_branches
+    instance:
+      id: "IJR-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "challenge.independent_judge"
+      proposal_ref: "PROP-2026-09-05-002"
+      positions_considered:
+        - id: "IJR-2026-09-05-002-P1"
+          description: "no controversy, unanimous"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      criteria_used: ["no security or compliance concern"]
+      judgment: "approved"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+
+invalid:
+  - name: missing_required_criteria_used
+    instance:
+      id: "IJR-2026-09-05-003"
+      version: "1.0.0"
+      proposal_ref: "PROP-x"
+      positions_considered:
+        - id: "IJR-2026-09-05-003-P1"
+          description: "x"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+      judgment: "approved"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "criteria_used is required with minItems 1 -- a ruling with zero stated criteria is the majority-vote-as-truth failure mode this method exists to prevent."
+  - name: empty_positions_considered_array
+    instance:
+      id: "IJR-2026-09-05-004"
+      version: "1.0.0"
+      proposal_ref: "PROP-x"
+      positions_considered: []
+      criteria_used: ["x"]
+      judgment: "approved"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED}
+    reason: "positions_considered requires minItems 1 -- a ruling that weighed nothing did not actually judge anything."

@@ -1,5 +1,80 @@
 # Worklog
 
+## 2026-09-05（續40，同一 session：Cognitive OS 第二十七個 Method Atlas 切片 — `challenge.independent_judge`，`challenge` 家族三個成員全部完工）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續完美完成系統」）。0 agent（除 critic subagent review）。
+
+**選型**：`challenge` 家族第三個、也是最後一個成員，完整關閉 Atlas §11.24 pairing「Blue Team → Red Team → Independent Judge」——同時關閉 red_team 自己的 `OQ-REDTEAM-1` 與 blue_team 自己的 `OQ-BLUETEAM-2`。全文件 grep「Independent Judge」精確 5 次命中（F12 table 列 L646、同一段的 flow diagram L654-664、§11.24 pairing 句 L1751、§13.4 recipe 位置 L3306、§22.3 escalation 提及 L4152），逐一直讀引用，糾正上一輪 blue_team 自己 draft 假宣稱「零命中」的錯誤。
+
+**真不變量**：table 列效益欄「避免多數決真理」直接蘊含：裁決不能在零 position、零 criteria、空白 judgment 的情況下產生。**真鏈接發現**（非發明）：§13.4 board-grade recipe 把 Independent Judge 排在 MCDA 之前、Reversal Criteria 之前——兩個都是本 session 已建方法（decision.mcda 第十個切片、learning.reversal_criteria 第八個切片），寫進 `recommended_next`。
+
+**critic 真跑抓到 5 個 Major（無 Critical）**：
+1. gate 層對 3 個前置條件中的 2 個（positions/judgment）完全沒有重驗——`all_gates_pass` 對「竄改成零 position」的記錄回報 True（schema 層擋住了，但那不等於 gate 層真的在運作）。補 `evaluate_positions_required_gate`／`evaluate_judgment_required_gate`，都改用與 builder 共用的 pure predicate。
+2. §11.24 段落引用錯誤，六處：flow diagram 其實在 F12 大節（L639-666）裡，不在 §11.24（§11.24 只有 pairing 那句）——本檔＋schema＋繼承進 blue_team 舊檔的兩處，全部修正。
+3. `reversal_conditions` 沒做強制的全 spec-root 概念查核——本 session 自己的 `reversal-criteria-set.schema.yaml` v1.1.0 早就因為上次重複定義事故而明文要求這個查核。補查 `specs/decision/reversal.schema.yaml`＋`reversal-criteria-set.schema.yaml`，寫進 compilation_decisions 說明為何刻意做成較弱的自由文字陣列而非重複定義。
+4. 跨檔修訂留下兩處過時陳述：blue_team 自己的 `recommended_next` 註解、`OQ-BLUETEAM-2` 的 `blocks:` 欄位，都還寫著「Independent Judge 沒有機器 id」——這個方法這次已經建了。改成正確的「pairing 是線性鏈，Blue Team 下一步是 Red Team，不是跳兩步到 Independent Judge」。
+5. `criteria_used` 驗證三層不一致：builder／schema 要求全部有效，gate 只要求至少一個有效——一個「一個真 criterion+一個空白」的混合清單，builder 造不出來卻能通過 gate。改成共用 predicate，三層一致。
+
+另修 10 個 Minor（`minority_opinion` 缺空值檢查、`unknowns`/`reversal_conditions` truthy 檢查改 `is not None`、錯誤碼精確度、gate FAIL 證據不夠診斷、跨檔案 dangling reference、「四分支皆選填」決策補查 Atlas L85+L3401 兩個條件式強制引用並誠實揭露殘留為新 OQ、`source_of_truth_for` 補齊 method-inventory.yaml+既有 gate id 引用、缺 slice 文件、`OQ-BLUETEAM-2` 第二問未答完整（現已補上：Independent Judge 不鎖定的理由跟 Blue Team 相反——§22.3 L4152 點名它是 Red Team 的合法升級對象）。**順手修一個姊妹檔案既有 bug**：red_team.py 的 evidence gate 對非 dict finding 會直接崩潰不是 FAIL，同一類 bug 這次在 independent_judge 自己的 port 上修過，順手補回原檔。
+
+29 個測試（21→29，另 test_red_team.py +1 回歸測試）全綠，635 tests 全套零回歸（623→635）。CLI 補強為雙層驗證（建構期+gate 層各自獨立證明不變量）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/challenge.independent_judge.contract.yaml`＋`specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml`＋fixture（2 valid+2 invalid）＋`contract-backlog.yaml` 新增 `tier_1.twentyfifth_concrete_entry`＋重新產生索引；`challenge.red_team.contract.yaml`（recommended_next 補上、OQ-REDTEAM-1 關閉）；`challenge.blue_team.contract.yaml`（OQ-BLUETEAM-2 關閉+修正兩處過時陳述+§11.24 引用修正）。Product root 新增 `ai_lego/modules/challenge/independent_judge.py`（builder+5 gate，3 個共用 predicate）＋`ai_lego/apps/cli/run_independent_judge_slice.py`（真實案例串連 red_team/blue_team 自己的範例+雙層攻擊驗證）＋`tests/unit/test_independent_judge.py`（29 tests）＋`docs/TWENTYSEVENTH_SLICE_CHALLENGE_INDEPENDENT_JUDGE.md`。`ai_lego/modules/challenge/red_team.py`+`tests/unit/test_red_team.py`（既有 evidence gate crash 修正+回歸測試）。`modules/challenge/__init__.py` docstring 補第三租戶。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2753→2762
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_independent_judge_slice`（修正後）| exit=0 | result=`PASS challenge.independent_judge: 2 positions, 2 criteria, gates [provenance_required=PASS, evidence_labeling_required=PASS, positions_required=PASS, criteria_required=PASS, judgment_required=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_independent_judge tests.unit.test_red_team -v` | exit=0 | result=49 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=65318 | result=**635 tests OK**（623→635，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，非自審，189K tokens/61 tool uses，本 session 至今最深入一輪）| verdict=fail(0 Critical, 5 Major)→fixed | findings=0c/5m/10minor（全數修正；1 個姊妹檔案既有 bug 順手修正；殘留限制誠實揭露為新 OQ-INDEPENDENTJUDGE-4 非隱藏）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`challenge[.]independent_judge\|IndependentJudgeRuling\|independent-judge-ruling\|run_independent_judge_slice\|INDEPENDENTJUDGE_` | hits=17（全部本切片自己新檔案+三個 challenge 家族契約互相引用+TASKS/WORKLOG 前向引用+session log 雜訊），無過期殘留；額外 grep `§11.24 flow diagram` 確認全庫零殘留（三處錯誤引用全修正）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-INDEPENDENTJUDGE-1`（source_ref 軟連結無執行期查核）、`OQ-INDEPENDENTJUDGE-2`（Minority Opinion／Human Decision 兩個 recipe 下一步未建）、`OQ-INDEPENDENTJUDGE-3`（無機器 id 列）、`OQ-INDEPENDENTJUDGE-4`（風險分級條件式強制未建模，新揭露）。皆非阻塞。**`challenge` 家族三個成員全部完工**（red_team／blue_team／independent_judge）。
+
+## 2026-09-05（HCI30 ADR-0017 Bitemporal scope Wave 1 gates 1-3 落地 + db-expert 覆審 3 Critical+6 Major 全修）
+
+**觸發**：延續操作者標準授權（「繼續完成系統，需要決定的事你決定」）。HCI30 Wave 1 ADR gate 清單下一個目標，選 ADR-0017（bitemporal scope）——gate 清單明確、不像 ADR-0019 需要還不存在的 Decision table。
+
+**[已修改]**：
+- 新增 `Projects/internal/hci30/database/migrations/0005_wave1_bitemporal_history_{up,down}.sql`：`hci.subject_records` 加六個 bitemporal 欄位（`valid_from`/`valid_to`/`system_recorded_at`/`system_superseded_at`/`supersedes_id`/`corrected_reason`）；新表 `hci.decisions`（`outcome` enum 取自 `04_HCI30_PRODUCT_SPEC.md` 的 Decision output 值，刻意不做完整 Decision workflow 語意）；`hci.mark_superseded()`；4 個 `_current` view + `_as_of()` function。
+- `database/tests/wave1-negative-tests.sql`：104→126 assertion；`database/fixtures/0001_synthetic.sql` 補 tenant-B `subject_records`/`decisions` 兩列。
+- `scripts/test-wave1-local.ps1`／`scripts/mutation-check-wave1.ps1`：接入 migration 0005，39→52 mutation。
+- `database/ERROR_CODE_REGISTRY.md`：H1008 從 `RESERVED, NOT RAISED` 改標 `RAISED`（defense-in-depth，見下）。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0017-bitemporal-scope.md` §Implementation note、`ADR_INDEX.md`、`wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`：完整記錄下方四次設計迭代與 db-expert 覆審全過程。
+- `agency-os/TASKS.md`：標記完成 + 新增 mutability-matrix SSOT 漂移（次要，非阻塞）與 gate 4 scope-fence（獨立 migration 0006）兩個後續項。
+
+**escape-hatch 機制的四次設計迭代**（`hci.mark_superseded()` 需要 UPDATE 前導列的 `system_superseded_at`，但那張表自己的 append-only trigger 對所有 UPDATE 無條件拒絕，包括 SECURITY DEFINER 內部呼叫）：
+
+1. **session-local GUC flag**——動工前 standalone probe 直接否決：PostgreSQL 預設任何角色都能 `SET` 任意自訂 GUC，app role 可自己設旗標偽造整個逃生口，繞過整個 append-only 保護，屬真實安全回歸不是理論疑慮。
+2. **`ALTER TABLE DISABLE/ENABLE TRIGGER`**——通過同一個五情境 probe，但真跑完整 migration（不是 probe）時炸 `55006`：`mark_superseded()` 是同一張表的 AFTER INSERT trigger，PostgreSQL 不允許對「本 session 有 active query」的關聯下 ALTER TABLE。Probe 沒抓到是因為它是獨立呼叫、沒有外層 INSERT——這正是為什麼要真跑完整 migration，不能只信 probe。
+3. **lazy per-session temp table `pg_temp.hci_supersession_lock`**——通過 118/118 assertion + 45/45 mutation，commit 前主動送 db-expert 覆審才被抓到真洞：**`pg_temp` 不是 owner 專屬**，任何持有 database `TEMPORARY` 權限（預設 PUBLIC，全部 migration 都沒 REVOKE）的角色，在自己 session 的 temp schema 上都有完整權限含 CREATE；而 `SET ROLE` 在同一 session 內共用同一個 `pg_temp`（正是本專案測試 harness 的跑法）。app role 可搶在 `mark_superseded()` 的 `CREATE TABLE IF NOT EXISTS` 之前自己建同名表，被靜默採用。跟被否決的 GUC 設計同一類洞（「任何角色都能植入被檢查的 session-local 標記」），只是換了個容器，不是新問題。
+4. **最終機制：effect-based 授權**——`reject_update_delete()` 不再檢查任何可植入的旗標，改成直接看「這次 UPDATE 做了什麼」：`system_superseded_at` 從 NULL 變 NOT NULL、其餘欄位（`jsonb` 減 key 比對）完全不變、且執行角色是該表 owner 的成員（`pg_has_role`）。沒有旗標、沒有暫存表，沒有東西可偽造。`mark_superseded()` 因此不再需要任何逃生口鷹架，直接下 UPDATE 即可。真跑 PoC 驗證（不只推理）：模擬「未來 app role 拿到欄位級 UPDATE 權限」的情境，塑形完全一致的偽造嘗試仍被 `H1003` 擋下——因為 app role 不是 `hci_owner` 的成員。
+
+**同一輪 db-expert 覆審另抓到的問題（全部同一 commit 內修完）**：
+- **Critical**：`mark_superseded()` 是 SECURITY DEFINER 卻沒 `REVOKE ALL FROM PUBLIC`（0001 自己的 `hci.current_tenant_id()` 早有此慣例，本檔第一版漏做）。
+- **Critical**：narrow-rollback down migration 從未真跑過一次（`test-wave1-local.ps1` 的 reversibility pass 只跑 `0001_down` 整包 DROP SCHEMA），`DROP FUNCTION hci.mark_superseded()` 順序在依賴它的 `DROP TRIGGER` 之前，必炸 `2BP01`。
+- **Major**：`now()`（transaction-start time，非 wall-clock）當 ledger 自己的時鐘，真實併發下會產生假 `23514`；改 `clock_timestamp()`。
+- **Major**：`UNIQUE(supersedes_id)` 未綁 `tenant_id`，unique index 不受 RLS 約束且先於 FK trigger 檢查，變成跨租戶存在性 oracle（`23505` vs `23503`洩漏另一租戶的 supersede 狀態）；改 `UNIQUE(tenant_id, supersedes_id)`。
+- **Major**：`corrected_reason=''` 能通過原本的 CHECK（只查 `IS NOT NULL`）；補 non-blank + 雙向配對兩個 CHECK，新增 `BITEMP-REASON-02`。
+- **Major**：`hci.decisions` 自己的 RLS／append-only／`security_invoker` 零測試零 mutation 覆蓋——118/118 全綠對這張表的這些控制完全沒證明力；新增 `RLS-LEAK-04`／`APPEND-ONLY-GRANT-09/10`／`APPEND-ONLY-TRIGGER-05`／`TRUNCATE-05`／`BITEMP-CLOCK-02`／`BITEMP-VIEWRLS-01` 共 7 個斷言 + 6 個對應 mutation。
+- Minor（已修，不逐條展開）：views 改明確欄位清單（不用 `SELECT *`，避免未來 `_as_of()` function 與 `_current` view 欄位集分岔）；`_as_of()` 四個 function 補 `REVOKE ALL FROM PUBLIC`；補兩個 partial index 支援 `_current`/`_as_of` 述詞。
+
+**mutation-check 額外抓到（非 db-expert，是真跑本身）**：`BITEMP-SUPERSEDE-02` 預測 `H1008`，實際 `23505`（gate 1 的 `UNIQUE` 比 `mark_superseded()` 自己的檢查先擋）——修正測試，`H1008` 保留為 mutation 證實可達的 defense-in-depth，不是死碼。過程也重複發作一次本專案已知病灶：`to_regclass(...) IS NOT NULL AND EXISTS(...)` 合併成一個布林式時炸 `42P01`（AND 不保證短路，EXISTS 子查詢照樣被 parse/plan）——跟 0001 down-migration 那次同一課，改巢狀 PL/pgSQL IF；此程式碼隨第 3 版設計整段移除，不留在最終版本裡。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1`（最終版本）| exit=0 | result=`HCI Wave 1 negative suite: 126 assertion(s) recorded, 0 failed`；down/up reversibility pass（含 0005 窄回滾路徑，此前從未真跑過）同批綠燈
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1`（最終版本）| exit=0 | result=`All 52 mutations killed. The Wave 1 negative suite is non-vacuous.`
+- REALTEST_EVIDENCE: tool=Bash | cmd=直接 probe：`GRANT UPDATE(system_superseded_at)` 模擬未來情境後，以 app role 送出塑形一致的偽造 UPDATE | result=`ERROR: hci.subject_records is append-only (UPDATE rejected)`（H1003，`pg_has_role` 檢查生效）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`\df+ hci.mark_superseded` 檢查 ACL | result=`hci_owner=X/hci_owner`，無 PUBLIC 項——確認 REVOKE 生效
+- REVIEW_DONE: critic=Deep（db-expert subagent，真實非自審）| verdict=fail(3 Critical, 6 Major, 10 Minor)→全部 Critical+Major 修正並複驗；Minor 除 N2/N3（隨機制移除已 moot）、N7（另立 TASKS 項）外全修
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`mark_superseded\|hci_supersession_lock\|H1008\|ADR-0017.*(RUNTIME OPEN\|not built\|gates still open)` | hits=45 總計；2 個真過期殘留抓到並修正（`ADR-0014-data-subject-rights-channel.md:13` 宣稱 HD-06 gates still open 已過期、`migrations/0004_wave1_source_provenance_up.sql:41` 宣稱 mark_superseded 未建已過期）；`ADR-0012:124`／`ADR-0019:64` 兩處經查為決策當下歷史快照引用（非即時狀態追蹤，即時狀態在 ADR_INDEX.md），依既有慣例不回頭改歷史決策文字，留著；`worklog-excerpt.md`（AO-RESUME 自動產生快照）不手動改
+- WORKLOG: 本條目
+
+**[剩餘風險]**：gate 4（`BITEMP-SCOPE-01` scope-fence，需對 11 張既有 tenant-owned 表補插入時間戳）與 mutability-matrix SSOT 漂移（N7）皆已記錄為 TASKS.md 獨立項，非阻塞、非隱藏。gate 5（Wave 4 `EXPLAIN-ASOF-01`）OPEN，等應用層。
+
+**[rollback]**：`0005_wave1_bitemporal_history_down.sql`（窄回滾，本輪首次真跑確認可用，含空表守衛拒絕在有資料時執行）；或 `0001_wave1_synthetic_down.sql`（整包 DROP SCHEMA，含 0002-0005 全部）。
+
 ## 2026-09-05（續39，同一 session：Cognitive OS 第二十六個 Method Atlas 切片 — `challenge.blue_team`，關閉 `challenge.red_team` 自己 OQ-REDTEAM-1 的一半）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」）。0 agent（除 critic subagent review）。

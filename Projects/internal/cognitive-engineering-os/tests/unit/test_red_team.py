@@ -131,6 +131,15 @@ class GateMutationTests(unittest.TestCase):
         gate = evaluate_provenance_required_gate(challenge, "test", "2026-09-04T00:00:00Z")
         self.assertEqual(gate["status"], "FAIL")
 
+    def test_non_dict_finding_fails_the_evidence_gate_not_a_crash(self):
+        """A critic review of this family's own third slice (challenge.independent_judge, WORKLOG continuation
+        40) found this exact gate crashes (AttributeError) on a non-dict finding instead of failing closed --
+        the same fix applied there was applied back here."""
+        challenge = _valid_challenge()
+        challenge["findings"] = ["not-a-dict"]
+        gate = evaluate_evidence_labeling_required_gate(challenge, "test", "2026-09-04T00:00:00Z")
+        self.assertEqual(gate["status"], "FAIL")
+
     def test_evidence_labeled_finding_with_no_refs_fails_evidence_labeling_gate(self):
         """Atlas's own real risk: an unevidenced claim of failure ('this is insecure') is still an ungrounded
         claim, whether or not it turns out to be true."""

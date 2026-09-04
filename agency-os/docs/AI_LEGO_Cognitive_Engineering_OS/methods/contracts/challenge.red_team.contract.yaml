@@ -120,12 +120,15 @@ forbidden_transition: []
 # must not become that other type," a different shape than Fishbone's or
 # SWOT's forbidden_transition). See open_questions.
 
-recommended_next: []
-# Atlas §11.24 names a real pairing ("Blue Team → Red Team → Independent
-# Judge") but gives neither `challenge.blue_team` nor an "Independent
-# Judge" method its own machine_id or contract anywhere in this spec root
-# yet -- disclosed in open_questions rather than inventing ids for methods
-# not yet built.
+recommended_next:
+  - challenge.independent_judge
+# UPDATED (2026-09-05, same session, twenty-seventh slice): Atlas §11.24's
+# own pairing ("Blue Team → Red Team → Independent Judge") is now fully
+# built end to end. `challenge.blue_team` is this method's own upstream
+# input, not its own recommended_next (the pairing is linear -- Blue Team
+# feeds Red Team, Red Team feeds Independent Judge, not the reverse).
+# challenge.independent_judge now has a real machine_id and contract --
+# see OQ-REDTEAM-1 below, closed.
 
 rollback:
   side_effect_free: true
@@ -135,6 +138,7 @@ rollback:
 
 open_questions:
   - id: "OQ-REDTEAM-1"
+    status: "CLOSED (2026-09-05, same session)"
     question: >
       Atlas §11.24's own pairing ("Blue Team → Red Team → Independent
       Judge") names two methods with no contract or machine_id anywhere in
@@ -142,6 +146,20 @@ open_questions:
       method Atlas gives no explicit id for at all). Should a future
       session build either, completing the pairing this method's own
       `recommended_next` currently cannot cite?
+    resolution: >
+      Both built, same session: `challenge.blue_team` (twenty-sixth
+      slice) and `challenge.independent_judge` (twenty-seventh slice).
+      This contract's own `recommended_next` now cites
+      `challenge.independent_judge` directly. Left as a closed record
+      rather than deleted, so a future reader can see the question was
+      actually asked and answered, not silently removed -- note this
+      `status`/`resolution` shape on an `open_questions[]` item is a
+      NEW pattern this file and `challenge.blue_team.contract.yaml`
+      introduce this session, not a pre-existing spec-root convention
+      (method.schema.yaml does not govern `open_questions` at all, so
+      nothing is broken by it, but it should not be cited as
+      established precedent until more of this directory's own
+      contracts actually use it).
     owner: "operator, or whoever next builds the Blue Team / Independent Judge methods"
     blocks: "nothing in this file's own validity"
   - id: "OQ-REDTEAM-2"

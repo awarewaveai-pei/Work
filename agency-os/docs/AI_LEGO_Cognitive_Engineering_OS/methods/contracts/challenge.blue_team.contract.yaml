@@ -130,15 +130,22 @@ forbidden_transition: []
 recommended_next:
   - challenge.red_team
   # Atlas §11.24's own pairing (L1751: "Blue Team → Red Team →
-  # Independent Judge") gives this method's own forward edge directly --
-  # unlike challenge.red_team.contract.yaml's own recommended_next
-  # (empty, because at the time it was built neither Blue Team nor
-  # Independent Judge had a contract yet), this contract CAN cite it
-  # now that challenge.blue_team itself exists. "Independent Judge" is
-  # deliberately NOT cited here -- Atlas gives it no machine_id or
-  # dedicated section anywhere, so inventing one to complete the chain
-  # would be the same class of invention this session's every Tier 1
-  # contract already refuses (see OQ-BLUETEAM-2).
+  # Independent Judge") gives this method's own forward edge directly.
+  # UPDATED (2026-09-05, twenty-seventh slice, same session):
+  # `challenge.independent_judge` now exists and is ACTIVE -- the
+  # earlier reasoning here ("Independent Judge deliberately NOT cited
+  # -- Atlas gives it no machine_id anywhere") is now STALE and was
+  # left in place after that method was built, which a critic review
+  # caught. The CORRECT reason `challenge.independent_judge` is still
+  # not listed here is the pairing's own LINEARITY, not its absence:
+  # L1751 is a linear chain (Blue Team → Red Team → Independent Judge),
+  # so Blue Team's own immediate next step is Red Team ONLY --
+  # Independent Judge is Red Team's own next step (see
+  # challenge.red_team.contract.yaml's own recommended_next, which now
+  # cites it directly), two hops from here, not one. This mirrors how
+  # `root_cause.fishbone.contract.yaml`'s own recommended_next lists
+  # its own immediate next methods, not the full downstream chain those
+  # methods themselves continue to.
 
 rollback:
   side_effect_free: true
@@ -198,38 +205,62 @@ open_questions:
     owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
     blocks: "nothing in this file's own validity"
   - id: "OQ-BLUETEAM-2"
+    status: "CLOSED (2026-09-05, same session)"
+    resolution: >
+      Built: `challenge.independent_judge` (twenty-seventh slice, same
+      session). Answers BOTH halves of the question below: (1) Atlas
+      gave enough (a real table-row formula plus a flow-diagram branch
+      structure) to build from -- a scope decision, not a "nothing to
+      build from" gap. (2) The authority-rule question DID get its own
+      fresh analysis, and reached the OPPOSITE conclusion from Blue
+      Team: `IndependentJudgeRuling` is NOT locked down, because §22.3's
+      own gate table (L4152: "Red Team | Final Decision | Independent
+      Judge / Human") names Independent Judge as the entity Red Team
+      must escalate TO for a real decision -- Independent Judge
+      legitimately carries the authority Red Team and Blue Team are
+      both barred from claiming. See
+      `challenge.independent_judge.contract.yaml`'s own
+      compilation_decisions for the full reasoning. UPDATED
+      (2026-09-05): `recommended_next` above, and this OQ's own
+      `blocks:` field below, were also corrected -- both had stale text
+      left over from before this method was built.
     question: >
       CORRECTED (critic review caught this contract's first draft
       falsely claiming "Independent Judge...zero hits anywhere in Atlas
       beyond the L1751 pairing line" -- an R4 grep-before-claiming
       failure): Atlas actually gives Independent Judge a real F12 table
       row (L646: "依證據與規則裁決 | positions→evidence→criteria→
-      judgment→dissent | 避免多數決真理"), a node in the same §11.24
-      flow diagram (L659), and a position in the §13.4 Board-grade
-      Strategy Recipe (L3306: "→ Independent Judge"). This is
-      comparable citation density to several methods this session
-      already built full contracts for from a single table row alone
-      (e.g. devops_sre.error_budget's own F19 table row was its
-      strongest single citation). So the real open question is NOT "can
-      this be built" (it can -- Atlas gives a real usage formula) but
-      "should a future session build `challenge.independent_judge` as
-      the third leg of this pairing, completing what
-      challenge.red_team's own OQ-REDTEAM-1 asked for," and if so,
-      whether its own no-final-authority-style structural rule (Atlas
-      L4144-4155's own gate table has no Independent Judge row either,
-      but that table's whole POINT is escalation TO Independent Judge --
-      a different relationship to the table than Blue Team's own
-      absence from it) needs its own fresh analysis rather than copying
-      either sibling's.
+      judgment→dissent | 避免多數決真理"), a node in the SAME F12
+      tool-family section's own flow diagram (L659, NOT inside §11.24 --
+      a second, separate citation error a later critic review caught
+      and this file's own description above was corrected for), and a
+      position in the §13.4 Board-grade Strategy Recipe (L3306: "→
+      Independent Judge"). This is comparable citation density to
+      several methods this session already built full contracts for
+      from a single table row alone (e.g. devops_sre.error_budget's own
+      F19 table row was its strongest single citation). So the real
+      open question is NOT "can this be built" (it can -- Atlas gives a
+      real usage formula) but "should a future session build
+      `challenge.independent_judge` as the third leg of this pairing,
+      completing what challenge.red_team's own OQ-REDTEAM-1 asked for,"
+      and if so, whether its own no-final-authority-style structural
+      rule (Atlas L4144-4155's own gate table has no Independent Judge
+      row either, but that table's whole POINT is escalation TO
+      Independent Judge -- a different relationship to the table than
+      Blue Team's own absence from it) needs its own fresh analysis
+      rather than copying either sibling's.
     owner: "operator, or whoever next builds challenge.independent_judge"
-    blocks: "nothing in this file's own validity -- challenge.red_team's own recommended_next still cannot cite it either, since neither sibling contract builds it"
+    blocks: "nothing -- resolved, see resolution above"
 
 verification:
   method: >
-    Read Atlas §11.24 (L1739-1752), the F12 tool table (L639-648,
+    Read Atlas §11.24 (L1739-1752), the F12 tool-family table (L639-648,
     including Blue Team's own L645 row and Independent Judge's own L646
-    row), the F12 index row (L312), the §11.24 flow diagram (L656-663),
-    the §13.4 recipe mention (L3306), and §22.3's own Method-specific
+    row), the F12 index row (L312), the SAME F12 tool-family section's
+    own flow diagram (L656-663, inside L639-666, NOT §11.24 -- corrected
+    after a later critic review of the sibling `challenge.independent
+    _judge` contract caught this exact misattribution and it was fixed
+    here too), the §13.4 recipe mention (L3306), and §22.3's own Method-specific
     Gate table (L4144-4155) directly at the cited lines. A critic review
     caught this contract's first draft falsely claiming "Independent
     Judge...zero hits" from an incomplete grep -- re-verified all

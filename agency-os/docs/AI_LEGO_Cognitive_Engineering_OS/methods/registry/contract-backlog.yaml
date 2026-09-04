@@ -797,9 +797,18 @@ tier_1:
       Same class of justification as every entry above. SECOND entry
       from the `challenge` family (F12), directly closing half of
       `challenge.red_team`'s own OQ-REDTEAM-1 (the "Independent Judge"
-      half of the same pairing remains unbuilt -- Atlas gives it no
-      machine_id or dedicated section anywhere, confirmed by grep before
-      writing). Atlas §11.24 gives this method a dedicated section:
+      half of the same pairing remained unbuilt at the time this entry
+      was written. CORRECTED, twentyfifth_concrete_entry below: the
+      "no machine_id or dedicated section anywhere" phrasing here
+      undersold what a full grep actually finds -- Atlas gives
+      Independent Judge a real F12 table row (L646) and flow-diagram
+      branch structure, just no dedicated §11.x protocol section. A
+      critic review of this contract's own first draft caught the
+      stronger, genuinely false claim this same phrasing repeated
+      inside challenge.blue_team.contract.yaml itself; this backlog
+      entry's own softer wording was accurate as far as it went but is
+      annotated here for consistency now that the sibling method is
+      built). Atlas §11.24 gives this method a dedicated section:
       purpose (steelman a proposal, not blindly endorse it) across a
       5-category improvement list, and the explicit pairing "Blue Team →
       Red Team → Independent Judge" already cited by its sibling
@@ -818,6 +827,40 @@ tier_1:
       itself cited elsewhere as a repeated teaching example. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the twenty-three entries above it.
+  twentyfifth_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-fifth Tier 1 entry, same
+    # additive-key rationale as the twenty-four entries above it.
+    method_id: "challenge.independent_judge"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. THIRD and final
+      entry from the `challenge` family (F12), completing the full
+      pairing challenge.red_team's own OQ-REDTEAM-1 asked about and
+      resolving challenge.blue_team's own OQ-BLUETEAM-2. Atlas gives no
+      dedicated §11.x section for this method -- exactly 5 hits on a
+      full-document grep (F12 table row L646, flow-diagram branch L659,
+      pairing L1751, §13.4 recipe L3306, §22.3 escalation-target
+      mention L4152), all read directly and cited by exact line number.
+      The benefit column's own text (L646: "避免多數決真理") directly
+      implies a real invariant -- a ruling with zero stated criteria is
+      the majority-vote-as-truth failure mode this method exists to
+      prevent. A REAL forward chain found on this slice's own read of
+      §13.4: Independent Judge sits directly before MCDA (L3307) and,
+      later in the same recipe, before Reversal Criteria (L3310) --
+      both already-built Tier 1 methods (decision.mcda, tenth slice;
+      learning.reversal_criteria, eighth slice), cited in this
+      contract's own recommended_next, the same "close a real chain a
+      mother document's own text already names" discipline
+      root_cause.five_whys/root_cause.pareto already applied to
+      root_cause.fishbone.
+    source: "methods/contracts/challenge.independent_judge.contract.yaml (built same session as this entry, mints machine_id challenge.independent_judge) + specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: two independent citations (table row
+      formula + flow diagram branch structure) but no dedicated §11.x
+      protocol section, thinner than several Tier 0 examples. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the twenty-four entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

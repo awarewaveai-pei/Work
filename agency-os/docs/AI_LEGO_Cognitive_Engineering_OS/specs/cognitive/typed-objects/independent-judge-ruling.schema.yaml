@@ -1,0 +1,200 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml"
+title: Independent Judge Ruling
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `IndependentJudgeRuling` --
+  the declared `outputs` of `challenge.independent_judge`'s Method
+  Contract (methods/contracts/challenge.independent_judge.contract.yaml,
+  `outputs: [IndependentJudgeRuling]`). A structured decision record,
+  not a checklist -- the third distinct shape this session's `challenge`
+  family uses (RedTeamChallenge: checklist-structured critique;
+  BlueTeamReview: checklist-structured improvement; this: a criteria-
+  weighed ruling with four independently-optional output branches).
+
+  Field provenance -- F12 tool-family section (L639-666), which
+  contains BOTH the table row (L646) AND the flow diagram (L654-664,
+  NOT §11.24 -- a mis-citation a critic review caught in this file's
+  own first draft and corrected here; §11.24 only contains the L1751
+  pairing sentence this method's own contract cites separately):
+    * The table row's own 5-step formula ("positions→evidence→
+      criteria→judgment→dissent") maps onto `positions_considered[]`,
+      `criteria_used[]`, `judgment`, and `minority_opinion`.
+    * The flow diagram's own 4 terminal branches (L660-663: Consensus,
+      Minority Opinion, Unknowns, Reversal Conditions) map onto
+      `judgment` (Consensus), `minority_opinion`, `unknowns[]`, and
+      `reversal_conditions[]` -- each independently optional except
+      `judgment` itself (see method contract compilation_decisions for
+      why the diagram's own 4-branch shape is not read as "all 4
+      required", now also checked against Atlas §1 L85 and §13.7
+      L3398-3403's own conditional mandates for the same content).
+    * `reversal_conditions[]` is a DELIBERATELY WEAKER bare string
+      array, not a reuse of `reversal-criteria-set.schema.yaml`'s own
+      structured indicator/condition/action/owner shape -- see the
+      method contract's own compilation_decisions for the full
+      spec-root concept check this field's naming required (this
+      session's own `reversal-criteria-set.schema.yaml` v1.1.0 exists
+      specifically to make that check mandatory before minting a new
+      typed object for an existing concept).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool-family section (L639-666), table row (L646)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool-family section's own flow diagram (L654-664, inside L639-666, NOT §11.24)"
+  - "specs/decision/reversal.schema.yaml and specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml -- checked before minting reversal_conditions, see method contract compilation_decisions"
+  - "methods/contracts/challenge.independent_judge.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+type: object
+required: [id, version, proposal_ref, positions_considered, criteria_used, judgment, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^IJR-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as red-team-challenge.schema.yaml's RTC- and blue-team-review.schema.yaml's BTR- prefixes."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.independent_judge"
+
+  proposal_ref:
+    type: string
+    description: "Free-text reference to the proposal/plan/analysis this ruling judges. Same scope-limited free-text pattern challenge.red_team/challenge.blue_team's own proposal_ref already uses, for the identical reason."
+
+  positions_considered:
+    type: array
+    minItems: 1
+    description: "The F12 table row's own step 1 ('positions') -- at least one required (method contract precondition): a ruling that weighed nothing did not actually judge anything."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, provenance]
+      properties:
+        id:
+          type: string
+          description: "Local id, intended to be unique within this ruling (e.g. IJR-001-P1)."
+        description:
+          type: string
+          minLength: 1
+          description: "The position itself, in natural language -- what viewpoint is being weighed."
+        source_ref:
+          type: string
+          description: "OPTIONAL soft reference to a RedTeamChallenge finding id or BlueTeamReview improvement id this position traces to. Not schema-verified to resolve -- see method contract OQ-INDEPENDENTJUDGE-1."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory uses. Required when this position's own provenance is labeled EVIDENCE (method contract quality.evidence_labeling_required:true, enforced at the runtime layer, not this schema layer)."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  criteria_used:
+    type: array
+    minItems: 1
+    description: "The F12 table row's own step 3 ('criteria') -- at least one required (method contract precondition, directly grounded in the benefit column's own text L646: '避免多數決真理', avoid majority-vote-as-truth). A ruling with zero stated criteria is exactly the failure mode this method exists to prevent."
+    items:
+      type: string
+      minLength: 1
+
+  judgment:
+    type: string
+    minLength: 1
+    description: "The F12 table row's own step 4 ('judgment') / the flow diagram's own Consensus branch (L660). The ruling itself, in natural language, reached by weighing positions_considered against criteria_used -- the only one of the flow diagram's 4 output branches that is REQUIRED (see method contract compilation_decisions)."
+
+  minority_opinion:
+    type: string
+    minLength: 1
+    description: "OPTIONAL. The F12 table row's own step 5 ('dissent') / the flow diagram's own Minority Opinion branch (L661). Absent when the ruling is unanimous -- not every ruling has a documented dissent."
+
+  unknowns:
+    type: array
+    default: []
+    items:
+      type: string
+      minLength: 1
+    description: "OPTIONAL. The flow diagram's own Unknowns branch (L662) -- genuinely unresolved matters the ruling could not settle. May be empty; not every ruling leaves open questions."
+
+  reversal_conditions:
+    type: array
+    default: []
+    items:
+      type: string
+      minLength: 1
+    description: "OPTIONAL. The flow diagram's own Reversal Conditions branch (L663) -- conditions under which this ruling should be revisited. May be empty; a ruling may be judged final with no stated reversal path. See method contract's own recommended_next for the real forward link to learning.reversal_criteria, which this field does not itself invoke."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A ruling over the same synthetic deployment proposal challenge.red_team/challenge.blue_team's own examples attack/strengthen: judgment favors proceeding with Blue Team's own fallback addition, one minority opinion, no unresolved unknowns, one reversal condition"
+    value:
+      id: "IJR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.independent_judge"
+      proposal_ref: "PROP-2026-09-04-001: 週末自動把所有客戶資料庫遷移到新機房"
+      positions_considered:
+        - id: "IJR-2026-09-05-001-P1"
+          description: "Red Team: 遷移計畫沒有寫明失敗時的 rollback 步驟"
+          source_ref: "RTC-2026-09-04-001-F1"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "IJR-2026-09-05-001-P2"
+          description: "Blue Team: 已加入明確 rollback 步驟與每 5 分鐘進度回報"
+          source_ref: "BTR-2026-09-05-001-I1"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      criteria_used:
+        - "Red Team 找到的每個高嚴重度發現都必須有對應的 Blue Team 改善項目才能核准"
+        - "核准後仍須有明確的 reversal 條件，不得視為一次性決定"
+      judgment: "核准週末遷移執行，前提是 Blue Team 的 rollback 與監控改善項目已到位"
+      minority_opinion: "仍有一票保留意見：建議延後到平日執行以確保有完整值班支援"
+      unknowns: []
+      reversal_conditions:
+        - "若遷移過程中 rollback 步驟實際觸發，暫停後續所有週末遷移直到根因排除"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A minimal, unanimous ruling: one position, one criterion, no dissent, no unknowns, no reversal conditions"
+    value:
+      id: "IJR-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "challenge.independent_judge"
+      proposal_ref: "PROP-2026-09-05-002"
+      positions_considered:
+        - id: "IJR-2026-09-05-002-P1"
+          description: "提案本身無爭議，一致同意"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      criteria_used: ["無安全或合規疑慮"]
+      judgment: "核准"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: >
+    Read the F12 tool-family section (L639-666) directly, including
+    both the table row (L646) and its own flow diagram (L654-664).
+    Grepped `specs/**` for "reversal"/"revisit" before finalizing
+    `reversal_conditions[]`'s own bare-string shape -- found
+    `specs/decision/reversal.schema.yaml` and
+    `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml`,
+    read both in full, confirmed no field-name collision and a
+    genuinely different shape (see method contract's own
+    compilation_decisions). Validated against jsonschema
+    Draft202012Validator.
+  note: >
+    The 5-step formula and the 4-branch output structure are both
+    directly grounded in Atlas's own cited text (correctly attributed
+    to the F12 tool-family section, not §11.24 -- a citation error a
+    critic review caught in this file's own first draft). The decision
+    that only `judgment` is required among the 4 output branches, that
+    `positions_considered[].source_ref` is a soft (not hard) reference,
+    and that `reversal_conditions[]` is a deliberately weaker shape than
+    `ReversalCriteriaSet` rather than a duplicate of it, are all
+    disclosed compilation choices -- see the method contract's own
+    compilation_decisions. No mother document was modified to
+    produce this file.

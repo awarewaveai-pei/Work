@@ -119,16 +119,23 @@ def evaluate_provenance_required_gate(challenge: dict[str, Any], validator: str,
 def evaluate_evidence_labeling_required_gate(challenge: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.evidence_labeling_required: true`` -- an unevidenced Red Team finding ('this is
     insecure') is exactly as dangerous as an unevidenced Fishbone cause hypothesis: a finding claiming the
-    EVIDENCE label must actually cite evidence."""
+    EVIDENCE label must actually cite evidence. FAILS CLOSED on a malformed finding (not a dict) rather than
+    crashing -- a critic review of this family's own third slice (challenge.independent_judge, WORKLOG
+    continuation 40) found this exact crash-instead-of-FAIL shape in this gate's own port and fixed it there;
+    applied back here since the underlying bug is identical."""
     findings = challenge.get("findings", [])
     problems: list[dict[str, Any]] = []
     for f in findings:
-        epistemic_type = (f.get("provenance") or {}).get("epistemic_type")
+        if not isinstance(f, dict):
+            problems.append({"id": repr(f), "reason": "not a dict"})
+            continue
+        provenance = f.get("provenance")
+        epistemic_type = provenance.get("epistemic_type") if isinstance(provenance, dict) else None
         if epistemic_type is None:
             problems.append({"id": f.get("id"), "reason": "no epistemic_type label"})
             continue
         if epistemic_type == "EVIDENCE" and not f.get("supporting_evidence_refs"):
-            problems.append({"id": f["id"], "reason": "labeled EVIDENCE but cites no supporting_evidence_refs"})
+            problems.append({"id": f.get("id"), "reason": "labeled EVIDENCE but cites no supporting_evidence_refs"})
     passed = not problems
     return _result("evidence_labeling_required", passed, [{"findings_checked": len(findings), "problems": problems}], validator, timestamp)
 
