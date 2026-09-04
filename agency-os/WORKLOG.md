@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-04（續20，同一 session：Cognitive OS 第八個 Method Atlas 切片 — `learning.reversal_criteria`，第五種結構形狀＋監控規則）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`learning.reversal_criteria`（F17，新家族）。Atlas §11.33 給了本 session 至今**最強的字面範例根基**——不是圖表或散文描述，是一段完整可直接轉譯的 YAML worked example（`indicator: CAC / condition: "> 300 USD for 3 consecutive months" / action: re_review / owner: growth_lead`）。第五種結構形狀：不是清單／敘事鏈／分類／排名／圖／矩陣，是**監控規則**——定義一次、之後要反覆對真實觀測值重新檢查，是本 session 唯一「產出後還要被持續檢驗」而非一次性驗證完就定案的方法。
+
+**不變量**：Atlas 條件欄位（`> 300 USD for 3 consecutive months`）恰好是可機械判定的簡單門檻，但真實世界的 reversal criteria 常常是無法量化的質性判斷——所以 `condition_description`（Atlas 原字，永遠必填）與可選的 `structured_rule`（operator/threshold/consecutive_periods）分開存放，不強迫每個 criterion 都套上假結構。`action`/`owner` 兩個欄位空白時等於「裝飾用的規則,沒有真正約束力」——Atlas 自己點名的效益（防組織因面子拒絕改方向）完全仰賴這兩個欄位真的有內容，所以 builder 建構時擋一次、`evaluate_actionable_gate` 又獨立重新檢查一次（mutation test 證明:繞過 builder 直接竄改記錄一樣會被閘擋下,不是只信任 builder 跑過就算數）。觸發判定回傳 `None`（不是 `False`）代表「這條規則本來就沒有可機械檢查的結構」——跟「檢查過了但還沒觸發」必須能區分,不能用同一個假值混在一起。
+
+**[已修改]**：spec-root 新增 `methods/contracts/learning.reversal_criteria.contract.yaml`（逐字引用 Atlas §11.33，含完整 worked YAML example）＋ `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml`＋對應 golden fixture＋`contract-backlog.yaml` 新增 `tier_1.sixth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/monitoring/triggers.py`（連續期間門檻判定,純函式,先用 5 種已知案例驗證正確才接進方法層）；`ai_lego/modules/learning/reversal_criteria.py`（builder＋觸發評估＋兩個 gate）；`ai_lego/apps/cli/run_reversal_criteria_slice.py`（同一次跑同時示範「有觸發」與「沒觸發」兩種真實案例）；`tests/unit/test_reversal_criteria.py`（19 tests，第一次跑就全綠，無需修正）；`docs/EIGHTH_SLICE_LEARNING_REVERSAL_CRITERIA.md`。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2565→2576
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_reversal_criteria_slice` | exit=0 | result=第一次真跑就通過:`PASS learning.reversal_criteria: 2 criteria, gates [provenance_required=PASS, actionable=PASS], trigger dip-case=False, trigger crossing-case=True, qualitative-criterion-evaluable=None`——三種案例（有觸發／被中斷未觸發／質性條件不可判定）結果全部符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_reversal_criteria -v` | exit=0 | ms=~700 | result=19 passed（第一次跑就全綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=250319 | result=**347 tests OK**（328→347，零回歸；`git diff --stat` 確認 fishbone.py 零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic/codex 皆 exit=3（同續14起記錄的斷路器狀態，未變）。REVIEW_DONE: critic=self(Standard,書面對抗自審) | verdict=pass | findings=0c/0m/0n —— 逐項自問:`modules/learning/` 是否也像 `modules/decision/` 一樣撞到 REPOSITORY_ARCHITECTURE.md 的裁決(不會,查證過該文件明文把 research/business/learning/brainstorm 四個列為「應保留為 vertical」,不在應移除清單內,bughunt grep 也確認零命中);`structured_rule` 為 `None` 時 `evaluate_criterion_trigger` 是否誤判為 False(不會,回傳 `None` 並有專屬測試驗證與 False 可區分);連續期間視窗不足時是否會誤判為觸發(不會,`len(observations) < consecutive_periods` 明確回傳 False,不是拋錯或預設 True)。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`learning[.]reversal_criteria\|ReversalCriteriaSet\|reversal-criteria-set\|compute[.]monitoring\|compute/monitoring\|modules[.]learning\|modules/learning` | hits=0 stale（全部命中皆為本次新增檔案自身；額外核對 REPOSITORY_ARCHITECTURE.md 零命中,確認這次沒有重演 decision 那次的命名衝突）
+
+**[剩餘風險]**：`DecisionRef` 是自由文字參照非硬 `$ref`（`Decision` 物件本身尚無 schema，`OQ-REVERSALCRITERIA-1`）；本方法只定義規則＋判定門檻是否跨過，不執行「重新審查」動作本身（Atlas 對下游動作零細節，`OQ-REVERSALCRITERIA-2`）；`cognitive_primitives` 推論非引用（`OQ-REVERSALCRITERIA-3`）。
+
+**[rollback]**：純新增檔案(除 spec-root 索引重新產生外，零既有檔案邏輯改動)，`git rm` 對應新檔即可完全復原。
+
 ## 2026-09-04（續19，同一 session：Cognitive OS 第七個 Method Atlas 切片 — `decision.ahp`，新家族＋真實 bughunt 抓到跨文件命名衝突）
 
 **觸發**：六個切片 push 完成後，操作者被問「下一步」，回「你做最完美的決定」——全權維持。0 agent。

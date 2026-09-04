@@ -1,0 +1,96 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml"
+target_ref: ""
+description: >
+  Exercises ReversalCriteriaSet's required fields, the `criteria[]`
+  minItems:1 guard, the `owner`/`action` minLength:1 floor (Atlas's own
+  named benefit -- a criterion with no accountable owner or defined action
+  is decorative, not enforceable), the optional nullable `structured_rule`,
+  and its closed comparison-operator enum.
+
+valid:
+  - name: atlas_worked_example_transcribed_plus_a_qualitative_criterion
+    instance:
+      id: "RCS-2026-09-04-001"
+      version: "1.0.0"
+      decision_ref: "DEC-2026-09-04-001: raise subscription price 15%"
+      criteria:
+        - id: "RCS-2026-09-04-001-C1"
+          indicator: "CAC"
+          condition_description: "> 300 USD for 3 consecutive months"
+          structured_rule: {operator: ">", threshold: 300, consecutive_periods: 3}
+          action: "re_review"
+          owner: "growth_lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+        - id: "RCS-2026-09-04-001-C2"
+          indicator: "platform escalation count"
+          condition_description: "two platform-team escalations within one quarter"
+          structured_rule: null
+          action: "escalate_to_leadership_review"
+          owner: "product_lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+  - name: single_criterion_no_structured_rule_field_at_all
+    instance:
+      id: "RCS-2026-09-04-002"
+      version: "1.0.0"
+      decision_ref: "DEC-2026-09-04-002"
+      criteria:
+        - id: "RCS-2026-09-04-002-C1"
+          indicator: "NPS"
+          condition_description: "drops below 20 for two consecutive quarters"
+          action: "re_review"
+          owner: "cx_lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+
+invalid:
+  - name: criteria_empty_array_violates_minitems
+    instance:
+      id: "RCS-2026-09-04-003"
+      version: "1.0.0"
+      decision_ref: "DEC-2026-09-04-003"
+      criteria: []
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+    reason: "criteria has minItems: 1 -- a reversal criteria set with no criteria monitors nothing (Atlas §11.33 requires at least one indicator/condition/action/owner tuple)."
+  - name: empty_owner_violates_minlength
+    instance:
+      id: "RCS-2026-09-04-004"
+      version: "1.0.0"
+      decision_ref: "DEC-2026-09-04-004"
+      criteria:
+        - id: "RCS-2026-09-04-004-C1"
+          indicator: "x"
+          condition_description: "y"
+          action: "re_review"
+          owner: ""
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+    reason: "owner has minLength: 1 -- Atlas's own named benefit (preventing face-saving refusal to change course) depends on a real accountable owner; empty is refused."
+  - name: structured_rule_operator_not_in_closed_enum
+    instance:
+      id: "RCS-2026-09-04-005"
+      version: "1.0.0"
+      decision_ref: "DEC-2026-09-04-005"
+      criteria:
+        - id: "RCS-2026-09-04-005-C1"
+          indicator: "x"
+          condition_description: "y"
+          structured_rule: {operator: "!=", threshold: 1, consecutive_periods: 1}
+          action: "re_review"
+          owner: "lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+    reason: "structured_rule.operator must be one of [>, <, >=, <=, ==] -- '!=' is not among them."
+  - name: missing_required_decision_ref
+    instance:
+      id: "RCS-2026-09-04-006"
+      version: "1.0.0"
+      criteria:
+        - id: "RCS-2026-09-04-006-C1"
+          indicator: "x"
+          condition_description: "y"
+          action: "re_review"
+          owner: "lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED}
+    reason: "decision_ref is required -- a reversal criteria set must name which decision it monitors, missing here."

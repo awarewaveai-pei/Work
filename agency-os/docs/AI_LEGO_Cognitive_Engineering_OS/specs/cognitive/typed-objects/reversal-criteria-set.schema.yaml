@@ -1,0 +1,189 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml"
+title: Reversal Criteria Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ReversalCriteriaSet` -- the
+  declared `outputs` of `learning.reversal_criteria`'s Method Contract
+  (methods/contracts/learning.reversal_criteria.contract.yaml, `outputs:
+  [ReversalCriteriaSet]`). A fifth structural shape this session: not a
+  chain, a ranking, a graph, or a comparison matrix -- a set of MONITORING
+  RULES (indicator + condition + committed action + accountable owner),
+  meant to be evaluated over time against real observations, not produced
+  once and left static.
+
+  Field provenance -- Atlas §11.33 (L1971-1995) gives a REAL worked YAML
+  example (L1980-1985), transcribed directly:
+
+  ```yaml
+  reversal:
+    indicator: CAC
+    condition: "> 300 USD for 3 consecutive months"
+    action: re_review
+    owner: growth_lead
+  ```
+
+  `indicator`/`condition_description`/`action`/`owner` are this schema's
+  own field names for exactly those four values, unchanged. `structured_rule`
+  is a compilation addition (see `compilation_decisions` in the method
+  contract) letting a caller ALSO supply a mechanically-evaluable form of
+  the same condition when it is genuinely a simple threshold, like Atlas's
+  own worked example is (">300 for 3 consecutive [periods]" is exactly
+  `{operator: ">", threshold: 300, consecutive_periods: 3}`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.33 決策反轉條件, worked YAML example (L1971-1995)"
+  - "methods/contracts/learning.reversal_criteria.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "ai_lego/compute/monitoring/triggers.py (the real compute this schema's structured_rule field records the result of when evaluated)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Should `owner` and `action` be free strings, or should this schema
+      enforce they are non-empty at the schema layer (via `minLength`)?
+    decision: "minLength: 1 on both."
+    reasoning: >
+      Atlas's own named benefit for this method (L1990, "防組織因面子拒絕
+      改方向" -- prevents the organization refusing to change course to
+      save face) depends entirely on the criterion being genuinely
+      enforceable: a reversal criterion with an empty owner or action is
+      decorative, not a real commitment. Same "the record must actually do
+      the thing its own name claims" discipline `causal-dag-analysis.schema.yaml`'s
+      `acyclic_verified: const true` already established for a different
+      method -- here expressed as a minLength floor rather than a const,
+      since owner/action are legitimately free text, not a fixed value.
+  - question: "Should structured_rule be required, matching Atlas's own worked example (which happens to be structured)?"
+    decision: "Optional."
+    reasoning: >
+      Atlas's own example is mechanically simple, but real reversal
+      criteria are frequently qualitative judgment calls with no clean
+      numeric threshold (e.g. 'if the platform team escalates twice in one
+      quarter'). Requiring structure would force every caller to either
+      invent a false numeric proxy or leave the field meaninglessly
+      populated -- forbidden by this codebase's own R4 discipline against
+      fabricating structure Atlas doesn't ask for.
+
+type: object
+required: [id, version, decision_ref, criteria, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^RCS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "learning.reversal_criteria"
+
+  decision_ref:
+    type: string
+    description: >
+      Free-text reference to the decision this set monitors -- no hard
+      $ref, because `Decision` (docs/architecture/REPOSITORY_ARCHITECTURE.md's
+      own Shared Kernel ruling) has no real schema in this spec root yet.
+      See the method contract's OQ-REVERSALCRITERIA-1.
+
+  criteria:
+    type: array
+    minItems: 1
+    description: "One or more monitoring rules. Atlas's own worked example (L1980-1985) is a single criterion; multiple criteria per decision is a natural, undisclosed-as-invented extension (an array, not a forced single object)."
+    items:
+      type: object
+      required: [id, indicator, condition_description, action, owner, provenance]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this set (e.g. RCS-001-C1)."
+        indicator:
+          type: string
+          description: "Atlas L1981 verbatim field name -- e.g. 'CAC' in the worked example."
+        condition_description:
+          type: string
+          description: "Atlas L1982 verbatim field ('condition'), renamed condition_description to avoid colliding with structured_rule's own machine-checkable 'condition'. Free text, always required -- e.g. '> 300 USD for 3 consecutive months'."
+        structured_rule:
+          type: ["object", "null"]
+          default: null
+          description: "Optional machine-evaluable form of condition_description. See compilation_decisions."
+          required: [operator, threshold, consecutive_periods]
+          properties:
+            operator:
+              type: string
+              enum: [">", "<", ">=", "<=", "=="]
+            threshold:
+              type: number
+            consecutive_periods:
+              type: integer
+              minimum: 1
+              description: "Atlas's own worked example: '3 consecutive months' -- how many most-recent observations must all satisfy the comparison."
+        action:
+          type: string
+          minLength: 1
+          description: "Atlas L1983 verbatim field name -- e.g. 're_review' in the worked example. See compilation_decisions for the minLength floor."
+        owner:
+          type: string
+          minLength: 1
+          description: "Atlas L1984 verbatim field name -- e.g. 'growth_lead' in the worked example. See compilation_decisions for the minLength floor."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas's own worked example, transcribed, plus a second qualitative (unstructured) criterion"
+    value:
+      id: "RCS-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "learning.reversal_criteria"
+      decision_ref: "DEC-2026-09-04-001: 調高訂閱方案價格 15%"
+      criteria:
+        - id: "RCS-2026-09-04-001-C1"
+          indicator: "CAC"
+          condition_description: "> 300 USD for 3 consecutive months"
+          structured_rule: {operator: ">", threshold: 300, consecutive_periods: 3}
+          action: "re_review"
+          owner: "growth_lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+        - id: "RCS-2026-09-04-001-C2"
+          indicator: "客服團隊升級投訴次數"
+          condition_description: "單一季度內平台團隊升級投訴達兩次"
+          structured_rule: null
+          action: "escalate_to_leadership_review"
+          owner: "product_lead"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-REVERSALCRITERIASET-1"
+    question: >
+      Should a `triggered`/`evaluation_history` field be added to record
+      PAST evaluations of `structured_rule` against real observations
+      (an audit trail of "was this criterion ever checked, and did it
+      fire"), or does that belong on a separate typed object entirely
+      (an evaluation-event record, not the criteria definition itself)?
+    owner: "operator, or whoever next wires this method's structured_rule evaluation into a real monitoring pipeline"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/learning/reversal_criteria.py's evaluate_criterion function returns a fresh verdict each call rather than mutating this record"
+
+verification:
+  method: >
+    Read Atlas §11.33 (L1971-1995) directly at the cited lines, including
+    the worked YAML example's exact field names and values. Validated
+    against jsonschema Draft202012Validator (required fields present, id
+    pattern satisfied, owner/action minLength enforced, structured_rule's
+    operator enum closed).
+  note: >
+    `indicator`/`condition_description`/`action`/`owner` are transcribed
+    verbatim from Atlas's own worked example field names and values
+    (L1980-1985). `structured_rule` and the minLength enforcement are
+    Phase 3-class compilation decisions, explicitly flagged above. No
+    mother document was modified to produce this file.

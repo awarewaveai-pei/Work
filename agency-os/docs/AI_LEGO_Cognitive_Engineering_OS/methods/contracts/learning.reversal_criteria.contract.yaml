@@ -1,0 +1,200 @@
+$id: "ai-lego://methods/contracts/learning.reversal_criteria.contract.yaml"
+title: "Reversal Criteria Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Eighth Method Atlas slice, and the FIRST from the
+  `learning` family (F17 -- "Learning / Reversal", Atlas index L317:
+  "何時改變決策？"). Also the first method whose subject is a `Decision`
+  Domain Object reference rather than a `CauseHypothesisSet` chain or a
+  standalone analytical run.
+
+  Atlas §11.33 (L1971-1995) gives this method a dedicated section: purpose
+  (a literal quoted question, not a paraphrase), and -- uniquely among
+  every Tier 1 contract this session built -- a REAL worked YAML example
+  transcribed directly into this contract's typed object, not a diagram or
+  prose description:
+
+  ```yaml
+  reversal:
+    indicator: CAC
+    condition: "> 300 USD for 3 consecutive months"
+    action: re_review
+    owner: growth_lead
+  ```
+
+  A fifth structural shape this session: not a chain (five_whys), a
+  calculated ranking (pareto), a graph (causal.dag), or a pairwise-
+  comparison matrix (decision.ahp) -- a MONITORING RULE (indicator +
+  condition + committed action + accountable owner), evaluated over time
+  against real observations, not produced once and left static.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.33 決策反轉條件／決策翻轉條件（Reversal Criteria）(L1971-1995) -- purpose, worked YAML example, benefits"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 index row (L317): 'Learning / Reversal | 何時改變決策？'"
+  - "methods/registry/method-inventory.yaml 'Reversal Criteria' entry (F17 learning, L1057-1061) -- no machine_id recorded there; this contract mints one, see decided_by"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.33 gives a real worked example
+  (the strongest concrete-example grounding of any Tier 1 contract this
+  session built, stronger even than `causal.dag`'s diagram -- this one is
+  literally already in the target data shape) -- direct transcription plus
+  low-risk, disclosed compilation choices. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a sixth concrete
+  entry.
+
+  `id: learning.reversal_criteria` mints a new machine_id, same situation
+  `decision.ahp.contract.yaml` was in (method-inventory.yaml's own entry
+  carries none). `family: learning` uses the exact "F17 learning" category
+  label method-inventory.yaml's own row already carries, the same
+  low-risk family-naming convention every prior Tier 1 contract this
+  session built already follows.
+
+id: learning.reversal_criteria
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [VALIDATE, REFLECT, LEARN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). Atlas's own quoted purpose (L1976, "哪些新資訊或指標達到什麼
+# 程度時，我們必須重新評估甚至撤銷目前決策？") is a VALIDATE (checking an
+# indicator against a condition) that triggers a REFLECT (re-evaluate the
+# decision) so the organization can LEARN (update its committed course) --
+# all three CANONICAL_KERNEL members.
+
+purpose:
+  - define_conditions_that_trigger_decision_re_review
+# Atlas L1976 verbatim sense (quoted directly, not paraphrased in the
+# mother document itself): pre-define what new information or indicator,
+# at what threshold, requires re-evaluating or reversing a decision.
+
+inputs:
+  required:
+    - DecisionRef
+  # NEW DESIGN. Atlas's own worked example (L1980-1985) monitors "a
+  # decision" but no mother document gives `Decision` its own typed-object
+  # field shape anywhere in this spec root yet (docs/architecture/
+  # REPOSITORY_ARCHITECTURE.md rules Decision belongs at
+  # `/core/domain/decision` as a Shared Kernel object, but that schema is
+  # not yet built). This contract therefore requires only a free-text
+  # reference to the decision being monitored, not a hard $ref to a type
+  # that does not exist yet -- see open_questions.
+
+outputs:
+  - ReversalCriteriaSet
+# NEW output type (see typed-objects/reversal-criteria-set.schema.yaml).
+# Same honesty gap every Tier 1 contract this session disclosed: Atlas
+# names no PascalCase output type for this method.
+
+preconditions:
+  - "at least one criterion supplied"
+  - "every criterion names a non-empty owner and a non-empty action"
+  # The second precondition is not itself Atlas-cited as a formal
+  # precondition, but is the machine-checkable form of Atlas's own named
+  # benefit (L1990, "防組織因面子拒絕改方向" -- prevents the organization
+  # refusing to change course to save face): a reversal criterion with no
+  # accountable owner or no defined action is decorative, not enforceable
+  # -- the same class of "the record must actually do the thing its own
+  # name claims" discipline `causal.dag`'s acyclic_verified const:true
+  # already established for a different method.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: every criterion and the overall record carry a
+  # provenance_record. evidence_labeling_required is FALSE: this method's
+  # criteria are forward-looking COMMITMENTS (what will trigger a
+  # re-review), not backward-looking evidence-cited claims about what
+  # already happened -- a genuinely different risk profile from
+  # Fishbone/SWOT/causal.dag, re-derived independently rather than copied
+  # from any single precedent (same discipline root_cause.pareto's and
+  # causal.dag's own departures/re-derivations already modeled).
+
+forbidden_transition: []
+# Atlas §11.33 gives no explicit forbidden-transition worked example.
+# Same open-question class as every other Tier 1 contract this session
+# built.
+
+recommended_next: []
+# Atlas §11.33 names no recommended_next method.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- defining monitoring criteria has no
+  # described external side effect; ACTING on a triggered criterion would,
+  # but that action is out of this method's own scope (see
+  # open_questions).
+
+compilation_decisions:
+  - question: >
+      Atlas's own worked example's `condition` field (L1982, "> 300 USD
+      for 3 consecutive months") is free text. Should this contract's
+      typed object keep it as free text only, or also support a
+      structured, mechanically-evaluable rule?
+    decision: >
+      Both: `condition_description` (free text, Atlas's own literal
+      format, always required) plus an OPTIONAL `structured_rule`
+      (operator/threshold/consecutive_periods) a caller may additionally
+      supply when the condition is mechanically simple, like Atlas's own
+      example genuinely is.
+    reasoning: >
+      Collapsing to free-text-only would forgo real, testable compute this
+      specific worked example clearly supports (a real threshold-crossing
+      check, `ai_lego/compute/monitoring/triggers.py`); forcing every
+      condition into a structured rule would overstate how many real-world
+      reversal criteria are actually this simple (many genuinely are
+      qualitative judgment calls, not clean numeric thresholds). Same
+      "literal field plus a separate, optional structured mechanism"
+      pattern `strategy.swot.contract.yaml`'s `source`/
+      `supporting_evidence_refs` split already used.
+
+open_questions:
+  - id: "OQ-REVERSALCRITERIA-1"
+    question: >
+      `DecisionRef` is a free-text reference, not a hard $ref to a real
+      `Decision` typed object, because `/core/domain/decision`
+      (docs/architecture/REPOSITORY_ARCHITECTURE.md's own ruling for where
+      the Decision Shared Kernel object belongs) has not been built as a
+      real schema in this spec root yet. Should a future session build
+      that schema and upgrade this contract's input to a real $ref?
+    owner: "operator, or whoever next builds specs/domain/decision.schema.yaml"
+    blocks: "nothing in this file's own validity -- a free-text reference is the more conservative (less invented) choice"
+  - id: "OQ-REVERSALCRITERIA-2"
+    question: >
+      This method's own scope stops at DEFINING criteria and (per the
+      runtime module) evaluating whether a structured_rule's threshold has
+      been crossed given real observations. It does NOT perform the
+      re-review/reversal ACTION itself once a criterion triggers -- Atlas
+      gives no worked detail for what "re_review"/"kill" etc. concretely
+      do at the platform level. Should a future method contract define
+      that downstream action?
+    owner: "operator, or whoever next builds the decision re-review workflow this method's triggered criteria would feed"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-REVERSALCRITERIA-3"
+    question: >
+      `cognitive_primitives: [VALIDATE, REFLECT, LEARN]` is this file's
+      own inference, not a cited Atlas composition formula. Same open
+      question class as every other Tier 1 contract's inferred
+      primitives.
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.33 (L1971-1995) and the F17 index row (L317) directly
+    at the cited lines. Grepped method-inventory.yaml and both mother
+    documents exhaustively for any existing "Reversal Criteria" machine_id
+    (none found) before minting `learning.reversal_criteria`. Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own worked YAML example
+    (L1980-1985) is transcribed directly into this contract's `outputs`
+    typed object -- the strongest literal-example grounding of any Tier 1
+    contract this session built. `purpose`/`preconditions`'s literal names
+    and the DecisionRef free-text-reference scope limit are Phase 3-class
+    compilation decisions, explicitly flagged above.
