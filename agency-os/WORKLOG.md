@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-04（續23，同一 session：Cognitive OS 第十個 Method Atlas 切片 — `decision.mcda`，AHP 的自然延伸＋首次跨家族重用評分函式）
+
+**觸發**：延續操作者授權，繼續自主推進。0 agent。
+
+**選型**：`decision.mcda`（F16，`decision` 家族第二個成員，延伸 `decision.ahp`）——第九切片文件與 TASKS.md「下一步」都已點名此為候選。Atlas §11.32 給了 8 節點 pipeline（Options→Criteria→Weights→Normalize→Score→Sensitivity→Stakeholder Views→Human Decision），且 §22.3「Method-specific Gate」表（同一張表已為 red_team 的 no-final-authority 規則提供根基）MCDA 那一列明文：「禁止直接輸出 Automatic Authority｜必須補的驗證 Human Judgment + Sensitivity」——本 session 第二個有**明文引用**（非推論）forbidden_transition 的 Tier 1 contract。
+
+**主動應用續21／續22學到的紀律**：寫程式碼前先讀完整個 `specs/decision/`。結果不只是「沒重複」，而是找到一個**既有 schema 早就預留的擴充點**：`decision.schema.yaml`（上個 session 建）的 `analyses[]` 欄位刻意留 `items: {}`（不限制形狀），且它自己的 `compilation_decisions`（OQ-DECISION-2）逐字寫：「更豐富的欄位形狀屬於未來一份真正定義它的 MCDA-specific schema，不屬於這個基礎 Decision 型別」——`decision.mcda.contract.yaml` 與 `mcda-analysis.schema.yaml` 就是那份被預告的檔案，不是重複 `Decision` 本身（`MCDAAnalysis` 是餵進 `Decision.analyses[]` 的候選，永遠不取代 `Decision`）。
+
+**不變量**：Atlas 對 MCDA 給了兩個獨立引用（§11.32 流程圖：Weights 在 Normalize 之前；F16 表格：normalize→weights），兩者對五個實質階段一致，只有 Weights/Normalize 順序不同——本 contract 沒有默默選一個引用不提，而是明文揭露這是**呈現順序差異，非形狀衝突**（加權和模型裡正規化與加權是互相獨立、可交換的運算），並選擇「先正規化」的工程理由：讓 `normalize_scores` 能在完全不依賴任何特定權重組的情況下獨立單元測試，同本 session 每個真計算切片一致的「先手算驗證純函式，再接進方法層」紀律。真正的方法論不變量：AHP 與 MCDA 都以加權和排名收尾，但 Atlas 只給 AHP 一個「怎麼推導權重」的技法（pairwise comparison），MCDA 完全沒有——這才是兩個方法真正的差異（MCDA 接受任何來源的權重，AHP 專門生產一組），不是省略。呼叫者若想用 AHP 推導的權重餵進 MCDA，現有程式碼零改動就做得到（`geometric_mean_weights` 算完直接傳進 `generate_mcda_analysis` 的 `weights` 參數）。`Sensitivity` 階段延續 AHP 的誠實留白（Atlas 只給名稱零公式）——但 §22.3 把 Sensitivity 列為 MCDA 明文必須補的驗證項目之一，所以本 contract 比 AHP 多做一步：`sensitivity_notes` 改為**必填**欄位，`evaluate_sensitivity_disclosed_gate` 檢查「有沒有揭露」而非「揭露內容是否正確」——誠實地只做結構性存在檢查，不發明公式。
+
+**首次跨家族重用評分函式（非只是驗證閘）**：Score 階段直接重用 `ai_lego.compute.ahp.weights.rank_options`——讀過其實作後確認完全不含 AHP 專屬邏輯（純 `dict[str,float]` 權重 + `{option_id,criterion_id,score}` 列表 → 排序結果），本 session 第一次跨方法家族重用的是「真計算評分函式」而非只是像 `evaluate_statistical_gate` 那樣的驗證閘（該閘本身這次是第四次被不同家族重用：research→pareto→ahp→mcda）。是否該把 `rank_options` 搬到「家族中立」的新模組也認真考慮過並否決：搬遷會動到 `decision.ahp` 已出貨、`git diff --stat` 零改動已驗證過的模組，純粹為了程式碼組織偏好，違反本 session「最小爆炸半徑」的既有紀律；另寫一份近乎重複的函式也被否決——重複已手算驗證過的計算程式碼，比一次跨家族 import 更糟。
+
+**[已修改]**：spec-root 新增 `methods/contracts/decision.mcda.contract.yaml`（逐字引用 Atlas §11.32＋F16 表格 L768＋§22.3 L4154 三個獨立引用）＋`specs/cognitive/typed-objects/mcda-analysis.schema.yaml`（頂層 `additionalProperties:false`，同 red_team 的執法強度）＋對應 golden fixture（2 valid + 5 invalid）＋`contract-backlog.yaml` 新增 `tier_1.eighth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/mcda/scoring.py`（`normalize_scores` 方向感知 min-max 正規化，先用 3 種已知案例——混合方向／打平的 criterion／三選項全 minimize——手算驗證正確才接進方法層；`validate_weights_sum_to_one`）＋`ai_lego/modules/decision/mcda.py`（builder＋自動權限守門＋四個 gate；`rank_options` 從 `compute/ahp/weights.py` 直接 import，零改動）＋`ai_lego/apps/cli/run_mcda_slice.py`（真實自建 vs 外包決策，含攻擊竄改驗證，同 red_team CLI 手法）＋`tests/unit/test_mcda.py`（22 tests，第一次跑就全綠，無需修正）＋`docs/TENTH_SLICE_DECISION_MCDA.md`。`ai_lego/modules/decision/__init__.py` docstring 補上 mcda 租戶（純增補）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "..."` 手算驗證 `normalize_scores`（3 種已知案例：混合方向／打平 criterion／三選項全 minimize）＋`validate_weights_sum_to_one` | exit=0 | result=全部與手算數值逐位吻合，才接進方法層
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_mcda_slice` | exit=0 | result=第一次真跑就通過：`PASS decision.mcda: ranking=[{'option_id': 'O2', 'weighted_score': 0.7}, {'option_id': 'O1', 'weighted_score': 0.3}], gates [provenance_required=PASS, genuine_compute=PASS, sensitivity_disclosed=PASS, no_automatic_authority_claim=PASS], no_automatic_authority_verified(runtime=True, schema=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_mcda -v` | exit=0 | ms=1378 | result=22 passed，第一次跑就全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 tests/gen_spec_index.py && python3 tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2590→2602
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，背景執行）| exit=0 | ms=48885 | result=**387 tests OK**（365→387，零回歸；`git diff --stat` 對照 `compute/ahp/weights.py`／`modules/decision/ahp.py`／`modules/research/gates.py`／`modules/challenge/red_team.py`／method_resolver.py／schema_contracts.py／event_ledger.py／provenance.py 八個共用/手足檔案確認全部零改動）
+- ORACLE_WAIVED: `oracle-quota.ps1 check` critic 仍 exit=3（阻擋至 2026-09-05 05:20）、codex 仍 exit=3（阻擋至 2026-09-07 11:06），同續14起記錄未變。REVIEW_DONE: critic=self（Standard，書面對抗自審）| verdict=pass | findings=0c/0m/0n —— 逐項自問：跨家族重用 `rank_options` 是否真的零改動且無 AHP 專屬耦合（是，`git diff --stat` 確認零改動，且已讀過該函式實作確認純泛型加權和邏輯）；`sensitivity_notes` 只驗證存在不驗證正確性算不算自欺（不算，contract 與 schema 皆明文揭露這是 disclosure-only，與 AHP 的完全不實作互相呼應而非矛盾）；Weights/Normalize 順序引用衝突是否被誠實揭露而非默默選邊（是，已在 contract description 與 compilation_decisions 兩處明文說明數學上可交換、選擇順序的工程理由）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`decision[.]mcda\|MCDAAnalysis\|mcda-analysis\|modules[.]mcda\|compute/mcda\|compute\.mcda\|modules/decision/mcda` | hits=全部為本切片自己的新檔案、session log 雜訊、`__pycache__` 編譯產物、以及兩個 gitignored 自動產生狀態檔（`doc-sync-state.json`／`closeout-*.md`，正確反映新檔案存在，非過期殘留）——無任何非預期殘留引用
+
+**[剩餘風險]**：`OQ-MCDA-1`（單一 `weights[]` 而非多 stakeholder profile 陣列——Atlas 效益文字提到但零欄位形狀，已揭露）；`OQ-MCDA-2`（sensitivity 只驗證揭露非正確性，同 AHP 的 OQ-AHP-2 同類留白）；`OQ-MCDA-3`（機器 id 未回填 method-inventory.yaml，同 AHP 的 OQ-AHP-3 同類留白）。皆非阻塞，已誠實揭露於 contract 與 docs。
+
+**[rollback]**：`git revert` 本次 commit 即可完整回退（新增檔案、`modules/decision/__init__.py` docstring 純增補是唯一觸碰既有檔案處，回退零副作用）。
+
 ## 2026-09-04（續22，同一 session：Cognitive OS 第九個 Method Atlas 切片 — `challenge.red_team`，第六種結構形狀＋顯式權限規則）
 
 **觸發**：延續操作者授權（"繼續做下一個切片（你決定）" 兩次），繼續自主推進。0 agent。

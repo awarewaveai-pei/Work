@@ -1,0 +1,344 @@
+$id: "ai-lego://methods/contracts/decision.mcda.contract.yaml"
+title: "Multi-Criteria Decision Analysis (MCDA) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry (mandated by the actively-running Cognitive OS
+  runtime slice, same class of justification as every Tier 1 contract this
+  session built). Tenth Method Atlas slice, second from the `decision`
+  family (F16) -- the natural extension of `decision.ahp` that
+  `docs/NINTH_SLICE_CHALLENGE_RED_TEAM.md`'s own "下一步" and
+  `TASKS.md`'s Cognitive OS master item both named as a candidate.
+
+  Atlas §11.32 (L1942-1965) gives this method a dedicated section: purpose,
+  a 7-node worked mermaid pipeline ("Options -> Criteria -> Weights ->
+  Normalize -> Score -> Sensitivity -> Stakeholder Views -> Human
+  Decision" -- 8 nodes, L1948-1957), and 3 named benefits. A SECOND,
+  independent citation exists at the F16 tool-table row (L768): "MCDA |
+  多目標、多 stakeholder | criteria→normalize→weights→score→sensitivity |
+  複雜決策" -- the two citations agree on the five substantive stages
+  (criteria/normalize/weights/score/sensitivity) but differ in the
+  Weights/Normalize ORDER (flowchart: Weights before Normalize; table:
+  normalize before weights). Both orders are mathematically equivalent for
+  a weighted-sum model (normalization and per-criterion weighting are
+  independent, commutative operations -- neither depends on the other's
+  output), so this is a presentation-order variance, not a shape conflict
+  -- same class of "two citations, no shape conflict" finding this
+  session's `decision.schema.yaml` reading already logged for
+  `HumanDecision`/`Decision` naming drift (see that file's own
+  description). This contract's compute layer normalizes first, then
+  applies weights (see `compilation_decisions`), disclosed explicitly
+  rather than silently picking one citation's order without saying so.
+
+  A THIRD, independent citation grounds this contract's forbidden_transition
+  directly: Atlas §22.3's "Method-specific Gate" table (L4154) states "MCDA
+  | 禁止直接輸出: Automatic Authority | 必須補的驗證: Human Judgment +
+  Sensitivity" -- the SAME table row format that already grounded
+  `challenge.red_team.contract.yaml`'s own no-final-authority rule (that
+  table's Red Team row, L4152: "Final Decision | Independent Judge /
+  Human"). This is the SECOND Tier 1 contract this session built with an
+  explicit, table-cited forbidden-authority rule (not an inferred one),
+  and the first to combine it with a second, distinct required-verification
+  item ("Sensitivity") that this contract's own quality gates also enforce
+  at the disclosure level (see `compilation_decisions` for why disclosure,
+  not a computed formula).
+
+  Proactive due-diligence (the corrected invariant from this session's own
+  `learning.reversal_criteria` fix, applied a second time after
+  `challenge.red_team`): before writing this contract, `specs/decision/`
+  and `specs/cognitive/typed-objects/` were read in full. `decision.schema.yaml`
+  (built a prior session) independently anticipates this exact gap --
+  its `options`/`criteria`/`analyses`/`simulations`/`stakeholder_positions`
+  fields are deliberately left `items: {}` (unconstrained) and its own
+  `compilation_decisions` (OQ-DECISION-2) states verbatim: "A richer
+  per-field shape belongs in a future MCDA-specific or recipe-specific
+  schema that actually specifies one, not in this base Decision type." This
+  contract and `typed-objects/mcda-analysis.schema.yaml` are that
+  future schema -- confirmed as the intended, not-yet-filled extension
+  point, not a duplicate of `Decision` itself (which remains the
+  chain-terminal object an `MCDAAnalysis` feeds into via `Decision.analyses[]`,
+  never replaces).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.32 多準則決策分析（MCDA）(L1942-1965) -- purpose, 8-node pipeline, 3 benefits"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, MCDA row (L768): 'criteria→normalize→weights→score→sensitivity｜複雜決策' -- second, independent stage-order citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table, MCDA row (L4154): 'Automatic Authority｜Human Judgment + Sensitivity' -- this contract's forbidden_transition and quality gates"
+  - "specs/decision/decision.schema.yaml (compilation_decisions OQ-DECISION-2, L244-253) -- explicit forward-reference to 'a future MCDA-specific ... schema' this contract fills"
+  - "methods/registry/method-inventory.yaml -- checked exhaustively for an existing MCDA machine_id (none found, same as decision.ahp's own verification note)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.32 gives a complete pipeline (two
+  independent citations agree on substance, differ only in a
+  mathematically-immaterial presentation order, disclosed above) and §22.3
+  gives an explicit, table-cited forbidden-authority rule -- direct
+  transcription plus low-risk, disclosed compilation choices, same
+  standard every Tier 1 contract this session built applies. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as an eighth concrete
+  entry.
+
+  `id: decision.mcda` is a NEW machine_id (method-inventory.yaml's own
+  "MCDA" entry, L1002, carries no machine_id -- same situation
+  `decision.ahp` was minted into). Minted following ADR-005b's
+  `<family>.<name>` bare-form grammar, `decision` as the family -- the
+  same family `decision.ahp` already uses (this is that family's SECOND
+  member, not a new family). No competing machine_id form was found for
+  MCDA anywhere in the corpus (grepped exhaustively, same method as
+  decision.ahp.contract.yaml's own verification note).
+
+id: decision.mcda
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, WEIGHT, CALCULATE, PRIORITIZE]
+# INFERRED, not cited -- Atlas §4 (L192) cites a primitive formula for
+# only 5 methods (Fishbone, SCAMPER, SWOT, Scenario Planning, AHP); MCDA
+# is not among them, unlike `decision.ahp.contract.yaml`'s own CITED
+# formula. Deliberately EXCLUDES DECIDE (present in AHP's cited formula)
+# -- not an oversight: §22.3's forbidden_transition explicitly bars this
+# method's own output from claiming decision authority, so inferring
+# DECIDE into this method's own primitive set would contradict the same
+# contract's forbidden_transition field two sections below. AHP's
+# inclusion of DECIDE is a verbatim Atlas citation this contract does not
+# need to reconcile; this contract's own inference is free to -- and does
+# -- reflect MCDA's distinct no-auto-authority profile.
+
+purpose:
+  - score_and_rank_options_against_weighted_multi_criteria
+# Atlas L1946 verbatim sense: "同時考慮安全、成本、維護性、法規、使用者
+# 價值等互相衝突的目標" (simultaneously weigh conflicting objectives like
+# safety, cost, maintainability, regulation, user value).
+
+inputs:
+  required:
+    - Options
+    - Criteria
+    - RawScores
+    - Weights
+  optional: []
+  # Atlas's own pipeline (L1948-1953) names Options, Criteria, Weights,
+  # and (implicitly, as the un-normalized input to the Normalize stage)
+  # raw per-option-per-criterion scores as the real required inputs to
+  # reach a Score. Unlike `decision.ahp.contract.yaml`, MCDA has no
+  # "weights-only, no options yet" partial-run analogue in Atlas's own
+  # pipeline -- Options is the pipeline's own FIRST node, not optional.
+
+outputs:
+  - MCDAAnalysis
+# NEW output type (see typed-objects/mcda-analysis.schema.yaml). Same
+# honesty gap every Tier 1 contract this session disclosed: Atlas names no
+# PascalCase output type for this method.
+
+preconditions:
+  - "every criterion carries a direction (maximize or minimize)"
+  - "weights are non-negative and sum to 1.0 (tolerance 1e-6)"
+  - "every raw_scores entry references a known option_id and criterion_id"
+  # NEW, structurally necessary preconditions -- Atlas's own pipeline
+  # names the Normalize and Weights stages but gives no field-level
+  # precondition text (same class of structurally-necessary-but-not-
+  # literally-cited precondition `decision.ahp.contract.yaml`'s own
+  # "exactly n*(n-1)/2 pairwise comparisons" already established): a
+  # min-max normalization is undefined without a per-criterion direction,
+  # and a weighted sum is not meaningfully comparable across runs unless
+  # weights are normalized to a common total.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: the MCDAAnalysis record itself carries a
+  # provenance_record (epistemic_type: CALCULATED_RESULT for the computed
+  # normalized_scores/ranking -- same genuine-compute class
+  # decision.ahp.contract.yaml and root_cause.pareto.contract.yaml already
+  # established). evidence_labeling_required is FALSE, re-derived
+  # independently for this method's own risk profile (same discipline
+  # decision.ahp.contract.yaml's own departure documents): this method's
+  # real risk (Atlas §22.3, L4154) is about UNAUTHORIZED AUTOMATIC
+  # AUTHORITY, not about omitting evidence citations for individual raw
+  # scores -- a distinct risk class, enforced instead via
+  # `forbidden_transition` and the `no_automatic_authority_claim` /
+  # `sensitivity_disclosed` quality gates below.
+
+forbidden_transition:
+  - "Automatic Authority"
+# CITED, Atlas §22.3 L4154 verbatim: "MCDA | 禁止直接輸出: Automatic
+# Authority | 必須補的驗證: Human Judgment + Sensitivity". Unlike every
+# other Tier 1 contract this session built except challenge.red_team
+# (whose own L4152 row cites "Final Decision"), this is a directly
+# table-cited forbidden-authority rule, not an inferred absence. Enforced
+# at the typed-object layer by `mcda-analysis.schema.yaml`'s own
+# `additionalProperties: false` (top level) plus
+# `ai_lego/modules/decision/mcda.py::assert_no_automatic_authority_claim`
+# (runtime, raise-before-construction) -- same two-layer belt-and-
+# suspenders discipline `challenge.red_team.contract.yaml`'s own
+# no-final-authority enforcement already established, independently
+# re-derived here for MCDA's own cited rule rather than copied wholesale.
+
+recommended_next: []
+# Atlas §22.3's own "必須補的驗證" column names "Human Judgment" as the
+# required next step before an MCDAAnalysis may inform an actual
+# Decision -- the same "candidate, not final authority" relationship
+# challenge.red_team's own challenge-artifact-not-verdict distinction
+# already established for a sibling method. Left empty here (not a list
+# entry) because `recommended_next` is schema-constrained to Method Atlas
+# machine_ids (`^[a-z_]+\.[a-z_]+$`) and "Human Judgment" is a Decision
+# object FIELD (`Decision.human_judgment`), not a callable method with its
+# own machine_id -- the actual downstream step is embedding this
+# MCDAAnalysis into `Decision.analyses[]`, described in prose above, not
+# a machine-resolvable next method.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- MCDAAnalysis is a pure record, no external
+  # side effects.
+
+compilation_decisions:
+  - question: >
+      Atlas's two independent citations for this method disagree on
+      Weights/Normalize ORDER (flowchart L1948-1957: Weights before
+      Normalize; F16 tool-table L768: normalize before weights). Which
+      order should the compute layer implement?
+    decision: "Normalize first, then apply weights."
+    reasoning: >
+      Mathematically immaterial for a weighted-sum model: normalizing a
+      criterion's raw values to [0,1] and multiplying by that criterion's
+      weight are independent, commutative per-criterion operations --
+      neither stage's output depends on having already run the other.
+      Normalize-first is chosen for a concrete engineering reason, not to
+      privilege one citation over the other: it lets `normalize_scores`
+      be validated and unit-tested in complete isolation from any
+      particular weight set (matching this session's own "hand-verify the
+      pure compute function before wiring it into the method layer"
+      discipline every prior genuine-compute slice already followed --
+      root_cause.pareto's ranking.py, decision.ahp's weights.py,
+      causal.dag's dag.py). Disclosed explicitly (see top-level
+      description) rather than silently picking an order and citing only
+      the flowchart or only the table.
+  - question: >
+      Should `Weights` (Atlas's own pipeline stage, L1951) be DERIVED via
+      pairwise comparison (reusing `decision.ahp`'s own
+      `build_pairwise_matrix`/`geometric_mean_weights`), the way a caller
+      might naturally want to combine the two decision-family methods?
+    decision: "No -- weights are a direct, caller-supplied input to MCDAAnalysis, not derived."
+    reasoning: >
+      Atlas §11.32 names "Weights" as its own pipeline stage with zero
+      cited derivation method (contrast §11.31's own AHP section, which
+      names pairwise comparison as ITS weight-derivation technique) --
+      this is the real, Atlas-grounded difference between the two
+      decision-family methods, not an oversight: MCDA is the more general
+      method that ACCEPTS a weight set from any source (direct assignment,
+      an AHP run, a voting process, ...), while AHP is specifically the
+      pairwise-comparison technique for PRODUCING one. A caller who wants
+      AHP-derived weights feeding an MCDA run can already do so today with
+      zero new code: call `decision.ahp`'s own
+      `geometric_mean_weights`/`generate_ahp_analysis` first, then pass
+      its `criteria_weights` into `generate_mcda_analysis`'s own `weights`
+      parameter -- this composability is a property of the platform's
+      existing MethodCatalog/compute-layer design, not something this
+      contract needs to hard-wire.
+  - question: >
+      Atlas's own benefit prose (L1962, "可以保留不同 stakeholder
+      weights") suggests multiple weight PROFILES per analysis. Should
+      `MCDAAnalysis` model an array of weight profiles (one ranking per
+      profile), rather than a single `weights[]`?
+    decision: "No -- a single weights[] field; multi-profile exploration is left to re-invocation, not a new schema field."
+    reasoning: >
+      This benefit line is a single, unstructured prose bullet with zero
+      field names, no worked example, and no cited relationship to the
+      pipeline's own named stages (contrast the doubly-cited, unambiguous
+      single "Weights" stage node). Inventing a `weight_profiles[]` array
+      shape here would be presenting a guess as a compiled fact -- the
+      exact failure mode this suite's `decided_by` sections repeatedly
+      flag as out of bounds (same standard `decision.ahp.contract.yaml`'s
+      own OQ-AHP-1 flat-vs-hierarchical-criteria decision already
+      applied). The benefit is still genuinely available without new
+      schema surface: `generate_mcda_analysis` is a pure function of its
+      inputs, so a caller wanting to compare stakeholder weightings simply
+      invokes it once per weight set, producing independent
+      `MCDAAnalysis` records -- the same free re-invocability property
+      this session's runtime already provides for every other genuine-
+      compute method. Disclosed as `OQ-MCDA-1` below rather than silently
+      narrowed.
+  - question: >
+      Atlas §22.3's own "必須補的驗證" column requires "Sensitivity" (not
+      just Human Judgment) before this method's output may inform a
+      Decision. Should the compute layer implement an actual
+      sensitivity-analysis algorithm (e.g. how much a weight would need to
+      shift before the top-ranked option changes)?
+    decision: "No -- `sensitivity_notes` is a required, non-empty, caller-authored disclosure field; no formula is computed."
+    reasoning: >
+      Same class of scope limit `decision.ahp.contract.yaml`'s own
+      OQ-AHP-2 already applied to its identically-named "Sensitivity"
+      pipeline stage: Atlas names the concept (twice, independently --
+      the flowchart node AND the §22.3 gate column) but gives zero worked
+      formula or example anywhere in either mother document for what a
+      sensitivity check concretely computes. Per this codebase's R4
+      claim-before-verify discipline, inventing a full sensitivity-
+      analysis algorithm from a bare NAME would be exactly the kind of
+      unearned/fabricated scope this project's governance exists to
+      prevent. UNLIKE AHP's own choice (fully unimplemented, no gate at
+      all), this contract's §22.3 citation makes Sensitivity an explicit
+      PART OF THE REQUIRED VERIFICATION before automatic-authority
+      forbidding is satisfied -- so this contract enforces its
+      DISCLOSURE (a human/caller must document what sensitivity check, if
+      any, was performed) via the `sensitivity_disclosed` quality gate,
+      honest about checking presence, not correctness or completeness, of
+      that documentation.
+
+open_questions:
+  - id: "OQ-MCDA-1"
+    question: >
+      Atlas's own benefit prose ("可以保留不同 stakeholder weights",
+      L1962) is not modeled as a `weight_profiles[]` array in this v1 --
+      only a single `weights[]` field, with multi-profile comparison left
+      to re-invocation (see compilation_decisions). Should a future
+      revision add a native multi-profile field if/when a worked example
+      or field shape for it is found or designed?
+    owner: "operator, or whoever next needs first-class multi-stakeholder-weight comparison inside a single MCDAAnalysis record"
+    blocks: "nothing in this file's own validity -- single-profile is the more conservative (less invented) choice, and re-invocation already provides the same practical benefit"
+  - id: "OQ-MCDA-2"
+    question: >
+      `sensitivity_notes` only enforces PRESENCE (non-empty string), not
+      any particular sensitivity-analysis methodology or correctness.
+      Should a future pass define what a real sensitivity computation
+      concretely means here (e.g. weight-perturbation-until-rank-change)
+      once a worked example or formula is found or designed -- the same
+      open question `decision.ahp.contract.yaml`'s OQ-AHP-2 already raised
+      for AHP's identically-named, identically-ungrounded stage?
+    owner: "operator, or whoever next reads Atlas for additional MCDA/AHP sensitivity-analysis content"
+    blocks: "nothing in this file's own validity -- the disclosure-only gate is itself a complete, honest implementation of what Atlas's own text supports"
+  - id: "OQ-MCDA-3"
+    question: >
+      `id: decision.mcda` mints a machine_id method-inventory.yaml's own
+      MCDA entry (L1002) never carried. Should that entry be updated to
+      record this new machine_id, the same open question
+      `decision.ahp.contract.yaml`'s own OQ-AHP-3 already raised and left
+      unresolved for its sibling entry?
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity -- consistent with (not a new departure from) how every prior Tier 1 contract's own method-inventory.yaml row was left unsynced"
+
+verification:
+  method: >
+    Read Atlas §11.32 (L1942-1965), the F16 tool-table MCDA row (L768),
+    and §22.3's Method-specific Gate table MCDA row (L4154) directly at
+    the cited lines. Read `specs/decision/decision.schema.yaml` in full
+    before writing this contract (proactive due-diligence, applied for
+    the second time this session after `challenge.red_team`'s own),
+    confirming its OQ-DECISION-2 explicitly anticipates and defers to
+    "a future MCDA-specific ... schema" rather than this contract
+    duplicating `Decision` itself. Grepped `specs/` and `methods/`
+    exhaustively for "mcda"/"multi-criteria"/"weighted sum"/"criteria
+    weight" before writing -- all six hits were either this contract's own
+    new files, `decision.schema.yaml`'s own forward-reference, or bare
+    method-name mentions in tables/inventories with no defined shape (no
+    duplicate typed object found). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `forbidden_transition` is the
+    strongest-grounded field in this file (directly table-cited, §22.3
+    L4154, not inferred) -- the second Tier 1 contract this session built
+    with that property (after challenge.red_team). `purpose`/
+    `preconditions`/`outputs`'s literal names are Phase 3 compilation,
+    explicitly flagged. The single-weights-field and sensitivity-
+    disclosure-only scope limits are DISCLOSED narrowing decisions, not
+    silent omissions -- see compilation_decisions and open_questions.

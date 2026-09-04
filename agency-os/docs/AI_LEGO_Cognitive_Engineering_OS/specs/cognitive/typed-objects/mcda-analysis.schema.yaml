@@ -1,0 +1,288 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/mcda-analysis.schema.yaml"
+title: MCDA Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MCDAAnalysis` -- the declared
+  `outputs` of `decision.mcda`'s Method Contract
+  (methods/contracts/decision.mcda.contract.yaml, `outputs: [MCDAAnalysis]`).
+  The second `decision`-family typed object (after `AhpAnalysis`), and the
+  file `specs/decision/decision.schema.yaml`'s own `compilation_decisions`
+  (OQ-DECISION-2) explicitly anticipates as "a future MCDA-specific ...
+  schema" -- this file is that schema, not a duplicate of `Decision`
+  itself (an `MCDAAnalysis` record is a candidate that feeds
+  `Decision.analyses[]`, never a `Decision` in its own right).
+
+  Field provenance -- Atlas §11.32 (L1942-1965)'s own 8-node pipeline
+  ("Options -> Criteria -> Weights -> Normalize -> Score -> Sensitivity ->
+  Stakeholder Views -> Human Decision") maps onto this schema's fields for
+  five of the eight nodes (Sensitivity is disclosed as DISCLOSURE-ONLY, not
+  computed; Stakeholder Views and Human Decision are explicitly OUT OF
+  SCOPE for this record -- see
+  `methods/contracts/decision.mcda.contract.yaml`'s own
+  `compilation_decisions`/`open_questions` OQ-MCDA-1/OQ-MCDA-2, this
+  schema does not re-litigate that scope choice):
+    * `options[]` / `criteria[]` -- the Options and Criteria stages.
+    * `raw_scores[]` -- caller-supplied, arbitrary-scale per-option,
+      per-criterion values; the input side of the Normalize stage.
+    * `weights[]` -- caller-supplied (NOT derived via pairwise comparison
+      the way `AhpAnalysis.criteria_weights` is -- see
+      `decision.mcda.contract.yaml`'s own compilation_decisions for why
+      this is the real, cited difference between the two decision-family
+      methods, not an omission).
+    * `normalized_scores[]` -- COMPUTED, the Normalize stage's own output
+      (`ai_lego/compute/mcda/scoring.py::normalize_scores`, direction-aware
+      min-max per criterion).
+    * `ranking[]` -- COMPUTED, the Score stage's own output. Reuses
+      `ai_lego.compute.ahp.weights.rank_options` UNCHANGED -- that
+      function is a generic weighted-sum ranker (criteria_weights dict +
+      per-option-per-criterion score list -> sorted ranking) with nothing
+      AHP-specific in its implementation, the same class of cross-family
+      genuine-compute reuse `evaluate_statistical_gate`'s own three prior
+      reuses (research -> root_cause.pareto -> decision.ahp) already
+      established -- this is the FIRST time this session reuses a
+      SCORING/RANKING compute function across families, not just a
+      validation gate.
+    * `sensitivity_notes` -- the Sensitivity stage, DISCLOSURE-ONLY (see
+      description above and the method contract's own compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.32 多準則決策分析（MCDA）, 8-node pipeline (L1942-1965)"
+  - "methods/contracts/decision.mcda.contract.yaml (outputs, preconditions, quality, forbidden_transition -- the method contract this type's shape must satisfy)"
+  - "ai_lego/compute/mcda/scoring.py (the real min-max normalization compute this schema's `normalized_scores` records the result of)"
+  - "ai_lego/compute/ahp/weights.py::rank_options (reused unchanged for `ranking`)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: >
+      Atlas §22.3 (L4154) forbids this method's output from claiming
+      "Automatic Authority" -- the same class of explicit governance rule
+      `red-team-challenge.schema.yaml` already enforces via top-level
+      `additionalProperties: false`. Should `MCDAAnalysis` use the same
+      structural enforcement?
+    decision: "Yes -- additionalProperties: false at the top level."
+    reasoning: >
+      Same reasoning `red-team-challenge.schema.yaml`'s own
+      compilation_decisions already documents for its identically-shaped
+      rule: a permissive schema would silently allow a caller to smuggle
+      an authority-claiming key (e.g. `approved`, `final_decision`) onto a
+      record whose entire cited purpose is to NOT make that claim. Unlike
+      `red-team-challenge.schema.yaml`, this record has no per-item array
+      needing the same treatment (no `findings[]`-shaped sub-array) -- the
+      top-level constraint alone is sufficient here.
+  - question: >
+      `ranking[]` reuses `ai_lego.compute.ahp.weights.rank_options`
+      UNCHANGED, a function that lives in the `ahp` compute package. Is
+      importing it from a DIFFERENT method's compute module an
+      architectural smell (an MCDA schema/module depending on an AHP
+      package), or should the function be relocated / duplicated?
+    decision: "Import it as-is from ai_lego.compute.ahp.weights; do not relocate or duplicate it."
+    reasoning: >
+      `rank_options`'s own implementation (read before this decision was
+      made) has NOTHING AHP-specific in it -- it accepts a plain
+      `dict[str, float]` of criterion weights and a plain list of
+      `{option_id, criterion_id, score}` entries, with no reference to
+      pairwise comparisons, Saaty's scale, or any other AHP-only concept;
+      it is a generic weighted-sum ranker that happens to have been
+      written first for AHP's own "Option scoring" pipeline stage.
+      Relocating it into a new shared, family-neutral module would touch
+      `decision.ahp`'s own already-shipped, zero-diff-verified module
+      (`ai_lego/modules/decision/ahp.py` still imports it from the same
+      path) for a pure code-organization preference, violating this
+      session's own minimal-blast-radius discipline (`git diff --stat`
+      showing zero changes to prior slices' shared infrastructure is this
+      session's strongest evidence of safe composability, repeated across
+      all nine prior slices). Writing an independent, near-duplicate
+      `weighted_sum_score` function in `compute/mcda/scoring.py` instead
+      was considered and rejected: duplicating working, hand-verified
+      compute code is a worse outcome than one cross-family import, and
+      this session's own established precedent already treats
+      `compute/` modules as family-neutral (three prior families already
+      import `evaluate_statistical_gate`, itself defined in
+      `modules/research/gates.py`, a fourth family's own module).
+
+type: object
+required: [id, version, options, criteria, raw_scores, weights, normalized_scores, ranking, sensitivity_notes, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^MCDA-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as ahp-analysis.schema.yaml's AHP- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.mcda"
+
+  options:
+    type: array
+    minItems: 2
+    description: "Atlas L1949 pipeline stage 1: 'Options'."
+    items:
+      type: object
+      required: [id, label]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        label: {type: string}
+
+  criteria:
+    type: array
+    minItems: 1
+    description: "Atlas L1950 'Criteria'. `direction` is a structurally-necessary addition (see method contract preconditions) -- Atlas's own pipeline names the stage but not a per-criterion direction field."
+    items:
+      type: object
+      required: [id, label, direction]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        label: {type: string}
+        direction:
+          enum: [maximize, minimize]
+
+  raw_scores:
+    type: array
+    minItems: 1
+    description: "Input side of Atlas L1952 'Normalize' -- caller-supplied, arbitrary-scale per-option, per-criterion values (e.g. cost in USD, a 1-10 satisfaction rating)."
+    items:
+      type: object
+      required: [option_id, criterion_id, raw_value]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        raw_value: {type: number}
+
+  weights:
+    type: array
+    minItems: 1
+    description: "Atlas L1951 'Weights' -- caller-supplied directly (not derived via pairwise comparison; see method contract compilation_decisions for why this is MCDA's real difference from AHP, not an omission). Must be non-negative and sum to 1.0 (tolerance 1e-6), enforced by ai_lego/compute/mcda/scoring.py."
+    items:
+      type: object
+      required: [criterion_id, weight]
+      additionalProperties: false
+      properties:
+        criterion_id: {type: string}
+        weight: {type: number, minimum: 0, maximum: 1}
+
+  normalized_scores:
+    type: array
+    minItems: 1
+    description: "Atlas L1952 'Normalize' -- COMPUTED, direction-aware min-max per criterion. Every raw_scores entry produces exactly one normalized_scores entry."
+    items:
+      type: object
+      required: [option_id, criterion_id, normalized_value]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        normalized_value: {type: number, minimum: 0, maximum: 1}
+
+  ranking:
+    type: array
+    minItems: 2
+    description: "Atlas L1953 'Score' -- COMPUTED, sorted descending by weighted_score. Reuses ai_lego.compute.ahp.weights.rank_options unchanged."
+    items:
+      type: object
+      required: [option_id, weighted_score]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        weighted_score: {type: number, minimum: 0}
+
+  sensitivity_notes:
+    type: string
+    minLength: 1
+    description: "Atlas L1954/1957 'Sensitivity' stage AND §22.3's (L4154) required-verification column -- DISCLOSURE-ONLY: presence is enforced (non-empty), the sensitivity methodology/correctness is not. See method contract compilation_decisions/OQ-MCDA-2 for why no formula is computed."
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses (reliability.py, pareto/ranking.py, graph/dag.py, ahp/weights.py, monitoring/triggers.py) -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed normalized_scores -- same convention every genuine-compute typed object in this directory already establishes. Points at normalize_scores (this method's own distinctive new compute), not rank_options (the reused-unchanged AHP function also used in this record)."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine MCDA run -- same design choice ahp-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two options, three criteria (one minimize -- cost), single weight profile, clear winner"
+    value:
+      id: "MCDA-2026-09-04-001"
+      version: "1.0.0"
+      generated_by_method: "decision.mcda"
+      options:
+        - {id: "O1", label: "方案 A：自建"}
+        - {id: "O2", label: "方案 B：外包"}
+      criteria:
+        - {id: "C1", label: "成本（美元）", direction: minimize}
+        - {id: "C2", label: "上線速度（1-10）", direction: maximize}
+        - {id: "C3", label: "長期可維護性（1-10）", direction: maximize}
+      raw_scores:
+        - {option_id: "O1", criterion_id: "C1", raw_value: 80000}
+        - {option_id: "O1", criterion_id: "C2", raw_value: 4}
+        - {option_id: "O1", criterion_id: "C3", raw_value: 9}
+        - {option_id: "O2", criterion_id: "C1", raw_value: 50000}
+        - {option_id: "O2", criterion_id: "C2", raw_value: 8}
+        - {option_id: "O2", criterion_id: "C3", raw_value: 5}
+      weights:
+        - {criterion_id: "C1", weight: 0.4}
+        - {criterion_id: "C2", weight: 0.3}
+        - {criterion_id: "C3", weight: 0.3}
+      normalized_scores:
+        - {option_id: "O1", criterion_id: "C1", normalized_value: 0.0}
+        - {option_id: "O1", criterion_id: "C2", normalized_value: 0.0}
+        - {option_id: "O1", criterion_id: "C3", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C1", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C2", normalized_value: 1.0}
+        - {option_id: "O2", criterion_id: "C3", normalized_value: 0.0}
+      ranking:
+        - {option_id: "O2", weighted_score: 0.7}
+        - {option_id: "O1", weighted_score: 0.3}
+      sensitivity_notes: "C1（成本）權重從 0.4 降到 0.25 以下時排名反轉；其餘區間排名穩定。人工檢查，非機械計算。"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mcda.scoring.normalize_scores"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-MCDAANALYSIS-1"
+    question: >
+      `ranking[]` has no schema-level constraint tying it to `options[]`
+      (e.g. every option must appear exactly once) -- left as a runtime
+      invariant, the same disclosed gap `ahp-analysis.schema.yaml`'s own
+      OQ-AHPANALYSIS-1 already documents for its structurally identical
+      field (`ai_lego/modules/decision/mcda.py`'s builder computes it
+      directly from `options`/`normalized_scores`, so it cannot legally
+      diverge in practice).
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.32 (L1942-1965) directly at the cited lines.
+    Cross-checked against methods/contracts/decision.mcda.contract.yaml's
+    own outputs/preconditions/quality/forbidden_transition and
+    ai_lego/compute/mcda/scoring.py's real min-max-normalization compute
+    (hand-verified against 3 known cases -- all-maximize, all-minimize,
+    a tied criterion -- before this schema was written). Validated
+    against jsonschema Draft202012Validator.
+  note: >
+    `options`/`criteria`/`raw_scores`/`weights`/`normalized_scores`/
+    `ranking`/`sensitivity_notes` field names and stage ordering are
+    transcribed from Atlas's own 8-node pipeline (L1948-1957). The
+    `additionalProperties: false` enforcement mirrors
+    `red-team-challenge.schema.yaml`'s own citation-grounded rule
+    (Atlas §22.3, a different table row for a different method). No
+    mother document was modified to produce this file.
