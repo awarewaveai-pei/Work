@@ -1,0 +1,13 @@
+{
+  "_schema": "answer-snapshot.schema.json",
+  "schema_version": "1.0.0",
+  "questionnaire_version": "1.1.0",
+  "questionnaire_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "project": {
+    "name": "demo-project"
+  },
+  "answers": {
+    "Q-SCOPE-001": "yes"
+  },
+  "custom_requirements": []
+}

@@ -1,0 +1,20 @@
+{
+  "_schema": "answer-snapshot.schema.json",
+  "schema_version": "1.0.0",
+  "questionnaire_version": "1.1.0",
+  "questionnaire_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "project": {
+    "name": "demo-project"
+  },
+  "answers": {
+    "Q-SCOPE-001": true,
+    "Q-SCOPE-002": false
+  },
+  "custom_requirements": [
+    {
+      "id": "REQ-CUSTOM-00001",
+      "category": "workflow",
+      "statement": "closing a case needs both client and manager sign-off"
+    }
+  ]
+}

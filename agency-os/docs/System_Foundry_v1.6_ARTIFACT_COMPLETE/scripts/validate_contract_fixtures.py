@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import json, sys
-from schema_runtime import validate, SchemaViolation
+from schema_runtime import validate, SchemaViolation, load_schema
 ROOT=Path(__file__).resolve().parents[1]
 def main():
     base=ROOT/'tests/fixtures/contracts'; errors=[]; total=0
     for kind,should_pass in [('valid',True),('invalid',False)]:
         for p in sorted((base/kind).glob('*.json')):
-            total+=1; data=json.loads(p.read_text()); schema=json.loads((ROOT/'schemas'/data.pop('_schema')).read_text())
+            total+=1; data=json.loads(p.read_text(encoding='utf-8')); schema=load_schema(ROOT/'schemas'/data.pop('_schema'))
             try: validate(data,schema); passed=True
             except SchemaViolation: passed=False
             if passed!=should_pass: errors.append(f'{kind}/{p.name}: expected {should_pass}, got {passed}')

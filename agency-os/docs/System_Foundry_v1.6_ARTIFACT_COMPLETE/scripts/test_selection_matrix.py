@@ -10,6 +10,29 @@ RULES={r['when']['question']:r for r in load('rules/question-rules.json')['rules
 CAPS={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
 MODS={m['id']:m for m in load('generation/module-manifests.json')['modules']}
 BPMAP=load('generation/blueprint-map.json')['documents']
+# "<CODE>: " (colon-space suffix, not the bare code) so a code that happens to be a string
+# prefix of another code -- or of an unrelated error message that starts with the same letters
+# -- can't false-match; today all 5 conflict-rules share one code so this is defence in depth,
+# not a fix for an observed collision.
+CONFLICT_PREFIXES=tuple(cr['code']+': ' for cr in load('rules/conflict-rules.json')['rules'])
+
+def expected_conflict(e):
+    # The ONLY two ValueError sources steps 4/6 are allowed to swallow as "this combination was
+    # never supposed to compile": merge()'s own prerequisite-incompatibility guard, and resolve()
+    # rejecting a genuine business conflict-rule. Anything else -- unknown question id,
+    # non-boolean answer, unanswered/wrongly-answered question, unknown capability, unknown
+    # condition shape -- is validate_answers()/capability_closure()/eval_condition() catching an
+    # actual harness or resolver bug and must fail the test loudly, not get counted as an
+    # expected rejection.
+    #
+    # resolve() joins ALL validate_answers() errors with '\n' (configurator_engine.py), so a
+    # single ValueError can carry several lines at once; checking only the first line is only
+    # safe as long as conflict-rule lines always sort last among validate_answers()'s error
+    # list, which is true today but is an accident of that function's statement order, not a
+    # guarantee this function should depend on -- so every line must independently be either the
+    # merge() message or a conflict-rule line.
+    lines=str(e).split('\n')
+    return all(line=='incompatible prerequisites' or line.startswith(CONFLICT_PREFIXES) for line in lines)
 
 def merge(a,b):
     out=dict(a)
@@ -114,6 +137,16 @@ def main():
             if cid not in pq['current_capabilities']: raise AssertionError(f'{qid} did not activate {cid}')
         for cid in r.get('defer',[]):
             if cid not in pq['deferred'] and cid not in pq['current_capabilities']: raise AssertionError(f'{qid} did not defer/preserve {cid}')
+    # 3.5) expected_conflict() discriminator itself, tested directly. In this catalog every one
+    # of the pairwise rejections below happens to be a merge()-prerequisite conflict and none of
+    # them (nor any of the 1000 random configs) happen to trip a conflict-rule -- so without this
+    # direct check, the CONFLICT_PREFIXES branch has zero real coverage and a mutation there
+    # (e.g. a typo in the colon-space suffix) would pass silently forever.
+    real_conflict=load('rules/conflict-rules.json')['rules'][0]
+    if not expected_conflict(ValueError('incompatible prerequisites')): raise AssertionError('expected_conflict must accept merge() prerequisite conflicts')
+    if not expected_conflict(ValueError(real_conflict['code']+': '+real_conflict['message'])): raise AssertionError('expected_conflict must accept a real conflict-rule code')
+    if expected_conflict(ValueError('Q-X: active question unanswered')): raise AssertionError('expected_conflict must reject an unrelated ValueError')
+    if expected_conflict(ValueError(real_conflict['code'])): raise AssertionError('expected_conflict must reject a bare code with no colon-space (not a real resolve() message shape)')
     # 4) exhaustive pairwise question interactions where prerequisites are compatible
     pairs=0; rejected=0
     ids=sorted(QMAP)
@@ -122,8 +155,8 @@ def main():
         for q2 in ids[i+1:]:
             try: ov=merge(pre1,satisfy(QMAP[q2].get('active_when'))); ov[q1]=True; ov[q2]=True; a=complete(ov,False); p=resolve({'name':'pair'},a,[]); assert_plan_invariants(p); pairs+=1
             except (ValueError,AssertionError) as e:
-                # ValueError is allowed only for intentionally conflicting configurations/prerequisites.
                 if isinstance(e,AssertionError): raise
+                if not expected_conflict(e): raise AssertionError(f'{q1}+{q2}: unexpected ValueError (not a known conflict): {e}') from e
                 rejected+=1
     # 5) every explicit conflict rule must fail closed
     for cr in load('rules/conflict-rules.json')['rules']:
@@ -152,9 +185,9 @@ def main():
         try:
             p=resolve({'name':f'random-{n}'},a,[]); assert_plan_invariants(p)
             if p!=resolve({'name':f'random-{n}'},dict(reversed(list(a.items()))),[]): raise AssertionError('non-deterministic plan')
-        except ValueError:
+        except ValueError as e:
             # only explicit conflict rules may reject random combinations
-            pass
+            if not expected_conflict(e): raise AssertionError(f'random-{n}: unexpected ValueError (not a known conflict): {e}') from e
     # 7) generate all-NO and all-YES and prove exact materialization/no leakage
     with tempfile.TemporaryDirectory() as td:
         out0=generate(p0,a0,[],td); verify_generated(out0,p0)
