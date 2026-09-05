@@ -14,9 +14,11 @@ V1 functional assessment is Person-only. Existing Person provenance remains the 
 | Evidence | `person_id` identifies the assessed Person | nullable `subject_type` default `PERSON`; nullable `subject_id` | reject any non-`PERSON` assessment semantics; if `subject_id` is populated, it must agree with the Person reference |
 | Claim | Person-scoped claim | same two fields | same Person-only rule |
 | Assessment | Person-scoped assessment | same two fields | same Person-only rule |
-| TrustDomain | Person-scoped trust context | same two fields | same Person-only rule |
+| TrustDomain | Person-scoped trust context | same two fields, plus a required `domain` (ADR-0004) | same Person-only rule, plus ADR-0004's domain-scoping and evidence-link rules below |
 
 The later addition of `ORGANIZATION` requires a superseding ADR plus its own Evidence, Assessment, TrustDomain, RLS, retention, and negative-test design. A nullable column is not an approved polymorphic subject model.
+
+**Updated 2026-09-05 (ADR-0004, Wave 1 gates 1-3)**: the TrustDomain row's identity key is `(tenant_id, person_id, domain)`, not `(tenant_id, person_id)` — a Person may hold up to seven TrustDomain rows (`domain` restricted to `OPERATIONAL`, `COMPETENCE`, `CONFIDENTIALITY`, `FINANCIAL`, `STRATEGIC`, `REPUTATIONAL`, `GOVERNANCE_POWER`), enforced by a partial `UNIQUE (tenant_id, person_id, domain) WHERE kind='TRUST_DOMAIN'` index, never a bare `UNIQUE (tenant_id, person_id)`. Every TrustDomain row must also carry a typed evidence reference (`evidence_ref_id`/`evidence_ref_kind`, `evidence_ref_kind IN ('EVIDENCE','CLAIM')`) via the same composite-FK pin `data_subject_request_targets` already uses. Landed in `Projects/internal/hci30/database/migrations/0011_wave1_trust_domain_scope_up.sql`; see ADR-0004's own "Implementation note".
 
 ## Permission-model relationships
 

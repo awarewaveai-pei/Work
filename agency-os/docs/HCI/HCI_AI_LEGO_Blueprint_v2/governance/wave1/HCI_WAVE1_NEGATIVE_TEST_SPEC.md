@@ -742,6 +742,114 @@ extends an already-reviewed mechanism rather than inventing a new one.
 Full narrative in the migration's header comments and ADR-0019's
 "Implementation note" (epistemic-label half).
 
+**Migration 0011 (2026-09-05): ADR-0004 (No Universal Human Trust Score),
+Wave 1 gates 1-3.** `hci.subject_records` gains `domain` (the seven
+`04_HCI30_PRODUCT_SPEC.md:59-65` names, TRUST_DOMAIN-scoped/required) and a
+typed evidence self-reference (`evidence_ref_id`/`evidence_ref_kind`,
+`evidence_ref_kind IN ('EVIDENCE','CLAIM')`, same composite-FK idiom
+`data_subject_request_targets` already uses), plus a partial
+`UNIQUE (tenant_id, person_id, domain) WHERE kind='TRUST_DOMAIN'` index -
+explicitly not a bare `UNIQUE(tenant_id, person_id)`, which is exactly the
+one-slot-per-Person shape the ADR forbids. Gate 1 (the CI-blocking column-
+name lint, `scripts/check-no-universal-trust-column.ps1`) is source-level
+and Docker-free like `verify-epistemic-annotation.ps1`; its self-test proves
+three things at once: an undomained forbidden-named column is flagged, a
+domained one is not, and a table whose forbidden column is declared in one
+migration file and whose `domain` column is added by a LATER file's `ALTER
+TABLE` still clears - the exact cross-migration shape ADR-0004's own
+`subject_records` case takes (CREATE in 0001, `domain` added by ALTER in
+0011). The retrofitted `TARGET-KIND-01a` fixture row (this file's original
+0001-era TRUST_DOMAIN insert, `wave1-negative-tests.sql:137-144`) is the
+base positive case; fifteen new assertions on the first pass (`TRUST-NEG-01`/
+`02` - the ADR's own named gate-2/gate-3 tests - plus one assertion per new
+CHECK/FK/UNIQUE: domain scope/required/enum, evidence-ref-id scope/required,
+evidence-ref-kind scope/required/enum, the composite FK's cross-tenant and
+typed-pin legs, the partial unique index, and a positive CLAIM-kind
+evidence-ref proof) prove each constraint actually rejects the shape it
+names, not merely that the happy path still works. SQL went green first
+try: **223/223 assertions**.
+
+Unlike several sibling migrations this session that only extend an
+already-reviewed mechanism, this one introduces a self-referencing composite
+FK and a table-wide lint exemption on the ADR's own protected table - new
+enough to request a db-expert review before commit (the migration had never
+been applied anywhere, so every fix below landed in-place, not as a
+follow-up migration). Found **1 Critical + 3 Major + 5 Minor/Suggestion**:
+- **C1 (Critical)**: gate 1's lint exempted a table on ANY column literally
+  named `domain`, nullable or not - this migration's own nullable `domain`
+  then exempted `hci.subject_records` from the WHOLE check, so
+  `ADD COLUMN overall_score numeric` on that exact table would have passed
+  from this migration onward. Fixed by requiring the exemption's `domain`
+  column be unconditionally `NOT NULL` (denies the exemption to a shared
+  multi-kind table like `subject_records`, correctly keeps it for a
+  genuinely domain-dedicated one) plus `TRUST-NO-AGGREGATE-COLUMN-01`, a
+  live `pg_attribute` catalog assertion as defense-in-depth.
+- **M1**: TrustDomain rows could never reach this table's only correction
+  mechanism (bitemporal supersession) - the partial unique index rejects the
+  superseding row before the predecessor's `mark_superseded()` trigger ever
+  runs. Fixed with an explicit `subject_records_trust_domain_no_supersede`
+  exclusion (same pattern 0008 uses to keep TRUST_DOMAIN out of
+  `author_class`), tested by `TRUST-NEG-NOSUPERSEDE-01`.
+- **M2**: the typed evidence pin keyed only on `(tenant_id, id, kind)`,
+  letting a TrustDomain row cite evidence about a DIFFERENT Person in the
+  same tenant. Widened to `(tenant_id, person_id, id, kind)`, tested by
+  `TRUST-EVIDENCE-CROSSPERSON-01` plus a dedicated regression-guard mutation
+  proving the `person_id` leg specifically is load-bearing.
+- **M3 (class fix)**: the down-migration empty-state guard pattern (which
+  0011 copied) reads a `FORCE ROW LEVEL SECURITY` table and would fail open
+  under a non-superuser owner. Fixed with `SET LOCAL row_security = off;` in
+  `0011_down` AND, since the bug predates this migration, in
+  `0005`/`0007`/`0008`/`0010`'s down files too.
+- **M4**: `TRUST-EVIDENCE-KINDVALUE-01` passed for the wrong reason (caught
+  by the composite FK, not the enum `CHECK` it claimed to test - this file's
+  own named anti-pattern). Fixed with a real tenant-A `ASSESSMENT` fixture
+  row and a retarget, plus a new `TRUST-EVIDENCE-CHAIN-01` (no chaining to
+  another TRUST_DOMAIN row).
+- Minor items also closed: `TRUST-PERSON-CROSSTENANT-01` (N4, the one new
+  typed reference in this ADR that had no real-other-tenant negative test) —
+  added, kept, but probed rather than trusted: weakening only the `persons`
+  FK still leaves it rejected (M2's own widened evidence FK also catches
+  it), so it stands as a real, tested assertion with no dedicated mutation
+  rather than a falsely-isolated one. Also closed: a tightened
+  down-migration idempotency guard (N3). Two Suggestion-level items tracked
+  in `TASKS.md`, not fixed here (an unused index; a pre-existing
+  tenant-predicate gap in 0007's `tombstone_evidence()`, out of this
+  migration's scope).
+
+A separate critic review of the lint script itself (`check-no-universal-
+trust-column.ps1`) and its two callers, requested independently of the
+db-expert SQL review since a regex bug is not a schema question, found the
+gate did not work as shipped and reproduced every bypass directly: case-
+sensitive type matching (`NUMERIC` uppercase matched nothing), the
+forbidden-column scan gated on the same type whitelist as the `domain`
+exemption (so `decimal`/`double precision`/`int`/`jsonb` all evaded it),
+`ALTER TABLE IF EXISTS foo` capturing the literal word `if` as the table
+name (collapsing unrelated tables' exemption state together - a form
+already present in this corpus's own `0002`/`0003` down migrations), and
+the self-test's own `compact_table` fixture never actually exercising the
+paren-depth tracking it claimed to (`NOT NULL` was placed before the
+`CHECK`, so a broken depth-walk still passed) - confirmed by literally
+reverting the depth-tracking and watching the self-test stay green. All
+fixed: case-insensitive matching, forbidden columns matched as identifiers
+independent of type, `IF (NOT) EXISTS`/`ONLY` skipped in the table-name
+capture, and the vacuous fixture repaired plus three new ones added
+(uppercase, an evading type, an `IF EXISTS` pair). Re-verified beyond the
+self-test: the reviewer's exact seven reproduction cases were re-run from
+scratch against the fixed script - all seven now correctly flagged. Also
+added: `TRUST-NEG-02` (ADR-0004's own named gate-3 proof) had no mutation
+anywhere - `collapse-trust-domain-to-one-slot` fills that gap, expect list
+taken from an actual probe run.
+
+Final tally after all fixes (SQL review + script review), re-verified with
+Docker runs from scratch each time: **229/229 assertions**, **115/115
+mutations killed** (0 vacuous/weak). Every new constraint (including the
+ones the reviews added) reuses an already-reviewed idiom (the
+scoped/required CHECK pair from 0007-0010, the composite typed-FK from
+0001/0005, a plain partial unique index, the `SET LOCAL row_security =
+off;` pattern from 0009) rather than inventing a new mechanism. Full
+narrative in the migration's header comments and ADR-0004's
+"Implementation note".
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
 requires the suite to go red on exactly the assertions covering it; **all 101

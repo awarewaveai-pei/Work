@@ -8,6 +8,13 @@
 -- note.
 BEGIN;
 SET LOCAL lock_timeout = '3s';
+-- M3 class fix (db-expert review of migration 0011, 2026-09-05): the guard
+-- below reads a FORCE ROW LEVEL SECURITY table. Under a non-superuser owner
+-- it would silently match zero rows instead of erroring, letting this
+-- migration destroy every CLAIM's epistemic_label with no warning. Same fix
+-- as 0005/0007/0008 (M4) - see 0005_wave1_bitemporal_history_down.sql's
+-- comment for the full account.
+SET LOCAL row_security = off;
 
 -- Empty-state guard. Any CLAIM row at all makes this one-way: after the
 -- columns are dropped, re-applying 0010 would find NULL epistemic_label on

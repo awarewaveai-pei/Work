@@ -17,6 +17,7 @@ $upMig7    = Join-Path $root 'database/migrations/0007_wave1_crypto_shredding_up
 $upMig8    = Join-Path $root 'database/migrations/0008_wave1_field_author_class_policy_up.sql'
 $upMig9    = Join-Path $root 'database/migrations/0009_wave1_adr0019_hardening_up.sql'
 $upMig10   = Join-Path $root 'database/migrations/0010_wave1_epistemic_label_up.sql'
+$upMig11   = Join-Path $root 'database/migrations/0011_wave1_trust_domain_scope_up.sql'
 $fixtures  = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness   = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests  = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -35,6 +36,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Peer-boundary architecture test failed.' }
 # Source-level, Docker-free, runs its own self-test first (see the script).
 & (Join-Path $PSScriptRoot 'verify-epistemic-annotation.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Epistemic-annotation check (ADR-0013 gate 5) failed.' }
+
+# ADR-0004 gate 1: no column matching overall_score|composite_trust|
+# aggregate_trust|universal_trust|^trust_score$ may exist on a table with no
+# domain column. Source-level, Docker-free, runs its own self-test first.
+& (Join-Path $PSScriptRoot 'check-no-universal-trust-column.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Universal-trust-column check (ADR-0004 gate 1) failed.' }
 
 # Windows PowerShell 5.1 pipes native stdin as ASCII by default, which would
 # silently replace any non-ASCII byte in a .sql file with '?' and still exit 0.
@@ -81,6 +88,7 @@ try {
   Invoke-SqlFile -Path $upMig8   -Label 'migration 0008 up (field author class policy)'
   Invoke-SqlFile -Path $upMig9   -Label 'migration 0009 up (ADR-0019 hardening)'
   Invoke-SqlFile -Path $upMig10  -Label 'migration 0010 up (epistemic label)'
+  Invoke-SqlFile -Path $upMig11  -Label 'migration 0011 up (trust domain scope)'
   Invoke-SqlFile -Path $fixtures -Label 'synthetic fixtures'
   Invoke-SqlFile -Path $harness  -Label 'test harness'
   Invoke-SqlFile -Path $sqlTests -Label 'negative test suite'
@@ -90,10 +98,10 @@ try {
   # schema is the case that actually catches dependency mistakes.
   #
   # A single 'down' (0001_wave1_synthetic_down.sql) is sufficient here even
-  # though ten migrations are now applied: it DROPs the whole hci schema,
-  # which removes everything 0002-0010 added along with everything 0001
-  # added, since all ten live in the same schema. The rebuild afterwards
-  # must therefore re-apply all ten up migrations, in order, to return to
+  # though eleven migrations are now applied: it DROPs the whole hci schema,
+  # which removes everything 0002-0011 added along with everything 0001
+  # added, since all eleven live in the same schema. The rebuild afterwards
+  # must therefore re-apply all eleven up migrations, in order, to return to
   # the same state this test run started from. (0002_wave1_case_aggregate_down.sql,
   # 0003_wave1_regulatory_market_scope_down.sql,
   # 0004_wave1_source_provenance_down.sql,
@@ -101,12 +109,13 @@ try {
   # 0006_wave1_bitemporal_scope_fence_down.sql,
   # 0007_wave1_crypto_shredding_down.sql,
   # 0008_wave1_field_author_class_policy_down.sql,
-  # 0009_wave1_adr0019_hardening_down.sql, and
-  # 0010_wave1_epistemic_label_down.sql exist for the narrower,
+  # 0009_wave1_adr0019_hardening_down.sql,
+  # 0010_wave1_epistemic_label_down.sql, and
+  # 0011_wave1_trust_domain_scope_down.sql exist for the narrower,
   # not-exercised-here case of rolling back one migration alone against a
   # schema where the others stay applied.)
   Write-Host 'Verifying the migration is reversible...'
-  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001-0010 together)'
+  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001-0011 together)'
   Invoke-SqlFile -Path $upMig   -Label 'migration 0001 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig2  -Label 'migration 0002 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig3  -Label 'migration 0003 up (clean rebuild after down)'
@@ -117,6 +126,7 @@ try {
   Invoke-SqlFile -Path $upMig8  -Label 'migration 0008 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig9  -Label 'migration 0009 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig10 -Label 'migration 0010 up (clean rebuild after down)'
+  Invoke-SqlFile -Path $upMig11 -Label 'migration 0011 up (clean rebuild after down)'
 
   Write-Host 'HCI Wave 1 local suite PASSED.'
 }

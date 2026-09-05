@@ -15,6 +15,13 @@
 -- merely a comment - same pattern as 0005's empty-bitemporal-history guard.
 BEGIN;
 SET LOCAL lock_timeout = '3s';
+-- M3 class fix (db-expert review of migration 0011, 2026-09-05): both tables
+-- this guard reads are FORCE ROW LEVEL SECURITY. Under a non-superuser owner
+-- the guard's SELECTs would silently match zero rows instead of erroring,
+-- letting this migration drop populated crypto-shredding state with no
+-- warning. Same fix as 0005/0009 (M4) - see 0005_wave1_bitemporal_history_down.sql's
+-- comment for the full account.
+SET LOCAL row_security = off;
 
 DO $$
 BEGIN

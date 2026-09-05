@@ -134,9 +134,13 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-04',
 -- ---------------------------------------------------------------------------
 -- Typed reference: a DSR target must match the kind it claims to point at
 -- ---------------------------------------------------------------------------
+-- Retrofitted 2026-09-05 (ADR-0004 gates 2-3): domain/evidence_ref_id/
+-- evidence_ref_kind became required for kind='TRUST_DOMAIN' by migration
+-- 0011. Evidence reference reuses '...101' (a real tenant-A EVIDENCE row,
+-- inserted above at line ~40), not a placeholder.
 SELECT hci_test.expect_success('TARGET-KIND-01a',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000109','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200')$q$);
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000109','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','OPERATIONAL','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$);
 
 SELECT hci_test.expect_sqlstate('TARGET-KIND-01b',
   $q$INSERT INTO hci.data_subject_request_targets (id,tenant_id,request_id,target_kind,target_id)
@@ -1409,7 +1413,216 @@ SELECT hci_test.expect_true('CRYPTO-NOEXTERNAL-01',
   'no network-capable extension installed; no hci function body calls one');
 
 -- ---------------------------------------------------------------------------
+-- ADR-0004 (No Universal Human Trust Score) Wave 1 gates 1-3, migration 0011.
+-- TARGET-KIND-01a above (retrofitted) is the base positive case: a
+-- TRUST_DOMAIN row with domain + a typed evidence reference persists. What
+-- follows proves every new CHECK/FK/UNIQUE actually rejects the shape it
+-- names, not merely that the happy path still works.
+-- ---------------------------------------------------------------------------
+
+-- Gate 2, the ADR's own named test: domain NULL on a TRUST_DOMAIN row is
+-- rejected (subject_records_domain_required).
+SELECT hci_test.expect_sqlstate('TRUST-NEG-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000960','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$,
+  '23514');
+
+-- Gate 3, the ADR's own named test: two TRUST_DOMAIN rows for the SAME
+-- (tenant_id, person_id) with two DIFFERENT domain values both persist -
+-- proving the schema holds the full vector, not one slot that happens to be
+-- unfilled. Same person as TARGET-KIND-01a's '...109' row (already
+-- OPERATIONAL), so this also proves a Person may carry more than one domain
+-- simultaneously, not merely one-at-a-time via supersession.
+SELECT hci_test.expect_success('TRUST-NEG-02-SETUP-A',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000961','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','COMPETENCE','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$);
+SELECT hci_test.expect_success('TRUST-NEG-02-SETUP-B',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000962','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','CONFIDENTIALITY','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$);
+SELECT hci_test.expect_true('TRUST-NEG-02',
+  $q$SELECT COUNT(DISTINCT domain) = 3 FROM hci.subject_records
+     WHERE tenant_id = '11111111-1111-1111-1111-111111111111'
+       AND person_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND kind = 'TRUST_DOMAIN'
+       AND domain IN ('OPERATIONAL','COMPETENCE','CONFIDENTIALITY')$q$,
+  'a Person must be able to hold TRUST_DOMAIN rows for more than one domain at once, not a single collapsed slot');
+
+-- domain is TRUST_DOMAIN-scoped: any other kind carrying it is rejected
+-- (subject_records_domain_scoped).
+SELECT hci_test.expect_sqlstate('TRUST-DOMAIN-SCOPE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000963','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','OPERATIONAL','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$,
+  '23514');
+
+-- domain is restricted to the seven 04_HCI30_PRODUCT_SPEC.md:59-65 names -
+-- not free text that a future roll-up formula could quietly repurpose.
+SELECT hci_test.expect_sqlstate('TRUST-DOMAIN-ENUM-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000964','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','OVERALL','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$,
+  '23514');
+
+-- (tenant_id, person_id, domain) is the TrustDomain identity key: a SECOND
+-- OPERATIONAL row for the same Person (TARGET-KIND-01a's '...109' already
+-- holds it) is rejected by subject_records_trust_domain_unique, not merely
+-- discouraged.
+SELECT hci_test.expect_sqlstate('TRUST-DOMAIN-UNIQUE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000965','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','OPERATIONAL','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$,
+  '23505');
+
+-- Evidence-link requirement (ADR-0004 Decision, third bullet): a
+-- TRUST_DOMAIN row with no evidence_ref_id is invalid, not merely
+-- undocumented (subject_records_evidence_ref_id_required).
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-REQ-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000966','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','STRATEGIC','EVIDENCE')$q$,
+  '23514');
+
+-- evidence_ref_id is TRUST_DOMAIN-scoped, same as domain
+-- (subject_records_evidence_ref_id_scoped).
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-SCOPE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,evidence_ref_id,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000967','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000101','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$,
+  '23514');
+
+-- evidence_ref_kind is independently required, not merely implied by
+-- evidence_ref_id being set (subject_records_evidence_ref_kind_required) -
+-- proves the two link columns each have their own named CHECK rather than
+-- one combined check that could not say which column was wrong.
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-KIND-REQ-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000968','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','STRATEGIC','aaaaaaaa-0000-0000-0000-000000000101')$q$,
+  '23514');
+
+-- evidence_ref_kind is TRUST_DOMAIN-scoped too
+-- (subject_records_evidence_ref_kind_scoped).
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-KIND-SCOPE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,evidence_ref_kind,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000969','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$,
+  '23514');
+
+-- evidence_ref_kind is restricted to EVIDENCE/CLAIM - an ASSESSMENT (or any
+-- other kind) may never be typed-pinned as a TrustDomain's evidence.
+-- db-expert review (2026-09-05, M4): the first version of this test pointed
+-- at '...101', a REAL EVIDENCE row, while claiming evidence_ref_kind=
+-- 'ASSESSMENT' - so dropping subject_records_evidence_ref_kind_check alone
+-- left the composite FK (which requires the referenced row's own kind to
+-- equal evidence_ref_kind) to reject it with 23503 instead, passing this
+-- assertion for the wrong reason (the exact anti-pattern this file already
+-- names at line ~662). Retargeted at a real tenant-A ASSESSMENT row (tenant
+-- A previously had none still alive) so removing the CHECK lets the FK
+-- succeed and the assertion genuinely depends on the CHECK.
+SELECT hci_test.expect_success('TRUST-EVIDENCE-KINDVALUE-01-SETUP-ASSESSMENT',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000974','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','ASSESSMENT','aaaaaaaa-0000-0000-0000-000000000200','PROBABILISTIC')$q$);
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-KINDVALUE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000970','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','STRATEGIC','aaaaaaaa-0000-0000-0000-000000000974','ASSESSMENT')$q$,
+  '23514');
+
+-- db-expert review (2026-09-05, M4): a TRUST_DOMAIN row may never chain to
+-- ANOTHER TRUST_DOMAIN row as its evidence (referencing the real '...109'
+-- row, not a nonexistent id) - caught directly by the enum CHECK, since
+-- 'TRUST_DOMAIN' is not in evidence_ref_kind's allowed set regardless of
+-- what the referenced row's actual kind is.
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-CHAIN-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000975','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','STRATEGIC','aaaaaaaa-0000-0000-0000-000000000109','TRUST_DOMAIN')$q$,
+  '23514');
+
+-- Targets a REAL tenant-B row (fixtures: 'bbbbbbbb-...-500', EVIDENCE kind),
+-- same reasoning as BITEMP-CROSSTENANT-01/CRYPTO-CROSSTENANT-KEYREF-01:
+-- proves the composite FK rejects a genuine cross-tenant reference, not
+-- merely an id that does not exist anywhere.
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-CROSSTENANT-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000971','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','STRATEGIC','bbbbbbbb-0000-0000-0000-000000000500','EVIDENCE')$q$,
+  '23503');
+
+-- Typed reference: '...101' is really kind='EVIDENCE', so claiming it as
+-- evidence_ref_kind='CLAIM' is rejected by the composite FK - same pattern
+-- as TARGET-KIND-01b, applied to this ADR's own typed pin.
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-TYPEDPIN-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000972','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','STRATEGIC','aaaaaaaa-0000-0000-0000-000000000101','CLAIM')$q$,
+  '23503');
+
+-- Positive proof that CLAIM (not only EVIDENCE) is a legal evidence_ref_kind
+-- - ADR-0004's Decision says "kind IN ('EVIDENCE','CLAIM')", and a suite
+-- that only ever exercised EVIDENCE would not actually prove CLAIM is
+-- accepted. References the real tenant-A CLAIM row '...916' (NEG-HD08-02's
+-- fixture, still ASSESSMENT_CANDIDATE/APPROVED - irrelevant to this check,
+-- which cares only about its subject_records kind).
+SELECT hci_test.expect_success('TRUST-EVIDENCE-CLAIM-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000973','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','GOVERNANCE_POWER','aaaaaaaa-0000-0000-0000-000000000916','CLAIM')$q$);
+
+-- db-expert review (2026-09-05, M2): the typed evidence pin originally keyed
+-- only on (tenant_id, id, kind) - the same tuple data_subject_request_targets
+-- pins against - which let a TrustDomain row for one Person cite evidence
+-- about a DIFFERENT Person in the same tenant. PERSON-02
+-- ('...a2', line ~199-201) taking '...101' (a real EVIDENCE row about
+-- PERSON-01, 'aaaa-...-aaaa') as its evidence now correctly fails: the
+-- widened FK requires evidence_ref_id to belong to the SAME person_id as the
+-- referencing row, not merely the same tenant.
+SELECT hci_test.expect_sqlstate('TRUST-EVIDENCE-CROSSPERSON-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000976','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-0000000000a2','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','FINANCIAL','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$,
+  '23503');
+
+-- db-expert review (2026-09-05, M1): this table's only correction mechanism
+-- (bitemporal supersession, 0005 - an AFTER INSERT trigger) can never fire
+-- on a TRUST_DOMAIN row, because subject_records_trust_domain_unique is
+-- checked before insert and would reject the superseding row as a duplicate
+-- (tenant_id, person_id, domain) before mark_superseded() ever runs on the
+-- predecessor. subject_records_trust_domain_no_supersede makes that an
+-- explicit, tested Wave 1 rule instead of a silently-unreachable path -
+-- corrected_reason is supplied so ONLY the new no-supersede CHECK is what
+-- rejects this insert (subject_records_reason_paired would otherwise fire
+-- first on a bare supersedes_id with no reason).
+SELECT hci_test.expect_sqlstate('TRUST-NEG-NOSUPERSEDE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind,supersedes_id,corrected_reason)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000977','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','REPUTATIONAL','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000109','TrustDomain rows do not support correction in Wave 1')$q$,
+  '23514');
+
+-- db-expert review (2026-09-05, N4): every other new typed reference in this
+-- ADR-0004 block has a cross-tenant test against a REAL other-tenant row;
+-- TRUST_DOMAIN's own person_id (via the pre-existing 0001:130 persons FK,
+-- not anything new in 0011) had none. Targets tenant B's real person
+-- ('bbbbbbbb-bbbb-...', fixtures) from a tenant-A insert. No dedicated
+-- mutation was added for this one specifically (checked by probe, not
+-- estimated): weakening ONLY the persons FK still leaves this insert
+-- rejected, because M2's own subject_records_evidence_ref_fk ALSO requires
+-- evidence_ref_id's person to match - '...101' belongs to tenant-A
+-- PERSON-01, not this tenant-B person - so the two protections overlap for
+-- this exact shape and a single-constraint-drop mutation cannot isolate
+-- which one fired. TRUST-EVIDENCE-CROSSPERSON-01 already has its own
+-- dedicated mutation for that second protection; this assertion still
+-- documents real, correct behavior (a suite-wide baseline this file
+-- already accepts: not every assertion needs its own mutation, only that
+-- the invariant it states is genuinely true and tested somewhere).
+SELECT hci_test.expect_sqlstate('TRUST-PERSON-CROSSTENANT-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,domain,evidence_ref_id,evidence_ref_kind)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000978','11111111-1111-1111-1111-111111111111','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','TRUST_DOMAIN','aaaaaaaa-0000-0000-0000-000000000200','REPUTATIONAL','aaaaaaaa-0000-0000-0000-000000000101','EVIDENCE')$q$,
+  '23503');
+
+-- db-expert review (2026-09-05, C1): defense-in-depth against
+-- check-no-universal-trust-column.ps1's own known limit (a text-based lint
+-- can be wrong about a column it has never seen) - a real DB-catalog
+-- assertion against the live schema, same idiom as CRYPTO-NOEXTERNAL-01
+-- (pg_proc scan) and CASE-PROJECTREF-01 (information_schema scan). Proves
+-- directly, at the only layer that cannot be fooled by migration-file text,
+-- that hci.subject_records never grows the exact column shape ADR-0004
+-- forbids - independent of whatever the lint script's exemption logic does
+-- or does not catch.
+SELECT hci_test.expect_true('TRUST-NO-AGGREGATE-COLUMN-01',
+  $q$SELECT NOT EXISTS (
+       SELECT 1 FROM pg_attribute
+        WHERE attrelid = 'hci.subject_records'::regclass AND attnum > 0 AND NOT attisdropped
+          AND attname ~ '(overall_score|composite_trust|aggregate_trust|universal_trust|^trust_score$)')$q$,
+  'no cross-domain aggregate column may exist on hci.subject_records (ADR-0004)');
+
+-- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(208);
+SELECT hci_test.finish(229);

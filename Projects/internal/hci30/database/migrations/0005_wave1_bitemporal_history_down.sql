@@ -20,6 +20,17 @@
 -- below makes that a checked precondition, not merely a comment.
 BEGIN;
 SET LOCAL lock_timeout = '3s';
+-- M3 class fix (db-expert review of migration 0011, 2026-09-05): both tables
+-- this guard reads are FORCE ROW LEVEL SECURITY (0001:343-345). Under a
+-- non-superuser owner (the real production shape - this test container's
+-- hci_owner is a superuser, so the gap never surfaced locally), the guard's
+-- SELECTs would silently match zero rows instead of erroring, and this
+-- migration would drop populated bitemporal history with no warning. Same
+-- fix 0009 (M4) already applied to every SECURITY DEFINER function in this
+-- schema, applied here to the down-migration's DO block, which needed it
+-- too - this file's own guard was the original template M3 traced the class
+-- back to.
+SET LOCAL row_security = off;
 
 DO $$
 BEGIN

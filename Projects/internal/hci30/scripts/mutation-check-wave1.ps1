@@ -38,6 +38,7 @@ $upMig7   = Join-Path $root 'database/migrations/0007_wave1_crypto_shredding_up.
 $upMig8   = Join-Path $root 'database/migrations/0008_wave1_field_author_class_policy_up.sql'
 $upMig9   = Join-Path $root 'database/migrations/0009_wave1_adr0019_hardening_up.sql'
 $upMig10  = Join-Path $root 'database/migrations/0010_wave1_epistemic_label_up.sql'
+$upMig11  = Join-Path $root 'database/migrations/0011_wave1_trust_domain_scope_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -677,6 +678,11 @@ $mutations = @(
   # (23514) at the insert itself, and every assertion that reads a row an
   # earlier failed setup would have created cascades with it. The full
   # list below is exactly what one real run reported - not an estimate.
+  # TRUST-EVIDENCE-CLAIM-01 (ADR-0004) joined this mutation's expect list
+  # 2026-09-05: it references CLAIM row '...916' by id rather than creating
+  # its own, so when this mutation collaterally fails that row's own INSERT
+  # (NEG-HD08-02-SETUP-CLAIM, already in this list), the FK it depends on
+  # has nothing to point at and correctly flips to 23503 instead of success.
   @{ id = 'remove-epistemic-default-inherit'
      sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql SET search_path = hci, pg_temp AS $fn$ DECLARE v_predecessor_reaudit boolean; v_predecessor_label text; v_predecessor_verifier uuid; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.supersedes_id IS NOT NULL THEN SELECT reaudit_required, epistemic_label, epistemic_verifier_principal_id INTO v_predecessor_reaudit, v_predecessor_label, v_predecessor_verifier FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; END IF; IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := COALESCE(v_predecessor_reaudit, false); END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label = ''SOURCE_FACT'' AND v_predecessor_label IN (''UNKNOWN'',''HYPOTHESIS'') AND NEW.epistemic_verifier_principal_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1019'', MESSAGE = ''x''; END IF; IF NEW.kind = ''CLAIM'' AND NEW.claim_state = ''ASSESSMENT_CANDIDATE'' AND NEW.human_spotcheck_status IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1014'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
      expect = @('EPISTEMIC-DEFAULT-SETUP-01','EPISTEMIC-DEFAULT-01','NEG-HD08-04','EPISTEMIC-INHERIT-SETUP-01','EPISTEMIC-INHERIT-01',
@@ -684,8 +690,89 @@ $mutations = @(
                 'SPOTCHECK-PRINCIPAL-CROSSTENANT-01','DECISION-CLAIMS-CROSSTENANT-02','APPEND-ONLY-TRIGGER-04',
                 'DECISION-CLAIMS-SETUP-01','APPEND-ONLY-TRIGGER-06','NEG-HD08-02-SETUP-CLAIM','NEG-HD08-02-FLAGGED',
                 'NEG-HD08-02','NEG-HD08-05-SUPERSEDE-SETUP','NEG-HD08-05','NEG-HD08-06-SETUP-CLAIM',
-                'NEG-HD08-07-SETUP-CLAIM','NEG-HD08-07-SETUP-LINK','NEG-HD08-07')
+                'NEG-HD08-07-SETUP-CLAIM','NEG-HD08-07-SETUP-LINK','NEG-HD08-07',
+                'TRUST-EVIDENCE-CLAIM-01')
      repin = @('hci.enforce_claim_state_admission()') }
+
+  # ADR-0004 (No Universal Human Trust Score, Wave 1 gates 1-3) - 2026-09-05.
+  # critic review M3: gate 3's own proof (TRUST-NEG-02, "a Person may hold
+  # more than one TrustDomain at once") had no mutation - the one-slot-per-
+  # Person shape the ADR forbids was never actually installed and shown to
+  # turn the suite red. Expect list is exactly what one real probe run
+  # reported (same discipline as every mutation in this file, e.g. the
+  # comment at line 680): collapsing the unique index also collaterally
+  # hits TRUST-EVIDENCE-CROSSTENANT-01/-TYPEDPIN-01/-CLAIM-01, because all
+  # three insert a THIRD/FOURTH TRUST_DOMAIN row for the same Person who
+  # already holds row '...109' - once the index no longer distinguishes by
+  # domain, any second TRUST_DOMAIN row for that Person collides on the
+  # index itself (23505) before whichever check each test actually names
+  # gets a chance to fire.
+  @{ id = 'collapse-trust-domain-to-one-slot'
+     sql = 'DROP INDEX hci.subject_records_trust_domain_unique; CREATE UNIQUE INDEX subject_records_trust_domain_unique ON hci.subject_records (tenant_id, person_id) WHERE kind = ''TRUST_DOMAIN'';'
+     expect = @('TRUST-NEG-02-SETUP-A','TRUST-NEG-02-SETUP-B','TRUST-NEG-02','TRUST-EVIDENCE-CROSSTENANT-01','TRUST-EVIDENCE-TYPEDPIN-01','TRUST-EVIDENCE-CLAIM-01') }
+  @{ id = 'drop-trust-domain-scoped'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_domain_scoped;'
+     expect = @('TRUST-DOMAIN-SCOPE-01') }
+  @{ id = 'drop-trust-domain-required'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_domain_required;'
+     expect = @('TRUST-NEG-01') }
+  @{ id = 'drop-trust-domain-value-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_domain_check;'
+     expect = @('TRUST-DOMAIN-ENUM-01') }
+  @{ id = 'drop-trust-domain-unique-index'
+     sql = 'DROP INDEX hci.subject_records_trust_domain_unique;'
+     expect = @('TRUST-DOMAIN-UNIQUE-01') }
+  @{ id = 'drop-evidence-ref-id-scoped'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_id_scoped;'
+     expect = @('TRUST-EVIDENCE-SCOPE-01') }
+  @{ id = 'drop-evidence-ref-id-required'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_id_required;'
+     expect = @('TRUST-EVIDENCE-REQ-01') }
+  @{ id = 'drop-evidence-ref-kind-scoped'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_kind_scoped;'
+     expect = @('TRUST-EVIDENCE-KIND-SCOPE-01') }
+  @{ id = 'drop-evidence-ref-kind-required'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_kind_required;'
+     expect = @('TRUST-EVIDENCE-KIND-REQ-01') }
+  # TRUST-EVIDENCE-CHAIN-01 joined this mutation's expect list 2026-09-05:
+  # it also depends on this exact enum CHECK (its evidence_ref_kind='TRUST_DOMAIN'
+  # is rejected by the enum, not by the FK - '...109' really is a TRUST_DOMAIN
+  # row, so the FK alone would accept it once the enum is gone).
+  @{ id = 'drop-evidence-ref-kind-value-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_kind_check;'
+     expect = @('TRUST-EVIDENCE-KINDVALUE-01','TRUST-EVIDENCE-CHAIN-01') }
+  # CROSSTENANT/TYPEDPIN/CROSSPERSON all target the same composite FK -
+  # CROSSTENANT via its tenant_id leg (a real tenant-B row, right kind, wrong
+  # tenant), TYPEDPIN via its kind leg (a real tenant-A row, right tenant,
+  # wrong claimed kind), CROSSPERSON via its person_id leg (M2, db-expert
+  # 2026-09-05: right tenant, right kind, wrong Person). Without the FK none
+  # of the three has anything left to reject them.
+  @{ id = 'drop-evidence-ref-fk'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_fk;'
+     expect = @('TRUST-EVIDENCE-CROSSTENANT-01','TRUST-EVIDENCE-TYPEDPIN-01','TRUST-EVIDENCE-CROSSPERSON-01') }
+  # M2 regression guard (db-expert, 2026-09-05): proves the person_id leg
+  # specifically is load-bearing, not merely "some FK exists" - regresses to
+  # the ORIGINAL 3-column pin (tenant_id, id, kind) this migration shipped
+  # with before the review, which still passes CROSSTENANT/TYPEDPIN (both
+  # still caught by the narrower FK) but no longer catches CROSSPERSON.
+  @{ id = 'regress-evidence-ref-fk-drop-person'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_evidence_ref_fk; ALTER TABLE hci.subject_records ADD CONSTRAINT subject_records_evidence_ref_fk FOREIGN KEY (tenant_id, evidence_ref_id, evidence_ref_kind) REFERENCES hci.subject_records (tenant_id, id, kind);'
+     expect = @('TRUST-EVIDENCE-CROSSPERSON-01') }
+  # M1 (db-expert, 2026-09-05): TrustDomain rows cannot use this table's only
+  # correction mechanism (bitemporal supersession) - see migration 0011's own
+  # header comment for the full account. This CHECK is the only thing making
+  # that an explicit, tested rule instead of a silently-unreachable trigger
+  # path.
+  @{ id = 'drop-trust-domain-no-supersede'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_trust_domain_no_supersede;'
+     expect = @('TRUST-NEG-NOSUPERSEDE-01') }
+  # C1 (db-expert, 2026-09-05): TRUST-NO-AGGREGATE-COLUMN-01 is a live
+  # DB-catalog assertion, not backed by any single DROPpable constraint - its
+  # mutation instead ADDS the exact forbidden shape ADR-0004 names, proving
+  # the assertion actually notices.
+  @{ id = 'add-universal-trust-column'
+     sql = 'ALTER TABLE hci.subject_records ADD COLUMN overall_score numeric;'
+     expect = @('TRUST-NO-AGGREGATE-COLUMN-01') }
 )
 
 $project = "hcimut$PID"
@@ -749,6 +836,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig8)   -ne 0) { throw 'mutation harness: 0008 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig9)   -ne 0) { throw 'mutation harness: 0009 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig10)  -ne 0) { throw 'mutation harness: 0010 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig11)  -ne 0) { throw 'mutation harness: 0011 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

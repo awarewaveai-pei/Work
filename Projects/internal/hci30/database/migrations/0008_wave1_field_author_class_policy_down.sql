@@ -8,6 +8,13 @@
 -- because all eight live in the same schema.
 BEGIN;
 SET LOCAL lock_timeout = '3s';
+-- M3 class fix (db-expert review of migration 0011, 2026-09-05): every table
+-- this guard reads is FORCE ROW LEVEL SECURITY. Under a non-superuser owner
+-- the guard's SELECTs would silently match zero rows instead of erroring,
+-- letting this migration destroy populated ADR-0019 state with no warning.
+-- Same fix as 0005/0007/0009 (M4) - see 0005_wave1_bitemporal_history_down.sql's
+-- comment for the full account.
+SET LOCAL row_security = off;
 
 -- db-expert review (2026-09-05, M5) corrected this guard in both
 -- directions. (a) The original check only tested `reaudit_required IS
