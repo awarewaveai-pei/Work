@@ -359,6 +359,16 @@
       "description": "Financial records are a core domain entity requiring accounting-grade integrity."
     },
     {
+      "id": "CAP-RECEIPT-OCR",
+      "name": "Receipt / Invoice OCR Intake",
+      "module": "ai",
+      "requires": [
+        "CAP-AI",
+        "CAP-FINANCIAL-RECORDS"
+      ],
+      "description": "Photographed or scanned receipts and invoices are OCR-extracted into structured vendor/date/amount/line-item data, staged for human confirmation before posting to financial records -- never auto-posted, since OCR/AI extraction errors in accounting-grade data have real financial and tax consequences."
+    },
+    {
       "id": "CAP-GEOLOCATION",
       "name": "Precise Geolocation",
       "module": "compliance",
@@ -643,6 +653,15 @@
       "module": "domain",
       "requires": [],
       "description": "A product or service catalog is a core domain entity."
+    },
+    {
+      "id": "CAP-PRODUCT-MATCHING",
+      "name": "Product / Vendor Name Reconciliation",
+      "module": "domain",
+      "requires": [
+        "CAP-PRODUCTS"
+      ],
+      "description": "Incoming product or vendor names that differ across suppliers and internal naming conventions are reconciled to one canonical product record via an alias table and fuzzy matching, with low-confidence matches routed to human confirmation instead of auto-merged."
     },
     {
       "id": "CAP-PROJECTS",

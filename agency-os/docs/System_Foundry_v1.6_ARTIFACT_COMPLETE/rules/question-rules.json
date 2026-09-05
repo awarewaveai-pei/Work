@@ -302,6 +302,16 @@
       ]
     },
     {
+      "id": "RULE-Q-DATA-011",
+      "when": {
+        "question": "Q-DATA-011",
+        "equals": true
+      },
+      "require": [
+        "CAP-PRODUCT-MATCHING"
+      ]
+    },
+    {
       "id": "RULE-Q-WF-001",
       "when": {
         "question": "Q-WF-001",
@@ -939,6 +949,16 @@
       },
       "require": [
         "CAP-AI-VOICE"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-011",
+      "when": {
+        "question": "Q-AI-011",
+        "equals": true
+      },
+      "require": [
+        "CAP-RECEIPT-OCR"
       ]
     },
     {

@@ -136,6 +136,7 @@
         "CAP-INVENTORY",
         "CAP-ORDERS",
         "CAP-ORG-DATA",
+        "CAP-PRODUCT-MATCHING",
         "CAP-PRODUCTS",
         "CAP-PROJECTS",
         "CAP-UGC"
@@ -302,6 +303,7 @@
         "CAP-AI-VOICE",
         "CAP-AI-WRITE",
         "CAP-MULTI-AGENT",
+        "CAP-RECEIPT-OCR",
         "DER-AI-AUDIT",
         "DER-AI-AUTHORITY",
         "DER-AI-HUMAN",

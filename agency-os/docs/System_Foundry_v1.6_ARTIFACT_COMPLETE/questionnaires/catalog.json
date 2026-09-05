@@ -457,6 +457,18 @@
       "required_when_active": true
     },
     {
+      "id": "Q-DATA-011",
+      "category": "records",
+      "label": "品項跨廠商名稱對應",
+      "description": "同一項產品或原料，不同供應商、不同單據上常常用不同名稱或型號稱呼，公司內部自己的叫法也可能跟對外不一樣。這題指的是系統要能把這些不同名稱自動對應回同一個內部標準品項，而不是每次都當成新品項重複建立。只在你有勾選「產品/商品/服務資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-003",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-WF-001",
       "category": "workflow",
       "label": "多步驟狀態流程",
@@ -1096,6 +1108,18 @@
       "description": "使用者可以用講話的方式跟系統互動（語音輸入或 AI 語音回覆），而不是只能打字。",
       "answer_type": "boolean",
       "required_when_active": true
+    },
+    {
+      "id": "Q-AI-011",
+      "category": "ai",
+      "label": "收據/發票拍照辨識記帳",
+      "description": "使用者可以直接拍照或掃描收據、發票，系統自動用 OCR/AI 辨識出廠商、日期、金額、品項等資訊，整理成待確認的記帳草稿，不需要人工一筆一筆手動輸入。辨識結果需要人工確認過才會正式入帳，避免辨識錯誤直接影響財務數字。只在你有勾選「會計/財務紀錄」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-009",
+        "equals": true
+      }
     },
     {
       "id": "Q-MIG-001",

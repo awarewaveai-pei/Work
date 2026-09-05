@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 150,
+  "active_answer_count": 152,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-AB-TESTING",
@@ -104,6 +104,7 @@
     "CAP-PAYROLL",
     "CAP-PERFORMANCE-REVIEW",
     "CAP-PROCUREMENT",
+    "CAP-PRODUCT-MATCHING",
     "CAP-PRODUCTS",
     "CAP-PROJECTS",
     "CAP-PUBLIC-API",
@@ -111,6 +112,7 @@
     "CAP-PUSH",
     "CAP-REALTIME",
     "CAP-REALTIME-COLLAB",
+    "CAP-RECEIPT-OCR",
     "CAP-RECRUITMENT",
     "CAP-REFUNDS",
     "CAP-REPORTS",

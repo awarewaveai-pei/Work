@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 新增 2 個 capability：收據/發票拍照 OCR 記帳、跨廠商品項名稱對應——操作者實際使用問卷後主動提出的真實需求缺口）
+
+**觸發**：操作者問「裡面的會計功能可以拍或掃描圖片就自動登入帳務嗎？還有同產品在不同廠商命名不同、本公司命名也不同，要怎麼解決？」——這是操作者實際想像自己要用這套系統規劃專案時，發現題庫沒涵蓋的兩個真實痛點，不是我主動找的缺口。
+
+**[現況分析]**：Grep 確認題庫裡`CAP-ACCOUNTING`只是「接外部記帳軟體 API」（方向是系統對外整合，不是 OCR 辨識輸入）；`Q-PAY-004`（發票）是系統開發票給客戶，方向相反；完全沒有 OCR/單據辨識、也沒有跨廠商品項名稱比對（Master Data Matching / Entity Resolution）這兩個能力。確認 `Q-DATA-009`（會計/財務紀錄）與 `Q-DATA-003`（產品/商品/服務資料）已存在，適合當新題目的前置閘門。
+
+**[方案比較]**：新能力要不要開全新 module，還是掛在既有 module 底下——`CAP-RECEIPT-OCR` 本質是 AI 文件辨識，掛在既有 `ai` module（跟 `CAP-AI-GENERATE`/`CAP-AI-CLASSIFY` 同層級）；`CAP-PRODUCT-MATCHING` 本質是產品主檔資料品質問題，掛在既有 `domain` module（跟 `CAP-PRODUCTS` 同層級）。兩個 module 都已存在完整的文件生成機制，不需要新增 module/blueprint 對應，範圍收斂成純資料新增（capabilities＋questions＋rules＋module activated_by 清單），不是架構變更。
+
+**[已修改]**：
+1. `capabilities/catalog.json` — 新增 `CAP-RECEIPT-OCR`（`module: ai`，`requires: [CAP-AI, CAP-FINANCIAL-RECORDS]`，明文寫「辨識結果進待確認佇列，絕不直接過帳」——OCR/AI 辨識錯誤在會計等級資料上有真實財務與稅務後果）與 `CAP-PRODUCT-MATCHING`（`module: domain`，`requires: [CAP-PRODUCTS]`，別名表＋模糊比對＋低信心分數轉人工確認）。
+2. `questionnaires/catalog.json` — 新增 `Q-AI-011`（收據/發票拍照辨識記帳，`active_when: Q-DATA-009=true`）與 `Q-DATA-011`（品項跨廠商名稱對應，`active_when: Q-DATA-003=true`）——兩者都只在對應的前置資料類型已勾選時才出現，避免對沒有會計/產品資料需求的專案顯示不相關題目。
+3. `rules/question-rules.json` — `RULE-Q-AI-011`／`RULE-Q-DATA-011` 對應要求各自的新 capability。
+4. `generation/module-manifests.json` — `ai`／`domain` 兩個 module 的 `activated_by` 清單加入新 capability id（`validate_artifact_generation.py` 強制檢查每個 capability 必須出現在自己 module 的 activated_by，缺了會直接 FAIL，不是可選項）。
+5. `tests/fixtures/selection/all_yes.json`、`tests/test_artifact_generation.py` — golden fixture 與硬編數字（`current_capabilities` 192→194、`active_answer_count` 150→152）更新，手算驗證新增的兩個 capability 是清單裡唯一的差異、無其他項目意外變動才動手改。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain 全部逐支手動跑（本機無 `make`）+ `python -m unittest discover -s tests` | 結果=`CONFIGURATOR VALIDATION: PASS questions=156 capabilities=194 modules=32`、`SELECTION MATRIX: PASS questions=156 pairwise_valid=12084 pairwise_rejected=6`（156 題 = 156×155/2=12090 配對，12084+6 吻合）、`MANIFEST VALIDATION: PASS`、29 tests OK
+- REALTEST_EVIDENCE: tool=Browser | cmd=`preview_start` 重啟撿新 catalog → 真實點擊「會計/財務紀錄」＋「產品/商品/服務資料」兩個閘門題 → DOM 讀回確認兩個新題目從 inactive 變成可點擊 → 點擊兩個新題目 → 點「送出並生成」 | 結果=`生成完成`，讀回硬碟 `.foundry/intake/answers.json` 逐欄核對全部 4 題值正確，`docs/modules/ai/`／`docs/modules/domain/` 底下的模組文件都正確列出新 capability，測試用資料夾已清除
+- REVIEW_DONE: critic=Quick（self-review；純資料新增（無 .py/.js 邏輯變更），套用既有已驗證過的 pattern（capability/question/rule/activated_by 四件套），且此系統自己的 12 步 verify chain 對「新 capability 沒進 activated_by」「question rule 覆蓋率非 1:1」等結構性錯誤是比一般 code review 更強的機械驗證，故未另開 subagent）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-RECEIPT-OCR\|CAP-PRODUCT-MATCHING\|Q-AI-011\|Q-DATA-011` | hits=0（`System_Foundry_v1.6_ARTIFACT_COMPLETE` 目錄外）；同 grep 於該目錄內部 hits=8，逐一核對皆為預期的四件套正確位置（capabilities 定義×2、module-manifests activated_by×2、question-rules require×2、golden fixture×2），無孤兒引用
+
+**[剩餘風險]**：低——新能力目前只是「規劃階段的問卷選項」，`foundry_generate.py` 產生的是需求規格文件（列出這個能力要考慮什麼），不是真的 OCR/比對演算法實作；使用者若真的選了這兩題，拿到的是一份工程規格書可以照著實作，不是現成的 OCR 功能——這跟本系統其餘 194 個 capability 的性質完全一致（technology-neutral 規劃工具，非成品）。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/{capabilities/catalog.json,questionnaires/catalog.json,rules/question-rules.json,generation/module-manifests.json,manifest.json,tests/fixtures/selection/all_yes.json,tests/test_artifact_generation.py}`
+
 ## 2026-09-05（續42，同一 session：Cognitive OS 第二十九個 Method Atlas 切片 — `database_data.reconciliation`，critic 挖出本 session 至今最嚴重的 2 個 Critical）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」）。0 agent（除 critic subagent review）。
