@@ -61,6 +61,7 @@
 | `specs/cognitive/typed-objects/quality-attribute-scenario.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, quality_goal, source, stimulus, artifact, environment, response, measure, provenance] properties[11] |
 | `specs/cognitive/typed-objects/reconciliation-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, source_ref, target_ref, checks, overall_status, engine, computation_provenance_ref, provenance] properties[10] |
 | `specs/cognitive/typed-objects/red-team-challenge.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, dimensions_examined, findings, provenance] properties[7] |
+| `specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, release_ref, domain_assessments, overall_status, provenance] properties[7] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
 | `specs/cognitive/typed-objects/sli-slo-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, indicators, provenance] properties[6] |

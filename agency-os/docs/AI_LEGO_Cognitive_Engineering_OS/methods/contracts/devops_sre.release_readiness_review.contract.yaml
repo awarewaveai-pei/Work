@@ -1,0 +1,265 @@
+$id: "ai-lego://methods/contracts/devops_sre.release_readiness_review.contract.yaml"
+title: "Release Readiness Review Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-second Method Atlas slice, SEVENTH from
+  the `devops_sre` family (F19), after `devops_sre.sli_slo` (twentieth),
+  `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth), and
+  `devops_sre.capacity_model` (thirty-first).
+
+  Atlas gives this method exactly ONE citation: the F19 tool table's
+  own Release Readiness Review row (L862: "change/data/security/
+  observability/rollback/capacity", benefit "防漏掉跨域風險" -- prevent
+  missing cross-domain risk). No dedicated §11.x section exists
+  (confirmed by direct read of the surrounding table, L845-863, and a
+  full-document heading grep for "Release Readiness"/"上線前"/"發布前"
+  returning only this table row). Atlas §22.3's own Method-specific
+  Gate table (L4144-4155) has no Release Readiness Review row.
+
+  CORRECTED post-critic-review: this contract's first draft grepped
+  only "release.readiness"/"go.live"/"readiness.review" case-
+  insensitive and concluded "no duplicate found" from that narrow
+  literal-term search (whose only hit, `error-budget-record.schema
+  .yaml`'s own `release_policy` field, is indeed a distinct, narrower
+  concept -- release VELOCITY restricted by SLO error-budget burn, not
+  a cross-domain checklist). That search was too narrow: it never
+  searched for "release checklist"/"pre-release" terms, and a critic
+  review found `policies/ai-execution/release-policy.yaml` (status:
+  ACTIVE) already carries a `pre_release_checklist` transcribing EC
+  §143's own 11-item Pre-release Checklist verbatim -- FIVE of Atlas's
+  own six domains map closely onto items there ("Change matches plan"/
+  "No scope creep" -> change; "Data PASS"/"Migration PASS" -> data;
+  "Security PASS" -> security; "Observability ready" -> observability;
+  "Rollback ready" -> rollback; only `capacity` has no EC §143
+  counterpart). This is NOT a duplicate of this method's own
+  deliverable -- `release-policy.yaml` is POLICY-AS-CODE binding which
+  PLATFORM GATES are mandatory for a release (a different layer,
+  governed by EC §143/§144 and ADR-011's gate-catalog wiring), not a
+  Method Atlas typed-object producing a cognitive REVIEW RECORD
+  instance the way this method does -- but it is the same real-world
+  CONCEPT (what must be true before a release) modeled at a different
+  layer, and this contract's first draft should have found and
+  disclosed it rather than silently missing it. See
+  compilation_decisions below for the full disclosed relationship.
+
+  The formula's own six named domains (change/data/security/
+  observability/rollback/capacity) are a CLOSED, exhaustive set --
+  Atlas lists exactly six, not "at least these" or "for example" --
+  and the benefit column's own text ("防漏掉跨域風險", prevent MISSING
+  cross-domain risk) directly implies the real invariant this contract
+  enforces: a review record must assess ALL SIX domains, no fewer, no
+  duplicates, and no domain outside this closed set -- a review that
+  silently skips one domain is exactly the "漏掉" (missed) failure this
+  method exists to prevent. The row's own 主要用途 (used-for) column
+  text, "上線前統一檢查" (a UNIFIED pre-release check), implies the
+  aggregation rule: `overall_status: ready` requires
+  every one of the six domain assessments to itself be `ready` -- one
+  failing domain blocks the unified verdict, the same "one domain's own
+  failure state propagates to the whole" pattern
+  `devops_sre.canary_deployment`'s own unhealthy-forbids-completed
+  invariant already established for a structurally analogous
+  aggregation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Release Readiness Review row (L862): 'change/data/security/observability/rollback/capacity'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4144-4155): confirmed no Release Readiness Review row"
+  - "methods/registry/method-inventory.yaml Release Readiness Review entry (L1182-1186): category 'F19 devops-sre', line field reads 859 -- CORRECTED here to the real L862 position, the same systematic +3 drift already disclosed by five prior contracts this session (Error Budget, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model), now observed a SEVENTH time"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a thirtieth
+  concrete entry. `id: devops_sre.release_readiness_review` mints a
+  new machine_id, SEVENTH member of the `devops_sre` family.
+
+id: devops_sre.release_readiness_review
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, MAP]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). The six named domains handled as distinct assessments
+# is DECOMPOSE; each domain's own ready/not_ready verdict plus the
+# aggregate unified verdict is VALIDATE; the fixed, closed six-domain
+# set is MAP -- the same inferred triple every prior structured-
+# checklist method this session built already uses.
+
+purpose:
+  - prove_every_one_of_the_six_canonical_release_domains_was_assessed_and_the_unified_verdict_reflects_the_worst_one
+inputs:
+  required: [ReleaseReadinessDomainAssessment]
+  optional: []
+outputs: [ReleaseReadinessReviewRecord]
+preconditions:
+  - "domain_assessments contains EXACTLY the six canonical domains (change, data, security, observability, rollback, capacity) -- no fewer, no duplicates, no domain outside this closed set"
+  - "every domain assessment whose verdict is not_ready carries a non-empty note (a failing domain must say why, not silently fail)"
+  - "overall_status:ready requires EVERY domain assessment's own verdict to be ready"
+  # The last precondition is directly implied by "統一檢查" (a unified
+  # check) -- a review cannot claim the release is ready while one of
+  # its own six assessed domains says otherwise. DELIBERATELY
+  # ONE-DIRECTIONAL, same class of restraint `database_data.backup_
+  # restore_drill`/`database_data.reconciliation`'s own status fields
+  # already established: a caller MAY conservatively declare
+  # overall_status:not_ready even when all six domains are individually
+  # ready -- e.g. pending a separate human sign-off, or a business
+  # reason outside the six technical domains -- Atlas's own text never
+  # forbids that conservative choice.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every structured-checklist contract in
+  # this package already reasons through: the real risk is
+  # completeness/aggregation integrity (was every domain actually
+  # assessed, does the unified verdict actually reflect the worst
+  # domain), not an evidence-citation risk over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Release Readiness Review row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. A real,
+# disclosed (not built) relationship: the `capacity` domain assessed
+# here could in principle be backed by a real
+# `devops_sre.capacity_model` record's own `status` field -- see
+# OQ-RELEASEREADINESS-2, the same soft-link pattern `devops_sre
+# .error_budget`'s own `related_slo_id` already established.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- it reports on assessments
+  # performed elsewhere (the actual security review, observability
+  # check, etc. happen outside this method's own scope), the same
+  # "record reports on an external observation" class every prior
+  # devops_sre contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Atlas's own formula lists six domains in a specific order
+      (change/data/security/observability/rollback/capacity) -- should
+      `domain_assessments` be a fixed-order array (positional, index 0
+      = change, etc.) or an unordered set of six distinct domain-tagged
+      entries?
+    decision: "Unordered set of six distinct domain-tagged entries -- each entry carries its own `domain` enum field, not a positional slot."
+    reasoning: >
+      Atlas's own formula uses "/" to separate the six domains, the
+      same punctuation every prior thin-table-row method's own
+      multi-item formula already uses for an UNORDERED list (e.g.
+      `database_data.reconciliation`'s own "counts/checksums/business
+      invariants"), not "→" (which this same table's OTHER rows use for
+      genuinely sequential steps). A positional array would invent an
+      ordering requirement Atlas's own punctuation does not support,
+      and would make the completeness check (all six present) harder
+      to verify robustly than a simple set-of-six-distinct-tags check.
+  - question: >
+      Should a domain assessment's own `verdict` support a third value
+      (e.g. `not_applicable`, for a release that genuinely has no data
+      migration or no security-relevant change) rather than a strict
+      binary ready/not_ready?
+    decision: "No -- binary ready/not_ready only, no not_applicable escape hatch."
+    reasoning: >
+      Atlas's own benefit text is "防漏掉跨域風險" (prevent MISSING
+      cross-domain risk) -- an unconditional not_applicable option
+      would reopen exactly the gap this method exists to close (a
+      reviewer could mark every domain not_applicable and still claim
+      overall_status:ready with zero real assessment). A domain
+      genuinely irrelevant to a given release is still an assessment
+      decision a human makes and records as `ready` with a note
+      explaining why (e.g. "no data migration in this release"), not a
+      silent skip -- consistent with this contract's own note
+      requirement design (see preconditions) even though that
+      requirement is currently only enforced for not_ready.
+  - question: >
+      `policies/ai-execution/release-policy.yaml` (status: ACTIVE)
+      already carries a `pre_release_checklist` transcribing EC §143's
+      own 11-item Pre-release Checklist verbatim, five of whose items
+      map closely onto five of Atlas's own six domains here (a critic
+      review found this contract's first draft's due-diligence grep
+      too narrow to surface it). Should this method's own six-domain
+      typed object be REPLACED by, or built as a thin wrapper around,
+      that policy file's own checklist instead of an independent
+      cognitive-layer schema?
+    decision: "No -- kept as a separate, independent Method Atlas typed object, not merged with or wrapping the policy file."
+    reasoning: >
+      The two serve genuinely different layers, not the same concern
+      twice: `release-policy.yaml` is POLICY-AS-CODE binding WHICH
+      PLATFORM GATES are mandatory before a release (its own
+      `mandatory_gate_rules`/`grounded_rules` reference
+      `gate.schema.yaml#/gate_catalog` ids directly, per ADR-011) --
+      an execution-layer compliance artifact. This method produces a
+      COGNITIVE REVIEW RECORD (`ReleaseReadinessReviewRecord`) -- a
+      structured human/AI judgment call per domain, the same class of
+      artifact every other Method Atlas slice this session produces,
+      consumed by a different part of the system than a gate-
+      resolution engine. Atlas's own six-domain formula and EC §143's
+      own 11-item checklist are two independently-grounded citations
+      for the SAME real-world concern (what must be true before a
+      release), at two different SSOT layers Atlas/EC's own document
+      split already establishes elsewhere (e.g. Atlas §11.x concept
+      sections routinely redirect to an EC section for "the precise
+      step sequence", the same split `database_data
+      .expand_contract_migration`'s own citation work already
+      encountered) -- not a reason to collapse either into the other.
+      The one domain with no EC §143 counterpart (`capacity`) is Atlas's
+      own addition, further evidence the two lists are related but not
+      identical.
+
+open_questions:
+  - id: "OQ-RELEASEREADINESS-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RELEASEREADINESS-2"
+    question: >
+      The `capacity` domain assessed here could in principle be backed
+      by a real `devops_sre.capacity_model` record's own `status`
+      field (a soft link, the same class `devops_sre.error_budget`'s
+      own `related_slo_id` already established) -- should a future
+      revision add an optional cross-reference field for this, and
+      analogous fields for the other five domains where a dedicated
+      method exists?
+    owner: "operator, or whoever next wires cross-method soft links for this family"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RELEASEREADINESS-3"
+    question: >
+      `policies/ai-execution/release-policy.yaml`'s own
+      `pre_release_checklist` (EC §143, 11 items) and this method's
+      own six-domain formula (Atlas F19 L862) independently ground the
+      SAME underlying concern at two different layers (see
+      compilation_decisions above) -- should a future revision add an
+      explicit cross-reference from one file to the other, so a reader
+      of either finds the sibling artifact rather than discovering the
+      overlap independently the way this contract's own critic review
+      did?
+    owner: "operator, or whoever next audits cross-references between Method Atlas contracts and policies/ai-execution/*.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L862) directly, confirmed against
+    the surrounding table (L845-863) that no dedicated §11.x section
+    exists for this method anywhere in the document, and confirmed
+    against §22.3's own Method-specific Gate table (L4144-4155) that no
+    additional gate rule exists for it there. A first-draft grep for
+    "release.readiness"/"go.live"/"readiness.review" case-insensitive
+    was too narrow (see the description's own corrected discussion
+    above) -- a critic review's broader search surfaced
+    `policies/ai-execution/release-policy.yaml`'s own EC §143
+    Pre-release Checklist, read in full and confirmed a related but
+    genuinely distinct-layer concept, not a duplicate typed object
+    (see compilation_decisions). Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The six-domain closed set and the
+    unified-verdict aggregation rule are both directly grounded in
+    Atlas's own cited row; the unordered-set-not-positional-array
+    design and the no-not_applicable decision are both disclosed
+    compilation choices, not silent inventions -- see
+    compilation_decisions above. A critic review additionally caught
+    and this revision fixes: an overly narrow citation due-diligence
+    grep (now corrected, with the real relationship to
+    release-policy.yaml disclosed rather than missed) and a
+    misattributed Atlas column reference in the module's own error
+    message (corrected to cite the 用途/used-for column, not the
+    benefit column, for "上線前統一檢查").

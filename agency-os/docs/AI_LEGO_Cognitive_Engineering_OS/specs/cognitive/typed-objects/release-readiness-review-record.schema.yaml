@@ -1,0 +1,100 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml"
+title: Release Readiness Review Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ReleaseReadinessReviewRecord`
+  -- the declared `outputs` of `devops_sre.release_readiness_review`'s
+  Method Contract. SEVENTH `devops_sre`-family typed object. Atlas's
+  own F19 tool table formula (L862: "change/data/security/
+  observability/rollback/capacity") maps onto `domain_assessments[]`'s
+  own closed six-value `domain` enum -- a review must assess ALL SIX,
+  no fewer, no duplicates, no domain outside this set (enforced at the
+  runtime layer, see method contract preconditions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Release Readiness Review row (L862): 'change/data/security/observability/rollback/capacity'"
+  - "methods/contracts/devops_sre.release_readiness_review.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, release_ref, domain_assessments, overall_status, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^RRR-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.release_readiness_review"
+  release_ref:
+    type: string
+    minLength: 1
+    description: "Which real release this record reviews, e.g. 'checkout-api v2.5.0'."
+  domain_assessments:
+    type: array
+    minItems: 6
+    maxItems: 6
+    description: "Exactly one entry per canonical domain (change/data/security/observability/rollback/capacity) -- Atlas's own closed, exhaustive six-item formula. Completeness (all six present, no duplicates) is enforced at the runtime layer, not expressible as a plain array constraint alone."
+    items:
+      type: object
+      required: [domain, verdict]
+      additionalProperties: false
+      properties:
+        domain:
+          enum: [change, data, security, observability, rollback, capacity]
+          description: "One of Atlas's own six named domains (F19 L862)."
+        verdict:
+          enum: [ready, not_ready]
+          description: "Binary only, deliberately no not_applicable escape hatch -- see method contract compilation_decisions (an unconditional not_applicable option would reopen the exact 'missing risk' gap this method exists to close)."
+        note:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "REQUIRED (non-whitespace) when verdict:not_ready -- a failing domain must say why, not silently fail. Optional when verdict:ready. pattern:\\S rejects a whitespace-only string minLength:1 alone would accept."
+  overall_status:
+    enum: [ready, not_ready]
+    description: "ready requires EVERY domain_assessments[].verdict to be ready -- enforced at the runtime layer (ai_lego/modules/devops_sre/release_readiness_review.py), not the schema layer. ONE-DIRECTIONAL, same class of restraint database_data.backup_restore_drill.contract.yaml's own status field already established: a caller may conservatively declare overall_status:not_ready even when all six domains are individually ready (e.g. pending a separate human sign-off) -- that is a legitimate operational choice, not forbidden by Atlas's own text."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a readiness review is a structured operational judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A ready release: all six domains assessed ready"
+    value:
+      id: "RRR-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.release_readiness_review"
+      release_ref: "checkout-api v2.5.0"
+      domain_assessments:
+        - {domain: change, verdict: ready}
+        - {domain: data, verdict: ready, note: "no schema migration in this release"}
+        - {domain: security, verdict: ready}
+        - {domain: observability, verdict: ready}
+        - {domain: rollback, verdict: ready}
+        - {domain: capacity, verdict: ready}
+      overall_status: ready
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A not_ready release: security domain failed with a reason"
+    value:
+      id: "RRR-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.release_readiness_review"
+      release_ref: "checkout-api v2.5.0"
+      domain_assessments:
+        - {domain: change, verdict: ready}
+        - {domain: data, verdict: ready}
+        - {domain: security, verdict: not_ready, note: "dependency scan flagged a critical CVE with no available patch"}
+        - {domain: observability, verdict: ready}
+        - {domain: rollback, verdict: ready}
+        - {domain: capacity, verdict: ready}
+      overall_status: not_ready
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L862) directly. Validated against jsonschema Draft202012Validator."
+  note: "The six-domain formula is directly transcribed. The completeness (all six, no duplicates) and unified-verdict pass invariants are both enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

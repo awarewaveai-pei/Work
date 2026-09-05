@@ -1060,6 +1060,51 @@ tier_1:
       (§12.41 L3109), thinner than several Tier 0 examples. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the twenty-eight entries above it.
+  thirtieth_concrete_entry:
+    # NEW (2026-09-05, same session): thirtieth Tier 1 entry, same
+    # additive-key rationale as the twenty-nine entries above it.
+    method_id: "devops_sre.release_readiness_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SEVENTH entry
+      from the `devops_sre` family (F19), after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, devops_sre.error_budget, and
+      devops_sre.capacity_model. Atlas's own F19 tool table row (L862:
+      "change/data/security/observability/rollback/capacity", benefit
+      "防漏掉跨域風險" -- prevent MISSING cross-domain risk) grounds a
+      real completeness invariant (exactly six canonical domains
+      assessed, no fewer/duplicate/foreign) and a real aggregation
+      invariant (unified `ready` verdict requires every domain ready,
+      the same "one failing part propagates to the whole" pattern
+      devops_sre.canary_deployment's own unhealthy-forbids-completed
+      invariant already established). A critic review of this
+      contract's own first draft caught a due-diligence gap, not a
+      code bug: the citation grep was too narrow to surface
+      `policies/ai-execution/release-policy.yaml`'s own EC §143
+      Pre-release Checklist (11 items), five of which map closely onto
+      five of Atlas's own six domains -- disclosed as a related-but-
+      distinct-layer artifact (policy-as-code gate binding vs. a
+      cognitive review record), not merged, with the relationship now
+      recorded in both this contract's own compilation_decisions and a
+      new open question (OQ-RELEASEREADINESS-3). Real code findings
+      also fixed: the shared `_assessment_is_valid` predicate validated
+      `note`'s own shape only for the not_ready case, leaving a `ready`
+      assessment's own note (including non-string, mutable values)
+      completely unvalidated at the layer both builder and gate share;
+      the gate never re-validated the record's own `id`/`release_ref`
+      fields or an assessment's own key set, the same "gate recomputes
+      outputs but not the inputs those outputs depend on" class
+      devops_sre.capacity_model's own critic round caught one slice
+      earlier, reintroduced here and now fixed the same way (a shared
+      `_record_identity_is_valid` predicate called by both layers).
+    source: "methods/contracts/devops_sre.release_readiness_review.contract.yaml (built same session as this entry, mints machine_id devops_sre.release_readiness_review) + specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation, thinner than several Tier 0 examples. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the twenty-nine entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

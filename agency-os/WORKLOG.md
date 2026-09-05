@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-05（續45，同一 session：Cognitive OS 第三十二個 Method Atlas 切片 — `devops_sre.release_readiness_review`，due-diligence 缺口撞見既有 EC §143 pre-release checklist + capacity_model 那條 gate 缺口原樣重演）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。
+
+**選型**：`devops_sre` 家族第七成員。Atlas F19 table 自己的 Release Readiness Review 列（L862「change/data/security/observability/rollback/capacity」，效益「防漏掉跨域風險」）——六域封閉集合直接蘊含完整性不變量（六域一個不少、不重複、不外加），「上線前統一檢查」（用途欄非效益欄）蘊含聚合規則：`overall_status:ready` 要求六域全部 ready，跟 `canary_deployment` 自己的 unhealthy-forbids-completed 同一種「一項失敗，整體失敗」聚合模式。
+
+**critic 真跑（窮舉全部 462 種六域 multiset 驗證完整性/聚合不變量水密）抓到 1 個 Critical 級 due-diligence 缺口（非程式碼 bug）+ 數個 Major**：
+1. **Critical（文件層）**：本契約自己的引用查證 grep（"release.readiness"/"go.live"/"readiness.review"）範圍太窄，沒查到真實存在、ACTIVE 的 `policies/ai-execution/release-policy.yaml` 自己的 EC §143 Pre-release Checklist（11 項），其中 5 項跟本方法六域中的 5 個幾乎 1:1 對應（只有 capacity 是 Atlas 獨有）。不是本方法自己 deliverable 的重複（那份是 policy-as-code 閘門綁定，跟本方法產出的認知層 review record 不同層），但關係應該被找到並揭露而非靜默漏掉。修正 contract 描述+驗證段落，新增 compilation_decision 說明兩者分層關係+開放問題 `OQ-RELEASEREADINESS-3`。
+2. **Major（原樣重演）**：`evaluate_readiness_integrity_gate` 重算完整性跟聚合結論，卻從沒重驗 `id`/`release_ref` 本身、也沒查 assessment 自己的 key 集合——跟上一個切片 `capacity_model` 自己 critic 才剛抓過的「gate 重算輸出、不重驗輸出所依賴的輸入」同一種缺口，教訓才學完一輪就在下一個切片重演。修法：新增共用 `_record_identity_is_valid`（builder+gate 都呼叫）+ gate 新增 `_assessment_keys_are_known` 檢查。
+3. **Major**：共用 predicate `_assessment_is_valid` 對 `note` 欄位的形狀驗證只在 `not_ready` 情境檢查，`ready` 情境的 note（含非字串值、呼叫端認證後還能事後修改的可變物件）在共用層完全零驗證——`domain_assessment()` 自己另一套更嚴格的檢查只保護走那個入口的呼叫，手工建構的輸入不受保護。修成共用 predicate 無條件驗證 note 形狀。
+4. **Major**：contract 宣稱已在 contract-backlog 註冊但沒有——已補上。
+
+另修數個 Minor：`_missing_domains` 經窮舉證明在其他檢查都跑完後不可能觸發（非疏漏，是刻意保留的 tripwire），但兩個測試的命名/docstring 誤植成好像是它在守——已改名澄清；一個弱 oracle 測試（只斷言 `status=="FAIL"` 無證據內容）被真突變證明分辨不出具體是哪個守衛觸發——已釘死；兩個 gate 對非 dict record 會讓原生 `AttributeError` 逸出，跟自己 docstring 宣稱的無條件 fail-closed 矛盾——已加 isinstance 守衛；模組錯誤訊息誤把「上線前統一檢查」歸類成 Atlas 效益欄，其實是用途欄——已修正。
+
+**本輪教訓**：上一輪學到的教訓（「gate 必須重驗輸出所依賴的輸入，不只重算輸出本身」）不會因為抽象原則記住了就自動套用到下一個切片*不同*的輸入欄位上——這次是 `id`/`release_ref`/assessment key 集合，每個新切片都要針對自己具體的原始輸入欄位重新逐一核對同一條原則，不能假設「上次學過了」就等於「這次自動做到了」。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.release_readiness_review.contract.yaml`（含修正後引用範圍+新增 EC §143 關係揭露+OQ-1~3）＋`specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml`＋`contract-backlog.yaml` 新增 `tier_1.thirtieth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/devops_sre/release_readiness_review.py`（builder+2 gate，五個共用 predicate）＋`ai_lego/apps/cli/run_release_readiness_review_slice.py`＋`tests/unit/test_release_readiness_review.py`（39 tests）＋`docs/THIRTYSECOND_SLICE_DEVOPS_SRE_RELEASE_READINESS_REVIEW.md`。順手修正 `modules/devops_sre/__init__.py` docstring 補齊本切片成員。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2780→2783
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_release_readiness_review_slice`（修正後）| exit=0 | result=`PASS devops_sre.release_readiness_review: 6 domains assessed, overall_status=ready, gates [provenance_required=PASS, readiness_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_release_readiness_review -v` | exit=0 | result=39 passed（32→39，含非字串 note/record-identity/extra-field 三類迴歸皆釘證據）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=72088 | result=**856 tests OK**（849→856，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，含窮舉 462 種 multiset 驗證完整性不變量）| verdict=fail(1 Critical 文件層, 4 Major)→fixed | findings=1c/4m/多個 Minor（全數修正）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory,policies | grep=`devops_sre[.]release_readiness_review\|ReleaseReadinessReviewRecord\|RELEASEREADINESS_` | hits=0（僅本切片自己新檔案，跨全部必查根目錄+policies 零過期殘留）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-RELEASEREADINESS-1`（無機器 id 列）、`OQ-RELEASEREADINESS-2`（六域軟連結各自對應方法未接線）、`OQ-RELEASEREADINESS-3`（跟 release-policy.yaml EC §143 checklist 的關係已揭露但雙向皆未接交叉引用）。皆非阻塞，已揭露非靜默缺口。
+
 ## 2026-09-05（HCI-30 Wave 1：ADR-0019 field/transition author-class policy gates 2-4 + gate 5 人類負責人半邊落地，db-expert 覆審 3 Critical+5 Major 全修，含覆審自己種出一個 regression 並修好）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」「繼續」，代理範疇內決策自決）。1 個 subagent（db-expert 獨立覆審，因本輪引入三個全新 schema 概念而非沿用已審模式）。
