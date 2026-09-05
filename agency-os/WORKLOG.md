@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 新增 5 個財務類 capability：應收帳款帳齡與催收、銀行對帳單比對、庫存計價方法、自動財務報表、財務分析——操作者接續前一批 OCR/品項對應繼續補財務規劃缺口）
+
+**觸發**：操作者在前一批新增（收據 OCR、品項跨廠商對應）之後接連追問「自動出財務報表」「財務分析、催款之類的」「帳款行程」，屬於同一輪對話裡持續補完財務規劃缺口。範圍在中途一度模糊（「財務分析」跟「自動財務報表」要不要合併、「帳款行程」是否算獨立項目），先整理成清單回報操作者確認（帳款行程併入應收帳款帳齡；財務分析與財務報表明確分開）才動工，避免猜錯範圍重做。
+
+**[現況分析]**：Grep 確認 `DER-PAYMENT-RECON`（既有）只比對金流商自己的清算紀錄（例如 Stripe 自己的結算），不是比對銀行帳戶本身的對帳單，跟操作者要的「銀行對帳單自動比對」是不同東西，說明文字裡明寫兩者差異避免未來誤判成重複。`Q-SR-004`（自訂報表）是使用者自選欄位的彈性報表，不是「損益表/資產負債表/現金流量表」這種固定格式財務報表，同樣在說明文字裡明寫差異。`CAP-INVENTORY` 只追蹤庫存數量，沒有計價方法欄位。
+
+**[方案比較]**：5 個新能力要不要開新 module——全部掛在既有 module（`payments`：應收帳款帳齡、銀行對帳單比對；`domain`：庫存計價方法；`analytics`：自動財務報表、財務分析，跟既有 `CAP-REPORTS`/`CAP-DASHBOARD` 同層級，因為財務報表本質是「從 domain 資料衍生出的固定格式報表」而不是原始資料本身）。範圍維持純資料新增（capabilities＋questions＋rules＋module activated_by），不新增 module/blueprint。
+
+**[已修改]**：
+1. `capabilities/catalog.json` — 新增 5 個 capability：`CAP-AR-AGING`（`module: payments`，`requires: [CAP-FINANCIAL-RECORDS]`，帳齡追蹤＋到期排程＋催收提醒三合一，操作者確認「帳款行程」併入這個能力不獨立）、`CAP-BANK-RECONCILIATION`（`module: payments`，`requires: [CAP-FINANCIAL-RECORDS]`，明文對比 `DER-PAYMENT-RECON` 的差異）、`CAP-INVENTORY-COSTING`（`module: domain`，`requires: [CAP-INVENTORY]`）、`CAP-FINANCIAL-STATEMENTS`（`module: analytics`，`requires: [CAP-FINANCIAL-RECORDS]`，明文對比自訂報表的差異）、`CAP-FINANCIAL-ANALYSIS`（`module: analytics`，`requires: [CAP-FINANCIAL-RECORDS]`，明文對比財務報表的差異：報表是產出數字，這個是數字背後的洞察）。
+2. `questionnaires/catalog.json` — 新增 5 題：`Q-PAY-007`（應收帳款帳齡與催收提醒，`active_when: Q-DATA-009`）、`Q-PAY-008`（銀行對帳單自動比對，`active_when: Q-DATA-009`）、`Q-DATA-012`（庫存計價方法，`active_when: Q-DATA-007`）、`Q-DATA-013`（自動財務報表，`active_when: Q-DATA-009`）、`Q-SR-007`（財務分析，`active_when: Q-DATA-009`）——皆掛在對應前置資料類型底下，沒勾會計/庫存資料就不會看到這些題目。
+3. `rules/question-rules.json` — 5 條對應規則。
+4. `generation/module-manifests.json` — `payments`／`domain`／`analytics` 三個既有 module 的 `activated_by` 清單各自補上新 capability id。
+5. `tests/fixtures/selection/all_yes.json`、`tests/test_artifact_generation.py` — golden fixture 與硬編數字更新（`current_capabilities` 194→199、`active_answer_count` 152→157），手算驗證新增的 5 個 capability 是清單裡唯一差異、模組集合不變才動手改。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=12 步 verify chain 全部逐支手動跑（本機無 `make`）+ `python -m unittest discover -s tests` | 結果=`CONFIGURATOR VALIDATION: PASS questions=161 capabilities=199 modules=32`、`SELECTION MATRIX: PASS questions=161 pairwise_valid=12874 pairwise_rejected=6`（161×160/2=12880，12874+6 吻合）、`MANIFEST VALIDATION: PASS`、29 tests OK
+- REALTEST_EVIDENCE: tool=Browser | cmd=`preview_start` 重啟撿新 catalog → 真實點擊「會計/財務紀錄」＋「庫存/倉儲資料」兩個閘門題 → DOM 讀回確認全部 5 個新題目從 inactive 變成可點擊 → 點擊全部 5 題 → 點「送出並生成」 | 結果=`生成完成`，讀回硬碟 `.foundry/intake/answers.json` 逐欄核對全部 7 題（含閘門題）值正確，`.foundry/resolution/foundry-plan.json` 的 `current_capabilities` 確認全部 5 個新 capability 都在，測試用資料夾已清除
+- REVIEW_DONE: critic=Quick（self-review；純資料新增，套用與前一批完全相同、已驗證過的 pattern，此系統自己的 `validate_artifact_generation.py` 對「capability 缺 activated_by」「question rule 覆蓋率非 1:1」是機械強制檢查，等同結構面已有 review）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=5 個新 capability id + 5 個新 question id | hits=0（`System_Foundry_v1.6_ARTIFACT_COMPLETE` 目錄外）；目錄內部 hits=5 個檔案，逐一核對皆為預期位置（capabilities 定義、module-manifests activated_by、question-rules require、golden fixture），無孤兒引用
+
+**[剩餘風險]**：低——跟前一批相同，新能力目前是規劃階段問卷選項，`foundry_generate.py` 產出需求規格文件而非現成演算法實作，與本系統其餘 199 個 capability 性質一致。
+
+**Rollback**：`git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/{capabilities/catalog.json,questionnaires/catalog.json,rules/question-rules.json,generation/module-manifests.json,manifest.json,tests/fixtures/selection/all_yes.json,tests/test_artifact_generation.py}`
+
 ## 2026-09-05（續45，同一 session：Cognitive OS 第三十二個 Method Atlas 切片 — `devops_sre.release_readiness_review`，due-diligence 缺口撞見既有 EC §143 pre-release checklist + capacity_model 那條 gate 缺口原樣重演）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。

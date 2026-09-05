@@ -312,6 +312,26 @@
       ]
     },
     {
+      "id": "RULE-Q-DATA-012",
+      "when": {
+        "question": "Q-DATA-012",
+        "equals": true
+      },
+      "require": [
+        "CAP-INVENTORY-COSTING"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-013",
+      "when": {
+        "question": "Q-DATA-013",
+        "equals": true
+      },
+      "require": [
+        "CAP-FINANCIAL-STATEMENTS"
+      ]
+    },
+    {
       "id": "RULE-Q-WF-001",
       "when": {
         "question": "Q-WF-001",
@@ -502,6 +522,16 @@
       ]
     },
     {
+      "id": "RULE-Q-SR-007",
+      "when": {
+        "question": "Q-SR-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-FINANCIAL-ANALYSIS"
+      ]
+    },
+    {
       "id": "RULE-Q-COM-001",
       "when": {
         "question": "Q-COM-001",
@@ -619,6 +649,26 @@
       },
       "require": [
         "CAP-SAVED-PAYMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-007",
+      "when": {
+        "question": "Q-PAY-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-AR-AGING"
+      ]
+    },
+    {
+      "id": "RULE-Q-PAY-008",
+      "when": {
+        "question": "Q-PAY-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-BANK-RECONCILIATION"
       ]
     },
     {

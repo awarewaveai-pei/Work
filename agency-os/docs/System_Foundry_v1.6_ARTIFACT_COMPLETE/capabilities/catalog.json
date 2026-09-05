@@ -116,6 +116,24 @@
       "description": "Actions can require a defined approval step before taking effect."
     },
     {
+      "id": "CAP-AR-AGING",
+      "name": "Accounts Receivable Aging & Collections",
+      "module": "payments",
+      "requires": [
+        "CAP-FINANCIAL-RECORDS"
+      ],
+      "description": "Tracks how overdue each outstanding receivable is (e.g. 30/60/90+ days), maintains a due-date schedule for what is expected when, and triggers reminders/escalation to customers who have not paid -- instead of requiring someone to manually check who owes what and when."
+    },
+    {
+      "id": "CAP-BANK-RECONCILIATION",
+      "name": "Bank Statement Reconciliation",
+      "module": "payments",
+      "requires": [
+        "CAP-FINANCIAL-RECORDS"
+      ],
+      "description": "Bank account transactions (from a statement or feed) are automatically matched against recorded invoices/bills/payments to surface discrepancies -- distinct from DER-PAYMENT-RECON, which only reconciles against the payment provider's own settlement ledger (e.g. Stripe), not the actual bank account the funds land in."
+    },
+    {
       "id": "CAP-BARCODE",
       "name": "Barcode / QR",
       "module": "mobile",
@@ -352,11 +370,29 @@
       "description": "A failure of this system would have direct financial consequences for users or the business."
     },
     {
+      "id": "CAP-FINANCIAL-ANALYSIS",
+      "name": "Financial Analysis",
+      "module": "analytics",
+      "requires": [
+        "CAP-FINANCIAL-RECORDS"
+      ],
+      "description": "Derives decision-support insight from financial data -- ratio analysis (margins, liquidity), trend analysis over time, profitability by product/customer/segment -- distinct from CAP-FINANCIAL-STATEMENTS, which only compiles the standard statements themselves, not what they mean."
+    },
+    {
       "id": "CAP-FINANCIAL-RECORDS",
       "name": "Financial Records",
       "module": "domain",
       "requires": [],
       "description": "Financial records are a core domain entity requiring accounting-grade integrity."
+    },
+    {
+      "id": "CAP-FINANCIAL-STATEMENTS",
+      "name": "Automated Financial Statements",
+      "module": "analytics",
+      "requires": [
+        "CAP-FINANCIAL-RECORDS"
+      ],
+      "description": "The system automatically compiles standard periodic financial statements (income statement, balance sheet, cash flow) from recorded financial data on a defined reporting cycle -- distinct from ad-hoc custom reports, since financial statements have a fixed standard structure most stakeholders (accountants, investors, tax authorities) expect."
     },
     {
       "id": "CAP-RECEIPT-OCR",
@@ -458,6 +494,15 @@
       "module": "domain",
       "requires": [],
       "description": "Inventory/stock is a core domain entity tracked by the system."
+    },
+    {
+      "id": "CAP-INVENTORY-COSTING",
+      "name": "Inventory Costing Method",
+      "module": "domain",
+      "requires": [
+        "CAP-INVENTORY"
+      ],
+      "description": "Inventory value and cost-of-goods-sold are computed using a defined costing method (e.g. FIFO, weighted average) rather than left undefined -- this directly affects financial statement figures, not just a warehouse-quantity detail."
     },
     {
       "id": "CAP-INVITES",

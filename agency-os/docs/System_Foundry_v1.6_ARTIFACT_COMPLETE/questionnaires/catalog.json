@@ -469,6 +469,30 @@
       }
     },
     {
+      "id": "Q-DATA-012",
+      "category": "records",
+      "label": "庫存計價方法",
+      "description": "庫存的成本要用哪種方式計算，例如先進先出（FIFO）或加權平均，而不是只記數量不記算法。這會直接影響財報上的存貨價值與銷貨成本數字，不是單純的倉儲細節。只在你有勾選「庫存/倉儲資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-007",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DATA-013",
+      "category": "records",
+      "label": "自動財務報表",
+      "description": "系統依固定週期（例如每月）自動彙整既有財務資料，產生標準格式的財務報表（損益表、資產負債表、現金流量表），而不是要人工整理成 Excel。跟「自訂報表」不同：自訂報表是使用者自己選欄位的彈性報表，這題是會計/投資人/稅務機關看得懂的固定格式報表。只在你有勾選「會計/財務紀錄」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-009",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-WF-001",
       "category": "workflow",
       "label": "多步驟狀態流程",
@@ -657,6 +681,18 @@
       "required_when_active": true
     },
     {
+      "id": "Q-SR-007",
+      "category": "search_reporting",
+      "label": "財務分析",
+      "description": "系統要能從財務資料延伸出決策用的分析，例如毛利率變化、各產品/客戶的獲利貢獻、現金流趨勢，而不是只有報表數字本身。跟「自動財務報表」不同：那題是產出標準報表，這題是報表數字背後代表什麼意思、要不要採取行動。只在你有勾選「會計/財務紀錄」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-009",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-COM-001",
       "category": "commercial",
       "label": "向客戶收費",
@@ -798,6 +834,30 @@
       "required_when_active": true,
       "active_when": {
         "question": "Q-PAY-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-007",
+      "category": "payments",
+      "label": "應收帳款帳齡與催收提醒",
+      "description": "系統要能追蹤每筆應收帳款逾期多久（例如逾期 30/60/90 天以上），記錄到期時間，並在客戶還沒付款時主動提醒或升級處理，而不是要人工一筆一筆確認誰還沒付錢、該催了沒有。只在你有勾選「會計/財務紀錄」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-009",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PAY-008",
+      "category": "payments",
+      "label": "銀行對帳單自動比對",
+      "description": "把銀行帳戶的實際交易紀錄（對帳單或串接的帳戶資料）拿來跟系統裡記錄的請款/付款自動比對，找出兜不起來的地方，而不是只手動核對。跟系統既有的「金流商清算對帳」不同：那個只比對 Stripe 等金流商自己的清算紀錄，這題是比對錢真正進出的銀行帳戶本身。只在你有勾選「會計/財務紀錄」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-009",
         "equals": true
       }
     },

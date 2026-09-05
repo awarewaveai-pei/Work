@@ -134,6 +134,7 @@
         "CAP-CUSTOMER-DATA",
         "CAP-FINANCIAL-RECORDS",
         "CAP-INVENTORY",
+        "CAP-INVENTORY-COSTING",
         "CAP-ORDERS",
         "CAP-ORG-DATA",
         "CAP-PRODUCT-MATCHING",
@@ -194,6 +195,8 @@
         "CAP-ANALYTICS",
         "CAP-DASHBOARD",
         "CAP-EXPORT",
+        "CAP-FINANCIAL-ANALYSIS",
+        "CAP-FINANCIAL-STATEMENTS",
         "CAP-REPORTS"
       ]
     },
@@ -221,6 +224,8 @@
         "tests/contract/payments"
       ],
       "activated_by": [
+        "CAP-AR-AGING",
+        "CAP-BANK-RECONCILIATION",
         "CAP-INVOICES",
         "CAP-PARTIAL-REFUND",
         "CAP-PAYMENTS",
