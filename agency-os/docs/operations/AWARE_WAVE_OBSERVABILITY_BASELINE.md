@@ -1,6 +1,8 @@
 # Aware Wave Observability Baseline
 
-Updated: 2026-06-01
+Updated: 2026-09-05
+
+> **已知範圍限制**：本檔涵蓋 AwareWave 自身 `aware-wave.com` 家族的監控分工；**不含**個別客戶站台的監控（那些各自在 `agency-os/tenants/<slug>/sites/<site>/OBSERVABILITY_*.md`，例：`tenants/company-soulful-expression/sites/soulfulexpression-org/OBSERVABILITY_HOSTINGER.md`），也**不含** MainWP 艦隊管理面本身內建的功能（見下方新增的 `MainWP` 列）。**目前沒有一份「所有監聽系統」的單一總覽文件**——這是 2026-09-05 盤查 soulful 站異常流量時發現 MainWP 內建 Uptime Monitor 與此檔案完全脫鉤才補上的已知缺口，尚未有更高層級的合併總覽。
 
 ## Goal
 
@@ -12,6 +14,7 @@ Define the minimum production monitoring baseline for the current Aware Wave sta
 - `PostHog`: product usage and funnel impact
 - `Cloudflare`: edge, DNS, WAF, and cache signals
 - `Slack`: alert delivery channel
+- `MainWP`: client-fleet management/backup/sync dashboard — **not** a monitoring source of truth; its own built-in Uptime Monitor feature must stay disabled (see below)
 
 This baseline assumes the current public surface includes:
 
@@ -33,6 +36,15 @@ This baseline assumes the current public surface includes:
 | `PostHog` | User journeys, drop-off, feature usage, frontend/product behavior | Infra paging or low-level service health |
 | `Cloudflare` | Edge errors, DNS, WAF/rate-limit events, cache behavior | Internal service metrics |
 | `Slack` | Human notification fan-out | Source of truth for system state |
+| `MainWP` | Client-site fleet management: backups (WPvivid), plugin/core updates, health sync | Uptime/reachability alerting — it ships a **built-in Uptime Monitor feature that duplicates Uptime Kuma** and must stay disabled (`mainwp_global_uptime_monitoring_settings` → `active:0`); see incident note below |
+
+## MainWP built-in Uptime Monitor — disabled 2026-09-05, keep it that way
+
+MainWP core (no separate extension plugin required) ships its own HTTP uptime-check feature, independent of Uptime Kuma. On the `mainwp-web` dashboard (ks-aw-01, DB `mainwp`, table `mwp_options`, key `mainwp_global_uptime_monitoring_settings`) it was found **silently active at a 60-second interval** for every site in the fleet, fully redundant with the dedicated Uptime Kuma monitors that already cover the same sites (`agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md`'s `Uptime Kuma` row; per-client detail in `tenants/<slug>/sites/<site>/OBSERVABILITY_*.md`). Nobody had documented this feature existed anywhere before this date, so it kept running unnoticed and roughly doubled the automated hit volume on monitored sites (discovered while investigating an unexplained Cloudflare pageview spike on `soulfulexpression.org`).
+
+- **Fix applied**: flipped `active` from `1` to `0` inside the serialized settings blob (byte-length-safe substitution — both are single-digit PHP integers, no serialization corruption risk). DB backed up first (`mysqldump mainwp` on ks-aw-01, `/tmp/mainwp.db.bak-20260905-uptime-disable.sql`).
+- **Trigger mechanism**: root crontab on ks-aw-01 hits `mainwp-web`'s `wp-cron.php` every 5 minutes (`*/5 * * * * curl ... http://127.0.0.1:8090/wp-cron.php?doing_wp_cron`); the uptime-check hook runs from there, not from a container-level cron.
+- **If re-enabling this feature is ever considered**: don't. Uptime Kuma already owns this job per the Monitoring Split table above — enabling both again reintroduces the exact duplication this note exists to prevent. If MainWP's own monitor is genuinely needed for some reason, retire the corresponding Uptime Kuma monitor(s) for that site first so there is still exactly one source of truth.
 
 ## Service Matrix
 
