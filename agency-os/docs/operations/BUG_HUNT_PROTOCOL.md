@@ -158,6 +158,7 @@ Build Playbook 預設 **Pattern audit** 形：可機械化偵測（CP950 regex�
 | **Cross-machine .md BOM audit** (2026-05-22) | Pattern | ✅ DEPLOYED | `/audit-cross-machine-bom`、`scripts/audit-cross-machine-bom.ps1` |
 | **Cross-machine sync verifier** (2026-05-22) | Pattern | ✅ DEPLOYED | `/sync-check`、`scripts/check-claude-sync.ps1` |
 | **Auto-Repair logic audit** (2026-05-23) | Logic | ✅ DEPLOYED + APPLIED | `/apply-audit`、`scripts/audit-tools/dogfood-auto-repair.ps1`、[`reports/audit/auto-repair-2026-05-23.md`](../../reports/audit/auto-repair-2026-05-23.md)。5 🔴 Critical (C1-C5) 全 FIXED 同日；10 Major + 9 Minor 留下次 iteration |
+| **Repo-hygiene audit：case-collision + oversized-file** (2026-09-05) | Pattern | ✅ DEPLOYED（case-collision 為硬閘；oversized-file 資訊性） | `/audit-repo-hygiene`、`scripts/audit-repo-hygiene.ps1`。上線前 critic 對抗審查用 3 個真實 fixture 端到端重現 3 Critical + 4 Major（CP950 主控台亂碼誤判 collision、unmerged index 自撞誤判、git 失敗 fail-open 假乾淨、只比對同深度漏掉本案起源的目錄層級 collision 等），全數修復並重跑三個 fixture 驗證通過才接線。`case-collision` 已接入 `system-health-check.ps1` check 7d 硬閘（dogfood 0/4715 hits）；`oversized-file` 17 個 🟡 TRACKED backlog，不擋。一般重複程式碼／naming drift 偵測**刻意不做**——需要判斷力，已由 critic/`/code-review`/`/simplify` 覆蓋，見腳本檔頭註解與 AUDIT_REGISTRY.md 完整審查報告 |
 
 ---
 

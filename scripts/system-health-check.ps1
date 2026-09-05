@@ -592,6 +592,41 @@ if (Test-Path $rawReadGate) {
     Add-CriticalFailure -Reason "audit-cp950-traps.ps1 not found - the CP950 unencoded-raw-read hard gate cannot run"
 }
 
+# 7d) Repo-hygiene case-collision gate (HARD). Two git-tracked paths (or a tracked
+# file vs. a tracked directory ancestor) whose lowercased form is identical will
+# silently merge into one on any case-insensitive filesystem (Windows, default
+# macOS) even though git's case-sensitive index sees them as distinct -- root
+# cause: `Projects/internal/hci30` (index) vs `Projects/internal/HCI30/` (disk)
+# drift, discovered 2026-09-05 while closing out agency-os/TASKS.md:822. Only
+# this class is a hard gate; the sibling oversized-file class stays informational
+# (legitimate hits are expected, not a defect -- see AUDIT_REGISTRY.md).
+# Dogfooded clean (0/4715 tracked paths) AND critic-reviewed against 3 reproduced
+# false-positive/false-negative fixtures (CP950 mojibake, unmerged index,
+# directory-level collision) before being wired here -- see
+# AUDIT_REGISTRY.md "Repo-hygiene audit" section for the full review.
+# SSOT: scripts/audit-repo-hygiene.ps1 -CaseCollisionOnly.
+# NOTE: always pass -CaseCollisionOnly here -- omitting it would let the
+# informational oversized-file class (16 known hits) silently fail this hard
+# gate too (critic review 2026-09-05, s3).
+$repoHygieneGate = Join-Path $monoRoot "scripts/audit-repo-hygiene.ps1"
+if (Test-Path $repoHygieneGate) {
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $repoHygieneGate -CaseCollisionOnly -Quiet -WorkRoot $monoRoot 2>&1 | Out-Null
+        $repoHygieneExit = $LASTEXITCODE
+        $repoHygienePass = ($repoHygieneExit -eq 0)
+        Add-Check -Name "No case-insensitive path collisions (git index vs. case-insensitive filesystem)" -Pass $repoHygienePass -Detail $(if ($repoHygienePass) { "OK (no colliding tracked paths)" } else { "FAIL: exit $repoHygieneExit - run scripts/audit-repo-hygiene.ps1 -CaseCollisionOnly to see the finding(s) or the reason (e.g. unresolved merge); fix = git mv the loser onto the canonical casing" })
+        if (-not $repoHygienePass) { Add-CriticalFailure -Reason "audit-repo-hygiene.ps1 -CaseCollisionOnly found a case-collision (or could not determine one, e.g. mid-merge) - see scripts/audit-repo-hygiene.ps1 -CaseCollisionOnly" }
+    } catch {
+        # Hard gate must fail CLOSED when its own tool crashes -- same principle as
+        # the CP950 gates above (codex-oracle review 2026-08-29 FINDING 2).
+        Add-Check -Name "No case-insensitive path collisions (git index vs. case-insensitive filesystem)" -Pass $false -Detail ("CRASHED (treated as FAIL for a hard gate): " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        Add-CriticalFailure -Reason "audit-repo-hygiene.ps1 -CaseCollisionOnly crashed instead of returning a verdict - a hard gate cannot silently pass when its own tool is broken"
+    }
+} else {
+    Add-Check -Name "No case-insensitive path collisions (git index vs. case-insensitive filesystem)" -Pass $false -Detail "MISSING: scripts/audit-repo-hygiene.ps1 not found - hard gate cannot verify without its tool"
+    Add-CriticalFailure -Reason "audit-repo-hygiene.ps1 not found - the case-collision hard gate cannot run"
+}
+
 # 9) Cloudflare security posture (warn-only informational check).
 # KNOWN GAP (same shape as the 7) deploy-drift note above, found 2026-08-29, not fixed here):
 # check-cloudflare-security.ps1 also lives only under monorepo-root scripts/, so this

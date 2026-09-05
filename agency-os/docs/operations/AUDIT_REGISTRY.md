@@ -409,6 +409,61 @@ Inconsistent bool env parsing (m1/m2), `any` cast on Zod value (m3), misleading 
 
 ---
 
+## Repo-hygiene audit (2026-09-05)
+
+**Scope**: all `git ls-files`-tracked paths (4715 at time of final run) for `case-collision`; tracked source files (`.ps1 .mjs .js .jsx .ts .tsx .py .sql .sh .cjs`, excluding `node_modules/ Backups/ .next/ dist/ build/ agency-os/reports/ agency-os/memory/daily/ .git/ vendor/ __pycache__/ .venv/ coverage/ out/ .turbo/` and `*.min.*`) for `oversized-file`.
+
+**Method**: deterministic, zero-LLM-judgment. `case-collision` expands every tracked path into all of its directory-prefix levels plus the full path itself, then groups ACROSS THE WHOLE REPO by lowercased form; a group holding more than one distinct original casing is a hit (catches both same-depth file/file collisions and cross-depth file-vs-directory-ancestor collisions — see M1 below for why the depth expansion matters). `oversized-file` is a plain streamed line-count/byte-size threshold (1000 lines OR 100KB) per file.
+
+**Tool**: [scripts/audit-repo-hygiene.ps1](../../../scripts/audit-repo-hygiene.ps1) → invoked via `/audit-repo-hygiene` slash command
+
+**Origin trigger**: 2026-09-05, discovered by hand while closing out `agency-os/TASKS.md:822` — `Projects/internal/hci30` (git index, lowercase) vs `Projects/internal/HCI30/` (disk, uppercase) had drifted apart under Windows' case-insensitive filesystem. By the time it was found the drift had already self-resolved (only lowercase remained, migration `0002_wave1_case_aggregate_up.sql` correctly tracked there), but the underlying risk class — two tracked paths that collide case-insensitively — was never mechanically checked for anywhere else in the repo. Prompted by comparing against a third-party Claude Skill (`Hao0321/claude-skill-code-cleanup`) that does general duplicate/naming-drift/oversized-file scanning; general duplicate-code and naming-drift detection were evaluated and explicitly declined for this repo (see script header comment) since both need judgment calls this repo's critic subagent + `/code-review` + `/simplify` already cover, and a naive mechanical version would risk the >10% FP-rate death spiral this protocol's own Step 7 warns about. Only the fully-mechanical, zero-legitimate-case subset (`case-collision`) and a cheap size threshold (`oversized-file`) were built.
+
+**Critic review BEFORE the hard gate was wired (Build Playbook Step 7)** — first draft ran clean on the real repo (0/4707 case-collision hits) but a dedicated critic pass built and ran three adversarial fixtures against the actual script rather than reasoning abstractly, and reproduced **3 CRITICAL + 4 MAJOR** findings end-to-end:
+
+| # | Finding | Reproduction | Fix |
+|---|---------|---------------|-----|
+| C1 | This machine's live console is CP950/Big5 (`zh-TW`, confirmed via `[Console]::OutputEncoding`); `git ls-files`'s raw UTF-8 output decoded through it mojibakes CJK filenames, turning two legitimately DIFFERENT tracked files (`docs/丁1.md`, `docs/丁2.md`) into a false collision — and the repo already has 95 non-ASCII tracked paths, 18/19 CJK ones already losing an ASCII char under this decode | Fixture `D:\tmp\hyg-verify-cjk2`: false COLLISION before fix → **0 hits, 2 correctly-distinct tracked files** after | Route every `git` capture through `Invoke-SafeGitCapture` (`scripts/lib/git-safe-ops.ps1`, wraps `Invoke-WithUtf8Console`) instead of a bare `&` capture |
+| C2 | An unmerged/mid-merge index lists the same path once per conflict stage (1/2/3); ungrouped, that reads as the path colliding with itself | Fixture `D:\tmp\hyg-verify-unmerged2` (built via `git update-index --index-info` at 3 stages): false `COLLISION: file.txt <-> file.txt <-> file.txt` before fix → **exit 2 with an explicit "index unmerged" message** after | Detect in-progress merge/rebase/cherry-pick/revert markers + `git ls-files --unmerged` up front; refuse (exit 2, not a false exit-1 drift) instead of guessing |
+| C3 | The original `try/catch` around a native `git` call does NOT catch a non-zero exit (PowerShell native commands don't throw); a broken git returned `$null`, both loops no-opped, and the tool reported "clean" having checked nothing | Fixture: `-WorkRoot` pointed at a non-git directory → **exit 2** ("could not resolve a git repository root") instead of a silent false "clean" | Check `Invoke-SafeGitCapture`'s explicit `.ExitCode`; treat a 0-path `ls-files` result as an error, not an empty-but-clean repo |
+| M1 | Same-depth-only comparison misses the actual origin incident's shape: a **file** colliding with a **different-depth directory ancestor** (`Projects/internal/HCI30/notes.md` vs `Projects/internal/hci30/plan.md` — different leaf names, so same-depth grouping never puts them together) | Fixture `D:\tmp\hyg-verify-dircase2` (built via `git update-index --add --cacheinfo`, since Windows' own case-insensitive filesystem can't even hold both directories to set the fixture up naturally): **0 hits (blind spot)** before fix → **`COLLISION: Projects/internal/HCI30 <-> Projects/internal/hci30`** after | Expand every path into all directory-prefix levels, not just the full leaf path, before grouping |
+| M2 | `git rev-parse --show-toplevel` with no `-C` resolves against the *caller's* CWD, not the script's location — the exact bug `audit-cp950-traps.ps1` already fixed under its own M2 (2026-08-29) | Ran from `D:\tmp` (unrelated CWD) → still correctly resolved and audited `D:\Work` | Mirror `audit-cp950-traps.ps1`'s `Resolve-RepoRoot` (`git -C $PSScriptRoot`, Split-Path fallback); added `-WorkRoot` override (same pattern as `commit-checkpoint.ps1`) for explicit callers/tests |
+| M3 | `Write-Error` under `$ErrorActionPreference='Stop'` is a terminating error — any `exit <n>` written after it never ran, so every intended "exit 2" was actually an indistinguishable "exit 1" | Mutual-exclusion test (`-CaseCollisionOnly -OversizedOnly` together) → **exit 2** (previously would have been silently 1) | Use `[Console]::Error.WriteLine` + `exit`, never `Write-Error`, for early-exit paths |
+| M4 | `TOOL_TRIGGER_MAP.md` declared the `system-health-check.ps1` check 7d hard gate before it was actually wired — a documentation claim pointing at something that didn't exist yet | N/A (doc-only) | Gate wiring landed in the same commit as these fixes; no longer a dangling claim |
+
+Minor/suggestion findings also fixed in the same pass: m1 (`@()`-wrap `.Count` against StrictMode null-crash), m2 (TOCTOU — `Get-Item` moved inside `try`), m3 (stale comment claimed the oversized-file exclude list also applied to case-collision; it never did and correctly shouldn't — a hard gate must have no blind spots, so the comment was fixed, not the behavior), m4 (`-TargetFile`/single-file mode now errors on an untracked path instead of silently reporting "clean"), s1 (broadened the oversized-file exclude list + skip `*.min.*`), s2 (renamed `-File` → `-TargetFile`, avoiding ambiguity with PowerShell's own `-File <script>` launch switch), s3 (wiring comment warns against omitting `-CaseCollisionOnly`), s4 (streamed line-counting via `StreamReader` instead of loading the whole file as a line array — this also fixed an incidental undercount: `scripts/ao-close.ps1` was reported as 1417 lines by the old `Get-Content | Measure-Object -Line` approach when `wc -l` ground-truth is 1492).
+
+**Final re-verification after all fixes** (Build Playbook Step 7, repeated): all three reproduction fixtures re-run and now behave correctly (see table above); full real-repo dogfood re-run: `-CaseCollisionOnly` → **0 hits across 4715 tracked paths**; `audit-cp950-traps.ps1` (the sibling gate) now reports the fixed script itself as clean (was drift=2 on the pre-fix draft). `case-collision` wired as a **hard AO-CLOSE gate** (`scripts/system-health-check.ps1` check 7d, passing `-CaseCollisionOnly -Quiet -WorkRoot $monoRoot`) on the strength of this re-verified 0-hit run; `oversized-file` stays informational-only per its own design (legitimate hits are expected, not a defect class).
+
+### 🛠 TOOL
+- `scripts/audit-repo-hygiene.ps1` — case-collision (hard gate) + oversized-file (informational) detectors, `/audit-repo-hygiene` slash command
+
+### 🟡 TRACKED (oversized-file backlog, informational — not required to fix, monthly Tier 3 candidates)
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/content/ContentStudio.tsx` — 4598 lines, 285794 bytes (largest hit)
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/canvas/CanvasEditor.tsx` — 2315 lines, 131064 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/banner/BannerStudio.tsx` — 2186 lines, 108565 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx` — 2187 lines, 108800 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/studio/StudioWorkbench.tsx` — 2121 lines, 117945 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/video/VideoStudio.tsx` — 2066 lines, 109475 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/TarotStudio.tsx` — 1873 lines, 86487 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/designs/DesignsGallery.tsx` — 1613 lines, 64801 bytes
+- `scripts/ao-close.ps1` — 1492 lines, 93937 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/publish/PublishWizard.tsx` — 1360 lines, 73135 bytes
+- `scripts/ao-resume.ps1` — 1348 lines, 79734 bytes
+- `Projects/internal/hci30/database/tests/wave1-negative-tests.sql` — 1329 lines, 96163 bytes
+- `tests/hooks/runner-parity.test.mjs` — 1307 lines, 73422 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/mockup/MockupStudio.tsx` — 1184 lines, 61279 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/onboard/OnboardWizard.tsx` — 1149 lines, 48340 bytes
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/video/ScriptForge.tsx` — 966 lines, 158375 bytes (byte-threshold trip, not line-count)
+- `lobster-factory/scripts/script_forge_video.jsx` — 703 lines, 135285 bytes (byte-threshold trip, not line-count)
+
+### Statistics
+| Audited (tracked paths) | case-collision hits | oversized-file hits | Critic findings (pre-deploy) | Real production breaks pre-audit |
+|---------|-------|-------|-------|-----------------------------------|
+| 4715 | 0 | 17 | 3 Critical + 4 Major + 4 Minor + 4 Suggestion, all fixed same day | 0 (Tier 3-style: incident-adjacent, not itself a production break) |
+
+---
+
 ## Related Documents (Auto-Synced)
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 

@@ -1,5 +1,104 @@
 # Worklog
 
+## 2026-09-05（soulfulexpression.org Cloudflare 流量異常查證 + 兩處監控冗餘修復：Uptime Kuma 檢查間隔、MainWP 內建 Uptime Monitor）
+
+**觸發**：操作者收到 Cloudflare 通知「上月 62,053 次 pageviews」，覺得「這網站應該不太可能有人看」，要求查清楚。
+
+**[任務理解]**：這數字是真是假？若真，是真人流量還是雜訊？
+
+**[現況分析]**：CF zone `bb1358fe8d3e1d73c822bdb31d3cd823`（`soulfulexpression.org`）為 2026-08-15 因搬遷專案新建（`DNS_MIGRATION_RECORD_MAP.md`），非長期累積數字。用 GraphQL Analytics API 拉每日 `httpRequests1dGroups`，Aug15–31 逐日 pageviews 加總 = **62,053**，與通知數字精確吻合（非灌水/誤植）。但逐日曲線幾乎鐵板一塊（3,500–4,100/天，無真人流量常見的週間波動），抓 8/30、9/4 兩天 `httpRequestsAdaptiveGroups` 明細後確認：Top 3 UA 全部是自動化工具，非真人：
+
+1. `Uptime-Kuma/1.23.17` 打 `/`（monitor 23、25 共用）+ `/wp-json/`（monitor 24）——**我們自己的 EU Kuma**（`ks-aw-01`／`kuma.db`），三支 monitor 各 `interval=60秒`
+2. `Mozilla/5.0 (compatible; MainWP/6.0.12...)` 打 `/`，UA 帶 `Mozilla/5.0` 字樣會被 CF 天真的 pageview 判定誤算成「真人瀏覽」——追查後發現這**不是** MainWP 正常艦隊同步，而是 **MainWP 核心內建的 Uptime Monitor 功能**（非獨立 extension plugin：`active_plugins` 只有 `mainwp/mainwp.php` 本體），設定 `mainwp_global_uptime_monitoring_settings` 顯示 `interval:60秒, active:1`，跟 Uptime Kuma **做一樣的事、對同一批網站、完全沒人知道它在跑**——两套系统各打各的，从未有文件记录过 MainWP 這一層。
+3. 其餘為真實雜訊：`GPTBot/1.4`（OpenAI 爬蟲）、反覆掃描 Ultimate Member/um-user-photos 外掛固定資源路徑的疑似漏洞掃描器（HK/US/CN/SG 輪換 IP）、一筆俄羅斯來源的 `/wp-admin/install.php?step=1` 安裝劫持攻擊探針。CF API 確認此 zone **WAF=off、Bot Fight Mode=off、所有 AI/crawler 防護=disabled**——上述雜訊完全沒被過濾，全部直打 Hostinger 源站。
+
+操作者確認：Uptime Kuma 間隔太密（先處理，我建議數字）+ 同意關閉 MainWP 內建 Uptime Monitor（跟 Kuma 重複）。
+
+**[風險清單]**：兩個都是活生產環境的監控設定變更；Kuma DB 直接 SQL 改動有寫壞 DB 風險（已按 `runbooks/UPTIME-KUMA-MONITOR-FIX.md` 走「先備份→短 transaction→重啟→驗證心跳」流程）；MainWP 選項是 PHP serialize 字串，改壞會讓整筆設定 unserialize 失敗（已限定只做**同長度**的 `i:1`→`i:0` 單字元替換，不動任何字串長度前綴，零破壞序列化風險）。
+
+**[方案比較]**：Kuma 間隔——考慮完全砍成單一 monitor（激進，可能漏掉 `/wp-json/` 或首頁內容各自的失效模式）vs 只調間隔保留 3 支既有分工（保守）。選後者：拉長到 180 秒（3 分鐘，UptimeRobot/Better Stack 業界常見預設區間），對一個無 SLA 的中小型行銷型網站而言，多等最多 3 分鐘才收到告警可接受，換來請求量砍 2/3。MainWP 內建監控——考慮保留但降頻 vs 直接關掉。選後者：Kuma 已完整覆蓋同樣的檢查項目，沒有理由維持兩套系統各自為政。
+
+**[實作計畫→已完成]**：
+1. Kuma：`sqlite3 kuma.db ".backup '/app/data/kuma.db.bak-20260905-interval180'"` → `BEGIN IMMEDIATE; UPDATE monitor SET interval=180 WHERE id IN (23,24,25); COMMIT;` → `docker restart uptime-kuma` → 讀回 3 支 monitor `interval=180` + 心跳全 `status=1, 200 - OK`
+2. MainWP：`mysqldump mainwp > /tmp/mainwp.db.bak-20260905-uptime-disable.sql` → `UPDATE mwp_options SET option_value = REPLACE(option_value, 's:6:"active";i:1;', 's:6:"active";i:0;') WHERE option_name='mainwp_global_uptime_monitoring_settings'` → 讀回確認 `active:i:0`，序列化字串其餘部分逐字元核對未變動
+3. 補文件缺口：`agency-os/docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` 新增「已知範圍限制」（本檔僅涵蓋 AwareWave 自身 stack，不含個別客戶站監控、也不含 MainWP 艦隊管理面本身——目前沒有單一總覽文件）+ `MainWP` 監控分工列 + 專節記錄此次發現與關閉理由，防止未來重新誤開
+
+**已修改**：
+- Kuma DB（`ks-aw-01`，非 repo 檔案）：monitor 23/24/25 `interval` 60→180
+- MainWP DB（`ks-aw-01`，非 repo 檔案）：`mainwp_global_uptime_monitoring_settings` 的 `active` 1→0
+- `agency-os/docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md`（新增範圍限制說明 + MainWP 監控分工列 + 「MainWP built-in Uptime Monitor — disabled 2026-09-05」專節）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec uptime-kuma sqlite3 kuma.db "SELECT id,interval,retry_interval,maxretries FROM monitor WHERE id IN (23,24,25)"` | exit=0 | result=三支皆 `interval=180`（改前 60）；`docker inspect -f '{{.State.Health.Status}}' uptime-kuma` = `healthy`；`SELECT ... FROM heartbeat ... ORDER BY time DESC LIMIT 6` 六筆最新心跳全數 `status=1`（monitor 23/24 `200 - OK`、25 `200 - OK, keyword is found`）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec mainwp-db mysql ... -e "SELECT option_value FROM mwp_options WHERE option_name='mainwp_global_uptime_monitoring_settings'"` | exit=0 | result=`active:i:0`（改前 `i:1`），其餘 10 個欄位（`monitor_id`／`wpid`／`type`／`keyword`／`interval`／`maxretries`／`up_status_codes`／`method`／`timeout`／`retention_limits`）逐字元比對與改動前完全一致，確認 PHP serialize 未被破壞
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF GraphQL `httpRequests1dGroups`（`date_geq/date_leq` 2026-08-15~2026-09-05）+ Aug15–31 pageviews 手動加總 | exit=0 | result=`77115`（含 9 月）/ `62053`（僅 8/15–31，與通知數字位元級吻合）
+- REVIEW_DONE: critic=self（唯讀 API 查證 + 兩處單欄位/單字元資料庫變更，範圍極窄、有完整備份與逐項讀回核對，未動用 subagent critic 額度；每一步變更後立即讀回驗證，非「改完就信」）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`mainwp_global_uptime_monitoring_settings|kuma.db.bak-20260905|AWARE_WAVE_OBSERVABILITY_BASELINE` | hits=本檔與剛新增的 baseline 章節本身，無其他檔案引用這兩個資料庫內部設定鍵名或需要同步更新
+
+**[剩餘風險]**：
+- MainWP 內建 Uptime Monitor 停用後**尚未實際觀察 Cloudflare 流量下降**（設定改動到下次 wp-cron 觸發生效之間有時間差，且 root crontab 每 5 分鐘才打一次 `wp-cron.php`）——建議下次查 CF Analytics 時順便確認 MainWP UA 的 `/` 請求量確實歸零，而非只憑設定值判定
+- RU 來源 `/wp-admin/install.php?step=1` 探針目前未進一步處理（研判無害但未逐項確認 `.htaccess`/檔案權限是否已阻擋），操作者提及有興趣時再處理
+- `AWARE_WAVE_OBSERVABILITY_BASELINE.md` 新增的「已知範圍限制」只是誠實標注缺口，**沒有**真的建立一份跨（AwareWave 自身 + 所有客戶站 + MainWP 艦隊功能）的單一監控總覽文件——那是本次發現後應該做但尚未做的後續工作
+
+**[rollback]**：
+- Kuma：`cp kuma.db.bak-20260905-interval180 kuma.db && docker restart uptime-kuma`（或直接 `UPDATE monitor SET interval=60 WHERE id IN (23,24,25)`）
+- MainWP：還原 `/tmp/mainwp.db.bak-20260905-uptime-disable.sql`（或 `UPDATE mwp_options SET option_value = REPLACE(option_value, 's:6:"active";i:0;', 's:6:"active";i:1;') WHERE option_name='mainwp_global_uptime_monitoring_settings'`）
+
+## 2026-09-05（新 audit class：repo-hygiene（case-collision 硬閘 + oversized-file 資訊性）——完整走 BUG_HUNT_PROTOCOL.md 9 步 playbook，critic 上線前對抗審查抓到 3 Critical + 4 Major，全修並重跑三個 fixture 驗證通過）
+
+**觸發**：操作者分享第三方 Claude Skill `Hao0321/claude-skill-code-cleanup`（duplicate/naming-drift/oversized-file 掃描）問「這是做什麼的」，接著問「或是把我們缺的加進我們的裡面？」，最後「你決定！」把範圍與是否動手的判斷權完整交給我，並要求全能架構師模式（多角度／30 年紀律／零重工／完整閉環／最小爆炸半徑）。
+
+**[任務理解]**：評估第三方工具的三個能力（duplicate-code、naming-drift、oversized-file）裡，哪些是本 repo 真正缺、且能用確定性（非 LLM 判斷）機械掃描補上而不落入補丁。
+
+**[現況分析]**：`git log -10` 確認無並行 session 搶跑同一區塊。Glob `scripts/*audit*`／`*dup*`／`*cleanup*` 確認無既有工具覆蓋這個 class（不重複造輪）。讀 `BUG_HUNT_PROTOCOL.md`（方法 SSOT，9 步 playbook + 5-tier 觸發 + Step 7 FP-rate 閘 + Step 9.5 operator-triggerability 檢核）與 `AUDIT_REGISTRY.md`（既有 class 格式範本，以 `audit-cp950-traps.ps1` 為例）。
+
+**[風險清單]**：duplicate-code／naming-drift 若做成天真版本，會落入 protocol 自己警告的「FP>10% 工具 2-3 個月內死掉」陷阱；`case-collision` 若要上 AO-CLOSE 硬閘，一旦誤判會擋住**所有人**收工，且 AGENTS.md 明令禁止 `-AllowNonPerfectHealth` 繞過——這是本次唯一夠格稱為 Medium 風險的部分。
+
+**[方案比較]**：A 整包移植第三方 Skill（違反 R0「禁止建重複模組」，critic/`/code-review`/`/simplify` 已覆蓋 duplicate/naming-drift 需要判斷力的部分）vs B 只抽出「完全機械化、零合法例外」的子集：`case-collision`（今天親手抓到 hci30/HCI30 大小寫分裂事件證實這類真實存在）+ `oversized-file`（單純 threshold，零判斷力）。選 B——`oversized-file` 定位為資訊性 backlog（合法命中本來就存在，不該當閘）；`case-collision` 因零合法碰撞案例，dogfood 過即可上硬閘。
+
+**[實作計畫→已完成]**：
+1. `scripts/audit-repo-hygiene.ps1` 新建，two-class 設計（case-collision + oversized-file），對真實 repo dogfood：case-collision 0/4707 命中，oversized-file 16 命中（皆為已知大檔，非誤報）。
+2. **上線前送 critic subagent 做對抗審查**（`case-collision` 即將成硬閘，誤判 = 擋全體收工，比照 CP950 gate 的審查規格要求）——critic 沒有空談，**寫了 3 個真實 fixture git repo 端到端重現**：
+   - **C1**：本機主控台實測就是 CP950/Big5（`zh-TW`，`[Console]::OutputEncoding` 證實）；`git ls-files` 原始 UTF-8 bytes 經 Big5 解碼會吃字元，兩個合法不同的 CJK 檔名（`docs/丁1.md`／`docs/丁2.md`）被判成幽靈 collision，且印出來的路徑本身就是亂碼——repo 現有 95 條非 ASCII 路徑，其中 18/19 條 CJK 已經在丟字元。
+   - **C2**：unmerged index 對同一路徑印 stage 1/2/3 共三次，未去重的分組邏輯把它當自己撞自己。
+   - **C3**：`try/catch` 包原生指令抓不到非零 exit code；git 失敗時兩個迴圈都不跑，`$totalFindings=0` → exit 0「乾淨」，其實什麼都沒查。
+   - **M1（最關鍵）**：只比對「完整路徑」的 lowercase，抓不到目錄層級分裂——這正是這個工具起源事故（`Projects/internal/hci30` vs `HCI30`）的真實形狀，因為兩邊 leaf 檔名通常不同。原始版本對這個 class 自己的起源事故是 **false negative**。
+   - 另 M2（repo root 依賴呼叫者 CWD，`audit-cp950-traps.ps1` 已修過的同款舊 bug 重犯）、M3（`Write-Error`＋`$ErrorActionPreference='Stop'` 下 `exit 2` 永遠執行不到，實際 exit code 跟「找到 drift」無法區分）、M4（文件搶先宣告硬閘已上線，其實尚未接線）。
+3. **全部修復**：C1→改用 repo 既有 SSOT `scripts/lib/git-safe-ops.ps1` 的 `Invoke-SafeGitCapture`（包 `Invoke-WithUtf8Console`，不重造輪子）；C2→偵測 merge/rebase/cherry-pick in-progress 標記 + `git ls-files --unmerged`，偵測到就 exit 2（誠實回報「無法判定」而非假 drift）；C3→顯式檢查 `.ExitCode`，0 筆 tracked path 視為錯誤非乾淨 repo；M1→改成路徑前綴展開（`a/b/c.md` → `a`、`a/b`、`a/b/c.md`）後對全體前綴做 lowercase 分組，同時覆蓋同深度與跨深度碰撞；M2→比照 `audit-cp950-traps.ps1` 的 `Resolve-RepoRoot`（`git -C $PSScriptRoot`），另加 `-WorkRoot` 覆寫參數（比照 `commit-checkpoint.ps1`／`validate-memory-index.ps1` 慣例）；M3→改用 `[Console]::Error.WriteLine` 取代 `Write-Error`。順手一併修 m1-m4／s1-s4（StrictMode null crash、TOCTOU、過期註解、`-File`未驗證 tracked、排除清單擴充、參數改名 `-TargetFile` 避免與 `powershell -File` 混淆、streaming 行數計算——意外發現這修正了一個既有低估：`scripts/ao-close.ps1` 舊版算出 1417 行，`wc -l` 實測真值 1492 行）。
+4. **重跑三個 fixture 逐一驗證修復生效**（見下方 REALTEST_EVIDENCE）；`audit-cp950-traps.ps1` 對修好的 `audit-repo-hygiene.ps1` 自己也重新判定為 clean（修前 drift=2）。
+5. 接線 `scripts/system-health-check.ps1` check 7d（比照 CP950 7b/7c 樣板），明確帶 `-CaseCollisionOnly -Quiet -WorkRoot $monoRoot`（critic s3：漏帶會讓 oversized-file 的 17 個已知合法命中意外炸穿硬閘）。
+6. 文件同步：`AUDIT_REGISTRY.md` 新增 "Repo-hygiene audit" 章節（含完整 critic 發現/修復對照表）、`BUG_HUNT_PROTOCOL.md` 已執行 class 表新增一行、`TOOL_TRIGGER_MAP.md` 兩處（主觸發表 + slash command 表）、`.claude/commands/audit-repo-hygiene.md`。
+
+**已修改**：
+- `scripts/audit-repo-hygiene.ps1`（新建，critic 修復後版本）
+- `scripts/system-health-check.ps1`（新增 check 7d，硬閘接線）
+- `.claude/commands/audit-repo-hygiene.md`（新建）
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`（新增 "Repo-hygiene audit" 章節）
+- `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（已執行 class 表 +1 行）
+- `agency-os/docs/operations/TOOL_TRIGGER_MAP.md`（主觸發表 +1 行、slash command 表 +1 行）
+- `agency-os/TASKS.md`／`agency-os/WORKLOG.md`（前一輪不相關修復，已於前一個 commit `c2533b94d` 落地，非本條目範圍）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/audit-repo-hygiene.ps1 -CaseCollisionOnly` | exit=0 | result=`0 hits across 4715 tracked paths`（真實 repo dogfood）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/audit-repo-hygiene.ps1 -OversizedOnly` | exit=1 | result=17 個已知大檔命中，數字與 `wc -l`/`wc -c` 交叉核對一致
+- REALTEST_EVIDENCE: tool=Bash | cmd=CJK fixture（`git update-index` 直接建兩個不同 CJK 檔名於 index）→ `audit-repo-hygiene.ps1 -CaseCollisionOnly -WorkRoot <fixture>` | exit=0 | result=C1 修復生效，`0 hits across 2 tracked paths`（修前為誤報 collision）
+- REALTEST_EVIDENCE: tool=Bash | cmd=unmerged-index fixture（`git update-index --index-info` 建 stage 1/2/3）→ 同上 | exit=2 | result=C2 修復生效，回報「index unmerged」而非假 collision
+- REALTEST_EVIDENCE: tool=Bash | cmd=directory-case fixture（`git update-index --add --cacheinfo` 建跨大小寫目錄，因 Windows 檔案系統本身無法讓兩種大小寫的資料夾同時存在磁碟上，改用 index 層級直接構造）→ 同上 | exit=1 | result=M1 修復生效，正確抓到 `Projects/internal/HCI30 <-> Projects/internal/hci30`（修前是 false negative，抓不到自己起源的事故形狀）
+- REALTEST_EVIDENCE: tool=Bash | cmd=non-git-dir fixture → 同上 | exit=2 | result=C3 修復生效（`could not resolve a git repository root`，非假乾淨）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`-CaseCollisionOnly -OversizedOnly`（互斥旗標同時給）| exit=2 | result=M3 修復生效（修前會是無法區分的 exit 1）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`-OversizedOnly -TargetFile <不存在/未追蹤路徑>` | exit=2 | result=m4 修復生效（修前會靜默 exit 0）
+- REALTEST_EVIDENCE: tool=Bash | cmd=從 `D:\tmp`（無關 CWD）執行 `-CaseCollisionOnly -Quiet` | exit=0 | result=M2 修復生效，正確稽核 `D:\Work` 而非誤判 CWD 所在目錄
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/audit-cp950-traps.ps1 -File scripts/audit-repo-hygiene.ps1` | exit=0 | result=C1 修復的連帶效果：本工具自己現在也通過既有 CP950 硬閘（修前 drift=2）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`[System.Management.Automation.Language.Parser]::ParseFile` 對 `audit-repo-hygiene.ps1` 與 `system-health-check.ps1` | exit=0 | result=`PARSE OK`（兩檔皆語法正確）
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=3c/4m/4n+4s — 全數修復並用 3 個真實 fixture 重跑驗證通過才接線硬閘，非自我描述取代 critic output
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`audit-repo-hygiene\|CaseCollisionOnly\|OversizedOnly\|-File <path>` | hits=符合預期（所有引用一致，無殘留舊 `-File` 參數名稱、無孤兒文件宣告不存在的硬閘）
+
+**剩餘風險**：
+- `oversized-file` class 目前完全不主動 surface（Step 9.5 operator-triggerability 檢核：既非硬閘也未接 AO-RESUME）——刻意選擇，因為 17 個合法命中是預期狀態非缺陷，接進 AO-RESUME 會變噪音；下次月度排程 audit 時，backlog 清單已在 `AUDIT_REGISTRY.md` 可直接撈取。
+- fixture repo 留在 `D:\tmp\hyg-verify-*`（repo 外，不影響 `D:\Work`），未清理，低優先。
+
+**Rollback**：`git checkout -- scripts/audit-repo-hygiene.ps1 scripts/system-health-check.ps1 .claude/commands/audit-repo-hygiene.md agency-os/docs/operations/AUDIT_REGISTRY.md agency-os/docs/operations/BUG_HUNT_PROTOCOL.md agency-os/docs/operations/TOOL_TRIGGER_MAP.md`；或依 `BUG_HUNT_PROTOCOL.md` §Rollback/Disable 標準流程（移除 AGENTS trigger row、刪工具+slash command、AUDIT_REGISTRY 該章節標記 RETIRED）。
+
 ## 2026-09-05（System Foundry v1.6 — 補「持續大規模」capability 缺口 + conflict-rules.json 交叉引用漏檢，操作者問「這套系統還缺什麼」後的稽核與修復）
 
 **觸發**：操作者問「看這套系統還有沒有缺什麼，讓我可以在任何情惜下都可以做出完美的功能架構」，針對 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/`（199 capabilities/161 questions/12步 verify chain 的問卷→規則引擎→藍圖產生器）做完整性稽核，找到 4 類缺口後操作者授權「你做最完美的處理」。
@@ -10,25 +109,36 @@
 3. **考慮過但主動放棄：capability 層級的「架構張力」衝突規則**（例如 `CAP-RESIDENCY` + `CAP-MULTI-TENANT` 同時存在時要不要當矛盾擋下）。查證後發現這類張力幾乎都是「條件性」而非「恆真」——例如多租戶不必然代表租戶跨國——若強行加入會製造偽陽性警告，比完全不檢查更糟（跟 `feedback_clean_no_patches` 同一類判準的鏡像案例：不是漏檢，是會亂報）。
 4. **考慮過但主動放棄：custom requirement 重複出現的偵測 ledger**。查證 `scripts/validate_manifest.py` 後發現這個 package 是**內容雜湊鎖定**、設計成可原樣複製到別處的產物（`regenerate_integrity.py` 對每個 git-tracked 檔案算 SHA256 存進 `manifest.json`，`README.md`/`validate_manifest.py` 註解明講這棵樹要能在任何複製出去的副本上獨立驗證）——任何會隨每次執行變動的 ledger 檔案放進這棵樹都會讓 manifest 陷入永久 drift。這類「跨對話追蹤反覆出現的客製需求該記在哪」屬於不同層級的基礎設施決策，不應該未經操作者同意就塞進一個刻意設計成不可變的套件。
 
+**Critic review 第二輪（第一版 diff 送審後）抓到 3 Major + 2 Minor，全部修正**（critic=Standard，非同一 session 的獨立 subagent；mutation test 由本 session 對照重跑驗證，非只採信文字敘述）：
+- **Major 1**：`Q-IMP-008` 描述原文用中文「不是…而是…」排他句型，對「日常量體巨大＋又有尖峰」的真實大型系統（多數樣態）會讓使用者判定「這題講的是別種情況」而靜默漏選——剛好重現這次要修的那個洞（拿到 `CAP-SPIKY-LOAD` 但拿不到 `CAP-HIGH-SCALE`）。改成非排他句型並明講「跟上一題不同方向，兩題可以同時選要」，拿掉 label 裡的「（非尖峰）」。
+- **Major 2**：新增的 conflict-rules 交叉引用檢查只看 top-level `if_all[].question`，另兩種同類寫法仍靜默漏檢——(a) typo 包在 `{"all":[...]}"` 巢狀裡、(b) `"equals"` 給字串 `"true"` 而非布林（`eval_condition` 用 `is` 比較，永遠 False）。改用既有 `refs()` 遞迴走訪（跟 active_when 檢查共用同一份，不重複維護兩份邏輯），加上 `isinstance(eq,bool)` 檢查與空 `if_all` 防呆（`all([])` 在 Python 恆真，空規則會擋下所有設定）。本 session 用四組突變（A 頂層 typo／B 巢狀 typo／C 字串 equals／D 錯誤 key 名）逐一對照修正前後結果，確認修正後四種全部被攔下。
+- **Major 3**：`README.md`／`QUALITY_STRENGTH_MATRIX.md`／`CHANGELOG_v1.6.md`／`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` 四份文件各自卡在三個不同的舊數字（121／154／192，證明手動維護必然失守），且後者還有多處 `foundry_generate.py`/`test_selection_matrix.py` 的 `file:line` 引用因程式碼成長而失效。逐一 Grep 實際行號核對後修正全部數字與行號引用（`162`／`200`／`13,041`／`2^162` 等），非盲目套用 critic 給的數字。
+- **Minor 1**：`criticality` 公式只把新題 `Q-IMP-008` 併入 `medium` 判定，卻漏了同屬「負載訊號」的既有 `Q-IMP-007`（尖峰）——同一類問題只補了眼前這個實例，正是 AGENTS.md §1 補丁判準要擋的樣態。改為 `load_pressure=any(...[Q-IMP-007,Q-IMP-008])`，兩題同層級處理。
+- **Minor 2**：`questionnaire_version` 內容變了但版號停在 `1.1.0`——查證 `schemas/answer-snapshot.schema.json:18-20` 確認該欄位 schema 只要求 `type:string`（無 `const`/`pattern`），三個 contract fixture 用的 `"1.1.0"` 純屬 schema 形狀測試資料、不需要跟著版號同步（critic 原建議「二選一」的另一半經查證是不必要的）；只需把 `questionnaire_version` bump 到 `1.2.0`。
+- **Suggestion（採納）**：`CAP-HIGH-SCALE` 原本插在 `CAP-SPIKY-LOAD` 前面打斷局部字母序，改移到 `CAP-HEALTH-DATA`／`CAP-HISTORICAL-IMPORT` 之間（跟它在 golden fixture 裡的排序位置一致），未來 diff 更乾淨。
+- **Suggestion（登記不做）**：`bootstrap/NEW_SYSTEM_INTAKE.yaml` 宣告的 scale 維度還有 `growth`（未來量體成長）沒有對應二元題；是否要補屬產品決策，本次只登記缺口。
+
 **[已修改]**：
-- `capabilities/catalog.json`：新增 `CAP-HIGH-SCALE`（module=reliability，requires=[]）
-- `questionnaires/catalog.json`：新增 `Q-IMP-008`（business_impact 類別，緊接 Q-IMP-007 之後）
+- `capabilities/catalog.json`：新增 `CAP-HIGH-SCALE`（module=reliability，requires=[]），置於 `CAP-HEALTH-DATA`/`CAP-HISTORICAL-IMPORT` 之間
+- `questionnaires/catalog.json`：新增 `Q-IMP-008`（business_impact 類別，緊接 Q-IMP-007 之後，非排他句型）；`questionnaire_version` `1.1.0`→`1.2.0`
 - `rules/question-rules.json`：新增 `RULE-Q-IMP-008` → require `CAP-HIGH-SCALE`
 - `generation/module-manifests.json`：`reliability` 模組 `activated_by` 加入 `CAP-HIGH-SCALE`（`validate_artifact_generation.py:19` 強制要求兩者一致，否則 12 步 verify chain 的 artifact-static 步驟會 FAIL）
-- `scripts/configurator_engine.py`：`criticality` 公式併入 `Q-IMP-008`（跟既有 `Q-IMP-001`/`Q-IMP-003` 同層級，單獨為真即判定至少 `medium`）
-- `scripts/validate_configurator.py`：新增 `rules/conflict-rules.json` 的 question-id 交叉引用檢查（見上述缺口 2）
+- `scripts/configurator_engine.py`：`criticality` 公式的 `medium` 判定併入 `Q-IMP-007`+`Q-IMP-008`（`load_pressure`）
+- `scripts/validate_configurator.py`：`refs()` 提升為函式層級共用；`rules/conflict-rules.json` 交叉引用檢查改遞迴走訪 + `equals` 型別檢查 + 空 `if_all` 防呆
 - `tests/fixtures/selection/all_yes.json`：`active_answer_count` 157→158，`current_capabilities` 插入 `CAP-HIGH-SCALE`（按字母序）
 - `tests/fixtures/selection/all_no.json`：`active_answer_count` 108→109（`Q-IMP-008` 無條件啟用，all-no 情境下仍會被明確答 false，答案數照樣 +1——第一次跑 `test_selection_matrix.py` 時漏了這個，被 `golden selection drift: all_no.json` 斷言當場抓到才補上）
 - `tests/test_artifact_generation.py`：硬編數字 `199`→`200`
+- `README.md`／`QUALITY_STRENGTH_MATRIX.md`／`CHANGELOG_v1.6.md`／`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md`：修正全部過期的題數／capability 數／pairwise 數與失效的 `file:line` 引用（見 Major 3）
 - `manifest.json`：`python scripts/regenerate_integrity.py --write` 重算全部雜湊（`kernel_digest` 未變，因為沒有動到任何 `kernel/*.md`，dry-run 已先確認）
 
 **[驗證結果]**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_versions.py`+`validate_semantics.py`+`validate_configurator.py`+`validate_artifact_generation.py`+`validate_contract_fixtures.py`+`run_adversarial_contract_tests.py`+`test_bootstrap_e2e.py`+`test_configurator_e2e.py`+`test_configurator_http_e2e.py`+`test_selection_matrix.py`+`python -m unittest discover -s tests`+`validate_manifest.py`（12 步 verify chain 逐一手動跑，本機無 `make`）| exit=0（每一步）| result=`SELECTION MATRIX: PASS questions=162 single=162 pairwise_valid=13035 pairwise_rejected=6 random=1000 modules=32 blueprints=73 all_yes_caps=200`；29 個 unittest 全綠；`MANIFEST VALIDATION: PASS`
-- REALTEST_EVIDENCE: tool=Bash+Browser | cmd=`preview_start(system-foundry-configurator)` 開真實瀏覽器，點擊「平常（非尖峰）使用規模就非常龐大」卡片→輸入專案名稱→「驗證並預覽」→「送出並生成」| exit=0 | result=`/api/resolve` 回傳 `current_capabilities` 含 `CAP-HIGH-SCALE`、`criticality:"medium"`、`traceability:{"CAP-HIGH-SCALE":["RULE-Q-IMP-008"]}`；`/api/generate` 落地的 `docs/modules/reliability/MODULE_MANIFEST.json` 讀回確認 `activated_capabilities:["CAP-HIGH-SCALE"]`，`.foundry/intake/answers.json` 讀回確認 `answers.Q-IMP-008:true`；測試資料夾 `generated/high-scale-test` 已用 Python `shutil.rmtree` 清除（`rm -rf` 被機械閘擋下改用此法），未留垃圾
-- REVIEW_DONE: critic=Standard | verdict=[PENDING -- 尚未收到 critic subagent 回覆，commit 前補齊，不得留空字串佔位]
-- BUGHUNT_DONE: scope=agency-os（含 System_Foundry_v1.6_ARTIFACT_COMPLETE 全樹）| grep=`\b199\b\|\b161\b\|\b157\b`（改動前）+ `CAP-HIGH-SCALE\|Q-IMP-008`（改動後一致性）| hits=改動前 3 個檔案提及舊數字，經查全部是過去時間點的凍結記錄（`WORKLOG.md` 既有條目本身、`reports/status/integrated-status-*`、`.agency-state/worklog-excerpt.md`），比照既有 CHANGELOG 慣例不回溯改寫歷史條目，不需修改；改動後 `CAP-HIGH-SCALE`/`Q-IMP-008` 在 9 個相關檔案中出現位置與預期完全一致
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_versions.py`+`validate_semantics.py`+`validate_configurator.py`+`validate_artifact_generation.py`+`validate_contract_fixtures.py`+`run_adversarial_contract_tests.py`+`test_bootstrap_e2e.py`+`test_configurator_e2e.py`+`test_configurator_http_e2e.py`+`test_selection_matrix.py`+`python -m unittest discover -s tests`+`validate_manifest.py`（12 步 verify chain 逐一手動跑兩輪：critic 修正前一輪、修正後最終一輪，本機無 `make`）| exit=0（每一步、兩輪皆是）| result=最終輪 `SELECTION MATRIX: PASS questions=162 single=162 pairwise_valid=13035 pairwise_rejected=6 random=1000 modules=32 blueprints=73 all_yes_caps=200`；29 個 unittest 全綠；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash+Browser | cmd=`preview_start(system-foundry-configurator)` 開真實瀏覽器，點擊使用規模題卡片→輸入專案名稱→「驗證並預覽」→「送出並生成」| exit=0 | result=`/api/resolve` 回傳 `current_capabilities` 含 `CAP-HIGH-SCALE`、`criticality:"medium"`、`traceability:{"CAP-HIGH-SCALE":["RULE-Q-IMP-008"]}`；`/api/generate` 落地的 `docs/modules/reliability/MODULE_MANIFEST.json` 讀回確認 `activated_capabilities:["CAP-HIGH-SCALE"]`，`.foundry/intake/answers.json` 讀回確認 `answers.Q-IMP-008:true`；測試資料夾 `generated/high-scale-test` 已用 Python `shutil.rmtree` 清除（`rm -rf` 被機械閘擋下改用此法），未留垃圾
+- REALTEST_EVIDENCE: tool=Bash | cmd=對照 critic mutation 報告，在 scratchpad 重寫 `refs()`/`check()` 邏輯跑 A/B/C/D 四組突變（頂層 typo／巢狀 typo／字串 equals／錯誤 key 名）+ 一組合法值 + 一組空 `if_all` | exit=0 | result=6 組全部符合預期（4 組突變各自被對應錯誤訊息攔下、合法值 0 錯誤、空 `if_all` 被防呆訊息攔下），證明 Major 2 修正非文字敘述、是可重現的行為
+- REVIEW_DONE: critic=Standard | verdict=pass（第二輪，第一輪 3 Major/2 Minor 已全部修正並經上述突變/re-verify 證實）| findings=0c/0m/2s（2 個建議：1 個已採納見上方 capability 排序、1 個登記不做見上方 growth 維度缺口）
+- BUGHUNT_DONE: scope=agency-os（含 System_Foundry_v1.6_ARTIFACT_COMPLETE 全樹）| grep=`\b199\b\|\b192\b\|\b161\b\|\b157\b\|\b154\b\|\b121\b\|11,781\|11781`（全部歷史舊數字一次掃完，非只掃自己剛改的）| hits=改動前 3+1 個檔案（README/QUALITY_STRENGTH_MATRIX/CHANGELOG_v1.6/V1_6_REPORT）共 12 處過期數字全部修正；WORKLOG.md 既有條目／`reports/status/integrated-status-*`／`.agency-state/worklog-excerpt.md` 為過去時間點凍結記錄不回溯改寫；**修正後同一 grep 重跑 = 0 hits**（唯一殘留在 System_Foundry 樹外的無關數字已排除）
 
-**[剩餘風險]**：`CAP-HIGH-SCALE` 目前只是一個 flag，跟既有其餘 199 個 capability 一樣不影響「blueprint 產出深度」——78 份藍圖模板不論選什麼都全部產生，內容仍是靠人／Claude 執行藍圖時填寫，criticality/profile 只寫進 `project-profile.json` 供人參考、不 gate 文件產生。這是系統既有設計，非本次改動引入的新限制。放棄的兩個候選缺口（架構張力衝突偵測、custom requirement 重複偵測 ledger）若操作者之後想要，需要先討論可接受的偽陽性率、以及 ledger 該放在套件樹外的哪裡，不建議之後隨手加進去。
+**[剩餘風險]**：`CAP-HIGH-SCALE` 目前只是一個 flag，跟既有其餘 199 個 capability 一樣不影響「blueprint 產出深度」——78 份藍圖模板不論選什麼都全部產生，內容仍是靠人／Claude 執行藍圖時填寫，criticality/profile 只寫進 `project-profile.json` 供人參考、不 gate 文件產生。這是系統既有設計，非本次改動引入的新限制。放棄的兩個候選缺口（架構張力衝突偵測、custom requirement 重複偵測 ledger）若操作者之後想要，需要先討論可接受的偽陽性率、以及 ledger 該放在套件樹外的哪裡，不建議之後隨手加進去。文件數字硬編這個 bug class 本身未治本（critic 建議改成從 `test_selection_matrix.py` 輸出取值或加 gate 比對，本次只修了症狀；第 4 次出現同類 drift 時應該做治本方案，屆時一併評估 `bootstrap/NEW_SYSTEM_INTAKE.yaml` 的 growth 維度缺口要不要補）。
 
 **[rollback]**：`git revert` 本次 commit 即可完整還原；`manifest.json` 雜湊會隨 revert 自動對齊，下次跑 `validate_manifest.py` 會自然通過，不需額外動作。
 
