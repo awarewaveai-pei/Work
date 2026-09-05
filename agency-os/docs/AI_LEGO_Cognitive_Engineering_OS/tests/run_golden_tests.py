@@ -59,6 +59,22 @@ recipe instance):
      documents by section, look shapes up in the quick-ref; a stale index
      is a detector that went quiet, so it fails the suite instead of
      drifting silently the way hand-typed line numbers did).
+  7. Typed-object schema `examples:` vs. real gates -- imports
+     tests/typed_object_example_gates_check.py (added 2026-09-06, closing a
+     systemic gap: no test anywhere ran a typed-object schema's own
+     `examples:` block through jsonschema, let alone through the real
+     `ai_lego` module function that gates that record type -- those
+     examples were correctness claims a human had to hand-verify by reading
+     the schema and the module side by side). Every example on every
+     specs/cognitive/typed-objects/*.schema.yaml file is validated against
+     its own schema, and -- for the ~39 of 41 schemas whose producing
+     `ai_lego/modules/**/*.py` module exposes a matching `evaluate_*_gates`/
+     `all_gates_pass` pair -- also run through that real gate function. This
+     is what caught cause-hypothesis-set.schema.yaml's own example #1
+     failing its own `evidence_labeling_required` gate (an EVIDENCE-labeled
+     hypothesis with no `supporting_evidence_refs`) the same day this check
+     was added; fixed by adding the missing evidence ref to the example,
+     not by loosening the gate.
 
 No mother document, ADR, or existing spec/policy file's normative content
 is modified by this file or by running it. Exit code 0 = all checks
@@ -491,6 +507,27 @@ def run_generated_index_freshness():
     check(rc == 0, "generated spec indexes are STALE -- run `python tests/gen_spec_index.py` and commit docs/architecture/SPEC_QUICKREF.md + MOTHER_DOC_SECTION_INDEX.md")
 
 
+# ---------------------------------------------------------------------------
+# 7. Typed-object schema examples vs. real gates (tests/typed_object_example_gates_check.py).
+#    Same import-and-fold pattern as check family 5.
+# ---------------------------------------------------------------------------
+def run_typed_object_example_gates_check():
+    global passed
+    import importlib.util
+    spec_path = os.path.join(ROOT, "tests", "typed_object_example_gates_check.py")
+    try:
+        spec = importlib.util.spec_from_file_location("typed_object_example_gates_check", spec_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.run()
+    except Exception as e:  # noqa: BLE001 -- same crash-isolation stance as family 5
+        failures.append(f"typed_object_example_gates_check: CRASHED -- {type(e).__name__}: {e}")
+        return
+    passed += mod.passed
+    for f in mod.failures:
+        failures.append(f"typed_object_example_gates_check.{f}")
+
+
 if __name__ == "__main__":
     run_schema_conformance()
     run_recipe_instance_conformance()
@@ -500,6 +537,7 @@ if __name__ == "__main__":
     run_search_content_pack_check()
     run_generated_index_freshness()
     run_ref_resolution_smoke()
+    run_typed_object_example_gates_check()
 
     print(f"PASSED: {passed}")
     if failures:

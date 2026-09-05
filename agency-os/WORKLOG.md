@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-09-06（Cognitive OS golden test 新增 check family 7 —— typed-object schema `examples:` 從未被驗證過的系統性缺口，第一次真跑就抓到一個真實 example bug；critic mutation-testing 覆審抓到 3 Major+6 Minor 全修並用同款突變重驗有效）
+
+**觸發**：操作者要求在 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/`（spec root golden test suite）新增一條規則：對每個 `specs/cognitive/typed-objects/*.schema.yaml`（現有 41 個）的 `examples:` block，同時驗證 (1) 對自己 schema 的 jsonschema 合規性，(2) 對 `Projects/internal/cognitive-engineering-os/ai_lego/modules/**/*.py` 真實 `evaluate_*_gates`/`all_gates_pass` 的真實 gate 通過性——因為過去這些 example 只是文件，從未被任何自動化驗證過。
+
+**前提查證（VBC，動手 Grep 而非照單全收）**：任務描述引用一個具體事故「`database_data.normalization` 第 41 個切片、WORKLOG 2026-09-06、critic 抓到 `ai_lego/compute/normalization/closure.py` 的 compute bug」作為動機。逐一 Grep `normalization`／`normalization-record`／相關檔名，**本 repo 內完全不存在這個切片、這個 schema 檔案、或這條 WORKLOG 記錄**——git log 最新是第四十個切片 `database_data.data_contract`（`72b47cd0d`），不是第四十一個；`Projects/internal/cognitive-engineering-os` 底下也沒有任何 `normalization` 相關檔案。這個具體事故是虛構的（或來自本 repo 看不到的另一條分支）。底層缺口本身是真的——獨立驗證：既有 `tests/unit/test_adr.py` 等單元測試完全不讀 schema 自己的 `examples:` block，只用手寫 fixture——所以任務值得做，但**沒有把這個編造的引用寫進任何程式碼註解或 docstring**（草稿一度寫入 `run_golden_tests.py` docstring，發現後自行修正為只描述真實缺口與本次真實抓到的 bug）。
+
+**設計**：schema → 產出模組的對應關係，靠每個 `generate_*` 函式 docstring 既有的引用慣例 `` Instance of ``typed-objects/<slug>.schema.yaml`` `` 反查（先寫 diagnostic script 逐一驗證，非憑印象假設：全部 41 個 schema 都恰好有一個這樣的引用，其中 39 個能唯一對應一個 `evaluate_*_gates` 函式；`ai_lego/modules/root_cause/fishbone.py` 一檔產三個型別但只定義一個 gate 函式，靠比對該函式第一個參數名稱消歧義，正確排除 `problem-statement`/`root-cause-fact` 這兩個本來就沒有專屬 gate 的型別，只留 `cause-hypothesis-set` 走真 gate）。
+
+**第一次真跑就抓到真 bug**：`cause-hypothesis-set.schema.yaml` 自己的 example 有一個 hypothesis 標 `provenance.epistemic_type: EVIDENCE` 卻沒有 `supporting_evidence_refs`——違反同檔案自己文件化的 Atlas §11.4 step 4 規則，也違反 `evaluate_evidence_labeling_required_gate` 的真實邏輯（EVIDENCE 標籤必須引用證據，否則是「宣稱有證據卻拿不出來」）。修法：比照同語料庫另外 3 個姊妹 schema（`swot-analysis`/`five-whys-validation`/`causal-dag-analysis`）既有慣例，補 `supporting_evidence_refs: ["E-1"]`（`E-1` 是 `specs/evidence/evidence.schema.yaml` 自己引用的 Atlas §11.20 正典範例 evidence id，非杜撰；此欄位本身是「soft reference」設計，不要求真的能解析到一筆 Evidence 記錄）。
+
+**critic 獨立覆審**（真實 subagent，實跑 mutation testing——複製整個 `ai_lego` 目錄到隔離 sandbox 動手改檔驗證，非憑代碼推論猜測）：0 Critical，**3 Major + 6 Minor/Suggestion**，全部修正並由本 session 自行用同款突變重跑驗證有效：
+- **Major 1**：coverage floor 原本只用 `schemas_gate_checked > 0` 計數——critic 突變刪掉 39 個引用裡的 38 個後，`FAILED: 0` exit 0，完全沒有任何訊號（正是 AGENTS.md §1 點名「比原 bug 更嚴重」的「偵測器悄悄失效」）。修為 `EXPECTED_SCHEMA_ONLY_SLUGS` 精確集合斷言（`{"problem-statement","root-cause-fact"}`，多一個少一個都吵）。
+- **Major 2**：單一檔案／單一 gate 函式的判定分支完全不驗參數名稱是否語意吻合，未來若該檔新增第二個 typed object 引用會靜默丟失既有 gate 檢查（critic 突變在 `causal/dag.py` 加一個 `problem-statement` 引用重現：`causal-dag-analysis` 悄悄掉出 gate 檢查，唯一冒出的失敗訊息卻是講另一個不相干的 schema）。未採 critic 提出的「改名 37 個既有模組參數」方案（無 bug 動機的重構，超出本次授權範圍），改靠 Major 1 的精確集合斷言當安全網——理由與效果 critic 報告已自行驗證：同一顆突變重跑後失敗訊息會清楚列出。
+- **Major 3**：gate 函式偵測原本靠 source-text regex，對重排過的多行函式簽名視而不見（critic 對 `swot.py` 重排成 4 行簽名重現：`swot-analysis` 靜默掉出 gate 檢查，`FAILED=0`）。改用 `inspect.getmembers`/`inspect.signature` 對已 import 的真實模組物件反查，用第一參數的 `kind`（POSITIONAL vs KEYWORD_ONLY）而非名稱排除 `ai_lego/modules/research/gates.py` 的 `evaluate_method_specific_gates`（全 keyword-only，呼叫慣例本來就不同）。
+- **Minor**：同檔重複引用被誤判為「跨檔衝突」且錯誤訊息自打嘴巴（改用 `set` 去重）；一個至今零使用且有潛在誤判風險的 slug-prefix 比對分支（直接刪除）；未驗證 dotted-import 真的解析到被掃描的那個檔案，理論上可能悄悄對到 `pip install .` 裝出來的另一份 `ai_lego` 副本（加 `os.path.samefile` 斷言）；`sys.path.insert(0, ...)` 讓 `docs`/`scripts`/`tests` 這類泛用頂層名稱有機會蓋掉別處的同名 import（改 `append`）；統計算式刻意繞路且標籤不準（直接寫減法＋改標籤）；gate-checked 計數把「呼叫失敗」也算進去（挪到 try 成功之後）；`failed_gates` 硬編 `{"PASS","NOT_APPLICABLE"}` 常數，未來若某模組的 `all_gates_pass` 語意分歧會跟著漂移（改成呼叫模組自己的 `all_gates_pass([g])` 逐項判定）。
+
+**[已修改]**
+- 新增：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/typed_object_example_gates_check.py`
+- 修改：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py`（新增 check family 7 wiring + module docstring 條目 7）
+- 修改：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/README.md`（新增條目 7 摘要）
+- 修改：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml`（補 `supporting_evidence_refs`，1 行資料修正）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（於 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`）| exit=0 | result=`PASSED: 2926`／`ALL GOLDEN TESTS PASSED`（新 check family 7 貢獻 117 項：41 個 schema 全部有 examples、57 個 example 完成 schema 驗證、55 個完成真 gate 驗證橫跨 39 個 schema、2 個 schema-only 且與 `EXPECTED_SCHEMA_ONLY_SLUGS` 精確吻合）
+- REALTEST_EVIDENCE: tool=Bash | cmd=自寫突變重驗腳本（複製 `Projects/internal/cognitive-engineering-os` 到 `D:\tmp` 隔離 sandbox，動手改 sandbox copy，不碰 repo 真檔）：(A) 剝除 39 個引用裡的 38 個重跑 → coverage-floor 斷言正確觸發 `FAILED=1` 並列出全部 39 個意外 slug；(B) 把 `swot.py` 的 `evaluate_swot_gates` 簽名重排成 4 行重跑 → `swot-analysis` 仍被正確 gate-check，`FAILED=0` | exit=0 | result=`ALL VERIFICATION TESTS PASSED`——同一組 critic 證明過會失效的路徑，修復後對照重跑證實兩個都已堵住
+- REVIEW_DONE: critic=Standard（真實 subagent，全程 mutation testing 對 sandbox copy 真跑改檔，非代碼推論）| verdict=0 Critical/3 Major/6 Minor+Suggestion，全修 | findings=0c/3m/6n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`typed_object_example_gates_check`\|`EXPECTED_SCHEMA_ONLY_SLUGS`\|`CHS-2026-08-29-001-H2`\|`supporting_evidence_refs` | hits=新符號僅出現在本次新增/修改的檔案內；`supporting_evidence_refs` 在其餘語料庫的命中皆為既有姊妹 schema（`swot-analysis`／`five-whys-validation`／`causal-dag-analysis`／`blue-team-review`）自己既有的欄位定義/範例，語意獨立不需連動修改；`scripts/` 零命中
+- WORKLOG: 本條目
+
+**[剩餘風險]**
+- `_build_gate_index()` 現在會 import 全部約 39 個有「Instance of」引用的 `ai_lego` 模組（原設計是延遲到真正需要時才 import 單一模組）；效能影響可忽略（golden test 整體仍在數秒內跑完），且目前全部確認為純讀取/路徑解析、無 I/O 副作用
+- Major 2 的殘留風險不是「今天」的 bug，是「未來」的：若某天有第二個模組檔案像 `fishbone.py` 一樣一檔產出多個 typed object，且新增的 typed object 恰好與既有已索引的 gate 函式參數名稱都不吻合，會落入 schema-only 桶——但 `EXPECTED_SCHEMA_ONLY_SLUGS` 精確集合斷言保證這一刻會是**吵鬧的 test failure**，不是靜默漏測
+- 未觸碰既有 37 個模組檔案的參數命名（critic 提出的另一個修法選項），因為那是無 bug 動機的重構，超出本次任務授權範圍（"不得修改既有 schema／模組檔案，除非新檢查本身找到真 bug"）
+
+**[rollback]** 單一新檔 + 兩個既有檔案的小型 diff（`run_golden_tests.py`／`README.md`）+ 一行 schema 資料修正；`git revert` 本 commit 即可，無 migration、無 prod 影響、無資料寫入。
+
 ## 2026-09-06（HCI30 ADR-0004 Wave 5 gates 4-5 落地——TRUST-NEG-03/METHOD-CONTRACT-NEG-01，critic 40-mutation 掃描抓到 0 Critical+2 Major+3 Minor 全修，ADR-0004 五個 gate 現已全數關閉）
 
 **觸發**：操作者「繼續完成 HCI 系統」，明確指名上次收尾的 ADR-0004 Wave 1 gates 1-3（`12d50c1fb`）之後「gates 4-5（Wave 5 Intelligence-math roll-up）remain honestly OPEN」，並全權授權決策，唯一硬性要求：不准無效益派多個 agent。

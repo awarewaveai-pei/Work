@@ -249,6 +249,7 @@ examples:
           statement: "客服人員手動確認流程造成延遲"
           category: "Process"
           provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_EDITED, locked: null }
+          supporting_evidence_refs: ["E-1"]
       promotion:
         validation_methods_applied: []
         ready_for_promotion: false

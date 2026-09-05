@@ -31,6 +31,13 @@ original four):
    used as a real `$ref` value anywhere under `specs/`, `policies/`,
    `methods/registry/`, `recipes/validated/` resolves to a real file and
    (if it carries a `#/...` fragment) a real node within that file.
+7. **Typed-object schema `examples:` vs. real gates**
+   (`tests/typed_object_example_gates_check.py`) — every example on every
+   `specs/cognitive/typed-objects/*.schema.yaml` file is validated against
+   its own schema, and, for the schemas whose producing
+   `ai_lego/modules/**/*.py` module exposes a matching `evaluate_*_gates`/
+   `all_gates_pass` pair, also run through that real gate function — not
+   just checked for shape.
 
 ## Fixture file contract (for check family 1)
 
