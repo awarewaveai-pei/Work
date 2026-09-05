@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 續：第二輪 critic 對 3 個已修改檔的獨立覆審，抓到 1 Major（criticality 行為零測試覆蓋）+ 5 Minor，全部修正並用突變測試證實有效）
+
+**觸發**：`verify-gate-commit` 機械閘要求本 session 修改過的 3 個 Python 檔（`configurator_engine.py`／`validate_configurator.py`／`tests/test_artifact_generation.py`）在 commit 前必須跑 `/verify-recent`，其 Step 2 要求獨立 critic 覆審。派出第二個、與前一輪完全獨立的 critic subagent，重新讀三個檔案的「現況」（非只信任前一輪的敘述）。
+
+**發現與修正**：
+- **Major**：`test_selection_matrix.py:173` 的 golden fixture drift 檢查只比對 `current_capabilities`／`modules`／`active_answer_count` 三個欄位，兩個 fixture（`all_no.json:27`／`all_yes.json:239`）都存了 `criticality` 欄位但沒有任何測試比對它——代表本次唯一真正改變的「行為」（`configurator_engine.py` 的 `criticality` 公式併入 `Q-IMP-007`/`Q-IMP-008`）完全沒有回歸測試保護，13,035 組窮舉配對＋1000 組隨機都不會看這個欄位。**已修**：golden drift 檢查加入 `criticality`/`profile` 比對；新增 3.6 步驟單獨驗證 `Q-IMP-007`／`Q-IMP-008` 各自單獨為真時 criticality 必須是 `medium`（兩個 fixture 都無法單獨驗證這個 clause：all-no 兩題皆 false，all-yes 兩題皆 true 但 `Q-IMP-004` 已經把 criticality 拉到 `mission_critical`，蓋掉了 load_pressure 分支）。**用突變測試證實新斷言真的有牙齒**：在 disposable 副本把 `load_pressure` 硬改成 `False`，重跑 `test_selection_matrix.py` 立刻在新增的 3.6 步驟紅燈（`AssertionError: Q-IMP-007 alone must yield criticality=medium, got low`），還原後綠燈——不是空測試。
+- **Minor 1**：新增的 conflict-rules 檢查裡有一段註解宣稱「`refs()` 解析不了的形狀（空字典、錯誤 key 名）之前只會在 `eval_condition()` 評估時噴 `unknown condition`」——實測 `eval_condition({})` 與 `eval_condition({"all":[]})` 其實回傳 `True`（不會噴錯），只有真正未知的 key 名才會噴錯，註解與程式行為不符。同時「無法解析形狀」跟「空/vacuous 條件恆真」是同一類缺陷（都會讓規則對任何設定都成立）卻被分類成不同錯誤訊息，容易誤導維修者去找錯字而不是去找恆真邏輯。**已修**：把衝突規則的 `if_all` 條目限制為扁平 `{question,equals}`（見下一項理由），恆真/未知形狀的區分問題因此不再適用於 conflict-rules；註解改為只描述扁平限制的理由。
+- **Minor 2（連動發現）**：`refs()` 會同時走訪 `all` 跟 `any` 兩個 key，但 `eval_condition()`（`configurator_engine.py`）用三個獨立 `if` 各自 `return`，實際上只會評估條件字典裡第一個符合的 key——一個同時帶 `all` 跟 `any` 的畸形條件會讓 `any` 分支被靜默丟棄，`refs()` 卻仍然照樣檢查裡面的問題 id，等於在檢查一段執行期根本不會被看到的邏輯。**已修**：新增 `shape_errors()` 遞迴檢查，任何條件字典同時帶超過一個 `question`/`all`/`any` key 一律回報「`eval_condition only evaluates the first`」，套用在 `active_when` 檢查（conflict-rules 因改扁平限制不受影響）。
+- **Minor 3**：新增的 conflict-rules 檢查驗證了 `if_all` 內容，但沒驗證規則本身要有 `id`/`code`/`message`——實測餵一條缺 `code` 的規則給驗證器，回報 0 errors；`validate_answers()`（`configurator_engine.py`）碰到它時直接 `KeyError: 'code'`，經 `serve_configurator.py` 的 catch-all 會讓「剛好觸發矛盾」的使用者收到不透明的 500 錯誤而非清楚的驗證訊息。**已修**：加入 `id`/`code`/`message` 三個必填欄位的存在性檢查。
+- **Minor 4**：新增的 conflict-rules 檢查允許巢狀 `{"all":[...]}` 形狀的 `if_all` 條目通過，但 `test_selection_matrix.py:163`（`raw={c['question']:c['equals'] for c in cr['if_all']}`）假設每個條目都是扁平的——一條巢狀的衝突規則會通過驗證器卻讓這行測試碼噴 `KeyError`。**已修**（選 critic 建議的較小爆炸半徑方案）：conflict-rules 的 `if_all` 條目直接限制為扁平 `{question,equals}`，非扁平一律回報「must be flat」錯誤，不去改測試碼配合巢狀。
+- **Minor 5**：`refs()` 對非 dict 輸入（例如條件是個 list）會直接 `AttributeError` 而非乾淨的驗證錯誤。**已修**：`refs()`／`shape_errors()` 開頭都加 `isinstance(c,dict)` 防呆。
+- **Suggestion（採納）**：`tests/test_artifact_generation.py` 硬編 `200`／`31` 正是 `EXPECTED_BLUEPRINT_COUNT`（`configurator_engine.py`）當初被抽成常數要解決的同一種味道（這次 commit 需要手動把 `199` 改成 `200` 就是這個 bug class 的直接證據）。**已修**：改成從 `capabilities/catalog.json`／`generation/module-manifests.json` 動態算出，之後新增 capability/module 不再需要手動改這個測試檔。
+- **Suggestion（採納）**：`validate_configurator.py` 的 active_when 迴圈原本重用變數名 `r` 代表「問題 id」，跟函式其他地方 `r` 代表「規則」混淆——改名 `qref`。
+
+**[已修改]**（延續同一 commit，尚未 push）：
+- `scripts/validate_configurator.py`：`refs()`/`shape_errors()` 防呆＋`active_when` 多重分支 key 檢查＋conflict-rules 改扁平限制＋`id`/`code`/`message` 存在性檢查＋變數改名
+- `scripts/test_selection_matrix.py`：golden drift 加入 `criticality`/`profile`；新增 3.6 步驟單獨驗證 `Q-IMP-007`/`Q-IMP-008`→`medium`
+- `tests/test_artifact_generation.py`：硬編 `200`/`31` 改為動態計算
+- `manifest.json`：`regenerate_integrity.py --write` 重算雜湊
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile` 三個變更檔 | exit=0 | result=語法全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=disposable 完整套件副本（`shutil.copytree`）逐一注入 6 種畸形 conflict-rule（缺 id／缺 code／巢狀 if_all／頂層 typo／字串 equals）+ 1 個 active_when 多重分支 key 突變，對真實檔案（非重寫邏輯）跑 `validate_configurator.py` | exit=1（每個突變皆是）| result=6 種全部被正確攔下且訊息符合預期，副本用完即刪
+- REALTEST_EVIDENCE: tool=Bash | cmd=disposable 副本把 `configurator_engine.py` 的 `load_pressure` 硬改 `False` 後跑 `test_selection_matrix.py` | exit=1 | result=`AssertionError: Q-IMP-007 alone must yield criticality=medium, got low`（新增的 3.6 步驟真的會抓到這個回歸，非空測試），還原後綠燈
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_foundry.py`＋`test_selection_matrix.py`＋`python -m unittest discover -s tests`＋`validate_manifest.py`（對真實 repo，非 disposable 副本）| exit=0（每一步）| result=`SELECTION MATRIX: PASS questions=162 single=162 pairwise_valid=13035 pairwise_rejected=6 random=1000 modules=32 blueprints=73 all_yes_caps=200`；29 unittest 全綠；`MANIFEST VALIDATION: PASS`
+- REVIEW_DONE: critic=Standard（第二個獨立 subagent，非同一個）| verdict=pass（本輪 1 Major+5 Minor+2 Suggestion 全部修正並上述突變證實）| findings=0c/0m/0maj（全部關閉）
+- BUGHUNT_DONE: scope=agency-os,scripts（System_Foundry_v1.6_ARTIFACT_COMPLETE 全樹）| grep=`refs(\|shape_errors\|load_pressure\|conflict if_all entries must be flat` | hits=符合預期，僅出現在本次修改的檔案內，無孤兒引用
+
+**[剩餘風險]**：`eval_condition()`（`configurator_engine.py`）本身對「條件字典同時帶多個分支 key」這個畸形輸入的行為（只評估第一個、靜默丟棄其餘）維持原樣未改——本次只在驗證層加了偵測，沒有動執行期語意，因為改執行期語意需要重新驗證全部 162 題現有 `active_when` 的行為，超出本次範圍；目前 0 個現存問卷條目觸發這個形狀，純屬防未來回歸。
+
+**[rollback]**：`git revert` 本次 commit 即可完整還原；`manifest.json` 雜湊隨 revert 自動對齊。
+
 ## 2026-09-05（HCI-30 Wave 1：ADR-0019 hardening migration 0009 — db-expert 覆審遺留 M4/M6/M7/M8/m2/m4＋建議項全數關閉；Docker Desktop 殘留 socket 復原）
 
 **觸發**：操作者「全部去完美處理好」（ADR-0019 遺留＋ADR-0009）。本輪 = 第一段（0009）。1 個 subagent（Explore，唯讀，研究 epistemic-label schema 與 ADR-0009 契約，供下兩個 migration 設計用）。

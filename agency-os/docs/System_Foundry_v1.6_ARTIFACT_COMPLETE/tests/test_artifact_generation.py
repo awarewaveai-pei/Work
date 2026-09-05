@@ -1,15 +1,21 @@
 import json,tempfile,unittest,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
-from configurator_engine import resolve,EXPECTED_BLUEPRINT_COUNT
+from configurator_engine import resolve,load,EXPECTED_BLUEPRINT_COUNT
 from foundry_generate import generate,MODULE_DOCS
 import test_selection_matrix as matrix
 
 class ArtifactGenerationTests(unittest.TestCase):
     def test_all_yes_materializes_complete_standard_modules_and_blueprint(self):
         a=matrix.complete({},True); p=resolve({'name':'all-yes-unit'},a,[])
-        self.assertEqual(len(p['current_capabilities']),199)
-        self.assertEqual(len(p['modules']),31)
+        # Derived from the catalogs themselves rather than a hardcoded count: this is the exact
+        # class of magic number EXPECTED_BLUEPRINT_COUNT (configurator_engine.py) was extracted to
+        # stop re-hardcoding across files -- a 2026-09-05 critic review pointed out these two were
+        # the last of that species left in the package (the reason this diff needed a manual
+        # 199->200 bump here at all) and the real invariants are "all-yes activates every
+        # capability" and "all-yes activates every module except the custom-requirement extension".
+        self.assertEqual(len(p['current_capabilities']),len(load('capabilities/catalog.json')['capabilities']))
+        self.assertEqual(len(p['modules']),len(load('generation/module-manifests.json')['modules'])-1)
         with tempfile.TemporaryDirectory() as td:
             out=generate(p,a,[],td)
             self.assertEqual(len(list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))),EXPECTED_BLUEPRINT_COUNT)

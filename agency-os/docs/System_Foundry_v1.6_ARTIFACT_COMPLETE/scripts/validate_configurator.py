@@ -29,6 +29,34 @@ def main():
     # NOTE: this does not cover the separate hazard of a *backward* reference to a question that is
     # itself conditionally active and currently answered False -- render() also deletes that
     # question's answers[] entry, so it stays undefined regardless of render order. Not checked here.
+    # Used by the active_when forward-reference check below, which allows full {all:[...]}/
+    # {any:[...]} nesting (matching eval_condition()'s general condition shape). The separate
+    # conflict-rules.json check further down does NOT call this -- it restricts if_all entries to
+    # flat {question,equals} instead (see that check's comment for why). Returns [] for an
+    # unrecognized shape (wrong key name, empty dict, non-dict, ...) so callers can treat "no refs
+    # found" as its own error rather than silently accepting a condition that eval_condition()
+    # would later raise on at runtime.
+    def refs(c):
+        if not c or not isinstance(c,dict):return []
+        if 'question'in c:return [(c['question'],c.get('equals'))]
+        return sum((refs(x) for x in c.get('all',[])+c.get('any',[])),[])
+    def branch_keys(c):
+        return [k for k in ('question','all','any') if isinstance(c,dict) and k in c]
+    # eval_condition() (configurator_engine.py) checks 'question'/'all'/'any' as separate `if`
+    # statements, each returning immediately -- so a condition dict carrying more than one of
+    # those keys silently evaluates only the first and drops the rest (a 2026-09-05 critic review
+    # measured this directly: {"all":[...true...],"any":[...references an unknown question...]}
+    # evaluates fine and the unknown question is never touched). refs() above walks 'all' AND
+    # 'any' together, so it would report the unknown question as a real error on a condition
+    # eval_condition never actually looks at -- flagging the ambiguous shape itself, wherever it
+    # appears in the tree, is more useful than either silently trusting or silently distrusting it.
+    def shape_errors(c):
+        if not c or not isinstance(c,dict):return []
+        bk=branch_keys(c); out=[]
+        if len(bk)>1: out.append('condition has multiple branch keys '+str(bk)+'; eval_condition only evaluates the first')
+        if 'question' not in c:
+            for x in c.get('all',[])+c.get('any',[]): out+=shape_errors(x)
+        return out
     render_index={}; _pos=0
     for c in cat_ids:
         for q in catalog['questions']:
@@ -37,16 +65,13 @@ def main():
         if q['category'] not in cats: errors.append(q['id']+': unknown category')
         if q.get('answer_type')!='boolean': errors.append(q['id']+': non-binary answer type')
         if q.get('group') and q['group'] not in group_ids_by_cat.get(q['category'],set()): errors.append(q['id']+': unknown group '+q['group'])
-        def refs(c):
-            if not c:return []
-            if 'question'in c:return [(c['question'],c.get('equals'))]
-            return sum((refs(x) for x in c.get('all',[])+c.get('any',[])),[])
         qi=render_index.get(q['id'])
-        for r,eq in refs(q.get('active_when')):
-            if r not in qset: errors.append(q['id']+': active_when unknown '+r)
+        for se in shape_errors(q.get('active_when')): errors.append(q['id']+': active_when '+se)
+        for qref,eq in refs(q.get('active_when')):
+            if qref not in qset: errors.append(q['id']+': active_when unknown '+qref)
             elif eq is False and qi is not None:
-                if r==q['id']: errors.append(q['id']+': active_when self-references '+r+' (condition can never be satisfied)')
-                elif render_index.get(r,_pos)>=qi: errors.append(q['id']+': active_when forward-references '+r+' (renders later, undefined on first paint)')
+                if qref==q['id']: errors.append(q['id']+': active_when self-references '+qref+' (condition can never be satisfied)')
+                elif render_index.get(qref,_pos)>=qi: errors.append(q['id']+': active_when forward-references '+qref+' (renders later, undefined on first paint)')
     caps={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
     for c in caps.values():
         for r in c['requires']:
@@ -58,6 +83,39 @@ def main():
                     if cid not in caps: errors.append(r['id']+': unknown capability '+cid)
             if 'when' in r and r['when'].get('question') not in qset: errors.append(r['id']+': unknown question')
             if 'when_capability' in r and r['when_capability'] not in caps: errors.append(r['id']+': unknown when capability')
+    # conflict-rules.json was never included in the loop above (different shape: if_all/code/message,
+    # no when/when_capability/require/defer/derive keys) so a typo'd question id inside a conflict
+    # rule's if_all has been silently unchecked since the file was introduced -- eval_condition()
+    # would just read answers.get(typo'd_id) as always-None/False, so the rule can never fire and the
+    # contradiction it exists to catch goes undetected with zero error anywhere. First version of
+    # this check only looked at the top-level `if_all[].question` key, which a 2026-09-05 critic
+    # review caught missing several other ways the same silent-dead-rule failure reaches production:
+    # a typo'd/unknown question nested inside an `{"all":[...]}"` or `{"any":[...]}"` entry, `"equals"`
+    # given as a non-boolean (e.g. the string "true" -- eval_condition() compares with `is`, so
+    # `answers[q] is "true"` is always False no matter the real boolean answer, same dead-rule
+    # outcome), a rule missing `id`/`code`/`message` (validate_answers() in configurator_engine.py
+    # unconditionally dereferences `r['code']`/`r['message']` -- a missing key there is a raw
+    # unhandled KeyError for every operator who trips the intended contradiction, not a validation
+    # message), and an empty/missing `if_all` (Python's `all([])` is vacuously True, so
+    # configurator_engine.py's `all(eval_condition(c,answers) for c in r['if_all'])` would reject
+    # every single configuration). Conflict `if_all` entries are intentionally restricted to flat
+    # `{question,equals}` here (unlike active_when, which allows full `all`/`any` nesting via the
+    # same refs() walker above) because test_selection_matrix.py:163's fail-closed check
+    # (`raw={c['question']:c['equals'] for c in cr['if_all']}`) assumes exactly that flat shape --
+    # a genuinely nested conflict condition would pass this validator yet crash that test with a
+    # confusing KeyError, so the smaller-blast-radius fix is to not allow the shape that test can't
+    # handle rather than teach the test to handle a shape conflict-rules.json has never used.
+    for r in load('rules/conflict-rules.json')['rules']:
+        rid=r.get('id','?')
+        for key in ('id','code','message'):
+            if not r.get(key): errors.append(rid+': conflict rule missing '+key)
+        if not r.get('if_all'): errors.append(rid+': empty if_all matches every configuration')
+        for cond in r.get('if_all',[]):
+            if not isinstance(cond,dict) or 'question' not in cond:
+                errors.append(rid+': conflict if_all entries must be flat {question,equals}'); continue
+            qid=cond['question']; eq=cond.get('equals')
+            if qid not in qset: errors.append(rid+': unknown question '+qid)
+            if not isinstance(eq,bool): errors.append(rid+': non-boolean equals for '+qid)
     # capability graph cycle check
     visiting=set(); done=set()
     def dfs(cid):

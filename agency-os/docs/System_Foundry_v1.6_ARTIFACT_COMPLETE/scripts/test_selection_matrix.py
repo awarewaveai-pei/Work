@@ -147,6 +147,16 @@ def main():
     if not expected_conflict(ValueError(real_conflict['code']+': '+real_conflict['message'])): raise AssertionError('expected_conflict must accept a real conflict-rule code')
     if expected_conflict(ValueError('Q-X: active question unanswered')): raise AssertionError('expected_conflict must reject an unrelated ValueError')
     if expected_conflict(ValueError(real_conflict['code'])): raise AssertionError('expected_conflict must reject a bare code with no colon-space (not a real resolve() message shape)')
+    # 3.6) Q-IMP-007/008 individually must each raise criticality to at least 'medium' (the
+    # 'load_pressure' clause in configurator_engine.py resolve()). The single-question loop above
+    # (step 3) only asserts require/defer capability activation, never criticality, and neither
+    # golden fixture exercises this clause in isolation (all-no has both False; all-yes has both
+    # True but Q-IMP-004 already forces 'mission_critical' there regardless of load_pressure) --
+    # a 2026-09-05 critic review found this was the one behavior this diff changed with zero
+    # regression coverage anywhere in the suite.
+    for qid in ['Q-IMP-007','Q-IMP-008']:
+        p=resolve({'name':'crit-'+qid.lower()},answer_for_question(qid),[])
+        if p['criticality']!='medium': raise AssertionError(f'{qid} alone must yield criticality=medium, got {p["criticality"]}')
     # 4) exhaustive pairwise question interactions where prerequisites are compatible
     pairs=0; rejected=0
     ids=sorted(QMAP)
@@ -167,10 +177,15 @@ def main():
             if cr['code'] not in str(e): raise AssertionError('wrong conflict code for '+cr['id']+': '+str(e))
         else:
             raise AssertionError('conflict did not fail closed: '+cr['id'])
-    # golden selection fixtures lock intended current coverage
+    # golden selection fixtures lock intended current coverage. criticality/profile were added to
+    # this comparison after a 2026-09-05 critic review found both fixtures already store the field
+    # (all_no.json:27, all_yes.json:239) but nothing compared it -- a future edit to the
+    # criticality/profile ternaries in configurator_engine.py's resolve() would silently rewrite
+    # every generated project's risk posture with this whole suite still green.
     for fixture,ans,plan in [('all_no.json',a0,p0),('all_yes.json',ay,py)]:
         g=json.loads((ROOT/'tests/fixtures/selection'/fixture).read_text())
-        if g['current_capabilities']!=plan['current_capabilities'] or g['modules']!=plan['modules'] or g['active_answer_count']!=len(ans):
+        if (g['current_capabilities']!=plan['current_capabilities'] or g['modules']!=plan['modules'] or g['active_answer_count']!=len(ans)
+            or g['criticality']!=plan['criticality'] or g['profile']!=plan['profile']):
             raise AssertionError('golden selection drift: '+fixture)
 
     # 6) deterministic randomized mixed configurations
