@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-09-05（續49，同一 session：Cognitive OS 第三十六個 Method Atlas 切片 — `devops_sre.stress_test`，349,440 case oracle 零分歧，critic warn 4 Major 全屬宣稱／半邊防線類，另揪出契約自己漏揭露的第三個同名異物）
+
+**觸發**：延續操作者「繼續」授權。1 個 critic subagent（額度檢查通過）。
+
+**選型**：`devops_sre` 家族第十一成員（F19 11/13，剩 Soak Test／RTO-RPO）。Atlas F19 L854「超過預期負載→觀察 cliff/recovery｜了解安全餘量」。**先處理近義異物風險**：Phase-0 `verified-findings.yaml:1052` 已記錄 F19「Stress Test」（L854，負載測試）與 F12「Stress Testing」（L652，情境紅隊測試）同名異物、皆無 machine_id；本契約 `id: devops_sre.stress_test` 鑄造前者，讀完 F12 那列全文確認是認知紅隊方法非本方法，disclosed 而非默默忽略。**重用 `devops_sre.load_test` 的 `#/$defs/load_measurement`**（跨檔 `$ref`，`SchemaContracts` 的 `referencing` registry 確認可正確解析），解答上一切片 OQ-LOADTEST-5。五個不變量：升載階梯 ≥2 階嚴格遞增、資源集合每階一致、至少一階嚴格超過 `expected_load_rps`、`breaking_thresholds` 閘重驗（capacity_model／load_test 教訓從第一版套用）、`breaking_point`（首個突破階或 null，genuine compute）與 `recovery`（found iff 必填，reduced load 嚴格低於突破階，`recovered` 全導出無覆寫）雙向 iff 耦合（跟 game_day 的 recovery-iff-stopped 同款）。新 compute 函式 `find_breaking_point`（純搜尋，不重排）。
+
+**critic 真跑（50 個 runtime 突變、獨立 oracle 窮舉 349,440 種 (ladder×thresholds×recovery) 形狀、直接 jsonschema 探測 if/then/else）：verdict warn，4 Major＋6 Minor，0 Critical**。核心水密：oracle 零逃逸零誤判零 gate 分歧、每個 builder raise 都追到 gate 同函式（含 gate 對 `breaking_thresholds` 的獨立重驗，capacity_model/load_test 教訓確認吸收）、跨檔 `$defs` reuse 證明可解析且 runtime/schema 兩層逐欄核對一致無分歧。Major 全修：
+1. 「首個突破（非最後）」與「照呼叫端順序搜尋（非重排）」——本方法的核心語義——完全沒測試逼它執行：兩個既有 fixture 剛好都只有一階違規、且剛好都已遞增排序，改成累積到最後一次違規、或先重排再搜尋都全綠。補兩個測試（多違規階梯釘第一個、非遞增階梯釘照原序）。
+2. `_derive_recovered` 的 `and` 換成 `or` 存活——因為兩個既有 `recovered:false` fixture 剛好同時壞兩個指標，從沒測過「只有一個指標壞」。補兩個測試（延遲正常/錯誤率壞、反過來）。
+3. `recovered` 的 `<=` 含邊界值只測了 breaking_point 那一半的鏡射邊界，自己這半沒釘。補一個剛好卡在兩個閾值上的測試。
+4. schema 的 `if/then/else` 只用 `properties` 沒加 `required`——JSON Schema 對「key 直接省略」（非 present-but-null）完全不擋，runtime gate 還攔得住所以沒有真的逃逸，但防禦縱深有洞。兩個分支補 `required: [recovery]`，另補一個「key 省略」的迴歸測試。
+Minor 全修：三個防禦性型別檢查無測試（bool load_rps／空 utilization map／load_rps=0 合法）；`breaking_point.load_rps` 用 `exclusiveMinimum:0` 跟重用的 `load_measurement` 自己的 `minimum:0` 不一致（改一致）；doc「ten shared predicates」算錯（改「九個布林 predicate＋共用的 find_breaking_point」）；drift 清單漏列「RTO/RPO comparison」卻序數照數（補回清單）；`generated_by_method` 可標錯無層察覺（家族級，doc 補揭露）；**契約自己漏掉三個「stress_test」同名異物**——Master Plan L1776 與 REPOSITORY_ARCHITECTURE.md:308 都在模擬／data-science 家族下放一個叫 `stress_test` 的目錄佔位（跟 load_test 那個 OQ-LOADTEST-5 是同一個佔位，本切片才是 F19 語意的真正實作）；Atlas 自己 quick-select L4477 第三次出現「Stress Test」字串，正是 Phase-0 早已點名「無法消歧」的那一列——三者都補進契約揭露＋新開 `OQ-STRESSTEST-6`。
+
+**本輪教訓**：邏輯類教訓（gate 重驗輸入、跨檔 reuse 正確、無發明規則）這次真的全部預防成功；但「這個方法唯一的意義所在」（首個非最後、原序非重排）沒有測試逼它執行——核心語義比周邊細節更容易被想當然爾地略過，因為兩個手寫 fixture 剛好都太簡單覆蓋不到分歧情境。schema 防禦縱深要對稱檢查兩個方向（不只 present-wrong-type，還要 absent-entirely）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.stress_test.contract.yaml`＋`specs/cognitive/typed-objects/stress-test-record.schema.yaml`（含跨檔 `$defs` reuse＋`if/then/else`）＋`contract-backlog.yaml` `tier_1.thirtyfourth_concrete_entry`＋`devops_sre.load_test.contract.yaml` OQ-5 標 ANSWERED＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/compute/stress_test/{__init__,analysis}.py`＋`ai_lego/modules/devops_sre/stress_test.py`＋`ai_lego/apps/cli/run_stress_test_slice.py`＋`tests/unit/test_stress_test.py`（70 tests）＋`docs/THIRTYSIXTH_SLICE_DEVOPS_SRE_STRESS_TEST.md`；`modules/devops_sre/__init__.py` docstring。`agency-os/TASKS.md` 切片條目＋F19 剩餘清單修正＋VBC 核對 hook bug 已由另一 session 修復標記完成。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2792→2796
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_stress_test_slice` | exit=0 | result=`PASS devops_sre.stress_test: 4 steps, breaking_point={'step_index': 3, 'load_rps': 1000}, recovered=True, gates [provenance_required=PASS, genuine_compute=PASS, stress_test_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_stress_test` | exit=0 | result=70 OK（62→70）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=93307（修正後重跑）| result=**1109 tests OK**（1039→1109，零回歸；初稿 1101）
+- REVIEW_DONE: critic=Standard（真實 subagent，50 runtime 突變、349,440 形狀獨立 oracle、直接 jsonschema 探測）| verdict=warn→4 Major＋6 Minor 全修 | findings=0c/4m/6minor
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]stress_test\|StressTestRecord\|STRESSTEST_` | hits=73（11 個檔案全部本切片自己；`.claude/bash-commands.log` 為本 session 指令記錄非程式碼；過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-STRESSTEST-1~6` 皆揭露；`recovery` 僅單一觀測點非對稱階梯；無 `capacity_model_ref` soft link；三個模擬家族同名異物未和解（`OQ-STRESSTEST-6`）；`generated_by_method`／頂層 key／own id 前綴皆家族級 schema-only 慣例。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
 ## 2026-09-05（續，soulful 加固：Bot Fight Mode 開了又關（免費方案會誤傷 SEO/AI 搜尋）+ install.php 加固誤打 Hostinger 死路徑後修正到 ks-aw-01 + 兩份文件的主機現況 drift 訂正）
 
 **觸發**：操作者對前一輪查出的兩個尾巴（soulful CF zone 缺 Bot Fight Mode、install.php 可公開存取）回「你認為要不要? 你才是頂尖專家權威」，授權我判斷並執行。

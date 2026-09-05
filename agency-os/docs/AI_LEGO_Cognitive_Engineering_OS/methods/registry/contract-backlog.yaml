@@ -1226,6 +1226,42 @@ tier_1:
       table-row citation of its own, thinner than several Tier 0
       examples. Tier 1, mandated by the actively-running implementation
       slice, same category as the thirty-two entries above it.
+  thirtyfourth_concrete_entry:
+    # NEW (2026-09-05, same session): thirty-fourth Tier 1 entry, same
+    # additive-key rationale as the thirty-three entries above it.
+    method_id: "devops_sre.stress_test"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. ELEVENTH entry
+      from the `devops_sre` family (F19), after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, devops_sre.error_budget,
+      devops_sre.capacity_model, devops_sre.release_readiness_review,
+      devops_sre.runbook_execution, devops_sre.game_day, and
+      devops_sre.load_test. Atlas's own F19 tool table row (L854:
+      "超過預期負載→觀察 cliff/recovery", benefit "了解安全餘量") grounds
+      FIVE real invariants: an escalating ladder of at least 2 load
+      measurements with strictly increasing load, uniform resource sets,
+      at least one step exceeding the expected load, caller-supplied
+      breaking thresholds re-verified by the gate, and a COMPUTED
+      breaking_point (the first breaching step, or null) whose presence
+      REQUIRES a recovery observation and whose absence FORBIDS one --
+      the recovery's own reduced load strictly below the breaking load
+      and its own recovered flag fully derived, no override. Reuses
+      devops_sre.load_test's own `#/$defs/load_measurement` unchanged
+      across files, resolving that contract's own OQ-LOADTEST-5.
+      Checked and confirmed distinct from F12's own near-identically-
+      named "Stress Testing" row (a cognitive red-team method, not this
+      engineering load method) -- the exact collision Phase-0's own
+      verified-findings.yaml:1052 flagged, now resolved by direct read
+      and disjoint machine IDs.
+    source: "methods/contracts/devops_sre.stress_test.contract.yaml (built same session as this entry, mints machine_id devops_sre.stress_test) + specs/cognitive/typed-objects/stress-test-record.schema.yaml (new output type, reuses load-test-record.schema.yaml's own $defs)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own, thinner than several Tier 0
+      examples. Tier 1, mandated by the actively-running implementation
+      slice, same category as the thirty-three entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

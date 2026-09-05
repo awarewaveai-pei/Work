@@ -1,0 +1,337 @@
+$id: "ai-lego://methods/contracts/devops_sre.stress_test.contract.yaml"
+title: "Stress Test Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-sixth Method Atlas slice, ELEVENTH from
+  the `devops_sre` family (F19), after `devops_sre.sli_slo` (twentieth),
+  `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth), `devops_sre.capacity_model`
+  (thirty-first), `devops_sre.release_readiness_review` (thirty-second),
+  `devops_sre.runbook_execution` (thirty-third), `devops_sre.game_day`
+  (thirty-fourth), and `devops_sre.load_test` (thirty-fifth).
+
+  Atlas gives this method exactly ONE citation of its own: the F19 tool
+  table's Stress Test row (L854: purpose "找系統破壞點" -- find the
+  system's breaking point; usage "超過預期負載→觀察 cliff/recovery" --
+  exceed the expected load, observe the cliff/recovery; benefit "了解安
+  全餘量" -- understand the safety margin). No dedicated §11.x section
+  exists (confirmed by direct read of the surrounding table, L848-863).
+
+  **Near-name collision, checked and confirmed distinct (the exact class
+  Phase-0's own `verified-findings.yaml:1052` flagged)**: F12's own
+  "Stress Testing" row (L652: "極端但合理情境 | extreme scenarios→run
+  →breaking points | 測 robustness") is a COGNITIVE red-team method --
+  running a PLAN or DECISION through extreme-but-plausible qualitative
+  scenarios to test its own robustness, sibling to Red Team/Pre-mortem
+  in F12's own challenge family (three of which -- `challenge.red_team`,
+  `challenge.blue_team`, `challenge.independent_judge` -- are already
+  built this session). F19's own Stress Test is an ENGINEERING load
+  test -- escalating REAL, MEASURED request load against a running
+  system until it observably breaks. Both use the word "breaking
+  point(s)" and neither carries a machine ID in `method-inventory.yaml`
+  to disambiguate by id alone (confirmed: L1142's own Stress Test entry
+  and the F12 table's own Stress Testing entry are both `has_contract:
+  false` with no machine_id field before this contract) -- `id:
+  devops_sre.stress_test` (this contract) and a future `challenge
+  .stress_testing` (unbuilt) would be the disambiguating machine IDs.
+  Neither is a duplicate of the other; both are real, distinct methods
+  Atlas names separately in separate packs.
+
+  This method's own typed object REUSES `devops_sre.load_test`'s own
+  `#/$defs/load_measurement` shape UNCHANGED across files, resolving
+  that contract's own OQ-LOADTEST-5 (whether Stress Test/Soak Test
+  should reuse it) -- YES, confirmed here by direct construction: the
+  same four fields (`load_rps`/`latency_p95_ms`/`error_rate`/
+  `resource_utilization`) describe one measurement at one load level in
+  both methods; only the SHAPE of the surrounding record differs (Load
+  Test: exactly two measurements, baseline vs target, judged against an
+  absolute acceptance bar; Stress Test: an ESCALATING LADDER of two or
+  more measurements, searched for the first one that breaches a
+  breaking-point definition).
+
+  A second echo, checked and disclosed: `devops_sre.capacity_model`'s
+  own PURPOSE column also names "安全餘量" (safety margin, L852:
+  "預估容量與安全餘量"). Distinct: capacity_model PROJECTS a future
+  headroom ratio from a growth-rate assumption, with no real load ever
+  applied; this method EMPIRICALLY DISCOVERS the breaking point by
+  actually escalating real, measured load against a running system.
+  Neither typed object references the other; a future revision could
+  cross-reference stress_test's own `breaking_point.load_rps` as an
+  empirical input to a capacity_model projection's own `current_capacity`
+  -- disclosed as OQ-STRESSTEST-4, not built.
+
+  Broad due-diligence search (case-insensitive spec-root greps for
+  "stress test"/"壓力測試"/"stress_test", "breaking point"/"cliff"/"破壞
+  點", "safety margin"/"安全餘量", "recovery"/"恢復"): the two echoes
+  above plus THREE further neighbours a critic review found this
+  contract's first draft had missed, all now disclosed: (1)
+  `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:1776`
+  reserves a `/modules/simulation/{scenario, monte_carlo, sensitivity,
+  stress_test}/` directory placeholder (no contents) under a
+  SIMULATION module family outputting "Success Probability" -- this is
+  the SAME placeholder `devops_sre.load_test`'s own OQ-LOADTEST-5
+  already flagged (now resolved for this method: `devops_sre
+  .stress_test` is the built implementation of the F19 sense of that
+  name; the Master Plan's own directory sits under a DIFFERENT module
+  family and is not this method's own home). (2)
+  `docs/architecture/REPOSITORY_ARCHITECTURE.md:308` and its mirror
+  `.ai/research/phase-0/architecture-inventory.yaml:1695` both list a
+  "Simulation Worker" handling "Monte Carlo/Scenario/Sensitivity/Stress
+  Test" under `/modules/data-science/simulation` -- the same
+  simulation-family placement as (1), not this method. (3) Atlas's own
+  quick-select table has a THIRD occurrence of the exact string
+  "Stress Test" at L4477 ("策略要撐未來 | Scenario Planning | Futures
+  Wheel / Stress Test | Single Forecast") -- read in context: this row
+  is itself the exact ambiguous reference Phase-0's own
+  `verified-findings.yaml:1059` already named as undisambiguatable
+  between F12's Stress Testing and F19's Stress Test; it belongs to
+  the SCENARIO-PLANNING (F12-family) sense by co-location with Futures
+  Wheel, not to this method, but the row's own text cannot formally
+  prove that -- disclosed, not silently resolved. None of the three is
+  a duplicate typed object or a competing method contract for THIS
+  concept (an engineering load method); no duplicate found.
+
+  Atlas's own formula and benefit ground FIVE real invariants: (1) the
+  load ladder has at least two steps, STRICTLY increasing `load_rps`
+  (an escalation, not a single measurement or a flat repeat); (2) at
+  least one step's own `load_rps` STRICTLY exceeds `expected_load_rps`
+  (Atlas's own "超過預期負載" -- a ladder that never exceeds the
+  expected load is not a stress test); (3) every step reports the SAME
+  set of resource names (the same like-for-like discipline
+  `devops_sre.load_test`'s own resource-set invariant already
+  establishes); (4) `breaking_point` is COMPUTED -- the first step, by
+  order, whose own latency or error rate breaches `breaking_thresholds`
+  -- `null` is a legitimate, honestly-disclosed outcome (no cliff found
+  within the tested range), never silently coerced to a false positive
+  or negative; (5) `recovery` is REQUIRED iff `breaking_point` is not
+  null and FORBIDDEN otherwise, its own `reduced_load_rps` is STRICTLY
+  below the breaking step's own `load_rps` (a genuine reduction, not a
+  re-measurement at the same or higher load), and its own `recovered`
+  flag is FULLY DERIVED against `breaking_thresholds` -- no caller
+  override, the same discipline `devops_sre.load_test`'s own `status`
+  already establishes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Stress Test row (L854): '超過預期負載→觀察 cliff/recovery'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Stress Testing row (L652): '極端但合理情境 | extreme scenarios→run→breaking points | 測 robustness' -- read in full, confirmed a DISTINCT cognitive red-team method, not this one"
+  - "methods/registry/method-inventory.yaml Stress Test entry (L1142-1146): category 'F19 devops-sre', line field reads 851 -- CORRECTED here to the real L854 position, the same systematic +3 drift already disclosed by nine prior contracts this session (Error Budget, RTO/RPO comparison, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model, Release Readiness Review, Runbook Execution, Game Day, Load Test), now observed an ELEVENTH time -- CORRECTED post-critic-review: this contract's first draft dropped 'RTO/RPO comparison' from the list while keeping it in the ELEVENTH count, an omission every contract from release_readiness_review onward had silently repeated"
+  - "specs/cognitive/typed-objects/load-test-record.schema.yaml#/$defs/load_measurement -- REUSED unchanged, resolving that contract's own OQ-LOADTEST-5"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-fourth concrete entry. `id: devops_sre.stress_test` mints a
+  new machine_id, ELEVENTH member of the `devops_sre` family --
+  disambiguating it from F12's own unbuilt `challenge.stress_testing`.
+  `family: devops_sre` reused as-is.
+
+id: devops_sre.stress_test
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, INFER]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating the ladder into discrete steps is DECOMPOSE;
+# judging each step against breaking_thresholds and the recovery
+# measurement against the same is VALIDATE; naming WHICH step is the
+# breaking point (and whether the system recovered) is INFER -- the
+# same inferred triple `devops_sre.load_test`'s own contract already
+# uses.
+
+purpose:
+  - find_the_load_level_at_which_a_system_breaks_by_escalating_real_measured_load_beyond_the_expected_load_and_observing_whether_it_recovers_when_load_is_reduced
+inputs:
+  required: [EscalatingLoadLadder, BreakingThresholds]
+  optional: [RecoveryObservation]
+outputs: [StressTestRecord]
+preconditions:
+  - "system_under_test is a non-empty string; expected_load_rps is finite and > 0"
+  - "load_steps has at least 2 entries, each a valid load_measurement (same shape/ranges as devops_sre.load_test's own), STRICTLY increasing load_rps, and the SAME set of resource names across every step"
+  - "at least one load_steps entry's own load_rps is STRICTLY greater than expected_load_rps"
+  - "breaking_thresholds carries exactly latency_p95_ms_max (finite, > 0) and error_rate_max (finite, in [0, 1]) -- re-verified independently by the gate, not builder-only, applying the lesson devops_sre.capacity_model's and devops_sre.load_test's own critic rounds taught"
+  - "breaking_point is computed by ai_lego.compute.stress_test.analysis.find_breaking_point: the FIRST load_steps entry (by order) whose own latency_p95_ms > breaking_thresholds.latency_p95_ms_max OR error_rate > breaking_thresholds.error_rate_max, or null if none breaches either -- never caller-supplied independently of that computation"
+  - "recovery is REQUIRED when breaking_point is not null, and FORBIDDEN when breaking_point is null"
+  - "when present, recovery.reduced_load_rps is STRICTLY less than breaking_point.load_rps, and recovery.recovered is computed (true iff recovery.latency_p95_ms <= breaking_thresholds.latency_p95_ms_max AND recovery.error_rate <= breaking_thresholds.error_rate_max) -- never caller-asserted"
+  # Preconditions 2-3 map onto Atlas's own '超過預期負載' formula step;
+  # 5-7 onto '觀察 cliff/recovery'. Same "structurally necessary,
+  # forbidden-state" class every prior genuine-compute contract this
+  # session built already establishes.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every genuine-compute contract in this
+  # package already reasons through: the real risk is computational
+  # integrity (was the cliff actually the first breach, was recovery
+  # actually a reduction), not evidence-citation over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Stress Test row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. Two real,
+# disclosed (not built as chains) relationships: (1) breaking_point's
+# own load_rps could feed devops_sre.capacity_model's own
+# current_capacity as an empirically-discovered ceiling rather than a
+# caller-estimated one (OQ-STRESSTEST-4); (2) F19's own Soak Test row
+# (L855) shares this method's escalating-measurement shape but asks a
+# different question (sustained load over TIME, not escalating load
+# levels) -- OQ-STRESSTEST-5.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- the real load generation
+  # and any remediation of the discovered breaking point happen outside
+  # this method's own scope, the same "record reports on an external
+  # observation" class every prior devops_sre contract's own rollback
+  # field already draws.
+
+compilation_decisions:
+  - question: >
+      Should this method redefine its own load-measurement shape, or
+      reuse `devops_sre.load_test`'s own `#/$defs/load_measurement`
+      across files?
+    decision: "Reuse unchanged via a cross-file $ref, resolving devops_sre.load_test's own OQ-LOADTEST-5."
+    reasoning: >
+      The four fields (load_rps/latency_p95_ms/error_rate/
+      resource_utilization) describe the exact same real-world
+      observation -- one measurement at one load level -- in both
+      methods; redefining an identical shape under a new name would be
+      duplication wearing a different label, the same discipline this
+      session's every prior reuse decision (e.g. the shared
+      `genuine_compute` gate) already applies. `SchemaContracts`'
+      `referencing`-library registry resolves a Draft 2020-12 `$defs`
+      fragment across files identically to a same-file fragment --
+      confirmed before writing this schema, not assumed.
+  - question: >
+      Should `breaking_thresholds` be the SAME field/value as
+      `devops_sre.load_test`'s own `acceptance`, since both are
+      latency/error threshold pairs of the identical shape?
+    decision: "Same SHAPE, deliberately separate field and separate caller-supplied value -- not shared or defaulted from one another."
+    reasoning: >
+      A load test's `acceptance` defines the bar a system must clear to
+      PASS at its target load; a stress test's `breaking_thresholds`
+      defines the bar whose breach marks FAILURE onset while
+      escalating past that load. A caller may legitimately set these to
+      different values for the same system (e.g. a stricter PASS bar at
+      expected load than the definition of "broken" under intentional
+      overload) -- collapsing them into one shared field would silently
+      forbid that legitimate difference. The shape is shared (both
+      reuse the same two-field latency/error pattern) precisely because
+      both are real, disclosed instances of the same "caller-supplied
+      operational judgment, no default" restraint this package already
+      established for acceptance-style fields.
+  - question: >
+      Should `breaking_point` search load_steps by INDEX ORDER or by
+      the numeric VALUE of load_rps (equivalent once strict increase is
+      enforced, but which is the primitive)?
+    decision: "By index order (the caller-supplied sequence), with load_rps strict-increase enforced as a separate precondition that makes the two equivalent."
+    reasoning: >
+      Atlas's own formula is a PROCEDURE ("超過預期負載→觀察") --
+      escalate, then observe -- not a numeric search over an unordered
+      set; searching by order is the literal reading and remains correct
+      even if a future revision relaxes the strict-increase requirement
+      for some as-yet-undisclosed reason. Enforcing strict increase
+      separately (rather than deriving order from it) keeps the two
+      concerns testable independently, the same discipline
+      `devops_sre.runbook_execution`'s own step-numbering-vs-decision
+      -justification split already established.
+  - question: >
+      Should a `recovery.recovered: false` (attempted recovery, did not
+      recover) be a legal, distinct outcome from `recovery` being absent
+      entirely (never attempted)?
+    decision: "Yes -- both are legal and distinct. recovery present with recovered:false means an attempt was made and failed; recovery absent (only legal when breaking_point is null) means no breaking point existed to recover FROM."
+    reasoning: >
+      Atlas's own formula names 'recovery' as an OBSERVATION following a
+      real cliff -- a system that broke and did not recover on a reduced
+      load is a real, disclosable finding (arguably the more operationally
+      important one), not an error state. Forcing recovery:true whenever
+      recovery is present would silently discard exactly the "the system
+      did not come back" case a stress test exists to surface.
+
+open_questions:
+  - id: "OQ-STRESSTEST-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)? Should F12's own Stress Testing entry ALSO gain a machine_id (e.g. challenge.stress_testing) at the same time, precisely because the two are otherwise indistinguishable by name alone?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STRESSTEST-6"
+    question: >
+      A critic review found THREE undisclosed neighbours placing a
+      `stress_test` module under a SIMULATION/data-science family
+      (`Master_Plan_v1.md:1776`, `REPOSITORY_ARCHITECTURE.md:308`,
+      Atlas's own quick-select L4477) rather than under `devops_sre`.
+      Should a future session reconcile the Master Plan's own
+      `/modules/simulation/stress_test/` placeholder with this method's
+      own home under `devops_sre` + `ai_lego/compute/stress_test/` (a
+      rename/merge/cross-reference), or are they genuinely two
+      different concerns (an engineering load method here vs. a
+      Monte-Carlo-family simulation there) that happen to share a name?
+    owner: "operator, or whoever next builds the simulation module family"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STRESSTEST-2"
+    question: >
+      No structured field exists for WHICH observation breached the
+      threshold (latency, error rate, or both) at the breaking point --
+      only that step's own index/load_rps are recorded, and a reader
+      must re-index load_steps to see why. Should a future revision add
+      a `breaching_metric` enum (latency/error_rate/both) alongside
+      `breaking_point`?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-STRESSTEST-3"
+    question: >
+      `recovery` supports exactly ONE post-cliff measurement. A caller
+      who reduces load in multiple stages to find the RECOVERY point
+      (symmetric with the escalating ladder that found the breaking
+      point) has no structured way to record intermediate stages. Should
+      a future revision support a recovery LADDER, symmetric with
+      load_steps?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STRESSTEST-4"
+    question: >
+      `breaking_point.load_rps` is an EMPIRICALLY discovered ceiling;
+      `devops_sre.capacity_model`'s own `current_capacity` is a
+      caller-ESTIMATED one. Should a future revision add a soft-link
+      field (e.g. `capacity_model_ref`, format-only, the same
+      discipline `devops_sre.game_day`'s own `runbook_execution_ref`
+      already establishes) so a capacity_model record can cite this
+      method's own output as its empirical basis?
+    owner: "operator, or whoever next revises either contract's own field design"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STRESSTEST-5"
+    question: >
+      F19's own Soak Test row (L855: "持續負載→memory/resource
+      leak→degradation") shares this method's own load_measurement
+      reuse candidacy but asks a different question (degradation over
+      SUSTAINED time at one load level, not escalation across levels).
+      Should it reuse `#/$defs/load_measurement` too, the way this
+      method does?
+    owner: "operator, or whoever next builds devops_sre.soak_test"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L854) directly, confirmed against
+    the surrounding table (L848-863) that no dedicated §11.x section
+    exists. Read F12's own Stress Testing row (L652) in full and
+    confirmed it a distinct cognitive red-team method, the exact
+    near-name collision Phase-0's own `verified-findings.yaml:1052`
+    flagged. Ran broad case-insensitive spec-root greps ("stress
+    test"/"壓力測試"/"stress_test", "breaking point"/"cliff"/"破壞點",
+    "safety margin"/"安全餘量", "recovery"/"恢復"), read every neighbour
+    surfaced (capacity_model's own purpose-column echo of "安全餘量",
+    load_test's own OQ-LOADTEST-5), and confirmed each distinct or
+    resolved by direct construction. Confirmed `SchemaContracts`'
+    `referencing`-library registry resolves a Draft 2020-12 `$defs`
+    fragment across files before writing the schema. No duplicate
+    typed object or method found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All five core invariants are each
+    grounded in Atlas's own formula or benefit column; the reused-
+    load-measurement, separate-but-same-shape-thresholds, index-order
+    search, and legal-failed-recovery designs are all disclosed
+    compilation choices, not silent inventions -- see
+    compilation_decisions above.

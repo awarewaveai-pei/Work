@@ -69,6 +69,7 @@
 | `specs/cognitive/typed-objects/runbook-execution-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, runbook_ref, steps, rollback_performed, provenance] properties[7] |
 | `specs/cognitive/typed-objects/sli-slo-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, indicators, provenance] properties[6] |
 | `specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, legacy_system_under_migration, seams, slices, provenance] properties[7] |
+| `specs/cognitive/typed-objects/stress-test-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_test, expected_load_rps, load_steps, breaking_thresholds, breaking_point, engine, computation_provenance_ref, provenance] properties[12] allOf[1] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |
 | `specs/cognitive/typed-objects/system-context-model.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_context, containers, provenance] properties[8] |
 | `specs/decision/decision.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, question, options, human_judgment_pending, provenance] properties[24] |

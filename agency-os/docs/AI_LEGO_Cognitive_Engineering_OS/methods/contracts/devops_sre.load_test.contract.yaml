@@ -274,6 +274,11 @@ open_questions:
       directory placeholder (`AI_LEGO_Cognitive_Engineering_Os_Global
       _Master_Plan_v1.md:1776`) with no contents -- a location, not a
       design; whoever builds stress_test should reconcile with it.
+      ANSWERED for Stress Test 2026-09-05 (thirty-sixth slice):
+      `devops_sre.stress_test` reuses `#/$defs/load_measurement`
+      unchanged via a cross-file `$ref`, confirmed to resolve correctly
+      under `SchemaContracts`' `referencing`-library registry. Soak
+      Test's own answer remains open.
     owner: "operator, or whoever next builds devops_sre.stress_test or devops_sre.soak_test"
     blocks: "nothing in this file's own validity"
 

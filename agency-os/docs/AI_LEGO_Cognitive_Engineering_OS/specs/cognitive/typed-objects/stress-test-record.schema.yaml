@@ -1,0 +1,175 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stress-test-record.schema.yaml"
+title: Stress Test Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StressTestRecord` -- the
+  declared `outputs` of `devops_sre.stress_test`'s Method Contract.
+  ELEVENTH `devops_sre`-family typed object. Atlas's own F19 tool table
+  formula (L854: "超過預期負載→觀察 cliff/recovery", purpose "找系統破壞
+  點" -- find the system's breaking point, benefit "了解安全餘量" --
+  understand the safety margin) maps onto an ESCALATING LADDER of load
+  steps (`load_steps[]`, each an instance of `devops_sre.load_test`'s
+  own `#/$defs/load_measurement`, REUSED across files rather than
+  redefined -- resolving `devops_sre.load_test`'s own OQ-LOADTEST-5),
+  a caller-supplied `breaking_thresholds` block defining "cliff", a
+  COMPUTED `breaking_point` (the first step, in order, that breaches
+  either threshold -- or `null` if none did, an honest "no cliff found
+  within the tested range" outcome), and a `recovery` observation that
+  is REQUIRED iff a breaking point was found and FORBIDDEN otherwise
+  (the same bidirectional-iff shape `devops_sre.game_day`'s own
+  `recovery.time_to_recover_minutes` already establishes -- recovery is
+  not a meaningful question to ask of a system that never broke).
+
+  `expected_load_rps` is the "預期負載" this method's own formula names
+  as the reference point every step must EXCEED -- this is what makes a
+  stress test a stress test rather than another load test: Atlas's own
+  benefit column names the safety margin BEYOND the expected load, not
+  at it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Stress Test row (L854): '超過預期負載→觀察 cliff/recovery'"
+  - "specs/cognitive/typed-objects/load-test-record.schema.yaml#/$defs/load_measurement -- REUSED unchanged, not redefined"
+  - "methods/contracts/devops_sre.stress_test.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, system_under_test, expected_load_rps, load_steps, breaking_thresholds, breaking_point, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^STRESSTEST-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.stress_test"
+  system_under_test:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  expected_load_rps:
+    type: number
+    exclusiveMinimum: 0
+    description: "Atlas's own '預期負載' reference point -- the load this system was designed for. Every load_steps entry's own load_rps must exceed this at least once across the ladder (the ladder as a whole, not necessarily every step) -- enforced at the runtime layer."
+  load_steps:
+    type: array
+    minItems: 2
+    description: "Atlas's own escalating-load ladder. Each entry is a full load_measurement (load_rps, latency_p95_ms, error_rate, resource_utilization) -- REUSED from devops_sre.load_test's own schema, not redefined. Ordered by STRICTLY increasing load_rps, and the SAME set of resource names across every step -- both enforced at the runtime layer, not here."
+    items:
+      $ref: "ai-lego://specs/cognitive/typed-objects/load-test-record.schema.yaml#/$defs/load_measurement"
+  breaking_thresholds:
+    type: object
+    required: [latency_p95_ms_max, error_rate_max]
+    additionalProperties: false
+    description: "Caller-supplied definition of 'broken' -- Atlas gives no numeric value for a breaking point, this is an operational judgment (same restraint devops_sre.load_test's own acceptance thresholds already establish; NOT the same field as that method's acceptance -- a stress test's breaking_thresholds define FAILURE onset, a load test's acceptance defines its own PASS bar, and the two need not share a value even for the same system)."
+    properties:
+      latency_p95_ms_max:
+        type: number
+        exclusiveMinimum: 0
+      error_rate_max:
+        type: number
+        minimum: 0
+        maximum: 1
+  breaking_point:
+    description: "COMPUTED (ai_lego.compute.stress_test.analysis.find_breaking_point): the first load_steps entry (by ORDER, not by load_rps -- the two coincide once ordering is enforced) whose own latency_p95_ms exceeds breaking_thresholds.latency_p95_ms_max OR whose own error_rate exceeds breaking_thresholds.error_rate_max. `null` means no tested step breached either threshold -- an honest 'the system did not break within the range this test exercised' finding, not a silent pass."
+    oneOf:
+      - type: "null"
+      - type: object
+        required: [step_index, load_rps]
+        additionalProperties: false
+        properties:
+          step_index:
+            type: integer
+            minimum: 0
+            description: "0-based position of the breaking step within load_steps."
+          load_rps:
+            type: number
+            minimum: 0
+            description: "That step's own load_rps, duplicated here for a reader who does not want to re-index load_steps. minimum:0 (not exclusiveMinimum), matching the reused load_measurement's own load_rps range -- CORRECTED post-critic-review: the first draft's exclusiveMinimum:0 was inconsistent with that shape, though unreachable via the builder today (a breaching step at load_rps:0 would require recovery.reduced_load_rps < 0, which the runtime already forbids)."
+  recovery:
+    description: "REQUIRED when breaking_point is not null, FORBIDDEN when breaking_point is null -- enforced at the runtime layer (the same bidirectional-iff shape devops_sre.game_day's own recovery.time_to_recover_minutes already establishes). Recovery is not a meaningful observation for a system that never broke."
+    oneOf:
+      - type: "null"
+      - type: object
+        required: [reduced_load_rps, latency_p95_ms, error_rate, recovered]
+        additionalProperties: false
+        properties:
+          reduced_load_rps:
+            type: number
+            exclusiveMinimum: 0
+            description: "The load level the caller reduced to AFTER the breaking point, to observe recovery. Must be strictly below the breaking_point's own load_rps -- enforced at the runtime layer (a 'recovery' measurement at or above the breaking load is not a reduction)."
+          latency_p95_ms:
+            type: number
+            exclusiveMinimum: 0
+          error_rate:
+            type: number
+            minimum: 0
+            maximum: 1
+          recovered:
+            type: boolean
+            description: "COMPUTED: true iff latency_p95_ms <= breaking_thresholds.latency_p95_ms_max AND error_rate <= breaking_thresholds.error_rate_max at the reduced load -- never caller-asserted independently of that computation, the same fully-derived discipline devops_sre.load_test's own status already establishes."
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted, importlib-resolvable path to the pure function that computed breaking_point -- ai_lego.compute.stress_test.analysis.find_breaking_point."
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- breaking_point/recovery.recovered are genuine deterministic compute over caller-observed measurements, not a narrative claim."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+allOf:
+  - if:
+      properties: {breaking_point: {type: "null"}}
+      required: [breaking_point]
+    then:
+      required: [recovery]
+      properties: {recovery: {type: "null"}}
+    else:
+      required: [recovery]
+      properties: {recovery: {type: object}}
+    description: "Schema-layer defense-in-depth for the recovery-iff-breaking-point coupling (the primary enforcement is the runtime layer, see method contract preconditions) -- the same discipline devops_sre.game_day's own if/then/else on recovery.time_to_recover_minutes already establishes. CORRECTED post-critic-review: the first draft's `else` branch used `properties` alone, which JSON Schema never enforces against an ABSENT key -- a record with breaking_point non-null and recovery simply OMITTED (not null) passed this block undetected (the runtime gate still caught it). `required: [recovery]` on both branches closes that half."
+
+examples:
+  - description: "A found breaking point at step 3, followed by a successful recovery at a reduced load"
+    value:
+      id: "STRESSTEST-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.stress_test"
+      system_under_test: "checkout-api v2.3 on staging"
+      expected_load_rps: 500
+      load_steps:
+        - {load_rps: 500, latency_p95_ms: 240, error_rate: 0.004, resource_utilization: {cpu: 0.72, db_connections: 0.91, memory: 0.55}}
+        - {load_rps: 750, latency_p95_ms: 310, error_rate: 0.006, resource_utilization: {cpu: 0.85, db_connections: 0.97, memory: 0.60}}
+        - {load_rps: 900, latency_p95_ms: 480, error_rate: 0.02, resource_utilization: {cpu: 0.95, db_connections: 1.0, memory: 0.66}}
+        - {load_rps: 1000, latency_p95_ms: 1800, error_rate: 0.35, resource_utilization: {cpu: 0.99, db_connections: 1.0, memory: 0.70}}
+      breaking_thresholds: {latency_p95_ms_max: 500, error_rate_max: 0.05}
+      breaking_point: {step_index: 3, load_rps: 1000}
+      recovery: {reduced_load_rps: 600, latency_p95_ms: 260, error_rate: 0.005, recovered: true}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.stress_test.analysis.find_breaking_point"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "No breaking point found -- the ladder never exceeded a safe margin within the tested range; no recovery field"
+    value:
+      id: "STRESSTEST-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.stress_test"
+      system_under_test: "checkout-api v2.3 on staging"
+      expected_load_rps: 500
+      load_steps:
+        - {load_rps: 500, latency_p95_ms: 240, error_rate: 0.004, resource_utilization: {cpu: 0.40, db_connections: 0.50, memory: 0.30}}
+        - {load_rps: 750, latency_p95_ms: 280, error_rate: 0.005, resource_utilization: {cpu: 0.55, db_connections: 0.65, memory: 0.35}}
+      breaking_thresholds: {latency_p95_ms_max: 500, error_rate_max: 0.05}
+      breaking_point: null
+      recovery: null
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.stress_test.analysis.find_breaking_point"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L854) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 超過預期負載→觀察 cliff/recovery formula is directly transcribed: load_steps is the escalating ladder, breaking_point is the computed cliff, recovery is the computed recovery observation. Strictly-increasing load ordering, identical resource sets, and recovered's own full derivation are enforced at the runtime layer (ai_lego/modules/devops_sre/stress_test.py), not the schema layer; the recovery-iff-breaking-point coupling additionally has a schema-layer if/then/else defense-in-depth signal. No mother document was modified."
