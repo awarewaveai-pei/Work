@@ -1,0 +1,135 @@
+# Composable AI Commerce OS
+## LEGO Documentation Master Index
+
+> 這個文件包把整套 Business OS 拆成可獨立施工的 LEGO。每塊都有邊界、Owns Data、Contract、Events、Permissions、AI Tools、MVP 與驗收。
+
+# Start Here
+
+```text
+01 Product Constitution
+02 Platform Core
+03 Identity / CDP / Consent
+29 Connector Runtime Standard
+39 Customer Service Phase 1 Plan
+40 Claude / Codex Work Rules
+```
+
+# Complete File Set
+
+- `Composable AI Commerce OS_01_Product_Constitution.md`
+- `Composable AI Commerce OS_02_Platform_Core.md`
+- `Composable AI Commerce OS_03_Identity_CDP_Consent.md`
+- `Composable AI Commerce OS_04_Customer_Service.md`
+- `Composable AI Commerce OS_05_CRM_Sales.md`
+- `Composable AI Commerce OS_06_Marketing_Growth.md`
+- `Composable AI Commerce OS_07_Social_Community.md`
+- `Composable AI Commerce OS_08_Content_Studio_DAM.md`
+- `Composable AI Commerce OS_09_PIM_PXM.md`
+- `Composable AI Commerce OS_10_Commerce_Hub.md`
+- `Composable AI Commerce OS_11_Marketplace_Operations.md`
+- `Composable AI Commerce OS_12_OMS_Order_Orchestration.md`
+- `Composable AI Commerce OS_13_Inventory_WMS.md`
+- `Composable AI Commerce OS_14_Procurement_Supplier.md`
+- `Composable AI Commerce OS_15_Logistics_Fulfillment.md`
+- `Composable AI Commerce OS_16_Returns_Warranty_After_Sales.md`
+- `Composable AI Commerce OS_17_Loyalty_Reviews_UGC.md`
+- `Composable AI Commerce OS_18_B2B_Wholesale.md`
+- `Composable AI Commerce OS_19_POS_Retail.md`
+- `Composable AI Commerce OS_20_Payments_Fraud_Risk.md`
+- `Composable AI Commerce OS_21_Finance_Treasury.md`
+- `Composable AI Commerce OS_22_Accounting_Tax.md`
+- `Composable AI Commerce OS_23_Cross_Border_Compliance.md`
+- `Composable AI Commerce OS_24_Analytics_Data_Platform.md`
+- `Composable AI Commerce OS_25_AI_Copilot_Agents.md`
+- `Composable AI Commerce OS_26_Automation_Workflow_Policy.md`
+- `Composable AI Commerce OS_27_Knowledge_Search_Documents.md`
+- `Composable AI Commerce OS_28_Developer_Platform_SDK.md`
+- `Composable AI Commerce OS_29_Connector_Runtime_Standard.md`
+- `Composable AI Commerce OS_30_Communication_Connectors.md`
+- `Composable AI Commerce OS_31_Commerce_Marketplace_Connectors.md`
+- `Composable AI Commerce OS_32_CRM_Marketing_Social_Connectors.md`
+- `Composable AI Commerce OS_33_Payment_Logistics_Finance_Connectors.md`
+- `Composable AI Commerce OS_34_Market_Pack_Taiwan.md`
+- `Composable AI Commerce OS_35_Market_Pack_Global.md`
+- `Composable AI Commerce OS_36_SaaS_Billing_Entitlements.md`
+- `Composable AI Commerce OS_37_Security_Privacy_Observability.md`
+- `Composable AI Commerce OS_38_Implementation_Roadmap.md`
+- `Composable AI Commerce OS_39_Customer_Service_Phase1_Plan.md`
+- `Composable AI Commerce OS_40_Claude_Codex_Work_Rules.md`
+- `Composable AI Commerce OS_41_Pricing_Promotions.md`
+- `Composable AI Commerce OS_42_Search_Merchandising_Discovery.md`
+- `Composable AI Commerce OS_43_Subscription_Commerce.md`
+- `Composable AI Commerce OS_44_Creator_Affiliate_Influencer.md`
+- `Composable AI Commerce OS_45_Experimentation_Feature_Flags.md`
+- `Composable AI Commerce OS_46_Demand_Planning_Forecasting.md`
+- `Composable AI Commerce OS_47_PLM_Quality.md`
+- `Composable AI Commerce OS_48_Customer_Portal_Self_Service.md`
+- `Composable AI Commerce OS_49_Agentic_Commerce.md`
+- `Composable AI Commerce OS_50_Work_Management_Approvals.md`
+
+# LEGO Groups
+
+## Core / Platform
+- Product Constitution
+- Platform Core
+- Identity / CDP / Consent
+- Automation / Workflow / Policy
+- Work Management / Approvals
+- Knowledge / Search / Documents
+- Security / Privacy / Observability
+- Developer Platform / SDK
+- Connector Runtime
+- SaaS Billing / Entitlements
+
+## Revenue / Customer
+- Customer Service
+- CRM / Sales
+- Marketing / Growth
+- Loyalty / Reviews / UGC
+- Creator / Affiliate / Influencer
+- Customer Portal / Self-Service
+
+## Content / Discovery
+- Social / Community
+- Content Studio / DAM
+- PIM / PXM
+- Pricing / Promotions
+- Search / Merchandising / Discovery
+- Experimentation / Feature Flags
+
+## Commerce / Operations
+- Commerce Hub
+- Marketplace Operations
+- Subscription Commerce
+- B2B / Wholesale
+- POS / Retail
+- OMS
+- Inventory / WMS
+- Demand Planning
+- Procurement / Supplier
+- Logistics / Fulfillment
+- Returns / Warranty
+- PLM / Quality
+
+## Money / Compliance
+- Payments / Fraud / Risk
+- Finance / Treasury
+- Accounting / Tax
+- Cross-Border / Compliance
+
+## Intelligence
+- Analytics / Data Platform
+- AI Copilot / Agents
+- Agentic Commerce
+
+## Connectors / Markets
+- Communication Connectors
+- Commerce / Marketplace Connectors
+- CRM / Marketing / Social Connectors
+- Payment / Logistics / Finance Connectors
+- Taiwan Market Pack
+- Global Market Packs
+
+# Construction Principle
+
+> 一次只施工一塊 LEGO。其他 LEGO 只能依賴它的 public contract，不能依賴 private tables 或 provider-specific implementation。
