@@ -1,7 +1,7 @@
 # System Foundry v1.6 — Selection / Output Assurance Report
 
 ## Scope
-This release closes the v1.5 gap where capability selection was complete but generated module directories were mostly empty shells. v1.6 proves 100% coverage of the defined question/rule/capability/module/blueprint inventory, plus exhaustive pairwise interactions and randomized higher-order combinations. It does not claim literal enumeration of all `2^154` theoretical answer vectors; correctness beyond the exhaustive component/pair matrix is enforced by deterministic invariants and randomized property checks.
+This release closes the v1.5 gap where capability selection was complete but generated module directories were mostly empty shells. v1.6 proves 100% coverage of the defined question/rule/capability/module/blueprint inventory, plus exhaustive pairwise interactions and randomized higher-order combinations. It does not claim literal enumeration of all `2^162` theoretical answer vectors; correctness beyond the exhaustive component/pair matrix is enforced by deterministic invariants and randomized property checks.
 
 ## VERIFIED findings and fixes
 
@@ -38,14 +38,14 @@ Fix: `+新增其他需求` can no longer disappear into notes. It creates an exp
 Expected result: custom requirements are retained, visible, actionable and fail-safe.
 
 ### F-005 — Blueprint completeness needed positive and negative applicability proof
-Evidence: applicability is deterministic at `scripts/foundry_generate.py:32-35`; all controlled sections are emitted ACTIVE or NOT_APPLICABLE at `scripts/foundry_generate.py:134-204`. Staging requires exactly 73 blueprint documents at `scripts/foundry_generate.py:219-220`.
+Evidence: applicability is deterministic at `scripts/foundry_generate.py:38-41`; all controlled sections are emitted ACTIVE or NOT_APPLICABLE at `scripts/foundry_generate.py:140-211`. Staging requires exactly 73 blueprint documents at `scripts/foundry_generate.py:226`.
 
 Fix: no blueprint section is silently omitted.
 
 Expected result: absence means verified N/A, not forgotten work.
 
 ### F-006 — Generated output needed content integrity
-Evidence: per-file SHA-256 artifact inventory is built at `scripts/foundry_generate.py:226-230` and written before atomic commit at `scripts/foundry_generate.py:270-272`.
+Evidence: per-file SHA-256 artifact inventory is built at `scripts/foundry_generate.py:232-236` and written before atomic commit at `scripts/foundry_generate.py:277`.
 
 Expected result: generated project artifacts are tamper/drift detectable.
 
@@ -57,22 +57,22 @@ Evidence: `tests/fixtures/selection/all_no.json:3-24` locks the 18 Foundry basel
 Expected result: choosing no optional product capability does not remove production engineering baseline and does not generate feature modules.
 
 ### ALL-YES golden
-Evidence: `tests/fixtures/selection/all_yes.json:3-196` locks all 192 current capabilities; `tests/fixtures/selection/all_yes.json:197-229` locks all 31 standard selectable modules. The all-YES assertion is implemented in `scripts/test_selection_matrix.py:116-121`.
+Evidence: `tests/fixtures/selection/all_yes.json:3-204` locks all 200 current capabilities; `tests/fixtures/selection/all_yes.json:205-237` locks all 31 standard selectable modules. The all-YES assertion is implemented in `scripts/test_selection_matrix.py:127-132`.
 
 Expected result: every defined standard capability and standard LEGO module is reachable; all 73 blueprint sections become ACTIVE.
 
 ### Every question individually
-Evidence: `scripts/test_selection_matrix.py:122-128` independently activates every one of the 154 questions with minimum prerequisites and verifies its declared required/deferred effect.
+Evidence: `scripts/test_selection_matrix.py:133-139` independently activates every one of the 162 questions with minimum prerequisites and verifies its declared required/deferred effect.
 
 Expected result: no dead or miswired question.
 
 ### Exhaustive pairwise interactions
-Evidence: `scripts/test_selection_matrix.py:129-139` traverses every pair of 154 questions. Current release result: 11,775 compatible pairs pass and 6 contradictory pairs fail closed, totaling all 11,781 pairs.
+Evidence: `scripts/test_selection_matrix.py:150-160` traverses every pair of 162 questions. Current release result: 13,035 compatible pairs pass and 6 contradictory pairs fail closed, totaling all 13,041 pairs.
 
 Expected result: two-feature interactions cannot silently change module projection or violate plan invariants.
 
 ### Explicit conflict rules
-Evidence: every conflict rule is intentionally constructed and required to fail with the canonical conflict code at `scripts/test_selection_matrix.py:128-136`.
+Evidence: every conflict rule is intentionally constructed and required to fail with the canonical conflict code at `scripts/test_selection_matrix.py:161-169`.
 
 Expected result: contradictions are rejected rather than patched around.
 
@@ -92,7 +92,7 @@ Evidence: real local HTTP server startup, token retrieval, POST `/api/generate`,
 Expected result: the real “勾選 -> 送出 -> 生成” transport path works, not only direct Python calls.
 
 ## Static inventory closure
-Evidence: module obligations must exactly equal generation modules at `scripts/validate_artifact_generation.py:8-13`; every capability must be present in its module activation map at `scripts/validate_artifact_generation.py:14-22`; all 73 templates must be covered by the blueprint map at `scripts/validate_artifact_generation.py:23-27`; all 154 questions must have exactly one question rule at `scripts/validate_artifact_generation.py:28-30`.
+Evidence: module obligations must exactly equal generation modules at `scripts/validate_artifact_generation.py:8-13`; every capability must be present in its module activation map at `scripts/validate_artifact_generation.py:14-22`; all 73 templates must be covered by the blueprint map at `scripts/validate_artifact_generation.py:23-27`; all 162 questions must have exactly one question rule at `scripts/validate_artifact_generation.py:28-30`.
 
 ## Release commands
 

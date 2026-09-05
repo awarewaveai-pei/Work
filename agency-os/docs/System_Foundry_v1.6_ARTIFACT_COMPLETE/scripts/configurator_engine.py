@@ -101,7 +101,16 @@ def resolve(project,answers,custom_requirements=None):
     regulated=any(answers.get(x,False) for x in ['Q-REG-001','Q-REG-002','Q-REG-003','Q-REG-004','Q-REG-005','Q-REG-007','Q-GLO-005'])
     high_impact=any(answers.get(x,False) for x in ['Q-IMP-004','Q-IMP-005','Q-IMP-006'])
     mission=answers.get('Q-IMP-004',False)
-    criticality='mission_critical' if mission else ('high' if high_impact else ('medium' if answers.get('Q-IMP-001',False) or answers.get('Q-IMP-003',False) else 'low'))
+    # Q-IMP-001/003 are consequence-of-failure signals (can't tolerate downtime / can't tolerate a
+    # duplicate execution); Q-IMP-007/008 are load-shape signals (bursty vs. sustained). Both raise
+    # the same "failure has wider or less forgiving blast radius" concern the kernel's own risk
+    # definition counts (kernel/10_RISK_AND_EXCEPTION_CONTRACT.md), so both load questions belong
+    # in this clause together -- adding only one of the two (a 2026-09-05 critic review caught this
+    # when CAP-HIGH-SCALE/Q-IMP-008 was introduced without also folding in the pre-existing
+    # Q-IMP-007) would have been the exact single-instance patch AGENTS.md's own guidance warns
+    # against instead of fixing the underlying "load conditions raise criticality" invariant.
+    load_pressure=any(answers.get(x,False) for x in ['Q-IMP-007','Q-IMP-008'])
+    criticality='mission_critical' if mission else ('high' if high_impact else ('medium' if answers.get('Q-IMP-001',False) or answers.get('Q-IMP-003',False) or load_pressure else 'low'))
     profile='enterprise' if regulated or answers.get('Q-ID-005',False) or answers.get('Q-ORG-003',False) else ('commercial' if commercial else 'standard')
     name=safe_name(project['name'])
     custom=[]

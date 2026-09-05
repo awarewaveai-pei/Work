@@ -1242,6 +1242,16 @@
       ]
     },
     {
+      "id": "RULE-Q-IMP-008",
+      "when": {
+        "question": "Q-IMP-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-HIGH-SCALE"
+      ]
+    },
+    {
       "id": "RULE-Q-FUT-001",
       "when": {
         "question": "Q-FUT-001",

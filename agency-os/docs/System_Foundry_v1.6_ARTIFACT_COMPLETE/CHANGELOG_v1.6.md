@@ -20,4 +20,4 @@
 - Documented blocking status codes were added to the canonical status registry.
 
 ## Assurance
-Release requires ALL-NO, ALL-YES, all 121 single-question cases, exhaustive pairwise interactions, 1,000 randomized configurations, all module reachability/materialization, blueprint applicability, conflict fail-closed behavior, artifact hash verification, E2E, adversarial tests, unit tests, semantic validation, and manifest integrity.
+Release requires ALL-NO, ALL-YES, all 162 single-question cases, exhaustive pairwise interactions, 1,000 randomized configurations, all module reachability/materialization, blueprint applicability, conflict fail-closed behavior, artifact hash verification, E2E, adversarial tests, unit tests, semantic validation, and manifest integrity.

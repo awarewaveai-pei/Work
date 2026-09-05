@@ -374,6 +374,7 @@
       "activated_by": [
         "CAP-24X7",
         "CAP-FINANCIAL-IMPACT",
+        "CAP-HIGH-SCALE",
         "CAP-LEGAL-IMPACT",
         "CAP-NONREPEATABLE",
         "CAP-REALTIME",

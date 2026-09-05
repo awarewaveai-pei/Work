@@ -1,6 +1,6 @@
 {
   "version": "1.6.0",
-  "questionnaire_version": "1.1.0",
+  "questionnaire_version": "1.2.0",
   "answer_contract": "YES_NO_ONLY",
   "principles": [
     "Only legitimate product/business choices are user-selectable.",
@@ -1370,6 +1370,14 @@
       "category": "business_impact",
       "label": "使用量會有明顯尖峰時段",
       "description": "使用量在特定時段會突然大幅增加，例如促銷活動或特定時間點，跟平常差異很大。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-IMP-008",
+      "category": "business_impact",
+      "label": "平常的使用規模就非常龐大",
+      "description": "即使不在促銷或尖峰時段，每天平常的使用人數或資料量本身就非常大，系統從一開始就要撐住這個規模。跟上一題「尖峰時段」是不同方向，兩題可以同時選要。",
       "answer_type": "boolean",
       "required_when_active": true
     },

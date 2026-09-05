@@ -433,6 +433,13 @@
       "description": "The system processes health-related personal data."
     },
     {
+      "id": "CAP-HIGH-SCALE",
+      "name": "Sustained High Scale",
+      "module": "reliability",
+      "requires": [],
+      "description": "The system must sustain a large volume of concurrent users or data as everyday load, not only during traffic spikes."
+    },
+    {
       "id": "CAP-HISTORICAL-IMPORT",
       "name": "Historical Import",
       "module": "migration",
