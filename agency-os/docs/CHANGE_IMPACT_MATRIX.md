@@ -90,6 +90,8 @@
 | `docs/operations/AGENTS_APPENDIX.md` | `AGENTS.md`, `docs/operations/TOOL_TRIGGER_MAP.md`（2026-09-04 AGENTS.md 瘦身搬出的機制細節與歷史；改 AGENTS.md 對應指標段時同步） |
 | `docs/operations/RUNNABLE_DEMOS.md` | `AGENTS.md`（DoD「Product work」列）, `../.claude/commands/ao-resume.md`（§1 可跑的 demo 行） |
 
+| `docs/operations/MONITORING_SYSTEMS_INVENTORY.md` | `docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` |
+
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新
 - [ ] `TASKS.md` 狀態已同步
@@ -107,4 +109,5 @@
 - `scripts/register-new-governance-doc.ps1`
 
 _Last synced: 2026-09-04 14:48:33 UTC_
+
 

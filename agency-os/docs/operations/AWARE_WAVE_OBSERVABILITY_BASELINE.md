@@ -1,8 +1,8 @@
-# Aware Wave Observability Baseline
+﻿# Aware Wave Observability Baseline
 
 Updated: 2026-09-05
 
-> **已知範圍限制**：本檔涵蓋 AwareWave 自身 `aware-wave.com` 家族的監控分工；**不含**個別客戶站台的監控（那些各自在 `agency-os/tenants/<slug>/sites/<site>/OBSERVABILITY_*.md`，例：`tenants/company-soulful-expression/sites/soulfulexpression-org/OBSERVABILITY_HOSTINGER.md`），也**不含** MainWP 艦隊管理面本身內建的功能（見下方新增的 `MainWP` 列）。**目前沒有一份「所有監聽系統」的單一總覽文件**——這是 2026-09-05 盤查 soulful 站異常流量時發現 MainWP 內建 Uptime Monitor 與此檔案完全脫鉤才補上的已知缺口，尚未有更高層級的合併總覽。
+> **範圍限制**：本檔涵蓋 AwareWave 自身 `aware-wave.com` 家族的監控分工；**不含**個別客戶站台的監控細節、也**不含** MainWP 艦隊管理面本身內建的功能（見下方新增的 `MainWP` 列）。**跨（AwareWave 自身 + 所有客戶站 + MainWP 艦隊 + 全部 Cloudflare zone）的單一總覽 → `MONITORING_SYSTEMS_INVENTORY.md`**（2026-09-05 新建，起因與本檔下方的 MainWP 內建 Uptime Monitor 事件同一次盤查）。
 
 ## Goal
 
@@ -184,8 +184,15 @@ Do not use Slack as a monitoring backend. It is only the transport layer.
 
 ## Related
 
+- `agency-os/docs/operations/MONITORING_SYSTEMS_INVENTORY.md` — cross-cutting index (all systems, all sites, all CF zones)
 - `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`
 - `lobster-factory/infra/hetzner-phase1-core/scripts/slack-alert-drill.sh`
 - `lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml`
 - `agency-os/docs/operations/SENTRY_ALERT_POLICY.md`
 - `agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`
+
+## Related Documents (Auto-Synced)
+- `docs/operations/MONITORING_SYSTEMS_INVENTORY.md`
+
+_Last synced: 2026-09-05 11:46:38 UTC_
+

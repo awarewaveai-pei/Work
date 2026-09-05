@@ -1,5 +1,76 @@
 # Worklog
 
+## 2026-09-05（續，soulful 監控查證後續：跨系統監控總覽文件 + 三項掃描/攻擊探針逐一查證）
+
+**觸發**：操作者對前一輪 soulful 流量查證結果回「要!」（建跨系統監控總覽）+「還要去查」GPTBot、Ultimate Member 外掛版本掃描、俄羅斯 install.php 探針三項。
+
+**[任務理解]**：把前一輪查證的三個「未處理」尾巴逐一查清楚是否構成真實風險，並把當時發現的文件缺口（無跨系統監控總覽）補起來。
+
+**[現況分析／查證結果]**：
+1. **GPTBot**：`curl` 直接抓 `soulfulexpression.org/robots.txt`——只有 WooCommerce/`wp-admin` 的通用 `Disallow`，完全沒有針對 `GPTBot` 的規則。結論：非安全問題，是「要不要讓 OpenAI 訓練用這站內容」的客戶授權決策，非我方需要技術修補的項目。
+2. **Ultimate Member / um-user-photos 版本掃描**：SSH 進 Hostinger 用 `wp plugin list` 查得 `ultimate-member=2.13.0`、`um-user-photos=2.2.0`，兩者皆 `update=none`（已是最新版）。WebSearch 查到 4 個近期 CVE（CVE-2026-4248 特權提升＜=2.11.2 修於 2.11.3；CVE-2026-19423／CVE-2026-19251＜2.13.0 修於 2.13.0；CVE-2026-1404 反射型 XSS＜=2.11.1 修於 2.11.2）——**全部在目前安裝版本之前就已修補**。結論：外掛版本掃描找不到可用的已知漏洞，站台已是安全版本；掃描器只是在指紋比對，非主動攻擊得逞。
+3. **RU `/wp-admin/install.php?step=1`**：直接 `curl` 實測，回應 HTTP 200 但內容是 WordPress 核心自己的安全檢查頁「Already Installed」——非漏洞，是 WP 核心設計行為。**唯一附帶發現**：此頁面會透過 enqueue 的樣式表 `?ver=6.9.7` 洩漏 WP 版本號，且證實後台確實已安裝——建議可選擇性在 nginx/`.htaccess` 層擋掉這個路徑做縱深防禦，但非急迫（WP 核心本身已擋下真正的攻擊路徑）。
+
+**附帶發現（非原本三項之一，順手查出）**：用 CF API 查了帳號下全部 5 個 zone（`aware-wave.com`／`soulfulexpression.org`／`hope-flow.org`／`weartheworld.org`／`wusheng.foundation`）的 `bot_management.fight_mode`——**只有 `aware-wave.com` 開著**，其餘 4 個全部關閉。查 `AWAREWAVE_STACK_QUICKREF.md` 確認 `hope-flow.org`／`weartheworld.org`／`wusheng.foundation` 三個是**零 DNS 記錄的保留網域**（品牌防禦用，未建站），所以那三個 off 不是缺口——只有 `soulfulexpression.org`（唯一另一個有實際流量的 zone）真的少開這個免費、非地區性（不會誤傷操作者出國時的存取——`feedback_global_traveler` 規則）的防護。**尚未動手，等待操作者明確同意**（Medium risk，帳號層安全設定變更）。
+
+**[實作計畫→已完成]**：
+1. 新建 `agency-os/docs/operations/MONITORING_SYSTEMS_INVENTORY.md`——跨（AwareWave 自身 stack + 全部 22 個 Uptime Kuma monitor 逐一列表 + 全部 5 個 CF zone 安全設定 + MainWP 艦隊現況 + 3 個租戶站台 Live/Discovery/Build 階段表）的單一總覽索引，內容連結既有細節文件而非重複
+2. 補回 `AWARE_WAVE_OBSERVABILITY_BASELINE.md` 前一輪寫的「目前沒有總覽文件」缺口說明，改指向新檔案
+3. `scripts/register-new-governance-doc.ps1` 註冊新文件進 `change-impact-map.json` + `CHANGE_IMPACT_MATRIX.md`（source→target 依存：改本檔要連動檢查 baseline 檔）
+4. `scripts/doc-sync-automation.ps1` 跑過，兩檔案自動同步 footer
+
+**已修改**：
+- `agency-os/docs/operations/MONITORING_SYSTEMS_INVENTORY.md`（新建）
+- `agency-os/docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md`（範圍限制說明改指向新檔 + Related 加一行）
+- `agency-os/docs/change-impact-map.json`、`agency-os/docs/CHANGE_IMPACT_MATRIX.md`（`register-new-governance-doc.ps1` 自動新增規則）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s https://soulfulexpression.org/robots.txt` | exit=0 | result=無 `GPTBot` 規則，僅通用 disallow
+- REALTEST_EVIDENCE: tool=SSH | cmd=Hostinger `wp plugin list --fields=name,status,version,update` | exit=0 | result=`ultimate-member 2.13.0 update=none`、`um-user-photos 2.2.0 update=none`
+- REALTEST_EVIDENCE: tool=WebSearch | cmd=查 4 個 Ultimate Member CVE 的受影響版本範圍與修補版本 | result=全部＜2.13.0 即修補，現行版本不受影響
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s https://soulfulexpression.org/wp-admin/install.php?step=1` | exit=0 | result=HTTP 200，body 為 WP 核心「Already Installed」安全頁，非漏洞
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF API 逐一查 5 個 zone 的 `bot_management`／`settings/waf` | exit=0 | result=僅 `aware-wave.com` fight_mode=true，其餘 4 個 zone 皆 false（3 個為零流量保留網域，1 個為待決定的 soulful）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`register-new-governance-doc.ps1` + `doc-sync-automation.ps1 -ChangedFiles` | exit=0 | result=`change-impact-map.json`／`CHANGE_IMPACT_MATRIX.md` 新規則寫入，兩檔案 footer 自動同步
+- REVIEW_DONE: critic=self（純查證唯讀操作 + 兩份文件的窄範圍新增/連結修正，無程式邏輯變更，未動用 subagent critic 額度）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`MONITORING_SYSTEMS_INVENTORY` | hits=3（本檔、baseline 檔 Related 區塊、`CHANGE_IMPACT_MATRIX.md` 自動新增列——皆為預期中的交叉引用，無殘留舊路徑）
+
+**附帶發現（非本次任務範圍，已用 spawn_task 開單）**：跑 `system-health-check.ps1` 順手驗證時發現健康分數 99.7%（325/326）——`scripts/test-docker-desktop-runtime-preflight.ps1:91,95` 兩處 `Get-Content -Raw` 缺 `-Encoding UTF8`（CP950 資料毀損陷阱類別，該檔近期由其他 session 的 commit `44f759693`／`f441b1168` 引入，非本次改動造成，未動手修，已開背景任務 `task_ed01dd9f`）。
+
+**[剩餘風險]**：
+- Bot Fight Mode 是否要幫 soulful 開啟——**尚未執行，等待操作者明確 go ahead**
+- install.php 路徑的伺服器層加固（nginx/`.htaccess` 擋 `/wp-admin/install.php`）——選擇性加固，尚未執行
+- GPTBot 是否要在 `robots.txt` 加規則擋——這是客戶的內容授權決策，非本方技術判斷範圍，尚待與客戶確認
+- `MONITORING_SYSTEMS_INVENTORY.md` 是索引不是即時查詢——Kuma monitor 列表、CF zone 設定都是 2026-09-05 當下的快照，之後新增/移除系統要記得回來更新，不會自動跟著實況變動
+
+**[rollback]**：純新增文件 + 既有文件的說明性修改，`git revert` 本次 commit 即可完整還原；未動任何生產設定（Bot Fight Mode 未開啟，install.php 未加固）。
+
+## 2026-09-05（AO-RESUME hook PS5.1 `Split-Path -LiteralPath -Parent` 參數集衝突修復 + 4 處孤兒 debris 清理）
+
+**觸發**：稽核 System Foundry v1.6 package 時，critic subagent 在該 package 樹內發現一個非預期的巢狀 `agency-os/` 目錄（`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/agency-os/.agency-state/ao-resume-hook-fail.log` + `.../reports/agent-dispatch/dispatch-20260904.jsonl`），追出根因是 hook 本身在跑。
+
+**根因**：`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:36`（`Resolve-MonorepoRootWithAoResume` 函式內）呼叫 `Split-Path -LiteralPath $cur -Parent`。本機 hook 實際跑在 Windows PowerShell 5.1.26100.9168（PATH 上沒有 `pwsh`），該版本 `-LiteralPath` 與 `-Parent` 屬於不同 parameter set，每次呼叫都噴 `AmbiguousParameterSet`（`參數集無法使用指定的具名參數解析`）。catch block 會 fail-open（`continue:true`，不擋 chat）但把例外寫進 **cwd 相對路徑**的 `agency-os/.agency-state/ao-resume-hook-fail.log`——若某個 process 的 cwd 剛好在 repo 深處子目錄（例如某個文件套件目錄），就會在該處長出一個假的巢狀 `agency-os/` 目錄，而非寫回真正的 monorepo 根。
+
+**影響**：(1) `Resolve-MonorepoRootWithAoResume` 每次都失敗 → hook 自動 `ao-resume.ps1 -FullMainlineParity` 從未真正跑過（fail-open 靜默）→ `.agency-state/ao-resume-hook-last.json`（AGENTS.md §8 規定每個 session 開工要讀的檔案）可能過期而無人發現。(2) 4 處孤兒 debris 目錄各自散落在不同深層子目錄下，`validate_manifest.py` 等腳本會誤報 WARN。
+
+**已修改**：
+- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:36`：`Split-Path -LiteralPath $cur -Parent` → `[System.IO.Path]::GetDirectoryName($cur)`（與同檔 29 行 `[System.IO.Path]::IsPathRooted` 手法一致，繞開 PS5.1 parameter set 衝突，邏輯不變）
+- 刪除 4 處孤兒 `agency-os/` debris 目錄（皆為 untracked，內容僅 `.agency-state/ao-resume-hook-fail.log` + 可能的 `reports/agent-dispatch/dispatch-*.jsonl`，已逐一 `git status --porcelain` 確認 untracked 才刪）：
+  - `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/agency-os/`
+  - `Projects/internal/cognitive-engineering-os/agency-os/`
+  - `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/agency-os/`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/agency-os/`
+  - 未動：`Ollama_Universal_AI_Foundry_Architecture_v1.0.md` 與 `recipes/ollama_Universal_AI_Foundry_Architecture_v1.0.md`（同套件內另兩份 untracked 檔，判斷為他人真實在製文件，非 debris）
+- `scripts/sync-claude-userlevel.ps1 -Mode merge` 跑過，`~/.claude/hooks/` 已同步（R1 SSOT 路徑）
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -NoProfile -Command "Split-Path -LiteralPath 'D:\Work' -Parent"`（修前，直接重現原始崩潰）| exit=1 | result=`AmbiguousParameterSet` 完全重現
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -NoProfile -Command "[System.IO.Path]::GetDirectoryName('D:\Work')"` | exit=0 | result=正常回傳 `D:\`
+- REALTEST_EVIDENCE: tool=Bash | cmd=把修補後的 `Resolve-MonorepoRootWithAoResume` 函式抽出寫成 scratchpad `.ps1`，用 System_Foundry package 深層路徑當 `WorkspaceRoots` 在真實 PS 5.1 跑 | exit=0 | result=`RESOLVED_ROOT=D:\Work\agency-os`（正常向上尋找，不再拋例外）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | result=155/155 全綠（含 git-add/commit-scope-guard、subagent-budget 等既有 155 項回歸，無新增失敗）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -NoProfile -File scripts/sync-claude-userlevel.ps1 -Mode merge`（跑兩次）| exit=0 | result=第一次 `hooks: update` 同步含修補檔；第二次 `hooks: same=43, update=0` 確認已落地 `~/.claude/hooks/`
+- REVIEW_DONE: critic=Standard（前次獨立 critic subagent 稽核 System Foundry 時發現本 bug 並重現；本 session 依其 finding 讀原始檔驗證、套用建議修法並自行重跑驗證，非照抄未查）| verdict=pass | findings=0c/0m/0n（單一根因單一修法，無殘留）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,lobster-factory,Projects | grep=`Split-Path\s+-LiteralPath\s+\$\w+\s+-Parent` | hits=0（全庫僅此一處曾有此樣式，已修）
+
 ## 2026-09-05（System Foundry v1.6 續：第二輪 critic 對 3 個已修改檔的獨立覆審，抓到 1 Major（criticality 行為零測試覆蓋）+ 5 Minor，全部修正並用突變測試證實有效）
 
 **觸發**：`verify-gate-commit` 機械閘要求本 session 修改過的 3 個 Python 檔（`configurator_engine.py`／`validate_configurator.py`／`tests/test_artifact_generation.py`）在 commit 前必須跑 `/verify-recent`，其 Step 2 要求獨立 critic 覆審。派出第二個、與前一輪完全獨立的 critic subagent，重新讀三個檔案的「現況」（非只信任前一輪的敘述）。

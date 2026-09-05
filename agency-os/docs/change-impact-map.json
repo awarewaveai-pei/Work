@@ -454,6 +454,12 @@
                                       "AGENTS.md",
                                       "../.claude/commands/ao-resume.md"
                                   ]
+                  },
+                  {
+                      "source":  "docs/operations/MONITORING_SYSTEMS_INVENTORY.md",
+                      "targets":  [
+                                      "docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md"
+                                  ]
                   }
               ]
 }
