@@ -1340,6 +1340,49 @@ tier_1:
       table-row citation of its own, thinner than several Tier 0
       examples. Tier 1, mandated by the actively-running implementation
       slice, same category as the thirty-five entries above it.
+  thirtyseventh_concrete_entry:
+    # NEW (2026-09-05, same session): thirty-seventh Tier 1 entry, same
+    # additive-key rationale as the thirty-six entries above it.
+    method_id: "database_data.erd"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FIFTH entry
+      from the `database_data` family (F21), after database_data
+      .backup_restore_drill, database_data.data_lineage, database_data
+      .expand_contract_migration, and database_data.reconciliation.
+      First database_data member built since F19's devops_sre family
+      completed (13/13) in the immediately prior slice. Atlas's own
+      F21 tool table row (L899: "entities→keys→relationships→
+      constraints") AND dedicated §11.47 實體關係圖 section (L2294-2306,
+      missed by this contract's own first draft, caught by a critic
+      review) together ground four real referential-integrity
+      invariants that make this record a genuine MODEL: every entity
+      has at least one is_primary_key:true attribute; every
+      relationship's own from_entity/to_entity name a real entity;
+      every relationship's own foreign_key_attributes[] entries ALL
+      name real attributes of that relationship's own from_entity --
+      an ARRAY (corrected post-critic-review from a first-draft single
+      string that could not represent a composite foreign key even
+      though composite primary keys were already legal). Cardinality is
+      restricted to one_to_one/many_to_one because foreign_key
+      _attributes always lives on from_entity by this record's own
+      field design (within this record's own declared PHYSICAL/LOGICAL
+      relational-schema scope, disclosed post-critic-review after the
+      first draft's own claim that "every ERD notation" requires a
+      junction table for many_to_many was found false for conceptual
+      Chen/Crow's-Foot/UML notations). An optional `migration_ref`
+      soft-links to the already-built `database_data
+      .expand_contract_migration`, resolving §11.47's own explicit
+      "起點" (starting-point) benefit -- also added post-critic-review,
+      after the first draft's own `recommended_next: []` silently
+      dropped a real, Atlas-grounded pairing.
+    source: "methods/contracts/database_data.erd.contract.yaml (built same session as this entry, mints machine_id database_data.erd) + specs/cognitive/typed-objects/erd-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own, thinner than several Tier 0
+      examples. Tier 1, mandated by the actively-running implementation
+      slice, same category as the thirty-six entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

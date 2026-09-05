@@ -2,4 +2,4 @@
 Architecture Pack and F19's own DevOps／SRE／可靠性套件. Tenants: ``database_data.backup_restore_drill``
 (see ``backup_restore_drill.py``), ``database_data.data_lineage`` (see ``data_lineage.py``),
 ``database_data.reconciliation`` (see ``reconciliation.py``), ``database_data.expand_contract_migration``
-(see ``expand_contract_migration.py``)."""
+(see ``expand_contract_migration.py``), ``database_data.erd`` (see ``erd.py``)."""

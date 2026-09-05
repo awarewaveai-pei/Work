@@ -1,0 +1,232 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/erd-record.schema.yaml"
+title: ERD Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ErdRecord` -- the declared
+  `outputs` of `database_data.erd`'s Method Contract. FIFTH
+  `database_data`-family typed object, after `database_data
+  .backup_restore_drill`, `database_data.data_lineage`, `database_data
+  .expand_contract_migration`, and `database_data.reconciliation`.
+  Atlas's own F21 tool table formula (L899: "entities→keys→
+  relationships→constraints") AND Atlas's own dedicated §11.47 實體關係
+  圖（ERD）section (L2294-2306: purpose "建模 entity、attribute、
+  primary/foreign key、cardinality", benefits "建立 DB schema 的共同語
+  言" and "可作為 migration 與 data contract 的起點") together ground
+  this record. CORRECTED post-critic-review: this contract's first
+  draft claimed no dedicated §11.x section existed -- §11.47 does exist
+  (it is THIN: purpose + two benefit bullets, no numbered protocol
+  beyond the F21 row's own formula, the same tier `devops_sre.rto_rpo`
+  compared its own F19 row against), and it explicitly names
+  `cardinality` as its own modeling target (not silent on it, as the
+  first draft's compilation_decisions wrongly premised) and gives a
+  real 推薦搭配 chain to migration and data-contract methods (`
+  migration_ref`, below, answers the migration half).
+
+  Fields map onto Atlas's own formula in order: `entities[]` (each
+  carrying its own `attributes[]`, "entities"/"attribute"), the
+  `is_primary_key` flag on each attribute ("keys"), `relationships[]`
+  ("relationships"), and `constraints[]` ("constraints"). `migration_ref`
+  is an OPTIONAL soft link resolving Atlas's own L2305 "起點"
+  (starting-point) benefit for `database_data.expand_contract_migration`
+  (already built).
+
+  **This record models a PHYSICAL/LOGICAL relational schema (foreign-
+  key-bearing), not a conceptual Chen-style ER diagram** -- CORRECTED
+  post-critic-review, a scope decision the first draft made implicitly
+  (via the required foreign-key fields) but never stated. Atlas's own
+  benefit "建立 DB schema 的共同語言" (build a common language for the
+  DB SCHEMA) supports this reading. Within that scope: `cardinality` is
+  restricted to `one_to_one`/`many_to_one` because `foreign_key
+  _attributes` always lives on `from_entity` by this record's own field
+  design (a conceptual `one_to_many(A→B)` is losslessly rewritten as
+  `many_to_one(B→A)` -- no modeling power lost, just a different
+  grammatical subject); `many_to_many` is modeled via a junction entity
+  with two `many_to_one` relationships, the way every REAL RELATIONAL
+  SCHEMA already requires it (CORRECTED: the first draft's claim that
+  "every ERD NOTATION" requires this was FALSE -- Chen's own ER model,
+  Crow's Foot, and UML all draw conceptual M:N directly; the junction
+  table is a physical-mapping artifact, not a notation rule -- see
+  method contract compilation_decisions for the narrowed, now-accurate
+  claim).
+
+  Four real referential-integrity invariants make this record a
+  genuine MODEL, not a bag of independently-valid parts: every
+  relationship's own `from_entity`/`to_entity` must name an entity that
+  actually exists in `entities[]`; every relationship's own
+  `foreign_key_attributes[]` entries must ALL name attributes that
+  actually exist on that relationship's own `from_entity` -- an ARRAY
+  (CORRECTED post-critic-review: the first draft used a single string,
+  which could not represent a COMPOSITE foreign key referencing a
+  composite primary key, even though composite primary keys are
+  explicitly legal here); every entity must carry at least one
+  attribute flagged `is_primary_key: true` ("keys"); and a supplied
+  `migration_ref` must carry the `database_data.expand_contract
+  _migration` record's own id prefix (`ECMIG-`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, ERD row (L899): 'entities→keys→relationships→constraints'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.47 實體關係圖（ERD）(L2294-2306) -- purpose, benefits, the 起點 (starting-point) chain to migration/data-contract -- CORRECTED post-critic-review, missed by this contract's own first draft"
+  - "methods/contracts/database_data.erd.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  attribute:
+    type: object
+    required: [name, data_type, is_primary_key]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      data_type:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Free text, e.g. 'uuid', 'varchar(255)', 'timestamptz' -- Atlas gives no fixed type vocabulary, and this record is database-engine-agnostic."
+      is_primary_key:
+        type: boolean
+        description: "Atlas's own 'keys' formula step. An entity may have more than one attribute flagged true (a composite primary key) -- legitimate, not forbidden, and exactly what a composite foreign key (see relationships[].foreign_key_attributes below) may need to reference."
+
+type: object
+required: [id, version, system_or_database, entities, relationships, constraints, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^ERD-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.erd"
+  system_or_database:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which system or database this model describes, e.g. 'checkout-api order database'."
+  entities:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'entities' formula step. At least one entity; entity names unique within this record (enforced at the runtime layer, not here)."
+    items:
+      type: object
+      required: [name, attributes]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        attributes:
+          type: array
+          minItems: 1
+          description: "At least one attribute; attribute names unique within this entity, and at least one attribute flagged is_primary_key:true -- both enforced at the runtime layer, not here."
+          items:
+            $ref: "#/$defs/attribute"
+  relationships:
+    type: array
+    description: "Atlas's own 'relationships' formula step. May be empty (a single-entity model has none). from_entity/to_entity must reference real entity names, and every foreign_key_attributes[] entry must reference a real attribute of from_entity -- both enforced at the runtime layer, not here (no schema mechanism cross-checks instance values against a sibling array without a $data extension this spec root does not use elsewhere)."
+    items:
+      type: object
+      required: [from_entity, to_entity, cardinality, foreign_key_attributes]
+      additionalProperties: false
+      properties:
+        from_entity:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The REFERENCING entity -- the one whose own attributes include every foreign_key_attributes[] entry."
+        to_entity:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The REFERENCED entity."
+        cardinality:
+          enum: [one_to_one, many_to_one]
+          description: "ERD cardinality vocabulary, from from_entity's own perspective (the side that HOLDS the foreign key). Since foreign_key_attributes always lives on from_entity, the only two cardinalities a single relationship entry can express are many_to_one (the usual case: many from_entity rows per to_entity row) and one_to_one (the foreign key column(s) are additionally unique). A conceptual one_to_many(A→B) is the SAME relationship as many_to_one(B→A) -- no modeling power lost, just from_entity's own perspective. many_to_many is NOT a third enum value here: this record models a PHYSICAL relational schema, where many_to_many is always realized as a junction entity with two many_to_one relationships (see method contract compilation_decisions for the corrected, narrower claim -- this is a fact about physical relational schemas, not a claim about every conceptual ERD notation)."
+        foreign_key_attributes:
+          type: array
+          minItems: 1
+          description: "One or more attribute names on from_entity forming the foreign key -- an ARRAY so a COMPOSITE foreign key (referencing a composite primary key on to_entity) can be represented as ONE relationship, not artificially split into multiple independent relationship entries. Every entry must name a real attribute of from_entity -- enforced at the runtime layer, not here."
+          items:
+            type: string
+            minLength: 1
+            pattern: "\\S"
+  constraints:
+    type: array
+    default: []
+    description: "Atlas's own 'constraints' formula step. REQUIRED array (may be empty) so an absence of additional constraints is an explicit disclosed finding, not an omitted field -- the same discipline database_data.backup_restore_drill's own issues_recorded already establishes. Free text: Atlas gives no structured constraint grammar, and inventing one (e.g. parsing 'entity.attribute NOT NULL') would be exactly the kind of unstated-assumption invention this package's every prior contract already disciplines itself against."
+    items:
+      type: string
+      minLength: 1
+  migration_ref:
+    type: string
+    pattern: "^ECMIG-"
+    description: "OPTIONAL soft link to the database_data.expand_contract_migration record (id prefix ECMIG-) that carried out (or will carry out) the schema evolution this model already reflects, or that this model is itself the starting point for -- resolves Atlas's own §11.47 L2305 '可作為 migration...的起點' benefit. Format-only: this method cannot see the referenced record (the same discipline devops_sre.game_day's own runbook_execution_ref and devops_sre.rto_rpo's own drill_ref already establish)."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- an ERD is a structured modeling judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A two-entity model: many orders reference one customer (many_to_one), citing the migration that introduced this schema, with one cross-entity constraint"
+    value:
+      id: "ERD-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.erd"
+      system_or_database: "checkout-api order database"
+      entities:
+        - name: "customers"
+          attributes:
+            - {name: "customer_id", data_type: "uuid", is_primary_key: true}
+            - {name: "email", data_type: "varchar(255)", is_primary_key: false}
+        - name: "orders"
+          attributes:
+            - {name: "order_id", data_type: "uuid", is_primary_key: true}
+            - {name: "customer_id", data_type: "uuid", is_primary_key: false}
+            - {name: "total_cents", data_type: "bigint", is_primary_key: false}
+      relationships:
+        - {from_entity: "orders", to_entity: "customers", cardinality: many_to_one, foreign_key_attributes: ["customer_id"]}
+      constraints:
+        - "orders.customer_id references a customer that must exist (referential integrity, enforced by the database)"
+      migration_ref: "ECMIG-2026-09-05-001"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A many_to_many relationship modeled via a junction entity (order_items) with a COMPOSITE foreign key referencing a composite primary key on shipments -- one relationship entry, two-element foreign_key_attributes, not two independent relationships"
+    value:
+      id: "ERD-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.erd"
+      system_or_database: "checkout-api order database"
+      entities:
+        - name: "orders"
+          attributes:
+            - {name: "order_id", data_type: "uuid", is_primary_key: true}
+        - name: "products"
+          attributes:
+            - {name: "product_id", data_type: "uuid", is_primary_key: true}
+        - name: "order_items"
+          attributes:
+            - {name: "order_id", data_type: "uuid", is_primary_key: true}
+            - {name: "product_id", data_type: "uuid", is_primary_key: true}
+            - {name: "quantity", data_type: "integer", is_primary_key: false}
+        - name: "warehouse_regions"
+          attributes:
+            - {name: "region_id", data_type: "uuid", is_primary_key: true}
+        - name: "shipments"
+          attributes:
+            - {name: "order_id", data_type: "uuid", is_primary_key: true}
+            - {name: "region_id", data_type: "uuid", is_primary_key: true}
+            - {name: "shipped_at", data_type: "timestamptz", is_primary_key: false}
+      relationships:
+        - {from_entity: "order_items", to_entity: "orders", cardinality: many_to_one, foreign_key_attributes: ["order_id"]}
+        - {from_entity: "order_items", to_entity: "products", cardinality: many_to_one, foreign_key_attributes: ["product_id"]}
+        - {from_entity: "shipments", to_entity: "order_items", cardinality: many_to_one, foreign_key_attributes: ["order_id", "region_id"]}
+      constraints: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L899) AND §11.47 (L2294-2306) directly. Validated against jsonschema Draft202012Validator."
+  note: "The entities->keys->relationships->constraints formula and §11.47's own purpose/benefits are directly transcribed. Entity-name uniqueness, attribute-name uniqueness within an entity, at-least-one-primary-key-per-entity, both referential-integrity checks on relationships (including every foreign_key_attributes[] entry), and migration_ref's own format are all enforced at the runtime layer (ai_lego/modules/database_data/erd.py), not the schema layer. This record models a PHYSICAL/LOGICAL relational schema, not a conceptual ER diagram -- disclosed scope, not a silent narrowing (see method contract compilation_decisions). No mother document was modified."

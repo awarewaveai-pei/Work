@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-09-05（續52，同一 session：Cognitive OS 第三十九個 Method Atlas 切片 — `database_data.erd`，F21 家族第五成員；critic verdict **fail**：本契約自己宣稱「Atlas 無專節」完全錯，連帶讓兩個設計前提出錯；複合外鍵結構性缺陷；79,716-case oracle 證明修正後邏輯水密）
+
+**觸發**：延續操作者「都不要停，直到 Cognitive Engineering OS 完美完成」授權。1 個 critic subagent（額度檢查通過）。
+
+**選型**：F19 devops_sre 家族 13/13 全部收官後，轉向 `database_data` 家族（F21）第五成員：ERD。Atlas F21 L899「entities→keys→relationships→constraints｜建立資料結構共識」。四個不變量：每個 entity 至少一個 `is_primary_key:true` 屬性（Atlas「keys」步驟）、每個 relationship 的 `from_entity`/`to_entity` 都真實存在於 `entities[]`、`foreign_key_attributes[]`（陣列）每個元素都真的是 `from_entity` 的屬性、選填 `migration_ref` soft link 格式檢查前綴 `ECMIG-`。本方法無算術，不重用 `genuine_compute` gate（跟 `game_day`／`runbook_execution`／`rto_rpo` 同類，只有 `provenance_required`＋一個 integrity gate）。
+
+**自查階段（critic 審查前）就抓到並修正一個設計錯誤**：cardinality 分類法初稿抄標準四值（one_to_one/one_to_many/many_to_one/many_to_many），但因為 `foreign_key_attribute` 定義上永遠掛在 `from_entity` 上，`one_to_many` 從 `from_entity` 視角根本不可能表達（概念上的 `one_to_many(A→B)` 就是 `many_to_one(B→A)`，換個主詞而已，沒有損失建模能力）——寫測試前就改成只留 `one_to_one`/`many_to_one` 兩值，`many_to_many` 走 junction entity 兩個 `many_to_one` 關係表示。
+
+**critic 真跑（mutation testing、79,716-case 窮舉 oracle、獨立論證 cardinality 分類法設計本身）：verdict FAIL，1 Critical＋4 Major＋4 Minor**。runtime/gate/schema 層本身水密（25/27 突變殺掉、oracle 零分歧）；問題出在引用層：
+
+1. **Critical**：本契約宣稱「Atlas 只給一個引用、沒有專節」——完全錯。Atlas 其實有 §11.47 實體關係圖專節（L2294-2306），第一版自己的 grep 範圍不夠寬沒抓到，critic 用更寬的 grep 抓到（跟 `stress_test`／`rto_rpo` 前兩輪一模一樣的「due-diligence grep 太窄」類別，這是第三次重演）。這個誤判是連鎖的：§11.47 明確點名 `cardinality` 是自己的建模目標之一（不是「隻字未提」，第一版某個 compilation_decision 的前提整個錯了）；§11.47 給了真實的「可作為 migration 與 data contract 的起點」推薦鏈，被第一版的 `recommended_next: []` 悄悄丟掉、還開了一個 OQ 假裝這只是推測關係。
+2. **Major，真結構性修正**：複合主鍵合法（junction entity 範例已示範），但複合外鍵完全無法表達——`foreign_key_attribute` 是單一字串。改成陣列 `foreign_key_attributes`，gate 逐一核對陣列每個元素是否存在於 `from_entity`。這不是補一句揭露就過關，是真的改了 schema／module／tests／CLI 四處的欄位型別。
+3. **Major**：「每個真實 ERD 記法（Chen／Crow's Foot／UML）都需要 junction table 表示 many_to_many」的宣稱不實——三種記法在概念層都能直接畫 M:N（菱形／雙 crow's feet／`*..*` association），junction table 是「實體層映射」的產物，不是記法規則本身。收窄成「本記錄是實體層 schema，不是概念層 Chen 式 ER 圖」的範圍決定，宣稱同時修正為「每個真實關聯式 schema」而非「每個真實 ERD 記法」。
+4. **Major**：跟上一條連動——本記錄其實只服務「實體層 schema」這個範圍，第一版從沒明講（透過「外鍵必填」這個欄位設計隱含決定），現在補一條明確的 compilation_decision。
+5. **Major**：due-diligence 沒搜過「node/edge」這種通用圖形詞彙，漏了本 session 自己已經建過的最接近真實結構先例——`dependency-map.schema.yaml`（節點+型別化邊+runtime 層交叉驗證，跟本方法同一套紀律）；順帶補列 `causal-dag-analysis.schema.yaml`、`evidence-graph.schema.yaml` 自己的 `entity_node`（那個 schema自己的 due-diligence 早就揭露過「ERD」對它而言是零命中，確認無關）。
+
+4 Minor 全修：builder 文件宣稱「重建每個巢狀物件」但 `provenance` 其實是別名傳遞（家族慣例非 bug，收窄措辭）；entity 額外欄位在 builder／gate 兩層都沒測試覆蓋（schema 層有）；schema 頂層 `required` 清單沒測試（之前每個測試都改值、沒人整個刪掉必填欄位）。另 1 Minor 選擇揭露不修：`relationships[]` 不去重、`cardinality` 是無交叉驗證的呼叫端宣稱（同一個 (from,to,fk) 三元組可以掛兩個矛盾的 cardinality）——新開 `OQ-ERD-5`，補一個測試證明這是刻意接受的行為非疏漏。
+
+**本輪教訓**：這是本 session 第一次 critic verdict 真的是 **fail**（前面最嚴重都只到 warn）——因為「Atlas 有沒有專節」這個事實性宣稱錯了，而且這個錯誤不是孤立的文件瑕疵，是兩個設計決策的前提本身建立在錯誤事實上。跟 `stress_test`／`rto_rpo` 連續兩輪都抓到「due-diligence grep 太窄」不同，這次的後果更嚴重：抽象教訓（「grep 要寬」）明明已經在前兩輪學過，但沒有真的內化成「每次都要重新懷疑自己的第一版事實性宣稱」的習慣，直到第三次真的漏掉一整個 Atlas 專節才被抓到。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.erd.contract.yaml`（含 §11.47 引用修正＋cardinality 範圍決定＋migration_ref soft link）＋`specs/cognitive/typed-objects/erd-record.schema.yaml`（`foreign_key_attributes` 陣列化＋`migration_ref`）＋`contract-backlog.yaml` `tier_1.thirtyseventh_concrete_entry`＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/modules/database_data/erd.py`（builder＋2 gate，10 共用 predicate）＋`ai_lego/apps/cli/run_erd_slice.py`＋`tests/unit/test_erd.py`（81 tests）＋`docs/THIRTYNINTH_SLICE_DATABASE_DATA_ERD.md`；`modules/database_data/__init__.py` docstring。`agency-os/TASKS.md` 切片條目。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2803→2806
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_erd_slice` | exit=0 | result=`PASS database_data.erd: 2 entities, 1 relationships, 1 constraints, migration_ref=ECMIG-2026-09-05-001, gates [provenance_required=PASS, erd_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_erd` | exit=0 | result=81 OK（63→81）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=99877（修正後重跑）| result=**1298 tests OK**（1280→1298，零回歸；初稿 63 個測試對應的全套數字未單獨量測，直接以修正後為準）
+- REVIEW_DONE: critic=Standard（真實 subagent，mutation testing＋79,716-case 窮舉 oracle＋cardinality 設計獨立論證）| verdict=fail→1 Critical＋4 Major 全修＋4 Minor 全修＋1 Minor 揭露 | findings=1c/4m/5minor
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`database_data[.]erd\|ErdRecord\|ERD_INVALID\|ERD_EMPTY\|ERD_DANGLING\|ERD_INVARIANT` | hits=8（8 個檔案全部本切片自己；過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-ERD-1~6` 皆揭露；`relationships[]` 不去重、`cardinality` 無交叉驗證（`OQ-ERD-5`）；本記錄只服務實體層 schema，概念層 pre-physicalization 模型無法表達（`OQ-ERD-6`）；`constraints[]` 純自由文字無結構；own id 前綴／`version` 型別／頂層 key 集合皆家族級 schema-only 慣例。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
 ## 2026-09-05（續51，同一 session：Cognitive OS 第三十八個 Method Atlas 切片 — `devops_sre.rto_rpo`，**F19 devops_sre 家族 13/13 全部收官**；解答第 25 個切片留下的 OQ-BACKUPDRILL-2 前向指稱；critic 6056-case oracle 零分歧但 6 個揭露/可追溯性類 Major）
 
 **觸發**：延續操作者「都不要停，直到 Cognitive Engineering OS 完美完成」授權。1 個 critic subagent（額度檢查通過）。

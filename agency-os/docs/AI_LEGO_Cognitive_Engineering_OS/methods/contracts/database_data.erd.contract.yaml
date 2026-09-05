@@ -1,0 +1,372 @@
+$id: "ai-lego://methods/contracts/database_data.erd.contract.yaml"
+title: "ERD Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-ninth Method Atlas slice, FIFTH from the
+  `database_data` family (F21's own "資料庫／資料套件 (DB / Data Pack)"),
+  after `database_data.backup_restore_drill` (twenty-fifth),
+  `database_data.data_lineage` (twenty-eighth), `database_data
+  .expand_contract_migration` (thirtieth), and `database_data
+  .reconciliation` (twenty-ninth). First `database_data` member built
+  since F19's `devops_sre` family completed (13/13) in the immediately
+  prior slice.
+
+  Atlas gives this method TWO citations: the F21 tool table's ERD row
+  (L899: purpose "建模 entity/attribute/relationship"; usage "entities→
+  keys→relationships→constraints"; benefit "建立資料結構共識") AND a
+  dedicated §11.47 實體關係圖（ERD）section (L2294-2306: purpose "建模
+  entity、attribute、primary/foreign key、cardinality"; benefits "建立
+  DB schema 的共同語言" and "可作為 migration 與 data contract 的起
+  點"). **CORRECTED post-critic-review**: this contract's first draft
+  claimed "exactly ONE citation" and "no dedicated §11.x section
+  exists" -- both FALSE. A critic review's own broad grep ("ERD"/
+  "entity relationship") caught what the first draft's own narrower
+  grep missed. §11.47 IS thin (purpose + two benefit bullets, no
+  numbered protocol beyond L899's own formula -- genuinely the same
+  tier `devops_sre.rto_rpo`'s own F19 row comparison already
+  established a precedent for calling "thin"), but it is NOT absent,
+  and it directly answers two things the first draft got wrong by
+  omission: (1) it explicitly NAMES `cardinality` as a modeling target,
+  the same tier as `primary/foreign key` -- the first draft's own
+  `compilation_decisions` wrongly premised "Atlas names no cardinality
+  vocabulary" as if cardinality itself were unmentioned, when only its
+  own VALUE VOCABULARY (which enum values) is unmentioned; (2) it gives
+  a REAL 推薦搭配 (recommended pairing) chain -- "可作為 migration 與
+  data contract 的起點" -- to `database_data.expand_contract_migration`
+  (already built) and a future `database_data.data_contract` (unbuilt),
+  which the first draft's own `recommended_next: []` silently dropped
+  while separately filing `OQ-ERD-4` as if the pairing were merely
+  speculative.
+
+  **This record models a PHYSICAL/LOGICAL relational schema (foreign-
+  key-bearing), not a conceptual Chen-style ER diagram** -- a scope
+  decision the first draft made implicitly (via required foreign-key
+  fields) but never stated, ADDED post-critic-review (see
+  compilation_decisions). Atlas's own §11.47 benefit "建立 DB schema
+  的共同語言" (build a common language for the DB SCHEMA) supports this
+  reading directly.
+
+  Due-diligence search, broad (learning from `devops_sre.stress_test`'s
+  and `devops_sre.rto_rpo`'s own critic rounds, both of which caught an
+  insufficiently broad citation grep on their FIRST attempt -- and this
+  contract's own first draft repeated that exact class a THIRD time,
+  caught by ITS OWN critic round): case-insensitive spec-root greps for
+  "ERD"/"entity relationship"/"entity_relationship", "primary_key"/
+  "foreign_key"/"cardinality", "entities→keys", and -- ADDED post-
+  critic-review -- "node"/"edge" (the generic graph-shape vocabulary a
+  narrower ERD-specific grep does not surface). Real neighbours found,
+  each read and confirmed distinct: (1) `docs/architecture/search-content
+  /SEARCH_CONTENT_DOMAIN_MODEL.md`'s own "entity" usage (`raw_observed
+  _entity`/`entity_ref`) is an NLP/information-extraction concept, not a
+  database schema entity; (2) `AI_LEGO_Cognitive_Engineering_Os_Global
+  _Master_Plan_v1.md:2591`'s own "Graph Store → Evidence / Claim /
+  Entity Relationships" is a Graph Store DATA-MODEL CONCEPT, not a
+  typed object or a generic ERD method; (3) `specs/domain
+  /repository-contract.schema.yaml`'s own `storage_tier` is a fixed
+  3-tier System-of-Record classification with no entity/attribute/
+  relationship modeling of its own; (4) ADDED post-critic-review:
+  `specs/cognitive/typed-objects/dependency-map.schema.yaml`'s own
+  `nodes[]`/`edges[]` shape -- the closest REAL structural analogue
+  this session has built (a graph of named nodes with typed,
+  referentially-validated edges, the SAME "cross-reference enforced at
+  the runtime layer, not the schema layer" discipline this contract
+  also uses) -- distinct: `DependencyMap` models service/vendor/data
+  DEPENDENCIES (commonly cyclic, a 3-value node vocabulary), not a
+  relational schema's own entities/attributes/keys; (5) ADDED post-
+  critic-review: `specs/cognitive/typed-objects/causal-dag-analysis
+  .schema.yaml`'s own `from_node_id`/`to_node_id` -- a CAUSAL graph
+  (acyclic by construction), a different domain entirely; (6) ADDED
+  post-critic-review: `specs/evidence/evidence-graph.schema.yaml`'s own
+  `entity_node` -- THAT schema's own due-diligence note already
+  disclosed a grep for "Entity Relationship Diagram" as a NON-hit for
+  its own purposes (an evidence/claim/decision graph, not a database
+  schema); its `entity_node` is a minimal placeholder for a mentioned
+  real-world entity (a person, organization) inside an evidence graph,
+  not this method's own database entity concept -- confirmed distinct
+  by direct read of both files. No duplicate typed object or method
+  found.
+
+  Atlas's own formula and §11.47 ground FOUR real invariants that make
+  this record a genuine MODEL, not a bag of independently-valid parts:
+  every relationship's own `from_entity`/`to_entity` must name a REAL
+  entity in `entities[]`; every relationship's own
+  `foreign_key_attributes[]` entries must ALL name REAL attributes of
+  that relationship's own `from_entity` (the side that structurally
+  HOLDS a foreign key) -- an ARRAY, CORRECTED post-critic-review from a
+  first-draft single string that could not represent a COMPOSITE
+  foreign key even though composite primary keys are explicitly legal;
+  every entity must carry at least one attribute flagged
+  `is_primary_key: true` (Atlas's own "keys" formula step); and a
+  supplied `migration_ref` must carry the
+  `database_data.expand_contract_migration` record's own id prefix.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, ERD row (L899): 'entities→keys→relationships→constraints'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.47 實體關係圖（ERD）(L2294-2306): purpose 'entity、attribute、primary/foreign key、cardinality'; benefits '建立 DB schema 的共同語言' and '可作為 migration 與 data contract 的起點' -- CORRECTED post-critic-review, missed by this contract's own first draft"
+  - "methods/registry/method-inventory.yaml ERD entry: category 'F21 database-data', no machine_id -- this contract mints one"
+  - "specs/cognitive/typed-objects/dependency-map.schema.yaml -- the closest real structural analogue (a graph of named nodes with typed, runtime-validated edges), read for comparison, confirmed a distinct domain, not this contract's own citation"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-seventh concrete entry. `id: database_data.erd` mints a new
+  machine_id, FIFTH member of the `database_data` family.
+
+id: database_data.erd
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating a schema into entities/attributes/
+# relationships/constraints is DECOMPOSE; assigning keys and cardinality
+# direction is MAP; the referential-integrity checks and the
+# at-least-one-key-per-entity check are VALIDATE -- the same inferred
+# triple every prior structured-record method this session built
+# already uses.
+
+purpose:
+  - model_a_database_schemas_entities_attributes_keys_relationships_and_constraints_as_one_internally_referentially_consistent_record
+inputs:
+  required: [EntitySet, RelationshipSet]
+  optional: [ConstraintSet, MigrationReference]
+outputs: [ErdRecord]
+preconditions:
+  - "system_or_database is a non-empty string"
+  - "entities has at least 1 entry; entity names are unique within the record; each entity has at least 1 attribute; attribute names are unique within that entity; each entity has at least one attribute flagged is_primary_key:true"
+  - "every relationships[] entry's own from_entity and to_entity both name a real entity in entities[]"
+  - "every relationships[] entry's own foreign_key_attributes[] has at least 1 entry, and EVERY entry names a real attribute of that entry's own from_entity (a composite foreign key is one relationship entry with multiple foreign_key_attributes, not multiple independent relationship entries)"
+  - "every relationships[] entry's own cardinality is one_to_one or many_to_one (many_to_many is modeled via a junction entity with two many_to_one relationships, not a third enum value -- see compilation_decisions)"
+  - "constraints is a required array (may be empty) of non-empty strings"
+  - "migration_ref, when present, is a non-empty string beginning with ECMIG- (the database_data.expand_contract_migration record id prefix) -- a format-only soft link"
+  # Preconditions 2 maps onto Atlas's own 'entities'+'keys' formula
+  # steps; 3-5 onto 'relationships'; 6 onto 'constraints'; 7 onto
+  # §11.47's own migration 起點 benefit. Same "structurally necessary,
+  # forbidden-state" class every prior genuine-compute-or-structural
+  # contract this session built already establishes.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every structured-record contract in this
+  # package already reasons through: the real risk is MODELING
+  # integrity (is the schema internally referentially consistent), not
+  # an evidence-citation risk over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no ERD row.
+recommended_next: []
+# CORRECTED post-critic-review: Atlas's own §11.47 L2305 DOES give an
+# explicit 推薦搭配 chain -- "可作為 migration 與 data contract 的起
+# 點" -- unlike this session's every OTHER "Atlas gives no explicit
+# chain" contract. The migration half is now a REAL field
+# (`migration_ref`, format-only soft link to database_data
+# .expand_contract_migration's own output), not left as a bare
+# disclosed-but-unbuilt relationship; the data-contract half remains
+# unbuilt (database_data.data_contract does not exist yet) -- see
+# OQ-ERD-4.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- the real database schema
+  # it models is created/migrated outside this method's own scope, the
+  # same "record describes an external structure" class every prior
+  # database_data contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      This record models a schema with REQUIRED foreign-key fields on
+      every relationship. Is this a conceptual Chen-style ER diagram
+      (where relationships can exist without a physical FK column), or
+      a physical/logical relational schema? The first draft made this
+      choice implicitly and never stated it.
+    decision: "A PHYSICAL/LOGICAL relational schema (foreign-key-bearing), not a conceptual ER diagram -- now explicitly disclosed."
+    reasoning: >
+      Atlas's own §11.47 benefit line reads "建立 DB SCHEMA 的共同語言"
+      (build a common language for the DB schema specifically, not a
+      conceptual data model in the abstract) -- this supports the
+      physical reading directly. Within this declared scope, every
+      relationship having a real FK column is not an invented
+      restriction; it is the definition of what a physical schema's own
+      relationships ARE. A caller wanting to record a pre-physicalization
+      conceptual model (a relationship with no FK column yet, e.g. "these
+      two entities are related, cardinality TBD") is out of this
+      method's own declared scope -- disclosed as OQ-ERD-6, not silently
+      unsupported.
+  - question: >
+      Atlas's own §11.47 formula names `cardinality` as a modeling
+      target but gives no value vocabulary (no enum, no worked
+      example). Should this contract adopt the common four-value ERD
+      taxonomy (one_to_one/one_to_many/many_to_one/many_to_many), or a
+      narrower one? CORRECTED post-critic-review: the first draft's own
+      premise ("Atlas names no cardinality vocabulary") was imprecise --
+      Atlas DOES name cardinality (§11.47 L2300), it simply gives no
+      VALUES for it.
+    decision: "Two values only: one_to_one and many_to_one, from from_entity's own perspective (the side holding the foreign key) -- within this record's own declared physical-schema scope."
+    reasoning: >
+      This record's own `foreign_key_attributes` field is REQUIRED and
+      always lives on `from_entity` -- that structural choice already
+      fixes the relationship's own direction: a foreign key column (or
+      column set) structurally means "many rows here reference one row
+      there" (many_to_one), or "at most one row here references one row
+      there" if the FK column(s) are additionally unique (one_to_one). A
+      conceptual `one_to_many(A→B)` is NOT lost -- it is the exact same
+      real-world relationship as `many_to_one(B→A)`, just expressed from
+      the other entity's own perspective, which this record's own field
+      design already requires (whichever entity holds the FK is
+      `from_entity` by definition). `many_to_many` genuinely IS always
+      realized as a junction entity with two `many_to_one` relationships
+      **in a physical relational schema** -- CORRECTED post-critic-review:
+      the first draft's own claim that "every real ERD NOTATION (Chen,
+      Crow's Foot, UML)" requires this was FALSE. Chen's own 1976
+      entity-relationship model, Crow's Foot notation, and UML class
+      diagrams all draw conceptual M:N directly (a diamond, crow's feet
+      on both ends, or a `*..*` association respectively) with no
+      association/junction entity required at the CONCEPTUAL level -- the
+      junction table is a PHYSICAL-MAPPING step, not a notation rule. The
+      corrected claim, scoped to this record's own declared physical-
+      schema domain, is accurate: this record cannot express conceptual
+      M:N directly, by design (see the physical-schema compilation
+      decision above), and a caller with a genuine M:N must resolve it to
+      a junction entity before recording it here -- disclosed, not
+      silently unsupported.
+  - question: >
+      Should `constraints[]` be structured (e.g. parsing
+      "entity.attribute: constraint_text" into an
+      {entity, attribute, rule} object), or free text?
+    decision: "Free text, no parsing, no structure."
+    reasoning: >
+      Atlas's own formula names "constraints" as a step with zero
+      further elaboration -- no attribute-level rule grammar, no
+      severity, no scope. Inventing a parseable grammar (which entity,
+      which attribute, which rule type) would be exactly the kind of
+      unstated-assumption invention this package's every prior contract
+      already disciplines itself against -- the same restraint
+      `database_data.backup_restore_drill`'s own `issues_recorded`
+      field and `devops_sre.rto_rpo`'s own free-text `tier` already
+      establish for an analogous "Atlas names the concept, not its
+      internal structure" gap.
+  - question: >
+      Should entity/attribute name uniqueness be case-sensitive or
+      case-insensitive (e.g. is "Orders" the same entity as "orders")?
+    decision: "Case-sensitive exact string match."
+    reasoning: >
+      Real database identifiers are frequently case-sensitive
+      (PostgreSQL's own quoted identifiers, for one) and Atlas's own
+      text gives no basis for inventing a case-folding rule; exact
+      match is the conservative default that never silently merges two
+      names a caller intended to keep distinct. A caller modeling a
+      case-INsensitive database can simply supply already-normalized
+      names.
+  - question: >
+      Should this contract reject two relationships with the SAME
+      (from_entity, to_entity, foreign_key_attributes) triple that
+      disagree on cardinality (e.g. one says one_to_one, another says
+      many_to_one for the identical column set)?
+    decision: "No -- relationships[] is not deduplicated, and cardinality is a caller-supplied assertion this method does not independently verify against any other field."
+    reasoning: >
+      Atlas's own formula gives no rule about relationship uniqueness or
+      about cross-checking cardinality against a UNIQUE constraint this
+      record's own attribute shape has no field for anyway (there is no
+      `is_unique` flag on an attribute to verify `one_to_one` against).
+      Inventing a de-duplication or cross-check rule Atlas does not ask
+      for would be exactly the kind of unstated-assumption invention this
+      package's every prior contract already disciplines itself against.
+      A caller who supplies two contradictory entries has made an
+      authoring mistake this method cannot detect without a field it
+      does not have -- disclosed as a real, known limit (OQ-ERD-5), not a
+      silent gap.
+
+open_questions:
+  - id: "OQ-ERD-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ERD-2"
+    question: >
+      No structured field exists for a relationship's own optionality
+      (is the foreign key column itself NULLABLE, i.e. is the
+      relationship optional or mandatory from from_entity's own side)?
+      Atlas's own formula names no such distinction. Should a future
+      revision add one?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-ERD-3"
+    question: >
+      F21's own Normalization row (L900: '1NF→2NF→3NF/BCNF；必要時有意識
+      denormalize') could take an ErdRecord's own entities as its input
+      and check for normal-form violations (e.g. a non-key attribute
+      that depends on only part of a composite key). Should a future
+      `database_data.normalization` slice consume this record's own
+      output as a soft link?
+    owner: "operator, or whoever next builds database_data.normalization"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ERD-4"
+    question: >
+      F21's own Data Contract row (L902: 'schema→semantics→quality/SLO→
+      ownership→compatibility') AND §11.47's own explicit "起點" benefit
+      both point at this method as a starting point for a future
+      `database_data.data_contract` slice. Should that future slice add
+      a soft link to this record's own output (the same
+      `migration_ref`-class field this contract already added for the
+      migration half of the same benefit sentence)?
+    owner: "operator, or whoever next builds database_data.data_contract"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ERD-5"
+    question: >
+      A critic review confirmed `relationships[]` is not deduplicated
+      and `cardinality` is an unverified caller assertion (see
+      compilation_decisions) -- two relationship entries with the
+      identical (from_entity, to_entity, foreign_key_attributes) triple
+      but contradictory cardinality both pass every gate today. Should
+      a future revision add an `is_unique` flag to `#/$defs/attribute`
+      (or to the relationship entry itself) so `one_to_one` becomes
+      independently verifiable rather than a bare assertion?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-ERD-6"
+    question: >
+      This record's own scope is a PHYSICAL/LOGICAL relational schema
+      (every relationship requires a real foreign key). A caller wanting
+      to record a PRE-PHYSICALIZATION conceptual model (entities related
+      with no FK column decided yet, or a genuine conceptual many-to-many
+      before junction-table design) cannot use this record as-is. Should
+      a future revision add an optional conceptual-modeling mode, or is
+      that a genuinely separate method (closer to Atlas's own generic
+      "Domain Model" language elsewhere) this contract should not absorb?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L899) AND §11.47 (L2294-2306)
+    directly -- CORRECTED post-critic-review: this contract's first
+    draft's own grep for "ERD" was narrower than it claimed and missed
+    §11.47 entirely; a critic review's own broader grep caught it. Ran
+    broad case-insensitive spec-root greps ("ERD"/"entity relationship"/
+    "entity_relationship", "primary_key"/"foreign_key"/"cardinality",
+    "entities→keys", and -- ADDED post-critic-review -- "node"/"edge"),
+    read every neighbour surfaced (SEARCH_CONTENT_DOMAIN_MODEL.md's own
+    NLP-sense "entity", Master Plan L2591's own Graph Store concept,
+    repository-contract.schema.yaml's own storage_tier,
+    dependency-map.schema.yaml's own nodes/edges shape,
+    causal-dag-analysis.schema.yaml's own causal graph,
+    evidence-graph.schema.yaml's own entity_node and its own disclosed
+    "Entity Relationship Diagram" non-hit), and confirmed each distinct.
+    No duplicate typed object or method found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The entities->keys->relationships
+    ->constraints formula and §11.47's own purpose/benefits are both
+    directly transcribed; the two-value cardinality taxonomy (now
+    correctly grounded in a physical-schema scope decision, not a false
+    claim about every ERD notation), the composite-foreign-key array
+    design, free-text constraints, case-sensitive name matching, and
+    the non-deduplicated-relationships limit are all disclosed
+    compilation choices, not silent inventions -- see
+    compilation_decisions above. A critic review found this contract's
+    first draft's central citation claim FALSE (a real §11.47 section
+    exists) and two of its five compilation_decisions built on
+    incomplete premises as a result; all corrected in this revision,
+    verified against a re-read of the actual mother document, not
+    merely against the critic's own quoted lines.
