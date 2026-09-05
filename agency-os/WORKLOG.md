@@ -1,5 +1,55 @@
 # Worklog
 
+## 2026-09-05（`git commit -m $var` 在 PowerShell 5.1 遇內嵌雙引號會 pathspec 錯誤——`commit-checkpoint.ps1`／`ao-close.ps1` 改走 `-F` 檔案傳遞，順手修出一個新引入的 BOM 副作用）
+
+**觸發**：操作者回報 2026-09-05 提交 `9205f2a0b` 過程中，`git commit -m $Message -- $Paths`（message 含 `"Repo-hygiene audit"` 字面雙引號）在這個 worktree 靜默錯位成多個 pathspec 引數，噴 `error: pathspec '...' did not match any file(s)`；操作者已自行排除是 apostrophe 觸發，鎖定「內嵌 `"`」為根因，並要求檢查 `scripts/` 內其他用變數組 `-m` 的腳本是否同款曝險。
+
+**[任務理解]**：這不是「訊息裡別放引號」的使用者教育問題——不變量是「commit 訊息內容不該影響 commit 是否成功、也不該影響 commit 是否被靜默改寫」，任何組 `-m $var` 的呼叫點都在賭訊息內容夠乾淨。
+
+**[現況分析]**：PowerShell 5.1 呼叫原生命令（`git.exe`）組 Win32 command line 時，不會對內嵌字面 `"` 做跳脫；`CommandLineToArgvW` 在該字元處重新斷詞，尾段文字落到 `--` 分隔符之後被 git 當成 pathspec。`Grep -n "git commit -m" **/*.ps1` 全庫掃描，實際呼叫點只有 2 處：`scripts/commit-checkpoint.ps1:133`（`-m $Message -- $Paths`）與 `scripts/ao-close.ps1:1296`（`-m $CommitMessage`，僅當操作者未傳 `-CommitMessageFile` 時走這支）；`scripts/backfill-missed-daily.ps1:140` 命中同一 grep 但只是 `Write-Host` 印出來的建議指令字串，不是實際呼叫，無曝險。`agency-os/scripts/ao-close.ps1` 是 single-owner wrapper（`& $ownerScript @splat`），委派到 `scripts/ao-close.ps1`，同一次修復覆蓋，不用重複改。
+
+**[風險清單]**：兩支都是 git 寫入路徑（commit-checkpoint 是唯一存活的 scoped commit 工具；ao-close 是每日收工的正式流程），改動範圍要小到不引入新的失敗模式；`git commit -F <file>` 讀檔內容當訊息，若檔案編碼帶 BOM，BOM 位元組會被 git 原樣塞進 commit subject 第一行——這在 PS 5.1 用 `Set-Content -Encoding UTF8`（預設帶 BOM）時**真的發生了**，是本次修復自己新引入的副作用，不是理論風險（見下方驗證）。
+
+**[方案比較]**：A) 在 `-m $Message` 前守衛/剝除內嵌雙引號——patch 式，會**改寫使用者的 commit 訊息內容**，比原 bug 更糟（訊息真實性 vs 引號），且只堵一種字元，backtick/`$`/換行等 PowerShell 原生呼叫的其他曝險字元完全沒解。B)（採用）兩處呼叫都改走臨時檔 + `git commit -F <file>`——`-F` 讀檔案內容當訊息，完全繞過 PowerShell 的 argv marshalling，不只解掉雙引號，是同一個不變量的完整解法；`ao-close.ps1` 本身已經對 `-CommitMessageFile` 用這條路徑，屬於本庫既有、已驗證過的正確模式（非新發明），只是沒有無條件套用到「沒給檔案」的分支。Rollback：兩處都是獨立、可直接 `git revert` 的最小 diff，不影響其他邏輯。
+
+**[建議方案]**：B。
+
+**[實作計畫]**：
+1. `scripts/commit-checkpoint.ps1`：`git commit -m $Message -- $Paths` 改為寫臨時檔 + `git commit -F <tmp> -- $Paths`，事後 `Remove-Item`；dry-run 提示文字與檔頭手動範例註解同步更新。
+2. `scripts/ao-close.ps1`：原本 `if ($resolvedMsgFile) { -F } else { -m $CommitMessage }` 改成無條件 `-F`——沒有 `$resolvedMsgFile`（即操作者未傳 `-CommitMessageFile`）時現場寫臨時檔並指派給它，兩個分支合一，`git commit failed` 錯誤處理不變。
+3. 兩處臨時檔寫入改用 `[System.IO.File]::WriteAllText(path, content, (New-Object System.Text.UTF8Encoding $false))`（本庫既有 BOM-free 慣例，`ao-resume.ps1`／`backfill-missed-daily.ps1`／`apply-closeout-task-checkmarks.ps1` 等已在用），不用 `Set-Content -Encoding UTF8`（PS 5.1 該旗標帶 BOM）。
+
+**critic 第一輪發現（真的動用 subagent，非自審）**：
+- 🟠 Major M1：`ao-close.ps1` 的 `-CommitMessageFile` 路徑繞過了 BOM-free 正規化——`$fileBody`（`Get-Content -Raw -Encoding UTF8`，已驗完空字串即丟）從未被使用，真正交給 `git commit -F` 的是 `$resolvedMsgFile` 的**原始 bytes**。critic 實測：帶 BOM 的 UTF-8 檔 → BOM 進 subject（同一 bug 在 sibling path 上完好無損）；UTF-16 檔 → `error: a NUL byte in commit log message not allowed`，exit 128，且是在 AO-CLOSE 所有 gate 都過完、`git add` 已完成之後才炸，錯誤訊息完全沒提編碼。
+- 🟡 Minor m1：`Remove-Item` 清理夾在擷取 `$commitExitCode` 與判斷之間、不在 `try/finally` 內——`git commit -F` 若拋例外（如 git 不在 PATH，兩檔皆 `$ErrorActionPreference='Stop'`）temp file 會洩漏；理論上清理失敗也可能偽裝成 commit 失敗（雖然 `-ErrorAction SilentlyContinue` 目前壓得住非終止錯誤）。
+- 🟡 Minor m2：`ao-close.ps1` 的 `git commit failed` 錯誤訊息沒有印出手上已經有的 `$commitExitCode`。
+- 🔵 Suggestion（未採用，記錄供未來參考）：`$resolvedMsgFile` 在舊版一度被回填成 temp file 路徑、語意混淆（已隨 M1 修法自然解決，因為 `$resolvedMsgFile` 現在只承載「操作者給的檔案」，temp file 用獨立變數）；改用 `git rev-parse --git-path` 取代 `%TEMP%` 依賴；commit 失敗時保留 temp file 供除錯；`-m` 對 >32K 訊息會讓 process 起不來且 `$LASTEXITCODE` 殘留前一指令的 0，造成假性成功——已在下方程式碼註解與 WORKLOG 記錄為本次修法的額外效益。
+
+修復對應：M1 → `ao-close.ps1` 統一經 `$fileBody`／`$CommitMessage` 單一來源寫入 BOM-free 臨時檔；m1 → 兩檔皆包 `try/finally`；m2 → 錯誤訊息補 `(exit $commitExitCode)`。
+
+**已修改**：
+- [scripts/commit-checkpoint.ps1](../../scripts/commit-checkpoint.ps1)（`-m $Message` → 臨時檔 `-F`；dry-run 訊息與檔頭註解同步；try/finally 包住寫檔＋commit＋擷取 exit code，`Remove-Item` 移進 `finally`）
+- [scripts/ao-close.ps1](../../scripts/ao-close.ps1)（1259-1327 行區塊：`-m $CommitMessage` 分支併入 `-F`；critic 抓到的 M1 修復後改成 `-CommitMessageFile` 與 `-CommitMessage` 兩個訊息來源統一經 `$fileBody`／`$CommitMessage` → 單一 BOM-free 臨時檔 → `-F`，`$resolvedMsgFile` 不再被 `git commit` 直接讀取；try/finally 化；錯誤訊息補 exit code）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File repro-quote-bug.ps1`（scratch git repo，`-Message 'fix: add "Repo-hygiene audit" class'` 打進**修前**的 `commit-checkpoint.ps1`）| exit=1 | result=`error: pathspec 'audit class' did not match any file(s) known to git`——原始 bug 現場重現成功（含控制組：不含引號的訊息同一支腳本 exit=0 正常提交），證實根因與操作者回報一致
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File verify-quote-fix2.ps1`（同一 scratch repo，**修後**腳本，訊息含 `"..."`）| exit=0 | result=`git log -1 --format=%s` 讀回字串與傳入 `$Message` **逐字元相等**（`$subject -eq $msg5` → `MATCH`），確認訊息完整保存、無位元組層級的殘留差異
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上腳本，訊息改含 backtick + `` `$var` `` + 內嵌引號混合字元（Test 4）| exit=0 | result=`git log` 顯示訊息原樣保留，證明修法解的是整類 argv-marshalling 曝險，不只雙引號
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File verify-ao-close-block.ps1`（從 `ao-close.ps1` 逐字複製出的獨立區塊，`$CommitMessage` 含內嵌 `"`，`$resolvedMsgFile=$null` 模擬未傳 `-CommitMessageFile`）| exit=0 | result=commit 建立、`$subject -eq $CommitMessage` → `MATCH`、臨時檔 `Test-Path` → `False`（確認清除），未整支跑 `ao-close.ps1`（該腳本會觸發 WORKLOG／health gate 等收工副作用，不適合當單元測試跑）
+- BUGHUNT_EVIDENCE（回應 R4 BOM 副作用，先跑出 RED 再修成 GREEN）：初版修法用 `Set-Content -LiteralPath $tmp -Value $Message -Encoding UTF8 -NoNewline`，`git log -1 --format=%s` 讀回顯示 `﻿fix: add "Repo-hygiene audit" class`（U+FEFF 可見於 subject 開頭）——若不是逐位元組核對訊息內容，只看 exit code 會誤判修復成功；改用 `[System.IO.File]::WriteAllText` + `UTF8Encoding($false)` 後重跑同一測試，BOM 消失，逐字元比對通過
+- ORACLE_WAIVED: codex-oracle 斷路器 BLOCKED（`scripts/oracle-quota.ps1 -Action check -Tool codex` exit=3，「BLOCKED until 2026-09-07 11:06 -- usage limit」），改走書面對抗自審 + 突變測試證據
+- REVIEW_DONE: critic=Standard（第一輪：真的動用 subagent，非自審——見下方 M1/m1/m2 三項發現與修復；第二輪：發 targeted re-verify subagent 確認三項修復是否關閉，該 subagent 因 Anthropic session rate limit（`resets 7:40pm Asia/Taipei`，HTTP 429）在讀檔階段即中止，未取得第二輪產出。改以下方三項 REALTEST_EVIDENCE 逐項自證關閉：每個 critic 發現都對應一支獨立跑出結果的驗證腳本，而非「讀碼相信自己」）
+- REALTEST_EVIDENCE（critic M1 關閉證據）: tool=Bash | cmd=`powershell.exe -File verify-ao-close-m1-fix.ps1`——從**修後** `ao-close.ps1:1261-1327` 逐字複製的區塊，Scenario A：`-CommitMessageFile` 指向帶 BOM 的 UTF-8 檔（內含 `"Repo-hygiene audit"`）；Scenario B：`-CommitMessageFile` 指向 UTF-16 檔 | exit=0（兩者皆是，前一版會分別是「BOM 進 subject」與「exit 128 NUL byte 錯誤」）| result=兩個 commit 皆成功，`git log -1 --format=%s` 逐位元組（`[System.Text.Encoding]::UTF8.GetBytes(...)` 十六進位）核對開頭 bytes 為純 ASCII 訊息文字，無 `ef bb bf`；另補一輪用 `[int]$subject[0]` 讀第一個字元的 code point（`0x0066`='f'）二次確認，排除同批測試腳本內建的 `.StartsWith([char]0xFEFF)` 判斷式本身有 bug 誤報的可能（該誤報已定位為測試腳本瑕疵，非產品程式碼問題，未採用該判斷式的結論）
+- REALTEST_EVIDENCE（critic M1 關閉證據，第三情境）: tool=Bash | cmd=`powershell.exe -File verify-ao-close-scenarioC.ps1`——同一修後區塊，`-CommitMessageFile` 留空、走 `$CommitMessage` 分支（原本就能動的路徑，確認 M1 重構沒有破壞它）| exit=0 | result=`$subject -eq $CommitMessage` → `MATCH`
+- REVIEW_DONE（critic m1/m2 關閉證據）: 上述所有 REALTEST_EVIDENCE 均基於**修後**含 try/finally 與 `(exit $commitExitCode)` 錯誤訊息的程式碼路徑跑出，每次都 exit=0 且無殘留臨時檔案（`ao-close-commit-msg-*.txt`／`commit-checkpoint-msg-*.txt` 皆由 `finally` 清除，前一版 `verify-ao-close-block.ps1` 已明確 `Test-Path` → `False` 驗證同一清除路徑）；m2（exit code 併入錯誤訊息）為純字串串接，語法檢查已過，無需另外執行證據
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`git commit -m` | hits=3（`commit-checkpoint.ps1`／`ao-close.ps1` 已修；`backfill-missed-daily.ps1:140` 為列印用建議字串非真呼叫，不需修改）；另 grep=`commit-checkpoint\.ps1\|CommitMessageFile\|-CommitMessage\b` 掃到的 21 個檔案（含 `scripts/README.md`、`.claude/commands/tomo.md`、`.claude/commands/checkpoint.md`、`agency-os/scripts/ao-close.ps1` wrapper 等）逐一檢視，均為用法文件或委派 wrapper，未見對舊 `-m` 內部機制的過時斷言，不需同步修改
+
+**[剩餘風險]**：
+- 未建立永久 `scripts/audit-*.ps1` 偵測工具或 Bug Hunt Protocol 新 class——本次評估為 Logic audit 形（2 個具體呼叫點的具體 patch，非可規模化的 pattern class），且範圍已透過 grep 窮舉確認封閉，工具化 ROI 低，故未走 9 步 Build Playbook；若未來新增 `-m $var` 呼叫點，目前無機械閘擋（僅靠這則 WORKLOG + 本次為兩處呼叫加的行內註解）
+- `commit-checkpoint.ps1` 檔頭給人工手動輸入的建議寫法（`git commit -m "<message>"`）仍是 `-m`，因為那是操作者自己在 shell 打字，非本腳本的程式碼路徑；已加一行 CAUTION 註解說明內嵌 `"` 的風險與 `-F` 替代方案，但不是機械強制
+
+**[rollback]**：`git revert` 對應的兩個檔案改動即可；兩處改動彼此獨立，可分開 revert。
+
 ## 2026-09-05（soulfulexpression.org Cloudflare 流量異常查證 + 兩處監控冗餘修復：Uptime Kuma 檢查間隔、MainWP 內建 Uptime Monitor）
 
 **觸發**：操作者收到 Cloudflare 通知「上月 62,053 次 pageviews」，覺得「這網站應該不太可能有人看」，要求查清楚。
