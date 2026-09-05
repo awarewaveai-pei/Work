@@ -1383,6 +1383,48 @@ tier_1:
       table-row citation of its own, thinner than several Tier 0
       examples. Tier 1, mandated by the actively-running implementation
       slice, same category as the thirty-six entries above it.
+  thirtyeighth_concrete_entry:
+    # NEW (2026-09-06, same session): thirty-eighth Tier 1 entry, same
+    # additive-key rationale as the thirty-seven entries above it.
+    method_id: "database_data.data_contract"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SIXTH entry
+      from the `database_data` family (F21), after database_data
+      .backup_restore_drill, database_data.data_lineage, database_data
+      .expand_contract_migration, database_data.reconciliation, and
+      database_data.erd. Directly closes database_data.erd's own
+      OQ-ERD-4. Atlas gives this method FOUR citations (F21 table row
+      L902, dedicated §11.49 section L2332-2351 with its own seven-step
+      formula, the DB Migration recipe L1113, and §11.47's own L2305
+      "起點" benefit sentence naming this exact pairing) -- a critic
+      review confirmed a first-draft count of three missed the fourth
+      (L2305), corrected in this revision. FOUR optional fields are
+      format-only soft links to already-built sibling records reused
+      by reference rather than re-modeled: schema_ref (ERD-,
+      database_data.erd), freshness_ref (SLO-, devops_sre.sli_slo,
+      whose own metric_type enum already includes "freshness"),
+      compatibility_ref (ECMIG-, database_data
+      .expand_contract_migration, resolving the DB Migration recipe's
+      own L1113 pairing), and deprecation_ref (DEP-,
+      specs/execution/deprecation-pipeline.schema.yaml, whose own
+      object_type enum includes "Schema"). Real structural invariants:
+      consumers[] non-empty with unique names, fields[] non-empty with
+      unique names, and every present soft-link ref carrying its own
+      required id prefix -- including the record's OWN `DC-` prefix,
+      added post-critic-review after a first-draft asymmetry left the
+      four OUTBOUND ref prefixes double-enforced (builder + gate) while
+      the record's own inbound id prefix was schema-layer-only.
+    source: "methods/contracts/database_data.data_contract.contract.yaml (built same session as this entry, mints machine_id database_data.data_contract) + specs/cognitive/typed-objects/data-contract-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas's own dedicated §11.49 section is
+      thin (a seven-step formula list, no worked example or protocol
+      detail beyond the F21 row's own compressed usage string), the
+      same tier `database_data.erd`'s own §11.47 comparison already
+      established. Tier 1, mandated by the actively-running
+      implementation slice, same category as the thirty-seven entries
+      above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

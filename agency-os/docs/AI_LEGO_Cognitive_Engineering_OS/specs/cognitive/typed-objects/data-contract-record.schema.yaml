@@ -1,0 +1,188 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/data-contract-record.schema.yaml"
+title: Data Contract Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DataContractRecord` -- the
+  declared `outputs` of `database_data.data_contract`'s Method Contract.
+  SIXTH `database_data`-family typed object, after `database_data
+  .backup_restore_drill`, `database_data.data_lineage`, `database_data
+  .expand_contract_migration`, `database_data.reconciliation`, and
+  `database_data.erd`. Atlas's own F21 tool table Data Contract row
+  (L902) AND dedicated §11.49 資料契約（Data Contract）section
+  (L2332-2351: formula "Schema→Semantics→Owner→Freshness→Quality→
+  Compatibility→Deprecation") together ground this record. Directly
+  closes `database_data.erd`'s own `OQ-ERD-4`.
+
+  Fields map onto Atlas's own §11.49 formula in order: `fields[]`
+  ("Schema"), `semantics` ("Semantics"), `producer` ("Owner", and the
+  table row's own "producer" role), `freshness_ref` ("Freshness"),
+  `quality_notes` ("Quality"), `compatibility_policy`+
+  `compatibility_ref` ("Compatibility"), `deprecation_ref`
+  ("Deprecation"). `consumers[]` answers the table row's own purpose
+  sentence ("定義 producer/consumer 承諾") -- a contract naming a
+  producer but zero consumers commits to nothing.
+
+  All FOUR of the optional fields are format-only soft links to
+  ALREADY-BUILT sibling records, reused by reference rather than
+  re-modeled here (see method contract due-diligence for the full
+  reasoning): `schema_ref` (`ERD-` prefix, `database_data.erd`,
+  resolving OQ-ERD-4), `freshness_ref` (`SLO-` prefix, `devops_sre
+  .sli_slo`, whose own `metric_type` enum already includes
+  `freshness`), `compatibility_ref` (`ECMIG-` prefix, `database_data
+  .expand_contract_migration`, resolving the DB Migration recipe's own
+  L1113 "Data Contract→Compatibility→Expand/Contract" pairing), and
+  `deprecation_ref` (`DEP-` prefix, `specs/execution/deprecation
+  -pipeline.schema.yaml`, whose own `object_type` enum includes
+  `Schema`). This method cannot see any referenced record's own
+  content -- format-only, the same declared limit every prior soft-
+  link field in this package already carries.
+
+  Two real structural invariants make this record a genuine MODEL, not
+  a bag of independently-valid parts: `consumers[]` must have at least
+  one entry with unique, non-empty names; `fields[]` must have at least
+  one entry with unique, non-empty names (both enforced at the runtime
+  layer, not here).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Data Contract row (L902): 'schema→semantics→quality/SLO→ownership→compatibility'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.49 資料契約（Data Contract）(L2332-2351): formula 'Schema→Semantics→Owner→Freshness→Quality→Compatibility→Deprecation'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md DB Migration recipe (L1113): 'Data Contract→Compatibility→Expand/Contract→Backfill→Restore/Rollback'"
+  - "methods/contracts/database_data.data_contract.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  field:
+    type: object
+    required: [name, data_type, nullable]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      data_type:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Free text, e.g. 'uuid', 'varchar(255)', 'timestamp' -- Atlas gives no fixed type vocabulary, and this record is format/engine-agnostic (a Kafka topic, a REST payload, or a database table column may all be described this way)."
+      nullable:
+        type: boolean
+        description: "Can a consumer expect this field to be absent or null? A distinct three-key shape from erd-record.schema.yaml's own attribute $def (which has is_primary_key, not nullable) -- see method contract compilation_decisions for why the two are not the same shape."
+
+type: object
+required: [id, version, dataset_or_topic, producer, consumers, fields, semantics, quality_notes, compatibility_policy, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^DC-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.data_contract"
+  dataset_or_topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which dataset, topic, or API payload this contract governs, e.g. 'checkout-api.order-events (Kafka topic)'."
+  producer:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'Owner' formula step, and the table row's own 'producer' role -- the single accountable publishing party."
+  consumers:
+    type: array
+    minItems: 1
+    description: "The table row's own 'consumer' role. At least one consumer; unique, non-empty names -- enforced at the runtime layer, not here."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  fields:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'Schema' formula step. At least one field; field names unique within this record -- enforced at the runtime layer, not here."
+    items:
+      $ref: "#/$defs/field"
+  schema_ref:
+    type: string
+    pattern: "^ERD-"
+    description: "OPTIONAL soft link to a database_data.erd record (id prefix ERD-) when a fuller multi-entity relational model already exists for this dataset -- resolves database_data.erd's own OQ-ERD-4. Format-only: this method cannot see the referenced record, and fields[] above is NOT cross-validated against it (see method contract OQ-DC-4)."
+  semantics:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'Semantics' formula step -- free text describing the overall business meaning of this dataset. No invented per-field grammar (see method contract compilation_decisions)."
+  freshness_ref:
+    type: string
+    pattern: "^SLO-"
+    description: "OPTIONAL soft link to a devops_sre.sli_slo record (id prefix SLO-) whose own indicators include a metric_type:freshness entry -- resolves Atlas's own §11.49 'Freshness' formula step by reusing an already-built typed object with an exact matching vocabulary term. Format-only: this method cannot see the referenced record's own indicators."
+  quality_notes:
+    type: array
+    default: []
+    description: "Atlas's own 'Quality' formula step. REQUIRED array (may be empty) so an absence of quality notes is an explicit disclosed finding, not an omitted field -- the same discipline database_data.erd's own constraints[] already establishes. Free text: no structured quality vocabulary exists yet (see method contract OQ-DC-2, forward-pointing to a still-unbuilt database_data.data_quality_dimensions)."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  compatibility_policy:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'Compatibility' formula step -- free text policy statement, e.g. 'backward-compatible only: new optional fields allowed, no field removal or type change without a major version bump'. Atlas gives no fixed compatibility-level enum."
+  compatibility_ref:
+    type: string
+    pattern: "^ECMIG-"
+    description: "OPTIONAL soft link to a database_data.expand_contract_migration record (id prefix ECMIG-) exemplifying or implementing this contract's own compatibility_policy -- resolves the DB Migration recipe's own L1113 'Data Contract→Compatibility→Expand/Contract' pairing. Format-only: this method cannot see the referenced record."
+  deprecation_ref:
+    type: string
+    pattern: "^DEP-"
+    description: "OPTIONAL soft link to a specs/execution/deprecation-pipeline.schema.yaml deprecation_record (id prefix DEP-, object_type Schema) -- resolves Atlas's own §11.49 'Deprecation' formula step by reusing the already-built retirement pipeline instead of re-modeling it here (see method contract compilation_decisions). Format-only: this method cannot see the referenced record's own step progress."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a data contract is a structured governance judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Kafka topic contract with all four optional soft links populated, citing an existing ERD, an SLO record covering freshness, the migration that established backward compatibility, and an in-progress deprecation of a sibling schema"
+    value:
+      id: "DC-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_contract"
+      dataset_or_topic: "checkout-api.order-events (Kafka topic)"
+      producer: "checkout-platform-team"
+      consumers: ["analytics-team", "fraud-detection-team", "fulfillment-team"]
+      fields:
+        - {name: "order_id", data_type: "uuid", nullable: false}
+        - {name: "customer_id", data_type: "uuid", nullable: false}
+        - {name: "total_cents", data_type: "bigint", nullable: false}
+        - {name: "promo_code", data_type: "varchar(64)", nullable: true}
+      schema_ref: "ERD-2026-09-05-001"
+      semantics: "Emitted once per finalized checkout order; total_cents is the post-discount charge amount in the smallest currency unit."
+      freshness_ref: "SLO-2026-09-05-001"
+      quality_notes: ["promo_code is free text supplied by the frontend and not validated against the promotions service at emit time"]
+      compatibility_policy: "Backward-compatible only: new optional fields allowed; no field removal or type change without a major version bump and a new topic."
+      compatibility_ref: "ECMIG-2026-09-05-001"
+      deprecation_ref: "DEP-2026-08-01-003"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal contract with no optional soft links -- a single-field internal dataset with one consumer"
+    value:
+      id: "DC-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_contract"
+      dataset_or_topic: "internal-metrics.daily-active-users"
+      producer: "growth-analytics-team"
+      consumers: ["exec-dashboard-service"]
+      fields:
+        - {name: "count", data_type: "integer", nullable: false}
+      semantics: "Count of distinct users with at least one tracked session in the prior 24 hours, UTC day boundary."
+      quality_notes: []
+      compatibility_policy: "No compatibility guarantee yet -- single internal consumer, informal coordination."
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L902), §11.49 (L2332-2351), and the DB Migration recipe (L1113) directly. Validated against jsonschema Draft202012Validator."
+  note: "The Schema->Semantics->Owner->Freshness->Quality->Compatibility->Deprecation formula and the table row's own producer/consumer purpose are directly transcribed. Consumer-name uniqueness, field-name uniqueness, and all four soft-link prefix formats are enforced at the runtime layer (ai_lego/modules/database_data/data_contract.py), not the schema layer. schema_ref/freshness_ref/compatibility_ref/deprecation_ref are format-only and NOT cross-validated against their referenced records' own content -- disclosed scope (method contract OQ-DC-4), not a silent gap. No mother document was modified."

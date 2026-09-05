@@ -301,6 +301,7 @@ open_questions:
     owner: "operator, or whoever next builds database_data.normalization"
     blocks: "nothing in this file's own validity"
   - id: "OQ-ERD-4"
+    status: "ANSWERED (2026-09-06) -- database_data.data_contract now exists and its own `schema_ref` field (ERD- prefix, optional) is exactly this soft link. See methods/contracts/database_data.data_contract.contract.yaml."
     question: >
       F21's own Data Contract row (L902: 'schema→semantics→quality/SLO→
       ownership→compatibility') AND §11.47's own explicit "起點" benefit

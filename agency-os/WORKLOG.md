@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-09-06（續53，同一 session：Cognitive OS 第四十個 Method Atlas 切片 — `database_data.data_contract`，F21 家族第六成員；直接解答 `database_data.erd` 的 OQ-ERD-4；critic verdict **SHIP WITH MINOR FIXES**：0 Critical，4 Major 全屬揭露/完整性類非邏輯 bug，含一個 registry 註冊宣稱造假、一個未揭露的偽普遍宣稱、一個缺檔、一個 gate docstring 誇大宣稱）
+
+**觸發**：延續操作者「都不要停，直到 Cognitive Engineering OS 完美完成」授權，本次訊息明確指名「erd 切片續52」→ 讀 WORKLOG 續52（第三十九個切片 ERD）自己留下的 `OQ-ERD-4` 前向指稱，直接續建下一個。1 個 critic subagent。
+
+**選型**：`database_data.erd` 自己的 `OQ-ERD-4` 明文指名：F21 table Data Contract 列（L902）＋ §11.47 L2305「可作為 migration 與 data contract 的起點」都指向 `database_data.data_contract` 是下一個天然候選——不是自由選擇，是解答既有前向指稱。
+
+**Atlas 引用（critic 覆核後定案為 4 筆，第一版只數到 3 筆漏了 L2305）**：F21 table Data Contract 列（L902，purpose「定義 producer/consumer 承諾」，usage「schema→semantics→quality/SLO→ownership→compatibility」）＋ §11.49 資料契約專節（L2332-2351，公式「Schema→Semantics→Owner→Freshness→Quality→Compatibility→Deprecation」七步驟，是 table 五詞壓縮 usage 字串的完整版——「quality/SLO」壓縮了 Freshness+Quality 兩步、table 完全省略 Deprecation）＋ DB Migration recipe（L1113，「Data Contract→Compatibility→Expand/Contract→Backfill→Restore/Rollback」，§10 Method Selection Engine 表格非誤植的「§13」）＋ §11.47 L2305 本身（`database_data.erd` 的 `OQ-ERD-4` 引用的原句）。
+
+**四個選填欄位皆為格式檢查 soft link，指向本 session 已完工的手足記錄，不重造結構**：`schema_ref`（`ERD-`，`database_data.erd`，解答 OQ-ERD-4）、`freshness_ref`（`SLO-`，`devops_sre.sli_slo`，其 `metric_type` enum 本來就有 `freshness` 值，字面對應 Atlas 公式）、`compatibility_ref`（`ECMIG-`，`database_data.expand_contract_migration`，解答 DB Migration recipe L1113 配對）、`deprecation_ref`（`DEP-`，`specs/execution/deprecation-pipeline.schema.yaml`，其 `object_type` enum 含 `Schema`）。`fields[]`（Schema 步驟）刻意用跟 `erd` 的 attribute `$def` 不同的三鍵形狀（`{name, data_type, nullable}` 而非 `{name, data_type, is_primary_key}`）——可為空判斷跟主鍵狀態是不同概念。「Quality」步驟無現成結構可借（`sli_slo` 沒有 `quality` metric type），維持自由文字並開 `OQ-DC-2` 前向指向尚未建的 `database_data.data_quality_dimensions`。
+
+**critic 真跑（獨立重讀四筆引用原文、直接讀四個被引用 schema 檔驗證 enum/prefix 真實存在、對兩層真跑突變、真實執行完整測試套件）：verdict SHIP WITH MINOR FIXES，0 Critical，4 Major**：
+
+1. **registry 註冊宣稱造假**：contract 自己的 `decided_by` 宣稱已在 `contract-backlog.yaml` `tier_1` 註冊為「thirty-eighth concrete entry」，grep 零命中，`tier_1` 序數止於 `thirtyseventh_concrete_entry`——直接補上缺的 entry。
+2. **未揭露的偽普遍宣稱**：`consumers: minItems: 1` 的理由寫成「零 consumer 的合約什麼都沒承諾」，但 contract-first publishing（producer 先發布合約、consumer 之後才註冊）是真實存在、有文獻記載的 data-mesh 慣例，本設計無法表達這個狀態——保留不變量（Atlas 引用的主要情境本來就是雙方已談妥的關係），但把宣稱改寫成明文揭露的範圍決定，新開 `OQ-DC-5`。
+3. **缺切片文件**：`docs/FORTIETH_SLICE_DATABASE_DATA_DATA_CONTRACT.md` 原本不存在，前面每個切片都有——已補。
+4. **gate docstring 誇大宣稱，蓋住真實的建構/gate 不對稱**：integrity gate 自己宣稱「重算 EVERY structural precondition」，但記錄自己的 `DC-` id 前綴與 `version` 型別在兩層都完全零檢查（只有 schema 層），而四個對外 soft link 前綴卻兩層都查——critic 真跑突變證明 `id="ERD-1"` 可以兩個 runtime gate 都過。修法：`RECORD_ID_PREFIX` 常數＋ builder／gate 兩層都補上 id 前綴與 version 型別檢查，跟四個 ref 檢查對稱。
+
+5 個 Minor 全修（「THREE of four」應為「all FOUR」計數錯；DB Migration recipe 誤植「§13-area」應為「§10」；「F21 next table row」誤指下一列（Data Contract 後面實際是 Schema Compatibility Analysis 非 Data Quality Dimensions）；引用計數三筆漏第四筆 L2305；`quality_notes` 陣列項目缺 `pattern: "\S"`，本檔案唯一漏這條的自由文字欄位）。2 個 Minor 揭露不改碼：consumer／field 名稱比對對空白字元敏感（延伸既有大小寫敏感決定明文涵蓋空白）；gate 層刪除測試覆蓋率缺口（家族共通模式非本切片獨有，仍補一個完整必填欄位刪除迴圈測試）。2 個 Suggestion（bare-prefix regex 收緊、`all_gates_pass` 對非法輸入健壯性）維持家族既有慣例不改。
+
+**順手關閉**：`database_data.erd` 自己的 `OQ-ERD-4` 標記 ANSWERED（本切片的 `schema_ref` 欄位就是答案），第三十九個切片文件（THIRTYNINTH_SLICE）的過期「尚未存在」措辭同步更新。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.data_contract.contract.yaml`＋`specs/cognitive/typed-objects/data-contract-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.thirtyeighth_concrete_entry`＋重新產生 `SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md`；`database_data.erd.contract.yaml` 的 `OQ-ERD-4` 標記 ANSWERED。Product root 新增 `ai_lego/modules/database_data/data_contract.py`（builder＋2 gate）＋`ai_lego/apps/cli/run_data_contract_slice.py`＋`tests/unit/test_data_contract.py`（81 tests）＋`docs/FORTIETH_SLICE_DATABASE_DATA_DATA_CONTRACT.md`；`modules/database_data/__init__.py` docstring；`docs/THIRTYNINTH_SLICE_DATABASE_DATA_ERD.md` 過期措辭同步。`agency-os/TASKS.md` 切片條目。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2806→2809（含本切片新增兩檔）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_data_contract_slice` | exit=0 | result=`PASS database_data.data_contract: 4 fields, 3 consumers, schema_ref=ERD-2026-09-05-001, freshness_ref=SLO-2026-09-05-001, compatibility_ref=ECMIG-2026-09-05-001, deprecation_ref=DEP-2026-08-01-003, gates [provenance_required=PASS, data_contract_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_data_contract` | exit=0 | result=81 OK（72→81，critic 修正後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=86927（修正後重跑）| result=**1379 tests OK**（1370→1379，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "jsonschema.Draft202012Validator(method.schema.yaml).validate(...)"` 對 erd／data_contract 兩份 contract yaml 直接驗證（新增 `OQ-ERD-4` 的 `status` 欄位是否合法）| exit=0 | result=兩份皆 `OK`
+- REVIEW_DONE: critic=Standard（真實 subagent，獨立重讀四筆 Atlas 引用原文＋直接讀四個被引用 schema 檔驗證 enum/prefix＋兩層真跑突變＋真實執行測試套件與 CLI）| verdict=SHIP WITH MINOR FIXES → 4 Major 全修＋5 Minor 全修＋2 Minor 揭露不修＋2 Suggestion 維持現狀 | findings=0c/4m/7minor+2suggestion
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`database_data[.]data_contract\|DataContractRecord\|DATACONTRACT_INVALID\|DATACONTRACT_EMPTY\|data-contract-record\|OQ-ERD-4` | hits=19（本切片自己 11 個檔案 + `OQ-ERD-4` 交叉引用 8 個檔案，過期殘留 0，THIRTYNINTH_SLICE 過期措辭已同步更新）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-DC-1~5` 皆揭露；`consumers` 無法表達 contract-first 零 consumer 發布狀態（`OQ-DC-5`）；`schema_ref` 與記錄自己的 `fields[]` 未交叉驗證（`OQ-DC-4`）；`quality_notes`／`compatibility_policy` 純自由文字無結構；欄位／consumer 名稱比對對大小寫與空白皆敏感（家族既有慣例延伸）。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
 ## 2026-09-05（System Foundry 3 項待決定 ②：Returns/RMA 第13缺口落地，含獨立 critic 抓到既有類系統性漏洞 + 立項不單點補丁）
 
 [根因/決策] `d51624f13` 吸收 12 個新模組時刻意不做第13個缺口：Returns/RMA（退貨換貨流程），因操作者當時只授權12個。今日操作者授權「你決定」全權處理３項待決定，① blueprint commit、③ doc-number/交叉引用驗證器皆已完成（見本檔同日稍早條目），此為第③項後緊接的第②項。設計：新增 `CAP-RETURNS`（module `returns`），`requires: [CAP-ORDERS, CAP-PRODUCTS, CAP-INVENTORY, CAP-REFUNDS]`（request→approval→return label→receive→inspection→refund/exchange handoff，明確不同於既有 `CAP-WARRANTY`〔瑕疵/保固期內〕與 `CAP-REFUNDS`〔純金流執行〕，依 `Composable AI Commerce OS_16_Returns_Warranty_After_Sales.md` 藍圖邊界定義）；新增問卷 `Q-RET-001`，gate 在 `Q-COM-001=true`（向客戶收費）——這個 gating 是必要非風格選擇：`CAP-RETURNS` 拉入 `CAP-REFUNDS`→`CAP-PAYMENTS` 金流鏈，若題目無條件可答會在 minimal single-question activation 觸發自己的新 conflict rule（`d51624f13` 第一版踩過的同一個坑）；新增 `RULE-Q-RET-001`＋`CONFLICT-RETURNS-NO-CHARGE`（defense-in-depth，本套件對每條 conflict rule 都有機械覆蓋測試，非裝飾性宣告）。

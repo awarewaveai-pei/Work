@@ -1,0 +1,406 @@
+$id: "ai-lego://methods/contracts/database_data.data_contract.contract.yaml"
+title: "Data Contract Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Fortieth Method Atlas slice, SIXTH from the
+  `database_data` family (F21's own "資料庫／資料套件 (DB / Data Pack)"),
+  after `database_data.backup_restore_drill` (twenty-fifth),
+  `database_data.data_lineage` (twenty-eighth), `database_data
+  .expand_contract_migration` (thirtieth), `database_data.reconciliation`
+  (twenty-ninth), and `database_data.erd` (thirty-ninth). Directly closes
+  `database_data.erd`'s own `OQ-ERD-4` (F21's §11.47 L2305 "起點"
+  benefit names this exact pairing) and F21's own DB Migration recipe
+  row (L1113: "Data Contract→Compatibility→Expand/Contract→Backfill→
+  Restore/Rollback").
+
+  Atlas gives this method FOUR citations, read in full before writing
+  this contract (learning from `database_data.erd`'s own first draft,
+  whose narrower grep missed a real §11.x section on its first attempt
+  -- due-diligence here started BROAD; a critic review confirmed a
+  first-draft count of THREE missed the fourth, corrected below): (1)
+  the F21 tool table's Data Contract row (L902: purpose "定義
+  producer/consumer 承諾"; usage "schema→semantics→quality/SLO→
+  ownership→compatibility"; benefit "防無聲 schema break"); (2) a
+  dedicated §11.49 資料契約（Data Contract）section (L2332-2351:
+  purpose stated as the SAME producer/consumer sentence, formula
+  "Schema→Semantics→Owner→Freshness→Quality→Compatibility→
+  Deprecation" -- SEVEN steps, a strict superset of the table row's
+  five-token compressed usage string: "quality/SLO" in the table
+  compresses BOTH the formula's own "Freshness" and "Quality" steps
+  into one hyphenated token, and the table's usage string omits
+  "Deprecation" entirely even though §11.49's own formula lists it --
+  the fuller §11.49 sequence is treated as authoritative, the table row
+  as a compressed restatement, not a second candidate structure); (3)
+  the DB Migration recipe (§10 Method Selection Engine's own
+  problem-type recipe table, L1113: "Data Contract→Compatibility→
+  Expand/Contract→Backfill→Restore/Rollback" -- CORRECTED
+  post-critic-review from a first-draft mislocation as a "§13-area"
+  table; §11 does not begin until L1118, after this recipe table),
+  which independently confirms this method's own "Compatibility" step
+  genuinely precedes and pairs with `database_data
+  .expand_contract_migration` (already built) in a real operational
+  sequence, not merely a narrative aside; (4) §11.47's own L2305
+  benefit sentence for `database_data.erd` -- "可作為 migration 與
+  data contract 的起點" -- ADDED post-critic-review (the first draft's
+  own citation count omitted this even though it is the exact sentence
+  `database_data.erd`'s own OQ-ERD-4 already quoted and this contract's
+  own `schema_ref` field directly resolves).
+
+  Due-diligence search, broad from the start (applying the lesson
+  `database_data.erd`'s own critic round forced onto that contract only
+  AFTER a first-draft miss): case-insensitive spec-root greps for
+  "data contract"/"producer"/"consumer"/"schema break"/"freshness"/
+  "deprecation". Real, closely-related structures found, each read in
+  full and confirmed either genuinely reusable-by-reference or
+  genuinely distinct (no duplicate typed object invented):
+  (a) `specs/cognitive/typed-objects/sli-slo-set.schema.yaml`
+  (`devops_sre.sli_slo`, already built) carries a `metric_type` enum
+  `{availability, latency, correctness, durability, freshness}` --
+  `freshness` is LITERALLY one of its five values, the exact word
+  Atlas's own §11.49 formula names as this method's own fourth step.
+  This is a genuine, Atlas-grounded reuse opportunity (the same class
+  of pairing `database_data.erd`'s own `migration_ref` already
+  established for its own §11.47 "起點" benefit), not a coincidental
+  word match: `freshness_ref` below is a format-only soft link to an
+  already-built `devops_sre.sli_slo` record (`SLO-` prefix). No
+  matching value exists for the formula's "Quality" step (the closest
+  enum entry, `correctness`, is a distinct SLI dimension, not a general
+  data-quality concept) -- `quality_notes` below therefore stays free
+  text, and a forward pointer to a still-unbuilt
+  `database_data.data_quality_dimensions` (F21's own Data Quality
+  Dimensions table row, L904) is filed as `OQ-DC-2`, the SAME
+  "disclosed forward gap, not
+  invented structure" discipline `database_data.erd`'s own `OQ-ERD-4`
+  already established for THIS method before it existed. (b)
+  `specs/execution/deprecation-pipeline.schema.yaml` (`DEP-` prefix)
+  models retirement of exactly seven object types including `Schema`
+  (EC §113 L3168-3174) -- a genuine, format-only soft-link target for
+  this method's own "Deprecation" step (`deprecation_ref` below),
+  distinct in scope from this record's OWN per-field or per-dataset
+  deprecation note (that pipeline retires a whole schema/object
+  end-to-end with a 7-step gate sequence; a data contract's own
+  deprecation notice is a lighter-weight, in-force annotation that a
+  replacement is coming -- the two are complementary, not duplicates:
+  a contract's own `deprecation_ref` may point at an IN-PROGRESS
+  retirement of the schema this contract itself governs). (c)
+  `specs/cognitive/typed-objects/erd-record.schema.yaml`
+  (`database_data.erd`, already built, `ERD-` prefix) is the exact
+  pairing `OQ-ERD-4` itself named -- `schema_ref` below is a format-only
+  soft link, OPTIONAL (not every data contract governing a single
+  dataset/topic needs a full multi-entity relational model; see
+  compilation_decisions for why `fields[]` is embedded directly rather
+  than requiring an ERD record to exist). (d)
+  `specs/cognitive/typed-objects/expand-contract-migration-record
+  .schema.yaml` (`database_data.expand_contract_migration`, already
+  built, `ECMIG-` prefix) is the exact pairing the DB Migration recipe
+  (L1113) names -- `compatibility_ref` below is a format-only soft
+  link. (e) `specs/execution/capability-resolution.schema.yaml`'s own
+  incidental uses of the words "producer"/"consumer" (documentation
+  prose describing which code module produced a value, and which code
+  module consumes a result) are a different, execution-layer sense of
+  both words entirely, confirmed by direct read -- not this method's
+  own producer/consumer-of-a-dataset concept. No duplicate typed
+  object or method found.
+
+  Atlas's own formula grounds real structural invariants that make
+  this record a genuine MODEL, not a bag of independently-valid parts:
+  at least one consumer must be named (a scope decision, NOT a
+  universal truth about every data contract -- contract-first
+  publishing, where a producer registers a contract before any
+  consumer exists, is a real, documented pattern this method's own
+  `consumers` field cannot represent as-is; see compilation_decisions
+  and OQ-DC-5, corrected post-critic-review from a first-draft claim
+  that zero-consumer contracts are inherently meaningless); `fields[]`
+  (the "Schema" step) must be non-empty with unique field names; the
+  record's own `id` and every optional soft-link field
+  (`schema_ref`/`freshness_ref`/`compatibility_ref`/`deprecation_ref`)
+  must carry its own required id prefix when present -- CORRECTED
+  post-critic-review: the first draft enforced the four OUTBOUND
+  ref prefixes at both the builder and the gate but left the record's
+  OWN inbound `DC-` prefix (and `version`'s own type) schema-layer-only,
+  an asymmetry a critic review's own mutation probe caught (a record
+  minted with `id="ERD-1"` passed both runtime gates, which would let
+  it be mistaken for an ERD record by anything reading `schema_ref`
+  soft links elsewhere).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Data Contract row (L902): 'schema→semantics→quality/SLO→ownership→compatibility'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.49 資料契約（Data Contract）(L2332-2351): formula 'Schema→Semantics→Owner→Freshness→Quality→Compatibility→Deprecation'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md DB Migration recipe (L1113): 'Data Contract→Compatibility→Expand/Contract→Backfill→Restore/Rollback'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.47 實體關係圖（ERD）(L2305): '可作為 migration 與 data contract 的起點' -- ADDED post-critic-review, the exact sentence database_data.erd's own OQ-ERD-4 quoted, resolved here by schema_ref"
+  - "methods/registry/method-inventory.yaml Data Contract entry: category 'F21 database-data', no machine_id -- this contract mints one"
+  - "specs/cognitive/typed-objects/sli-slo-set.schema.yaml -- reused by reference for the Freshness step (metric_type enum already includes 'freshness')"
+  - "specs/execution/deprecation-pipeline.schema.yaml -- reused by reference for the Deprecation step"
+  - "specs/cognitive/typed-objects/erd-record.schema.yaml -- reused by reference for the Schema step's optional full-model link, resolving database_data.erd's own OQ-ERD-4"
+  - "specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml -- reused by reference for the Compatibility step, resolving the DB Migration recipe's own L1113 pairing"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-eighth concrete entry. `id: database_data.data_contract`
+  mints a new machine_id, SIXTH member of the `database_data` family.
+
+id: database_data.data_contract
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating a producer/consumer commitment into
+# schema/semantics/ownership/policy elements is DECOMPOSE; assigning
+# the four optional soft links to their sibling records is MAP; the
+# internal-consistency checks (non-empty consumers, unique field
+# names, soft-link prefix formats) are VALIDATE -- the same inferred
+# triple `database_data.erd` (and every prior structured-record method
+# this session built) already uses.
+
+purpose:
+  - define_a_producer_consumer_data_contract_covering_schema_semantics_ownership_freshness_quality_compatibility_and_deprecation_as_one_internally_consistent_record
+inputs:
+  required: [FieldSet, ConsumerSet]
+  optional: [SchemaReference, FreshnessReference, CompatibilityReference, DeprecationReference]
+outputs: [DataContractRecord]
+preconditions:
+  - "dataset_or_topic is a non-empty string"
+  - "producer is a non-empty string (Atlas's own 'Owner' formula step, and the table row's own 'producer' role)"
+  - "consumers has at least 1 entry; every entry is a non-empty string; entries are unique (the table row's own 'producer/consumer 承諾' purpose is meaningless with zero or duplicate-counted consumers)"
+  - "fields has at least 1 entry (Atlas's own 'Schema' formula step); every entry has exactly the three known keys (name, data_type, nullable); name/data_type are non-empty strings; nullable is a real bool; field names are unique within the record"
+  - "semantics is a non-empty string (Atlas's own 'Semantics' formula step -- free text, no invented per-field grammar)"
+  - "quality_notes is a required array (may be empty) of non-empty strings (Atlas's own 'Quality' formula step -- free text, see compilation_decisions for why no structured link exists yet)"
+  - "compatibility_policy is a non-empty string (Atlas's own 'Compatibility' formula step -- free text policy statement)"
+  - "schema_ref, when present, is a non-empty string beginning with ERD- (the database_data.erd record id prefix) -- a format-only soft link resolving OQ-ERD-4"
+  - "freshness_ref, when present, is a non-empty string beginning with SLO- (the devops_sre.sli_slo record id prefix) -- a format-only soft link resolving Atlas's own 'Freshness' formula step"
+  - "compatibility_ref, when present, is a non-empty string beginning with ECMIG- (the database_data.expand_contract_migration record id prefix) -- a format-only soft link resolving the DB Migration recipe's own L1113 pairing"
+  - "deprecation_ref, when present, is a non-empty string beginning with DEP- (the deprecation-pipeline.schema.yaml record id prefix) -- a format-only soft link resolving Atlas's own 'Deprecation' formula step"
+  # Preconditions 1-3 map onto the table row's own 'producer/consumer'
+  # purpose; 4 onto 'Schema'; 5 onto 'Semantics'; 6 onto 'Quality'; 7
+  # onto 'Compatibility'; 8-11 onto the four soft-linked formula steps
+  # (Schema's optional full-model link, Freshness, Compatibility's
+  # optional migration-event link, Deprecation). Same "structurally
+  # necessary, forbidden-state" class every prior genuine-compute-or-
+  # structural contract this session built already establishes.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure database_data.erd's own contract already
+  # reasons through: the real risk is MODELING integrity (is the
+  # contract internally consistent and correctly soft-linked), not an
+  # evidence-citation risk over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Data Contract row.
+recommended_next: []
+# database_data.data_quality_dimensions (F21's own next table row,
+# L904) does not exist yet -- see OQ-DC-2. database_data.erd,
+# devops_sre.sli_slo, database_data.expand_contract_migration, and the
+# deprecation pipeline are all ALREADY built and consumed here as real
+# soft-link fields (schema_ref/freshness_ref/compatibility_ref/
+# deprecation_ref), not left as bare recommended_next entries -- the
+# same "turn a real pairing into a field, not a narrative aside"
+# discipline database_data.erd's own migration_ref already established.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- the real schema/pipeline/
+  # SLO/migration it references are created and governed outside this
+  # method's own scope, the same "record describes an external
+  # structure" class every prior database_data contract's own rollback
+  # field already draws.
+
+compilation_decisions:
+  - question: >
+      Atlas's own §11.49 formula names "Schema" as its first step. Should
+      this record EMBED a field list directly, or REQUIRE a soft link to
+      an already-built database_data.erd record (the pairing OQ-ERD-4
+      itself proposed)?
+    decision: "Embed a lightweight fields[] list directly (required); schema_ref to a full ERD record is OPTIONAL, not required."
+    reasoning: >
+      Not every data contract governs a multi-entity relational schema
+      -- a single Kafka topic or API response payload has ONE flat field
+      list, and forcing every such contract to first construct an
+      unrelated multi-entity ERD record would be an invented coupling
+      Atlas's own text does not ask for (§11.49 says "Schema", not
+      "Entity-Relationship Model"). Embedding fields[] directly keeps
+      the common case (a single dataset's own field list) self-
+      contained, while schema_ref remains available for the genuinely
+      Atlas-grounded case where a fuller relational model already exists
+      (resolving OQ-ERD-4 without over-constraining every caller).
+  - question: >
+      Should fields[] reuse database_data.erd's own {name, data_type,
+      is_primary_key} attribute shape verbatim, or a different shape?
+    decision: "A distinct three-key shape: {name, data_type, nullable} -- is_primary_key is dropped, nullable is added."
+    reasoning: >
+      A data contract's own field-level concern is nullability (can a
+      consumer expect this field to always be present), not primary-key
+      status -- a concept meaningful only inside a relational entity
+      model, which this record does not require (see the prior
+      decision). Reusing the exact same three-key shape as
+      erd-record.schema.yaml's own attribute $def would conflate two
+      genuinely different concerns under a shared name; a distinct,
+      purpose-built shape avoids that, while keeping the same
+      `name`/`data_type` naming convention for consistency across the
+      `database_data` family.
+  - question: >
+      Atlas's own §11.49 formula names "Quality" as a step but gives no
+      further structure (no rules/profiling/threshold vocabulary --
+      that belongs to F21's OWN separate, still-unbuilt Data Quality
+      Dimensions row, L904: "rules→profiling→threshold→quarantine→
+      owner"). Should this contract invent a structured quality field,
+      or borrow devops_sre.sli_slo's own vocabulary the way Freshness
+      does?
+    decision: "Free text (quality_notes[], may be empty) -- no structured link yet, filed as OQ-DC-2 for when database_data.data_quality_dimensions exists."
+    reasoning: >
+      devops_sre.sli_slo's own metric_type enum has no 'quality' value
+      (the closest entry, 'correctness', is a distinct SLI dimension
+      about system behavior, not a general data-quality concept covering
+      completeness/accuracy/consistency/uniqueness/timeliness/validity
+      -- F21's own Data Quality Dimensions row, L904, names those six
+      dimensions explicitly, none of which is 'correctness'). Inventing
+      a structured quality vocabulary here would preempt that future
+      method's own design and risk exactly the kind of premature,
+      unstated-assumption invention this package's every prior contract
+      already disciplines itself against. Free text, with an honest
+      forward-pointer OQ, is the same restraint `database_data.erd`'s
+      own `constraints[]` field and OQ-ERD-4 already modeled for this
+      method before it existed.
+  - question: >
+      Should "Deprecation" be modeled as this record's own multi-step
+      pipeline (mirroring deprecation-pipeline.schema.yaml's own 7-step
+      Notice→...→Archive sequence), or a lightweight reference?
+    decision: "A lightweight, OPTIONAL format-only soft link (deprecation_ref, DEP- prefix) to an existing deprecation-pipeline.schema.yaml record -- no duplicate pipeline modeled here."
+    reasoning: >
+      deprecation-pipeline.schema.yaml already models retirement of a
+      Schema (one of its own 7 object_type enum values, EC §113
+      L3168-3174) end-to-end with a real 7-step gate sequence and
+      blocking invariants. Re-modeling any part of that pipeline inside
+      this record would create exactly the kind of duplicate-registry
+      drift that file's own compilation_decisions already disciplines
+      itself against avoiding. A data contract's own "Deprecation" step
+      is satisfied by POINTING AT that already-built, already-gated
+      pipeline when the schema this contract governs is being retired --
+      the same reuse-by-reference discipline this contract already
+      applies to Freshness, Compatibility, and the optional Schema link.
+  - question: >
+      Should field-name uniqueness within fields[] (and consumer-name
+      uniqueness within consumers[]) be case-sensitive/whitespace-
+      sensitive, or normalized?
+    decision: "Exact string match on both case and whitespace, same as database_data.erd's own entity/attribute-name uniqueness -- 'orders' and 'Orders', or 'team-a' and 'team-a ', are treated as distinct names."
+    reasoning: >
+      Same reasoning database_data.erd's own compilation_decisions
+      already established for entity/attribute names: real schema
+      field names are frequently case-sensitive (JSON keys, many
+      column-naming conventions), and Atlas's own text gives no basis
+      for inventing a case-folding OR whitespace-trimming rule. ADDED
+      post-critic-review: a critic review's own probe found
+      whitespace-distinct names (e.g. a trailing space) pass every
+      layer as "unique" today -- this is the SAME exact-match decision
+      already made for case, extended explicitly to whitespace rather
+      than left as an undisclosed edge case. A caller modeling a
+      normalized system can supply already-trimmed, already-folded
+      names.
+  - question: >
+      Is "at least one consumer" a universal truth about every data
+      contract, or a scope decision this method's own field design
+      makes?
+    decision: >
+      A disclosed SCOPE DECISION, not a universal truth -- CORRECTED
+      post-critic-review from a first-draft description that stated
+      "zero consumers commits to nothing" as if no real counter-example
+      existed.
+    reasoning: >
+      A critic review found a real, documented counter-example:
+      contract-first publishing, where a producer registers a data
+      contract BEFORE any consumer exists (a normal initial state in
+      data-mesh and schema-registry practice, not a degenerate one).
+      This method's own `consumers` field cannot represent that state
+      as-is (`minItems: 1`). The invariant is KEPT (not relaxed to
+      `minItems: 0`) because the table row's own purpose sentence
+      ("定義 producer/consumer 承諾") is this method's primary citation
+      for existing at all, and the common, Atlas-cited case IS an
+      already-agreed producer/consumer relationship; a caller with a
+      genuine contract-first, zero-consumer state is out of this
+      method's own declared scope for now -- disclosed as OQ-DC-5, not
+      silently unsupported or forced into a placeholder consumer name
+      (which would pollute the exact list this design treats as
+      load-bearing).
+
+open_questions:
+  - id: "OQ-DC-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-DC-2"
+    question: >
+      F21's own Data Quality Dimensions table row (L904: 'rules→
+      profiling→threshold→quarantine→owner') is this method's own
+      natural partner
+      for the 'Quality' formula step, but does not exist yet. Should a
+      future `database_data.data_quality_dimensions` slice add a
+      structured `quality_ref` soft link here (the same class of field
+      `schema_ref`/`freshness_ref`/`compatibility_ref`/`deprecation_ref`
+      already establish), once that method's own id prefix is minted?
+    owner: "operator, or whoever next builds database_data.data_quality_dimensions"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-DC-3"
+    question: >
+      This record's own `consumers[]` is a flat list of non-empty
+      strings (team/service names) with no per-consumer detail (e.g. a
+      consumer-specific SLA, or which fields[] a given consumer actually
+      reads). Atlas's own formula names no such per-consumer structure.
+      Should a future revision add one?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-DC-4"
+    question: >
+      `schema_ref` (optional link to a full database_data.erd record)
+      and the record's OWN embedded `fields[]` are not cross-validated
+      against each other -- a caller could supply a schema_ref whose
+      referenced ERD record's own entity attributes disagree entirely
+      with this record's own fields[]. This method cannot see the
+      referenced record (format-only soft link, the same declared limit
+      every prior soft-link field in this package already carries).
+      Should a future revision add a runtime cross-check (would require
+      this method to load and parse the referenced record, a genuinely
+      different, heavier design)?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-DC-5"
+    question: >
+      ADDED post-critic-review. `consumers` requires at least 1 entry,
+      which cannot represent contract-first publishing (a producer
+      registers a contract before any consumer exists -- a real,
+      documented data-mesh/schema-registry pattern, not a degenerate
+      state). Should a future revision relax `minItems` to 0 and
+      demote at-least-one-consumer to an advisory check, or add a
+      distinct `status` field (e.g. `draft`/`active`) that legitimizes
+      a zero-consumer state only while `draft`?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed scope limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L902), §11.49 (L2332-2351), and the
+    DB Migration recipe (L1113) directly, broad grep from the start
+    (case-insensitive: "data contract"/"producer"/"consumer"/"schema
+    break"/"freshness"/"deprecation") -- applying the lesson
+    `database_data.erd`'s own critic round forced onto that contract
+    only after a first-draft miss, this contract's own first pass
+    already searched broadly. Read `specs/cognitive/typed-objects
+    /sli-slo-set.schema.yaml`, `specs/execution/deprecation-pipeline
+    .schema.yaml`, `specs/cognitive/typed-objects/erd-record.schema
+    .yaml`, `specs/cognitive/typed-objects/expand-contract-migration
+    -record.schema.yaml`, and `specs/execution/capability-resolution
+    .schema.yaml` in full; confirmed the first four are genuine reuse-
+    by-reference targets and the fifth is a distinct, execution-layer
+    sense of "producer"/"consumer". Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The Schema→Semantics→Owner→
+    Freshness→Quality→Compatibility→Deprecation formula and the table
+    row's own purpose/benefit are both directly transcribed; the
+    embedded fields[] shape (distinct from database_data.erd's own
+    attribute shape), free-text semantics/quality_notes/
+    compatibility_policy, case-sensitive field-name matching, and the
+    four format-only soft-link fields are all disclosed compilation
+    choices, not silent inventions -- see compilation_decisions above.
