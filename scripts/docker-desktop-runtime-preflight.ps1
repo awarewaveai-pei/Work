@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([switch]$StartDesktop)
+param(
+    [switch]$StartDesktop,
+    [switch]$Quiet
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -18,6 +21,11 @@ $activeProcessNames = @(
     'com.docker.proxy'
     'com.docker.vpnkit'
 )
+
+function Write-PreflightResult {
+    param([Parameter(Mandatory)][string]$Message)
+    if (-not $Quiet) { Write-Output $Message }
+}
 
 function Test-DockerDesktopActive {
     foreach ($processName in $activeProcessNames) {
@@ -46,19 +54,19 @@ function Test-ContainsReparsePoint {
 }
 
 if (Test-DockerDesktopActive) {
-    Write-Output 'SKIP: Docker Desktop is active; runtime paths are untouched.'
+    Write-PreflightResult 'SKIP: Docker Desktop is active; runtime paths are untouched.'
     exit 0
 }
 
 foreach ($runtimeDirectory in $runtimeDirectories) {
     if (-not (Test-ContainsReparsePoint -Path $runtimeDirectory.Path)) {
-        Write-Output "CLEAN: $($runtimeDirectory.Path)"
+        Write-PreflightResult "CLEAN: $($runtimeDirectory.Path)"
         continue
     }
 
     # Reduce (but cannot eliminate) the race with an independent manual start.
     if (Test-DockerDesktopActive) {
-        Write-Output 'SKIP: Docker Desktop started during preflight; no further runtime paths will be changed.'
+        Write-PreflightResult 'SKIP: Docker Desktop started during preflight; no further runtime paths will be changed.'
         exit 0
     }
 
@@ -69,7 +77,7 @@ foreach ($runtimeDirectory in $runtimeDirectories) {
     $destination = Join-Path -Path $parent -ChildPath $archiveName
 
     Rename-Item -LiteralPath $runtimeDirectory.Path -NewName $archiveName -ErrorAction Stop
-    Write-Output "QUARANTINED: $($runtimeDirectory.Path) -> $destination"
+    Write-PreflightResult "QUARANTINED: $($runtimeDirectory.Path) -> $destination"
 }
 
 # Use this switch from the safe-start shortcut so every launch gets a preflight,

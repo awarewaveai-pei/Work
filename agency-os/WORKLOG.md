@@ -74,16 +74,17 @@
 
 **不變量**：若 Docker backend 未運行且 runtime 目錄含 reparse-point socket，guard 必須可在 Windows PowerShell 實際執行、只以可回復 rename 隔離該目錄；禁止觸及 VHDX、volumes、containers 或 reset 設定。
 
-**[已修改]**：`scripts/docker-desktop-runtime-preflight.ps1` 以 `[IO.Path]::GetDirectoryName` + 同目錄 `Rename-Item` 取代不相容 `Split-Path` 路徑，並新增 `-StartDesktop` 安全啟動入口；新增 `scripts/test-docker-desktop-runtime-preflight.ps1` 的 7 情境 PowerShell 5.1 回歸測試；新增 `runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md`，固化排程、同次登入重啟與資料保護步驟。
+**[已修改]**：`scripts/docker-desktop-runtime-preflight.ps1` 以 `[IO.Path]::GetDirectoryName` + 同目錄 `Rename-Item` 取代不相容 `Split-Path` 路徑，新增 `-StartDesktop` 安全啟動入口與 quiet mode；新增 `scripts/watch-docker-desktop-runtime.ps1`，每 2 秒只在 Docker 已停止時呼叫 guard；登入排程改為 guard→啟動 Desktop，並新增常駐 `Docker Desktop Runtime Watchdog`；新增 `scripts/test-docker-desktop-runtime-preflight.ps1` 的 8 情境 PowerShell 5.1 回歸測試；新增 `runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md`，固化全自動排程與資料保護步驟。
 
 **[驗證結果]**：
 - REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=`docker-desktop-runtime-preflight.ps1`（Desktop 停止、真實 stale sockets） | exit=0 | ms=3700 | result=`Docker/run` 與 `docker-secrets-engine` 已改名為 timestamp archive；沒有刪除。
 - REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`Start-ScheduledTask 'Docker Desktop Runtime Preflight'` | exit=0 | ms=12200 | result=`LastTaskResult=0`；修正後排程在 Desktop 停止狀態可跑。
 - REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=`Start-Process Docker Desktop.exe` + `docker version` + health inspection | exit=0 | ms=16700 | result=Engine 29.7.2 可用；VHDX=15225323520 bytes、8 個既有關鍵 volumes 存在、Trigger Webapp/Supervisor healthy。
-- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=`test-docker-desktop-runtime-preflight.ps1` | exit=0 | ms=800 | result=7/7 PASS：缺路徑、普通檔、已執行、檢查中啟動、真 reparse-point 隔離＋冪等、安全啟動、已執行時不啟動；每例驗資料 sentinel/junction target 未受損。
+- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=`test-docker-desktop-runtime-preflight.ps1` | exit=0 | ms=800 | result=8/8 PASS：缺路徑、普通檔、已執行、檢查中啟動、真 reparse-point 隔離＋冪等、watchdog recovery、安全啟動、已執行時不啟動；每例驗資料 sentinel/junction target 未受損。
 - REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=`test-docker-desktop-runtime-preflight.ps1 -ScriptPath <e97201870 version>` | exit=1 | ms=836 | result=舊版在真 reparse-point 隔離分支穩定重現 `Split-Path` ParameterBindingException。
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n fixed（登入觸發非每次啟動、race 訊息不應聲稱全程未改動）。
-- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=`Split-Path.*LiteralPath.*Parent|docker-desktop-runtime-preflight|sailor-ingest` | hits=17（皆為本次 script/test/runbook/worklog 與既有歷史證據，無 stale guard implementation）。
+- REVIEW_DONE: critic=Standard（guard）+ self(Standard)（watchdog/task flow） | verdict=pass | findings=0c/0m/2n fixed（登入觸發非每次啟動、race 訊息不應聲稱全程未改動）。
+- REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`Register-ScheduledTask` + `Start-ScheduledTask` | exit=0 | ms=11700 | result=Preflight `LastTaskResult=0`；Watchdog `Running`，每 2 秒執行 quiet guard。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=`Split-Path.*LiteralPath.*Parent|docker-desktop-runtime-preflight|watch-docker-desktop-runtime|sailor-ingest` | hits=20（皆為本次 script/test/runbook/worklog 與既有歷史證據，無 stale guard implementation）。
 
 **[剩餘風險]**：guard 在登入與使用者手動啟動 Desktop 間仍有極小 race，但會在看到 Docker 進程時 fail-safe no-op；未來不同類型的 Desktop bug 仍需另行診斷。**[rollback]**：archive 目錄保留供人工復原；腳本／runbook 可 `git revert`，但不可為回滾而刪除 archive 或資料盤。
 

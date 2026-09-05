@@ -13,13 +13,16 @@ timestamped archive so every action is reversible.
 
 ## Normal protection
 
-The scheduled task **Docker Desktop Runtime Preflight** runs at user logon. It
-protects only a launch that happens after the task finishes; it does not run
-again for a later restart in the same login. It exits without changes when a
-Docker process is already active. Its script is
-`D:\Work\scripts\docker-desktop-runtime-preflight.ps1`.
+The scheduled task **Docker Desktop Runtime Preflight** runs at user logon and
+starts Docker after the guard completes. **Docker Desktop Runtime Watchdog**
+then checks every two seconds during the login session. It exits without
+changes while Docker is active and cleans stale runtime sockets once it stops.
+The tasks use `D:\Work\scripts\docker-desktop-runtime-preflight.ps1` and
+`D:\Work\scripts\watch-docker-desktop-runtime.ps1`.
 
-For any later restart in the same login, use the safe launch entrypoint:
+Later restarts can use the normal Docker Desktop icon because the watchdog has
+already cleaned stale sockets. This command remains available for an immediate
+manual recovery:
 
 ```powershell
 & 'D:\Work\scripts\docker-desktop-runtime-preflight.ps1' -StartDesktop

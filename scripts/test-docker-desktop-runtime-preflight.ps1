@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$ScriptPath
+    [string]$ScriptPath,
+    [string]$WatchScriptPath
 )
 
 # Run with Windows PowerShell 5.1, the same host as the scheduled task.
@@ -11,7 +12,11 @@ $ErrorActionPreference = 'Stop'
 if (-not $ScriptPath) {
     $ScriptPath = Join-Path $PSScriptRoot 'docker-desktop-runtime-preflight.ps1'
 }
+if (-not $WatchScriptPath) {
+    $WatchScriptPath = Join-Path $PSScriptRoot 'watch-docker-desktop-runtime.ps1'
+}
 $ScriptPath = (Resolve-Path -LiteralPath $ScriptPath).Path
+$WatchScriptPath = (Resolve-Path -LiteralPath $WatchScriptPath).Path
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('docker-preflight-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 $originalLocalAppData = $env:LOCALAPPDATA
@@ -42,7 +47,7 @@ function Assert-True {
 }
 
 function Invoke-Fixture {
-    param([string]$Case, [string]$Mode, [switch]$Sockets, [switch]$Empty, [switch]$Launch)
+    param([string]$Case, [string]$Mode, [switch]$Sockets, [switch]$Empty, [switch]$Launch, [switch]$Watchdog)
     $caseRoot = Join-Path $testRoot $Case
     New-Item -ItemType Directory -Path $caseRoot | Out-Null
     $env:LOCALAPPDATA = $caseRoot
@@ -69,7 +74,11 @@ function Invoke-Fixture {
         New-Item -ItemType Junction -Path (Join-Path $runPath 'sailor-ingest.sock') -Target $target | Out-Null
         New-Item -ItemType Junction -Path (Join-Path $secretPath 'engine.sock') -Target $target | Out-Null
     }
-    & $ScriptPath -StartDesktop:$Launch
+    if ($Watchdog) {
+        & $WatchScriptPath -Once
+    } else {
+        & $ScriptPath -StartDesktop:$Launch
+    }
     $expectedStarts = 0
     if ($Launch -and $Mode -eq 'stopped') { $expectedStarts = 1 }
     Assert-True ($global:DockerPreflightTestState.Starts -eq $expectedStarts) "$Case launch count"
@@ -100,9 +109,10 @@ try {
     Invoke-Fixture -Case 'active-process' -Mode active -Sockets
     Invoke-Fixture -Case 'process-starts-during-check' -Mode starts-during-check -Sockets
     Invoke-Fixture -Case 'stale-reparse-points' -Mode stopped -Sockets
+    Invoke-Fixture -Case 'watchdog-recovery' -Mode stopped -Sockets -Watchdog
     Invoke-Fixture -Case 'safe-launch' -Mode stopped -Sockets -Launch
     Invoke-Fixture -Case 'already-running-launch' -Mode active -Sockets -Launch
-    Write-Output ('PASS: all 7 scenarios; PowerShell ' + $PSVersionTable.PSVersion)
+    Write-Output ('PASS: all 8 scenarios; PowerShell ' + $PSVersionTable.PSVersion)
 } finally {
     $env:LOCALAPPDATA = $originalLocalAppData
     # Preserve fixtures for inspection; no recursive cleanup through junctions.
