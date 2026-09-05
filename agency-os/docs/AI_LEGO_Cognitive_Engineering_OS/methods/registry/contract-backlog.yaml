@@ -955,6 +955,63 @@ tier_1:
       above), thinner than several Tier 0 examples. Tier 1, mandated by
       the actively-running implementation slice, same category as the
       twenty-six entries above it.
+  twentyeighth_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-eighth Tier 1 entry, same
+    # additive-key rationale as the twenty-seven entries above it.
+    method_id: "database_data.expand_contract_migration"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FOURTH entry
+      from the `database_data` family (F21), after
+      database_data.backup_restore_drill, database_data.data_lineage,
+      and database_data.reconciliation. Atlas's own direct citations
+      (§11.50 L2354-2364, §13.10 L3466-3469) are each a one-line
+      redirect to Execution Contract §28 -- the thinnest direct Atlas
+      citation of any method this session built -- but EC §28's own
+      15-step diagram, §29/§30's detailed requirements, and an ACTIVE
+      ADR-005a-grounded machine-readable recipe
+      (recipes/validated/db-migration-expand-contract.recipe.yaml)
+      together make this the richest-grounded method this session
+      built. This method's own typed object tracks a REAL migration's
+      progress through the recipe's own 15 canonical stages (the same
+      `steps[].ref` vocabulary, transcribed not invented), the same
+      "recipe defines the static sequence, method tracks a live
+      instance's progress" split devops_sre.canary_deployment's own
+      CanaryDeploymentPlan already established. A genuine
+      documentation-drift finding surfaced and disclosed (not silently
+      fixed, out of this contract's own scope): the recipe file's own
+      description claims EC §28 "still shows its original 11-step
+      mermaid", but EC §28's CURRENT text already matches ADR-005a's
+      15-step form -- confirmed two independent ways (direct re-read,
+      and `.ai/proposals/023-db-migration-15-step-sequence-ec
+      /PROPOSAL.md`'s own `status: APPLIED`/`applied_commit`
+      cross-checked against `git log`). A critic review of this
+      contract's own first draft caught a Critical: the original
+      completion invariant checked only WHICH stage_ids were present
+      (a contiguous prefix), not WHEN each stage's own `completed_at`
+      actually occurred -- a record could record every stage_id present
+      while `contract_old_schema` (destroying the rollback path) had a
+      `completed_at` genuinely BEFORE `reconciliation`'s own, silently
+      certifying the exact failure this method exists to forbid. Fixed
+      by requiring `completed_at` to be a real, parseable ISO-8601
+      timestamp (removing the first draft's free-form-string design,
+      which is what made the hole possible) and enforcing non-decreasing
+      order across stages sorted by canonical index, at both the
+      builder and the gate. A second Major, from the same review: the
+      builder stored hand-built stage dicts verbatim (aliased, with no
+      rebuild), letting extra/wrong fields survive into a certified
+      record -- fixed by rebuilding every stage from known fields only,
+      mirroring the fix `database_data.reconciliation`'s own critic
+      round already established one slice earlier.
+    source: "methods/contracts/database_data.expand_contract_migration.contract.yaml (built same session as this entry, mints machine_id database_data.expand_contract_migration) + specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas's own direct citations are both
+      one-line redirects, the thinnest of any method this session
+      built -- but the Execution Contract + existing recipe corpus
+      behind it is the richest. Tier 1, mandated by the actively-running
+      implementation slice, same category as the twenty-seven entries
+      above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

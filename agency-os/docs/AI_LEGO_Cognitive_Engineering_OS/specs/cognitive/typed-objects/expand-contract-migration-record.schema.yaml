@@ -1,0 +1,139 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml"
+title: Expand Contract Migration Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ExpandContractMigrationRecord`
+  -- the declared `outputs` of `database_data.expand_contract_migration`'s
+  Method Contract. FOURTH `database_data`-family typed object. Tracks a
+  REAL migration's own progress through Execution Contract §28's 15
+  canonical stages (the SAME stage identifiers already minted by
+  `recipes/validated/db-migration-expand-contract.recipe.yaml`'s own
+  `steps[].ref` values -- transcribed here, not independently invented).
+
+  `stages[]` is a GROWING LIST of stages already completed, not a full
+  15-slot checklist with pending placeholders (see method contract's
+  own compilation_decisions). TWO invariants are enforced at the
+  runtime layer (`ai_lego/modules/database_data/expand_contract_migration
+  .py`), not the schema layer: (1) the contiguous-prefix completion
+  rule (no stage recorded while an earlier one in the canonical
+  sequence has not also been recorded), and (2) `completed_at` values
+  must be non-decreasing when sorted by canonical stage index -- a
+  critic review caught that presence alone (invariant 1) proves nothing
+  about the REAL order events happened in: a record could otherwise
+  record `reconciliation` and `contract_old_schema` both present while
+  the latter's own `completed_at` is actually earlier in wall-clock
+  time, certifying exactly the "destroyed the rollback path before
+  reconciliation ran" scenario this method exists to forbid.
+  `completed_at` is therefore REQUIRED to be a real, parseable ISO-8601
+  timestamp (not the first draft's free-form string) -- this is what
+  makes invariant (2) checkable at all.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1077-1116): the 15-step canonical sequence"
+  - "recipes/validated/db-migration-expand-contract.recipe.yaml: the same 15 stage identifiers (steps[].ref)"
+  - "methods/contracts/database_data.expand_contract_migration.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, migration_ref, stages, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^ECMIG-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.expand_contract_migration"
+  migration_ref:
+    type: string
+    minLength: 1
+    description: "Which real schema migration this record tracks, e.g. 'orders table: add customer_tier column, 2026-Q3'."
+  stages:
+    type: array
+    minItems: 1
+    description: "One entry per canonical EC §28 stage ALREADY completed -- a growing list, not a full 15-slot checklist. The contiguous-prefix invariant (no stage recorded while an earlier one in the canonical sequence has not also been recorded) is enforced at the runtime layer, not here."
+    items:
+      type: object
+      required: [stage_id, completed_at]
+      additionalProperties: false
+      description: "additionalProperties:false -- a critic review caught that a hand-built stage dict with an extra field (e.g. a self-declared 'status: pending' marker) was previously stored verbatim and certified as a completed stage; closing the shape here is defense-in-depth alongside the runtime layer's own rebuild-from-known-fields fix."
+      properties:
+        stage_id:
+          enum:
+            - schema_baseline
+            - data_contract
+            - compatibility_analysis
+            - backup_restore_validation
+            - expand
+            - deploy_compatible_code
+            - enable_dual_write
+            - backfill
+            - reconciliation
+            - dual_read_verification
+            - canary
+            - traffic_migration_switch
+            - observe
+            - contract_old_schema
+            - close_rollback_window
+          description: "One of EC §28's own 15 canonical stages, in the SAME order and spelling as recipes/validated/db-migration-expand-contract.recipe.yaml's own steps[].ref values."
+        completed_at:
+          type: string
+          minLength: 1
+          description: "When this stage was completed -- REQUIRED to be a real, parseable ISO-8601 timestamp (ai_lego.core.support.parse_timestamp), enforced at the runtime layer. A critic review found the first draft's 'free-form, no structured format' design was exactly what let completion order go unchecked -- see this schema's own top-level description."
+        evidence_ref:
+          type: string
+          minLength: 1
+          description: "OPTIONAL, uninterpreted soft link to supporting evidence -- e.g. a database_data.reconciliation or database_data.backup_restore_drill record's own id. Not fetched or cross-validated at this layer -- see method contract's own compilation_decisions."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a migration progress record is a structured operational observation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A migration recorded through Backfill (stage 8 of 15) -- reconciliation and everything after remains ahead"
+    value:
+      id: "ECMIG-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.expand_contract_migration"
+      migration_ref: "orders table: add customer_tier column, 2026-Q3"
+      stages:
+        - {stage_id: schema_baseline, completed_at: "2026-09-01T09:00:00Z"}
+        - {stage_id: data_contract, completed_at: "2026-09-01T10:00:00Z"}
+        - {stage_id: compatibility_analysis, completed_at: "2026-09-01T14:00:00Z"}
+        - {stage_id: backup_restore_validation, completed_at: "2026-09-02T09:00:00Z", evidence_ref: "DRILL-2026-09-02-001"}
+        - {stage_id: expand, completed_at: "2026-09-02T15:00:00Z"}
+        - {stage_id: deploy_compatible_code, completed_at: "2026-09-03T09:00:00Z"}
+        - {stage_id: enable_dual_write, completed_at: "2026-09-03T09:30:00Z"}
+        - {stage_id: backfill, completed_at: "2026-09-04T02:00:00Z"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A fully completed migration through all 15 stages, reconciliation backed by a real record"
+    value:
+      id: "ECMIG-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.expand_contract_migration"
+      migration_ref: "legacy_orders_db -> orders_db_v2, full cutover"
+      stages:
+        - {stage_id: schema_baseline, completed_at: "2026-08-01T09:00:00Z"}
+        - {stage_id: data_contract, completed_at: "2026-08-01T10:00:00Z"}
+        - {stage_id: compatibility_analysis, completed_at: "2026-08-01T14:00:00Z"}
+        - {stage_id: backup_restore_validation, completed_at: "2026-08-02T09:00:00Z"}
+        - {stage_id: expand, completed_at: "2026-08-02T15:00:00Z"}
+        - {stage_id: deploy_compatible_code, completed_at: "2026-08-03T09:00:00Z"}
+        - {stage_id: enable_dual_write, completed_at: "2026-08-03T09:30:00Z"}
+        - {stage_id: backfill, completed_at: "2026-08-04T02:00:00Z"}
+        - {stage_id: reconciliation, completed_at: "2026-08-04T10:00:00Z", evidence_ref: "RECON-2026-08-04-001"}
+        - {stage_id: dual_read_verification, completed_at: "2026-08-05T09:00:00Z"}
+        - {stage_id: canary, completed_at: "2026-08-06T09:00:00Z"}
+        - {stage_id: traffic_migration_switch, completed_at: "2026-08-07T09:00:00Z"}
+        - {stage_id: observe, completed_at: "2026-08-10T09:00:00Z"}
+        - {stage_id: contract_old_schema, completed_at: "2026-08-12T09:00:00Z"}
+        - {stage_id: close_rollback_window, completed_at: "2026-08-12T09:05:00Z"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Execution Contract §28 (L1077-1116) directly, and recipes/validated/db-migration-expand-contract.recipe.yaml in full to confirm the stage_id enum matches its own steps[].ref values verbatim. Validated against jsonschema Draft202012Validator."
+  note: "The 15-value stage_id enum is a direct, verbatim transcription of the existing recipe's own canonical vocabulary, not an independent invention. Both the contiguous-prefix AND the completed_at temporal-order invariants are enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced (the temporal-order check was added post-critic-review; the first draft only had the prefix check, which a hand-built or dishonest record could satisfy while still recording an irreversible later stage as completed before an earlier one in real time). No mother document or the existing recipe file was modified."

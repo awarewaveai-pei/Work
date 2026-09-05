@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-09-05（續43，同一 session：Cognitive OS 第三十個 Method Atlas 切片 — `database_data.expand_contract_migration`，1 個 Critical + 3 個 Major 是上一切片已修過的同款 bug 原樣重現）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。
+
+**選型**：`database_data` 家族第四成員。Atlas 對本方法自己的直接引用（§11.50、§13.10）都只是一行導向 Execution Contract §28（唯一正本），是本 session 至今最薄的 Atlas 直接引用——但 EC §28 自己的 15 步驟圖＋§29/§30 詳細要求＋一支既有 ADR-005a 15 步 recipe（`recipes/validated/db-migration-expand-contract.recipe.yaml`）合起來，是本 session 至今根基最厚的方法。本方法自己的 typed object 追蹤一個真實 migration 在同一組 15 個標準階段上的真實進度（同一套 `steps[].ref` 詞彙，逐字沿用非自創），跟 `devops_sre.canary_deployment` 自己的 `CanaryDeploymentPlan`（recipe 定義靜態序列，method 追蹤即時進度）同一種分工。
+
+**真發現一個文件過期，主動揭露非靜默修正**：既有 recipe 檔自己的說明宣稱「EC §28 目前還是舊版 11 步 mermaid，尚未依 ADR-005a 修改」——但本契約直接重讀 EC §28 目前內容，已經是 15 步 ADR-005a 修正版。雙重獨立驗證：直接重讀 + `.ai/proposals/023-db-migration-15-step-sequence-ec/PROPOSAL.md` 自己的 `status: APPLIED`/`applied_commit` 對照 `git log` 確認真的套用過。修正屬於另一份文件自己的範疇，本契約只揭露（`OQ-EXPANDCONTRACT-4`），不代為修正。
+
+**critic 真跑抓到 1 個 Critical + 4 個 Major，其中 3 個 Major 是上一個切片（`database_data.reconciliation`）critic 已抓過、已修過、又原樣重現的同一 bug**：
+1. **Critical**：第一版真不變量只檢查「哪些 stage_id 存在」（連續前綴），從未比較各階段的 `completed_at` 時間先後——一筆記錄可以讓 `reconciliation` 標記 2026-09-30 完成、`contract_old_schema`（銷毀 rollback 路徑）標記 2026-08-09 完成，schema 實際上在 reconciliation 真的跑之前就被銷毀，卻同時通過 builder/兩個 gate/schema 驗證，直接打臉本方法自己 purpose 行「依序完成」的宣稱。修法：`completed_at` 改為強制真實可解析 ISO-8601 時間戳（拿掉第一版「自由格式，EC 原文無結構化格式要求」的設計——這個設計本身就是漏洞成因），並在 builder 與 gate 兩層各自獨立重算「依 canonical 順序排序後 completed_at 必須不遞減」。
+2. **Major（原樣重現）**：不可雜湊的 `stage_id`（list/dict）在三處呼叫點直接讓 `TypeError` 逸出而非 fail-closed——跟上一個切片 `database_data.reconciliation` 自己 critic 剛修過、且留了具名迴歸測試的同一種 bug 一字不差。修成 `isinstance` 守衛優先於 `in _STAGE_INDEX`。
+3. **Major（原樣重現）**：手工建構的 stage dict 原樣存入（別名，未重建）——攻擊者可夾帶額外欄位（例如自稱 `status: pending`）存活進一份已認證完成的記錄，且呼叫端事後修改自己的 list/dict 會回溯污染已建構的記錄。修成從已知欄位重建每個 stage dict——跟上一個切片同一款修法。
+4. **Major（原樣重現）**：三個 gate 測試只斷言 `status=="FAIL"`，critic 真的跑了一次突變（刪掉 gate 的 unknown-stage 守衛）證明三個測試全部維持綠燈，分辨不出是哪個守衛真的觸發。修成全部釘死具體 `evidence[0]["reason"]` 與命中的欄位值，並用同一突變重新驗證變紅。
+5. **Major**：contract 自己宣稱已在 `contract-backlog.yaml` 註冊（twentyeighth_concrete_entry），實際沒有——跟上一個切片同一種「宣稱已做但沒做」。補上該條目。
+
+另修數個 Minor：`evidence_ref` 完全零驗證（空字串、非字串）；共用 predicate `_non_contiguous_gaps` 若未來被直接呼叫可能對重複輸入靜默回報「無缺口」——改參數型別為 `frozenset[str]`，讓前置條件在型別層面就不可偽造而非只靠執行期檢查；`modules/database_data/__init__.py` 自己的 docstring 過期兩個成員（連 reconciliation 都沒補，這次一併補齊）；缺 slice 文件（本切片一併補上）。
+
+**本輪教訓**：切片自己 docstring 明文「已套用前面所有教訓」不等於真的做了——三個 Major 全部是「先讀上一個切片自己的迴歸測試 docstring 跟 WORKLOG Minor 清單，寫之前先查」就能機械避免的重複，事後才被抓到才修正。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.expand_contract_migration.contract.yaml`（含完整揭露的引用查證+開放問題 OQ-1~4）＋`specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml`＋`contract-backlog.yaml` 新增 `tier_1.twentyeighth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/database_data/expand_contract_migration.py`（builder 全重建+2 gate，含時序不變量）＋`ai_lego/apps/cli/run_expand_contract_migration_slice.py`（真實 in-flight+全完成案例，reconciliation 階段引用上一切片真實 record id）＋`tests/unit/test_expand_contract_migration.py`（38 tests）＋`docs/THIRTIETH_SLICE_DATABASE_DATA_EXPAND_CONTRACT_MIGRATION.md`。順手修正 `modules/database_data/__init__.py` docstring（補齊 reconciliation+本切片兩個過期缺漏成員）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2774→2777
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_expand_contract_migration_slice`（修正後）| exit=0 | result=`PASS database_data.expand_contract_migration: in-flight 8/15 stages, completed 15/15 stages, gates [provenance_required=PASS, stage_order_integrity=PASS], invariant_verified(prefix_construction=True, prefix_gate=True, temporal_construction=True, temporal_gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_expand_contract_migration -v` | exit=0 | result=38 passed（26→38，含時序違規/不可雜湊 stage_id/額外欄位不存活三類迴歸，兩層皆驗）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=73576 | result=**760 tests OK**（748→760，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，含真突變實驗證明弱 oracle 測試）| verdict=fail(1 Critical, 4 Major)→fixed | findings=1c/4m/多個 Minor（全數修正）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`database_data[.]expand_contract_migration\|ExpandContractMigrationRecord\|EXPANDCONTRACT_` | hits=全部本切片自己新檔案+本 session transcript 雜訊，無過期殘留
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-EXPANDCONTRACT-1`（無機器 id 列，同前三個 database_data 切片模式）、`OQ-EXPANDCONTRACT-2`（無漸進式 append API，記錄只驗證單一完整快照非真實跨時間逐步更新）、`OQ-EXPANDCONTRACT-3`（無失敗/放棄終態模型，EC §28 原文本身未提及）、`OQ-EXPANDCONTRACT-4`（既有 recipe 檔自己的 EC §28 過期宣稱，揭露非修正，非本契約範疇）。皆非阻塞，已揭露非靜默缺口。
+
 ## 2026-09-05（System Foundry v1.6 新增 2 個 capability：收據/發票拍照 OCR 記帳、跨廠商品項名稱對應——操作者實際使用問卷後主動提出的真實需求缺口）
 
 **觸發**：操作者問「裡面的會計功能可以拍或掃描圖片就自動登入帳務嗎？還有同產品在不同廠商命名不同、本公司命名也不同，要怎麼解決？」——這是操作者實際想像自己要用這套系統規劃專案時，發現題庫沒涵蓋的兩個真實痛點，不是我主動找的缺口。

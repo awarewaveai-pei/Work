@@ -1,0 +1,294 @@
+$id: "ai-lego://methods/contracts/database_data.expand_contract_migration.contract.yaml"
+title: "Expand-Contract Migration Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirtieth Method Atlas slice, FOURTH from the
+  `database_data` family (F21), after `database_data.backup_restore_drill`
+  (twenty-fifth), `database_data.data_lineage` (twenty-eighth), and
+  `database_data.reconciliation` (twenty-ninth).
+
+  Atlas gives this method the THINNEST possible direct citation --
+  §11.50 (L2354-2364) and §13.10 (L3466-3469) are each a one-line
+  redirect: "精確步驟序列見 Execution Contract §28（唯一正本）" (the
+  precise step sequence is at Execution Contract §28, the sole
+  canonical source; this section only explains the concept and
+  applicability). Despite the thin Atlas citation, this is the
+  RICHEST-grounded method built this session: Execution Contract §28
+  (Database Change Contract) gives a full 15-step sequential diagram,
+  §29 (DB Migration Requirements) and §30 (Data Integrity Contract) give
+  detailed per-step requirements, and an ACTIVE, ADR-005a-grounded
+  machine-readable recipe already exists
+  (`recipes/validated/db-migration-expand-contract.recipe.yaml`) with
+  the SAME 15 steps, real `gate_ref` bindings, and its own
+  `mandatory_elements`/`forbidden_actions`.
+
+  This method's own typed object is deliberately NOT a duplicate of that
+  recipe (a static, canonical STEP DEFINITION list) -- it is a PROGRESS
+  RECORD instance tracking a REAL migration's own completion through
+  those same 15 canonical stages, the same "recipe defines the static
+  sequence, method typed-object tracks a live instance's progress
+  through it" split `devops_sre.canary_deployment`'s own
+  `CanaryDeploymentPlan` (5-stage rollout progress) already established
+  for a structurally analogous case. The 15 stage identifiers
+  transcribed into this contract's own `stage_id` enum are the SAME
+  `ref:` values already minted by that recipe file (`schema_baseline`,
+  `data_contract`, ... `close_rollback_window`) -- not independently
+  invented, confirmed by direct read of the recipe file in full before
+  writing this contract.
+
+  A genuine documentation-drift finding surfaced while verifying this
+  citation, DISCLOSED here rather than silently corrected (correcting it
+  is out of this contract's own scope -- see verification.note): the
+  recipe file's own description (written 2026-08-29) claims "EC §28
+  currently STILL shows its original 11-step mermaid... it has NOT yet
+  been edited to match ADR-005a" -- but a direct re-read of EC §28
+  (L1077-1116, done for THIS contract) shows the CURRENT text already
+  matches ADR-005a's 15-step corrected form (Data Contract present,
+  Enable Dual Write as its own step immediately before Backfill, Dual
+  Read Verification present, Canary as its own step) -- meaning EC §28
+  has been edited to match ADR-005a SINCE the recipe file's own
+  description was written, without that recipe file's own
+  source_of_truth_for/description being updated to match. This
+  contract cites EC §28's CURRENT (already-ADR-005a-matching) content
+  directly, not the recipe's own now-stale "still 11-step" claim.
+
+  The real invariant this contract enforces is directly implied by EC
+  §28's own diagram structure -- a single linear "→" sequence, not a
+  DAG with alternate paths -- and by §30's own emphatic rule ("Migration
+  完成不能只看 command exit code = 0... 必須證明 data invariant = PASS"):
+  a stage may only be recorded completed if every EARLIER stage in the
+  canonical 15-step sequence has ALSO been recorded completed. This is
+  a single, general ordering rule (no stage skipped ahead of an earlier
+  one) that subsumes the specific, highest-consequence case EC §30's
+  own rule implies -- `contract_old_schema` (stage 14, which destroys
+  the rollback path) cannot be recorded completed while
+  `reconciliation` (stage 9) has not been -- as one instance of the same
+  general rule, not a special-cased pairwise check.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.50 擴張－收縮遷移模式（Expand–Contract Migration）(L2354-2364): concept/benefit only, redirects to EC §28 for the step sequence"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.10 Database Migration Recipe (L3466-3469): same one-line redirect to EC §28"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1077-1116): the CURRENT 15-step sequential diagram -- Schema Baseline → Data Contract → Compatibility Analysis → Backup/Restore Validation → Expand → Deploy Compatible Code → Enable Dual Write → Backfill → Reconciliation → Dual Read Verification → Canary → Traffic Migration/Switch → Observe → Contract Old Schema → Close Rollback Window"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1154-1176): 'Migration 完成不能只看 command exit code = 0，必須證明 data invariant = PASS' -- the textual grounding for this contract's own completion-order invariant"
+  - "recipes/validated/db-migration-expand-contract.recipe.yaml: the SAME 15 canonical stage identifiers (steps[].ref), ADR-005a-grounded, gate_ref bindings for 3 of the 15 steps -- this contract's stage_id enum transcribes these verbatim, no new vocabulary invented"
+  - "methods/registry/method-inventory.yaml Expand–Contract Migration entry (L1277-1281): category 'F21 database-data', line field reads 904 -- CORRECTED here to the real L907 position, the same systematic +3 drift already disclosed by three prior database_data contracts, now observed a FOURTH time"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-eighth
+  concrete entry. `id: database_data.expand_contract_migration` mints a
+  new machine_id, FOURTH member of the `database_data` family.
+
+id: database_data.expand_contract_migration
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, MAP]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). The 15 discrete stages are DECOMPOSE; checking a stage
+# completion against the canonical order is VALIDATE; the stage
+# sequence itself, a fixed linear order, is MAP -- the same inferred
+# triple `database_data.backup_restore_drill`'s own 6-step protocol
+# already used.
+
+purpose:
+  - prove_a_schema_migration_completed_every_canonical_ec28_stage_in_order_with_no_stage_skipped_ahead
+inputs:
+  required: [MigrationStageCompletionEvent]
+  optional: []
+outputs: [ExpandContractMigrationRecord]
+preconditions:
+  - "stages is a non-empty list"
+  - "every stage's stage_id is one of the 15 canonical EC §28 / recipe stage identifiers"
+  - "every stage_id is unique within the record (a stage cannot be recorded completed twice)"
+  - "the set of recorded (completed) stage_ids forms a CONTIGUOUS PREFIX of the canonical 15-step sequence -- no stage may be recorded while any EARLIER stage in the sequence has not also been recorded"
+  - "every stage's completed_at is a real, parseable ISO-8601 timestamp -- REQUIRED (not free-form text), because the next precondition depends on being able to compare timestamps at all"
+  - "completed_at values are non-decreasing when stages are sorted by canonical index -- an EARLIER-in-sequence stage's own completed_at must not be AFTER a LATER-in-sequence stage's"
+  # Directly implied by EC §28's own diagram being a single linear
+  # sequence (not a DAG with alternate orderings) and by §30's own
+  # "exit code != proof" rule. Same "structurally necessary, forbidden-
+  # state" class every prior ordered-sequence method this session built
+  # already establishes (devops_sre.canary_deployment's own escalation
+  # order, devops_sre.blue_green_deployment's own verify-before-switch).
+  #
+  # The last two preconditions were ADDED post-critic-review: this
+  # contract's own first draft enforced ONLY stage_id presence (the
+  # contiguous-prefix rule above), which a critic review found proved
+  # nothing about REAL temporal order -- a record with every stage_id
+  # present but `contract_old_schema`'s own completed_at genuinely
+  # BEFORE `reconciliation`'s (the schema physically destroyed before
+  # reconciliation ever ran) still satisfied the presence-only check.
+  # "In order" in this method's own purpose line means order in real
+  # time, not merely which labels appear in the same snapshot.
+  #
+  # This record is APPEND-ONLY in spirit (a caller adds one stage
+  # completion at a time as the real migration progresses) -- but this
+  # contract does not itself model an incremental-update API, only the
+  # invariant a record's own full `stages[]` snapshot must satisfy at
+  # any point it is validated. See OQ-EXPANDCONTRACT-2.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure the three prior database_data contracts
+  # already reasoned through: the real risk here is a sequencing-
+  # integrity risk (was every earlier stage actually completed first),
+  # not an evidence-citation risk over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Expand-Contract Migration row.
+recommended_next:
+  - database_data.reconciliation
+  - database_data.backup_restore_drill
+# Both are REAL, cited forward links, not invented: the recipe's own
+# `Reconciliation` step (ref: reconciliation, gate_ref: data) is stage
+# 9 of THIS method's own canonical sequence, and its own
+# `Backup / Restore Validation` step (gate_ref: recovery_rollback_
+# rehearsal) is stage 4 -- both already-built Tier 1 methods this
+# session constructed (twenty-ninth and twenty-fifth slices
+# respectively). This is the SAME "close a real chain a mother
+# document's own text already names" discipline root_cause.pareto/
+# challenge.independent_judge already applied -- and directly answers
+# `database_data.reconciliation`'s own OQ-RECONCILIATION-2 (should a
+# soft link exist between the two methods): yes, via each stage's own
+# optional `evidence_ref` field -- see compilation_decisions below.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- it reports on migration
+  # work performed elsewhere (schema changes, dual-write, backfill,
+  # traffic cutover all happen outside this method's own scope). Same
+  # "record reports on an external observation" class every prior
+  # database_data contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Should this contract model all 15 stages as a rigid CHECKLIST
+      (every stage always present, most marked `pending`), the way a
+      literal state-machine implementation might, or as a GROWING LIST
+      of only the stages actually completed so far?
+    decision: "Growing list of completed stages only -- stages[] contains one entry per stage ALREADY completed, not a full 15-slot checklist with placeholder pending entries."
+    reasoning: >
+      A migration record queried mid-flight (e.g. after Backfill but
+      before Reconciliation) has no real information to report for the
+      6 stages still ahead -- forcing a `pending` placeholder for each
+      would be inventing structure Atlas/EC's own diagram (a sequence
+      of arrows, not a checklist template) does not itself specify.
+      The contiguous-prefix invariant is exactly as enforceable against
+      a growing list as against a full checklist (the same
+      "count from index 0, no gap" check either way) -- so the simpler
+      shape loses nothing.
+  - question: >
+      `database_data.reconciliation`'s own OQ-RECONCILIATION-2 asked
+      whether this method's output should feed that method's own
+      `source_ref`/`target_ref` as a soft link. Should this contract
+      instead consume A `ReconciliationRecord`'s own `id` as a REQUIRED,
+      validated cross-reference on the `reconciliation` stage entry?
+    decision: "No -- each stage entry carries an OPTIONAL, caller-supplied, uninterpreted evidence_ref string. Not fetched, not schema-cross-validated against the referenced record's own content."
+    reasoning: >
+      This method has no access to another method's own runtime state
+      at the schema/builder layer (the same boundary every prior soft-
+      link field in this package already respects -- e.g.
+      `devops_sre.error_budget`'s own `related_slo_id`). Requiring and
+      cross-validating a real `ReconciliationRecord` would mean this
+      method's own construction depends on a live lookup mechanism this
+      package's Method Atlas slices do not otherwise have -- a real,
+      larger architectural question (the same capability-resolution
+      wiring `database_data.reconciliation`'s own OQ-RECONCILIATION-4
+      already deferred), not something to invent ad hoc here. The
+      optional string is enough to let a caller RECORD which
+      Reconciliation/Backup-Restore-Drill record backs a given stage's
+      own completion claim, disclosed as unenforced.
+  - question: >
+      EC §28's linear diagram gives no explicit rule for a FAILED or
+      ABANDONED migration (only a forward sequence of successful
+      steps) -- should this contract invent a `status: failed`/
+      `abandoned` state?
+    decision: "No -- out of scope. A record's own stages[] simply stops growing if a migration is abandoned; no explicit terminal-failure state is modeled."
+    reasoning: >
+      EC §28's own text is silent on this; inventing a failure taxonomy
+      would be exactly the kind of unstated-assumption invention this
+      package's every prior contract already disciplines itself
+      against. Disclosed as a real limit, not a silent gap -- see
+      OQ-EXPANDCONTRACT-3.
+
+open_questions:
+  - id: "OQ-EXPANDCONTRACT-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-EXPANDCONTRACT-2"
+    question: >
+      This contract validates a full `stages[]` snapshot at any point,
+      but does not itself define an incremental-append API (e.g. "add
+      one newly-completed stage to an existing record"). Should a
+      future revision add one, given a real migration's own record
+      would in practice be updated stage-by-stage over what could be
+      hours or days, not constructed once with a final full list?
+    owner: "operator, or whoever next wires this method into a real migration-execution workflow"
+    blocks: "nothing in this file's own validity -- disclosed scope limit"
+  - id: "OQ-EXPANDCONTRACT-3"
+    question: >
+      No failed/abandoned terminal state is modeled (see
+      compilation_decisions) -- should a future revision add one, or is
+      "the record's own stages[] simply stops growing" sufficient
+      signal given this method's own side-effect-free, report-only
+      scope?
+    owner: "operator, or whoever next revises this contract's own state-model design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-EXPANDCONTRACT-4"
+    question: >
+      `recipes/validated/db-migration-expand-contract.recipe.yaml`'s
+      own description/source_of_truth_for claims "EC §28 currently
+      STILL shows its original 11-step mermaid... has NOT yet been
+      edited to match ADR-005a" -- but this contract's own direct
+      re-read of EC §28 (L1077-1116) shows the CURRENT text already IS
+      the 15-step ADR-005a-corrected form. CONFIRMED by a critic review
+      via a second, independent path, not just re-reading the same
+      file twice: `.ai/proposals/023-db-migration-15-step-sequence-ec/
+      PROPOSAL.md` has `status: APPLIED` and `applied_commit:
+      "9d587c082"` -- `git log` confirms that commit's own message is
+      "apply proposal 023 — Execution Contract §28 DB migration
+      sequence 11->15 steps". The edit genuinely happened, after the
+      recipe file's own description was written. Should that recipe
+      file's own stale claim (and its OQ-DBMIG-1, which assumes the
+      edit hasn't happened yet) be corrected in a separate, dedicated
+      pass?
+    owner: "operator, or a future session auditing recipes/validated/db-migration-expand-contract.recipe.yaml's own EC §28 citation freshness"
+    blocks: "nothing in this file's own validity -- this contract cites EC §28's own current content directly, not the recipe's stale claim about it"
+
+verification:
+  method: >
+    Read Atlas §11.50 (L2354-2364) and §13.10 (L3466-3469) directly --
+    both one-line redirects to EC §28, confirmed by direct read, not
+    assumed from the recipe file's own paraphrase. Read EC §28
+    (L1077-1116), §29 (L1117-1153), §30 (L1154-1176) directly in full.
+    Read `recipes/validated/db-migration-expand-contract.recipe.yaml`
+    in full (279 lines) to confirm this contract's own 15-stage
+    `stage_id` enum transcribes that file's own `steps[].ref` values
+    verbatim, not an independently invented vocabulary -- and, in doing
+    so, discovered the recipe's own EC §28 staleness claim no longer
+    matches EC §28's current content (disclosed above and in
+    OQ-EXPANDCONTRACT-4, not silently corrected -- fixing another
+    file's own stale claim is out of this contract's own scope).
+    Grepped the full spec root for "expand.contract", "expandcontract",
+    "migration.*stage", "stage.*sequence", "schema_baseline",
+    "contract_old_schema" case-insensitive before minting a new typed
+    object -- the only structurally similar hit,
+    `architecture.strangler_fig` / `strangler-fig-plan.schema.yaml`, is
+    confirmed by direct read to be a different concept (F18's own
+    generic incremental legacy-replacement-by-seam pattern, not F21's
+    DB-schema-specific dual-write/backfill/reconciliation lifecycle).
+    No duplicate found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document, ADR, or the existing recipe file was modified.
+    The 15-stage vocabulary and the contiguous-prefix completion
+    invariant are both directly grounded in EC §28's own linear diagram
+    and §30's own "exit code != proof" rule; the decision to model only
+    completed stages (not a full pending-slot checklist) and to leave
+    cross-method references as an optional, unenforced string are both
+    disclosed compilation choices, not silent omissions -- see
+    compilation_decisions above. The recipe-staleness finding
+    (OQ-EXPANDCONTRACT-4) is disclosed, not fixed, as genuinely out of
+    this contract's own scope.
