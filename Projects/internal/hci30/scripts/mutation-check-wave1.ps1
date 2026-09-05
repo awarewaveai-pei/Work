@@ -37,6 +37,7 @@ $upMig6   = Join-Path $root 'database/migrations/0006_wave1_bitemporal_scope_fen
 $upMig7   = Join-Path $root 'database/migrations/0007_wave1_crypto_shredding_up.sql'
 $upMig8   = Join-Path $root 'database/migrations/0008_wave1_field_author_class_policy_up.sql'
 $upMig9   = Join-Path $root 'database/migrations/0009_wave1_adr0019_hardening_up.sql'
+$upMig10  = Join-Path $root 'database/migrations/0010_wave1_epistemic_label_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -471,8 +472,13 @@ $mutations = @(
   # dropping only the inheritance branch, not this mutation's target, would
   # collaterally break NEG-HD08-05 - real-Docker run found this, 2026-09-05) -
   # removes only the ASSESSMENT_CANDIDATE/human_spotcheck_status gate itself.
+  # Real-Docker correction (migration 0010): this literal must mirror the
+  # function's CURRENT full body, now including 0010's epistemic default/
+  # inherit/redline - the pre-0010 version of this literal silently dropped
+  # epistemic defaulting entirely and collaterally broke ~18 unrelated
+  # CLAIM-insert tests across the suite (2026-09-05).
   @{ id = 'weaken-claim-state-admission-gate'
-     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql AS $fn$ DECLARE v_predecessor_reaudit boolean; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN IF NEW.supersedes_id IS NOT NULL THEN SELECT reaudit_required INTO v_predecessor_reaudit FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; NEW.reaudit_required := COALESCE(v_predecessor_reaudit, false); ELSE NEW.reaudit_required := false; END IF; END IF; RETURN NEW; END $fn$;'
+     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql SET search_path = hci, pg_temp AS $fn$ DECLARE v_predecessor_reaudit boolean; v_predecessor_label text; v_predecessor_verifier uuid; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.supersedes_id IS NOT NULL THEN SELECT reaudit_required, epistemic_label, epistemic_verifier_principal_id INTO v_predecessor_reaudit, v_predecessor_label, v_predecessor_verifier FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; END IF; IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := COALESCE(v_predecessor_reaudit, false); END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label IS NULL THEN NEW.epistemic_label := COALESCE(v_predecessor_label, ''UNKNOWN''); IF NEW.epistemic_verifier_principal_id IS NULL THEN NEW.epistemic_verifier_principal_id := v_predecessor_verifier; END IF; END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label = ''SOURCE_FACT'' AND v_predecessor_label IN (''UNKNOWN'',''HYPOTHESIS'') AND NEW.epistemic_verifier_principal_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1019'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
      expect = @('NEG-HD08-01')
      repin = @('hci.enforce_claim_state_admission()') }
   # Dropping the WHOLE cascade trigger also breaks every downstream
@@ -523,8 +529,13 @@ $mutations = @(
   # minus only the one behaviour it targets, matching this file's own
   # established discipline (see 'weaken-tombstone-shape-check' above) rather
   # than dropping the whole trigger and risking unrelated collateral hits.
+  # Real-Docker correction (migration 0010): re-includes epistemic default/
+  # inherit/redline unchanged, so only the reaudit-inheritance behaviour
+  # this mutation targets is removed (the pre-0010 literal dropped
+  # epistemic defaulting entirely and collaterally broke ~18 tests,
+  # 2026-09-05).
   @{ id = 'remove-supersede-reaudit-inheritance'
-     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := false; END IF; IF NEW.kind = ''CLAIM'' AND NEW.claim_state = ''ASSESSMENT_CANDIDATE'' AND NEW.human_spotcheck_status IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1014'', MESSAGE = ''ASSESSMENT_CANDIDATE requires human_spotcheck_status=APPROVED, independent of case risk_tier''; END IF; RETURN NEW; END $fn$;'
+     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql SET search_path = hci, pg_temp AS $fn$ DECLARE v_predecessor_label text; v_predecessor_verifier uuid; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.supersedes_id IS NOT NULL THEN SELECT epistemic_label, epistemic_verifier_principal_id INTO v_predecessor_label, v_predecessor_verifier FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; END IF; IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := false; END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label IS NULL THEN NEW.epistemic_label := COALESCE(v_predecessor_label, ''UNKNOWN''); IF NEW.epistemic_verifier_principal_id IS NULL THEN NEW.epistemic_verifier_principal_id := v_predecessor_verifier; END IF; END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label = ''SOURCE_FACT'' AND v_predecessor_label IN (''UNKNOWN'',''HYPOTHESIS'') AND NEW.epistemic_verifier_principal_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1019'', MESSAGE = ''x''; END IF; IF NEW.kind = ''CLAIM'' AND NEW.claim_state = ''ASSESSMENT_CANDIDATE'' AND NEW.human_spotcheck_status IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1014'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
      expect = @('NEG-HD08-05')
      repin = @('hci.enforce_claim_state_admission()') }
   # CREATE OR REPLACE FUNCTION does not carry forward attributes omitted from
@@ -624,6 +635,57 @@ $mutations = @(
   @{ id = 'reset-function-search-path'
      sql = 'ALTER FUNCTION hci.enforce_claim_state_admission() RESET search_path;'
      expect = @('FUNCTION-SEARCHPATH-01') }
+
+  # Epistemic-label promotion redline (ADR-0019 gate 5 second half,
+  # migration 0010) - 2026-09-05. The value-set CHECK is the unnamed column
+  # CHECK, so PostgreSQL's generated name is used.
+  @{ id = 'drop-epistemic-valueset-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_epistemic_label_check;'
+     expect = @('EPISTEMIC-VALUESET-01') }
+  @{ id = 'drop-epistemic-scoped-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_epistemic_scoped;'
+     expect = @('EPISTEMIC-SCOPED-01') }
+  @{ id = 'drop-epistemic-required-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_epistemic_required;'
+     expect = @('EPISTEMIC-REQUIRED-01') }
+  @{ id = 'drop-epistemic-verifier-scoped-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_epistemic_verifier_scoped;'
+     expect = @('EPISTEMIC-VERIFIER-SCOPED-01') }
+  @{ id = 'drop-source-fact-verified-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_source_fact_verified;'
+     expect = @('EPISTEMIC-SOURCEFACT-VERIFIER-01') }
+  @{ id = 'drop-epistemic-verifier-fk'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_epistemic_verifier_fk;'
+     expect = @('EPISTEMIC-VERIFIER-CROSSTENANT-01') }
+  # Removes only the H1019 promotion branch; default/inherit, reaudit and
+  # H1014 stay. Both NEG-HD08-04 tests then fall through to the
+  # source_fact_verified CHECK (23514, not the H1019 they assert).
+  @{ id = 'weaken-epistemic-redline'
+     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql SET search_path = hci, pg_temp AS $fn$ DECLARE v_predecessor_reaudit boolean; v_predecessor_label text; v_predecessor_verifier uuid; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.supersedes_id IS NOT NULL THEN SELECT reaudit_required, epistemic_label, epistemic_verifier_principal_id INTO v_predecessor_reaudit, v_predecessor_label, v_predecessor_verifier FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; END IF; IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := COALESCE(v_predecessor_reaudit, false); END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label IS NULL THEN NEW.epistemic_label := COALESCE(v_predecessor_label, ''UNKNOWN''); IF NEW.epistemic_verifier_principal_id IS NULL THEN NEW.epistemic_verifier_principal_id := v_predecessor_verifier; END IF; END IF; IF NEW.kind = ''CLAIM'' AND NEW.claim_state = ''ASSESSMENT_CANDIDATE'' AND NEW.human_spotcheck_status IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1014'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
+     expect = @('NEG-HD08-04','NEG-HD08-04b')
+     repin = @('hci.enforce_claim_state_admission()') }
+  # Removes only the label default/inherit branch; the redline, reaudit and
+  # H1014 stay. Every unlabelled Claim insert then hits
+  # subject_records_epistemic_required, and everything downstream of those
+  # rows goes with it.
+  # Real-Docker correction: removing the default/inherit branch entirely
+  # (rather than the narrower "no predecessor -> UNKNOWN" half alone, which
+  # would hit the identical set - virtually every CLAIM insert in this
+  # suite is a standalone row, not a superseding one) leaves
+  # epistemic_label NULL on every CLAIM that does not set it explicitly,
+  # which is most of the suite: this fails subject_records_epistemic_required
+  # (23514) at the insert itself, and every assertion that reads a row an
+  # earlier failed setup would have created cascades with it. The full
+  # list below is exactly what one real run reported - not an estimate.
+  @{ id = 'remove-epistemic-default-inherit'
+     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql SET search_path = hci, pg_temp AS $fn$ DECLARE v_predecessor_reaudit boolean; v_predecessor_label text; v_predecessor_verifier uuid; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.supersedes_id IS NOT NULL THEN SELECT reaudit_required, epistemic_label, epistemic_verifier_principal_id INTO v_predecessor_reaudit, v_predecessor_label, v_predecessor_verifier FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; END IF; IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := COALESCE(v_predecessor_reaudit, false); END IF; IF NEW.kind = ''CLAIM'' AND NEW.epistemic_label = ''SOURCE_FACT'' AND v_predecessor_label IN (''UNKNOWN'',''HYPOTHESIS'') AND NEW.epistemic_verifier_principal_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1019'', MESSAGE = ''x''; END IF; IF NEW.kind = ''CLAIM'' AND NEW.claim_state = ''ASSESSMENT_CANDIDATE'' AND NEW.human_spotcheck_status IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1014'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
+     expect = @('EPISTEMIC-DEFAULT-SETUP-01','EPISTEMIC-DEFAULT-01','NEG-HD08-04','EPISTEMIC-INHERIT-SETUP-01','EPISTEMIC-INHERIT-01',
+                'CLAIM-FIXTURE-01','RLS-CLAIM-02','DECISION-CLAIMS-CREATEDAT-SETUP-01','DECISION-CLAIMS-INSERT-01',
+                'SPOTCHECK-PRINCIPAL-CROSSTENANT-01','DECISION-CLAIMS-CROSSTENANT-02','APPEND-ONLY-TRIGGER-04',
+                'DECISION-CLAIMS-SETUP-01','APPEND-ONLY-TRIGGER-06','NEG-HD08-02-SETUP-CLAIM','NEG-HD08-02-FLAGGED',
+                'NEG-HD08-02','NEG-HD08-05-SUPERSEDE-SETUP','NEG-HD08-05','NEG-HD08-06-SETUP-CLAIM',
+                'NEG-HD08-07-SETUP-CLAIM','NEG-HD08-07-SETUP-LINK','NEG-HD08-07')
+     repin = @('hci.enforce_claim_state_admission()') }
 )
 
 $project = "hcimut$PID"
@@ -686,6 +748,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig7)   -ne 0) { throw 'mutation harness: 0007 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig8)   -ne 0) { throw 'mutation harness: 0008 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig9)   -ne 0) { throw 'mutation harness: 0009 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig10)  -ne 0) { throw 'mutation harness: 0010 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

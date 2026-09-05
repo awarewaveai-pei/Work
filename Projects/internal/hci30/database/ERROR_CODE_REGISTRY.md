@@ -37,6 +37,7 @@ column. Do not compute "next free" from any other file.**
 | `H1016` | A Claim linked into `hci.decision_claims` is not an approved Assessment Candidate (`claim_state='ASSESSMENT_CANDIDATE' AND human_spotcheck_status='APPROVED'`) | RAISED — db-expert review (2026-09-05) found gate 3's state machine had no downstream consumer: a `DRAFT`/unspotchecked Claim could be linked to a Decision without ever passing gate 3 | `hci.enforce_decision_reaudit_gate()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
 | `H1017` | A case's `risk_tier` elevation retroactively flags a Claim that is already linked to a `PROCEED`/`PROCEED_WITH_CONTROLS`/`EXIT` Decision | RAISED — db-expert review (2026-09-05) found the link->elevate ordering was unguarded (only elevate->link was); this closes it by rejecting the elevation itself, forcing human review before the tier change is recorded | `hci.flag_claims_on_risk_elevation()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
 | `H1018` | Unrecognized `risk_tier` value reached the elevation-rank comparison | **RESERVED, NOT RAISED** — `hci.cases.risk_tier`'s own `CHECK (risk_tier IN ('R0'..'R4'))` (`migrations/0002_wave1_case_aggregate_up.sql:66`) makes this branch currently unreachable via any legal input; same "reserved but unraisable today" disposition as `H1012`. Defense-in-depth against a future tier being added to that CHECK without updating `hci.flag_claims_on_risk_elevation()`'s hardcoded rank array (db-expert review, 2026-09-05) | `hci.flag_claims_on_risk_elevation()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
+| `H1019` | Epistemic promotion `UNKNOWN`/`HYPOTHESIS` -> `SOURCE_FACT` on a superseding Claim without a human verifier (`epistemic_verifier_principal_id`) - the `epistemic-label.schema.yaml` `forbidden_transition`, ADR-0019 gate 5 / `NEG-HD08-04` | RAISED | `hci.enforce_claim_state_admission()` | `migrations/0010_wave1_epistemic_label_up.sql` |
 
 `'H1TST'` is reserved separately for the test-harness sentinel
 (`database/tests/00_test_harness.sql`) and must never be raised by schema
@@ -45,7 +46,7 @@ succeeded" from every real domain code.
 
 ## Next free code
 
-**`H1019`.**
+**`H1020`.**
 
 ## Maintenance rule
 

@@ -332,6 +332,50 @@ idempotent on a second run, cleanly re-applied, and refused against a
 populated schema. Full narrative in the migration's header comments and in
 ADR-0019's "Implementation note" (hardening pass).
 
+Epistemic-label addition (same day, migration `0010_wave1_epistemic_label_up.sql`),
+closing the last OPEN item under ADR-0019 (`NEG-HD08-04`):
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| EPISTEMIC-DEFAULT-SETUP-01 / -01 | App-role Claim insert with no `epistemic_label` | A born-unlabelled Claim defaults to `UNKNOWN`, never NULL | Succeeds; `epistemic_label = 'UNKNOWN'` |
+| EPISTEMIC-VALUESET-01 | App-role Claim with `epistemic_label='FACT'` | Value set is the ADR-0013 kernel's 11-value enum verbatim - `FACT` is the bare literal the kernel's own note says exists in no enum | Rejected, `23514` |
+| EPISTEMIC-SCOPED-01 / -VERIFIER-SCOPED-01 | App-role EVIDENCE row carrying `epistemic_label` / `epistemic_verifier_principal_id` | Both columns are CLAIM-scoped | Rejected, `23514` |
+| EPISTEMIC-SOURCEFACT-VERIFIER-01 | App-role Claim BORN `SOURCE_FACT`, no predecessor, no verifier | Every `SOURCE_FACT` names a verifier, not only a promotion - closes the "born in the final state" bypass class (0008's C1/C2) | Rejected, `23514` |
+| EPISTEMIC-VERIFIER-CROSSTENANT-01 | App-role Claim naming a real tenant-B principal as verifier | `epistemic_verifier_principal_id`'s tenant-composite FK | Rejected, `23503` |
+| NEG-HD08-04 / NEG-HD08-04b | App-role superseding insert, predecessor `UNKNOWN` / `HYPOTHESIS`, new label `SOURCE_FACT`, no verifier | The named redline itself: direct promotion without a human verifier is forbidden | Rejected, `H1019` |
+| EPISTEMIC-PROMOTE-01 | App-role superseding insert, predecessor `HYPOTHESIS`, new label `SOURCE_FACT`, real verifier supplied | A gate that rejects every promotion is also broken - the legal "via Human Validation" path must succeed | Succeeds |
+| EPISTEMIC-INHERIT-SETUP-01 / -01 | App-role superseding insert of a `SOURCE_FACT` row with no `epistemic_label` supplied | An unlabelled correction inherits both the label AND the verifier together, never a silent demotion | Succeeds; label/verifier unchanged |
+| EPISTEMIC-REQUIRED-01 | Owner-run, user triggers on `subject_records` disabled, `reaudit_required` supplied explicitly | `subject_records_epistemic_required`, isolated from the trigger default that normally satisfies it first | Rejected, `23514` |
+
+Real execution found a false-positive risk in the new ADR-0013 annotation
+script itself before it ever ran against real migrations: a naive
+declaration-line regex also matches a `RETURNS TABLE(...)` column list,
+which re-declares an already-annotated real column's type for a function's
+return shape and carries no CHECK/ENUM of its own - excluded by tracking
+the `RETURNS TABLE (` ... `) LANGUAGE` span, with its own dedicated
+self-test case proving the exclusion is not itself a silent hole. Mutation-
+check then found that the two 0009-era mutations targeting the same
+trigger function this migration also rewrote had gone stale - their
+literals predated 0010's epistemic default/inherit logic, so applying
+either now collaterally stripped it from every CLAIM insert (up to 18
+assertions at once) - fixed by re-syncing both to the function's current
+full body, the same "body-rewriting mutations must mirror the current
+function" lesson 0009 taught, now shown to need re-checking on every
+subsequent change to that function. A third finding:
+`CHECK-REAUDIT-DEFAULT-01` (0009) went `VACUOUS` once the same disabled
+trigger also stopped defaulting `epistemic_label` - the row failed a
+DIFFERENT CHECK behind the identical `23514` SQLSTATE, masking whether the
+one under test still mattered - fixed by supplying `epistemic_label`
+explicitly so only the intended CHECK can be the reason it fails. No
+db-expert review requested: extends an already-reviewed mechanism (the
+BEFORE INSERT trigger, the composite-FK-to-principals pattern, inherit-
+across-supersession) rather than inventing a new one. Final tally:
+**208/208 assertions, 101/101 mutations killed** (194 + 14 new assertions,
+93 + 8 new mutations); `0010_down` verified alone, idempotent on a second
+run, cleanly re-applied, and refused against a populated schema - all on
+the first attempt. Full narrative in the migration's header comments and
+ADR-0019's "Implementation note" (epistemic-label half).
+
 ## Test execution requirements
 
 1. Run against an HCI database/API using a non-superuser tenant role; service-role or owner-only tests do not prove tenant isolation.
@@ -669,9 +713,38 @@ drop both. Final: **194/194 assertions, 93/93 mutations killed**;
 and refused against a populated schema. Full narrative in the migration's
 header comments and ADR-0019's "Implementation note" (hardening pass).
 
+**Execution evidence (2026-09-05, ADR-0019 epistemic-label addition).**
+Migration `0010_wave1_epistemic_label_up.sql`, closing gate 5's last OPEN
+item (`NEG-HD08-04`). Also built `scripts/verify-epistemic-annotation.ps1`
+- ADR-0013 gate 5 had specified this script but nothing had built it, and
+this migration was the first Wave 1 change to introduce a column its
+pattern (`epistemic|risk_tier|admission_state|fact_type`) matches. The
+script self-tests before checking real migrations (an unannotated
+synthetic column must be flagged, an annotated one and a `RETURNS
+TABLE(...)` re-declaration of the same column must not - the latter found
+as a real false-positive risk before the script ever ran for real, fixed
+by tracking the `RETURNS TABLE (...)` span as excluded) and, run for real,
+found one genuine pre-existing gap: `hci.cases.risk_tier` (migration 0002)
+had never carried the ADR-0013 citation - annotated in place, comment
+only. SQL itself went green first try: **208/208 assertions, 101/101
+mutations killed**. Mutation-check then found two of 0009's own mutations
+had gone stale against the trigger function this migration also rewrote -
+their literals predated 0010's epistemic default/inherit logic, so
+applying either now collaterally stripped it from up to 18 unrelated
+assertions - fixed by re-syncing both literals to the function's current
+full body. A third finding: `CHECK-REAUDIT-DEFAULT-01` (0009) went
+`VACUOUS` once the same trigger-disabled test also lost its epistemic
+default, masking which CHECK actually fired behind an identical SQLSTATE -
+fixed by supplying `epistemic_label` explicitly. `0010_down` verified
+alone, idempotent on a second run, cleanly re-applied, and refused against
+a populated schema - all first attempt. No db-expert review requested:
+extends an already-reviewed mechanism rather than inventing a new one.
+Full narrative in the migration's header comments and ADR-0019's
+"Implementation note" (epistemic-label half).
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 93
+requires the suite to go red on exactly the assertions covering it; **all 101
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
 Source-provenance mutations + 2 Consent-class mutations + 15 Bitemporal-
@@ -682,7 +755,9 @@ Field/transition author-class policy mutations (10 landed pre-review + 5
 added by the db-expert review round, one of them a regression guard for a
 bug the review's own fix introduced) + 15 ADR-0019 hardening mutations
 (migration 0009: three spotcheck-principal constraints, four composite-FK
-weakenings/drops, six CHECK drops, two function-config resets),
+weakenings/drops, six CHECK drops, two function-config resets) + 8
+epistemic-label mutations (migration 0010: six CHECK/FK drops, the named
+redline weakened, the default/inherit branch removed),
 2026-09-05, covering every invariant listed above). This
 exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same

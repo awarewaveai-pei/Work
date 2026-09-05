@@ -63,6 +63,11 @@ CREATE TABLE hci.cases (
   tenant_id uuid NOT NULL REFERENCES hci.tenants(id),
   tenant_authorization_id uuid NOT NULL,
   purpose text NOT NULL CHECK (length(btrim(purpose)) > 0),
+  -- ADR-0013 (WAVE1-EPISTEMIC-ANNOTATION-01): R0-R4 mirrors AI LEGO's
+  -- risk-tier.schema.yaml ladder and is PROVISIONAL pending ADR-0013 gate 3.
+  -- Annotation added 2026-09-05 (comment only, no schema change) when
+  -- scripts/verify-epistemic-annotation.ps1 was built and found this
+  -- pre-existing Wave 1 column uncited.
   risk_tier text NOT NULL CHECK (risk_tier IN ('R0','R1','R2','R3','R4')),
   relationship_context text,
   requester_context text NOT NULL CHECK (length(btrim(requester_context)) > 0),

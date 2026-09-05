@@ -883,6 +883,75 @@ SELECT hci_test.expect_sqlstate('CHECK-SPOTCHECK-REQUIRED-01',
      VALUES ('aaaaaaaa-0000-0000-0000-000000000942','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT')$q$,
   '23514');
 
+-- ---------------------------------------------------------------------------
+-- Epistemic-label promotion redline (ADR-0019 gate 5, second half;
+-- migration 0010). "Promotion" on an append-only table is a superseding row
+-- (ADR-0017), so NEG-HD08-04 is an INSERT with supersedes_id, never an
+-- UPDATE. All app-role reachable: both columns are in the INSERT grant.
+-- ---------------------------------------------------------------------------
+-- A Claim born unlabelled is UNKNOWN (trigger default - the least-trusted
+-- state is the only safe default), not NULL and not an error.
+SELECT hci_test.expect_success('EPISTEMIC-DEFAULT-SETUP-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000945','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING')$q$);
+SELECT hci_test.expect_true('EPISTEMIC-DEFAULT-01',
+  $q$SELECT epistemic_label = 'UNKNOWN' FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000945'$q$,
+  'a Claim inserted without an epistemic_label must default to UNKNOWN');
+-- Value set is the ADR-0013 kernel's 11 values verbatim; 'FACT' is exactly
+-- the bare literal the kernel's own promotion_redline note says exists in
+-- no enum.
+SELECT hci_test.expect_sqlstate('EPISTEMIC-VALUESET-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000946','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','FACT')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('EPISTEMIC-SCOPED-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000947','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC','UNKNOWN')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('EPISTEMIC-VERIFIER-SCOPED-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,epistemic_verifier_principal_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000948','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC','aaaaaaaa-0000-0000-0000-000000000850')$q$,
+  '23514');
+-- Born SOURCE_FACT with no predecessor: the promotion-only rule would never
+-- see it, so the CHECK is what closes that bypass (the class 0008's C1/C2
+-- review findings were about).
+SELECT hci_test.expect_sqlstate('EPISTEMIC-SOURCEFACT-VERIFIER-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000949','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','SOURCE_FACT')$q$,
+  '23514');
+SELECT hci_test.expect_sqlstate('EPISTEMIC-VERIFIER-CROSSTENANT-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label,epistemic_verifier_principal_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000950','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','SOURCE_FACT','bbbbbbbb-0000-0000-0000-000000000850')$q$,
+  '23503');
+-- NEG-HD08-04 (ADR-0019 gate 5): UNKNOWN -> SOURCE_FACT with no human
+-- verifier is the forbidden direct promotion.
+SELECT hci_test.expect_sqlstate('NEG-HD08-04',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000951','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000945','promoted without anyone checking','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','SOURCE_FACT')$q$,
+  'H1019');
+SELECT hci_test.expect_success('EPISTEMIC-HYPOTHESIS-SETUP-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000952','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','HYPOTHESIS')$q$);
+SELECT hci_test.expect_sqlstate('NEG-HD08-04b',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000953','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000952','hypothesis promoted without anyone checking','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','SOURCE_FACT')$q$,
+  'H1019');
+-- A gate that rejects every promotion is also broken: the legal path
+-- ("via Human Validation") must succeed with a named verifier.
+SELECT hci_test.expect_success('EPISTEMIC-PROMOTE-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label,epistemic_verifier_principal_id)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000954','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000952','verified by analyst','aaaaaaaa-0000-0000-0000-000000000800','HUMAN_ONLY','DRAFT','PENDING','SOURCE_FACT','aaaaaaaa-0000-0000-0000-000000000850')$q$);
+-- An unlabelled correction of a SOURCE_FACT keeps both the label and the
+-- human who attested it - never a silent demotion to UNKNOWN, never a
+-- SOURCE_FACT with the verifier dropped on the floor.
+SELECT hci_test.expect_success('EPISTEMIC-INHERIT-SETUP-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,supersedes_id,corrected_reason,encryption_key_ref,author_class,claim_state,human_spotcheck_status)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000955','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000954','metadata correction','aaaaaaaa-0000-0000-0000-000000000800','HUMAN_ONLY','DRAFT','PENDING')$q$);
+SELECT hci_test.expect_true('EPISTEMIC-INHERIT-01',
+  $q$SELECT epistemic_label = 'SOURCE_FACT' AND epistemic_verifier_principal_id = 'aaaaaaaa-0000-0000-0000-000000000850'
+       FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000955'$q$,
+  'an unlabelled superseding row must inherit its predecessor''s epistemic_label and verifier together');
+
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
@@ -959,9 +1028,14 @@ SELECT hci_test.expect_sqlstate('CHECK-REAUDIT-SCOPED-01',
      VALUES ('aaaaaaaa-0000-0000-0000-000000000943','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC',false)$q$,
   '23514');
 ALTER TABLE hci.subject_records DISABLE TRIGGER USER;
+-- epistemic_label supplied explicitly (migration 0010 landed after this
+-- test - with user triggers disabled its own default no longer fires
+-- either, and an unrelated NULL there would mask which CHECK actually
+-- rejects the row behind the same 23514 SQLSTATE; real-Docker run found
+-- this, 2026-09-05).
 SELECT hci_test.expect_sqlstate('CHECK-REAUDIT-DEFAULT-01',
-  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status)
-     VALUES ('aaaaaaaa-0000-0000-0000-000000000944','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING')$q$,
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,epistemic_label)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000944','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING','UNKNOWN')$q$,
   '23514');
 ALTER TABLE hci.subject_records ENABLE TRIGGER USER;
 
@@ -984,6 +1058,18 @@ SELECT hci_test.expect_true('FUNCTION-SEARCHPATH-01',
                           AND NOT EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c
                                            WHERE c LIKE 'search_path=%'))$q$,
   'every function in hci must pin search_path');
+
+-- Epistemic label (0010), owner-run half: subject_records_epistemic_required
+-- is normally satisfied by the trigger default before the CHECK sees the
+-- row, so - like CHECK-REAUDIT-DEFAULT-01 - it is proven with the table's
+-- user triggers stripped for one statement (reaudit_required supplied
+-- explicitly so only the epistemic CHECK can be the one that fails).
+ALTER TABLE hci.subject_records DISABLE TRIGGER USER;
+SELECT hci_test.expect_sqlstate('EPISTEMIC-REQUIRED-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,reaudit_required)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000956','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','CLAIM','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','DRAFT','PENDING',false)$q$,
+  '23514');
+ALTER TABLE hci.subject_records ENABLE TRIGGER USER;
 
 -- TRUNCATE does not fire row-level triggers and is a separate privilege, so it
 -- is the one statement that would otherwise walk past both layers at once.
@@ -1326,4 +1412,4 @@ SELECT hci_test.expect_true('CRYPTO-NOEXTERNAL-01',
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(194);
+SELECT hci_test.finish(208);

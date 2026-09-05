@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-05（HCI-30 Wave 1：ADR-0019 gate 5 認識論標籤半邊 migration 0010 —— ADR-0019 全部 5 個 gate 現已關閉；順手建好 ADR-0013 gate 5 稽核腳本；Docker Desktop 第二次殘留 socket 復原）
+
+**觸發**：延續操作者「全部去完美處理好」授權（ADR-0019 遺留＋ADR-0009，本輪 = 前者最後一段：gate 5 認識論標籤半邊）。0 新 subagent（沿用上一輪 Explore 研究結果）。
+
+**阻斷與排除**：Docker Desktop 再次於本輪跑到一半失聯（同一台機器、同一類殘留 socket 問題，這是本 session 第二次），操作者手動重啟後恢復；另一個小插曲：Bash cwd 因先前一次 `cd` 指令意外滯留在 `Projects/internal/hci30`，導致相對路徑呼叫 `test-wave1-local.ps1` 失敗（"引數不存在"），改用絕對路徑排除。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0010_wave1_epistemic_label_{up,down}.sql`（新）— `hci.subject_records` 新增 `epistemic_label`（CLAIM-scoped、未填預設 `UNKNOWN`、superseding 未填繼承前身標籤+verifier）＋`epistemic_verifier_principal_id`（複合 FK→`hci.principals`，`SOURCE_FACT` 一律要求，非僅 promotion 才要）；redline 本身（新碼 `H1019`）掛在既有 `enforce_claim_state_admission()` trigger；4 個 canonical view/`_as_of()` 再補一輪欄位平行。
+- `Projects/internal/hci30/scripts/verify-epistemic-annotation.ps1`（新）— ADR-0013 gate 5（`WAVE1-EPISTEMIC-ANNOTATION-01`）指定但先前未建的稽核腳本：掃 `database/migrations/*_up.sql` 找 `epistemic|risk_tier|admission_state|fact_type` 欄位宣告未帶 ADR-0013 引註者；自帶 self-test（誤判／正判／`RETURNS TABLE` 排除三案例）先跑再查真檔。
+- `Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_up.sql`：真跑該腳本抓到既有 `risk_tier` 欄位從未引註，補純註解（無 schema 變更）。
+- `database/tests/wave1-negative-tests.sql`（194→208）：14 個新測（`NEG-HD08-04`/`04b` 本尊、defaults／值集／CLAIM-scoped／verifier-scoped／born-SOURCE_FACT／跨租戶／合法 promotion／繼承／owner-run required）；順手修一個因新 trigger 邏輯被遮蔽的既有測試（`CHECK-REAUDIT-DEFAULT-01` 補顯式 `epistemic_label`）。`scripts/mutation-check-wave1.ps1`（93→101）：8 個新 mutation；同步修正 0009 兩個舊 mutation（`weaken-claim-state-admission-gate`／`remove-supersede-reaudit-inheritance`）字面補上 0010 新邏輯（否則連帶打壞最多 18 個既有斷言）。`scripts/test-wave1-local.ps1` wire 0010 + 掛上新稽核腳本呼叫。
+- 治理：ADR-0019 Implementation note 加「gate 5 epistemic-label half」段（標記全部 5 個 gate 已關閉）、`ADR_INDEX.md` 兩列（ADR-0019 收尾＋ADR-0013 gate 5 列新增）、`HCI_WAVE1_NEGATIVE_TEST_SPEC.md` 新章節＋Execution/Non-vacuity 更新、`HCI_FIELD_AUTHOR_CLASS_POLICY.md` status／policy table／gate cross-reference 三處、`ERROR_CODE_REGISTRY.md`（`H1019`，next free `H1020`）、`TASKS.md` 完成項。
+
+**真跑抓到（非預測）**：① 稽核腳本自己的 regex 誤把 `RETURNS TABLE(...)` 裡的欄位重宣告當成需引註的新分類決策——加 span 排除＋專屬反例 self-test；② migration header comment 直接寫姊妹產品（cognitive-os）檔案路徑，觸發既有 `ARCH-PEER-01` Node 架構測試（跨產品耦合零容忍）——改用不含路徑的敘述，機制本身留給 ADR-0019 Implementation note 引註；③ mutation-check 抓到 0009 兩個改寫同一 trigger 的舊 mutation 字面沒跟上 0010 新邏輯，連帶打壞最多 18 個既有斷言（重新同步）；④ `CHECK-REAUDIT-DEFAULT-01` 因同一 trigger 停用後連 epistemic 預設也不跑，被同一 `23514` 遮蔽 CHECK 身分變 VACUOUS（補顯式欄位隔離）。全部一次真跑（含 narrow rollback）就抓到並修完，無第二輪殘留。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=`HCI Wave 1 negative suite: 208 assertion(s) recorded, 0 failed`（forward + 整包 reversibility）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 101 mutations killed. The Wave 1 negative suite is non-vacuous.`（第二次跑全綠，第一次抓到上述③④）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/verify-epistemic-annotation.ps1` | exit=0 | result=`verify-epistemic-annotation: ok - every epistemic/risk classification column cites ADR-0013`（self-test 先過）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad `verify-0010-narrow-rollback.ps1` | exit=0 | result=`NARROW ROLLBACK VERIFICATION (0010) PASSED.`（獨立 down／冪等第二次 no-op／重套用 up／populated 拒絕，四關第一次真跑就過）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m（沿用 0008/0009 已審過的 trigger/複合FK/繼承機制，非新設計，未送外部 oracle；自審聚焦新增的 redline 邏輯與 ADR-0013 稽核腳本本身）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=finish\(194\)\|194/194\|93/93 mutation\|gate 5.*epistemic-label half remains OPEN\|NEG-HD08-04.*OPEN | hits=0（除 dated WORKLOG/TASKS 歷史敘述外）
+
+**[剩餘風險]**：ADR-0019 五個 gate 全數關閉，本 ADR 無殘留。0008_down 冪等性（m3，已 push 檔刻意不動）仍是唯一已知小缺口，非阻斷。下一步轉 ADR-0009（租戶/組織 adapter）：研究已完成，契約文件無具體 schema，`hci.tenants` 零 portal 連結欄位，`TENANT-ADAPTER-NEG-01/03` 需真 adapter 程式碼（任一 repo 皆無）——規劃只落地 schema 層 seam＋等價於 -02 的證明，其餘誠實留 OPEN。
+
+**[rollback]**：`0010_down` 四關真跑驗證；整體仍可 `0001_down` 一次全清。
+
 ## 2026-09-05（續49，同一 session：Cognitive OS 第三十六個 Method Atlas 切片 — `devops_sre.stress_test`，349,440 case oracle 零分歧，critic warn 4 Major 全屬宣稱／半邊防線類，另揪出契約自己漏揭露的第三個同名異物）
 
 **觸發**：延續操作者「繼續」授權。1 個 critic subagent（額度檢查通過）。

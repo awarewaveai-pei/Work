@@ -57,7 +57,7 @@ Runtime implementation gates are **OPEN**. Before Wave 1 schema freeze or any re
 
 All five land at **Wave 1** (schema freeze), alongside ADR-0009/0010/0011/0015/0016's own open gates, on the same synthetic-first path ADR-0014/0015/0016 already used (`D:\Work\Projects\internal\hci30\database\`) before any non-synthetic data is admitted.
 
-## Implementation note (2026-09-05, Wave 1 gates 2, 3, 4, and gate 5's human-principal half landed; gate 5's epistemic-label half remains OPEN)
+## Implementation note (2026-09-05, all Wave 1 gates landed - gates 2, 3, 4, and both halves of gate 5)
 
 Recorded here rather than editing the numbered gates above, which remain the
 historical decision record.
@@ -201,10 +201,98 @@ migrations are immutable, follow-ups get a new number):
 
 Tally after 0009: **194/194 assertions, 93/93 mutations killed**; `0009_down`
 verified alone, verified idempotent on a second run, re-applied cleanly,
-and correctly refused against a populated schema. Still open: gate 5's
-epistemic-label half (own migration, next), and 0008's own down-migration
-idempotency (m3) - left as-is because 0008 is shipped, and 0009's down was
-written idempotent from the start instead.
+and correctly refused against a populated schema. Still open at that point:
+gate 5's epistemic-label half, and 0008's own down-migration idempotency
+(m3) - left as-is because 0008 is shipped, and 0009's down was written
+idempotent from the start instead.
+
+**Gate 5, epistemic-label half, migration `0010_wave1_epistemic_label_up.sql`
+(same day).** Closes `NEG-HD08-04`, the last OPEN item under this ADR.
+
+**What upstream actually provides, verified before writing any code (a
+targeted research pass, not assumed).** ADR-0019's own text says to reuse
+"epistemic-label.schema.yaml:37-63's already-schema-validated
+promotion_redline". That file lives in the sibling cognitive-os product's
+spec tree (not cited here by path - this migration's own header explains
+why: `Projects/internal/hci30`'s source tree must not carry a direct
+reference into that product outside `integrations/cognitive-os/`, per
+ARCH-PEER-01/ADR-0001, and the peer-boundary Node test caught exactly this
+when the path was first written into the migration's own comment). Reading
+it found: an 11-value `epistemic_type` enum (`SOURCE_FACT, EVIDENCE,
+ASSUMPTION, HYPOTHESIS, AI_INFERENCE, AI_SUGGESTION, HUMAN_OPINION,
+CALCULATED_RESULT, SIMULATED_RESULT, UNKNOWN, DECISION`), not merely the
+three values (`UNKNOWN`/`HYPOTHESIS`/`SOURCE_FACT`) ADR-0019's own text
+names; a `promotion_redline` block that is structured DOCUMENTATION
+(`forbidden_transition`/`legal_paths`/`each_legal_path_must_record`), not a
+JSON-Schema validator keyword - nothing upstream mechanically enforces it;
+and no verifier field or type named anywhere. ADR-0013 (shared kernel,
+ACCEPTED the same batch) then scopes what Wave 1 may take from this: the
+11-value enum only - not `authorship_state`, not `locked`, not the
+composite provenance record - and its own gate 5
+(`WAVE1-EPISTEMIC-ANNOTATION-01`) requires every Wave 1 classification
+column to carry an inline `ADR-0013` citation marking the value set
+provisional pending ADR-0013's own gate 3 (Wave 3 lossless-mapping test).
+That citation script (`scripts/verify-epistemic-annotation.ps1`) did not
+exist before this round - ADR-0013 specified it but nothing had built it -
+so it was built here as part of landing this migration correctly, wired
+into `test-wave1-local.ps1`, self-tests itself (an unannotated synthetic
+column must be flagged, an annotated one and a bare column reference must
+not) before checking real migrations, and found one genuine pre-existing
+gap: `hci.cases.risk_tier` (migration 0002, matches the script's own
+`risk_tier` trigger word) had never carried the citation - annotated in
+place (comment only, no schema change).
+
+**Design decisions this migration had to make, none handed down by any
+ADR** (documented in the migration's own header, not repeated here):
+`epistemic_label` is CLAIM-scoped (the best-evidenced target - no document
+pins it wider); a CLAIM born unlabelled defaults to `UNKNOWN` (the
+least-trusted state is the only safe default); a superseding row with no
+label inherits its predecessor's label AND verifier together (never a
+silent demotion - the same reasoning gate 4's `reaudit_required`
+inheritance already established); "human verifier" is
+`epistemic_verifier_principal_id`, a tenant-composite FK to
+`hci.principals` reused from this ADR's own gate 5 human-principal half and
+0009's spot-check binding; every `SOURCE_FACT` row requires a verifier by
+CHECK, not only on a promotion - otherwise a Claim simply BORN as
+`SOURCE_FACT` with no predecessor bypasses a promotion-only rule entirely,
+the exact "no downstream consumer" bypass class 0008's C1/C2 review
+findings were about; `authorship_state`, `locked`, and any demotion rule
+are explicitly NOT modelled (ADR-0013 reserves the first two, no ADR
+authorizes them as columns yet).
+
+First real run found one real cross-cutting bug outside SQL entirely: the
+migration's header comment citing the sibling product's file path tripped
+`ARCH-PEER-01` (the Node architecture test), fixed by describing the
+mechanism without the literal path. SQL itself: **208/208 assertions,
+101/101 mutations killed**, first try on both. Mutation-check then found
+two real gaps in the two 0009-era mutations that target the same trigger
+function this migration also rewrote (`weaken-claim-state-admission-gate`,
+`remove-supersede-reaudit-inheritance`): their literals had not been
+updated to include 0010's epistemic default/inherit logic, so applying
+either now collaterally stripped epistemic defaulting from every CLAIM
+insert - up to 18 unrelated assertions at once - fixed by re-syncing both
+literals to the function's current full body (the same "body-rewriting
+mutations must mirror the current function" discipline 0009 already
+established, now shown to need re-checking every time that function
+changes again). A third finding: `CHECK-REAUDIT-DEFAULT-01` (0009, run with
+user triggers disabled to reach the CHECK) went `VACUOUS` once triggers
+also stopped defaulting `epistemic_label` - the row failed
+`subject_records_epistemic_required` regardless of whether the
+reaudit-specific CHECK existed, masking which constraint actually fired
+behind the same `23514` SQLSTATE - fixed by supplying `epistemic_label`
+explicitly so only the one CHECK under test can be the reason it fails.
+Narrow-rollback (`0010_down` alone against an unpopulated schema, a second
+run proving idempotency, a clean `0010_up` re-application, and refusal
+against a populated schema) passed on the first attempt.
+
+No db-expert review was requested for this gate: it extends an
+already-reviewed mechanism (the same BEFORE INSERT trigger, the same
+composite-FK-to-principals pattern, the same inherit-across-supersession
+shape) rather than inventing a new one, matching this session's own
+established criterion for when review is and is not warranted.
+
+**All five ADR-0019 gates are now DONE.** Final tally across migrations
+0008-0010: **208/208 assertions, 101/101 mutations killed**.
 
 ## Consequences
 
