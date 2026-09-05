@@ -330,6 +330,20 @@ open_questions:
     owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
     blocks: "nothing in this file's own validity"
   - id: "OQ-DC-2"
+    status: >
+      ANSWERED (2026-09-06), via a DIFFERENT mechanism than literally
+      proposed below -- database_data.data_quality_dimensions now
+      exists, but the soft link lives on ITS OWN record
+      (`data_contract_ref`, DC- prefix, pointing back at this method),
+      not as a new `quality_ref` field retrofitted onto THIS record.
+      That contract's own compilation_decisions explain why: adding a
+      field to an already-shipped, already-critic-reviewed sibling
+      schema is a larger blast radius than the direction every other
+      cross-database_data-slice soft link in this session already
+      uses (the newer record points back at the older one -- e.g. this
+      method's own `schema_ref` to `database_data.erd`). The underlying
+      NEED this OQ named (a way to link a data contract's own quality
+      commitment to a real quality assessment) is satisfied either way.
     question: >
       F21's own Data Quality Dimensions table row (L904: 'rules→
       profiling→threshold→quarantine→owner') is this method's own

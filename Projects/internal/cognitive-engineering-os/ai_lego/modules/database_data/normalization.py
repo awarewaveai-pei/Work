@@ -20,9 +20,14 @@ carries non-empty `reasoning`.
 
 This method reuses `ai_lego.modules.research.gates
 .evaluate_statistical_gate` UNCHANGED for its `genuine_compute` gate --
-the seventh reuse this session (after `root_cause.pareto`/`decision
-.ahp`/`decision.mcda`/`devops_sre.error_budget`/`database_data
-.data_lineage`/`database_data.reconciliation`).
+the ELEVENTH reuse this session (CORRECTED post-critic-review of the
+following slice, `database_data.data_quality_dimensions`, whose own
+critic round found this docstring's own chain had silently dropped
+four intervening reuses; the real chain is `root_cause.pareto`/
+`decision.ahp`/`decision.mcda`/`devops_sre.error_budget`/`database_data
+.data_lineage`/`database_data.reconciliation`/`devops_sre
+.capacity_model`/`devops_sre.load_test`/`devops_sre.stress_test`/
+`devops_sre.soak_test`).
 
 **CRITICAL, fixed after a critic review of this slice's own first
 draft**: a declared `primary_key_attributes` set that is a superkey
@@ -243,7 +248,7 @@ def evaluate_provenance_required_gate(record: dict[str, Any], validator: str, ti
 def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
     provenance/computation_provenance_ref/engine, all of which NormalizationRecord also carries at the top
-    level. Seventh reuse of this gate this session."""
+    level. Eleventh reuse of this gate this session (CORRECTED post-critic-review, see module docstring)."""
     if not isinstance(record, dict):
         return _result("genuine_compute", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(record)

@@ -1,0 +1,178 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/data-quality-assessment-record.schema.yaml"
+title: Data Quality Assessment Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DataQualityAssessmentRecord`
+  -- the declared `outputs` of `database_data.data_quality_dimensions`'s
+  Method Contract. EIGHTH `database_data`-family typed object, after
+  `database_data.backup_restore_drill`, `database_data.data_lineage`,
+  `database_data.expand_contract_migration`, `database_data
+  .reconciliation`, `database_data.erd`, `database_data.data_contract`,
+  and `database_data.normalization`. Atlas's own F21 tool table Data
+  Quality Dimensions row (L904) AND dedicated §12.39 section
+  (L3066-3082: six dimensions -- Completeness, Accuracy, Consistency,
+  Uniqueness, Timeliness, Validity) together ground this record.
+  Directly closes `database_data.data_contract`'s own `OQ-DC-2`.
+
+  `passes_threshold` (per dimension entry), `quality_gate_status`, and
+  `quarantined_dimensions` are GENUINE COMPUTE (`quality.genuine_compute:
+  true`) -- derived from each entry's own raw `profiled_score`/
+  `threshold` (a >= comparison), NOT caller-asserted. FOUR optional
+  fields are format-only soft links to already-built sibling records:
+  `schema_ref` (`ERD-`), `lineage_ref` (`DLR-`), `restore_drill_ref`
+  (`DRILL-`) -- together the OTHER THREE pillars of the mother
+  document's own "Data Gate" quartet (L4379: "Schema/Data Quality/
+  Lineage/Restore 可驗證") -- and `data_contract_ref` (`DC-`),
+  resolving `OQ-DC-2`.
+
+  Real structural invariants: `dimensions[]` has at least one entry;
+  every entry's own `dimension` is one of the six closed enum values;
+  `profiled_score`/`threshold` are bounded to `[0.0, 1.0]` -- both
+  enforced at the runtime layer, not here (schema-layer numeric bounds
+  below are a cheap complementary check, not the sole enforcement).
+
+  The `dimension` enum is Atlas §12.39's own six-item data-governance
+  vocabulary, deliberately NOT widened to Master Plan §35's own
+  different, ML/statistics-specific nine-item pre-analysis checklist
+  (Missing Values/Duplicates/Outliers/Impossible Values/Data Type Error
+  /Sampling Bias/Leakage/Class Imbalance/Distribution Shift) -- see the
+  method contract's own compilation_decisions for why the two lists
+  answer different questions and are not merged.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Data Quality Dimensions row (L904): 'rules→profiling→threshold→quarantine→owner'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.39 資料品質維度 (L3066-3082): six dimensions"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §35 Data Quality Engine (L1807-1821): a different, ML-specific nine-item checklist -- cited for context, not merged into this schema's own six-value enum"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1154-1165): 'Quarantine Policy' as a required element"
+  - "methods/contracts/database_data.data_quality_dimensions.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  dimension_assessment:
+    type: object
+    required: [dimension, rule, profiled_score, threshold, owner, passes_threshold]
+    additionalProperties: false
+    properties:
+      dimension:
+        enum: [completeness, accuracy, consistency, uniqueness, timeliness, validity]
+        description: "Atlas's own §12.39 six-dimension vocabulary, transcribed verbatim (lower-cased for a machine enum)."
+      rule:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own 'rules' formula step -- free text, e.g. 'customer_email must be non-null for active accounts'. No invented rule grammar (see method contract compilation_decisions)."
+      profiled_score:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+        description: "Atlas's own 'profiling' formula step -- a single normalized [0.0, 1.0] measurement of how well this profiling run satisfied the rule. Finite-ness (rejecting Infinity/NaN) is enforced at the runtime layer, not expressible in JSON Schema's own numeric type."
+      threshold:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+        description: "Atlas's own 'threshold' formula step -- the minimum acceptable profiled_score."
+      owner:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own 'owner' formula step -- the accountable party for this specific dimension rule."
+      passes_threshold:
+        type: boolean
+        description: "GENUINE COMPUTE, not caller-supplied -- profiled_score >= threshold, re-derived at the runtime layer (ai_lego/modules/database_data/data_quality_dimensions.py), not trusted from a stored value."
+
+type: object
+required: [id, version, dataset_or_topic, dimensions, quality_gate_status, quarantined_dimensions, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^DQ-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.data_quality_dimensions"
+  dataset_or_topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which dataset this assessment covers, e.g. 'checkout-api.order-events (Kafka topic)'."
+  dimensions:
+    type: array
+    minItems: 1
+    description: "Atlas's own six-dimension formula, applied as a subset (Atlas's own qualifier is '通常包括' -- usually includes -- not a mandatory full six; see method contract compilation_decisions). Repeat dimension values are legal (multiple independent rules under the same dimension)."
+    items:
+      $ref: "#/$defs/dimension_assessment"
+  quality_gate_status:
+    enum: [PASS, QUARANTINED]
+    description: "GENUINE COMPUTE, not caller-supplied -- PASS iff every dimensions[] entry's own passes_threshold is true, else QUARANTINED. Resolves Atlas's own 'quarantine' formula step and its own benefit line ('任何統計、ML、策略分析前的 mandatory gate')."
+  quarantined_dimensions:
+    type: array
+    default: []
+    description: "GENUINE COMPUTE. The full dimensions[] entries (not references) whose own passes_threshold is false -- self-contained evidence, the same 'evidence travels with the finding' convention database_data.reconciliation's own resolution-carrying checks and database_data.normalization's own violation lists already establish."
+    items:
+      $ref: "#/$defs/dimension_assessment"
+  schema_ref:
+    type: string
+    pattern: "^ERD-"
+    description: "OPTIONAL soft link to a database_data.erd record -- one of the four 'Data Gate' pillars (L4379). Format-only: this method cannot see the referenced record."
+  lineage_ref:
+    type: string
+    pattern: "^DLR-"
+    description: "OPTIONAL soft link to a database_data.data_lineage record -- one of the four 'Data Gate' pillars (L4379). Format-only."
+  restore_drill_ref:
+    type: string
+    pattern: "^DRILL-"
+    description: "OPTIONAL soft link to a database_data.backup_restore_drill record -- one of the four 'Data Gate' pillars (L4379). Format-only."
+  data_contract_ref:
+    type: string
+    pattern: "^DC-"
+    description: "OPTIONAL soft link to a database_data.data_contract record -- resolves that method's own OQ-DC-2 (its own 'Quality' formula step, forward-pointing to this method before it existed). Format-only."
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    const: "ai_lego.compute.data_quality.gate.evaluate_dimensions"
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- quality_gate_status is a deterministic computation, the same class every genuine_compute record in this package already carries."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A dataset with two dimensions: Completeness passes, Accuracy fails and is quarantined -- overall gate QUARANTINED, all four soft links populated"
+    value:
+      id: "DQ-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_quality_dimensions"
+      dataset_or_topic: "checkout-api.order-events (Kafka topic)"
+      dimensions:
+        - {dimension: completeness, rule: "customer_id must be non-null for every event", profiled_score: 0.98, threshold: 0.95, owner: "checkout-platform-team", passes_threshold: true}
+        - {dimension: accuracy, rule: "total_cents must equal sum of line items within 1 cent", profiled_score: 0.80, threshold: 0.99, owner: "checkout-platform-team", passes_threshold: false}
+      quality_gate_status: "QUARANTINED"
+      quarantined_dimensions:
+        - {dimension: accuracy, rule: "total_cents must equal sum of line items within 1 cent", profiled_score: 0.80, threshold: 0.99, owner: "checkout-platform-team", passes_threshold: false}
+      schema_ref: "ERD-2026-09-05-001"
+      lineage_ref: "DLR-2026-09-05-001"
+      restore_drill_ref: "DRILL-2026-09-05-001"
+      data_contract_ref: "DC-2026-09-05-001"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.data_quality.gate.evaluate_dimensions"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "A minimal single-dimension assessment with no optional soft links, gate PASS"
+    value:
+      id: "DQ-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.data_quality_dimensions"
+      dataset_or_topic: "internal-reference.country-codes"
+      dimensions:
+        - {dimension: uniqueness, rule: "iso_code must be unique across all rows", profiled_score: 1.0, threshold: 1.0, owner: "data-platform-team", passes_threshold: true}
+      quality_gate_status: "PASS"
+      quarantined_dimensions: []
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.data_quality.gate.evaluate_dimensions"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L904) and §12.39 (L3066-3082) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 'rules→profiling→threshold→quarantine→owner' formula and the six-dimension list are directly transcribed. Dimension enum membership, score/threshold finiteness, passes_threshold/quality_gate_status/quarantined_dimensions recomputation, and all four soft-link prefix formats are enforced at the runtime layer (ai_lego/modules/database_data/data_quality_dimensions.py), not the schema layer. No mother document was modified."

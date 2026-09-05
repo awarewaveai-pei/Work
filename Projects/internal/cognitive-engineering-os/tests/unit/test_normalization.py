@@ -474,9 +474,10 @@ class GateMutationTests(unittest.TestCase):
 
     # --- genuine_compute gate (shared function, reused unchanged) ---
     def test_genuine_compute_gate_is_the_real_evaluate_statistical_gate_function_reused_unchanged(self):
-        """Proves the reuse is real function identity -- seventh reuse this session, after root_cause.pareto/
-        decision.ahp/decision.mcda/devops_sre.error_budget/database_data.data_lineage/database_data
-        .reconciliation."""
+        """Proves the reuse is real function identity -- eleventh reuse this session (CORRECTED post-critic-
+        review of the following slice; real chain: root_cause.pareto/decision.ahp/decision.mcda/devops_sre
+        .error_budget/database_data.data_lineage/database_data.reconciliation/devops_sre.capacity_model
+        /devops_sre.load_test/devops_sre.stress_test/devops_sre.soak_test)."""
         from ai_lego.modules.database_data import normalization as normalization_module
 
         self.assertIs(normalization_module.evaluate_statistical_gate, evaluate_statistical_gate)

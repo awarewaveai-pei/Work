@@ -1451,7 +1451,13 @@ tier_1:
       established, applied here from the first draft (not discovered
       by a critic round). Reuses ai_lego.modules.research.gates
       .evaluate_statistical_gate UNCHANGED for the genuine_compute gate
-      (seventh reuse this session). The record's own `NORM-` id prefix
+      (eleventh reuse this session -- CORRECTED post-critic-review of
+      the following slice, database_data.data_quality_dimensions,
+      whose own critic round found this file's "seventh" and that
+      slice's own first-draft "eighth" both undercounted against the
+      real import chain: pareto/ahp/mcda/error_budget/data_lineage
+      /reconciliation/capacity_model/load_test/stress_test/soak_test
+      /normalization/data_quality_dimensions). The record's own `NORM-` id prefix
       is checked at both the builder and the gate from the first draft,
       applying the exact lesson database_data.data_contract's own
       critic round forced onto that slice as a Major finding.
@@ -1464,6 +1470,63 @@ tier_1:
       later critic round. Tier 1, mandated by the actively-running
       implementation slice, same category as the thirty-eight entries
       above it.
+  fortieth_concrete_entry:
+    # NEW (2026-09-06, same session): fortieth Tier 1 entry, same
+    # additive-key rationale as the thirty-nine entries above it. A
+    # critic review of THIS entry's own slice found the contract's own
+    # decided_by claimed this registration already existed when it did
+    # not -- the second occurrence of that exact class this session
+    # (first: database_data.data_contract, commit 72b47cd0d). Added
+    # here for real, with a golden-suite parity check flagged as a
+    # follow-up (see WORKLOG) so a third occurrence is caught
+    # mechanically rather than by a critic reading two files by hand.
+    method_id: "database_data.data_quality_dimensions"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. EIGHTH entry
+      from the `database_data` family (F21), after database_data
+      .backup_restore_drill, database_data.data_lineage, database_data
+      .expand_contract_migration, database_data.reconciliation,
+      database_data.erd, database_data.data_contract, and
+      database_data.normalization. Directly closes database_data
+      .data_contract's own OQ-DC-2. Atlas gives this method FIVE
+      citations (F21 table row L904, dedicated §12.39 section
+      L3066-3082 with its own six-dimension list, the §10 Causal
+      recipe row L1108, a 分析導向 recipe chain L3644-3654, and the
+      §26-area "Data 正確"/"Data Gate" row L4379 naming this method one
+      of four pillars alongside database_data.erd/data_lineage
+      /backup_restore_drill, all three already built) -- a critic
+      review additionally found two normative-document citations this
+      contract's own first-draft due-diligence had missed (Master
+      Plan §35 Data Quality Engine's own nine-item statistical/ML
+      pre-analysis checklist, and Execution Contract §30 Data
+      Integrity Contract's own "Quarantine Policy" element), both
+      added post-critic-review with a disclosed compilation_decision
+      explaining why this method keeps Atlas's own six-dimension
+      governance vocabulary rather than adopting MP §35's different,
+      ML-specific nine-item one. `passes_threshold`/`quality_gate
+      _status` are genuine compute (a `>=` comparison), never
+      caller-supplied parameters. Reuses ai_lego.modules.research.gates
+      .evaluate_statistical_gate UNCHANGED (twelfth reuse this
+      session, corrected from a first-draft miscount -- see the prior
+      entry's own correction). Four optional format-only soft links
+      (schema_ref/lineage_ref/restore_drill_ref/data_contract_ref)
+      resolve the Data Gate quartet and OQ-DC-2 by reference rather
+      than re-modeling structure. This record's own `DQ-` id prefix,
+      `version` type, and score/threshold finiteness bounds were
+      checked at BOTH runtime layers from the FIRST draft, applying
+      the lessons database_data.normalization's and devops_sre
+      .capacity_model's own critic rounds each had to learn the hard
+      way.
+    source: "methods/contracts/database_data.data_quality_dimensions.contract.yaml (built same session as this entry, mints machine_id database_data.data_quality_dimensions) + specs/cognitive/typed-objects/data-quality-assessment-record.schema.yaml (new output type) + ai_lego/compute/data_quality/gate.py (new compute module)"
+    note: >
+      Not placed under `tier_0`: Atlas's own dedicated §12.39 section
+      is thin (a six-item list plus purpose/benefit, no numbered
+      protocol beyond the F21 row's own formula), the same tier every
+      prior Tier 1 `database_data` entry already establishes. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the thirty-nine entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

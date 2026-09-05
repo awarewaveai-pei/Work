@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-06（續55，同一 session：Cognitive OS 第四十二個 Method Atlas 切片 — `database_data.data_quality_dimensions`，F21 家族第八成員；直接解答 `database_data.data_contract` 的 OQ-DC-2；critic verdict **FAIL**：2 個 Critical，1 個是本 session 第二次重演的「宣稱已註冊 contract-backlog 但實際沒做」、1 個是 due-diligence 沒查姊妹母文件漏掉兩筆真引用；已修正並開 follow-up task 機械化防止第三次重演）
+
+**觸發**：操作者「繼續做 直到完美完成 Cognitive Engineering OS」。承接 WORKLOG 續54 的候選清單，選 `database_data.data_contract` 自己的 `OQ-DC-2`（F21 table Data Quality Dimensions 列，data_contract 自己的「Quality」步驟前向指稱的天然夥伴）。1 個 critic subagent（未使用 Workflow 工具，符合操作者一貫要求）。
+
+**選型與設計**：Atlas 給本方法五筆引用（F21 table L904「rules→profiling→threshold→quarantine→owner」＋ §12.39 專節 L3066-3082 六維度列表＋ §10 Causal recipe 列 L1108＋分析導向 recipe chain L3644-3654＋ §26 區「Data 正確」列 L4379，點名本方法是「Data Gate」四支柱之一，另三支柱 `database_data.erd`／`data_lineage`／`backup_restore_drill` 本 session 皆已建）。`passes_threshold`（每維度）與 `quality_gate_status`（整體）皆為真計算（`profiled_score >= threshold`），builder 公開介面連參數都不開放。四個選填欄位皆格式檢查 soft link：`schema_ref`（ERD-）、`lineage_ref`（DLR-）、`restore_drill_ref`（DRILL-）— 合起來解答 L4379 的 Data Gate 四支柱剩餘三個 — 以及 `data_contract_ref`（DC-，解答 OQ-DC-2，欄位加在本記錄自己身上指回去，非回頭改 data_contract 已出貨的 schema）。
+
+**critic 真跑（獨立重推引用查證含姊妹母文件、真實執行、mutation testing）：verdict FAIL，2 個 Critical**：
+
+1. **Critical，本 session 第二次重演**：`decided_by` 宣稱已在 `contract-backlog.yaml` `tier_1` 註冊為第四十筆，grep 零命中，`tier_1` 序數止於 `thirtyninth_concrete_entry`（`database_data.normalization`）——跟兩個切片前 `database_data.data_contract`（commit `72b47cd0d`）一模一樣的失守類別，AGENTS.md 明文「同一 reviewer 對同一段 code 連續回報 2 次→第 3 次修正前先寫不變量分析」的門檻已達（第 2 次）。已補上真正的 `fortieth_concrete_entry`；另開 follow-up task（見下）機械化防止第三次重演，不再只靠 critic 人工比對兩個檔案。
+2. **Critical**：due-diligence 只查過 Atlas 母文件，沒查姊妹母文件——更廣 grep 找到兩筆真引用：(a) Master Plan §35「Data Quality Engine」（L1807-1821，九項 ML/統計預分析檢查：Missing Values／Duplicates／Outliers／Impossible Values／Data Type Error／Sampling Bias／Leakage／Class Imbalance／Distribution Shift，附一條硬規則跟 Atlas 自己的 benefit 句「防垃圾資料造成高信心結論」同一原則）；(b) Execution Contract §30「Data Integrity Contract」（L1154-1165，「Quarantine Policy」是六個必要元素之一——Atlas 自己「quarantine」步驟在遷移語境下的權威定義，姊妹契約 `database_data.reconciliation` 已引用過同一節）。兩筆補進 `source_of_truth_for`，新增 compilation_decision 說明為何維持 Atlas §12.39 自己的六維度詞彙、不吸收 MP §35 的九項詞彙——兩份清單回答的是不同問題（資料治理靜態品質維度 vs. 統計/ML 建模前檢查），不是同一清單的兩種措辭。
+
+4 Major 全修：「第八次重用」`evaluate_statistical_gate` 的宣稱錯誤，四處皆是——真實鏈（pareto/ahp/mcda/error_budget/data_lineage/reconciliation/capacity_model/load_test/stress_test/soak_test/normalization/data_quality_dimensions）本方法其實是第十二次，同款錯誤在上一個切片 `database_data.normalization` 自己的 docstring／backlog entry 也存在（宣稱「第七次」實際第十一次），一併修正；`devops_sre.sli_slo` 被誤稱跟本方法同款「測量值 vs 門檻」形狀——`sli_slo` 自己的 `slo_target` 其實是自由文字、完全沒有測量值或比對，真正最接近的手足是從未被查過的 `devops_sre.load_test`／`soak_test`／`stress_test`，已修正措辭；突變測試證明 `dimensions` 與 `quarantined_dimensions` 的「不共用物件」保證零測試覆蓋（正是上一個切片 `database_data.normalization` 剛出過的同款真 bug 類別）——已補物件身分測試；突變測試證明六個 Atlas 維度中兩個（`consistency`／`timeliness`）從未被任何測試碰過，且 module 與 schema 的兩份 enum 副本沒有互相比對——已補全六維度 round-trip + parity 測試。5 Minor 全修（測試命名與實際行為不符、`>=` 邊界只靠意外命名的測試防守、gate 層 exact-key-set 檢查只靠下游 recomputation-mismatch 間接防守、contract 引用排除清單列舉不完整、`math.isfinite` 防護宣稱誇大）。1 Suggestion 採納：新增 compilation_decision 明說本方法的 genuine-compute gate 只能證明「內部一致性」非「測量真實性」。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.data_quality_dimensions.contract.yaml`＋`specs/cognitive/typed-objects/data-quality-assessment-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortieth_concrete_entry`（含修正 `thirtyninth_concrete_entry` 自己的引用次數錯誤）＋重新產生 `SPEC_QUICKREF.md`；`database_data.data_contract.contract.yaml` 的 `OQ-DC-2` 標記 ANSWERED（經不同機制解答）。Product root 新增 `ai_lego/compute/data_quality/gate.py`＋`ai_lego/modules/database_data/data_quality_dimensions.py`（builder＋3 gate）＋`ai_lego/apps/cli/run_data_quality_dimensions_slice.py`＋`tests/unit/test_data_quality_dimensions.py`（76 tests）＋`docs/FORTYSECOND_SLICE_DATABASE_DATA_DATA_QUALITY_DIMENSIONS.md`；`modules/database_data/__init__.py` docstring；`modules/database_data/normalization.py`＋`tests/unit/test_normalization.py` 的引用次數錯誤同步修正。`agency-os/TASKS.md` 切片條目。另開兩個 spawn_task follow-up：全庫 schema-examples 驗證規則（上個切片開的，操作者已在另一 session 啟動）、contract-backlog 註冊對齊機械檢查（本次新開）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2812→2815
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_data_quality_dimensions_slice` | exit=0 | result=`PASS database_data.data_quality_dimensions: order_events=QUARANTINED (2 dimensions, 1 quarantined), reference=PASS, gates [3×PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_data_quality_dimensions`（修正後重跑）| exit=0 | result=76 OK（72→76）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_normalization`（回歸重跑，因同步修正該檔引用次數）| exit=0 | result=88 OK，零回歸
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，修正後重跑）| exit=0 | ms=95129 | result=**1543 tests OK**（1467→1543，含上一個切片 88 個既有＋本切片 76 個新增，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，獨立重推引用查證含姊妹母文件、真實執行、mutation testing）| verdict=FAIL → 2 Critical 全修＋4 Major 全修＋5 Minor 全修＋1 Suggestion 採納 | findings=2c/4m/5minor+1suggestion
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`database_data[.]data_quality_dimensions\|DataQualityAssessmentRecord\|DATAQUALITY_INVALID\|DATAQUALITY_EMPTY\|evaluate_dimensions\|fortieth_concrete_entry` | hits=14（本切片自己 13 個檔案 + `normalization.py` 交叉修正 1 個，過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-DQD-1~4` 皆揭露；四個 soft-link 皆未與本記錄自己的 `dimensions[]`/`dataset_or_topic` 交叉驗證；MP §35 九項詞彙刻意不吸收進本方法（屬未來獨立方法的範疇）；gate 只證明內部一致性非測量真實性（本 session 每個 genuine-compute 記錄的共同已知限制，本次首次明說）。歷史上 `devops_sre.capacity_model` 自己 backlog entry／test 檔的「第八次重用」宣稱同款錯誤（應為第七次）判定為本次範圍外的既存問題，未動手修（非本切片引入、非本輪 critic 指名）。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
 ## 2026-09-06（System Foundry：正式逐節比對藍圖 8 個候選缺口，確認 5 個真缺口，第一個 Pricing/Promotions 落地）
 
 [根因/決策] 前一輪（②Returns/RMA）critic 覆審後，操作者質疑「藍圖資料夾裡提到的架構都整合了嗎」——查證後回報僅 13 個缺口有正式比對過，另外用關鍵字 grep 找到 8 個候選但未逐節查證。操作者指出：藍圖是「要建置的系統內容」，缺口代表 System Foundry 產生的系統架構會比預想的單薄，要求正式逐節比對＋確認的真缺口全部照 Returns/RMA 同等流程做掉（非本次一次做完，逐一序列化執行避免像 `d51624f13` 一次塞43個capability又漏依賴邊）。

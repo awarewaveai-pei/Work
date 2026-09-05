@@ -1,0 +1,414 @@
+$id: "ai-lego://methods/contracts/database_data.data_quality_dimensions.contract.yaml"
+title: "Data Quality Dimensions Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-second Method Atlas slice, EIGHTH from
+  the `database_data` family (F21's own "資料庫／資料套件 (DB / Data
+  Pack)"), after `database_data.backup_restore_drill` (twenty-fifth),
+  `database_data.data_lineage` (twenty-eighth), `database_data
+  .expand_contract_migration` (thirtieth), `database_data.reconciliation`
+  (twenty-ninth), `database_data.erd` (thirty-ninth), `database_data
+  .data_contract` (fortieth), and `database_data.normalization`
+  (forty-first). Directly closes `database_data.data_contract`'s own
+  `OQ-DC-2`.
+
+  Atlas gives this method FIVE citations, broad grep from the start
+  (applying the lesson every prior slice in this family had to learn --
+  three separate rounds each initially undercounted a citation): (1)
+  the F21 tool table's Data Quality Dimensions row (L904: purpose "檢查
+  完整/準確/一致/唯一/時效/有效"; usage "rules→profiling→threshold→
+  quarantine→owner"; benefit "防垃圾資料造成高信心結論"); (2) a
+  dedicated §12.39 資料品質維度 section (L3066-3082: the SAME six
+  dimensions spelled out as an explicit English list -- Completeness,
+  Accuracy, Consistency, Uniqueness, Timeliness, Validity -- purpose
+  "任何統計、ML、策略分析前的 mandatory gate", benefit "防止 garbage
+  in → confident garbage out"); (3) the Method Selection Engine's own
+  Causal problem-type recipe row (§10, L1108: "DAG→Data Quality→
+  Identification→Compute→Sensitivity"), naming this method as the
+  SECOND recommended step in any causal-analysis workflow, right after
+  `root_cause.dag`; (4) a "分析導向" (analysis-oriented) recipe chain
+  (L3644-3654: "Question→Dataset→Data Quality→DAG→Statistics→
+  Sensitivity→MCDA"), independently confirming the same "Data Quality
+  gates everything downstream" positioning; (5) the §26-area system-wide
+  architecture invariant table's own "Data 正確" row (L4379: "Schema/
+  Data Quality/Lineage/Restore 可驗證" verified by a "Data Gate") --
+  naming this method as ONE OF FOUR PILLARS of data correctness
+  alongside `database_data.erd` (Schema), `database_data.data_lineage`
+  (Lineage), and `database_data.backup_restore_drill` (Restore) -- ALL
+  THREE already built this session.
+
+  Due-diligence search, broad from the start: case-insensitive
+  spec-root and mother-document greps for "data quality"/"completeness"
+  /"accuracy"/"consistency"/"uniqueness"/"timeliness"/"validity"/
+  "profiling"/"quarantine". Real neighbours found in the mother document
+  and confirmed distinct: L685/767/900/908/1925 "consistency" (Cross-
+  impact Analysis's own scenario consistency, the F21 table row's own
+  benefit-column "一致性", and `decision.ahp`'s own Consistency Ratio --
+  a pairwise-comparison quality metric, already-built or unrelated
+  methods in a different sense of the word); L1731/2771 "validity"
+  (statistical/construct validity in a research-methodology sense --
+  measurement validity, not data-quality validity); L4178/4181
+  "completeness"/"accuracy" (Provenance completeness and Method-
+  selection accuracy -- epistemic-label and meta-evaluation concepts,
+  not this method's own data-quality dimensions); L3095/4118 "隔離"
+  (isolation, in an incident-response and a data-classification sense,
+  not this method's own "quarantine" formula step).
+
+  **CORRECTED post-critic-review**: the first draft's own due diligence
+  covered only the Atlas mother document, missing two directly relevant
+  citations in this spec root's own sibling normative documents (the
+  SAME two documents `database_data.reconciliation`'s and
+  `database_data.data_contract`'s own contracts already cite for
+  adjacent reasons): (1)
+  `AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md` §35 Data
+  Quality Engine (L1807-1821) -- a NINE-item automated pre-analysis
+  checklist (Missing Values, Duplicates, Outliers, Impossible Values,
+  Data Type Error, Sampling Bias, Leakage, Class Imbalance,
+  Distribution Shift) with its own hard rule, "不得在資料品質嚴重異常時
+  直接得出高信心結論" (must not draw a high-confidence conclusion while
+  data quality is severely abnormal) -- the SAME underlying principle
+  as Atlas's own F21 benefit line ("防垃圾資料造成高信心結論"), but a
+  GENUINELY DIFFERENT, ML/statistics-specific vocabulary from Atlas
+  §12.39's own six classic data-governance dimensions (see
+  compilation_decisions for why this contract keeps Atlas's own
+  vocabulary rather than adopting MP §35's); (2)
+  `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md`
+  §30 Data Integrity Contract (L1154-1165) -- names "Quarantine Policy"
+  as one of six required elements of any data change's own integrity
+  contract, the authoritative EC-level grounding for Atlas's own
+  "quarantine" formula step in a migration-specific context (this
+  method's own quarantine mechanism applies more generally, to any
+  dataset quality check, not only migrations -- consistent with, not
+  contradicting, EC §30's narrower scope). EC §28 (L1077-1116, the
+  Expand-Contract Migration "唯一正本" already cited by
+  `database_data.expand_contract_migration`) was also checked in full
+  and confirmed to have no Data Quality step of its own -- no citation
+  owed there.
+
+  No duplicate typed object or compute module found in the spec root.
+  **CORRECTED post-critic-review**: the first draft's own claim that
+  `devops_sre.sli_slo` shares this method's own "measured value vs.
+  threshold" shape is FALSE -- `sli_slo`'s own `slo_target` is a
+  free-text string (e.g. "p99 < 300ms，30 天滾動窗口") with no measured-
+  value field and no comparison anywhere in that record; read again in
+  full to confirm. The genuinely closest structural analogues are
+  `devops_sre.load_test`/`devops_sre.soak_test`/`devops_sre
+  .stress_test` (each compares a real MEASURED value against a caller-
+  supplied acceptance threshold to derive a pass/fail-shaped status) --
+  read in full and confirmed a different DOMAIN (system performance
+  under load, not data-quality profiling). `devops_sre.capacity_model`'s
+  own low/high threshold pair remains a genuinely different domain too
+  (a three-way banding of a COMPUTED headroom ratio from a workload
+  projection, not a measured-vs-declared threshold).
+
+  This method's own formula ("rules→profiling→threshold→quarantine→
+  owner") is GENUINE COMPUTE, the same class `database_data
+  .reconciliation`/`devops_sre.capacity_model`/`database_data
+  .normalization` already established: `passes_threshold` (per
+  dimension) and the overall `quality_gate_status` are NOT caller-
+  supplied -- always derived from each dimension's own raw
+  `profiled_score`/`threshold`, re-verified fresh at the gate layer.
+  FOUR optional fields are format-only soft links to already-built
+  sibling records, resolving the two real pairings found above rather
+  than re-modeling structure: `schema_ref` (`ERD-`, `database_data
+  .erd`), `lineage_ref` (`DLR-`, `database_data.data_lineage`),
+  `restore_drill_ref` (`DRILL-`, `database_data.backup_restore_drill`)
+  -- together resolving the L4379 "Data Gate" quartet's other three
+  pillars -- and `data_contract_ref` (`DC-`, `database_data
+  .data_contract`), resolving `OQ-DC-2` (the field lives HERE, on the
+  newer record, pointing back at the older one, the SAME direction
+  every prior cross-`database_data`-slice soft link in this session
+  already uses -- `database_data.normalization`'s own `schema_ref` to
+  `erd`, `database_data.data_contract`'s own `schema_ref` to `erd`,
+  rather than retrofitting a new field onto an already-shipped, already
+  critic-reviewed sibling schema).
+
+  Atlas's own qualifier "核心通常包括" (the core USUALLY includes these
+  six) is read literally: `dimensions[]` requires AT LEAST ONE entry
+  from the closed six-value enum, not all six -- a caller assessing a
+  static reference table with no meaningful "Timeliness" dimension is
+  not forced to invent one. Multiple entries for the SAME dimension are
+  legal (e.g. two independent Completeness rules for two different
+  critical columns) -- Atlas's own formula names no one-rule-per-
+  dimension restriction.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Data Quality Dimensions row (L904): 'rules→profiling→threshold→quarantine→owner'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.39 資料品質維度 (L3066-3082): six dimensions (Completeness/Accuracy/Consistency/Uniqueness/Timeliness/Validity)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Method Selection Engine, Causal recipe row (L1108): 'DAG→Data Quality→Identification→Compute→Sensitivity'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md 分析導向 recipe chain (L3644-3654): 'Question→Dataset→Data Quality→DAG→Statistics→Sensitivity→MCDA'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §26-area architecture invariant table, 'Data 正確' row (L4379): 'Schema/Data Quality/Lineage/Restore 可驗證' verified by a 'Data Gate'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §35 Data Quality Engine (L1807-1821): nine-item ML/statistics pre-analysis checklist -- ADDED post-critic-review, missed by this contract's own first-draft due diligence; a genuinely different vocabulary from Atlas's own six dimensions, see compilation_decisions"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1154-1165): names 'Quarantine Policy' as a required element -- ADDED post-critic-review, the authoritative EC-level grounding for Atlas's own 'quarantine' formula step in a migration-specific context"
+  - "methods/registry/method-inventory.yaml Data Quality Dimensions entry: category 'F21 database-data', no machine_id -- this contract mints one"
+  - "ai_lego/modules/research/gates.py evaluate_statistical_gate -- reused UNCHANGED for the genuine_compute gate, TWELFTH reuse this session -- CORRECTED post-critic-review from a first-draft miscount ('eighth'); real chain: pareto/ahp/mcda/error_budget/data_lineage/reconciliation/capacity_model/load_test/stress_test/soak_test/normalization/data_quality_dimensions"
+  - "specs/cognitive/typed-objects/{erd-record,data-lineage-record,backup-restore-drill-record,data-contract-record}.schema.yaml -- reused by reference for the four optional soft-link fields"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  fortieth concrete entry. `id: database_data.data_quality_dimensions`
+  mints a new machine_id, EIGHTH member of the `database_data` family.
+
+id: database_data.data_quality_dimensions
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating a dataset's own data quality into per-
+# dimension rule/profile/threshold entries is DECOMPOSE; the pass/fail
+# derivation and overall gate status computation IS the validation act
+# itself -- the same inferred pair `database_data.normalization`'s own
+# contract already uses for a method whose formula's own back half is
+# a derived classification, not an independently-assigned role.
+
+purpose:
+  - assess_a_dataset_against_one_or_more_data_quality_dimensions_and_derive_a_pass_or_quarantine_gate_status_from_measured_profiling_against_declared_thresholds
+inputs:
+  required: [DimensionAssessmentSet]
+  optional: [SchemaReference, LineageReference, RestoreDrillReference, DataContractReference]
+outputs: [DataQualityAssessmentRecord]
+preconditions:
+  - "dataset_or_topic is a non-empty string"
+  - "dimensions has at least 1 entry; every entry's own dimension is one of {completeness, accuracy, consistency, uniqueness, timeliness, validity}; rule and owner are non-empty strings; profiled_score and threshold are finite real numbers in the closed range [0.0, 1.0] (explicitly rejecting infinity/NaN, the same guard devops_sre.capacity_model's own critic-caught lesson already established for threshold-bearing fields)"
+  - "passes_threshold (per dimension entry) and quality_gate_status (overall) are NOT caller-supplied -- the builder computes them internally (profiled_score >= threshold per entry; quality_gate_status: PASS iff every entry passes, else QUARANTINED), and the gate independently re-derives and compares against the stored values, the same 'no parameter even lets a caller attempt to fake it' discipline devops_sre.capacity_model's own builder and database_data.normalization's own builder already establish"
+  - "quarantined_dimensions is NOT caller-supplied -- always the list of dimension entries whose own passes_threshold is false, re-derived at the gate layer"
+  - "schema_ref, when present, is a non-empty string beginning with ERD- (database_data.erd) -- a format-only soft link"
+  - "lineage_ref, when present, is a non-empty string beginning with DLR- (database_data.data_lineage) -- a format-only soft link"
+  - "restore_drill_ref, when present, is a non-empty string beginning with DRILL- (database_data.backup_restore_drill) -- a format-only soft link"
+  - "data_contract_ref, when present, is a non-empty string beginning with DC- (database_data.data_contract) -- a format-only soft link resolving OQ-DC-2"
+  # Preconditions 1-2 map onto 'rules'+'profiling'+'threshold'+'owner';
+  # 3-4 onto the derived 'quarantine' step; 5-8 onto the Data Gate
+  # quartet (L4379) and OQ-DC-2's own pairing.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  genuine_compute: true
+  # Same class of departure database_data.normalization's own contract
+  # already reasons through: passes_threshold/quality_gate_status are
+  # CALCULATED RESULTS (a >= comparison), not narrative claims needing
+  # evidence citations.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Data Quality Dimensions row.
+recommended_next: []
+# database_data.erd, database_data.data_lineage, database_data
+# .backup_restore_drill, and database_data.data_contract are all
+# ALREADY built and consumed here as real soft-link fields, not left as
+# bare recommended_next entries -- the same "turn a real pairing into a
+# field, not a narrative aside" discipline every prior database_data
+# contract in this session already establishes.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- any real remediation of a
+  # quarantined dataset happens outside this method's own scope, the
+  # same "record describes an external structure" class every prior
+  # database_data contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      ADDED post-critic-review. Master Plan §35 Data Quality Engine
+      (L1807-1821) names a NINE-item pre-analysis checklist (Missing
+      Values, Duplicates, Outliers, Impossible Values, Data Type Error,
+      Sampling Bias, Leakage, Class Imbalance, Distribution Shift) --
+      a genuinely different vocabulary from Atlas §12.39's own six
+      classic dimensions (Completeness/Accuracy/Consistency/Uniqueness
+      /Timeliness/Validity). Should this method's own `dimension` enum
+      be widened to the union of both lists, or replaced with MP §35's
+      own nine items?
+    decision: "Keep Atlas §12.39's own six-value enum unchanged. Do not merge or replace with MP §35's own vocabulary."
+    reasoning: >
+      The two lists answer genuinely different questions, not two
+      overlapping phrasings of the same one. Atlas §12.39's six
+      dimensions are the classic DATA-GOVERNANCE quality framework
+      (structural/consistency properties of a dataset AT REST, equally
+      meaningful for a single database table with no statistical or ML
+      use in mind -- e.g. "is customer_email ever null" is Completeness,
+      independent of any model). MP §35's nine items are a STATISTICS/
+      ML-SPECIFIC pre-modeling checklist (Outliers, Leakage, Class
+      Imbalance, and Distribution Shift are meaningless outside a
+      statistical/ML analysis context -- there is no "class imbalance"
+      in a customer address table). Atlas's own F21 tool table places
+      this method in the "資料庫／資料套件 (DB / Data Pack)" family
+      (F21), a general database-quality toolset, not inside any
+      statistics- or ML-specific pack -- the citation this contract's
+      own machine_id and family assignment are grounded in is §12.39,
+      not MP §35. Widening the enum to MP §35's own items would
+      silently absorb a DIFFERENT method's own subject matter (an ML
+      pre-analysis gate) into a database-quality record, the same
+      "inventing structure a different, uncited method actually owns"
+      class this package's own restraint discipline already guards
+      against elsewhere. MP §35's own checklist remains a real,
+      disclosed citation (this method's own benefit line and MP §35's
+      own hard rule state the identical underlying principle -- do not
+      draw high-confidence conclusions from bad data) without being
+      absorbed into this method's own field design; a future,
+      dedicated ML-pre-analysis method (if one is ever built) would be
+      the correct home for MP §35's own nine items, not a retrofit
+      here.
+  - question: >
+      This method's own gate re-derives `passes_threshold`/
+      `quality_gate_status` from the record's own raw `profiled_score`,
+      but has no way to verify the `profiled_score` itself was measured
+      honestly (a caller could invent a `profiled_score: 0.99` for a
+      column that is, in reality, 40% null). What does this method's
+      own genuine-compute guarantee actually cover?
+    decision: "The gate proves INTERNAL CONSISTENCY (the stored classification correctly follows from the stored scores), not MEASUREMENT TRUTH (that the stored scores themselves reflect reality)."
+    reasoning: >
+      ADDED post-critic-review, stating explicitly a limit every prior
+      genuine-compute record in this session shares implicitly:
+      `profiled_score` is itself caller-supplied input, the same
+      epistemic position `database_data.normalization`'s own
+      `functional_dependencies` occupies (trusted domain knowledge this
+      method cannot independently verify against real data it is never
+      given). An internally-consistent forgery (a caller inventing both
+      a `profiled_score` and letting the builder correctly derive
+      `passes_threshold` from it) passes every gate -- because it IS
+      internally consistent, which is the only thing genuine compute
+      can prove without direct access to the real dataset. This is not
+      a gap unique to this method; stating it here plainly is more
+      honest than leaving it implicit.
+  - question: >
+      Atlas's own formula names "rules" and "profiling" as separate
+      steps but gives no structured vocabulary for either (no rule
+      grammar, no profiling-tool output schema). Should this contract
+      invent one?
+    decision: "Free text for 'rule' (the human-readable expectation); a single normalized profiled_score in [0.0, 1.0] for 'profiling' (the measured result of applying that rule)."
+    reasoning: >
+      Atlas gives no rule grammar or profiling-tool schema to transcribe
+      (unlike database_data.erd's own attribute shape, which DOES have
+      a real referential-integrity structure to enforce). Inventing a
+      structured rule-condition language (e.g. parsing 'column X NOT
+      NULL') would be exactly the kind of unstated-assumption invention
+      this package's every prior contract already disciplines itself
+      against -- the same restraint database_data.erd's own free-text
+      constraints[] and database_data.data_contract's own free-text
+      compatibility_policy already establish. A single [0.0, 1.0] score
+      is the natural, engine-agnostic normalization of "how well did
+      this profiling run satisfy the rule" -- comparable to a threshold
+      without inventing units.
+  - question: >
+      Atlas's own qualifier reads "核心通常包括" (the core USUALLY
+      includes these six dimensions) -- should this method REQUIRE all
+      six dimensions to be assessed, or allow a subset?
+    decision: "A subset is legal -- dimensions[] requires at least 1 entry from the six-value enum, not all six."
+    reasoning: >
+      "通常" (usually) is Atlas's own qualifier, not "必須" (must). A
+      caller assessing a static reference table (e.g. a country-code
+      lookup) has no meaningful "Timeliness" dimension to profile;
+      forcing an invented, meaningless entry to satisfy an artificial
+      completeness requirement would be worse than allowing a genuinely
+      partial assessment. The mandatory-gate framing (Atlas's own
+      benefit line, "任何統計、ML、策略分析前的 mandatory gate") is
+      satisfied by requiring AT LEAST ONE real dimension, not by forcing
+      all six regardless of relevance.
+  - question: >
+      Should `dimensions[]` require a unique dimension value per entry
+      (at most one Completeness rule, at most one Accuracy rule, etc.),
+      or allow repeats?
+    decision: "Repeats are legal -- multiple entries may share the same dimension value."
+    reasoning: >
+      Atlas's own formula names no one-rule-per-dimension restriction,
+      and a real dataset commonly needs MULTIPLE independent rules under
+      the same dimension (e.g. a Completeness rule for column A and a
+      separate Completeness rule for column B). Inventing a uniqueness
+      restriction Atlas does not ask for would silently prevent a
+      legitimate, common real-world assessment shape.
+  - question: >
+      Should `quarantined_dimensions` store the FULL dimension entry
+      (rule/profiled_score/threshold/owner) or just a reference (e.g. an
+      index) into `dimensions[]`?
+    decision: "The full entry, duplicated inline."
+    reasoning: >
+      Atlas's own 'quarantine' step benefits directly from self-
+      contained evidence -- a consumer inspecting quarantined_dimensions
+      should not have to cross-reference back into dimensions[] by
+      position to understand WHY something was quarantined. This
+      mirrors database_data.reconciliation's own resolution-carrying
+      check entries and database_data.normalization's own self-
+      contained violation-list entries -- the family's own established
+      convention for "evidence should travel with the finding".
+  - question: >
+      §10's own Causal recipe row (L1108) recommends this method
+      immediately follow `root_cause.dag` -- should this record add a
+      soft link BACK to a `root_cause.dag` (or `causal.dag`) record, the
+      same direction database_data.normalization's own schema_ref
+      points at database_data.erd?
+    decision: "Not in this revision -- disclosed as OQ-DQD-4, not silently unlinked."
+    reasoning: >
+      Unlike the Data Gate quartet (L4379, a stable, closed four-member
+      set this contract already resolves in full) and OQ-DC-2 (an
+      EXPLICIT, already-filed forward pointer this contract directly
+      answers), the Causal recipe pairing is a RECOMMENDED SEQUENCE in
+      a problem-selection guide, not a data-correctness pairing this
+      method's own formula names. Adding a fifth soft-link field on
+      SPECULATION, without an existing filed OQ or a closed citation
+      set to bound it, risks exactly the kind of scope creep this
+      package's own restraint discipline already guards against
+      elsewhere. Disclosed as a real, findable pairing for a future
+      revision (or for `root_cause.dag`'s own contract to add the
+      pointer in the other direction) rather than silently ignored.
+
+open_questions:
+  - id: "OQ-DQD-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-DQD-2"
+    question: >
+      `profiled_score`/`threshold` are single normalized [0.0, 1.0]
+      values with no structured provenance of HOW the score was
+      computed (which profiling tool, what sample size, what population
+      the score is relative to). Should a future revision add
+      structured profiling metadata?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-DQD-3"
+    question: >
+      None of the four soft-link fields (schema_ref/lineage_ref/
+      restore_drill_ref/data_contract_ref) is cross-validated against
+      this record's own dimensions[] or dataset_or_topic -- a caller
+      could supply four refs describing an entirely unrelated dataset.
+      This method cannot see any referenced record's own content
+      (format-only soft link, the same declared limit every prior
+      soft-link field in this package already carries). Should a future
+      revision add a runtime cross-check?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-DQD-4"
+    question: >
+      §10's own Causal recipe row (L1108: "DAG→Data Quality→
+      Identification→Compute→Sensitivity") recommends this method
+      immediately follow a causal-DAG method (already built this
+      session as a graph-shaped method under a different family).
+      Should a future revision add a soft link, or should that method's
+      OWN contract add the pointer in the other direction instead (the
+      same direction database_data.normalization's own schema_ref
+      points backward at database_data.erd)?
+    owner: "operator, or whoever next revises either contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L904), §12.39 (L3066-3082), the
+    §10 Causal recipe row (L1108), the 分析導向 recipe chain
+    (L3644-3654), and the §26-area 'Data 正確' architecture invariant
+    row (L4379) directly. Broad case-insensitive grep across the full
+    mother document and spec root for "data quality"/"completeness"/
+    "accuracy"/"consistency"/"uniqueness"/"timeliness"/"validity"/
+    "profiling"/"quarantine" -- every non-citation hit read and
+    confirmed distinct (see description above). Read `devops_sre
+    .sli_slo` and `devops_sre.capacity_model` in full to confirm their
+    own threshold-comparison SHAPE is a genuinely different DOMAIN, not
+    a duplicate. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 'rules→profiling→threshold→
+    quarantine→owner' formula and the six-dimension list are both
+    directly transcribed. The single normalized [0.0, 1.0] profiled
+    -score/threshold shape, the subset-not-all-six dimension
+    requirement, repeat-dimension legality, and the self-contained
+    quarantined_dimensions evidence shape are all disclosed compilation
+    choices, not silent inventions -- see compilation_decisions above.
