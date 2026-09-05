@@ -1,0 +1,177 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/load-test-record.schema.yaml"
+title: Load Test Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LoadTestRecord` -- the
+  declared `outputs` of `devops_sre.load_test`'s Method Contract. TENTH
+  `devops_sre`-family typed object. Atlas's own F19 tool table formula
+  (L853: "baseline→target load→latency/errors/resources", benefit
+  "找性能瓶頸" -- find the performance bottleneck) maps onto TWO
+  measurements of identical shape (`baseline`, `target`), each carrying
+  the three observation classes the formula names (`latency_p95_ms`,
+  `error_rate`, `resource_utilization`), a caller-supplied `acceptance`
+  block whose field name transcribes the Execution Contract's own §73
+  Expected Result example (L2329: `p95_latency_ms_max`), and four
+  COMPUTED fields (`latency_ratio`, `error_rate_delta`, `bottleneck`,
+  `status`), all genuine deterministic compute
+  (`ai_lego.compute.load_test.comparison`), never caller-asserted.
+  Requiring BOTH measurements by construction is this record's own
+  encoding of EC §50 Performance Contract's closing rule (L1789: "不要用
+  單次 benchmark" -- never a single benchmark). Five real invariants
+  (target load strictly above baseline; identical resource sets in both
+  measurements; every number finite and in range; acceptance
+  thresholds valid; computed fields derived, never overridden) are
+  enforced at the runtime layer, not the schema layer -- see method
+  contract preconditions.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Load Test row (L853): 'baseline→target load→latency/errors/resources'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §73 Expected Result 必填, performance example (L2329: 'p95_latency_ms_max: 300') -- the `acceptance.latency_p95_ms_max` field name, transcribed not invented"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §50 Performance Contract (L1760-1789): 'Baseline→Target→Load Profile→Test→Compare→Accept/Reject', closing rule '不要用單次 benchmark' -- why baseline AND target are both required"
+  - "methods/contracts/devops_sre.load_test.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  load_measurement:
+    type: object
+    required: [load_rps, latency_p95_ms, error_rate, resource_utilization]
+    additionalProperties: false
+    properties:
+      load_rps:
+        type: number
+        minimum: 0
+        description: "Offered load in requests per second (EC §50's own 'throughput' observation, expressed as the driven load). target.load_rps must be STRICTLY greater than baseline.load_rps -- enforced at the runtime layer."
+      latency_p95_ms:
+        type: number
+        exclusiveMinimum: 0
+        description: "Atlas's own 'latency' observation, at the 95th percentile in milliseconds. Strictly positive (baseline is the divisor of latency_ratio)."
+      error_rate:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: "Atlas's own 'errors' observation, as a fraction of requests in [0, 1]."
+      resource_utilization:
+        type: object
+        minProperties: 1
+        description: "Atlas's own 'resources' observation: utilization fraction in [0, 1] per named resource (e.g. cpu, memory, db_connections -- EC §50's own CPU/memory/IO/DB/queue list is the natural key set, caller-defined). The SAME key set must appear in baseline and target -- enforced at the runtime layer."
+        additionalProperties:
+          type: number
+          minimum: 0
+          maximum: 1
+        propertyNames:
+          pattern: "\\S"
+
+type: object
+required: [id, version, system_under_test, baseline, target, acceptance, latency_ratio, error_rate_delta, bottleneck, status, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^LOADTEST-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.load_test"
+  system_under_test:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What was loaded, e.g. 'checkout-api v2.3 on staging'."
+  baseline:
+    $ref: "#/$defs/load_measurement"
+    description: "Atlas's own 'baseline' phase -- the measurement at the reference load."
+  target:
+    $ref: "#/$defs/load_measurement"
+    description: "Atlas's own 'target load' phase -- the measurement at the expected load being verified (purpose column: '驗證預期負載')."
+  acceptance:
+    type: object
+    required: [latency_p95_ms_max, error_rate_max]
+    additionalProperties: false
+    description: "Caller-supplied acceptance thresholds for the TARGET measurement. Atlas gives no numeric values; EC §73 L2329 gives the field-name shape (`p95_latency_ms_max: 300`) as a worked example, not a default -- see method contract compilation_decisions."
+    properties:
+      latency_p95_ms_max:
+        type: number
+        exclusiveMinimum: 0
+        description: "target.latency_p95_ms must be <= this (inclusive) for status:passed."
+      error_rate_max:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: "target.error_rate must be <= this (inclusive) for status:passed."
+  latency_ratio:
+    type: number
+    exclusiveMinimum: 0
+    description: "COMPUTED: target.latency_p95_ms / baseline.latency_p95_ms (ai_lego.compute.load_test.comparison.compare_load_measurements). The same 'p95 relative to baseline' quantity policies/provider/ai-gateway-fallback.policy.yaml's own trip condition uses with a multiplier of 3 -- reported here, NOT judged against that constant (different context, see method contract)."
+  error_rate_delta:
+    type: number
+    minimum: -1
+    maximum: 1
+    description: "COMPUTED: target.error_rate - baseline.error_rate."
+  bottleneck:
+    type: object
+    required: [resource, utilization]
+    additionalProperties: false
+    description: "COMPUTED (ai_lego.compute.load_test.comparison.find_bottleneck): the resource with the HIGHEST utilization at target load -- Atlas's own benefit column ('找性能瓶頸'). Ties resolve to the lexicographically smallest resource name, deterministically (see method contract compilation_decisions)."
+    properties:
+      resource:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      utilization:
+        type: number
+        minimum: 0
+        maximum: 1
+  status:
+    enum: [passed, failed]
+    description: "COMPUTED, entirely derived: passed iff target.latency_p95_ms <= acceptance.latency_p95_ms_max AND target.error_rate <= acceptance.error_rate_max (both inclusive). Never caller-asserted independently of that computation -- no conservative override, the same fully-derived discipline devops_sre.capacity_model's own status already establishes."
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted, importlib-resolvable path to the pure function that computed latency_ratio/error_rate_delta -- ai_lego.compute.load_test.comparison.compare_load_measurements."
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- latency_ratio/error_rate_delta/bottleneck/status are genuine deterministic compute, not a narrative claim."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A passed load test: 5x load, p95 doubled but under budget, db_connections is the bottleneck"
+    value:
+      id: "LOADTEST-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.load_test"
+      system_under_test: "checkout-api v2.3 on staging"
+      baseline: {load_rps: 100, latency_p95_ms: 120, error_rate: 0.001, resource_utilization: {cpu: 0.35, db_connections: 0.40, memory: 0.50}}
+      target: {load_rps: 500, latency_p95_ms: 240, error_rate: 0.004, resource_utilization: {cpu: 0.72, db_connections: 0.91, memory: 0.55}}
+      acceptance: {latency_p95_ms_max: 300, error_rate_max: 0.01}
+      latency_ratio: 2.0
+      error_rate_delta: 0.003
+      bottleneck: {resource: "db_connections", utilization: 0.91}
+      status: passed
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.load_test.comparison.compare_load_measurements"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "A failed load test: same load, p95 blew the budget"
+    value:
+      id: "LOADTEST-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.load_test"
+      system_under_test: "checkout-api v2.3 on staging"
+      baseline: {load_rps: 100, latency_p95_ms: 120, error_rate: 0.001, resource_utilization: {cpu: 0.35, db_connections: 0.40, memory: 0.50}}
+      target: {load_rps: 500, latency_p95_ms: 420, error_rate: 0.004, resource_utilization: {cpu: 0.72, db_connections: 0.98, memory: 0.55}}
+      acceptance: {latency_p95_ms_max: 300, error_rate_max: 0.01}
+      latency_ratio: 3.5
+      error_rate_delta: 0.003
+      bottleneck: {resource: "db_connections", utilization: 0.98}
+      status: failed
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.load_test.comparison.compare_load_measurements"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L853), EC §50 (L1760-1789) and EC §73's example (L2322-2334) directly. Validated against jsonschema Draft202012Validator."
+  note: "The baseline->target load->latency/errors/resources formula is directly transcribed into two identically-shaped measurements. latency_ratio/error_rate_delta/bottleneck/status are enforced-computed at the runtime layer (ai_lego/modules/devops_sre/load_test.py), not the schema layer; target>baseline load and identical resource sets are likewise runtime-enforced. No mother document was modified."

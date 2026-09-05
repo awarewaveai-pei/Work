@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-09-05（續48，同一 session：Cognitive OS 第三十五個 Method Atlas 切片 — `devops_sre.load_test`，critic warn：邏輯水密（70 萬 case oracle 零分歧）但三個 Major 全是「宣稱與證明」類）
+
+**觸發**：延續操作者「繼續完美完成這個系統」授權。1 個 critic subagent（額度檢查通過，前次成功後已 `clear`）。
+
+**選型**：`devops_sre` 家族第十成員（F19 10/13，剩 Stress Test／Soak Test／RTO-RPO）。Atlas F19 L853「baseline→target load→latency/errors/resources｜找性能瓶頸」。EC 有兩個真實兄弟，引用並對齊不重複：§50 Performance Contract（L1760-1789，「Baseline→Target→Load Profile→Test→Compare→Accept/Reject」＋「不要用單次 benchmark」→ 本記錄結構上強制 baseline＋target 兩筆量測）、§73 Expected Result 範例（L2329 `p95_latency_ms_max: 300`→ acceptance 欄位名轉錄，300 是範例非預設）。五個不變量：target load 嚴格大於 baseline、兩側資源集合相同、數值有限且在範圍內、acceptance 閾值有效且 **gate 重驗**（capacity_model 教訓從第一版套用）、四個計算欄位（`latency_ratio`／`error_rate_delta` 走 Decimal 精確、`bottleneck`＝target 最高使用率資源＋字典序 tie-break、`status` 全導出無覆寫）。新 compute 包 `ai_lego/compute/load_test/comparison.py`（入口守衛＋輸出有限性檢查從第一版就有）。
+
+**due-diligence 寬掃**：`ai-gateway-fallback.policy.yaml:59-62`「p95 > 3x baseline」＝同一個 ratio 但是 runtime 斷路器常數→只回報不套用（OQ-4）；`DEVOPS_SRE_PLAN.md` §2.1 p95 預算＝caller 輸入非常數；capacity_model OQ-2 標 PARTIALLY ANSWERED（觀測係數 soft link 仍未建，OQ-LOADTEST-3）；Phase-0 Stress Test／Stress Testing 同名異物；Atlas L557/L1609「系統負載」是因果迴路節點。
+
+**critic 真跑（36 runtime 突變、17 schema 層刪除、獨立 oracle 窮舉 705,600 種 (baseline, target, acceptance) 形狀＋浮點邊界掃描）：verdict warn，3 Major＋6 Minor，0 Critical**。核心水密：oracle 零分歧、每個 builder raise 都追到 gate 同函式、`$defs` 雙站 `$ref` 證明可解析、Decimal 效益屬實（`0.3/0.1` 原生 float 得 2.9999999999999996）、無發明規則。Major 全修：
+1. 「genuine_compute gate 第九次重用」是錯的——第八次。上游是 capacity_model 自己 docstring 寫「第八」卻只列六個前輩（monte_carlo 明寫不重用），本切片初稿繼承了 off-by-one。**兩處同一 commit 修正**（我自己先前的「計數屬實」自驗也算錯了——把 9 個含 load_test 的檔案當成 8 個前輩）。
+2. 17 條 schema 約束刪掉全綠（只釘了 4 條）。補 6 條高價值釘（`propertyNames`、頂層 `required`、`engine` const、acceptance `additionalProperties`、`error_rate_delta` 界、`computation_provenance_ref` pattern）；其餘是家族級 fixture 缺口（36 個 typed object 只有 29 個 fixture 檔）揭露不封。
+3. overflow 守衛經公開 API 可達（`5e-324` baseline p95 vs `1.7e308` target → inf）卻零測試，拔掉守衛／DecimalException handler／gate 的 except 全存活。補 3 個測試（compute／builder／gate）。
+Minor 全修：doc 誤稱頂層 key 集合「schema 層管」（實為無任何層管，家族 36 個 schema 只 3 個封頂層）；`generated_by_method` 可標錯無層察覺（家族級，補揭露）；「eight shared predicates」對不上任何實數（改「九個布林 predicate＋兩個」）；漏列兩個最近的 typed object 鄰居（`quality-attribute-scenario`、`sli-slo-set` 都編碼延遲預算，補區分）；`policy-inventory.yaml:267` 是 `kind: gate` 非 policy item；Master Plan L1776 `/stress_test/` 空佔位（補進 OQ-5）；doc 兩處 pending。critic 另提 stray `agency-os/` 樹（已在 TASKS，本切片不動）。另：初稿測試 helper `util or {...}` 把空 map 吃掉，critic 前自己抓到修掉。
+
+**本輪教訓**：從兄弟 docstring 抄來的序數是「宣稱」，宣稱會遺傳錯誤，唯一防線是重新數；只在沒有測試會建構的輸入上才觸發的守衛，跟死碼無法區分，直到有人建構那個輸入。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.load_test.contract.yaml`＋`specs/cognitive/typed-objects/load-test-record.schema.yaml`（含 `$defs/load_measurement`）＋`contract-backlog.yaml` `tier_1.thirtythird_concrete_entry`＋`devops_sre.capacity_model.contract.yaml` OQ-2 標 PARTIALLY ANSWERED＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/compute/load_test/{__init__,comparison}.py`＋`ai_lego/modules/devops_sre/load_test.py`＋`ai_lego/apps/cli/run_load_test_slice.py`＋`tests/unit/test_load_test.py`（75 tests）＋`docs/THIRTYFIFTH_SLICE_DEVOPS_SRE_LOAD_TEST.md`；`modules/devops_sre/__init__.py` docstring；`modules/devops_sre/capacity_model.py:159` 序數「Eighth→Seventh」。`agency-os/TASKS.md` 切片條目。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，契約定稿後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2789→2792
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_load_test_slice` | exit=0 | result=`PASS devops_sre.load_test: 100->500 rps, latency_ratio=2.0, error_rate_delta=0.003, bottleneck=db_connections@0.91, status=passed, gates [provenance_required=PASS, genuine_compute=PASS, load_test_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_load_test` | exit=0 | result=75 OK（66→75）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=96755（修正後重跑）| result=**1039 tests OK**（964→1039，零回歸；初稿 1030）
+- REVIEW_DONE: critic=Standard（真實 subagent，36 runtime＋17 schema 突變、705,600 形狀獨立 oracle）| verdict=warn→3 Major＋6 Minor 全修 | findings=0c/3m/6minor
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]load_test\|LoadTestRecord\|LOADTEST_` | hits=81（10 個檔案：9 個本切片自己＋capacity_model 契約既有 OQ-2 前向指稱已標註；`.claude/worktrees/` 1 命中為別 worktree 舊副本；過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-LOADTEST-1~5` 皆揭露；頂層 key 無任何層約束、`generated_by_method` 可標錯（皆家族級慣例，已揭露）；36 typed object 只 29 個 fixture 檔（家族級缺口，未在本切片封）。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
 ## 2026-09-05（soulfulexpression.org Cloudflare 流量異常查證 + 兩處監控冗餘修復：Uptime Kuma 檢查間隔、MainWP 內建 Uptime Monitor）
 
 **觸發**：操作者收到 Cloudflare 通知「上月 62,053 次 pageviews」，覺得「這網站應該不太可能有人看」，要求查清楚。

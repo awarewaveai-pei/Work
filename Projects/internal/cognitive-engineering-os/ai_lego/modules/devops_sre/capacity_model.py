@@ -156,7 +156,8 @@ def evaluate_provenance_required_gate(record: dict[str, Any], validator: str, ti
 def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
     provenance/computation_provenance_ref/engine, all of which CapacityModelRecord also carries at the top
-    level. Eighth reuse of this gate this session (after root_cause.pareto/decision.ahp/decision.mcda/
+    level. Seventh reuse of this gate this session (CORRECTED from "Eighth" by devops_sre.load_test's own
+    critic round -- the six predecessors listed here plus this module make seven; after root_cause.pareto/decision.ahp/decision.mcda/
     devops_sre.error_budget/database_data.data_lineage/database_data.reconciliation, and -- via the
     reconciliation-slice's own null-provenance fail-closed fix -- benefiting every prior reuser too)."""
     passed, evidence = evaluate_statistical_gate(record)

@@ -196,6 +196,11 @@ open_questions:
       field for that, the same class of cross-method reference
       `devops_sre.error_budget`'s own `related_slo_id` already
       established?
+      PARTIALLY ANSWERED 2026-09-05 (thirty-fifth slice):
+      `devops_sre.load_test` now exists, but its record carries observed
+      utilization FRACTIONS per resource, not a resource-units-per-
+      request coefficient -- the soft link is still not built; see that
+      contract's own OQ-LOADTEST-3 for the two candidate designs.
     owner: "operator, or whoever next builds devops_sre.load_test or devops_sre.stress_test"
     blocks: "nothing in this file's own validity"
   - id: "OQ-CAPACITYMODEL-3"

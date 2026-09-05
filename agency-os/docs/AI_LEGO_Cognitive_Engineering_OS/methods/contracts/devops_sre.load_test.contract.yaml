@@ -1,0 +1,302 @@
+$id: "ai-lego://methods/contracts/devops_sre.load_test.contract.yaml"
+title: "Load Test Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-fifth Method Atlas slice, TENTH from the
+  `devops_sre` family (F19), after `devops_sre.sli_slo` (twentieth),
+  `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth), `devops_sre.capacity_model`
+  (thirty-first), `devops_sre.release_readiness_review` (thirty-second),
+  `devops_sre.runbook_execution` (thirty-third), and
+  `devops_sre.game_day` (thirty-fourth).
+
+  Atlas gives this method exactly ONE citation of its own: the F19 tool
+  table's Load Test row (L853: purpose "驗證預期負載" -- verify the
+  expected load; usage "baseline→target load→latency/errors/resources";
+  benefit "找性能瓶頸" -- find the performance bottleneck). No dedicated
+  §11.x section exists (confirmed by direct read of the surrounding
+  table, L848-863; a full-Atlas grep for "負載" returns only this row,
+  its two sibling rows L854-855, and two causal-loop diagram nodes
+  "系統負載" at L557/L1609 that belong to system-dynamics examples, not
+  to this method).
+
+  The Execution Contract, however, carries TWO real siblings this
+  contract cites and aligns with rather than duplicates: (1) §50
+  Performance Contract (L1760-1789) -- the governance-side rule for
+  WHEN a change must be load-tested, with its own flow "Baseline→
+  Target→Load Profile→Test→Compare→Accept/Reject", an observation list
+  (latency, throughput, CPU, memory, IO, DB, queue, cost) and the
+  closing rule "不要用單次 benchmark" (never a single benchmark). Atlas
+  L853 is the METHOD that flow invokes; this contract's typed object
+  requires BOTH a baseline and a target measurement by construction --
+  a single measurement cannot form a `LoadTestRecord` -- which is
+  exactly §50's closing rule made structural. `policy-inventory.yaml:267`
+  (Phase 0) lists §50 as a `kind: gate` item with no policy-as-code file
+  built yet (confirmed: no `policies/**/performance*` exists), so no
+  duplicate artifact exists to reconcile against -- disclosed as
+  OQ-LOADTEST-2.
+  (2) §73 Expected Result 必填 (L2312-2334) -- its worked example
+  carries `performance: p95_latency_ms_max: 300` (L2329); this
+  contract's own `acceptance.latency_p95_ms_max` field TRANSCRIBES that
+  name (the `300` is a worked value in an example, not a default -- see
+  compilation_decisions).
+
+  Broad due-diligence search (case-insensitive spec-root greps for
+  "load test"/"負載測試"/"load_test", "bottleneck"/"瓶頸", "p95"/
+  "latency budget"/"throughput", "load profile"/"performance contract";
+  every neighbour read, each confirmed distinct): `policies/provider/
+  ai-gateway-fallback.policy.yaml:59-62` trips a circuit breaker on
+  "p95 latency > 3x rolling baseline" -- the SAME p95-relative-to-
+  baseline quantity this method computes as `latency_ratio`, but a
+  RUNTIME circuit-breaker rule with a fixed multiplier (transcribed from
+  `DEVOPS_SRE_PLAN.md` §4 L148), not a load-test acceptance criterion;
+  this contract reports the ratio and deliberately does NOT judge it
+  against that constant (OQ-LOADTEST-4 asks whether a ratio-based
+  acceptance mode should exist). `DEVOPS_SRE_PLAN.md` §2.1 (L78-84)
+  gives per-edition p95 latency BUDGETS (e.g. 2s p95 / 4s p99 for
+  Enterprise) -- exactly the kind of number a caller supplies as
+  `acceptance.latency_p95_ms_max`, not something this method
+  hard-codes. `REPOSITORY_ARCHITECTURE.md:324` uses p95 latency as a
+  service-extraction signal; `SEARCH_CONTENT_MVP_VERTICAL_SLICE.md:315`
+  lists "rate-limit/load test" as a checklist item; `computation
+  .monte_carlo`'s own P95 is a simulation percentile, not a latency.
+  `devops_sre.capacity_model`'s own OQ-CAPACITYMODEL-2 anticipated this
+  method as a source of an OBSERVED `resource_coefficient` -- this
+  record carries observed utilizations per resource, not a coefficient,
+  so that soft link is still not built (OQ-LOADTEST-3, and that OQ is
+  annotated accordingly). Phase-0 `verified-findings.yaml:1052` records
+  the near-name collision between F19's Stress Test (L854) and F12's
+  Stress Testing (L649); this method is neither -- F19's Stress Test
+  and Soak Test (L854-855) remain unbuilt siblings (OQ-LOADTEST-5).
+  ADDED post-critic-review, the two nearest TYPED OBJECTS that also
+  encode a latency budget: `specs/cognitive/typed-objects/quality-
+  attribute-scenario.schema.yaml:67,78` (a REQUIREMENT scenario --
+  "turning 'fast' into a testable latency scenario", e.g. `measure:
+  "p99 延遲 < 300ms"`) and `sli-slo-set.schema.yaml:72` (a rolling
+  PRODUCTION target -- "p99 < 300ms，30 天滾動窗口"); this record is a
+  MEASURED COMPARISON against a caller-supplied budget, which a QAS
+  may specify and an SLO may later monitor -- distinct objects, each a
+  legitimate source of `acceptance.latency_p95_ms_max`, neither a
+  duplicate. No duplicate typed object or method found; the search
+  that reached that conclusion is the broad one, recorded here.
+
+  Atlas's own formula and benefit ground FIVE real invariants: (1)
+  "baseline→target load" -- `target.load_rps` is STRICTLY greater than
+  `baseline.load_rps` (a target at or below the baseline is not a load
+  test of the expected load); (2) "resources" compared like-for-like --
+  both measurements report the SAME set of resource names (a bottleneck
+  found among resources only one side measured is not a comparison);
+  (3) every measured number is finite and in range (utilizations and
+  error rates in [0, 1], latencies strictly positive since the baseline
+  is a divisor); (4) `acceptance` thresholds are valid (finite, positive
+  latency budget, error budget in [0, 1]) -- re-verified by the gate,
+  not builder-only, applying the lesson `devops_sre.capacity_model`'s
+  own critic round taught; (5) `latency_ratio`, `error_rate_delta`,
+  `bottleneck`, and `status` are COMPUTED (`ai_lego.compute.load_test
+  .comparison`), never caller-supplied, and `status` is FULLY DERIVED
+  with no conservative override -- there is no operational-judgment
+  reading of "is this p95 at or under this budget" (the same reasoning
+  `devops_sre.capacity_model`'s own status already established).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Load Test row (L853): 'baseline→target load→latency/errors/resources'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §50 Performance Contract (L1760-1789): 'Baseline→Target→Load Profile→Test→Compare→Accept/Reject', observation list, and '不要用單次 benchmark' -- the governance-side rule this method serves; cited, not duplicated"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §73 Expected Result 必填, performance example (L2329: 'p95_latency_ms_max: 300') -- the acceptance field name, transcribed"
+  - "methods/registry/method-inventory.yaml Load Test entry (L1137-1141): category 'F19 devops-sre', line field reads 850 -- CORRECTED here to the real L853 position, the same systematic +3 drift already disclosed by eight prior contracts this session (Error Budget, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model, Release Readiness Review, Runbook Execution, Game Day), now observed a TENTH time"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-third concrete entry. `id: devops_sre.load_test` mints a new
+  machine_id, TENTH member of the `devops_sre` family.
+
+id: devops_sre.load_test
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, INFER]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating baseline from target and the three
+# observation classes from each other is DECOMPOSE; judging the target
+# against acceptance is VALIDATE; naming the most-saturated resource as
+# the bottleneck is INFER (all three are real members of
+# specs/cognitive/primitive.schema.yaml's own kernel enum, checked
+# before writing this line).
+
+purpose:
+  - verify_a_system_meets_its_expected_load_by_comparing_a_target_load_measurement_against_a_baseline_and_naming_the_most_saturated_resource_as_the_bottleneck
+inputs:
+  required: [BaselineLoadMeasurement, TargetLoadMeasurement, LoadAcceptanceThresholds]
+  optional: []
+outputs: [LoadTestRecord]
+preconditions:
+  - "system_under_test is a non-empty string"
+  - "baseline and target each carry exactly load_rps / latency_p95_ms / error_rate / resource_utilization; load_rps finite and >= 0, latency_p95_ms finite and > 0, error_rate finite in [0, 1], resource_utilization a non-empty map of non-empty resource names to finite fractions in [0, 1]"
+  - "target.load_rps is STRICTLY greater than baseline.load_rps"
+  - "baseline and target report the SAME set of resource names"
+  - "acceptance carries exactly latency_p95_ms_max (finite, > 0) and error_rate_max (finite, in [0, 1]) -- re-verified independently by the gate (ai_lego.modules.devops_sre.load_test._acceptance_is_valid), not builder-only"
+  - "latency_ratio, error_rate_delta, bottleneck, and status are all computed by ai_lego.compute.load_test.comparison plus the shared _derive_status predicate, never caller-supplied independently of that computation"
+  - "status:passed iff target.latency_p95_ms <= acceptance.latency_p95_ms_max AND target.error_rate <= acceptance.error_rate_max (both inclusive); status:failed otherwise -- FULLY DERIVED, no caller override"
+  # Preconditions 3-4 map onto Atlas's own 'baseline->target load' and
+  # 'resources' formula steps; 5-7 onto the 'latency/errors' observation
+  # and the benefit column. Same "structurally necessary, forbidden-
+  # state" class every prior genuine-compute contract this session
+  # built already establishes.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every genuine-compute contract in this
+  # package already reasons through: the real risk is computational
+  # integrity, not evidence-citation over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Load Test row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. Real, disclosed
+# (not built as chains) relationships: EC §50's own Accept/Reject step
+# consumes this record's `status`; `devops_sre.capacity_model` could
+# consume an observed coefficient derived from this record's own
+# utilizations (OQ-LOADTEST-3); F19's own Stress Test / Soak Test rows
+# extend the same measurement shape beyond the expected load
+# (OQ-LOADTEST-5).
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- the real load generation
+  # and any remediation of the named bottleneck happen outside this
+  # method's own scope, the same "record reports on an external
+  # observation" class every prior devops_sre contract's own rollback
+  # field already draws.
+
+compilation_decisions:
+  - question: >
+      EC §73's own example carries `p95_latency_ms_max: 300` and
+      `DEVOPS_SRE_PLAN.md` §2.1 carries per-edition p95 budgets -- should
+      this contract default `acceptance.latency_p95_ms_max` (or
+      `error_rate_max`) to any of those numbers?
+    decision: "No -- both acceptance thresholds are strictly required caller input, no default."
+    reasoning: >
+      `300` is a worked value inside an EXAMPLE block, and the §2.1
+      budgets are per-edition SLA figures for one specific product tier;
+      neither is a load-test constant Atlas states. Inventing a default
+      would be exactly the unstated-assumption invention this package's
+      every prior contract disciplines itself against -- the same
+      restraint `devops_sre.capacity_model`'s own thresholds and
+      `database_data.backup_restore_drill`'s own RTO/RPO fields already
+      established. Only the field NAME is transcribed from §73.
+  - question: >
+      Atlas's own benefit column says "找性能瓶頸" (find the performance
+      bottleneck) but gives no rule for identifying it. How is
+      `bottleneck` computed?
+    decision: "The resource with the HIGHEST utilization fraction in the TARGET measurement; ties resolve to the lexicographically smallest resource name."
+    reasoning: >
+      The most-saturated resource under the expected load is the
+      standard, non-inventive reading of "bottleneck" given that
+      utilization fractions are the only resource observation Atlas's
+      formula names. Alternatives (largest GROWTH from baseline, or a
+      caller-asserted name) were rejected: growth can crown a resource
+      that went from 1% to 5% over one that sits at 95%, and a caller-
+      asserted bottleneck would make the benefit column a narrative
+      claim rather than a computed finding. The tie-break is
+      deterministic so the gate's own recomputation is reproducible --
+      disclosed, not hidden behind dict ordering.
+  - question: >
+      `ai-gateway-fallback.policy.yaml` already encodes "p95 > 3x
+      rolling baseline" as a trip rule -- should this method's
+      `status` also fail when `latency_ratio` exceeds a multiplier?
+    decision: "No -- status judges the TARGET measurement against ABSOLUTE acceptance thresholds only; latency_ratio is reported, not judged."
+    reasoning: >
+      That multiplier is a RUNTIME circuit-breaker constant transcribed
+      from `DEVOPS_SRE_PLAN.md` §4 for the AI gateway specifically; a
+      load test's own acceptance is what EC §73 asks a task to declare
+      up front (`p95_latency_ms_max`), an absolute budget. Importing the
+      3x constant here would silently couple two different governance
+      contexts. Whether a caller-supplied ratio budget should be an
+      OPTIONAL second acceptance mode is disclosed as OQ-LOADTEST-4, not
+      decided here.
+  - question: >
+      Should `status` allow a conservative caller override (e.g. a
+      caller marking a numerically-passed test `failed` because of a
+      qualitative observation), the way `database_data
+      .backup_restore_drill`'s own status does?
+    decision: "No -- fully derived, no override, the same reasoning devops_sre.capacity_model already applied."
+    reasoning: >
+      "Is this p95 at or under this budget AND is this error rate at or
+      under this budget" is pure arithmetic against caller-supplied
+      thresholds; a caller who wants a stricter verdict tightens the
+      thresholds. A status that disagrees with the computed one is
+      simply wrong, not a legitimate judgment call.
+
+open_questions:
+  - id: "OQ-LOADTEST-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LOADTEST-2"
+    question: >
+      EC §50 Performance Contract (L1760-1789) is listed in Phase 0's
+      `policy-inventory.yaml:267` as a policy item, but no
+      `policies/ai-execution/*performance*` policy-as-code file exists
+      yet. When one is built, should its Accept/Reject step bind to
+      this method's own `status` as its gate input, the way
+      `release-policy.yaml` binds gates to typed objects?
+    owner: "operator, or whoever next transcribes EC §50 into policies/ai-execution/"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LOADTEST-3"
+    question: >
+      `devops_sre.capacity_model`'s own OQ-CAPACITYMODEL-2 anticipated a
+      load test supplying an OBSERVED `resource_coefficient`. This record
+      carries observed utilization FRACTIONS per resource, not a
+      resource-units-per-request coefficient -- deriving one needs
+      provisioned capacity per resource, which this record does not
+      carry. Should a future revision add per-resource capacity so the
+      coefficient can be computed, or should capacity_model accept a
+      `load_test_ref` soft link and do the derivation itself?
+    owner: "operator, or whoever next revises either contract's field design"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LOADTEST-4"
+    question: >
+      Should `acceptance` gain an OPTIONAL `latency_ratio_max` (a
+      relative budget, the shape `ai-gateway-fallback.policy.yaml`'s own
+      trip rule uses) alongside the absolute `latency_p95_ms_max`?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LOADTEST-5"
+    question: >
+      F19's own Stress Test (L854: "超過預期負載→觀察 cliff/recovery") and
+      Soak Test (L855: "持續負載→memory/resource leak→degradation") share
+      this method's measurement shape but ask different questions
+      (breaking point; degradation over time). Should they reuse
+      `#/$defs/load_measurement` from this record's schema when built?
+      Note the Master Plan already reserves a `/stress_test/`
+      directory placeholder (`AI_LEGO_Cognitive_Engineering_Os_Global
+      _Master_Plan_v1.md:1776`) with no contents -- a location, not a
+      design; whoever builds stress_test should reconcile with it.
+    owner: "operator, or whoever next builds devops_sre.stress_test or devops_sre.soak_test"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L853) directly, confirmed against
+    the surrounding table (L848-863) and a full-Atlas grep for "負載"
+    that no dedicated §11.x section exists. Read EC §50 (L1760-1789)
+    and §73's example (L2322-2334) in full. Ran BROAD case-insensitive
+    spec-root greps ("load test"/"負載測試"/"load_test"; "bottleneck"/
+    "瓶頸"; "p95"/"latency budget"/"throughput"; "load profile"/
+    "performance contract"), read every neighbour surfaced
+    (ai-gateway-fallback.policy.yaml, DEVOPS_SRE_PLAN.md §2.1/§4,
+    REPOSITORY_ARCHITECTURE.md:324, SEARCH_CONTENT_MVP_VERTICAL_SLICE.md
+    :315, computation.monte_carlo, capacity_model OQ-2, Phase-0
+    verified-findings:1052), and confirmed each distinct by direct read.
+    No duplicate typed object or method found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All five core invariants are each
+    grounded in Atlas's own formula or benefit column, or in EC §50's
+    own closing rule; the no-default-thresholds, max-utilization
+    bottleneck, absolute-not-ratio acceptance, and no-override status
+    designs are all disclosed compilation choices, not silent
+    inventions -- see compilation_decisions above.
