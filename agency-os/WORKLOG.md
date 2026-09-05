@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-09-06（P0-04 Trust-Domain roll-up 公式落地，同日第二輪——操作者「就去做啊」明確授權；動工前交叉檢查抓到 gate 4 與已 ACCEPTED 的 ADR-0032 真衝突，當場自我修正）
+
+**觸發**：完成 gates 4-5（見下一條同日條目）後回報「P0-04 公式本身需要操作者對數學規格簽核」，操作者回覆「那就去做啊 我不是說都由你決定怎麼進行」——即之前已全權授權（「我全部同意核准，需要決定的事都你決定」）不需要每個子決策都回頭問。重讀 `04_HCI30_PRODUCT_SPEC.md:87` 原文後確認：14→7 roll-up 公式本身明文寫「這是數學規格問題，非價值判斷，不需操作者簽核，由 implementer 推導」——不同於 ADR-0004 否決的「7→1 再聚合」那類才是真正需要簽核的價值判斷。這解決了先前回報時的猶豫：不是「權限不足」，是我自己沒把原文讀到那一句。
+
+**範圍界定**：`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04 實際是七份規格（Evidence Quality/Confidence/Trust Domain/Risk/Permission/Contradiction/Time Decay），不是只有 trust-domain 一份。為避免「完整閉環」原則下七份都做成半成品，本輪只做 Trust-Domain 這一份（`HCI_TRUST_DOMAIN_SPEC.md`），其餘六份誠實留 OQ，列 TASKS.md。
+
+**設計**：讀完 `04_HCI30_PRODUCT_SPEC.md` 全文、`HCI30_RESEARCH_REVIEW/05_DOMAIN_ARCHITECTURE_REVIEW.md`（DOM-03 finding 明確點出這個 gap 但未給出實際公式）、`05_HCI30_INTELLIGENCE_METHODS.md`（Method Contract 12 欄位）後設計：14 個維度嚴格 **partition**（非加權多對多矩陣）進 7 個 domain，每 domain 恰 2 個維度——理由：partition 零可調數值參數，天然滿足 P0-04 自己要求的「獨立實作給同輸入必同輸出」；一個 14×7 加權矩陣需要證成 98 個數值格，一個 partition 只需證成 14 個類別歸屬，是小得多、可審查得多的判斷，且不會留下未來可被悄悄調整的權重旋鈕（同 ADR-0004 gates 1-3 用的「結構上不可表達，非僅未寫」哲學，套用到歸屬層而非 schema 層）。聚合＝兩維度 rank 平均、四捨五入取半律「向下」（保守偏向，系統既有慣例：高估信任比低估危害更大）。分工說明：多個 method 對同一維度的跨 method 加權已由 gate 5 `decision_weight` 管（不重新規範），本 spec 只管「已解析出的 14 個維度值」如何併成 7 個 domain 值這一層。
+
+**動工前交叉檢查抓到真架構衝突（非外部 review，是自己讀 ADR-0032 發現的）**：已 ACCEPTED 的 `ADR-0032`（2026-09-02，HD-23）明文「qualitative bands are the only confidence surface until Wave 11 delivers calibration evidence」（ICD 203 五級 Very Low..Very High，明確禁裸數字直到有校準證據）。而**本 session 稍早同一天**剛出貨的 gate 4 validator（`validate-trust-domain-response.mjs`）把 `value` 定義成裸 finite number——直接違反這條已核准 ADR，且正是 ADR-0004 自己否決替代方案點名的「Person X = 62/100 trust」fabricated-precision 問題，只是從跨 domain 移到單一 domain 內而已。**當場修正，不是補丁**：`value` 改為 ADR-0032 五級 band enum；新增必填 `coverage`（`FULL`/`PARTIAL`）欄位記錄該 domain 兩個維度是否都有證據——都缺則該 domain 整列從回應中省略，絕不預設 `MODERATE`（呼應 `04_HCI30_PRODUCT_SPEC.md` §Unknowns as first-class data，「未知必須明確記錄」不能用「平均」偷渡成「觀察到普通結果」）。因無任何真實 consumer 存在，此修正零遷移成本。
+
+**實作**：新 `Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`（規格全文，含 partition 表逐格理由、聚合規則、明確排除的六份姊妹規格清單）+ `packages/intelligence/assessment-dimensions.mjs`（14 維度常數 + partition map，import 時自我斷言 partition 完整不重疊，防止兩個常數各自被改壞而不互相知道）+ `rollup-trust-domains.mjs`（純函數，無 `Date.now()`/`Math.random()`/model call）。修改 `validate-trust-domain-response.mjs`（gate 4 修正）+ 其 test 檔（13→17 assertion，全面改用 band 字串）。
+
+**[已修改]**
+- 新增：`Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`
+- 新增：`Projects/internal/hci30/packages/intelligence/{assessment-dimensions,rollup-trust-domains}.mjs`
+- 新增：`Projects/internal/hci30/tests/unit/intelligence/{assessment-dimensions,rollup-trust-domains}.test.mjs`
+- 修改（ADR-0032 修正）：`Projects/internal/hci30/packages/contracts/validate-trust-domain-response.mjs`
+- 修改：`Projects/internal/hci30/tests/unit/contracts/validate-trust-domain-response.test.mjs`（band+coverage 全面改寫）
+- 修改：`Projects/internal/hci30/scripts/test-wave1-local.ps1`（+2 個 `node --test` 區段）
+- 修改：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{04_HCI30_PRODUCT_SPEC.md,21_HCI_TOP_TIER_GAP_ANALYSIS.md,governance/ADR-0004-no-universal-human-trust-score.md,governance/ADR_INDEX.md}`
+- 修改：`agency-os/TASKS.md`（P0-04 trust-domain 已完成項 + 另六份 spec 追蹤項 + mutation-check 追蹤項範圍更新）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs tests/unit/intelligence/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=67/67 pass（50 既有 + 17 新增：assessment-dimensions 5 + rollup-trust-domains 12，含 25-組窮舉 rank-pair 測試視為 1 個 test 但涵蓋 25 個斷言子案例）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1` | exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，全流程含新 2 個 Node 區段 + 全部既有 gate + 11-migration Docker SQL suite + reversibility，真跑綠燈
+- REVIEW_DONE: 見下方獨立 critic 覆審段落（本條目先寫實作，critic 結果與修復追加於同一 commit 前）
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os | grep=`rollupTrustDomains\|ASSESSMENT_DIMENSIONS\|DIMENSION_TO_DOMAIN\|HCI_TRUST_DOMAIN_SPEC\|packages/intelligence` | hits=14（新建 8 檔 + 6 個文件交叉引用，皆預期內，V1 blueprint 封存版不計入需修改）
+- WORKLOG: 本條目
+
+**[剩餘風險]**
+- P0-04 另六份規格（Evidence Quality/Confidence/Risk/Permission/Contradiction/Time Decay）仍未寫，已列 TASKS.md OQ；roll-up 公式本身無 severity override 機制——一個 VERY_HIGH + 一個 VERY_LOW 會平庸化成 MODERATE，真正嚴重的單一發現可能被稀釋，此判斷刻意留給尚未寫的 `HCI_RISK_SPEC.md`，非本次遺漏
+- 尚無真實 trust-read endpoint 或 method catalog 消費這條 roll-up pipeline——純 pre-code 基礎設施
+- partition 本身是 V1、可修訂的判斷（spec 文件已明講），非唯一正解；14 個維度定義本身仍只是 `04_HCI30_PRODUCT_SPEC.md` 的一行描述，尚無操作性定義（例如「Boundary respect」實際怎麼從證據算出一個 band）——那是各自 method 的工作，不在此 spec 範圍
+
+**[rollback]** 純新增+一處已知零消費者的 shape 修正，`git revert` 即可；無 schema/migration/prod 變更。
+
 ## 2026-09-06（HCI30 ADR-0004 Wave 5 gates 4-5 落地——TRUST-NEG-03/METHOD-CONTRACT-NEG-01，critic 40-mutation 掃描抓到 0 Critical+2 Major+3 Minor 全修，ADR-0004 五個 gate 現已全數關閉）
 
 **觸發**：操作者「繼續完成 HCI 系統」，明確指名上次收尾的 ADR-0004 Wave 1 gates 1-3（`12d50c1fb`）之後「gates 4-5（Wave 5 Intelligence-math roll-up）remain honestly OPEN」，並全權授權決策，唯一硬性要求：不准無效益派多個 agent。
@@ -37,6 +73,37 @@
 - `packages/contracts/` 下兩個新 validator 皆無 `validate-request.mjs` 有的 CLI stdin 入口——目前無呼叫方需要，非疏漏，留待真有 endpoint 時再補
 
 **[rollback]** 單一功能，`git revert` 本 commit 即可；無 schema/migration/prod 變更，無資料寫入。
+
+## 2026-09-06（續54，同一 session：Cognitive OS 第四十一個 Method Atlas 切片 — `database_data.normalization`，F21 家族第七成員；直接解答 `database_data.erd` 的 OQ-ERD-3；critic verdict **FAIL**：2 個 Critical 皆真數學錯誤——非最小宣告主鍵會讓正規化等級判斷高報，schema 自己的範例會被自己的 gate 拒絕；修正後 7 組教科書/反例全數複驗通過）
+
+**觸發**：操作者「繼續完成 01- Cognitive Engineering OS！我全部同意核准，需要決定的事都你決定」+ 明確重申「不准一次無效益派出多個 agents」。承接 WORKLOG 續53 收工時的候選清單，選 `database_data.erd` 自己的 `OQ-ERD-3`（F21 table Normalization 列緊接在 ERD 列之後，天然候選）。1 個 critic subagent（未使用 Workflow 工具，符合操作者要求）。
+
+**選型與設計**：Atlas F21 table Normalization 列（L900，僅此一筆引用，無 §11.x/§12.x 專節）「1NF→2NF→3NF/BCNF；必要時有意識 denormalize」是本 session `database_data` 家族第一個真正**可計算**的方法——不是結構性 record，是關聯式資料庫理論的真演算法：給定宣告主鍵、非鍵屬性、呼叫端提供的函數相依集合（functional dependencies），用教科書標準屬性閉包演算法（attribute closure，Armstrong's axioms 的不動點計算）derive 出真正達到的正規化等級，非呼叫端可主張。`achieved_normal_form` 與三個違規清單連參數都不開放給呼叫端（同 `devops_sre.capacity_model` 已建立的「builder 公開介面連讓呼叫端嘗試造假都不行」紀律）。四個選填欄位含 `schema_ref`（`ERD-` 前綴，解答 OQ-ERD-3）。
+
+**critic 真跑（獨立重推關聯代數、手構反例、真實執行、7 個突變測試）：verdict FAIL，2 個 Critical**：
+
+1. **Critical**：**非最小（non-minimal）宣告主鍵會讓演算法高報正規化等級**。第一版契約宣稱本設計「絕不會高報」，critic 構造反例推翻：`PK=[A,B]`＋FD `A→B`、`C→B`——因為 `A` 單獨（透過顯式 FD 加上主鍵本身定義的閉包）就已經能推出全部屬性，`B` 其實不是真正的 prime attribute，只是宣告的主鍵刻意選大了。第一版程式碼判成 `THIRD_NF`，教科書正確答案（相對真正最小主鍵 `{A}`）是 `SECOND_NF`；第二個反例（3 屬性版本）程式碼判 `THIRD_NF`，正確答案是 `FIRST_NF`。修法：新增 `primary_key_is_minimal`（逐一移除單一屬性測試是否仍是 superkey，數學上可證明此法足以偵測任何大小的不可約性），builder／gate 兩層皆列為真正的 fail-closed 前提——非最小主鍵直接拒收，不再靜默算錯。
+2. **Critical**：**schema 自己的範例會被自己的真 gate 拒絕**。根因：`transitive_dependency_violations`（3NF 違規清單）把每一筆 2NF（partial dependency）違規也重複算了一次進去——在 3NF 裸定義下形式上不算錯，但讓清單名稱名不符實，也讓 order_items 範例自己宣告的 `transitive_dependency_violations: []` 與真實重算的結果（含兩筆）不一致。修法：從 transitive 清單排除已出現在 partial 清單的項目（分類等級判斷完全不受影響，FIRST_NF 分支本來就會在檢查 transitive 前就短路），純粹讓兩份證據清單互斥且誠實命名。
+
+**6 個 Major 全修**：`version` 欄位兩層完全零檢查——第一版 docstring 宣稱「已完整套用 `data_contract` 的 id/version 教訓」，實際只做了 id 那一半，跟上一個切片一模一樣的疏漏重演；引用宣稱「grep 只回傳這一列」經 critic 覆核為假（實際 6 行命中，其餘 5 行為 MCDA 分數正規化與零重工架構的 pipeline 概念，皆確認無關）——改寫成如實描述 grep 原始輸出＋逐一排除理由；突變測試找到演算法本身 5 個存活突變（含拿掉不動點迴圈、拿掉隱含主鍵公理）——補 4 個針對性回歸測試逼真正機制（多輪收斂、公理串接、3+ FD 順序無關性）；`dict(fd)` 淺拷貝讓每筆違規紀錄的 `determinant` 陣列跟 `functional_dependencies` 共用同一個 list 物件，違反 builder 自己「REBUILDS every nested object」宣稱——改為深層重建；缺切片文件；全 repo 系統性缺口——沒有任何測試驗證 typed-object schema 自己的 `examples` 區塊真的過得了 schema 與 gate（本切片自己的範例 #1 正是受害者）——本切片自己補了驗證測試，另開 follow-up task 建議全庫補這條 golden-test 規則。
+
+**5 個 Minor 全修**：sort key 並列問題隨「禁止重複 FD」修法自動解決（兩者判準恰好是同一個 tuple）；`functional_dependencies` 補 `uniqueItems: true`＋執行期真正去重（`(frozenset(determinant), dependent)` 相同即拒收）；驗證宣稱「五組教科書案例」實際第五組（two-hop closure chain）缺回歸測試，已補。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.normalization.contract.yaml`＋`specs/cognitive/typed-objects/normalization-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.thirtyninth_concrete_entry`＋重新產生 `SPEC_QUICKREF.md`；`database_data.erd.contract.yaml` 的 `OQ-ERD-3` 標記 ANSWERED。Product root 新增 `ai_lego/compute/normalization/closure.py`（含 `primary_key_is_minimal`）＋`ai_lego/modules/database_data/normalization.py`（builder＋3 gate）＋`ai_lego/apps/cli/run_normalization_slice.py`＋`tests/unit/test_normalization.py`（88 tests）＋`docs/FORTYFIRST_SLICE_DATABASE_DATA_NORMALIZATION.md`；`modules/database_data/__init__.py` docstring；`docs/THIRTYNINTH_SLICE_DATABASE_DATA_ERD.md` 過期措辭同步。`agency-os/TASKS.md` 切片條目。另開 spawn_task 建議：全庫 golden-test 補 schema-examples 驗證規則（非本次範圍）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2809→2812
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_normalization_slice` | exit=0 | result=`PASS database_data.normalization: order_items=FIRST_NF, customers=BCNF, enrollments=THIRD_NF, gates [3×PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_normalization` | exit=0 | result=88 OK（71→88，critic 修正後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，修正後重跑）| exit=0 | result=**1467 tests OK**（1450→1467，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 python 腳本手推 7 組關聯代數案例（5 組教科書＋2 組 critic 反例）| exit=0 | result=修正前 2 組反例判錯（THIRD_NF 應為 SECOND_NF／FIRST_NF），修正後全數與教科書答案一致
+- REVIEW_DONE: critic=Standard（真實 subagent，獨立重推關聯代數＋手構反例＋真實執行＋7 個突變測試）| verdict=FAIL → 2 Critical 全修（含新增 `primary_key_is_minimal` 不變量與 transitive/partial 清單互斥修正）＋6 Major 全修＋5 Minor 全修 | findings=2c/6m/5minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`database_data[.]normalization\|NormalizationRecord\|NORMALIZATION_INVALID\|NORMALIZATION_PRIMARY_KEY_NOT_MINIMAL\|NORMALIZATION_DUPLICATE_FUNCTIONAL_DEPENDENCY\|primary_key_is_minimal\|OQ-ERD-3` | hits=13（本切片自己 13 個檔案，過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-NORM-1~3` 皆揭露；本方法僅相對單一宣告（已強制最小）主鍵判斷，未枚舉完整 candidate key 集合，可能相對完整理論低報（`OQ-NORM-1`，非本次可修範圍——枚舉全部 candidate key 是更難的組合問題）；`schema_ref` 與記錄自己宣告的鍵/屬性未交叉驗證（`OQ-NORM-3`）；`functional_dependencies` 是受信任的呼叫端宣稱，本方法無法對照真實資料驗證。全庫「schema examples 未經 gate 驗證」系統性缺口已開 follow-up task，非本次修復範圍。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
 
 ## 2026-09-06（續53，同一 session：Cognitive OS 第四十個 Method Atlas 切片 — `database_data.data_contract`，F21 家族第六成員；直接解答 `database_data.erd` 的 OQ-ERD-4；critic verdict **SHIP WITH MINOR FIXES**：0 Critical，4 Major 全屬揭露/完整性類非邏輯 bug，含一個 registry 註冊宣稱造假、一個未揭露的偽普遍宣稱、一個缺檔、一個 gate docstring 誇大宣稱）
 

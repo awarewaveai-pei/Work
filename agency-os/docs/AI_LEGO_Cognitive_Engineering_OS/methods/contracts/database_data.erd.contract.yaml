@@ -291,6 +291,7 @@ open_questions:
     owner: "operator, or whoever next revises this contract's own field design"
     blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
   - id: "OQ-ERD-3"
+    status: "ANSWERED (2026-09-06) -- database_data.normalization now exists and its own `schema_ref` field (ERD- prefix, optional) is exactly this soft link. See methods/contracts/database_data.normalization.contract.yaml."
     question: >
       F21's own Normalization row (L900: '1NF→2NF→3NF/BCNF；必要時有意識
       denormalize') could take an ErdRecord's own entities as its input

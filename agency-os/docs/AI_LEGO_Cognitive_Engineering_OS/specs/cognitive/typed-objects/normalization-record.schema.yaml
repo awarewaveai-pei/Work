@@ -1,0 +1,192 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/normalization-record.schema.yaml"
+title: Normalization Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `NormalizationRecord` -- the
+  declared `outputs` of `database_data.normalization`'s Method
+  Contract. SEVENTH `database_data`-family typed object, after
+  `database_data.backup_restore_drill`, `database_data.data_lineage`,
+  `database_data.expand_contract_migration`, `database_data
+  .reconciliation`, `database_data.erd`, and `database_data
+  .data_contract`. Atlas's own F21 tool table Normalization row (L900:
+  "1NF→2NF→3NF/BCNF；必要時有意識 denormalize") grounds this record.
+  Directly closes `database_data.erd`'s own `OQ-ERD-3`.
+
+  `achieved_normal_form` and its three violation lists are GENUINE
+  COMPUTE (`quality.genuine_compute: true`) -- derived by
+  `ai_lego/compute/normalization/closure.py`'s own attribute-closure
+  algorithm from `primary_key_attributes`/`non_key_attributes`/
+  `functional_dependencies`, NOT caller-asserted. `schema_ref` is a
+  format-only soft link to an already-built `database_data.erd` record
+  (`ERD-` prefix), resolving `OQ-ERD-3`. `denormalization_decision`
+  answers Atlas's own "必要時有意識 denormalize" qualifier -- a
+  recorded decision, either way, always carries non-empty `reasoning`.
+
+  Two real structural invariants make this record a genuine MODEL:
+  `primary_key_attributes` and `non_key_attributes` must be disjoint;
+  every `functional_dependencies[]` entry's own `determinant`/
+  `dependent` must name real attributes of this entity, and `dependent`
+  must not be a member of its own `determinant` (no trivial FDs) --
+  both enforced at the runtime layer, not here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Normalization row (L900): '1NF→2NF→3NF/BCNF；必要時有意識 denormalize'"
+  - "methods/contracts/database_data.normalization.contract.yaml"
+  - "ai_lego/compute/normalization/closure.py"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  functional_dependency:
+    type: object
+    required: [determinant, dependent]
+    additionalProperties: false
+    properties:
+      determinant:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: "One or more attribute names that together determine `dependent`. Real referential integrity (every entry names a real attribute of this entity) and the no-trivial-FD rule (dependent not in determinant) are enforced at the runtime layer, not here."
+        items:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+      dependent:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+type: object
+required: [id, version, entity_name, primary_key_attributes, non_key_attributes, functional_dependencies, achieved_normal_form, partial_dependency_violations, transitive_dependency_violations, bcnf_violations, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^NORM-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.normalization"
+  entity_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which entity/table this analysis covers, e.g. 'order_items'."
+  schema_ref:
+    type: string
+    pattern: "^ERD-"
+    description: "OPTIONAL soft link to a database_data.erd record (id prefix ERD-) whose entities are the real-world source of this record's own primary_key_attributes/non_key_attributes -- resolves database_data.erd's own OQ-ERD-3. Format-only: this method cannot see the referenced record, and is NOT cross-validated against it (see method contract OQ-NORM-3)."
+  primary_key_attributes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: "Atlas's own entity 'key' -- at least one attribute; unique. Disjoint from non_key_attributes -- enforced at the runtime layer, not here. A single declared key, not the full candidate-key closure of the FD set (see method contract compilation_decisions, OQ-NORM-1)."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  non_key_attributes:
+    type: array
+    default: []
+    uniqueItems: true
+    description: "REQUIRED array (may be empty) of this entity's own non-key attributes, unique, disjoint from primary_key_attributes -- enforced at the runtime layer, not here."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  functional_dependencies:
+    type: array
+    default: []
+    uniqueItems: true
+    description: "REQUIRED array (may be empty) of caller-supplied functional dependencies (trusted domain knowledge, see method contract compilation_decisions) -- the standard textbook input any real normal-form classification needs. The implicit 'primary key determines every other attribute' axiom is injected by the compute layer, NOT required to be spelled out here. `uniqueItems` catches only LITERAL duplicates (identical determinant list order); two entries describing the same dependency with a differently-ORDERED determinant list are a distinct JSON value and pass this schema-layer check -- the real, order-independent duplicate rule is enforced at the runtime layer (ai_lego/modules/database_data/normalization.py), not here."
+    items:
+      $ref: "#/$defs/functional_dependency"
+  achieved_normal_form:
+    enum: [FIRST_NF, SECOND_NF, THIRD_NF, BCNF]
+    description: "GENUINE COMPUTE, not caller-supplied -- derived by ai_lego/compute/normalization/closure.py:classify_normal_form from this record's own primary_key_attributes/non_key_attributes/functional_dependencies. 1NF is assumed satisfied by construction (this record's own attribute lists are already flat/atomic)."
+  partial_dependency_violations:
+    type: array
+    default: []
+    description: "GENUINE COMPUTE. The functional_dependencies[] entries that violate 2NF (a partial dependency on a proper, non-empty subset of a composite primary key)."
+    items:
+      $ref: "#/$defs/functional_dependency"
+  transitive_dependency_violations:
+    type: array
+    default: []
+    description: "GENUINE COMPUTE. The functional_dependencies[] entries that violate 3NF via a genuine transitive dependency (dependent is a non-key attribute, determinant is not a superkey) -- MUTUALLY EXCLUSIVE with partial_dependency_violations, CORRECTED post-critic-review (a first-draft version double-counted every 2NF violation here too, which is formally accurate under 3NF's bare definition but made this list's own name misleading and broke a canonical example's own self-consistency)."
+    items:
+      $ref: "#/$defs/functional_dependency"
+  bcnf_violations:
+    type: array
+    default: []
+    description: "GENUINE COMPUTE. The functional_dependencies[] entries that violate BCNF (determinant is not a superkey, regardless of whether dependent is a key or non-key attribute)."
+    items:
+      $ref: "#/$defs/functional_dependency"
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    const: "ai_lego.compute.normalization.closure.classify_normal_form"
+  denormalization_decision:
+    type: object
+    required: [decision, reasoning]
+    additionalProperties: false
+    description: "OPTIONAL. Answers Atlas's own '必要時有意識 denormalize' qualifier -- a recorded decision, either way, always carries non-empty reasoning."
+    properties:
+      decision:
+        enum: [keep_normalized, denormalize]
+      reasoning:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- achieved_normal_form is a deterministic computation, the same class every genuine_compute record in this package already carries."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A classic 2NF violation: order_items has a composite key (order_id, product_id), and product_id alone (a proper subset) determines product_name/product_price -- both non-key. Achieved: FIRST_NF."
+    value:
+      id: "NORM-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.normalization"
+      entity_name: "order_items"
+      schema_ref: "ERD-2026-09-05-002"
+      primary_key_attributes: ["order_id", "product_id"]
+      non_key_attributes: ["quantity", "product_name", "product_price"]
+      functional_dependencies:
+        - {determinant: ["product_id"], dependent: "product_name"}
+        - {determinant: ["product_id"], dependent: "product_price"}
+      achieved_normal_form: "FIRST_NF"
+      partial_dependency_violations:
+        - {determinant: ["product_id"], dependent: "product_name"}
+        - {determinant: ["product_id"], dependent: "product_price"}
+      transitive_dependency_violations: []
+      bcnf_violations:
+        - {determinant: ["product_id"], dependent: "product_name"}
+        - {determinant: ["product_id"], dependent: "product_price"}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.normalization.closure.classify_normal_form"
+      denormalization_decision: {decision: "denormalize", reasoning: "product_name/product_price are intentionally duplicated onto order_items to preserve the historical price at time of order -- the products table's own price can change later; this is a point-in-time snapshot, not update-anomaly-prone redundancy."}
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "A fully BCNF entity with a single-attribute key and no non-key functional dependencies beyond the key itself"
+    value:
+      id: "NORM-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.normalization"
+      entity_name: "customers"
+      primary_key_attributes: ["customer_id"]
+      non_key_attributes: ["email", "signup_date"]
+      functional_dependencies: []
+      achieved_normal_form: "BCNF"
+      partial_dependency_violations: []
+      transitive_dependency_violations: []
+      bcnf_violations: []
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.normalization.closure.classify_normal_form"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L900) directly. Validated against jsonschema Draft202012Validator. Compute layer independently verified against five textbook normalization examples before this schema was written."
+  note: "The '1NF→2NF→3NF/BCNF；必要時有意識 denormalize' formula is directly transcribed. Key/non-key disjointness, FD referential integrity, the no-trivial-FD rule, and achieved_normal_form's own recomputation-vs-stored check are all enforced at the runtime layer (ai_lego/modules/database_data/normalization.py), not the schema layer. schema_ref is format-only and NOT cross-validated against its referenced record's own content -- disclosed scope (method contract OQ-NORM-3), not a silent gap. No mother document was modified."

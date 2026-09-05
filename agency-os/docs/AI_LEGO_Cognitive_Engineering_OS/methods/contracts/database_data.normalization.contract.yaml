@@ -1,0 +1,377 @@
+$id: "ai-lego://methods/contracts/database_data.normalization.contract.yaml"
+title: "Normalization Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-first Method Atlas slice, SEVENTH from
+  the `database_data` family (F21's own "資料庫／資料套件 (DB / Data
+  Pack)"), after `database_data.backup_restore_drill` (twenty-fifth),
+  `database_data.data_lineage` (twenty-eighth), `database_data
+  .expand_contract_migration` (thirtieth), `database_data.reconciliation`
+  (twenty-ninth), `database_data.erd` (thirty-ninth), and `database_data
+  .data_contract` (fortieth). Directly closes `database_data.erd`'s own
+  `OQ-ERD-3` (F21's own Normalization row, L900, was named there as a
+  natural consumer of an `ErdRecord`'s own entities).
+
+  Atlas gives this method exactly ONE citation: the F21 tool table's
+  Normalization row (L900: purpose "降低重複與更新異常"; usage "1NF→2NF
+  →3NF/BCNF；必要時有意識 denormalize"; benefit "提高一致性"). No
+  dedicated §11.x/§12.x section exists -- verified by a broad, case-
+  insensitive grep for "normaliz"/"1NF"/"2NF"/"3NF"/"BCNF"/"denormal"
+  across the full mother document, which returns SIX lines (676, 768,
+  769, 900, 1956, 4083), NOT only L900 -- CORRECTED post-critic-review
+  from a first-draft claim that the grep "returns ONLY this table row",
+  which stated the grep's intended CONCLUSION as if it were the raw
+  output. Each of the other five, read directly: L676/768/769/1956 are
+  all "normalize" in the MCDA/TOPSIS scoring and cross-jurisdiction-
+  comparison sense (normalizing a SCORE to a common scale), a
+  completely different mathematical operation from relational
+  normal-form theory; L4083 is "Normalize Once" inside "# 20. 零重工
+  架構" (zero-rework architecture), a pipeline/idempotency concept, not
+  a database schema concept. A second pass with Chinese-language terms
+  ("正規"/"範式"/"函數依賴"/"更新異常"/"反正規化") hits only L369 (FAST's
+  own "冗餘功能", an unrelated feature-redundancy phrase) and L900
+  itself. Cross-checked the family's own §11.x/§12.x section list
+  directly (ERD §11.47, Data Lineage §11.48, Data Contract §11.49,
+  Expand-Contract Migration §11.50, Data Quality Dimensions §12.39,
+  Backup/Restore Drill §12.40 all exist) -- Normalization has none,
+  confirming the CONCLUSION (single table-row citation, no dedicated
+  section) is correct even though the first draft's own grep-output
+  claim was imprecise. Also checked
+  `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md`
+  for the same term set (the way F21's own Schema Compatibility
+  Analysis and Expand-Contract Migration rows point to EC §28 as their
+  own "唯一正本") -- zero hits, nothing to cross-reference. This is the
+  thinnest single-citation class this session has already established
+  a precedent for (`devops_sre.rto_rpo`'s own F19 row, `architecture
+  .quality_attribute_scenario`'s own table-only citation) -- disclosed
+  here directly rather than discovered by a critic round, applying the
+  lesson `database_data.erd`'s and `database_data.data_contract`'s own
+  first drafts each had to learn the hard way (an insufficiently broad
+  citation grep missing a real section, or missing a real citation
+  count) -- though, per the correction above, this contract's own FIRST
+  draft still overstated the grep's own raw output, a milder recurrence
+  of the same underlying discipline gap (verify what a claim SAYS
+  against what a re-run actually produces, not against what you expect
+  it to produce).
+
+  UNLIKE every prior structural `database_data` record, this method's
+  own formula ("1NF→2NF→3NF/BCNF") names a real, well-defined,
+  COMPUTABLE fact from relational database theory -- not a caller
+  assertion. Given an entity's declared primary key, its non-key
+  attributes, and a set of caller-supplied functional dependencies
+  (X -> A, "X determines A"), the highest normal form the entity
+  actually satisfies is DERIVED by the standard textbook attribute-
+  closure algorithm (Armstrong's axioms' fixed-point computation),
+  the same class of genuine, re-derivable compute this session's
+  `database_data.reconciliation` and `devops_sre.capacity_model`
+  already established (`quality.genuine_compute: true`, the shared
+  `evaluate_statistical_gate` reused UNCHANGED for its seventh time
+  this session). 1NF is assumed satisfied by construction (this
+  record's own attribute lists are already flat/atomic -- no repeating-
+  group representation exists to violate 1NF).
+
+  `schema_ref` is an OPTIONAL format-only soft link to an already-built
+  `database_data.erd` record (`ERD-` prefix), resolving `OQ-ERD-3`
+  directly: F21's own Normalization row (L900) sits immediately AFTER
+  the ERD row (L899) in Atlas's own table, and an ERD's own entities
+  (with their own `is_primary_key` flags) are the natural real-world
+  source of the `primary_key_attributes`/`non_key_attributes` this
+  method requires as input. This method cannot see the referenced
+  ERD record's own content (format-only, the same declared limit
+  every prior soft-link field in this package already carries) --
+  cross-validating this record's own declared key/attributes against
+  the referenced entity's own attributes is out of scope, filed as
+  `OQ-NORM-3`.
+
+  `denormalization_decision` is an OPTIONAL structured field directly
+  answering Atlas's own qualifier "必要時**有意識**denormalize" (when
+  necessary, **consciously** denormalize) -- "有意識" (conscious/
+  deliberate) is not satisfied by a bare enum flip; a recorded decision
+  (either `keep_normalized` or `denormalize`) must always carry
+  non-empty `reasoning`, whichever way it goes.
+
+  Due-diligence search, broad from the start (applying the lesson from
+  the immediately prior two slices): case-insensitive spec-root greps
+  for "normaliz"/"functional_dependenc"/"candidate.key"/"superkey"/
+  "1NF"/"2NF"/"3NF"/"BCNF"/"closure". Zero hits for any relational-
+  normalization-specific term (`grep -i "closure"` alone returns 22
+  files, but every one is a generic English word match -- "loop
+  closure", "gap closure", "case closure" -- none is a functional-
+  dependency or attribute-closure concept; confirmed by direct read of
+  a sample). No duplicate typed object, compute module, or method
+  found. `ai_lego/compute/` has no existing normalization-theory
+  module; the closest structural analogue, `compute/lineage
+  /traversal.py`'s own forward-reachability fixed point, is a DIFFERENT
+  algorithm (graph reachability, not attribute closure) solving a
+  different problem, confirmed distinct by direct read -- its
+  determinism/order-independence DISCIPLINE (not its algorithm) is
+  reused directly in this method's own `compute/normalization
+  /closure.py`.
+
+  Real invariants that make this record a genuine MODEL, not a bag of
+  independently-valid parts: `primary_key_attributes` and `non_key
+  _attributes` must be disjoint (an attribute cannot be both);
+  every functional dependency's own `determinant`/`dependent` must
+  name REAL attributes of this entity, and `dependent` must NOT be a
+  member of its own `determinant` (a trivial FD, e.g. `{A,B} -> A`, is
+  always vacuously true and would silently pollute the classification's
+  own evidence -- refused, not silently accepted); and `achieved_normal
+  _form` plus its three violation lists must be exactly what re-running
+  `classify_normal_form` on the record's own raw `primary_key
+  _attributes`/`non_key_attributes`/`functional_dependencies` produces
+  -- a caller cannot assert a stronger normal form than the declared
+  key and FDs actually support.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Normalization row (L900): '1NF→2NF→3NF/BCNF；必要時有意識 denormalize'"
+  - "methods/registry/method-inventory.yaml Normalization entry: category 'F21 database-data', no machine_id -- this contract mints one"
+  - "ai_lego/compute/normalization/closure.py -- the standard relational-algebra attribute-closure algorithm this contract's own genuine_compute gate re-derives against"
+  - "ai_lego/modules/research/gates.py evaluate_statistical_gate -- reused UNCHANGED for the genuine_compute gate, the same function database_data.reconciliation/devops_sre.capacity_model/devops_sre.error_budget/database_data.data_lineage/root_cause.pareto/decision.ahp/decision.mcda already reuse"
+  - "specs/cognitive/typed-objects/erd-record.schema.yaml -- reused by reference for the optional schema_ref field, resolving database_data.erd's own OQ-ERD-3"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-ninth concrete entry. `id: database_data.normalization`
+  mints a new machine_id, SEVENTH member of the `database_data` family.
+
+id: database_data.normalization
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating an entity into key/non-key attributes and a
+# functional-dependency set is DECOMPOSE; the closure-based normal-form
+# classification IS the validation act itself (a derived fact checked
+# against the declared key/FDs, not an independent downstream check) --
+# no separate MAP step exists here (unlike database_data.erd/
+# data_contract, this method assigns no soft-link roles beyond the two
+# already-established optional format-only refs, schema_ref itself
+# being a direct carry-over of the family's own existing MAP pattern,
+# not a new one this method's own formula requires).
+
+purpose:
+  - classify_the_highest_relational_normal_form_an_entity_actually_satisfies_given_its_declared_key_and_functional_dependencies_and_record_a_conscious_denormalization_decision_when_made
+inputs:
+  required: [EntityKeyDeclaration, FunctionalDependencySet]
+  optional: [SchemaReference, DenormalizationDecision]
+outputs: [NormalizationRecord]
+preconditions:
+  - "entity_name is a non-empty string"
+  - "primary_key_attributes has at least 1 entry; every entry is a non-empty string; entries are unique"
+  - "non_key_attributes is a required array (may be empty) of unique, non-empty strings, disjoint from primary_key_attributes"
+  - "functional_dependencies is a required array (may be empty); every entry's own determinant has at least 1 entry, all unique non-empty strings, all real attributes of this entity (member of primary_key_attributes or non_key_attributes); every entry's own dependent is a non-empty string naming a real attribute of this entity; dependent is NOT a member of its own determinant (no trivial FDs)"
+  - "achieved_normal_form, partial_dependency_violations, transitive_dependency_violations, and bcnf_violations are NOT caller-supplied -- the builder computes them internally via ai_lego/compute/normalization/closure.py:classify_normal_form, and the gate independently re-derives and compares against the stored values, the same 'no parameter even lets a caller ATTEMPT to fake it' discipline devops_sre.capacity_model's own builder already established"
+  - "schema_ref, when present, is a non-empty string beginning with ERD- (the database_data.erd record id prefix) -- a format-only soft link resolving OQ-ERD-3"
+  - "denormalization_decision, when present, is an object with exactly {decision, reasoning}; decision is keep_normalized or denormalize; reasoning is a non-empty string -- required regardless of which decision was made, answering Atlas's own '有意識' (conscious) qualifier"
+  # Preconditions 1-4 map onto Atlas's own 'entity key + FD set' input
+  # requirement (the standard textbook input any real normal-form
+  # classification needs); 5 onto the '1NF→2NF→3NF/BCNF' formula itself
+  # (a derived fact, not an assertion); 6 onto the schema_ref pairing
+  # with database_data.erd (resolving OQ-ERD-3); 7 onto '必要時有意識
+  # denormalize'.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  genuine_compute: true
+  # Same class of departure database_data.reconciliation's own contract
+  # already reasons through: achieved_normal_form is a CALCULATED
+  # RESULT (an attribute-closure computation), not a narrative claim
+  # needing evidence citations.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Normalization row.
+recommended_next: []
+# database_data.erd is ALREADY built and consumed here as a real
+# soft-link field (schema_ref), not left as a bare recommended_next
+# entry -- the same "turn a real pairing into a field, not a
+# narrative aside" discipline database_data.erd's own migration_ref
+# and database_data.data_contract's own four soft links already
+# established.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- any real schema change
+  # (e.g. splitting a table to reach a higher normal form) happens
+  # outside this method's own scope, the same "record describes an
+  # external structure" class every prior database_data contract's own
+  # rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Should this method compute normal forms relative to the FULL
+      candidate-key closure of the functional-dependency set (every
+      minimal attribute set that is a superkey), or relative to a
+      SINGLE declared primary key?
+    decision: "A single declared primary key only, REQUIRED to be minimal (irreducible) -- checked as a real fail-closed invariant, not assumed. Computing the full candidate-key set from an FD set is a genuinely different, harder combinatorial problem, out of this method's own scope."
+    reasoning: >
+      Atlas's own formula names no candidate-key-enumeration step, and
+      finding EVERY candidate key of a relation from an arbitrary FD
+      set is a well-known harder problem (worst-case exponential in the
+      number of attributes) than testing whether one GIVEN key is a
+      superkey (linear-ish, the closure algorithm this method already
+      implements). The single-declared-key scope is not a shortcut
+      around real theory -- it is the SAME scope every prior
+      `database_data` record already assumes: `database_data.erd`'s
+      own `is_primary_key` flag is exactly one declared key per entity,
+      never a full candidate-key enumeration. A caller with additional
+      unique constraints (other candidate keys) that are NOT the
+      declared primary key will see this method potentially UNDER-
+      report the achieved normal form relative to full relational
+      theory (a real limitation, disclosed as `OQ-NORM-1`, not silently
+      papered over).
+
+      **CORRECTED post-critic-review**: the first draft of this
+      decision additionally claimed this method "will never OVER-
+      report" the achieved normal form, reasoning that "the declared
+      key's own closure is always a real, correctly-computed lower
+      bound". A critic review constructed a direct counterexample
+      disproving this: a declared key that is a superkey but NOT
+      MINIMAL (e.g. `{A, B}` as the declared key when the explicit FD
+      `A -> B` already means `{A}` alone, plus the key's own defining
+      closure, reaches every attribute) makes `B` count as a "prime"
+      attribute purely because the declared key was needlessly large --
+      "prime attribute" (3NF's own exception) is only a meaningful
+      concept relative to a MINIMAL candidate key in real relational
+      theory. Two concrete inputs that both pass every gate under the
+      first draft's code produced `THIRD_NF` when the true, minimal-key
+      answer is `SECOND_NF` and `FIRST_NF` respectively -- a genuine
+      OVER-report, not merely a theoretical risk. Fixed by making
+      minimality a REAL, fail-closed precondition (`ai_lego.compute
+      .normalization.closure.primary_key_is_minimal`, checked at both
+      the builder and the gate): a non-minimal declared key is now
+      REFUSED outright, not silently miscomputed. With that fix in
+      place, the original "never over-report" property genuinely holds
+      for every key this method accepts -- the corrected claim is
+      narrower (conditioned on minimality being enforced, not assumed)
+      but actually true, verified against the critic's own two
+      counterexamples post-fix.
+  - question: >
+      A validly-declared primary key, by definition, determines every
+      other attribute in its own entity -- should the caller be
+      required to spell out one explicit functional dependency from the
+      primary key to EVERY non-key attribute, or should this be an
+      implicit axiom the compute layer injects?
+    decision: "An implicit axiom, injected by ai_lego/compute/normalization/closure.py before running the closure algorithm -- NOT required as explicit caller input."
+    reasoning: >
+      Requiring a caller to spell out `{primary_key} -> attribute` once
+      per non-key attribute (potentially dozens) to establish a fact
+      that is already TRUE BY DEFINITION of what a "key" means in
+      relational theory would be pure ceremony -- Atlas's own formula
+      gives no such requirement, and inventing it would fail this
+      package's own restraint discipline in the OPPOSITE direction (an
+      invented BURDEN, not an invented shortcut). The closure
+      algorithm's own correctness does not depend on this choice: it is
+      mathematically equivalent to requiring the explicit FDs, just
+      without the ceremony.
+  - question: >
+      Should functional_dependencies validate that the declared
+      dependencies are themselves mutually CONSISTENT (e.g. no two FDs
+      that jointly imply a determinant is both a superkey and provably
+      cannot be, under some stricter external constraint this method
+      has no field for)?
+    decision: "No -- functional_dependencies is trusted, caller-supplied domain knowledge (the same class of trust every prior database_data record extends to its own caller-supplied structural facts, e.g. database_data.erd's own cardinality assertion, disclosed as OQ-ERD-5)."
+    reasoning: >
+      A functional dependency is an assertion about the REAL WORLD data
+      this entity holds (e.g. 'product_id determines product_name') --
+      this method has no independent way to verify that claim against
+      actual data (it is not given any), the same epistemic position
+      every prior structural record in this family already occupies
+      for its own caller-supplied facts. What IS independently
+      verified, and re-derived at the gate layer rather than trusted,
+      is the DOWNSTREAM classification (achieved_normal_form) that
+      follows MECHANICALLY from the declared FDs -- that part is
+      genuine compute, not assertion.
+  - question: >
+      ADDED post-critic-review. Should `functional_dependencies` permit
+      two entries that describe the SAME dependency (identical
+      determinant SET + dependent) merely written with a different
+      determinant list order (e.g. `{determinant: [a,b], dependent: c}`
+      and `{determinant: [b,a], dependent: c}`)?
+    decision: "No -- rejected as NORMALIZATION_DUPLICATE_FUNCTIONAL_DEPENDENCY, checked at both the builder and the gate."
+    reasoning: >
+      A critic review found two real costs to allowing this: (1) it
+      pollutes every violation list's own evidence with a duplicate
+      entry describing the identical fact twice; (2) it makes
+      `classify_normal_form`'s own claimed order-independence
+      UNTESTABLE in a specific way -- its internal sort key is exactly
+      `(sorted(determinant), dependent)`, so two such "duplicate" FDs
+      are, by construction, indistinguishable to that sort and their
+      relative position in the output list would depend on Python's
+      stable-sort tie-breaking (i.e. on the CALLER's own input order),
+      which is exactly the property the compute layer's own docstring
+      claims never to depend on. Rejecting exact semantic duplicates
+      removes the possibility of that tie entirely, rather than adding
+      a secondary sort key to break it arbitrarily -- the caller
+      supplied redundant information, and the honest response is to
+      refuse it, not silently pick a winner.
+
+open_questions:
+  - id: "OQ-NORM-1"
+    question: >
+      This method tests normal forms relative to a SINGLE declared
+      primary key (now REQUIRED to be minimal/irreducible, checked as a
+      real invariant -- see compilation_decisions and the critic-caught
+      Critical this contract's own history records), not the full
+      candidate-key closure of the FD set. An entity with additional
+      real candidate keys that are NOT the declared one (i.e. more than
+      one minimal superkey exists, and the caller declared only one of
+      them) could still have its achieved normal form UNDER-reported
+      relative to full relational theory, since attributes exclusive to
+      an undeclared candidate key are not treated as prime. Should a
+      future revision accept multiple declared candidate keys?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-NORM-2"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-NORM-3"
+    question: >
+      `schema_ref` (optional link to a full database_data.erd record)
+      is not cross-validated against this record's OWN
+      `primary_key_attributes`/`non_key_attributes` -- a caller could
+      supply a schema_ref whose referenced entity's own attributes
+      disagree entirely with this record's own declared key/attributes.
+      This method cannot see the referenced record (format-only soft
+      link, the same declared limit database_data.data_contract's own
+      `OQ-DC-4` already discloses for its own schema_ref field). Should
+      a future revision add a runtime cross-check?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L900) directly. Broad case-
+    insensitive grep across the full mother document for
+    "normaliz"/"1NF"/"2NF"/"3NF"/"BCNF"/"denormal" (six raw hits, five
+    confirmed distinct by direct read -- see description above) plus a
+    Chinese-language second pass and a check of
+    AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md
+    confirmed no dedicated §11.x/§12.x section exists and nothing to
+    cross-reference (a single-citation method, disclosed directly
+    rather than discovered by a critic round for the CONCLUSION, though
+    the first draft's own grep-output wording was corrected by a critic
+    round). Independently verified the attribute-closure algorithm
+    against five textbook normalization examples (a classic 2NF
+    partial-dependency violation, a classic 3NF transitive-dependency
+    violation, the classic student/course/teacher BCNF-violates-but-3NF
+    -holds example, a fully BCNF entity with no non-key FDs, and a
+    two-hop transitive-closure chain) BEFORE writing the method/schema
+    /tests around it -- all five matched the textbook-expected
+    classification. A critic review's own adversarial pass then
+    constructed two ADDITIONAL counterexamples (non-minimal declared
+    keys) that the first draft's code classified WRONG (over-reporting
+    SECOND_NF/FIRST_NF as THIRD_NF) -- both re-verified correct after
+    the `primary_key_is_minimal` fix, alongside a re-check of all seven
+    prior examples for zero regression. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The '1NF→2NF→3NF/BCNF；必要時有意識
+    denormalize' formula is directly transcribed. The single-declared-
+    key scope, the implicit key-determines-everything axiom, and
+    trusting caller-supplied functional dependencies as domain
+    knowledge are all disclosed compilation choices, not silent
+    inventions -- see compilation_decisions above.

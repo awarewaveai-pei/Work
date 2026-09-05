@@ -1425,6 +1425,45 @@ tier_1:
       established. Tier 1, mandated by the actively-running
       implementation slice, same category as the thirty-seven entries
       above it.
+  thirtyninth_concrete_entry:
+    # NEW (2026-09-06, same session): thirty-ninth Tier 1 entry, same
+    # additive-key rationale as the thirty-eight entries above it.
+    method_id: "database_data.normalization"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SEVENTH entry
+      from the `database_data` family (F21), after database_data
+      .backup_restore_drill, database_data.data_lineage, database_data
+      .expand_contract_migration, database_data.reconciliation,
+      database_data.erd, and database_data.data_contract. Directly
+      closes database_data.erd's own OQ-ERD-3. Atlas's own F21 table
+      Normalization row (L900: "1NF→2NF→3NF/BCNF；必要時有意識
+      denormalize") names a real, well-defined, COMPUTABLE fact from
+      relational database theory: given a declared primary key,
+      non-key attributes, and a set of caller-supplied functional
+      dependencies, the highest normal form actually satisfied is
+      DERIVED by the standard textbook attribute-closure algorithm
+      (Armstrong's axioms), not caller-asserted. The builder's own
+      public interface does not even accept achieved_normal_form or
+      its three violation lists as parameters -- always computed fresh,
+      the same discipline devops_sre.capacity_model's own builder
+      established, applied here from the first draft (not discovered
+      by a critic round). Reuses ai_lego.modules.research.gates
+      .evaluate_statistical_gate UNCHANGED for the genuine_compute gate
+      (seventh reuse this session). The record's own `NORM-` id prefix
+      is checked at both the builder and the gate from the first draft,
+      applying the exact lesson database_data.data_contract's own
+      critic round forced onto that slice as a Major finding.
+    source: "methods/contracts/database_data.normalization.contract.yaml (built same session as this entry, mints machine_id database_data.normalization) + specs/cognitive/typed-objects/normalization-record.schema.yaml (new output type) + ai_lego/compute/normalization/closure.py (new compute module, independently verified against five textbook normalization examples before the method/schema/tests were written)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own (L900), no dedicated §11.x section
+      -- verified by a broad grep across the full mother document
+      before this contract was written, not discovered as a gap by a
+      later critic round. Tier 1, mandated by the actively-running
+      implementation slice, same category as the thirty-eight entries
+      above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
