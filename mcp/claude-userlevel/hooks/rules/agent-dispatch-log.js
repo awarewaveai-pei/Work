@@ -38,6 +38,30 @@ function extractResult(response) {
   return '';
 }
 
+// Walk up from cwd looking for the monorepo root (same sentinel pair as the
+// PowerShell ao-resume-on-prompt.ps1 hook: scripts\ao-resume.ps1 + .git).
+// Prior version wrote to path.join(ctx.cwd, 'agency-os') directly -- when a
+// subagent's cwd was deep inside e.g. agency-os/docs/<package>/, that check
+// always failed (no nested agency-os dir there) and mkdirSync then CREATED
+// one, which is exactly the orphan agency-os/ debris found 2026-09-05. This
+// walk finds the real root instead of testing only the exact cwd.
+function findMonorepoRoot(startDir) {
+  if (!startDir || !path.isAbsolute(startDir)) return null;
+  let cur = startDir;
+  for (let i = 0; i < 16; i++) {
+    if (
+      fs.existsSync(path.join(cur, 'scripts', 'ao-resume.ps1')) &&
+      fs.existsSync(path.join(cur, '.git'))
+    ) {
+      return cur;
+    }
+    const parent = path.dirname(cur);
+    if (!parent || parent === cur) break;
+    cur = parent;
+  }
+  return null;
+}
+
 module.exports = {
   check(ctx) {
     // ctx.shared can be null in degraded mode (lib/shared.js failed to
@@ -64,9 +88,9 @@ module.exports = {
       result_snippet: truncate(redact(extractResult(ctx.payload.tool_response)), 200),
     });
 
-    const aoDir = path.join(ctx.cwd, 'agency-os');
-    const dispDir = fs.existsSync(aoDir)
-      ? path.join(aoDir, 'reports', 'agent-dispatch')
+    const root = findMonorepoRoot(ctx.cwd);
+    const dispDir = root
+      ? path.join(root, 'agency-os', 'reports', 'agent-dispatch')
       : path.join(os.homedir(), '.claude', 'agent-dispatch');
     fs.mkdirSync(dispDir, { recursive: true });
     fs.appendFileSync(path.join(dispDir, `dispatch-${dateStr}.jsonl`), record + '\n');

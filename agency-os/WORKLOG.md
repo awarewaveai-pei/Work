@@ -48,12 +48,18 @@
 
 **觸發**：稽核 System Foundry v1.6 package 時，critic subagent 在該 package 樹內發現一個非預期的巢狀 `agency-os/` 目錄（`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/agency-os/.agency-state/ao-resume-hook-fail.log` + `.../reports/agent-dispatch/dispatch-20260904.jsonl`），追出根因是 hook 本身在跑。
 
-**根因**：`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:36`（`Resolve-MonorepoRootWithAoResume` 函式內）呼叫 `Split-Path -LiteralPath $cur -Parent`。本機 hook 實際跑在 Windows PowerShell 5.1.26100.9168（PATH 上沒有 `pwsh`），該版本 `-LiteralPath` 與 `-Parent` 屬於不同 parameter set，每次呼叫都噴 `AmbiguousParameterSet`（`參數集無法使用指定的具名參數解析`）。catch block 會 fail-open（`continue:true`，不擋 chat）但把例外寫進 **cwd 相對路徑**的 `agency-os/.agency-state/ao-resume-hook-fail.log`——若某個 process 的 cwd 剛好在 repo 深處子目錄（例如某個文件套件目錄），就會在該處長出一個假的巢狀 `agency-os/` 目錄，而非寫回真正的 monorepo 根。
+**根因 1**：`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:36`（`Resolve-MonorepoRootWithAoResume` 函式內）呼叫 `Split-Path -LiteralPath $cur -Parent`。本機 hook 實際跑在 Windows PowerShell 5.1.26100.9168（PATH 上沒有 `pwsh`），該版本 `-LiteralPath` 與 `-Parent`（以及 `-Leaf`／`-Qualifier`）屬於不同 parameter set，每次呼叫都噴 `AmbiguousParameterSet`（`參數集無法使用指定的具名參數解析`）。catch block 會 fail-open（`continue:true`，不擋 chat）但把例外寫進 **cwd 相對路徑**的 `agency-os/.agency-state/ao-resume-hook-fail.log`。
 
-**影響**：(1) `Resolve-MonorepoRootWithAoResume` 每次都失敗 → hook 自動 `ao-resume.ps1 -FullMainlineParity` 從未真正跑過（fail-open 靜默）→ `.agency-state/ao-resume-hook-last.json`（AGENTS.md §8 規定每個 session 開工要讀的檔案）可能過期而無人發現。(2) 4 處孤兒 debris 目錄各自散落在不同深層子目錄下，`validate_manifest.py` 等腳本會誤報 WARN。
+**根因 2（第二輪獨立 critic 覆審抓到的 Critical，修根因 1 才會被啟用）**：`ao-resume-on-prompt.ps1:32-34` 的 sentinel `scripts\ao-resume.ps1` **不是 root-unique**——`D:\Work\agency-os\scripts\ao-resume.ps1` 是一個 1038-byte 的 thin wrapper（真正實作在 monorepo 根 `D:\Work\scripts\ao-resume.ps1`），會讓 walk-up 迴圈在 `agency-os` 這層就提前停下。修完根因 1 之後，任何 cwd 在 `agency-os/` 子樹底下的呼叫都會把 `$root` 錯誤解析成 `D:\Work\agency-os`（而非 `D:\Work`），導致 `stateDir=D:\Work\agency-os\agency-os\.agency-state` 又長出巢狀目錄——跟這次要清的 debris 一模一樣的樣態，而且是**新引入、可重現**的回歸（修前因為根因 1 在 iteration 1 就先崩潰、fail-open 提早離開，這條錯誤路徑實際上打不到；修根因 1 後才變成 `agency-os/` 整個子樹都會走到）。**已修**：sentinel 改為要求同時存在 `scripts\ao-resume.ps1` **且** `.git`（`D:\Work\.git` 存在、`D:\Work\agency-os\.git` 不存在），任何未來的巢狀 wrapper 都無法再假冒 root。
+
+**根因 3（同一 debris 類的第二個寫入來源，第二輪 critic 覆審一併抓到）**：`mcp/claude-userlevel/hooks/rules/agent-dispatch-log.js:67`（PostToolUse，記錄 Agent 派工）原本 `path.join(ctx.cwd, 'agency-os')` 純 cwd 相對，完全沒有向上尋根——是 `dispatch-*.jsonl` 那一半 debris 的實際元兇（不是 PS hook 的失敗 log 造成的），且不受根因 1/2 的修法影響，下次從深層 cwd 派 Agent 還是會重造。**已修**：新增 `findMonorepoRoot()`（與 PS hook 相同的 `scripts/ao-resume.ps1` + `.git` 雙條件、16 層上限的向上尋根），找不到才 fallback 回 `~/.claude/agent-dispatch/`（原本的 fallback 語意不變）。
+
+**影響**（更正：初版寫「hook 自動 ao-resume.ps1 從未真正跑過」，經第二輪 critic 覆審用 mtime／內容證實不成立——`.agency-state/ao-resume-hook-last.json` 有持續更新、`ao-resume-hook-fail.log` 最新一筆是 2026-05-20 且與本 bug 無關；根因 1 只在 cwd **不等於**任何 sentinel 目錄時才會走到出錯的那一行，正常的 `cwd=D:\Work` 呼叫從未受影響）：(1) 只有當 hook/派工 process 的 cwd 落在 repo 深層子目錄（例如某個文件套件目錄）時，根因 1 才會崩潰或（修完根因 1 後）根因 2 才會把 root 解析錯；兩者的共同後果都是在該深層子目錄長出巢狀 `agency-os/`，而非寫回真正的 monorepo 根，`.agency-state/ao-resume-hook-last.json` 因此可能過期而無人發現。(2) 4 處孤兒 debris 目錄已各自散落確認過。
 
 **已修改**：
-- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:36`：`Split-Path -LiteralPath $cur -Parent` → `[System.IO.Path]::GetDirectoryName($cur)`（與同檔 29 行 `[System.IO.Path]::IsPathRooted` 手法一致，繞開 PS5.1 parameter set 衝突，邏輯不變）
+- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:36`：`Split-Path -LiteralPath $cur -Parent` → `[System.IO.Path]::GetDirectoryName($cur)`（與同檔 29 行 `[System.IO.Path]::IsPathRooted` 手法一致，繞開 PS5.1 parameter set 衝突）
+- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:32-35`：sentinel 加 `.git` 共同條件，修掉根因 2 的 wrong-root 回歸
+- `mcp/claude-userlevel/hooks/rules/agent-dispatch-log.js`：新增 `findMonorepoRoot()` 向上尋根（同一雙條件），取代原本純 cwd 相對的 `path.join(ctx.cwd,'agency-os')`
 - 刪除 4 處孤兒 `agency-os/` debris 目錄（皆為 untracked，內容僅 `.agency-state/ao-resume-hook-fail.log` + 可能的 `reports/agent-dispatch/dispatch-*.jsonl`，已逐一 `git status --porcelain` 確認 untracked 才刪）：
   - `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/agency-os/`
   - `Projects/internal/cognitive-engineering-os/agency-os/`
@@ -65,11 +71,16 @@
 **[驗證結果]**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -NoProfile -Command "Split-Path -LiteralPath 'D:\Work' -Parent"`（修前，直接重現原始崩潰）| exit=1 | result=`AmbiguousParameterSet` 完全重現
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -NoProfile -Command "[System.IO.Path]::GetDirectoryName('D:\Work')"` | exit=0 | result=正常回傳 `D:\`
-- REALTEST_EVIDENCE: tool=Bash | cmd=把修補後的 `Resolve-MonorepoRootWithAoResume` 函式抽出寫成 scratchpad `.ps1`，用 System_Foundry package 深層路徑當 `WorkspaceRoots` 在真實 PS 5.1 跑 | exit=0 | result=`RESOLVED_ROOT=D:\Work\agency-os`（正常向上尋找，不再拋例外）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | result=155/155 全綠（含 git-add/commit-scope-guard、subagent-budget 等既有 155 項回歸，無新增失敗）
+- REALTEST_EVIDENCE: tool=Bash | cmd=只修根因 1（未加 `.git` 條件）時，把函式抽出寫成 scratchpad `.ps1` 用 System_Foundry 深層路徑跑 | exit=0 | result=`RESOLVED_ROOT=D:\Work\agency-os`（**這正是第二輪 critic 抓到的根因 2 錯誤結果**，初版誤標成「正常」，本輪更正）
+- REALTEST_EVIDENCE: tool=Bash | cmd=加上 `.git` 共同條件後，同一 scratchpad harness 對 6 組起點（`agency-os` 各深度子目錄、4 個原 debris 位置、monorepo 根本身）逐一斷言 `-eq 'D:\Work'` | exit=0 | result=6/6 全部正確解析為 `D:\Work`（含 exact `D:\Work\agency-os` 起點——之前會直接命中 wrapper 短路）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check mcp/claude-userlevel/hooks/rules/agent-dispatch-log.js` | exit=0 | result=語法過
+- REALTEST_EVIDENCE: tool=Bash | cmd=直接 `require()` 修補後的 `agent-dispatch-log.js`、以 System_Foundry 深層路徑當 `ctx.cwd` 呼叫 `check()` | exit=0 | result=正確寫入 `D:\Work\agency-os\reports\agent-dispatch\dispatch-20260905.jsonl`，深層目錄底下**沒有**長出新的 `agency-os/`（測試附帶寫入的一行事後從真實 log 移除，未污染正式紀錄）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | result=155/155 全綠（PS hook 改動的回歸範圍）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/hooks/runner-parity.test.mjs` | exit=0 | result=100/100 全綠，含 `agent-dispatch-log writes jsonl for Agent tool`（驗證無 `.git`/sentinel 時仍正確 fallback 回 `~/.claude/agent-dispatch/`，未破壞既有 fallback 語意）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -NoProfile -File scripts/sync-claude-userlevel.ps1 -Mode merge`（跑兩次）| exit=0 | result=第一次 `hooks: update` 同步含修補檔；第二次 `hooks: same=43, update=0` 確認已落地 `~/.claude/hooks/`
-- REVIEW_DONE: critic=Standard（前次獨立 critic subagent 稽核 System Foundry 時發現本 bug 並重現；本 session 依其 finding 讀原始檔驗證、套用建議修法並自行重跑驗證，非照抄未查）| verdict=pass | findings=0c/0m/0n（單一根因單一修法，無殘留）
-- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,lobster-factory,Projects | grep=`Split-Path\s+-LiteralPath\s+\$\w+\s+-Parent` | hits=0（全庫僅此一處曾有此樣式，已修）
+- REVIEW_DONE: critic=Standard（第二個獨立 critic subagent，針對本次 PS 一行修法做覆審；未照單全收，逐項自行重跑驗證確認 Critical/Major 屬實後才採納）| verdict=pass（1 Critical + 3 Major + 3 Minor + 1 Suggestion，Critical/Major 全部修正並附上方 REALTEST_EVIDENCE 佐證；Minor 2/3 屬觀察性註記非需改動的邏輯缺陷）| findings=0c/0m/0n（全部關閉）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,lobster-factory,Projects | grep=`Split-Path\s+-LiteralPath\s+\$\w+\s+-Parent` | hits=0（全庫僅此一處曾有此樣式，已修；`.claude/worktrees/*/` 底下其他並行 session 的獨立 checkout 不計入，非本 repo 現況）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,lobster-factory,Projects | grep=`path\.join\(ctx\.cwd` | hits=2（`agent-dispatch-log.js:43`＝已修的新註解、`batch-format.js:20`＝無關用途——定位 `node_modules/.bin` 執行檔，非組出 `agency-os` debris 路徑，確認不需要改；已修檔已用 `sync-claude-userlevel.ps1 -Mode merge` 落地 `~/.claude/hooks/`，diff 比對 byte-identical）
 
 ## 2026-09-05（System Foundry v1.6 續：第二輪 critic 對 3 個已修改檔的獨立覆審，抓到 1 Major（criticality 行為零測試覆蓋）+ 5 Minor，全部修正並用突變測試證實有效）
 
