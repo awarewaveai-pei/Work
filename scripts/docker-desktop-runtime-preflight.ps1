@@ -1,10 +1,10 @@
 [CmdletBinding()]
-param()
+param([switch]$StartDesktop)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Docker Desktop 4.71 can leave AF_UNIX reparse-point sockets behind after an
+# Docker Desktop can leave AF_UNIX reparse-point sockets behind after an
 # abnormal backend exit. Renaming only those runtime directories is reversible
 # and deliberately excludes the WSL disk, volumes, containers, and settings.
 $runtimeDirectories = @(
@@ -56,16 +56,25 @@ foreach ($runtimeDirectory in $runtimeDirectories) {
         continue
     }
 
-    # Re-check immediately before the move to avoid racing a manual Docker start.
+    # Reduce (but cannot eliminate) the race with an independent manual start.
     if (Test-DockerDesktopActive) {
-        Write-Output 'SKIP: Docker Desktop started during preflight; runtime paths are untouched.'
+        Write-Output 'SKIP: Docker Desktop started during preflight; no further runtime paths will be changed.'
         exit 0
     }
 
-    $parent = Split-Path -LiteralPath $runtimeDirectory.Path -Parent
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmssfff'
-    $destination = Join-Path $parent "$($runtimeDirectory.ArchiveName)-$stamp"
+    $archiveName = "$($runtimeDirectory.ArchiveName)-$stamp"
+    # Split-Path -LiteralPath cannot be combined with -Parent in Windows PS 5.1.
+    $parent = [IO.Path]::GetDirectoryName($runtimeDirectory.Path)
+    $destination = Join-Path -Path $parent -ChildPath $archiveName
 
-    Move-Item -LiteralPath $runtimeDirectory.Path -Destination $destination -ErrorAction Stop
+    Rename-Item -LiteralPath $runtimeDirectory.Path -NewName $archiveName -ErrorAction Stop
     Write-Output "QUARANTINED: $($runtimeDirectory.Path) -> $destination"
+}
+
+# Use this switch from the safe-start shortcut so every launch gets a preflight,
+# including restarts within the same Windows login. Errors above prevent launch.
+if ($StartDesktop) {
+    $desktopExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+    Start-Process -FilePath $desktopExe -WindowStyle Hidden -ErrorAction Stop
 }

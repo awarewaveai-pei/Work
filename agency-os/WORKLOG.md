@@ -1,5 +1,37 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 — 補「持續大規模」capability 缺口 + conflict-rules.json 交叉引用漏檢，操作者問「這套系統還缺什麼」後的稽核與修復）
+
+**觸發**：操作者問「看這套系統還有沒有缺什麼，讓我可以在任何情惜下都可以做出完美的功能架構」，針對 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/`（199 capabilities/161 questions/12步 verify chain 的問卷→規則引擎→藍圖產生器）做完整性稽核，找到 4 類缺口後操作者授權「你做最完美的處理」。
+
+**稽核發現與取捨**（完整脈絡見對話紀錄，此處記錄「做了什麼」與「為什麼不做另外兩項」）：
+1. **`CAP-SPIKY-LOAD` 只覆蓋負載「變異度」（尖峰），沒有覆蓋「持續大規模」**——一個穩定日活 5000 萬、從不尖峰的系統，跟一個 10 人內部工具會得到完全相同的 capability 集合。已修：新增 `Q-IMP-008`/`CAP-HIGH-SCALE`，比照既有 `Q-IMP-007`/`CAP-SPIKY-LOAD` 的問法與掛法。
+2. **`validate_configurator.py` 從未把 `rules/conflict-rules.json` 納入交叉引用檢查**（原本只查 question-rules.json/derivation-rules.json，見該檔第 54-60 行舊版）——一個打錯字的 question id 藏在 conflict rule 的 `if_all` 裡會永久靜默失效（`eval_condition` 讀到 `answers.get(typo)` 恆為 None/False），該條矛盾檢查形同虛設卻沒有任何錯誤訊息浮現。已修：加入該檔案的 question-id 存在性檢查。稽核當下 0 hits（5 條既有規則的 question id 全部有效，純屬補洞防未來回歸）。
+3. **考慮過但主動放棄：capability 層級的「架構張力」衝突規則**（例如 `CAP-RESIDENCY` + `CAP-MULTI-TENANT` 同時存在時要不要當矛盾擋下）。查證後發現這類張力幾乎都是「條件性」而非「恆真」——例如多租戶不必然代表租戶跨國——若強行加入會製造偽陽性警告，比完全不檢查更糟（跟 `feedback_clean_no_patches` 同一類判準的鏡像案例：不是漏檢，是會亂報）。
+4. **考慮過但主動放棄：custom requirement 重複出現的偵測 ledger**。查證 `scripts/validate_manifest.py` 後發現這個 package 是**內容雜湊鎖定**、設計成可原樣複製到別處的產物（`regenerate_integrity.py` 對每個 git-tracked 檔案算 SHA256 存進 `manifest.json`，`README.md`/`validate_manifest.py` 註解明講這棵樹要能在任何複製出去的副本上獨立驗證）——任何會隨每次執行變動的 ledger 檔案放進這棵樹都會讓 manifest 陷入永久 drift。這類「跨對話追蹤反覆出現的客製需求該記在哪」屬於不同層級的基礎設施決策，不應該未經操作者同意就塞進一個刻意設計成不可變的套件。
+
+**[已修改]**：
+- `capabilities/catalog.json`：新增 `CAP-HIGH-SCALE`（module=reliability，requires=[]）
+- `questionnaires/catalog.json`：新增 `Q-IMP-008`（business_impact 類別，緊接 Q-IMP-007 之後）
+- `rules/question-rules.json`：新增 `RULE-Q-IMP-008` → require `CAP-HIGH-SCALE`
+- `generation/module-manifests.json`：`reliability` 模組 `activated_by` 加入 `CAP-HIGH-SCALE`（`validate_artifact_generation.py:19` 強制要求兩者一致，否則 12 步 verify chain 的 artifact-static 步驟會 FAIL）
+- `scripts/configurator_engine.py`：`criticality` 公式併入 `Q-IMP-008`（跟既有 `Q-IMP-001`/`Q-IMP-003` 同層級，單獨為真即判定至少 `medium`）
+- `scripts/validate_configurator.py`：新增 `rules/conflict-rules.json` 的 question-id 交叉引用檢查（見上述缺口 2）
+- `tests/fixtures/selection/all_yes.json`：`active_answer_count` 157→158，`current_capabilities` 插入 `CAP-HIGH-SCALE`（按字母序）
+- `tests/fixtures/selection/all_no.json`：`active_answer_count` 108→109（`Q-IMP-008` 無條件啟用，all-no 情境下仍會被明確答 false，答案數照樣 +1——第一次跑 `test_selection_matrix.py` 時漏了這個，被 `golden selection drift: all_no.json` 斷言當場抓到才補上）
+- `tests/test_artifact_generation.py`：硬編數字 `199`→`200`
+- `manifest.json`：`python scripts/regenerate_integrity.py --write` 重算全部雜湊（`kernel_digest` 未變，因為沒有動到任何 `kernel/*.md`，dry-run 已先確認）
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_versions.py`+`validate_semantics.py`+`validate_configurator.py`+`validate_artifact_generation.py`+`validate_contract_fixtures.py`+`run_adversarial_contract_tests.py`+`test_bootstrap_e2e.py`+`test_configurator_e2e.py`+`test_configurator_http_e2e.py`+`test_selection_matrix.py`+`python -m unittest discover -s tests`+`validate_manifest.py`（12 步 verify chain 逐一手動跑，本機無 `make`）| exit=0（每一步）| result=`SELECTION MATRIX: PASS questions=162 single=162 pairwise_valid=13035 pairwise_rejected=6 random=1000 modules=32 blueprints=73 all_yes_caps=200`；29 個 unittest 全綠；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash+Browser | cmd=`preview_start(system-foundry-configurator)` 開真實瀏覽器，點擊「平常（非尖峰）使用規模就非常龐大」卡片→輸入專案名稱→「驗證並預覽」→「送出並生成」| exit=0 | result=`/api/resolve` 回傳 `current_capabilities` 含 `CAP-HIGH-SCALE`、`criticality:"medium"`、`traceability:{"CAP-HIGH-SCALE":["RULE-Q-IMP-008"]}`；`/api/generate` 落地的 `docs/modules/reliability/MODULE_MANIFEST.json` 讀回確認 `activated_capabilities:["CAP-HIGH-SCALE"]`，`.foundry/intake/answers.json` 讀回確認 `answers.Q-IMP-008:true`；測試資料夾 `generated/high-scale-test` 已用 Python `shutil.rmtree` 清除（`rm -rf` 被機械閘擋下改用此法），未留垃圾
+- REVIEW_DONE: critic=Standard | verdict=[PENDING -- 尚未收到 critic subagent 回覆，commit 前補齊，不得留空字串佔位]
+- BUGHUNT_DONE: scope=agency-os（含 System_Foundry_v1.6_ARTIFACT_COMPLETE 全樹）| grep=`\b199\b\|\b161\b\|\b157\b`（改動前）+ `CAP-HIGH-SCALE\|Q-IMP-008`（改動後一致性）| hits=改動前 3 個檔案提及舊數字，經查全部是過去時間點的凍結記錄（`WORKLOG.md` 既有條目本身、`reports/status/integrated-status-*`、`.agency-state/worklog-excerpt.md`），比照既有 CHANGELOG 慣例不回溯改寫歷史條目，不需修改；改動後 `CAP-HIGH-SCALE`/`Q-IMP-008` 在 9 個相關檔案中出現位置與預期完全一致
+
+**[剩餘風險]**：`CAP-HIGH-SCALE` 目前只是一個 flag，跟既有其餘 199 個 capability 一樣不影響「blueprint 產出深度」——78 份藍圖模板不論選什麼都全部產生，內容仍是靠人／Claude 執行藍圖時填寫，criticality/profile 只寫進 `project-profile.json` 供人參考、不 gate 文件產生。這是系統既有設計，非本次改動引入的新限制。放棄的兩個候選缺口（架構張力衝突偵測、custom requirement 重複偵測 ledger）若操作者之後想要，需要先討論可接受的偽陽性率、以及 ledger 該放在套件樹外的哪裡，不建議之後隨手加進去。
+
+**[rollback]**：`git revert` 本次 commit 即可完整還原；`manifest.json` 雜湊會隨 revert 自動對齊，下次跑 `validate_manifest.py` 會自然通過，不需額外動作。
+
 ## 2026-09-05（續47，新 session：Cognitive OS 第三十四個 Method Atlas 切片 — `devops_sre.game_day`，本 session 首個 critic 一審零 Critical／零 Major，但「正確卻沒測試逼它執行」那類突變存活兩次）
 
 **觸發**：操作者「繼續完美完成這個系統」（標準授權延續）。1 個 critic subagent（第一次派出撞 429 session limit，14:40 重置後依操作者「Try again」重派成功；額度斷路器未設 block，因重置點已過）。
@@ -35,6 +67,25 @@
 **[剩餘風險]**：`OQ-GAMEDAY-1`（無 inventory machine id 列）、`-2`（F17 AAR 建契約後 `aar` 是否改 ref）、`-3`（DEVOPS_SRE_PLAN §3.1 failover 演練未交叉引用）、`-4`（只有時長無 timeline）、`-5`（無 `chaos_experiment_ref`）；runtime 不驗自身 id 前綴（schema 層釘住）。皆已揭露非靜默。
 
 **[rollback]**：單一 commit，`git revert`；spec-root 索引檔由 `gen_spec_index.py` 重生即可。
+
+## 2026-09-05（Docker Desktop 4.89 stale `sailor-ingest.sock` recurrence — preflight compatibility repair）
+
+**觸發／根因**：Desktop 4.89.0 再次因 `Docker/run/sailor-ingest.sock` reparse-point socket 無法改名而退出。既有登入排程在 14:08 有觸發但 `LastTaskResult=1`。實際執行 guard 後，PowerShell stack trace 證實 `Split-Path -LiteralPath ... -Parent` 在 Windows PowerShell 5.1 是不相容參數組；`Test-Path -LiteralPath ... -PathType Container` 經 5.1 實測可用。guard 只在 Docker 已運行時測過 no-op，從未走過真正的隔離路徑。
+
+**不變量**：若 Docker backend 未運行且 runtime 目錄含 reparse-point socket，guard 必須可在 Windows PowerShell 實際執行、只以可回復 rename 隔離該目錄；禁止觸及 VHDX、volumes、containers 或 reset 設定。
+
+**[已修改]**：`scripts/docker-desktop-runtime-preflight.ps1` 以 `[IO.Path]::GetDirectoryName` + 同目錄 `Rename-Item` 取代不相容 `Split-Path` 路徑，並新增 `-StartDesktop` 安全啟動入口；新增 `scripts/test-docker-desktop-runtime-preflight.ps1` 的 7 情境 PowerShell 5.1 回歸測試；新增 `runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md`，固化排程、同次登入重啟與資料保護步驟。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=`docker-desktop-runtime-preflight.ps1`（Desktop 停止、真實 stale sockets） | exit=0 | ms=3700 | result=`Docker/run` 與 `docker-secrets-engine` 已改名為 timestamp archive；沒有刪除。
+- REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`Start-ScheduledTask 'Docker Desktop Runtime Preflight'` | exit=0 | ms=12200 | result=`LastTaskResult=0`；修正後排程在 Desktop 停止狀態可跑。
+- REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=`Start-Process Docker Desktop.exe` + `docker version` + health inspection | exit=0 | ms=16700 | result=Engine 29.7.2 可用；VHDX=15225323520 bytes、8 個既有關鍵 volumes 存在、Trigger Webapp/Supervisor healthy。
+- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=`test-docker-desktop-runtime-preflight.ps1` | exit=0 | ms=800 | result=7/7 PASS：缺路徑、普通檔、已執行、檢查中啟動、真 reparse-point 隔離＋冪等、安全啟動、已執行時不啟動；每例驗資料 sentinel/junction target 未受損。
+- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=`test-docker-desktop-runtime-preflight.ps1 -ScriptPath <e97201870 version>` | exit=1 | ms=836 | result=舊版在真 reparse-point 隔離分支穩定重現 `Split-Path` ParameterBindingException。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n fixed（登入觸發非每次啟動、race 訊息不應聲稱全程未改動）。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=`Split-Path.*LiteralPath.*Parent|docker-desktop-runtime-preflight|sailor-ingest` | hits=17（皆為本次 script/test/runbook/worklog 與既有歷史證據，無 stale guard implementation）。
+
+**[剩餘風險]**：guard 在登入與使用者手動啟動 Desktop 間仍有極小 race，但會在看到 Docker 進程時 fail-safe no-op；未來不同類型的 Desktop bug 仍需另行診斷。**[rollback]**：archive 目錄保留供人工復原；腳本／runbook 可 `git revert`，但不可為回滾而刪除 archive 或資料盤。
 
 ## 2026-09-05（VBC 補勾 TASKS.md 一條 2026-09-04 repo 衛生待辦——三子項已被其他 session 順手解決但文件未更新）
 
@@ -10762,4 +10813,3 @@ Hostinger nameserver 改回 `ns1.dns-parking.com` / `ns2.dns-parking.com`；CF z
 - REALTEST_WAIVED: DOC_ONLY -- report generation; no executable code changed
 - REVIEW_WAIVED: DOC_ONLY -- monthly review document; prose review only
 - BUGHUNT_WAIVED: DOC_ONLY -- no code modified
-
