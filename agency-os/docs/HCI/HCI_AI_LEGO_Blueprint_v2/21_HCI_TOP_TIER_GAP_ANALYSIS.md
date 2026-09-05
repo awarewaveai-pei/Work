@@ -57,6 +57,8 @@ Path: `D:\Work\Projects\internal\hci30\docs\intelligence\{HCI_EVIDENCE_QUALITY_S
 
 Must define: score semantics, uncertainty, minimum evidence, source independence, contradiction, time decay, severity exceptions, missing data, model disagreement, insufficient-data behavior, **and (new in V2) the Trust-Domain-to-Assessment-Dimension roll-up formula (`04_HCI30_PRODUCT_SPEC.md` note) and the qualitative-band-to-probability-range mapping (`19` §Confidence Display) until this spec ships**.
 
+**Partial closure (2026-09-06)**: the Trust-Domain-to-Assessment-Dimension roll-up formula sub-item is done — `Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`, using ADR-0032's already-ratified qualitative-band scale (reusing `19`'s Confidence Display bands rather than a second numeric scale). The remaining six specs (`HCI_EVIDENCE_QUALITY_SPEC.md`, `HCI_CONFIDENCE_SPEC.md`, `HCI_RISK_SPEC.md`, `HCI_PERMISSION_SPEC.md`, `HCI_CONTRADICTION_SPEC.md`, `HCI_TIME_DECAY_SPEC.md`) — covering score semantics for methods generally, uncertainty, minimum evidence beyond Trust Domain, source independence, contradiction, time decay, severity exceptions, and model disagreement — remain open; see `HCI_TRUST_DOMAIN_SPEC.md` §Explicitly out of scope for the exact boundary.
+
 Expected result: independent implementations given the same inputs produce equivalent outputs.
 
 ## P0-05 Machine-readable HCI policy

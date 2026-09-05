@@ -84,7 +84,7 @@ At minimum:
 13. Context stability
 14. Predictability
 
-> ⚠️ **SPEC GAP, not a 🔴 decision** — these 14 granular, observation-facing dimensions and the 7 coarse, decision-facing Trust Domains above are not stated as the same axis system, and V1 never specifies the roll-up formula from one to the other. This is a mathematical-specification question (not a value trade-off — no operator sign-off needed, an implementer needs to derive the formula), correctly filed under `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04 (Mathematical Specifications), work that must happen before Wave 5 (Intelligence math v1). Flagged here so an implementer does not silently invent a roll-up formula without documenting it. Full reasoning: `HCI30_RESEARCH_REVIEW/05_DOMAIN_ARCHITECTURE_REVIEW.md`.
+> ✅ **RESOLVED (2026-09-06)** — the roll-up formula from these 14 dimensions to the 7 Trust Domains above is now specified: `Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md` (a strict 2-dimensions-per-domain partition, mean-of-ranks aggregation, round-half-down tie-break; qualitative bands only, per `ADR-0032`, never a bare number). This closes only the roll-up-formula sub-item of `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04 (Mathematical Specifications) — the other six P0-04 specs (evidence quality, confidence, risk, permission, contradiction, time decay) remain open. Full original-gap reasoning: `HCI30_RESEARCH_REVIEW/05_DOMAIN_ARCHITECTURE_REVIEW.md`.
 
 ## Relationship lifecycle
 

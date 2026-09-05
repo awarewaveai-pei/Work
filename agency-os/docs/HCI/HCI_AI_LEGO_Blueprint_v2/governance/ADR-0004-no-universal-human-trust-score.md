@@ -269,7 +269,11 @@ roll-up formula; a math team must still define that.
   — same ESM-module-plus-`node --test` pattern as the existing
   `validate-request.mjs` (ADR-0010 gate, request-validation layer). Validates
   a Person-trust read response is shaped `{ domains: [{domain, value,
-  evidence_refs}] }`; rejects a bare top-level field matching
+  evidence_refs}] }` **— superseded by the "Implementation note (2026-09-06,
+  P0-04 Trust-Domain roll-up formula landed, gate 4 corrected)" below, which
+  adds a required `coverage` field and changes `value` from a number to a
+  band; this paragraph is left as the historical record of what shipped
+  first**; rejects a bare top-level field matching
   `overall_score|composite_trust|aggregate_trust|universal_trust|trust_score`
   (gate 1's own SQL-column list) **plus `overall_trust`**, which this gate's
   own text (item 4 above) names but the SQL-column list never had reason to
@@ -346,6 +350,135 @@ formula (P0-04); they exist so the first real trust-read endpoint and the
 first real method-catalog entry cannot introduce the forbidden shape
 unnoticed, exactly as the "Required implementation gates" section above
 specifies.
+
+## Implementation note (2026-09-06, P0-04 Trust-Domain roll-up formula landed, gate 4 corrected)
+
+`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04's Trust-Domain-to-Assessment-
+Dimension roll-up formula (the specific gap `04_HCI30_PRODUCT_SPEC.md:87`
+names and this ADR explicitly declined to resolve) now exists:
+`Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`, with
+`packages/intelligence/{assessment-dimensions,rollup-trust-domains}.mjs` as
+its implementation. Summary: a strict 2-dimensions-per-domain partition of
+the 14 dimensions (not a weighted many-to-many matrix — see that spec's own
+rationale), aggregated by mean-of-ranks with a round-half-down tie-break.
+`04_HCI30_PRODUCT_SPEC.md:87`'s SPEC GAP callout and
+`21_HCI_TOP_TIER_GAP_ANALYSIS.md`'s P0-04 entry are updated to reference it;
+six sibling P0-04 specs (evidence quality, confidence, risk, permission,
+contradiction, time decay) remain open and are out of scope for that file.
+
+**Design change to gate 4, made while writing the roll-up spec, not by
+external review — and, per a critic review's own M7 finding below, better
+described as "extends ADR-0032 by analogy" than "conflicts with/corrects
+ADR-0032"**: cross-checking against `ADR-0032` (ACCEPTED,
+`governance/ADR-0032-personality-and-behavioral-method-disposition.md`)
+found it ratifies qualitative bands for four *second-order* confidence
+axes (Evidence Confidence, Model Agreement, Method Robustness, Decision
+Confidence) — a Trust-Domain `value` is a *first-order* substantive
+assessment, outside that ADR's own enumerated scope, so gate 4's original
+bare-number `value` did not literally violate an ACCEPTED decision. The
+change is nonetheless made, by analogy: the harm ADR-0032 guards against
+(a number reading as calibrated before any calibration evidence exists)
+applies with at least as much force here, and ADR-0004's own
+rejected-alternative text already named exactly this shape ("once a
+'Person X = 62/100 trust' fact is stored... it becomes permanent
+reputational surface") — moved one level down from universal to per-domain.
+Unlike ADR-0032, this new rule provides no calibration escape hatch (a
+deliberate V1 simplification, not an oversight — see
+`HCI_TRUST_DOMAIN_SPEC.md`'s own Status/Context sections for the full
+disclosure). Changed: `value` is now one of ADR-0032's five qualitative bands
+(`VERY_LOW|LOW|MODERATE|HIGH|VERY_HIGH`); a new required `coverage`
+(`FULL|PARTIAL`) field records whether both or only one of a domain's two
+assigned dimensions had evidence, since that distinction is real
+information a due-diligence reader needs (`04_HCI30_PRODUCT_SPEC.md`
+§Unknowns as first-class data) and must not be silently absorbed into the
+value itself. `tests/unit/contracts/validate-trust-domain-response.test.mjs`
+updated to match (13→17 assertions). No consumer of gate 4 existed yet (no
+real trust-read endpoint), so this correction has zero migration cost —
+the cheapest point at which to catch it, and a self-caught cross-check
+rather than a defect an external review found.
+
+Verification: `tests/unit/intelligence/assessment-dimensions.test.mjs`
+proves the 14-dimension partition is exhaustive and non-overlapping
+mechanically (not trusted from a comment, same lesson as this ADR's own
+`trust-domains.mjs` drift-test precedent);
+`tests/unit/intelligence/rollup-trust-domains.test.mjs` exhaustively checks
+all 25 rank-pair combinations (not a sample) plus an end-to-end test
+proving the roll-up's own output always passes gate 4's
+`validateTrustDomainResponse` unchanged.
+
+**Independent critic review** (same rationale as gate 4/5's own reviews:
+new design + new JS logic, not a database-schema question) found **0
+Critical, 7 Major, 7 Minor**, all fixed before commit — a real mutation
+sweep (17 mutations against a scratch copy) plus a close read of every
+cross-file claim this spec made, not code-reading alone:
+- **M1**: the spec's prose partition table and `DIMENSION_TO_DOMAIN` had no
+  test binding them — swapping two assignments passed the whole suite.
+  Fixed with a machine-checked `DIMENSION -> DOMAIN` appendix block in the
+  spec, parsed and `deepEqual`'d against the export
+  (`tests/unit/intelligence/assessment-dimensions.test.mjs`), same pattern
+  `trust-domains.test.mjs` already uses against SQL text.
+- **M2**: the import-time self-check verified total count and domain
+  validity but not per-domain arity, so a dimension silently reassigned to
+  the wrong domain passed the guard *and* then produced a wrong `coverage`
+  value (`rollup-trust-domains.mjs` derived `coverage` from a literal
+  `present.length === 1`, which only happened to agree with "all assigned
+  dimensions present" because every domain currently has exactly 2). Fixed
+  both: the guard now checks per-domain arity, and `coverage` is derived
+  from `present.length === assigned.length`.
+- **M3**: `evidence_refs` ordering was unstated, and two of the spec's own
+  test cases already disagreed about it. Pinned: ordered by each
+  dimension's position in `ASSESSMENT_DIMENSIONS`, asserted explicitly
+  (not via a sort that would hide a regression).
+- **M4**: the spec claimed `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md`
+  "already specifies" a qualitative-band-to-probability-range mapping;
+  it does not (`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04 lists that mapping
+  as still owed), and the omission had silently dropped it from both open-item
+  lists. Fixed: corrected the claim and added the mapping to
+  `HCI_TRUST_DOMAIN_SPEC.md` §Explicitly out of scope and to `TASKS.md`.
+- **M5**: mean-of-ranks arithmetic assumes the five bands are evenly
+  spaced, which the (not-yet-written) ICD 203 probability mapping likely
+  will not be — the spec's two claims ("aligns with ICD 203" and "take the
+  arithmetic mean") were not jointly consistent. Fixed: the spec now states
+  the 1-5 rank encoding is normative for aggregation and any future
+  probability mapping is display-only, never used to re-derive it.
+- **M6**: §Layering claimed cross-method-per-dimension combination is
+  "already governed by gate 5's `decision_weight`" — checked directly:
+  `decision_weight` is keyed by Trust Domain, not by Assessment Dimension,
+  and defines no combination semantics at all, so this is a genuinely
+  unowned gap, not a closed one. Fixed the claim and added the gap to
+  `TASKS.md`.
+- **M7**: the spec's citation of `04_HCI30_PRODUCT_SPEC.md:87` ("no
+  operator sign-off needed") covers the aggregation *formula* only —
+  applying ADR-0032's band convention to Trust-Domain values, and the
+  seven domains' own working definitions, are separate decisions this
+  citation does not authorize on its own. Fixed: the spec's Status/Context
+  sections now explicitly separate the two kinds of decision and disclose
+  that the ADR-0032 extension is new, by analogy, and stricter than
+  ADR-0032 itself (no calibration escape hatch), rather than a mandated
+  correction.
+- **m1**: the nested per-entry forbidden-name check (an aggregate field
+  declared *inside* a domain entry, e.g. `{..., overall_score: 62}`) was
+  still rejected but misrouted through the generic "unknown property" path
+  instead of `TRUST-NEG-03` — the same class of bug m2 already fixed one
+  level up. Fixed symmetrically.
+- **m2**: `rollupTrustDomains` re-read `entry.value`/`entry.dimension`
+  multiple times after validation, a time-of-check/time-of-use gap a
+  getter-backed input could exploit. Fixed by validating into a plain
+  snapshot object and operating only on that.
+- Five further Minor items fixed: a stale verbatim quote of `04:87`'s
+  pre-change text (now cited historically); `HCI_CONTRADICTION_SPEC.md`
+  missing from `TASKS.md`'s sibling-spec list (it had been folded into the
+  evidence-quality item instead of listed as its own P0-04 file); the
+  zero-evidence-dimension guarantee mis-attributed to a SQL constraint that
+  governs a different table (no `AssessmentDimension` schema exists yet —
+  the guarantee is a function-boundary check); a superseded-by pointer
+  added at this note's own gate-4 paragraph above; and a weak `||`-joined
+  test assertion split into two exact ones.
+
+Final tally after all fixes: **72/72 Node assertions** across all six
+contract/intelligence test files (up from 67 before the review); full
+`test-wave1-local.ps1` run green end-to-end (all Node-level gates plus the
+unrelated 11-migration Docker SQL suite and reversibility check).
 
 ## Evidence
 

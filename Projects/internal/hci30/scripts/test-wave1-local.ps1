@@ -47,6 +47,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Trust-domain response validator tests failed (
 node --test (Join-Path $root 'tests/unit/contracts/validate-method-contract.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Method-contract registry validator tests failed (ADR-0004 gate 5).' }
 
+# P0-04 Trust-Domain roll-up formula (docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md):
+# the 14-dimension-to-7-domain partition and its aggregation function.
+# Node-level, Docker-free.
+node --test (Join-Path $root 'tests/unit/intelligence/assessment-dimensions.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Assessment-dimension partition test failed (P0-04 Trust-Domain spec).' }
+
+node --test (Join-Path $root 'tests/unit/intelligence/rollup-trust-domains.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Trust-domain roll-up formula tests failed (P0-04 Trust-Domain spec).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.

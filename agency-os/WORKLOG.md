@@ -22,17 +22,32 @@
 - 修改：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{04_HCI30_PRODUCT_SPEC.md,21_HCI_TOP_TIER_GAP_ANALYSIS.md,governance/ADR-0004-no-universal-human-trust-score.md,governance/ADR_INDEX.md}`
 - 修改：`agency-os/TASKS.md`（P0-04 trust-domain 已完成項 + 另六份 spec 追蹤項 + mutation-check 追蹤項範圍更新）
 
+**送 critic 獨立覆審**（純設計+JS 邏輯，同 gate 4/5 判準只需 critic）——實跑 17-mutation 掃描 + 逐條核對每個跨檔引用是否真實，抓到 **0 Critical + 7 Major + 7 Minor**，commit 前全修：
+- **M1**：spec 文件的 prose partition 表跟 `DIMENSION_TO_DOMAIN` 無任何綁定測試——互換兩個歸屬後整套 test 依然全綠。修為 spec 文件內加一段機器可解析的 `DIMENSION -> DOMAIN` 附錄區塊，寫測試直接讀該區塊比對 export，同 `trust-domains.test.mjs` 讀 SQL 文字的既有手法。
+- **M2**：import-time 自我檢查只驗總數與 domain 合法性，未驗「每 domain 恰 2 個」——一個維度被誤配到錯的 domain 時 guard 沒抓到，且 `coverage` 判斷用字面 `=== 1` 而非「present.length === 該 domain 應配數量」，兩者原本只是巧合一致（因為當下每 domain 剛好都是 2）。修法：guard 加逐 domain 數量檢查；`coverage` 改用相對計算。
+- **M3**：`evidence_refs` 順序未定義，spec 自己兩個 test case 就互相矛盾。釘死為依 `ASSESSMENT_DIMENSIONS` 內順序，寫明確斷言（不用 sort 掩蓋順序回歸）。
+- **M4**：spec 誤稱「`19` 已定義 band→probability range 對照」，實際 `21` P0-04 原文明講這仍是待補項，且該遺漏讓這項從兩份 open-item 清單中都消失。修正措辭並補回 `HCI_TRUST_DOMAIN_SPEC.md` §Explicitly out of scope 與 `TASKS.md`。
+- **M5**：mean-of-ranks 運算假設五個 band 等距，但未來的 ICD 203 機率對照大機率不等距，spec 原文「對齊 ICD 203」跟「取 rank 算術平均」兩個宣稱互相矛盾。修為明講 rank 編碼對聚合運算才是規範性的，未來機率對照純顯示用途不得回頭改聚合結果。
+- **M6**：§Layering 宣稱跨 method 對同一維度的聚合「已由 gate 5 `decision_weight` 管」，直接查證：`decision_weight` 是綁 Trust Domain 不是綁 Assessment Dimension，且完全沒定義任何聚合語意——這是真的無人管的缺口，不是已關閉的。修正宣稱並補進 TASKS.md。
+- **M7**：spec 引用 `04:87`「不需操作者簽核」只涵蓋 14→7 聚合公式本身，不涵蓋「用 band 而非數字」跟「七個 domain 的操作性定義」這兩個獨立判斷。修為 spec 開頭明確拆成兩種不同性質的決定，且揭露 ADR-0032 延伸是「類比適用、新的、比 ADR-0032 本身更嚴格（無校準逃生艙口）」，不是「違反已核准 ADR 而被迫修正」。
+- **m1**：nested 版本的禁用名檢查（domain entry 內部塞 `overall_score`）原本一樣被拒但走錯路徑（回報成 generic unknown property 而非 `TRUST-NEG-03`），同 m2 的 class bug 低一層再犯一次。同手法修正。
+- **m2**：`rollupTrustDomains` 對同一 entry 的 `value`/`dimension` 欄位驗證後又重讀多次，getter-backed 輸入可製造 time-of-check/time-of-use 落差。修為驗證時就地寫入一份 plain snapshot，之後只讀 snapshot。
+- 另 5 個 Minor：`04:87` 被同一次改動修改後，spec 自己引用的逐字引號變成過期宣稱（改標註「改動前原文」）；`TASKS.md` 六份姊妹 spec 清單漏了 `HCI_CONTRADICTION_SPEC.md`（誤併進 evidence-quality 一條）；零證據維度「不可表達」的保證誤歸因給一張根本無關的 SQL 表（實際上是 function 邊界檢查，`AssessmentDimension` 目前無任何 schema）；ADR-0004 舊版 gates-4-5 note 補一行 superseded-by 指標；一個弱 `||` regex 斷言拆成兩個精確斷言。
+
 **[驗證結果]**
-- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs tests/unit/intelligence/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=67/67 pass（50 既有 + 17 新增：assessment-dimensions 5 + rollup-trust-domains 12，含 25-組窮舉 rank-pair 測試視為 1 個 test 但涵蓋 25 個斷言子案例）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1` | exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，全流程含新 2 個 Node 區段 + 全部既有 gate + 11-migration Docker SQL suite + reversibility，真跑綠燈
-- REVIEW_DONE: 見下方獨立 critic 覆審段落（本條目先寫實作，critic 結果與修復追加於同一 commit 前）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs tests/unit/intelligence/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=72/72 pass（critic 修復前 67，新增 5 個測試：M1 綁定測試 1 個、M2 guard drift 測試 1 個、M3 順序測試 2 個、m1/m7 相關測試調整不淨增）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check packages/intelligence/rollup-trust-domains.mjs` | exit=0（過程中自己打錯兩處 `//` 寫成 `#`，node --check 當場抓到，修正後才跑 test）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1` | exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，全流程真跑綠燈（critic 修復後重跑）
+- REVIEW_DONE: critic=Standard（真實 subagent，17-mutation 掃描 + 逐條核對跨檔引用真實性）| verdict=0 Critical/7 Major/7 Minor，全修 | findings=0c/7m/7minor
 - BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os | grep=`rollupTrustDomains\|ASSESSMENT_DIMENSIONS\|DIMENSION_TO_DOMAIN\|HCI_TRUST_DOMAIN_SPEC\|packages/intelligence` | hits=14（新建 8 檔 + 6 個文件交叉引用，皆預期內，V1 blueprint 封存版不計入需修改）
 - WORKLOG: 本條目
 
 **[剩餘風險]**
-- P0-04 另六份規格（Evidence Quality/Confidence/Risk/Permission/Contradiction/Time Decay）仍未寫，已列 TASKS.md OQ；roll-up 公式本身無 severity override 機制——一個 VERY_HIGH + 一個 VERY_LOW 會平庸化成 MODERATE，真正嚴重的單一發現可能被稀釋，此判斷刻意留給尚未寫的 `HCI_RISK_SPEC.md`，非本次遺漏
+- P0-04 另六份規格（Evidence Quality/Contradiction/Confidence/Risk/Permission/Time Decay）仍未寫，已列 TASKS.md OQ；roll-up 公式本身無 severity override 機制——一個 VERY_HIGH + 一個 VERY_LOW 會平庸化成 MODERATE，真正嚴重的單一發現可能被稀釋，此判斷刻意留給尚未寫的 `HCI_RISK_SPEC.md`，非本次遺漏
+- **跨 method 對同一維度的聚合目前無人管**（critic M6 揭露的真缺口，非本次遺漏但值得標注優先度）：gate 5 `decision_weight` 結構上管不到這件事，`HCI_CONFIDENCE_SPEC.md` 尚未寫
 - 尚無真實 trust-read endpoint 或 method catalog 消費這條 roll-up pipeline——純 pre-code 基礎設施
-- partition 本身是 V1、可修訂的判斷（spec 文件已明講），非唯一正解；14 個維度定義本身仍只是 `04_HCI30_PRODUCT_SPEC.md` 的一行描述，尚無操作性定義（例如「Boundary respect」實際怎麼從證據算出一個 band）——那是各自 method 的工作，不在此 spec 範圍
+- partition 本身是 V1、可修訂的判斷（spec 文件已明講），非唯一正解；ADR-0032 延伸本身也是新判斷，操作者可用後續明確決定推翻
+- 14 個維度定義本身仍只是 `04_HCI30_PRODUCT_SPEC.md` 的一行描述，尚無操作性定義（例如「Boundary respect」實際怎麼從證據算出一個 band）——那是各自 method 的工作，不在此 spec 範圍
 
 **[rollback]** 純新增+一處已知零消費者的 shape 修正，`git revert` 即可；無 schema/migration/prod 變更。
 
