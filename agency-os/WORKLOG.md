@@ -1,5 +1,18 @@
 # Worklog
 
+## 2026-09-05（System Foundry 3 項待決定 ①：commit 操作者藍圖原始檔）
+
+[根因/決策] `d51624f13` 吸收 12 個新模組時，來源藍圖 `Composable AI Commerce OS.md`（連同其 50 模組 LEGO_Documentation_Pack、Roadmap、Master Plan，同目錄共 55 檔、324K）留在套件目錄但未進 git track（該 commit 訊息 line 59 自己記錄「非本次改動範圍」）。操作者今日要求對 3 個待決定給出決策並執行：commit 與否是第 1 項。判斷：這批檔案是本次與未來缺口比對（含尚未做的第13個 Returns/RMA）的唯一可追溯依據，不進 git 等於分析基礎在 repo 外部、換機/換 session 會遺失。決定 commit 全部 55 檔（同一藍圖的組成部分，非只該讓使用者點名的單一 .md，拆開 track 會留下互相引用卻消失一半的殘缺參考集）。
+
+[風險評估] Low——純新增文件，不改動任何現有邏輯/設定/測試，無 secrets（commit 前跑 grep 排除 api_key/password/PRIVATE KEY/secret_key 樣式，0 命中）。放置位置刻意選在 `agency-os/docs/Composable AI Commerce OS/`（其原始位置）而非 `System_Foundry_v1.6_ARTIFACT_COMPLETE/` 套件目錄內——後者 `manifest.json` 對套件內每檔算 file_hash 做完整性校驗，混入非套件產物的參考文件會誤增校驗範圍。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git add "agency-os/docs/Composable AI Commerce OS/" && git commit` | exit=0 | result=commit `97cdea3ed`，55 files changed, 16717 insertions(+)，`git status` 確認該目錄轉為 clean/tracked
+- REVIEW_WAIVED: DOC_ONLY -- 純文件新增，無程式邏輯可審；已執行 grep 型 secrets 掃描替代
+- BUGHUNT_WAIVED: DOC_ONLY -- 新增檔案未被任何既有程式碼引用（grep 確認 `Composable AI Commerce OS` 字串在 `scripts/`／`configurator/`／`*.json` 中除 WORKLOG 本身外零命中），無 downstream 可能因此檔案存在而改變行為
+
+[剩餘風險] 無。後續 ②③ 兩項待決定另開條目處理。
+
 ## 2026-09-05（AO-RESUME 順手修：CP950 raw-read trap，health gate 唯一失敗項）
 
 [根因] `scripts/test-docker-desktop-runtime-preflight.ps1:91,95` 的 `Get-Content -Raw` 讀自己在 `:66,73` 寫入的 fixture（`preserve.txt`/`target.txt`）未帶 `-Encoding`，被 `audit-cp950-traps.ps1 -RawReadOnly` 判定 CP950 資料損毀風險——這是本輪 AO-RESUME health report 唯一的 critical_failure（score 99.7%→100%）。critic 覆審額外發現：`New-Item -Value` 實測不論系統 codepage 一律寫 UTF-8-no-BOM（在 ACP=950/Big5 機器上驗證過），故修前讀端其實是 ANSI(CP950) 讀 UTF-8 寫入，屬真實潛在 mismatch，非僅為過閘。
