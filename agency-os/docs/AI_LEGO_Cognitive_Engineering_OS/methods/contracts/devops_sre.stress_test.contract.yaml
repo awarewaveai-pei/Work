@@ -307,6 +307,10 @@ open_questions:
       SUSTAINED time at one load level, not escalation across levels).
       Should it reuse `#/$defs/load_measurement` too, the way this
       method does?
+      ANSWERED 2026-09-05 (thirty-seventh slice): `devops_sre.soak_test`
+      reuses `#/$defs/load_measurement` unchanged, the same cross-file
+      pattern this contract established, confirming it generalizes to
+      a third consumer.
     owner: "operator, or whoever next builds devops_sre.soak_test"
     blocks: "nothing in this file's own validity"
 

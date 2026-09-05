@@ -68,6 +68,7 @@
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
 | `specs/cognitive/typed-objects/runbook-execution-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, runbook_ref, steps, rollback_performed, provenance] properties[7] |
 | `specs/cognitive/typed-objects/sli-slo-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, indicators, provenance] properties[6] |
+| `specs/cognitive/typed-objects/soak-test-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_test, sustained_load_rps, samples, degradation_thresholds, degradation, engine, computation_provenance_ref, provenance] properties[11] |
 | `specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, legacy_system_under_migration, seams, slices, provenance] properties[7] |
 | `specs/cognitive/typed-objects/stress-test-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_test, expected_load_rps, load_steps, breaking_thresholds, breaking_point, engine, computation_provenance_ref, provenance] properties[12] allOf[1] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |

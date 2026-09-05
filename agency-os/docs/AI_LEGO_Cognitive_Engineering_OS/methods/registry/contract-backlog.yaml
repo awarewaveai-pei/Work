@@ -1262,6 +1262,46 @@ tier_1:
       table-row citation of its own, thinner than several Tier 0
       examples. Tier 1, mandated by the actively-running implementation
       slice, same category as the thirty-three entries above it.
+  thirtyfifth_concrete_entry:
+    # NEW (2026-09-05, same session): thirty-fifth Tier 1 entry, same
+    # additive-key rationale as the thirty-four entries above it.
+    method_id: "devops_sre.soak_test"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. TWELFTH entry
+      from the `devops_sre` family (F19) -- the last but one before
+      devops_sre.rto_rpo, after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, devops_sre.error_budget,
+      devops_sre.capacity_model, devops_sre.release_readiness_review,
+      devops_sre.runbook_execution, devops_sre.game_day,
+      devops_sre.load_test, and devops_sre.stress_test. Atlas's own
+      F19 tool table row (L855: "持續負載→memory/resource
+      leak→degradation", benefit "找慢性問題") grounds SIX real
+      invariants: a time-ordered series of at least 3 samples with
+      strictly increasing elapsed_minutes, EVERY sample held at one
+      CONSTANT declared load level (the exact opposite discipline from
+      devops_sre.stress_test's own escalating ladder), uniform
+      resource sets across the whole series, caller-supplied
+      degradation_thresholds re-verified by the gate, and a COMPUTED
+      degradation verdict (first sample vs last, never a caller-
+      invented trend/regression statistic) fully derived with no
+      override. Reuses devops_sre.load_test's own
+      `#/$defs/load_measurement` unchanged across files -- the SAME
+      cross-file pattern devops_sre.stress_test already established,
+      now confirmed to generalize to a third consumer, resolving that
+      contract's own OQ-STRESSTEST-5. Due diligence deliberately
+      checked whether the simulation-family placeholder
+      devops_sre.stress_test's own critic round found
+      (Master_Plan_v1.md:1776) also names a soak_test sibling --
+      confirmed it does not.
+    source: "methods/contracts/devops_sre.soak_test.contract.yaml (built same session as this entry, mints machine_id devops_sre.soak_test) + specs/cognitive/typed-objects/soak-test-record.schema.yaml (new output type, reuses load-test-record.schema.yaml's own $defs)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own, thinner than several Tier 0
+      examples. Tier 1, mandated by the actively-running implementation
+      slice, same category as the thirty-four entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

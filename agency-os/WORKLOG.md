@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-05（續50，同一 session：Cognitive OS 第三十七個 Method Atlas 切片 — `devops_sre.soak_test`，F19 進度 12/13 只剩 RTO-RPO；自查抓到 Decimal 精度真 bug，critic 4000-series oracle 零逃逸但兩個算式的迴歸測試選錯數字）
+
+**觸發**：延續操作者「繼續」授權。1 個 critic subagent（額度檢查通過）。
+
+**選型**：`devops_sre` 家族第十二成員（F19 12/13，只剩 RTO-RPO）。Atlas F19 L855「持續負載→memory/resource leak→degradation｜找慢性問題」。**跟緊鄰的兩個手足恰好相反**：load_test 比較兩個不同負載量測；stress_test 沿升載階梯找破壞點；本方法負載完全恆定，改變的是時間——一段時間序列樣本，找只有真實持續時間才看得出來的漂移。重用 `devops_sre.load_test` 的 `#/$defs/load_measurement`（第三個消費者，證明這個跨檔 reuse 模式確實可推廣，解答 stress_test 的 OQ-STRESSTEST-5）。六個不變量：≥3 樣本（Atlas「持續」蘊含真實時長非兩點快照）、`elapsed_minutes` 嚴格遞增、每個樣本負載恆等於宣告的 `sustained_load_rps`（跟 stress_test 的升載階梯正相反）、全序列資源集合一致、`degradation_thresholds` 閘重驗（capacity_model／load_test／stress_test 教訓從第一版套用）、`degradation`（首尾比較，非發明趨勢/回歸統計——避免 Atlas 沒指定的統計技術，跟 load_test 的 baseline/target 兩點設計同款精神）全導出無覆寫。
+
+**本模組自己第一版、critic 審查前就抓到一個真 bug**：`detect_degradation` 原本用原生 float 減法算三個增量，`0.40-0.30` 在 Python 得 `0.10000000000000003`，會讓剛好卡在門檻 `0.10` 上的資源被誤判洩漏——寫測試時自己撞到，立刻改用 `decimal.Decimal`（跟 `ai_lego.compute.load_test.comparison` 同款教訓，同款誠實揭露：因為公開介面吃 float，Decimal 防不了輸入本身已經失去的精度，只防累積減法誤差）。
+
+**due-diligence 特別檢查 stress_test 自己 critic 抓到的同類漏洞**：`Master_Plan_v1.md:1776` 的模擬家族 `/modules/simulation/{scenario, monte_carlo, sensitivity, stress_test}/` 目錄佔位，主動核對是否也列了 `soak_test`——確認沒有（只列四個名字）。
+
+**critic 真跑（45 個突變、temp spec-root schema 探測、4000 條序列獨立 oracle 用精確 `Fraction` 運算）：verdict warn，0 Critical，3 Major＋6 Minor**。核心水密：oracle 零逃逸零誤判、每個 builder raise 都追到 gate 同 predicate（含 gate 對 `degradation_thresholds` 的獨立重驗先於信任 `degradation`，三輪教訓確認吸收）、跨檔 `$defs` reuse 在 sample wrapper 內證明可解析且真的約束。Major 全修：
+1. Decimal 修法在程式碼三個算式（latency／error_rate／resource）全覆蓋，但只有 resource 那個算式有真正能分辨 Decimal 跟原生 float 的邊界測試——latency／error_rate 兩個既有迴歸測試剛好用了二進位浮點下精確的數字（`100→120` 對門檻 `20`、`0.0→0.01` 對門檻 `0.01`），各自單獨還原成原生減法照樣全綠。補兩個新邊界測試（`100.7→100.9` 對 `0.2`、`0.7→0.9` 對 `0.2`）。
+2. `_measurement_is_valid` 的精確 key 集合檢查在 builder／gate 兩層都沒測試（只有透過 schema 驗證間接測到）——鬆成 subset 檢查兩層都存活。補 builder＋gate 各一個測試。
+3. threshold 範圍測試只覆蓋 4 種欄位×方向組合中的 2 種——跟 stress_test 自己 critic 抓到的鏡射邊界同款類別，換了個軸再犯一次（`resource_increase_max` 上界、`error_rate_increase_max` 下界都沒測）。補兩個測試。
+Minor 全修：空 `resource_utilization` map 在 builder 層沒測試（會讓「memory/resource leak」半條公式靜默變 no-op）；文件宣稱的 bool 型別排除零測試覆蓋；due-diligence 揭露不完整（漏列 jurisdiction 家族 `auto_degrade`~19 命中＋Phase-0 研究快照裡一個過期重複條目，皆已補列並說明無關）；本 session 自己的 slice doc「六個不變量」卻只列五項（拆開修正）；`detect_degradation` 的 resource-key 查找方向是等價突變但未揭露裸 `KeyError` 路徑（今日透過 gate 不可達，因資源集合一致性先被檢查，已補進 compute 模組自己 docstring）。
+
+**本輪教訓**：Decimal 修法「三個算式都改了」不等於「三個算式都被迴歸測試逼著證明有改」——迴歸測試自己選的數字如果剛好是二進位浮點下的精確值，就測不出差異；跟 stress_test 那輪「宣稱涵蓋不等於真被驗證」是同一類但落在不同的具體算式上，抽象教訓要重新對照每個新的算式逐一核對，不會自動套用。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.soak_test.contract.yaml`＋`specs/cognitive/typed-objects/soak-test-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.thirtyfifth_concrete_entry`＋`devops_sre.stress_test.contract.yaml` OQ-5 標 ANSWERED＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/compute/soak_test/{__init__,analysis}.py`（含 Decimal 修正）＋`ai_lego/modules/devops_sre/soak_test.py`＋`ai_lego/apps/cli/run_soak_test_slice.py`＋`tests/unit/test_soak_test.py`（65 tests）＋`docs/THIRTYSEVENTH_SLICE_DEVOPS_SRE_SOAK_TEST.md`；`modules/devops_sre/__init__.py` docstring。`agency-os/TASKS.md` 切片條目＋F19 剩餘清單修正。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2796→2800
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_soak_test_slice` | exit=0 | result=`PASS devops_sre.soak_test: 4 samples over 180 min at 200 rps, overall_degraded=False, gates [provenance_required=PASS, genuine_compute=PASS, soak_test_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_soak_test` | exit=0 | result=65 OK（57→65）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=106634（修正後重跑）| result=**1174 tests OK**（1109→1174，零回歸；初稿 1166）
+- REVIEW_DONE: critic=Standard（真實 subagent，45 runtime 突變＋schema 探測、4000 條序列獨立 oracle）| verdict=warn→3 Major＋6 Minor 全修 | findings=0c/3m/6minor
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]soak_test\|SoakTestRecord\|SOAKTEST_` | hits=39（10 個檔案全部本切片自己；過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-SOAKTEST-1~4` 皆揭露；`degradation` 僅首尾比較非全序列趨勢；無 `capacity_model_ref` soft link；`generated_by_method`／頂層 key／own id 前綴皆家族級 schema-only 慣例。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
 ## 2026-09-05（System Foundry 3 項待決定 ①：commit 操作者藍圖原始檔）
 
 [根因/決策] `d51624f13` 吸收 12 個新模組時，來源藍圖 `Composable AI Commerce OS.md`（連同其 50 模組 LEGO_Documentation_Pack、Roadmap、Master Plan，同目錄共 55 檔、324K）留在套件目錄但未進 git track（該 commit 訊息 line 59 自己記錄「非本次改動範圍」）。操作者今日要求對 3 個待決定給出決策並執行：commit 與否是第 1 項。判斷：這批檔案是本次與未來缺口比對（含尚未做的第13個 Returns/RMA）的唯一可追溯依據，不進 git 等於分析基礎在 repo 外部、換機/換 session 會遺失。決定 commit 全部 55 檔（同一藍圖的組成部分，非只該讓使用者點名的單一 .md，拆開 track 會留下互相引用卻消失一半的殘缺參考集）。

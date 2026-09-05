@@ -1,0 +1,284 @@
+$id: "ai-lego://methods/contracts/devops_sre.soak_test.contract.yaml"
+title: "Soak Test Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-seventh Method Atlas slice, TWELFTH from
+  the `devops_sre` family (F19), after `devops_sre.sli_slo` (twentieth),
+  `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth), `devops_sre.capacity_model`
+  (thirty-first), `devops_sre.release_readiness_review` (thirty-second),
+  `devops_sre.runbook_execution` (thirty-third), `devops_sre.game_day`
+  (thirty-fourth), `devops_sre.load_test` (thirty-fifth), and
+  `devops_sre.stress_test` (thirty-sixth). LAST but one F19 member
+  before `devops_sre.rto_rpo` (F19 will then be 13/13 complete).
+
+  Atlas gives this method exactly ONE citation of its own: the F19 tool
+  table's Soak Test row (L855: purpose "驗證長時間穩定" -- verify
+  long-duration stability; usage "持續負載→memory/resource leak→degrad
+  ation" -- sustained load, observe memory/resource leak, observe
+  degradation; benefit "找慢性問題" -- find chronic problems). No
+  dedicated §11.x section exists (confirmed by direct read of the
+  surrounding table, L848-863).
+
+  **The defining difference from this method's two immediate F19
+  siblings, both already built**: `devops_sre.load_test` compares TWO
+  measurements at DIFFERENT load levels (baseline vs target);
+  `devops_sre.stress_test` escalates load across an INCREASING ladder
+  to find a breaking point; THIS method holds load PERFECTLY CONSTANT
+  (`sustained_load_rps`) and instead varies TIME -- a series of samples
+  taken at increasing elapsed minutes, searching for drift (a leak, a
+  slow-growing latency/error trend) that only a real DURATION can
+  reveal. All three share the same per-observation shape
+  (`load_rps`/`latency_p95_ms`/`error_rate`/`resource_utilization`) --
+  this contract REUSES `devops_sre.load_test`'s own
+  `#/$defs/load_measurement` unchanged across files, the SAME cross-
+  file pattern `devops_sre.stress_test` already established, resolving
+  that contract's own OQ-STRESSTEST-5 (the mirror of `devops_sre
+  .load_test`'s own OQ-LOADTEST-5, now answered for BOTH remaining F19
+  siblings that could reuse it).
+
+  Due-diligence search, deliberately broad from the first draft (the
+  narrow-grep class two consecutive prior slices' own critic rounds
+  caught, and `devops_sre.stress_test`'s own critic round caught a
+  THIRD time via a missed simulation-family placeholder): case-
+  insensitive spec-root greps for "soak"/"持續負載"/"soak_test",
+  "memory leak"/"resource leak"/"記憶體洩漏", "chronic"/"慢性問題",
+  "degradation"/"degrad", and -- learning directly from
+  `devops_sre.stress_test`'s own missed neighbour -- a check of
+  whether `Master_Plan_v1.md`'s own `/modules/simulation/{scenario,
+  monte_carlo, sensitivity, stress_test}/` placeholder (L1774-1777,
+  already disclosed in `devops_sre.stress_test.contract.yaml`) ALSO
+  names a `soak_test` sibling: confirmed it does NOT -- that
+  placeholder lists exactly four names and `soak_test`/`soak test` is
+  absent from it and from `REPOSITORY_ARCHITECTURE.md`'s own
+  simulation-family entries. Real neighbours found and confirmed
+  distinct, ADDED post-critic-review (the first draft's own
+  enumeration understated the grep results): `specs/execution
+  /rollback.schema.yaml`'s own unrelated `degradation_path` field (a
+  rollback-plan fallback tier, not a measured drift over time);
+  several `docs/architecture/search-content/*.md` uses of
+  "degradation" describing retrieval-quality decay; the entire
+  `policies/jurisdiction/legal-freshness-sla.policy.yaml`/`specs
+  /jurisdiction/pack.schema.yaml`/`docs/architecture
+  /GLOBAL_JURISDICTION_PLAN.md` §2.3 "auto_degrade" family (~19 hits)
+  -- a document-freshness SLA concept, an unrelated domain; and
+  `.ai/research/phase-0/method-inventory.yaml:887`'s own stale
+  duplicate Soak Test entry (Phase-0's own research snapshot, not a
+  second live registry -- the ACTIVE registry is
+  `methods/registry/method-inventory.yaml`, already cited above). No
+  duplicate typed object or method found.
+
+  Atlas's own formula and benefit ground SIX real invariants: (1)
+  `samples` has at least 3 entries (Atlas's own "持續" -- sustained --
+  implies an observed DURATION, not a two-point snapshot; one
+  intermediate sample is the minimum that distinguishes a soak from a
+  `devops_sre.load_test`-shaped pair); (2) `elapsed_minutes` is
+  STRICTLY increasing across samples (time moves forward); (3) EVERY
+  sample's own `measurement.load_rps` EQUALS `sustained_load_rps`
+  (Atlas's own "持續負載" -- constant, not escalating -- the exact
+  opposite discipline from `devops_sre.stress_test`'s own strictly-
+  increasing ladder); (4) every sample reports the SAME set of resource
+  names (the same like-for-like discipline every prior load-measurement
+  method this session built already establishes); (5)
+  `degradation_thresholds` is valid and RE-VERIFIED BY THE GATE, not
+  builder-only (the lesson `devops_sre.capacity_model`'s,
+  `devops_sre.load_test`'s, and `devops_sre.stress_test`'s own critic
+  rounds each taught, applied here from the first draft); (6)
+  `degradation` is COMPUTED -- comparing the FIRST sample against the
+  LAST -- never caller-supplied, `overall_degraded` fully derived from
+  its own three sub-signals with no caller override.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Soak Test row (L855): '持續負載→memory/resource leak→degradation'"
+  - "methods/registry/method-inventory.yaml Soak Test entry (L1147-1151): category 'F19 devops-sre', line field reads 852 -- CORRECTED here to the real L855 position, the same systematic +3 drift already disclosed by eleven prior contracts this session (Error Budget, RTO/RPO comparison, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model, Release Readiness Review, Runbook Execution, Game Day, Load Test, Stress Test), now observed a TWELFTH time"
+  - "specs/cognitive/typed-objects/load-test-record.schema.yaml#/$defs/load_measurement -- REUSED unchanged, resolving devops_sre.stress_test's own OQ-STRESSTEST-5"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-fifth concrete entry. `id: devops_sre.soak_test` mints a new
+  machine_id, TWELFTH member of the `devops_sre` family.
+
+id: devops_sre.soak_test
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, INFER]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating the series into discrete time-stamped
+# samples is DECOMPOSE; judging the first-vs-last delta against
+# degradation_thresholds is VALIDATE; naming WHICH resources leaked is
+# INFER -- the same inferred triple `devops_sre.load_test`'s and
+# `devops_sre.stress_test`'s own contracts already use.
+
+purpose:
+  - verify_long_duration_stability_at_a_constant_load_by_comparing_the_first_and_last_of_a_time_ordered_measurement_series_and_naming_any_resource_that_leaked
+inputs:
+  required: [SustainedLoadLevel, TimeOrderedMeasurementSeries, DegradationThresholds]
+  optional: []
+outputs: [SoakTestRecord]
+preconditions:
+  - "system_under_test is a non-empty string; sustained_load_rps is finite and > 0"
+  - "samples has at least 3 entries, each a valid {elapsed_minutes, measurement} pair (measurement: same shape/ranges as devops_sre.load_test's own load_measurement)"
+  - "elapsed_minutes is STRICTLY increasing across samples"
+  - "every sample's own measurement.load_rps EQUALS sustained_load_rps"
+  - "every sample reports the SAME set of resource names"
+  - "degradation_thresholds carries exactly latency_p95_increase_ms_max (finite, >= 0), error_rate_increase_max (finite, in [0, 1]), and resource_increase_max (finite, in [0, 1]) -- re-verified independently by the gate (ai_lego.modules.devops_sre.soak_test._thresholds_are_valid), not builder-only"
+  - "degradation is computed by ai_lego.compute.soak_test.analysis.detect_degradation comparing samples[0] against samples[-1] -- never caller-supplied independently of that computation"
+  - "overall_degraded is true iff latency_degraded OR error_rate_degraded OR degraded_resources is non-empty -- fully derived, no caller override"
+  # Preconditions 2-5 map onto Atlas's own '持續負載' formula step; 7-8
+  # onto 'memory/resource leak→degradation'. Same "structurally
+  # necessary, forbidden-state" class every prior genuine-compute
+  # contract this session built already establishes.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every genuine-compute contract in this
+  # package already reasons through: the real risk is computational
+  # integrity (was the constant-load invariant actually held, was the
+  # degradation verdict actually derived from the recorded samples),
+  # not evidence-citation over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Soak Test row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. One real,
+# disclosed (not built) relationship: a `degraded_resources` finding
+# here could motivate a future devops_sre.capacity_model run with a
+# revised resource_coefficient -- no soft-link field exists yet
+# (OQ-SOAKTEST-4).
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- the real sustained load
+  # generation and any remediation of a discovered leak happen outside
+  # this method's own scope, the same "record reports on an external
+  # observation" class every prior devops_sre contract's own rollback
+  # field already draws.
+
+compilation_decisions:
+  - question: >
+      Should `degradation` be computed from a real TREND across all
+      samples (e.g. a monotonic-increase check, or a linear-regression
+      slope), or from a simple FIRST-vs-LAST delta?
+    decision: "First-vs-last delta only -- the temporal twin of devops_sre.load_test's own baseline-vs-target two-point design."
+    reasoning: >
+      Atlas's own text names a sequence ("持續負載→...→degradation") but
+      specifies no statistical technique for detecting it. Inventing a
+      trend/regression statistic (what slope counts as a leak? over
+      what window? with what noise tolerance?) would be exactly the
+      kind of unstated-assumption invention this package's every prior
+      contract already disciplines itself against -- the same
+      restraint that rejected a computed string-equality outcome for
+      `devops_sre.runbook_execution`'s own step outcomes. First-vs-last
+      is the simplest reading that is still a REAL comparison (not a
+      narrative claim), directly mirrors the two-point design
+      `devops_sre.load_test`'s own `status` already established (there:
+      two load levels; here: two points in time), and keeps the
+      INTERMEDIATE samples genuinely recorded evidence a reader can
+      inspect even though the verdict itself does not consume them --
+      disclosed as a real limit, not a silent one (see
+      OQ-SOAKTEST-2).
+  - question: >
+      Should `samples` require a MINIMUM of 2 entries (matching
+      `devops_sre.load_test`'s own two-measurement design) or more?
+    decision: "Minimum 3."
+    reasoning: >
+      A 2-sample series is indistinguishable in SHAPE from a
+      `devops_sre.load_test`-shaped baseline/target pair (this method's
+      own constant-load invariant is the only thing that would still
+      distinguish them) -- requiring a genuine INTERMEDIATE sample is
+      the minimum structural signal that a real DURATION was observed,
+      matching Atlas's own "持續" (sustained) language, which a
+      two-point read does not honor even though the verdict computation
+      itself only needs the endpoints.
+  - question: >
+      Should `resource_increase_max` be a single threshold applied to
+      EVERY resource, or a per-resource map (e.g. a stricter budget for
+      `memory` than for `cpu`)?
+    decision: "A single threshold, uniform across all resources -- the same design devops_sre.load_test's own acceptance and devops_sre.stress_test's own breaking_thresholds already use."
+    reasoning: >
+      Atlas's own text names "memory/resource leak" without
+      distinguishing a per-resource budget; a caller with a genuine
+      need for asymmetric budgets can run the method once per resource
+      class or await a future revision -- inventing a per-resource map
+      here would be unstated-assumption invention this package already
+      disciplines against, and would break the field-shape symmetry
+      this session's every prior threshold-pair field already
+      establishes.
+  - question: >
+      Should `degraded_resources` name every resource ABOVE an absolute
+      utilization ceiling (e.g. "over 90% now"), or only those whose
+      utilization INCREASED by more than `resource_increase_max`?
+    decision: "Increase only -- a resource that was already near-saturated at the FIRST sample and stays flat is not exhibiting a leak."
+    reasoning: >
+      Atlas's own benefit column is "找慢性問題" (find CHRONIC problems)
+      via "memory/resource leak" -- a leak is a GROWTH pattern, not an
+      absolute level; a resource already busy at t=0 that stays exactly
+      as busy at t=N has not leaked anything, and flagging it would
+      conflate this method with a simple threshold check (already
+      served by other fields elsewhere in this package, e.g.
+      `devops_sre.capacity_model`'s own headroom classification).
+
+open_questions:
+  - id: "OQ-SOAKTEST-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-SOAKTEST-2"
+    question: >
+      `degradation` compares only samples[0] and samples[-1] -- a real
+      leak that spiked mid-soak and partially recovered by the last
+      sample would be under-reported, and the intermediate samples are
+      recorded but not consumed by the verdict. Should a future
+      revision compute a real trend (e.g. worst-intermediate-sample
+      comparison, or a monotonicity check) instead of or alongside the
+      first-vs-last delta?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-SOAKTEST-3"
+    question: >
+      F19 will be 13/13 complete once `devops_sre.rto_rpo` is built --
+      the last unbuilt member of this pack. Should it be the next
+      slice?
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-SOAKTEST-4"
+    question: >
+      A `degraded_resources` finding here is exactly the kind of signal
+      that could motivate a `devops_sre.capacity_model` re-run with a
+      revised `resource_coefficient`. Should a future revision add a
+      soft-link field (format-only, the same discipline
+      `devops_sre.game_day`'s own `runbook_execution_ref` and
+      `devops_sre.stress_test`'s own disclosed-but-unbuilt
+      `capacity_model_ref` idea already establish)?
+    owner: "operator, or whoever next revises either contract's own field design"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L855) directly, confirmed against
+    the surrounding table (L848-863) that no dedicated §11.x section
+    exists. Ran broad case-insensitive spec-root greps ("soak"/"持續負
+    載"/"soak_test", "memory leak"/"resource leak"/"記憶體洩漏",
+    "chronic"/"慢性問題", "degradation"/"degrad"), specifically checked
+    whether `Master_Plan_v1.md:1776`'s own simulation-family
+    placeholder (already disclosed in `devops_sre.stress_test
+    .contract.yaml`, and the exact class of neighbour that contract's
+    own critic round found missed) also names a `soak_test` sibling --
+    confirmed it does not. Read every other neighbour surfaced
+    (`specs/execution/rollback.schema.yaml`'s own unrelated
+    `degradation_path`, several search-content docs' own unrelated
+    "degradation" usage) and confirmed each distinct. No duplicate
+    typed object or method found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All six core invariants are each
+    grounded in Atlas's own formula or benefit column; the first-vs-
+    last delta (not a trend/regression), minimum-3-samples,
+    uniform-threshold, and increase-only-flagging designs are all
+    disclosed compilation choices, not silent inventions -- see
+    compilation_decisions above.

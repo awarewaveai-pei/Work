@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/soak-test-record.schema.yaml"
+title: Soak Test Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SoakTestRecord` -- the
+  declared `outputs` of `devops_sre.soak_test`'s Method Contract.
+  TWELFTH `devops_sre`-family typed object. Atlas's own F19 tool table
+  formula (L855: "持續負載→memory/resource leak→degradation", purpose
+  "驗證長時間穩定" -- verify long-duration stability, benefit "找慢性問
+  題" -- find chronic problems) maps onto a TIME-ORDERED series of
+  samples (`samples[]`) held at ONE CONSTANT load level
+  (`sustained_load_rps`) -- the defining difference from
+  `devops_sre.stress_test`'s own ESCALATING ladder at the same instant
+  and from `devops_sre.load_test`'s own two-point baseline/target
+  comparison at different load levels: this method varies TIME, not
+  load. Each sample REUSES `devops_sre.load_test`'s own
+  `#/$defs/load_measurement` shape unchanged across files (the SAME
+  cross-file reuse `devops_sre.stress_test` already established,
+  answering that contract's own OQ-STRESSTEST-5), wrapped with an
+  `elapsed_minutes` field the measurement shape itself has no room for.
+  `degradation` is COMPUTED (`ai_lego.compute.soak_test.analysis
+  .detect_degradation`) by comparing the FIRST sample against the LAST
+  -- the temporal twin of `devops_sre.load_test`'s own baseline-vs-
+  target design, not an invented trend/regression statistic Atlas's
+  text does not specify (see method contract compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Soak Test row (L855): '持續負載→memory/resource leak→degradation'"
+  - "specs/cognitive/typed-objects/load-test-record.schema.yaml#/$defs/load_measurement -- REUSED unchanged, the same cross-file pattern devops_sre.stress_test already established"
+  - "methods/contracts/devops_sre.soak_test.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, system_under_test, sustained_load_rps, samples, degradation_thresholds, degradation, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^SOAKTEST-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.soak_test"
+  system_under_test:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  sustained_load_rps:
+    type: number
+    exclusiveMinimum: 0
+    description: "Atlas's own '持續負載' -- the ONE constant load level held throughout the soak. Every samples[] entry's own measurement.load_rps must EQUAL this value -- enforced at the runtime layer, not here (no schema mechanism compares two independent instance values without a $data extension this spec root does not use elsewhere)."
+  samples:
+    type: array
+    minItems: 3
+    description: "Atlas's own time-ordered observation series. At least 3 entries -- one intermediate sample beyond a mere start/end pair is what makes this a SUSTAINED observation rather than two load-test-shaped snapshots (see method contract compilation_decisions). Ordered by STRICTLY increasing elapsed_minutes, every entry's own measurement.load_rps equal to sustained_load_rps, and the SAME set of resource names across every sample -- all three enforced at the runtime layer, not here."
+    items:
+      type: object
+      required: [elapsed_minutes, measurement]
+      additionalProperties: false
+      properties:
+        elapsed_minutes:
+          type: number
+          minimum: 0
+          description: "Wall-clock minutes since the soak began. The full series must be STRICTLY increasing -- enforced at the runtime layer."
+        measurement:
+          $ref: "ai-lego://specs/cognitive/typed-objects/load-test-record.schema.yaml#/$defs/load_measurement"
+  degradation_thresholds:
+    type: object
+    required: [latency_p95_increase_ms_max, error_rate_increase_max, resource_increase_max]
+    additionalProperties: false
+    description: "Caller-supplied definition of a chronic problem -- Atlas gives no numeric value; an operational judgment, the same restraint devops_sre.load_test's own acceptance and devops_sre.stress_test's own breaking_thresholds already establish. Applied uniformly across every resource (a single resource_increase_max, not a per-resource map) -- see compilation_decisions."
+    properties:
+      latency_p95_increase_ms_max:
+        type: number
+        minimum: 0
+        description: "Maximum ALLOWED increase in latency_p95_ms from the first sample to the last before this counts as degradation."
+      error_rate_increase_max:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: "Maximum ALLOWED increase in error_rate from the first sample to the last."
+      resource_increase_max:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: "Maximum ALLOWED increase in ANY resource's own utilization fraction from the first sample to the last -- Atlas's own 'memory/resource leak' half of the formula."
+  degradation:
+    type: object
+    required: [latency_degraded, error_rate_degraded, degraded_resources, overall_degraded]
+    additionalProperties: false
+    description: "COMPUTED (ai_lego.compute.soak_test.analysis.detect_degradation): compares samples[0] against samples[-1] against degradation_thresholds. Never caller-asserted independently of that computation -- the same fully-derived discipline devops_sre.load_test's own status and devops_sre.stress_test's own recovery.recovered already establish."
+    properties:
+      latency_degraded:
+        type: boolean
+        description: "true iff (last.latency_p95_ms - first.latency_p95_ms) > latency_p95_increase_ms_max."
+      error_rate_degraded:
+        type: boolean
+        description: "true iff (last.error_rate - first.error_rate) > error_rate_increase_max."
+      degraded_resources:
+        type: array
+        description: "SORTED list of resource names (Atlas's own 'memory/resource leak') whose own utilization increased by more than resource_increase_max from first to last. Empty list (not omitted) when none did -- an explicit disclosed finding, the same 'absence is a disclosed finding, not an omitted field' discipline database_data.backup_restore_drill's own issues_recorded already establishes."
+        items:
+          type: string
+          minLength: 1
+      overall_degraded:
+        type: boolean
+        description: "true iff ANY of latency_degraded, error_rate_degraded, or degraded_resources is non-empty -- the single umbrella verdict Atlas's own 'degradation' formula step names."
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted, importlib-resolvable path to the pure function that computed degradation -- ai_lego.compute.soak_test.analysis.detect_degradation."
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- degradation is genuine deterministic compute over caller-observed measurements, not a narrative claim."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A stable soak: four samples over 3 hours at a constant 200 rps, no degradation"
+    value:
+      id: "SOAKTEST-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.soak_test"
+      system_under_test: "checkout-api v2.3 on staging"
+      sustained_load_rps: 200
+      samples:
+        - {elapsed_minutes: 0, measurement: {load_rps: 200, latency_p95_ms: 140, error_rate: 0.002, resource_utilization: {cpu: 0.40, memory: 0.35, db_connections: 0.30}}}
+        - {elapsed_minutes: 60, measurement: {load_rps: 200, latency_p95_ms: 142, error_rate: 0.002, resource_utilization: {cpu: 0.41, memory: 0.36, db_connections: 0.31}}}
+        - {elapsed_minutes: 120, measurement: {load_rps: 200, latency_p95_ms: 141, error_rate: 0.003, resource_utilization: {cpu: 0.40, memory: 0.37, db_connections: 0.30}}}
+        - {elapsed_minutes: 180, measurement: {load_rps: 200, latency_p95_ms: 143, error_rate: 0.002, resource_utilization: {cpu: 0.42, memory: 0.38, db_connections: 0.31}}}
+      degradation_thresholds: {latency_p95_increase_ms_max: 20, error_rate_increase_max: 0.01, resource_increase_max: 0.10}
+      degradation: {latency_degraded: false, error_rate_degraded: false, degraded_resources: [], overall_degraded: false}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.soak_test.analysis.detect_degradation"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "A leaking soak: memory climbs steadily over 3 hours, flagged as a degraded resource"
+    value:
+      id: "SOAKTEST-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.soak_test"
+      system_under_test: "checkout-api v2.3 on staging"
+      sustained_load_rps: 200
+      samples:
+        - {elapsed_minutes: 0, measurement: {load_rps: 200, latency_p95_ms: 140, error_rate: 0.002, resource_utilization: {cpu: 0.40, memory: 0.35, db_connections: 0.30}}}
+        - {elapsed_minutes: 60, measurement: {load_rps: 200, latency_p95_ms: 145, error_rate: 0.002, resource_utilization: {cpu: 0.41, memory: 0.55, db_connections: 0.31}}}
+        - {elapsed_minutes: 120, measurement: {load_rps: 200, latency_p95_ms: 150, error_rate: 0.003, resource_utilization: {cpu: 0.40, memory: 0.75, db_connections: 0.30}}}
+        - {elapsed_minutes: 180, measurement: {load_rps: 200, latency_p95_ms: 155, error_rate: 0.003, resource_utilization: {cpu: 0.42, memory: 0.95, db_connections: 0.31}}}
+      degradation_thresholds: {latency_p95_increase_ms_max: 20, error_rate_increase_max: 0.01, resource_increase_max: 0.10}
+      degradation: {latency_degraded: false, error_rate_degraded: false, degraded_resources: ["memory"], overall_degraded: true}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.soak_test.analysis.detect_degradation"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L855) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 持續負載→memory/resource leak→degradation formula is directly transcribed: samples is the time-ordered series at one constant load, degradation is the computed chronic-problem verdict. Strictly-increasing elapsed_minutes, the constant-load-per-sample invariant, uniform resource sets, and degradation's own full derivation are all enforced at the runtime layer (ai_lego/modules/devops_sre/soak_test.py), not the schema layer. No mother document was modified."
