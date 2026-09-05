@@ -39,8 +39,16 @@ param()
 #
 # Mechanism: ESM imports resolve relative paths at parse time, so a mutated
 # module cannot be swapped in at runtime. Each mutation copies the whole
-# packages/ and tests/ trees to a fresh temp directory, edits the target
-# file's copy, and runs node --test against the copied test file.
+# packages/, tests/, database/, and docs/ trees to a fresh temp directory
+# (critic review, 2026-09-06 M5: an earlier version copied only packages/
+# and tests/, so any test reading database/ or docs/ -- trust-domains.test.mjs
+# reads a migration file; assessment-dimensions.test.mjs reads a spec doc --
+# threw ENOENT regardless of the mutation, which this script's own
+# non-zero-exit-code-means-killed logic silently counted as a correct
+# "kill". A baseline no-op check, below, now runs every unique target test
+# file once with NO mutation applied before the real sweep starts, and
+# throws if that alone is not green -- turning that whole failure class
+# into a loud, specific error instead of an inflated "killed" count).
 # ============================================================================
 
 $ErrorActionPreference = 'Stop'
@@ -113,21 +121,47 @@ $mutations = @(
      replace = ''
      test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
 
-  @{ id = 'rollup-force-round-up-tie-break'
-     file = 'packages/intelligence/rollup-trust-domains.mjs'
+  @{ id = 'band-scale-force-round-up-tie-break'
+     file = 'packages/intelligence/band-scale.mjs'
      find = 'return fractional > 0.5 ? Math.ceil(mean) : Math.floor(mean);'
      replace = 'return Math.ceil(mean);'
-     test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
+     test = 'tests/unit/intelligence/band-scale.test.mjs' }
+
+  @{ id = 'combine-findings-drop-duplicate-method-check'
+     file = 'packages/intelligence/combine-method-findings.mjs'
+     find = 'if (seenMethods.has(finding.method_id)) throw new Error(`duplicate method_id in findings: ${finding.method_id}`);'
+     replace = ''
+     test = 'tests/unit/intelligence/combine-method-findings.test.mjs' }
+
+  @{ id = 'combine-findings-lower-disagreement-threshold-to-zero'
+     file = 'packages/intelligence/combine-method-findings.mjs'
+     find = 'const DISAGREEMENT_SPREAD_THRESHOLD = 2;'
+     replace = 'const DISAGREEMENT_SPREAD_THRESHOLD = 0;'
+     test = 'tests/unit/intelligence/combine-method-findings.test.mjs' }
+
+  @{ id = 'combine-findings-weaken-disagreement-boundary'
+     file = 'packages/intelligence/combine-method-findings.mjs'
+     find = 'const disagreement = spread >= DISAGREEMENT_SPREAD_THRESHOLD;'
+     replace = 'const disagreement = spread > DISAGREEMENT_SPREAD_THRESHOLD;'
+     test = 'tests/unit/intelligence/combine-method-findings.test.mjs' }
 )
+
+function New-MutationSandbox {
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) "hci-node-mut-$([Guid]::NewGuid().ToString('N'))"
+  New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+  foreach ($dir in @('packages', 'tests', 'database', 'docs')) {
+    $source = Join-Path $root $dir
+    if (Test-Path -LiteralPath $source) {
+      Copy-Item -Recurse -LiteralPath $source (Join-Path $tmp $dir)
+    }
+  }
+  return $tmp
+}
 
 function Invoke-NodeMutation {
   param([Parameter(Mandatory)]$Mutation)
 
-  $tmp = Join-Path ([IO.Path]::GetTempPath()) "hci-node-mut-$([Guid]::NewGuid().ToString('N'))"
-  New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-  Copy-Item -Recurse -LiteralPath (Join-Path $root 'packages') (Join-Path $tmp 'packages')
-  Copy-Item -Recurse -LiteralPath (Join-Path $root 'tests') (Join-Path $tmp 'tests')
-
+  $tmp = New-MutationSandbox
   $targetPath = Join-Path $tmp $Mutation.file
   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
   $content = [IO.File]::ReadAllText($targetPath)
@@ -144,6 +178,25 @@ function Invoke-NodeMutation {
 
   Remove-Item -Recurse -Force -LiteralPath $tmp -ErrorAction SilentlyContinue
   return $exitCode
+}
+
+# Baseline gate (critic review, 2026-09-06 M5): run every unique target test
+# file once, unmutated, in the same kind of fresh sandbox the real
+# mutations use. A non-zero exit here means the sandbox itself is
+# incomplete (a missing directory, a stale path) -- not that any control is
+# broken -- and every mutation sharing that test file would otherwise be
+# misreported as "killed" for the wrong reason.
+Write-Host 'Baseline check: every target test file must pass unmutated in a fresh sandbox...'
+$uniqueTestFiles = $mutations.test | Select-Object -Unique
+foreach ($testFile in $uniqueTestFiles) {
+  $tmp = New-MutationSandbox
+  node --test (Join-Path $tmp $testFile) *> $null
+  $baselineExit = $LASTEXITCODE
+  Remove-Item -Recurse -Force -LiteralPath $tmp -ErrorAction SilentlyContinue
+  if ($baselineExit -ne 0) {
+    throw "Baseline FAILED for $testFile in an unmutated sandbox (exit $baselineExit) -- the sandbox is missing something this test needs (check for a path outside packages/tests/database/docs), not a real mutation result."
+  }
+  Write-Host "  $testFile : baseline OK"
 }
 
 Write-Host 'Node-level gate mutation check (packages/contracts + packages/intelligence)...'

@@ -1,5 +1,52 @@
 # Worklog
 
+## 2026-09-06（同日第四輪：HCI_CONFIDENCE_SPEC.md 部分落地——method-finding-to-dimension combination，critic 覆審 51-mutation 掃描抓到 1 Critical+8 Major+7 Minor，含 spec 自己安全宣稱被自己的 worked example 證偽）
+
+**觸發**：操作者「繼續做 直到完美完成 HCI 系統」，同日第三輪清完 mutation-check-node-gates.ps1 技術債後，回頭處理第二輪 critic 覆審 M6 揭露的真缺口——「跨 method 對同一 Assessment Dimension 的 finding 如何合併」目前無人管，`HCI_TRUST_DOMAIN_SPEC.md` 自己的 roll-up 公式輸入契約（14 個已解析維度值）隱性假設這件事已經有答案，但檢查後發現沒有。
+
+**設計**：讀 `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md` §Analysis lenses「Do not average lens disagreement away」+ §Model disagreement 段落後確認：多個 method 對同一維度的分歧不能悄悄平均消音。設計 `combineMethodFindings(dimension, findings)`：N≥1 個 method finding 進，同時計算 mean-of-rank 值**與** `disagreement` flag（spread≥2 才觸發——相鄰 band 差 1 是正常量測變異，差 2 以上代表方法間真的結論不同）。**順手抽出共用邏輯**：`rollup-trust-domains.mjs` 自己的 rank/round 常數與函式，抽成 `packages/intelligence/band-scale.mjs`，兩個消費者共用。過程中發現兩個檔案各自的「N=1 特例分支」其實都是冗餘的（`meanRankBand` 對單一 rank 本來就是恆等函式）——先用 50,504 案例差分測試證明移除該分支零行為差異，才動手簡化，不是憑直覺猜對。
+
+**送 critic 獨立覆審**（純設計+邏輯，同前三輪判準）——實跑 51-mutation 掃描 + 差分測試 + 精確算術核對，抓到 **1 Critical + 8 Major + 7 Minor**，commit 前全修：
+
+- **C1（最嚴重，本輪唯一 Critical）**：spec 原文宣稱 `disagreement` 欄位「絕不會被悄悄丟棄」，但這個安全宣稱被 spec 自己下面的 worked example 端到端證偽——把 `combineMethodFindings` 的輸出接進既有 `rollupTrustDomains`（其輸入契約 `{dimension,value,evidence_refs}` 沒有 disagreement 欄位，gate 4 白名單也會擋任何新增欄位）時，`disagreement` 確實被靜默丟棄，正是 spec 自己想防止的那個失敗，只是往上移了一層。**不是補丁式硬塞** gate 4 第三次修改：改為誠實收斂宣稱範圍（「這是這個函式自己輸出的保證」），明確揭露 domain 層的 disagreement 傳遞是獨立未解問題（怎麼把兩個 dimension-level disagreement 卷積成一個 domain-level disagreement，目前無答案），列 TASKS.md 追蹤而非隱藏。
+- **M1**：combine→rollup 的組合路徑目前只靠一個未言明的 validator 不對稱性才恰好能跑（rollup 沒有 unknown-key 拒絕，gate 4 有），已在 spec 明文揭露這個 seam，不是靜默依賴。
+- **M2（測試瘦身留下的真缺口）**：先前把 rollup-trust-domains.test.mjs 的窮舉測試搬去 band-scale.test.mjs 時，意外連帶刪掉了唯一證明 `rollupTrustDomains` 自己邏輯（非算術本身）正確的測試——3 個危險 mutation（硬編 MODERATE、只取最後一個維度值、取最小 rank 當「severity override」）在整個 repo 測試套件下全部存活。補回 7 個 domain 各一筆代表性數值斷言（(MODERATE,VERY_HIGH)→HIGH 這組能同時抓到全部三種 mutation）。
+- **M3**：spec 原文自己的維度排序說明文字，跟 partition 表格兩個 domain（CONFIDENTIALITY、GOVERNANCE_POWER）的順序互相矛盾——實際輸出順序依 `ASSESSMENT_DIMENSIONS` 陣列位置（已用真實 import 驗證），prose table 兩列順序寫反了。修正 table + 補寫全 7 domain 的順序斷言（先前只測 OPERATIONAL 一個）。
+- **M4**：spec 三處仍引用「rollup-trust-domains.test.mjs 窮舉 25 組合」的舊測試位置，該測試已搬到 band-scale.test.mjs——三處全部更正。
+- **M5（harness 自身的完整性 bug）**：mutation harness 的 sandbox 只複製 packages/+tests/，但 `trust-domains.test.mjs` 讀 `database/` 底下的 migration 檔、`assessment-dimensions.test.mjs` 讀 `docs/` 底下的 spec 檔——兩者在 sandbox 裡都會 ENOENT，而 harness 的「非零 exit code = killed」邏輯把這個誤判成「成功殺掉 mutation」。補一個 baseline no-op 檢查（每個 target test 檔案先在乾淨 sandbox 跑一次不加任何 mutation，不綠就整個 harness 直接報錯)，並把 database/、docs/ 也加進複製範圍。
+- **M6**：spec 引用 `04_HCI30_PRODUCT_SPEC.md:87` 的逐字引號，但該行文字已經被同一天更早的 commit 改寫掉——補上「改動前原文，見 git history」的限定語。
+- **M7**：Status 段落的授權框架抄了姊妹 spec（HCI_TRUST_DOMAIN_SPEC.md）M7 修復後的格式，但論證本身不夠嚴謹——把 `04:87` 的授權範圍誤稱為「general」，而姊妹 spec 自己才剛在同一個 session 內結論那句話「只涵蓋聚合數學本身」。拆成 (1a) disagreement 揭露規則（`19:17` 文字直接支持）+ (1b) mean-of-ranks 公式本身（跟姊妹 spec 的判斷 2 同類，操作者一般授權，非 `04:87` 特別授權)。
+- **M8**：`HCI_TRUST_DOMAIN_SPEC.md` §Layering 段落自己還留著「無人管」的舊措辭——本輪剛好給了答案，回填更新。
+- 7 個 Minor 全修：3-finding disagreement 測試的最大值剛好在陣列兩端，讓「只比較頭尾」的 mutation 存活；spread=0 且 N≥2 的案例沒有明確斷言 disagreement=false；`method_id` 有驗證但輸出不回傳，未揭露這是刻意的最小化介面設計；`README.md` 沒提到新 mutation harness；一句自我指涉的措辭（「this file is a partial closure of HCI_CONFIDENCE_SPEC.md」——這份文件本身就是那份文件）；`meanRankBand([])` 靜默回傳 undefined，補防禦性檢查（現在有第三個消費者，不能再靠「兩個既有呼叫方剛好都有擋」這種巧合）；mutation harness 最弱的一個 entry（只改錯誤訊息文字）換成真正的邊界值 mutation（disagreement 判斷用 `>` 取代 `>=`）。
+
+**[已修改]**
+- 新增：`Projects/internal/hci30/docs/intelligence/HCI_CONFIDENCE_SPEC.md`
+- 新增：`Projects/internal/hci30/packages/intelligence/{band-scale,combine-method-findings}.mjs`
+- 新增：`Projects/internal/hci30/tests/unit/intelligence/{band-scale,combine-method-findings}.test.mjs`
+- 修改（重構，行為不變，已用差分測試驗證）：`Projects/internal/hci30/packages/intelligence/rollup-trust-domains.mjs`
+- 修改：`Projects/internal/hci30/tests/unit/intelligence/rollup-trust-domains.test.mjs`（移除窮舉測試、補回 7-domain 數值/順序斷言）
+- 修改：`Projects/internal/hci30/scripts/test-wave1-local.ps1`（+2 個 `node --test` 區段）
+- 修改：`Projects/internal/hci30/scripts/mutation-check-node-gates.ps1`（+baseline no-op gate、+database/docs 複製範圍、+3 個新 mutation、修正 1 個舊 mutation 的檔案路徑、strengthen 1 個弱 mutation）
+- 修改：`Projects/internal/hci30/README.md`（提及新 harness）
+- 修改：`Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`（§Layering 回填答案、修正排序矛盾、修正 3 處過期測試引用）
+- 修改：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{21_HCI_TOP_TIER_GAP_ANALYSIS.md,governance/ADR-0004-no-universal-human-trust-score.md,governance/ADR_INDEX.md}`
+- 修改：`agency-os/TASKS.md`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs tests/unit/intelligence/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=99/99 pass（critic 修復前 96，新增/調整淨增 3：every-domain 數值測試+pair-order 測試+empty-array guard 測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/mutation-check-node-gates.ps1` | exit=0 | result=`All 15/15 Node-gate mutations killed.`，含新 baseline no-op gate 全部 7 個 target test 檔先過一輪未變異驗證
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1` | exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，全流程重跑綠燈
+- REVIEW_DONE: critic=Standard（真實 subagent，51-mutation 掃描 + 50,504 案例差分測試 + 1,286 案例精確算術核對）| verdict=1 Critical/8 Major/7 Minor，全修 | findings=1c/8m/7minor
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os | grep=`combineMethodFindings\|combine-method-findings\|band-scale\|meanRankBand\|DISAGREEMENT_SPREAD_THRESHOLD\|HCI_CONFIDENCE_SPEC` | hits=14（新建/修改檔案皆預期內，V1 blueprint 封存版不計入需修改）
+- WORKLOG: 本條目
+
+**[剩餘風險]**
+- **C1 揭露的 disagreement 傳遞缺口仍是開放問題**（非本輪遺漏，誠實留白）：`disagreement` 從 dimension 層傳到 domain 層目前無路徑，已列 TASKS.md 追蹤，等真有 trust-read endpoint 或碰 `HCI_RISK_SPEC.md`（severity override 同一問題空間）時一併決定，不在無真實 consumer 前搶先修改已出貨兩輪的 gate 4 contract
+- P0-04 剩五份規格（Evidence Quality/Contradiction/Risk/Permission/Time Decay）+ HCI_CONFIDENCE_SPEC.md 剩餘部分（Evidence Confidence/Model Agreement/Method Robustness/Decision Confidence 四軸、band-to-probability mapping、校準）仍未寫，已列 TASKS.md OQ
+- `method_id` 不在 `combineMethodFindings` 輸出中，`19` 要求的「Methods used」explainability 需求需呼叫方自行從原始 findings 保留，非本函式責任（已在 spec 明文揭露）
+
+**[rollback]** 純新增+一處已知零消費者的重構（差分測試驗證行為不變），`git revert` 即可；無 schema/migration/prod 變更。
+
 ## 2026-09-06（續55，同一 session：Cognitive OS 第四十二個 Method Atlas 切片 — `database_data.data_quality_dimensions`，F21 家族第八成員；直接解答 `database_data.data_contract` 的 OQ-DC-2；critic verdict **FAIL**：2 個 Critical，1 個是本 session 第二次重演的「宣稱已註冊 contract-backlog 但實際沒做」、1 個是 due-diligence 沒查姊妹母文件漏掉兩筆真引用；已修正並開 follow-up task 機械化防止第三次重演）
 
 **觸發**：操作者「繼續做 直到完美完成 Cognitive Engineering OS」。承接 WORKLOG 續54 的候選清單，選 `database_data.data_contract` 自己的 `OQ-DC-2`（F21 table Data Quality Dimensions 列，data_contract 自己的「Quality」步驟前向指稱的天然夥伴）。1 個 critic subagent（未使用 Workflow 工具，符合操作者一貫要求）。

@@ -1,14 +1,6 @@
 import { TRUST_DOMAINS } from '../contracts/trust-domains.mjs';
 import { ASSESSMENT_DIMENSIONS, DIMENSION_TO_DOMAIN } from './assessment-dimensions.mjs';
-
-// HCI_TRUST_DOMAIN_SPEC.md §Score semantics: the only representable values.
-// The rank encoding below is normative for aggregation; a future
-// band-to-probability-range display mapping (open, P0-04) is a separate,
-// display-only concern and must never be used to re-derive this ranking
-// (HCI_TRUST_DOMAIN_SPEC.md §Aggregation rule note on ordinal spacing).
-const BAND_RANK = Object.freeze({ VERY_LOW: 1, LOW: 2, MODERATE: 3, HIGH: 4, VERY_HIGH: 5 });
-const RANK_BAND = Object.freeze(['VERY_LOW', 'LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
-const BANDS = Object.freeze(Object.keys(BAND_RANK));
+import { BAND_RANK, BANDS, meanRankBand } from './band-scale.mjs';
 
 // Group each domain's assigned dimensions once, derived from
 // DIMENSION_TO_DOMAIN rather than hand-duplicated, so the two files cannot
@@ -40,17 +32,6 @@ function normalizeDimensionInput(entry, index) {
     return ref;
   });
   return { dimension, value, evidence_refs: evidenceRefs };
-}
-
-// HCI_TRUST_DOMAIN_SPEC.md §Aggregation rule: mean of the assigned
-// dimensions' ranks, rounded to the nearest integer rank, ties broken DOWN
-// (conservative -- overstating trust is more harmful than understating it).
-// Math.round rounds .5 UP, so the down-bias is applied explicitly here
-// rather than relying on (or accidentally depending on) the built-in's
-// default direction.
-function roundHalfDown(mean) {
-  const fractional = mean - Math.floor(mean);
-  return fractional > 0.5 ? Math.ceil(mean) : Math.floor(mean);
 }
 
 // HCI_TRUST_DOMAIN_SPEC.md's own worked function: 14 already-resolved
@@ -87,15 +68,11 @@ export function rollupTrustDomains(dimensionScores) {
     // `=== assigned.length` only because every domain currently has
     // exactly 2 assigned dimensions, an invariant nothing enforced).
     const coverage = present.length === assigned.length ? 'FULL' : 'PARTIAL';
-
-    if (present.length === 1) {
-      domains.push({ domain, value: present[0].value, coverage, evidence_refs: evidenceRefs });
-      continue;
-    }
-
-    const meanRank = present.reduce((sum, entry) => sum + BAND_RANK[entry.value], 0) / present.length;
-    const roundedRank = roundHalfDown(meanRank);
-    domains.push({ domain, value: RANK_BAND[roundedRank - 1], coverage, evidence_refs: evidenceRefs });
+    // meanRankBand is a correct pass-through for a single rank (mean of one
+    // number is itself), so no separate present.length === 1 branch is
+    // needed here -- verified by band-scale.test.mjs's own single-rank case.
+    const value = meanRankBand(present.map((entry) => BAND_RANK[entry.value]));
+    domains.push({ domain, value, coverage, evidence_refs: evidenceRefs });
   }
 
   return { domains };

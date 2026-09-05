@@ -5,36 +5,63 @@ import { validateTrustDomainResponse } from '../../../packages/contracts/validat
 
 const BANDS = ['VERY_LOW', 'LOW', 'MODERATE', 'HIGH', 'VERY_HIGH'];
 
-// HCI_TRUST_DOMAIN_SPEC.md §Aggregation rule: mean of two ranks, rounded
-// down on a .5 tie. Since both inputs are always integers 1-5, the mean's
-// fractional part is always exactly 0 or 0.5, so this reduces to
-// Math.floor((rankA + rankB) / 2) -- computed independently here (not by
-// importing the module's own rounding helper) so the test cannot pass by
-// sharing a bug with the implementation it is checking.
-function expectedBand(bandA, bandB) {
-  const rankA = BANDS.indexOf(bandA) + 1;
-  const rankB = BANDS.indexOf(bandB) + 1;
-  return BANDS[Math.floor((rankA + rankB) / 2) - 1];
-}
+// The exhaustive 25-rank-pair test that used to live here now lives in
+// band-scale.test.mjs, against meanRankBand directly -- rollupTrustDomains's
+// own mean-computation is a thin pass-through to that shared primitive
+// (packages/intelligence/band-scale.mjs, extracted 2026-09-06 when
+// combine-method-findings.mjs needed the same rank/round logic), so
+// re-asserting all 25 combinations here would test the same arithmetic
+// twice through two different textures. What remains below is specific to
+// rollupTrustDomains's own logic: domain iteration, coverage FULL/PARTIAL,
+// evidence dedup and ordering, and input validation.
 
-// Exhaustive: all 25 rank-pair combinations for one domain (OPERATIONAL:
-// RELIABILITY_FULFILLMENT + PREDICTABILITY), not a sample. This is exactly
-// the P0-04 "independent implementations given the same inputs produce
-// equivalent outputs" claim -- a sampled test would leave 24 of the 25
-// input pairs unproven the same way a critic review already found other
-// gates' self-tests leaving branches unproven by mutation.
-test('exhaustive: all 25 rank-pair combinations round-half-down correctly', () => {
-  for (const bandA of BANDS) {
-    for (const bandB of BANDS) {
-      const result = rollupTrustDomains([
-        { dimension: 'RELIABILITY_FULFILLMENT', value: bandA, evidence_refs: ['ev-reliability'] },
-        { dimension: 'PREDICTABILITY', value: bandB, evidence_refs: ['ev-predictability'] },
-      ]);
-      const operational = result.domains.find((d) => d.domain === 'OPERATIONAL');
-      assert.ok(operational, `no OPERATIONAL row for (${bandA}, ${bandB})`);
-      assert.equal(operational.value, expectedBand(bandA, bandB), `(${bandA}, ${bandB}) expected ${expectedBand(bandA, bandB)}, got ${operational.value}`);
-      assert.equal(operational.coverage, 'FULL');
-    }
+// Critic review, 2026-09-06 M2: the trim above removed the ONLY tests that
+// asserted a computed `value` for domains other than OPERATIONAL. Three
+// mutations specific to THIS file's own logic (not band-scale.mjs's
+// arithmetic) survived the entire repo suite as a result: hardcoding
+// 'MODERATE' for every FULL-coverage domain, using the last present
+// dimension's value instead of the mean, and using the minimum rank
+// instead of the mean (the exact "severity override" HCI_RISK_SPEC.md is
+// meant to decide, not something this file should silently do). The pair
+// (MODERATE, VERY_HIGH) -> HIGH catches all three at once: hardcoded
+// 'MODERATE' misses (real answer is HIGH), last-value misses (VERY_HIGH),
+// min-based misses (MODERATE) -- so a single assertion per domain is
+// sufficient, not a second 25-combination sweep duplicating band-scale.test.mjs.
+// This also fixes M3: DOMAIN_DIMENSIONS below is each domain's real pair in
+// ASSESSMENT_DIMENSIONS order (confirmed against the live module, not
+// retyped by hand), used both to assert the computed value and the
+// evidence_refs pair order for every domain, not only OPERATIONAL.
+const DOMAIN_DIMENSIONS_IN_ORDER = {
+  OPERATIONAL: ['RELIABILITY_FULFILLMENT', 'PREDICTABILITY'],
+  COMPETENCE: ['COMPETENCE', 'LEARNING_ADAPTABILITY'],
+  CONFIDENTIALITY: ['BOUNDARY_RESPECT', 'INFORMATION_GOVERNANCE'],
+  FINANCIAL: ['INCENTIVE_ALIGNMENT', 'RISK_EXTERNALIZATION'],
+  STRATEGIC: ['RECIPROCITY_FAIRNESS', 'CONTEXT_STABILITY'],
+  REPUTATIONAL: ['INTEGRITY_CONSISTENCY', 'COMMUNICATION_QUALITY'],
+  GOVERNANCE_POWER: ['CONFLICT_REPAIR', 'POWER_BEHAVIOR'],
+};
+
+test('every domain computes a real mean, not a hardcoded value, the last dimension, or the minimum rank', () => {
+  for (const [domain, [firstDim, secondDim]] of Object.entries(DOMAIN_DIMENSIONS_IN_ORDER)) {
+    const result = rollupTrustDomains([
+      { dimension: firstDim, value: 'MODERATE', evidence_refs: [`ev-${firstDim}`] },
+      { dimension: secondDim, value: 'VERY_HIGH', evidence_refs: [`ev-${secondDim}`] },
+    ]);
+    const row = result.domains.find((d) => d.domain === domain);
+    assert.ok(row, `no row for ${domain}`);
+    assert.equal(row.value, 'HIGH', `${domain}: expected HIGH (mean of MODERATE+VERY_HIGH), got ${row.value}`);
+    assert.equal(row.coverage, 'FULL');
+  }
+});
+
+test('evidence_refs pair order follows ASSESSMENT_DIMENSIONS position for every domain, not only OPERATIONAL', () => {
+  for (const [domain, [firstDim, secondDim]] of Object.entries(DOMAIN_DIMENSIONS_IN_ORDER)) {
+    const result = rollupTrustDomains([
+      { dimension: firstDim, value: 'HIGH', evidence_refs: [`ev-${firstDim}`] },
+      { dimension: secondDim, value: 'HIGH', evidence_refs: [`ev-${secondDim}`] },
+    ]);
+    const row = result.domains.find((d) => d.domain === domain);
+    assert.deepEqual(row.evidence_refs, [`ev-${firstDim}`, `ev-${secondDim}`], `${domain}: pair order wrong`);
   }
 });
 

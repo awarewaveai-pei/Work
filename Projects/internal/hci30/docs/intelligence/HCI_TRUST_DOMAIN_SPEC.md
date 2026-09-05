@@ -129,15 +129,20 @@ claimed, already governed by `ADR-0004` gate 5's `decision_weight` field**
 keyed by domain names (multi-domain) — it defines no combination semantics
 at all, and it is keyed by **Trust Domain**, not by Assessment Dimension, so
 it cannot structurally express "how do method A's and method B's findings
-about the Reliability/fulfillment *dimension* combine." That question has
-**no owner yet**. This spec's own input — "the already-resolved 14
-dimension-level values" — therefore rests on a mechanism that does not
-exist. `HCI_CONFIDENCE_SPEC.md` (not yet written, P0-04) is the right place
-to define it; until it does, a real implementation feeding this spec's
-`rollupTrustDomains` needs its own (undocumented, ad hoc) answer to
-cross-method-per-dimension combination, which is exactly the "two
-implementers reinvent the same gap differently" failure P0-04 exists to
-prevent. Tracked in `TASKS.md`, not solved here or silently assumed away.
+about the Reliability/fulfillment *dimension* combine."
+
+**Update (2026-09-06, same day): this question now has an owner.**
+`HCI_CONFIDENCE_SPEC.md` (partial) and
+`packages/intelligence/combine-method-findings.mjs` answer it — mean-of-
+ranks with a disclosed `disagreement` flag, the same shape this spec's own
+domain-level formula uses. This spec's own input — "the already-resolved
+14 dimension-level values" — now rests on a real, tested mechanism rather
+than an assumed one. One seam remains genuinely open, not silently closed:
+`combineMethodFindings`'s output carries a `disagreement` flag that
+`rollupTrustDomains`'s input contract (below) has no field for, so it is
+silently dropped if fed straight through today — see
+`HCI_CONFIDENCE_SPEC.md`'s own disclosure of this gap, tracked in
+`TASKS.md`.
 
 ## Roll-up formula (14 → 7)
 
@@ -171,15 +176,22 @@ secondary relevance without scoring it twice avoids exactly the kind of
 undeclared double-weighting that would reintroduce a numeric-tuning
 surface).
 
+The "Assigned dimensions" column below lists each domain's pair in
+`ASSESSMENT_DIMENSIONS` position order — the same order §Aggregation rule
+uses for `evidence_refs` — not narrative or alphabetical order; a critic
+review (2026-09-06 M3) found two rows (`CONFIDENTIALITY`,
+`GOVERNANCE_POWER`) originally listed in the opposite order, which would
+have misled a reader into assuming table order matched output order.
+
 | Domain | Assigned dimensions (primary) | Rationale | Plausible secondary domain (not scored) |
 |---|---|---|---|
 | **Operational Trust** | Reliability/fulfillment; Predictability | Can they be relied on to execute day-to-day commitments as agreed, consistently? | Strategic (long-run predictability) |
 | **Competence Trust** | Competence; Learning/adaptability | Do they have — and keep developing — the skill/capability they claim? | — |
-| **Confidentiality Trust** | Information governance; Boundary respect | Can sensitive information and agreed-upon access limits be trusted with them? | Governance/Power (boundary-as-power) |
+| **Confidentiality Trust** | Boundary respect; Information governance | Can sensitive information and agreed-upon access limits be trusted with them? | Governance/Power (boundary-as-power) |
 | **Financial Trust** | Incentive alignment; Risk externalization | Are their financial/material incentives aligned, and do they avoid pushing risk onto counterparties? | Strategic (aligned goals) |
 | **Strategic Trust** | Reciprocity/fairness; Context stability | Is this a mutually-beneficial relationship that holds up as circumstances change? | Financial (fair dealing) |
 | **Reputational Trust** | Integrity consistency; Communication quality | Is their character and self-representation consistent and defensible to outside observers? | Operational (day-to-day communication) |
-| **Governance/Power Trust** | Power behavior; Conflict repair | Do they exercise authority and resolve conflict through legitimate, accountable process? | — |
+| **Governance/Power Trust** | Conflict repair; Power behavior | Do they exercise authority and resolve conflict through legitimate, accountable process? | — |
 
 Full 14-dimension inventory with `04_HCI30_PRODUCT_SPEC.md` line references:
 Integrity consistency (`:72`), Reliability/fulfillment (`:73`), Competence
@@ -239,14 +251,23 @@ entity; that schema-level guarantee is owed to P0-01, not this spec):
   structurally-safer alternative at every choice point) — overstating trust
   is more harmful than understating it. `coverage = FULL`. `evidence_refs`
   = the deduplicated union of both dimensions' evidence refs, **ordered by
-  each dimension's position in `ASSESSMENT_DIMENSIONS`, not by input order**
-  (`RELIABILITY_FULFILLMENT` before `PREDICTABILITY` for Operational, etc.
-  — see the machine-checked list above for every domain's pair order). This
-  ordering is normative, not incidental — pinned so two independent
-  implementations given the same input cannot disagree merely by iterating
-  a `Map`/`Set` differently (critic review, 2026-09-06 M3, which found the
-  first version of this spec left the order unstated while two of its own
-  test cases already disagreed on it).
+  each dimension's position in `ASSESSMENT_DIMENSIONS` (the 14-item list
+  earlier in this document), not by input order and not by the row order of
+  the machine-checked partition block** (`RELIABILITY_FULFILLMENT` before
+  `PREDICTABILITY` for Operational, because that is `ASSESSMENT_DIMENSIONS`'s
+  own order, regardless of which order a domain's two dimensions happen to
+  be written in the partition block or the prose table). This ordering is
+  normative, not incidental — pinned so two independent implementations
+  given the same input cannot disagree merely by iterating a `Map`/`Set`
+  differently (critic review, 2026-09-06 M3, which found the first version
+  of this spec left the order unstated while two of its own test cases
+  already disagreed on it; **a second critic review found the fix's own
+  wording — "see the machine-checked list... for pair order" — was itself
+  wrong for 2 of 7 domains, since that block's row order is not
+  `ASSESSMENT_DIMENSIONS` order for `CONFIDENTIALITY` or
+  `GOVERNANCE_POWER`; corrected here to cite `ASSESSMENT_DIMENSIONS` alone**,
+  and `tests/unit/intelligence/rollup-trust-domains.test.mjs` now asserts
+  the pair order for every domain, not only `OPERATIONAL`).
 
 **The rank encoding (`VERY_LOW=1 .. VERY_HIGH=5`) is normative for this
 aggregation; it is not a claim that the five bands are equally spaced on
@@ -267,9 +288,16 @@ Worked example: `Reliability/fulfillment = HIGH (4)`,
 
 This is a pure function of its inputs — no model calls, no hidden state, no
 `Date.now()`/`Math.random()` — so determinism (P0-04's "Expected result")
-holds by construction; `tests/unit/intelligence/rollup-trust-domains.test.mjs`
-exhaustively checks all 25 rank-pair combinations rather than sampling a
-few.
+holds by construction. The exhaustive all-25-rank-pair-combination check
+lives in `tests/unit/intelligence/band-scale.test.mjs` (against the shared
+`meanRankBand` primitive `rollup-trust-domains.mjs` calls, extracted
+2026-09-06 when `combine-method-findings.mjs` needed the same logic — a
+critic review's M4 finding caught this paragraph and two others still
+citing the pre-extraction test location, corrected here);
+`rollup-trust-domains.test.mjs` itself now asserts the value for every
+domain across a representative set of band combinations plus the pair
+order for all 7 domains, rather than re-asserting all 25 combinations a
+second time through a different texture.
 
 ## Explicitly out of scope (forward references to their own P0-04 specs)
 
@@ -318,17 +346,22 @@ into this file's scope.
 - `tests/unit/intelligence/assessment-dimensions.test.mjs` — proves the
   partition covers all 14 dimensions exactly once across all 7 domains (no
   gap, no double-assignment).
-- `tests/unit/intelligence/rollup-trust-domains.test.mjs` — exhaustive
-  25-combination rank-pair test, `PARTIAL`/`FULL` coverage tests, the
-  0-of-2 omission case, and an end-to-end composition test proving the
-  roll-up's own output always passes gate 4's
-  `validateTrustDomainResponse` unchanged.
+- `tests/unit/intelligence/rollup-trust-domains.test.mjs` — value and
+  `PARTIAL`/`FULL` coverage assertions across a representative set of band
+  combinations for every domain, the pair-order assertion for all 7
+  domains, the 0-of-2 omission case, and an end-to-end composition test
+  proving the roll-up's own output always passes gate 4's
+  `validateTrustDomainResponse` unchanged. The exhaustive all-25-combination
+  rank-arithmetic test itself lives in
+  `tests/unit/intelligence/band-scale.test.mjs`, against the shared
+  primitive both this file and `combine-method-findings.mjs` call.
 
 ## Rollback
 
 Purely additive, pre-code (no real trust-read endpoint or method catalog
 consumes this yet): reverting this spec and its two new modules removes the
 formula entirely with no migration and no data to reconcile. A future
-change to the partition table or the tie-break rule requires updating
-`assessment-dimensions.mjs`'s `DIMENSION_TO_DOMAIN` map and re-running the
-exhaustive test above, not a schema migration.
+change to the partition table requires updating `assessment-dimensions.mjs`'s
+`DIMENSION_TO_DOMAIN` map and re-running that file's own tests; a future
+change to the tie-break rule requires updating `band-scale.mjs` and
+re-running its exhaustive test, not a schema migration.

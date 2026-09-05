@@ -480,6 +480,78 @@ contract/intelligence test files (up from 67 before the review); full
 `test-wave1-local.ps1` run green end-to-end (all Node-level gates plus the
 unrelated 11-migration Docker SQL suite and reversibility check).
 
+## Implementation note (2026-09-06, HCI_CONFIDENCE_SPEC.md partial: method-to-dimension combination)
+
+Same day, continuing the P0-04 sequence: `HCI_CONFIDENCE_SPEC.md` (partial)
+and `packages/intelligence/combine-method-findings.mjs` answer the gap the
+previous note's §Layering fix named but did not close — how multiple HCI
+methods' findings about the same Assessment Dimension combine into one
+dimension-level value. Mean-of-ranks with a disclosed `disagreement` flag
+(spread of 2+ ranks between findings), grounded in
+`19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:17`'s "Do not average lens
+disagreement away." `packages/intelligence/band-scale.mjs` extracted the
+rank/round-half-down primitive out of `rollup-trust-domains.mjs` for this
+second consumer; the extraction also revealed both files' `length === 1`
+special cases were redundant (`meanRankBand` is already a correct
+pass-through for a single rank) and removed them — verified
+behavior-preserving, not merely tests-still-pass, before shipping.
+
+**Independent critic review** (same rationale as every prior gate in this
+family: new design + new JS logic) ran 51 mutations, a 50,504-case
+differential test of the refactor, and a 1,286-case exact-arithmetic check,
+finding **1 Critical + 8 Major + 7 Minor**, all fixed before commit:
+- **C1 (Critical)**: this spec's own text claimed `disagreement` is "never
+  silently droppable" by any consumer — falsified by the spec's own worked
+  example: piping `combineMethodFindings`'s output into `rollupTrustDomains`
+  (whose input contract has no `disagreement` field, and whose gate-4
+  whitelist would reject one) silently drops it, reproducing the exact
+  "papers over a real disagreement" failure the spec exists to prevent, one
+  layer up. Fixed by narrowing the claim to this function's own output and
+  disclosing the propagation gap explicitly (tracked in `TASKS.md`) rather
+  than claiming it solved or patching gate 4 a third time without a real
+  answer to how a domain would roll up two dimensions' disagreement flags.
+- **M1**: the combine→rollup composition happened to work only via an
+  unstated validator asymmetry (rollup has no unknown-key rejection, gate 4
+  does) — documented, not silently relied upon.
+- **M2**: trimming `rollup-trust-domains.test.mjs`'s exhaustive test (moved
+  to `band-scale.test.mjs`) accidentally deleted the only coverage proving
+  `rollupTrustDomains`'s own logic computes a real mean rather than
+  hardcoding `MODERATE`, using the last dimension's value, or using the
+  minimum rank as an ad hoc severity override — all three mutations
+  survived the entire repo suite. Restored with one assertion per domain.
+- **M3**: the spec's own ordering directive contradicted the partition
+  table for 2 of 7 domains (`CONFIDENTIALITY`, `GOVERNANCE_POWER`) — fixed
+  the prose table and added a pair-order assertion for all 7 domains, not
+  only `OPERATIONAL`.
+- **M4**: three now-stale references to the relocated exhaustive test.
+- **M5**: the mutation harness copied only `packages/` and `tests/`, so two
+  existing test files that read `database/` or `docs/` threw `ENOENT`
+  regardless of mutation and were silently counted as "killed." Fixed with
+  a baseline no-op gate (every target test file must pass unmutated in a
+  fresh sandbox first) plus copying `database/`/`docs/` into the sandbox.
+- **M6**: a citation of `04_HCI30_PRODUCT_SPEC.md:87` quoting text a prior
+  commit in this same session had already replaced.
+- **M7**: the Status section's authority framing reused the sibling spec's
+  structure without the same rigor — split into (1a) the disagreement-
+  disclosure rule, textually grounded in `19:17`, and (1b) the specific
+  mean-of-ranks formula, operator-delegated like item 2, not blanket-
+  licensed by `04:87`.
+- **M8**: `HCI_TRUST_DOMAIN_SPEC.md` §Layering still said the combination
+  question had "no owner yet" after this same change gave it one — updated.
+- 7 Minor: a 3-finding test whose disagreement source happened to sit at
+  an array extreme (so a first/last-only spread mutation survived); a
+  spread-0-with-N>=2 case with no explicit `disagreement === false`
+  assertion; `method_id` validated but not returned, undisclosed;
+  `README.md` not mentioning the new mutation harness; a self-referential
+  sentence; `meanRankBand([])` silently returning `undefined`; the mutation
+  harness's weakest entry (a message-text-only mutation) swapped for a real
+  boundary mutation.
+
+Final tally: **99/99 Node assertions** across all seven contract/intelligence
+test files (up from 96 pre-review); `mutation-check-node-gates.ps1` 15/15
+killed including the new baseline gate; full `test-wave1-local.ps1` run
+green end-to-end.
+
 ## Evidence
 
 - `01_SYSTEM_CONSTITUTION.md:113-132` — Invariant 8 (unenforced principle is not a control) and "Definition of architecture failure" naming "a single universal human trust score."
