@@ -1,0 +1,349 @@
+$id: "ai-lego://methods/contracts/database_data.retention_deletion_model.contract.yaml"
+title: "Retention / Deletion Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-third Method Atlas slice, NINTH and FINAL
+  member of the `database_data` family (F21's own "資料庫／資料套件 (DB
+  / Data Pack)"), after `database_data.backup_restore_drill`
+  (twenty-fifth), `database_data.data_lineage` (twenty-eighth),
+  `database_data.expand_contract_migration` (thirtieth), `database_data
+  .reconciliation` (twenty-ninth), `database_data.erd` (thirty-ninth),
+  `database_data.data_contract` (fortieth), `database_data
+  .normalization` (forty-first), and `database_data
+  .data_quality_dimensions` (forty-second). F21's own remaining table
+  row, `Schema Compatibility Analysis` (L903), was investigated and
+  found to be ALREADY FULLY COVERED, not a ninth build candidate -- see
+  the dedicated note below.
+
+  Atlas gives this method exactly ONE citation of its own: the F21
+  tool table's Retention / Deletion Model row (L906: purpose "保存、
+  刪除、legal hold"; usage "data class→purpose→retention→deletion→
+  exception→proof"; benefit "降合規與暴露風險"). No dedicated §11.x/
+  §12.x section exists in the Atlas mother document itself -- verified
+  by a broad grep for "retention"/"保存"/"legal hold"/"data class"/
+  "資料分類"/"deletion"/"刪除"/"purge"/"archiv" across the full
+  document (the wider term set critic-review-confirmed to still find
+  nothing beyond L906 -- the only near-miss, Atlas L2328 "支援 legal
+  deletion / correction impact analysis", sits inside §11.48 Data
+  Lineage's own benefits list and belongs to `database_data
+  .data_lineage`, confirmed distinct).
+
+  **Due diligence here started BROAD ACROSS ALL THREE normative
+  documents from the first draft** (applying the invariant this
+  session's own AGENTS.md §4 demands after the SAME "due-diligence
+  survey covered only Atlas, missed a real citation in a sibling
+  document" class was caught on TWO consecutive prior slices --
+  `database_data.data_contract`, commit `72b47cd0d`, and `database_data
+  .data_quality_dimensions`, same session -- the third occurrence
+  threshold this package's own governance treats as mandatory-
+  invariant-analysis territory). The broadened search found a real,
+  substantial second citation: `AI_LEGO_Cognitive_Engineering_Os_Global
+  _Master_Plan_v1.md` §114 "Records Retention / Legal Hold /
+  eDiscovery" (L4711-4735) -- a section whose own TITLE nearly
+  duplicates this method's own Atlas name. §114 elaborates Atlas's own
+  bare "exception" formula step into FIVE named hold/trigger types
+  (Legal Hold, Regulatory Hold, Research Hold, Contractual Hold, User
+  Deletion Request) alongside the base Retention Policy, and adds a
+  genuine conflict-resolution requirement Atlas's own bare table row
+  never states: "衝突時 Policy Engine 決定，並產生理由" (when these
+  conflict, a Policy Engine decides AND PRODUCES A REASON). This is the
+  authoritative source for `holds[]` below, not an invention.
+
+  EIGHT other Master Plan hits for "retention" were individually read
+  and confirmed to be unrelated passing checklist items in different
+  contexts (**CORRECTED post-critic-review**: a first-draft count of
+  "seven" omitted two of them, L3139 and L4532, from the enumeration
+  though the grep survey itself had already covered the full document
+  -- L1063: a generic "each thing needs a Retention Policy" metadata
+  field inside an unrelated Temporary-Context section; L3139: a bare
+  "retention/" directory-tree entry inside an unrelated §79 file-layout
+  listing; L3899-3901: a compliance-DOMAIN enumeration listing "Records
+  Retention"/"Legal Hold" as domain NAMES, not an elaboration; L4308: a
+  data-subject-record field list; L4532: "Retention" inside a §107
+  compliance-Pack field list; L5224: a risk-approval checklist item;
+  L5546/L5570: an AI-PROVIDER evaluation criterion about THAT
+  provider's own data-retention practice -- a completely different
+  subject). Two further Execution Contract hits beyond EC §31 were also
+  read and confirmed unrelated (EC L2848: "retention-controlled" inside
+  §102 Logging Contract; EC L3397: "retention" inside §127 Resource
+  Ownership) -- no further Execution Contract CITATION exists beyond EC
+  §31 itself (see the due-diligence note on `deletion_evidence_ref`
+  below, already fully modeled and NOT re-cited as if newly found).
+
+  This method is a STRUCTURAL POLICY record, the same
+  provenance_required-plus-one-integrity-gate class as `database_data
+  .erd`/`database_data.data_contract` -- NOT genuine compute. A
+  deliberate design choice, not an oversight, grounded in TWO textual
+  facts rather than a claim about what is technically possible
+  (**CORRECTED post-critic-review**: the first draft argued a live
+  eligibility check was technically UNAVOIDABLE without breaking this
+  session's own "deterministic, stored-data-only" gate discipline --
+  a critic review found that framing false: storing an explicit
+  `evaluated_as_of` reference timestamp alongside a structured
+  retention-period length WOULD keep such a check a pure, deterministic
+  function of stored fields, and this very family already has exactly
+  that pattern -- `database_data.expand_contract_migration`'s own gate
+  compares two STORED `completed_at` timestamps against each other,
+  `ai_lego/modules/database_data/expand_contract_migration.py:119`, a
+  deterministic temporal computation over stored data, not wall-clock
+  "now"). The REAL grounds for this scope decision: (1) Atlas's own
+  formula ends in "proof" (recording that a compliant policy and its
+  own evidence EXIST), not in an "eligibility" or "check" step -- the
+  textual formula itself does not ask for a live computation; (2)
+  Master Plan §114's own opening sentence (L4713: "資料不能只用固定
+  「30 天刪除」" -- data cannot just use a fixed "30-day deletion" rule)
+  actively argues AGAINST inventing a single structured duration
+  grammar simple enough to drive a generic eligibility formula --
+  real retention rules are commonly conditional, jurisdiction-specific,
+  and hold-dependent in ways a single "retention_period_days" field
+  cannot faithfully represent without first designing that entire
+  structured grammar, itself a substantial, undertaken-elsewhere design
+  question. This is disclosed as a real, elective scope boundary
+  (`OQ-RDM-2`, corrected to name the known-viable deterministic
+  alternative rather than claiming none exists), not silently narrowed
+  and not a technical impossibility.
+
+  **Confirmed NOT a duplicate of two real neighbours, each read in
+  full**: (1) `specs/execution/data-deletion.schema.yaml` (EC §31 Data
+  Deletion Contract -- CORRECTED post-critic-review: `L1181-1230`, not
+  a first-draft `L1225-1251` that had run off the end of §31 into §32
+  Security Change Contract, an error a critic review found was likely
+  INHERITED from that same sibling file's own two pre-existing stale
+  citations rather than independently re-derived; `DEL-` prefix) models
+  the EXECUTION MECHANICS of carrying out ONE triggered deletion
+  request (a 10-step Authorization→...→Deletion Evidence pipeline) --
+  a genuinely different layer than this method's own POLICY (which
+  data class exists, why it is kept, for how long, and what exceptions
+  apply). The two are complementary, not overlapping: EC §31's own
+  pipeline literally has "Retention Check" and "Legal Hold Check" as
+  STEPS (L1188, L1190) that would consult a policy record shaped like
+  THIS method's own output. `deletion_evidence_ref` below is a
+  format-only soft link resolving that real relationship. (2) F21's
+  own remaining table row, `Schema Compatibility Analysis` (L903:
+  "精確步驟序列見 Execution Contract §28（唯一正本）"), redirects to
+  the SAME EC §28 15-step sequence `database_data
+  .expand_contract_migration` already fully modeled -- and that
+  record's own `stage_id` enum ALREADY includes `compatibility_analysis`
+  as the third of 15 enum values (`specs/cognitive/typed-objects
+  /expand-contract-migration-record.schema.yaml:70`, within the enum
+  block L67-82 -- CORRECTED post-critic-review from a first-draft
+  citation pointing at that same file's own `examples:` block, L106/122,
+  where the value merely appears as sample data rather than at its own
+  enum definition). Building a separate `database_data
+  .schema_compatibility_analysis` machine_id would duplicate an
+  already-tracked stage of an already-shipped, already-critic-reviewed
+  method. That said, `expand_contract_migration`'s own record stores
+  only that the stage COMPLETED (`{stage_id, completed_at}`), not any
+  findings the analysis itself produced (e.g. a backward/forward-
+  compatibility verdict or a breaking-change list) -- this method's own
+  Atlas cell (L903) carries no formula of its own to model beyond the
+  EC §28 redirect, so there is no additional content this coverage
+  leaves unmodeled; covered to the FULL EXTENT Atlas's own table cell
+  defines, not merely nominally. F21's own TEN-row table (L899-908) is
+  therefore FULLY accounted for with NINE built machine_ids (this one
+  being the ninth and last) plus ONE confirmed-already-covered row
+  (Schema Compatibility Analysis) -- ten rows, nine builds, not a
+  discrepancy.
+
+  Atlas's own formula grounds real structural invariants that make
+  this record a genuine MODEL: `holds[]` entries use MP §114's own
+  five named hold-type vocabulary (not invented); and whenever MORE
+  THAN ONE hold is simultaneously `active: true`, a non-empty
+  `conflict_resolution` explaining the Policy-Engine-style precedence
+  decision is REQUIRED -- directly implementing MP §114's own
+  "衝突時...並產生理由" requirement, not an invented cross-check.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Retention / Deletion Model row (L906): 'data class→purpose→retention→deletion→exception→proof'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §114 Records Retention / Legal Hold / eDiscovery (L4711-4735): five named hold/trigger types plus a Policy-Engine conflict-resolution requirement"
+  - "specs/execution/data-deletion.schema.yaml -- confirmed a distinct, complementary execution-layer record (EC §31), reused by reference for the optional deletion_evidence_ref field"
+  - "specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml -- confirmed F21's own Schema Compatibility Analysis row (L903) is already fully covered by that record's own compatibility_analysis stage, not a separate build candidate"
+  - "methods/registry/method-inventory.yaml Retention / Deletion Model entry: category 'F21 database-data', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  forty-first concrete entry. `id: database_data.retention_deletion_model`
+  mints a new machine_id, NINTH and FINAL member of the `database_data`
+  family -- F21's own TEN-row table is now fully accounted for (nine
+  built machine_ids plus one, Schema Compatibility Analysis, confirmed
+  already covered by an existing sibling's own stage).
+
+id: database_data.retention_deletion_model
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating a data class's own policy into retention/
+# deletion/exception elements is DECOMPOSE; the conflict-resolution
+# requirement on simultaneous active holds IS the validation act
+# itself -- the same inferred pair `database_data.normalization`'s own
+# contract already uses.
+
+purpose:
+  - record_a_data_retention_and_deletion_policy_for_a_data_class_including_named_holds_and_their_conflict_resolution_and_evidence_of_compliance
+inputs:
+  required: [DataClassDeclaration, RetentionRule, DeletionTrigger, ComplianceEvidence]
+  optional: [HoldSet, SchemaReference, DeletionEvidenceReference]
+outputs: [RetentionDeletionModelRecord]
+preconditions:
+  - "data_class, purpose, retention_rule, deletion_trigger, and compliance_evidence are all non-empty strings"
+  - "holds is a required array (may be empty); every entry's own hold_type is one of MP §114's own five named values (legal_hold, regulatory_hold, research_hold, contractual_hold, user_deletion_request); reason is a non-empty string; active is a real bool"
+  - "when MORE THAN ONE holds[] entry has active:true, conflict_resolution is REQUIRED (a non-empty string) -- directly implementing MP §114's own 'Policy Engine 決定，並產生理由' requirement; when 0 or 1 holds are active, conflict_resolution MUST be absent (no conflict exists to resolve, avoiding an invented resolution for a non-conflict)"
+  - "schema_ref, when present, is a non-empty string beginning with ERD- (database_data.erd) -- a format-only soft link, OPTIONAL because a data class may span multiple modeled entities or exist outside any modeled ERD"
+  - "deletion_evidence_ref, when present, is a non-empty string beginning with DEL- (specs/execution/data-deletion.schema.yaml's own deletion_request) -- a format-only soft link, present once a real deletion has been carried out under this policy"
+  # Precondition 1 maps onto 'data class'/'purpose'/'retention'/
+  # 'deletion'/'proof'; 2-3 onto 'exception' (MP §114's own five-type
+  # vocabulary plus its own conflict-resolution requirement); 4-5 onto
+  # the two real cross-references confirmed by due diligence.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class every prior structural (non-genuine-compute)
+  # database_data contract already reasons through: the real risk is
+  # MODELING integrity (is the policy internally consistent and
+  # correctly evidenced), not an evidence-citation risk over a
+  # narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Retention / Deletion Model row.
+recommended_next: []
+# database_data.erd and specs/execution/data-deletion.schema.yaml are
+# both ALREADY built/existing and consumed here as real soft-link
+# fields, not left as bare recommended_next entries.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- any real deletion this
+  # policy eventually triggers happens outside this method's own scope
+  # (in specs/execution/data-deletion.schema.yaml's own execution
+  # layer), the same "record describes an external policy/structure"
+  # class every prior database_data contract's own rollback field
+  # already draws.
+
+compilation_decisions:
+  - question: >
+      Should this method compute a live 'is this data class currently
+      eligible for deletion' boolean from a stored retention-period
+      length and a reference timestamp?
+    decision: "No -- this record is a POLICY declaration (data class/purpose/retention rule/deletion trigger/holds/evidence), not a live eligibility computation."
+    reasoning: >
+      CORRECTED post-critic-review: the first draft argued this was
+      technically FORCED (a live check would supposedly have to depend
+      on wall-clock time, which no other genuine-compute record in this
+      family does) -- a critic review found a real counterexample: an
+      `evaluated_as_of` stored timestamp compared against a stored
+      retention-period length WOULD stay a deterministic function of
+      stored fields, and `database_data.expand_contract_migration`'s
+      own gate already compares two stored `completed_at` timestamps
+      this same way (`ai_lego/modules/database_data
+      /expand_contract_migration.py:119`). The REAL grounds are textual,
+      not technical: Atlas's own formula ends in "proof" (evidence that
+      a compliant policy exists), not an "eligibility" or "check" step;
+      and Master Plan §114's own opening line (L4713, "資料不能只用固定
+      「30 天刪除」" -- data cannot just use a fixed 30-day rule) argues
+      against inventing the single structured duration grammar a
+      generic eligibility formula would need, since real retention
+      rules are commonly conditional and hold-dependent in ways one
+      field cannot faithfully represent. Disclosed as a real, ELECTIVE
+      scope boundary (OQ-RDM-2, corrected to name the known-viable
+      deterministic alternative) -- a future revision building a
+      genuinely time-aware eligibility engine (using the
+      `evaluated_as_of`-style pattern) would be a DIFFERENT, dedicated
+      method (or an execution-layer trigger consuming this record as
+      input), not a retrofit here.
+  - question: >
+      MP §114 names FIVE hold/trigger types (Legal/Regulatory/Research
+      /Contractual Hold, User Deletion Request) plus a base "Retention
+      Policy". Should "Retention Policy" itself be a sixth `hold_type`
+      enum value?
+    decision: "No -- 'Retention Policy' is this record's own baseline (retention_rule), not one of the five EXCEPTION-shaped hold types holds[] models."
+    reasoning: >
+      MP §114's own six-item list (L4718-4723) mixes one BASELINE
+      concept (Retention Policy -- the default rule) with five
+      EXCEPTION concepts (holds that override or accelerate that
+      baseline). Atlas's own formula already separates these into two
+      distinct steps ("retention" vs. "exception") -- this record's own
+      field design follows that same separation: retention_rule is the
+      baseline (Atlas's "retention"), holds[] is the exception set
+      (Atlas's "exception", using MP §114's own five-item vocabulary
+      for it). Folding "Retention Policy" into the same enum as its own
+      five exceptions would conflate a rule with the exceptions TO that
+      rule.
+  - question: >
+      Should `holds[]` reject two entries with the identical hold_type
+      (e.g. two separate legal_hold entries for two different legal
+      matters)?
+    decision: "No -- repeated hold_type values are legal."
+    reasoning: >
+      A real data class can genuinely be subject to two independent
+      legal holds from two different matters simultaneously (e.g. two
+      separate litigation holds). Atlas's own formula and MP §114 name
+      no one-hold-per-type restriction; inventing one would be exactly
+      the kind of unstated-assumption invention this package's every
+      prior contract already disciplines itself against.
+
+open_questions:
+  - id: "OQ-RDM-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RDM-2"
+    question: >
+      This record deliberately does NOT compute a live 'eligible for
+      deletion now' boolean (see compilation_decisions) -- it declares
+      a policy, not a live eligibility engine. This is an ELECTIVE scope
+      decision, not a technical impossibility -- CORRECTED post-critic-
+      review: a critic review found a real, known-viable deterministic
+      design (an `evaluated_as_of` stored reference timestamp compared
+      against a stored retention-period length, the same pattern
+      `database_data.expand_contract_migration`'s own gate already uses
+      to compare two stored `completed_at` timestamps,
+      `ai_lego/modules/database_data/expand_contract_migration.py:119`)
+      that WOULD stay a pure function of stored data. Should a future,
+      DEDICATED method (or an execution-layer trigger consuming this
+      record's own retention_rule as input) be built using that pattern
+      to perform a genuinely time-aware check?
+    owner: "operator, or whoever next scopes a time-aware retention-eligibility engine"
+    blocks: "nothing in this file's own validity -- disclosed scope boundary, not a silent gap"
+  - id: "OQ-RDM-3"
+    question: >
+      Neither `schema_ref` nor `deletion_evidence_ref` is cross-
+      validated against this record's own `data_class` -- a caller
+      could supply refs describing an entirely unrelated dataset. This
+      method cannot see either referenced record's own content
+      (format-only soft link, the same declared limit every prior
+      soft-link field in this package already carries). Should a
+      future revision add a runtime cross-check?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L906) directly. Broad grep across
+    ALL THREE normative documents (Atlas, Master Plan, Execution
+    Contract) from the FIRST draft for "retention"/"保存"/"legal hold"/
+    "data class"/"資料分類"/"deletion"/"刪除"/"purge"/"archiv" --
+    applying the mandatory-
+    invariant-analysis threshold this session's own governance sets
+    after the SAME citation-completeness failure class recurred twice
+    on the two immediately preceding slices. Found and read in full:
+    Master Plan §114 (L4711-4735, a real, substantial second citation)
+    and seven other Master Plan "retention" hits (all confirmed
+    unrelated passing mentions, individually listed above). Read
+    `specs/execution/data-deletion.schema.yaml` and `specs/cognitive
+    /typed-objects/expand-contract-migration-record.schema.yaml` in
+    full to confirm this method is not a duplicate of either, and that
+    F21's own remaining Schema Compatibility Analysis row is already
+    fully covered (not a ninth build candidate). Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 'data class→purpose→
+    retention→deletion→exception→proof' formula and MP §114's own
+    five-hold-type vocabulary plus conflict-resolution requirement are
+    both directly transcribed. The structural-record (not genuine-
+    compute) scope decision, the retention-rule/holds separation, and
+    the repeated-hold-type legality are all disclosed compilation
+    choices, not silent inventions -- see compilation_decisions above.

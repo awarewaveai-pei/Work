@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/retention-deletion-model-record.schema.yaml"
+title: Retention / Deletion Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RetentionDeletionModelRecord`
+  -- the declared `outputs` of `database_data.retention_deletion_model`'s
+  Method Contract. NINTH and FINAL `database_data`-family typed object --
+  F21's own TEN-row table is now fully accounted for (nine built
+  machine_ids plus this one; the remaining row, Schema Compatibility
+  Analysis, is already covered by
+  `database_data.expand_contract_migration`'s own `compatibility_analysis`
+  stage, confirmed by direct read, not a separate build). Atlas's own
+  F21 tool table Retention / Deletion Model row (L906: "data class→
+  purpose→retention→deletion→exception→proof") AND Master Plan §114
+  Records Retention / Legal Hold / eDiscovery (L4711-4735: five named
+  hold/trigger types plus a Policy-Engine conflict-resolution
+  requirement) together ground this record.
+
+  A STRUCTURAL POLICY record (`provenance_required` plus one integrity
+  gate), NOT genuine compute -- deliberately: this record declares a
+  policy's own parameters, not a live "is this data class currently
+  eligible for deletion" computation (which would depend on wall-clock
+  time at evaluation, not solely on the record's own stored fields --
+  see method contract compilation_decisions and `OQ-RDM-2`).
+
+  `holds[]` uses MP §114's own five named hold-type vocabulary
+  verbatim. The real structural invariant: whenever MORE THAN ONE hold
+  is simultaneously `active: true`, `conflict_resolution` is REQUIRED
+  (a non-empty string) -- directly implementing MP §114's own "衝突時
+  Policy Engine 決定，並產生理由" requirement; with 0 or 1 active
+  holds, `conflict_resolution` MUST be absent (no conflict exists) --
+  both enforced at the runtime layer, not here. `deletion_evidence_ref`
+  is a format-only soft link to `specs/execution/data-deletion
+  .schema.yaml`'s own `deletion_request` (a confirmed-distinct,
+  complementary execution-layer record, EC §31), present once a real
+  deletion has been carried out under this policy. `schema_ref` is a
+  format-only soft link to a `database_data.erd` record.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Retention / Deletion Model row (L906): 'data class→purpose→retention→deletion→exception→proof'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §114 Records Retention / Legal Hold / eDiscovery (L4711-4735): five named hold types, Policy-Engine conflict-resolution requirement"
+  - "methods/contracts/database_data.retention_deletion_model.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  hold:
+    type: object
+    required: [hold_type, reason, active]
+    additionalProperties: false
+    properties:
+      hold_type:
+        enum: [legal_hold, regulatory_hold, research_hold, contractual_hold, user_deletion_request]
+        description: "Master Plan §114's own five named hold/trigger types (L4719-4723), transcribed verbatim as a machine enum. 'Retention Policy' itself (§114's own sixth list item) is NOT a member -- it is this record's own baseline (retention_rule), not one of the exceptions to it. See method contract compilation_decisions."
+      reason:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Human-readable justification for this specific hold, e.g. 'Litigation hold, Smith v. Acme, filed 2026-08-01'."
+      active:
+        type: boolean
+        description: "Is this hold currently in force? A hold may be recorded but no longer active (e.g. a resolved litigation hold)."
+
+type: object
+required: [id, version, data_class, purpose, retention_rule, deletion_trigger, holds, compliance_evidence, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^RDM-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.retention_deletion_model"
+  data_class:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'data class' formula step -- which kind of data this policy governs, e.g. 'customer PII', 'financial transaction records'."
+  purpose:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'purpose' formula step -- why this data is collected/retained."
+  retention_rule:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'retention' formula step -- the baseline retention rule, e.g. '7 years from transaction completion date, per [regulation]'. Free text: no structured duration grammar is invented (see method contract compilation_decisions)."
+  deletion_trigger:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'deletion' formula step -- what triggers actual deletion once retention lapses, e.g. 'automated purge job, 30 days after retention period ends'."
+  holds:
+    type: array
+    default: []
+    description: "Atlas's own 'exception' formula step, using Master Plan §114's own five-item vocabulary. REQUIRED array (may be empty) so an absence of holds is an explicit disclosed finding, the same discipline database_data.erd's own constraints[] already establishes."
+    items:
+      $ref: "#/$defs/hold"
+  conflict_resolution:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "REQUIRED when more than one holds[] entry has active:true; MUST be absent otherwise -- enforced at the runtime layer, not here. Directly implements Master Plan §114's own 'Policy Engine 決定，並產生理由' (Policy Engine decides, and produces a reason) requirement for simultaneous conflicting holds."
+  compliance_evidence:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'proof' formula step -- free text evidencing this policy's own compliance, e.g. 'Legal review approved 2026-01-15, see LEGAL-REVIEW-2026-001'."
+  schema_ref:
+    type: string
+    pattern: "^ERD-"
+    description: "OPTIONAL soft link to a database_data.erd record when this data class maps to a specific already-modeled entity. Format-only: this method cannot see the referenced record."
+  deletion_evidence_ref:
+    type: string
+    pattern: "^DEL-"
+    description: "OPTIONAL soft link to a specs/execution/data-deletion.schema.yaml deletion_request (id prefix DEL-), present once a real deletion has been carried out under this policy. Format-only: this method cannot see the referenced record's own step progress."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a retention/deletion policy is a structured governance judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A customer-PII data class with two simultaneously active holds (legal + regulatory) requiring a recorded conflict resolution, and a real deletion already carried out under an earlier, now-superseded version of this policy"
+    value:
+      id: "RDM-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.retention_deletion_model"
+      data_class: "customer PII"
+      purpose: "Fraud investigation and regulatory reporting for completed transactions."
+      retention_rule: "7 years from transaction completion date, per financial record-keeping regulation."
+      deletion_trigger: "Automated purge job, 30 days after retention period ends and no active holds remain."
+      holds:
+        - {hold_type: legal_hold, reason: "Litigation hold, Smith v. Acme, filed 2026-08-01", active: true}
+        - {hold_type: regulatory_hold, reason: "Open regulatory inquiry, Case #RQ-2026-4471", active: true}
+        - {hold_type: user_deletion_request, reason: "GDPR erasure request DSAR-2026-0912, superseded by active legal/regulatory holds", active: false}
+      conflict_resolution: "Legal and regulatory holds both take precedence over the user deletion request until both are lifted; Legal counsel confirmed 2026-09-01 that erasure cannot proceed while litigation is open."
+      compliance_evidence: "Legal review approved retention schedule 2026-01-15, see LEGAL-REVIEW-2026-001; hold conflict reviewed by counsel 2026-09-01."
+      schema_ref: "ERD-2026-09-05-001"
+      deletion_evidence_ref: "DEL-2026-01-001"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal policy for an internal reference dataset with no active holds and no conflict_resolution"
+    value:
+      id: "RDM-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.retention_deletion_model"
+      data_class: "internal reference: country codes"
+      purpose: "Reference lookup data with no personal or regulated content."
+      retention_rule: "Retained indefinitely; no regulatory retention period applies."
+      deletion_trigger: "Manual deletion only, if the dataset is decommissioned."
+      holds: []
+      compliance_evidence: "Data classification review confirmed no PII or regulated content, 2026-09-01."
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L906) and Master Plan §114 (L4711-4735) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 'data class->purpose->retention->deletion->exception->proof' formula and MP §114's own five-hold-type vocabulary plus conflict-resolution requirement are directly transcribed. The active-hold-count-vs-conflict_resolution invariant and both soft-link prefix formats are enforced at the runtime layer (ai_lego/modules/database_data/retention_deletion_model.py), not the schema layer. No mother document was modified."

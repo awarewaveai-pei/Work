@@ -1527,6 +1527,72 @@ tier_1:
       prior Tier 1 `database_data` entry already establishes. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the thirty-nine entries above it.
+  fortyfirst_concrete_entry:
+    # NEW (2026-09-06, same session): forty-first Tier 1 entry, same
+    # additive-key rationale as the forty entries above it. Added to
+    # THIS file in the SAME editing pass that wrote the contract
+    # itself -- not deferred to "after the critic round" -- directly
+    # applying the invariant-analysis lesson the immediately preceding
+    # entry's own critic round forced (a false registration claim
+    # recurring a second time). NINTH and FINAL database_data family
+    # member -- F21's own TEN-row table is now fully accounted for
+    # (nine built machine_ids plus one confirmed already covered).
+    method_id: "database_data.retention_deletion_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. NINTH and
+      FINAL entry from the `database_data` family (F21), after
+      database_data.backup_restore_drill, database_data.data_lineage,
+      database_data.expand_contract_migration, database_data
+      .reconciliation, database_data.erd, database_data.data_contract,
+      database_data.normalization, and database_data
+      .data_quality_dimensions. F21's own remaining table row, Schema
+      Compatibility Analysis (L903), was investigated and found
+      already fully covered by database_data.expand_contract
+      _migration's own compatibility_analysis stage (stage 3 of that
+      record's own 15-stage EC §28 sequence) -- confirmed by direct
+      read, not a ninth build candidate. Atlas gives THIS method one
+      citation of its own (F21 table row L906: "data class→purpose→
+      retention→deletion→exception→proof"), broadened from the FIRST
+      draft (not discovered by a critic round) to also search the
+      Master Plan and Execution Contract -- applying the mandatory-
+      invariant-analysis threshold the two immediately preceding
+      slices' own critic rounds each forced after the identical
+      "due-diligence covered only Atlas" failure class recurred twice.
+      Found a real, substantial second citation: Master Plan §114
+      Records Retention / Legal Hold / eDiscovery (L4711-4735), whose
+      own five named hold types (legal/regulatory/research/contractual
+      hold, user deletion request) plus a Policy-Engine conflict-
+      resolution requirement ground this record's own `holds[]` field
+      and its own real invariant (more than one simultaneously active
+      hold REQUIRES a non-empty `conflict_resolution`, absent
+      otherwise). A STRUCTURAL POLICY record (provenance_required plus
+      one integrity gate), deliberately NOT genuine compute -- a live
+      "eligible for deletion now" check would depend on wall-clock time
+      at evaluation, breaking the "same stored record always yields the
+      same verdict" invariant every genuine-compute record in this
+      session shares; disclosed as OQ-RDM-2. Two optional format-only
+      soft links (`schema_ref` to database_data.erd,
+      `deletion_evidence_ref` to the already-built, confirmed-distinct
+      `specs/execution/data-deletion.schema.yaml` EC §31 execution
+      record) resolve real cross-references without re-modeling
+      structure. This record's own `RDM-` id prefix and `version` type
+      are checked at both runtime layers from the first draft.
+    source: "methods/contracts/database_data.retention_deletion_model.contract.yaml (built same session as this entry, mints machine_id database_data.retention_deletion_model) + specs/cognitive/typed-objects/retention-deletion-model-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own (L906), no dedicated §11.x/§12.x
+      section in the Atlas mother document itself (Master Plan §114 is
+      a real, cited second source, but lives in a different normative
+      document than Atlas's own numbered sections) -- the same tier
+      every prior Tier 1 `database_data` entry already establishes.
+      Tier 1, mandated by the actively-running implementation slice,
+      same category as the forty entries above it. This is the LAST
+      `database_data` family entry -- F21's own TEN-row table is now
+      fully represented: nine machine_ids built as separate records
+      (this one included) plus one, Schema Compatibility Analysis,
+      confirmed already covered by an existing sibling's own stage.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

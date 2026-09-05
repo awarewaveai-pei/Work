@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-06（續56，同一 session：Cognitive OS 第四十三個 Method Atlas 切片 — `database_data.retention_deletion_model`，F21 家族第九個、也是最後一個成員；critic verdict **SHIP WITH MINOR FIXES**：0 Critical，連續第三次「missing registry entry」失守類別本次真正打斷；引用完整性第四次出現但範圍大幅縮小——查證後零真引用遺漏，全部是行號/措辭精度問題；F21 家族十列全數交代完畢）
+
+**觸發**：操作者「繼續做 直到完美完成 Cognitive Engineering OS」。承接 WORKLOG 續55 候選清單，選 F21 table 最後一列 Retention/Deletion Model。動工前先查證 F21 剩餘的另一列 Schema Compatibility Analysis 是否需要獨立建置——讀 EC §28 確認其 15 步驟序列已含 `Compatibility Analysis` 為第 3 步，且 `database_data.expand_contract_migration` 自己的 `stage_id` enum 早已收錄 `compatibility_analysis` 值——確認**已完整覆蓋，非第十個建置候選**，F21 十列表格因此以九個 machine_id + 一個確認重複覆蓋收官。1 個 critic subagent。
+
+**選型與設計**：Atlas 僅一筆引用（F21 table L906，無專節）。**本次動工前主動套用連續三輪 critic 教訓，廣度查證延伸到三份規範文件**（Atlas／Master Plan／Execution Contract），找到 Master Plan §114「Records Retention / Legal Hold / eDiscovery」（L4711-4735）——五種具名 hold 類型（legal/regulatory/research/contractual hold、user deletion request）+ 一條 Atlas 自己沒提到的真規則：「衝突時 Policy Engine 決定，並產生理由」。本方法設計為純結構性 policy record（provenance_required + 一個 integrity gate），刻意不做真計算——記錄政策存在與證據，非即時「現在是否該刪除」判斷。真不變量：`conflict_resolution` 在 2 個以上 hold 同時 `active:true` 時必填，否則必須不存在（直接落實 MP §114 的衝突消解規則）。`contract-backlog.yaml` 註冊條目**在跟 contract 同一次編輯就寫入**，不留到 critic 覆審後才補（吸取上兩輪教訓）。
+
+**critic 真跑（獨立重新查證全部 5 份規範文件、直接 grep 驗證 registry 條目真實存在、真跑 73 個突變）：verdict SHIP WITH MINOR FIXES，0 Critical**：
+
+**headline 好消息**：**registry 註冊造假這個連續兩輪的失守類別，這次真的斷了**——critic 直接 grep `contract-backlog.yaml` 確認 `fortyfirst_concrete_entry` 與正確 `method_id` 真實存在，不是憑 contract 自己的 `decided_by` 文字相信。
+
+引用完整性第四次被抓到，但**範圍大幅縮小**：critic 獨立重新查證全部 5 份規範文件（含本契約自己從未提過的另外兩份），確認**沒有任何真引用被漏掉**，全部缺失都是行號精度或措辭問題：①「F21 第十列已被涵蓋」的佐證引用指向錯誤位置——`expand-contract-migration-record.schema.yaml:106,122` 其實是 `examples:` 區塊的範例資料，真正的 `stage_id` enum 定義在第 70 行，已修正；②EC §31 行號區間（L1225-1251）越界跑進 §32，且跟同段稍後正確引用的 L1188/L1190 自相矛盾——critic 追出根因：既有姊妹檔 `data-deletion.schema.yaml` 自己就帶著同一組錯誤行號的舊引用（`L1229-1248`／`L1251`），本契約第一版很可能是照抄過去，非獨立重新查證——已修正為查證後的真實區間（L1181-1230），姊妹檔的既有錯誤另開 follow-up task 修（非本次範圍）；③「非真計算」設計論證原本主張「技術上無法避免依賴牆鐘時間」，critic 找到本家族自己的反例——`database_data.expand_contract_migration` 自己的 gate 就是拿兩個**已存的** `completed_at` 時間戳比較，是對存量資料的確定性計算——已改寫成基於 Atlas 公式本身終於「proof」+ MP §114 開場白反對發明單一結構化期限文法這兩個真實文本理由，OQ-RDM-2 補上「已知可行的確定性替代設計」而非宣稱不存在；④一個測試自己的命名跟斷言完全相反（名稱說「fails the gate」，斷言卻是全部 gate 通過）——已改名；⑤真跑突變測試抓到 gate 重驗迴圈五個欄位中四個（含 Atlas 自己「proof」步驟對應的 `compliance_evidence`）完全零測試覆蓋，只有第一個欄位被釘住——已補齊。7 個 Minor 全修（引用計數少算一筆、Execution Contract 查證只有結論沒列出命中清單、兩處 grep 詞彙集合前後不一致、「已完整覆蓋」措辭誇大既有記錄實際儲存內容、gate 層 `record.get()` 無法區分「欄位不存在」與「欄位存在但值為 null」這個真邏輯漏洞——已修正為明確 presence 檢查、重複 hold_type 測試只測了非 active 情境漏了更關鍵的 active 情境）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.retention_deletion_model.contract.yaml`＋`specs/cognitive/typed-objects/retention-deletion-model-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortyfirst_concrete_entry`（跟 contract 同一次編輯寫入）＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/modules/database_data/retention_deletion_model.py`（builder＋2 gate，修正 `conflict_resolution` presence 檢查邏輯漏洞）＋`ai_lego/apps/cli/run_retention_deletion_model_slice.py`＋`tests/unit/test_retention_deletion_model.py`（71 tests）＋`docs/FORTYTHIRD_SLICE_DATABASE_DATA_RETENTION_DELETION_MODEL.md`；`modules/database_data/__init__.py` docstring（F21 家族收官）。`agency-os/TASKS.md` 切片條目。另開兩個 spawn_task follow-up：全庫 schema-examples 驗證規則、contract-backlog 註冊對齊機械檢查（皆為上兩個切片已開，操作者已在另一 session 啟動其一）、`data-deletion.schema.yaml` 既有 EC §31 行號錯誤修正（本次新開）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2815→2818
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_retention_deletion_model_slice` | exit=0 | result=`PASS database_data.retention_deletion_model: 3 holds (2 active), conflict_resolution=present, deletion_evidence_ref=DEL-2026-01-001, gates [2×PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_retention_deletion_model`（修正後重跑）| exit=0 | result=71 OK（68→71）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root，修正後重跑）| exit=0 | ms=96237 | result=**1614 tests OK**（1543→1614，含上一個切片 76 個既有＋本切片 71 個新增，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，獨立重新查證全部 5 份規範文件＋直接 grep 驗證 registry 條目＋73 個突變測試）| verdict=SHIP WITH MINOR FIXES → 5 Major 全修（含一個真邏輯漏洞：gate 無法區分欄位不存在與欄位存在但為 null）＋7 Minor 全修 | findings=0c/5m/7minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`database_data[.]retention_deletion_model\|RetentionDeletionModelRecord\|RETENTIONDELETION_INVALID\|RETENTIONDELETION_EMPTY\|fortyfirst_concrete_entry` | hits=8（本切片自己 8 個檔案，過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-RDM-1~3` 皆揭露；本記錄刻意不做即時「現在是否該刪除」計算（選擇性範圍決定非技術限制，OQ-RDM-2 已補已知可行替代設計）；`schema_ref`／`deletion_evidence_ref` 皆未與本記錄自己的 `data_class` 交叉驗證；`data-deletion.schema.yaml` 既有 EC §31 行號錯誤已發現但本次未修（範圍外，另開 follow-up task）。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
+**F21 `database_data` 家族正式收官**：十列表格全數交代完畢（九個 machine_id 直接建置＋一列確認已被既有成員覆蓋），是本 session 完整收官的第三個 pack 家族（前兩個為 F18 Software Architecture、F19 DevOps/SRE）。
+
 ## 2026-09-06（同日第四輪：HCI_CONFIDENCE_SPEC.md 部分落地——method-finding-to-dimension combination，critic 覆審 51-mutation 掃描抓到 1 Critical+8 Major+7 Minor，含 spec 自己安全宣稱被自己的 worked example 證偽）
 
 **觸發**：操作者「繼續做 直到完美完成 HCI 系統」，同日第三輪清完 mutation-check-node-gates.ps1 技術債後，回頭處理第二輪 critic 覆審 M6 揭露的真缺口——「跨 method 對同一 Assessment Dimension 的 finding 如何合併」目前無人管，`HCI_TRUST_DOMAIN_SPEC.md` 自己的 roll-up 公式輸入契約（14 個已解析維度值）隱性假設這件事已經有答案，但檢查後發現沒有。
