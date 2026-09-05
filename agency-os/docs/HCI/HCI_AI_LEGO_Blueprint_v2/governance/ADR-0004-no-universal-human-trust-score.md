@@ -252,9 +252,100 @@ the historical decision record.
   **229/229 assertions**, **115/115 mutations killed** (0 vacuous/weak) —
   see `HCI_WAVE1_NEGATIVE_TEST_SPEC.md` for the run narrative. Every new
   constraint (including the ones the reviews added) reuses an
-  already-reviewed idiom rather than inventing one. Gates 4-5 (Wave 5, the
-  Intelligence-math roll-up work) remain `OPEN`, not faked — that work does
-  not exist yet.
+  already-reviewed idiom rather than inventing one.
+
+## Implementation note (2026-09-06, gates 4-5 landed)
+
+Gates 4-5 are **enforcement infrastructure landing ahead of the Wave 5
+deliverable they gate**, not the Intelligence-math roll-up work (P0-04)
+itself — the same sequencing gates 1-3 already used against the schema
+(`hci.subject_records` had no `domain` column when gates 1-3 landed;
+neither a trust-read endpoint nor a method catalog exists yet for gates
+4-5). This ADR still does not resolve P0-04's 14-dimension-to-7-domain
+roll-up formula; a math team must still define that.
+
+- **Gate 4** (`TRUST-NEG-03`): new
+  `Projects/internal/hci30/packages/contracts/validate-trust-domain-response.mjs`
+  — same ESM-module-plus-`node --test` pattern as the existing
+  `validate-request.mjs` (ADR-0010 gate, request-validation layer). Validates
+  a Person-trust read response is shaped `{ domains: [{domain, value,
+  evidence_refs}] }`; rejects a bare top-level field matching
+  `overall_score|composite_trust|aggregate_trust|universal_trust|trust_score`
+  (gate 1's own SQL-column list) **plus `overall_trust`**, which this gate's
+  own text (item 4 above) names but the SQL-column list never had reason to
+  include — a real discrepancy between the Decision section's five names and
+  this gate's own wording, caught by the validator's own self-test failing
+  on the first run (`overall_trust` initially passed as an "unknown
+  property" instead of a named `TRUST-NEG-03` rejection).
+- **Gate 5** (`METHOD-CONTRACT-NEG-01`): new
+  `validate-method-contract.mjs`. Validates a method-catalog entry against
+  the 12 Method Contract fields (`05_HCI30_INTELLIGENCE_METHODS.md:151-167`,
+  including the independently-required `inference_mode` at `:169`); if
+  `outputs.domains` names more than one Trust Domain, `decision_weight` must
+  be an object keyed exactly to those domains, not a scalar.
+- Both gates share one forbidden-name constant and the domain enum
+  (`packages/contracts/trust-domains.mjs`) rather than each keeping its own
+  copy — `TRUST_DOMAINS` is a verbatim copy of migration 0011's `CHECK
+  (domain IN (...))` list, now held in sync by a dedicated Node test
+  (`tests/unit/contracts/trust-domains.test.mjs`) that reads the migration
+  file's actual constraint text rather than trusting the comment.
+- Wired into `test-wave1-local.ps1` alongside the existing Node-level,
+  Docker-free checks (request-policy validator, peer-boundary, epistemic
+  annotation, gate 1 lint) — these two gates need no database, so they run
+  regardless of Docker availability, same reasoning as ARCH-PEER-01.
+
+**Independent critic review** (same rationale as gate 1's own script review:
+new JS validation logic, not a database-schema question) found **0
+Critical, 2 Major, 3 Minor**, all fixed before commit — the reviewer ran an
+actual 40-mutation sweep against scratch copies with `node --test` rather
+than reasoning from the code alone, the same non-vacuity method this ADR's
+own gate-1/gate-3 history already established:
+- **M1**: gate 5's `outputs` field had no key whitelist and no
+  forbidden-name check at all — a method could declare
+  `outputs.overall_score` (a more direct Decision-bullet-3 violation than
+  the scalar `decision_weight` the gate does catch) and pass. Fixed by
+  whitelisting `outputs` to `{domains}` and running the shared
+  forbidden-name check over its keys.
+- **M2**: `trust-domains.mjs`'s "keep in sync" comment was unenforced —
+  reviewer mutations adding an 8th domain, deleting one, and renaming one
+  all left the 28-test suite green (only `OPERATIONAL`/`FINANCIAL` were
+  ever exercised). Fixed by the `trust-domains.test.mjs` migration-text
+  cross-check above.
+- **M3/M4**: 19 of the two new test files' checks were vacuous by mutation
+  (self-test asserted the right error existed via a *different* code path
+  than the one actually being tested) — most notably the domain-entry
+  unknown-key whitelist (gate 4) and the per-domain-weight finite-number
+  check inside the `domains.length > 1` branch (gate 5, i.e. inside
+  METHOD-CONTRACT-NEG-01's own guard). Fixed by adding one test per
+  previously-unproven branch (27 new tests total across both files: 50
+  assertions now pass, up from 28).
+- **m1**: a `Number`-boxed `decision_weight` carrying the domain keys as own
+  properties (`Object.assign(new Number(0.5), {FINANCIAL, OPERATIONAL})`)
+  passed every check and serialized back to a bare scalar — the exact shape
+  the gate exists to stop. Fixed by requiring a plain object
+  (`Object.getPrototypeOf(weight) === Object.prototype`), not merely
+  `typeof === 'object'`.
+- **m2**: the `TRUST-NEG-03` rejection was key-order dependent — a response
+  combining an unrelated unknown key with `overall_trust` reported the
+  unrelated key first, misrouting a CI failure away from the named gate.
+  Fixed by running the forbidden-name scan over all keys before the
+  whitelist loop.
+- Two Minor/tracked items not fixed here (see `TASKS.md`): the negative-test
+  spec registration for these two gate ids (documentation-only, closed
+  below in the same commit) and the pre-existing gap that
+  `mutation-check-wave1.ps1` covers zero Node-level tests (predates this
+  work — `CONSENT-NEG-01` has the same gap — non-vacuity here instead comes
+  from each test file's own accept/reject pairs, per the established Node-gate
+  convention).
+
+Final tally, re-verified end-to-end via `test-wave1-local.ps1` (Docker
+available on this machine): **50/50 Node assertions** across the four
+contract-test files, full 11-migration SQL suite green, reversibility
+intact. Gates 4-5 do not depend on and do not implement the Wave 5 roll-up
+formula (P0-04); they exist so the first real trust-read endpoint and the
+first real method-catalog entry cannot introduce the forbidden shape
+unnoticed, exactly as the "Required implementation gates" section above
+specifies.
 
 ## Evidence
 

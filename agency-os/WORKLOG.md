@@ -1,5 +1,43 @@
 # Worklog
 
+## 2026-09-06（HCI30 ADR-0004 Wave 5 gates 4-5 落地——TRUST-NEG-03/METHOD-CONTRACT-NEG-01，critic 40-mutation 掃描抓到 0 Critical+2 Major+3 Minor 全修，ADR-0004 五個 gate 現已全數關閉）
+
+**觸發**：操作者「繼續完成 HCI 系統」，明確指名上次收尾的 ADR-0004 Wave 1 gates 1-3（`12d50c1fb`）之後「gates 4-5（Wave 5 Intelligence-math roll-up）remain honestly OPEN」，並全權授權決策，唯一硬性要求：不准無效益派多個 agent。
+
+**範圍界定（R0 風險清單的核心判斷）**：讀完 ADR-0004 全文＋`0011_wave1_trust_domain_scope_up.sql:42-44` 自己的 comment 後確認：gates 4-5 是「先於 Wave 5 真實 feature 落地的護欄基礎設施」，不是 P0-04 roll-up 公式本身——ADR 原文明講「This ADR does not resolve the P0-04 roll-up-formula gap itself」。若連公式一起做＝隱性發明未經操作者簽核的權重演算法，正是 ADR 自己否決的替代方案（"weighted average...unreviewed value judgment"）。範圍卡死在「兩個 standalone validator + self-test」，不碰 P0-04 公式、不建 trust-read endpoint、不建真 method catalog（三者都還不存在，做了就是無中生有）。
+
+**實作**：新 `Projects/internal/hci30/packages/contracts/trust-domains.mjs`（共用七值 domain enum，verbatim 抄自 `0011:92-93`，+ 共用禁用名 regex）、`validate-trust-domain-response.mjs`（gate 4，TRUST-NEG-03：response 必須是 `{domains:[{domain,value,evidence_refs}]}`，禁裸 `trust_score`/`overall_trust`/`overall_score`/`composite_trust`/`aggregate_trust`/`universal_trust`）、`validate-method-contract.mjs`（gate 5，METHOD-CONTRACT-NEG-01：method 若 `outputs.domains` 跨 >1 domain，`decision_weight` 必須逐 domain 而非純量）。三個對應 `tests/unit/contracts/*.test.mjs`，wired 進 `test-wave1-local.ps1`（Docker-free Node 區段，沿用既有 `validate-request.mjs` pattern）。**自建 test 過程自抓一個真 bug**：gate 4 禁用名清單一開始漏了 `overall_trust`——ADR-0004 自己 gate 4 文字（`:44`）獨立點名這個字，但 Decision 段落的五名清單（gate 1 SQL 欄位用）裡沒有，兩處原文本身就不一致，須各自忠實對應各自 gate 的原文。
+
+**送 critic 獨立覆審**（純 JS 邏輯非 SQL，同 gate 1 判準：db-expert 審 SQL、critic 審 regex/邏輯，只需一個）——實跑 40-mutation 掃描（非憑代碼推論，對 scratch copy 真跑 `node --test`），抓到 **0 Critical + 2 Major + 3 Minor**，commit 前全修：
+- **M1**：gate 5 `outputs` 欄位原本零白名單、零禁用名檢查——方法可直接宣告 `outputs.overall_score`（比 `decision_weight` 純量更直接違反 Decision bullet 3）並通過。修為 `outputs` 白名單 `{domains}` + 共用 `FORBIDDEN_AGGREGATE_KEY` 掃描其 key。
+- **M2**：`trust-domains.mjs`「keep in sync」註解無測試背書——critic 實際 mutation：加第 8 個 domain、刪一個、改名一個，全部原地 28-test 綠燈（只有 OPERATIONAL/FINANCIAL 真的被測到）。修為 `trust-domains.test.mjs` 直接讀 `0011_wave1_trust_domain_scope_up.sql` 真實 `CHECK (domain IN (...))` 文字比對，非憑 comment 信任。
+- **M3/M4**：兩份新 test 檔合計 19 個檢查 mutation 存活，其中 gate 5 自己 `domains.length > 1` branch 內的 per-domain-weight finite 檢查（METHOD-CONTRACT-NEG-01 named gate 本身的檢查）也在存活名單裡。補 27 個新測試全部殺掉未證明的分支。
+- **m1**：`Object.assign(new Number(0.5), {FINANCIAL:0.6, OPERATIONAL:0.4})` 這種 boxed-Number 帶 domain key 的 decision_weight 能通過所有檢查並序列化回純量 0.5——正是這個 gate 存在的目的要擋的形狀。修為要求 plain object（`Object.getPrototypeOf(weight) === Object.prototype`），不只 `typeof === 'object'`。
+- **m2**：TRUST-NEG-03 的錯誤訊息受 key 順序影響（`{computed_at, overall_trust, domains}` 原本先報 `computed_at` 而非命名的 gate 違反），改為先掃全部禁用名再跑白名單迴圈。
+
+**收尾同步**：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0004-no-universal-human-trust-score.md` 補「Implementation note (2026-09-06, gates 4-5 landed)」；`ADR_INDEX.md:62` 狀態從「remain OPEN」改為「landed」；`HCI_WAVE1_NEGATIVE_TEST_SPEC.md` 新增「Trust domain — Wave 5 gates」小節（含 TRUST-NEG-03/METHOD-CONTRACT-NEG-01 登記表，比照既有 `CONSENT-NEG-01` 慣例）；`TASKS.md` 新增已完成項 + 一個追蹤中的次要待辦（`mutation-check-wave1.ps1` 對 Node-level gate 零覆蓋，非本次範圍，留待下次觸碰時處理）。
+
+**[已修改]**
+- 新增：`Projects/internal/hci30/packages/contracts/{trust-domains,validate-trust-domain-response,validate-method-contract}.mjs`
+- 新增：`Projects/internal/hci30/tests/unit/contracts/{trust-domains,validate-trust-domain-response,validate-method-contract}.test.mjs`
+- 修改：`Projects/internal/hci30/scripts/test-wave1-local.ps1`（+3 個 `node --test` 區段，皆 Docker-free）
+- 修改：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/{ADR-0004-no-universal-human-trust-score.md,ADR_INDEX.md,wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md}`
+- 修改：`agency-os/TASKS.md`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=50/50 pass（3 既有 + 13 gate4 + 12 gate5 + 1 drift 起始，critic 修正後 13→13/12→22 淨增 27 條，最終 50）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1`（Windows PowerShell 5.1，本機無 pwsh7 改用此路徑，腳本本身已對 5.1/7 雙相容設計）| exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，含全部 Node-level gate + 11-migration Docker SQL suite + reversibility，兩次全流程真跑（M-fix 前後）皆綠
+- REVIEW_DONE: critic=Standard（真實 subagent，40-mutation 掃描非代碼推論）| verdict=0 Critical/2 Major/3 Minor，全修 | findings=0c/2m/3minor
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os | grep=`TRUST-NEG-03\|METHOD-CONTRACT-NEG-01\|validateTrustDomainResponse\|validateMethodContract\|TRUST_DOMAINS\|FORBIDDEN_AGGREGATE_KEY` | hits=11（本次新建/修改的 7 檔 + 4 個原本記載「remain OPEN」的既有文件，已逐一同步，無殘留過期宣稱）
+- WORKLOG: 本條目
+
+**[剩餘風險]**
+- `mutation-check-wave1.ps1` 對三個 Node-level gate（含既有 CONSENT-NEG-01）零覆蓋，非空洞證明目前只靠各 test 檔自身 accept/reject 成對案例；已列 TASKS.md 追蹤，非阻斷
+- Wave 5 真正的 P0-04 roll-up 公式、trust-read endpoint、method catalog 三者仍不存在——gates 4-5 是等它們出現時的護欄，不是它們本身；下一步若要往下做，需要操作者對 14→7 roll-up 公式本身的明確簽核（ADR 原文明講這是價值判斷不能由實作者代invent）
+- `packages/contracts/` 下兩個新 validator 皆無 `validate-request.mjs` 有的 CLI stdin 入口——目前無呼叫方需要，非疏漏，留待真有 endpoint 時再補
+
+**[rollback]** 單一功能，`git revert` 本 commit 即可；無 schema/migration/prod 變更，無資料寫入。
+
 ## 2026-09-06（續53，同一 session：Cognitive OS 第四十個 Method Atlas 切片 — `database_data.data_contract`，F21 家族第六成員；直接解答 `database_data.erd` 的 OQ-ERD-4；critic verdict **SHIP WITH MINOR FIXES**：0 Critical，4 Major 全屬揭露/完整性類非邏輯 bug，含一個 registry 註冊宣稱造假、一個未揭露的偽普遍宣稱、一個缺檔、一個 gate docstring 誇大宣稱）
 
 **觸發**：延續操作者「都不要停，直到 Cognitive Engineering OS 完美完成」授權，本次訊息明確指名「erd 切片續52」→ 讀 WORKLOG 續52（第三十九個切片 ERD）自己留下的 `OQ-ERD-4` 前向指稱，直接續建下一個。1 個 critic subagent。

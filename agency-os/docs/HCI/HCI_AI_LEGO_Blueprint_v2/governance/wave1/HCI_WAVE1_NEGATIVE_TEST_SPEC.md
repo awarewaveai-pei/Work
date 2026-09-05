@@ -850,6 +850,41 @@ off;` pattern from 0009) rather than inventing a new mechanism. Full
 narrative in the migration's header comments and ADR-0004's
 "Implementation note".
 
+## Trust domain — Wave 5 gates *(new, ADR-0004 gates 4-5, migration-free — Node test only, no SQL)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| TRUST-NEG-03 *(implemented, Node)* | A Person-trust read response carries a bare top-level `trust_score`/`overall_trust`/`overall_score`/`composite_trust`/`aggregate_trust`/`universal_trust` field | Response is rejected before it can reach a caller | Validation error naming `TRUST-NEG-03` — `tests/unit/contracts/validate-trust-domain-response.test.mjs`, not SQL |
+| METHOD-CONTRACT-NEG-01 *(implemented, Node)* | A method-catalog entry's `outputs.domains` names more than one Trust Domain but `decision_weight` is a single scalar (or an aggregate field is declared inside `outputs` itself) | Method definition is rejected and cannot be loaded | Validation error naming `METHOD-CONTRACT-NEG-01` (or, for the `outputs`-field case, `ADR-0004: forbidden cross-domain field in outputs`) — `tests/unit/contracts/validate-method-contract.test.mjs`, not SQL |
+
+Gates 4-5 land as standalone enforcement infrastructure ahead of the actual
+Wave 5 Intelligence-math roll-up work (P0-04, still unspecified) — there is
+no real trust-read endpoint or method catalog yet, same sequencing gates
+1-3 already used against the schema. `packages/contracts/trust-domains.mjs`
+holds the shared domain enum and forbidden-name list both gates use; a
+dedicated test (`tests/unit/contracts/trust-domains.test.mjs`) reads
+migration 0011's actual `CHECK (domain IN (...))` text so the JS-side enum
+cannot silently drift from the SQL-side one.
+
+An independent critic review (0 Critical, 2 Major, 3 Minor, all fixed)
+ran an actual 40-mutation sweep against scratch copies rather than
+reasoning from the code, and found a real bypass: gate 5's `outputs` field
+had no key whitelist, so a method could declare `outputs.overall_score`
+directly — a more direct violation of ADR-0004's Decision bullet 3 than the
+scalar `decision_weight` the gate was built to catch — and pass. Also
+found: the shared domain enum's "keep in sync" comment was unenforced (the
+drift test above closes it); 19 checks across both new test files were
+vacuous by mutation (27 tests added to close them, most notably the
+per-domain-weight finite-number check sitting *inside*
+METHOD-CONTRACT-NEG-01's own multi-domain branch); and a `Number`-boxed
+`decision_weight` carrying domain keys as own properties passed every check
+and serialized back to a bare scalar (fixed by requiring a plain object,
+not merely `typeof === 'object'`). Full account in ADR-0004's own
+"Implementation note (2026-09-06, gates 4-5 landed)". Final tally: **50/50
+Node assertions** across all four contract-test files (13 + 12 + 3 new,
+plus the pre-existing 3), re-verified via a full `test-wave1-local.ps1` run
+including the unrelated 11-migration SQL suite and reversibility check.
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
 requires the suite to go red on exactly the assertions covering it; **all 101

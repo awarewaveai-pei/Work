@@ -25,6 +25,28 @@ $sqlTests  = Join-Path $root 'database/tests/wave1-negative-tests.sql'
 node --test (Join-Path $root 'tests/unit/contracts/validate-request.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Request-policy validator tests failed.' }
 
+# ADR-0004 (all gates): TRUST_DOMAINS (packages/contracts/trust-domains.mjs)
+# must stay verbatim-identical to migration 0011's domain CHECK constraint --
+# a critic review found this drift was previously silent (added/removed/
+# renamed a domain all left the suite green). Node-level, Docker-free.
+node --test (Join-Path $root 'tests/unit/contracts/trust-domains.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Trust-domain enum drift check failed (ADR-0004, JS vs SQL).' }
+
+# ADR-0004 gate 4 (TRUST-NEG-03): any Person-trust read response must be a
+# domains: [] vector, never a bare top-level trust_score/overall_trust (or
+# semantic equivalent). Node-level, Docker-free -- there is no real
+# trust-read endpoint yet (the roll-up formula, P0-04, is still
+# unspecified); this validator exists so the first one built cannot
+# introduce the forbidden shape unnoticed.
+node --test (Join-Path $root 'tests/unit/contracts/validate-trust-domain-response.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Trust-domain response validator tests failed (ADR-0004 gate 4).' }
+
+# ADR-0004 gate 5 (METHOD-CONTRACT-NEG-01): a method whose outputs touch
+# more than one Trust Domain must express decision_weight per-domain, not
+# as a single scalar. Node-level, Docker-free.
+node --test (Join-Path $root 'tests/unit/contracts/validate-method-contract.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Method-contract registry validator tests failed (ADR-0004 gate 5).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.
