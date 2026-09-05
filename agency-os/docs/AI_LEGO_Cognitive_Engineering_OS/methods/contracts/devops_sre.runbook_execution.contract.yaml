@@ -200,6 +200,12 @@ open_questions:
       could in principle exercise a real runbook as part of its own
       "recover" step -- should a future `devops_sre.game_day` slice
       cross-reference this method's own output as a soft link?
+      ANSWERED 2026-09-05 (thirty-fourth slice): `devops_sre.game_day`
+      carries an optional `recovery.runbook_execution_ref` (format-only,
+      prefix `RBEXEC-`) pointing at this method's own output. Kept here
+      as the record of the question; the remaining open half -- whether
+      the link should ever be verified across records -- is that
+      contract's own compilation_decisions, not this one's.
     owner: "operator, or whoever next builds devops_sre.game_day"
     blocks: "nothing in this file's own validity"
   - id: "OQ-RUNBOOKEXECUTION-3"

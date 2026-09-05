@@ -1151,6 +1151,43 @@ tier_1:
       table-row citation, thinner than several Tier 0 examples. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the thirty entries above it.
+  thirtysecond_concrete_entry:
+    # NEW (2026-09-05, same session): thirty-second Tier 1 entry, same
+    # additive-key rationale as the thirty-one entries above it.
+    method_id: "devops_sre.game_day"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. NINTH entry
+      from the `devops_sre` family (F19), after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, devops_sre.error_budget,
+      devops_sre.capacity_model, devops_sre.release_readiness_review,
+      and devops_sre.runbook_execution. Atlas's own F19 tool table row
+      (L858: "scenario→roles→inject→recover→AAR", benefit "驗證人與
+      流程") grounds FOUR real invariants, one per formula phase that
+      carries structure: unique role names (roles), a recovery duration
+      present iff the recovery happened (recover), an optional
+      runbook_execution_ref carrying the RBEXEC- prefix (recover -- the
+      soft link devops_sre.runbook_execution's own OQ-RUNBOOKEXECUTION-2
+      asked for, now answered), and all four of Atlas F17 L804's own
+      After Action Review questions answered (AAR -- transcribed, the
+      F17 method itself NOT minted). Due-diligence search was
+      deliberately broad (AAR/after action/postmortem, 演練/drill/
+      tabletop, inject) after two consecutive prior slices' own critic
+      rounds each caught a narrow name-only grep; neighbours found and
+      confirmed distinct by direct read: chaos_engineering (system
+      hypothesis vs people/process), backup_restore_drill (data restore
+      vs people/process), DEVOPS_SRE_PLAN.md §3.1's own semi-annual
+      failover exercise (prose, disclosed as OQ-GAMEDAY-3), EC §55's
+      own Post-mortem terminal step, and risk-tier R4's own "Recovery
+      Drill" required-action name.
+    source: "methods/contracts/devops_sre.game_day.contract.yaml (built same session as this entry, mints machine_id devops_sre.game_day) + specs/cognitive/typed-objects/game-day-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own, thinner than several Tier 0
+      examples. Tier 1, mandated by the actively-running implementation
+      slice, same category as the thirty-one entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

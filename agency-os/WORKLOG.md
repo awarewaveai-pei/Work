@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-09-05（續47，新 session：Cognitive OS 第三十四個 Method Atlas 切片 — `devops_sre.game_day`，本 session 首個 critic 一審零 Critical／零 Major，但「正確卻沒測試逼它執行」那類突變存活兩次）
+
+**觸發**：操作者「繼續完美完成這個系統」（標準授權延續）。1 個 critic subagent（第一次派出撞 429 session limit，14:40 重置後依操作者「Try again」重派成功；額度斷路器未設 block，因重置點已過）。
+
+**選型**：`devops_sre` 家族第九成員（F19 進度 9/13，剩 Load Test／Stress Test／Soak Test／RTO-RPO）。Atlas F19 table Game Day 列（L858「scenario→roles→inject→recover→AAR」，效益「驗證人與流程」）。公式最後一段 AAR 本身是 F17 具名方法（L804 After Action Review「Expected? Actual? Why? Next?」）——本切片把四問轉錄成自己的 `aar` 階段輸出，**不鑄造 F17 方法**（compilation decision 揭露，`OQ-GAMEDAY-2`）。四個不變量：role 名唯一（whitespace-collapse＋casefold）、`time_to_recover_minutes` 存在 iff `recovered`（刻意雙向，跟本 session 既有單向慣例不同，理由：失敗演練帶恢復時長會被讀成成功）、`runbook_execution_ref` 格式 `^RBEXEC-`（回答上一切片 `OQ-RUNBOOKEXECUTION-2`，該契約已標 ANSWERED）、AAR 四問全答。schema 另加 `if/then/else` 防禦縱深。
+
+**due-diligence 這次刻意做寬**（前兩輪連續被抓 grep 太窄）：`game.?day`／`AAR|after.action|postmortem`／`演練|drill|tabletop` 全 spec root 掃，鄰居逐一讀並揭露：chaos_engineering（系統假設 vs 人與流程）、backup_restore_drill（資料還原 vs 人與流程）、`DEVOPS_SRE_PLAN.md` §3.1 半年跨區 failover 演練（最近的真實兄弟，`OQ-GAMEDAY-3`）、EC §55 Post-mortem、risk-tier R4「Recovery Drill」。
+
+**critic 真跑（20 個 runtime 突變×63 測試、6 個 schema 層突變、獨立 violation oracle 窮舉 1,012 種 recovery/roles 形狀）：verdict pass，0 Critical、0 Major、6 Minor、4 建議**。7 個 builder raise 全部追到 gate 用同一 predicate 重驗；oracle 零逃逸零誤判；backlog 註冊屬實；無發明規則。Minor 全修：
+1. `_duplicate_role_names` 的 `sorted()` 沒測試用兩個不同重複名逼它——突變改成無序 list 全套照綠（跟上一切片 runbook_execution 的排序存活**同款**，而本切片初稿宣稱已帶進教訓）。補兩重複名 gate 測試。
+2. builder 的 `version`／`generated_by_method` 參數零斷言，硬編碼存活。補 round-trip 測試。
+3. runtime 驗別人的 id 前綴（`RBEXEC-`）卻不驗自己的 `^GAMEDAY-`／`version` 型別／頂層 key 集合，builder 吐 `id: DRILL-999` 兩個 gate 都過——家族慣例（schema 管 envelope、runtime 管階段不變量），補 compilation decision 揭露＋schema 層釘測試。
+4. schema 除 `if/then/else` 外全無迴歸保護（`\S` 全弱化、`additionalProperties` 翻掉、id 前綴刪掉都存活）。補 3 個負向 schema 測試，既有 2 個從 `assertRaises(Exception)` 收緊成欄位名 regex。
+5. 寬 grep 仍漏掉本契約自己的 purpose 動詞 `rehears*`：Atlas L838/867/1111/3420/3449/4481＋EC §55 的「Rehearsal」是未具名的 pre-deploy 流程步驟，非方法——契約補揭露（L1111 是我核對時發現 critic 也漏的）。
+6. slice doc 留了「regression pending」過期宣稱。已改。
+建議未採（各有揭露）：頂層 key 不封閉（家族慣例）、`_duplicate_role_names` 對畸形 role 的 `continue`（兩呼叫端都先驗）。
+
+**本輪教訓**：邏輯類（gate 重驗輸入、註冊宣稱、寬 grep）可以真的被預防；**證明類**（正確的一行沒測試逼它執行）靠 review 抓不到，靠突變測試才抓得到——而且這次就出在跟上一切片存活行完全同構的那行。修完用 in-memory monkeypatch 重跑兩個存活突變，各被 1 個具名測試殺掉。
+
+**順帶發現（非本切片，不修）**：`~/.claude/hooks/ao-resume-on-prompt.ps1:36` `Resolve-MonorepoRootWithAoResume` 在 cwd 非 monorepo root 時拋「參數集無法使用指定的具名參數解析」，並以 cwd 相對路徑寫 `agency-os/.agency-state/ao-resume-hook-fail.log`／`agency-os/reports/agent-dispatch/*.jsonl` → product root 與 spec root 各長出一棵 untracked `agency-os/` 樹（fail log 7 次，2026-09-04 14:43Z 起）。未刪、未 commit，登 TASKS。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.game_day.contract.yaml`＋`specs/cognitive/typed-objects/game-day-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.thirtysecond_concrete_entry`＋`devops_sre.runbook_execution.contract.yaml` OQ-2 標 ANSWERED＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/modules/devops_sre/game_day.py`（builder＋2 gate，8 共用 predicate＋1 normalize helper）＋`ai_lego/apps/cli/run_game_day_slice.py`＋`tests/unit/test_game_day.py`（68 tests）＋`docs/THIRTYFOURTH_SLICE_DEVOPS_SRE_GAME_DAY.md`；`modules/devops_sre/__init__.py` docstring 補成員。`agency-os/TASKS.md` 切片條目＋F19 剩餘清單修正＋hook cwd bug 新項。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，契約定稿後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2786→2789
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_game_day_slice` | exit=0 | result=`PASS devops_sre.game_day: 3 roles, outcome=recovered, time_to_recover_minutes=23, runbook_execution_ref=RBEXEC-2026-09-05-002, gates [provenance_required=PASS, game_day_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_game_day` | exit=0 | result=68 OK（63→68）；`mutate_game_day.py`（scratchpad）兩個 critic 存活突變各被 1 個具名測試 KILLED
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=141430 | result=**964 tests OK**（896→964，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，20 runtime＋6 schema 突變、1,012 形狀獨立 oracle）| verdict=pass→6 Minor 全修 | findings=0c/0m/6minor
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]game_day\|GameDayRecord\|GAMEDAY_` | hits=70（9 個檔案，全部為本切片自己新增／修改的檔案；另 73 命中在 `.claude/projects/*.jsonl` 對話 transcript 非程式碼；過期殘留 0）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-GAMEDAY-1`（無 inventory machine id 列）、`-2`（F17 AAR 建契約後 `aar` 是否改 ref）、`-3`（DEVOPS_SRE_PLAN §3.1 failover 演練未交叉引用）、`-4`（只有時長無 timeline）、`-5`（無 `chaos_experiment_ref`）；runtime 不驗自身 id 前綴（schema 層釘住）。皆已揭露非靜默。
+
+**[rollback]**：單一 commit，`git revert`；spec-root 索引檔由 `gen_spec_index.py` 重生即可。
+
 ## 2026-09-05（VBC 補勾 TASKS.md 一條 2026-09-04 repo 衛生待辦——三子項已被其他 session 順手解決但文件未更新）
 
 **觸發**：操作者問「（TASKS.md 這條 repo 衛生待辦）處理過了嗎」。VBC 原則（單一資料點缺失≠整體未完成，[[feedback_claim_before_verify]]）：checkbox 是 `[ ]` 不代表現況未解，先查實際磁碟/git 狀態再答。

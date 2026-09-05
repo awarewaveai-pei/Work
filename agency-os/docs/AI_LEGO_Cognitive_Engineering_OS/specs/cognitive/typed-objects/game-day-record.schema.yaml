@@ -1,0 +1,172 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/game-day-record.schema.yaml"
+title: Game Day Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `GameDayRecord` -- the
+  declared `outputs` of `devops_sre.game_day`'s Method Contract. NINTH
+  `devops_sre`-family typed object. Atlas's own F19 tool table formula
+  (L858: "scenario→roles→inject→recover→AAR", benefit "驗證人與流程")
+  maps onto five phase fields in formula order: `scenario`, `roles[]`,
+  `injected_failure`, `recovery`, `aar`. The `aar` phase's own four
+  fields transcribe Atlas's F17 After Action Review row (L804:
+  "Expected? Actual? Why? Next?") -- see the method contract for why
+  that row is cited here WITHOUT minting the F17 method. Four real
+  invariants (unique role names; recovery time present iff recovered;
+  runbook_execution_ref, when supplied, carries the RunbookExecutionRecord
+  id prefix; all four AAR questions answered) are enforced at the runtime
+  layer, not the schema layer -- see method contract preconditions. The
+  recovery-time coupling additionally carries a schema-layer
+  defense-in-depth signal (the `if/then/else` block on `recovery`), the
+  same discipline `backup-restore-drill-record.schema.yaml`'s own
+  `dependentRequired` block already establishes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Game Day row (L858): 'scenario→roles→inject→recover→AAR'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 tool table, After Action Review row (L804): 'Expected? Actual? Why? Next?' -- the four `aar` fields, transcribed not invented"
+  - "methods/contracts/devops_sre.game_day.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, scenario, roles, injected_failure, recovery, aar, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^GAMEDAY-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.game_day"
+  scenario:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'scenario' formula phase -- which failure this exercise rehearses, e.g. 'primary database loses its data volume during peak traffic'. pattern:\\S rejects a whitespace-only string minLength:1 alone would accept (lesson carried forward from devops_sre.release_readiness_review's own schema)."
+  roles:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'roles' formula phase -- who played which role during the exercise. Role names must be unique (compared after whitespace-collapse + casefold) -- enforced at the runtime layer, not here. The same assignee MAY hold more than one role (see method contract compilation_decisions)."
+    items:
+      type: object
+      required: [role, assignee]
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The role exercised, e.g. 'Incident Commander'."
+        assignee:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Who held this role for the exercise (a person or an on-call handle, caller-defined)."
+  injected_failure:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'inject' formula phase -- what was actually done to simulate the scenario, e.g. 'detached the primary's data volume via the cloud console'."
+  recovery:
+    type: object
+    required: [outcome]
+    additionalProperties: false
+    description: "Atlas's own 'recover' formula phase. time_to_recover_minutes is REQUIRED when outcome is recovered and FORBIDDEN when outcome is not_recovered -- enforced primarily at the runtime layer; the if/then/else below is a schema-layer defense-in-depth signal only."
+    properties:
+      outcome:
+        enum: [recovered, not_recovered]
+        description: "Did the people and process actually recover the system during the exercise?"
+      time_to_recover_minutes:
+        type: integer
+        minimum: 0
+        description: "Wall-clock minutes from injection to recovery. Present iff outcome is recovered -- a duration for a recovery that never happened is meaningless and would let a failed exercise read as a fast success."
+      runbook_execution_ref:
+        type: string
+        pattern: "^RBEXEC-"
+        description: "OPTIONAL soft link to the RunbookExecutionRecord (devops_sre.runbook_execution, id prefix RBEXEC-) the recovery phase exercised -- answers devops_sre.runbook_execution's own OQ-RUNBOOKEXECUTION-2. Format-only: this method cannot see the referenced record (see method contract compilation_decisions)."
+    if:
+      properties:
+        outcome: {const: recovered}
+      required: [outcome]
+    then:
+      required: [time_to_recover_minutes]
+    else:
+      not:
+        required: [time_to_recover_minutes]
+  aar:
+    type: object
+    required: [expected, actual, why, next]
+    additionalProperties: false
+    description: "Atlas's own 'AAR' formula phase, structured as the four questions Atlas's F17 After Action Review row (L804) itself names: 'Expected? Actual? Why? Next?'. All four must be answered (non-empty) -- an exercise whose benefit is '驗證人與流程' has produced nothing if any question is left blank."
+    properties:
+      expected:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Expected? -- what the team expected to happen."
+      actual:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Actual? -- what actually happened."
+      why:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Why? -- why the two differed (or did not)."
+      next:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Next? -- what the team will change or do next."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a game day record is a structured operational observation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A recovered exercise: three distinct roles, recovery via a real runbook execution, AAR fully answered"
+    value:
+      id: "GAMEDAY-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.game_day"
+      scenario: "primary database loses its data volume during peak traffic"
+      roles:
+        - {role: "Incident Commander", assignee: "alice"}
+        - {role: "Communications Lead", assignee: "bob"}
+        - {role: "Database Operator", assignee: "carol"}
+      injected_failure: "detached the primary's data volume via the cloud console at T+0"
+      recovery:
+        outcome: recovered
+        time_to_recover_minutes: 23
+        runbook_execution_ref: "RBEXEC-2026-09-05-002"
+      aar:
+        expected: "replica promoted and traffic repointed within 15 minutes"
+        actual: "replica promoted at T+9, connection string repoint took until T+23 because the secret rotation step was undocumented"
+        why: "the failover runbook's step 3 assumed the connection secret was already rotated; it was not"
+        next: "add an explicit secret-rotation precondition to step 3 of database-failover-runbook v3"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A not-recovered exercise: no time_to_recover_minutes, no runbook link, AAR fully answered"
+    value:
+      id: "GAMEDAY-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.game_day"
+      scenario: "object storage region becomes unreachable"
+      roles:
+        - {role: "Incident Commander", assignee: "alice"}
+        - {role: "Storage Operator", assignee: "dave"}
+      injected_failure: "blocked egress to the storage region at the firewall"
+      recovery:
+        outcome: not_recovered
+      aar:
+        expected: "artifacts served from the secondary region within 30 minutes"
+        actual: "secondary region had never been synced; exercise abandoned at T+45"
+        why: "cross-region replication was configured but the replication job had been silently failing for 11 days"
+        next: "add replication-lag to the SLO set and a game day precondition that verifies it before injection"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L858) and F17 tool table row (L804) directly. Validated against jsonschema Draft202012Validator."
+  note: "The scenario/roles/inject/recover/AAR formula is directly transcribed into the five phase fields; the AAR phase's four questions are directly transcribed from F17 L804. All four core invariants (unique role names, recovery time iff recovered, runbook_execution_ref prefix, all AAR questions answered) are enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced; the recovery-time coupling additionally has the if/then/else defense-in-depth signal. No mother document was modified."

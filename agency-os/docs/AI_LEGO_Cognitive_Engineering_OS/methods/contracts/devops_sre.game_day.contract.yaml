@@ -1,0 +1,318 @@
+$id: "ai-lego://methods/contracts/devops_sre.game_day.contract.yaml"
+title: "Game Day Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-fourth Method Atlas slice, NINTH from
+  the `devops_sre` family (F19), after `devops_sre.sli_slo`
+  (twentieth), `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth), `devops_sre.capacity_model`
+  (thirty-first), `devops_sre.release_readiness_review` (thirty-second),
+  and `devops_sre.runbook_execution` (thirty-third).
+
+  Atlas gives this method exactly ONE citation of its own: the F19 tool
+  table's Game Day row (L858: "scenario→roles→inject→recover→AAR",
+  purpose "演練故障與 runbook", benefit "驗證人與流程" -- verify people
+  and process). No dedicated §11.x section exists (confirmed by direct
+  read of the surrounding table, L848-863, and a full spec-root
+  case-insensitive grep for "game day"/"gameday" returning only this
+  table row, the two method inventories' own entries, and
+  `devops_sre.runbook_execution`'s own OQ-RUNBOOKEXECUTION-2).
+
+  The formula's own final phase, "AAR", is itself a NAMED Atlas method:
+  F17's After Action Review row (L804: "比較預期與實際 | Expected?
+  Actual? Why? Next? | 快速組織學習"). This contract transcribes those
+  four questions as the structure of its own `aar` phase output rather
+  than inventing a findings/action-items shape -- but does NOT mint an
+  F17 machine_id, does not build gates for After Action Review as a
+  standalone method, and leaves that F17 entry pending in
+  method-inventory.yaml exactly as it was. The `aar` object is Game
+  Day's own phase output, cited to the row that defines what an AAR
+  asks (see compilation_decisions and OQ-GAMEDAY-2).
+
+  Due-diligence search, deliberately BROADER than a name-only grep (the
+  narrow-grep class both `devops_sre.release_readiness_review`'s and
+  `devops_sre.runbook_execution`'s own critic rounds caught in
+  consecutive slices): case-insensitive spec-root greps for "AAR /
+  after action / postmortem / post-mortem", "演練 / drill / tabletop",
+  and the already-known "inject" neighbourhood. Real neighbours found,
+  each read and each confirmed distinct: (1) `devops_sre
+  .chaos_engineering` (built, §11.43) -- injects a fault to test a
+  SYSTEM's steady-state hypothesis within a blast radius; Game Day
+  injects a failure to rehearse PEOPLE and PROCESS (roles, runbook,
+  AAR) -- Atlas lists them as separate F19 rows with separate benefit
+  columns ("找隱藏 dependency" vs "驗證人與流程"); a game day may run a
+  chaos experiment as its inject phase, disclosed as OQ-GAMEDAY-5, not
+  built. (2) `database_data.backup_restore_drill` (built, §12.40) -- a
+  DATA restore drill measured against RTO/RPO; distinct object, distinct
+  family. (3) `docs/architecture/DEVOPS_SRE_PLAN.md` §3.1 "演練週期"
+  table -- schedules a semi-annual "完整跨區 failover 演練" and
+  quarterly restore drills; this is the closest real sibling artifact
+  (a scheduled DR exercise IS a game-day-class event), operational-
+  procedure prose in this same family's scoped-authority plan, not a
+  typed object; relationship disclosed as OQ-GAMEDAY-3, not cross-
+  referenced. (4) Execution Contract §55 Incident Mode (L1905-1923) ends
+  its own incident flow at "Post-mortem", and `DEVOPS_SRE_PLAN.md` §1.4's
+  incident record carries `postmortem_ref` -- both are REAL-incident
+  learning steps, Atlas's own separate F17 Post-mortem row (L805), not
+  a rehearsal's AAR. (5) `specs/execution/risk-tier.schema.yaml:122` and
+  `policies/ai-execution/mandatory-gates.yaml` name "Recovery Drill" as
+  an R4 required ACTION -- a policy-layer action name, not a typed
+  object. (6) ADDED post-critic-review -- `rehears*` was also searched
+  after the review found this contract's own purpose verb ("rehearse")
+  missing from the term list: Atlas L838, L867, L1111, L3420, L3449 and
+  L4481 use "Rehearsal" as an unnamed pre-deploy flowchart/table step (no
+  tool-table row, no formula, no benefit column), and the Execution
+  Contract §55 incident flow already cited above carries "Rehearsal"
+  two steps before "Deploy" -- read, not a method, not a typed object.
+  No duplicate typed object or method found; the search that reached
+  that conclusion is the broad one, recorded here.
+
+  `id: devops_sre.game_day` follows Atlas's own row name. The typed
+  object is a `GameDayRecord` -- ONE EXERCISE's own record, the same
+  "record reports on a real event executed elsewhere" split every prior
+  devops_sre record-class contract already draws.
+
+  Atlas's own 5-phase formula grounds FOUR real invariants this
+  contract enforces: (1) "roles" -- every role is unique (an exercise
+  whose benefit is verifying PEOPLE cannot have two people ambiguously
+  holding the same role); (2) "recover" -- a recovery duration exists
+  iff the recovery happened (`time_to_recover_minutes` REQUIRED when
+  `outcome: recovered`, FORBIDDEN when `not_recovered`); (3) the
+  optional `recovery.runbook_execution_ref`, when supplied, carries the
+  `RunbookExecutionRecord` id prefix `RBEXEC-` -- the soft link
+  `devops_sre.runbook_execution`'s own OQ-RUNBOOKEXECUTION-2 asked for;
+  (4) "AAR" -- all four of Atlas L804's own questions are answered
+  (non-empty), because an AAR with a blank question has not performed
+  the phase.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Game Day row (L858): 'scenario→roles→inject→recover→AAR'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 tool table, After Action Review row (L804): 'Expected? Actual? Why? Next?' -- cited for the `aar` phase's own four fields ONLY; the F17 method itself is not minted here"
+  - "methods/registry/method-inventory.yaml Game Day entry (L1162-1166): category 'F19 devops-sre', line field reads 855 -- CORRECTED here to the real L858 position, the same systematic +3 drift already disclosed by seven prior contracts this session (Error Budget, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model, Release Readiness Review, Runbook Execution), now observed a NINTH time"
+  - "methods/registry/method-inventory.yaml After Action Review entry (L1042-1046): category 'F17 learning', line field reads 801 (real L804, same +3 drift), has_contract:false -- left UNCHANGED by this contract"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-second concrete entry. `id: devops_sre.game_day` mints a new
+  machine_id, NINTH member of the `devops_sre` family.
+
+id: devops_sre.game_day
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [CHALLENGE, VALIDATE, REFLECT]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Deliberately injecting a failure to challenge the team
+# is CHALLENGE; verifying that people and process actually recovered is
+# VALIDATE; the AAR's own Expected/Actual/Why/Next is REFLECT (all three
+# are real members of specs/cognitive/primitive.schema.yaml's own
+# 24-primitive kernel enum, checked before writing this line).
+
+purpose:
+  - rehearse_a_failure_scenario_with_named_roles_and_a_real_injection_to_verify_that_people_and_process_recover_and_capture_an_after_action_review
+inputs:
+  required: [GameDayScenario, RoleAssignment, InjectedFailure, RecoveryObservation, AfterActionAnswers]
+  optional: [RunbookExecutionRecord]
+outputs: [GameDayRecord]
+preconditions:
+  - "scenario and injected_failure are non-empty strings"
+  - "roles is a non-empty list; every role carries exactly role + assignee, both non-empty; role names are unique after whitespace-collapse + casefold"
+  - "recovery.outcome is recovered or not_recovered"
+  - "recovery.time_to_recover_minutes (a non-negative integer) is REQUIRED when outcome is recovered and FORBIDDEN when outcome is not_recovered"
+  - "recovery.runbook_execution_ref, when present, is a non-empty string beginning with RBEXEC- (the RunbookExecutionRecord id prefix) -- a format-only soft link"
+  - "aar carries exactly expected/actual/why/next, all non-empty"
+  # Each precondition maps onto one phase of Atlas's own 5-phase formula
+  # (scenario/inject -> 1; roles -> 2; recover -> 3, 4, 5; AAR -> 6),
+  # disclosed individually above in this contract's own description.
+  # Same "structurally necessary, forbidden-state" class every prior
+  # record-class method this session built already establishes.
+  #
+  # DELIBERATELY BIDIRECTIONAL on recovery time (unlike the one-
+  # directional restraint every prior status-like field this session
+  # built): a duration for a recovery that never happened is not a
+  # conservative extra, it is a claim that reads as success on a failed
+  # exercise -- see compilation_decisions.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every record-class contract in this package
+  # already reasons through: the real risk is phase integrity (were the
+  # roles unambiguous, does the recovery claim cohere, was the AAR
+  # actually done), not an evidence-citation risk over a narrative
+  # claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Game Day row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. Two real,
+# disclosed (not built as chains) relationships: (1) the recovery phase
+# may EXERCISE a real runbook -- carried here as the optional
+# `recovery.runbook_execution_ref` soft link into
+# `devops_sre.runbook_execution`'s own output, answering that contract's
+# OQ-RUNBOOKEXECUTION-2; (2) the AAR's own `next` answer is exactly the
+# kind of input F17's own learning methods consume -- no F17 contract
+# exists yet to link to (OQ-GAMEDAY-2).
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- it reports on a real
+  # exercise executed elsewhere (the actual failure injection, the real
+  # people responding, the real recovery actions), the same "record
+  # reports on an external observation" class every prior devops_sre
+  # contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Atlas's own formula ends at "AAR", and F17 already names After
+      Action Review as its own method with its own four-question usage
+      formula (L804). Should this contract (a) embed those four questions
+      as its own `aar` object, (b) reference a future F17 typed object
+      by id, or (c) invent a generic findings/action-items shape?
+    decision: "(a) -- embed Atlas L804's own four questions as the `aar` object; do not mint the F17 method; do not invent a shape."
+    reasoning: >
+      (c) would invent structure Atlas does not specify when Atlas has
+      already specified one. (b) would require an After Action Review
+      typed object that does not exist (F17 is entirely pending in
+      method-inventory.yaml), and building it here would be an F17
+      method smuggled in through an F19 slice. (a) transcribes the row
+      Atlas itself points to and keeps this method's own output self-
+      contained -- the same discipline `devops_sre
+      .release_readiness_review` used when it embedded its six domains
+      rather than referencing six separate review objects. If a future
+      session builds `learning.after_action_review`, this `aar` object
+      is the obvious candidate to become a reference -- disclosed as
+      OQ-GAMEDAY-2, not decided here.
+  - question: >
+      Should `time_to_recover_minutes` be ONE-directional (required when
+      recovered, merely optional when not_recovered), the way every prior
+      status-like field this session built has been?
+    decision: "No -- BIDIRECTIONAL: required iff recovered, forbidden iff not_recovered."
+    reasoning: >
+      The one-directional precedent exists to permit a caller's own
+      conservative extra (a precautionary rollback, a conservative stop).
+      A recovery duration on a not_recovered exercise is not conservative
+      -- it is a number that reads as "recovered in N minutes" to any
+      reader or downstream consumer, on an exercise whose own outcome
+      says the opposite. Forbidding it closes exactly the "failed drill
+      read as a fast success" class this method's benefit column
+      ("驗證人與流程") exists to expose. Disclosed as a deliberate
+      departure from the session's own precedent, not a silent one.
+  - question: >
+      Should assignees be unique across roles (one person, one role), in
+      addition to role names being unique?
+    decision: "No -- role names unique, assignees free."
+    reasoning: >
+      Atlas's own text says "roles", not "one person per role". In a
+      small team one on-call engineer legitimately holds both Operations
+      and Communications during an exercise; forbidding that would fail
+      real records for a rule Atlas never states. Role-name uniqueness
+      is different: two entries both named "Incident Commander" make the
+      exercise's own accountability ambiguous, which defeats verifying
+      people. Names are compared after whitespace-collapse + casefold so
+      "Incident Commander" and "incident  commander" cannot both be
+      recorded as if distinct.
+  - question: >
+      `recovery.runbook_execution_ref` names a RunbookExecutionRecord --
+      should this method verify that record exists, or that its own
+      `rollback_performed`/stop state is consistent with this exercise's
+      own `outcome`?
+    decision: "No -- format-only soft link (prefix RBEXEC-)."
+    reasoning: >
+      This method has no access to any other record; every prior `*_ref`
+      field this session built (e.g. `source_cause_hypothesis_set_ref`,
+      `release_ref`) is format-only for the same reason, and cross-record
+      consistency belongs to a ledger-level or plan-level check that does
+      not exist yet. The prefix check is real (it rejects a ref that
+      names some other typed object), disclosed as the full extent of
+      what is verified.
+  - question: >
+      The runtime layer enforces ANOTHER record's id prefix (`RBEXEC-`
+      on `runbook_execution_ref`) but not this record's own `^GAMEDAY-`
+      id prefix, its `version` string type, or a closed TOP-LEVEL key
+      set -- a critic review showed the builder happily emits
+      `id: DRILL-999` and an extra top-level key that both gates pass
+      and only `SchemaContracts.validate` rejects. Should the runtime
+      layer enforce these too?
+    decision: "No -- own-id prefix, version type and the top-level key set are SCHEMA-LAYER ONLY; disclosed, with a pinned schema test."
+    reasoning: >
+      This is the family-wide convention (`runbook-execution-record`,
+      `release-readiness-review-record` and every sibling typed object
+      enforce their own id prefix only in the schema, and none closes
+      its top-level key set) -- diverging here alone would make this
+      one record's runtime stricter than its siblings for no Atlas-
+      grounded reason, the exact "one clear owner per concern" split
+      this package draws: the schema owns the record's OWN envelope
+      (id shape, version, top-level keys), the runtime owns the phase
+      invariants Atlas's formula implies. The asymmetry is real and
+      now disclosed rather than silent; every path that persists a
+      record (the CLI, the ledger validator) already runs
+      `SchemaContracts.validate`, and `test_game_day.py` pins the
+      `^GAMEDAY-` rejection at the schema layer so the sole defense is
+      regression-protected.
+
+open_questions:
+  - id: "OQ-GAMEDAY-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-GAMEDAY-2"
+    question: >
+      This contract embeds Atlas L804's own four After Action Review
+      questions as its `aar` object without minting the F17 method. When
+      a future session builds an F17 `after_action_review` contract and
+      typed object, should this method's `aar` become a reference to
+      that object (a breaking change to this schema), or remain embedded
+      with the F17 object cross-referencing back?
+    owner: "operator, or whoever next builds an F17 learning-family contract"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-GAMEDAY-3"
+    question: >
+      `docs/architecture/DEVOPS_SRE_PLAN.md` §3.1 schedules a semi-annual
+      "完整跨區 failover 演練" and quarterly restore drills, each producing
+      EC §65 content-addressed evidence. Is a `GameDayRecord` the intended
+      evidence artifact for the failover exercise? Neither document
+      references the other today.
+    owner: "operator, or whoever next audits cross-references between Method Atlas contracts and docs/architecture/*.md"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-GAMEDAY-4"
+    question: >
+      This record carries a recovery DURATION but no timeline (no
+      injected_at / recovered_at timestamps, no per-role action log).
+      Atlas's own row gives only the five phases; should a future
+      revision add a structured timeline, the same class of field a
+      Post-mortem's own "timeline→impact→causes→actions" (F17 L805)
+      would need?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-GAMEDAY-5"
+    question: >
+      A game day's inject phase may be a real `devops_sre
+      .chaos_engineering` experiment. Should a future revision add an
+      optional `chaos_experiment_ref` soft link (prefix of that method's
+      own typed-object id), symmetric with `runbook_execution_ref`?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L858) and F17 tool table row
+    (L804) directly, confirmed against the surrounding F19 table
+    (L848-863) that no dedicated §11.x section exists for Game Day
+    anywhere in the document. Ran BROAD case-insensitive spec-root greps
+    ("game day"/"gameday"; "AAR"/"after action"/"postmortem"/
+    "post-mortem"; "演練"/"drill"/"tabletop") rather than a name-only
+    grep, read every neighbour surfaced (chaos_engineering,
+    backup_restore_drill, DEVOPS_SRE_PLAN.md §1.4/§3.1, EC §55,
+    risk-tier R4 "Recovery Drill"), and confirmed each distinct by
+    direct read. No duplicate typed object or method found. Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All four core invariants are each
+    grounded in one phase of Atlas's own 5-phase formula; the embedded-
+    AAR (not minted F17), bidirectional recovery-time, free-assignee,
+    and format-only-soft-link designs are all disclosed compilation
+    choices, not silent inventions -- see compilation_decisions above.
