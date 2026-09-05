@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-05（HCI-30：ADR-0009 租戶/組織 adapter 查證——推翻「HCI 需加 seam 欄位」假設，gate 1-2 重新核實正確、gate 3 確認真阻斷於跨 repo 應用層，刻意不建 migration）
+
+**觸發**：延續「全部去完美處理好」授權（ADR-0019 遺留＋ADR-0009 兩項），ADR-0019 三個 migration 全部關閉後轉本項。0 新 subagent（沿用前一輪 Explore 研究：ADR-0009 契約文件無具體 schema、`hci.tenants` 零 portal 連結欄位）。
+
+**過程**：原計畫（前一輪對操作者的回報）是「落地 schema 層 seam」，動工前先去讀 portal 那邊真正的 migration 檔查證，發現原計畫方向錯誤——推翻後改為純文件查證，未寫一行 migration。
+
+**[已修改]**（全部文件，無 schema/測試變更）：
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-tenant-organization-model-reconciliation.md`：新增 Implementation note，記錄查證過程與結論。
+- `ADR_INDEX.md`：ADR-0009 列更新（gate 1-2 重新核實正確、gate 3 確認真阻斷）。
+- `wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`：status 行加註 2026-09-05 已對照真實 portal migration 重新核實。
+- `agency-os/TASKS.md`：新增查證完成項（標明「純查證，未寫 migration」）。
+
+**發現**：① portal 側 `lobster-factory/packages/db/migrations/0062_organization_product_subscriptions.sql` 早已正確實作 gate 1-2 要求的整套 seam——`external_tenant_id uuid`（nullable、故意無 FK，欄位註解本身就寫「NULL = not yet provisioned」）+ live-scoped UNIQUE index（`status <> 'canceled'`）已擋重複認領；契約文件「Adapter mapping」規則 1 早已明寫「HCI 擁有 immutable tenant_id；portal 只是把它存成 external_tenant_id」——**HCI 這邊不需要任何鏡射欄位**，若真的加了會違反契約自己的「Not permitted」禁令（portal org id 變成 HCI tenant 主鍵、跨產品 DB FK）。② gate 3（`TENANT-ADAPTER-NEG-01..03`）契約文件自己說「cannot be run until HCI has an executable API, database, and non-superuser tenant role」——後兩者本 session 這一輪已透過 176/176→208/208 assertion 的完整 RLS/跨租戶測試證明存在且經得起真跑，唯一缺的是「executable API」（adapter 應用層），此程式碼兩個 repo（`hci30`、`lobster-factory`）都不存在，是跨 repo 應用層缺口，非 hci30 schema 缺口。若硬造一個假 adapter 去測，測的只是自己寫的稻草人，不是真實行為——比照 ADR-0018 gate 4/5、ADR-0019 gate 5（epistemic-label 半邊當時）同款「誠實留 OPEN 不做淺版」判準。
+
+**[驗證結果]**：
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（純文件查證，核心驗證是「讀真實 portal migration 檔案內容」本身，已引用具體 file:line 佐證每個結論）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=external_tenant_id\|TENANT-ADAPTER-NEG | hits=0（hci30 側確認零既有殘留引用，非本輪引入新符號）
+- REALTEST_WAIVED: NA -- 本輪無 schema/程式碼變更，無可真跑的新行為
+
+**[剩餘風險]**：ADR-0009 gate 3 仍 OPEN，待未來某個橫跨 `lobster-factory`＋`hci30` 的應用層/adapter 實作任務（讀 subscription seam＋綁定 request-scoped tenant session）——明確超出本輪資料庫 migration 範疇，未動手。HCI-30 Wave 1 佇列中其餘 `SPECIFIED — RUNTIME OPEN` 的 ADR（0003/0006/0007/0008/0013 剩餘 gate/0021~0033 等）多數標的是 Wave 2/3/4/6/10，非現在該做階段。
+
+**[rollback]**：無變更需回滾（純文件）。
+
 ## 2026-09-05（HCI-30 Wave 1：ADR-0019 gate 5 認識論標籤半邊 migration 0010 —— ADR-0019 全部 5 個 gate 現已關閉；順手建好 ADR-0013 gate 5 稽核腳本；Docker Desktop 第二次殘留 socket 復原）
 
 **觸發**：延續操作者「全部去完美處理好」授權（ADR-0019 遺留＋ADR-0009，本輪 = 前者最後一段：gate 5 認識論標籤半邊）。0 新 subagent（沿用上一輪 Explore 研究結果）。

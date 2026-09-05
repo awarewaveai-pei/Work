@@ -1,6 +1,6 @@
 # HCI Tenant / Portal Organization Adapter Contract
 
-Status: **DESIGN ARTIFACT COMPLETE — runtime mapping, migration, and negative test remain OPEN**
+Status: **DESIGN ARTIFACT COMPLETE — re-verified 2026-09-05 against the real portal migration (`lobster-factory/packages/db/migrations/0062_organization_product_subscriptions.sql`), confirmed accurate as written; runtime mapping needs no HCI-30 schema (see ADR-0009's "Implementation note"); migration and negative test remain OPEN, the latter genuinely blocked on an adapter/API layer that does not exist in either repo**
 Date: 2026-09-01
 Authority: ADR-0009 (`HD-01=A`)
 Scope: A pre-implementation contract for the HCI Wave 1 adapter. It does not alter portal tables, create a cross-product foreign key, or provision a tenant.

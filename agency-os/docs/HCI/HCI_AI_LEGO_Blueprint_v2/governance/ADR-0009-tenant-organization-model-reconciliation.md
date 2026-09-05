@@ -35,8 +35,75 @@ The design artifacts are now specified in `wave1/HCI_TENANT_ORGANIZATION_ADAPTER
 - The required schema, migration, and negative test have not been implemented; their gates remain open.
 - Before implementation, rollback is to supersede this ADR with a new explicit human decision. After implementation, rollback must follow the approved migration plan; it must not rewrite tenant ownership in place.
 
+## Implementation note (2026-09-05 - investigation only, no schema change; gate 3 confirmed genuinely blocked, not an HCI-30 gap)
+
+Recorded here rather than editing the numbered gates above, which remain
+the historical decision record. Prompted by the standing "work through the
+Wave 1 ADR queue" delegation, after ADR-0019's five gates closed the same
+day (see that ADR's own Implementation note).
+
+**Gates 1-2 re-verified, not rebuilt.** Before assuming these needed
+schema work, the actual portal-side artifact they describe was read
+directly: `lobster-factory/packages/db/migrations/0062_organization_product_subscriptions.sql`.
+It already ships exactly what gate 1's "mapping artifact" and gate 2's
+"compatibility and migration plan" require: `external_tenant_id uuid`,
+nullable, explicitly commented `NULLABLE, INTENTIONALLY NOT A FOREIGN
+KEY... NULL = not yet provisioned; the launcher must render "coming soon",
+never fake a provisioned state`, plus a live-scoped unique index
+(`org_product_subs_external_tenant_uniq ... where external_tenant_id is
+not null and status <> 'canceled'`) that already enforces "one live portal
+claimant per HCI tenant" - closing exactly the "duplicate request / fail
+closed on any different claimant" row in
+`wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`'s own provisioning
+table. **This means HCI-30's schema needs no mirror column, no reverse
+pointer, and no new migration for this ADR at all** - the contract
+document's own "Adapter mapping" rule 1 already says so explicitly ("HCI
+owns an immutable `tenant_id`; the portal only stores it as
+`external_tenant_id`"), and its own "Provisioning and lifecycle contract"
+section states the portal migration "already enforces one live HCI
+subscription per portal organization and one live portal claimant per
+`external_tenant_id`; this contract adds no stronger claim until an HCI
+Tenant implementation exists." Building an `hci.tenants` column anyway -
+the initial plan before this verification - would have been the wrong
+direction entirely: a redundant, coupling-creating seam the contract
+explicitly forbids ("Not permitted: reusing a portal organization ID as
+the HCI Tenant primary key" / "a cross-product DB foreign key").
+
+**Gate 3 is genuinely blocked, confirmed by the contract's own text, not
+merely unbuilt.** The contract's "Runtime-verification gate" section says
+`TENANT-ADAPTER-NEG-01..03` "cannot be run until HCI has an executable
+API, database, and non-superuser tenant role." Two of those three already
+exist and are exhaustively tested by this session's own Wave 1 work: a
+real PostgreSQL database and non-superuser tenant roles
+(`hci_app_test_a`/`hci_app_test_b`) whose tenant isolation is proven by
+`RLS-LEAK-01` through `-06`, `BITEMP-CROSSTENANT-01`,
+`CRYPTO-CROSSTENANT-KEYREF-01`, and every other `*-CROSSTENANT-*`
+assertion across migrations 0001-0010. The one missing piece is
+"an executable API" - the adapter application layer that would receive an
+authenticated portal request, resolve `external_tenant_id` for that
+organization's live `product_key='hci'` subscription, and bind the
+resulting DB session to that tenant's scope. **That code exists in
+neither `hci30` nor `lobster-factory` today.** Writing a test against it
+now would mean testing a strawman harness standing in for code that does
+not exist, not the real adapter behavior - the same "don't build a narrow
+version that has to be torn out" reasoning already applied to ADR-0019
+gate 5's epistemic-label half and ADR-0018 gates 4-5. Left honestly
+`OPEN`, same disposition as `ADR-0016`'s tenancy-principal mechanism
+(resolved by `ADR-0033`, still open at runtime) and `ADR-0005` gate 2
+("genuinely blocked on an application/API layer that does not exist yet
+at Wave 1 schema stage").
+
+**Conclusion: nothing to build in `hci30` for this ADR right now.** The
+correct next step, when it happens, is an adapter/API-layer implementation
+task spanning both `lobster-factory` (read the subscription seam) and
+`hci30` (bind the resolved tenant into a request-scoped role/session) -
+out of scope for a database-migration round and not undertaken here. No
+migration file, fixture, or test was added; adding one would have been
+premature schema surface, not progress.
+
 ## Evidence
 
 - `02_PRODUCT_BOUNDARIES.md` — HD-01 alternatives and product-boundary context.
 - `D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\docs\adr\ADR-003-tenant-model-and-cas-isolation.md` — accepted shared Tenant semantics.
 - `D:\Work\agency-os\reports\decisions\2026-09-01-hci-wave-1-decision-tranche.md` — approval tranche and required artifacts.
+- `D:\Work\lobster-factory\packages\db\migrations\0062_organization_product_subscriptions.sql` — the already-shipped portal-side seam and its live-scoped uniqueness guarantee, re-read 2026-09-05 to confirm gates 1-2 need no HCI-side schema mirror.
