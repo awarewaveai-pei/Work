@@ -57,17 +57,17 @@ Evidence: `tests/fixtures/selection/all_no.json:3-22` locks the 18 Foundry basel
 Expected result: choosing no optional product capability does not remove production engineering baseline and does not generate feature modules.
 
 ### ALL-YES golden
-Evidence: `tests/fixtures/selection/all_yes.json:3-256` locks all 252 current capabilities; `tests/fixtures/selection/all_yes.json:257-304` locks all 46 standard selectable modules. The all-YES assertion is implemented in `scripts/test_selection_matrix.py:127-132`.
+Evidence: `tests/fixtures/selection/all_yes.json:3-261` locks all 257 current capabilities; `tests/fixtures/selection/all_yes.json:262-310` locks all 47 standard selectable modules. The all-YES assertion is implemented in `scripts/test_selection_matrix.py:127-132`.
 
 Expected result: every defined standard capability and standard LEGO module is reachable; all 73 blueprint sections become ACTIVE.
 
 ### Every question individually
-Evidence: `scripts/test_selection_matrix.py:133-139` independently activates every one of the 214 questions with minimum prerequisites and verifies its declared required/deferred effect.
+Evidence: `scripts/test_selection_matrix.py:133-139` independently activates every one of the 218 questions with minimum prerequisites and verifies its declared required/deferred effect.
 
 Expected result: no dead or miswired question.
 
 ### Exhaustive pairwise interactions
-Evidence: `scripts/test_selection_matrix.py:160-170` traverses every pair of 214 questions. Current release result: 22,785 compatible pairs pass and 6 contradictory pairs fail closed, totaling all 22,791 pairs.
+Evidence: `scripts/test_selection_matrix.py:160-170` traverses every pair of 218 questions. Current release result: 23,647 compatible pairs pass and 6 contradictory pairs fail closed, totaling all 23,653 pairs.
 
 Expected result: two-feature interactions cannot silently change module projection or violate plan invariants.
 
@@ -92,7 +92,7 @@ Evidence: real local HTTP server startup, token retrieval, POST `/api/generate`,
 Expected result: the real “勾選 -> 送出 -> 生成” transport path works, not only direct Python calls.
 
 ## Static inventory closure
-Evidence: module obligations must exactly equal generation modules at `scripts/validate_artifact_generation.py:8-13`; every capability must be present in its module activation map at `scripts/validate_artifact_generation.py:14-22`; all 73 templates must be covered by the blueprint map at `scripts/validate_artifact_generation.py:23-27`; all 214 questions must have exactly one question rule at `scripts/validate_artifact_generation.py:28-30`.
+Evidence: module obligations must exactly equal generation modules at `scripts/validate_artifact_generation.py:8-13`; every capability must be present in its module activation map at `scripts/validate_artifact_generation.py:14-22`; all 73 templates must be covered by the blueprint map at `scripts/validate_artifact_generation.py:23-27`; all 218 questions must have exactly one question rule at `scripts/validate_artifact_generation.py:28-30`.
 
 ## Release commands
 

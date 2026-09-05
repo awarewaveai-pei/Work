@@ -183,6 +183,13 @@
         "DER-INDEPENDENT-ASSURANCE",
         "DER-HUMAN-OVERSIGHT"
       ]
+    },
+    {
+      "id": "DERIVE-SHIPPING",
+      "when_capability": "CAP-SHIPPING",
+      "derive": [
+        "DER-CARRIER-ADAPTER"
+      ]
     }
   ]
 }

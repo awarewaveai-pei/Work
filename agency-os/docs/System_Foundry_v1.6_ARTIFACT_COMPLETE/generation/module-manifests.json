@@ -673,6 +673,20 @@
         "CAP-CHARGEBACK",
         "CAP-RISK-SCREENING"
       ]
+    },
+    {
+      "id": "shipping",
+      "paths": [
+        "packages/shipping",
+        "tests/contract/shipping"
+      ],
+      "activated_by": [
+        "CAP-3PL",
+        "CAP-PICKUP-POINT",
+        "CAP-SHIPPING",
+        "CAP-SHIPPING-RATES",
+        "DER-CARRIER-ADAPTER"
+      ]
     }
   ]
 }

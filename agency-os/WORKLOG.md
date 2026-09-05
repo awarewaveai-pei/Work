@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-06（System Foundry：5個真缺口的第3個 Logistics/Shipping 落地，critic 抓到「同一名詞跨模組無邊」第三度重演）
+
+[根因/決策] 承接前兩輪（Pricing/Promotions、Fraud/Risk）確認的5個真缺口，本輪做第3個：Logistics/Fulfillment（出貨/物流）。設計新增5個capability：`CAP-SHIPPING`（出貨單建立+貨態追蹤，requires `[CAP-ORDERS,CAP-PRODUCTS]`）、`CAP-SHIPPING-RATES`（運費試算，requires `[CAP-SHIPPING]`）、`CAP-PICKUP-POINT`（超商/取貨點，requires `[CAP-SHIPPING]`）、`CAP-3PL`（委外倉儲代發貨，requires `[CAP-SHIPPING,CAP-INVENTORY]`——跟既有`CAP-DROPSHIP`〔供應商自己出貨〕明確不同，貨權歸屬是判準）、`DER-CARRIER-ADAPTER`（物流商協定隔離層，仿既有`DER-PAYMENT-ADAPTER`）。承接master blueprint把Shipping跟Payments/Accounting/Tax同列「優先串接」清單、但後三者都有實體capability的先例。
+
+[執行] 委派fullstack-engineer agent實作（brief裡直接寫入前3輪critic教訓：requires邊完整性、gating精確度、doc引用漂移防範）→ agent自己在實作過程中主動抓到一個潛在缺陷並修正：`rules/derivation-rules.json`是讓`DER-*`capability真的進入resolved plan的唯一機制（question-rules.json從不直接引用`DER-`id），agent機械清點確認既有26個`DER-*`全部100%有對應derivation rule、零孤兒——若只新增`DER-CARRIER-ADAPTER`卻不補`DERIVE-SHIPPING`，會是史上第一個孤兒`DER-*`（只存在obligations文字宣稱，resolve()永遠拿不到），已補上並用真實resolve()+突變測試（拔掉derivation rule確認all-YES覆蓋率真的掉到256/257）驗證load-bearing。
+
+[critic覆審] 獨立critic全新覆審：**requires邊、closure、gate、raw-API繞過、CAP-3PL/CAP-DROPSHIP雙向非耦合、TASKS.md兩個既有系統性類別（Class 1「6題繞道CAP-PAYMENTS」、Class 2「money-adjacent capability缺Q-COM-001 gate」）皆重新掃描確認零新增、13步verify chain+29 unittest全綠、藍圖§5來源章節7項public capabilities覆蓋度確認**——模組本身內部乾淨。但抓到本輪**與既有模組接縫**的問題，verdict SHIP WITH MINOR FIXES：
+
+- **H1/M1（High/Medium，真缺陷，已修，且開新TASKS.md條目追蹤同類）**：`CAP-SHIPPING`第一次把「shipment」這個名詞給了明確主人，但3個既有capability（`CAP-RETURNS`的退貨寄回步驟、`CAP-ORDER-SPLIT`的多倉庫分批出貨、`CAP-CLICK-COLLECT`的門市代寄）的描述早就在用這個詞、藍圖原文（`_15`/`_16`章節）也雙向明文宣告Logistics↔Returns是Core Dependency，卻沒有任何一邊有`requires`邊或交叉引用——critic實測`resolve(Q-RET-001)`：`CAP-RETURNS=True`但`CAP-SHIPPING=False`，證明生成的RMA流程含「退貨寄回」步驟卻沒有出貨/物流追蹤能力。這是`d51624f13`（斷邊）與`8073bd5cb`（obligations宣稱與resolve()結果不符）兩輪critic各自判定「serious defect, not style」的同一個class**第三次現身**。修法：不加硬requires邊（會強迫所有選退貨的系統都長出shipping模組，需要另外明確決策），改在`shipping`與`returns`兩邊obligations各補一條跨模組不變量（仿`promotions`模組已有的樣板），並在TASKS.md §D開新條目追蹤`CAP-ORDER-SPLIT`/`CAP-CLICK-COLLECT`兩個尚未處理的同類實例——明確禁止只補這兩個當單點補丁。
+- **M2/M3（Medium，已修）**：`Q-SHIP-002`（運費試算）文案自我矛盾——前句說「讓客戶依價格選物流方式」、後句說「不涉及轉嫁給客戶」，兩句不可能同時為真；且這句disclaimer正是`CAP-SHIPPING-RATES`被critic獨立判斷排除在Class 2之外的唯一依據，論據脆弱。已改「客戶」為「系統或客服」選擇，消除矛盾，讓排除理由站得住，並在TASKS.md Class 2條目明確寫下「已考慮並排除CAP-SHIPPING-RATES，理由X」。`Q-SHIP-003`（超商/取貨點）與既有`Q-POS-003`（門市取貨/出貨）可同時勾選但文案未消歧，已比照`CAP-3PL`/`Q-SHIP-004`已做過的消歧句式補上。
+- **N1（Nit，已修）**：`CAP-SHIPPING-RATES`描述誤引用`CAP-PROMOTIONS`（實際buy-X-get-Y屬於`CAP-PROMO-RULES`）——這是`d51624f13`/`fec071dad`/`8073bd5cb`都出現過的「引用另一個artifact文字要逐字核對」同一類問題，第四次出現，已修正。
+- **N2（Nit，已修）**：藍圖§5的`Cancel`（取消出貨）在capability描述裡沒有明確歸屬，只在obligations security條文裡隱含出現——已在`CAP-SHIPPING`描述的生命週期句補上「or cancelled」。
+- **N4（Nit，已修）**：TASKS.md Class 2既有清單（6個）漏了`CAP-PROMO-RULES`（透過`Q-PROMO-002`，會被父項`CAP-PROMOTIONS`連坐修好但清單仍要列出）——critic獨立掃描發現，屬既有缺口非本輪引入，已補進清單（6→7個）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=13步verify chain+`python -m unittest discover -s tests`（critic獨立重跑一次，套用7項修正後自己再跑一次）| exit=0（每一步、兩輪皆是）| result=最終`questions=218 capabilities=257 modules=48 standard_modules=47 pairwise_valid=23647 pairwise_rejected=6(不變) pairwise_total=23653`；`Ran 29 tests...OK`；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic獨立跑`DER-CARRIER-ADAPTER`突變測試（monkeypatch拔掉`DERIVE-SHIPPING`，純記憶體未動repo檔）| exit=assertion fail | result=all-YES覆蓋率從257/257掉到256/257，missing=`['DER-CARRIER-ADAPTER']`——證明該derivation rule確實load-bearing、既有13步chain的all-YES覆蓋率斷言本來就會抓到孤兒`DER-*`
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic獨立跑`resolve(Q-OMS-004)`（供應商代發貨）vs`resolve(Q-SHIP-004)`（3PL）雙向測試 | exit=0 | result=`Q-OMS-004`單獨→`CAP-DROPSHIP=True`且`CAP-3PL/CAP-INVENTORY`皆`False`；`Q-SHIP-004`單獨→`CAP-3PL=True,CAP-INVENTORY=True,CAP-DROPSHIP=False`——雙向零耦合確認
+- REVIEW_DONE: critic=Standard（全新獨立subagent，從diff重新驗證+額外突變測試）| verdict=SHIP WITH MINOR FIXES→H1/M1/M2/M3/N1/N2/N4全部處理（6項修正+1項新TASKS.md條目追蹤同類殘留）| findings=0c/0m（收尾時）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-SHIPPING\|CAP-SHIPPING-RATES\|CAP-PICKUP-POINT\|CAP-3PL\|DER-CARRIER-ADAPTER\|DERIVE-SHIPPING\|Q-SHIP-00[1-4]` | hits=每個新id僅在歸屬檔各出現一次，零重複零半寫引用；category重新編號1-43連續無跳號無重複
+
+[剩餘風險] TASKS.md §D新條目（`CAP-ORDER-SPLIT`/`CAP-CLICK-COLLECT`同類「shipment無邊」殘留）待排入；Class 2清單已擴充到7個但仍未實際處理；第9候選Inventory/WMS多倉庫仍待深讀；5個真缺口中已完成3個（Pricing/Promotions、Fraud/Risk、Logistics/Shipping），剩餘2個（PLM/Quality、Merchandising）序列化進行中。
+
 ## 2026-09-06（續57，同一 session：Cognitive OS 第四十四個 Method Atlas 切片 — `security.stride`，新 `security` 家族（F20）第一個成員；critic 初稿 verdict **FAIL**——跑時邏輯零破綻（6/6 突變全命中指名測試、本 session 五大復發 bug class 全乾淨），FAIL 全落在治理/查證面，5 Major 全修後 SHIP）
 
 **觸發**：操作者「繼續」，承接 WORKLOG 續56 收官 F21 後列出的候選清單，選 F20 自己表格第一列 STRIDE——也是唯一有 Atlas 專節（§11.44）的 F20 成員，且 Execution Contract §32 明文列 STRIDE 為可選滿足方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。

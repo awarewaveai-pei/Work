@@ -958,7 +958,8 @@
       "invariants": [
         "A refund or exchange is never executed (via CAP-REFUNDS / inventory restock) before the return request has been approved.",
         "Inventory disposition (restock, quarantine, or dispose) is only recorded after the returned item has actually been received and inspected, never on request or approval alone.",
-        "A return request always references a real, already-placed order and product; it cannot be created against an order that does not exist."
+        "A return request always references a real, already-placed order and product; it cannot be created against an order that does not exist.",
+        "When CAP-SHIPPING is also selected, the return-shipment step (the customer sending the item back) uses that module's shipment/tracking record rather than a separate return-only shipment representation; when CAP-SHIPPING is not selected, return-shipment tracking is out of this module's scope."
       ],
       "security": [
         "A return request and its inspection result are only visible to the requesting customer and authorized staff; a customer cannot view or act on another customer's RMA."
@@ -1057,6 +1058,32 @@
       ],
       "recovery": [
         "Risk-screening flag, review-queue decision, and chargeback case records are included in backup scope."
+      ]
+    },
+    "shipping": {
+      "purpose": "Create a shipment record for an order, obtain a tracking number, and track delivery status through to completion, plus quote/compare carrier rates, offer pickup-point/convenience-store delivery, and hand off fulfillment to a 3PL that holds the merchant's own stock -- distinct from CAP-DROPSHIP, where the supplier ships its own goods and the merchant never holds the inventory at all, and distinct from carrier API integration itself (account credentials, label format, tracking webhook shape), which sits behind DER-CARRIER-ADAPTER, not owned directly by this module's domain data.",
+      "invariants": [
+        "A shipment always references a real, already-placed order; it cannot be created against an order that does not exist.",
+        "Shipping rate quoting reads a product's weight and dimensions from CAP-PRODUCTS' own catalog data, never a hardcoded or stale default value.",
+        "Per-carrier account credentials, service codes, and label/tracking payload shapes are only ever accessed through DER-CARRIER-ADAPTER; this module's own shipment/tracking domain data never embeds a specific carrier's protocol directly.",
+        "CAP-3PL requires CAP-INVENTORY because the merchant retains ownership of stock held at the 3PL's warehouse; this is never conflated with CAP-DROPSHIP, where the supplier ships its own goods and the merchant never holds that inventory.",
+        "Pickup-point/convenience-store delivery still creates and tracks a shipment through the same shipment record as any other delivery destination; it is never a parallel or duplicate shipment representation.",
+        "Shipping rate quoting only computes what a carrier would charge to move a package; it never decides what the customer is charged for shipping, discounted, or waived above a threshold -- that pricing decision belongs to the checkout/pricing layer.",
+        "When this module is also selected, every other capability whose own description or obligations mentions a shipment (CAP-RETURNS' return-shipment step, CAP-ORDER-SPLIT's per-warehouse shipments, CAP-CLICK-COLLECT's ship-to-customer path) refers to this module's shipment record, never a second parallel shipment representation of its own."
+      ],
+      "security": [
+        "Shipment and tracking detail is only visible to the customer who placed the order and to authorized staff, never to another customer.",
+        "Manually overriding a shipment's carrier-reported status (`shipment.override`) requires a separate, higher permission than creating or cancelling a shipment; ordinary staff can create or cancel a shipment without being able to silently rewrite its carrier-reported delivery status."
+      ],
+      "tests": [
+        "The order-existence guard is contract-tested: shipment creation against a nonexistent order is rejected, the same pattern CAP-RETURNS and CAP-CHARGEBACK use for their own existence guards.",
+        "CAP-3PL vs. CAP-DROPSHIP non-overlap is contract-tested: activating CAP-DROPSHIP alone never resolves CAP-3PL, and activating CAP-3PL alone never resolves CAP-DROPSHIP."
+      ],
+      "operations": [
+        "Delivery-exception rate and carrier-specific tracking latency are observable and alertable, so a failing carrier integration is detected before it silently degrades customer-facing tracking."
+      ],
+      "recovery": [
+        "Shipment, package, and tracking-event records are included in backup scope."
       ]
     }
   }

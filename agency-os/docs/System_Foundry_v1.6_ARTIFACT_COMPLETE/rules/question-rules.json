@@ -2142,6 +2142,46 @@
       "require": [
         "CAP-CHARGEBACK"
       ]
+    },
+    {
+      "id": "RULE-Q-SHIP-001",
+      "when": {
+        "question": "Q-SHIP-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-SHIPPING"
+      ]
+    },
+    {
+      "id": "RULE-Q-SHIP-002",
+      "when": {
+        "question": "Q-SHIP-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SHIPPING-RATES"
+      ]
+    },
+    {
+      "id": "RULE-Q-SHIP-003",
+      "when": {
+        "question": "Q-SHIP-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PICKUP-POINT"
+      ]
+    },
+    {
+      "id": "RULE-Q-SHIP-004",
+      "when": {
+        "question": "Q-SHIP-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-3PL"
+      ]
     }
   ]
 }

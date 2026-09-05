@@ -2037,6 +2037,53 @@
         "CAP-CUSTOMER-DATA"
       ],
       "description": "A card-network chargeback or payment dispute is tracked as a case referencing the original order, payment, and customer, from case creation through evidence submission to a won/lost outcome. A lost or refund-owed outcome is settled through CAP-REFUNDS' normal refund workflow, never a silent balance adjustment outside it. Scoped to disputes on the online/card-not-present payments this system itself processes (see Q-PAY-001); in-store card-present disputes on a POS-only sales channel are a separate, currently unmodeled boundary, not covered by this capability."
+    },
+    {
+      "id": "CAP-SHIPPING",
+      "name": "Shipment Creation & Tracking",
+      "module": "shipping",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "A shipment record is created for an order, a tracking number and label are obtained, and delivery status (in transit, delivered, exception) is tracked through to completion or cancellation. Requires CAP-PRODUCTS because rate/label generation needs the product's own weight and dimensions, not just the order line items. Per-carrier account credentials, service codes, and API/webhook integration are explicitly out of scope and sit behind DER-CARRIER-ADAPTER; this capability owns the shipment/tracking domain data, not any single carrier's protocol. Other capabilities whose own description or obligations mention a \"shipment\" (e.g. CAP-RETURNS' return-shipment step, CAP-ORDER-SPLIT's per-warehouse shipments, CAP-CLICK-COLLECT's ship-to-customer path) refer to this same shipment record when this capability is also selected, not a parallel shipment concept of their own."
+    },
+    {
+      "id": "CAP-SHIPPING-RATES",
+      "name": "Shipping Rate Quoting",
+      "module": "shipping",
+      "requires": [
+        "CAP-SHIPPING"
+      ],
+      "description": "Available carrier rates for a shipment are calculated and compared by weight, dimensions, and destination, so staff or an automated policy can select a shipping method by cost or speed. This only answers what a carrier would charge to move a given package; it does not decide what the customer is charged for shipping, is discounted, or is offered as free above a threshold -- that pricing decision belongs to the checkout/pricing layer (see CAP-PROMO-RULES' buy-X-get-Y/threshold scope)."
+    },
+    {
+      "id": "CAP-PICKUP-POINT",
+      "name": "Pickup Point / Convenience Store Delivery",
+      "module": "shipping",
+      "requires": [
+        "CAP-SHIPPING"
+      ],
+      "description": "A customer can choose a convenience store or another predefined pickup location as the delivery destination instead of a self-entered address, while shipment creation and tracking still go through the same shipment record."
+    },
+    {
+      "id": "CAP-3PL",
+      "name": "Outsourced Fulfillment (3PL)",
+      "module": "shipping",
+      "requires": [
+        "CAP-SHIPPING",
+        "CAP-INVENTORY"
+      ],
+      "description": "A third-party logistics provider picks, packs, and ships orders out of its own warehouse on the merchant's behalf, holding the merchant's own stock. Requires CAP-INVENTORY because the merchant still owns and tracks this stock, unlike CAP-DROPSHIP, where the supplier ships its own goods and the merchant never holds the inventory at all."
+    },
+    {
+      "id": "DER-CARRIER-ADAPTER",
+      "name": "Carrier Provider Boundary",
+      "module": "shipping",
+      "requires": [
+        "CAP-SHIPPING"
+      ],
+      "description": "Carrier/logistics provider integration sits behind an owned adapter boundary, not a direct dependency on any single carrier's API, label format, or tracking webhook shape."
     }
   ]
 }
