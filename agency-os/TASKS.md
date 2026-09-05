@@ -347,12 +347,20 @@
 
 - [ ] **【2026-09-05 開出｜critic 覆審 CAP-RETURNS 時抓到的類別風險】System Foundry v1.6：6 個題目在明確答「不要線上付款」時仍悄悄拉進 `CAP-PAYMENTS`**
   - `🟡 未開始` · `2026-09-05` · `可直接做`
-  - **背景**：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 的正門是 `Q-PAY-001`（線上付款）→ `Q-PAY-002`（退款，`active_when` 掛在 `Q-PAY-001=true`）＋ `CONFLICT-REFUND-NO-PAY` 雙重護欄，`Q-PAY-001=false` 時整條退款鏈正確消失。但獨立 critic 在覆審新增的 `CAP-RETURNS`（Returns/RMA，第13個缺口）時機械掃過全部 209 題的 minimal activation，發現 6 題在 `Q-PAY-001≠true` 下仍會經由各自的 `requires` 閉包把 `CAP-PAYMENTS` 拉進 plan：`Q-LOY-004`／`Q-RET-001`／`Q-SUBC-001`／`Q-SUBC-002`／`Q-SUBC-003`／`Q-XB-003`。其中 5 題（除 `Q-RET-001`）是 `d51624f13`（12 模組吸收）留下的既有缺口；`Q-RET-001` 是第 6 個、也是唯一同時拉進 `CAP-REFUNDS` 的。pairwise 測試（`test_selection_matrix.py`）抓不到——它只把成對題設 True，`Q-PAY-001=false` 這種否定組合不在其覆蓋空間內，所以 13 步 verify chain 全綠不代表沒有這個問題。
+  - **背景**：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 的正門是 `Q-PAY-001`（線上付款）→ `Q-PAY-002`（退款，`active_when` 掛在 `Q-PAY-001=true`）＋ `CONFLICT-REFUND-NO-PAY` 雙重護欄，`Q-PAY-001=false` 時整條退款鏈正確消失。但獨立 critic 在覆審新增的 `CAP-RETURNS`（Returns/RMA，第13個缺口）時機械掃過全部 209 題的 minimal activation，發現 6 題在 `Q-PAY-001≠true` 下仍會經由各自的 `requires` 閉包把 `CAP-PAYMENTS` 拉進 plan：`Q-LOY-004`／`Q-RET-001`／`Q-SUBC-001`／`Q-SUBC-002`／`Q-SUBC-003`／`Q-XB-003`。其中 5 題（除 `Q-RET-001`）是 `d51624f13`（12 模組吸收）留下的既有缺口；`Q-RET-001` 是第 6 個、也是唯一同時拉進 `CAP-REFUNDS` 的。pairwise 測試（`test_selection_matrix.py`）抓不到——它只把成對題設 True，`Q-PAY-001=false` 這種否定組合不在其覆蓋空間內，所以 13 步 verify chain 全綠不代表沒有這個問題。**2026-09-06 複查**：新增 Pricing/Promotions 模組（3 個新 capability）後，獨立 critic 重跑同一套掃描（母體改為 212 題），offender 清單仍是同一 6 題，零新增——確認本題新設計（`CAP-PROMOTIONS`/`CAP-PROMO-RULES`/`CAP-CHANNEL-PRICING` 皆不 require `CAP-PAYMENTS`）沒有製造第 7 個實例。
   - **影響**：生成的 blueprint 會替明確答「不做線上付款」的商家配置 payments 模組——屬「宣稱與真實不符」類，不是崩潰或阻斷性錯誤，但違反本系統「照題目回答如實生成」的核心承諾。
   - **禁止的修法**：只改 `Q-RET-001` 一題（單點補丁，治標不治本，AGENTS.md R0 補丁判準明文禁止）。
   - **建議方向（擇一，未拍板）**：① 把 6 題的 `active_when` 全部改成 `{all:[原條件, Q-PAY-001=true]}`（最小改動，但會排除「線下收款仍走這些流程」的真實商家情境，需先確認每題的商業語意是否真的綁定線上付款）② 拆出不依賴 `CAP-PAYMENTS` 的退款/貸記 primitive，讓這 6 個 capability `requires` 它而非直接鏈到 `CAP-PAYMENTS`（較正確但改動面大）③ 若判斷這是可接受的設計（例如「有這些能力的商家事實上一定需要付款基礎設施」），明確在 `capabilities/catalog.json` 的描述與 `V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` 裡揭露這個耦合、不再視為缺陷，並加一條機械檢查防止第 7 個同類題目在未來悄悄新增。
   - **完成定義**：6 題全部處理完（修正或明確接受並文件化+機械防呆），不是只處理 `Q-RET-001`；`scripts/validate_configurator.py` 或新腳本加一條防未來新增第 7 個同類題目的檢查。
   - **證據**：critic 覆審報告（本次 CAP-RETURNS 加入的獨立 critic session，2026-09-05）；`agency-os/WORKLOG.md` 2026-09-05「System Foundry 3 項待決定 ②：Returns/RMA」條目。
+
+- [ ] **【2026-09-06 開出｜critic 覆審 Pricing/Promotions 時抓到的類別風險，跟上一條 CAP-PAYMENTS 繞道問題相關但不同】System Foundry v1.6：多個會影響客戶實付金額的 capability 完全沒 gate 在「向客戶收費」（`Q-COM-001`）上**
+  - `🟡 未開始` · `2026-09-06` · `可直接做`
+  - **背景**：`CAP-PROMOTIONS`（促銷折扣）目前無條件可選——實測 `Q-PROMO-001=True` + `Q-COM-001=False`（明確答「不向客戶收費」）仍被接受，plan 正確產出 `CAP-PROMOTIONS`。獨立 critic 指出這是既有模式的延續而非本次新引入：`CAP-B2B-PRICING`（不同企業客戶議價）與 `CAP-REPRICING`（依競爭對手自動調價）自 `d51624f13` 以來就沒有 `Q-COM-001` 護欄。這跟上面那條「6題繞道 CAP-PAYMENTS」不同：那條是題目意外拉進 `CAP-PAYMENTS` 這個 capability；這條是「會決定客戶實付多少錢」的 capability 群本身沒有跟「這系統到底有沒有跟客戶收費」這個最上位的問題掛勾。
+  - **影響**：跟上一條同類——生成的 blueprint 會替明確答「不向客戶收費」的（例如純內部工具、非營利用途）系統配置定價/促銷模組，屬「宣稱與真實不符」，非阻斷性錯誤。
+  - **禁止的修法**：只 gate `CAP-PROMOTIONS`/`Q-PROMO-001` 一題（單點補丁）。
+  - **完成定義**：先機械掃過全部 capability，列出「描述裡明確主張決定/調整客戶實付金額」的完整清單（目前已知至少 `CAP-PROMOTIONS`／`CAP-CHANNEL-PRICING`／`CAP-B2B-PRICING`／`CAP-REPRICING` 4 個），逐一判斷是否該 gate 在 `Q-COM-001`，一次處理完並加機械檢查防止第 5 個同類未來悄悄新增（可能跟上一條的檢查合併成同一支腳本的兩種模式）。
+  - **證據**：critic 覆審報告（Pricing/Promotions 加入的獨立 critic session，2026-09-06）；`agency-os/WORKLOG.md` 2026-09-06「System Foundry：Pricing/Promotions」條目。
 
 - [ ] **【2026-08-29 開出｜db-expert review 抓到的類別風險】SECURITY DEFINER 函式的 anon/authenticated 洞可能被未來 DROP+CREATE 靜默重開**
   - `🟡 未開始` · `2026-08-29` · `可直接做`

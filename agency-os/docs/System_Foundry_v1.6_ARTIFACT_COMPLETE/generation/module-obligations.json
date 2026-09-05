@@ -822,7 +822,7 @@
       ]
     },
     "loyalty": {
-      "purpose": "Reward repeat customers with points, tiers, referrals, or stored value, independent of one-off promotional discounts.",
+      "purpose": "Reward repeat customers with points, tiers, referrals, or stored value, independent of CAP-PROMOTIONS' one-off discounts and coupons.",
       "invariants": [
         "A customer's points balance and store-credit balance are each a single canonical ledger; no code path adjusts the displayed balance without writing a corresponding ledger entry.",
         "Referral rewards are only granted once the referred customer completes the qualifying action (e.g. first purchase), never at signup alone, to prevent trivial abuse."
@@ -1010,6 +1010,29 @@
       ],
       "recovery": [
         "Identity resolution links and the full consent ledger history are included in backup scope."
+      ]
+    },
+    "promotions": {
+      "purpose": "Apply discounts and conditional promotion rules to a transaction at checkout, and price the same product differently per sales channel or market -- distinct from CAP-CAMPAIGNS, which only tracks a marketing campaign's own budget/schedule/performance rather than changing what a customer pays.",
+      "invariants": [
+        "A promotion or price book adjusts the amount charged at checkout; it never rewrites the product's own recorded base price.",
+        "A coupon code's redemption count and remaining uses are read from a single canonical ledger at the moment of redemption, never from a stale cached count, so the same code cannot be redeemed past its intended limit under concurrent use.",
+        "Channel/market price book resolution is deterministic for a given product, channel, and market combination -- never ambiguous between two applicable price book entries with no defined precedence.",
+        "A promotion or price book is checked against the product's configured margin floor before the discounted price is allowed to apply; a rule that would price below floor is rejected rather than silently applied at a loss.",
+        "When a marketplace/channel-sync capability (e.g. CAP-MARKETPLACE-SYNC, CAP-MULTI-MARKETPLACE) is also selected, the price book is the resolution authority for what a customer is charged; the sync/connector layer only publishes the already-resolved price outward and never writes a competing price back as authoritative."
+      ],
+      "security": [
+        "Coupon code redemption is rate-limited/monitored to detect brute-force code guessing."
+      ],
+      "tests": [
+        "Coupon redemption-limit enforcement is contract-tested for the concurrent-redemption race condition, and price book resolution is contract-tested for the channel+market precedence case.",
+        "Margin-floor rejection is contract-tested for a promotion rule that would price below the configured floor."
+      ],
+      "operations": [
+        "Unusual coupon redemption velocity (possible abuse) is observable and alertable."
+      ],
+      "recovery": [
+        "Promotion, coupon redemption, and price book records are included in backup scope."
       ]
     }
   }

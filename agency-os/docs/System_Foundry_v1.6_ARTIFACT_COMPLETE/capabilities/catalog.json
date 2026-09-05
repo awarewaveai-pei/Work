@@ -1987,6 +1987,34 @@
         "CAP-CUSTOMER-DATA"
       ],
       "description": "The customer's consent status for each marketing channel and purpose is recorded as an auditable history, not just a single current-state flag, to support opt-out and compliance audits."
+    },
+    {
+      "id": "CAP-PROMOTIONS",
+      "name": "Promotions / Coupons",
+      "module": "promotions",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "A discount -- a time-limited sale, a coupon code, or a spend-threshold markdown -- is scoped to specific catalog items and applied against a transaction's total at checkout, reducing the amount owed without altering the item's own base price."
+    },
+    {
+      "id": "CAP-PROMO-RULES",
+      "name": "Conditional Promotion Rules",
+      "module": "promotions",
+      "requires": [
+        "CAP-PROMOTIONS"
+      ],
+      "description": "A promotion can carry conditional logic beyond a flat markdown -- buy-X-get-Y, multi-item bundle pricing, or a spend-threshold trigger -- rather than a single unconditional discount amount."
+    },
+    {
+      "id": "CAP-CHANNEL-PRICING",
+      "name": "Channel / Market Price Books",
+      "module": "promotions",
+      "requires": [
+        "CAP-PRODUCTS"
+      ],
+      "description": "The same product is priced differently depending on the sales channel (e.g. own site vs. a marketplace) or market it sells in, driven by a price book rather than one single price applied everywhere."
     }
   ]
 }

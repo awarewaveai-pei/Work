@@ -17,21 +17,21 @@ Rollback: generation happens in an isolated staging directory and is deleted on 
 Expected result: a selected LEGO is never an empty shell.
 
 ### F-002 — Unselected module leakage required explicit proof
-Evidence: exact absence checks for every unselected module document/path are implemented in `scripts/foundry_generate.py:214-218` and independently rechecked in `scripts/test_selection_matrix.py:80-98`.
+Evidence: exact absence checks for every unselected module document/path are implemented in `scripts/foundry_generate.py:214-218` and independently rechecked in `scripts/test_selection_matrix.py:110-114`.
 
 Fix: output must be an exact projection of the canonical plan.
 
 Expected result: no unnecessary architecture or implementation surface is generated.
 
 ### F-003 — Deferred and current capability states could conflict
-Evidence: rule/dependency fixed-point resolution is `scripts/configurator_engine.py:74-92`; current closure now removes any overlapping deferred state at `scripts/configurator_engine.py:93-94`.
+Evidence: rule/dependency fixed-point resolution is `scripts/configurator_engine.py:74-92`; current closure now removes any overlapping deferred state at `scripts/configurator_engine.py:94-95`.
 
 Fix: CURRENT deterministically wins over DEFERRED when another selected/derived dependency makes the capability necessary now.
 
 Expected result: no capability can be simultaneously “build now” and “future only.”
 
 ### F-004 — Custom requirements could be preserved without a generated work surface
-Evidence: custom requirements receive stable IDs and `ARCHITECTURE_REVIEW_REQUIRED` at `scripts/configurator_engine.py:106-110`; they activate a dedicated `custom` module at `scripts/configurator_engine.py:111-113`. The module is declared at `generation/module-manifests.json:379-386`.
+Evidence: custom requirements receive stable IDs and `ARCHITECTURE_REVIEW_REQUIRED` at `scripts/configurator_engine.py:116-120`; they activate a dedicated `custom` module at `scripts/configurator_engine.py:121-123`. The module is declared at `generation/module-manifests.json:485-492`.
 
 Fix: `+新增其他需求` can no longer disappear into notes. It creates an explicit review extension while still refusing to guess technology.
 
@@ -52,37 +52,37 @@ Expected result: generated project artifacts are tamper/drift detectable.
 ## Multi-angle reverse validation
 
 ### ALL-NO golden
-Evidence: `tests/fixtures/selection/all_no.json:3-24` locks the 18 Foundry baseline capabilities and core-only module result.
+Evidence: `tests/fixtures/selection/all_no.json:3-22` locks the 18 Foundry baseline capabilities and core-only module result.
 
 Expected result: choosing no optional product capability does not remove production engineering baseline and does not generate feature modules.
 
 ### ALL-YES golden
-Evidence: `tests/fixtures/selection/all_yes.json:3-251` locks all 247 current capabilities; `tests/fixtures/selection/all_yes.json:252-297` locks all 44 standard selectable modules. The all-YES assertion is implemented in `scripts/test_selection_matrix.py:127-132`.
+Evidence: `tests/fixtures/selection/all_yes.json:3-254` locks all 250 current capabilities; `tests/fixtures/selection/all_yes.json:255-301` locks all 45 standard selectable modules. The all-YES assertion is implemented in `scripts/test_selection_matrix.py:127-132`.
 
 Expected result: every defined standard capability and standard LEGO module is reachable; all 73 blueprint sections become ACTIVE.
 
 ### Every question individually
-Evidence: `scripts/test_selection_matrix.py:133-139` independently activates every one of the 209 questions with minimum prerequisites and verifies its declared required/deferred effect.
+Evidence: `scripts/test_selection_matrix.py:133-139` independently activates every one of the 212 questions with minimum prerequisites and verifies its declared required/deferred effect.
 
 Expected result: no dead or miswired question.
 
 ### Exhaustive pairwise interactions
-Evidence: `scripts/test_selection_matrix.py:150-160` traverses every pair of 209 questions. Current release result: 21,730 compatible pairs pass and 6 contradictory pairs fail closed, totaling all 21,736 pairs.
+Evidence: `scripts/test_selection_matrix.py:160-170` traverses every pair of 212 questions. Current release result: 22,360 compatible pairs pass and 6 contradictory pairs fail closed, totaling all 22,366 pairs.
 
 Expected result: two-feature interactions cannot silently change module projection or violate plan invariants.
 
 ### Explicit conflict rules
-Evidence: every conflict rule is intentionally constructed and required to fail with the canonical conflict code at `scripts/test_selection_matrix.py:161-169`.
+Evidence: every conflict rule is intentionally constructed and required to fail with the canonical conflict code at `scripts/test_selection_matrix.py:171-179`.
 
 Expected result: contradictions are rejected rather than patched around.
 
 ### Randomized higher-order combinations
-Evidence: 1,000 deterministic randomized configurations are generated at `scripts/test_selection_matrix.py:143-157`, including repeat compilation with reversed answer ordering to prove deterministic output.
+Evidence: 1,000 deterministic randomized configurations are generated at `scripts/test_selection_matrix.py:191-205`, including repeat compilation with reversed answer ordering to prove deterministic output.
 
 Expected result: higher-order interaction defects have an additional property-based detection layer.
 
 ### Exact generation / no leakage
-Evidence: ALL-NO and ALL-YES are physically generated and verified at `scripts/test_selection_matrix.py:158-163`; every module is proven reachable and physically generated at `scripts/test_selection_matrix.py:164-183`.
+Evidence: ALL-NO and ALL-YES are physically generated and verified at `scripts/test_selection_matrix.py:206-211`; every module is proven reachable and physically generated at `scripts/test_selection_matrix.py:212-231`.
 
 Expected result: plan correctness and filesystem/document correctness agree bidirectionally.
 
@@ -92,7 +92,7 @@ Evidence: real local HTTP server startup, token retrieval, POST `/api/generate`,
 Expected result: the real “勾選 -> 送出 -> 生成” transport path works, not only direct Python calls.
 
 ## Static inventory closure
-Evidence: module obligations must exactly equal generation modules at `scripts/validate_artifact_generation.py:8-13`; every capability must be present in its module activation map at `scripts/validate_artifact_generation.py:14-22`; all 73 templates must be covered by the blueprint map at `scripts/validate_artifact_generation.py:23-27`; all 209 questions must have exactly one question rule at `scripts/validate_artifact_generation.py:28-30`.
+Evidence: module obligations must exactly equal generation modules at `scripts/validate_artifact_generation.py:8-13`; every capability must be present in its module activation map at `scripts/validate_artifact_generation.py:14-22`; all 73 templates must be covered by the blueprint map at `scripts/validate_artifact_generation.py:23-27`; all 212 questions must have exactly one question rule at `scripts/validate_artifact_generation.py:28-30`.
 
 ## Release commands
 

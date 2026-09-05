@@ -160,7 +160,7 @@
       "id": "loyalty",
       "order": 23,
       "title": "會員忠誠度與獎勵",
-      "description": "點數、會員等級、推薦獎勵、儲值金等留住回頭客的機制，跟一次性促銷折扣不同。"
+      "description": "點數、會員等級、推薦獎勵、儲值金等留住回頭客的機制，跟「促銷折扣與優惠券」不同：那是當下直接折價的一次性機制，這裡是持續累積的回頭客回饋。"
     },
     {
       "id": "reviews",
@@ -217,50 +217,56 @@
       "description": "辨識不同管道接觸你的其實是同一位客戶，以及正式記錄客戶對各行銷管道的同意狀態，供退出與法規稽核使用。"
     },
     {
-      "id": "mobile_offline",
+      "id": "promotions",
       "order": 33,
+      "title": "定價與促銷",
+      "description": "商品折扣、優惠券與買 X 送 Y 等促銷規則，以及同一商品依通路或市場設定不同價格的價目表，跟「會員忠誠度與獎勵」類別的點數、儲值金等長期回頭客機制不同，這裡是當下直接影響價格或折扣的機制。"
+    },
+    {
+      "id": "mobile_offline",
+      "order": 34,
       "title": "行動與離線",
       "description": "行動裝置、現場作業與離線能力"
     },
     {
       "id": "globalization",
-      "order": 34,
+      "order": 35,
       "title": "多國與在地化",
       "description": "語言、幣別、時區與資料所在地"
     },
     {
       "id": "ai",
-      "order": 35,
+      "order": 36,
       "title": "AI 與自動化",
       "description": "AI 輔助、生成、決策與代理操作"
     },
     {
       "id": "migration",
-      "order": 36,
+      "order": 37,
       "title": "既有系統與資料遷移",
       "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "regulated",
-      "order": 37,
+      "order": 38,
       "title": "特殊資料與產業",
       "description": "會觸發額外治理或法規研究的領域事實"
     },
     {
       "id": "business_impact",
-      "order": 38,
+      "order": 39,
       "title": "營運影響",
       "description": "描述業務本身的運作方式與影響，不是選工程技術"
     },
     {
       "id": "future",
-      "order": 39,
+      "order": 40,
       "title": "未來規劃",
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
       "id": "custom",
-      "order": 40,
+      "order": 41,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -2163,7 +2169,7 @@
       "id": "Q-LOY-001",
       "category": "loyalty",
       "label": "提供會員點數或獎勵機制",
-      "description": "客戶消費或完成特定行為可以累積點數或獲得獎勵，不是純折扣促銷。",
+      "description": "客戶消費或完成特定行為可以累積點數或獲得獎勵，跟「促銷折扣與優惠券」不同：那是當下直接折價，這裡是持續累積的回饋。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -2466,6 +2472,34 @@
         "question": "Q-SCOPE-002",
         "equals": true
       }
+    },
+    {
+      "id": "Q-PROMO-001",
+      "category": "promotions",
+      "label": "促銷折扣與優惠券",
+      "description": "需要規劃並執行限時折扣、優惠券、滿額折抵等促銷活動，系統要能在結帳時計算折扣後金額並記錄每張優惠券的使用情形。跟「行銷」類別的「行銷活動管理」不同：那題管的是活動預算、時程與成效追蹤，這題是實際把價格折下去的機制；跟「會員忠誠度與獎勵」類別的「提供會員點數或獎勵機制」、「提供儲值金或禮品卡」也不同，那些是持續累積的回頭客回饋，這題是當下直接折價。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PROMO-002",
+      "category": "promotions",
+      "label": "買 X 送 Y、組合價與滿額門檻",
+      "description": "折扣規則本身帶有條件式邏輯，例如買兩件送一件、多項商品組成套裝優惠價、消費滿額才享折扣或滿額免運，而不是單一固定金額或百分比的折抵。只在你有勾選「促銷折扣與優惠券」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PROMO-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-PROMO-003",
+      "category": "promotions",
+      "label": "同一商品在不同通路或市場賣不同價格",
+      "description": "同一項商品依銷售通路（例如自有官網 vs. 電商平台）或依市場（例如不同國家）預先設定不同價格，是一份價目表本身的設定。跟「企業客戶與批發」類別的「不同企業客戶有不同的協議價格」不同：那題是針對個別客戶談出來的價格，這題是依通路/市場整批設定的價目表；跟「多平台市集營運」類別的「需要依競爭對手價格自動調整售價」也不同：那題是依競爭對手動態自動調整，這題是主動預先規劃、不隨競爭對手變動的定價。",
+      "answer_type": "boolean",
+      "required_when_active": true
     }
   ]
 }

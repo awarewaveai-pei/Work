@@ -2092,6 +2092,36 @@
       "require": [
         "CAP-CONSENT-LEDGER"
       ]
+    },
+    {
+      "id": "RULE-Q-PROMO-001",
+      "when": {
+        "question": "Q-PROMO-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-PROMOTIONS"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROMO-002",
+      "when": {
+        "question": "Q-PROMO-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-PROMO-RULES"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROMO-003",
+      "when": {
+        "question": "Q-PROMO-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-CHANNEL-PRICING"
+      ]
     }
   ]
 }

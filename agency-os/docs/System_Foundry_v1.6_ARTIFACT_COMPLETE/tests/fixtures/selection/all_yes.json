@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 205,
+  "active_answer_count": 208,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-3WAY-MATCH",
@@ -35,6 +35,7 @@
     "CAP-CALL-CENTER",
     "CAP-CAMERA",
     "CAP-CAMPAIGNS",
+    "CAP-CHANNEL-PRICING",
     "CAP-CLI",
     "CAP-CLICK-COLLECT",
     "CAP-COEXISTENCE",
@@ -144,6 +145,8 @@
     "CAP-PRODUCT-PASSPORT",
     "CAP-PRODUCTS",
     "CAP-PROJECTS",
+    "CAP-PROMO-RULES",
+    "CAP-PROMOTIONS",
     "CAP-PUBLIC-API",
     "CAP-PUBLIC-PAGES",
     "CAP-PUSH",
@@ -283,6 +286,7 @@
     "portals",
     "pos",
     "procurement",
+    "promotions",
     "reliability",
     "returns",
     "reviews",

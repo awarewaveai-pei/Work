@@ -650,6 +650,18 @@
         "CAP-CONSENT-LEDGER",
         "CAP-IDENTITY-RESOLUTION"
       ]
+    },
+    {
+      "id": "promotions",
+      "paths": [
+        "packages/promotions",
+        "tests/contract/promotions"
+      ],
+      "activated_by": [
+        "CAP-CHANNEL-PRICING",
+        "CAP-PROMO-RULES",
+        "CAP-PROMOTIONS"
+      ]
     }
   ]
 }

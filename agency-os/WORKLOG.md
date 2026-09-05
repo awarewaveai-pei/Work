@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-06（System Foundry：正式逐節比對藍圖 8 個候選缺口，確認 5 個真缺口，第一個 Pricing/Promotions 落地）
+
+[根因/決策] 前一輪（②Returns/RMA）critic 覆審後，操作者質疑「藍圖資料夾裡提到的架構都整合了嗎」——查證後回報僅 13 個缺口有正式比對過，另外用關鍵字 grep 找到 8 個候選但未逐節查證。操作者指出：藍圖是「要建置的系統內容」，缺口代表 System Foundry 產生的系統架構會比預想的單薄，要求正式逐節比對＋確認的真缺口全部照 Returns/RMA 同等流程做掉（非本次一次做完，逐一序列化執行避免像 `d51624f13` 一次塞43個capability又漏依賴邊）。
+
+[查證] 派 planner agent 逐一讀完 8 個候選章節全文（非關鍵字掃描）+ 全部 250 capability/212 題描述交叉核對。結論：**5 個真缺口**（Pricing/Promotions、Payments 的 Fraud/Risk 半邊、Logistics/Fulfillment、PLM/Quality、Search 的 Merchandising 半邊）、**2 個已覆蓋**（Finance/Treasury → `Q-SR-007`；Work Management/Approvals → 5個既有capability）、**1 個排除**（Experimentation/Feature Flags，工程基礎設施，業務半邊已有 `CAP-AB-TESTING`）。額外發現第9個候選（Inventory/WMS 多倉庫/庫存保留），比對強度較弱需再深讀，本輪不處理，另待後續。每個真缺口附完整可實作設計（capability id、依賴邊、題目草稿），並吸取 Returns/RMA 教訓（例如 Fraud 的退款爭議題目改 gate 在 `Q-PAY-001` 而非 `Q-COM-001`，避免變成 TASKS.md 既有那條「6題繞道CAP-PAYMENTS」問題的第7個實例）。
+
+[執行：Pricing/Promotions（5個真缺口的第1個）] 委派 fullstack-engineer agent 實作 `CAP-PROMOTIONS`（requires `[CAP-ORDERS,CAP-PRODUCTS]`）／`CAP-PROMO-RULES`（requires `[CAP-PROMOTIONS]`）／`CAP-CHANNEL-PRICING`（requires `[CAP-PRODUCTS]` only）＋3題（`Q-PROMO-002` gate 在 `Q-PROMO-001`）＋修復題庫裡3處指向「促銷折扣」這個當時不存在概念的懸空引用（改指真實題目標籤）→ 獨立 critic 全新覆審：**requires 邊正確、無重複能力、fixture 皆真實 resolve() 重生、13步verify chain+29 unittest全綠、`CAP-PAYMENTS` 不可達（既有6題繞道清單掃描212題後仍是同一6題、零新增）、bug hunt 零殘留**。verdict SHIP WITH MINOR FIXES，抓到7項發現，處理如下：
+
+- **已修**：① 藍圖第41節9個Public Capabilities中「免運門檻」「margin floor」原本沒對應，已補：`Q-PROMO-002` 描述加入「滿額免運」範例（歸入既有 `CAP-PROMO-RULES`，非新增capability）；`promotions` module-obligations 新增 margin-floor 拒絕的 invariant+test 條目。② `CHANGELOG_v1.6.md` 模組清單卡在12個模組舊數字（連 Returns 都沒列），已更新為14個模組+47 capabilities+47 questions。③ `V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` 內 9 處 `scripts/test_selection_matrix.py`／`configurator_engine.py`／`module-manifests.json` 的 file:line 引用早已過期（部分是這次改動前就漂移，部分是這次改動本身造成的第2次同類drift），逐一比對真實檔案內容後全部修正。④ 新增跨模組 price 權威 invariant（藍圖已有答案：price book 決定實付、connector 只負責發布不寫回）到 promotions obligations。
+- **登記不單點補丁**：⑤「Q-PROMO-002 gate 精確度」的引用聲稱「零例外」經 critic 查證是過度宣稱（87個反例，但真正成立的不變量——「無 gate 的題目描述絕不宣稱前提」——確實零反例），屬文字精確度非設計錯誤，本輪不動程式僅認知修正。⑥ `CAP-PROMOTIONS` 等4個影響客戶實付金額的capability完全沒 gate 在 `Q-COM-001`（向客戶收費）——這是既有模式延續（`CAP-B2B-PRICING`/`CAP-REPRICING` 從 `d51624f13` 起就沒這個護欄），非本次新引入，已在 `agency-os/TASKS.md` §D 新增一條待辦（跟既有「6題繞道CAP-PAYMENTS」條目相關但不同：那條是意外拉進特定capability，這條是「決定客戶付多少錢」的capability群沒掛最上位的收費問題）。⑦ `validate_configurator.py` 的 `勾選「X」` 護欄看不到 `跟「X」不同` 這種措辭的交叉引用（本次新增12處這類未受保護的引用）——風險評估後判斷「擴大護欄涵蓋全部97+處既有引用」是獨立的系統性工程（需先審過全部既有引用避免大量假陽性），非本次改動範圍內能安全完成，暫不動，留給下次維護週期。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=13步verify chain（含`validate_doc_numbers`第13步）+`python -m unittest discover -s tests`（critic獨立重跑一次，我修正7項發現後自己再跑一次）| exit=0（每一步、兩輪皆是）| result=最終 `questions=212 capabilities=250 modules=46 standard_modules=45 pairwise_valid=22360 pairwise_rejected=6(不變) pairwise_total=22366`；`Ran 29 tests...OK`；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic獨立跑 `resolve()` 4種情境（Q-PROMO-001單獨/Q-PROMO-002 minimal/raw-API繞過gate/Q-PROMO-003單獨）| exit=各異 | result=全部符合預期：`CAP-PROMOTIONS`正確resolve且`CAP-PROMO-RULES`不會意外跟著出現；raw-API繞過被`active_when`擋下（"inactive question cannot be YES"）；`CAP-CHANNEL-PRICING`確認只依賴`CAP-PRODUCTS`（`CAP-ORDERS`不出现，證明依賴邊方向正確非雙向）
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic獨立跑真實HTTP server（`serve_configurator.py`，ephemeral port + 明確`--output-root`避免污染repo）`/api/generate` | exit=200 | result=`docs/modules/promotions/MODULE_MANIFEST.json`等全部產物正確落地；all-false情境正確不產出
+- REVIEW_DONE: critic=Standard（全新獨立subagent，從diff本身重新驗證）| verdict=SHIP WITH MINOR FIXES→4項Medium全修、3項Low/Nit登記不補丁 | findings=0c/0m（收尾時）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-PROMOTIONS\|CAP-PROMO-RULES\|CAP-CHANNEL-PRICING\|Q-PROMO-00[1-9]` | hits=每個id僅在歸屬檔各出現一次，零重複零半寫引用；category重新編號1-41連續無跳號無重複
+
+[剩餘風險] `agency-os/TASKS.md` §D 新增條目（4個capability缺Q-COM-001 gate）待排入；`validate_configurator.py` 護欄範圍擴大（涵蓋`跟「X」不同`措辭）待下次維護週期系統性處理；第9候選 Inventory/WMS 多倉庫待深讀確認；剩餘4個真缺口（Fraud/Risk、Logistics/Shipping、PLM/Quality、Merchandising）尚未落地，序列化逐一進行中。
+
 ## 2026-09-06（同日第三輪：新增 `mutation-check-node-gates.ps1`，補上兩輪 commit 累積的 Node-level gate mutation 覆蓋缺口，12/12 全殺）
 
 **觸發**：操作者「繼續做 直到完美完成 HCI 系統」延續授權；優先處理已在 TASKS.md 累積兩輪的小額技術債（`mutation-check-wave1.ps1` 對 Node-level gate 零覆蓋），而非直接跳下一個大型規格（`HCI_CONFIDENCE_SPEC.md`）——小額債務先清，避免累積到第三次才處理，同時保持每個 commit 完整閉環。
