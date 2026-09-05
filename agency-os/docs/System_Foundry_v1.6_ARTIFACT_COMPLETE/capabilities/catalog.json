@@ -397,7 +397,7 @@
     {
       "id": "CAP-RECEIPT-OCR",
       "name": "Receipt / Invoice OCR Intake",
-      "module": "ai",
+      "module": "payments",
       "requires": [
         "CAP-AI",
         "CAP-FINANCIAL-RECORDS"
@@ -1367,6 +1367,16 @@
       "description": "客戶可在網站/App 裡即時打字跟客服對話。"
     },
     {
+      "id": "CAP-AI-FIRST-CHAT",
+      "name": "AI 優先即時客服",
+      "module": "customer_service",
+      "requires": [
+        "CAP-AI",
+        "CAP-LIVE-CHAT"
+      ],
+      "description": "即時客服預設由 AI 自動回覆，客戶主動要求或問題超出 AI 能力時才轉真人或信件。"
+    },
+    {
       "id": "CAP-KNOWLEDGE-BASE",
       "name": "知識庫／常見問題自助查詢",
       "module": "customer_service",
@@ -1393,6 +1403,16 @@
       "module": "customer_service",
       "requires": [],
       "description": "透過電話或客服中心系統（自動撥號、通話錄音）處理客戶問題。"
+    },
+    {
+      "id": "CAP-AI-VOICE-SUPPORT",
+      "name": "AI 語音客服",
+      "module": "customer_service",
+      "requires": [
+        "CAP-AI-VOICE",
+        "CAP-CALL-CENTER"
+      ],
+      "description": "電話或客服中心來電預設由 AI 語音客服自動應答與處理，客戶要求或問題超出 AI 能力時才轉真人。"
     },
     {
       "id": "CAP-SALES-PIPELINE",
@@ -1519,6 +1539,16 @@
       "module": "procurement",
       "requires": [],
       "description": "員工提出採購需求並經核准流程。"
+    },
+    {
+      "id": "CAP-3WAY-MATCH",
+      "name": "採購單三方核對",
+      "module": "procurement",
+      "requires": [
+        "CAP-PROCUREMENT",
+        "CAP-RECEIPT-OCR"
+      ],
+      "description": "OCR 辨識出的收據/發票自動跟原始採購單比對廠商、金額與品項，兜不起來時提出警示，而非各自獨立記錄。"
     },
     {
       "id": "CAP-VENDOR-MGMT",

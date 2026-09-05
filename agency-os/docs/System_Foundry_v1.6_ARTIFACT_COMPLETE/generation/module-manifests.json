@@ -229,6 +229,7 @@
         "CAP-INVOICES",
         "CAP-PARTIAL-REFUND",
         "CAP-PAYMENTS",
+        "CAP-RECEIPT-OCR",
         "CAP-REFUNDS",
         "CAP-SAVED-PAYMENT",
         "CAP-TAX",
@@ -308,7 +309,6 @@
         "CAP-AI-VOICE",
         "CAP-AI-WRITE",
         "CAP-MULTI-AGENT",
-        "CAP-RECEIPT-OCR",
         "DER-AI-AUDIT",
         "DER-AI-AUTHORITY",
         "DER-AI-HUMAN",
@@ -404,6 +404,8 @@
         "tests/contract/customer-service"
       ],
       "activated_by": [
+        "CAP-AI-FIRST-CHAT",
+        "CAP-AI-VOICE-SUPPORT",
         "CAP-CALL-CENTER",
         "CAP-CSAT",
         "CAP-KNOWLEDGE-BASE",
@@ -448,6 +450,7 @@
         "tests/contract/procurement"
       ],
       "activated_by": [
+        "CAP-3WAY-MATCH",
         "CAP-CONTRACT-RENEWAL",
         "CAP-PROCUREMENT",
         "CAP-VENDOR-MGMT"

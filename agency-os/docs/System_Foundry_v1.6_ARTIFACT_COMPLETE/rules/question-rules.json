@@ -1002,9 +1002,9 @@
       ]
     },
     {
-      "id": "RULE-Q-AI-011",
+      "id": "RULE-Q-PAY-009",
       "when": {
-        "question": "Q-AI-011",
+        "question": "Q-PAY-009",
         "equals": true
       },
       "require": [
@@ -1621,6 +1621,36 @@
       },
       "require": [
         "CAP-CONTRACT-RENEWAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROC-004",
+      "when": {
+        "question": "Q-PROC-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-3WAY-MATCH"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-007",
+      "when": {
+        "question": "Q-CS-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-FIRST-CHAT"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-008",
+      "when": {
+        "question": "Q-CS-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-VOICE-SUPPORT"
       ]
     }
   ]

@@ -284,7 +284,7 @@
       "id": "Q-ID-003",
       "category": "identity",
       "label": "不同使用者角色",
-      "description": "系統裡不同的人有不同的權限（例如一般使用者 vs 管理員），而不是所有登入者權限都一樣。",
+      "description": "系統裡不同的人有不同的權限（例如一般使用者 vs 管理員），而不是所有登入者權限都一樣。這題處理的是「同一套系統內用權限區分看得到/改得了什麼」；如果你要的是員工後台跟客戶前台是兩個完全分開的介面（客戶連後台網址都進不去，不是進得去但選單被隱藏），那是「對外入口」類別的「客戶自助入口」在處理，兩者通常會一起做（分開的入口內部往往還是需要角色權限）。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1170,10 +1170,10 @@
       "required_when_active": true
     },
     {
-      "id": "Q-AI-011",
-      "category": "ai",
+      "id": "Q-PAY-009",
+      "category": "payments",
       "label": "收據/發票拍照辨識記帳",
-      "description": "使用者可以直接拍照或掃描收據、發票，系統自動用 OCR/AI 辨識出廠商、日期、金額、品項等資訊，整理成待確認的記帳草稿，不需要人工一筆一筆手動輸入。辨識結果需要人工確認過才會正式入帳，避免辨識錯誤直接影響財務數字。只在你有勾選「會計/財務紀錄」時才有意義。",
+      "description": "使用者可以直接拍照或掃描收據、發票，系統自動用 OCR/AI 辨識出廠商、日期、金額、品項等資訊，整理成待確認的記帳草稿，不需要人工一筆一筆手動輸入。辨識結果需要人工確認過才會正式入帳，避免辨識錯誤直接影響財務數字。歸在帳務類是因為這是記帳流程的一部分，AI/OCR 只是實作方式。只在你有勾選「會計/財務紀錄」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -1855,6 +1855,50 @@
             "equals": true
           }
         ]
+      }
+    },
+    {
+      "id": "Q-PROC-004",
+      "category": "procurement",
+      "label": "收據與採購單自動核對",
+      "description": "拍照辨識出來的收據/發票金額與品項，自動跟原始採購單比對，確保進貨與請款金額一致，兜不起來時要有警示，而不是各自獨立記錄、互不比對。只在你同時有「採購申請與簽核」和「收據/發票拍照辨識記帳」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "all": [
+          {
+            "question": "Q-PROC-001",
+            "equals": true
+          },
+          {
+            "question": "Q-PAY-009",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-CS-007",
+      "category": "customer_service",
+      "label": "即時客服優先由 AI 回覆",
+      "description": "客戶傳訊息時先由 AI 自動回覆，不用每次都等真人上線；客戶主動要求轉真人，或問題超出 AI 能力時，才轉真人客服或改用信件處理。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CS-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-CS-008",
+      "category": "customer_service",
+      "label": "電話／客服中心優先由 AI 語音客服處理",
+      "description": "客戶來電或使用客服中心時，先由 AI 語音客服自動應答與處理；客戶要求，或問題超出 AI 能力時，才轉真人客服。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CS-006",
+        "equals": true
       }
     }
   ]

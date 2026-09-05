@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 續：操作者實測配置器介面回報 6 項問題，逐項查證與修復——1 個文件澄清、1 個分類搬移、3 個新 capability/question、1 個確認非 bug）
+
+**觸發**：操作者實際點過配置器介面後回報 6 項具體問題（非泛泛而談）：①「03 帳號與成員」沒有明確區分後台員工與前台客戶操作 ②07/09 三題（財務分析、應收帳款帳齡、銀行對帳單比對）點不了 ③11 類即時客服希望先 AI 後真人 ④希望電話/App 客服加 AI 語音客服 ⑤22 類收據OCR記帳的分類位置跟採購單整合疑問。逐項查證後 5 項是真缺口，1 項確認是既有設計（gate 邏輯正確，非 bug）。
+
+**逐項處理**：
+1. **Q-ID-003（不同使用者角色）描述澄清**：查證後發現系統設計上這是兩件事——`Q-ID-003` 處理「同一套系統內用權限區分看得到/改得了什麼」，「後台/前台是完全分開的兩個入口」是另一個既有機制（17. 對外入口類別的「客戶自助入口」`Q-PORT-002`），但兩者間沒有互相提示，容易讓人以為系統把兩種情境混在一起。已修：`Q-ID-003` 描述補上跨類別提示，比照本檔既有的「跟另一題的關係」寫法慣例。
+2. **07/09 三題「不能選」**：查證 `Q-SR-007`（財務分析）／`Q-PAY-007`（應收帳款）／`Q-PAY-008`（銀行對帳單）的 `active_when`，三題都設計為必須先勾選「會計/財務紀錄」（`Q-DATA-009`）才會啟用——這是題目描述裡本來就寫明的前提（「只在你有勾選『會計/財務紀錄』時才有意義」），UI 上未選取前置答案時卡片會顯示「由前置答案自動停用」。**確認非 bug，維持原樣**。
+3. **收據OCR記帳分類搬移**：`Q-AI-011`／`CAP-RECEIPT-OCR` 原本歸類在「22. AI 與自動化」，操作者指出這其實是記帳流程的一環、AI/OCR 只是實作方式——查證後同意，且與此案例平行的 `CAP-AR-AGING`／`CAP-BANK-RECONCILIATION`（同樣是「AI/自動化色彩的財務能力」）本來就歸在 `payments` 而非 `ai`，搬過去才符合既有慣例。**已修**：`Q-AI-011`→`Q-PAY-009`，`category`／`CAP-RECEIPT-OCR.module` 均從 `ai`→`payments`，`generation/module-manifests.json` 兩邊 `activated_by` 同步搬動。
+4. **採購單三方核對（回應「要跟採購單整合？」）**：新增 `Q-PROC-004`（收據與採購單自動核對），`active_when` 同時要求「採購申請與簽核」`Q-PROC-001` 與收據OCR `Q-PAY-009` 皆為真才出現（用既有 `active_when` 的 `all` 語法直接表達，不需要擴充 `derivation-rules.json` 引擎本身只支援單一觸發 capability 的限制）；新增 `CAP-3WAY-MATCH`（module=procurement，requires=[`CAP-PROCUREMENT`,`CAP-RECEIPT-OCR`]）。
+5. **AI-first 客服（回應「先AI後真人」與「加AI語音客服」）**：新增 `Q-CS-007`（即時客服優先由 AI 回覆，掛 `Q-CS-002`）→`CAP-AI-FIRST-CHAT`（requires=[`CAP-AI`,`CAP-LIVE-CHAT`]）；新增 `Q-CS-008`（電話／客服中心優先由 AI 語音客服處理，掛 `Q-CS-006`）→`CAP-AI-VOICE-SUPPORT`（requires=[`CAP-AI-VOICE`,`CAP-CALL-CENTER`]）。兩者皆為「預設 AI、客戶要求或超出能力才轉真人」的模式，語意上是既有對應人工管道能力的加值層，而非取代。
+
+**[已修改]**：
+- `questionnaires/catalog.json`：`Q-ID-003` 描述澄清；`Q-AI-011`→`Q-PAY-009`（含 category 搬移＋描述補充）；新增 `Q-PROC-004`／`Q-CS-007`／`Q-CS-008`（165 題）
+- `capabilities/catalog.json`：`CAP-RECEIPT-OCR.module` `ai`→`payments`；新增 `CAP-3WAY-MATCH`／`CAP-AI-FIRST-CHAT`／`CAP-AI-VOICE-SUPPORT`（203 個）
+- `rules/question-rules.json`：`RULE-Q-AI-011`→`RULE-Q-PAY-009`；新增 `RULE-Q-PROC-004`／`RULE-Q-CS-007`／`RULE-Q-CS-008`
+- `generation/module-manifests.json`：`ai`/`payments` 兩模組的 `activated_by` 搬動 `CAP-RECEIPT-OCR`；`procurement`/`customer_service` 新增三個新 capability 的 `activated_by`
+- `tests/fixtures/selection/all_yes.json`：改用 `resolve()` 實際輸出直接重寫（非手算），`active_answer_count` 158→161，capabilities 200→203
+- `README.md`／`QUALITY_STRENGTH_MATRIX.md`／`CHANGELOG_v1.6.md`／`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md`：題數/capability數/pairwise數與行號引用更新（162→165／200→203／13,041→13,530）——**這是本 session 第三次手動更新這些數字**，累積證據支持之前已登記的「應改治本方案」殘留風險
+- `manifest.json`：`regenerate_integrity.py --write` 重算雜湊
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_foundry.py`＋`test_selection_matrix.py`＋`python -m unittest discover -s tests`＋`validate_manifest.py`（12 步 verify chain）| exit=0（每一步）| result=`SELECTION MATRIX: PASS questions=165 single=165 pairwise_valid=13524 pairwise_rejected=6 random=1000 modules=32 blueprints=73 all_yes_caps=203`；29 unittest 全綠；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash+Browser | cmd=`preview_start` 開真實瀏覽器，透過 `answers` 物件直接設定 8 個相關題目為 true（`Q-DATA-009`/`Q-PAY-009`/`Q-PROC-001`/`Q-PROC-004`/`Q-CS-002`/`Q-CS-007`/`Q-CS-006`/`Q-CS-008`）後呼叫真實 `preview()`/`generate()` | exit=0 | result=`/api/resolve` 回傳含全部 4 個新/搬移 capability 且 `traceability` 正確對應各自 `RULE-*`；`/api/generate` 落地的 `docs/modules/{payments,procurement,customer_service}/MODULE_MANIFEST.json` 讀回確認 `activated_capabilities` 正確分佈在三個模組；新頁面重新整理後 `find` 確認 `Q-CS-007`／`Q-PROC-004` 卡片文字正確渲染；測試資料夾 `generated/gap-fix-test` 已清除
+- BUGHUNT_DONE: scope=agency-os（System_Foundry_v1.6_ARTIFACT_COMPLETE 全樹）| grep=`\b162\b\|\b200\b\|13,041\|13041\|13,035\|13035\|2\^162`（改動前）| hits=改動前僅本套件 4 份文件（已修正）+ 操作者剛加入的兩份無關文件（`Composable AI Commerce OS*.md`，數字純屬巧合，非本套件引用）+ `test_artifact_generation.py`/`serve_configurator.py` 的無關命中（歷史註解／HTTP status code，非計數宣稱）
+
+**[剩餘風險]**：文件數字第三次手動更新——如果再發生第四次，應該照 critic 建議把這幾個數字改成從 `test_selection_matrix.py` 的 PASS 輸出行讀取，而不是繼續手改。操作者剛提供的國際電商藍圖（`Composable AI Commerce OS.md`）尚未評估是否要吸收進本套件，範圍決策待操作者確認。
+
+**[rollback]**：`git revert` 本次 commit 即可完整還原；`manifest.json` 雜湊隨 revert 自動對齊。
+
 ## 2026-09-05（續，soulful 監控查證後續：跨系統監控總覽文件 + 三項掃描/攻擊探針逐一查證）
 
 **觸發**：操作者對前一輪 soulful 流量查證結果回「要!」（建跨系統監控總覽）+「還要去查」GPTBot、Ultimate Member 外掛版本掃描、俄羅斯 install.php 探針三項。
