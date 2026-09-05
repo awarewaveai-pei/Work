@@ -1012,6 +1012,54 @@ tier_1:
       behind it is the richest. Tier 1, mandated by the actively-running
       implementation slice, same category as the twenty-seven entries
       above it.
+  twentyninth_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-ninth Tier 1 entry, same
+    # additive-key rationale as the twenty-eight entries above it.
+    method_id: "devops_sre.capacity_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SIXTH entry
+      from the `devops_sre` family (F19), after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, and devops_sre.error_budget.
+      Atlas's own F19 tool table row (L852: "workload→growth→resource
+      coefficients→headroom", benefit "防容量事故與過度採購" -- prevent
+      BOTH capacity incidents AND over-provisioning) grounds a genuine
+      three-way classification (insufficient/healthy/over_provisioned),
+      not a single pass/fail bit, directly reflecting the benefit
+      column's own two-sided framing. `projected_workload`/
+      `required_resources`/`headroom_ratio` are genuine compute
+      (`ai_lego.compute.capacity_model.projection`), the eighth reuse
+      of `evaluate_statistical_gate` this session. A critic review of
+      this contract's own first draft caught 2 Critical findings: (1)
+      the independent gate re-derived the four COMPUTED fields but
+      never re-validated the two THRESHOLD fields the builder itself
+      requires (finite, low < high) -- a record hand-tampered to
+      reverse or infinitize its own thresholds passed every gate and
+      the schema, in one case making `status:healthy` mathematically
+      unreachable regardless of real headroom; (2) the same missing
+      finiteness check let `±inf` thresholds through the SANCTIONED
+      public builder with zero tampering, certifying a resource at a
+      fraction of a percent of its required capacity as `healthy` and
+      producing non-RFC8259 `Infinity` JSON on persistence. Both fixed
+      with one shared `_thresholds_are_valid` predicate called by BOTH
+      the builder and the gate. Also fixed: missing isinstance guards
+      that let non-numeric input escape as raw TypeError/AttributeError
+      instead of failing closed (the same class two immediately-prior
+      slices had already fixed elsewhere in this package); an uncaught
+      `decimal.Overflow` for a large-but-schema-legal `periods_ahead`;
+      and an overstated Decimal-precision claim in this contract's own
+      first draft that contradicted the compute module's own honest
+      disclosure. See the contract's own compilation_decisions and
+      open_questions for full accounting.
+    source: "methods/contracts/devops_sre.capacity_model.contract.yaml (built same session as this entry, mints machine_id devops_sre.capacity_model) + specs/cognitive/typed-objects/capacity-model-record.schema.yaml (new output type) + ai_lego/compute/capacity_model/projection.py (new compute module)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method one
+      definitional table-row citation plus one prose cross-reference
+      (§12.41 L3109), thinner than several Tier 0 examples. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the twenty-eight entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

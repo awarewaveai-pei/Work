@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-05（續44，同一 session：Cognitive OS 第三十一個 Method Atlas 切片 — `devops_sre.capacity_model`，2 個 Critical 同出一個共同缺口：gate 只重驗算出的欄位，沒重驗 threshold 本身）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。
+
+**選型**：`devops_sre` 家族第六成員。Atlas F19 table 自己的 Capacity Model 列（L852「workload→growth→resource coefficients→headroom」，效益「防容量事故與過度採購」——雙向關切，不只防不足）。真三態分類（insufficient/healthy/over_provisioned）直接對應效益欄雙向文字，非單一 pass/fail。`status` 完全由計算導出，builder 公開介面連讓呼叫端「嘗試」造假 status 的參數都沒有——跟 `backup_restore_drill`/`reconciliation` 自己允許的單向 override 不同類。
+
+**critic 真跑（含真實突變矩陣+6000 筆隨機模糊測試）抓到 2 個 Critical，同出一個共同缺口：gate 只重算 builder 算出來的四個欄位，卻從沒重驗 builder 自己要求的兩個門檻欄位本身**：
+1. **Critical**：一筆記錄被竄改成對調 `low_threshold_ratio`/`high_threshold_ratio` 後，三個 gate 跟 schema 全部通過——critic 實測其中一種情境讓 `status:healthy` 從此在數學上不可能達成（無論真實餘量多少），靜默廢掉 Atlas 效益欄「防過度採購」那一半。
+2. **Critical**：`±inf` 門檻透過**正常公開 builder 介面、零竄改**就能直達計算層（真實可觸發路徑：YAML 原生把 `-.inf`/`.inf` 解析成浮點無限大，設定檔打錯一個字就中）。critic 重現一個真實供給量只有需求 0.03% 的資源被每一層都認證為 `healthy`，且該記錄序列化成不符 RFC 8259 的 `Infinity` JSON。
+兩者同一修法：新增共用 predicate `_thresholds_are_valid`（isinstance+`math.isfinite`+嚴格排序），builder 跟 gate 兩處都呼叫——跟 `expand_contract_migration` 自己模組 docstring 早就承諾的「builder 要求的每個前置條件，gate 都要重驗」同一條紀律，這次補上「不只重驗算出的輸出，也要重驗 builder 自己吃的原始輸入」這一半。
+
+另修 3 個 Major：① 缺 isinstance 守衛讓非數值輸入（`resource_name` 傳 int、`current_workload` 傳字串）直接讓 `AttributeError`/`TypeError` 逸出而非 fail-closed——跟前兩個切片已修過的同一類 bug，改用同款 `_is_nonempty_str`/`_is_real_number` 守衛；② `periods_ahead` 過大時 `decimal.Overflow` 未被捕捉（指數運算寫在 try block 外面）——移進 try block 並擴大 except 範圍，兩個 compute 函式都加輸出端有限性檢查；③ contract 自己宣稱的 Decimal 精度保證誇大，跟 compute 模組自己 docstring 誠實揭露的範圍矛盾——已修正對齊。另一個 Major：contract 宣稱已在 contract-backlog 註冊但沒有——已補上；一個由真突變證明的弱測試：`healthy` 分類只測了 low 邊界，high 邊界的 `>`→`>=` 突變全套測試沒抓到——補上鏡射測試。
+
+**本輪教訓**：重算 builder 輸出的每個欄位是必要條件，不是充分條件——gate 還必須重驗 builder 對「原始輸入」本身要求的每個前置條件，否則一筆記錄可以在「所有算出的欄位個別看都正確」的情況下，靠汙染輸入本身的合法性基礎而通過驗證。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.capacity_model.contract.yaml`（含修正後的 Decimal 揭露+新增 §12.41 CPM 引用+OQ-1~3）＋`specs/cognitive/typed-objects/capacity-model-record.schema.yaml`＋`contract-backlog.yaml` 新增 `tier_1.twentyninth_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/capacity_model/projection.py`（純算術，含誠實揭露 Decimal 保護範圍的 docstring）＋`ai_lego/modules/devops_sre/capacity_model.py`（builder+3 gate，共用 threshold 驗證 predicate）＋`ai_lego/apps/cli/run_capacity_model_slice.py`＋`tests/unit/test_capacity_model.py`（57 tests）＋`docs/THIRTYFIRST_SLICE_DEVOPS_SRE_CAPACITY_MODEL.md`。順手修正 `modules/devops_sre/__init__.py` docstring 補齊本切片成員。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2777→2780
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_capacity_model_slice`（修正後）| exit=0 | result=`PASS devops_sre.capacity_model: headroom_ratio=0.2914, status=healthy, gates [provenance_required=PASS, genuine_compute=PASS, capacity_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_capacity_model -v` | exit=0 | result=57 passed（40→57，含門檻對調/無限大/NaN 三類迴歸兩層皆驗、decimal.Overflow 迴歸、high 邊界迴歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=74486 | result=**817 tests OK**（800→817，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，含真突變矩陣+6000 筆隨機模糊測試）| verdict=fail(2 Critical, 3 Major)→fixed | findings=2c/3m/多個 Minor（全數修正）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]capacity_model\|CapacityModelRecord\|CAPACITYMODEL_` | hits=0（僅本切片自己新檔案，跨全部必查根目錄零過期殘留）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-CAPACITYMODEL-1`（無機器 id 列）、`OQ-CAPACITYMODEL-2`（Load Test/Stress Test 未建，無法提供實測 resource_coefficient 軟連結）、`OQ-CAPACITYMODEL-3`（Critical Path Method 未建，雙向交叉引用未接線）。皆非阻塞，已揭露非靜默缺口。
+
 ## 2026-09-05（續43，同一 session：Cognitive OS 第三十個 Method Atlas 切片 — `database_data.expand_contract_migration`，1 個 Critical + 3 個 Major 是上一切片已修過的同款 bug 原樣重現）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。

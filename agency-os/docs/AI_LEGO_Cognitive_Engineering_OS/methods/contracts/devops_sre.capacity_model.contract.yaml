@@ -1,0 +1,238 @@
+$id: "ai-lego://methods/contracts/devops_sre.capacity_model.contract.yaml"
+title: "Capacity Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-first Method Atlas slice, SIXTH from the
+  `devops_sre` family (F19), after `devops_sre.sli_slo` (twentieth),
+  `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third), and
+  `devops_sre.error_budget` (twenty-fourth).
+
+  Atlas gives this method ONE definitional citation -- the F19 tool
+  table's own Capacity Model row (L852: "workload→growth→resource
+  coefficients→headroom", benefit "防容量事故與過度採購" -- prevent both
+  capacity incidents AND over-provisioning) -- PLUS one prose
+  cross-reference this contract's first draft missed and a critic
+  review caught: §12.41 Critical Path Method's own "限制" (limitation)
+  line (L3109: "資源限制另需 resource leveling / capacity model" --
+  a resource-constrained critical path needs resource leveling /
+  capacity model as a complementary technique). No dedicated §11.x
+  section exists for Capacity Model itself (confirmed by direct read
+  of the surrounding table, L845-858, and a full-document heading grep
+  for "Capacity Model"/"容量模型"/"容量規劃" returning only this table
+  row). Grepped the full spec root for "capacity.model"/"headroom"/
+  "growth.*coefficient" case-insensitive before writing this contract
+  -- no duplicate typed object or method found.
+
+  The benefit column's own TWO-SIDED framing ("防容量事故" AND "過度採
+  購" -- both directions are named, not just the under-provisioning
+  half) directly implies this method's own three-way classification:
+  `status` is not a single pass/fail bit but `insufficient` /
+  `healthy` / `over_provisioned`, computed from a single
+  `headroom_ratio` value against two caller-supplied thresholds. Atlas
+  gives no numeric threshold values anywhere in this row or its
+  surrounding table -- the boundary between the three states is left
+  as caller-supplied input (`low_threshold_ratio`/
+  `high_threshold_ratio`), not an invented constant, the same
+  restraint `database_data.backup_restore_drill.contract.yaml`'s own
+  RTO/RPO target fields already established for a structurally
+  analogous "Atlas names the concept, not a number" gap.
+
+  `projected_workload`, `required_resources`, and `headroom_ratio` are
+  GENUINE COMPUTE (`ai_lego.compute.capacity_model.projection`), never
+  caller-asserted -- the same Trusted Compute discipline every prior
+  CALCULATED_RESULT method in this package already established.
+  Workload compounding and the final division use `decimal.Decimal`,
+  not raw `float` arithmetic -- CORRECTED post-critic-review (the
+  first draft of this very paragraph overstated the protection this
+  buys, claiming parity with `database_data.reconciliation`'s own
+  large-magnitude guarantee): because this method's own public
+  compute signature accepts `float` parameters, not the `str`
+  parameters reconciliation's own compare function accepts
+  specifically to preserve arbitrary-precision input, any precision
+  beyond a `float`'s own 53-bit mantissa is already lost before this
+  module ever sees a value -- Decimal here does NOT protect against
+  huge-magnitude truncation (not a realistic capacity-planning
+  magnitude regardless). What it DOES buy, honestly: numerically
+  stable compounding across many periods and an exact final division,
+  avoiding the smaller but real ACCUMULATED rounding error repeated
+  `float` multiplication/division can introduce -- see
+  `ai_lego/compute/capacity_model/projection.py`'s own module
+  docstring for the full disclosure and a concrete before/after
+  example.
+
+  A critic review of this slice's own first draft also found the
+  independent gate re-derived the four COMPUTED fields but never
+  re-validated the two THRESHOLD fields the builder itself requires --
+  a record hand-tampered to reverse or infinitize its own thresholds
+  passed every gate and the schema, in one case making `status:
+  healthy` mathematically unreachable regardless of real headroom
+  (silently defeating the over-provisioning half of Atlas's own
+  two-sided benefit), in the other certifying a resource at a fraction
+  of a percent of its required capacity as `healthy`. Fixed with a
+  single shared `_thresholds_are_valid` predicate, called by BOTH the
+  builder and the gate -- see preconditions below.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Capacity Model row (L852): 'workload→growth→resource coefficients→headroom'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.41 Critical Path Method 限制 line (L3109): '資源限制另需 resource leveling / capacity model' -- a real prose cross-reference, disclosed as unbuilt (see OQ-CAPACITYMODEL-3), not silently omitted"
+  - "methods/registry/method-inventory.yaml Capacity Model entry (L1132-1136): category 'F19 devops-sre', line field reads 849 -- CORRECTED here to the real L852 position, the same systematic +3 drift already disclosed by four prior contracts this session (Error Budget, RTO/RPO comparison, Backup/Restore Drill, Reconciliation, Expand-Contract Migration), now observed a SIXTH time"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-ninth
+  concrete entry. `id: devops_sre.capacity_model` mints a new
+  machine_id, SIXTH member of the `devops_sre` family.
+
+id: devops_sre.capacity_model
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, MAP]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). The workload/growth/coefficient/capacity inputs being
+# handled as distinct quantities is DECOMPOSE; the headroom-vs-
+# threshold classification is VALIDATE; the compounding-forward
+# projection over periods is MAP -- the same inferred triple
+# `database_data.backup_restore_drill`'s own protocol already used.
+
+purpose:
+  - prove_current_capacity_can_absorb_projected_workload_growth_without_being_insufficient_or_wastefully_over_provisioned
+inputs:
+  required: [CapacityModelInput]
+  optional: []
+outputs: [CapacityModelRecord]
+preconditions:
+  - "current_workload is finite and >= 0"
+  - "growth_rate_per_period is finite and strictly greater than -1"
+  - "periods_ahead is a non-negative integer"
+  - "resource_coefficient is finite and strictly positive"
+  - "current_capacity is finite and strictly positive"
+  - "low_threshold_ratio and high_threshold_ratio are both finite numbers, and low_threshold_ratio is strictly less than high_threshold_ratio -- re-verified independently by the gate (ai_lego.modules.devops_sre.capacity_model._thresholds_are_valid), not builder-only (a critic review found the first draft's gate never re-checked this, letting a hand-tampered record with reversed or infinite thresholds pass unchallenged)"
+  - "projected_workload, required_resources, headroom_ratio, and status are all computed by ai_lego.compute.capacity_model.projection, never caller-supplied independently of that computation"
+  - "status:insufficient iff headroom_ratio < low_threshold_ratio; status:over_provisioned iff headroom_ratio > high_threshold_ratio; status:healthy otherwise (inclusive of both boundary values)"
+  # The last precondition is directly implied by Atlas's own benefit
+  # column naming BOTH failure directions. UNLIKE the one-directional
+  # status fields `database_data.backup_restore_drill`/`database_data
+  # .reconciliation` already established (where a caller may
+  # conservatively override a computed-fine verdict), `status` here is
+  # FULLY DERIVED with no caller override -- there is no legitimate
+  # "operational judgment" reading of this classification the way
+  # there is for a drill's own pass/fail call or a reconciliation
+  # check's own resolution; it is a pure arithmetic classification
+  # against caller-supplied thresholds, so a caller-supplied status
+  # that disagrees with the computed one is simply wrong, not a
+  # legitimate conservative choice.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every genuine-compute contract in this
+  # package already reasons through: the real risk is computational
+  # integrity, not evidence-citation over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Capacity Model row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. Two real,
+# disclosed (not built) relationships: (1) §12.41 Critical Path
+# Method's own 限制 line (L3109) names capacity_model as a
+# complementary technique for a resource-constrained critical path --
+# see OQ-CAPACITYMODEL-3; (2) F19's own Load Test and Stress Test rows
+# (L853-854) could in principle supply an empirically OBSERVED
+# resource_coefficient (rather than an estimated one) -- see
+# OQ-CAPACITYMODEL-2. None of the three (critical_path_method,
+# load_test, stress_test) is built in this slice.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- provisioning changes
+  # implied by an insufficient/over_provisioned verdict happen outside
+  # this method's own scope, the same "record reports on an external
+  # observation/projection" class every prior devops_sre contract's
+  # own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Atlas's own formula step "growth" gives no explicit compounding
+      model (linear vs. exponential/compounded) -- which should this
+      contract assume?
+    decision: "Exponential compounding: projected_workload = current_workload * (1 + growth_rate_per_period) ** periods_ahead."
+    reasoning: >
+      "Growth rate per period" compounding forward over multiple
+      periods is the standard reading of a period-over-period
+      percentage rate in capacity planning (the same model SLO error
+      budgets, population growth, and compound interest all share) --
+      a linear reading (current_workload + growth_rate_per_period *
+      periods_ahead, treating growth_rate_per_period as an absolute
+      increment rather than a fraction) does not match "rate" language
+      and would silently understate growth over more than one period.
+  - question: >
+      Should `low_threshold_ratio`/`high_threshold_ratio` have Atlas-
+      derived default values (e.g. a commonly-cited "20% headroom"
+      industry rule of thumb), or be strictly required caller input
+      with no default?
+    decision: "Strictly required, no default."
+    reasoning: >
+      Atlas's own text gives no number anywhere in this row or its
+      surrounding table for either threshold. Inventing a default
+      (even a commonly-cited industry figure) would be exactly the
+      kind of unstated-assumption invention this package's every prior
+      contract already disciplines itself against -- same restraint
+      `database_data.backup_restore_drill.contract.yaml`'s own
+      RTO/RPO fields already established.
+
+open_questions:
+  - id: "OQ-CAPACITYMODEL-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CAPACITYMODEL-2"
+    question: >
+      F19's own Load Test (L853) and Stress Test (L854) rows could in
+      principle supply an empirically OBSERVED `resource_coefficient`
+      (measured under real load) rather than this method's own
+      caller-estimated one -- should a future revision add a soft-link
+      field for that, the same class of cross-method reference
+      `devops_sre.error_budget`'s own `related_slo_id` already
+      established?
+    owner: "operator, or whoever next builds devops_sre.load_test or devops_sre.stress_test"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CAPACITYMODEL-3"
+    question: >
+      §12.41 Critical Path Method's own 限制 line (L3109: "資源限制另需
+      resource leveling / capacity model") names this method as a
+      complementary technique for a resource-constrained critical path
+      -- a critic review found this contract's first draft omitted this
+      real citation while disclosing a purely speculative Load Test/
+      Stress Test relationship (OQ-CAPACITYMODEL-2) instead. Should a
+      future revision of `architecture.critical_path_method` (unbuilt)
+      cross-reference this method as its own recommended remediation
+      for a resource-constrained path?
+    owner: "operator, or whoever next builds a Critical Path Method slice"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L852) directly, confirmed against
+    the surrounding table (L845-858) that no dedicated §11.x section
+    exists for this method anywhere in the document. Read §12.41's own
+    限制 line (L3109) directly -- a real prose cross-reference, not
+    found until a critic review of this contract's own first draft
+    caught the omission. Grepped the full spec root for "capacity.
+    model"/"headroom"/"growth.*coefficient" case-insensitive before
+    writing this contract -- no duplicate typed object or method
+    found. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The workload->growth->resource
+    coefficients->headroom formula and the two-sided
+    insufficient/over_provisioned classification are both directly
+    grounded in Atlas's own cited row; the exponential-compounding
+    growth model and the no-default-thresholds decision are both
+    disclosed compilation choices, not silent inventions -- see
+    compilation_decisions above. A critic review additionally caught
+    and this revision fixes: an overstated Decimal-precision claim
+    (now matching ai_lego/compute/capacity_model/projection.py's own
+    honest disclosure) and an omitted real citation (§12.41 L3109, now
+    added alongside OQ-CAPACITYMODEL-3).

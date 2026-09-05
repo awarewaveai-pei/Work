@@ -2,4 +2,5 @@
 own Software Architecture Pack. Tenants: ``devops_sre.sli_slo`` (see ``sli_slo.py``), ``devops_sre
 .canary_deployment`` (see ``canary_deployment.py``), ``devops_sre.chaos_engineering`` (see
 ``chaos_engineering.py``), ``devops_sre.blue_green_deployment`` (see ``blue_green_deployment.py``),
-``devops_sre.error_budget`` (see ``error_budget.py``)."""
+``devops_sre.error_budget`` (see ``error_budget.py``), ``devops_sre.capacity_model`` (see
+``capacity_model.py``)."""

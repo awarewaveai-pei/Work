@@ -1,0 +1,144 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/capacity-model-record.schema.yaml"
+title: Capacity Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CapacityModelRecord` -- the
+  declared `outputs` of `devops_sre.capacity_model`'s Method Contract.
+  SIXTH `devops_sre`-family typed object. Atlas's own F19 tool table
+  formula (L852: "workload->growth->resource coefficients->headroom")
+  maps onto this schema's own raw input fields (`current_workload`,
+  `growth_rate_per_period`, `periods_ahead`, `resource_coefficient`,
+  `current_capacity`) and its own COMPUTED fields
+  (`projected_workload`, `required_resources`, `headroom_ratio`,
+  `status`), all genuine deterministic compute
+  (`ai_lego.compute.capacity_model.projection`), never caller-asserted.
+
+  `status` is derived entirely from the COMPUTED `headroom_ratio`
+  against two caller-supplied threshold fields
+  (`low_threshold_ratio`/`high_threshold_ratio`) -- Atlas's own benefit
+  column names BOTH failure directions ("防容量事故與過度採購" -- prevent
+  both capacity incidents AND over-provisioning), so this schema models
+  a real three-way classification rather than a single pass/fail bit.
+  Atlas gives no numeric threshold values, so the boundary between
+  "healthy", "insufficient", and "over_provisioned" is a caller-supplied
+  operational judgment, not an invented constant.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Capacity Model row (L852): 'workload→growth→resource coefficients→headroom'"
+  - "methods/contracts/devops_sre.capacity_model.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, resource_name, current_workload, growth_rate_per_period, periods_ahead, resource_coefficient, current_capacity, low_threshold_ratio, high_threshold_ratio, projected_workload, required_resources, headroom_ratio, status, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^CAPMODEL-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.capacity_model"
+  resource_name:
+    type: string
+    minLength: 1
+    description: "What is being capacity-planned, e.g. 'checkout-api CPU cores' or 'orders_db storage GB'."
+  current_workload:
+    type: number
+    minimum: 0
+    description: "The current observed demand, in whatever unit resource_coefficient is expressed per (e.g. requests/second)."
+  growth_rate_per_period:
+    type: number
+    exclusiveMinimum: -1
+    description: "Fractional growth per period (e.g. 0.10 for 10% growth per period; negative values shrink, but not by 100% or more)."
+  periods_ahead:
+    type: integer
+    minimum: 0
+    description: "How many periods to project the workload forward."
+  resource_coefficient:
+    type: number
+    exclusiveMinimum: 0
+    description: "Resource units required per unit of workload (e.g. CPU cores per request/second)."
+  current_capacity:
+    type: number
+    exclusiveMinimum: 0
+    description: "Currently provisioned capacity, in the same resource units resource_coefficient produces."
+  low_threshold_ratio:
+    type: number
+    description: "Caller-supplied floor: headroom_ratio below this is status:insufficient. Atlas gives no numeric value -- an operational judgment, not an invented constant. MUST be finite (enforced at the runtime layer -- a critic review found the first draft's own gate did not re-check this, letting an infinite threshold make status:healthy mathematically unreachable or trivially certify any capacity)."
+  high_threshold_ratio:
+    type: number
+    description: "Caller-supplied ceiling: headroom_ratio above this is status:over_provisioned. MUST be finite and strictly greater than low_threshold_ratio, enforced at the runtime layer, not the schema layer, at BOTH construction and gate re-evaluation."
+  projected_workload:
+    type: number
+    minimum: 0
+    description: "COMPUTED: current_workload compounded forward by growth_rate_per_period over periods_ahead periods (ai_lego.compute.capacity_model.projection.project_workload)."
+  required_resources:
+    type: number
+    minimum: 0
+    description: "COMPUTED: projected_workload * resource_coefficient."
+  headroom_ratio:
+    type: number
+    description: "COMPUTED: (current_capacity - required_resources) / current_capacity. Positive means spare capacity; negative means the projected requirement exceeds current capacity."
+  status:
+    enum: [insufficient, healthy, over_provisioned]
+    description: "COMPUTED, entirely derived from headroom_ratio against low_threshold_ratio/high_threshold_ratio -- never caller-asserted independently of that computation. insufficient: headroom_ratio < low_threshold_ratio. over_provisioned: headroom_ratio > high_threshold_ratio. healthy: otherwise (inclusive of both boundary values)."
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted, importlib-resolvable path to the pure function that computed headroom_ratio -- ai_lego.compute.capacity_model.projection.compute_headroom_ratio."
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- projected_workload/required_resources/headroom_ratio/status are genuine deterministic compute, not a narrative claim or human opinion."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A healthy projection: 29% headroom after 6 periods of 10% growth"
+    value:
+      id: "CAPMODEL-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.capacity_model"
+      resource_name: "checkout-api CPU cores"
+      current_workload: 1000
+      growth_rate_per_period: 0.10
+      periods_ahead: 6
+      resource_coefficient: 0.002
+      current_capacity: 5
+      low_threshold_ratio: 0.15
+      high_threshold_ratio: 0.60
+      projected_workload: 1771.561
+      required_resources: 3.543122
+      headroom_ratio: 0.2913756
+      status: healthy
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.capacity_model.projection.compute_headroom_ratio"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "An insufficient projection: negative headroom, projected demand exceeds current capacity"
+    value:
+      id: "CAPMODEL-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.capacity_model"
+      resource_name: "checkout-api CPU cores"
+      current_workload: 1000
+      growth_rate_per_period: 0.10
+      periods_ahead: 6
+      resource_coefficient: 0.002
+      current_capacity: 3
+      low_threshold_ratio: 0.15
+      high_threshold_ratio: 0.60
+      projected_workload: 1771.561
+      required_resources: 3.543122
+      headroom_ratio: -0.18104066666666666
+      status: insufficient
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.capacity_model.projection.compute_headroom_ratio"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L852) directly. Validated against jsonschema Draft202012Validator."
+  note: "The workload->growth->resource coefficients->headroom formula is directly transcribed. status/headroom_ratio/projected_workload/required_resources are all enforced-computed at the runtime layer (ai_lego/modules/devops_sre/capacity_model.py), not the schema layer. No mother document was modified."
