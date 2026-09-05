@@ -489,6 +489,157 @@
       ],
       "activated_by": [],
       "activated_by_custom_requirements": true
+    },
+    {
+      "id": "marketplace_ops",
+      "paths": [
+        "packages/marketplace-ops",
+        "tests/contract/marketplace-ops"
+      ],
+      "activated_by": [
+        "CAP-MARKETPLACE-SETTLEMENT",
+        "CAP-MARKETPLACE-SYNC",
+        "CAP-MULTI-MARKETPLACE",
+        "CAP-REPRICING",
+        "CAP-SELLER-HEALTH"
+      ]
+    },
+    {
+      "id": "b2b",
+      "paths": [
+        "packages/b2b",
+        "tests/contract/b2b"
+      ],
+      "activated_by": [
+        "CAP-B2B",
+        "CAP-B2B-BUYER-ROLES",
+        "CAP-B2B-PRICING",
+        "CAP-CREDIT-TERMS",
+        "CAP-MOQ",
+        "CAP-RFQ"
+      ]
+    },
+    {
+      "id": "subscription_commerce",
+      "paths": [
+        "packages/subscription-commerce",
+        "tests/contract/subscription-commerce"
+      ],
+      "activated_by": [
+        "CAP-SUBC-CHANGE-PLAN",
+        "CAP-SUBC-DUNNING",
+        "CAP-SUBC-PAUSE",
+        "CAP-SUBSCRIPTION-COMMERCE"
+      ]
+    },
+    {
+      "id": "loyalty",
+      "paths": [
+        "packages/loyalty",
+        "tests/contract/loyalty"
+      ],
+      "activated_by": [
+        "CAP-GIFT-CARD",
+        "CAP-LOYALTY-POINTS",
+        "CAP-LOYALTY-TIERS",
+        "CAP-REFERRAL"
+      ]
+    },
+    {
+      "id": "reviews",
+      "paths": [
+        "packages/reviews",
+        "tests/contract/reviews"
+      ],
+      "activated_by": [
+        "CAP-REVIEW-MEDIA",
+        "CAP-REVIEW-MODERATION",
+        "CAP-REVIEW-REQUEST",
+        "CAP-REVIEWS"
+      ]
+    },
+    {
+      "id": "cross_border",
+      "paths": [
+        "packages/cross-border",
+        "tests/contract/cross-border"
+      ],
+      "activated_by": [
+        "CAP-CROSS-BORDER",
+        "CAP-HS-CODE",
+        "CAP-LANDED-COST",
+        "CAP-PRODUCT-PASSPORT"
+      ]
+    },
+    {
+      "id": "oms",
+      "paths": [
+        "packages/oms",
+        "tests/contract/oms"
+      ],
+      "activated_by": [
+        "CAP-BACKORDER",
+        "CAP-DROPSHIP",
+        "CAP-ORDER-SPLIT",
+        "CAP-PREORDER"
+      ]
+    },
+    {
+      "id": "demand_planning",
+      "paths": [
+        "packages/demand-planning",
+        "tests/contract/demand-planning"
+      ],
+      "activated_by": [
+        "CAP-DEMAND-FORECAST",
+        "CAP-REORDER-POINT"
+      ]
+    },
+    {
+      "id": "affiliate",
+      "paths": [
+        "packages/affiliate",
+        "tests/contract/affiliate"
+      ],
+      "activated_by": [
+        "CAP-AFFILIATE",
+        "CAP-AFFILIATE-ATTRIBUTION",
+        "CAP-INFLUENCER"
+      ]
+    },
+    {
+      "id": "pos",
+      "paths": [
+        "packages/pos",
+        "tests/contract/pos"
+      ],
+      "activated_by": [
+        "CAP-CLICK-COLLECT",
+        "CAP-POS",
+        "CAP-POS-INVENTORY-SYNC"
+      ]
+    },
+    {
+      "id": "warranty",
+      "paths": [
+        "packages/warranty",
+        "tests/contract/warranty"
+      ],
+      "activated_by": [
+        "CAP-REPAIR-TRACKING",
+        "CAP-WARRANTY"
+      ]
+    },
+    {
+      "id": "cdp",
+      "paths": [
+        "packages/cdp",
+        "tests/contract/cdp"
+      ],
+      "activated_by": [
+        "CAP-CONSENT-LEDGER",
+        "CAP-IDENTITY-RESOLUTION"
+      ]
     }
   ]
 }

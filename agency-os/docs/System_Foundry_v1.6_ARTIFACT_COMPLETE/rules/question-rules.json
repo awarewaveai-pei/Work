@@ -1652,6 +1652,436 @@
       "require": [
         "CAP-AI-VOICE-SUPPORT"
       ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-001",
+      "when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-MULTI-MARKETPLACE"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-002",
+      "when": {
+        "question": "Q-MKTOPS-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-MARKETPLACE-SYNC"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-003",
+      "when": {
+        "question": "Q-MKTOPS-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-REPRICING"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-004",
+      "when": {
+        "question": "Q-MKTOPS-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-SELLER-HEALTH"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-005",
+      "when": {
+        "question": "Q-MKTOPS-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-MARKETPLACE-SETTLEMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-B2B-001",
+      "when": {
+        "question": "Q-B2B-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-B2B"
+      ]
+    },
+    {
+      "id": "RULE-Q-B2B-002",
+      "when": {
+        "question": "Q-B2B-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-B2B-PRICING"
+      ]
+    },
+    {
+      "id": "RULE-Q-B2B-003",
+      "when": {
+        "question": "Q-B2B-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-MOQ"
+      ]
+    },
+    {
+      "id": "RULE-Q-B2B-004",
+      "when": {
+        "question": "Q-B2B-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-RFQ"
+      ]
+    },
+    {
+      "id": "RULE-Q-B2B-005",
+      "when": {
+        "question": "Q-B2B-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-CREDIT-TERMS"
+      ]
+    },
+    {
+      "id": "RULE-Q-B2B-006",
+      "when": {
+        "question": "Q-B2B-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-B2B-BUYER-ROLES"
+      ]
+    },
+    {
+      "id": "RULE-Q-SUBC-001",
+      "when": {
+        "question": "Q-SUBC-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUBSCRIPTION-COMMERCE"
+      ]
+    },
+    {
+      "id": "RULE-Q-SUBC-002",
+      "when": {
+        "question": "Q-SUBC-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUBC-PAUSE"
+      ]
+    },
+    {
+      "id": "RULE-Q-SUBC-003",
+      "when": {
+        "question": "Q-SUBC-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUBC-CHANGE-PLAN"
+      ]
+    },
+    {
+      "id": "RULE-Q-SUBC-004",
+      "when": {
+        "question": "Q-SUBC-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUBC-DUNNING"
+      ]
+    },
+    {
+      "id": "RULE-Q-LOY-001",
+      "when": {
+        "question": "Q-LOY-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-LOYALTY-POINTS"
+      ]
+    },
+    {
+      "id": "RULE-Q-LOY-002",
+      "when": {
+        "question": "Q-LOY-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-LOYALTY-TIERS"
+      ]
+    },
+    {
+      "id": "RULE-Q-LOY-003",
+      "when": {
+        "question": "Q-LOY-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-REFERRAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-LOY-004",
+      "when": {
+        "question": "Q-LOY-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-GIFT-CARD"
+      ]
+    },
+    {
+      "id": "RULE-Q-REV-001",
+      "when": {
+        "question": "Q-REV-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-REVIEWS"
+      ]
+    },
+    {
+      "id": "RULE-Q-REV-002",
+      "when": {
+        "question": "Q-REV-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-REVIEW-MEDIA"
+      ]
+    },
+    {
+      "id": "RULE-Q-REV-003",
+      "when": {
+        "question": "Q-REV-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-REVIEW-MODERATION"
+      ]
+    },
+    {
+      "id": "RULE-Q-REV-004",
+      "when": {
+        "question": "Q-REV-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-REVIEW-REQUEST"
+      ]
+    },
+    {
+      "id": "RULE-Q-XB-001",
+      "when": {
+        "question": "Q-XB-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-CROSS-BORDER"
+      ]
+    },
+    {
+      "id": "RULE-Q-XB-002",
+      "when": {
+        "question": "Q-XB-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-HS-CODE"
+      ]
+    },
+    {
+      "id": "RULE-Q-XB-003",
+      "when": {
+        "question": "Q-XB-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-LANDED-COST"
+      ]
+    },
+    {
+      "id": "RULE-Q-XB-004",
+      "when": {
+        "question": "Q-XB-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-PRODUCT-PASSPORT"
+      ]
+    },
+    {
+      "id": "RULE-Q-OMS-001",
+      "when": {
+        "question": "Q-OMS-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORDER-SPLIT"
+      ]
+    },
+    {
+      "id": "RULE-Q-OMS-002",
+      "when": {
+        "question": "Q-OMS-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-BACKORDER"
+      ]
+    },
+    {
+      "id": "RULE-Q-OMS-003",
+      "when": {
+        "question": "Q-OMS-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-PREORDER"
+      ]
+    },
+    {
+      "id": "RULE-Q-OMS-004",
+      "when": {
+        "question": "Q-OMS-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-DROPSHIP"
+      ]
+    },
+    {
+      "id": "RULE-Q-DEM-001",
+      "when": {
+        "question": "Q-DEM-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-DEMAND-FORECAST"
+      ]
+    },
+    {
+      "id": "RULE-Q-DEM-002",
+      "when": {
+        "question": "Q-DEM-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-REORDER-POINT"
+      ]
+    },
+    {
+      "id": "RULE-Q-AFF-001",
+      "when": {
+        "question": "Q-AFF-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-INFLUENCER"
+      ]
+    },
+    {
+      "id": "RULE-Q-AFF-002",
+      "when": {
+        "question": "Q-AFF-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-AFFILIATE"
+      ]
+    },
+    {
+      "id": "RULE-Q-AFF-003",
+      "when": {
+        "question": "Q-AFF-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-AFFILIATE-ATTRIBUTION"
+      ]
+    },
+    {
+      "id": "RULE-Q-POS-001",
+      "when": {
+        "question": "Q-POS-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-POS"
+      ]
+    },
+    {
+      "id": "RULE-Q-POS-002",
+      "when": {
+        "question": "Q-POS-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-POS-INVENTORY-SYNC"
+      ]
+    },
+    {
+      "id": "RULE-Q-POS-003",
+      "when": {
+        "question": "Q-POS-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-CLICK-COLLECT"
+      ]
+    },
+    {
+      "id": "RULE-Q-WAR-001",
+      "when": {
+        "question": "Q-WAR-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-WARRANTY"
+      ]
+    },
+    {
+      "id": "RULE-Q-WAR-002",
+      "when": {
+        "question": "Q-WAR-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-REPAIR-TRACKING"
+      ]
+    },
+    {
+      "id": "RULE-Q-CDP-001",
+      "when": {
+        "question": "Q-CDP-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-IDENTITY-RESOLUTION"
+      ]
+    },
+    {
+      "id": "RULE-Q-CDP-002",
+      "when": {
+        "question": "Q-CDP-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-CONSENT-LEDGER"
+      ]
     }
   ]
 }

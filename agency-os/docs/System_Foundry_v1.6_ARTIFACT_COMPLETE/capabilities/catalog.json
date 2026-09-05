@@ -1563,6 +1563,418 @@
       "module": "procurement",
       "requires": [],
       "description": "採購/供應商合約到期前主動提醒續約或終止。"
+    },
+    {
+      "id": "CAP-MULTI-MARKETPLACE",
+      "name": "Multi-Marketplace Selling",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-PRODUCTS"
+      ],
+      "description": "The same product catalog is listed for sale on more than one third-party online marketplace at once."
+    },
+    {
+      "id": "CAP-MARKETPLACE-SYNC",
+      "name": "Marketplace Inventory/Price Sync",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-INVENTORY",
+        "CAP-MULTI-MARKETPLACE"
+      ],
+      "description": "Inventory levels and prices are kept automatically in sync across all connected marketplaces from one canonical source."
+    },
+    {
+      "id": "CAP-REPRICING",
+      "name": "Automated Repricing",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-MULTI-MARKETPLACE"
+      ],
+      "description": "Prices on marketplaces are automatically adjusted based on competitor pricing, subject to a minimum margin floor."
+    },
+    {
+      "id": "CAP-SELLER-HEALTH",
+      "name": "Marketplace Seller Health Monitoring",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-MULTI-MARKETPLACE"
+      ],
+      "description": "Each marketplace account's health metrics (late shipment rate, cancellation rate, policy warnings, account standing) are tracked and alerted on."
+    },
+    {
+      "id": "CAP-MARKETPLACE-SETTLEMENT",
+      "name": "Marketplace Settlement Reconciliation",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-FINANCIAL-RECORDS",
+        "CAP-MULTI-MARKETPLACE"
+      ],
+      "description": "Marketplace payout amounts are automatically reconciled against expected revenue minus fees, refunds, and penalties."
+    },
+    {
+      "id": "CAP-B2B",
+      "name": "B2B / Wholesale Buyers",
+      "module": "b2b",
+      "requires": [
+        "CAP-CUSTOMER-USERS",
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "Some customers are businesses purchasing through a company account with a buying process different from individual consumer checkout."
+    },
+    {
+      "id": "CAP-B2B-PRICING",
+      "name": "Negotiated B2B Pricing",
+      "module": "b2b",
+      "requires": [
+        "CAP-B2B"
+      ],
+      "description": "Different business customers can have different negotiated or volume-based prices for the same products."
+    },
+    {
+      "id": "CAP-MOQ",
+      "name": "Minimum Order Quantity",
+      "module": "b2b",
+      "requires": [
+        "CAP-B2B"
+      ],
+      "description": "Business customers must order at least a minimum quantity per product or order."
+    },
+    {
+      "id": "CAP-RFQ",
+      "name": "Quote / RFQ Workflow",
+      "module": "b2b",
+      "requires": [
+        "CAP-B2B"
+      ],
+      "description": "Business customers request a price quote before placing a formal order, rather than buying directly off a listed price."
+    },
+    {
+      "id": "CAP-CREDIT-TERMS",
+      "name": "Credit Terms / Payment on Account",
+      "module": "b2b",
+      "requires": [
+        "CAP-B2B",
+        "CAP-FINANCIAL-RECORDS"
+      ],
+      "description": "Business customers can receive goods before paying, on agreed credit terms (e.g. net 30/60/90) up to a credit limit."
+    },
+    {
+      "id": "CAP-B2B-BUYER-ROLES",
+      "name": "Company Buyer Roles",
+      "module": "b2b",
+      "requires": [
+        "CAP-B2B",
+        "CAP-ROLES"
+      ],
+      "description": "A business customer's own company has multiple people with different purchasing roles (e.g. requester vs. approver) under one company account."
+    },
+    {
+      "id": "CAP-SUBSCRIPTION-COMMERCE",
+      "name": "Subscription Commerce",
+      "module": "subscription_commerce",
+      "requires": [
+        "CAP-PAYMENTS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "The system sells recurring subscription products or services to end customers (distinct from the platform's own operator billing)."
+    },
+    {
+      "id": "CAP-SUBC-PAUSE",
+      "name": "Subscription Pause/Skip",
+      "module": "subscription_commerce",
+      "requires": [
+        "CAP-SUBSCRIPTION-COMMERCE"
+      ],
+      "description": "Customers can pause or skip an upcoming subscription cycle without fully cancelling."
+    },
+    {
+      "id": "CAP-SUBC-CHANGE-PLAN",
+      "name": "Subscription Upgrade/Downgrade",
+      "module": "subscription_commerce",
+      "requires": [
+        "CAP-SUBSCRIPTION-COMMERCE"
+      ],
+      "description": "Customers can change their subscription plan (upgrade or downgrade) with the price difference prorated."
+    },
+    {
+      "id": "CAP-SUBC-DUNNING",
+      "name": "Failed Payment Recovery (Dunning)",
+      "module": "subscription_commerce",
+      "requires": [
+        "CAP-SUBSCRIPTION-COMMERCE"
+      ],
+      "description": "When a recurring payment fails, the system automatically retries and notifies the customer before cancelling the subscription."
+    },
+    {
+      "id": "CAP-LOYALTY-POINTS",
+      "name": "Loyalty Points / Rewards",
+      "module": "loyalty",
+      "requires": [
+        "CAP-CUSTOMER-USERS",
+        "CAP-ORDERS"
+      ],
+      "description": "Customers earn points or rewards for purchases or other qualifying actions."
+    },
+    {
+      "id": "CAP-LOYALTY-TIERS",
+      "name": "Loyalty Membership Tiers",
+      "module": "loyalty",
+      "requires": [
+        "CAP-LOYALTY-POINTS"
+      ],
+      "description": "Customers are grouped into membership tiers (e.g. silver/gold/VIP) with different benefits."
+    },
+    {
+      "id": "CAP-REFERRAL",
+      "name": "Referral Rewards",
+      "module": "loyalty",
+      "requires": [
+        "CAP-LOYALTY-POINTS"
+      ],
+      "description": "Customers are rewarded for referring new customers who go on to complete a qualifying purchase."
+    },
+    {
+      "id": "CAP-GIFT-CARD",
+      "name": "Gift Cards / Store Credit",
+      "module": "loyalty",
+      "requires": [
+        "CAP-PAYMENTS"
+      ],
+      "description": "Customers can hold and redeem store credit or gift card balances."
+    },
+    {
+      "id": "CAP-REVIEWS",
+      "name": "Product / Store Reviews",
+      "module": "reviews",
+      "requires": [
+        "CAP-PRODUCTS",
+        "CAP-UGC"
+      ],
+      "description": "Customers can leave ratings and written reviews for products or the store."
+    },
+    {
+      "id": "CAP-REVIEW-MEDIA",
+      "name": "Photo/Video Reviews",
+      "module": "reviews",
+      "requires": [
+        "CAP-IMAGES",
+        "CAP-REVIEWS"
+      ],
+      "description": "Customers can attach photos or videos to their reviews."
+    },
+    {
+      "id": "CAP-REVIEW-MODERATION",
+      "name": "Review Moderation",
+      "module": "reviews",
+      "requires": [
+        "CAP-REVIEWS"
+      ],
+      "description": "Reviews must be approved before they are published publicly."
+    },
+    {
+      "id": "CAP-REVIEW-REQUEST",
+      "name": "Review Request Campaigns",
+      "module": "reviews",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-REVIEWS"
+      ],
+      "description": "The system proactively invites customers to leave a review after their purchase, rather than waiting for unprompted reviews."
+    },
+    {
+      "id": "CAP-CROSS-BORDER",
+      "name": "Cross-Border Trade",
+      "module": "cross_border",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "Products are sold across national borders and involve import/export customs processes, distinct from domestic-only sales."
+    },
+    {
+      "id": "CAP-HS-CODE",
+      "name": "HS Code / Tariff Classification",
+      "module": "cross_border",
+      "requires": [
+        "CAP-CROSS-BORDER",
+        "CAP-PRODUCTS"
+      ],
+      "description": "Products carry a customs tariff classification code (HS code) as part of their master data, since it directly affects the duty rate."
+    },
+    {
+      "id": "CAP-LANDED-COST",
+      "name": "Duties / Landed Cost Calculation",
+      "module": "cross_border",
+      "requires": [
+        "CAP-CROSS-BORDER",
+        "CAP-PAYMENTS",
+        "CAP-TAX"
+      ],
+      "description": "The system calculates import duties/taxes so the customer sees the total landed cost, not just the product price."
+    },
+    {
+      "id": "CAP-PRODUCT-PASSPORT",
+      "name": "Product Compliance Registry (e.g. Digital Product Passport)",
+      "module": "cross_border",
+      "requires": [
+        "CAP-CROSS-BORDER",
+        "CAP-PRODUCTS"
+      ],
+      "description": "Products must be registered in a destination market's product compliance/passport registry before they can be sold there."
+    },
+    {
+      "id": "CAP-ORDER-SPLIT",
+      "name": "Order Split / Partial Fulfillment",
+      "module": "oms",
+      "requires": [
+        "CAP-ORDERS"
+      ],
+      "description": "A single order can be fulfilled as multiple separate shipments (e.g. from different warehouses, or partial-now/rest-later)."
+    },
+    {
+      "id": "CAP-BACKORDER",
+      "name": "Backorder Support",
+      "module": "oms",
+      "requires": [
+        "CAP-INVENTORY",
+        "CAP-ORDERS"
+      ],
+      "description": "Customers can order out-of-stock items, which ship once restocked, rather than being blocked from ordering."
+    },
+    {
+      "id": "CAP-PREORDER",
+      "name": "Preorder Support",
+      "module": "oms",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "Customers can order products before they are officially released or in stock."
+    },
+    {
+      "id": "CAP-DROPSHIP",
+      "name": "Dropship Fulfillment",
+      "module": "oms",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-VENDOR-MGMT"
+      ],
+      "description": "Some orders are shipped directly by the supplier to the customer rather than through the merchant's own warehouse."
+    },
+    {
+      "id": "CAP-DEMAND-FORECAST",
+      "name": "Demand Forecasting",
+      "module": "demand_planning",
+      "requires": [
+        "CAP-INVENTORY",
+        "CAP-ORDERS"
+      ],
+      "description": "The system predicts future sales volume to support inventory planning, rather than planning being based purely on gut feel."
+    },
+    {
+      "id": "CAP-REORDER-POINT",
+      "name": "Automated Reorder Recommendations",
+      "module": "demand_planning",
+      "requires": [
+        "CAP-DEMAND-FORECAST",
+        "CAP-PROCUREMENT"
+      ],
+      "description": "The system automatically recommends when and how much to reorder based on forecasted demand, lead time, and safety stock."
+    },
+    {
+      "id": "CAP-INFLUENCER",
+      "name": "Influencer / Creator Partnerships",
+      "module": "affiliate",
+      "requires": [
+        "CAP-CAMPAIGNS"
+      ],
+      "description": "The business works with influencers or content creators who promote products in exchange for compensation."
+    },
+    {
+      "id": "CAP-AFFILIATE",
+      "name": "Affiliate Program",
+      "module": "affiliate",
+      "requires": [
+        "CAP-ORDERS"
+      ],
+      "description": "External affiliate partners earn a commission for sales they refer."
+    },
+    {
+      "id": "CAP-AFFILIATE-ATTRIBUTION",
+      "name": "Affiliate/Influencer Attribution Tracking",
+      "module": "affiliate",
+      "requires": [
+        "CAP-ORDERS"
+      ],
+      "description": "Each referral link or promo code's actual resulting sales and commission are tracked, not just estimated."
+    },
+    {
+      "id": "CAP-POS",
+      "name": "Physical Retail POS",
+      "module": "pos",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "The business sells through physical retail locations, pop-ups, or events using a point-of-sale system."
+    },
+    {
+      "id": "CAP-POS-INVENTORY-SYNC",
+      "name": "POS/Online Inventory Sync",
+      "module": "pos",
+      "requires": [
+        "CAP-INVENTORY",
+        "CAP-POS"
+      ],
+      "description": "In-store inventory is kept in sync with online inventory from one canonical stock record."
+    },
+    {
+      "id": "CAP-CLICK-COLLECT",
+      "name": "Click & Collect / Ship-from-Store",
+      "module": "pos",
+      "requires": [
+        "CAP-POS"
+      ],
+      "description": "Customers can order online and pick up in-store, or have a store location ship the order to them."
+    },
+    {
+      "id": "CAP-WARRANTY",
+      "name": "Product Warranty Tracking",
+      "module": "warranty",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS"
+      ],
+      "description": "Products carry a warranty period and customers can file a warranty claim within it."
+    },
+    {
+      "id": "CAP-REPAIR-TRACKING",
+      "name": "Repair / Replacement Case Tracking",
+      "module": "warranty",
+      "requires": [
+        "CAP-STATE-WORKFLOW",
+        "CAP-WARRANTY"
+      ],
+      "description": "Repair or replacement cases are tracked through a defined status workflow from intake to resolution."
+    },
+    {
+      "id": "CAP-IDENTITY-RESOLUTION",
+      "name": "Cross-Channel Identity Resolution",
+      "module": "cdp",
+      "requires": [
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "The same real customer contacting the business through different channels (email, chat apps, different platform accounts) is automatically recognized as one person, with conservative auto-merge and a manual review path for uncertain matches."
+    },
+    {
+      "id": "CAP-CONSENT-LEDGER",
+      "name": "Marketing Consent Ledger",
+      "module": "cdp",
+      "requires": [
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "The customer's consent status for each marketing channel and purpose is recorded as an auditable history, not just a single current-state flag, to support opt-out and compliance audits."
     }
   ]
 }

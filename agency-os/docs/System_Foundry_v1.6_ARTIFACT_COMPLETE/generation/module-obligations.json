@@ -759,6 +759,238 @@
       "recovery": [
         "A failed scheduled post is retried or surfaced as a failure, never silently dropped."
       ]
+    },
+    "marketplace_ops": {
+      "purpose": "Manage selling the same catalog across multiple third-party online marketplaces as one coordinated operation, distinct from the single-storefront Commerce/domain capabilities.",
+      "invariants": [
+        "A SKU's inventory and price on any connected marketplace is always derived from the canonical product/inventory record, never edited independently per marketplace.",
+        "Automated repricing never sets a price below the merchant's configured minimum margin floor.",
+        "Marketplace settlement reconciliation flags any payout that does not match expected revenue minus fees/refunds/penalties; it never silently accepts a mismatch."
+      ],
+      "security": [
+        "Marketplace API credentials are scoped per connected account and revocable independently of other connectors."
+      ],
+      "tests": [
+        "Repricing logic is contract-tested against the minimum-margin floor with an adversarial case at the floor boundary.",
+        "Settlement reconciliation is contract-tested with an intentionally mismatched payout fixture that must be flagged, not silently reconciled."
+      ],
+      "operations": [
+        "Per-marketplace account health (rate limits, policy warnings, sync failures) is observable and alertable."
+      ],
+      "recovery": [
+        "A marketplace connector outage does not block order intake from other channels; queued listing/price updates retry once the connector recovers."
+      ]
+    },
+    "b2b": {
+      "purpose": "Support business (company-to-company) buyers whose purchasing process differs structurally from individual consumer checkout.",
+      "invariants": [
+        "A company account's negotiated pricing and credit terms apply consistently to every buyer acting under that company, never per-individual-buyer overrides that bypass the company agreement.",
+        "An order placed against a credit-terms account cannot exceed the account's approved credit limit without an explicit override recorded with who approved it.",
+        "A quote/RFQ becomes a binding order only through an explicit conversion step, never implicitly from viewing or discussing it."
+      ],
+      "security": [
+        "Company buyer roles restrict which company employees can submit vs. approve purchases, independent of the merchant's own staff roles."
+      ],
+      "tests": [
+        "Credit-limit enforcement is contract-tested at and just above the limit boundary."
+      ],
+      "operations": [
+        "Outstanding credit-terms balances approaching their due date are observable for collections follow-up."
+      ],
+      "recovery": [
+        "Company account records, negotiated pricing, and credit terms are included in backup scope."
+      ]
+    },
+    "subscription_commerce": {
+      "purpose": "Sell recurring subscription products/services to end customers -- distinct from CAP-SUBSCRIPTION, which is how this generated system itself charges its own operator customers.",
+      "invariants": [
+        "A subscription's next billing date and product/plan are always derived from its own recorded lifecycle state, never recomputed ad hoc from unrelated order history.",
+        "A failed recurring payment triggers the dunning process before the subscription is cancelled; it is never silently cancelled on the first failure.",
+        "A pause, plan change, or cancellation takes effect on a recorded effective date, never applied retroactively to already-fulfilled cycles."
+      ],
+      "security": [
+        "Stored payment methods used for recurring billing follow the same PCI-scope boundary as one-time payments (DER-PAYMENT-ADAPTER); no local plaintext storage."
+      ],
+      "tests": [
+        "Dunning/retry logic is contract-tested across the full failed-payment-to-cancellation sequence."
+      ],
+      "operations": [
+        "Upcoming renewals, failed-payment recovery rate, and churn are observable."
+      ],
+      "recovery": [
+        "Subscription lifecycle state and billing history are included in backup scope."
+      ]
+    },
+    "loyalty": {
+      "purpose": "Reward repeat customers with points, tiers, referrals, or stored value, independent of one-off promotional discounts.",
+      "invariants": [
+        "A customer's points balance and store-credit balance are each a single canonical ledger; no code path adjusts the displayed balance without writing a corresponding ledger entry.",
+        "Referral rewards are only granted once the referred customer completes the qualifying action (e.g. first purchase), never at signup alone, to prevent trivial abuse."
+      ],
+      "security": [
+        "Gift card and store credit redemption is rate-limited/monitored to detect brute-force code guessing."
+      ],
+      "tests": [
+        "Points/store-credit ledger arithmetic is contract-tested for rounding and concurrent-redemption race conditions."
+      ],
+      "operations": [
+        "Unusual redemption velocity (possible fraud) is observable and alertable."
+      ],
+      "recovery": [
+        "Points balances, tier status, and stored value balances are included in backup scope."
+      ]
+    },
+    "reviews": {
+      "purpose": "Collect and surface customer-generated product/store feedback.",
+      "invariants": [
+        "A review is attributed to the customer account or contact record that submitted it; verified-purchase linkage, where the merchant wants it, is implemented via CAP-ORDERS and is not assumed by this module on its own.",
+        "Moderation state (pending/approved/rejected) is tracked per review; a rejected review never displays publicly regardless of caching."
+      ],
+      "security": [
+        "Uploaded review media is scanned/validated the same as any other user-uploaded file capability, not exempted."
+      ],
+      "tests": [
+        "Moderation-gating is contract-tested: a pending review must not appear in any public read path."
+      ],
+      "operations": [
+        "Review volume and average rating trend are observable."
+      ],
+      "recovery": [
+        "Review content and moderation history are included in backup scope."
+      ]
+    },
+    "cross_border": {
+      "purpose": "Handle customs, duties, and cross-border product compliance data distinct from domestic tax handling.",
+      "invariants": [
+        "A product's HS code and country of origin are stored as canonical product master data, never re-entered per shipment.",
+        "Landed cost (duties/import tax) shown to a customer is computed from the actual applicable rate for the destination country, never a flat estimate presented as final."
+      ],
+      "security": [
+        "Customs/compliance documents (commercial invoices, certificates) are access-controlled the same as other regulated business records, since they carry sensitive shipment and pricing data."
+      ],
+      "tests": [
+        "Landed cost calculation is contract-tested across at least one de-minimis-threshold boundary case."
+      ],
+      "operations": [
+        "Shipments missing required customs documentation before dispatch are observable and blockable."
+      ],
+      "recovery": [
+        "HS code and compliance registry data are included in backup scope."
+      ]
+    },
+    "oms": {
+      "purpose": "Orchestrate order fulfillment logistics (splitting, backordering, preordering, dropshipping) beyond simple single-shipment order records.",
+      "invariants": [
+        "A split order's child shipments always sum back to the original order's line items and quantities; nothing is lost or duplicated across the split.",
+        "A backordered or preordered line item is never marked fulfilled until the actual stock movement confirming it exists."
+      ],
+      "security": [
+        "Order-routing decisions (which warehouse/supplier fulfills a split) never leak cross-tenant inventory visibility in a multi-tenant deployment."
+      ],
+      "tests": [
+        "Order-split reconciliation (children sum to parent) is contract-tested."
+      ],
+      "operations": [
+        "Aging backorders and preorders past their expected date are observable."
+      ],
+      "recovery": [
+        "Order orchestration state (split/backorder/preorder/dropship routing) is included in backup scope."
+      ]
+    },
+    "demand_planning": {
+      "purpose": "Forecast future demand and recommend restocking, distinct from simply recording current inventory levels.",
+      "invariants": [
+        "A restock recommendation is always traceable to the forecast and safety-stock parameters that produced it, never an opaque unexplained number."
+      ],
+      "security": [
+        "Historical demand data used for forecasting is scoped per tenant/brand in a multi-tenant deployment, never pooled across unrelated tenants without explicit consent."
+      ],
+      "tests": [
+        "Reorder-point calculation is contract-tested against known forecast/lead-time/safety-stock inputs with a hand-verified expected output."
+      ],
+      "operations": [
+        "Forecast accuracy (predicted vs. actual) is tracked over time so drift can be caught."
+      ],
+      "recovery": [
+        "Forecast models and historical demand data used to produce them are included in backup scope."
+      ]
+    },
+    "affiliate": {
+      "purpose": "Manage third-party promoters (influencers, affiliates) who drive sales in exchange for commission, distinct from the merchant's own marketing campaigns.",
+      "invariants": [
+        "A commission is only calculated and payable against an attributed, completed, non-refunded sale -- never against clicks/views alone.",
+        "Attribution follows a single documented rule (e.g. last-click within a window) applied consistently, not an ad hoc per-case decision."
+      ],
+      "security": [
+        "Promo/referral codes are rate-limited against brute-force enumeration."
+      ],
+      "tests": [
+        "Commission calculation is contract-tested including a refunded-sale case that must reverse the commission."
+      ],
+      "operations": [
+        "Pending commission payouts and top-performing partners are observable."
+      ],
+      "recovery": [
+        "Partner records, attribution data, and commission history are included in backup scope."
+      ]
+    },
+    "pos": {
+      "purpose": "Support physical retail point-of-sale operations distinct from purely online commerce.",
+      "invariants": [
+        "In-store inventory and online inventory are reconciled against a single canonical stock record; a sale in either channel decrements the same source of truth.",
+        "A click-and-collect or ship-from-store order is not marked ready/fulfilled until the specific store location confirms the physical action."
+      ],
+      "security": [
+        "Store-level staff access to POS transaction history follows the same role-based access as other customer_service/commerce data; no separate unmanaged cash-handling data model is introduced by this module."
+      ],
+      "tests": [
+        "Cross-channel inventory decrement (online sale reducing in-store availability and vice versa) is contract-tested."
+      ],
+      "operations": [
+        "Per-store daily reconciliation discrepancies are observable."
+      ],
+      "recovery": [
+        "POS transaction records are included in backup scope."
+      ]
+    },
+    "warranty": {
+      "purpose": "Track product warranty coverage and repair/replacement workflows for durable goods, distinct from CAP-REFUNDS, which only covers returning money, not tracking a physical repair/replacement case.",
+      "invariants": [
+        "Warranty eligibility for a claim is determined from the product's actual recorded purchase/serial data, never an unverified customer-stated purchase date.",
+        "A repair's status transitions follow a single recorded state machine; a repair is never simultaneously 'completed' and 'awaiting parts'."
+      ],
+      "security": [
+        "Warranty claim lookup is restricted to the claiming customer and authorized staff; looking up by serial number alone never exposes another customer's purchase data."
+      ],
+      "tests": [
+        "Warranty-eligibility determination is contract-tested against an expired-warranty boundary case."
+      ],
+      "operations": [
+        "Repairs stalled past an expected turnaround time are observable."
+      ],
+      "recovery": [
+        "Warranty and repair-case records are included in backup scope."
+      ]
+    },
+    "cdp": {
+      "purpose": "Recognize that the same real customer is contacting the business through multiple different channel identities, and record their marketing consent per channel/purpose -- distinct from CAP-IDENTITY (login accounts) and CAP-INTERACTION-HISTORY (activity log for an already-known customer).",
+      "invariants": [
+        "Automatic merging of two channel identities into one customer record requires a documented confidence threshold (e.g. matching verified email or phone); it is never merged on a weak/inferred signal alone without that being recorded as low-confidence.",
+        "A merge is always reversible (unmerge) and logged with who/what triggered it.",
+        "A customer's consent status for a given channel and purpose is read from the consent ledger at the moment of sending, never assumed from a stale cached flag."
+      ],
+      "security": [
+        "Consent ledger entries are immutable/append-only (a withdrawal is a new entry, not an edit of history) to support compliance audits."
+      ],
+      "tests": [
+        "Identity merge/unmerge is contract-tested including a low-confidence case that must NOT auto-merge."
+      ],
+      "operations": [
+        "Pending identity-merge conflicts requiring human review are observable."
+      ],
+      "recovery": [
+        "Identity resolution links and the full consent ledger history are included in backup scope."
+      ]
     }
   }
 }

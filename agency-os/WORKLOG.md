@@ -1,5 +1,50 @@
 # Worklog
 
+## 2026-09-05（System Foundry v1.6 續：操作者提供國際電商藍圖，吸收 12 個新業務模組——2 輪 critic 抓到含 1 個嚴重的架構缺口（新 capability 完全沒接進既有 graph），全部修復並重新驗證）
+
+**觸發**：操作者丟一份 5600 行「Composable AI Commerce OS」藍圖文件（國際電商/全通路平台架構規格），問這對現有 System Foundry 有什麼啟發。查證後對照現有 31 模組/203 capability，找出 12 個真正的業務缺口（非「怎麼做」的工程細節，那類刻意排除，跟本套件既有的「只問業務決策」哲學一致）：Marketplace Ops、B2B/批發、訂閱制商品銷售、忠誠度、評論、跨境關務、訂單履行調度(OMS)、需求預測、網紅聯盟行銷、實體門市、保固售後、客戶身分解析/行銷同意。操作者選「全部12個都做」。
+
+**實作**：新增 12 個模組、43 個 capability、43 題問卷（含新分類插入既有「採購」類別之後、重新編號後續類別、`custom` 類別順位順帶調整），每個模組含完整 `module-obligations.json`（purpose/invariants/security/tests/operations/recovery）。
+
+**第一輪 critic 抓到 High risk：1 Critical(manifest 過期)＋1 Critical(架構缺口)＋4 Major＋6 Minor**：
+- **C1**：`regenerate_integrity.py --write` 跑的時機在其他修復之前，導致 manifest 又過期。**已修**：改成最後一步才跑一次。
+- **C2（最嚴重）**：新增的 43 個 capability 全部是「孤島」——完全沒有 `requires` 邊接進既有 203 個 capability 的圖——critic 用真實 `resolve()` 生出 6 個具體反例證實：例如只選「多平台上架」會得到 `CAP-MULTI-MARKETPLACE` 但沒有 `CAP-PRODUCTS`/`CAP-INVENTORY`；訂閱制扣款重試會得到 `CAP-SUBC-DUNNING` 但沒有 `CAP-PAYMENTS`。**已修**：逐一為 43 個 capability 補上正確的 `requires` 邊（例如 `CAP-MULTI-MARKETPLACE`→`CAP-PRODUCTS`、`CAP-BACKORDER`→[`CAP-ORDERS`,`CAP-INVENTORY`]、`CAP-WARRANTY`→[`CAP-PRODUCTS`,`CAP-ORDERS`]），critic 的 6 個反例重新用真實 `resolve()` 逐一驗證全部修正。
+- **M2**：可以同時選「賣訂閱制商品給終端客戶」跟「不向客戶收費」，邏輯矛盾但沒有規則擋。**已修**：一開始加 conflict-rule，結果讓 `test_selection_matrix.py` 的單題測試（`answer_for_question`）失敗——因為新題 `Q-SUBC-001` 是無條件啟用，單獨測試時不會連帶把「向客戶收費」設成真，立刻觸發新規則。追根究柢對照既有規則（`Q-COM-002`/`Q-PAY-002` 本身就直接掛在對應前提題底下，這才是它們單題測試不會誤觸發衝突規則的真正原因）——**正確修法**：把 `Q-SUBC-001` 的 `active_when` 直接掛在「向客戶收費」底下，`Q-SUBC-004`（扣款重試）掛在「訂閱制」+「線上付款」底下，衝突規則保留作為繞過 UI 的原始 API 呼叫防線（比照既有兩組規則同樣的雙重保險模式）。
+- **M4**：`CAP-REVIEWS`（評論）跟既有 `CAP-UGC`（使用者產生內容）重疊——`Q-DATA-010` 自己的說明文字就把「評論」列為 UGC 的例子。**已修**：`CAP-REVIEWS` 改 `requires` `CAP-UGC`，`Q-REV-001` 改掛在 `Q-DATA-010` 底下，`Q-DATA-010` 說明移除「評論」例子。
+- **M5**：warranty 模組的 obligations 引用一個不存在的「Returns/RMA capability」，warranty 分類說明引用一個不存在的「退款」類別。**已修**：改成正確引用既有 `CAP-REFUNDS`／「退款」問題（第二輪 critic 抓到我第一次改成直接寫 capability ID `CAP-REFUNDS` 洩漏了內部代號到給商家看的文案裡，違反問卷「只給業務層文字」的分層原則，再改成引用真正的題目標籤「退款」）。Returns/RMA 本身確實是遺漏的第 13 個缺口，但操作者只授權 12 個，登記不做。
+- **m8/m9**：pos 模組 obligations 宣稱「收銀機跟值班員工綁定」但沒有對應 capability 支撐；reviews 模組的不變量條件依賴一個問卷裡根本不存在的「需要驗證購買」設定。**已修**：兩處都改成只宣稱實際有 capability 支撐的內容。
+- **m10**：`identity_resolution` 分類/模組 id 跟它底下的題目前綴 `Q-CDP-*` 對不上，`CAP-CONSENT-LEDGER` 語意上更像 CDP/法遵而非「身分解析」，且兩題對純內部系統（沒有外部客戶）也會問。**已修**：`identity_resolution`→`cdp` 全面改名（分類、capability 的 module 欄位、`module-manifests.json`、`module-obligations.json`），兩題改掛在「外部客戶使用」底下。
+- **m11**：好幾題說明文字引用別題標籤時斷章取義（跟真正標籤文字不完全一樣）。**已修**：逐一改成完整引用真正標籤文字。
+
+**第二輪 critic（獨立重跑，非同一個）確認前述全部修復真的落地**，用真實 `resolve()`/DFS 重新驗證 43/43 capability 全部有非空 `requires`、`identity_resolution` 改名零殘留引用、`Q-SUBC-001/004` 的雙重擋法（`active_when`+conflict-rule）真的擋得住對抗性輸入——**但抓到第一輪修復本身留下的 3 個新問題**：①`Q-AFF-003` 說明引用的兩個題目標籤仍是縮寫非完整原文 ②warranty 分類說明我改成直接寫 `CAP-REFUNDS`（內部代號），洩漏到商家看的文案層，且該句跟開頭語意重複 ③`Q-REV-001` 把題目標籤「使用者產生內容」誤稱為「類別」。**三個都已修正**，改完再次跑過 `validate_configurator.py`/`test_selection_matrix.py` 確認無新增問題。
+
+**[已修改]**：
+- `capabilities/catalog.json`：新增 43 個 capability（12 模組），全部含正確 `requires` 邊；`identity_resolution`→`cdp` module 改名
+- `questionnaires/catalog.json`：新增 12 個分類（插入「採購」之後，`order` 重新編號，`custom` 順位 27→39）＋ 43 題；`Q-SUBC-001/004` 補 `active_when` 前提；`Q-REV-001` 掛 `Q-DATA-010`；`Q-CDP-001/002` 掛 `Q-SCOPE-002`；`Q-DATA-010` 移除「評論」例子；多處引用文字修正到完整標籤
+- `rules/question-rules.json`：新增 43 條規則
+- `rules/conflict-rules.json`：新增 `CONFLICT-SUBC-NO-CHARGE`／`CONFLICT-DUNNING-NO-PAY`
+- `generation/module-manifests.json`：新增 12 個模組（含 `cdp` 改名後的正確 paths/activated_by）
+- `generation/module-obligations.json`：新增 12 個模組的完整 obligations（含兩輪修正後的版本）
+- `tests/fixtures/selection/all_no.json`／`all_yes.json`：改用 `resolve()` 實際輸出直接重寫
+- `README.md`／`QUALITY_STRENGTH_MATRIX.md`／`CHANGELOG_v1.6.md`／`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md`：計數更新（208 題／246 capability／43 標準模組／21,528 組配對）＋ CHANGELOG 補上這批新增的具名條目
+- `manifest.json`：`regenerate_integrity.py --write` 作為最後一步重算（吸取 C1 教訓：其他檔案全部改完才跑）
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_foundry.py`＋`test_selection_matrix.py`＋`python -m unittest discover -s tests`＋`validate_manifest.py`（12 步 verify chain，兩輪 critic 修復後各跑一次）| exit=0（每一步）| result=最終 `SELECTION MATRIX: PASS questions=208 single=208 pairwise_valid=21522 pairwise_rejected=6 random=1000 modules=44 blueprints=73 all_yes_caps=246`；29 unittest 全綠；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=對 critic 提供的 6 個真實反例（A-F）逐一用真實 `resolve()` 重新跑 | exit=各異（ACCEPTED 或正確 REJECTED）| result=A/C/E/F 原本缺的 capability 現在都正確出現；B 正確被新 conflict-rule 擋下（`CONFIGURATION_CONTRADICTION`）；D 重新確認測試方法本身有誤（漏設前提題）非真的缺陷，補設前提後確認 `CAP-UGC`/`CAP-IMAGES` 都正確出現
+- REALTEST_EVIDENCE: tool=Bash+Browser | cmd=`preview_start` 開真實瀏覽器，透過 `answers` 設定跨 5 個新模組的 9 個題目為 true，呼叫真實 `preview()`/`generate()`；另外單獨測試「不勾選向客戶收費，訂閱制題目應該是 disabled」| exit=0 | result=9 個 capability 全部正確解析且落地到正確的 `MODULE_MANIFEST.json`；訂閱制卡片在未滿足前提時確認 `class=inactive`、`onclick=null`（正確停用，非文字仍在 DOM 就代表可選）
+- REVIEW_DONE: critic=Standard（兩輪，第二輪為獨立新 subagent 重新驗證非同一個）| verdict=pass（第一輪 High risk 全部關閉；第二輪 3 個 Minor 全部關閉）| findings=0c/0m（收尾時）
+- BUGHUNT_DONE: scope=agency-os,scripts（System_Foundry_v1.6_ARTIFACT_COMPLETE 全樹）| grep=`identity_resolution`（改名殘留）+ `\b165\b\|\b203\b\|13,530\|13530\|13,524\|13524\|2\^165`（改動前）| hits=`identity_resolution` 0 殘留；文件數字改動前 0 個檔案殘留舊數字（本次是先改文字後一次到位，未重複踩前幾輪的手動更新錯誤）
+
+**[剩餘風險]**：
+- 文件數字第 4 次手動更新——強烈建議下次新增前先做 critic suggestion #4：把這些數字改成從 `test_selection_matrix.py` PASS 輸出行讀取，而非繼續手改。
+- critic suggestion #4（另一半）：新增一個 `validate_configurator.py` 檢查，強制「說明文字裡『勾選「X」』的 X 必須完全等於 active_when 鏈上某題的真實標籤」，把 m11 這類問題從「修一次漏一次」變成機械擋死；本次因時間成本高，先不做，連同前述文件數字問題一起排進下次維護。
+- critic suggestion #5：capability closure 透過 `requires` 拉進來的 derived capability 沒有寫入 `traceability`（例如只選「多平台庫存同步」，plan 裡的 `CAP-PRODUCTS`/`CAP-INVENTORY` 說不出「為什麼在這裡」）——這是既有機制的既有缺口，本次新增的 43 個 capability 讓受影響數量變多，但不是本次新問題，先不修。
+- 遺漏的第 13 個缺口 Returns/RMA（退貨換貨流程，跟現有「保固」/「退款」都不同）已由第二輪 critic 確認是真缺口，操作者若要做需另外授權。
+- 操作者提供的藍圖原始檔（`Composable AI Commerce OS.md`）留在套件目錄但未加入 git 追蹤，非本次改動範圍。
+
+**[rollback]**：`git revert` 本次 commit 即可完整還原；`manifest.json` 雜湊隨 revert 自動對齊。
+
 ## 2026-09-05（HCI-30：ADR-0009 租戶/組織 adapter 查證——推翻「HCI 需加 seam 欄位」假設，gate 1-2 重新核實正確、gate 3 確認真阻斷於跨 repo 應用層，刻意不建 migration）
 
 **觸發**：延續「全部去完美處理好」授權（ADR-0019 遺留＋ADR-0009 兩項），ADR-0019 三個 migration 全部關閉後轉本項。0 新 subagent（沿用前一輪 Explore 研究：ADR-0009 契約文件無具體 schema、`hci.tenants` 零 portal 連結欄位）。

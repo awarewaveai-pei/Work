@@ -10,6 +10,7 @@
 - `generation/module-obligations.json` and `generation/blueprint-map.json`.
 - Static artifact generation validator and multi-angle selection matrix.
 - Golden ALL-NO / ALL-YES selection fixtures.
+- 12 new business-domain modules distilled from an operator-supplied global commerce blueprint, each with full capability/question/rule/obligation coverage: `marketplace_ops`, `b2b`, `subscription_commerce`, `loyalty`, `reviews`, `cross_border`, `oms`, `demand_planning`, `affiliate`, `pos`, `warranty`, `cdp` (+43 capabilities, +43 questions).
 
 ## Fixed
 - A capability can no longer remain simultaneously `DEFERRED` and `CURRENT`; current closure wins deterministically.
@@ -20,4 +21,4 @@
 - Documented blocking status codes were added to the canonical status registry.
 
 ## Assurance
-Release requires ALL-NO, ALL-YES, all 165 single-question cases, exhaustive pairwise interactions, 1,000 randomized configurations, all module reachability/materialization, blueprint applicability, conflict fail-closed behavior, artifact hash verification, E2E, adversarial tests, unit tests, semantic validation, and manifest integrity.
+Release requires ALL-NO, ALL-YES, all 208 single-question cases, exhaustive pairwise interactions, 1,000 randomized configurations, all module reachability/materialization, blueprint applicability, conflict fail-closed behavior, artifact hash verification, E2E, adversarial tests, unit tests, semantic validation, and manifest integrity.

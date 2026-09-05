@@ -139,50 +139,122 @@
       "description": "公司對外採購與供應商管理，跟客戶端的訂單/交易資料方向相反"
     },
     {
-      "id": "mobile_offline",
+      "id": "marketplace_ops",
       "order": 20,
+      "title": "多平台市集營運",
+      "description": "同時在多個電商平台銷售時的上架、定價、對帳與帳號健康管理，跟單一官網/單一平台的基本商品訂單設定是不同層級的問題。"
+    },
+    {
+      "id": "b2b",
+      "order": 21,
+      "title": "企業客戶與批發",
+      "description": "客戶包含以公司名義採購、走協議價格、帳期或詢價流程的情境，跟一般消費者直接結帳不同。"
+    },
+    {
+      "id": "subscription_commerce",
+      "order": 22,
+      "title": "訂閱制商品銷售",
+      "description": "賣給終端客戶的商品或服務本身是訂閱制、需要定期續訂——跟「商業模式」類別問的是這套系統本身要不要跟你收訂閱費，是不同方向的問題。"
+    },
+    {
+      "id": "loyalty",
+      "order": 23,
+      "title": "會員忠誠度與獎勵",
+      "description": "點數、會員等級、推薦獎勵、儲值金等留住回頭客的機制，跟一次性促銷折扣不同。"
+    },
+    {
+      "id": "reviews",
+      "order": 24,
+      "title": "評論與口碑",
+      "description": "客戶留下評分、文字、照片或影片評論，以及評論的審核與邀請機制。"
+    },
+    {
+      "id": "cross_border",
+      "order": 25,
+      "title": "跨境關務與合規",
+      "description": "商品跨國銷售牽涉的報關稅則、關稅計算與特定市場的產品合規登記，跟「多國與在地化」類別的語言/幣別/時區設定是不同層面的問題。"
+    },
+    {
+      "id": "oms",
+      "order": 26,
+      "title": "訂單履行與調度",
+      "description": "訂單如何被實際履行——分批出貨、缺貨後補、預購、供應商代發貨，是訂單建立之後、出貨之前的調度問題。"
+    },
+    {
+      "id": "demand_planning",
+      "order": 27,
+      "title": "需求預測與補貨",
+      "description": "根據歷史銷售預測未來需求、自動建議補貨時間與數量，是庫存管理更進一步的規劃能力。"
+    },
+    {
+      "id": "affiliate",
+      "order": 28,
+      "title": "網紅與聯盟行銷",
+      "description": "透過外部網紅、創作者或聯盟夥伴推廣商品並依實際成效給予報酬，跟公司自己執行的行銷活動是不同的合作關係。"
+    },
+    {
+      "id": "pos",
+      "order": 29,
+      "title": "實體門市銷售",
+      "description": "有實體門市、快閃店或現場銷售據點時的收銀、庫存同步與跨通路取貨/出貨需求。"
+    },
+    {
+      "id": "warranty",
+      "order": 30,
+      "title": "保固與售後維修",
+      "description": "商品保固期限、維修或換貨案件的處理與追蹤，是耐久財特有的售後機制，跟「付款與帳務」類別的「退款」（純粹把錢退回）不同。"
+    },
+    {
+      "id": "cdp",
+      "order": 31,
+      "title": "客戶身分識別與行銷同意",
+      "description": "辨識不同管道接觸你的其實是同一位客戶，以及正式記錄客戶對各行銷管道的同意狀態，供退出與法規稽核使用。"
+    },
+    {
+      "id": "mobile_offline",
+      "order": 32,
       "title": "行動與離線",
       "description": "行動裝置、現場作業與離線能力"
     },
     {
       "id": "globalization",
-      "order": 21,
+      "order": 33,
       "title": "多國與在地化",
       "description": "語言、幣別、時區與資料所在地"
     },
     {
       "id": "ai",
-      "order": 22,
+      "order": 34,
       "title": "AI 與自動化",
       "description": "AI 輔助、生成、決策與代理操作"
     },
     {
       "id": "migration",
-      "order": 23,
+      "order": 35,
       "title": "既有系統與資料遷移",
       "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "regulated",
-      "order": 24,
+      "order": 36,
       "title": "特殊資料與產業",
       "description": "會觸發額外治理或法規研究的領域事實"
     },
     {
       "id": "business_impact",
-      "order": 25,
+      "order": 37,
       "title": "營運影響",
       "description": "描述業務本身的運作方式與影響，不是選工程技術"
     },
     {
       "id": "future",
-      "order": 26,
+      "order": 38,
       "title": "未來規劃",
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
       "id": "custom",
-      "order": 27,
+      "order": 39,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -452,7 +524,7 @@
       "id": "Q-DATA-010",
       "category": "records",
       "label": "使用者產生內容",
-      "description": "使用者可以自己在系統裡建立內容，例如貼文、評論、上傳的作品，而不只是填寫固定表單。",
+      "description": "使用者可以自己在系統裡建立內容，例如貼文、討論串、上傳的作品，而不只是填寫固定表單。針對單一商品的評分/評論是更明確的「評論與口碑」類別在處理。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1898,6 +1970,482 @@
       "required_when_active": true,
       "active_when": {
         "question": "Q-CS-006",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MKTOPS-001",
+      "category": "marketplace_ops",
+      "label": "同時在多個電商平台/市集上架同一批商品",
+      "description": "你的商品同時在兩個以上的第三方電商平台或市集銷售（例如同時在 Shopee、Amazon、蝦皮上架同一批貨），不是只有自己的官網或單一平台。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-MKTOPS-002",
+      "category": "marketplace_ops",
+      "label": "需要庫存與價格跨平台自動同步",
+      "description": "任一平台賣出或調價時，其他平台的庫存與價格需要自動跟著更新，不是人工到每個後台個別維護。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MKTOPS-003",
+      "category": "marketplace_ops",
+      "label": "需要依競爭對手價格自動調整售價",
+      "description": "系統要能參考競爭對手在同一平台的售價，自動調整你的售價以維持競爭力，但不能低於你設定的最低毛利。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MKTOPS-004",
+      "category": "marketplace_ops",
+      "label": "需要追蹤各平台帳號健康分數與違規警告",
+      "description": "需要監控每個平台帳號的表現指標（例如延遲出貨率、取消率、違規警告），避免帳號被停權才發現。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MKTOPS-005",
+      "category": "marketplace_ops",
+      "label": "需要平台清算金額與實際入帳自動核對",
+      "description": "平台實際撥款金額，需要自動跟「預期營收扣掉平台費、退款、罰款」算出來的金額比對，兜不起來要有警示。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。跟「銀行對帳單自動比對」（比對銀行實際入帳）、「金流商清算對帳」（比對金流商自己的清算紀錄）都不同：這題比對的是電商平台自己的清算撥款。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-B2B-001",
+      "category": "b2b",
+      "label": "客戶包含企業採購，流程跟一般消費者不同",
+      "description": "部分客戶是以公司名義採購，採購流程（議價、審核、對帳）跟一般消費者直接刷卡結帳不一樣。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-B2B-002",
+      "category": "b2b",
+      "label": "不同企業客戶有不同的協議價格",
+      "description": "同樣的商品，不同企業客戶可能談到不同價格（例如量大的客戶有更低單價），不是所有人看到同一個價格。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-B2B-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-B2B-003",
+      "category": "b2b",
+      "label": "有最低訂購量限制",
+      "description": "企業客戶下單有最低數量門檻，低於這個量不能單獨下單。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-B2B-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-B2B-004",
+      "category": "b2b",
+      "label": "客戶會先詢價再下單",
+      "description": "企業客戶通常先提出詢價，你報價之後對方才確認下單，不是直接照網站標價下單。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-B2B-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-B2B-005",
+      "category": "b2b",
+      "label": "允許客戶先拿貨後付款（帳期）",
+      "description": "企業客戶可以先收到商品，之後依約定天數（例如月結 30 天）才付款，而不是下單當下就要付清。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-B2B-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-B2B-006",
+      "category": "b2b",
+      "label": "企業客戶自己有多個承辦人角色",
+      "description": "同一家企業客戶內部有不同的人負責提出採購需求、有不同的人負責核准，系統需要區分這些角色，而不是整家公司共用一個帳號。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-B2B-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-SUBC-001",
+      "category": "subscription_commerce",
+      "label": "賣訂閱制商品或服務給終端客戶",
+      "description": "你賣給客戶的是需要定期續訂的商品或服務（例如訂閱盒、月費服務），不是這套系統本身要不要跟你收費的那個問題（那是另一類「商業模式」問題）。只在你有勾選「向客戶收費」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-SUBC-002",
+      "category": "subscription_commerce",
+      "label": "客戶可以暫停或跳過某一期",
+      "description": "客戶不想取消訂閱，但這個月不想收到貨或不想扣款，可以暫停或跳過一期。只在你有勾選「賣訂閱制商品或服務給終端客戶」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SUBC-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-SUBC-003",
+      "category": "subscription_commerce",
+      "label": "客戶可以升級或降級訂閱方案",
+      "description": "客戶可以自己把訂閱方案換成更高或更低的等級，系統需要處理價差找補。只在你有勾選「賣訂閱制商品或服務給終端客戶」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SUBC-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-SUBC-004",
+      "category": "subscription_commerce",
+      "label": "扣款失敗需要自動重試與提醒",
+      "description": "客戶的定期扣款失敗時，系統要自動重試並通知客戶更新付款方式，不是扣款失敗就直接取消訂閱。只在你同時有勾選「賣訂閱制商品或服務給終端客戶」與「線上付款」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "all": [
+          {
+            "question": "Q-SUBC-001",
+            "equals": true
+          },
+          {
+            "question": "Q-PAY-001",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-LOY-001",
+      "category": "loyalty",
+      "label": "提供會員點數或獎勵機制",
+      "description": "客戶消費或完成特定行為可以累積點數或獲得獎勵，不是純折扣促銷。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-LOY-002",
+      "category": "loyalty",
+      "label": "不同等級會員有不同權益",
+      "description": "客戶依消費金額或其他條件分成不同會員等級（例如一般/銀卡/金卡），各等級權益不同。只在你有勾選「提供會員點數或獎勵機制」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-LOY-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-LOY-003",
+      "category": "loyalty",
+      "label": "推薦朋友有獎勵機制",
+      "description": "客戶推薦新客戶，且新客戶完成第一次消費後，推薦人才拿到獎勵（不是新客戶一註冊就給，避免濫用）。只在你有勾選「提供會員點數或獎勵機制」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-LOY-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-LOY-004",
+      "category": "loyalty",
+      "label": "提供儲值金或禮品卡",
+      "description": "客戶可以預先儲值或持有禮品卡餘額，之後消費時折抵。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-REV-001",
+      "category": "reviews",
+      "label": "客戶可以留評論或評分",
+      "description": "客戶可以針對商品或整體購物體驗留下評分與文字評論，是結構化的評分/評論機制（跟「核心資料」類別的「使用者產生內容」自由發文/上傳不同，那邊不特定針對單一商品評分）。只在你有勾選「使用者產生內容」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-010",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-REV-002",
+      "category": "reviews",
+      "label": "客戶可上傳照片或影片評論",
+      "description": "評論除了文字，客戶還可以附上實際拍攝的照片或影片。只在你有勾選「客戶可以留評論或評分」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-REV-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-REV-003",
+      "category": "reviews",
+      "label": "評論發布前需要審核",
+      "description": "客戶留的評論要先經過審核通過才會公開顯示，不是送出就直接上架。只在你有勾選「客戶可以留評論或評分」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-REV-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-REV-004",
+      "category": "reviews",
+      "label": "需要主動邀請客戶留評論",
+      "description": "客戶收到商品後，系統要主動發訊息邀請留評論，而不是被動等客戶自己想到才留。只在你有勾選「客戶可以留評論或評分」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-REV-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-XB-001",
+      "category": "cross_border",
+      "label": "商品跨國銷售且涉及進出口關務",
+      "description": "商品會賣到其他國家，涉及報關、進出口程序，不是單純同一國內配送。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-XB-002",
+      "category": "cross_border",
+      "label": "需要記錄商品的海關稅則號別",
+      "description": "每項商品需要有正式的海關稅則分類號（HS Code），這會直接影響進口關稅率。只在你有勾選「商品跨國銷售且涉及進出口關務」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-XB-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-XB-003",
+      "category": "cross_border",
+      "label": "需要計算關稅並顯示到岸總價",
+      "description": "客戶下單時要能看到含關稅/進口稅在內的實際總價，而不是只看到商品售價、關稅另外通知。只在你有勾選「商品跨國銷售且涉及進出口關務」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-XB-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-XB-004",
+      "category": "cross_border",
+      "label": "商品需要符合特定市場的合規登記制度",
+      "description": "要銷售到的市場要求商品先完成正式登記（例如產品護照、合規註冊）才能上市。只在你有勾選「商品跨國銷售且涉及進出口關務」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-XB-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-OMS-001",
+      "category": "oms",
+      "label": "訂單可能需要拆成多筆分開出貨",
+      "description": "一筆訂單有時需要分成好幾批出貨（例如商品分散在不同倉庫，或缺貨部分先出其餘的），不是每筆訂單一定一次出完。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-OMS-002",
+      "category": "oms",
+      "label": "允許缺貨時繼續接單，之後補貨再出（預購後補）",
+      "description": "商品缺貨時，客戶仍可以下單，等補貨後系統自動安排出貨，而不是直接不能下單。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-OMS-003",
+      "category": "oms",
+      "label": "允許客戶預購尚未正式上市的商品",
+      "description": "商品還沒真正上市或到貨，客戶就可以先下單預訂。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-OMS-004",
+      "category": "oms",
+      "label": "部分訂單由供應商直接出貨給客戶",
+      "description": "某些商品不經過你自己的倉庫，而是供應商收到訂單後直接寄給客戶（代發貨）。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DEM-001",
+      "category": "demand_planning",
+      "label": "需要系統預測未來銷量以規劃備貨",
+      "description": "系統要能根據歷史銷售預測未來一段時間的需求量，協助決定要備多少貨，而不是純憑經驗猜測。跟「銷售與客戶關係管理」類別的「銷售預測與漏斗分析」不同：那題是業務團隊預測個別商機能不能成交，這題是整體庫存備貨要用的需求量預測。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-DEM-002",
+      "category": "demand_planning",
+      "label": "需要系統自動建議何時該補貨、補多少",
+      "description": "系統根據預測需求、進貨前置時間與安全庫存，自動算出建議補貨時間點與數量，而不是人工憑經驗判斷。只在你有勾選「需要系統預測未來銷量以規劃備貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DEM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-AFF-001",
+      "category": "affiliate",
+      "label": "透過網紅／創作者合作帶貨",
+      "description": "你會找網紅或內容創作者推廣商品，並提供對方報酬或商品作為合作條件。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AFF-002",
+      "category": "affiliate",
+      "label": "有聯盟行銷夥伴賺取分潤",
+      "description": "外部合作夥伴推薦客戶下單後可以抽成分潤，是正式的聯盟行銷機制，不是網紅個案合作。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AFF-003",
+      "category": "affiliate",
+      "label": "需要追蹤每個推廣連結/優惠碼帶來的實際業績",
+      "description": "系統要能精確算出每個網紅或聯盟夥伴的推廣連結/優惠碼實際帶來多少訂單與該給多少分潤，而不是憑感覺估算。只在你有勾選「透過網紅／創作者合作帶貨」或「有聯盟行銷夥伴賺取分潤」其中之一時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "any": [
+          {
+            "question": "Q-AFF-001",
+            "equals": true
+          },
+          {
+            "question": "Q-AFF-002",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-POS-001",
+      "category": "pos",
+      "label": "有實體門市或快閃店銷售",
+      "description": "除了線上，你還有實體門市、快閃店或展場等現場銷售據點。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-POS-002",
+      "category": "pos",
+      "label": "門市庫存需要跟線上庫存即時同步",
+      "description": "門市賣掉的東西要立刻反映到線上庫存，反之亦然，不能各自獨立算庫存。只在你有勾選「有實體門市或快閃店銷售」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-POS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-POS-003",
+      "category": "pos",
+      "label": "支援線上下單門市取貨或門市出貨",
+      "description": "客戶可以線上下單、選門市取貨，或由門市直接出貨寄給客戶。只在你有勾選「有實體門市或快閃店銷售」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-POS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-WAR-001",
+      "category": "warranty",
+      "label": "商品有保固期限與保固申請流程",
+      "description": "你賣的商品有正式保固期，客戶可以在期限內提出保固申請，是耐久財常見的售後機制，跟一般退貨（不喜歡就退）不同。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WAR-002",
+      "category": "warranty",
+      "label": "需要追蹤維修/換貨流程狀態",
+      "description": "保固內的維修或換貨案件需要有明確的處理狀態可以追蹤（例如：已收件、維修中、待補零件、已完成），而不是靠客服人工記憶進度。只在你有勾選「商品有保固期限與保固申請流程」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-WAR-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-CDP-001",
+      "category": "cdp",
+      "label": "同一位客戶會透過多個不同管道聯絡，需要自動辨識是同一人",
+      "description": "客戶可能透過 LINE、Email、不同平台帳號等多種方式接觸你，系統需要自動判斷這些其實是同一個人，而不是各管道各自建立獨立、互不相關的客戶資料。只在你有勾選「外部客戶使用」時才有意義——純內部員工工具沒有跨管道客戶身分辨識的問題。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SCOPE-002",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-CDP-002",
+      "category": "cdp",
+      "label": "需要記錄客戶對各行銷管道的同意狀態",
+      "description": "需要正式記錄客戶對每個行銷管道與用途（例如 email 行銷、簡訊）是否同意接收，並保留歷史紀錄供稽核與退出使用，而不是只有一個目前是否訂閱的開關。只在你有勾選「外部客戶使用」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SCOPE-002",
         "equals": true
       }
     }

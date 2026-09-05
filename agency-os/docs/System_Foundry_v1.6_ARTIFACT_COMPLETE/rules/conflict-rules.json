@@ -75,6 +75,36 @@
       ],
       "code": "CONFIGURATION_CONTRADICTION",
       "message": "跨公司共同案件需要多家公司使用。"
+    },
+    {
+      "id": "CONFLICT-SUBC-NO-CHARGE",
+      "if_all": [
+        {
+          "question": "Q-SUBC-001",
+          "equals": true
+        },
+        {
+          "question": "Q-COM-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "賣訂閱制商品給終端客戶，代表你會向客戶收費，跟「不向客戶收費」互相矛盾。"
+    },
+    {
+      "id": "CONFLICT-DUNNING-NO-PAY",
+      "if_all": [
+        {
+          "question": "Q-SUBC-004",
+          "equals": true
+        },
+        {
+          "question": "Q-PAY-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "扣款失敗自動重試需要先有線上付款能力。"
     }
   ]
 }
