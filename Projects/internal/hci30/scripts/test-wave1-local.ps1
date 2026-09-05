@@ -65,6 +65,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Shared band-rank arithmetic tests failed (pack
 node --test (Join-Path $root 'tests/unit/intelligence/combine-method-findings.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Method-finding-to-dimension combination tests failed (HCI_CONFIDENCE_SPEC.md).' }
 
+node --test (Join-Path $root 'tests/unit/intelligence/dimension-score.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Shared dimension-score validator tests failed (packages/intelligence/dimension-score.mjs).' }
+
+# HCI_RISK_SPEC.md (partial): severity-floor detection -- a VERY_LOW
+# dimension is surfaced as a parallel signal, never used to override a
+# Trust Domain average. Node-level, Docker-free.
+node --test (Join-Path $root 'tests/unit/intelligence/detect-severity-floor.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Severity-floor detection tests failed (HCI_RISK_SPEC.md).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.

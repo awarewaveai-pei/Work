@@ -311,25 +311,30 @@ silently invent inline here:
   separate P0-04 sibling from evidence quality, not folded into it.
 - **Time decay** of evidence relevance before it feeds a dimension →
   `HCI_TIME_DECAY_SPEC.md` (not yet written).
-- **Model disagreement / calibration**, and **cross-method combination
-  within one dimension** (multiple methods bearing on the same Assessment
-  Dimension), of the method(s) that produce a dimension's own band in the
-  first place → `HCI_CONFIDENCE_SPEC.md` (not yet written). See §Layering
-  above — this is a genuinely unowned gap today, not one gate 5 already
-  closes.
+- **Cross-method combination within one dimension** (multiple methods
+  bearing on the same Assessment Dimension) — **update, 2026-09-06**:
+  `HCI_CONFIDENCE_SPEC.md` (partial) and
+  `packages/intelligence/combine-method-findings.mjs` now answer this;
+  see §Layering above. **Model disagreement across dimensions and
+  calibration of the method(s) themselves** remain open in that same
+  file's own out-of-scope list.
 - **The qualitative-band-to-probability-range mapping** (`19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md`
   §Confidence display asks for one but does not define it;
   `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04 names it explicitly) →
-  `HCI_CONFIDENCE_SPEC.md` (not yet written). §Aggregation rule above
-  already notes this spec's rank encoding must not be re-derived from
-  whatever that mapping turns out to be.
+  `HCI_CONFIDENCE_SPEC.md`'s own out-of-scope list (still open there).
+  §Aggregation rule above already notes this spec's rank encoding must not
+  be re-derived from whatever that mapping turns out to be.
 - **Risk severity exceptions** (a single severe finding overriding an
-  otherwise-favorable average) → `HCI_RISK_SPEC.md` (not yet written). This
-  spec's mean-of-two-ranks rule has no severity override; a domain fed one
-  `VERY_HIGH` and one `VERY_LOW` dimension rolls up to `MODERATE`
-  (rank 3) under this spec alone, which may be the wrong answer for a
-  genuinely severe finding — that judgment belongs to the risk spec, not
-  smuggled into this aggregation rule.
+  otherwise-favorable average) — **update, 2026-09-06**:
+  `HCI_RISK_SPEC.md` (partial) and
+  `packages/intelligence/detect-severity-floor.mjs` now answer the
+  narrower "is a VERY_LOW dimension hidden by the average" case, as a
+  parallel signal that does **not** change this spec's mean-of-two-ranks
+  rule — a domain fed one `VERY_HIGH` and one `VERY_LOW` dimension still
+  rolls up to `MODERATE` (rank 3) here; `detectSeverityFloor` separately
+  reports the `VERY_LOW` crossing. Broader risk questions (the `RiskEvent`
+  entity, Risk-to-Permission mapping, stage-aware severity) remain open in
+  that file's own out-of-scope list.
 - **Permission implications** of a given Trust Domain profile →
   `HCI_PERMISSION_SPEC.md` (not yet written).
 

@@ -1,5 +1,50 @@
 # Worklog
 
+## 2026-09-06（同日第五輪：HCI_RISK_SPEC.md 部分落地——severity-floor detection，解答上一輪 disagreement-propagation 待辦的觸發，critic 覆審抓到 1 Critical+3 Major+3 Minor，同款「安全宣稱被自己文件說的操作步驟證偽」再度出現）
+
+**觸發**：操作者「繼續」，延續同日第四輪結束時我自己提出的候選——`HCI_RISK_SPEC.md`（severity override）。上一輪 TASKS.md 明文留了一個觸發條件：「等真有 trust-read endpoint 或碰 `HCI_RISK_SPEC.md` 時一併決定」disagreement 傳遞問題，本輪碰了 HCI_RISK_SPEC.md，所以先檢視這個觸發（見下方 [已修改]／TASKS.md 更新）。
+
+**設計**：讀 `HCI_TRUST_DOMAIN_SPEC.md` §Explicitly out of scope 自己留的洞（「一個 VERY_HIGH+一個 VERY_LOW 會平庸化成 MODERATE，這對真正嚴重的單一發現可能是錯的答案」）後，比較兩種修法：(a) 覆寫 domain 的 `value`——否決，理由跟 partition 設計否決加權矩陣同一套（會重新引入未揭露的 ad hoc 數值塑形），且會是第二次為了聚合公式微調而改 gate 4 contract；(b) 建平行訊號函式——採用，同 `combineMethodFindings` 的 `disagreement` flag 手法：不動 `rollupTrustDomains` 或 gate 4，`detectSeverityFloor(dimensionScores)` 獨立回報哪些維度落在 VERY_LOW，附帶同 domain 的其他維度（`siblings`，寫成陣列而非單一欄位，這樣 partition 若未來擴大到每 domain 3 個維度也不會靜默漏資料）。**順手抽出 `packages/intelligence/dimension-score.mjs`**（`rollupTrustDomains` 的 `{dimension,value,evidence_refs}` 驗證邏輯，這是它的第二個消費者，非之後文件初稿誤寫的「第三個」），用 250,010 案例差分測試證明重構零行為差異才動手。
+
+**送 critic 獨立覆審**（純設計+邏輯，同前四輪判準）——抓到 **1 Critical + 3 Major + 3 Minor**，commit 前全修：
+
+- **C1（本輪唯一 Critical，跟上一輪 HCI_CONFIDENCE_SPEC.md 的 C1 同一種失敗模式）**：`SEVERITY_FLOOR_RANK` 比對原本寫 `===`（嚴格相等）。spec 自己的 Rollback 段落宣稱「這是一個具名常數，調整門檻只要改一行，不需重新設計機制」——但真的把常數從 `BAND_RANK.VERY_LOW` 改成 `BAND_RANK.LOW` 時，`===` 語意讓 VERY_LOW 完全停止觸發（真正該被抓出來的最差情況反而消失），這正是 spec 自己教的「一行修改」操作步驟，執行後證偽了 spec 自己的安全承諾。改為 `<=`（「floor」真正的語意：等於或低於），這樣未來調高門檻時 VERY_LOW 依然會被涵蓋。
+- **M1**：文件與程式碼共 4 處把 `dimension-score.mjs` 稱為「第三個消費者」，實際只有 `rollupTrustDomains` 和 `detectSeverityFloor` 兩個（`combine-method-findings.mjs` 因欄位形狀不同刻意不算）。
+- **M2**：引用 `04_HCI30_PRODUCT_SPEC.md:87` 的逐字文字，但該行已在本 session 更早的 commit 被改寫成 RESOLVED 版本——補上「改動前原文，見 git history」的限定語（同款錯誤本 session 已經修過兩次，這是第三次犯）。
+- **M3**：`RiskEvent` 實體的行號引用抄自二手研究文件且該文件自己就抄錯了行——V2 藍圖裡那行實際是 Permission 不是 RiskEvent；改引正確行號並註明 `risk_events` 表名其實是 V1 藍圖的用語，V2 沒有逐行核對過。
+- **M4**：alert 清單原本依輸入陣列順序、sibling 清單依 `ASSESSMENT_DIMENSIONS` 順序，兩者互不一致且未在文件宣告任一順序為規範性；唯一的測試用 `Set` 比對完全測不出順序差異。統一改成兩者都依 `ASSESSMENT_DIMENSIONS` 順序（跟套件裡其他排序慣例一致），補精確順序斷言（含刻意打亂輸入順序的測試）。
+- **M5**：`siblings` 寫成陣列而非單一欄位的理由（partition 若擴大到每 domain 3 個維度仍要正確）完全沒有測試背書——建一個真的 21-維度/3-per-domain sandbox（因為改真實 14-維度檔案做「一行漂移」做不出真正的 3-per-domain 分佈，直接寫一份自訂 `assessment-dimensions.mjs` 內容）匯入真實、未修改的 `detect-severity-floor.mjs` 驗證：不崩潰、正確排除自己、缺席的維度回報 `null`。
+- 3 個 Minor 全修：TASKS.md 引用的觸發條件對錯（見下方 TASKS.md 更新）；「這會是 gate 4 第三次為了聚合公式微調而改」計數錯（實際目前只改過一次，`9888bd5d7` 那次）；HCI_CONFIDENCE_SPEC.md 的 C1 finding 被本檔誤歸因成「critic 建議別碰 gate 4」，實際上 C1 只是抓到一個假宣稱，「不碰 gate 4」是作者自己選的修法不是 finding 本身要求的。
+
+**同步觸發檢視（TASKS.md 待辦，上一輪明文留的條件）**：「等碰 HCI_RISK_SPEC.md 時一併決定 disagreement 傳遞」——本輪碰了，檢視後**明確再次遞延，非疏漏**：severity-floor 解掉的是「單一維度嚴重值被平均掉」，跟「domain 內兩個維度自己是否算互相不同意（inter-dimension spread）」以及「dimension 層 cross-method disagreement 該不該往上傳」是不同的設計問題，severity-floor 的落地方式（平行訊號、不碰 gate 4）雖然提供了可依循的模式，但不構成這條待辦本身的答案——仍需先決定 domain 層的「disagreement」概念定義本身。
+
+**[已修改]**
+- 新增：`Projects/internal/hci30/docs/intelligence/HCI_RISK_SPEC.md`
+- 新增：`Projects/internal/hci30/packages/intelligence/{dimension-score,detect-severity-floor}.mjs`
+- 新增：`Projects/internal/hci30/tests/unit/intelligence/{dimension-score,detect-severity-floor}.test.mjs`
+- 修改（重構，行為不變，已用 250,010 案例差分測試驗證）：`Projects/internal/hci30/packages/intelligence/rollup-trust-domains.mjs`
+- 修改：`Projects/internal/hci30/scripts/test-wave1-local.ps1`（+2 個 `node --test` 區段）
+- 修改：`Projects/internal/hci30/scripts/mutation-check-node-gates.ps1`（+4 個新 mutation、修正 1 個因程式碼搬家變成 stale 的舊 mutation 指向）
+- 修改：`Projects/internal/hci30/README.md`
+- 修改：`Projects/internal/hci30/docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`（§Explicitly out of scope 回填 HCI_CONFIDENCE_SPEC.md 與 HCI_RISK_SPEC.md 兩個部分關閉的答案）
+- 修改：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/21_HCI_TOP_TIER_GAP_ANALYSIS.md`（第三次 partial closure 記錄）
+- 修改：`agency-os/TASKS.md`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs tests/unit/intelligence/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=123/123 pass（critic 修復前 119，新增/調整淨增 4：alert 順序測試+widened-partition 測試+Array.isArray 測試+evidence_refs 別名測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/mutation-check-node-gates.ps1` | exit=0 | result=`All 18/18 Node-gate mutations killed.`（含 baseline no-op gate 全部 9 個 target test 檔）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1` | exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，全流程重跑綠燈
+- REVIEW_DONE: critic=Standard（真實 subagent，250,010 隨機+4,981 窮舉差分測試 + 34 個手動 mutation + widened-partition 真跑）| verdict=1 Critical/3 Major/3 Minor，全修 | findings=1c/3m/3minor
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os | grep=`detectSeverityFloor\|detect-severity-floor\|dimension-score\|SEVERITY_FLOOR_RANK\|HCI_RISK_SPEC\|findSiblingDimensions` | hits=15（13 個本輪新建/修改檔案 + 2 個前幾輪 WORKLOG 歷史條目提及 HCI_RISK_SPEC「尚未寫」，屬歷史記錄不應回改，皆預期內）
+- WORKLOG: 本條目
+
+**[剩餘風險]**
+- disagreement 從 dimension 層傳到 domain 層的路徑仍不存在，本輪明確再次遞延（見上方觸發檢視段落），非本輪遺漏
+- P0-04 剩四份規格（Evidence Quality/Contradiction/Permission/Time Decay）+ HCI_CONFIDENCE_SPEC.md／HCI_RISK_SPEC.md 各自剩餘未關閉部分仍未寫，已列 TASKS.md OQ
+- `RiskEvent` 實體本身（真正的持久化、生命週期物件）完全不在本輪範圍內——`detectSeverityFloor` 是純函式，不是 schema 或 workflow
+
+**[rollback]** 純新增+一處已知零消費者的重構（差分測試驗證行為不變），`git revert` 即可；無 schema/migration/prod 變更。
+
 ## 2026-09-06（System Foundry：5個真缺口的第2個 Fraud/Risk 落地，critic 抓到 requires 邊不完整的真缺陷）
 
 [根因/決策] 承接前一輪（Pricing/Promotions）確認的5個真缺口，本輪做第2個：Fraud/Risk（Payments_Fraud_Risk 藍圖章節中 payments 半邊已有既有`CAP-PAYMENTS`覆蓋，fraud/risk半邊未覆蓋）。設計吸取前兩輪教訓：新增`CAP-RISK-SCREENING`（訂單濫用篩查，requires `[CAP-ORDERS,CAP-CUSTOMER-DATA]`，不碰`CAP-PAYMENTS`）+`CAP-CHARGEBACK`（拒付爭議案件管理，requires `[CAP-PAYMENTS,CAP-ORDERS]`）；`Q-RISK-002`刻意 gate 在`Q-PAY-001`（線上付款，較窄）而非`Q-COM-001`（向客戶收費，較寬）——這是本輪最重要的設計決策，直接針對`488bf60ad`（Returns/RMA）的錯誤示範：`Q-RET-001`當初gate在`Q-COM-001`導致變成TASKS.md既有那條「6題繞道CAP-PAYMENTS」清單的第6個實例；這次gate在`Q-PAY-001`（`Q-PAY-001=true`本身已蘊含`Q-COM-001=true`）從根本上不製造同類問題。

@@ -115,10 +115,15 @@ $mutations = @(
      replace = ''
      test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
 
-  @{ id = 'rollup-drop-duplicate-dimension-check'
+  # The duplicate-dimension check itself moved to dimension-score.mjs in
+  # the HCI_RISK_SPEC.md refactor (2026-09-06, extracted for a second
+  # consumer) -- covered there by dimension-score-drop-duplicate-check
+  # below. This entry now targets rollup-trust-domains.mjs's own remaining
+  # logic (coverage derivation) instead of re-testing the moved check.
+  @{ id = 'rollup-hardcode-full-coverage'
      file = 'packages/intelligence/rollup-trust-domains.mjs'
-     find = 'if (seenDimensions.has(entry.dimension)) throw new Error(`duplicate dimension in input: ${entry.dimension}`);'
-     replace = ''
+     find = "const coverage = present.length === assigned.length ? 'FULL' : 'PARTIAL';"
+     replace = "const coverage = 'FULL';"
      test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
 
   @{ id = 'band-scale-force-round-up-tie-break'
@@ -144,6 +149,24 @@ $mutations = @(
      find = 'const disagreement = spread >= DISAGREEMENT_SPREAD_THRESHOLD;'
      replace = 'const disagreement = spread > DISAGREEMENT_SPREAD_THRESHOLD;'
      test = 'tests/unit/intelligence/combine-method-findings.test.mjs' }
+
+  @{ id = 'dimension-score-drop-duplicate-check'
+     file = 'packages/intelligence/dimension-score.mjs'
+     find = 'if (seen.has(entry.dimension)) throw new Error(`duplicate dimension in input: ${entry.dimension}`);'
+     replace = ''
+     test = 'tests/unit/intelligence/dimension-score.test.mjs' }
+
+  @{ id = 'severity-floor-lower-threshold-to-low'
+     file = 'packages/intelligence/detect-severity-floor.mjs'
+     find = 'const SEVERITY_FLOOR_RANK = BAND_RANK.VERY_LOW;'
+     replace = 'const SEVERITY_FLOOR_RANK = BAND_RANK.LOW;'
+     test = 'tests/unit/intelligence/detect-severity-floor.test.mjs' }
+
+  @{ id = 'severity-floor-include-self-as-sibling'
+     file = 'packages/intelligence/detect-severity-floor.mjs'
+     find = ".filter((other) => other !== dimension && DIMENSION_TO_DOMAIN[other] === domain)"
+     replace = '.filter((other) => DIMENSION_TO_DOMAIN[other] === domain)'
+     test = 'tests/unit/intelligence/detect-severity-floor.test.mjs' }
 )
 
 function New-MutationSandbox {

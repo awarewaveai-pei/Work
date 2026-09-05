@@ -1,6 +1,7 @@
 import { TRUST_DOMAINS } from '../contracts/trust-domains.mjs';
 import { ASSESSMENT_DIMENSIONS, DIMENSION_TO_DOMAIN } from './assessment-dimensions.mjs';
-import { BAND_RANK, BANDS, meanRankBand } from './band-scale.mjs';
+import { BAND_RANK, meanRankBand } from './band-scale.mjs';
+import { normalizeDimensionScore, assertNoDuplicateDimensions } from './dimension-score.mjs';
 
 // Group each domain's assigned dimensions once, derived from
 // DIMENSION_TO_DOMAIN rather than hand-duplicated, so the two files cannot
@@ -15,25 +16,6 @@ const DOMAIN_DIMENSIONS = Object.freeze(
   }, {}),
 );
 
-// Validates AND returns a plain, re-read-proof snapshot of the input entry
-// -- reading each field exactly once into a new object closes a
-// time-of-check/time-of-use gap a getter-backed input could otherwise open
-// between validation and use (critic review, 2026-09-06 m2).
-function normalizeDimensionInput(entry, index) {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`dimensionScores[${index}] must be an object`);
-  const dimension = entry.dimension;
-  const value = entry.value;
-  const evidenceRefsInput = entry.evidence_refs;
-  if (!ASSESSMENT_DIMENSIONS.includes(dimension)) throw new Error(`dimensionScores[${index}]: invalid dimension: ${dimension}`);
-  if (!BANDS.includes(value)) throw new Error(`dimensionScores[${index}]: invalid band: ${value}`);
-  if (!Array.isArray(evidenceRefsInput) || evidenceRefsInput.length === 0) throw new Error(`dimensionScores[${index}]: evidence_refs must be a non-empty array`);
-  const evidenceRefs = evidenceRefsInput.map((ref) => {
-    if (typeof ref !== 'string' || ref.trim() === '') throw new Error(`dimensionScores[${index}]: evidence_refs must contain only non-empty strings`);
-    return ref;
-  });
-  return { dimension, value, evidence_refs: evidenceRefs };
-}
-
 // HCI_TRUST_DOMAIN_SPEC.md's own worked function: 14 already-resolved
 // dimension values in, 0-7 domain values out (a domain with none of its
 // assigned dimensions present is omitted entirely, never defaulted to
@@ -43,13 +25,8 @@ function normalizeDimensionInput(entry, index) {
 // equivalent outputs" requirement by construction.
 export function rollupTrustDomains(dimensionScores) {
   if (!Array.isArray(dimensionScores)) throw new Error('dimensionScores must be an array');
-  const normalized = dimensionScores.map(normalizeDimensionInput);
-
-  const seenDimensions = new Set();
-  for (const entry of normalized) {
-    if (seenDimensions.has(entry.dimension)) throw new Error(`duplicate dimension in input: ${entry.dimension}`);
-    seenDimensions.add(entry.dimension);
-  }
+  const normalized = dimensionScores.map(normalizeDimensionScore);
+  assertNoDuplicateDimensions(normalized);
 
   const byDimension = new Map(normalized.map((entry) => [entry.dimension, entry]));
   const domains = [];
