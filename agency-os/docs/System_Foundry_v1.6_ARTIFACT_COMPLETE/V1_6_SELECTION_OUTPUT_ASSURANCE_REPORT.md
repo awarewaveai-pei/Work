@@ -110,6 +110,7 @@ python scripts/test_configurator_http_e2e.py
 python scripts/test_selection_matrix.py
 python -m unittest discover -s tests -v
 python scripts/validate_manifest.py
+python scripts/validate_doc_numbers.py
 ```
 
 Or:

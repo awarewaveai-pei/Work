@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-09-05（System Foundry 3 項待決定 ③：doc-number 自動化驗證器 + 問卷交叉引用驗證器）
+
+[根因/決策] 承接①之後 `d51624f13` 留下的「critic suggestion #4」兩項待辦（見本檔同日稍早 ①條目、`d51624f13` commit message）：(a) 4 份文件（README/QUALITY_STRENGTH_MATRIX/CHANGELOG_v1.6/V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT）手改題數/capability數/模組數/pairwise 組合數已錯過 4 次；(b) `勾選「X」`這種行內標籤引用（"m11" bug class）已被 critic 手動抓到 3 次。決定：不做盲目正則自動改寫（`2^208`／`1,000 randomized configs` 等非目錄計數的數字混在同一份文件散文中，盲目 regex 會誤傷），改建**驗證器**——`scripts/validate_doc_numbers.py`（新增，接入第 13 步 `make verify`）從 `configurator_engine.load()`／`EXPECTED_BLUEPRINT_COUNT`／`foundry_generate.MODULE_DOCS`／真實跑一次 `test_selection_matrix.py` 算出真實數字，每個檢查點錨定到特定句子而非裸 `\d+`；`scripts/validate_configurator.py` 新增檢查，要求 `勾選「X」`的 X 不只要是真實題目標籤，還要在引用者自己的 `active_when` 前提鏈上（比 WORKLOG 原授權文字更嚴格地做到「鏈上某題」而非「任一題」）。
+
+[執行] 委派 fullstack-engineer agent 實作 → 獨立 critic 覆審（首輪 SHIP WITH MINOR FIXES：4 Medium + 數個 Low）→ 我親自套用全部 4 Medium + 2 Low 修正（gate-script 數改用 Makefile 解析而非硬編、Release-commands 重現指令區塊補上遺漏腳本並加結構化防呆、「10 個模組產物」改用 `foundry_generate.MODULE_DOCS` 推導而非誤稱「固定常數」、`勾選「X」`檢查從「任一真實標籤」收緊為「鏈上真實標籤」、`standard_modules` 改讀 `activated_by_custom_requirements` 旗標而非硬編 `-1`、closest-match 提示改用 `difflib`）→ 第二輪獨立 delta critic 逐項覆審全部修正（6/6 FIXED CORRECTLY，含對每個修正的真實突變測試）→ 該輪又抓到 3 個 Minor（N2 Release-commands 防呆掃描範圍應收斂到 `verify:` 鏈而非整個 Makefile、N3「id 是第一個 key」假設只寫在註解未機械強制、N5 ASCII 引號容忍度註解與實際 JSON escape 行為不符）→ 我再修這 3 個並重跑完整驗證鏈確認仍全綠。過程中 git reflog 顯示同一 shared worktree 有其他 session 並行 commit（`d51624f13`→`6f487f008`→...→`06c772dcf`），造成 staging 被中途重置兩次（`reset: moving to origin/main`/`moving to HEAD`）——內容經 sha256/git-hash-object 逐檔核對皆完整無損，僅需重新 `git add` 這次改動的 7 個檔案（不可用 `-A`，會誤觸其他 session 的未完成 WIP）。
+
+[驗證] 13 步 verify chain（含新的 `doc-numbers` 第 13 步）+ 29 個 unittest 全綠：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`validate_versions/foundry/semantics/configurator/artifact_generation/contract_fixtures/adversarial/bootstrap_e2e/configurator_e2e/configurator_http_e2e/selection_matrix/doc_numbers.py`（12 支）+ `validate_manifest.py`（manifest 作為最後一步 `regenerate_integrity.py --write` 重算）+ `python -m unittest discover -s tests` | exit=0（每一步，含兩輪 critic 修正後各重跑一次）| result=`DOC NUMBERS VALIDATION: PASS questions=208 capabilities=246 modules=44 standard_modules=43 blueprints=73 baseline_capabilities=18 module_artifacts=10 gate_scripts=13 unit_tests=29 pairwise_valid=21522 pairwise_rejected=6 pairwise_total=21528`；`MANIFEST VALIDATION: PASS`；`Ran 29 tests ... OK`
+- REALTEST_EVIDENCE: tool=Bash | cmd=對兩個新檢查各自跑真實突變測試（README「10」→「9」、V1_6 report 移除 `validate_doc_numbers.py` 那行、`questionnaires/catalog.json` 內把某題描述改成引用鏈外的真實標籤、Makefile 加一個假的第 14 個 gate script）| exit=各異 | result=每一種突變都被正確抓到且訊息含正確 `file:line`，還原後（sha256 逐一核對回原值）重跑全綠
+- REVIEW_DONE: critic=Standard（兩輪，第二輪為獨立新 subagent 對第一輪修正做 delta review，非同一個）| verdict=SHIP WITH MINOR FIXES → 全部 4 Medium+2 Low 修正確認 FIXED CORRECTLY → 第二輪再抓 3 Minor 全修 | findings=0c/0m（收尾時）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`gate_script_count\|active_when_closure\|module_artifacts` | hits=僅本次新增函式自身定義與呼叫點，0 個過期/重複引用
+
+[剩餘風險] N4（`activated_by_custom_requirements` 旗標目前只有這支新腳本讀取，引擎本身不讀，理論上可能與引擎行為漂移——已記錄為後續小幅強化項，非本次阻塞項，可加入既有 `consistency` 交叉檢查列表）；N7（`validate_doc_numbers.py` 重跑一次 `test_selection_matrix.py` 增加約 30 秒執行時間，設計上刻意選擇「不重新實作」而非「零延遲」，可接受）。
+
 ## 2026-09-05（續52，同一 session：Cognitive OS 第三十九個 Method Atlas 切片 — `database_data.erd`，F21 家族第五成員；critic verdict **fail**：本契約自己宣稱「Atlas 無專節」完全錯，連帶讓兩個設計前提出錯；複合外鍵結構性缺陷；79,716-case oracle 證明修正後邏輯水密）
 
 **觸發**：延續操作者「都不要停，直到 Cognitive Engineering OS 完美完成」授權。1 個 critic subagent（額度檢查通過）。
