@@ -909,6 +909,27 @@ defect was demonstrated, not merely argued - the original suite exits 0 with
 the authorization, DSR-lifecycle, append-only, and identity-confirmation
 triggers physically dropped from the schema.
 
+**Node-level gate non-vacuity (2026-09-06, closes a debt tracked in TASKS.md
+across the two commits that shipped the Node-level gates themselves)**:
+`scripts/mutation-check-node-gates.ps1` is the `node --test` equivalent of
+the SQL harness above, for `CONSENT-NEG-01` and the five ADR-0004/P0-04
+Node-level gate/spec files (`validate-request.mjs`, `trust-domains.mjs`,
+`validate-trust-domain-response.mjs`, `validate-method-contract.mjs`,
+`rollup-trust-domains.mjs`) — **12/12 mutations killed**. Coarser than the
+SQL harness by design and disclosed as such in the script's own header:
+it checks "does the target test file's suite go red at all" rather than
+naming the exact assertions expected to flip, since `node --test`'s default
+reporter is not as reliably line-parseable as the SQL harness's
+SQLSTATE-driven assertions. Self-verified non-vacuous the same way this
+whole suite's own history required: a mutation deliberately pointed at an
+unrelated test file (so it could have no observable effect) was confirmed
+to report "vacuous" rather than silently passing.
+`packages/intelligence/assessment-dimensions.mjs` is intentionally absent
+from this harness — its own test file already carries a bespoke,
+self-updating mutation test (re-reads the real source, applies a drift,
+imports the mutated copy) that would be redundant with a second generic
+entry here.
+
 Portal-adapter tests (TENANT-ADAPTER-NEG-01..03) remain excluded from this local
 skeleton. Passing these tests is a statement about the synthetic schema only. It
 is not evidence of legal compliance, production readiness, or permission to
