@@ -36,6 +36,7 @@ $upMig5   = Join-Path $root 'database/migrations/0005_wave1_bitemporal_history_u
 $upMig6   = Join-Path $root 'database/migrations/0006_wave1_bitemporal_scope_fence_up.sql'
 $upMig7   = Join-Path $root 'database/migrations/0007_wave1_crypto_shredding_up.sql'
 $upMig8   = Join-Path $root 'database/migrations/0008_wave1_field_author_class_policy_up.sql'
+$upMig9   = Join-Path $root 'database/migrations/0009_wave1_adr0019_hardening_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -117,7 +118,8 @@ $mutations = @(
 
   @{ id = 'allow-person-repoint-after-confirm'
      sql = 'CREATE OR REPLACE FUNCTION hci.require_identity_verification() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.match_state = ''MATCH_CONFIRMED'' AND NOT EXISTS (SELECT 1 FROM hci.identity_verifications v WHERE v.tenant_id = NEW.tenant_id AND v.candidate_id = NEW.id AND v.method IN (''DETERMINISTIC'',''HUMAN'') AND v.evidence_ref IS NOT NULL) THEN RAISE EXCEPTION USING ERRCODE = ''H1004'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
-     expect = @('IDENTITY-NEG-05') }
+     expect = @('IDENTITY-NEG-05')
+     repin = @('hci.require_identity_verification()') }
 
   @{ id = 'drop-truncate-guards'
      sql = 'DROP TRIGGER data_subject_request_events_no_truncate ON hci.data_subject_request_events; DROP TRIGGER subject_records_no_truncate ON hci.subject_records;'
@@ -211,7 +213,8 @@ $mutations = @(
   # mutation's failure set.
   @{ id = 'weaken-case-closed-immutable'
      sql = 'CREATE OR REPLACE FUNCTION hci.enforce_case_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF TG_OP = ''INSERT'' THEN IF NEW.status <> ''OPEN'' THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; RETURN NEW; END IF; IF NEW.status IS DISTINCT FROM OLD.status THEN IF NOT ((OLD.status = ''OPEN'' AND NEW.status = ''ACTIVE'') OR (OLD.status = ''ACTIVE'' AND NEW.status = ''CLOSED'')) THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; IF NEW.status = ''CLOSED'' THEN NEW.closed_at := now(); END IF; END IF; RETURN NEW; END $fn$;'
-     expect = @('CASE-CLOSED-IMMUTABLE-01') }
+     expect = @('CASE-CLOSED-IMMUTABLE-01')
+     repin = @('hci.enforce_case_lifecycle()') }
 
   # M2: hci.cases originally had the grant layer only. These reuse
   # hci.reject_update_delete(), so a break-glass/table-owner session could
@@ -278,7 +281,7 @@ $mutations = @(
   # (mutation-check-wave1.ps1 2026-09-05).
   @{ id = 'drop-all-subject-records-referencing-fks'
      sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.data_subject_request_targets''::regclass AND contype = ''f'' AND array_length(conkey,1) = 3; EXECUTE format(''ALTER TABLE hci.data_subject_request_targets DROP CONSTRAINT %I'', c); SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.source_relationships''::regclass AND contype = ''f'' AND confrelid = ''hci.subject_records''::regclass; EXECUTE format(''ALTER TABLE hci.source_relationships DROP CONSTRAINT %I'', c); SELECT conname INTO c FROM pg_constraint WHERE conrelid = ''hci.decision_claims''::regclass AND contype = ''f'' AND confrelid = ''hci.subject_records''::regclass; EXECUTE format(''ALTER TABLE hci.decision_claims DROP CONSTRAINT %I'', c); END $$;'
-     expect = @('TARGET-KIND-01b','TRUNCATE-02-FK') }
+     expect = @('TARGET-KIND-01b','TRUNCATE-02-FK','DECISION-CLAIMS-CROSSTENANT-01-FK','DECISION-CLAIMS-KIND-01-FK') }
   @{ id = 'drop-source-relationships-ownership-fk'
      sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO STRICT c FROM pg_constraint WHERE conrelid = ''hci.source_relationships''::regclass AND contype = ''f'' AND confrelid = ''hci.sources''::regclass; EXECUTE format(''ALTER TABLE hci.source_relationships DROP CONSTRAINT %I'', c); END $$;'
      expect = @('RLS-CLAIM-01') }
@@ -454,7 +457,8 @@ $mutations = @(
   # rewrite in sync with hci.reject_update_delete()'s actual current shape.
   @{ id = 'weaken-tombstone-shape-check'
      sql = 'CREATE OR REPLACE FUNCTION hci.reject_update_delete() RETURNS trigger LANGUAGE plpgsql AS $fn$ DECLARE o jsonb; n jsonb; BEGIN IF TG_OP = ''UPDATE'' THEN o := to_jsonb(OLD); n := to_jsonb(NEW); IF o ? ''system_superseded_at'' AND o->>''system_superseded_at'' IS NULL AND n->>''system_superseded_at'' IS NOT NULL AND (o - ''system_superseded_at'') = (n - ''system_superseded_at'') AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), ''MEMBER'') THEN RETURN NEW; END IF; IF o ? ''tombstoned_at'' AND o->>''tombstoned_at'' IS NULL AND n->>''tombstoned_at'' IS NOT NULL AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), ''MEMBER'') THEN RETURN NEW; END IF; IF o ? ''reaudit_required'' AND o->>''reaudit_required'' = ''false'' AND n->>''reaudit_required'' = ''true'' AND (o - ''reaudit_required'') = (n - ''reaudit_required'') AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), ''MEMBER'') THEN RETURN NEW; END IF; END IF; RAISE EXCEPTION USING ERRCODE = ''H1003'', MESSAGE = format(''%s.%s is append-only (%s rejected)'', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP); END $fn$;'
-     expect = @('CRYPTO-TOMBSTONE-SHAPE-01') }
+     expect = @('CRYPTO-TOMBSTONE-SHAPE-01')
+     repin = @('hci.reject_update_delete()') }
 
   # ADR-0019 (Field/transition author-class policy, HD-08) - 2026-09-05.
   @{ id = 'drop-author-class-triggers'
@@ -469,7 +473,8 @@ $mutations = @(
   # removes only the ASSESSMENT_CANDIDATE/human_spotcheck_status gate itself.
   @{ id = 'weaken-claim-state-admission-gate'
      sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql AS $fn$ DECLARE v_predecessor_reaudit boolean; BEGIN IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN IF NEW.supersedes_id IS NOT NULL THEN SELECT reaudit_required INTO v_predecessor_reaudit FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.supersedes_id; NEW.reaudit_required := COALESCE(v_predecessor_reaudit, false); ELSE NEW.reaudit_required := false; END IF; END IF; RETURN NEW; END $fn$;'
-     expect = @('NEG-HD08-01') }
+     expect = @('NEG-HD08-01')
+     repin = @('hci.enforce_claim_state_admission()') }
   # Dropping the WHOLE cascade trigger also breaks every downstream
   # assertion that depends on it having actually flagged a claim earlier in
   # the run: NEG-HD08-05 (supersession-inheritance test, reads '...916''s
@@ -484,9 +489,13 @@ $mutations = @(
   # claim_state/human_spotcheck_status check it now carries (C1 fix), so
   # NEG-HD08-06 collaterally succeeds instead of raising H1016 - real-Docker
   # run found this, 2026-09-05.
+  # With the gate trigger gone, the two claim-side '-GATE' tests (migration
+  # 0009's M8 pair) fall through to the composite FK and get 23503 instead
+  # of the H1016 they assert - the FK layer catching what the gate layer
+  # used to, which is exactly the defense-in-depth split they document.
   @{ id = 'drop-decision-reaudit-gate-trigger'
      sql = 'DROP TRIGGER decision_claims_reaudit_gate ON hci.decision_claims;'
-     expect = @('NEG-HD08-02','NEG-HD08-06') }
+     expect = @('NEG-HD08-02','NEG-HD08-06','DECISION-CLAIMS-CROSSTENANT-01-GATE','DECISION-CLAIMS-KIND-01-GATE') }
   @{ id = 'disable-rls-on-principals'
      sql = 'ALTER TABLE hci.principals NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.principals DISABLE ROW LEVEL SECURITY;'
      expect = @('RLS-LEAK-05') }
@@ -516,7 +525,8 @@ $mutations = @(
   # than dropping the whole trigger and risking unrelated collateral hits.
   @{ id = 'remove-supersede-reaudit-inheritance'
      sql = 'CREATE OR REPLACE FUNCTION hci.enforce_claim_state_admission() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.kind = ''CLAIM'' AND NEW.reaudit_required IS NULL THEN NEW.reaudit_required := false; END IF; IF NEW.kind = ''CLAIM'' AND NEW.claim_state = ''ASSESSMENT_CANDIDATE'' AND NEW.human_spotcheck_status IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1014'', MESSAGE = ''ASSESSMENT_CANDIDATE requires human_spotcheck_status=APPROVED, independent of case risk_tier''; END IF; RETURN NEW; END $fn$;'
-     expect = @('NEG-HD08-05') }
+     expect = @('NEG-HD08-05')
+     repin = @('hci.enforce_claim_state_admission()') }
   # CREATE OR REPLACE FUNCTION does not carry forward attributes omitted from
   # the new definition - LANGUAGE plpgsql SECURITY DEFINER SET search_path
   # must be repeated here, or this mutation would ALSO silently revert to
@@ -525,7 +535,8 @@ $mutations = @(
   # on the real function documents finding, 2026-09-05).
   @{ id = 'weaken-decision-reaudit-gate-claimstate-check'
      sql = 'CREATE OR REPLACE FUNCTION hci.enforce_decision_reaudit_gate() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = hci, pg_temp AS $fn$ DECLARE v_outcome text; v_reaudit boolean; BEGIN SELECT outcome INTO v_outcome FROM hci.decisions WHERE tenant_id = NEW.tenant_id AND id = NEW.decision_id; SELECT reaudit_required INTO v_reaudit FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.claim_id FOR SHARE; IF v_outcome IN (''PROCEED'',''PROCEED_WITH_CONTROLS'',''EXIT'') AND v_reaudit IS TRUE THEN RAISE EXCEPTION USING ERRCODE = ''H1015'', MESSAGE = ''cannot link a reaudit-required Claim to a PROCEED/PROCEED_WITH_CONTROLS/EXIT decision''; END IF; RETURN NEW; END $fn$;'
-     expect = @('NEG-HD08-06') }
+     expect = @('NEG-HD08-06','DECISION-CLAIMS-CROSSTENANT-01-GATE','DECISION-CLAIMS-KIND-01-GATE')
+     repin = @('hci.enforce_decision_reaudit_gate()') }
   # Regression guard for the exact bug found while fixing C3 (2026-09-05):
   # reverting this function to SECURITY INVOKER (the default CREATE OR
   # REPLACE falls back to when the clause is omitted) makes its FOR SHARE
@@ -533,13 +544,86 @@ $mutations = @(
   # every app-role link attempt 42501s instead of succeeding.
   @{ id = 'regress-decision-reaudit-gate-to-invoker'
      sql = 'CREATE OR REPLACE FUNCTION hci.enforce_decision_reaudit_gate() RETURNS trigger LANGUAGE plpgsql AS $fn$ DECLARE v_outcome text; v_reaudit boolean; v_claim_state text; v_spotcheck text; BEGIN SELECT outcome INTO v_outcome FROM hci.decisions WHERE tenant_id = NEW.tenant_id AND id = NEW.decision_id; SELECT reaudit_required, claim_state, human_spotcheck_status INTO v_reaudit, v_claim_state, v_spotcheck FROM hci.subject_records WHERE tenant_id = NEW.tenant_id AND id = NEW.claim_id FOR SHARE; IF v_claim_state IS DISTINCT FROM ''ASSESSMENT_CANDIDATE'' OR v_spotcheck IS DISTINCT FROM ''APPROVED'' THEN RAISE EXCEPTION USING ERRCODE = ''H1016'', MESSAGE = ''x''; END IF; IF v_outcome IN (''PROCEED'',''PROCEED_WITH_CONTROLS'',''EXIT'') AND v_reaudit IS TRUE THEN RAISE EXCEPTION USING ERRCODE = ''H1015'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
-     expect = @('DECISION-CLAIMS-INSERT-01') }
+     expect = @('DECISION-CLAIMS-INSERT-01','DECISION-CLAIMS-CROSSTENANT-01-GATE','DECISION-CLAIMS-KIND-01-GATE','DECISION-CLAIMS-CROSSTENANT-02')
+     repin = @('hci.enforce_decision_reaudit_gate()') }
   @{ id = 'remove-elevation-conflict-check'
      sql = 'CREATE OR REPLACE FUNCTION hci.flag_claims_on_risk_elevation() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = hci, pg_temp AS $fn$ DECLARE v_old_rank int; v_new_rank int; BEGIN v_old_rank := array_position(ARRAY[''R0'',''R1'',''R2'',''R3'',''R4''], OLD.risk_tier); v_new_rank := array_position(ARRAY[''R0'',''R1'',''R2'',''R3'',''R4''], NEW.risk_tier); IF v_old_rank IS NULL OR v_new_rank IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1018'', MESSAGE = format(''unrecognized risk_tier in elevation rank comparison (old=%s, new=%s)'', OLD.risk_tier, NEW.risk_tier); END IF; IF v_new_rank > v_old_rank THEN UPDATE hci.subject_records SET reaudit_required = true WHERE tenant_id = NEW.tenant_id AND case_id = NEW.id AND kind = ''CLAIM'' AND reaudit_required = false AND system_superseded_at IS NULL AND tombstoned_at IS NULL; END IF; RETURN NEW; END $fn$;'
-     expect = @('NEG-HD08-07') }
+     expect = @('NEG-HD08-07')
+     repin = @('hci.flag_claims_on_risk_elevation()') }
   @{ id = 'regrant-decision-claims-createdat'
      sql = 'GRANT INSERT (created_at) ON hci.decision_claims TO hci_app_test_a;'
      expect = @('DECISION-CLAIMS-CREATEDAT-01') }
+
+  # ADR-0019 hardening, migration 0009 (M4/M7/M8 closures) - 2026-09-05.
+  @{ id = 'drop-spotcheck-principal-required-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_spotcheck_principal_required;'
+     expect = @('SPOTCHECK-PRINCIPAL-REQUIRED-01') }
+  @{ id = 'drop-spotcheck-principal-scope-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_spotcheck_principal_scoped;'
+     expect = @('SPOTCHECK-PRINCIPAL-SCOPE-01') }
+  @{ id = 'drop-spotcheck-principal-fk'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_spotcheck_principal_fk;'
+     expect = @('SPOTCHECK-PRINCIPAL-CROSSTENANT-01') }
+  # Composite -> single-column: the tenant half is what the composite shape
+  # exists for. NO ACTION is unchanged, so PRINCIPAL-DELETE-RI-01 keeps
+  # passing here - only the cross-tenant proof goes red (the RI barrier is
+  # proven separately by 'drop-all-principals-referencing-fks' below).
+  @{ id = 'weaken-decisions-principal-fk'
+     sql = 'ALTER TABLE hci.decisions DROP CONSTRAINT decisions_principal_fk, ADD CONSTRAINT decisions_principal_fk_weak FOREIGN KEY (principal_id) REFERENCES hci.principals (id);'
+     expect = @('DECISION-PRINCIPAL-CROSSTENANT-01') }
+  # Removing the FKs entirely also removes the RI barrier that blocks
+  # deleting a still-referenced principal. Since 0009 TWO independent FKs
+  # reference hci.principals (decisions_principal_fk and
+  # subject_records_spotcheck_principal_fk), so - exactly like
+  # 'drop-all-subject-records-referencing-fks' above - dropping either alone
+  # leaves the other still blocking the DELETE, and only dropping both can
+  # turn PRINCIPAL-DELETE-RI-01 red (real-Docker run found the coupling,
+  # 2026-09-05). Both cross-tenant proofs go red with it - three controls
+  # behind two constraints.
+  @{ id = 'drop-all-principals-referencing-fks'
+     sql = 'ALTER TABLE hci.decisions DROP CONSTRAINT decisions_principal_fk; ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_spotcheck_principal_fk;'
+     expect = @('DECISION-PRINCIPAL-CROSSTENANT-01','SPOTCHECK-PRINCIPAL-CROSSTENANT-01','PRINCIPAL-DELETE-RI-01') }
+  # decision_claims' two FKs are declared inline (unnamed) in 0008, so they
+  # are located via pg_constraint by referenced table, the same way
+  # 'drop-typed-target-fk' does. A single-column replacement strips BOTH
+  # the tenant half and the claim_kind pin at once, so both tests go red.
+  # Only the owner-run '-FK' pair (trigger stripped) can go red here: the
+  # app-role '-GATE' pair is rejected by enforce_decision_reaudit_gate()
+  # before the FK is ever evaluated, so weakening the FK alone cannot
+  # change what they observe (real-Docker correction, 2026-09-05).
+  @{ id = 'weaken-decision-claims-claim-fk'
+     sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO STRICT c FROM pg_constraint WHERE conrelid = ''hci.decision_claims''::regclass AND contype = ''f'' AND confrelid = ''hci.subject_records''::regclass; EXECUTE format(''ALTER TABLE hci.decision_claims DROP CONSTRAINT %I'', c); ALTER TABLE hci.decision_claims ADD CONSTRAINT decision_claims_claim_fk_weak FOREIGN KEY (claim_id) REFERENCES hci.subject_records (id); END $$;'
+     expect = @('DECISION-CLAIMS-CROSSTENANT-01-FK','DECISION-CLAIMS-KIND-01-FK') }
+  @{ id = 'weaken-decision-claims-decision-fk'
+     sql = 'DO $$ DECLARE c text; BEGIN SELECT conname INTO STRICT c FROM pg_constraint WHERE conrelid = ''hci.decision_claims''::regclass AND contype = ''f'' AND confrelid = ''hci.decisions''::regclass; EXECUTE format(''ALTER TABLE hci.decision_claims DROP CONSTRAINT %I'', c); ALTER TABLE hci.decision_claims ADD CONSTRAINT decision_claims_decision_fk_weak FOREIGN KEY (decision_id) REFERENCES hci.decisions (id); END $$;'
+     expect = @('DECISION-CLAIMS-CROSSTENANT-02') }
+  # m2: 0008's six paired CHECK constraints, one mutation each.
+  @{ id = 'drop-claimstate-scoped-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_claim_state_scoped;'
+     expect = @('CHECK-CLAIMSTATE-SCOPED-01') }
+  @{ id = 'drop-claimstate-required-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_claim_state_required;'
+     expect = @('CHECK-CLAIMSTATE-REQUIRED-01') }
+  @{ id = 'drop-spotcheck-scoped-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_spotcheck_scoped;'
+     expect = @('CHECK-SPOTCHECK-SCOPED-01') }
+  @{ id = 'drop-spotcheck-required-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_spotcheck_required;'
+     expect = @('CHECK-SPOTCHECK-REQUIRED-01') }
+  @{ id = 'drop-reaudit-scoped-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_reaudit_scoped;'
+     expect = @('CHECK-REAUDIT-SCOPED-01') }
+  @{ id = 'drop-reaudit-required-default-check'
+     sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_reaudit_required_default;'
+     expect = @('CHECK-REAUDIT-DEFAULT-01') }
+  # M4 / search_path: the generic pg_proc assertions must notice a single
+  # function losing its config.
+  @{ id = 'reset-definer-row-security'
+     sql = 'ALTER FUNCTION hci.flag_claims_on_risk_elevation() RESET row_security;'
+     expect = @('DEFINER-RLS-FAILCLOSED-01') }
+  @{ id = 'reset-function-search-path'
+     sql = 'ALTER FUNCTION hci.enforce_claim_state_admission() RESET search_path;'
+     expect = @('FUNCTION-SEARCHPATH-01') }
 )
 
 $project = "hcimut$PID"
@@ -601,6 +685,7 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $upMig6)   -ne 0) { throw 'mutation harness: 0006 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig7)   -ne 0) { throw 'mutation harness: 0007 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig8)   -ne 0) { throw 'mutation harness: 0008 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig9)   -ne 0) { throw 'mutation harness: 0009 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }
@@ -621,6 +706,29 @@ try {
   foreach ($m in $mutations) {
     Reset-Schema
     if ((Invoke-Sql -Sql $m.sql) -ne 0) { throw "mutation '$($m.id)' could not be applied; its SQL no longer matches the schema" }
+    # CREATE OR REPLACE FUNCTION replaces a function's config (proconfig)
+    # wholesale, so a mutation that rewrites a body silently strips the
+    # search_path / row_security pins 0009 applied with ALTER FUNCTION and
+    # trips the generic FUNCTION-SEARCHPATH-01 / DEFINER-RLS-FAILCLOSED-01
+    # assertions as collateral - found by real run, 2026-09-05. A body-
+    # rewriting mutation therefore names the function(s) it rewrites in
+    # `repin`, and the config is re-applied here so the mutation removes
+    # only the one behaviour it targets. search_path is re-pinned on every
+    # rewritten function; row_security=off ONLY on SECURITY DEFINER ones -
+    # on a SECURITY INVOKER trigger function fired by the application role
+    # it is not harmless at all: the role's policy-filtered lookup becomes
+    # a hard error instead ("query would be affected by row-level security
+    # policy"), which real-Docker turned up as six IDENTITY-NEG collateral
+    # hits on 'allow-person-repoint-after-confirm' (2026-09-05). That is the
+    # same fail-closed semantics 0009 wants for definers, and exactly the
+    # wrong thing for an invoker. The two mutations whose *target* is this
+    # config ('reset-definer-row-security', 'reset-function-search-path')
+    # carry no repin.
+    foreach ($fn in @($m.repin)) {
+      if (-not $fn) { continue }
+      $repinSql = "ALTER FUNCTION $fn SET search_path = hci, pg_temp; DO `$rp`$ BEGIN IF (SELECT prosecdef FROM pg_proc WHERE oid = '$fn'::regprocedure) THEN EXECUTE 'ALTER FUNCTION $fn SET row_security = off'; END IF; END `$rp`$;"
+      if ((Invoke-Sql -Sql $repinSql) -ne 0) { throw "mutation '$($m.id)': repin of $fn failed" }
+    }
 
     $exit = Invoke-SqlFile -Path $sqlTests
     $failed = Get-FailedAssertions

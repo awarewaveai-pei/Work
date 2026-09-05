@@ -104,8 +104,8 @@ INSERT INTO hci.source_terms_records (id,tenant_id,source_id,terms_ref) VALUES
 -- HCI_FIELD_AUTHOR_CLASS_POLICY.md's own policy table.
 INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class) VALUES
   ('bbbbbbbb-0000-0000-0000-000000000500','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800','DETERMINISTIC');
-INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status) VALUES
-  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','ASSESSMENT_CANDIDATE','APPROVED');
+INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status,spotcheck_principal_id) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','ASSESSMENT_CANDIDATE','APPROVED','bbbbbbbb-0000-0000-0000-000000000850');
 INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,author_class) VALUES
   ('bbbbbbbb-0000-0000-0000-000000000502','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','ASSESSMENT','bbbbbbbb-0000-0000-0000-000000000200','PROBABILISTIC');
 -- One real tenant-B hci.decisions row (RLS-LEAK-04 / BITEMP-VIEWRLS-01),

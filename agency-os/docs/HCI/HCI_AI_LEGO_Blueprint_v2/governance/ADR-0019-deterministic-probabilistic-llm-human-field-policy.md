@@ -152,15 +152,59 @@ merge:
   positive test (`DECISION-CLAIMS-INSERT-01`) plus a regression-guard
   mutation (`regress-decision-reaudit-gate-to-invoker`).
 
-M4, M6, M7, M8, and the review's minor/suggestion-tier findings (RLS-
-independence of the SECURITY DEFINER writers under a non-superuser owner;
-canonical-view/`_as_of()` column parity for the four new columns; binding
-`human_spotcheck_status='APPROVED'` to a `hci.principals` reference rather
-than a self-asserted string; cross-tenant/typed-FK test coverage for the two
-new composite FKs; down-migration idempotency under `to_regclass`) are
-tracked as explicit follow-up in `TASKS.md`, not silently dropped - none are
-exploitable at Wave 1 synthetic-data scale, and closing them reshapes gate 5
-in ways better done alongside its still-open epistemic-label half.
+**Hardening pass, migration `0009_wave1_adr0019_hardening_up.sql` (same
+day).** The review's remaining Major/minor/suggestion findings were first
+tracked in `TASKS.md`, then closed in their own migration rather than by
+amending the already-pushed 0008 (this schema's convention: shipped
+migrations are immutable, follow-ups get a new number):
+
+- **M7** - `human_spotcheck_status='APPROVED'` was a self-asserted string.
+  New `spotcheck_principal_id` on `hci.subject_records`, tenant-composite FK
+  to `hci.principals`, required whenever the status is `APPROVED`, forbidden
+  on non-CLAIM rows - the same shape as `hci.decisions.principal_id`. Six
+  existing `APPROVED` rows retrofitted.
+- **M6** - the four `_current` views and `_as_of()` functions had picked up
+  neither ADR-0018's `encryption_key_ref`/`tombstoned_at` nor this ADR's
+  columns; both migrations' worth of parity closed at once. Real execution
+  found that the reverse direction cannot use `CREATE OR REPLACE VIEW`
+  (PostgreSQL never lets it remove a column, `42P16`) - the down path drops
+  and recreates the views and re-issues their SELECT grant.
+- **M4** - every SECURITY DEFINER function in `hci` (all five, not only the
+  two the review named) now carries `row_security = off` as function
+  config: under FORCE ROW LEVEL SECURITY with a non-superuser owner a
+  definer's lookup would otherwise resolve `hci.current_tenant_id()` to
+  NULL and silently match zero rows (fail-open); with the parameter set it
+  raises instead (fail-closed). A no-op under today's superuser test owner.
+  Asserted generically over `pg_proc` (`DEFINER-RLS-FAILCLOSED-01`), no
+  hardcoded list. The zero-row case in the cascade is deliberately not a
+  `ROW_COUNT` error - once the RLS-silent path errors, zero rows can only
+  mean "no Claims".
+- **M8** - cross-tenant and typed-pin tests for both composite FKs 0008
+  built, plus mutations weakening each to single-column. Real execution
+  corrected the design: for a cross-tenant or non-CLAIM `claim_id` the
+  BEFORE INSERT gate trigger rejects (`H1016`) before the FK is ever
+  evaluated, so the claim-side FK is defense in depth behind the trigger
+  and is proven owner-run with the trigger stripped (`-FK` pair), while
+  the app-role `-GATE` pair proves the outer layer.
+- **m2** - direct assertions and mutations for 0008's six paired CHECK
+  constraints; **m4** - `PRINCIPAL-DELETE-RI-01` proves the FK's NO ACTION
+  barrier (whose mutation had to drop *both* FKs into `principals`, since
+  M7 added a second one - the same two-independent-FKs coupling already
+  documented for `subject_records`); **suggestions** - `search_path`
+  pinned on the eleven remaining functions (asserted generically,
+  `FUNCTION-SEARCHPATH-01`) and RI-lookup indexes for both principals FKs.
+- Harness lesson worth keeping: `CREATE OR REPLACE FUNCTION` replaces a
+  function's config wholesale, so body-rewriting mutations now re-pin
+  `search_path` and (definers only - on an invoker fired by the app role,
+  `row_security=off` turns the role's own filtered lookup into a hard
+  error, found as six collateral hits) `row_security`.
+
+Tally after 0009: **194/194 assertions, 93/93 mutations killed**; `0009_down`
+verified alone, verified idempotent on a second run, re-applied cleanly,
+and correctly refused against a populated schema. Still open: gate 5's
+epistemic-label half (own migration, next), and 0008's own down-migration
+idempotency (m3) - left as-is because 0008 is shipped, and 0009's down was
+written idempotent from the start instead.
 
 ## Consequences
 

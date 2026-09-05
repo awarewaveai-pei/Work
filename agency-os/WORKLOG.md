@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-05（HCI-30 Wave 1：ADR-0019 hardening migration 0009 — db-expert 覆審遺留 M4/M6/M7/M8/m2/m4＋建議項全數關閉；Docker Desktop 殘留 socket 復原）
+
+**觸發**：操作者「全部去完美處理好」（ADR-0019 遺留＋ADR-0009）。本輪 = 第一段（0009）。1 個 subagent（Explore，唯讀，研究 epistemic-label schema 與 ADR-0009 契約，供下兩個 migration 設計用）。
+
+**阻斷與排除**：Docker Desktop backend 於 05:32Z 被終止（exit `0x40010004`），殘留 `%LOCALAPPDATA%\Docker\run\sailor-ingest.sock`，重啟時 rename 成 `.stale` 失敗（「The file cannot be accessed by the system」）→ 錯誤對話框 → Quit。從 `log/host/com.docker.backend.exe.log` 讀出根因；操作者把 `run/` 目錄封存（`run.socket-archive-20260905-144157982/`，機上已是第三次同款）後重啟成功。兩次不同方法啟動失敗即停手回報，未硬試第三次。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0009_wave1_adr0019_hardening_{up,down}.sql`（新）— M7 `spotcheck_principal_id`（複合 FK→`hci.principals`，APPROVED 必填、非 CLAIM 禁填）；M6 四個 `_current` view／`_as_of()` 補齊 ADR-0018（`encryption_key_ref`/`tombstoned_at`）＋ADR-0019 全部欄位；M4 五個 SECURITY DEFINER function `SET row_security = off`（非 superuser owner 在 FORCE RLS 下 fail-closed 而非靜默 0 列）；11 個 function `SET search_path`；兩個 RI 索引。down：DROP+CREATE VIEW（`CREATE OR REPLACE VIEW` 不能縮欄位 `42P16`）＋重 GRANT、`information_schema`＋`EXECUTE` 的冪等防呆（PL/pgSQL 整塊先 parse，不能直接引用要 drop 的欄位；`to_regclass AND EXISTS` 合併布林式不保證短路——本 schema 0003/0005 舊傷）、RESET 恰好 0009 設的 config。
+- `database/tests/wave1-negative-tests.sql`（176→194）：6 個 APPROVED 列 retrofit；M7 三測；M8 六測（`-GATE` app-role 外層 `H1016`／`-FK` owner 停 `TRIGGER USER` 內層 `23503`／decision 側直達 FK）；m4 `PRINCIPAL-DELETE-RI-01`；m2 六個 CHECK 直接斷言（reaudit 兩個 owner-run，其一停 trigger）；`DEFINER-RLS-FAILCLOSED-01`／`FUNCTION-SEARCHPATH-01` 通用 `pg_proc` 斷言。`fixtures/0001_synthetic.sql` tenant-B claim 補 principal。
+- `scripts/mutation-check-wave1.ps1`（78→93）：15 個新 mutation；新增 `repin` 機制（改寫 body 的 mutation 重釘 `search_path`，definer 才重釘 `row_security`）；`drop-decisions-principal-fk`→`drop-all-principals-referencing-fks`（兩個 FK 同時 drop 才能讓 RI 測試變紅）；`drop-all-subject-records-referencing-fks` expect 加 `-FK` 對。`scripts/test-wave1-local.ps1` wire 0009。
+- 治理：ADR-0019 Implementation note 加「Hardening pass」段、`ADR_INDEX.md` 列、`HCI_WAVE1_NEGATIVE_TEST_SPEC.md` 表＋Execution／Non-vacuity 段、`HCI_FIELD_AUTHOR_CLASS_POLICY.md` status、`TASKS.md` 遺留項打勾。
+
+**真跑抓到（非預測）**：① claim 側 FK 測試回 `H1016` 非 `23503`（BEFORE ROW trigger 在 RI 檢查之前）→ 拆雙層；② `CREATE OR REPLACE VIEW` 縮欄位 `42P16`；③ down 防呆引用被 drop 的欄位不冪等；④ body-rewrite mutation 蓋掉 proconfig（6 個連帶）；⑤ `row_security=off` 套到 invoker trigger 炸 app role 自己的 RLS 查詢（6 個 IDENTITY-NEG 連帶）；⑥ principals RI barrier 自 M7 起由兩個 FK 共同撐住。另自抓一個文件標籤錯誤：先前把 m4（principals DELETE）誤標 M4，真 M4（definer RLS fail-open）當時未做，本輪一併做完。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=`HCI Wave 1 negative suite: 194 assertion(s) recorded, 0 failed`（forward + 整包 reversibility）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 93 mutations killed. The Wave 1 negative suite is non-vacuous.`（第三次跑才全綠，前兩次分別抓到 ④⑤⑥）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad `verify-0009-narrow-rollback.ps1` | exit=0 | result=`NARROW ROLLBACK VERIFICATION (0009) PASSED.`（獨立 down／第二次冪等 no-op／重套用 up／populated 拒絕，四關）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m（本輪為上一輪 db-expert Deep review 的遺留關閉，每項對照原 finding 逐條核；未再送外部 oracle，理由：全為已審模式的閉環，且每項都有真跑＋mutation 雙證據）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=finish\(186\)\|176/176\|78/78\|DECISION-CLAIMS-KIND-01'\|tracked as explicit follow-up | hits=0（除 dated WORKLOG／TASKS 歷史敘述與 AO-RESUME 產生的 excerpt 外）
+
+**[剩餘風險]**：gate 5 認識論標籤半邊（`NEG-HD08-04`）仍 OPEN → 下一個 migration（0010），研究已完成：值集須用 ADR-0013 的 11 值 `epistemic_type`、不得加 `authorship_state`/`locked`、CHECK 須帶 ADR-0013 `WAVE1-EPISTEMIC-ANNOTATION-01` 註解、人類驗證者參照重用 `hci.principals`；`scripts/verify-epistemic-annotation.ps1`（ADR-0013 gate 5 指定）尚不存在，落地 0010 時一併建。0008_down 冪等性（m3）刻意不改已 push 檔。ADR-0009 租戶 adapter（0011）：契約文件無具體 schema，HCI 側 `hci.tenants` 零 portal 連結欄位，`TENANT-ADAPTER-NEG-01/03` 需真 adapter 程式碼（任一 repo 皆無）— 只能落地 schema 層 seam＋-02 等價證明，其餘誠實留 OPEN。
+
+**[rollback]**：`0009_down` 四關真跑驗證；整體仍可 `0001_down` 一次全清。
+
 ## 2026-09-05（續48，同一 session：Cognitive OS 第三十五個 Method Atlas 切片 — `devops_sre.load_test`，critic warn：邏輯水密（70 萬 case oracle 零分歧）但三個 Major 全是「宣稱與證明」類）
 
 **觸發**：延續操作者「繼續完美完成這個系統」授權。1 個 critic subagent（額度檢查通過，前次成功後已 `clear`）。

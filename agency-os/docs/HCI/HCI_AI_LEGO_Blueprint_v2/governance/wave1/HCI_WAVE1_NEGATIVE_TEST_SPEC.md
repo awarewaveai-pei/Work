@@ -300,6 +300,38 @@ assertions after the review round, 73 + 5 new mutations). Full narrative in
 the migration file's own header comments and in ADR-0019's "Implementation
 note".
 
+Hardening addition (same day, migration `0009_wave1_adr0019_hardening_up.sql`),
+closing the review's remaining findings in their own migration rather than
+by amending shipped 0008:
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| SPOTCHECK-PRINCIPAL-REQUIRED-01 / -SCOPE-01 / -CROSSTENANT-01 | App-role Claim `APPROVED` without a principal / `spotcheck_principal_id` on an ASSESSMENT / a real tenant-B principal | M7: `APPROVED` must name a real same-tenant human (`hci.principals`), never a self-asserted string | Rejected, `23514` / `23514` / `23503` |
+| DECISION-PRINCIPAL-CROSSTENANT-01 | App-role Decision naming a real tenant-B principal | `decisions_principal_fk`'s tenant half | Rejected, `23503` |
+| DECISION-CLAIMS-CROSSTENANT-01-GATE / KIND-01-GATE | App-role link to a real tenant-B Claim / to a real EVIDENCE row | Outer layer: the gate trigger's tenant-scoped lookup rejects before the FK is evaluated (real-Docker correction of a 23503 prediction) | Rejected, `H1016` |
+| DECISION-CLAIMS-CROSSTENANT-01-FK / KIND-01-FK | Owner-run, user triggers on `decision_claims` disabled for exactly these two statements | Inner layer: the composite `(tenant_id, claim_id, claim_kind)` FK on its own | Rejected, `23503` |
+| DECISION-CLAIMS-CROSSTENANT-02 | App-role link naming a real tenant-B Decision | The decision-side composite FK (reaches the FK directly - a missing decision row is not itself a gate error) | Rejected, `23503` |
+| PRINCIPAL-DELETE-RI-01 | App-role `DELETE` of a principal still referenced by Decisions | m4: the FK's NO ACTION barrier (two FKs into `principals` since M7 - the mutation must drop both) | Rejected, `23503` |
+| CHECK-CLAIMSTATE-SCOPED/REQUIRED-01, CHECK-SPOTCHECK-SCOPED/REQUIRED-01, CHECK-REAUDIT-SCOPED-01, CHECK-REAUDIT-DEFAULT-01 | One insert per constraint (the last with `subject_records` user triggers stripped, since the trigger otherwise satisfies the CHECK first) | m2: 0008's six paired CHECK constraints, each directly | Rejected, `23514` |
+| DEFINER-RLS-FAILCLOSED-01 | Owner-run `pg_proc` introspection, no hardcoded list | M4: every SECURITY DEFINER function in `hci` carries `row_security=off` (fails closed, never silently zero-row, under FORCE RLS with a non-superuser owner) | Predicate true |
+| FUNCTION-SEARCHPATH-01 | Owner-run `pg_proc` introspection | Every function in `hci` pins `search_path` | Predicate true |
+
+M6 (canonical `_current` views / `_as_of()` functions gaining every
+ADR-0018 and ADR-0019 column) is covered by the existing `BITEMP-ASOF-01`/
+`BITEMP-VIEWRLS-01` paths continuing to pass against the widened shapes;
+the down direction taught its own lesson (`CREATE OR REPLACE VIEW` can add
+but never remove a column, so `0009_down` drops/recreates and re-grants).
+Real execution corrected two predictions (the `-GATE`/`-FK` layering above,
+and the two-FK coupling on the principals RI barrier) and one harness
+assumption (body-rewriting mutations must re-pin `search_path`, and
+`row_security=off` only on definers - on an invoker fired by the app role
+it hard-errors the role's own filtered lookup, six collateral hits). Final
+tally after 0009: **194/194 assertions, 93/93 mutations killed** (176 + 18
+new assertions, 78 + 15 new mutations); `0009_down` verified alone,
+idempotent on a second run, cleanly re-applied, and refused against a
+populated schema. Full narrative in the migration's header comments and in
+ADR-0019's "Implementation note" (hardening pass).
+
 ## Test execution requirements
 
 1. Run against an HCI database/API using a non-superuser tenant role; service-role or owner-only tests do not prove tenant isolation.
@@ -615,9 +647,31 @@ re-application) run manually, matching the pattern established for
 migration file's own header comments and in ADR-0019's "Implementation
 note".
 
+**Execution evidence (2026-09-05, ADR-0019 hardening addition).** Migration
+`0009_wave1_adr0019_hardening_up.sql`, closing the db-expert review's
+M4/M6/M7/M8/m2/m4 and both suggestions in their own migration. First real
+run went red on exactly two predictions - the two claim-side FK tests got
+`H1016` (the BEFORE INSERT gate trigger's own tenant-scoped lookup fires
+before PostgreSQL evaluates the FK), corrected by splitting each into an
+app-role `-GATE` assertion (outer layer) and an owner-run `-FK` assertion
+with the table's user triggers stripped (inner layer). Two real bugs in
+`0009_down` were found by reasoning and confirmed by the narrow-rollback
+run before they could ship: `CREATE OR REPLACE VIEW` cannot remove
+columns (`42P16`), and the empty-state guard referenced the very column it
+drops (not idempotent). Mutation-check then surfaced three more real
+findings: body-rewriting mutations strip 0009's `ALTER FUNCTION ... SET`
+config (hence the harness `repin` hook); `row_security=off` on a SECURITY
+INVOKER trigger fired by the app role hard-errors the role's own filtered
+lookup (six `IDENTITY-NEG` collateral hits - repin now definer-only); and
+the principals RI barrier is held by two FKs since M7, so its mutation must
+drop both. Final: **194/194 assertions, 93/93 mutations killed**;
+`0009_down` verified alone, idempotent on a second run, cleanly re-applied,
+and refused against a populated schema. Full narrative in the migration's
+header comments and ADR-0019's "Implementation note" (hardening pass).
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 78
+requires the suite to go red on exactly the assertions covering it; **all 93
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
 Source-provenance mutations + 2 Consent-class mutations + 15 Bitemporal-
@@ -626,8 +680,10 @@ history mutations (7 landed pre-review + 6 added by the db-expert review pass
 Bitemporal-scope-fence mutations + 5 Crypto-shredding mutations + 15
 Field/transition author-class policy mutations (10 landed pre-review + 5
 added by the db-expert review round, one of them a regression guard for a
-bug the review's own fix introduced), 2026-09-05, covering every invariant
-listed above). This
+bug the review's own fix introduced) + 15 ADR-0019 hardening mutations
+(migration 0009: three spotcheck-principal constraints, four composite-FK
+weakenings/drops, six CHECK drops, two function-config resets),
+2026-09-05, covering every invariant listed above). This
 exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same
 handler that caught the control's rejection (both SQLSTATE P0001). That

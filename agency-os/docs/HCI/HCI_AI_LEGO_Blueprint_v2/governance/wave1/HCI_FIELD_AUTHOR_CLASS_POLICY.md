@@ -1,6 +1,6 @@
 # HCI Field/Transition Author-Class Policy
 
-Status: **DESIGN ARTIFACT COMPLETE (gate 1) — runtime enforcement (gates 2-4) real-Docker-verified and db-expert-reviewed (2026-09-05: 3 Critical + 5 Major found and fixed, see ADR-0019's own "Implementation note"); gate 5's human-principal half verified, its epistemic-label half OPEN (see note at end)**
+Status: **DESIGN ARTIFACT COMPLETE (gate 1) — runtime enforcement (gates 2-4) real-Docker-verified and db-expert-reviewed (2026-09-05: 3 Critical + 5 Major found and fixed in migration 0008; the review's remaining M4/M6/M7/M8/m2/m4 + suggestions closed the same day in hardening migration 0009 — `APPROVED` spot-checks now name a real `hci.principals` row, see ADR-0019's own "Implementation note"); gate 5's human-principal half verified, its epistemic-label half OPEN (see note at end)**
 Date: 2026-09-05
 Authority: ADR-0019 (`HD-08`)
 Scope: A machine-readable enumeration of which author class (human, deterministic code, probabilistic model, or LLM-with-human-review) may produce or transition each named field/state at Wave 1. It does not itself grant real-person processing authority, and it does not invent a second risk-tier ladder — the tier condition column below cites AI LEGO's existing `risk-tier.schema.yaml#/mandatory_gate_injection_trigger` rather than redefining one.
