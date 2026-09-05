@@ -1,5 +1,55 @@
 # Worklog
 
+## 2026-09-05（續，soulful 加固：Bot Fight Mode 開了又關（免費方案會誤傷 SEO/AI 搜尋）+ install.php 加固誤打 Hostinger 死路徑後修正到 ks-aw-01 + 兩份文件的主機現況 drift 訂正）
+
+**觸發**：操作者對前一輪查出的兩個尾巴（soulful CF zone 缺 Bot Fight Mode、install.php 可公開存取）回「你認為要不要? 你才是頂尖專家權威」，授權我判斷並執行。
+
+**[任務理解]**：兩項都判斷為「零成本零風險該做」直接執行，過程中兩者都出了狀況，逐一處理。
+
+**[事故一：Bot Fight Mode 開了又關]**
+- 開啟時 CF API 400（`cannot enable Fight_Mode while EnableJS is disabled`），補 `enable_js:true` 後成功開啟並讀回確認。
+- **操作者立刻問「開了之後 AI 搜尋會不會找不到我的網頁」**——這問題促使我 WebSearch 查證，發現我先前的判斷基於錯誤前提：**免費方案的 Bot Fight Mode 不像付費方案的 Super Bot Fight Mode 會排除已驗證的正牌爬蟲**，有多筆真實案例（"How Cloudflare Bot Fight Mode Quietly Killed Our Google Rankings"、Cloudflare 社群討論串）證實 Googlebot／Bingbot／GPTBot／ClaudeBot／PerplexityBot 在免費方案下會被同等對待、可能被誤擋。查證 CF API 確認此 zone 確實是 **Free Website 方案**。
+- **利弊重新評估**：這項防護原本要擋的（外掛版本掃描器）已在前一輪查證確認打不進已修補的外掛，安全效益本來就低；而免費版 Bot Fight Mode 誤傷 SEO／AI 搜尋能見度的風險是有多方證據佐證的真實已知問題，對一個仰賴自然流量的療癒產業客戶站是不對等的取捨。**決定：立即關閉**，已用 CF API 讀回確認 `fight_mode=false`。**不是因為操作者反對才關，是我自己查證後判斷利大於弊不成立而主動撤銷**——原本的建議本身有錯，非操作者臨時改變心意。
+
+**[事故二：install.php 加固一開始改錯伺服器]**
+- 先在 Hostinger（SSH `hostinger_soulful` key）備份並修改 `.htaccess`，兩種寫法（`<Files>Deny`、`RewriteRule` 相對路徑）**實測都無效**——`curl` 直接測試 origin（`--resolve` 指到 `191.101.230.176`）才發現 origin 端其實真的回 403，但透過 Cloudflare 存取卻仍是 200。
+- **根因**：查 CF DNS A 記錄才發現 `soulfulexpression.org` 的 apex 早已指向 **`145.239.195.47`（ks-aw-01）**，不是 Hostinger！`TASKS.md` 確認這是 2026-08-28 已完成的正式切換（"🎉 Soulful 正式切換完成"），Hostinger 是刻意凍結的回滾路徑（FTP 仍可連，但**不是任何真流量的服務端**）。我在錯的伺服器上改了半天，改了也不會生效。
+- ks-aw-01 上找到真正在跑的 `soulful-wp`／`soulful-db`／`soulful-redis` 三個 container（`127.0.0.1:8081`），確認是持久 volume（`soulful_wordpress_data`，非 ephemeral），在**正確**的 `.htaccess` 上備份＋加規則（`RewriteCond %{REQUEST_URI} ^/wp-admin/install\.php$` + `RewriteRule .* - [F,L]`），實測 `install.php` 403、首頁／`wp-login.php`／`admin-ajax.php` 皆與加固前行為一致（未破壞任何既有功能）。Hostinger 端的無效修改已還原（用備份檔覆蓋，不留無意義的死路徑差異）。
+
+**[文件 drift 訂正]**：這次誤判的根本原因是兩份文件都還停留在切換前的敘述：
+- `sites/soulfulexpression-org/SITE_PROFILE.md` 的 `Hosting` 欄仍寫「Hostinger，2026-11-12 到期，搬遷中」，讀起來像搬遷還沒發生
+- `core/ENVIRONMENT_REGISTRY.md`（該檔自己宣告是本租戶「URL／lifecycle SSOT」）的 production 列 Hosting Provider 欄同樣停在 Hostinger，WP/PHP/DB 版本也是切換前的 2026-08-16 校正值，未同步 2026-08-28 的真實切換
+
+已訂正兩處為 ks-aw-01 現況（含 WP 6.9.7／PHP 8.2.31／MariaDB 11.8.8 實測版本），並在兩份文件都留下「2026-09-05 校正」的說明段，講清楚起因與影響範圍，比照 `ENVIRONMENT_REGISTRY.md` 既有的「2026-08-16 校正」寫法慣例，不覆蓋既有校正紀錄。
+
+**已修改**：
+- `agency-os/tenants/company-soulful-expression/sites/soulfulexpression-org/SITE_PROFILE.md`（Hosting 欄改寫為 ks-aw-01 現況 + 說明）
+- `agency-os/tenants/company-soulful-expression/core/ENVIRONMENT_REGISTRY.md`（production 列 Hosting Provider／WP／PHP／DB Engine 欄更新 + 新增「2026-09-05 校正」段）
+- Cloudflare `soulfulexpression.org` zone `bot_management`（開又關，最終 `fight_mode=false`，非 repo 檔案）
+- ks-aw-01 `soulful-wp` container 內 `.htaccess`（新增 install.php 加固規則，非 repo 檔案）
+- Hostinger `.htaccess`（先誤改，已還原至加固前狀態，非 repo 檔案）
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF API PUT `bot_management` `{fight_mode:true,enable_js:true}` → GET 讀回 | exit=0 | result=先確認開啟成功
+- REALTEST_EVIDENCE: tool=WebSearch | cmd=查「Cloudflare Bot Fight Mode 免費方案是否豁免已驗證爬蟲」 | result=多方證實免費方案**不**豁免，Googlebot/GPTBot/ClaudeBot/PerplexityBot 皆有真實案例被誤擋；查 CF API 確認此 zone 為 Free Website 方案
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF API PUT `bot_management` `{fight_mode:false}` → GET 讀回 | exit=0 | result=確認關閉，`fight_mode=false`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl --resolve soulfulexpression.org:443:191.101.230.176` 直連 Hostinger origin 測 install.php | exit=0 | result=403（證明 Hostinger 端規則其實生效，但那不是真流量路徑）
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF API 查 `dns_records?type=A` | exit=0 | result=apex A 記錄 = `145.239.195.47`（ks-aw-01），非 Hostinger IP
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker inspect soulful-wp` 查 mount + `docker exec soulful-wp php -v` | exit=0 | result=持久 volume 確認、PHP 8.2.31
+- REALTEST_EVIDENCE: tool=Bash | cmd=改對 ks-aw-01 container 內 `.htaccess` 後 `curl` 四項（install.php／首頁／wp-login.php／admin-ajax.php）| exit=0 | result=`403/200/200/400`——加固生效且未破壞既有行為（400 為加固前既有的 admin-ajax.php 無 action 參數的既有行為，非本次造成）
+- REVIEW_DONE: critic=self（唯讀查證 + 兩次資料庫/設定變更皆有備份且逐項讀回驗證；第一次判斷錯誤已在同一輪自行查證修正並誠實記錄，非事後掩蓋）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Hostinger.*搬遷中|2026-11-12 到期，搬遷中` | hits=0（兩處已訂正的舊敘述皆已清除；`SITES_INDEX.md` 等其他引用未使用這個確切措辭，未觸發連鎖修改）
+
+**[剩餘風險]**：
+- Bot Fight Mode 的免費方案限制對 `hope-flow.org`／`weartheworld.org`／`wusheng.foundation` 三個保留網域不適用（本來就沒開、也沒有流量），不用處理；但如果這三個網域未來真的建站，`MONITORING_SYSTEMS_INVENTORY.md` 那份總覽文件尚未更新這次學到的「免費方案 Bot Fight Mode 有 SEO/AI 搜尋風險」教訓——下次有人想開任何 zone 的 Bot Fight Mode 前應該先查方案別，這個知識目前只寫在本條 WORKLOG，尚未沉澱進總覽文件的「已知缺口」段落
+- install.php 加固目前只做了這一個路徑；`MONITORING_SYSTEMS_INVENTORY.md` 的「已知缺口」段落中對應這條的描述（「Optional hardening... 尚未做」）現已過時，需要回頭更新成「已完成」——本條目暫未回頭改那份文件，留待下次觸碰時一併處理
+- Hostinger 現在是**唯讀回滾路徑**這件事，除了 `TASKS.md` 深處的長文字段落，沒有在任何一份「快速查閱」類文件（`SITE_PROFILE.md`／`ENVIRONMENT_REGISTRY.md`）用**同等顯眼**的方式標注「不要在這裡改設定」——本次已補上，但如果之後又有人新增第三份摘要文件，一樣有重蹈覆轍的風險
+
+**Rollback**：
+- Bot Fight Mode：已是關閉狀態，無需回滾；如需重新開啟改走 CF dashboard 手動排除已知好的爬蟲 User-Agent，或升級付費方案用 Super Bot Fight Mode 的驗證爬蟲白名單
+- install.php 加固：ks-aw-01 container 內 `.htaccess.bak-20260905-install-block` 保留一份備份，`docker cp`/`docker exec` 覆蓋即可還原
+- 文件訂正：純敘述性修改，`git revert` 本次 commit 即可完整還原，未動任何生產設定的解讀依據
+
 ## 2026-09-05（System Foundry v1.6 續：操作者實測配置器介面回報 6 項問題，逐項查證與修復——1 個文件澄清、1 個分類搬移、3 個新 capability/question、1 個確認非 bug）
 
 **觸發**：操作者實際點過配置器介面後回報 6 項具體問題（非泛泛而談）：①「03 帳號與成員」沒有明確區分後台員工與前台客戶操作 ②07/09 三題（財務分析、應收帳款帳齡、銀行對帳單比對）點不了 ③11 類即時客服希望先 AI 後真人 ④希望電話/App 客服加 AI 語音客服 ⑤22 類收據OCR記帳的分類位置跟採購單整合疑問。逐項查證後 5 項是真缺口，1 項確認是既有設計（gate 邏輯正確，非 bug）。
