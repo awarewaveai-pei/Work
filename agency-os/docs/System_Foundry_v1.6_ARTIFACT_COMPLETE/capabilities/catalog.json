@@ -2015,6 +2015,28 @@
         "CAP-PRODUCTS"
       ],
       "description": "The same product is priced differently depending on the sales channel (e.g. own site vs. a marketplace) or market it sells in, driven by a price book rather than one single price applied everywhere."
+    },
+    {
+      "id": "CAP-RISK-SCREENING",
+      "name": "Order / Transaction Abuse Screening",
+      "module": "risk",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "Suspicious orders are flagged for manual review using rules -- velocity limits, blacklist/allowlist membership, and promo, referral, or return abuse patterns -- keyed to a customer identity rather than an order in isolation. Raw card-level payment fraud scoring is explicitly out of scope and is delegated to the payment provider (e.g. Stripe Radar); account takeover / credential-compromise detection is also explicitly out of scope here and is a session/credential security concern (see DER-SESSION), not an order-abuse rule; this capability only covers first-party transaction-abuse signals a PSP cannot see. Distinct from CAP-FINANCIAL-DECISION, which per Q-REG-002 is scoped to lending/credit/insurance-eligibility decisions about a person, not order-abuse flags."
+    },
+    {
+      "id": "CAP-CHARGEBACK",
+      "name": "Chargeback / Dispute Case Management",
+      "module": "risk",
+      "requires": [
+        "CAP-PAYMENTS",
+        "CAP-ORDERS",
+        "CAP-REFUNDS",
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "A card-network chargeback or payment dispute is tracked as a case referencing the original order, payment, and customer, from case creation through evidence submission to a won/lost outcome. A lost or refund-owed outcome is settled through CAP-REFUNDS' normal refund workflow, never a silent balance adjustment outside it. Scoped to disputes on the online/card-not-present payments this system itself processes (see Q-PAY-001); in-store card-present disputes on a POS-only sales channel are a separate, currently unmodeled boundary, not covered by this capability."
     }
   ]
 }

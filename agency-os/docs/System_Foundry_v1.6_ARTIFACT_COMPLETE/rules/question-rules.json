@@ -2122,6 +2122,26 @@
       "require": [
         "CAP-CHANNEL-PRICING"
       ]
+    },
+    {
+      "id": "RULE-Q-RISK-001",
+      "when": {
+        "question": "Q-RISK-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-RISK-SCREENING"
+      ]
+    },
+    {
+      "id": "RULE-Q-RISK-002",
+      "when": {
+        "question": "Q-RISK-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-CHARGEBACK"
+      ]
     }
   ]
 }

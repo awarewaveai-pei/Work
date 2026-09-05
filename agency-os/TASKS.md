@@ -359,7 +359,7 @@
   - **背景**：`CAP-PROMOTIONS`（促銷折扣）目前無條件可選——實測 `Q-PROMO-001=True` + `Q-COM-001=False`（明確答「不向客戶收費」）仍被接受，plan 正確產出 `CAP-PROMOTIONS`。獨立 critic 指出這是既有模式的延續而非本次新引入：`CAP-B2B-PRICING`（不同企業客戶議價）與 `CAP-REPRICING`（依競爭對手自動調價）自 `d51624f13` 以來就沒有 `Q-COM-001` 護欄。這跟上面那條「6題繞道 CAP-PAYMENTS」不同：那條是題目意外拉進 `CAP-PAYMENTS` 這個 capability；這條是「會決定客戶實付多少錢」的 capability 群本身沒有跟「這系統到底有沒有跟客戶收費」這個最上位的問題掛勾。
   - **影響**：跟上一條同類——生成的 blueprint 會替明確答「不向客戶收費」的（例如純內部工具、非營利用途）系統配置定價/促銷模組，屬「宣稱與真實不符」，非阻斷性錯誤。
   - **禁止的修法**：只 gate `CAP-PROMOTIONS`/`Q-PROMO-001` 一題（單點補丁）。
-  - **完成定義**：先機械掃過全部 capability，列出「描述裡明確主張決定/調整客戶實付金額」的完整清單（目前已知至少 `CAP-PROMOTIONS`／`CAP-CHANNEL-PRICING`／`CAP-B2B-PRICING`／`CAP-REPRICING` 4 個），逐一判斷是否該 gate 在 `Q-COM-001`，一次處理完並加機械檢查防止第 5 個同類未來悄悄新增（可能跟上一條的檢查合併成同一支腳本的兩種模式）。
+  - **完成定義**：先機械掃過全部 capability，列出「描述裡明確主張決定/調整客戶實付金額」的完整清單（目前已知至少 6 個：`CAP-PROMOTIONS`／`CAP-CHANNEL-PRICING`／`CAP-B2B-PRICING`／`CAP-REPRICING`／`CAP-LANDED-COST`〔關稅/到岸成本，透過 `Q-XB-003`〕／`CAP-RFQ`〔報價流程，透過 `Q-B2B-004`〕——後兩個是 2026-09-06 Fraud/Risk 缺口 critic 覆審時獨立機械掃描發現，屬既有缺口非該次新引入），逐一判斷是否該 gate 在 `Q-COM-001`，一次處理完並加機械檢查防止第 7 個同類未來悄悄新增（可能跟上一條的檢查合併成同一支腳本的兩種模式）。
   - **證據**：critic 覆審報告（Pricing/Promotions 加入的獨立 critic session，2026-09-06）；`agency-os/WORKLOG.md` 2026-09-06「System Foundry：Pricing/Promotions」條目。
 
 - [ ] **【2026-08-29 開出｜db-expert review 抓到的類別風險】SECURITY DEFINER 函式的 anon/authenticated 洞可能被未來 DROP+CREATE 靜默重開**

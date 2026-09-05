@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 208,
+  "active_answer_count": 210,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-3WAY-MATCH",
@@ -36,6 +36,7 @@
     "CAP-CAMERA",
     "CAP-CAMPAIGNS",
     "CAP-CHANNEL-PRICING",
+    "CAP-CHARGEBACK",
     "CAP-CLI",
     "CAP-CLICK-COLLECT",
     "CAP-COEXISTENCE",
@@ -167,6 +168,7 @@
     "CAP-REVIEW-REQUEST",
     "CAP-REVIEWS",
     "CAP-RFQ",
+    "CAP-RISK-SCREENING",
     "CAP-ROLES",
     "CAP-RTL",
     "CAP-SAFETY-IMPACT",
@@ -290,6 +292,7 @@
     "reliability",
     "returns",
     "reviews",
+    "risk",
     "sales",
     "search",
     "social",

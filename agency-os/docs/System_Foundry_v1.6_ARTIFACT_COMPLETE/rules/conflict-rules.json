@@ -120,6 +120,21 @@
       ],
       "code": "CONFIGURATION_CONTRADICTION",
       "message": "扣款失敗自動重試需要先有線上付款能力。"
+    },
+    {
+      "id": "CONFLICT-CHARGEBACK-NO-PAY",
+      "if_all": [
+        {
+          "question": "Q-RISK-002",
+          "equals": true
+        },
+        {
+          "question": "Q-PAY-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "信用卡拒付／爭議款案件處理需要先有線上付款能力。"
     }
   ]
 }

@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-06（System Foundry：5個真缺口的第2個 Fraud/Risk 落地，critic 抓到 requires 邊不完整的真缺陷）
+
+[根因/決策] 承接前一輪（Pricing/Promotions）確認的5個真缺口，本輪做第2個：Fraud/Risk（Payments_Fraud_Risk 藍圖章節中 payments 半邊已有既有`CAP-PAYMENTS`覆蓋，fraud/risk半邊未覆蓋）。設計吸取前兩輪教訓：新增`CAP-RISK-SCREENING`（訂單濫用篩查，requires `[CAP-ORDERS,CAP-CUSTOMER-DATA]`，不碰`CAP-PAYMENTS`）+`CAP-CHARGEBACK`（拒付爭議案件管理，requires `[CAP-PAYMENTS,CAP-ORDERS]`）；`Q-RISK-002`刻意 gate 在`Q-PAY-001`（線上付款，較窄）而非`Q-COM-001`（向客戶收費，較寬）——這是本輪最重要的設計決策，直接針對`488bf60ad`（Returns/RMA）的錯誤示範：`Q-RET-001`當初gate在`Q-COM-001`導致變成TASKS.md既有那條「6題繞道CAP-PAYMENTS」清單的第6個實例；這次gate在`Q-PAY-001`（`Q-PAY-001=true`本身已蘊含`Q-COM-001=true`）從根本上不製造同類問題。
+
+[執行] 委派fullstack-engineer agent實作 → 獨立critic全新覆審（從diff重新驗證，含真實resolver round-trip、raw-API繞過gate測試、真實HTTP server round-trip）：**TASKS.md兩個既有系統性類別都重新掃描確認零新增**（Class 1「6題繞道CAP-PAYMENTS」清單完全不變；Class 2「money-adjacent capability缺Q-COM-001 gate」的`CAP-RISK-SCREENING`經critic獨立判斷正確排除——它從不主張決定客戶實付金額，只是把可疑訂單送人工複核）。13步verify chain+29 unittest全綠。verdict SHIP WITH MINOR FIXES，但明確標註「H1+M2兩項必須在commit前修，不是事後」：
+
+- **H1（Medium，真缺陷，已修）**：`CAP-CHARGEBACK`原本沒有`requires: CAP-REFUNDS`，但`module-obligations.json`自己宣稱的invariant明講「拒付案件敗訴時透過CAP-REFUNDS正常退款流程處理」——critic用真實resolve()證明反例：`Q-PAY-002=false`+`Q-RISK-002=true`時`CAP-CHARGEBACK=True`但`CAP-REFUNDS=False`，生成的module contract自我宣稱矛盾（比原本沒有這個invariant更嚴重的「宣稱與事實不符」類）。修法：`CAP-CHARGEBACK.requires`加入`CAP-REFUNDS`，critic在自己的disposable copy上驗證過此修法不會製造Class 1的第7個實例（offender清單仍是同6個）。
+- **M2（Medium，已修）**：`CAP-CHARGEBACK`同樣缺`CAP-CUSTOMER-DATA`——藍圖第20節自己的驗收標準明講「Chargeback可關聯order/contact」，且sibling `CAP-RISK-SCREENING`正確有這個依賴，`CAP-CHARGEBACK`卻沒有，前後不一致。已補上。
+- **M1（Medium，已修，範圍收斂）**：藍圖master document §75列了11項fraud/risk項目，「Account Takeover（帳號被盜用）」完全沒有對應，且`Q-RISK-001`的標籤「訂單與帳號風險偵測」文字上宣稱涵蓋「帳號」但內容其實只有訂單層級的濫用規則——標籤過度宣稱。判斷：帳號被盜用偵測屬於登入/session安全範疇（`DER-SESSION`），跟訂單濫用規則是不同性質的能力，不新增第三個capability（避免範圍蔓延），改為：capability改名`CAP-RISK-SCREENING`→"Order / Transaction Abuse Screening"、`Q-RISK-001`標籤收窄為「訂單與交易濫用風險偵測」並在描述明確排除帳號安全範疇（比照原本排除信用卡原始詐欺偵測的寫法）。
+- **M3（Low，已修）**：藍圖第10節列了兩個獨立權限（`risk.review`／`risk.rules.manage`），本輪只實作了審核可見性，沒有規則編輯授權的獨立護欄（能改規則的人可以把自己列入白名單、永久關掉篩查）——已在obligations補上第二條security條目明確分離兩種授權層級。
+- **M4（Low，已修，登記非補丁）**：critic獨立重新掃描全部252個capability，發現既有的「4個money-adjacent capability缺Q-COM-001 gate」清單其實漏了2個：`CAP-LANDED-COST`（關稅/到岸成本）、`CAP-RFQ`（報價流程）——都是既有缺口非本輪引入。已將TASKS.md該條目清單從4個更新為6個，完成定義的「防第N個」計數同步更新。
+- **L2（Low，已修）**：PSP風險分數要保留來源（藍圖明講），原invariant只講不覆寫、沒講保留provenance——已補一句。
+- **L3（Low，已文件化不補丁）**：純實體門市（POS-only）刷卡的拒付案件目前不在`Q-RISK-002`涵蓋範圍（因為gate在`Q-PAY-001`）——這是既有`CAP-POS`本身沒有付款能力建模留下的邊界，critic明確警告「不要為了涵蓋這個情境把gate放寬到`Q-POS-001`，那樣會製造Class 1的第7個實例」。已在`Q-RISK-002`描述加一句明講此邊界，不動gate。
+- **L1（Nit，已修）**：`CAP-RISK-SCREENING`描述裡引用`CAP-FINANCIAL-DECISION`的範圍文字寫錯（誤植成`CAP-FINANCIAL-DECISION`自己沒有的「lending/credit-scoring」限定詞，那句話其實是`Q-REG-002`的敘述）——這是`d51624f13`/`fec071dad`都出現過的「引用另一個artifact文字要逐字核對」同一類問題，第三次出現，已修正引用來源。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=13步verify chain+`python -m unittest discover -s tests`（critic獨立重跑一次，我套用7項修正後自己再跑一次）| exit=0（每一步、兩輪皆是）| result=最終`questions=214 capabilities=252 modules=47 standard_modules=46 pairwise_valid=22785 pairwise_rejected=6(不變) pairwise_total=22791`；`Ran 29 tests...OK`；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=修正H1/M2後親自跑真實`resolve()`：`{Q-COM-001:T,Q-PAY-001:T,Q-PAY-002:F,Q-RISK-002:T}` | exit=0 | result=`CAP-CHARGEBACK=True CAP-REFUNDS=True CAP-CUSTOMER-DATA=True CAP-PAYMENTS=True`——修法生效，obligations宣稱的invariant現在有真實資料支撐
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic獨立跑raw-API繞過gate情境（`Q-RISK-002=true,Q-PAY-001=false`）| exit=ValueError | result=同時觸發`active_when`錯誤（"inactive question cannot be YES"）與新conflict rule的`CONFIGURATION_CONTRADICTION`訊息——雖critic指出兩者必然同時出現（conflict rule技術上不算「補active_when漏洞」，是house pattern一貫如此，非本次獨有），機制仍是正確的
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic獨立跑真實HTTP server（明確`--output-root`避免污染repo）`/api/generate` | exit=200 | result=`docs/modules/risk/*`全部產物正確落地
+- REVIEW_DONE: critic=Standard（全新獨立subagent，從diff重新驗證+對H1修法做disposable copy驗證安全性）| verdict=SHIP WITH MINOR FIXES→H1/M2/M1/M3/M4/L1/L2/L3全部處理（7項修正+1項文件化不補丁）| findings=0c/0m（收尾時）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-RISK-SCREENING\|CAP-CHARGEBACK\|Q-RISK-00[1-9]\|Order / Account Risk Screening\|訂單與帳號風險偵測` | hits=每個新id僅在歸屬檔各出現一次；改名前的舊capability名稱與舊題目標籤（`Order / Account Risk Screening`／`訂單與帳號風險偵測`）全庫零殘留
+
+[剩餘風險] TASKS.md §D Class 2 條目清單已擴充到6個但仍未實際處理（本輪範圍外）；第9候選Inventory/WMS多倉庫仍待深讀；5個真缺口中已完成2個（Pricing/Promotions、Fraud/Risk），剩餘3個（Logistics/Shipping、PLM/Quality、Merchandising）序列化進行中。
+
 ## 2026-09-06（續56，同一 session：Cognitive OS 第四十三個 Method Atlas 切片 — `database_data.retention_deletion_model`，F21 家族第九個、也是最後一個成員；critic verdict **SHIP WITH MINOR FIXES**：0 Critical，連續第三次「missing registry entry」失守類別本次真正打斷；引用完整性第四次出現但範圍大幅縮小——查證後零真引用遺漏，全部是行號/措辭精度問題；F21 家族十列全數交代完畢）
 
 **觸發**：操作者「繼續做 直到完美完成 Cognitive Engineering OS」。承接 WORKLOG 續55 候選清單，選 F21 table 最後一列 Retention/Deletion Model。動工前先查證 F21 剩餘的另一列 Schema Compatibility Analysis 是否需要獨立建置——讀 EC §28 確認其 15 步驟序列已含 `Compatibility Analysis` 為第 3 步，且 `database_data.expand_contract_migration` 自己的 `stage_id` enum 早已收錄 `compatibility_analysis` 值——確認**已完整覆蓋，非第十個建置候選**，F21 十列表格因此以九個 machine_id + 一個確認重複覆蓋收官。1 個 critic subagent。

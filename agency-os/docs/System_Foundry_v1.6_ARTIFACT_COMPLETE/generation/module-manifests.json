@@ -662,6 +662,17 @@
         "CAP-PROMO-RULES",
         "CAP-PROMOTIONS"
       ]
+    },
+    {
+      "id": "risk",
+      "paths": [
+        "packages/risk",
+        "tests/contract/risk"
+      ],
+      "activated_by": [
+        "CAP-CHARGEBACK",
+        "CAP-RISK-SCREENING"
+      ]
     }
   ]
 }

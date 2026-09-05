@@ -223,50 +223,56 @@
       "description": "商品折扣、優惠券與買 X 送 Y 等促銷規則，以及同一商品依通路或市場設定不同價格的價目表，跟「會員忠誠度與獎勵」類別的點數、儲值金等長期回頭客機制不同，這裡是當下直接影響價格或折扣的機制。"
     },
     {
-      "id": "mobile_offline",
+      "id": "risk",
       "order": 34,
+      "title": "風險與詐欺防制",
+      "description": "訂單／帳號風險規則偵測（速度異常、黑白名單、促銷／推薦／退貨濫用）供人工複核，以及信用卡拒付／爭議款案件處理，跟支付服務商自己的原始卡片風險評分（例如 Stripe Radar）不同——這裡處理的是 PSP 看不到的一階濫用訊號，不重做 PSP 已經在做的事。"
+    },
+    {
+      "id": "mobile_offline",
+      "order": 35,
       "title": "行動與離線",
       "description": "行動裝置、現場作業與離線能力"
     },
     {
       "id": "globalization",
-      "order": 35,
+      "order": 36,
       "title": "多國與在地化",
       "description": "語言、幣別、時區與資料所在地"
     },
     {
       "id": "ai",
-      "order": 36,
+      "order": 37,
       "title": "AI 與自動化",
       "description": "AI 輔助、生成、決策與代理操作"
     },
     {
       "id": "migration",
-      "order": 37,
+      "order": 38,
       "title": "既有系統與資料遷移",
       "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "regulated",
-      "order": 38,
+      "order": 39,
       "title": "特殊資料與產業",
       "description": "會觸發額外治理或法規研究的領域事實"
     },
     {
       "id": "business_impact",
-      "order": 39,
+      "order": 40,
       "title": "營運影響",
       "description": "描述業務本身的運作方式與影響，不是選工程技術"
     },
     {
       "id": "future",
-      "order": 40,
+      "order": 41,
       "title": "未來規劃",
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
       "id": "custom",
-      "order": 41,
+      "order": 42,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -2500,6 +2506,26 @@
       "description": "同一項商品依銷售通路（例如自有官網 vs. 電商平台）或依市場（例如不同國家）預先設定不同價格，是一份價目表本身的設定。跟「企業客戶與批發」類別的「不同企業客戶有不同的協議價格」不同：那題是針對個別客戶談出來的價格，這題是依通路/市場整批設定的價目表；跟「多平台市集營運」類別的「需要依競爭對手價格自動調整售價」也不同：那題是依競爭對手動態自動調整，這題是主動預先規劃、不隨競爭對手變動的定價。",
       "answer_type": "boolean",
       "required_when_active": true
+    },
+    {
+      "id": "Q-RISK-001",
+      "category": "risk",
+      "label": "訂單與交易濫用風險偵測",
+      "description": "用規則（例如短時間內下單次數異常、黑名單／白名單、促銷或推薦碼濫用、異常退貨模式）標記可疑訂單，交由人工複核，系統本身不自動判定或封鎖。信用卡本身的原始刷卡詐欺偵測通常由支付服務商內建處理（例如 Stripe Radar 這類即時風險評分），帳號被盜用／憑證外洩的偵測則屬於登入與 session 安全的範疇，兩者都不是這題要做的事，避免跟支付服務商層級或帳號安全層級的防護工具搞混。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-RISK-002",
+      "category": "risk",
+      "label": "信用卡拒付／爭議款案件處理",
+      "description": "信用卡拒付（chargeback）或爭議款案件要建立案件記錄、提交證據，並追蹤最終結果（勝訴或敗訴），是一套完整的案件管理流程，不只是把錢退回去的退款。只在你有勾選「線上付款」時才有意義——沒有線上刷卡就不會有拒付爭議案件；純實體門市刷卡（POS）的拒付案件目前不在本題涵蓋範圍內。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PAY-001",
+        "equals": true
+      }
     }
   ]
 }

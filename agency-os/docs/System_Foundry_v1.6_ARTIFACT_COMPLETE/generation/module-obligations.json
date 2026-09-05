@@ -1034,6 +1034,30 @@
       "recovery": [
         "Promotion, coupon redemption, and price book records are included in backup scope."
       ]
+    },
+    "risk": {
+      "purpose": "Flag suspicious orders for manual review using rules (velocity, blacklist/allowlist, promo/referral/return abuse patterns) keyed to a customer identity, and separately track the card-network chargeback/dispute case lifecycle from creation through evidence submission to a won/lost outcome, resolved through the ordinary refund workflow when money is owed back -- distinct from CAP-PAYMENTS, which owns payment authorization/capture and (via the payment provider) raw card-level fraud scoring, and distinct from account-takeover/credential-compromise detection, which is a session/credential security concern, not an order-abuse rule; this module owns only the first-party order-abuse signals a PSP cannot see, not the PSP's own fraud engine and not account security.",
+      "invariants": [
+        "A risk-screening rule match produces a recommendation routed to a manual review queue, never an automatic order block or account suspension; a human reviewer's decision is the enforcement point.",
+        "A chargeback/dispute case always references a real, already-captured payment and its originating order; it cannot be created against a payment or order that does not exist.",
+        "Velocity, blacklist, and allowlist rules are evaluated against the customer identity a screened order or account belongs to (via CAP-CUSTOMER-DATA), not the order in isolation, so the same abusive actor cannot reset their risk history simply by placing a new order.",
+        "A chargeback case reaching a lost or refund-owed outcome triggers the money movement through CAP-REFUNDS' normal refund workflow, never a silent balance adjustment outside it.",
+        "Raw card-level fraud scoring remains the payment provider's responsibility (e.g. Stripe Radar); this module never re-implements or overrides that score, only consumes it, alongside its own original PSP-assigned identifier, as one optional input into the manual-review queue -- the external score's provenance is retained, not collapsed into an undifferentiated internal number."
+      ],
+      "security": [
+        "Manual review queue entries and chargeback case detail are only visible to authorized staff holding risk-review permission, never to the customer whose order or account is flagged.",
+        "Authoring or modifying a velocity/blacklist/allowlist rule requires a separate, higher risk-rule-management permission than merely reviewing flagged items -- a reviewer cannot silently escalate to rule-author by holding review access alone, since a rule author could otherwise allowlist their own abuse and permanently disable screening for it."
+      ],
+      "tests": [
+        "The manual-review-not-auto-block invariant is contract-tested: a rule match alone, with no reviewer action, must not change order or account state.",
+        "Chargeback case creation against a nonexistent payment or order is rejected, contract-tested the same way CAP-RETURNS tests its own order-existence guard."
+      ],
+      "operations": [
+        "Manual review queue depth and average time-to-resolution, and chargeback case volume/outcome rate, are observable and alertable."
+      ],
+      "recovery": [
+        "Risk-screening flag, review-queue decision, and chargeback case records are included in backup scope."
+      ]
     }
   }
 }
