@@ -1,5 +1,5 @@
 # Composable AI Commerce OS
-## Final Master Blueprint v2.0
+## Final Master Blueprint
 
 > **Composable AI Business OS for Global Commerce**
 >
@@ -5598,4 +5598,4 @@ Amazon 庫存與 Shopee 延遲訂單。
 
 ---
 
-**End of Master Blueprint v2.0**
+**End of Master Blueprint**
