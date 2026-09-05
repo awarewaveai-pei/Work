@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-05（續46，同一 session：Cognitive OS 第三十三個 Method Atlas 切片 — `devops_sre.runbook_execution`，主動套用前兩輪教訓從第一版就做對，critic 窮舉 39.44 萬種組合驗證屬實）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。操作者中途表示要收工 clear，本輪完成後停。
+
+**選型**：`devops_sre` 家族第八成員。Atlas F19 table 自己的 Runbook/Playbook 列（L861「preconditions→steps→expected output→stop/go→rollback」，效益「降操作錯誤」）——5 段公式直接蘊含 4 個獨立不變量（步驟編號良構 1..N、decision:go 需要前兩項檢查都過、stop 後不得再有步驟、stop 必須觸發 rollback）。
+
+**本切片刻意從第一版就主動套用前兩輪（capacity_model/release_readiness_review）的教訓，不是事後補**：8 個共用 predicate（含 record identity、step key 集合）builder 跟 gate 從頭就共用同一份函式。**critic 真跑（含獨立寫的 violation oracle 窮舉 394,400 種記錄形狀+12 萬筆模糊測試）驗證這個宣稱屬實**：8 個 builder 前置條件全部被 gate 獨立重驗，零逃逸、零誤判——前兩輪連續被抓到的「gate 只重算輸出、不重驗輸入」缺口這次真的沒有重演。
+
+**critic 仍抓到 1 個 Critical（文件層）+ 3 個 Major（測試覆蓋缺口）**：
+1. **Critical**：contract 宣稱已在 contract-backlog 註冊但沒有——已補上 `thirtyfirst_concrete_entry`。
+2. **Major**：引用查證 grep 範圍太窄——跟上一個切片同款失誤，重演一次。真全 spec root 約 26 個檔案命中，漏掉 `docs/architecture/DEVOPS_SRE_PLAN.md` 自己的「pre-approved playbook」自動化執行層級敘述+一個跟本方法無關的「Recipe/Runbook」文件權威層級命名巧合。兩者都不是競爭 typed object，已揭露（新增 OQ-4）。
+3. **Major**：`_stopped_steps_are_last` 內部真的有排序（程式碼本身正確），但沒有任何既有測試用「非數字順序」的步驟輸入去驗證這個排序真的有作用——真突變刪掉排序，全套 36 個測試照樣綠燈。補上打亂順序的建構層+gate 層測試。
+4. **Major**：gate 對 `runbook_ref` 的獨立重驗沒有專屬測試（只測了 `id` 那一半）——同一種缺口換一個具體欄位又出現一次，補上鏡射測試。
+
+另修 1 個 Minor：非布林值 `rollback_performed` 原本只在「有 stop」的路徑檢查，沒 stop 時靜默放行——改成無條件先驗型別。
+
+**本輪教訓**：「gate 要重驗輸入」這個抽象原則這次真的被完整套用且窮舉驗證通過——證明教訓確實可以被真正吸收而非每次重犯。但同時也證明「邏輯正確」跟「有測試證明正確」是兩件事：排序這行程式碼本身沒錯，錯的是沒人寫測試去逼它非執行不可，直到 critic 真的跑突變才發現。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.runbook_execution.contract.yaml`（含修正後引用範圍+OQ-1~4）＋`specs/cognitive/typed-objects/runbook-execution-record.schema.yaml`（含 whitespace pattern 修正）＋`contract-backlog.yaml` 新增 `tier_1.thirtyfirst_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/modules/devops_sre/runbook_execution.py`（builder+2 gate，8 個共用 predicate）＋`ai_lego/apps/cli/run_runbook_execution_slice.py`＋`tests/unit/test_runbook_execution.py`（40 tests）＋`docs/THIRTYTHIRD_SLICE_DEVOPS_SRE_RUNBOOK_EXECUTION.md`。順手修正 `modules/devops_sre/__init__.py` docstring 補齊本切片成員。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2783→2786
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_runbook_execution_slice`（修正後）| exit=0 | result=`PASS devops_sre.runbook_execution: 3 steps, rollback_performed=False, gates [provenance_required=PASS, runbook_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_runbook_execution -v` | exit=0 | result=40 passed（36→40，含打亂順序 stop 迴歸兩層+非布林 rollback 迴歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=93747 | result=**896 tests OK**（892→896，零回歸）
+- REVIEW_DONE: critic=Standard（真實 subagent，含獨立 violation oracle 窮舉 394,400 種形狀+12 萬筆模糊測試，驗證核心宣稱屬實）| verdict=fail(1 Critical 文件層, 3 Major 測試覆蓋)→fixed | findings=1c/3m/1minor（全數修正）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]runbook_execution\|RunbookExecutionRecord\|RUNBOOKEXEC_` | hits=0（僅本切片自己新檔案，跨全部必查根目錄零過期殘留）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-RUNBOOKEXECUTION-1`（無機器 id 列）、`OQ-RUNBOOKEXECUTION-2`（Game Day 未建，soft-link 未接）、`OQ-RUNBOOKEXECUTION-3`（無結構化 note 欄位）、`OQ-RUNBOOKEXECUTION-4`（跟 DEVOPS_SRE_PLAN.md 自動化 playbook 層級的關係已揭露但雙向皆未接交叉引用）。皆非阻塞，已揭露非靜默缺口。
+
+**本次收工**：操作者要求本切片完成後停下 clear。本 session 累計完成 33 個 Method Atlas 切片（本輪從 29→33，共 5 個：29 reconciliation、30 expand_contract_migration、31 capacity_model、32 release_readiness_review、33 runbook_execution），全部已 commit+push 到 main，無待處理未提交變更。
+
 ## 2026-09-05（System Foundry v1.6 新增 5 個財務類 capability：應收帳款帳齡與催收、銀行對帳單比對、庫存計價方法、自動財務報表、財務分析——操作者接續前一批 OCR/品項對應繼續補財務規劃缺口）
 
 **觸發**：操作者在前一批新增（收據 OCR、品項跨廠商對應）之後接連追問「自動出財務報表」「財務分析、催款之類的」「帳款行程」，屬於同一輪對話裡持續補完財務規劃缺口。範圍在中途一度模糊（「財務分析」跟「自動財務報表」要不要合併、「帳款行程」是否算獨立項目），先整理成清單回報操作者確認（帳款行程併入應收帳款帳齡；財務分析與財務報表明確分開）才動工，避免猜錯範圍重做。
@@ -11899,3 +11932,28 @@ _Last synced: 2026-08-24 19:21:02 UTC_
 - `docs/HCI/` 重組（誰做的、何時、是否已通知 WORKLOG）與新出現的 `agency-os/docs/System_Foundry_v1.0/`（大型未提交新框架，內部自稱路徑 `docs/SYSTEM_FOUNDRY/` 與實際落點不符）均未在此 WORKLOG 留下起源記錄，留待與操作者確認後續處置，不在本條目範圍內處理。
 
 **Rollback**: `git diff` 未 staged，直接 `git checkout -- <path>` 個別還原；或 revert baseline sourceKey 回 `line:12`（僅在 `.claude/settings.json` 行數真的變回 12 時才需要）。
+
+## 2026-09-05（續，System Foundry v1.6 configurator：`validate_configurator.py` 補 active_when 前向引用檢查）
+
+### fix(system-foundry): validate_configurator 抓 active_when 指向「渲染順序在後」的題目
+
+**根本問題**：`configurator/app.js` 的 `render()` 每個 category 由上到下單趟渲染（category 順序 = `catalog.json` `categories` 陣列順序；category 內題目順序 = `catalog.json` `questions` 陣列順序），只在第一次抵達某個「剛變 active」的題目時才 `answers[q.id]=false` 初始化。若題目 A 的 `active_when` 指向渲染順序在 A **之後**的題目 B，第一次渲染時 `answers[B.id]` 仍是 `undefined`；對 `equals:false` 條件而言 `undefined===false` 為 `false`，A 在首次繪製時被誤判為 inactive，要等下一次點擊觸發 re-render 才會自我修正。此為 2026-09-05 同日稍早 critic review（同日 WORKLOG「System Foundry v1.6 configurator UI/UX 重做第一批」條目）發現的 Suggestion 級 pre-existing 缺陷：非本次改動引入，且對現有 161 題全掃描零命中（latent，非 active bug）。
+
+**已修改**：`scripts/validate_configurator.py`
+- 建 `render_index`（category 陣列序 × category 內 question 陣列序 的穩定索引，忠實對應 `app.js:20` 雙層迴圈的真實走訪順序）
+- 對每題 `active_when` 的每個 `question` 參照，`equals is False` 且參照目標的 `render_index` ≥ 自身索引 → 判定為 forward-reference 錯誤
+- `equals:true` 的前向參照不觸發（`undefined===true` 同樣是 `false`，跟穩態一致，沒有首次繪製分歧，故不算缺陷）
+- 自我參照（`r==q['id']`）獨立訊息（`active_when self-references`，非「渲染順序在後」）
+- 新增 `duplicate category id` 檢查（`len(cat_ids)!=len(cats)`，比照既有 `duplicate question id` 寫法）——這是本次 critic review 抓到的兩個 Major 之一：category id 重複時，`render_index` 對重複 category 的第二次走訪覆蓋掉第一次的索引，會同時造成真實前向參照的假陰性、以及無關題目的假陽性；沒有這條檢查，本次新增的檢查本身在 category id 重複時可能回報錯誤結論
+- 「渲染不到」的參照目標（`category` 本身無效，因此進不了任何 category 的走訪）預設索引改成 `_pos`（走訪總數，等同「最後」）而非 `0`（「最先」），因為前者才是「這個答案永遠是 undefined」的正確近似——`0` 會把它誤判成最安全的「早就渲染過」
+- 註解明確標出本檢查的邊界（另一個 Major）：只抓「前向參照」，**不**抓「參照一個本身有條件、且目前答否而被 `render()` `delete` 掉 `answers[]` 的題目」——那是同一大類「渲染時讀到 undefined」下的另一半，`app.js:20` 的 `delete answers[q.id]` 分支會讓被參照題目即使渲染順序在前也可能是 undefined；目前 catalog 裡所有 13 個 `equals:false` 參照對象都是無條件 active（critic 已驗證），此半目前 latent，特意在註解寫明未涵蓋範圍，不讓下一個讀者誤以為本檢查已封閉整個「undefined」問題類別
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_configurator.py`（未改動前後 baseline）| exit=0 | result=`CONFIGURATOR VALIDATION: PASS questions=161 capabilities=199 modules=32`，改動前後不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=5 組突變測試腳本（scratch，每組先從 pristine catalog 複製再改，跑完個別 revert，最後整體 revert 再跑一次確認回到 PASS）：(1) 跨 category 的 `equals:false` 前向參照 → FAIL 且訊息含 forward-references；(2) 額外重複一個 category id 同時製造真實前向參照 → FAIL 且明確列出 `duplicate category id`（修復 Major #1 前，這個案例會漏報真前向參照、誤報無關題目）；(3) `equals:true` 前向參照 → 維持 PASS（修復 Major/Minor #4 前會誤報 FAIL）；(4) 自我參照 → FAIL 且訊息為 `self-references`（修復 Minor #5 前訊息文字為誤導性的 forward-references）；(5) 參照目標 `category` 本身無效（渲染不到）→ FAIL 且仍正確標出前向參照（修復 Minor #3 前，`,0` 預設值會讓這個案例被誤判為「安全」）| exit=0（全部 5 組斷言通過）| result=`ALL MUTATIONS OK`
+- REVIEW_DONE: critic=Standard | verdict=warn（首輪：2 Major + 3 Minor + 1 Suggestion，0 Critical）→ 逐項修復後以上述 5 組突變測試自行驗證，未二次呼叫 critic subagent（額度考量，AGENTS.md §5 扇出治理；修復內容為單一小檔案的窄範圍修正，风险 Low，突變測試對每個 finding 都有專屬紅燈證據）| findings=0c/2m/3n（Major #1 重複 category id 遮蔽真前向參照已修；Major #2 delete 路徑半個不變量未涵蓋——選擇窄化註解說明邊界而非擴大實作，因使用者原始需求明確界定為「前向參照」這一種情境；Minor #3 預設值方向錯誤已修；Minor #4 equals:true 假陽性已修；Minor #5 自我參照訊息誤導已修；Suggestion #6/#7 為既有程式碼共通假設/效能備註，非本次改動範圍）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`render_index`（新識別符）+ `active_when forward` | hits=1（僅本檔本身），確認無其他檔案引用此驗證器內部錯誤訊息格式或此識別符
+
+**[剩餘風險]**：Major #2（backward reference 到「本身有條件且目前答否」的題目，`app.js:20` 的 `delete` 分支）目前 latent（13 個 `equals:false` 參照全部指向無條件 active 的題目），未來若有人新增這類 catalog pattern，此檢查不會抓到；註解已明確標出此邊界，供下一個改動者判斷是否需要擴充。
+
+**Rollback**: `git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/validate_configurator.py`（單檔、無資料遷移、無下游依賴此檔內部實作）。
