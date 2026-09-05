@@ -47,6 +47,21 @@
       "message": "訂閱制與「不向客戶收費」互相矛盾。"
     },
     {
+      "id": "CONFLICT-RETURNS-NO-CHARGE",
+      "if_all": [
+        {
+          "question": "Q-RET-001",
+          "equals": true
+        },
+        {
+          "question": "Q-COM-001",
+          "equals": false
+        }
+      ],
+      "code": "CONFIGURATION_CONTRADICTION",
+      "message": "客戶退貨換貨（RMA）需要先向客戶收費，跟「不向客戶收費」互相矛盾。"
+    },
+    {
       "id": "CONFLICT-REFUND-NO-PAY",
       "if_all": [
         {

@@ -35,12 +35,12 @@ Generator output is technology-neutral until architecture convergence. It genera
 
 `make verify` proves:
 
-- 208/208 questionnaire questions have deterministic YES rules.
-- 246/246 standard capabilities are reachable in the ALL-YES configuration.
-- 43 standard LEGO modules are produced by ALL-YES; a 44th `custom` extension module is activated only when the user adds custom requirements.
+- 209/209 questionnaire questions have deterministic YES rules.
+- 247/247 standard capabilities are reachable in the ALL-YES configuration.
+- 44 standard LEGO modules are produced by ALL-YES; a 45th `custom` extension module is activated only when the user adds custom requirements.
 - ALL-NO produces only the locked `core` module.
-- All 208 questions are tested individually.
-- All 21,528 question pairs are attempted; compatible pairs compile and explicit contradictory pairs fail closed.
+- All 209 questions are tested individually.
+- All 21,736 question pairs are attempted; compatible pairs compile and explicit contradictory pairs fail closed.
 - 1,000 deterministic randomized configurations are tested.
 - Every generation module is proven reachable and materialized.
 - Every selected module receives 10 mandatory artifacts; unselected module paths/documents are absent.

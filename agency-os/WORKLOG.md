@@ -1,5 +1,56 @@
 # Worklog
 
+## 2026-09-05（System Foundry 3 項待決定 ②：Returns/RMA 第13缺口落地，含獨立 critic 抓到既有類系統性漏洞 + 立項不單點補丁）
+
+[根因/決策] `d51624f13` 吸收 12 個新模組時刻意不做第13個缺口：Returns/RMA（退貨換貨流程），因操作者當時只授權12個。今日操作者授權「你決定」全權處理３項待決定，① blueprint commit、③ doc-number/交叉引用驗證器皆已完成（見本檔同日稍早條目），此為第③項後緊接的第②項。設計：新增 `CAP-RETURNS`（module `returns`），`requires: [CAP-ORDERS, CAP-PRODUCTS, CAP-INVENTORY, CAP-REFUNDS]`（request→approval→return label→receive→inspection→refund/exchange handoff，明確不同於既有 `CAP-WARRANTY`〔瑕疵/保固期內〕與 `CAP-REFUNDS`〔純金流執行〕，依 `Composable AI Commerce OS_16_Returns_Warranty_After_Sales.md` 藍圖邊界定義）；新增問卷 `Q-RET-001`，gate 在 `Q-COM-001=true`（向客戶收費）——這個 gating 是必要非風格選擇：`CAP-RETURNS` 拉入 `CAP-REFUNDS`→`CAP-PAYMENTS` 金流鏈，若題目無條件可答會在 minimal single-question activation 觸發自己的新 conflict rule（`d51624f13` 第一版踩過的同一個坑）；新增 `RULE-Q-RET-001`＋`CONFLICT-RETURNS-NO-CHARGE`（defense-in-depth，本套件對每條 conflict rule 都有機械覆蓋測試，非裝飾性宣告）。
+
+[執行] 委派 fullstack-engineer agent 實作（含真實 resolver round-trip 驗證＋真實 HTTP server `/api/catalog`／`/api/generate`／`/api/resolve` 端到端驗證，因本次 session 無瀏覽器工具可用，已誠實揭露此限制而非假裝做了 DOM 截圖）→ 獨立 critic 全新覆審（重新從 diff 本身驗證，不採信 agent 報告）：**requires 邊正確、無斷邊、無重複能力、fixture 皆為真實 resolve() 重生（非手改）、13 步 verify chain+29 unittest 全綠、conflict rule 有機械覆蓋且 pairwise_rejected 維持 6 不變、bug hunt 零殘留**——沒有重演 `d51624f13` 第一版的斷邊缺陷。
+
+critic 額外抓到 2 個問題，已處理：
+1. **F2（Low，已修）**：`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md:60` 的 `all_yes.json` 行號引用（`3-250`/`251-295`）在新增一個 capability 後已經是錯的（真實邊界應為 `3-251`/`252-297`），`validate_doc_numbers.py` 只驗數字不驗行號，這個 drift 正好從今天稍早③剛建立的護欄底下漏出去。已修正兩處行號。
+2. **F1（Medium，既有類，不單點補丁，已立項）**：critic 機械掃過全部209題 minimal activation，發現 **6 題**（`Q-LOY-004`／`Q-RET-001`／`Q-SUBC-001`／`Q-SUBC-002`／`Q-SUBC-003`／`Q-XB-003`）在 `Q-PAY-001=false`（不做線上付款）時仍會經 `requires` 閉包拉進 `CAP-PAYMENTS`，繞過 `Q-PAY-002`/`CONFLICT-REFUND-NO-PAY` 這條退款正門的雙重護欄。其中5題是 `d51624f13` 留下的既有缺口，`Q-RET-001` 是第6個、也是唯一同時拉進 `CAP-REFUNDS` 的。pairwise 測試抓不到這類（只測成對題設 True，`X=false` 組合不在覆蓋空間內），13步全綠不代表無此問題。**依 AGENTS.md R0 補丁判準（「這一類問題的不變量是什麼？我是關掉整類還是只關眼前這個實例？」）不得只改 `Q-RET-001` 一題**，已在 `agency-os/TASKS.md` §D 立一條新待辦（標題含「6 個題目」），列三個候選修法方向及完成定義（六題全處理或明確接受+文件化+機械防呆，非僅一題）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=13 步 verify chain（`validate_versions/foundry/semantics/configurator/artifact_generation/contract_fixtures/adversarial/bootstrap_e2e/configurator_e2e/configurator_http_e2e/selection_matrix/manifest/doc_numbers.py`）+ `python -m unittest discover -s tests`（critic 獨立重跑，非採信 agent 報告）| exit=0（每一步）| result=`questions=209 capabilities=247 modules=45 standard_modules=44 blueprints=73 pairwise_valid=21730 pairwise_rejected=6 pairwise_total=21736`；`Ran 29 tests ... OK`；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic 獨立跑 `resolve({'Q-COM-001':True,'Q-RET-001':True})` | exit=0 | result=`CAP-RETURNS`/`CAP-ORDERS`/`CAP-PRODUCTS`/`CAP-INVENTORY`/`CAP-REFUNDS`/`CAP-PAYMENTS` 全部出現，`'returns' in plan['modules']`，`traceability['CAP-RETURNS']==['RULE-Q-RET-001']`
+- REALTEST_EVIDENCE: tool=Bash | cmd=agent 跑真實 HTTP server（`serve_configurator.py`）`/api/generate` with `Q-COM-001=true,Q-RET-001=true` | exit=200 | result=`docs/modules/returns/MODULE_MANIFEST.json` 等全部 10 個 module 產物正確落地磁碟；`Q-COM-001=false` 情境下 `returns` 正確不出現在 `plan['modules']`
+- REVIEW_DONE: critic=Standard（全新獨立 subagent，從 diff 本身重新驗證，非採信 agent 自報）| verdict=SHIP WITH MINOR FIXES → F2 已修、F1 已立項不阻擋合併 | findings=0c/1m(F1,已轉TASKS)/1low(F2,已修)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-RETURNS\|Q-RET-001\|RULE-Q-RET-001\|CONFLICT-RETURNS-NO-CHARGE` | hits=每個 id 僅在其歸屬檔各出現一次，零重複、零半寫引用、套件內無「第13缺口 deferred」殘留字樣
+
+[剩餘風險] TASKS.md §D 新條目（6題 CAP-PAYMENTS 繞道問題）待排入；`generation/module-obligations.json` 既有的 derived-capability traceability 缺口（critic suggestion #5，`d51624f13` 已知，本次新增的 requires 邊讓受影響數量略增但非本次引入）。
+
+## 2026-09-05（HCI-30 Wave 1：ADR-0004 No Universal Human Trust Score gates 1-3 落地，migration 0011，db-expert 覆審 1 Critical+3 Major+5 Minor/Suggestion 全修 + 另一輪獨立 critic 覆審 lint 腳本本身抓到 gate 1 實際無效，全修，含跨檔 M3 class fix）
+
+**觸發**：延續當日 HCI-30 Wave 1 ADR 逐個關閉的節奏（ADR-0019 五個 gate、ADR-0009 查證皆已收尾），操作者「繼續做 HCI」。挑下一個尚未動工、Wave 1 範疇內的 ADR：ADR-0004（`SPECIFIED — RUNTIME OPEN`，gate 1-3 皆 Wave 1）。2 個 subagent（db-expert 覆審 migration 0011 SQL；critic 獨立覆審 lint 腳本本身的 regex/PowerShell 邏輯，因非 db-expert 專業領域另派）。
+
+**過程**：先讀 ADR-0004 全文＋`0001_wave1_synthetic_up.sql` 既有 `subject_records`/`data_subject_request_targets`/`supersedes_id` 三個既有 idiom，確認 gate 1-3 可完全沿用既有 CHECK-pair／複合 typed-FK 模式，不需發明新機制。因這輪引入「自我參照複合 FK」+「對 ADR 自己保護對象表的 lint 豁免」兩個新形狀，首輪 223/223 assertion 全綠後主動送 db-expert 覆審（migration 從未部署過，任何修正都是原地改，非另開 follow-up migration）。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0011_wave1_trust_domain_scope_{up,down}.sql`（新）：`hci.subject_records` 加 `domain`（七值 enum，TRUST_DOMAIN-scoped/required）+ 型別化證據自我參照 `evidence_ref_id`/`evidence_ref_kind`（`IN ('EVIDENCE','CLAIM')`）+ partial `UNIQUE(tenant_id,person_id,domain) WHERE kind='TRUST_DOMAIN'`；db-expert 覆審後加 `subject_records_person_kind_unique UNIQUE(tenant_id,person_id,id,kind)`（M2，證據 pin 擴到含 person_id）+ `subject_records_trust_domain_no_supersede CHECK`（M1，明文排除 TRUST_DOMAIN 於 bitemporal supersession 之外）。down migration 補冪等性收緊（N3：先查 `domain` 欄是否存在再判斷）。
+- `Projects/internal/hci30/scripts/check-no-universal-trust-column.ps1`（新，ADR-0004 gate 1 CI lint）：db-expert C1 覆審後把「豁免判準」從「有沒有叫 `domain` 的欄位」收緊為「`domain` 是否恆為 NOT NULL」。**另一輪獨立 critic 覆審發現這支腳本實際上完全沒作用**：大小寫敏感（`NUMERIC` 大寫不比對）、禁用欄位偵測跟豁免偵測共用同一份型別白名單（`decimal`/`double precision`/`int`/`jsonb` 全部繞過）、table 名稱擷取沒排除 `IF EXISTS`/`ONLY`（`ALTER TABLE IF EXISTS foo` 把不相干的表擠進同一個 `if` bucket）、self-test 自己的 fixture 從未真正測到宣稱的 paren-depth 邏輯。全部修復，並用 critic 原始 7 個繞過案例逐一重現驗證（獨立於 self-test，直接對修後腳本重跑）全部正確攔截。
+- `database/tests/wave1-negative-tests.sql`（208→229）：`TRUST-NEG-01`/`02`（ADR 自己命名的 gate 2/3 測試）+ 13 個首輪覆蓋每個新 CHECK/FK/UNIQUE + db-expert 覆審後再加 6 個（`TRUST-NO-AGGREGATE-COLUMN-01` C1 目錄斷言、`TRUST-EVIDENCE-CROSSPERSON-01`/`TRUST-NEG-NOSUPERSEDE-01` M1/M2、`TRUST-EVIDENCE-CHAIN-01`/一個 tenant-A ASSESSMENT fixture 列 M4、`TRUST-PERSON-CROSSTENANT-01` N4）。既有 `TARGET-KIND-01a`（唯一既存 TRUST_DOMAIN 列）retrofit 補 domain/evidence_ref。
+- `scripts/mutation-check-wave1.ps1`（101→115）：14 個新 mutation，含一個獨立 regression-guard（`regress-evidence-ref-fk-drop-person`，專門證明 person_id 這條腿真的有作用）+ critic 覆審後補的 `collapse-trust-domain-to-one-slot`（TRUST-NEG-02 原本完全沒有 mutation，expect 清單來自真跑探測，非估計）。
+- `scripts/test-wave1-local.ps1`：wire 0011 + gate 1 lint 呼叫。
+- **M3 跨檔 class fix**：`0005`/`0007`/`0008`/`0010_wave1_*_down.sql` 四個既有 down migration 的 empty-state guard 都讀 FORCE RLS 表，在真實 non-superuser owner 下會靜默 0 列 fail-open——本機測試容器 owner 恰好是 superuser 才沒現形。四檔補 `SET LOCAL row_security = off;`（沿用 0009 M4 已用過的同一修法）。
+- 治理：`ADR-0004-no-universal-human-trust-score.md` Implementation note、`ADR_INDEX.md` 列、`HCI_WAVE1_DOMAIN_ERD.md` TrustDomain 行、`HCI_WAVE1_NEGATIVE_TEST_SPEC.md` migration 0011 段（含兩輪 review 完整敘述）、`TASKS.md` 完成項。
+
+**db-expert 覆審發現（SQL 層，1 Critical + 3 Major + 5 Minor/Suggestion，全修）**：C1（lint 豁免太寬鬆，見上）；M1（TRUST_DOMAIN 列永遠碰不到 supersession 機制，明文 CHECK 排除）；M2（證據 pin 沒釘 person_id，擴到含 person_id）；M3（見上）；M4（`TRUST-EVIDENCE-KINDVALUE-01` 為錯的理由通過，補真實 ASSESSMENT fixture 改指）；N3/N4（down migration 冪等性；補 `TRUST-PERSON-CROSSTENANT-01`——後續探測發現此測試因 M2 修復而與 `TRUST-EVIDENCE-CROSSPERSON-01` 雙重覆蓋，無法寫出乾淨獨立 mutation，保留斷言本身，不硬造假隔離）。兩個 Suggestion 級（未用索引；0007 既有 `tombstone_evidence()` tenant 述詞缺口）列 TASKS 追蹤。
+
+**critic 覆審發現（lint 腳本本身，2026-09-05 同日追加，5 項全修）**：大小寫敏感；型別白名單缺口；`IF EXISTS`/`ONLY` table 名稱擷取 bug；self-test fixture 從未測到宣稱的邏輯（critic 實際把 paren-depth 邏輯拔掉驗證 self-test 仍全綠）；`TRUST-NEG-02` 零 mutation。修復後用 critic 原始 7 個繞過案例重現驗證全部攔截。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1`（db-expert 修復前）| exit=0 | result=`223 assertion(s) recorded, 0 failed`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1`（兩輪覆審修復後）| exit=0 | result=`229 assertion(s) recorded, 0 failed`，含整包 reversibility
+- REVIEW_DONE: critic=Deep（db-expert subagent，背景跑，讀完 up/down migration＋ADR 全文＋既有 idiom＋新斷言/mutation）| verdict=warn→1C+3M+5m 全修 | findings=1c/3m/5minor
+- REVIEW_DONE: critic=Deep（第二個獨立 critic subagent，專審 lint 腳本＋兩個呼叫端的 PowerShell/regex 邏輯，非 SQL）| verdict=warn→5 項全修，含 1 個 Critical 等級（gate 1 實際無效）| findings=見上
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`subject_records_evidence_ref_fk\|subject_records_trust_domain_no_supersede\|check-no-universal-trust-column` | hits=0（除本輪自己新增檔案外無殘留舊引用）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1`（兩輪覆審修復後，115 個 mutation）| exit=0 | result=`All 115 mutations killed. The Wave 1 negative suite is non-vacuous.`（過程中兩次 WEAK：`remove-epistemic-default-inherit` 漏列新增的 `TRUST-EVIDENCE-CLAIM-01`、`drop-evidence-ref-kind-value-check` 漏列新增的 `TRUST-EVIDENCE-CHAIN-01`，皆為既有 mutation 的 expect 清單維護缺口而非真 bug，補列即修正）
+- 額外獨立驗證（超出 self-test）：critic 提供的 7 個 lint 繞過案例（大寫/混寫型別/decimal/double precision/int/jsonb/IF EXISTS bucket 碰撞）逐一寫成獨立 fixture 對修後腳本重跑，全部正確攔截。
+
+**[剩餘風險]**：Gate 4-5（Wave 5 `TRUST-NEG-03`/`METHOD-CONTRACT-NEG-01`）誠實留 OPEN——Intelligence-math roll-up 尚未動工。兩個 Suggestion 級發現追蹤不阻斷。M3 class fix 只覆蓋 0005/0007/0008/0010/0011 五個 down 檔；未來新增的 down migration 若複製同一 guard pattern 需記得帶上 `row_security = off`（未建自動化檢查，屬人工紀律）。**本輪額外發現的流程風險**：`agency-os/WORKLOG.md` 本身在本輪撰寫期間被至少兩個並行 session 的 commit 覆蓋過一次（本條目第一版寫入後未及時 commit，被後續並行寫入蓋掉，需重寫一次）——高並行寫入的共享檔案，未來大段落撰寫後應盡快 commit 縮小視窗，而非累積多個文件編輯到最後一次性 commit。
+
+**[rollback]**：`0011_down` 獨立跑未經 Docker 手動驗證（未列入 `test-wave1-local.ps1` 的 reversibility pass，同既有慣例僅 `0001_down` 整包驗證）；`git revert` 本次全部新檔＋四個既有 down 檔的補丁行即可完全復原。
+
 ## 2026-09-05（System Foundry 3 項待決定 ③：doc-number 自動化驗證器 + 問卷交叉引用驗證器）
 
 [根因/決策] 承接①之後 `d51624f13` 留下的「critic suggestion #4」兩項待辦（見本檔同日稍早 ①條目、`d51624f13` commit message）：(a) 4 份文件（README/QUALITY_STRENGTH_MATRIX/CHANGELOG_v1.6/V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT）手改題數/capability數/模組數/pairwise 組合數已錯過 4 次；(b) `勾選「X」`這種行內標籤引用（"m11" bug class）已被 critic 手動抓到 3 次。決定：不做盲目正則自動改寫（`2^208`／`1,000 randomized configs` 等非目錄計數的數字混在同一份文件散文中，盲目 regex 會誤傷），改建**驗證器**——`scripts/validate_doc_numbers.py`（新增，接入第 13 步 `make verify`）從 `configurator_engine.load()`／`EXPECTED_BLUEPRINT_COUNT`／`foundry_generate.MODULE_DOCS`／真實跑一次 `test_selection_matrix.py` 算出真實數字，每個檢查點錨定到特定句子而非裸 `\d+`；`scripts/validate_configurator.py` 新增檢查，要求 `勾選「X」`的 X 不只要是真實題目標籤，還要在引用者自己的 `active_when` 前提鏈上（比 WORKLOG 原授權文字更嚴格地做到「鏈上某題」而非「任一題」）。

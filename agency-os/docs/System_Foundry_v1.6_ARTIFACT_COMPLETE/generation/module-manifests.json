@@ -620,6 +620,16 @@
       ]
     },
     {
+      "id": "returns",
+      "paths": [
+        "packages/returns",
+        "tests/contract/returns"
+      ],
+      "activated_by": [
+        "CAP-RETURNS"
+      ]
+    },
+    {
       "id": "warranty",
       "paths": [
         "packages/warranty",

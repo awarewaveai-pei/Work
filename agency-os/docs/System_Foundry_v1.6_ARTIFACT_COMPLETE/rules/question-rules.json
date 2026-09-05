@@ -2044,6 +2044,16 @@
       ]
     },
     {
+      "id": "RULE-Q-RET-001",
+      "when": {
+        "question": "Q-RET-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-RETURNS"
+      ]
+    },
+    {
       "id": "RULE-Q-WAR-001",
       "when": {
         "question": "Q-WAR-001",

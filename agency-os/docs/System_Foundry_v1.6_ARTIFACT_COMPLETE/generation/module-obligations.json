@@ -953,6 +953,26 @@
         "POS transaction records are included in backup scope."
       ]
     },
+    "returns": {
+      "purpose": "Track the customer-initiated post-purchase return/exchange workflow (request, approval, return shipment, receiving inspection, refund-or-exchange handoff) for a product with no defect, distinct from CAP-WARRANTY, which only applies within a defect/warranty window, and from CAP-REFUNDS, which only executes the money movement, not the request/approval/inspection workflow around it.",
+      "invariants": [
+        "A refund or exchange is never executed (via CAP-REFUNDS / inventory restock) before the return request has been approved.",
+        "Inventory disposition (restock, quarantine, or dispose) is only recorded after the returned item has actually been received and inspected, never on request or approval alone.",
+        "A return request always references a real, already-placed order and product; it cannot be created against an order that does not exist."
+      ],
+      "security": [
+        "A return request and its inspection result are only visible to the requesting customer and authorized staff; a customer cannot view or act on another customer's RMA."
+      ],
+      "tests": [
+        "The approval-before-refund invariant is contract-tested: attempting to trigger the refund/exchange handoff on an unapproved return request is rejected."
+      ],
+      "operations": [
+        "Return requests stalled past an expected inspection turnaround time are observable."
+      ],
+      "recovery": [
+        "Return/RMA request and inspection records are included in backup scope."
+      ]
+    },
     "warranty": {
       "purpose": "Track product warranty coverage and repair/replacement workflows for durable goods, distinct from CAP-REFUNDS, which only covers returning money, not tracking a physical repair/replacement case.",
       "invariants": [

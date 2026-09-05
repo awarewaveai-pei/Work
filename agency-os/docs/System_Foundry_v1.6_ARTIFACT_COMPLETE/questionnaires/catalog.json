@@ -199,62 +199,68 @@
       "description": "有實體門市、快閃店或現場銷售據點時的收銀、庫存同步與跨通路取貨/出貨需求。"
     },
     {
-      "id": "warranty",
+      "id": "returns",
       "order": 30,
+      "title": "退貨與換貨（RMA）",
+      "description": "客戶主動申請退貨或換貨的流程（申請→核准→退回→驗貨→退款或換貨），不是因為商品有瑕疵才走「保固與售後維修」類別，退款金額執行本身也仍是「付款與帳務」類別的「退款」。"
+    },
+    {
+      "id": "warranty",
+      "order": 31,
       "title": "保固與售後維修",
       "description": "商品保固期限、維修或換貨案件的處理與追蹤，是耐久財特有的售後機制，跟「付款與帳務」類別的「退款」（純粹把錢退回）不同。"
     },
     {
       "id": "cdp",
-      "order": 31,
+      "order": 32,
       "title": "客戶身分識別與行銷同意",
       "description": "辨識不同管道接觸你的其實是同一位客戶，以及正式記錄客戶對各行銷管道的同意狀態，供退出與法規稽核使用。"
     },
     {
       "id": "mobile_offline",
-      "order": 32,
+      "order": 33,
       "title": "行動與離線",
       "description": "行動裝置、現場作業與離線能力"
     },
     {
       "id": "globalization",
-      "order": 33,
+      "order": 34,
       "title": "多國與在地化",
       "description": "語言、幣別、時區與資料所在地"
     },
     {
       "id": "ai",
-      "order": 34,
+      "order": 35,
       "title": "AI 與自動化",
       "description": "AI 輔助、生成、決策與代理操作"
     },
     {
       "id": "migration",
-      "order": 35,
+      "order": 36,
       "title": "既有系統與資料遷移",
       "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "regulated",
-      "order": 36,
+      "order": 37,
       "title": "特殊資料與產業",
       "description": "會觸發額外治理或法規研究的領域事實"
     },
     {
       "id": "business_impact",
-      "order": 37,
+      "order": 38,
       "title": "營運影響",
       "description": "描述業務本身的運作方式與影響，不是選工程技術"
     },
     {
       "id": "future",
-      "order": 38,
+      "order": 39,
       "title": "未來規劃",
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
       "id": "custom",
-      "order": 39,
+      "order": 40,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -2402,6 +2408,18 @@
       "required_when_active": true,
       "active_when": {
         "question": "Q-POS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-RET-001",
+      "category": "returns",
+      "label": "客戶可主動申請退貨或換貨（RMA）",
+      "description": "客戶單純不想要商品（不是商品有瑕疵）時，可以在購買後提出退貨或換貨申請，經核准、退回驗貨後才進入退款或換貨，是一套完整流程，不是「商品有瑕疵才適用」的保固，也不只是把錢退回的退款。只在你有勾選「向客戶收費」時才有意義——純自用系統沒有客戶退貨的問題。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
         "equals": true
       }
     },

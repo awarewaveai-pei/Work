@@ -1939,6 +1939,18 @@
       "description": "Customers can order online and pick up in-store, or have a store location ship the order to them."
     },
     {
+      "id": "CAP-RETURNS",
+      "name": "Returns / RMA Workflow",
+      "module": "returns",
+      "requires": [
+        "CAP-ORDERS",
+        "CAP-PRODUCTS",
+        "CAP-INVENTORY",
+        "CAP-REFUNDS"
+      ],
+      "description": "Customers can request a post-purchase return or exchange (not tied to a product defect) that goes through request, approval, return shipment, receiving inspection, and a refund-or-exchange handoff, distinct from both warranty claims and raw refund execution."
+    },
+    {
       "id": "CAP-WARRANTY",
       "name": "Product Warranty Tracking",
       "module": "warranty",
