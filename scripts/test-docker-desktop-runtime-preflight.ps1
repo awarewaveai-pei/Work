@@ -88,11 +88,11 @@ function Invoke-Fixture {
     if ($Sockets -and $Mode -eq 'stopped') {
         Assert-True ($archives.Count -eq 1) "$Case archives runtime directory"
         Assert-True (-not (Test-Path -LiteralPath $runPath)) "$Case vacates runtime path"
-        Assert-True ((Get-Content -LiteralPath (Join-Path $archives[0].FullName 'preserve.txt') -Raw) -eq 'KEEP') "$Case preserves ordinary files"
+        Assert-True ((Get-Content -LiteralPath (Join-Path $archives[0].FullName 'preserve.txt') -Raw -Encoding UTF8) -eq 'KEEP') "$Case preserves ordinary files"
         $secretArchives = @(Get-ChildItem -LiteralPath $caseRoot -Directory |
             Where-Object { $_.Name -like 'docker-secrets-engine.socket-archive-*' })
         Assert-True ($secretArchives.Count -eq 1) "$Case archives secrets runtime"
-        Assert-True ((Get-Content -LiteralPath (Join-Path $target 'target.txt') -Raw) -eq 'KEEP TARGET') "$Case preserves junction target"
+        Assert-True ((Get-Content -LiteralPath (Join-Path $target 'target.txt') -Raw -Encoding UTF8) -eq 'KEEP TARGET') "$Case preserves junction target"
         & $ScriptPath
         Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $caseRoot 'Docker') -Directory |
             Where-Object { $_.Name -like 'run.socket-archive-*' }).Count -eq 1) "$Case is idempotent"

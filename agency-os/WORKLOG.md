@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-09-05（AO-RESUME 順手修：CP950 raw-read trap，health gate 唯一失敗項）
+
+[根因] `scripts/test-docker-desktop-runtime-preflight.ps1:91,95` 的 `Get-Content -Raw` 讀自己在 `:66,73` 寫入的 fixture（`preserve.txt`/`target.txt`）未帶 `-Encoding`，被 `audit-cp950-traps.ps1 -RawReadOnly` 判定 CP950 資料損毀風險——這是本輪 AO-RESUME health report 唯一的 critical_failure（score 99.7%→100%）。critic 覆審額外發現：`New-Item -Value` 實測不論系統 codepage 一律寫 UTF-8-no-BOM（在 ACP=950/Big5 機器上驗證過），故修前讀端其實是 ANSI(CP950) 讀 UTF-8 寫入，屬真實潛在 mismatch，非僅為過閘。
+
+[步驟] 兩處 `Get-Content -Raw` 加 `-Encoding UTF8`。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-docker-desktop-runtime-preflight.ps1` | exit=0 | ms=~9000（8/8 scenarios PASS）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（Minor：`-eq` 字串比較對 NUL 交錯不敏感，建議改 `[string]::Equals(...,Ordinal)` 或改用 `Get-FileHash`，因受測腳本從不重寫檔案內容而風險極低，列追蹤不強制修）
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`preserve.txt\|target.txt`/`test-docker-desktop-runtime-preflight` | hits=4（僅本檔自身讀寫配對，無其他呼叫端假設舊簽名）
+- 另跑 `audit-cp950-traps.ps1 -RawReadOnly`：scanned=174 clean=174 drift=0（修前 173/174）
+
+[剩餘風險] Minor 級字串比較 NUL 不敏感未修（追蹤，非阻斷）；`audit-cp950-traps.ps1` 全量模式對約 30 個檔的 `[git]/[ssh]/[docker]` capture-trap class 仍回報，屬既有已知類別、與本次無關。
+[rollback] `git revert` 本 commit（僅測試腳本兩行）。
+
 ## 2026-09-05（System Foundry v1.6 續：操作者提供國際電商藍圖，吸收 12 個新業務模組——2 輪 critic 抓到含 1 個嚴重的架構缺口（新 capability 完全沒接進既有 graph），全部修復並重新驗證）
 
 **觸發**：操作者丟一份 5600 行「Composable AI Commerce OS」藍圖文件（國際電商/全通路平台架構規格），問這對現有 System Foundry 有什麼啟發。查證後對照現有 31 模組/203 capability，找出 12 個真正的業務缺口（非「怎麼做」的工程細節，那類刻意排除，跟本套件既有的「只問業務決策」哲學一致）：Marketplace Ops、B2B/批發、訂閱制商品銷售、忠誠度、評論、跨境關務、訂單履行調度(OMS)、需求預測、網紅聯盟行銷、實體門市、保固售後、客戶身分解析/行銷同意。操作者選「全部12個都做」。
