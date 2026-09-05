@@ -1,0 +1,251 @@
+$id: "ai-lego://methods/contracts/devops_sre.runbook_execution.contract.yaml"
+title: "Runbook Execution Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-third Method Atlas slice, EIGHTH from
+  the `devops_sre` family (F19), after `devops_sre.sli_slo`
+  (twentieth), `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth),
+  `devops_sre.capacity_model` (thirty-first), and
+  `devops_sre.release_readiness_review` (thirty-second).
+
+  Atlas gives this method exactly ONE citation: the F19 tool table's
+  own Runbook / Playbook row (L861: "preconditions→steps→expected
+  output→stop/go→rollback", benefit "降操作錯誤" -- reduce operational
+  error). No dedicated §11.x section exists (confirmed by direct read
+  of the surrounding table, L855-863, and a full-document heading grep
+  for "Runbook"/"Playbook"/"高壓操作" returning only this table row).
+
+  CORRECTED post-critic-review: this contract's first draft claimed a
+  spec-root grep for "runbook"/"playbook" found only one unrelated hit.
+  That materially understated the real scope (~26 files, ~20 distinct
+  hits outside this method's own new files) -- the same class of
+  narrow-grep gap `devops_sre.release_readiness_review`'s own critic
+  round already caught one slice earlier. Two hits genuinely matter:
+  (1) `docs/architecture/DEVOPS_SRE_PLAN.md:45,96,116` describes an
+  automated "pre-approved playbook" execution tier and "drill
+  runbook" language, within this SAME `devops_sre` family's own scoped-
+  authority plan -- read in full: it is operational-procedure PROSE
+  describing a policy tier, not a typed object or method contract, so
+  not a duplicate, but a real, disclosed relationship (see
+  OQ-RUNBOOKEXECUTION-4); (2) `Architecture-Constitution-v1.md:26`,
+  `docs/adr/ADR-001-scoped-authority-precedence-unification.md:27,42`,
+  `AI_LEGO_OS_Program_Plan_v1.md:38`, and `.ai/research/phase-0
+  /document-authority-map.yaml:30` all use "Recipe / Runbook" as a
+  TIER NAME in this repo's own document-authority precedence ladder
+  (Law -> ... -> Recipe/Runbook -> Example -> Ad-hoc) -- a genuine
+  shared-vocabulary collision with a governance-authority sense of the
+  word "runbook", distinct from this method's own operational-
+  execution sense, confirmed distinct by direct read (the same class
+  of collision `devops_sre.chaos_engineering`'s own contract already
+  verified for `blast_radius`). Neither class of hit names a competing
+  typed object or method contract for THIS concept. No duplicate
+  found, but the search that reached that conclusion is now the real
+  one, not the understated first-draft claim.
+
+  `id: devops_sre.runbook_execution`, not `devops_sre.runbook` --
+  Atlas's own formula describes ONE EXECUTION of a runbook through its
+  own steps (preconditions checked, each step's real output compared
+  against what was expected, a stop/go decision, rollback if stopped),
+  not a static runbook TEMPLATE/document. The typed object this method
+  produces is a `RunbookExecutionRecord` -- an execution instance, the
+  same "the recipe/template is a separate, static artifact; this
+  method's own typed object tracks a live instance's progress through
+  it" split `devops_sre.canary_deployment`/`database_data
+  .expand_contract_migration` already established, but here the
+  runbook's own steps are CALLER-DEFINED per execution (a runbook's
+  own step count and content vary by runbook), not a single Atlas-wide
+  fixed canonical list the way expand_contract_migration's 15 stages
+  are -- a genuinely different shape, not a duplicate pattern wearing
+  a new name.
+
+  Atlas's own 5-part formula directly implies FOUR separate, real
+  invariants this contract enforces, one per formula transition: (1)
+  step numbering is well-formed (1..N, no gaps, no duplicates); (2) a
+  step's own `decision: go` requires BOTH its own preconditions met AND
+  its own outcome matching what was expected -- "stop/go" is not a
+  free caller choice independent of the preceding two formula steps;
+  (3) once any step's own decision is `stop`, no LATER step may be
+  recorded -- an operator does not continue past a stop gate; (4) if
+  any step stopped, `rollback_performed: true` is REQUIRED at the
+  record level -- Atlas's own formula ends the sequence at "rollback"
+  specifically for the stopped case, not as an optional afterthought.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Runbook / Playbook row (L861): 'preconditions→steps→expected output→stop/go→rollback'"
+  - "methods/registry/method-inventory.yaml Runbook / Playbook entry (L1177-1181): category 'F19 devops-sre', line field reads 858 -- CORRECTED here to the real L861 position, the same systematic +3 drift already disclosed by six prior contracts this session (Error Budget, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model, Release Readiness Review), now observed an EIGHTH time"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-first concrete entry. `id: devops_sre.runbook_execution`
+  mints a new machine_id, EIGHTH member of the `devops_sre` family.
+
+id: devops_sre.runbook_execution
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, MAP]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). The runbook broken into discrete steps is DECOMPOSE;
+# each step's own preconditions/outcome/decision check plus the
+# stop-forbids-later-steps and stop-requires-rollback rules are
+# VALIDATE; the fixed step ORDER (1..N) is MAP -- the same inferred
+# triple every prior structured-protocol method this session built
+# already uses.
+
+purpose:
+  - prove_a_high_pressure_operational_procedure_was_executed_step_by_step_with_no_step_skipped_past_a_stop_gate_and_rollback_performed_if_stopped
+inputs:
+  required: [RunbookStepExecution]
+  optional: []
+outputs: [RunbookExecutionRecord]
+preconditions:
+  - "steps is a non-empty list, numbered exactly 1..N with no gaps and no duplicates"
+  - "every step's own decision is go or stop"
+  - "decision:go requires BOTH preconditions_met:true AND outcome:matched_expected -- a step cannot proceed on a partial match"
+  - "once any step's own decision is stop, no step with a HIGHER step_number may be recorded"
+  - "if any step's own decision is stop, rollback_performed:true is required at the record level"
+  # Each of the last four preconditions maps onto one transition of
+  # Atlas's own 5-part formula (preconditions->steps->expected
+  # output->stop/go->rollback), disclosed individually above in this
+  # contract's own description. Same "structurally necessary,
+  # forbidden-state" class every prior ordered-protocol method this
+  # session built already establishes (devops_sre.canary_deployment's
+  # own escalation order, database_data.expand_contract_migration's
+  # own contiguous-prefix rule).
+  #
+  # DELIBERATELY NOT bidirectional on rollback: rollback_performed:true
+  # is legal even when EVERY step went (a caller performing a
+  # precautionary rollback for a reason outside this record's own
+  # scope) -- Atlas's own text never forbids that conservative choice,
+  # the same one-directional restraint every prior status-like field
+  # this session built already establishes.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every structured-protocol contract in this
+  # package already reasons through: the real risk is sequencing/
+  # aggregation integrity (was each step actually gated correctly, was
+  # rollback actually performed when required), not an evidence-
+  # citation risk over a narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Runbook / Playbook row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. A real,
+# disclosed (not built) relationship: F19's own Game Day row (L858,
+# "scenario→roles→inject→recover→AAR") could in principle EXERCISE a
+# real runbook as part of its own "recover" step -- see
+# OQ-RUNBOOKEXECUTION-2.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- it reports on a real
+  # operational procedure executed elsewhere (the actual commands,
+  # scripts, or manual steps run outside this method's own scope), the
+  # same "record reports on an external observation" class every prior
+  # devops_sre contract's own rollback field already draws. Note this
+  # is a DIFFERENT sense of "rollback" than `rollback_performed` above
+  # (a Runbook-domain field this record tracks) -- the method-contract
+  # convention's own `rollback:` field is about undoing a MISTAKE in
+  # this record's own construction, not the runbook's own operational
+  # rollback step.
+
+compilation_decisions:
+  - question: >
+      Atlas's own formula names "expected output" and implies a
+      comparison against real output -- should this contract require
+      both an `expected_output` and `actual_output` free-text field and
+      enforce STRING EQUALITY between them as the outcome, the way an
+      automated test assertion would?
+    decision: "No -- outcome is a caller-supplied enum (matched_expected/deviated), not a computed string comparison."
+    reasoning: >
+      A runbook step's own "expected output" is frequently a human
+      judgment call over unstructured real-world evidence (e.g. "did
+      the dashboard look healthy", "did the customer confirm the fix"),
+      not always a literal, comparable string -- forcing exact string
+      equality would invent a rigor Atlas's own text does not specify
+      and would wrongly fail legitimate steps whose real output varies
+      in incidental ways (timestamps, ids) while still substantively
+      matching. This mirrors `database_data.backup_restore_drill`'s own
+      `integrity_checks_passed` design (a caller-supplied boolean
+      judgment, not a computed check) rather than this session's
+      genuine-compute methods' own design.
+  - question: >
+      Should `rollback_performed` support a third state (e.g.
+      `partial`, for a rollback that only partially succeeded) rather
+      than a strict boolean?
+    decision: "No -- boolean only."
+    reasoning: >
+      Atlas's own formula names "rollback" as the final step with no
+      further branching; inventing a partial-rollback taxonomy would be
+      exactly the kind of unstated-assumption invention this package's
+      every prior contract already disciplines itself against. A
+      caller with a genuinely partial rollback records
+      `rollback_performed:true` with a note (if evidence labeling is
+      later added, see OQ-RUNBOOKEXECUTION-3) explaining the partial
+      nature -- disclosed as a real, current limit, not a silent gap.
+
+open_questions:
+  - id: "OQ-RUNBOOKEXECUTION-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RUNBOOKEXECUTION-2"
+    question: >
+      F19's own Game Day row (L858, "scenario→roles→inject→recover→AAR")
+      could in principle exercise a real runbook as part of its own
+      "recover" step -- should a future `devops_sre.game_day` slice
+      cross-reference this method's own output as a soft link?
+    owner: "operator, or whoever next builds devops_sre.game_day"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RUNBOOKEXECUTION-3"
+    question: >
+      No structured field exists for a step's own free-text
+      explanation (e.g. WHY a step deviated, or details of a partial
+      rollback) -- should a future revision add an optional `note`
+      field per step and at the record level, the same class of field
+      `devops_sre.release_readiness_review`'s own domain assessments
+      already carry?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-RUNBOOKEXECUTION-4"
+    question: >
+      `docs/architecture/DEVOPS_SRE_PLAN.md:45,96,116` describes an
+      automated "pre-approved playbook" execution tier ("Tier 0 —
+      Automated Containment") and "drill runbook" language, within
+      this same `devops_sre` family's own scoped-authority plan -- a
+      critic review found this contract's first draft's citation grep
+      too narrow to surface it. Should a future revision add an
+      explicit cross-reference from this contract to that plan
+      document, or vice versa, so a reader of either finds the
+      sibling artifact?
+    owner: "operator, or whoever next audits cross-references between Method Atlas contracts and docs/architecture/*.md"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L861) directly, confirmed against
+    the surrounding table (L855-863) that no dedicated §11.x section
+    exists for this method anywhere in the document. A first-draft grep
+    for "runbook"/"playbook" case-insensitive was too narrow (~26 files
+    actually match, not the one hit first claimed) -- a critic review's
+    broader read surfaced `docs/architecture/DEVOPS_SRE_PLAN.md`'s own
+    automated-playbook tier (operational-procedure prose, not a
+    competing typed object) and a genuine but unrelated "Recipe /
+    Runbook" document-authority-tier naming collision (confirmed
+    distinct by direct read of `ADR-001-scoped-authority-precedence
+    -unification.md` and `document-authority-map.yaml`). No duplicate
+    typed object or method found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All four core invariants are each
+    directly grounded in one transition of Atlas's own 5-part formula;
+    the caller-supplied-outcome (not computed-string-comparison) design
+    and the boolean-only rollback_performed decision are both disclosed
+    compilation choices, not silent inventions -- see
+    compilation_decisions above.

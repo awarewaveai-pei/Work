@@ -1105,6 +1105,52 @@ tier_1:
       table-row citation, thinner than several Tier 0 examples. Tier 1,
       mandated by the actively-running implementation slice, same
       category as the twenty-nine entries above it.
+  thirtyfirst_concrete_entry:
+    # NEW (2026-09-05, same session): thirty-first Tier 1 entry, same
+    # additive-key rationale as the thirty entries above it.
+    method_id: "devops_sre.runbook_execution"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. EIGHTH entry
+      from the `devops_sre` family (F19), after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, devops_sre.error_budget,
+      devops_sre.capacity_model, and devops_sre.release_readiness
+      _review. Atlas's own F19 tool table row (L861: "preconditions→
+      steps→expected output→stop/go→rollback", benefit "降操作錯誤")
+      grounds FOUR separate invariants, one per formula transition:
+      well-formed step numbering, decision:go requires both preceding
+      checks, stop forbids any later step, and stop requires rollback.
+      This slice's own module was explicitly written applying every
+      "gate must re-validate the inputs its outputs depend on" lesson
+      from the two immediately-prior slices' own critic rounds FROM
+      THE FIRST DRAFT, not after being caught -- a critic review
+      confirmed this claim held: all eight builder-enforced
+      preconditions, including record identity and each step's own
+      key set, are independently re-derived by the gate via the exact
+      same shared predicate functions, verified via an independently-
+      written violation oracle across 394,400 enumerated record
+      shapes with zero escapes. The review nonetheless found: (1) a
+      due-diligence gap repeating `devops_sre.release_readiness
+      _review`'s own class -- the citation grep was too narrow to
+      surface `docs/architecture/DEVOPS_SRE_PLAN.md`'s own automated-
+      playbook execution tier and a genuine "Recipe/Runbook"
+      document-authority naming collision, both now disclosed
+      (neither is a duplicate typed object); (2) the stop-forbids-
+      later-steps invariant's own internal sort-by-step_number was
+      correct but untested against out-of-order input, and the gate's
+      own `runbook_ref` re-validation was untested independently of
+      `id` -- both now covered by dedicated regression tests; (3) a
+      non-bool `rollback_performed` was only checked on the stopped
+      path, silently accepted when nothing stopped -- fixed to check
+      unconditionally.
+    source: "methods/contracts/devops_sre.runbook_execution.contract.yaml (built same session as this entry, mints machine_id devops_sre.runbook_execution) + specs/cognitive/typed-objects/runbook-execution-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation, thinner than several Tier 0 examples. Tier 1,
+      mandated by the actively-running implementation slice, same
+      category as the thirty entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

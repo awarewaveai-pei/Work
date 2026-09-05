@@ -64,6 +64,7 @@
 | `specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, release_ref, domain_assessments, overall_status, provenance] properties[7] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
 | `specs/cognitive/typed-objects/root-cause-fact.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, status, statement, source_cause_hypothesis_set_ref, legal_promotion_path, provenance] properties[10] |
+| `specs/cognitive/typed-objects/runbook-execution-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, runbook_ref, steps, rollback_performed, provenance] properties[7] |
 | `specs/cognitive/typed-objects/sli-slo-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, indicators, provenance] properties[6] |
 | `specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, legacy_system_under_migration, seams, slices, provenance] properties[7] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |

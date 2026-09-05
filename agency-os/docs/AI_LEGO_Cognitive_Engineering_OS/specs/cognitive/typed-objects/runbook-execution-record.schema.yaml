@@ -1,0 +1,103 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/runbook-execution-record.schema.yaml"
+title: Runbook Execution Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RunbookExecutionRecord` --
+  the declared `outputs` of `devops_sre.runbook_execution`'s Method
+  Contract. EIGHTH `devops_sre`-family typed object. Atlas's own F19
+  tool table formula (L861: "preconditions→steps→expected
+  output→stop/go→rollback") maps onto `steps[]`'s own
+  `preconditions_met`/`outcome`/`decision` fields per step, and
+  `rollback_performed` at the record level. Four real invariants
+  (well-formed step numbering; decision:go requires both preceding
+  checks; stop forbids any later step; stop requires rollback) are
+  enforced at the runtime layer, not the schema layer -- see method
+  contract preconditions.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, Runbook / Playbook row (L861): 'preconditions→steps→expected output→stop/go→rollback'"
+  - "methods/contracts/devops_sre.runbook_execution.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, runbook_ref, steps, rollback_performed, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^RBEXEC-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.runbook_execution"
+  runbook_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which real runbook/playbook this record executes, e.g. 'database-failover-runbook v3'. pattern:\\S rejects a whitespace-only string minLength:1 alone would accept (lesson from devops_sre.release_readiness_review's own schema, carried forward here)."
+  steps:
+    type: array
+    minItems: 1
+    description: "One entry per executed step, numbered 1..N with no gaps or duplicates -- enforced at the runtime layer, not here."
+    items:
+      type: object
+      required: [step_number, description, preconditions_met, outcome, decision]
+      additionalProperties: false
+      properties:
+        step_number:
+          type: integer
+          minimum: 1
+          description: "This step's own position in the runbook's own sequence -- the full set across steps[] must be exactly 1..N, enforced at the runtime layer."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What this step does, e.g. 'promote replica to primary'."
+        preconditions_met:
+          type: boolean
+          description: "Atlas's own 'preconditions' formula step -- were this step's own preconditions satisfied before it ran?"
+        outcome:
+          enum: [matched_expected, deviated]
+          description: "Atlas's own 'expected output' formula step, as a caller-supplied judgment (not a computed string comparison -- see method contract compilation_decisions): did this step's own real output match what was expected?"
+        decision:
+          enum: [go, stop]
+          description: "Atlas's own 'stop/go' formula step. decision:go REQUIRES preconditions_met:true AND outcome:matched_expected -- enforced at the runtime layer, not here."
+  rollback_performed:
+    type: boolean
+    description: "Atlas's own 'rollback' formula step. REQUIRED true if any step's own decision is stop -- enforced at the runtime layer, not the schema layer. Legal to be true even when every step went (a precautionary rollback), per method contract's own one-directional design."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a runbook execution record is a structured operational observation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A fully completed execution: all three steps went, no rollback needed"
+    value:
+      id: "RBEXEC-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.runbook_execution"
+      runbook_ref: "database-failover-runbook v3"
+      steps:
+        - {step_number: 1, description: "verify replica lag < 5s", preconditions_met: true, outcome: matched_expected, decision: go}
+        - {step_number: 2, description: "promote replica to primary", preconditions_met: true, outcome: matched_expected, decision: go}
+        - {step_number: 3, description: "repoint application connection string", preconditions_met: true, outcome: matched_expected, decision: go}
+      rollback_performed: false
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A stopped execution: step 2 deviated, execution halted, rollback performed"
+    value:
+      id: "RBEXEC-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.runbook_execution"
+      runbook_ref: "database-failover-runbook v3"
+      steps:
+        - {step_number: 1, description: "verify replica lag < 5s", preconditions_met: true, outcome: matched_expected, decision: go}
+        - {step_number: 2, description: "promote replica to primary", preconditions_met: true, outcome: deviated, decision: stop}
+      rollback_performed: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L861) directly. Validated against jsonschema Draft202012Validator."
+  note: "The preconditions/steps/expected-output/stop-go/rollback formula is directly transcribed. All four core invariants (well-formed numbering, go-requires-both-checks, stop-forbids-later-steps, stop-requires-rollback) are enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."
