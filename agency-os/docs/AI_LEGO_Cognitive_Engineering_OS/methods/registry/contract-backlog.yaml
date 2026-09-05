@@ -1302,6 +1302,44 @@ tier_1:
       table-row citation of its own, thinner than several Tier 0
       examples. Tier 1, mandated by the actively-running implementation
       slice, same category as the thirty-four entries above it.
+  thirtysixth_concrete_entry:
+    # NEW (2026-09-05, same session): thirty-sixth Tier 1 entry, same
+    # additive-key rationale as the thirty-five entries above it.
+    method_id: "devops_sre.rto_rpo"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. THIRTEENTH and
+      LAST entry from the `devops_sre` family (F19) -- F19 is now
+      COMPLETE (13/13), after devops_sre.sli_slo,
+      devops_sre.canary_deployment, devops_sre.chaos_engineering,
+      devops_sre.blue_green_deployment, devops_sre.error_budget,
+      devops_sre.capacity_model, devops_sre.release_readiness_review,
+      devops_sre.runbook_execution, devops_sre.game_day,
+      devops_sre.load_test, devops_sre.stress_test, and
+      devops_sre.soak_test. Atlas's own F19 tool table row (L860:
+      "business impact→tiers→architecture→drill", purpose "定義恢復時
+      間/資料損失") grounds one field per formula word: business_impact
+      _statement, tier (free text, no invented taxonomy), system_or
+      _component, and an optional format-only drill_ref soft link into
+      database_data.backup_restore_drill's own output -- resolving that
+      contract's own OQ-BACKUPDRILL-2, a forward reference left open
+      since the twenty-fifth slice. Both rto_target_seconds and
+      rpo_target_seconds are REQUIRED (unlike the drill contract's own
+      optional RPO pair), since this method's own name and purpose line
+      define RTO and RPO together as the deliverable. Due diligence
+      confirmed specs/execution/risk-tier.schema.yaml's own R0-R4 tier
+      (a governance-action classification) is a distinct concept from
+      this method's own business-impact/recovery-speed tier, and that
+      docs/architecture/DEVOPS_SRE_PLAN.md §2.2 / Master Plan §74's own
+      RPO/RTO numbers are disclosed real precedent, not a hard-coded
+      default.
+    source: "methods/contracts/devops_sre.rto_rpo.contract.yaml (built same session as this entry, mints machine_id devops_sre.rto_rpo) + specs/cognitive/typed-objects/rto-rpo-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation of its own, thinner than several Tier 0
+      examples. Tier 1, mandated by the actively-running implementation
+      slice, same category as the thirty-five entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

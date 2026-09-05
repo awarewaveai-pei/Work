@@ -183,6 +183,16 @@ open_questions:
       `related_slo_id`-class pattern `devops_sre.error_budget.contract
       .yaml` already established for a different cross-method reference),
       rather than leaving them as bare caller-supplied numbers?
+      ANSWERED 2026-09-05 (thirty-eighth slice, F19 now complete):
+      `devops_sre.rto_rpo` was built with the soft link running the
+      OTHER direction instead -- its own `drill_ref` field (format-only,
+      prefix `DRILL-`) points FROM the target-definition record INTO
+      this drill record, rather than retrofitting a field here. This
+      contract itself was left STRUCTURALLY unmodified -- no field or
+      schema change, only this OQ annotation (see that contract's own
+      compilation_decisions); its own `OQ-RTORPO-2` now
+      asks the reverse question (should THIS contract gain a soft link
+      back).
     owner: "operator, or whoever next builds devops_sre.rto_rpo"
     blocks: "nothing in this file's own validity"
   - id: "OQ-BACKUPDRILL-3"

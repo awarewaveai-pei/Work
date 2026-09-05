@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-09-05（續51，同一 session：Cognitive OS 第三十八個 Method Atlas 切片 — `devops_sre.rto_rpo`，**F19 devops_sre 家族 13/13 全部收官**；解答第 25 個切片留下的 OQ-BACKUPDRILL-2 前向指稱；critic 6056-case oracle 零分歧但 6 個揭露/可追溯性類 Major）
+
+**觸發**：延續操作者「都不要停，直到 Cognitive Engineering OS 完美完成」授權。1 個 critic subagent（額度檢查通過）。
+
+**選型**：`devops_sre` 家族第十三、也是最後一個成員。Atlas F19 L860「business impact→tiers→architecture→drill｜DR 可量化驗證」。**本切片解答第 25 個切片（`database_data.backup_restore_drill`）自己留下的前向指稱 OQ-BACKUPDRILL-2**：那個契約當初讀過 F19 RTO/RPO 這一列後決定先做 drill 協定（有 6 步驟具體協定，RTO/RPO 只有一行公式），把 rto/rpo 目標數字當成呼叫端輸入，同時開了 OQ 問「未來 rto_rpo 方法的輸出該不該回填這兩個數字」。本切片的答案：`RtoRpoRecord` 是「定義」半邊，`BackupRestoreDrillRecord` 是「量測」半邊；soft link 方向從新記錄指向 drill 記錄（`drill_ref`，格式檢查前綴 `DRILL-`，跟 `game_day` 的 `runbook_execution_ref`、`error_budget` 的 `related_slo_id` 同款慣例），不回頭改動已出貨的 drill 契約本身。
+
+Atlas 公式一字一欄位、依公式順序：`business_impact_statement`（business impact，自由文字無發明分類）、`tier`（tiers，自由文字無發明 enum，確認跟 `risk-tier.schema.yaml` 的 R0-R4 治理層級是不同概念）、`system_or_component`（architecture）、`drill_ref`（drill，選填 soft link）。`rto_target_seconds`／`rpo_target_seconds` 兩者皆必填——跟 drill 契約的選填 RPO 不同，因為本方法自己的名稱與 purpose line 就是把兩者定義為同一個交付物（drill 協定的選填理由是 6 步驟協定沒有明確的 RPO 動作；本方法沒有步驟清單可讀，直接從 purpose 句子推）。本方法沒有任何算術，不重用 `genuine_compute` gate——跟 `game_day`／`runbook_execution` 同一類（只有 `provenance_required`＋一個 integrity gate）。
+
+**critic 真跑（16+ 個突變逐一驗證、6,056 case 窮舉 oracle 覆蓋 rto/rpo/drill_ref 全組合）：verdict warn，0 Critical，6 Major＋3 Minor，全屬揭露／可追溯性類**。核心邏輯水密：oracle 零逃逸零誤判，7 個 builder 前置條件全被 gate 獨立重驗，RTO/RPO 真的無法只填一半，tier 真的是自由文字，drill 契約真的結構未變。Major 全修：
+1. due-diligence 只揭露 4 個鄰居，但實際「RTO」關鍵字全 spec root 命中 23 個檔案——漏了 `specs/domain/repository-contract.schema.yaml` 既有的 `backup_dr_matrix`（同款 `{storage,rpo,rto,method}` 表，來自 `DATA_ARCHITECTURE_PLAN.md` §4）。已補揭露＋區分（那是本 repo 固定架構的逐儲存引擎政策表，本方法是任意系統的通用逐次呼叫記錄）＋新開 `OQ-RTORPO-4`。
+2. "tier" 同名異物只揭露一種（`risk_tier` 的 R0-R4）卻漏了另外兩種：`primitive.schema.yaml` 自己就有一個叫 `tier` 的欄位（`CANONICAL_KERNEL`/`OBSERVED_EXTENSION`）；`repository-contract.schema.yaml` 的 `storage_tier.tiers[].tier_id`「TIER_0_ULTIMATE_SOR」拼法跟本契約自己的範例值「Tier 0 - Critical」撞名到足以讓讀者瞬間混淆。兩者皆已補揭露。
+3. +3 drift 引用清單漏列「RTO/RPO comparison」卻序數照數（十二→十三）——跟 stress_test 那輪 critic 已經關掉一次的同一種缺失，這次又在不同契約裡重演，已補回清單。
+4. schema 沒揭露 Infinity/NaN 對 `exclusiveMinimum:0` 的已知繞過（runtime 層才真的擋）——四個手足 schema（capacity_model／load_test／backup_restore_drill／reconciliation）都有這句揭露，本檔沒有，已補。
+5. `all_gates_pass` 的 FAIL 方向完全零測試覆蓋——突變改成永遠回傳 `True`，42 個測試全綠通過，因為所有呼叫點都只斷言 PASS 方向。補一個 `assertFalse` 測試。
+6. F19 已在本檔宣稱「13/13 全部收官」，但上一個切片 `soak_test` 自己的 `OQ-SOAKTEST-3`（問「rto_rpo 該不該是下一個切片」）還沒標 ANSWERED——同一輪工作內自相矛盾。已補標註。
+3 Minor 全修：`_drill_ref_is_valid` 的非空檢查是可證明的等價突變（保留但補充說明理由）；schema 自己的 `verification.note` 沒揭露 id 前綴只在 schema 層擋（家族慣例，已補）；drill 契約的措辭「deliberately left unmodified」語意模糊（收緊成「structurally unmodified — no field or schema change」）。
+
+**本輪教訓**：這是本 session 第一個沒有真正邏輯 bug、純粹是揭露/可追溯性缺口的 critic warn——證明「核心不變量水密」跟「文件對周邊事實的完整核對」是兩個獨立的品質軸，後者不會因為前者做得好就自動達標；6 個 Major 裡有 2 個是本 session 已經明文點名過的重複類別（drift 清單漏項、鏡射方向測試缺失的變體）在新契約裡各自獨立重演一次，抽象教訓不會自動套用到新的具體場合。
+
+**[已修改]**：spec-root 新增 `methods/contracts/devops_sre.rto_rpo.contract.yaml`＋`specs/cognitive/typed-objects/rto-rpo-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.thirtysixth_concrete_entry`＋`database_data.backup_restore_drill.contract.yaml` OQ-BACKUPDRILL-2 標 ANSWERED＋`devops_sre.soak_test.contract.yaml` OQ-SOAKTEST-3 標 ANSWERED＋重新產生 `SPEC_QUICKREF.md`。Product root 新增 `ai_lego/modules/devops_sre/rto_rpo.py`（builder＋2 gate，3 共用 predicate）＋`ai_lego/apps/cli/run_rto_rpo_slice.py`＋`tests/unit/test_rto_rpo.py`（43 tests）＋`docs/THIRTYEIGHTH_SLICE_DEVOPS_SRE_RTO_RPO.md`；`modules/devops_sre/__init__.py` docstring（F19 完整 13 成員清單）。`agency-os/TASKS.md` 切片條目＋F19 完工里程碑。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2800→2803
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_rto_rpo_slice` | exit=0 | result=`PASS devops_sre.rto_rpo: 'checkout-api order database' tier='Tier 0 - Critical', rto=7200s, rpo=300s, drill_ref=DRILL-2026-09-05-001, gates [provenance_required=PASS, rto_rpo_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_rto_rpo` | exit=0 | result=43 OK（42→43；初稿另有 1 個 `authorship_state` enum 值誤植 `HUMAN_CREATED`→`HUMAN_ORIGINAL`，schema 真驗證自己抓到，critic 審查前已修）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=293301（修正後重跑）| result=**1217 tests OK**（1174→1217，零回歸；初稿 1216）
+- REVIEW_DONE: critic=Standard（真實 subagent，16+ 突變逐一驗證、6,056-case 窮舉 oracle）| verdict=warn→6 Major＋3 Minor 全修 | findings=0c/6m/3minor
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`devops_sre[.]rto_rpo\|RtoRpoRecord\|RTORPO_` | hits=11（11 個檔案：9 個本切片自己＋2 個既有前向指稱（`backup_restore_drill` 25 號切片 doc、`agency-os/WORKLOG.md` 舊條目）已標註非過期殘留）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-RTORPO-1~4` 皆揭露；drill 契約自己尚無反向 soft link；`backup_dr_matrix` 交叉引用未建；`drill_ref` 純格式檢查未驗證真實存在；own id 前綴／`version` 型別／頂層 key 集合皆家族級 schema-only 慣例。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
+**F19 `devops_sre` 家族總結（13/13，全數完工）**：sli_slo／canary_deployment／chaos_engineering／blue_green_deployment／error_budget／capacity_model／release_readiness_review／runbook_execution／game_day／load_test／stress_test／soak_test／rto_rpo。累計本 session 完成 38 個 Method Atlas 切片，涵蓋 architecture／challenge／causal／computation／database_data／decision／devops_sre／evidence／learning／research／root_cause／stakeholder／strategy 等家族。下一步：F21 `database_data` 其餘成員（ERD／Normalization／Data Contract／Data Quality Dimensions／Retention-Deletion Model），或 F20 資安／隱私套件（整包未開），依操作者「都不要停」授權自主推進。
+
 ## 2026-09-05（續50，同一 session：Cognitive OS 第三十七個 Method Atlas 切片 — `devops_sre.soak_test`，F19 進度 12/13 只剩 RTO-RPO；自查抓到 Decimal 精度真 bug，critic 4000-series oracle 零逃逸但兩個算式的迴歸測試選錯數字）
 
 **觸發**：延續操作者「繼續」授權。1 個 critic subagent（額度檢查通過）。

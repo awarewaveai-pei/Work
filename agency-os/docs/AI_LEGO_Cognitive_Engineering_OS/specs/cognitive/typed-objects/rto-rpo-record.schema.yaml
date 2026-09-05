@@ -1,0 +1,107 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/rto-rpo-record.schema.yaml"
+title: RTO RPO Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RtoRpoRecord` -- the
+  declared `outputs` of `devops_sre.rto_rpo`'s Method Contract.
+  THIRTEENTH and LAST `devops_sre`-family typed object (F19 complete,
+  13/13). Atlas's own F19 tool table formula (L860: "business
+  impact→tiers→architecture→drill", purpose "定義恢復時間/資料損失" --
+  define recovery time / data loss, benefit "DR 可量化驗證" -- make
+  disaster recovery quantifiably verifiable) maps onto four fields in
+  formula order: `business_impact_statement`, `tier`,
+  `system_or_component`, and an OPTIONAL `drill_ref` soft link into
+  `database_data.backup_restore_drill`'s own output -- the exact
+  forward reference that contract's own OQ-BACKUPDRILL-2 named as a
+  real, separately-buildable candidate. `rto_target_seconds` and
+  `rpo_target_seconds` are the NUMBERS this method exists to define,
+  which `database_data.backup_restore_drill`'s own record already
+  consumes as bare caller-supplied input -- this record is the
+  DEFINITION half of that pair, the drill record is the MEASUREMENT
+  half.
+
+  Unlike `database_data.backup_restore_drill` (where RPO fields are
+  optional because Atlas's own 6-step protocol has no explicit RPO
+  action), this method's own name and purpose line name RTO AND RPO
+  together as the thing being DEFINED -- both are REQUIRED here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, RTO/RPO row (L860): 'business impact→tiers→architecture→drill'"
+  - "methods/contracts/database_data.backup_restore_drill.contract.yaml#/open_questions/OQ-BACKUPDRILL-2 -- the forward reference this record's own drill_ref resolves"
+  - "methods/contracts/devops_sre.rto_rpo.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, system_or_component, business_impact_statement, tier, rto_target_seconds, rpo_target_seconds, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^RTORPO-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "devops_sre.rto_rpo"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'architecture' formula step -- which system, service, or data layer this target definition covers, e.g. 'checkout-api order database' or 'Core metadata (Enterprise/Sovereign)'. pattern:\\S rejects a whitespace-only string minLength:1 alone would accept (lesson carried forward from devops_sre.release_readiness_review's own schema)."
+  business_impact_statement:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'business impact' formula step -- a real, non-empty description of the consequence of an outage or data loss for this system/component, e.g. 'checkout-api outage stops 100% of online revenue'. Atlas gives no structured taxonomy for this -- free text, a caller-supplied operational judgment, not an invented severity enum."
+  tier:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'tiers' formula step -- the business-impact classification this system/component was assigned to, e.g. 'Tier 0 - Critical' or 'Enterprise/Sovereign Core metadata'. Atlas gives no fixed tier taxonomy or names -- caller-supplied, the same restraint every prior 'Atlas names the concept, not a number/enum' field in this package already establishes. NOT the same concept as specs/execution/risk-tier.schema.yaml's own R0-R4 governance-action risk tier (confirmed distinct by direct read -- that tier classifies how much oversight an AI action needs; this tier classifies how fast a SYSTEM must recover)."
+  rto_target_seconds:
+    type: number
+    exclusiveMinimum: 0
+    description: "Recovery Time Objective in seconds -- how long this system/component may be down before recovery. Atlas gives no numeric default (docs/architecture/DEVOPS_SRE_PLAN.md §2.2's own RPO/RTO tiering table and Master Plan §74's own worked example are real, disclosed precedents, not hard-coded defaults here -- see method contract compilation_decisions). This is the NUMBER database_data.backup_restore_drill's own rto_target_seconds field consumes as bare caller input; a future revision could soft-link the two (OQ-RTORPO-2). MUST be finite -- exclusiveMinimum:0 alone does not reject Infinity or NaN (a known jsonschema-library behavior); enforced at the runtime layer (ai_lego/modules/devops_sre/rto_rpo.py), not the schema layer, at BOTH construction and gate re-evaluation, the same disclosure devops_sre.capacity_model's own schema already establishes."
+  rpo_target_seconds:
+    type: number
+    exclusiveMinimum: 0
+    description: "Recovery Point Objective in seconds -- the maximum acceptable data-loss window (how stale restored data may be). REQUIRED here (unlike database_data.backup_restore_drill's own optional RPO fields) because this method's own name and purpose line define RTO AND RPO together as a combined deliverable -- see method contract compilation_decisions. MUST be finite -- same Infinity/NaN caveat and runtime-layer enforcement as rto_target_seconds above."
+  drill_ref:
+    type: string
+    pattern: "^DRILL-"
+    description: "OPTIONAL soft link to the database_data.backup_restore_drill record (id prefix DRILL-) that verified these targets were actually met -- resolves that contract's own OQ-BACKUPDRILL-2. Format-only: this method cannot see the referenced record (the same discipline devops_sre.game_day's own runbook_execution_ref and devops_sre.error_budget's own related_slo_id already establish)."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- an RTO/RPO target definition is a structured business/operational judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Tier 0 target definition, verified by a real drill"
+    value:
+      id: "RTORPO-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.rto_rpo"
+      system_or_component: "checkout-api order database"
+      business_impact_statement: "checkout-api outage stops 100% of online revenue and blocks all order fulfillment"
+      tier: "Tier 0 - Critical"
+      rto_target_seconds: 7200
+      rpo_target_seconds: 300
+      drill_ref: "DRILL-2026-09-05-001"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A Tier 2 target definition, not yet verified by any drill"
+    value:
+      id: "RTORPO-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "devops_sre.rto_rpo"
+      system_or_component: "internal analytics dashboard"
+      business_impact_statement: "outage delays internal reporting by up to a business day; no customer-facing or revenue impact"
+      tier: "Tier 2 - Standard"
+      rto_target_seconds: 86400
+      rpo_target_seconds: 86400
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F19 tool table row (L860) directly. Validated against jsonschema Draft202012Validator."
+  note: "The business impact->tiers->architecture->drill formula is directly transcribed into business_impact_statement/tier/system_or_component/drill_ref, in that formula order. No numeric or taxonomic default is invented for tier/rto_target_seconds/rpo_target_seconds -- all caller-supplied, disclosed in the method contract's own compilation_decisions. This record's own id prefix (^RTORPO-) is enforced only at this schema layer, not the runtime layer -- the same family-wide convention every sibling typed-object schema in this directory (game-day-record, backup-restore-drill-record, etc.) already establishes; a hand-built record with a foreign id prefix passes the runtime gates and fails only here. No mother document was modified."

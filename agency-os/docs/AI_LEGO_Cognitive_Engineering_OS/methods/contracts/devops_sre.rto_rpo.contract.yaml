@@ -1,0 +1,296 @@
+$id: "ai-lego://methods/contracts/devops_sre.rto_rpo.contract.yaml"
+title: "RTO/RPO Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Thirty-eighth Method Atlas slice, THIRTEENTH
+  and LAST member of the `devops_sre` family (F19) -- F19 is now
+  COMPLETE (13/13), after `devops_sre.sli_slo` (twentieth),
+  `devops_sre.canary_deployment` (twenty-first),
+  `devops_sre.chaos_engineering` (twenty-second),
+  `devops_sre.blue_green_deployment` (twenty-third),
+  `devops_sre.error_budget` (twenty-fourth), `devops_sre.capacity_model`
+  (thirty-first), `devops_sre.release_readiness_review` (thirty-second),
+  `devops_sre.runbook_execution` (thirty-third), `devops_sre.game_day`
+  (thirty-fourth), `devops_sre.load_test` (thirty-fifth),
+  `devops_sre.stress_test` (thirty-sixth), and `devops_sre.soak_test`
+  (thirty-seventh).
+
+  Atlas gives this method exactly ONE citation of its own: the F19 tool
+  table's RTO/RPO row (L860: purpose "定義恢復時間/資料損失" -- define
+  recovery time / data loss; usage "business impact→tiers→architecture
+  →drill"; benefit "DR 可量化驗證" -- make disaster recovery
+  quantifiably verifiable). No dedicated §11.x section exists (this
+  session's own F19 devops_sre entries jump from §11.43 Chaos
+  Engineering directly to §11.44 STRIDE, an F20 method -- confirmed by
+  direct read of the surrounding sections before writing this
+  contract, the same check `database_data.backup_restore_drill.contract
+  .yaml`'s own description already performed when it first compared
+  these two methods).
+
+  **This slice resolves a forward reference two prior contracts each
+  left open**: `database_data.backup_restore_drill.contract.yaml`'s own
+  `OQ-BACKUPDRILL-2` asked whether a future `devops_sre.rto_rpo` should
+  feed that method's own `rto_target_seconds`/`rpo_target_seconds` as a
+  soft link; this method's own typed object (`RtoRpoRecord`) is exactly
+  that -- the DEFINITION half of the RTO/RPO pair, where
+  `database_data.backup_restore_drill`'s own record is the MEASUREMENT
+  half. Rather than retrofitting a hard link into the already-shipped
+  drill contract (a breaking change to a Tier 1 contract this session
+  disciplines itself against making without operator direction), this
+  method's own `drill_ref` field is the soft link, format-only (prefix
+  `DRILL-`), the same direction `devops_sre.game_day`'s own
+  `runbook_execution_ref` and `devops_sre.error_budget`'s own
+  `related_slo_id` already establish -- see compilation_decisions.
+
+  Due-diligence search, deliberately broad from the first draft
+  (learning directly from three consecutive prior slices' own critic
+  rounds each catching an insufficiently broad grep): case-insensitive
+  spec-root greps for "RTO"/"RPO"/"rto_rpo", "business impact"/"tier",
+  "disaster recovery"/"DR", "recovery time"/"recovery point". A critic
+  review of this contract's own first draft found the grep results
+  (23 files matching "RTO") understated to only 4 named neighbours;
+  the complete disclosure, ADDED post-critic-review: (1)
+  `database_data.backup_restore_drill.contract.yaml` (already discussed
+  above -- the measurement half, not a duplicate); (2)
+  `docs/architecture/DEVOPS_SRE_PLAN.md` §2.2's own real RPO/RTO
+  tiering table (data layer x edition -> concrete RPO/RTO numbers, e.g.
+  "Core metadata: RPO 5min/RTO 2h, Enterprise/Sovereign") -- a
+  PRODUCT-SPECIFIC governance table, not this Atlas method's own
+  generic taxonomy; disclosed as real prior art for what a `tier` value
+  might look like, NOT hard-coded as a default (see
+  compilation_decisions); (3) `AI_LEGO_Cognitive_Engineering_Os_Global
+  _Master_Plan_v1.md` §74 Disaster Recovery (L2945-2974) -- the
+  ORIGINAL source of DEVOPS_SRE_PLAN.md §2.2's own numbers, explicitly
+  labeled "範例" (example) in the Master Plan's own text, same
+  non-default status; (4) `specs/execution/risk-tier.schema.yaml`'s own
+  R0-R4 risk-tier enum -- a GOVERNANCE-ACTION risk classification (how
+  much oversight an AI action needs), a different sense of "tier" than
+  this method's own business-impact/recovery-speed tier, confirmed
+  distinct by direct read; (5) ADDED post-critic-review:
+  `specs/domain/repository-contract.schema.yaml`'s own
+  `backup_dr_matrix` (L249-284, sourced from
+  `docs/architecture/DATA_ARCHITECTURE_PLAN.md` §4, L76-98) -- an
+  EXISTING machine-readable `{storage, rpo, rto, method}` tuple per
+  storage engine, the closest structural analogue to this new record.
+  Distinct, not a duplicate: `backup_dr_matrix` is a PER-STORAGE-ENGINE
+  POLICY TABLE fixed to this repo's own architecture (3 SoR rows +
+  N derived rows, `rto_basis` a formula not a caller input), while
+  `RtoRpoRecord` is a GENERIC per-method-invocation record for ANY
+  system/component Atlas's own formula names, with caller-supplied
+  free-text tier and numeric targets -- a future revision could
+  cross-reference specific `backup_dr_matrix` rows as real-world
+  instances this method's own records describe (disclosed, not built,
+  `OQ-RTORPO-4`); (6) ADDED post-critic-review: at least two further
+  senses of the bare word "tier" exist in the spec root beyond
+  `risk_tier` -- `specs/cognitive/primitive.schema.yaml`'s own `tier`
+  property (`CANONICAL_KERNEL`/`OBSERVED_EXTENSION`, a primitive's own
+  provenance classification) and `specs/domain/repository-contract
+  .schema.yaml`'s own `storage_tier.tiers[].tier_id`
+  (`TIER_0_ULTIMATE_SOR`/`TIER_1_STRONG_CONSISTENCY`/
+  `TIER_2_EVENTUAL_DERIVED`, a System-of-Record hierarchy) -- the
+  latter's own "Tier 0" spelling is close enough to this contract's own
+  worked example ("Tier 0 - Critical") that a reader could momentarily
+  conflate them; both confirmed distinct by direct read, disclosed
+  here rather than left for a reader to discover. The exact class of
+  terminology collision `devops_sre.chaos_engineering`'s own
+  `blast_radius` field and `devops_sre.runbook_execution`'s own
+  "Recipe/Runbook" naming collision already established a precedent
+  for disclosing rather than silently conflating -- this contract's
+  own first draft under-applied that precedent to "tier" specifically.
+  No duplicate typed object or method found.
+
+  Atlas's own formula grounds the field set directly (one field per
+  formula word, in formula order): `business_impact_statement`
+  ("business impact"), `tier` ("tiers"), `system_or_component`
+  ("architecture"), and `drill_ref` ("drill", optional soft link).
+  `rto_target_seconds`/`rpo_target_seconds` are the NUMBERS this
+  method's own purpose line ("定義恢復時間/資料損失") exists to define
+  -- both REQUIRED here (unlike `database_data.backup_restore_drill`'s
+  own optional RPO pair, because THAT method's own 6-step protocol has
+  no explicit RPO action while THIS method's own name and purpose line
+  name RTO and RPO together as the deliverable).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 tool table, RTO/RPO row (L860): 'business impact→tiers→architecture→drill'"
+  - "methods/contracts/database_data.backup_restore_drill.contract.yaml#/open_questions/OQ-BACKUPDRILL-2 -- the forward reference this contract's own drill_ref field resolves"
+  - "docs/architecture/DEVOPS_SRE_PLAN.md §2.2 (L88-96) RPO/RTO 分層 table -- read for comparison, NOT this contract's own numeric source (no default invented)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §74 Disaster Recovery (L2945-2974) -- read for comparison, its own numbers explicitly labeled 範例 (example), not this contract's own numeric source"
+  - "methods/registry/method-inventory.yaml RTO/RPO entry: category 'F19 devops-sre', line field reads 857 -- CORRECTED here to the real L860 position, the same systematic +3 drift already disclosed by twelve prior contracts this session (Error Budget, RTO/RPO comparison, Backup/Restore Drill, Reconciliation, Expand-Contract Migration, Capacity Model, Release Readiness Review, Runbook Execution, Game Day, Load Test, Stress Test, Soak Test), now observed a THIRTEENTH time -- CORRECTED post-critic-review: this contract's first draft dropped 'RTO/RPO comparison' from the list while keeping it in the THIRTEENTH count, the same repeat this session already fixed once in devops_sre.stress_test.contract.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  thirty-sixth concrete entry. `id: devops_sre.rto_rpo` mints a new
+  machine_id, THIRTEENTH and LAST member of the `devops_sre` family --
+  F19 is now complete.
+
+id: devops_sre.rto_rpo
+version: "1.0.0"
+family: devops_sre
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating impact/tier/architecture/drill into
+# distinct fields is DECOMPOSE; assigning a system to a tier and target
+# numbers is MAP; the required-both-RTO-and-RPO and drill_ref-format
+# checks are VALIDATE -- the same inferred triple every prior
+# structured-record method this session built already uses.
+
+purpose:
+  - define_a_quantifiable_recovery_time_and_recovery_point_target_for_one_system_or_component_grounded_in_its_own_business_impact_and_tier_classification
+inputs:
+  required: [BusinessImpactStatement, TierClassification, SystemOrComponent, RecoveryTargets]
+  optional: [BackupRestoreDrillReference]
+outputs: [RtoRpoRecord]
+preconditions:
+  - "system_or_component, business_impact_statement, and tier are all non-empty strings"
+  - "rto_target_seconds and rpo_target_seconds are both finite and strictly positive"
+  - "drill_ref, when present, is a non-empty string beginning with DRILL- (the database_data.backup_restore_drill record id prefix) -- a format-only soft link"
+  # Directly grounded in Atlas's own formula: business_impact_statement
+  # ("business impact"), tier ("tiers"), system_or_component
+  # ("architecture"), drill_ref ("drill"). Both RTO and RPO required,
+  # unlike database_data.backup_restore_drill's own optional RPO pair
+  # -- see compilation_decisions.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure every structured-record contract in this
+  # package already reasons through: the real risk is definitional
+  # integrity (are impact/tier/architecture/targets all genuinely
+  # present and well-formed), not an evidence-citation risk over a
+  # narrative claim.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no RTO/RPO row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. One real,
+# disclosed (not built as a hard link) relationship: this record's own
+# rto_target_seconds/rpo_target_seconds are exactly the numbers
+# database_data.backup_restore_drill's own record consumes as bare
+# caller input -- see compilation_decisions and OQ-RTORPO-2.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- the real architecture
+  # decisions and drill execution that satisfy these targets happen
+  # outside this method's own scope, the same "record reports on/
+  # defines an external commitment" class every prior devops_sre
+  # contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      `database_data.backup_restore_drill.contract.yaml`'s own
+      `OQ-BACKUPDRILL-2` asked whether a future rto_rpo method's output
+      should feed that method's own rto_target_seconds/rpo_target_seconds
+      as a soft link. Should this contract instead retrofit a HARD
+      `$ref` into the already-shipped drill contract, or provide the
+      link from this side only?
+    decision: "Soft link from THIS side only (drill_ref, format-only, pointing INTO the drill record) -- the drill contract itself is not modified."
+    reasoning: >
+      Retrofitting a hard cross-reference into an already-shipped Tier
+      1 contract without operator direction would be exactly the kind
+      of unrequested breaking change this session's every prior
+      contract already disciplines itself against; `drill_ref` here
+      is additive (a new optional field on a NEW record), the same
+      "soft, unenforced text link" class `devops_sre.error_budget`'s
+      own `related_slo_id` and `devops_sre.game_day`'s own
+      `runbook_execution_ref` already establish. The direction of the
+      link (rto_rpo -> drill, not drill -> rto_rpo) matches the
+      contract's own logical role: a target DEFINITION citing the
+      MEASUREMENT that verified it, not the reverse.
+  - question: >
+      `database_data.backup_restore_drill`'s own RPO fields are
+      OPTIONAL (Atlas's own 6-step protocol has no explicit RPO
+      action). Should this method's own rpo_target_seconds be
+      optional too, for consistency?
+    decision: "No -- both rto_target_seconds and rpo_target_seconds are REQUIRED here."
+    reasoning: >
+      This method's own NAME and purpose line ("定義恢復時間/資料損失")
+      name RTO and RPO together as the single thing being DEFINED --
+      unlike the drill protocol (which has an explicit timing action
+      but no explicit data-staleness action), this method has no
+      textual asymmetry between the two halves to justify treating them
+      differently. A record that defines a recovery time target but
+      declines to define a data-loss target has not actually completed
+      Atlas's own "定義恢復時間/資料損失" purpose. ADDED post-critic-
+      review: this method and `database_data.backup_restore_drill`
+      apply DIFFERING evidentiary standards to the same RTO/RPO word
+      pair -- that method's own optionality is grounded in its own
+      6-step protocol's own missing action; this method's own
+      requiredness is grounded in a purpose SENTENCE, since Atlas gives
+      this method no step list to parse at all. Both are real,
+      disclosed readings of genuinely different source text for the
+      two methods, not an inconsistency between the two contracts.
+  - question: >
+      Should `tier` be a closed enum (e.g. grounded in
+      `DEVOPS_SRE_PLAN.md` §2.2's own Enterprise/Professional/Personal
+      Pro/Local Pro edition tiers), or free text?
+    decision: "Free text, caller-supplied -- no enum."
+    reasoning: >
+      Atlas's own text names "tiers" as a formula step but gives no
+      tier taxonomy; `DEVOPS_SRE_PLAN.md`'s own table is a real,
+      PRODUCT-SPECIFIC (this repo's own edition/pricing structure)
+      example, not an Atlas-given universal taxonomy -- hard-coding it
+      as an enum would tie this generic Method Atlas contract to one
+      product's own current pricing tiers, which is exactly the kind of
+      unstated-assumption invention this package's every prior contract
+      already disciplines itself against. A caller using this method
+      for a different product, or before this repo's own edition
+      structure exists, needs a free-text tier just as much.
+
+open_questions:
+  - id: "OQ-RTORPO-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RTORPO-2"
+    question: >
+      Should a future revision of `database_data.backup_restore_drill
+      .contract.yaml` add its OWN soft-link field (e.g. `rto_rpo_ref`)
+      pointing back at the `RtoRpoRecord` whose targets a given drill
+      measured against, closing the loop from both sides?
+    owner: "operator, or whoever next revises the backup_restore_drill contract's own field design"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RTORPO-3"
+    question: >
+      F19 is now complete (13/13). Should the next Method Atlas slice
+      move to F21's remaining `database_data` family members (ERD,
+      Normalization, Data Contract, Data Quality Dimensions,
+      Retention-Deletion Model), F20 (Security/Privacy Pack, entirely
+      unbuilt), or another F-category entirely?
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RTORPO-4"
+    question: >
+      `specs/domain/repository-contract.schema.yaml`'s own
+      `backup_dr_matrix` (L249-284) already carries real
+      `{storage, rpo, rto, method}` rows for this repo's own actual
+      storage engines. Should a future revision add a soft-link field
+      (format-only, the same discipline `drill_ref` already
+      establishes) so an `RtoRpoRecord` can cite which `backup_dr_matrix`
+      row it corresponds to, or is the relationship better left as
+      "this generic method could describe any of those rows, informally"?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F19 tool table row (L860) directly, confirmed against
+    the surrounding table (L848-863) and the §11.43->§11.44 section
+    jump that no dedicated §11.x section exists. Read
+    `database_data.backup_restore_drill.contract.yaml` in full
+    (including its own `OQ-BACKUPDRILL-2`) before writing this
+    contract. Ran broad case-insensitive spec-root greps ("RTO"/"RPO"/
+    "rto_rpo", "business impact"/"tier", "disaster recovery"/"DR",
+    "recovery time"/"recovery point"), read `DEVOPS_SRE_PLAN.md` §2.2
+    and Master Plan §74 in full, and confirmed `risk-tier.schema.yaml`'s
+    own R0-R4 tier is a distinct concept by direct read. No duplicate
+    typed object or method found. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. All fields are directly grounded
+    in Atlas's own 4-word formula, in formula order; the soft-link
+    direction, both-required-RTO-and-RPO, and free-text-tier designs
+    are all disclosed compilation choices, not silent inventions -- see
+    compilation_decisions above.
