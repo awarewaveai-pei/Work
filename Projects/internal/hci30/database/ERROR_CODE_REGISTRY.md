@@ -31,6 +31,12 @@ column. Do not compute "next free" from any other file.**
 | `H1010` | Case lifecycle transition rejected (includes the INSERT-side "must be created OPEN" case) | RAISED | `hci.enforce_case_lifecycle()` | `migrations/0002_wave1_case_aggregate_up.sql:100-119` |
 | `H1011` | Case is not `OPEN`/`ACTIVE`; new `research_workflows`/`subject_records` row may not be admitted against it | RAISED | `hci.require_open_or_active_case()` | `migrations/0002_wave1_case_aggregate_up.sql:271-280` |
 | `H1012` | Excluded jurisdiction or purpose | **RESERVED, NOT RAISED** — `ADR-0012` gates 1-2 are enforced by plain `CHECK` constraints instead (a `CHECK` has no bypass path a trigger could add; see that ADR's own "Gate 3 disposition"/"Implementation note"). Recorded as available-but-unused rather than silently dropped, in case a future migration has an actual distinct-SQLSTATE use for it. | (none — `REG-NEG-*` tests expect `23514`, the real `check_violation` SQLSTATE, not this code) | `governance/ADR-0012-regulatory-market-scope.md:37,82`; `migrations/0003_wave1_regulatory_market_scope_up.sql:174-182` |
+| `H1013` | Row's `author_class` does not match the field/transition policy for its `kind` (`wave1/HCI_FIELD_AUTHOR_CLASS_POLICY.md`) | RAISED | `hci.enforce_field_author_class()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
+| `H1014` | Claim admitted to `ASSESSMENT_CANDIDATE` without an approved human spot-check, independent of case `risk_tier` | RAISED | `hci.enforce_claim_state_admission()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
+| `H1015` | A `reaudit_required` Claim was linked to a `PROCEED`/`PROCEED_WITH_CONTROLS`/`EXIT` Decision | RAISED | `hci.enforce_decision_reaudit_gate()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
+| `H1016` | A Claim linked into `hci.decision_claims` is not an approved Assessment Candidate (`claim_state='ASSESSMENT_CANDIDATE' AND human_spotcheck_status='APPROVED'`) | RAISED — db-expert review (2026-09-05) found gate 3's state machine had no downstream consumer: a `DRAFT`/unspotchecked Claim could be linked to a Decision without ever passing gate 3 | `hci.enforce_decision_reaudit_gate()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
+| `H1017` | A case's `risk_tier` elevation retroactively flags a Claim that is already linked to a `PROCEED`/`PROCEED_WITH_CONTROLS`/`EXIT` Decision | RAISED — db-expert review (2026-09-05) found the link->elevate ordering was unguarded (only elevate->link was); this closes it by rejecting the elevation itself, forcing human review before the tier change is recorded | `hci.flag_claims_on_risk_elevation()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
+| `H1018` | Unrecognized `risk_tier` value reached the elevation-rank comparison | **RESERVED, NOT RAISED** — `hci.cases.risk_tier`'s own `CHECK (risk_tier IN ('R0'..'R4'))` (`migrations/0002_wave1_case_aggregate_up.sql:66`) makes this branch currently unreachable via any legal input; same "reserved but unraisable today" disposition as `H1012`. Defense-in-depth against a future tier being added to that CHECK without updating `hci.flag_claims_on_risk_elevation()`'s hardcoded rank array (db-expert review, 2026-09-05) | `hci.flag_claims_on_risk_elevation()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
 
 `'H1TST'` is reserved separately for the test-harness sentinel
 (`database/tests/00_test_harness.sql`) and must never be raised by schema
@@ -39,7 +45,7 @@ succeeded" from every real domain code.
 
 ## Next free code
 
-**`H1013`.**
+**`H1019`.**
 
 ## Maintenance rule
 

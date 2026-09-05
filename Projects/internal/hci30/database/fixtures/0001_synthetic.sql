@@ -26,6 +26,14 @@ INSERT INTO hci.data_encryption_keys (id,tenant_id) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000801','11111111-1111-1111-1111-111111111111'),
   ('bbbbbbbb-0000-0000-0000-000000000800','22222222-2222-2222-2222-222222222222');
 
+-- Human-principal fixtures (ADR-0019 gate 5). hci.decisions.principal_id is
+-- NOT NULL, so every existing/future Decision insert needs a real
+-- principal to reference. One per tenant, matching the key-fixture reuse
+-- pattern directly above.
+INSERT INTO hci.principals (id,tenant_id,display_name) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000850','11111111-1111-1111-1111-111111111111','Synthetic Analyst A'),
+  ('bbbbbbbb-0000-0000-0000-000000000850','22222222-2222-2222-2222-222222222222','Synthetic Analyst B');
+
 -- Case/Engagement aggregate fixtures (ADR-0020). One OPEN case per tenant so
 -- research_workflows/subject_records tests have a valid case_id to bind to;
 -- one pre-CLOSED tenant-A case for the terminal-state-guard test
@@ -46,6 +54,12 @@ UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-00000
 UPDATE hci.cases SET status = 'CLOSED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000201';
 INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
   VALUES ('bbbbbbbb-0000-0000-0000-000000000200','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture');
+-- R0-tier tenant-A case (ADR-0019 NEG-HD08-01): the human-spot-check
+-- requirement is independent of tier "including R0" per the ADR's own
+-- "Additionally" paragraph - a dedicated R0 case makes that literal, rather
+-- than relying on the existing R1 cases above to stand in for it.
+INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+  VALUES ('aaaaaaaa-0000-0000-0000-000000000202','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R0','synthetic fixture');
 
 -- Source/SourceSnapshot provenance fixtures (ADR-0026). One source +
 -- snapshot per tenant, so RLS-CLAIM-01/SOURCE-RLS-01 have a real cross-
@@ -81,13 +95,29 @@ INSERT INTO hci.source_terms_records (id,tenant_id,source_id,terms_ref) VALUES
 -- assumption, not a checked fact).
 -- EVIDENCE/CLAIM rows carry encryption_key_ref (ADR-0018 gate 2, tenant-B
 -- key fixture above); ASSESSMENT correctly carries none (the scope-fence
--- CHECK forbids it there).
-INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref) VALUES
-  ('bbbbbbbb-0000-0000-0000-000000000500','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800'),
-  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800');
-INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id) VALUES
-  ('bbbbbbbb-0000-0000-0000-000000000502','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','ASSESSMENT','bbbbbbbb-0000-0000-0000-000000000200');
+-- CHECK forbids it there). author_class (ADR-0019 gate 2) + claim_state/
+-- human_spotcheck_status (gate 3, CLAIM only) added the same way -
+-- EVIDENCE=DETERMINISTIC, CLAIM=LLM_ASSISTED_HUMAN_REVIEW_REQUIRED (already
+-- spot-checked APPROVED so it can freely be used as a supersedes_id/
+-- decision_claims target elsewhere without every consuming test having to
+-- re-clear that gate itself), ASSESSMENT=PROBABILISTIC per
+-- HCI_FIELD_AUTHOR_CLASS_POLICY.md's own policy table.
+INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000500','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','EVIDENCE','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800','DETERMINISTIC');
+INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class,claim_state,human_spotcheck_status) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000501','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','CLAIM','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000800','LLM_ASSISTED_HUMAN_REVIEW_REQUIRED','ASSESSMENT_CANDIDATE','APPROVED');
+INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,author_class) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000502','22222222-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','ASSESSMENT','bbbbbbbb-0000-0000-0000-000000000200','PROBABILISTIC');
 -- One real tenant-B hci.decisions row (RLS-LEAK-04 / BITEMP-VIEWRLS-01),
--- mirroring the subject_records row directly above.
-INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale) VALUES
-  ('bbbbbbbb-0000-0000-0000-000000000600','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000200','PROCEED','synthetic fixture rationale - tenant B');
+-- mirroring the subject_records row directly above. author_class is always
+-- HUMAN_ONLY for decisions (the only value the trigger accepts); principal_id
+-- references the tenant-B principal fixture above.
+INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale,author_class,principal_id) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000600','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000200','PROCEED','synthetic fixture rationale - tenant B','HUMAN_ONLY','bbbbbbbb-0000-0000-0000-000000000850');
+-- One real tenant-B hci.decision_claims row (RLS-LEAK-06), mirroring the
+-- decisions row directly above. reaudit_required on the linked claim
+-- ('...501') defaults false (no risk-tier elevation ever touches tenant B's
+-- fixture case), so this link is not itself rejected by the outcome='PROCEED'
+-- H1015 gate.
+INSERT INTO hci.decision_claims (id,tenant_id,decision_id,claim_id) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000920','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000600','bbbbbbbb-0000-0000-0000-000000000501');

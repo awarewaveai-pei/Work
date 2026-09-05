@@ -1,7 +1,7 @@
 # HCI Wave 1 Negative-Test Specification
 
-Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, the Bitemporal history addition, the Bitemporal scope fence addition, and the Crypto-shredding addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
-Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history, Bitemporal scope fence, and Crypto-shredding sections added and executed 2026-09-05)
+Status: **EXECUTED AND MUTATION-CHECKED (synthetic scope only) — the HD-03/04/05 slice, the Case/Engagement addition, the Regulatory market scope addition, the Peer-product boundary addition, the Source provenance addition, the Consent-class RLS addition, the Bitemporal history addition, the Bitemporal scope fence addition, the Crypto-shredding addition, and the Field/transition author-class policy addition are all real-Docker-verified (or real-Node-verified), see Execution evidence**
+Date: 2026-09-01 (Case/Engagement section added 2026-09-03, executed 2026-09-04; Regulatory market scope, Peer-product boundary, Source provenance, and Consent-class RLS sections added and executed 2026-09-05; Bitemporal history, Bitemporal scope fence, Crypto-shredding, and Field/transition author-class policy sections added and executed 2026-09-05)
 Authority: ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0016, ADR-0020, ADR-0012, ADR-0001, ADR-0002, ADR-0005, ADR-0026, ADR-0017, ADR-0018
 Scope: Required acceptance tests before the respective runtime gates can close. Test names are stable identifiers, not passing results.
 
@@ -256,6 +256,49 @@ a considered product choice rather than an oversight - "erasure" is not a
 meaningful concept to test against a row that never held real content
 through the proper write path - so it is respected here rather than built
 past on a technical loophole.
+
+## Field/transition author-class policy *(new, ADR-0019 gates 2-4 + gate 5 human-principal half, migration 0008)*
+
+| ID | Setup | Must prove | Expected result |
+|---|---|---|---|
+| AUTHORCLASS-NEG-01..04 | App-role insert with a wrong `author_class` for the row's `kind` (EVIDENCE/CLAIM/ASSESSMENT/Decision) | `hci.enforce_field_author_class()`'s per-kind mapping | Rejected, `H1013` |
+| NEG-HD08-01 | App-role Claim insert, `claim_state='ASSESSMENT_CANDIDATE'`, `human_spotcheck_status='PENDING'`, on an R0 case | Admission gate has no risk_tier branch at all | Rejected, `H1014` |
+| NEG-HD08-06 | Owner-run link of a `DRAFT`/unspotchecked Claim into `hci.decision_claims` | A Claim must be an approved Assessment Candidate before it can be cited as a Decision's basis at all | Rejected, `H1016` |
+| NEG-HD08-02 | Owner-run: elevate a case's `risk_tier`, confirm the linked Claim is flagged with no direct write to it, then attempt to link it to a `PROCEED` decision | The elevate-then-link ordering | Rejected, `H1015` |
+| NEG-HD08-05 | Owner-run: INSERT a Claim with `supersedes_id` pointing at the already-flagged Claim above | A correcting row inherits `reaudit_required`, does not reset to `false` | `reaudit_required = true` on the successor |
+| NEG-HD08-07 | Owner-run: link an unflagged Claim to a `PROCEED` decision, then elevate its case's `risk_tier` | The reverse, link-then-elevate ordering | The elevation itself is rejected, `H1017` |
+| DECISION-CLAIMS-INSERT-01 | App-role link of an approved Claim to a non-conflicting Decision | The real application role (not just the owner) can actually complete a legal link | Succeeds |
+| DECISION-CLAIMS-CREATEDAT-01 | App-role link specifying `created_at` explicitly | `created_at` withheld from the INSERT grant, matching `CREATED-AT-01`'s own pattern | Rejected, `42501` |
+| NEG-HD08-03 | App-role Decision insert omitting `principal_id` | `hci.decisions.principal_id` is `NOT NULL` | Rejected, `23502` |
+| PRINCIPAL-SCOPE-01 / TENANT-IMMUTABLE-02 | App-role grant-layer / owner-run trigger-layer attempt to change a `hci.principals` row's `tenant_id` | Belt (narrow `GRANT UPDATE (display_name)`-only) and suspenders (`principals_tenant_immutable` trigger) both hold independently | Rejected, `42501` / `H1006` |
+| RLS-LEAK-05 / RLS-LEAK-06 | Tenant A queries `hci.principals` / `hci.decision_claims` for a real tenant-B row | RLS tenant isolation on both new tables | Row not visible |
+| APPEND-ONLY-GRANT-11/12, APPEND-ONLY-TRIGGER-06/07, TRUNCATE-06 | App-role grant layer / owner-run trigger layer / TRUNCATE against `hci.decision_claims` | Two-layer append-only, matching every other ledger table in this schema | Rejected, `42501` / `H1003` / `H1003` |
+
+An independent db-expert review (2026-09-05) found 3 Critical and 5 Major
+findings against the first version of this migration - unlike the "reuse a
+proven pattern" gates elsewhere in this Wave, gates 3-5 introduce three
+genuinely new schema concepts, so a full review was warranted here. All
+findings were fixed in the same migration before commit: gate 3's state
+machine had no downstream consumer (closed by `H1016`), `reaudit_required`
+could be reset by an ordinary correcting INSERT (closed by supersession
+inheritance), the elevate/link race was only guarded in one direction
+(closed by `H1017` plus a `FOR SHARE` row lock), an unrecognized `risk_tier`
+value failed open (closed by `H1018`, reserved/unraisable today), the
+already-superseded/tombstoned rows were reachable by the cascade (excluded),
+`decision_claims.created_at` was client-writable (narrowed), and the
+down-migration's guard was wrong in both directions (too narrow to catch
+real data, and permanently unreachable once any Decision exists) - fixed and
+re-verified. Fixing the concurrency lock (`FOR SHARE`) itself introduced a
+regression - it silently requires UPDATE privilege the application role
+never has on this append-only table, which nothing caught because every
+existing `decision_claims` test ran under the owner role - found by manual
+reproduction against a real non-superuser role, fixed by making the trigger
+function `SECURITY DEFINER`, and closed with a genuine app-role positive
+test (`DECISION-CLAIMS-INSERT-01`) that had never existed before. Final
+tally: **176/176 assertions, 78/78 mutations killed** (164 + 12 new
+assertions after the review round, 73 + 5 new mutations). Full narrative in
+the migration file's own header comments and in ADR-0019's "Implementation
+note".
 
 ## Test execution requirements
 
@@ -546,16 +589,45 @@ and this file - fixed with a small, reused set of synthetic per-tenant keys
 the migration file's own header comment and in ADR-0018's "Implementation
 note".
 
+**Execution evidence (2026-09-05, Field/transition author-class policy
+addition).** ADR-0019 gates 2-4 and gate 5's human-principal half, migration
+`0008_wave1_field_author_class_policy_up.sql`: `author_class` on
+`subject_records`/`decisions`, `claim_state`/`human_spotcheck_status` on
+`subject_records`, `reaudit_required` (a third effect-based escape-hatch
+branch on `hci.reject_update_delete()`), the risk-tier elevation cascade,
+new `hci.decision_claims`/`hci.principals` tables, and three new codes
+(`H1016`-`H1018`). First real run green at **164/164 assertions, 73/73
+mutations killed** with three real bugs fixed along the way (a column
+DEFAULT that cannot reference a sibling column; a case-ID collision with a
+pre-existing test; a TRUNCATE SQLSTATE corrected from `H1003` to `0A000`
+once `decision_claims`'s new FK made it FK-blocked). An independent
+db-expert review then found 3 Critical + 5 Major findings against that first
+version (gate 3 had no downstream consumer, `reaudit_required` was
+resettable by supersession, the elevate/link race was one-directional, an
+unknown `risk_tier` failed open, the down-migration's guard was destructive
+in one direction and permanently unreachable in the other) plus a
+self-inflicted privilege regression found while fixing the concurrency lock
+- all fixed, landing at **176/176 assertions, 78/78 mutations killed**. Both
+narrow-rollback paths (`0008_down` alone against a populated schema, correctly
+refused; `0008_down` against an empty schema then a clean `0008_up`
+re-application) run manually, matching the pattern established for
+0005/0006/0007's own narrow-rollback verification. Full narrative in the
+migration file's own header comments and in ADR-0019's "Implementation
+note".
+
 **Non-vacuity evidence.** A green suite is not by itself evidence that a gate is
 closed. `scripts/mutation-check-wave1.ps1` deletes each control in turn and
-requires the suite to go red on exactly the assertions covering it; **all 63
+requires the suite to go red on exactly the assertions covering it; **all 78
 mutations killed** (15 original, 2026-09-02, + 11 Case-aggregate mutations,
 2026-09-04, + 2 Regulatory-scope mutations + 2 Peer-boundary mutations + 7
 Source-provenance mutations + 2 Consent-class mutations + 15 Bitemporal-
 history mutations (7 landed pre-review + 6 added by the db-expert review pass
 + 2 added by a second critic review of the harness scripts themselves) + 4
-Bitemporal-scope-fence mutations + 5 Crypto-shredding mutations,
-2026-09-05, covering every invariant listed above). This
+Bitemporal-scope-fence mutations + 5 Crypto-shredding mutations + 15
+Field/transition author-class policy mutations (10 landed pre-review + 5
+added by the db-expert review round, one of them a regression guard for a
+bug the review's own fix introduced), 2026-09-05, covering every invariant
+listed above). This
 exists because the first version of this suite
 could not fail: four assertions caught their own failure signal with the same
 handler that caught the control's rejection (both SQLSTATE P0001). That

@@ -14,6 +14,7 @@ $upMig4    = Join-Path $root 'database/migrations/0004_wave1_source_provenance_u
 $upMig5    = Join-Path $root 'database/migrations/0005_wave1_bitemporal_history_up.sql'
 $upMig6    = Join-Path $root 'database/migrations/0006_wave1_bitemporal_scope_fence_up.sql'
 $upMig7    = Join-Path $root 'database/migrations/0007_wave1_crypto_shredding_up.sql'
+$upMig8    = Join-Path $root 'database/migrations/0008_wave1_field_author_class_policy_up.sql'
 $fixtures  = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness   = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests  = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -69,6 +70,7 @@ try {
   Invoke-SqlFile -Path $upMig5   -Label 'migration 0005 up (bitemporal history)'
   Invoke-SqlFile -Path $upMig6   -Label 'migration 0006 up (bitemporal scope fence)'
   Invoke-SqlFile -Path $upMig7   -Label 'migration 0007 up (crypto shredding)'
+  Invoke-SqlFile -Path $upMig8   -Label 'migration 0008 up (field author class policy)'
   Invoke-SqlFile -Path $fixtures -Label 'synthetic fixtures'
   Invoke-SqlFile -Path $harness  -Label 'test harness'
   Invoke-SqlFile -Path $sqlTests -Label 'negative test suite'
@@ -78,20 +80,21 @@ try {
   # schema is the case that actually catches dependency mistakes.
   #
   # A single 'down' (0001_wave1_synthetic_down.sql) is sufficient here even
-  # though seven migrations are now applied: it DROPs the whole hci schema,
-  # which removes everything 0002-0007 added along with everything 0001
-  # added, since all seven live in the same schema. The rebuild afterwards
-  # must therefore re-apply all seven up migrations, in order, to return to
+  # though eight migrations are now applied: it DROPs the whole hci schema,
+  # which removes everything 0002-0008 added along with everything 0001
+  # added, since all eight live in the same schema. The rebuild afterwards
+  # must therefore re-apply all eight up migrations, in order, to return to
   # the same state this test run started from. (0002_wave1_case_aggregate_down.sql,
   # 0003_wave1_regulatory_market_scope_down.sql,
   # 0004_wave1_source_provenance_down.sql,
   # 0005_wave1_bitemporal_history_down.sql,
-  # 0006_wave1_bitemporal_scope_fence_down.sql, and
-  # 0007_wave1_crypto_shredding_down.sql exist for the narrower,
+  # 0006_wave1_bitemporal_scope_fence_down.sql,
+  # 0007_wave1_crypto_shredding_down.sql, and
+  # 0008_wave1_field_author_class_policy_down.sql exist for the narrower,
   # not-exercised-here case of rolling back one migration alone against a
   # schema where the others stay applied.)
   Write-Host 'Verifying the migration is reversible...'
-  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001-0007 together)'
+  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001-0008 together)'
   Invoke-SqlFile -Path $upMig   -Label 'migration 0001 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig2  -Label 'migration 0002 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig3  -Label 'migration 0003 up (clean rebuild after down)'
@@ -99,6 +102,7 @@ try {
   Invoke-SqlFile -Path $upMig5  -Label 'migration 0005 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig6  -Label 'migration 0006 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig7  -Label 'migration 0007 up (clean rebuild after down)'
+  Invoke-SqlFile -Path $upMig8  -Label 'migration 0008 up (clean rebuild after down)'
 
   Write-Host 'HCI Wave 1 local suite PASSED.'
 }

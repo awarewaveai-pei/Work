@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-05（HCI-30 Wave 1：ADR-0019 field/transition author-class policy gates 2-4 + gate 5 人類負責人半邊落地，db-expert 覆審 3 Critical+5 Major 全修，含覆審自己種出一個 regression 並修好）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」「繼續」，代理範疇內決策自決）。1 個 subagent（db-expert 獨立覆審，因本輪引入三個全新 schema 概念而非沿用已審模式）。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/migrations/0008_wave1_field_author_class_policy_up.sql`（新）— gate 2（`author_class` + `hci.enforce_field_author_class()`）、gate 3（`claim_state`/`human_spotcheck_status` + `hci.enforce_claim_state_admission()`）、gate 4（`reaudit_required` 第三個 escape-hatch shape clause + `hci.flag_claims_on_risk_elevation()` 級聯 + 新表 `hci.decision_claims` + `hci.enforce_decision_reaudit_gate()`）、gate 5 人類負責人半邊（新表 `hci.principals`）。三個全新概念（Claim 狀態機、Decision-Claim 連結、人類負責人實體），先派 Explore subagent 確認 v2 藍圖真的未定義過才動手。
+- 同檔 `..._down.sql` — 修正兩個真 bug（原順序先刪 `hci.principals` 再刪引用它的 `decisions_principal_fk` 會炸；防呆邏輯原本一個方向太窄一個方向太嚴，見下）。
+- `database/tests/wave1-negative-tests.sql`（153→176 assertions）、`database/fixtures/0001_synthetic.sql`（新增 `hci.principals`/`hci.decision_claims` fixture 列）、`database/ERROR_CODE_REGISTRY.md`（新增 `H1013`-`H1018`，next free `H1019`）、`scripts/mutation-check-wave1.ps1`（63→78 mutations）、`scripts/test-wave1-local.ps1`（wire 0008）。
+- 治理文件：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0019-deterministic-probabilistic-llm-human-field-policy.md`（新增 Implementation note）、`ADR_INDEX.md`（ADR-0019 列 + Last reviewed）、`wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`（新增章節 + Execution/Non-vacuity evidence 更新）、`wave1/HCI_FIELD_AUTHOR_CLASS_POLICY.md`（status 行）、`agency-os/TASKS.md`（完成項 + 覆審遺留追蹤項）。
+
+**過程**：首輪真跑抓到 3 個真 bug（`reaudit_required` 欄位 `DEFAULT` 無法條件化、case ID 撞到既有測試、`TRUNCATE-05` SQLSTATE 因新 FK 從 `H1003` 改判 `0A000`），首輪 164/164 assertion、73/73 mutation 全綠。db-expert 覆審抓到 3 Critical（gate 3 狀態機零下游消費者、`reaudit_required` 可被 supersede 重置、elevate/link 雙向競態只擋一邊）+ 5 Major（risk_tier 未知值 fail-open、`decision_claims.created_at` 可偽造、級聯會追溯改到已 superseded/tombstoned 列、down migration 防呆兩個方向都錯）全修，過程中修 C3 併發鎖（`FOR SHARE`）自己種出一個新 regression（該子句實測需要 `UPDATE` 權限而非僅 `SELECT`，app role 對 append-only 表本無 `UPDATE`，會讓真實 app role 完全連結不了任何 Claim——因既有測試全跑在 owner/superuser 之下而未被抓到），手動用非 superuser 角色重現後改 `SECURITY DEFINER` 修好並補齊該路徑第一個真 app-role 正向測試。最終 176/176 assertion、78/78 mutation 全綠，narrow rollback 手動兩輪皆過。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=`HCI Wave 1 negative suite: 176 assertion(s) recorded, 0 failed`（forward path + 整包 reversibility pass）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=`All 78 mutations killed. The Wave 1 negative suite is non-vacuous.`
+- REALTEST_EVIDENCE: tool=Bash | cmd=手動 narrow-rollback 腳本（scratchpad，非 repo 內）| exit=0 | result=`NARROW ROLLBACK VERIFICATION PASSED.`（空 schema 獨立跑 `0008_down` 成功並重套用 `0008_up`；populated schema 正確拒絕 `0008_down`）
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=3c/5m（db-expert subagent，3 Critical + 5 Major 全修，含 M4/M6/M7/M8/minors 明列追蹤於 TASKS.md 而非隱藏）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=finish\(174\)\|finish\(175\)\|enforce_decision_reaudit_gate\|enforce_claim_state_admission\|flag_claims_on_risk_elevation | hits=0（除 migration 本檔與其自身引用點外無殘留）
+
+**[剩餘風險]**：gate 5 認識論標籤半邊（`NEG-HD08-04`）誠實留 OPEN，理由見政策文件；db-expert 覆審 M4/M6/M7/M8/minors 遺留（`hci.principals` DELETE RI 未斷言、canonical view 欄位未平行、`human_spotcheck_status=APPROVED` 未綁 `hci.principals` 參照、兩個新複合 FK 跨租戶測試零覆蓋、down migration 冪等性）已列 TASKS.md 追蹤，非阻斷但應在 gate 5 完整落地時一併處理。
+
+**[rollback]**：`0008_wave1_field_author_class_policy_down.sql` 空 schema 案例已真跑驗證；populated schema 案例設計上刻意拒絕（非 bug）。整體 schema 仍可用 `0001_wave1_synthetic_down.sql` 一次性全清。
+
 ## 2026-09-05（續44，同一 session：Cognitive OS 第三十一個 Method Atlas 切片 — `devops_sre.capacity_model`，2 個 Critical 同出一個共同缺口：gate 只重驗算出的欄位，沒重驗 threshold 本身）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。

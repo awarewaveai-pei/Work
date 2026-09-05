@@ -57,6 +57,111 @@ Runtime implementation gates are **OPEN**. Before Wave 1 schema freeze or any re
 
 All five land at **Wave 1** (schema freeze), alongside ADR-0009/0010/0011/0015/0016's own open gates, on the same synthetic-first path ADR-0014/0015/0016 already used (`D:\Work\Projects\internal\hci30\database\`) before any non-synthetic data is admitted.
 
+## Implementation note (2026-09-05, Wave 1 gates 2, 3, 4, and gate 5's human-principal half landed; gate 5's epistemic-label half remains OPEN)
+
+Recorded here rather than editing the numbered gates above, which remain the
+historical decision record.
+
+**Migration number.** The real migration is
+`0008_wave1_field_author_class_policy_up.sql`, extending 0001-0007.
+
+**Three new concepts, none backfilled from an existing blueprint spec.**
+Gates 3, 4, and 5 (human-principal half) each assume a concept absent from
+the v2 blueprint prior to this ADR - confirmed by a targeted search before
+writing any code: a Claim state machine with an `ASSESSMENT_CANDIDATE` value
+(gate 3), a Decision-to-Claim linking relationship (gate 4), and a
+human-user/analyst entity (gate 5). What was built is the smallest shape
+each gate's own text actually requires - `claim_state`/`human_spotcheck_status`
+on `hci.subject_records`, `hci.decision_claims` (a plain tenant-scoped
+junction table), `hci.principals` (`id, tenant_id, display_name`, full CRUD
+unlike this schema's append-only tables) - each flagged in
+`wave1/HCI_FIELD_AUTHOR_CLASS_POLICY.md` as provisional, open to being
+superseded once a future ADR specifies these concepts in full.
+
+**Gate 5's epistemic-label half (`NEG-HD08-04`, `UNKNOWN`/`HYPOTHESIS` ->
+`SOURCE_FACT` promotion redline) is explicitly NOT built.** Unlike the three
+concepts above, an epistemic-label lifecycle is broad and referenced by other
+not-yet-read chapters of this blueprint; a narrow version now risks a shape
+that has to be torn out later. Left honestly OPEN rather than built shallow.
+
+**Gates 2-4, 5(human-principal) - DONE**, real-Docker-verified:
+`test-wave1-local.ps1` green at **176/176** assertions,
+`mutation-check-wave1.ps1` green at **78/78** mutations killed, on both the
+forward path and the narrow-rollback path (`0008_down`, run manually twice -
+once alone against a populated 0001-0008 schema, once followed by a clean
+re-application of `0008_up` - the harness's own reversibility pass only
+exercises the whole-schema `0001_down`).
+
+**db-expert review requested and acted on** - unlike the "reuse a proven
+pattern" gates elsewhere in this Wave (which skip review by this session's
+own established criterion), this migration introduces three genuinely new
+schema concepts, so a full review was warranted and run. It found three
+Critical and five Major findings, all fixed in this same migration before
+merge:
+
+- **C1** - gate 3's `claim_state`/`human_spotcheck_status` state machine had
+  no downstream consumer: a `DRAFT`, never-spot-checked Claim could be linked
+  to a Decision without ever passing gate 3's own admission check. Fixed by
+  making `hci.enforce_decision_reaudit_gate()` require
+  `claim_state='ASSESSMENT_CANDIDATE' AND human_spotcheck_status='APPROVED'`
+  before any link is admitted (`H1016`, new).
+- **C2** - `reaudit_required` reset to `false` on an ordinary correcting
+  INSERT (`supersedes_id` pointing at an already-flagged Claim), defeating
+  gate 4 with two ordinary app-role statements. Fixed in
+  `hci.enforce_claim_state_admission()`: a superseding row now inherits its
+  predecessor's `reaudit_required` instead of defaulting `false`.
+- **C3** - the elevate-then-link ordering was guarded (`NEG-HD08-02`); the
+  reverse, link-then-elevate ordering was not, in either the sequential or
+  concurrent case. Fixed with two changes: `hci.flag_claims_on_risk_elevation()`
+  now rejects (`H1017`, new) a `risk_tier` elevation that would retroactively
+  flag a Claim already linked to a `PROCEED`/`PROCEED_WITH_CONTROLS`/`EXIT`
+  Decision (an append-only link cannot be withdrawn, so the elevation itself
+  is the only thing that can still be stopped); and
+  `hci.enforce_decision_reaudit_gate()` now takes `SELECT ... FOR SHARE` on
+  the Claim row so the two triggers cannot both read a stale value under
+  concurrency.
+- **M1** - `flag_claims_on_risk_elevation()`'s hardcoded tier-rank array
+  failed open (silently flagged nothing) on an unrecognized `risk_tier`
+  value. Fixed to `RAISE` (`H1018`, new - reserved/unraisable today, same
+  disposition as `H1012`, since `hci.cases.risk_tier`'s own CHECK currently
+  admits only R0-R4).
+- **M2** - `hci.decision_claims`'s INSERT grant was table-level, making
+  `created_at` the one append-only ledger timestamp in this schema the
+  audited party could choose. Narrowed to a column list excluding it.
+- **M3** - the risk-tier cascade could retroactively flag an already-
+  superseded or tombstoned Claim, a closed ledger entry under ADR-0017's
+  bitemporal design. Fixed by excluding `system_superseded_at IS NOT NULL`/
+  `tombstoned_at IS NOT NULL` rows from the cascade's UPDATE.
+- **M5** - the down-migration's guard was wrong in both directions: too
+  narrow (`reaudit_required IS TRUE` only, missing the general case of any
+  EVIDENCE/CLAIM/ASSESSMENT row with real data in the dropped columns, which
+  the narrower check would have let be silently destroyed and left the
+  schema unable to re-apply `0008` up) and its stated reason was factually
+  wrong (`DROP COLUMN` does not "orphan" a row, it destroys the value
+  outright). Fixed to check `hci.subject_records WHERE kind <> 'TRUST_DOMAIN'`
+  generally, with a corrected message.
+- **Self-inflicted regression found while fixing C3, fixed in the same
+  pass**: adding `FOR SHARE` made `hci.enforce_decision_reaudit_gate()`
+  require UPDATE privilege on `hci.subject_records`, which the application
+  role never has (append-only by design) - every real app-role link attempt
+  would have 42501'd, and nothing in the suite caught it because every
+  existing decision_claims test ran under the owner role (a superuser,
+  which bypasses the privilege check). Fixed by making the function
+  `SECURITY DEFINER` (matching `flag_claims_on_risk_elevation()`'s own
+  posture), and closed the coverage gap that hid it with a genuine app-role
+  positive test (`DECISION-CLAIMS-INSERT-01`) plus a regression-guard
+  mutation (`regress-decision-reaudit-gate-to-invoker`).
+
+M4, M6, M7, M8, and the review's minor/suggestion-tier findings (RLS-
+independence of the SECURITY DEFINER writers under a non-superuser owner;
+canonical-view/`_as_of()` column parity for the four new columns; binding
+`human_spotcheck_status='APPROVED'` to a `hci.principals` reference rather
+than a self-asserted string; cross-tenant/typed-FK test coverage for the two
+new composite FKs; down-migration idempotency under `to_regclass`) are
+tracked as explicit follow-up in `TASKS.md`, not silently dropped - none are
+exploitable at Wave 1 synthetic-data scale, and closing them reshapes gate 5
+in ways better done alongside its still-open epistemic-label half.
+
 ## Consequences
 
 - `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-05 and every downstream HCI intelligence/public-intelligence/decision-flow chapter that already assumes this enumeration is adopted policy (`10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:118`) now has a ratified source to cite instead of an open decision.
