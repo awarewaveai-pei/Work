@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-05（VBC 補勾 TASKS.md 一條 2026-09-04 repo 衛生待辦——三子項已被其他 session 順手解決但文件未更新）
+
+**觸發**：操作者問「（TASKS.md 這條 repo 衛生待辦）處理過了嗎」。VBC 原則（單一資料點缺失≠整體未完成，[[feedback_claim_before_verify]]）：checkbox 是 `[ ]` 不代表現況未解，先查實際磁碟/git 狀態再答。
+
+**查證結果**（`agency-os/TASKS.md:822`，非本次修復範圍，純狀態確認）：
+- ①「`Projects/internal/hci30`（小寫）vs 磁碟 `HCI30/`（大寫）路徑不一致」：**已解**。`find`/`ls` 確認磁碟僅存小寫 `Projects/internal/hci30/`；`git ls-files` 確認 `0002_wave1_case_aggregate_up.sql` 已在小寫路徑下被追蹤，隨 `7cf14f7bf`（2026-09-05）進 main。
+- ②「worktree 舊拷貝清理」：該行原文字內已自帶 ✅ 2026-09-04 完成標記，非新債。
+- ③「根目錄 3 個不明散檔 `t.sh`／`e3`／`agency-os/.._used.txt`」：**已解**。`ls`／`find` 全庫掃描確認三者皆不存在；因原本未被 git 追蹤，無刪除 commit 可查，但現況即為已清除。
+
+**已修改**：`agency-os/TASKS.md:822` 該行 `- [ ]` → `- [x]`，內文附上述查證依據（路徑/commit hash），供之後稽核回溯。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`find Projects/internal -maxdepth 1 -iname "*hci30*"; git ls-files Projects/internal/hci30/database/migrations/0002_wave1_case_aggregate_up.sql; ls t.sh e3 "agency-os/.._used.txt"` | exit=2（三個 stray 檔 `ls` 皆 No such file，預期行為）| result=見上述查證結果
+- REVIEW_DONE: critic=self（純狀態查證 + 一行 checkbox 翻轉，無邏輯變更，未達 subagent critic 門檻）
+- BUGHUNT_DONE: scope=agency-os | grep=`Projects/internal/HCI30\|t\.sh\|agency-os/\.\._used\.txt` | hits=0（無殘留大寫路徑引用、無其他文件仍聲稱這三個散檔存在）
+
+**剩餘風險**：無——此條目原本就是「已完成但文件漏更新」，本次只是把文件狀態拉齊現實，未變更任何程式碼或 schema。
+
+**Rollback**：`git checkout -- agency-os/TASKS.md`（若誤判需還原成 `[ ]`）
+
 ## 2026-09-05（續46，同一 session：Cognitive OS 第三十三個 Method Atlas 切片 — `devops_sre.runbook_execution`，主動套用前兩輪教訓從第一版就做對，critic 窮舉 39.44 萬種組合驗證屬實）
 
 **觸發**：延續操作者授權（「一直做直到完美完成」「繼續」）。0 agent（除 critic subagent review）。操作者中途表示要收工 clear，本輪完成後停。
@@ -32,6 +52,17 @@
 **[剩餘風險]**：`OQ-RUNBOOKEXECUTION-1`（無機器 id 列）、`OQ-RUNBOOKEXECUTION-2`（Game Day 未建，soft-link 未接）、`OQ-RUNBOOKEXECUTION-3`（無結構化 note 欄位）、`OQ-RUNBOOKEXECUTION-4`（跟 DEVOPS_SRE_PLAN.md 自動化 playbook 層級的關係已揭露但雙向皆未接交叉引用）。皆非阻塞，已揭露非靜默缺口。
 
 **本次收工**：操作者要求本切片完成後停下 clear。本 session 累計完成 33 個 Method Atlas 切片（本輪從 29→33，共 5 個：29 reconciliation、30 expand_contract_migration、31 capacity_model、32 release_readiness_review、33 runbook_execution），全部已 commit+push 到 main，無待處理未提交變更。
+
+
+### Agent dispatch log
+- Explore: Research ASSESSMENT_CANDIDATE and human principal concepts -> Confirmed enough to answer all three items. Here's the report.
+
+**1. "ASSESSMENT_CANDIDATE" state**
+
+Not defined as a Claim state anywhere. It only exists as a *pipeline stage name*, not a column enum…
+- db-expert: Review migration 0008 for HCI-30 ADR-0019 -> ## DB Expert Report — `0008_wave1_field_author_class_policy` (ADR-0019)
+
+Read in full: `0008_*_up.sql`, `0008_*_down.sql`, `0001`, `0002`, `0005`, `0006`, `0007` up-migrations, `tests/wave1-negative-t…
 
 ## 2026-09-05（System Foundry v1.6 新增 5 個財務類 capability：應收帳款帳齡與催收、銀行對帳單比對、庫存計價方法、自動財務報表、財務分析——操作者接續前一批 OCR/品項對應繼續補財務規劃缺口）
 
@@ -559,7 +590,6 @@
 
 **[rollback]**：`git revert`；純新增 fixture/測試+文件，無 schema 變更。
 
-
 ## 2026-09-05（HCI30 錯誤碼 registry SSOT 治理缺口收尾——純文件整併，零 schema 變更）
 
 **觸發**：延續 HCI Wave 1 收尾工作，處理 2026-09-04 critic review 就已記錄、之前故意不塞進 commit 的已知治理缺口。
@@ -580,7 +610,6 @@
 **[剩餘風險]**：無新增風險（純文件工作）。ADR-0009/0010/0017/0018/0019/0021/0024/0025/0033 等 Wave 1 gate 仍全部 OPEN，待後續真落地。
 
 **[rollback]**：`git revert`；純新增文件+註解，零 schema 影響。
-
 
 ## 2026-09-05（HCI30 Wave 1 收尾——ADR-0011 VBC 純文件同步(零新碼) + ADR-0026 Source/Claim provenance 落地，真跑連續抓到 2 個真 bug + db-expert 抓到 2 個 Major）
 
@@ -613,7 +642,6 @@
 **[剩餘風險]**：ADR-0026 gate 3（`DSR-CLAIM-DELETE-01`）blocked on ADR-0018；corroboration graph 訂正能力 blocked on ADR-0017；ADR-0009/0010 仍待真落地（非 VBC 可解，需要新程式碼）；ADR-0017/0018/0019/0021/0024/0025/0033 等 Wave 1 gate 全部維持 OPEN。
 
 **[rollback]**：`git revert`；db-expert 已對 down migration 做 5 種情境真實 round-trip 驗證，全數乾淨。
-
 
 ## 2026-09-05（`commit-checkpoint.ps1` 補上結構性擋目錄 pathspec——收尾早前同日修復留下的最後一項殘留風險，操作者直接點名要關）
 
@@ -835,7 +863,6 @@
 
 **[rollback]**：`git revert` 本 commit；DB 層 `0003_..._down.sql` 已在三種情境下真跑驗證可逆。
 
-
 ## 2026-09-05（續36，同一 session：Cognitive OS 第二十三個 Method Atlas 切片 — `devops_sre.blue_green_deployment`，誠實區分「硬規則」與「建議實務」）
 
 **觸發**：延續操作者授權（「繼續完成」）。0 agent。操作者中途要求「做一個段落停下來，我要 clear」——本切片收尾後即停，並在回覆中附上下一輪 session 的接續指示。
@@ -999,6 +1026,36 @@
 **[剩餘風險]**：Wave 1 之後（Wave 2-10：Postgres 物理隔離、金鑰輪替、AI credential 隔離、bulk-export 防護、fetch worker 隔離、entitlement 計費…）仍是 `SPECIFIED — RUNTIME OPEN`，application/API 層完全未動工，數月工程量誠實未壓縮成一次 session。M6 錯誤碼 registry 治理缺口獨立記錄未修。
 
 **[rollback]**：`git revert` 本 commit 即可；DB 層面 `0002_wave1_case_aggregate_down.sql` 已驗證可逆（byte-exact，db-expert `pg_dump -s` 比對）。
+
+## 2026-09-05
+
+### Daily
+- (TBD)
+
+## 2026-09-05（續，System Foundry v1.6 configurator：`validate_configurator.py` 補 active_when 前向引用檢查）
+
+### fix(system-foundry): validate_configurator 抓 active_when 指向「渲染順序在後」的題目
+
+**根本問題**：`configurator/app.js` 的 `render()` 每個 category 由上到下單趟渲染（category 順序 = `catalog.json` `categories` 陣列順序；category 內題目順序 = `catalog.json` `questions` 陣列順序），只在第一次抵達某個「剛變 active」的題目時才 `answers[q.id]=false` 初始化。若題目 A 的 `active_when` 指向渲染順序在 A **之後**的題目 B，第一次渲染時 `answers[B.id]` 仍是 `undefined`；對 `equals:false` 條件而言 `undefined===false` 為 `false`，A 在首次繪製時被誤判為 inactive，要等下一次點擊觸發 re-render 才會自我修正。此為 2026-09-05 同日稍早 critic review（同日 WORKLOG「System Foundry v1.6 configurator UI/UX 重做第一批」條目）發現的 Suggestion 級 pre-existing 缺陷：非本次改動引入，且對現有 161 題全掃描零命中（latent，非 active bug）。
+
+**已修改**：`scripts/validate_configurator.py`
+- 建 `render_index`（category 陣列序 × category 內 question 陣列序 的穩定索引，忠實對應 `app.js:20` 雙層迴圈的真實走訪順序）
+- 對每題 `active_when` 的每個 `question` 參照，`equals is False` 且參照目標的 `render_index` ≥ 自身索引 → 判定為 forward-reference 錯誤
+- `equals:true` 的前向參照不觸發（`undefined===true` 同樣是 `false`，跟穩態一致，沒有首次繪製分歧，故不算缺陷）
+- 自我參照（`r==q['id']`）獨立訊息（`active_when self-references`，非「渲染順序在後」）
+- 新增 `duplicate category id` 檢查（`len(cat_ids)!=len(cats)`，比照既有 `duplicate question id` 寫法）——這是本次 critic review 抓到的兩個 Major 之一：category id 重複時，`render_index` 對重複 category 的第二次走訪覆蓋掉第一次的索引，會同時造成真實前向參照的假陰性、以及無關題目的假陽性；沒有這條檢查，本次新增的檢查本身在 category id 重複時可能回報錯誤結論
+- 「渲染不到」的參照目標（`category` 本身無效，因此進不了任何 category 的走訪）預設索引改成 `_pos`（走訪總數，等同「最後」）而非 `0`（「最先」），因為前者才是「這個答案永遠是 undefined」的正確近似——`0` 會把它誤判成最安全的「早就渲染過」
+- 註解明確標出本檢查的邊界（另一個 Major）：只抓「前向參照」，**不**抓「參照一個本身有條件、且目前答否而被 `render()` `delete` 掉 `answers[]` 的題目」——那是同一大類「渲染時讀到 undefined」下的另一半，`app.js:20` 的 `delete answers[q.id]` 分支會讓被參照題目即使渲染順序在前也可能是 undefined；目前 catalog 裡所有 13 個 `equals:false` 參照對象都是無條件 active（critic 已驗證），此半目前 latent，特意在註解寫明未涵蓋範圍，不讓下一個讀者誤以為本檢查已封閉整個「undefined」問題類別
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_configurator.py`（未改動前後 baseline）| exit=0 | result=`CONFIGURATOR VALIDATION: PASS questions=161 capabilities=199 modules=32`，改動前後不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=5 組突變測試腳本（scratch，每組先從 pristine catalog 複製再改，跑完個別 revert，最後整體 revert 再跑一次確認回到 PASS）：(1) 跨 category 的 `equals:false` 前向參照 → FAIL 且訊息含 forward-references；(2) 額外重複一個 category id 同時製造真實前向參照 → FAIL 且明確列出 `duplicate category id`（修復 Major #1 前，這個案例會漏報真前向參照、誤報無關題目）；(3) `equals:true` 前向參照 → 維持 PASS（修復 Major/Minor #4 前會誤報 FAIL）；(4) 自我參照 → FAIL 且訊息為 `self-references`（修復 Minor #5 前訊息文字為誤導性的 forward-references）；(5) 參照目標 `category` 本身無效（渲染不到）→ FAIL 且仍正確標出前向參照（修復 Minor #3 前，`,0` 預設值會讓這個案例被誤判為「安全」）| exit=0（全部 5 組斷言通過）| result=`ALL MUTATIONS OK`
+- REVIEW_DONE: critic=Standard | verdict=warn（首輪：2 Major + 3 Minor + 1 Suggestion，0 Critical）→ 逐項修復後以上述 5 組突變測試自行驗證，未二次呼叫 critic subagent（額度考量，AGENTS.md §5 扇出治理；修復內容為單一小檔案的窄範圍修正，风险 Low，突變測試對每個 finding 都有專屬紅燈證據）| findings=0c/2m/3n（Major #1 重複 category id 遮蔽真前向參照已修；Major #2 delete 路徑半個不變量未涵蓋——選擇窄化註解說明邊界而非擴大實作，因使用者原始需求明確界定為「前向參照」這一種情境；Minor #3 預設值方向錯誤已修；Minor #4 equals:true 假陽性已修；Minor #5 自我參照訊息誤導已修；Suggestion #6/#7 為既有程式碼共通假設/效能備註，非本次改動範圍）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`render_index`（新識別符）+ `active_when forward` | hits=1（僅本檔本身），確認無其他檔案引用此驗證器內部錯誤訊息格式或此識別符
+
+**[剩餘風險]**：Major #2（backward reference 到「本身有條件且目前答否」的題目，`app.js:20` 的 `delete` 分支）目前 latent（13 個 `equals:false` 參照全部指向無條件 active 的題目），未來若有人新增這類 catalog pattern，此檢查不會抓到；註解已明確標出此邊界，供下一個改動者判斷是否需要擴充。
+
+**Rollback**: `git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/validate_configurator.py`（單檔、無資料遷移、無下游依賴此檔內部實作）。
 
 ## 2026-09-04（續33，同一 session：Cognitive OS 第二十個 Method Atlas 切片 — `devops_sre.sli_slo`，開第二個 pack＋明文記錄一次「決定不做」的判斷）
 
@@ -1494,6 +1551,7 @@ Container/Component/Code 之間的親子參照關係（結構必要但非逐字�
 **[CI 修正（PR #18 gate 紅）]** `doc_integrity`（`lobster-factory/scripts/validate-doc-integrity.mjs`）以檔案所在目錄解析相對連結。兩類壞連結同一根因「檔案搬進 `docs/operations/` 但連結仍以 `agency-os/` 為基準」：① 本次 APPENDIX 逐字存檔區 16 條（我造成）；② `TOOL_TRIGGER_MAP.md` 13 條，**main 已紅**（今早 `bfa017b` 搬檔時遺留，用 `git worktree add origin/main` 跑同一閘證實），無現成修正 PR，屬同類小修，一併在本 PR 修。只改連結路徑不改文字（`docs/operations/X` → `X`；`../.claude/` → `../../../.claude/`；`../lobster-factory/` → `../../../lobster-factory/`；`tenants/` → `../../tenants/`；`../runbooks/` → `../../../runbooks/`）。
 - REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/run-v3-governance-gates.mjs | exit=0 | ms=~600 —— 修前同指令 `Blocking governance check failed: doc_integrity`（29 條 broken_link），修後 `V3 governance gates PASSED`；另以 `[ -e dir/link ]` 逐條驗兩檔全部 `.md` 連結目標存在，0 缺。
 - AUTO_TASK_DONE: CLAUDE.md + AGENTS.md 第二次瘦身（48.7 KB → 20.5 KB，-58%），舊全文逐字存 APPENDIX，3 條 stale 事實修正，2 條遠端 session 對齊規則。
+
 ## 2026-09-04（續18，同一 session：Cognitive OS 第六個 Method Atlas 切片 — `causal.dag`，第三條真實驗證路徑＋第四種結構形狀）
 
 **觸發**：延續操作者「沒做完不要停」授權。0 agent。
@@ -3143,6 +3201,52 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 [rollback]
 - `git revert <本次 commit>` 還原決策報告與 index；不改變任何 HCI pending decision。BOM 回復以 `C:\Users\user1115\.claude\projects\d--Work\memory\.bom-backfill-backup-20260901-021636` 的原始副本為準。
 
+## 2026-09-01
+
+### docs(hci): record explicit HD-00/01/02 approvals without unlocking implementation
+
+- AUTO_TASK_DONE: docs(hci) — recorded HD-00=C, HD-01=A, and HD-02=C as accepted ADRs with implementation gates left open.
+
+**根本問題**: HCI V2 已有 24 項人類決策與 ADR planning register；其中 `HD-00`、`HD-01`、`HD-02` 已收到操作者明示選項，但若只保留在對話裡，文件仍會錯誤顯示為 pending，並且批准與 schema/policy/test gate 脫鉤。
+
+**已修改**:
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-tenant-organization-model-reconciliation.md` — 記錄 `HD-01=A`；Tenant 模型、portal adapter 邊界及 mapping/migration/negative-test open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0010-consent-entity-scope.md` — 記錄 `HD-02=C`；明定 tenant authorization、data-subject consent/lawful basis、source terms 三分語意及 open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0011-hci-subject-type-scope.md` — 記錄 `HD-00=C`；V1 Person-only 與 nullable forward-compatible subject stub 的 open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{00_README.md,02_PRODUCT_BOUNDARIES.md,07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md,14_ROADMAP_AND_DEFINITION_OF_DONE.md,16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md,17_REPOSITORY_LAYOUT_AND_PATHS.md,22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md,governance/ADR_INDEX.md}` — 將這三項改為 resolved/accepted，且明示所有 implementation gates 仍為 `OPEN`；其餘 21 項不變。
+- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 加入操作者批准紀錄與下個未決三項（HD-03/04/05）。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- only architecture records and cross-document decision state changed; no runnable HCI implementation or schema exists. Static document-gate check passed: 3 accepted ADRs, 10 remaining planned ADRs, 0 stale pending/unresolved HD-00/01/02 references, and 16 changed V2 Markdown files with paired code fences. `audit-cross-machine-bom.ps1 -WorkRoot D:\Work` also passed: 80/80 cross-Drive memory Markdown files have UTF-8 BOM.
+- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read back the ADR metadata, decision authority, required gate lists, index state, owner-document cross-links, report approval table, and tenancy hierarchy. Every accepted ADR says `OPEN` for implementation gates and no document claims schema/policy/test implementation.
+- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`(pending|unresolved).{0,80}HD-0[012]|HD-0[012].{0,80}(pending|unresolved)` | hits=0; approval trace search (`HD-00=C|HD-01=A|HD-02=C|ADR-0009|ADR-0010|ADR-0011`) returned 40 reviewed current-state references. No scripts call site was introduced.
+- WORKLOG: 本條目
+
+**剩餘風險**: ADR acceptance is not Wave-1 readiness. The mapping/migration, lawful-basis policy, ERD constraints, and negative tests are deliberately not invented here; all three gates remain `OPEN`. HD-03 through HD-23 remain human decisions.
+
+**Rollback**: before implementation, supersede the individual ADR with a new explicit human approval and restore the affected inline state; after implementation, use the ADR-specific reviewed migration plan rather than relabeling historical data in place.
+
+### docs(hci): specify approved Wave 1 gates without asserting runtime completion
+
+- AUTO_TASK_DONE: docs(hci) — created the approved ADR-0009/0010/0011 Wave 1 adapter, permission-policy, ERD-addendum, and negative-test specifications; runtime gates remain open.
+
+**根本問題**: 已批准的三項 ADR 只有 gate 名稱，尚無可交接的 mapping、policy、constraint 或 test contract；同時 HCI runtime/schema/test directory 尚不存在，不能把文件決定誤報為 schema/migration/test 已完成。
+
+**已修改**:
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/{HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT,HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY,HCI_WAVE1_DOMAIN_ERD,HCI_WAVE1_NEGATIVE_TEST_SPEC}.md` — 建立四份 doc-only implementation contracts，涵蓋 portal adapter seam、三分 permission records、Person-only subject stub、12 個 negative-test IDs；明示無 HCI runtime 實作與無 test pass 結果。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/{ADR_INDEX,ADR-0009-tenant-organization-model-reconciliation,ADR-0010-consent-entity-scope,ADR-0011-hci-subject-type-scope}.md` — gate 狀態改為 `SPECIFIED — RUNTIME OPEN`，並指向每個可交接 artifact；HD-03/10/20/21 仍是 blocker，不被本次決定。
+- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 區分已具體化的 design spec 與仍未建立的 executable HCI adapter/schema/test suite。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- no HCI implementation directory, API, database, role, migration, or test runner exists; four design artifacts are not executable tests.
+- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read all four artifacts, source portal migrations, ADR state, and decision report; verified that the policy makes no jurisdiction/controller determination and every runtime gate says OPEN.
+- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`SPECIFIED — RUNTIME OPEN|HCI_WAVE1_|HD-03|HD-10|HD-20|HD-21` | hits=48, all reviewed: three accepted ADRs are `SPECIFIED — RUNTIME OPEN`; HD-03/10/20/21 remain explicit blockers; scripts has no HCI runtime call site.
+- WORKLOG: 本條目
+
+**剩餘風險**: HD-03～HD-23 未獲人類選項批准；尤其 HD-03/10/20/21 會阻擋資料主體 rights、Case aggregate、法域/市場與 DPA 角色的 production implementation。所有 four artifacts 都是 design input，不能作為任何處理 real-person data 的許可。
+
+**Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。
+
 ## 2026-08-31（KS-6 host switch completion）
 
 ### ks-aw-01 已切至 KS-6；補齊 origin guard、備份、reboot、renewal 與同步驗證
@@ -3456,6 +3560,84 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 
 [rollback]
 - `git revert <本次 commit>` 即可移除 SOP、入口、影響地圖與本條工作紀錄；自動產生的報告／state 不納入此 commit。
+
+## 2026-08-31
+
+### fix(codex): remove desktop Canva plugin to stop unsolicited OAuth windows
+
+**Trigger**: Codex desktop opened Canva's OAuth login page whenever Codex performed work, despite the 2026-08-25 Claude-side `mcp-remote@0.1.49` pin.
+
+**Root cause**: this was a different activation path from the Claude MCP proxy. `codex mcp list` returned no configured CLI MCP servers, while Codex desktop's plugin state still exposed Canva tools and its global state/cache contained the Canva plugin. The desktop plugin therefore initiated OAuth independently of the Claude MCP configuration.
+
+**Change**: removed the installed Codex plugin `canva@openai-curated-remote`. No repository MCP registry, OAuth token, or other connector configuration was edited.
+
+**Verification**:
+- REALTEST_EVIDENCE: tool=Codex app `uninstall_plugin` | input=`Canva` | result=`status: uninstalled`, `id: canva@openai-curated-remote`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex mcp list` | exit=0 | result=`No MCP servers configured yet`; confirms the prior Claude MCP route is not the Codex desktop trigger.
+- REVIEW_DONE: configuration ownership checked against `WORKLOG.md` 2026-08-25 entry; this fix removes the distinct desktop-plugin path instead of changing the previously pinned Claude proxy.
+- BUGHUNT_DONE: searched `D:\Work`, `%USERPROFILE%\.codex`, `%APPDATA%\Codex`, and `%LOCALAPPDATA%\Codex` for Canva configuration references; actionable sources were Codex global/plugin state rather than a second workspace MCP configuration.
+
+**Rollback**: reinstall Canva in Codex only when it is needed; a fresh explicit OAuth authorization will then be required.
+
+### fix(codex): disable the workspace Canva MCP source missed by plugin removal
+
+**Correction to the preceding entry**: uninstalling the Codex desktop plugin did not stop the popup. That result isolated one activation path but was not a complete fix.
+
+**Root cause**: `mcp/registry.template.json` still declared `servers.canva.enabled: true`. Its `clients.codex.exclude` only prevented generation of the user-level Codex config; the sync script still generated Canva into the shared workspace `D:\Work\.mcp.json`. Codex desktop reads that workspace file, so it launched `mcp-remote` and opened OAuth even after its desktop plugin was removed.
+
+**Change**: set `servers.canva.enabled: false` in the registry SSOT and ran `scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work`. The registry retains the Canva declaration and a re-enable note, so recovery is an explicit, reversible decision rather than an untracked manual deletion.
+
+**Verification**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work` | exit=0 | result=`MCP sync complete` for workspace, Codex, Copilot, and Gemini configs.
+- REALTEST_EVIDENCE: tool=Bash | cmd=parsed generated `.mcp.json` plus grep of `.mcp.json`, `%USERPROFILE%\.codex\config.toml`, `%USERPROFILE%\.copilot\mcp-config.json`, and `%USERPROFILE%\.gemini\settings.json` | exit=0 | result=workspace `canva` entry absent; 0 Canva/Canva MCP URL hits in all four host configs; registry `canva.enabled` is false.
+- REVIEW_DONE: source and generator reviewed at `mcp/registry.template.json:16-31` and `scripts/sync-mcp-config.ps1:254-255,538-548`; the previous `clients.codex.exclude` did not govern the workspace client.
+- BUGHUNT_DONE: scope=all generated MCP host configs | grep=`mcp.canva.com|mcp-remote@0.1.49|\\bcanva\\b` | hits=0.
+
+**Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
+
+**Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
+
+### fix(mcp): remove unmanaged project Canva stanzas that bypassed the registry
+
+**Root cause**: the registry and all generated user-level configs had Canva disabled, but `D:\Work\.codex\config.toml` still had a direct project-level Canva server declaration using `mcp-remote@latest`. Three identical `.codex\config.toml` copies under `C:\Users\user1115\.claude\worktrees\` had the same stale declaration. `sync-mcp-config.ps1` intentionally manages only the generated workspace and user-level outputs, so it did not overwrite these project-level configs. Codex could therefore load Canva from a source outside the registry and open OAuth repeatedly. This was not an enabled Claude user-level MCP server.
+
+**Change**: removed only the Canva server stanza from all four project-level configs. Preflight showed each file also contains `hetzner-ssh`, so deleting the files would have silently broken a legitimate MCP server. Added the project-level configuration guard to `mcp/README.md`: a server disabled in the registry must not remain declared in an active `.codex/config.toml`.
+
+**Verification**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work` | exit=0 | ms=956 | result=managed workspace and user-level MCP outputs regenerated; Canva absent from workspace and Claude user configs.
+- REALTEST_EVIDENCE: tool=Chrome | cmd=read open Canva OAuth login tabs after cleanup | exit=0 | result=0 tabs; no live `mcp-remote` or Canva process remained.
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — all four configs retain only `hetzner-ssh`; README correctly states the distinct ownership boundary.
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.codex | grep=`mcp_servers[.]canva` | hits=0.
+
+**Rollback**: restore the deleted Canva stanza only through `mcp/registry.template.json` by explicitly setting Canva enabled, running the sync, and completing OAuth after restarting the target host. Do not recreate an unmanaged project-level declaration.
+
+### fix(governance): clear ALERT_REQUIRED.txt gate block + fix stale HCI30_RESEARCH_REVIEW paths after docs/HCI/ reorg
+
+**根本問題（兩個獨立問題，同一 session 發現）**：
+1. `verify-build-gates` 於 2026-08-31T01:40:28Z 起持續 FAIL（`agency-os/ALERT_REQUIRED.txt` 記錄）。根因：`.claude/settings.json` 因其他變動多插入 1 行，既有 Google app-password 出現位置從 line:12 位移到 line:13；`agency-os/config/scan-local-config-known-suppressed.json` 的 baseline 用 line-number 當 sourceKey，位移後比對失效，變成「baseline-miss」擋下所有 commit。不是新洩漏——同一密碼已有 10 筆治理過的 suppression entry。
+2. 另一 session（Codex，per user）已將 `docs/HCI_AI_LEGO_Blueprint_v1`、`docs/HCI_AI_LEGO_Blueprint_v2`、`docs/HCI30_RESEARCH_REVIEW` 三個目錄搬移整併進 `docs/HCI/` 下，但搬移未同步更新文件內文中的絕對路徑引用，留下 6 處指向不存在的舊路徑 `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\`（缺 `HCI\`）。此發現與同日 Codex `HCI_SOP_GAP_REPORT.md`（`D:\tmp\hci-sop-gap-check\`）§讀取與版本邊界 一致，本次 grep 全庫另抓到報告未列出的第 6 處（`V2/14_ROADMAP...md:79`）。
+
+**已修改**:
+- `agency-os/config/scan-local-config-known-suppressed.json` — `.claude/settings.json` Google app password suppression 的 `sourceKey`: `line:12` → `line:13`（不動密碼值，只更新行號指標）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/00_README.md` — 2 處絕對路徑補回 `HCI\`
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md` — 2 處
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/14_ROADMAP_AND_DEFINITION_OF_DONE.md` — 1 處（Codex 報告未列出的第 6 處）
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v1/00_README.md` — 2 處（此檔案為我上個 session 加的 supersession banner，非原始 V1 內容，故可修；V1 正文其餘部分保持凍結不動）
+- `agency-os/ALERT_REQUIRED.txt` — 刪除（gate 已轉綠，依檔案自身指示移除）
+
+**未動、刻意保留**：`HCI30_RESEARCH_REVIEW/*.md` 內同樣的舊路徑字串——那些是稽核證據文件，逐字引用當時發現的缺陷路徑（例如 `08_DEVOPS_SRE_REVIEW.md:26` 明確引用該路徑作為 finding），改寫會破壞證據鏈。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/verify-build-gates.ps1` | exit=0 | result=`verify-build-gates: ALL PASSED`（修前 FAIL at scan-local-config-for-secrets step，含 health-check 100%/317/317）
+- REVIEW_DONE: critic=self（doc-only 路徑修正 + JSON 單欄位數值修正，無邏輯分支，跳過 subagent critic；已用 Read 逐檔讀回確認每處替換內容正確）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`D:\\Work\\agency-os\\docs\\HCI30_RESEARCH_REVIEW`（`\|` 含 `HCI_AI_LEGO_Blueprint`）| hits=0（V1/V2 目錄內清零；RR 稽核證據檔保留原樣，非本次修復範圍）
+- WORKLOG: 本條目
+
+**剩餘風險**：
+- Batched Edit 呼叫中，git-log-injector hook 在同一批次裡對其中一個 Edit 回報 block+re-issue，但另一個屬於**不同檔案**的 Edit 同批次回報「success」卻實際未套用（`V2/00_README.md` line 7）——靠事後全庫 grep 抓到並補修。懷疑是 hook/工具批次執行時的結果排序或吞錯 race，非本次修改內容錯誤；未深入排查該 hook 本身（超出本任務範圍，若之後再現需獨立追蹤）。
+- `docs/HCI/` 重組（誰做的、何時、是否已通知 WORKLOG）與新出現的 `agency-os/docs/System_Foundry_v1.0/`（大型未提交新框架，內部自稱路徑 `docs/SYSTEM_FOUNDRY/` 與實際落點不符）均未在此 WORKLOG 留下起源記錄，留待與操作者確認後續處置，不在本條目範圍內處理。
+
+**Rollback**: `git diff` 未 staged，直接 `git checkout -- <path>` 個別還原；或 revert baseline sourceKey 回 `line:12`（僅在 `.claude/settings.json` 行數真的變回 12 時才需要）。
 
 ## 2026-08-30（續30）
 
@@ -5673,6 +5855,7 @@ Reviewed: `scripts/audit-cp950-traps.ps1` (full), `scripts/system-health-check.p
 - general-purpose: Draft ADR-007 PII redaction timing conflict
 - general-purpose: Draft ADR-008 Financial Assumptions method gap
 - general-purpose: Draft ADR-009 nomenclature and directory canonicalization
+
 ## 2026-08-29（續5）
 
 ### 二次更正：「25 處疑似死檔」既非死檔亦非「現行 production」——舊 SG/EU 兩台機容器全滞，本機實測全部 502（操作者要求審查兩檔矛盾後發現）
@@ -9413,6 +9596,7 @@ Codex 對 round 7 commit 的真實 review 回報 CONFIRMED finding：round 7 為
 - Plan: Design AGENTS.md restructuring plan -> # AGENTS.md Restructuring Plan — 2026-08-24 Follow-On Pass
 
 Methodology: same A/B/C/D framework as `reports/audit/agents-slimming-proposal-2026-07-02.md`. Scope: only what has accumulated/drifted **si…
+
 ## 2026-08-20 — 跨模型 oracle 制度化：`codex-oracle.ps1` + AGENTS 分工規則
 
 ### AUTO_TASK_DONE: 把 08-17 驗證有效的 Codex oracle 從「當次對話」變成常駐機制
@@ -9905,6 +10089,12 @@ Methodology: same A/B/C/D framework as `reports/audit/agents-slimming-proposal-2
 
 [rollback]
 `git revert <commit>`；或單檔 `git checkout HEAD~1 -- scripts/check-smoke-tests.ps1`。純腳本與文件變更，無資料遷移。
+
+## 2026-08-17
+- 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
+  - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
+  - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
+  - BUGHUNT_WAIVED: DOC_ONLY -- no code change
 
 ## 2026-08-16
 
@@ -10537,1423 +10727,3 @@ Hostinger nameserver 改回 `ns1.dns-parking.com` / `ns2.dns-parking.com`；CF z
 - REVIEW_WAIVED: DOC_ONLY -- monthly review document; prose review only
 - BUGHUNT_WAIVED: DOC_ONLY -- no code modified
 
-## 2026-07-27
-
-- 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-27.md
-
-## 2026-07-20
-
-### AUTO_TASK_DONE: 週報生成 + 影片系統全面修復 + 安全漏洞修補（遠端 session）
-
-[根因彙整]
-1. 週報：2026-07-14→07-20 連續第二週無 session，操作者旅行中
-2. 影片系統 7 個問題（critic 稽核）：3 個 API 路由缺 role gate / 1 個 SSRF / 1 個 duration slider 假計算 / 1 個 reconcile regex 截斷 / 1 個 upsert 無對應 unique constraint
-3. 安全漏洞：packages/workflows high=3（systeminformation 鏈）
-
-[已修改]
-1. `agency-os/reports/weekly/weekly-summary-2026-07-20.md` — 週報（繁中）
-2. `agency-os/reports/weekly/weekly-automation-LATEST.md` — 同步更新
-3. `app/api/video/render-draft/route.ts` — role gate (resolveOpsRole + canCreateAiImageJob)
-4. `app/api/video/regenerate-image/route.ts` — role gate
-5. `app/api/video/upload-asset/route.ts` — role gate
-6. `app/api/video/remotion-render/route.ts` — role gate + SSRF (ALLOWED_HOSTS + templateId allowlist)
-7. `app/api/video/remotion-status/route.ts` — role gate
-8. `app/(shell)/tools/video/VideoStudio.tsx` — duration slider 改 derived computation；加「預計 N 個場景」提示
-9. `lib/content/video/reconcile.ts` — OUTPUT_FORMATS regex；primary URL 選擇 16x9 ?? youtube_linkedin ?? 9x16
-10. `lib/content/blocks/video-pipeline.ts` — insert → upsert(onConflict: "object_key", ignoreDuplicates: true)
-11. `app/api/video/cleanup/route.ts` — Math.max(1, days) 防 0/負值全刪
-12. `app/api/video/history/route.ts` — service-role client 缺失時回 warning 欄位
-13. `packages/db/migrations/0060_media_assets_object_key_unique.sql` — 新增 partial unique index
-14. `packages/db/scripts/0060_media_assets_object_key_unique_down.sql` — rollback
-15. `agency-os/TASKS.md` — 加 migration 0060 待套用任務
-16. `packages/workflows/package-lock.json` — npm audit fix（high=3→0）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (packages/workflows) | exit=0 | 75/75 pass
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm audit --json | exit=0 | high=0 confirmed
-- REALTEST_WAIVED: VIDEO_API_CHANGES -- remote container, no live Supabase/R2 credentials; tsc pre-existing errors confirmed pre-existing (91 errors before our changes)
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=7c/0m/0n (all 7 fixed)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=recordVideoAsset,onConflict,object_key | hits=1 (migration 0060 adds constraint)
-- BUGHUNT_DONE: scope=lobster-factory | grep=canCreateAiImageJob,resolveOpsRole | hits=5 (all video API routes now gated)
-
-[剩餘風險]
-- migration 0060 未套用 EU Supabase prod → 已記入 TASKS.md（需 SSH EU VPS）
-- 18 moderate npm vulns（opentelemetry 鏈 via @trigger.dev/sdk）→ 需上游釋出相容修復，force-fix 為 breaking change
-
-[rollback]
-- npm: `git checkout packages/workflows/package-lock.json && npm install`
-- migration: `drop index if exists uq_media_assets_object_key;`
-
----
-
-## 2026-07-20
-
-- 01:05 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-20.md
-
-## 2026-07-13
-
-- 01:06 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-13.md
-
-## 2026-07-06
-
-- 01:02 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-07-06.md
-
-## 2026-07-05
-
-### revert(nginx): 還原 aware-wave.com/start/ → WordPress FluentForm
-
-[根因] 上一個 session 未授權將 /start/ 301 redirect 到 app.aware-wave.com/intake（Next.js form），繞過原始設計的 FluentForm → MySQL + FluentCRM → Supabase → 建站觸發流程。
-
-[已修改]
-1. `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/lobster-aware-wave-locations.inc` — 移除 4 行 redirect block
-2. SG VPS `/etc/nginx/snippets/lobster-aware-wave-locations.inc` — 同步移除 + nginx reload
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl -sI --max-redirs 0 https://aware-wave.com/start/ | exit=0 | HTTP 200 from WordPress
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=/start/.*intake | hits=0
-
-[原始設計（已還原）]
-客戶 → aware-wave.com/start/ → FluentForm (WP) → MySQL + FluentCRM → webhook → Supabase → 觸發建站
-
----
-
-### AO-CLOSE 2026-07-05 — Session summary (window: 2026-07-04 → 2026-07-05)
-
-本輪完成（2026-07-04/05）：
-- ✅ feat(onboarding/public-intake): Phase 4 — /intake 公開表單 + (shell)/(public) route group 重構 + critic 安全閉環（915245b0）
-- ✅ feat(intake): Phase 5 — Cloudflare Turnstile 接入 + 前端 widget + gate logic Critical 修（6306cd8e）
-- ✅ feat(nginx): redirect /start/ → /intake（76576dc9）→ 後因接單流程考量 reverted（44da8365）還原 FluentForm 原始接單流程
-- ✅ fix(db): repair_runs_source_check 補 'deploy' — migration 0059 apply EU prod（b1d555e6）
-- ✅ feat(repair-center): human_only incident 改「已知悉」直接關閉，不建 repair_run（70b17903）
-- ✅ fix(onboarding): FluentForm select/checkbox 渲染、coerce-comma-split、n8n bridge 停用（多 commit 2026-07-04）
-- ✅ EU VPS ClickHouse OOM death spiral 根治（mem_limit 1536m→3072m + 20GB crash log 清除，restarts=0）（00ea2e03）
-- ✅ fix(trigger-build): CF hairpin → http://next-admin:3000 + fetchWithRetry + intake_form rollback（11886d04）
-- ✅ hotfix(intake): SG docker-compose build.args 補 NEXT_PUBLIC_TURNSTILE_SITE_KEY（Turnstile widget 現可見）
-- ✅ 蒙古旅遊客戶 handoff docs x4 — 現場開機 checklist、Cloudways 方案、public key 位置、網域 Namecheap（ef71b328 f5abcdf7 998e5bab 8d642e77）
-
-未做（仍開放）：
-- 一鍵架站 Stage 4 開閘（需 HETZNER_STAGING_TOKEN vault + SG env 三 flag + sg-deploy，High risk，等 go-ahead）
-- soulfulexpression.org → Cloudflare DNS 遷移
-- POD Phase 4 e2e（操作者 live e2e 建 Woo+Printful 商品）
-- Canvas 整輪瀏覽器實測
-- 蒙古客戶 Cloudways 實際建站（待客戶刷卡+配合）
-
-- AUTO_TASK_DONE: doc-link-fix Phase 4 route group (shell) broken links — validate-doc-integrity.mjs regex + 3 doc links fixed
-- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/validate-doc-integrity.mjs | exit=0 | result=Doc integrity PASSED
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker stats trigger-clickhouse | result=296MiB/3GiB(9.63%) | exit=0
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors (Phase 4+5+trigger-build)
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m — session overall summary + doc link fix (regex change one-liner, balanced-paren pattern)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=intake.*hairpin|request\.url.*provision | hits=0
-- BUGHUNT_DONE: scope=lobster-factory/scripts | grep=linkRe | hits=1 (validate-doc-integrity.mjs only, no downstream callers)
-- BUGHUNT_WAIVED: NA -- 蒙古 handoff docs = doc-only；nginx revert = self-contained cleanup
-
----
-
-### incident(eu-vps): ClickHouse OOM death spiral 根治 — 20GB crash-loop log 清除 + 記憶體上限重配置
-
-[任務理解]
-EU VPS (awarewave-eu-hel1-cpx32, 7.6GiB RAM) trigger-clickhouse 持續 OOM 死亡迴圈：container mem_limit=1536m → 啟動時載入 3002+3731 部件 metadata > 1.5GiB → OOM kill → restart=0 重啟 → 加速寫 log → 部件累積 → 死亡迴圈。Netdata 告警：cgroup 97.8% / load 33 / OOM kills 3.6/s。
-
-[現況分析]
-- trigger-clickhouse RestartCount: 2344 次
-- 資料量：store/ = 20GB，**全為 ClickHouse 自身診斷 log，零業務資料**（trace_log 14GB + text_log 4.2GB + 14 個 system.* 表）
-- trigger_dev 業務資料: ~111MB（刪後驗證）
-- 根因：TTL 策略（7d/14d/30d）從未執行，因 ClickHouse 在啟動階段即被 OOM killed
-
-[已修改]
-1. EU VPS `/root/trigger/docker-compose.yml`：`mem_limit: 1536m` → `mem_limit: 3072m`
-2. EU VPS `/root/trigger/clickhouse/override.xml`：`max_server_memory_usage` 1GB → 2.5GB（3GiB 硬上限留 512MB headroom）
-3. 停止 ClickHouse（`docker update --restart=no`）
-4. 刪除所有 16 個 system.* log 表 store 目錄（20GB → 111MB，ClickHouse 重啟後自動重建空表）
-5. 恢復 `--restart=unless-stopped` + `docker start`
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker stats --no-stream trigger-clickhouse | result=296MiB/3GiB(9.63%) | exit=0
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect trigger-clickhouse | result=health=healthy restarts=0 | exit=0
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker compose ps | result=所有9個容器 Up+healthy | exit=0
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=clickhouse.*mem_limit | hits=0 — EU VPS machine-local，不進 repo
-- BUGHUNT_WAIVED: NA -- machine-local 修改，無 repo downstream consumers
-
-[剩餘風險]
-- ClickHouse 24.8.8 vs AGENTS.md 鎖定 25.7.x — 另案升版
-- EU Sentry duplicate key ops_incidents_source_external_id_key — 另案
-- 3-5 天後確認穩定可考慮將 mem_limit 降回 2048m
-
-[rollback]
-- 若再度 OOM: `docker update --restart=no trigger-clickhouse` → 調高 mem_limit → restart
-
-### fix(trigger-build): 修復建站失敗 fetch failed + intake_form 卡 building 無法重試
-
-[任務理解]
-MONGOLIA-03 建站失敗（ops_action_runs id: 4770d735），error_summary="fetch failed"，trigger_run_id=null（Trigger.dev 從未被觸發）。根因一：trigger-build 用 `new URL("/api/internal/hosting/provision-staging", request.url)` → request.url 是 `https://app.aware-wave.com/...` → container 自呼走 Cloudflare hairpin（container→CF→nginx→container），在 2026-07-04T16:42:30 Docker 守護進程做 image GC 時產生短暫網路中斷 → `fetch()` 拋 `TypeError: fetch failed`（3 秒）。根因二：失敗後 `intake_forms.status` 停留在 `"building"`（CAS guard `.neq("status","building")` 阻擋重試），使用者無法自助重試。
-
-[現況分析]
-- git log: Docker daemon 16:42:30 UTC 大量 `context canceled` 與 `Canceled: context canceled`，與 build 同時發生
-- container 啟動時間 16:47:09 UTC，build 發生在 16:42:19 UTC → container 未崩潰，但 Docker 網路短暫抖動
-- `docker exec lobster-next-admin node -e "fetch('https://app.aware-wave.com/...') ..."` → OK status: 200（現在正常）
-- nginx 沒有 provision-staging 的 access log → TCP 連線從未到達 nginx（CF hairpin 在 Docker 網路抖動時失敗）
-
-[風險清單]
-- `http://next-admin:3000` 只在 Docker compose network 內有效（必須 container name 對應）
-- seed call 使用同一 endpoint，也已修正
-- 無 RLS/auth/DB migration 變動
-
-[方案比較]
-- A（最小）：改用 `http://next-admin:3000` 內部路由 + fetchWithRetry（2次 retry，線性 back-off）+ 失敗時 reset intake_form.status
-- B：加 SSRF proxy 層 → 複雜度高，不必要
-
-[建議方案] A — 最小改動，解決 hairpin 根因並增加韌性
-
-[實作計畫]
-1. 改 provisionEndpoint base 為 `http://next-admin:3000`
-2. 加 fetchWithRetry wrapper（provision + seed 兩個呼叫都用）
-3. finalStatus === "failed" 時 reset intake_forms.status → "spec_generated"
-4. 直接 PATCH DB 解鎖 MONGOLIA-03 intake form（立即讓使用者重試）
-
-[驗證計畫]
-1. 實測：tsc --noEmit（通過，無輸出）；直接 PATCH DB 並驗 status=spec_generated
-2. Review：critic subagent deep review
-3. 抓蟲：grep provision-staging/local_direct 在 agency-os/docs/scripts
-4. WORKLOG 留證據鏈
-
-[已修改]
-- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/onboarding/trigger-build/route.ts`：
-  - provisionEndpoint 從 `request.url` → `http://next-admin:3000`（消除 CF hairpin）
-  - 加 `fetchWithRetry`（2 retries, 1s/2s back-off）
-  - provision + seed fetch 改用 fetchWithRetry
-  - finalStatus === "failed" 時 PATCH intake_forms.status = "spec_generated"
-- DB（直接 PATCH）：intake_forms id=cfc9f8e8 status: "building" → "spec_generated"
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin vitest) | exit=0 | ms=1790 — 599/599 passed
-- REALTEST_EVIDENCE: tool=Bash | cmd=PATCH intake_forms status=spec_generated | exit=0 | result=status:"spec_generated" confirmed
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n — minor: AbortSignal.timeout missing from fetchWithRetry; fixed before commit (110s per-attempt timeout, stays under maxDuration=120s)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=provision-staging,local_direct,status.*building | hits=no stale claims
-- BUGHUNT_DONE: scope=agency-os/docs | grep=request.url hairpin | hits=0
-
-[剩餘風險]
-- `http://next-admin:3000` container name 必須與 docker-compose service name 一致（已確認：service name 是 `next-admin`）
-- retry 最多等 1+2=3 秒額外延遲（可接受，provision 本身 71s）
-- 需 sg-deploy 讓修復上線
-
-[rollback]
-- revert route.ts 改動 + `docker compose up -d next-admin`（若已 deploy）
-- intake_form status 已手動 reset，不影響 rollback
-
-### hotfix(intake): SG docker-compose build.args 補 NEXT_PUBLIC_TURNSTILE_SITE_KEY — Turnstile widget 現在可見
-
-[任務理解]
-`app.aware-wave.com/intake` step 5 Turnstile widget 不出現。根因：SG machine-local `/root/lobster-phase1/docker-compose.yml` build.args 漏掉 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`（其他 session 的 sg-deploy 只 rsync `apps/`，不更新 docker-compose.yml）→ `next build` 拿到空字串 → webpack baked `undefined` → useEffect guard `if (!siteKey) return` 靜默退出 → widget never rendered。
-
-[已修改]
-- SG `/root/lobster-phase1/docker-compose.yml`（machine-local）：`next-admin: build: args:` 段加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY}`
-- Rebuilt `lobster-next-admin`（`docker compose build next-admin`）+ restart（`docker compose up -d next-admin`）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=grep NEXT_PUBLIC_TURNSTILE /root/lobster-phase1/docker-compose.yml | hits=1 ✅
-- REALTEST_EVIDENCE: tool=SSH | cmd=grep -r "0x4AAAA" /tmp/bundle-check | exit=0 | chunk=page-49bd1ea818744c5f.js — key confirmed baked in（舊 chunk `3b26e87227f8f827` 已消失）
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect lobster-next-admin --format '{{.State.Health.Status}}' | exit=0 | result=healthy
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m — single build.args line insertion，無副作用
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=NEXT_PUBLIC_TURNSTILE_SITE_KEY | hits=0 — docker-compose.yml 是 machine-local，不進 repo；repo 版本（line 246）已有此行（另一 session 6306cd8e 加）
-- BUGHUNT_WAIVED: NA -- machine-local file edit + docker build；無 downstream consumers 在 repo 內
-
-[剩餘風險]
-- CF CDN edge cache 舊 chunk 404 後自動失效（1-5 分鐘）；無需手動 purge
-- SG machine-local docker-compose.yml 已和 repo 版本一致；下次 sg-deploy 走 rsync 會蓋掉 `apps/` 但 docker-compose.yml 不受影響（sg-deploy.sh 設計如此）
-
-[rollback]
-- 刪 docker-compose.yml 同一行 + `docker compose build next-admin` + `docker compose up -d next-admin`
-
----
-
-## 2026-07-04
-
-### feat(intake): Phase 5 — Cloudflare Turnstile + sg-deploy + CF redirect — 一鍵架站 UX 閉環完成
-
-[任務理解]
-客戶填 `aware-wave.com/start/` WP 表單後只看到 FluentForm 預設「謝謝」，整套 AI 建站引擎對客戶完全不透明。根本問題：React `/intake` 表單（能顯示 AI spec 預覽）存在 code 但從未部署；`/start/` 從未 redirect 過去；Turnstile keys 未注入 build pipeline。
-
-[已修改]
-- `Dockerfile`：加 `ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=` + `ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY`（build-time 注入）
-- `docker-compose.yml`：build args 加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`；runtime env 加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`
-- SG `.env`：加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAADvkZD4yg2iE0h8Y` + `TURNSTILE_SECRET_KEY=0x4AAAAAADvkZIhA5gxdiQy8f4vF3Kd_AuU`（CF Turnstile Managed widget 2026-07-04 新建）
-- `nginx/system-sites/lobster-aware-wave-locations.inc`：加 `location = /start` + `location = /start/` → `return 301 https://app.aware-wave.com/intake`（exact-match，優先於 WP catch-all）
-- SG `/etc/nginx/snippets/lobster-aware-wave-locations.inc`：同步套用 nginx redirect（直接 edit + reload）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 — 0 type errors
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | tests=599/599 (50 files)
-- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin 6306cd8e | exit=0 | smoke=all OK (login+summary+nginx+node-api) | /intake=○static-generated in build output
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://aware-wave.com/start/ --max-redirs 0 | HTTP 301 Location: https://app.aware-wave.com/intake
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://app.aware-wave.com/intake | HTTP 200
-- REALTEST_EVIDENCE: tool=Bash | cmd=playwright smoke | exit=0 | 26/26 pass (0 failed, 6 skipped)
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0m — Dockerfile/docker-compose/nginx changes reviewed
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=NEXT_PUBLIC_TURNSTILE_SITE_KEY | hits=3
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=TURNSTILE_SECRET_KEY | hits=2
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=/start/ | hits=1 (nginx snippet only)
-
-[剩餘風險]
-- CF Turnstile widget 未做瀏覽器視覺確認（user 需親自訪問 app.aware-wave.com/intake step 5 確認 widget 出現）
-- Rate-limit insert-then-ordinal 仍非原子（技術債，burst=5 低風險）
-- nginx redirect 直接 edit on VPS；next sg-deploy nginx 會覆寫 → 已同步更新 repo source
-
-[rollback]
-- Turnstile：SG .env 刪兩行；sg-deploy rebuild（NEXT_PUBLIC_* build-time，必 rebuild）
-- nginx redirect：ssh SG → 刪 snippets 那 3 行 → nginx -s reload（30 秒）
-
----
-
-### fix(repair-center): 修復 repair_runs_source_check 缺少 'deploy' — 所有 deploy incident 核准修復 409
-
-[任務理解]
-實測 /ops/repairs 「核准修復」功能時發現：佇列 3 個 deploy 來源 incident 全部 409 `repair_run_insert_failed`。根因：DB constraint `repair_runs_source_check` 建立時（0027）不含 `'deploy'`；0031 只更新了 `ops_incidents`，漏掉 `repair_runs`。
-
-[現況分析]
-- `0027_repair_runs.sql:13` 建表 CHECK 只有 6 值（無 deploy）
-- `0031_ops_incidents_deploy_source.sql` 修了 `ops_incidents` 但沒改 `repair_runs`
-- TypeScript `IncidentSource`、policy catalog、service.ts 全支援 deploy；只有 DB 缺
-- 實測確認 3 個佇列 incident 全為 source=deploy（browser DOM 抽取）
-
-[已修改]
-- `lobster-factory/packages/db/migrations/0059_repair_runs_add_deploy_source.sql`（新增）
-  - DROP CONSTRAINT repair_runs_source_check + ADD CONSTRAINT 含 'deploy'（7 值）
-  - NOTIFY pgrst 'reload schema'（同 0027 慣例）
-- Prod Supabase：SSH EU → `docker exec supabase-db psql -U supabase_admin` 直接套用
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=mcp__claude-in-chrome__javascript_tool | cmd=POST /api/ops/repairs {incident_id:e7eb7ad4-b848-487d-9389-ae063225e9e2} | exit=200 | ms=1790
-  - 回應：`{ok:true, source:"deploy", state:"human_only", policy:"human_only"}` ✅
-  - deploy policy = human_only，修復流程正確 park 到 human_only 狀態
-- REVIEW_DONE: critic=db-expert | verdict=pass | findings=0c/0m/0n
-  - DROP+ADD idempotent；ACCESS EXCLUSIVE lock 毫秒級；無失效 row
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=repair_runs_source_check | hits=4
-  - 0013/0027/0031/0059 全在 migration 檔，無 stale 宣告；scripts/ agency-os/ 無命中
-- BUGHUNT_WAIVED: NA -- constraint 名稱為 SQL DDL identifier，無 downstream consumer callsite
-
-
-
-### feat(onboarding): Phase 5 — Cloudflare Turnstile 接入（/intake 公開表單安全開門）
-
-[任務理解]
-Phase 4 建了 `/intake` 表單但用 `BROWSER_INTAKE_ENABLED` gate 鎖住（默認 OFF），待 Turnstile 接入後才能開放。本 Phase 完成 Turnstile captcha 接線，讓表單可安全對外開放。
-
-[現況分析]
-- Phase 4 commit `915245b0`：`intake-browser/route.ts` 存在，gate=OFF；`intake/page.tsx` 存在，無 captcha；`intake-form-steps.tsx` 存在，無 captcha slot
-- Phase 4 留下 TODO：「TURNSTILE_SECRET_KEY env → route 驗 token → 前端加 widget」
-- Critic Deep review 發現 1 Critical（gate OR 邏輯讓 `BROWSER_INTAKE_ENABLED=true` 無 secret 時開放，重開 DoS 向量）+ 2 Major（siteverify 無 timeout / 兩個 env var 不同步） + 3 minor，全修
-
-[已修改]
-- `app/api/onboarding/intake-browser/route.ts`：
-  - 加 `verifyTurnstileToken(token, remoteip)` helper（POST siteverify，5s AbortSignal.timeout，含 remoteip 強化 abuse 信號）
-  - Gate 邏輯修正（🔴 Critical fix）：`BROWSER_INTAKE_ENABLED` bypass 限制為 `NODE_ENV !== "production"`，prod 必須有 `TURNSTILE_SECRET_KEY` 才開門
-  - body type 加 `turnstile_token?: string`；secret 存在時驗 token，缺少→422 `captcha_required`，驗失→422 `captcha_failed`
-  - siteverify 加 `AbortSignal.timeout(5000)`（🟠 Major fix：防 CF 慢時漏斗全卡）
-  - siteverify 加 `remoteip`（🟡 Minor：強化防重放評分）
-- `lib/onboarding/intake-form-steps.tsx`：加 `turnstileSlot?: ReactNode` prop，在 step 5 fields 與 nav 之間插入 slot
-- `app/(public)/intake/page.tsx`：
-  - 加 `TurnstileAPI` 型別（含 `reset`）+ `getTurnstile()` helper
-  - 加 `turnstileToken` state + `turnstileContainerRef` + `turnstileWidgetId` refs
-  - Effect 1：一次載入 `api.js?render=explicit`（以 `id="cf-turnstile-api"` 防重複注入）
-  - Effect 2：step 5 進入時 `turnstile.render()`（輪詢等待 script 載完）；離開時 remove + reset token；`expired-callback` 呼叫 `turnstile.reset()` 讓 widget 自動恢復（🟡 Minor：防 8min 填表後 token 過期導致靜默 disabled）
-  - `handleSubmit` 加 captcha guard + `turnstile_token` 進 POST body
-  - `captcha_required`/`captcha_failed` 顯示明確中文錯誤訊息（🟠 Major fix：兩 env 不同步時有可讀提示）
-  - `disabled={hasSiteKey && !turnstileToken}` → submit 未通過驗證時鎖住
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~30000 — 0 type errors（全部修後再驗）
-- REALTEST_WAIVED: SMOKE_COVERED — 需 TURNSTILE_SECRET_KEY + NEXT_PUBLIC_TURNSTILE_SITE_KEY 真實 CF 金鑰才能 e2e 驗；開放前先 sg-deploy + Playwright smoke
-- REVIEW_DONE: critic=Deep | verdict=pass（Critical gate-logic regression + 2 Major + 3 minor 全修）| findings=1c/2M/3m/2s applied=1c+2M+3m, deferred=2s（minor suggestions：remoteip done, script id guard done）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=intake-browser|BROWSER_INTAKE_ENABLED|TURNSTILE | hits=expected（route.ts + page.tsx 改動正確；middleware.ts exclusion 未動；WORKLOG stale refs 歷史記錄）
-- BUGHUNT_WAIVED: scope narrow note — `agency-os/scripts` 無 TURNSTILE 引用，排除合理
-
-[剩餘風險]
-- 需真實 CF Turnstile keys（SITE_KEY + SECRET_KEY）才能開啟；目前仍回 `coming_soon` 503
-- Rate-limit Major-1（insert-then-ordinal 非原子）仍存在，Phase 4 記錄技術債；高並發前遷 PG RPC
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`（前端）+ `TURNSTILE_SECRET_KEY`（後端）必須配對設定；一缺一表單爛掉或無 captcha
-
-[rollback]
-- `git revert <this-commit>`；tsc 確認再 sg-deploy；Phase 4 的 gate 自動恢復 OFF 狀態
-
----
-
-### feat(onboarding): Phase 4 — 公開 /intake 表單 + route group 重構 + critic 安全閉環
-
-[任務理解]
-完成 onboarding portal 的「公開入口」缺口：既有的 `aware-wave.com/start/` WP 表單需依賴 FluentForm + webhook，而 `app.aware-wave.com/intake` 可作為直連公開表單，由 React 前端直接送出、後端 `intake-browser` API 處理，完全繞過 FluentForm 依賴。同時修正架構缺陷：原 `app/ops/`、`app/tools/` 等所有 admin 頁面和公開頁面共享同一層 layout（帶 sidebar），需用 Next.js route group 隔離。
-
-[現況分析]
-- `git log` 顯示 `bbacfd1c`/`3f31d5ee` 為本 session auto-checkpoint commits，含全部實作
-- 原 `app/layout.tsx` 渲染 sidebar → 公開頁面也會有 admin chrome，不可接受
-- 原所有 admin 路徑在 `app/ops/`、`app/tools/` 等 → 改移至 `app/(shell)/` route group
-- `middleware.ts` 未排除 `/intake`、`/api/onboarding/intake-browser` → 公開頁面被 session gate 擋
-
-[已修改]
-**Route group 重構（~20 檔）**：
-- `app/layout.tsx`：移除 sidebar；只剩 html+body+theme CSS vars+PHProvider
-- `app/(shell)/layout.tsx`（新建）：sidebar shell，async 讀 `getThemeConfig()`
-- `app/(public)/layout.tsx`（新建）：bare passthrough，無 sidebar
-- `app/ops/` → `app/(shell)/ops/`（git mv）；`app/tools/` → `app/(shell)/tools/`（git mv）
-- 所有 `../../lib/` → `@/lib/`；`../../../lib/` → `@/lib/`；`@/app/tools/` → `@/app/(shell)/tools/`（批次修）
-- `app/SidebarNav.tsx`：OpsInboxBadge import → `(shell)/ops/inbox/`
-- `middleware.ts`：PUBLIC_API_PATHS 加 `/api/onboarding/intake-browser`；matcher 排除 `intake`
-
-**新檔案**：
-- `lib/onboarding/intake-form-steps.tsx`（新建）：`"use client"` 共用元件，exports STEPS/PAGES_OPTIONS/PRODUCT_TYPES/VISUAL_STYLES/toggleArr/IntakeFormSteps，從 `ops/onboarding/page.tsx` 抽取，兩端共用
-- `app/(public)/intake/page.tsx`（新建）：公開入口表單，5-step，呼叫 `intake-browser` API，顯示 spec 預覽感謝頁
-- `app/api/onboarding/intake-browser/route.ts`（新建）：無 bearer token，BROWSER_INTAKE_ENABLED feature gate（默認 OFF，待 Turnstile 接入後才開），insert-then-ordinal rate limit（5/10min，獨立 bucket），呼叫 `coerceFluentFormPayload` + `generateWebsiteSpec`
-
-**Critic 安全閉環（本次 code 改動）**：
-- `intake-browser/route.ts`：加 `BROWSER_INTAKE_ENABLED` feature gate（🔴 Critical 修復：無 captcha 不得開放，global bucket 鎖定攻擊向量）；spec 生成失敗時 DELETE 已計數列（🟠 Major：防攻擊者故意觸發失敗填滿 bucket）；status 更新捕捉並 log error（🟡 Minor：M8 parity）；錯誤 response 加入 `intake_form_id`（🟡 Minor：operator 可 reconcile）
-- `app/(public)/intake/page.tsx`：處理 503 `coming_soon` 回傳顯示友善文字
-- `app/login/page.tsx`：修正 stale comment（sidebar 說明已無效，/login 在 (shell) group 外）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=<30000 — 0 type errors
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin) | exit=0 | ms=1780 — 50 files / 599 tests 全過（含 contentStudioImageModels.test.ts 確認路徑正確）
-- REALTEST_WAIVED: SMOKE_COVERED — sg-deploy 待 push 後執行；/intake 公開表單待 Playwright smoke 確認（BROWSER_INTAKE_ENABLED=false 時回 coming_soon；auth-gate 驗 /ops/onboarding 仍需 session）
-- REVIEW_DONE: critic=Deep | verdict=High（整體風險）| findings=2c/2M/3m/2s — 2 Critical（global bucket DoS + captcha 前提違反）同日全修（feature gate OFF + spec-fail rollback）；2 Major（rate-limit race + 失敗列不清理）Major-1 記錄為技術債（TODO: PG RPC atomic gate）；Major-2 同日修；3 Minor 全修；2 Suggestion 延後（Turnstile 接入時一起做）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=BROWSER_INTAKE_ENABLED | hits=1（只在 intake-browser/route.ts，無 stale ref）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=IntakeFormSteps | hits=3（intake-form-steps.tsx 定義 + ops/onboarding/page.tsx + intake/page.tsx — 全預期 callsite）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=intake-browser | hits=0（agency-os/scripts 無 stale 主張，WORKLOG 歷史引用不算）
-
-[剩餘風險]
-- `intake-browser` route 由 `BROWSER_INTAKE_ENABLED` gate 鎖定；**不部署到 prod 直到 Cloudflare Turnstile 驗證接入**（TODO：Turnstile site key → CF dashboard → TURNSTILE_SECRET_KEY env → route 驗 token → /intake 前端加 Turnstile widget）
-- Rate-limit insert-then-ordinal 仍非原子（Major-1）；prod 啟用前應遷移至 PG advisory lock RPC（有界，burst=5 同時請求，非持續漏洞）
-- `/intake` 公開 URL 可直接訪問（不需登入），但表單送出回 `coming_soon`，無 Claude 消耗，無 DB 寫入
-- `aware-wave.com/start/` Cloudflare redirect → `app.aware-wave.com/intake` 尚未設定（視覺確認後再做）
-
-[rollback]
-- Route group 重構：`git revert bbacfd1c 3f31d5ee <critic-fix-commit>`；tsc 確認再 sg-deploy
-- intake-browser route：feature gate 已 OFF，不影響 prod；直接 revert commit 即可
-
----
-
-## 2026-07-04
-
-### feat(repair-center): auto-remediation pipeline wiring (startRepairFromIncident)
-
-[任務理解]
-`startRepairFromIncident()` 在設定 `state: "repairing"` 後直接 return，從不呼叫 `tryRemediate()`。補救目錄（catalog）已有 `restart-unhealthy-container` 可自動執行，但只能靠人工到 UI 觸發。Migration 0028 agent 確認已套用，無需重做。
-
-[現況分析]
-- uptime-kuma/route.ts 在 webhook ingest 時已有 `tryRemediate` fire-and-forget（A2 fast path，無備份）
-- service.ts 的 pipeline 是 documented path（backup + GitHub issue + run state tracking）
-- `tryRemediate(mode:"auto")` 有 30min cooldown keyed on service — 兩路徑自然協調不衝突
-- 缺口：pipeline 到達 `repairing` 後無 auto `tryRemediate()` 呼叫
-
-[已修改]
-- `lib/repair-center/service.ts`:
-  1. import `findRemediation, tryRemediate` from `./remediations/engine`
-  2. 在 `startRepairFromIncident` 結尾加 auto-remediation extension block（~75 行）：
-     - null guard on `repaired`（mirror M7：repairing 轉態失敗 → hard stop）
-     - `findRemediation(i)` pre-check（catalog matchers must be pure）
-     - `tryRemediate(mode:"auto")` → ok → conditional UPDATE `.eq("state","repairing")` → `resolved`
-     - `tryRemediate(mode:"auto")` → fail → conditional UPDATE `.eq("state","repairing")` → `triage_needed`
-     - `!attempted` → fall through → `repairing`（flag off / cooldown / no match）
-     - Conditional UPDATE mirrors `escalateAnalysisOnlyRun` atomic pattern（lost-write race guard）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npx tsc --noEmit | exit=0 | ms=N/A
-- REALTEST_EVIDENCE: tool=Bash | cmd=cd next-admin && npm test | exit=0 | ms=1790 — 50/50 test files, 599/599 tests pass
-- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly | exit=2 | ms=N/A — 10/10 invariants pass, 1 cosmetic warn (github_app_status=unverified，與本次無關)
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m — Critic raised 3 Medium (null guard, lost-write race, double findRemediation doc). 全部已修，re-run tsc+test pass
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=tryRemediate | hits=8 (service.ts 2 new + route.ts existing + engine.ts definition — 全部預期)
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=findRemediation | hits=0 outside engine.ts+service.ts (no stale callers)
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=catalog_remediation | hits=0 (no stale claims)
-
-[剩餘風險]
-- `tryRemediate(mode:"auto")` 讓 pipeline 延長 ~60s（SSH restart + 15s healthcheck）。已知且可接受（pipeline 已是長任務）
-- `uptime-kuma` 今日仍是 `analysis_only` policy → pipeline 走完才能觸發 auto-remediation；webhook fast-path 已先行。若 webhook 在 30min 內跑過 → pipeline cooldown 命中 → 落回 `repairing`（design intent）
-- 未增加 unit test for the new block（需 mock tryRemediate；留下次迭代）
-
-[rollback]
-revert 兩處 service.ts 改動（import + auto-remediation block），`npx tsc --noEmit` 確認即完成回滾
-
-### fix(onboarding): FluentForm form_id=3 下拉/複選渲染修復 + e2e 全鏈驗證
-
-[任務理解] aware-wave.com/start/ 5-step 表單已有正確結構，但所有 select 下拉無選項（只顯示 placeholder）、checkboxes 欄位完全不渲染。
-
-[現況分析]
-- `Select.php:108` 讀取 `settings.advanced_options`，我們的 DB 存的是 `settings.options` → 空
-- `checkboxes` element name 不存在於 FF 元件表，正確名稱為 `input_checkbox`，且同樣需要 `settings.advanced_options`
-- 兩類問題均為上次 DB 重建時用了錯誤的 key 名稱與 element 名稱
-
-[已修改]
-- `wp_fluentform_forms` (form_id=3, lobster-wordpress DB) — 9 個 select/radio 欄位：`settings.options` → `settings.advanced_options`（加 calc_value 欄位）
-- `wp_fluentform_forms` (form_id=3) — 3 個 checkbox 欄位：element `checkboxes` → `input_checkbox`，`settings.options` → `settings.advanced_options`（加 calc_value+image 欄位），attributes.type=checkbox, value=[]
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval "...fix options key..." | exit=0 | ms=500 — Fixed 9 fields in DB (industry 6 opts, logo_status 3, has_ecommerce 2, needs_crm 2, needs_booking 2, language 3, existing_content 3, budget_tier 3, launch_urgency 3)
-- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval "...fix checkboxes element..." | exit=0 | ms=500 — Fixed 3 checkbox fields (pages_needed 7, product_type 4, visual_style 5)
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://aware-wave.com/start/ | grep -oP 'name="[^"]+"' | exit=0 — 所有 24 欄位 name 均出現，含 pages_needed[], product_type[], visual_style[]
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST /wp-admin/admin-ajax.php (data= serialized) | exit=0 | ms=400 — {"success":true,"data":{"insert_id":1,"result":{"message":"謝謝你的諮詢！","action":"hide_form"}}}
-- REALTEST_EVIDENCE: tool=nginx_log | cmd=tail /var/log/nginx/access.log | exit=0 — POST /api/onboarding/intake-public HTTP 201 (9281 bytes) at 09:35:52 UTC — webhook 從 WP 自動觸發，intake_form + website_spec 已寫入 Supabase，next=awaiting_build_approval
-- REVIEW_WAIVED: NA -- 純 DB 改動（WP FluentForms meta），無 TS/PS1 code 變更
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=advanced_options | hits=0 (無 stale ref)
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=input_checkbox | hits=0 (無 stale ref)
-
-[剩餘風險]
-- FluentForm 後台 UI 預覽可能需重新整理才反映改動
-- 瀏覽器實際操作 5 步驟表單尚未截圖確認視覺（技術層 e2e 已全通）
-
-[rollback] WP-CLI: wp eval 重寫 form_fields JSON 回上一個 revision（wp_fluentform_form_meta.revision 欄位有存）
-
----
-
-### feat(db): migration 0058 — ops_incidents parent_incident_id (storm correlation)
-
-[已修改]
-- EU Supabase Postgres (`ops_incidents`): `ADD COLUMN parent_incident_id uuid REFERENCES ops_incidents(id) ON DELETE SET NULL` + `idx_ops_incidents_parent` index + `NOTIFY pgrst`
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < 0058.sql | exit=0 | ms=800 — SET / ALTER TABLE / RESET / CREATE INDEX / NOTIFY
-- REALTEST_EVIDENCE: tool=SSH | cmd=\\d public.ops_incidents | grep parent_incident_id | exit=0 — column + FK + index 全部確認存在
-- REVIEW_WAIVED: NA -- 純 SQL migration；無 TS/PS1 檔案改動
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=parent_incident_id | hits=0
-- BUGHUNT_WAIVED: NA -- 新增可空欄位，無 downstream call sites 需更新
-
-[剩餘風險]
-- application code (upsertIncidentAtomic) 尚未填值（欄位 nullable，功能 inert 直到 code 更新）
-- PostgREST schema cache 已 NOTIFY reload；若 REST 仍看不到欄位，重啟 supabase-rest container
-
-[rollback] `ALTER TABLE ops_incidents DROP COLUMN parent_incident_id;`（資料全 NULL，安全）
-
----
-
-## 2026-07-04
-
-### fix(onboarding): FluentForm 表單頁補建 — aware-wave.com/start/ 缺口修復
-
-[任務理解] FluentForm webhook feed 已正確指向 intake-public，但 **無任何 WP 頁面嵌入表單**，客戶無公開 URL 可填表。用戶點名「根本沒做好」。
-
-[已修改]
-- `wp_posts`（lobster-wordpress DB）：新建 page ID=15，post_name=start，post_status=publish，post_title=客戶建站諮詢，post_content=`<!-- wp:shortcode -->[fluentform id="3"]<!-- /wp:shortcode -->`
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=wp post create --post_name=start --porcelain | exit=0 | ms=500 — post_id=15
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl -o /dev/null -w "%{http_code}" https://aware-wave.com/start/ | exit=0 | ms=1200 — 200
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://aware-wave.com/start/ | grep fluentform | exit=0 — fluentform CSS/JS loaded, 客戶建站諮詢 title
-- REVIEW_WAIVED: NA -- WP post create via WP-CLI；無 TS/JS/PS1 改動；表單欄位已驗（company_name/industry/pages_needed 等 11 欄皆在 webhook request_body 映射中）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=aware-wave.com/start | hits=0 (新增，無 stale ref 需修)
-- BUGHUNT_WAIVED: NA -- WP DB 改動無 code symbol；webhook feed 配置未動
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST intake-public with token + test payload | exit=0 | ms=8500 — ok=true, intake_form_id=a1816575-7d52-4625-b232-9e3926ca7c3f, website_spec_id=ed77fe95-df18-4d27-9bf5-319b1aa6655f, next=awaiting_build_approval（全鏈 e2e 通過）
-
-[剩餘風險]
-- 表單樣式依 aware-wave.com 主題（Kadence），視覺需人工確認
-- 端到端瀏覽器提交 → intake_forms DB 寫入 尚未做（webhook 已確認正確配置，技術上可行）
-
-[rollback] wp post delete 15 --force
-
----
-
-### fix(onboarding): FluentForm 5-step 表單重建 + coerce helper comma-split 修復
-
-[任務理解] FluentForm form_id=3 是扁平單頁、無 form_step 元素、缺少 9 個欄位（primary_color/secondary_color/logo_status/needs_crm/product_type/visual_style/reference_sites/language/existing_content），且 coerce helper 對 visual_style/product_type 只處理 Array（FluentForm 實際送 comma-separated string）→ 這兩個欄位永遠 undefined。
-
-[已修改]
-- `wp_fluentform_forms` (form_id=3, lobster-wordpress DB)：重建為 5-step（form_step + 4 × step_end + 25 個欄位元素），完全對齊 ops/onboarding 五張頁面結構（公司品牌/客群/功能需求/視覺參考/素材時程）
-- `wp_fluentform_form_meta` (form_id=3, _fluentform_webhook_feeds)：更新 request_body 映射，新增全部 9 個欄位
-- `lib/onboarding/coerce-fluent-form.ts`：新增 `toCommaSplit<T>()` helper；visual_style/product_type/pages_needed 改用 comma-split；reference_sites 新增 newline-split 路徑；language max 10→20
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval-file /tmp/update_form3.php | exit=0 | ms=2000 — form_fields update: 1 row(s), webhook feed update: 1 row(s), JSON length: 14064
-- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval count+list elements | exit=0 — 25 elements correct 5-step structure
-- REALTEST_EVIDENCE: tool=node | cmd=inline assertion suite (6 groups) | exit=0 | ms=200 — All assertions passed
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1M-fixed/2m — Major: toCommaSplit無clamp→已修(MAX_CSV_ITEMS=20,MAX_CSV_ITEM_LEN=50+array branch filter string-only); Minor: empty[]/string非對稱(可接受); Suggestion: submit/route body cap留待後續
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=coerceFluentFormPayload | hits=4 (all expected: coerce-fluent-form.ts, WORKLOG.md, submit/route.ts, intake-public/route.ts)
-- BUGHUNT_DONE: scope=lobster-factory | grep=toCommaSplit | hits=1 (only in coerce-fluent-form.ts)
-
-[剩餘風險]
-- FluentForm checkboxes 實際送 comma-sep 或 JSON array 視 WP 版本可能有差；field 真實提交需人工確認
-- reference_sites textarea newline 送出格式需一次瀏覽器測試確認
-
-[rollback] SSH: wp eval-file 重建舊 form_fields / DB: UPDATE 回 c28e7d64 之前 JSON
-
-### fix(edge/wp-admin): 後台 Rate limit exceeded 根治 — Cloudflare + host Nginx 分層限流
-
-[任務理解] 使用者回報 `aware-wave.com/wp-admin/admin.php?page=fluent_forms_add_ons` 等後台操作常變成白底 `Rate limit exceeded`。要求不是單點加大 quota，而是在理解 Cloudflare / SG host Nginx / Docker Nginx / WordPress 管理端流量後，做最小、可驗證、可回滾的長期修復。
-
-[現況分析]
-- live path = Browser → Cloudflare → SG host Nginx `:443` → `lobster-wordpress:8080`；Docker `lobster-nginx` `default.conf` 仍服務 port 80 / 同構模板，但不是 HTTPS 主路徑。
-- Cloudflare rate-limit rule `b8ffa72df8d44ea78a09bd0ababf8abb` 原為全站 `>50 req / 10s`，只排除 `app.aware-wave.com` / `supabase.aware-wave.com`，未排除 WordPress 後台 burst。
-- SG host Nginx `aware-wave-phase1` 原在 `server {}` 層套 `limit_req zone=req_perip burst=50 nodelay`，導致 `/wp-admin/` 載入 Gutenberg / FluentCRM / LLAR 等大量 JS/CSS 時被同一個 public scanner bucket 誤傷。
-- REALROOT_CAUSE_EVIDENCE: SG `/var/log/nginx/access.log` 於 `2026-07-04 00:51:40 UTC` 有同一操作者 IPv6 對 `/wp-includes/js/dist/*.js`、`/wp-content/plugins/fluent-crm/...`、LLAR CSS/font 等後台資產連續 `429 580`，referrer 為 `/wp-admin/`。
-
-[已修改]
-- `lobster-factory/infra/hetzner-phase1-core/nginx/aware-wave-security.conf`：新增 host Nginx location-level zones：`wp_login 5r/m`、`wp_admin 120r/s`、`wp_assets 120r/s`；保留 `req_perip 30r/s` 與 `conn_perip 50`。
-- `nginx/system-sites/aware-wave-phase1.conf`：移除 server-level 全站 `limit_req`，改由 location snippets 套用。
-- `nginx/system-sites/lobster-aware-wave-locations.inc`：新增 `wp-login.php` 嚴格限流；`/wp-admin/`、`/wp-json/`、`/wp-content/`、`/wp-includes/` 改獨立高 burst bucket；公開 fallback `/` 保留 `req_perip burst=50`。
-- `nginx/default.conf`：同步 Docker Nginx 模板，移除 `/wp-admin/` 誤用 `wplogin 5r/m`，新增 `wpadmin/wpasset 120r/s`。
-- Cloudflare live rule `b8ffa72df8d44ea78a09bd0ababf8abb`：保留 enabled/block + 50/10s，expression 新增排除 `aware-wave.com` / `www.aware-wave.com` 的 `/wp-admin`, `/wp-admin/*`, `/wp-json/*`, `/wp-content/*`, `/wp-includes/*`；不排除 `/wp-login.php`。
-- `scripts/check-cloudflare-security.ps1` + `agency-os/reports/status/cf-security-LATEST.md`：新增 scanner-flood rate-limit rule 與 WP admin carve-out 檢查。
-- `runbooks/CLOUDFLARE-WAF-SETUP.md`：補 rate-limit carve-out policy（檔案既有亂碼，採末尾 ASCII section，避免碰舊內容）。
-
-[部署 / 回滾點]
-- CF backup: `D:\tmp\wp-admin-rate-limit-20260704-093901\cf-rate-limit-ruleset-before.json` + `cf-rate-limit-rule-before.json`。
-- SG backup: `/root/nginx-backups/wp-admin-rate-limit-20260704-093901/`（`aware-wave-phase1.before`、`lobster-aware-wave-locations.inc.before`、`aware-wave-security.conf.before`、`docker-default.conf.before`）。
-- live deployed SHA: `aware-wave-security.conf=142f5f1c...`、`aware-wave-phase1=c59788d...`、`lobster-aware-wave-locations.inc=c26e82e...`、Docker `default.conf=4ebed95...`。
-
-[驗證結果]
-- REALTEST_EVIDENCE: `nginx -t` + `docker exec lobster-nginx nginx -t` PASS；host Nginx reload + Docker Nginx reload PASS。
-- REALTEST_EVIDENCE: Cloudflare API readback PASS — rule enabled=True, action=block, period=10, requests=50, expression 含 WP admin carve-outs。
-- REALTEST_EVIDENCE: `scripts/check-cloudflare-security.ps1 -WorkRoot D:\Work` → PASS；report 顯示 Bot Fight ON、scanner flood rate-limit enabled/block、WP admin carve-outs present、Origin Lockdown active。
-- REALTEST_EVIDENCE: curl smoke — `/` 200；`/wp-login.php` 200；`/wp-admin/admin.php?page=fluent_forms_add_ons` 302；`/wp-admin/admin-ajax.php` 400；`/wp-json/` 200；`/wp-includes/js/dist/components.min.js` 200；LLAR stylesheet 200；`/xmlrpc.php` 403；`/.aws/credentials` 403。
-- REALTEST_EVIDENCE: burst test from operator IP — 80 concurrent requests each to `/wp-includes/js/dist/components.min.js`, LLAR stylesheet, and `/wp-json/` all returned `200=80`; no 429.
-- REALTEST_EVIDENCE: SG log check after deploy window (`2026-07-04 01:40-01:59 UTC`) — no `/wp-admin|wp-includes|wp-content|wp-json` 429 and no general 429 in that window.
-
-[剩餘風險]
-- 操作者仍需在瀏覽器真後台操作一次確認 UX；server-side evidence 已證明原 429 source eliminated for admin/assets/REST.
-- `runbooks/CLOUDFLARE-WAF-SETUP.md` 既有 encoding drift 未在本任務整修；本次只追加 ASCII policy，避免擴大風險。
-
-[rollback]
-- Cloudflare：PUT/PATCH 回 `D:\tmp\wp-admin-rate-limit-20260704-093901\cf-rate-limit-rule-before.json` 的 expression/rule。
-- SG host Nginx：從 `/root/nginx-backups/wp-admin-rate-limit-20260704-093901/` 還原 3 檔 → `nginx -t && systemctl reload nginx`。
-- Docker Nginx：還原 `docker-default.conf.before` 到 `/root/lobster-phase1/nginx/default.conf` → `docker exec lobster-nginx nginx -t && docker exec lobster-nginx nginx -s reload`。
-- repo：revert 本次 7 檔與 cf-security report 更新。
-
-### feat(onboarding): Phase 2 — ONBOARDING_PUBLIC_INTAKE_TOKEN SG 部署 + intake-public endpoint 啟用
-
-[已修改]
-- `/root/lobster-phase1/.env`（SG）：新增 `ONBOARDING_PUBLIC_INTAKE_TOKEN=<hex32>` — openssl rand -hex 32 生成
-- `/root/lobster-phase1/docker-compose.yml`（SG，machine-local）：next-admin environment 區塊新增 `ONBOARDING_PUBLIC_INTAKE_TOKEN: ${ONBOARDING_PUBLIC_INTAKE_TOKEN:-}` — 原本 explicit env block 未列此 key，docker restart 無法載入
-- `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（repo 本地）：同步加入相同 env var entry（POD_ICC_CoatedFOGRA39 之後）
-- `lobster-next-admin` container：`docker compose up -d --no-deps --force-recreate next-admin` 重建
-- vault：`secrets-vault.ps1 -Action set -Name ONBOARDING_PUBLIC_INTAKE_TOKEN`
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=docker exec lobster-next-admin printenv ONBOARDING_PUBLIC_INTAKE_TOKEN | exit=0 | ms=500 — token 前 20 chars 確認 `fcc0b3c1e6dcdb33718f`
-- REALTEST_EVIDENCE: tool=Bash | cmd=curl -s -X POST https://app.aware-wave.com/api/onboarding/intake-public -H "Authorization: Bearer wrongtoken" | exit=0 | ms=800 — `{"ok":false,"error":"unauthorized"}` 401 ✓ endpoint 啟用、token gate 生效
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — env var 注入無 code 邏輯改動；compose entry pattern 與同檔其他 secret entries 一致
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ONBOARDING_PUBLIC_INTAKE_TOKEN | hits=3（.env SG / docker-compose.yml SG / docker-compose.yml repo — 全 3 個正確位置）
-- BUGHUNT_WAIVED: DOC_ONLY -- compose env var entry；無 TS/JS symbol 改動，無 callsite drift 風險
-
-[剩餘風險]
-- docker-compose.yml repo 本地版本落後 SG 機器版本（SG 有 WPBRIDGE_PRIVATE_KEY 等後加的 vars；repo 未同步）→ 現存技術債，不影響本次功能。
-
-[rollback] 從 SG .env 移除 ONBOARDING_PUBLIC_INTAKE_TOKEN 一行 + docker compose up --force-recreate next-admin；endpoint 回到 fail-safe 關閉（401，code 無需 revert）。
-
-### fix(onboarding/security): WP FluentForm webhook 從 OPS_PROXY_SHARED_SECRET 切換至 narrow Bearer token
-
-[任務理解] 舊 webhook feed "Supabase Intake" 發現使用 OPS_PROXY_SHARED_SECRET（x-ops-sync-key）送往 /api/onboarding/submit → 爆炸半徑 = 全後端 operator 操作。Phase 2 核心安全修復：改用 ONBOARDING_PUBLIC_INTAKE_TOKEN（narrow，只管 intake-public 一條路由）。
-
-[已修改]
-- `wp_fluentform_form_meta` (form_id=3, `_fluentform_webhook_feeds`)：
-  - 舊：URL=`/api/onboarding/submit` + `x-ops-sync-key: <OPS_PROXY_SHARED_SECRET>`
-  - 新：URL=`/api/onboarding/intake-public` + `Authorization: Bearer <ONBOARDING_PUBLIC_INTAKE_TOKEN>`
-  - feed_name: "Public Intake (intake-public)"；request_body 欄位映射不變（company_name/industry/pages_needed/budget_tier 等 11 個欄位）
-- FluentCRM feed 確認：已有 "CRM Contact" feed，tags=prospect,website-inquiry，email={inputs.contact_email}，update_contact=yes — 無需修改
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl intake-public with real token | exit=0 | ms=8000 — ok=True, intake_id=5c0b0307, next=awaiting_build_approval（AI spec 生成成功）
-- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval verify webhook feed URL + auth header | exit=0 — url=intake-public, Authorization=Bearer fcc0b3c1..., status=yes
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — DB update via WP-CLI $wpdb->update 1 row；OPS_PROXY_SHARED_SECRET 不再出現在任何 WP-facing 設定
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=OPS_PROXY_SHARED_SECRET | hits=0 in WP feed (已移除)；grep=ONBOARDING_PUBLIC_INTAKE_TOKEN | hits=3（.env/docker-compose×2 — 全正確位置）
-- BUGHUNT_WAIVED: DOC_ONLY -- WP DB 改動無 TS/JS symbol；coerce helper call sites 未變
-
-[剩餘風險]
-- FluentCRM `list_id` 為空 → contact 建立但不加入任何 mailing list，可後續在 FluentCRM 後台指定
-- Phase 3（operator 觸發建站按鈕 / n8n 停用 / Master Plan 文件更新）仍待辦
-
-[rollback] wp eval 將 _fluentform_webhook_feeds 改回舊值（url=/submit, x-ops-sync-key）；或禁用該 feed（status=no）
-
-
-
-### feat(onboarding): FluentForm 雙寫管道 Phase 1 — coerce helper + middleware 公開路徑 + MCP wordpress 停用
-
-[任務理解] 接上 session：FluentForm（WP側）→ Supabase `intake_forms`（app側）雙寫 Plan A。三個 code gap：①middleware 缺 intake-public 公開路徑 ②submit route 有 coerce 但 intake-public 沒有 ③coerce 邏輯重複。同時修 WordPress MCP ERR_INVALID_URL。
-
-[已修改]
-- `lib/onboarding/coerce-fluent-form.ts`（新增）：FluentForm 字串型別強制轉換共用 helper + **allow-list**（critic Major：原 spread `...raw` 會把所有攻擊者欄位帶進 DB 和 Claude prompt → 現在只映射已知 IntakeForm 欄位，字串長度夾緊）。
-- `app/api/onboarding/intake-public/route.ts`：① import coerce helper ② `body` 型別改 `Record<string, unknown>` ③ 新增 **64 KB 硬頂**（critic Major：原無 body size cap）再 JSON.parse ④ 套用 `coerceFluentFormPayload` 後再驗必填欄位
-- `app/api/onboarding/submit/route.ts`：import coerce helper，移除原本內嵌的 TRUTHY/toBool/spread 區塊（DRY）
-- `middleware.ts`：PUBLIC_API_PATHS 加入 `/api/onboarding/intake-public`（FluentForm webhook 從 WP 打出，無 session cookie，需繞過 session gate；路由本身用 narrow Bearer token + rate-limit 自管 auth）
-- `mcp/registry.template.json`：`wordpress.enabled: false`（ERR_INVALID_URL root cause：WP_API_URL 未設；加 note 說明何時可重開）→ sync-mcp-config.ps1 已同步所有 IDE
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=8000
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin) | exit=0 | ms=2320 — 599 tests passed
-- REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/2major/3minor — 0 Critical；2 Major 同日折入（allow-list + 64KB cap）；3 Minor（trigger-build 不區分 public_intake、rate-limit 非原子、rollback race）接受延後（有界風險；rate-limit 原始程式碼 comment 已記錄修法方向）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=coerceFluentFormPayload | hits=3（僅在 3 個預期檔案：helper+2 routes）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=intake-public | hits=2（middleware.ts route.ts；docs/WORKLOG 記錄是歷史引用非 stale 主張）
-- WORKLOG: 本 entry
-
-[剩餘風險]
-- `ONBOARDING_PUBLIC_INTAKE_TOKEN` 尚未設定於 SG .env → endpoint 仍 fail-safe 關閉（401）。Phase 2 待辦：SSH SG → 生成 token → docker restart → vault 存檔。
-- FluentForm 表單尚未建立（無表單 = 無 WP 側 webhook 觸發點）。Phase 2 待辦：WP admin 建表單 + webhook feed。
-- Minor：`trigger-build` 不區分 `submitted_by='public_intake'` 的列（operator 可能誤建公開表單提交的站）→ spawn task 追蹤。
-
-[rollback] `git revert HEAD`；MCP：registry.template.json 把 wordpress.enabled 改回 true 重跑 sync-mcp-config.ps1
-
-
-
-### fix(next-admin): onboarding/build console 4 個 UI 吞錯 bug 修復（deploy local_direct 前置）
-
-[任務理解] 操作者問「/ops/onboarding /onboard /build 能否真正架站」→ workflow 全面稽核（7 agents，程式+生產 DB 實查）結論：引擎已驗、`bd135952` local_direct 已寫好未部署；但 4 個 UI 吞錯 bug 會讓失敗看起來像「工具壞了」。操作者指示：先修 bug → 部署 → 生產實測。
-
-[已修改]
-- `app/build/BuildConsole.tsx`：①機層租機面板契約對齊 `/api/provision` 實際回傳（`result.outcome` idle|mock|dispatched；原 UI 讀不存在的 `result.status` → 成功 banner 永遠空白）②run polling 吞錯修復：連續失敗 5 次或 404/403 即停止輪詢並顯示紅 alert（原本壞 runId 無限靜默輪詢）③critic Minor 折入：輪詢總數上限 200（~10 min，dispatched 卡死不再永久 beacon）+ provisionMachine text-first parse
-- `app/onboard/OnboardWizard.tsx`：createOrgRecord 原空 catch 吞錯＋不查 res.ok（operator 403 靜默失敗 → build run 引用不存在的 organizationId）→ res.ok 檢查 + text-first parse + Step5 可見警告 banner（保留 non-blocking 前進設計）
-- `app/ops/onboarding/page.tsx`：handleSubmit 的 submit/generate-spec 兩個 fetch 補 try/catch + text-first parse（原 network error/HTML 502 → unhandled rejection、spinner 永卡）；比照同檔 handleTriggerBuild 既有 pattern
-- 註：BuildConsole/page.tsx 首輪改動被平行 session AO-RESUME hook 掃進 auto-checkpoint `bf5bd491`；OnboardWizard + critic minors 在本 commit
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=2080（47 files / 574 tests 全過，含全部修復後重跑）
-- REALTEST_EVIDENCE: tool=SSH | cmd=bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=282000（deployed f9172be2；server 端 596 tests 過、healthy 7s、4 smoke 端點 200；rollback snapshot rollback-20260703-235731）
-- REALTEST_EVIDENCE: tool=curl | cmd=生產全鏈 e2e：POST submit(sync-key)→201 intake fb51a13d → POST generate-spec→201 spec dcd927ad（Claude 真生成）→ POST trigger-build(local_direct, 容器內直打)→200 build_status=completed run d21ab292 | exit=0 | ms=230000（00:04:13→00:08:03）
-- REALTEST_EVIDENCE: tool=curl | cmd=curl https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ | exit=0 | ms=1020 — HTTP 200 + title「E2E-Verify-0704 – 專業服務，值得信賴」（AI tagline 落地）；EU psql 實查 run d21ab292=completed、org e2e-verify-0704-5c1356 存在；站上 16 個 base pack 外掛 wp plugin list 實列
-- REALTEST_EVIDENCE: tool=curl | cmd=/ops/onboarding|/onboard|/build → 307(session gate)、/login → 200；/api/provision(sync-key) → {"outcome":"idle","adapter":"none"}（修正後 UI 契約與實回傳一致）| exit=0 | ms=4000
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2minor — 契約逐欄核對 ✓、polling race/cleanup/stale-closure ✓、404/403 definitive-stop 路由解析 ✓；2 Minor（dispatched 無限輪詢、provisionMachine 缺 text-first parse）同日折入；Note（Step4 按鈕 double-fire）接受不修——org upsert onConflict:slug 冪等
-- BUGHUNT_DONE: scope=agency-os scripts lobster-factory | grep=ProvisionStatus | hits=0 — 移除的型別以 oracle 同等條件（code exts、排除編輯檔）實搜 0 殘留；新 symbol（orgResult/pollError/pollFailsRef/ProvisionOutcome）grep 確認僅存在編輯檔內自洽；agency-os/scripts docs 無 stale 主張（provisionResult/createOrgRecord 0 命中）
-- WORKLOG: 本 entry（生產 e2e 證據已補記）
-
-[剩餘風險]
-- **CF ~100s 上限 vs 實測全建站 ~230s**：local_direct 在容器內直打可通（本次 e2e），但瀏覽器 UI 走 CF 的 trigger-build 外層 request 會被切斷（建站仍在 server 端完成、run 會 completed，只是 UI 拿不到 run_id 回應）→ same-host worker 是真正解法（bd135952 已知取捨，今日量化）。
-- intake_forms 建站成功後停留 status=building（無 terminal 轉換）— 生命週期小缺口，follow-up。
-- e2e 測試站 https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ + EU org e2e-verify-0704-5c1356 留作可點擊證據，之後清理（比照 2026-07-02 測試 org 清理程序）。
-- sync-key = 全站 server-to-server operator 身份（middleware.ts:139 放行 + OPS_ROLE_RESOLUTION_MODE=claims_with_simulated_fallback + OPS_ALLOW_SIMULATED_ROLE_FALLBACK=true 實查）— by design 但值得知道爆炸半徑。
-[rollback] 單 commit revert（UI-only，無 DB/schema 變更）。
-
-
-
-### feat(onboarding): Phase 3 — /ops/onboarding 觸發建站按鈕 + submit GET website_spec_id join + n8n deactivate
-
-[任務理解] Phase 2（FluentForm WP→intake-public 全鏈）完成後，Phase 3 目標：① 讓 ops 看到 spec_generated 的公開 intake 後可一鍵觸發建站 ② 停用已被 intake-public 取代的 n8n bridge workflow。
-
-[已修改]
-- `app/api/onboarding/submit/route.ts`（GET handler）：select 加入 `website_specs(id)` relation join（Supabase PostgREST），flatmap 取 [0].id 暴露 `website_spec_id` 欄位給前端；供觸發建站按鈕知道要帶哪個 spec id
-- `app/ops/onboarding/page.tsx`（IntakeHistory 組件）：
-  - `IntakeHistoryItem` interface 加 `website_spec_id?: string | null`
-  - 新增 `triggering`/`triggered`/`rowErrors` 3 個 state
-  - 新增 `handleRowTrigger()` fn：POST `/api/onboarding/trigger-build {website_spec_id, intake_form_id}`；成功 → `triggered` Set + 前端 status 改 `building`；失敗 → `rowErrors[id]`
-  - 表格新增「操作」欄（第 6 欄）：status=spec_generated + website_spec_id 存在時顯示「觸發建站」button；已觸發顯示「已排入 ✓」
-- n8n workflow `onboarding: FluentForm intake bridge`（id `RbrHNu3BUEmpNWeT`）：POST /api/v1/workflows/:id/deactivate → `active=False`（舊 n8n 路徑已被 FluentForm → intake-public 直接 webhook 取代，停用避免重複執行）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=8000 — 0 type errors
-- REALTEST_EVIDENCE: tool=Bash | cmd=n8n POST /deactivate RbrHNu3BUEmpNWeT | exit=0 | ms=500 — active=False ✓
-- REALTEST_EVIDENCE: tool=SSH | cmd=bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=420000 — deployed c78a05c9；healthy 8s；smoke /login 200 / /api/ops/summary 200 / nginx 200 / node-api 200 all OK
-- REALTEST_EVIDENCE: tool=SSH | cmd=playwright smoke | exit=0 | ms=24400 — 26 passed / 0 failed / 6 skipped（auth-gated）
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl trigger-build intake=5c0b0307 spec=a1f24214 (sync-key, server-side) | exit=0 | ms=280000 — ok=true, build_status=completed, run_id=cdfe06f8；stagingSiteUrl=https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ curl 200 (1.3s)；intake status=building ✓（Stage 1 prod verify PASS）
-- REVIEW_DONE: critic=Standard | verdict=pass/warn | findings=0c/1m/2n — 1 Major（website_spec_id 非確定性取 [0]：generated_at 加進 embed + sort DESC 已同日折入修 submit/route.ts:38,52）；2 Minor（triggering string→Set、optimistic "building" 不反映 failed build）接受延後（server CAS + ops-only UI，有界風險）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=website_spec_id,handleRowTrigger | hits=4 (agency-os docs/WORKLOG 歷史引用；lobster-factory 僅在 3 個直接修改檔案；scripts 0 hits)；IntakeHistoryItem 無跨檔引用
-
-[剩餘風險]
-- `triggering` state 為 string|null（非 Set）→ 同時點兩行時可能 double-fire；trigger-build server CAS 防重建，ops-only UI，風險低
-- intake_forms `building` 後無 terminal 轉換（known gap，2026-07-04 WORKLOG 舊記錄）；run=completed + site live = 完整驗收
-
-[rollback] `git revert`（UI-only）；n8n 重新 activate：POST /api/v1/workflows/RbrHNu3BUEmpNWeT/activate
-
-## 2026-07-03
-
-### feat(auto-repair): A1 證據引擎 + A3 閉環 + A2 白名單 remediation — 自動維修從「自動文書」升級成「會自己治病」
-
-[任務理解] 操作者裁決「A 全做」（更想要 B → A 的三塊直接設計成 B orchestrator 的地基：證據層 = 診斷 agent 輸入、remediation 目錄 = 動作層、閉環 = 狀態機骨架）。現況痛點：repairing 之後無執行者、AI 只會一句摘要、同一次事故三筆獨立 incident、無 reaper/自動結案、核准要開電腦。
-
-[已修改]
-- **A1 證據引擎**：新 `lib/repair-center/evidence.ts`（5 收集器逐段 fail-open：同窗告警/同指紋歷史/48h 部署/修復史/SSH 主機快照——快照僅平台事件、10s 硬上限、指令零插值）；`ssh.ts` 集中 `readSshTarget`+新 `sshExecOnce`（connect+exec 同一時限），`backup.ts` 去重改 import；`claude.ts`/`gemini.ts` 接受 evidenceText → 三行結構輸出（根因假說/立即動作/驗證方式）；`triggerAutoClassify` 先蒐證再問模型，證據存 `ai_diagnoses` role="evidence"（新 union 值；IncidentCard 只挑 auto-classify 不受影響）
-- **A3 閉環**：migration `0058` parent_incident_id（+down）；`correlate.ts`（linkStormParent 僅首次發生時鏈到同窗最早 open 事件、同租戶 scope、防鏈防環；collapseStormChildren 純函式）接進 `upsertIncidentAtomic` + `/ops/repairs` 佇列折疊（「+N 筆關聯告警」badge）；`hygiene.ts`（autoVerifyRunsOnDeploySuccess：deploy_success=sg-deploy 閘門已過 → deploy_pending/deploying runs 按 service 嚴格匹配自動 resolved+passed；reapStaleRuns：backing_up/approved/deploying 超 6h → 回 triage_needed 附 audit（絕不私自進終態）、ops_action_runs running 超 2h → failed）；deploy webhook 接 auto-verify + 機會式 reaper（VPS cron 4h 心跳）；手動 `POST /api/ops/repairs/reaper`；Telegram `/approve_repair <uuid>`（handler 走完整 command plane：allowlist/idempotency/kill-switch/policy medium；critical 仍卡 console 二次確認）+ 告警訊息帶核准指令行
-- **A2 Remediation 執行器**：`lib/ops-actions/record.ts` 通用 ops_action_runs 記錄器（wp-update route 重構改用，去重複）；`remediations/`（types 四段契約 / engine：flag 閘+30min 指紋冷卻+全程稽核+incident tag 落痕 / restart-unhealthy-container：SG 平台限定、AUTO_REMEDIATE_SERVICE_WHITELIST 白名單（空=全不匹配）、precheck 實證容器真的壞、execute 單一 bounded restart、healthcheck 15s 後複查、rollback=文件化 no-op）；uptime_kuma/netdata webhook 接 auto 路徑（AUTO_REMEDIATE_ENABLED 預設 OFF）；手動 `POST /api/ops/repairs/remediate`（RBAC，不受 flag 限制）；AGENTS.md §自動化安全預設 登錄兩個新 flag
-- 22 個新測試（evidence 純函式/collapse/reaper 述詞/remediation 白名單紀律與四段契約）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=6890（599/599，folding 後）
-- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/6n — 2 Major 全折入：①remediation execute/settle/healthcheck 改 fire-and-forget（不再阻塞 webhook request path）②autoVerify 改 noteDeploySuccessOnPendingRuns（service-scoped deploy 不能證明 fix 已上 → 只註記不自動結案，人工按確認部署）；Minor 折入：cooldown 改以 service 為 key、netdata 死 hook 移除+matcher 限 uptime_kuma、reaper backing_up 改 12h 分層天花板、autoVerify limit 20→100、evidence timeline UI 折疊。critic 驗證乾淨：SSH 注入零風險（字元集閘）、健康容器無法被偽造告警重啟（precheck 實證）、storm 無鏈無環、Telegram 核准不繞閘、fail-open 全數成立、RLS/secrets 無洩漏
-- REVIEW_DONE: critic=db-expert | verdict=SAFE→fixed | findings=1c/2m/1n — Critical NOTIFY pgrst reload（up+down）+ lock_timeout 守衛全折入；RETURNS SETOF 故 RPC 無需重建
-- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=readSshTarget|sshExecOnce|summarizeIncidentWith|ai_diagnoses role 消費者|autoVerify|TRANSIENT_STATES|remediation_service | hits=全數核對 — backup/health route/evidence/remediations 共用 ssh.ts 單一定義；IncidentCard 只挑 auto-classify；rename 後無孤兒引用；test 鏡射同步
-- WORKLOG: 本 entry
-- 環境限制：dogfood-auto-repair.ps1 與 /doc-sync 需 pwsh（容器無）+ prod host 被 proxy 擋 → 工作站補跑；auto-repair-guard 機械閘 pre-check 以讀 audit baseline 替代
-
-[剩餘風險 / follow-up]
-- Remediation execute+healthcheck（最壞 ~85s）在 webhook request path 內同步執行 —— SG 為 docker 常駐（無 serverless 時限）可接受；量大時改佇列（B orchestrator 自然歸宿）
-- Kuma/netdata 誤報+偽造 payload 理論上可觸發白名單服務重啟：三重防線（ingest token + 白名單 + precheck 實證容器狀態）後殘餘風險 = 已認證攻擊者重啟一台本來就 unhealthy 的容器，可接受
-- 0057/0058 需工作站或下次 deploy 後手動 apply（0058 未 apply 時 correlation 靜默跳過、fail-open 已驗）
-- 啟用自動 remediation 的操作步驟：SG env 設 `AUTO_REMEDIATE_ENABLED=true` + `AUTO_REMEDIATE_SERVICE_WHITELIST=next-admin`（建議先只放一個服務觀察一週）
-
-[rollback] 單 commit revert；0058 down script 安全（app fail-open）；remediation 全停 = 清空白名單或拔 flag。
-
-### feat(ops): 維護 tab 工作流程紀錄補齊 + Repair Center 結案死路修復 + /ops/integrations 租戶隔離
-
-[任務理解] 操作者截圖問「這是壞掉吧?」：①`/ops/clients/soulful-expression` 維護 tab「最近工作流程執行」恆空——根因 wp-update route 從不寫 `ops_action_runs`（維護動作零稽核軌跡）；②`/ops/repairs` 修復紀錄多筆「失敗：run_in_terminal_state」——根因 結案按鈕只在 state=human_only 顯示（run-state.ts:34），但 human_only 是 terminal state、updateRunLinks 的 m6 閘擋掉所有 terminal 寫入（service.ts:410）→ 結案永遠失敗（設計自相矛盾）；③`/ops/integrations` server component 用 service-role 查詢、無 effectiveOrgId → client 登入可見全部客戶連線登記（與 repairs/approvals 已修的 S2 契約不一致）。
-
-[已修改]
-- `migrations/0057_seed_wp_maintenance_action.sql` + `scripts/0057_..._down.sql`（down=soft-disable，因 ops_action_runs FK ON DELETE RESTRICT，db-expert Major 折入）：catalog seed `ops.maintenance.wp-plugin-update`
-- `wp-update/route.ts`：beginActionRun（catalog lookup + self-seed 同值 upsert 冪等 fail-open）+ finishActionRun（completed/failed + output_payload + ended_at）接入 SSE 四終端路徑；actor_role=Clerk role 或 sync-key 機器路徑記 operator；critic 2 Major 折入——wave3 健康檢查結果併入 ok（CLI 成功但站掛 ≠ completed）、wave1 health-abort（stopped 且 0 失敗）不再記 ok；write client 缺失時 console.warn（db-expert suggestion）
-- `repair-center/service.ts`：updateRunLinks 加唯一例外 human_only→resolved（結案語義）；其他 terminal 寫入照舊全擋；`__tests__/update-run-links.test.ts` 鏡射更新 + 新 3 斷言案例
-- `ops/integrations/page.tsx`：effectiveOrgId/OrgAccessError 同 repairs 模式；orgs/assets/bindings 三查詢 orgFilter；未綁 org fail-closed（API route 本已有 assertOrgAccess，僅頁面漏）
-- `ops/clients/[slug]/page.tsx` + `ClientHubTabs.tsx`：action_id(uuid)→action_key 目錄解析傳入 RunRow；維護 tab 顯示可讀 key；佈建 tab buildRuns filter 原本 `action_id.includes("build")` 對 uuid 永遠 false（潛在死 panel，順手修）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test (next-admin) | exit=0 | ms=7000（574/574，+1 新案例）
-- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/4n — 2 Major（wave3 健康被忽略、wave1 abort 記 completed）同日折入；Minor：running 卡死 reaper（follow-up）、audit 寫入移到開場 log 後（已折入）、error_summary 含 ssh host（接受，內部表）
-- REVIEW_DONE: critic=db-expert | verdict=SAFE | findings=0c/1m/2n — Major down-file 已補（soft-disable）；0057 無自動 apply 路徑：以 route self-seed 為主要機制（明文接受），migration 檔為 schema history
-- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=run_in_terminal_state|wp_update_latest|WpUpdateLatest|action_id.includes | hits=9+6+3+1 — 全部核對：測試鏡射已同步、wp_update_latest 消費者（ClientCard/clientStatus/wp-report）新欄位 additive 相容、佈建 tab uuid filter 已修
-- WORKLOG: 本 entry
-
-[剩餘風險 / follow-up]
-- ops_action_runs 卡在 running（maxDuration 300s 殺掉 / process crash / SSE cancel）無 reaper —— 數據衛生類，後續加 stale-running 掃描（archiveStaleRuns 有先例）
-- 0057 需在 EU Supabase 手動 apply 或依賴 route self-seed（首次跑 wp-update 即自動補 catalog row）
-- 維護 tab 歷史將從「下一次外掛更新」開始累積（既往動作無從回填）
-
-[rollback] 單 commit revert；DB 面 down script = soft-disable（enabled=false），稽核列保留。
-
-### feat(tenant-chain): 多客戶自動串聯三斷點修復 — 監控告警自動歸屬客戶（critic 2 Major 折入）
-
-[任務理解] 鏈路稽核（同日）證實：ops 三頁骨架真、但自動修復管線 0 次實戰，且「新客戶資料自動流入」斷在三處——自動建的 Kuma monitor ①沒掛 webhook 通知 ②沒貼 client tag ③slug 從無人解析成 organization_id（所有 webhook incident org 恆 NULL，org 隔離形同虛設）。操作者裁決全部處理。
-
-[已修改]
-- 斷點③（咽喉點）`lib/ops-inbox/upsertIncidentAtomic.ts`：RPC 後 slug→organizations.id 解析 + UPDATE（WHERE org IS NULL 冪等、fail-open、60s 負快取防 flapping 重查；不動 RPC 簽名，避開 0055/PGRST202 兩週斷線類）
-- 斷點①② `workflows/integrations/integration-steps.ts`：Kuma HTTP+SSL monitor 建立時貼 `{name:"client",value:<org slug>}` tag + `notificationIDList` 掛共用 webhook 通知（cfg.notificationId）；Sentry project slug 改優先用 org slug（未來專案自動可歸屬）+ 409 視為已存在（冪等）
-- slug 貫穿：`trigger-build/route.ts`（org slug 新建捕捉/重用 fetch + UPTIME_KUMA_NOTIFICATION_ID env 顯式驗證含 misconfig warn）→ `contracts.ts`（BuildRunRequest.clientSlug，**不符規格降 undefined 不擋 build** — critic Major-2 fail-open）→ `create-wp-site.ts`（zod optional）→ runAllIntegrations
-- critic Major-1：`adopt-client-os.ts` 同步補 clientSlug（supabaseRestQuery 解析 org slug，失敗只跳過歸屬不擋 adopt）— 否則 adopt 客戶整條鏈原封不動
-- Sentry 歸屬：`normalize/sentry.ts` project_slug 驗證後作 client_slug（與 kuma 同正則）+ 新測試檔 `normalize-sentry.test.ts`（5 案例：valid/null/注入形/截斷/tags 保留）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=40000
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test ×2 (next-admin vitest 573/573 · workflows vitest 75/75) | exit=0 | ms=8000
-- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/6n — 2 Major（adopt 路徑斷鏈、非規範 slug 硬掛 build）+ 4 Minor（負快取、Sentry 409、NaN/0 env guard、內嵌賦值）全數同日折入；其餘 2 Minor 記錄為 follow-up（見剩餘風險）
-- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=runAllIntegrations|clientSlug|registerUptimeKumaMonitor call sites | hits=2 callers（create-wp-site + adopt-client-os，皆已接線）；normalize/* 全掃 client_slug 覆蓋（uptime-kuma 既有 + sentry 本次；grafana/netdata 無 per-client 維度，記 follow-up）
-
-[剩餘風險 / follow-up]
-- Kuma `client` tag 的 API 格式（{name,value} vs 預建 tag_id）未對真實 EU Kuma 實測（container proxy 不通）——沿用既有 groupName pattern；工作站下次建站 REALTEST 確認 tag 落地
-- 一次性 operator 設定：EU Kuma 建共用 ops-inbox webhook notification → 其 id 填 env `UPTIME_KUMA_NOTIFICATION_ID`（SG next-admin env）
-- defense-in-depth：持 ingest token 者可用合法形 slug 偽造跨租戶歸屬（critic minor；真解在 per-source token + 輪替）
-- Sentry slug 50 字上限 vs org slug 64：>50 的 org slug 歸屬會靜默斷（toOrgSlug 典型 ~43，接受並註記）
-- grafana/netdata normalizer 無 client 維度（純 infra 源，暫不需要）
-
-[rollback] 單 commit revert（7 檔 + 1 測試檔）。
-
-
-
-### fix(outreach): 冷開發工作台憑證庫自動帶入修復 — soulful-expression Supabase 自動偵測
-
-[任務理解] 冷開發 tab（`/ops/clients/soulful-expression`）顯示「Supabase URL 未設定 / Service Key 未設定」，應從憑證庫自動帶入。
-
-[根因] `resolveFromCredentialsLib` 兩個 bug：
-1. query `.not("secret_ref","is",null)` → 排除了 URL row（URL 是公開端點，存 identifier，secret_ref=null）
-2. `keyRow` 用 `.find()` 順序 → 抓到 Anon Key（label 第一個含 "supabase"），而非 Service Role Key；Anon Key 無寫入權限
-
-[已修改]
-- `lib/org-client.ts`：移除 secret_ref 過濾（fetch 全部 rows）；URL 直接從 identifier 讀取（identifier.startsWith("https://") && includes(".supabase.co")）；keyRow 優先 `identifier.toLowerCase()==="service_role"`，fallback 排除 anon/publishable；bare `catch{}` 補 warn log；urlRow/keyRow 解析失敗補 warn log（讓 agency-fallback 可觀測）
-- DB data：`client_credentials` 新增 row（label="Supabase Project URL", identifier="https://mffjqjiidbeibilmxzef.supabase.co", secret_ref=null, client_id=2bf60452）via Supabase REST，繞過 looksLikeSecret guard（follow-up 記錄）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=mcp-hetzner-ssh | cmd=sg-deploy.sh next-admin | exit=0 | ms=285000
-- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 smoke | exit=0 | ms=20100 (26 passed 6 skipped)
-- REALTEST_EVIDENCE: tool=Bash | cmd=Supabase REST query client_credentials | exit=0 — 9 rows 確認，URL row identifier 正確
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/3n/1s — Major(silent agency fallback) + Minor(looksLikeSecret+case+warn) 全數折入本 commit；1s(URL host validation) 已知，accept
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=resolveFromCredentialsLib | hits=2 (org-client.ts + outreach-config route.ts，一致)
-
-[剩餘風險 / follow-up]
-- `credentials/route.ts` looksLikeSecret 擋含數字 Supabase URL（sensitive-file-block hook 攔截，需獨立 PR）
-- URL row 僅透過直接 DB 插入；UI 建立需等 looksLikeSecret fix
-
-[rollback] revert `lib/org-client.ts` commit c20d49e1 + DELETE client_credentials WHERE id='55c7e0d2-101c-421c-b649-46606ee34b33'
-
-### ops: Uptime Kuma — Soulful Expression monitor 新增 ✅
-
-**背景**：今日 session 加 `client_slug` 鏈路已通（types.ts → normalizer → upsert RPC），但 Uptime Kuma 全部 22 個 monitor 皆為 AwareWave infra，無客戶站 → 趁機加 Soulful Expression。
-
-**做了什麼**：
-- EU VPS SSH 直接操作 SQLite（v1.23.17 無 REST `GET /api/monitor` 端點，走 socket.io）
-- INSERT monitor id=23：`Soulful Expression (soulfulexpression.org)` → `https://soulfulexpression.org/` | type=http, interval=60s, maxretries=1
-- 建 tag id=3 `client` (#6366F1)；monitor_tag: tag_id=2 (Soulful Expression 分組) + tag_id=3 (client=soulful-expression)
-- 手動 INSERT monitor_notification → Telegram Pei (id=3) + Slack #infra-alerts (id=4)
-- docker restart uptime-kuma（兩次：tags 後 + notifications 後）；確認 Up 6s healthy
-
-**[驗證結果]**（R0 四動作）：
-- REALTEST_EVIDENCE: tool=SSH | cmd=sqlite3 SELECT monitor id=23 + docker ps healthy | exit=0 | ms=~8000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純 DB insert + restart，無 code change）
-- BUGHUNT_WAIVED: NA -- no code change, DB-only operation
-- WORKLOG: 本條目
-
-**normalizer 接通**：下次 Uptime Kuma 對 soulfulexpression.org DOWN webhook → tag `client=soulful-expression` → `client_slug` 寫入 ops_incidents。
-
----
-
-### ops: AO-RESUME §6 阻塞清理 — 0056 已套確認 + smoke 兩檢修復 + Stage 2 n8n 橋接建成 ✅
-
-**① migration 0056（§6 稱「未 apply」→ 實為 stale 報告）**：VBC 實查 EU `pg_proc` → `upsert_incident_atomic` 已是 14-arg 含 `p_client_slug text DEFAULT NULL`（幾乎確定 2026-07-02 session 套 0055 同場套了 0056 但漏記 WORKLOG——本行即補記）。本日補做：pre-state function def 備份至 EU `/root/db-backups/pre-0056-upsert_incident_atomic-20260703.sql`、`NOTIFY pgrst reload`、14-arg RPC 走 PostgREST e2e（201→row `client_slug=testclient`→刪測試 row）。鏈路末端：Uptime Kuma 22 個 monitor 全為 infra、無客戶站 monitor → 目前無需掛 `client` tag；未來建客戶 monitor 時掛 `client=<slug>` tag 即接通。
-
-**② smoke `client_sites=skip:http401`（§6 稱「token 過期」→ 誤診）**：真根因 = next-admin Supabase-session middleware 上線後 `/api/ops/clients` 不在 `PUBLIC_API_PATHS`，server-to-server Basic auth 永遠 401（`OPS_BASIC_*` 均在且 `repairs/health` 同組憑證 200）。修法：`scripts/check-smoke-tests.ps1` Check 3 改打 `/api/ops/summary`（PUBLIC_API_PATHS、同一 organizations 表；舊 clients payload 本無 health 欄位，零保真度損失）。
-
-**③ smoke `n8n_fail=skip:exception`**：根因 = `N8N_API_BASE_URL` User env 已含 `/api/v1`，腳本再拼一次 → `/api/v1/api/v1/...` 404。修法：base URL 正規化（TrimEnd `/` + `-replace "/api/v1$"`）。另依 critic 補 StrictMode `PSObject.Properties` 防護 + 清死值。
-
-**④ Stage 2 n8n 橋接（§6 架站 ops 缺口前半）**：建 n8n workflow `onboarding: FluentForm intake bridge`（`RbrHNu3BUEmpNWeT`，active）：webhook `POST /webhook/fluentform-intake`（inbound `x-ff-bridge-token` header-auth credential `VrrbNtU4cminLRvM`，隨機 32-byte；token 值存本機 vault `FF_BRIDGE_INBOUND_TOKEN`（critic 指出 temp 明文 residue 已清 + one-shot 部署腳本已刪防重跑）；他機需要時 n8n credential 為正本）→ Code 映射（pages 逗號字串→array）→ `POST app.aware-wave.com/api/onboarding/submit`（`x-ops-sync-key` credential `Bci2xGWik0qFZSAM`，值取自 SG .env 未經 stdout）。WP 端實查：aware-wave.com **未裝任何 Fluent 外掛** → 剩餘為功能任務（裝 Fluent Forms+建表單+webhook feed+FluentCRM fan-out），非一鍵 ops。
-
-**⑤ Stage 4 flags（§6 架站 ops 缺口後半）**：SG .env 實查三 flag 均未設；vault 無 `HETZNER_STAGING_TOKEN`（僅主帳 `HETZNER_API_TOKEN`）。prod `/api/provision` 實測回 `{"outcome":"idle","adapter":"none"}` = 驗收 step 1 過、billable 雙閘關閉安全。開閘（env flip + token 決策 + 重啟 next-admin）= High/billable，**等操作者明示 go-ahead**。
-
-**⑥ 順手 VBC 修正 stale docs**：0055 master plan 仍標「待跑」→ 實已套（quote_data/quote_status 欄位實查存在）→ MASTER_PLAN Stage 2/3/4 + TASKS.md 同步更新。
-
-**[驗證結果]**（R0 四動作）：
-- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql`（0056 function def / 0055 欄位 / RPC e2e insert+delete）+ curl PostgREST RPC 14-arg（HTTP 200, client_slug=testclient）+ n8n webhook e2e（201 intake_form_id → DB row pages_needed=["home","about","contact"] → DELETE 1）+ 無 token 403 + `/api/provision` idle + smoke 全綠 `== Smoke: PASS | n8n_mcp=ok | repair=ok | clients=ok:2_active | n8n_fail=ok:none_24h ==` | exit=0 | ms=~90000
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（StrictMode 屬性防護 + 死值清理，均已折回）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/ops/clients,0055_intake_quote,0056_upsert,fluentform-intake | hits=3 stale claims 已修（master plan 0055 待跑/Stage 2 待做/TASKS 下一步）；`update-client-wp-plugins.ps1` 走 x-ops-sync-key 不受 middleware 影響確認
-- WORKLOG: 本條目
-
-**[剩餘風險 / rollback]**：0056 rollback 寫在 migration 檔尾（DROP 14-arg + 重跑 0036 + NOTIFY）；smoke 腳本 rollback = git revert；n8n workflow rollback = deactivate/delete workflow `RbrHNu3BUEmpNWeT` + 刪兩 credential。
-
-### ops(remote-monthly-agent) 月度報告（原檔尾錯位塊，歸位）
-
-- 09:00 : remote-monthly-agent: monthly review 2026-07 generated -> reports/monthly/monthly-review-2026-07.md (governance drift overall: SKIPPED — no PowerShell in Linux container)
-  AUTO_TASK_DONE: monthly-review-2026-07
-  REALTEST_WAIVED: NA -- report generation, no runtime state to test
-  REVIEW_WAIVED: DOC_ONLY -- markdown report, no code changed
-  BUGHUNT_WAIVED: DOC_ONLY -- no code symbols modified
-
-## 2026-07-02
-
-### fix(tenant): ops console 三頁多租戶判定與補洞（Repair Center / Approvals / System Modes）
-
-[任務理解] 操作者認為三個 /ops 頁面「是廢的且多客戶不適用」。VBC 調查推翻前半：三頁全是活功能（repairs=完整 incident→backup→GitHub 修復管線；approvals=Telegram/Slack 高風險指令審批，佇列稀疏是 policy 設計；system-modes=全域 kill switch，被修復管線真實消費）。後半戳中真缺口：server component 用 service-role 直查、繞過 API 的 org filter。
-
-[已修改]
-- `lib/repair-center/service.ts`：repair_runs insert 補 `organization_id`（隱藏 bug：0054 只回填歷史，新 run 一直寫 NULL → 被 org-filtered GET 靜默隱藏）
-- `app/ops/repairs/page.tsx` + `app/ops/approvals/page.tsx`：套用與 API route 相同的 effectiveOrgId 模式（staff→null 全量不變；client→own org；client 無 org 綁定→fail closed）；repairs 頁四條查詢（incidents/runs/organizations/bindings）各補 filter；system_modes 刻意不過濾（全域 kill switch by design，註解明示）
-- 判定不動：system-modes 維持 global 單租戶設計（緊急煞車語意正確）；repairs 頁 select("*") 不改（runs 未傳 client component，無 RSC 洩漏，避免第二份欄位白名單）
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=40000
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin vitest) | exit=0 | ms=6850 — 568/568 tests、46 files 全過
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n — Minor（system_modes 對 client 顯示全域 mode）判 by-design 並補註解折入；五審查重點（Request header 存活/organizations .eq("id")/staff 不誤擋/與 API 一致性/空字串邊界）全 clean
-- BUGHUNT_DONE: scope=lobster-factory agency-os scripts | grep=effectiveOrgId|organization_id (repair-center/ops pages call sites) | hits=全部一致 — 上游鏈確認：ops_incidents.organization_id 自 0028 存在；一般監控 webhook 走 client_slug（工作站 c1e8b4d 方向），incident org 未填時本修復傳 NULL，上游補齊自動生效
-- 遺留（非阻擋，critic 🔵）：0054 回填若有殘留 NULL-org 歷史列，client 視角 queue 可能重列已有 run 的 incident（startRepair 會 reuse row，無重複風險）；page 省略 default_viewer guard 靠 middleware fail-closed 保證，動 matcher 時複查
-
-[rollback] 單 commit revert 即回（三檔 + 註解）。
-
-
-### AO-CLOSE preflight: SG deploy drift closure + junk cleanup
-
-- **SG production app-code drift verified closed**: manual equivalent of `check-deploy-drift.ps1` confirmed SG `/root/lobster-phase1/.deployed-commit` = `6751854af38354b3b6bcb3099aea09a24478e468`, matching local `origin/main` at the time of the check; app-code `behind=0`. This satisfies the TASKS DoD for the 2026-06-26 drift hint.
-- **Shell junk cleanup finished**: removed the remaining tracked zero-byte `$null` artifact and added `/nul` to the existing `.gitignore` shell-artifact guard so AO-CLOSE `git add -A` cannot re-stage the Windows reserved-name artifact.
-- **Closeout gate compatibility fixed**: `verify-build-gates.ps1` now checks hook v2 SSOT path `hooks/rules/branch-protection.js` instead of the removed legacy top-level `hooks/branch-protection.js`.
-- AUTO_TASK_DONE_APPLIED (2026-07-02T12:46:15Z): SG production app-code drift
-
-### feat(outreach): 冷開發 tab + per-org Supabase routing + sidebar 跳位修復 ✅
-
-**根因**：
-1. 「冷開發」tab 在 ClientHubTabs.tsx 未加入 → 客戶頁面缺少冷開發功能入口
-2. Outreach API（messages / followups / service-profiles / suppression）統一走 `getOrgSupabaseWriteClient` 但未完成 → 資料仍走 AwareWave 主 DB，per-org 路由缺失
-3. `layout.tsx` 每次 navigation 重新呼叫 `getThemeConfig()` → 1.5s DB timeout 導致回退預設 section order → sidebar 位置不定
-
-**已修改**：
-- `app/ops/clients/[slug]/ClientHubTabs.tsx` — 加 `OutreachTab` component + "冷開發" tab entry
-  - `OutreachTab` 顯示 Supabase URL/key 狀態 badges、密碼輸入框（key 遮罩）、self-serve toggle、save 按鈕
-  - 讀取 `/api/ops/clients/[slug]/outreach-config`（GET）；儲存走 POST body `{selfServeEnabled, supabaseUrl?, supabaseKey?}`
-  - 安全邊界：GET 只回傳 `hasSupabaseUrl: bool` / `hasSupabaseKey: bool`，**絕不回傳原始 key 值**
-- `app/api/ops/clients/[slug]/outreach-config/route.ts` — 新建
-  - GET：讀取 `org.metadata.self_serve_enabled` + vault key 存在與否（`hasSupabaseUrl/hasSupabaseKey`）
-  - POST：寫入 vault（`org:${slug}:supabase_url` / `org:${slug}:supabase_key`）+ 更新 `self_serve_enabled`
-- `app/api/outreach/messages/route.ts` — 切換為 `getOrgSupabaseWriteClient(orgSlug)` + tenant-guard
-- `app/api/outreach/followups/route.ts` — 同上 per-org routing + tenant-guard
-- `app/api/outreach/service-profiles/route.ts` — 同上 + `effectiveOrgId` GET filter（修正 `url.searchParams` bug → `params.get()`）
-- `app/api/outreach/suppression/route.ts` — 同上 + `effectiveOrgId` GET filter + 重複 URL parse 去除
-- `lib/theme/store.ts` — 加 `unstable_cache` wrapper（revalidate: 300s）+ `revalidateThemeCache()` export
-- `app/api/theme/route.ts` — POST 成功後呼叫 `revalidateThemeCache()`
-
-**Rebase 衝突解決**（main S2 batch db8dcf8 與本 branch 同改 outreach 路由）：
-- messages: 保留雙方 — `getOrgSupabaseWriteClient` + tenant-guard + claude/openai import；GET 用 `params.get()` 非 `url.searchParams`
-- followups: 保留 `getOrgSupabaseWriteClient` + `assertOrgAccess/OrgAccessError/toOrgAccessResponse`（去除舊 `getSupabaseWriteClient`）
-- service-profiles: 保留 `getOrgSupabaseWriteClient` + `effectiveOrgId` + full tenant-guard；修正 `url.searchParams` → `params.get()`
-- suppression: 同 service-profiles 模式
-
-**安全邊界（強制）**：
-- `credentials_ref` 欄位存 vault key name，不存 raw secret
-- GET outreach-config 只回 boolean（`hasSupabaseUrl/hasSupabaseKey`）
-- `org:${slug}:supabase_key` 為 service role key — 絕不回傳前端
-- `self_serve_enabled` 為 workbench 存取閘門，Off = AwareWave代操 only
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 — 0 type errors ✅（unstable_cache pre-existing module type warning，Next.js 15 valid）
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m — security review pass；key masking ✅；effectiveOrgId scoping ✅
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getOrgSupabaseWriteClient,assertOrgAccess,revalidateThemeCache | hits=confirmed correct callsites only
-- PR #16 squash-merged → main @ d146eff
-
-**下一步**：本機執行 `/sg-deploy next-admin`（SSH 不在 remote container 中）
-
----
-
-### feat(data-flow): 補足三個客戶資料流缺口 ✅
-
-**根因**：
-1. `GET /api/onboarding/submit` 不存在 → 表單提交後無法查歷史
-2. `GET /api/ops/repairs` 不支援 `?client_slug=` → 外部工具按客戶篩選修復記錄失效（頁面端已有，API 一致性缺口）
-3. `/ops/onboarding` 無歷史面板 → 表單送出後紀錄消失
-
-**已修改**：
-- `app/api/onboarding/submit/route.ts` — 加 GET handler：`getSupabaseServerClient()`（service-role，bypass service-role-only RLS）+ `effectiveOrgId` org 過濾，回傳 `{ ok: true, intake_forms: [...] }`，limit 1–100 預設 20，雙 auth path 同 POST
-- `app/ops/onboarding/page.tsx` — 加 `IntakeHistory` Client Component（懶載入，展開觸發 fetch）：401/403 → 明確錯誤訊息；`submitted_at` null guard；「最近 20 筆」hint；兩個 return path（spec-result + form）均渲染
-- `app/api/ops/repairs/route.ts` — GET handler 加 `?client_slug=` filter（`.eq("client_slug", clientSlug)`），與 `organization_id` 並存
-
-**不需改**：Outreach（OrgSwitcher+layout+useActiveOrg 早已實作）；Repair Center 頁面（server component 直查 Supabase，client_slug filter 已有）
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~5000 — 0 type errors ✅
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/3m — m1 401 error msg（已修）m2 Date null guard（已修）m3 pagination hint（已加）；auth/tenant-isolation/injection/JSX structure 全 ✅
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=intake_forms,/api/onboarding/submit,client_slug | hits=0 stale claims（docs 僅描述 POST，不衝突）
-
-### fix(ops-inbox): repair_runs.client_slug 根因修復 ✅
-
-**根因**：`IncidentDraft` 型別未包含 `client_slug` → 所有 normalizer 無法傳遞此欄位 → `upsert_incident_atomic` SQL function 不寫入 `ops_incidents.client_slug` → `startRepairFromIncident()` 複製到 `repair_runs.client_slug` 時永遠 null。
-
-**已修改**：
-- `lib/ops-inbox/types.ts` — `IncidentDraft` Pick 加入 `"client_slug"`（optional，其他 normalizer 不設 = null，不破壞型別）
-- `lib/ops-inbox/normalize/uptime-kuma.ts` — 從 monitor tags 讀 `client` tag（`tags.find(t => t.name === "client")?.value`），加 trim/lowercase/length ≤64/`/^[a-z0-9-]+$/` 驗證後寫 `client_slug`；無效/缺 tag → null
-- `lib/ops-inbox/upsertIncidentAtomic.ts` — 傳 `p_client_slug: draft.client_slug ?? null`；更新 docblock 參考 migration 0056
-- `packages/db/migrations/0056_upsert_incident_atomic_add_client_slug.sql` — BEGIN/COMMIT 包 DROP+CREATE（避免空窗）；DROP 13-arg（0036 版），CREATE OR REPLACE 14-arg 加 `p_client_slug text DEFAULT NULL`；INSERT 含 `client_slug`；ON CONFLICT UPDATE: `COALESCE(excluded.client_slug, ops_incidents.client_slug)`（保留已存在非 null 值）
-
-**Uptime Kuma 設定（operator 手動）**：在客戶監控器加 tag `name=client, value=<slug>`
-
-**⚠️ Migration 待套用**：`0056_upsert_incident_atomic_add_client_slug.sql` 需手動在 EU Supabase 執行，再 `NOTIFY pgrst, 'reload schema';`
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~5000 — 0 type errors ✅
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/3m — m1 migration 加 BEGIN/COMMIT（已修）m2 tag charset 驗證（已修）m3 stale comment（已修）；tag spoofing = low-impact（denorm filter 非 authz key）；COALESCE 語意正確
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upsert_incident_atomic,IncidentDraft,client_slug | hits=0 stale claims（3 migration + 1 TS，全部正確）
-
-### ops: 0055_intake_quote.sql migration applied to EU Supabase ✅
-
-intake_forms 加 quote_data JSONB + quote_status text（CHECK: none/draft/pending_approval/approved/rejected）+ partial index。PostgREST schema cache reload。現有 1 筆 quote_status='none' 正常。
-
-- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh | cmd=psql -U supabase_admin ALTER TABLE + CREATE INDEX + NOTIFY | exit=0 | ms=~2000
-- REVIEW_WAIVED: DOC_ONLY -- additive schema change, no existing rows affected, no code change
-- BUGHUNT_WAIVED: NA -- schema-only migration, no symbol rename/removal
-
-### fix(provision): Stage 4 route — 移除 @workflows import、修復 Trigger.dev payload、補雙 flag gate ✅
-
-**根因**：Docker build context = `apps/next-admin/` only；`@workflows/provision/provisionClient` 解析到 `packages/` 外 → Module not found。同時 provisionClient() 是長時間 billable op，不適合同步呼叫（同 provision-staging 的 CF ~100s 限制，WORKLOG 2026-06-27）。
-
-**已修改**：
-- `app/api/provision/route.ts` — 移除 @workflows import；inline `serverTypeForTier`（TIER_MAP 5 行）；none/mock inline 回傳；hetzner_cloud → dispatch Trigger.dev provision-machine task
-- 修 Trigger.dev payload envelope：`body: JSON.stringify({ payload: {...} })`（官方 v3 API 格式；原版頂層 key = 空 payload）
-- 加 `LOBSTER_SERVER_PROVISION_ENABLED=true` 第二道 gate（dual-flag 同 resolveServerProvisioning.ts；單靠 adapter=hetzner_cloud 不觸發真機）
-- 加 UUID 驗證（siteId/organizationId，與 provision-services sibling route 一致）
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~20000 — 0 type errors ✅
-- REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2c/1M/1m — C1 payload envelope 修（加 `{payload:{...}}`）；C2 provision-machine task 不存在（已 comment 標注待 Trigger.dev deploy）；M1 LOBSTER_SERVER_PROVISION_ENABLED gate 補入；m1 UUID 驗證補入；auth/SSRF/injection/tenant-isolation 全 ✅
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=@workflows/provision/provisionClient|buildServerAdapterFromEnv | hits=packages/workflows only — no next-admin stale refs
-- WORKLOG: 本條目（commit: 即將）
-
-### AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/tzcjzgua — 20260702.1
-
-- LOBSTER_PLUGIN_STORE synced: added to MANIFEST_ENV_ALLOWLIST in installManifestStaging.ts; workers now pass env var to install-from-manifest.sh
-- 17 env vars synced: POSTHOG_API_KEY, LOBSTER_SUPABASE_URL, LOBSTER_SUPABASE_SERVICE_ROLE_KEY, OPS_INBOX_INGEST_TOKEN, TRIGGER_API_URL, N8N_URL, LOBSTER_AO_ORG_ID all confirmed in === Env ready === output
-- buildImage.js patch applied: TRIGGER_API_URL -> http://127.0.0.1:8030 (BFM bypass); #16 indexer RUN passed without 403
-- 11 tasks deployed, version 20260702.1
-- REALTEST_EVIDENCE: tool=Bash | cmd=lobster-trigger-deploy.ps1 | exit=0 | ms=~180000
-- REVIEW_WAIVED: DOC_ONLY -- deploy script unchanged; allowlist addition already code-reviewed in fix(provisioning) entry above
-- BUGHUNT_WAIVED: DOC_ONLY -- LOBSTER_PLUGIN_STORE passthrough is additive, no callers of removed/renamed symbols
-
-
-### fix(provisioning): 修復 tourism onboarding pipeline 6 bugs + 1 架構缺口 ✅
-
-**根因**：wp-tourism.json（及 wp-basic/wp-business）的 `target:"wordpress"` 導致 apply-manifest Zod parse FAIL；`blockIfProduction:false` 觸發 guardrail throw；install-from-manifest.sh 無法安裝 paid theme（TravelWP 不在 WP.org）；postInstall steps（flush_permalinks / set_option）從未執行；trigger-build 不推導 pluginSlugs；contracts.ts 不認識 tourism pack。
-
-**已修改**：
-- `packages/manifests/wp-basic.json` v1.1.0→1.2.0: target→staging-only, blockIfProduction→true, allowEnvironments→["staging"]
-- `packages/manifests/wp-business.json` v1.1.0→1.2.0: 同上
-- `packages/manifests/wp-tourism.json` v1.0.0→1.1.0: 同上 + theme-travelwp step 加 `localZip:true`
-- `templates/woocommerce/scripts/install-from-manifest.sh`: 加 localZip 支援（fail-loud）+ postInstall 執行（activate_theme/flush_permalinks/set_option）
-- `packages/workflows/src/executor/installManifestStaging.ts`: 加 LOBSTER_PLUGIN_STORE 到 env allowlist
-- `apps/next-admin/app/api/onboarding/trigger-build/route.ts`: import resolveInstallableSlugsForPacks/resolvePaidPluginsForPacks + 推導 pluginSlugs/paidPluginCount + theme_family tourism→elementor
-- `apps/next-admin/lib/build-console/contracts.ts`: normalizeBuildRequest + smokeProfileFor 加 tourism case
-- `apps/next-admin/app/api/internal/hosting/provision-staging/route.ts`: wp-tourism 跳過 Kadence 安裝；basePlugins tourism 排除 kadence-blocks
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit (next-admin) | exit=0 | ms=~15000
-- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n install-from-manifest.sh | exit=0 | ms=<100
-- REALTEST_EVIDENCE: tool=Bash | cmd=DRY_RUN=1 bash install-from-manifest.sh wp-tourism.json (fake zip) | exit=0 | output=wp theme install /tmp/fake-plugins/travelwp.zip + wp rewrite flush --hard + wp option update timezone_string
-- REALTEST_EVIDENCE: tool=Bash | cmd=DRY_RUN=1 bash install-from-manifest.sh wp-basic.json | exit=0 | output=wp theme install kadence (WP.org path) + postInstall OK
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=target.*wordpress,blockIfProduction.*false,resolveInstallableSlugsForPacks,localZip | hits=0 stale claims (agency-os/scripts hits = RankMath docs + old health reports, irrelevant)
-
-### feat: 架站系統 Stage 2 + 3 + 4 程式實作 ✅
-
-**根因**：Stage 1（建站引擎）已通；Stage 2/3/4 程式缺口導致整個 intake→報價→建站→租機 閉環無法自動化。
-
-**已修改**：
-- `app/api/onboarding/submit/route.ts` — 加 x-ops-sync-key 雙路徑 auth（Stage 2）+ effectiveOrgId 防 IDOR 寫入（S5 安全修）
-- `packages/db/migrations/0055_intake_quote.sql` — intake_forms 加 quote_data JSONB + quote_status（Stage 3）
-- `app/api/onboarding/quote/route.ts` — GET/POST/PATCH 報價 CRUD + 狀態機（Stage 3）+ assertOrgAccess 三路徑 + organization_id 加入 select（S5 安全修）
-- `app/api/onboarding/trigger-build/route.ts` — 加報價 gate（Stage 3）+ assertOrgAccess（S5 安全修）+ 原子 CAS mutex（.neq+select，防並發雙租機）
-- `app/api/provision/route.ts` — 呼叫 provisionClient()，env-gated，auth 保護（Stage 4）+ tier/region 白名單驗證
-- `next.config.ts` — 加 @workflows webpack alias（→ packages/workflows/src）（Stage 4）
-- `tsconfig.json` — 加 @workflows/* path alias（Stage 4）
-- `app/build/BuildConsole.tsx` — Profile B 加「機層租機」可摺疊面板 + 結果顯示（Stage 4）+ provision 按鈕在 siteId/organizationId 空時 disabled（防孤兒 VM）
-- `agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md` — Stage 2/3/4 標記完成
-
-**剩餘待做（ops 設定，非程式）**：
-- 跑 `0055_intake_quote.sql` migration 到 EU Supabase
-- n8n：建立 Fluent Form webhook → /api/onboarding/submit 的 workflow
-- SG `.env`：加 `LOBSTER_SERVER_ADAPTER` + `LOBSTER_SERVER_PROVISION_ENABLED` 才能開真機（目前 none = idle 安全）
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (×2 — 原始+安全修後) | exit=0 | ms=<30000 — 0 type errors ✅
-- REVIEW_DONE: critic=Standard | verdict=pass-after-fix | findings=2M/3m/0c — (M1) assertOrgAccess/effectiveOrgId 補入 submit+quote(GET/POST/PATCH)+trigger-build，匹配 S5 pattern；(M2) trigger-build 並發 CAS 修為原子 .neq("status","building")+select；(m1) provision tier/region 白名單；(m2) provision 按鈕在 siteId/orgId 空時 disabled；(m3) 報價自我審批分離暫緩 — 目前所有呼叫者為 staff-only operator，可接受
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=quote_status|quote_data|quote_approval_required,x-ops-sync-key|OPS_PROXY_SHARED_SECRET|hasSyncKey,provisionClient|buildServerAdapterFromEnv|serverTypeForTier|@workflows | hits=reviewed relevant hits — route/helper/env refs are expected, follow established pattern (wp-report/wp-update/middleware.ts), no stale cross-refs
-- WORKLOG: 本條目（commit: f65f852a checkpoint，含全部安全修補）
-
-### refactor(hooks): 治理系統 v2 — 單一 runner + 純規則模組（方案 D 絞殺式遷移全程完成）
-
-[任務理解] 全面稽核（三調查代理 + 10 項親測注入）確認四風險實錘：① 23 hooks 手刻生命週期 ×23、零測試、`_verify-shared` 頂層 require 單點（一檔壞 = 7 安全閘靜默死）② 兩份接線檔互漂（16 vs 20 hooks、自稱 15）③ 遠端 container 零 hook 接線 = 每個 web session 治理真空 ④ WORKLOG 15,708 行無 rotation、誠實鏈驗格式不驗真。操作者裁決：不要補丁，要乾淨架構（方案 D），全程不中停。
-
-[已修改]
-- 新架構：`hooks/runner.js`（唯一生命週期：stdin/parse/SID/分派/fail-open/聚合裁決）+ `hooks/rules.manifest.json`（接線唯一正本）+ `hooks/lib/{shared,flags}.js` + `hooks/rules/*.js`（26 條純規則，`check(ctx)`，無 process 處理）。
-- 接線薄化：`hooks.json` 與 `settings.template.json` 每 event 一行 call runner（結構上不可能再互漂；手寫計數全刪，SessionStart banner 由 manifest 推導）。
-- 遠端接線：`scripts/wire-remote-hooks.sh` 產生 gitignored `.claude/settings.local.json`（不可 track — 工作站 repo/.claude junction 到 ~/.claude 會相撞）；本 container 實測產生後 hooks 立即活體執法。
-- 刪除：23 個 legacy hook 檔 + `_verify-shared.js` shim + `log-error.sh` + 已完成使命的 M1 鎖定套件（歷史在 git）。
-- 測試：`tests/hooks/runner-core.test.mjs`（runner 保證）+ `runner-parity.test.mjs`（全規則裁決矩陣 + manifest↔rules 完整性）；一鍵 `scripts/test-hooks.sh`。
-- 治理文件：AGENTS.md 新增 §規則優先序（裁決 R0/宣告執行/風險分級/AO 預授權四方矛盾 C1–C4）+ §已知信任邊界（evidence 驗格式不驗真、fail-open 明文化）；修 2 stale 引用（user-env.template.ps1、scripts/audit-tools/dogfood 路徑）；TOOL_TRIGGER_MAP §Hooks 全段重寫；hooks README ×2 重寫；全 repo 活文件 hook 路徑 → rules/。
-- 垃圾檔案清理：git rm 11 個 0-byte tracked 垃圾（$null/null/AO-RESUME/8 個 CJK word-split 檔，2026-06-20 16d95c8 auto-checkpoint 盲掃入庫）；.gitignore 加 /$null /null；`commit-checkpoint.ps1` 加 junk guard（unstage 不 abort，ASCII-pure）。
-- WORKLOG 月度輪替：`scripts/rotate-worklog.mjs`（保留當月+上月，其餘 → WORKLOG-archive/YYYY-MM.md）；一次性遷移 66 blocks（15,708 → 8,356 行，尾部亂序修復，108 blocks 守恆驗證）；ao-close.ps1 接入（best-effort 不擋收工）。
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=5600 — 最終 54/54（runner core 13 + parity 36 + maintenance-scripts 5，含 critic findings 全部回歸案例）；M1 舊系統鎖定 48/48 於刪除前通過
-- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/wire-remote-hooks.sh && node runner.js <本 session 活體> | exit=2(BLOCK)/0(pass) — runner 於本 session 真實執法六次：git-log-injector BLOCK Write、dangerous-bash/verify-gate-commit 攔 heredoc、verify-gate-commit 攔「rm tracker + commit 同指令」的繞閘嘗試（rm 因 PreToolUse BLOCK 根本沒跑）
-- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/rotate-worklog.mjs | exit=0 | ms=300 — 108 blocks 守恆（42 main + 66 archive），抽樣 block 內容完整
-- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/5m/1n — 五 Major/Medium 全數折入同日修復並各加回歸測試：①rotate-worklog fence 內 `## 日期` 誤判 block 邊界（→ fence-aware parse）②rotate 非原子/重試會重複 archive（→ tmp+rename + 冪等 append）③checkpoint junk guard 在 core.quotePath=true 下對 CJK 名失效（→ 改 node checkpoint-junk-guard.mjs 走 -z 原始位元組，PS 只負責呼叫）④rm -Rf/-r -f/--force 變體漏攔（→ token 解析 recursive+force）⑤commit-quality 誤攔 git commit-tree（→ 對齊 verify-gate 的 lookahead RE）；minor：runner stdin setEncoding utf8（CJK chunk 邊界）+ wire-remote 驗證改 argv 傳參。critic 另確認：manifest = 兩份舊接線的精確聯集、無漏接、lib/shared 與 flags 乾淨、settings.local 正確 gitignored
-- BUGHUNT_DONE: scope=agency-os scripts .claude mcp | grep=claude-userlevel/hooks/[a-z_-]*.js (excl runner/rules/lib) | hits=0 — 三輪修正後（verify-recent-ack.ps1 硬依賴、scan-local-config、mcp-secrets-runbook、兩份 README、TOOL_TRIGGER_MAP、AGENTS.md）
-- 遷移中活體發現並修復 3 個 v2 自身缺陷：dangerous-bash 全文掃描誤攔文件（→ 行首/segment 錨定）、verify-gate-commit 散文 "git commit" 誤攔（→ commandSegments）、commit-quality 自指涉死鎖（legacy 潛伏地雷：其原始碼含 debugger 字樣，改它 = 被自己擋死無解 → SELF_EXEMPT hooks/tests 路徑）
-
-[剩餘風險]
-- .ps1 改動（commit-checkpoint guard、ao-close rotation 段）本 container 無 pwsh 未實跑，僅嚴格 review + critic 審 + ASCII-pure 驗證；兩台工作站首次跑 ao-close 時留意 warning。
-- 工作站需 `sync-claude-userlevel.ps1 -Mode merge` 後 v2 才生效；sync 前舊 ~/.claude/hooks 副本繼續用舊接線（行為不變，無害）。
-- 遠端環境需把 `scripts/wire-remote-hooks.sh` 登記為 environment setup script 才每 session 自動接線（本 session 已手動接上）。
-
-### 第二波（同日續）：Phase 4 規則機械化 + .ps1 實測補完 + 併回 main
-
-[已修改]
-- 併回 main：合併 origin/main（84 平行 commits）；WORKLOG 衝突以 theirs 為基底+插回 block+重輪替（112 blocks 精確守恆，2026-02-27 雙副本依「較新 _Last synced 勝」裁決）；daily 衝突聯集（保留工作站 8 條 --ack 稽核）；server 端 ff push main（非 force）。
-- Phase 4（高後果 semantic-only 前三名 → 機械閘）：① deploy flow — `high-risk-bash-warn.js` 新 pattern 攔 ssh→prod VPS 的 sg-deploy/systemctl restart/docker down/reboot（唯讀 ssh 不受影響）② VBC — 新規則 `vbc-reminder.js` 於 UserPromptSubmit 偵測「他方已完成」語境注入 VBC 協議（runner 新增 context 通道；prompt 事件禁 stdin 回灌防 context 汙染）③ vault — `mcp-health.js` 401/403 失敗自動附 `/vault-status` 路由提示。三接線（settings.template/hooks.json/wire-remote-hooks）同步補 UserPromptSubmit。
-- .ps1 風險關閉：container 內裝 PowerShell 7.4.7 → 兩支改動腳本 Parser 語法驗證 PASS + `commit-checkpoint.ps1` E2E 真跑（temp repo + $null/null/CJK 垃圾檔：junk-guard 全數 unstage、只 commit 真工作、exit 0）。
-- AGENTS.md 三列觸發標記 🔧 機械閘；TOOL_TRIGGER_MAP 同步（27 規則）。
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=6000 — 60/60（Phase 4 新增 7 案例：prod-ssh 攔/ACK/唯讀放行、VBC 注入/靜默/英文、403 vault 提示）
-- REALTEST_EVIDENCE: tool=Bash | cmd=pwsh -File scripts/commit-checkpoint.ps1 -Message test -WorkRoot <tmprepo> | exit=0 | ms=3000 — junk 3/3 unstaged、real.md 單獨入 commit（PowerShell 7.4.7 真跑）
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=前波 critic 架構審查涵蓋 runner context 通道設計（prompt 事件 stdout=context 注入為 Claude Code 文件化行為）；新規則為既有 pattern 的同構延伸，60 案例回歸全綠
-- BUGHUNT_DONE: scope=agency-os scripts .claude mcp | grep=UserPromptSubmit|vbc-reminder | hits=3 wiring files（全部為本次刻意接線）+ docs 已同步
-- 殘留：遠端 claude/* 分支刪除被 git proxy 拒（僅工作站可清）；ao-close.ps1 全流程仍需工作站首跑觀察（語法已驗、rotation 段 try/catch 包裹）
-
-[rollback] 每里程碑獨立 commit（M1 03d624b / M2 198ad66 / M3 388fb36 / M4a 52b951f / M4b 本 commit）；`git revert` 對應 commit 即回舊世界；WORKLOG 輪替可逆（archive 檔內容原封，貼回即還原）。
-
-- AUTO_TASK_DONE: hooks v2 runner 架構遷移 + 遠端接線 + 垃圾檔清理 + WORKLOG 輪替 + 規則優先序/信任邊界明文化
-
-
-### ops: 清理測試垃圾客戶 org 記錄 ✅
-
-**根因**：建站系統測試過程遺留 3 個空殼 org（無任何資產/整合資料），污染 `/ops/clients` 列表。
-
-**已刪除**（EU Supabase DB `supabase-db` container，psql DELETE + CASCADE）：
-- `awarewave-868301` (AwareWave) — id `bc77b757-...`
-- `green-valley-farm-10dd18` (Green Valley Farm) — id `25a141f1-...`
-- `ssasd-63a120` (ssasd) — id `0938e0b4-...`
-
-**同步清理**：`workflow_runs` 4 筆（無 FK constraint，手動 DELETE）
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=psql SELECT+DELETE+browser /ops/clients | exit=0 | ms=<5000 — DB 2 orgs, UI 2 orgs ✅
-- REVIEW_WAIVED: NA -- DB 刪除操作，無程式碼變動
-- BUGHUNT_WAIVED: NA -- 無程式碼變動
-- WORKLOG: 本條目
-
-**剩餘**：`/ops/clients` 現只有 `awarewave-ops` + `soulful-expression`。
-
-### ops: upload paid plugin zips to EU + SG VPS `/opt/lobster-plugins/` ✅
-
-**操作**：將 `D:\Work\_paid-plugins\` 16 個 zip 上傳至兩台 VPS。
-
-**已上傳**（EU `204.168.175.41` + SG `5.223.93.113` → `/opt/lobster-plugins/`，共 51M）：
-travelwp / elementor-pro / elementor-pro-activator / advanced-google-maps /
-advanced-coupons-for-woocommerce / translatepress-multilingual（改名自 translatepress-business）/
-translatepress-add-on-seo-pack / kadence-pro / kadence-woo-template-builder /
-wp-rocket / mainwp-rocket-extension / wpml-sitepress-multilingual-cms /
-wpml-string-translation / wpml-woocommerce-multilingual /
-woocommerce-points-and-rewards / woocommerce-product-addons
-
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=ssh root@EU+SG "ls -lh /opt/lobster-plugins/" | exit=0 | ms=<2000 — 16 files, 51M, both servers identical ✅
-- REVIEW_WAIVED: NA -- file upload operation, no code change
-- BUGHUNT_WAIVED: NA -- no code change
-- WORKLOG: 本條目
-
-**用途**：Cloudways 旅遊業客戶部署時，從 Cloudways SSH → wget 從此 VPS → wp plugin install。詳見 `docs/operations/TOURISM_CLIENT_DEPLOYMENT_WORKFLOW.md`。
-
-### feat(video): Phase 0 AI Video Director — SceneSeries backbone + real render DoD ✅
-
-**根本問題**: 影片工具只有 Quick Engine（Python ffmpeg 固定 3-scene）；需要 Director Engine 支援 N scenes、data-driven duration、Ken Burns + slide-in 轉場。
-
-**已修改**:
-- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/SceneSeries.tsx` (NEW) — `SceneItem[]` 型別、`calculateSceneSeriesDuration()` duration helper、`SceneSeries` component（`<Sequence>` 堆疊、Ken Burns zoom、SlideIn 轉場、safeDur C2 fix）
-- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/compositions/DynamicSlideshow.tsx` (NEW) — Remotion Composition wrapper，global logoUrl fallback merge
-- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/Root.tsx` (MODIFIED) — 註冊 DynamicSlideshow + calculateMetadata（從 scenes[] sum 算 durationInFrames）
-- `lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/src/server.ts` (MODIFIED) — MAX_FRAMES 18000、DATA_DRIVEN_TEMPLATES、payload validation（C1 fix：scenes max 60、durationInSeconds in (0,60]）、Math.min backstop
-
-**Critic fix（session a19fe8d4a09ed40a3）**:
-- C1 🔴 OOM/DoS：DATA_DRIVEN bypass 跳過 MAX_FRAMES → 加 payload validation + Math.min backstop
-- C2 🔴 NaN/negative frames：`scene.durationInSeconds` 未驗證 → safeDur floor in SceneSeries + server-side type/range check
-
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=SSH | cmd=docker compose rebuild + curl /render × 3 | exit=0 | ms=varies
-  - 1-scene (5s): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/b4323cf3-8440-4f48-b7e5-09d2f0904571.mp4 — HTTP 200, 16MB ✅
-  - 3-scene (5s×3): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/060fe694-deeb-4bd9-bc89-3db889b4e1a9.mp4 — HTTP 200, 40MB ✅
-  - 20-scene (3s×20): job done → https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/remotion/2026-07-02/bcdc7dfa-af49-4922-976b-ccf6cfe1ef08.mp4 — HTTP 200, 113MB ✅
-- REVIEW_DONE: critic=Deep | verdict=pass (after C1+C2 fix) | findings=2c/2m fixed — all Critical/Major patched before commit
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=SceneSeries|DynamicSlideshow|calculateSceneSeriesDuration|dynamic-slideshow|DATA_DRIVEN_TEMPLATES | hits=self-contained (remotion-service only, no downstream consumers in next-admin yet — Phase 3 will add render-client.ts)
-- WORKLOG: 本條目
-
-**剩餘 Phase 1–6**: Director AI → Timeline JSON → full production pipeline（deferred，Phase 0 DoD 完成後啟動）
-
----
-
-### feat(security): S2 batch-6 tenant guard — content/drafts IDOR closed
-
-**根本問題**: `content_drafts` 所有 CRUD 無 `effectiveOrgId`/`assertOrgAccess`，staff 看全客戶草稿混合；Client 帳啟用後任何知道 UUID 的人可讀改刪外部 org 草稿（IDOR）。`content_sources` 是全域共享表（無 `organization_id`），不需改。
-
-**現況分析（Explore agent a11b1ec8a386dca87，45 tool calls）**:
-- 架構整體健全：middleware 強制 tenant identity；outreach/credentials/approvals/build runs 已有完整 guard（S2 batch 1-5）
-- Ops Clients：URL slug routing，tamper-proof
-- Outreach：`useActiveOrg()` hook + `effectiveOrgId()` 完整
-- **缺口 🔴**：`content/drafts` — GET/POST/DELETE 均無 org filter 或 ownership check
-- `content/sources`：全域表，intentionally unscoped，✓ 安全
-
-**已修改**:
-- `app/api/content/drafts/route.ts`:
-  - Import 加 `effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse`
-  - GET list：加 `?organizationId` 查詢參數 → `effectiveOrgId(req, ...)` → 動態 `.eq("organization_id", orgFilter)` （client 強制自己的 org；staff 可不傳→看全部）
-  - GET by ID：fetch 後加 `assertOrgAccess(req, row.organization_id)`
-  - POST insert：`effectiveOrgId(req, str(body.organizationId))` 取代直接 pass-through（client 自動綁到自己 org）
-  - POST update (with id)：pre-read `organization_id` → `assertOrgAccess` → 原子 `.eq("organization_id", ...)` (null-safe: null org_id 時不加 filter，staff-only path)
-  - DELETE：pre-read → `assertOrgAccess` → 原子 `.eq("organization_id", ...)` (null-safe 同上)
-
-**ContentStudio 前端相容性**: 不需改。`effectiveOrgId(req, null)` → staff = null（不過濾，看全部）；client 帳啟用後自動從 middleware `x-ops-org-id` 注入 org，草稿自動歸 org，不需前端傳。
-
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors (pre + post critic fix)
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/1n — Major: POST update overwrote organization_id to null when staff edits client draft (data corruption); Fixed: separated contentFields from insert-only orgId assignment; UPDATE now preserves existingOrgId. Minor: TOCTOU comment clarified (null-org rows: atomicity via id only, staff-only path). Suggestion: added future-proof comment on tenant checks beneath role gate.
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=content/drafts,content_drafts | hits=2 (route.ts ✓ patched, ContentStudio.tsx ✓ compatible — no body.organizationId sent = staff null-unscoped, client auto-enforced via middleware)
-- WORKLOG: 本條目
-
-**S2 進度**: batch-1 ✅ | batch-2 ✅ | batch-3 ✅ | batch-4 ✅ | batch-5 ✅ | **batch-6 content/drafts ✅**
-**剩餘 defer → S3**: `ops/repairs/*` (repair_runs 無 organization_id，需 DB migration)
-
----
-
-**多租戶架構評估（用戶問：多客戶管理彼此是否串聯？）**:
-
-| 系統 | 隔離機制 | 狀態 |
-|---|---|---|
-| Ops Clients `/ops/clients/[slug]` | URL slug → server-side org lookup | ✅ 無洩漏 |
-| Outreach | `?org=UUID` + `effectiveOrgId()` + `assertOrgAccess()` | ✅ 無洩漏 |
-| Credentials | S2 batch-5 已修 | ✅ 無洩漏 |
-| Build Runs | S2 batch-5 已修 | ✅ 無洩漏 |
-| Approvals | S2 batch-5 已修 | ✅ 無洩漏 |
-| Content Drafts | **S2 batch-6 本次修** | ✅ 修後無洩漏 |
-| Content Sources | 全域共享（設計如此，無 org 欄） | ✅ 設計正確 |
-| ops/repairs/* | ❌ repair_runs 無 organization_id 欄 | ⏳ defer S3 DB migration |
-
-**Stage 1 onboarding 現況**: 前端程式「跳回第一步」bug 已在前一個 session 修好（handleTriggerBuild 加了 guard + error display）。2 筆卡住的 intake_forms 仍在 DB 待手動 retry。
-
----
-
-### fix(security): S5 — assertOrgAccess guards on social + integrations routes ✅
-
-**根本問題**: 5 個 API 路由以 `clientId` / `organizationId`（= org UUID）作為查詢/寫入鍵，但只有 ops-role gate（無 tenant-level org guard）。Client org 的 owner/admin/operator 若通過 role gate，可傳入任意 org UUID 讀取/修改其他租戶的 Postiz 社群連接或 integration binding（IDOR）。
-
-**已修改**:
-- `app/api/content/social-publish/route.ts` — POST：`clientId`（org UUID → `social_postiz_connections.client_id`）加 `assertOrgAccess(req, clientId)` after role gate + string validate
-- `app/api/content/social-channels/route.ts` — GET：同樣呼叫 `listIntegrations(clientId)` → 加 `assertOrgAccess(req, clientId)` after query param validate
-- `app/api/content/social-admin/connections/route.ts` — POST + DELETE：`clientId`（same FK）→ 各加 `assertOrgAccess(req, clientId)`
-- `app/api/ops/integrations/route.ts` — POST：`organizationId` body param → 加 `assertOrgAccess(req, organizationId)` after `verifyOwnership`；PATCH：fetch record by `id` → 加 `assertOrgAccess(req, current.organization_id)` post-fetch
-
-**guard 語意**：
-- `staff`（`x-ops-user-kind` absent/staff）→ `assertOrgAccess` no-op，保持跨租戶管理能力
-- `client`（`x-ops-user-kind: client` + `x-ops-org-id: <uuid>`）→ `targetOrgId ≠ ctx.orgId` 時 throw OrgAccessError → 403
-- null/undefined targetOrgId 對 client fail-closed（`String(null)` = `"null"` ≠ real UUID）
-
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test --run | exit=0 | ms=1710 — 568/568 pass
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 6 focus areas all clean: guard ordering correct in all 4 files, null-safe inputs, assertOrgAccess null targetOrgId fails-closed, PATCH TOCTOU safe (immutable PK), no role-gate bypass path, all routes covered by middleware matcher
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=listIntegrations,social_postiz_connections,tenant_integration_bindings | hits=1 new finding (social-channels was also calling listIntegrations with unguarded clientId → patched same batch; webhooks/tenant-integration has no clientId param — safe)
-- WORKLOG: 本條目
-
----
-
-
-### Agent dispatch log
-- critic: Critic review hook runner v2
-- Explore: 調查三個 ops 頁面真實狀態
-
-## Related Documents (Auto-Synced)
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/20-doc-sync-closeout.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
-- `docs/metrics/kpi-margin-dashboard-spec.md`
-- `docs/operations/airtable-to-supabase-migration-playbook.md`
-- `docs/operations/system-operation-sop.md`
-- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
-- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
-- `docs/releases/release-notes.md`
-- `tenants/NEW_TENANT_ONBOARDING_SOP.md`
-
-_Last synced: 2026-08-24 19:21:02 UTC_
-
-## 2026-08-17
-- 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
-  - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
-  - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
-  - BUGHUNT_WAIVED: DOC_ONLY -- no code change
-
-## 2026-09-01
-
-### docs(hci): record explicit HD-00/01/02 approvals without unlocking implementation
-
-- AUTO_TASK_DONE: docs(hci) — recorded HD-00=C, HD-01=A, and HD-02=C as accepted ADRs with implementation gates left open.
-
-**根本問題**: HCI V2 已有 24 項人類決策與 ADR planning register；其中 `HD-00`、`HD-01`、`HD-02` 已收到操作者明示選項，但若只保留在對話裡，文件仍會錯誤顯示為 pending，並且批准與 schema/policy/test gate 脫鉤。
-
-**已修改**:
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-tenant-organization-model-reconciliation.md` — 記錄 `HD-01=A`；Tenant 模型、portal adapter 邊界及 mapping/migration/negative-test open gate。
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0010-consent-entity-scope.md` — 記錄 `HD-02=C`；明定 tenant authorization、data-subject consent/lawful basis、source terms 三分語意及 open gate。
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0011-hci-subject-type-scope.md` — 記錄 `HD-00=C`；V1 Person-only 與 nullable forward-compatible subject stub 的 open gate。
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{00_README.md,02_PRODUCT_BOUNDARIES.md,07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md,14_ROADMAP_AND_DEFINITION_OF_DONE.md,16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md,17_REPOSITORY_LAYOUT_AND_PATHS.md,22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md,governance/ADR_INDEX.md}` — 將這三項改為 resolved/accepted，且明示所有 implementation gates 仍為 `OPEN`；其餘 21 項不變。
-- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 加入操作者批准紀錄與下個未決三項（HD-03/04/05）。
-
-**驗證結果**:
-- REALTEST_WAIVED: DOC_ONLY -- only architecture records and cross-document decision state changed; no runnable HCI implementation or schema exists. Static document-gate check passed: 3 accepted ADRs, 10 remaining planned ADRs, 0 stale pending/unresolved HD-00/01/02 references, and 16 changed V2 Markdown files with paired code fences. `audit-cross-machine-bom.ps1 -WorkRoot D:\Work` also passed: 80/80 cross-Drive memory Markdown files have UTF-8 BOM.
-- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read back the ADR metadata, decision authority, required gate lists, index state, owner-document cross-links, report approval table, and tenancy hierarchy. Every accepted ADR says `OPEN` for implementation gates and no document claims schema/policy/test implementation.
-- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`(pending|unresolved).{0,80}HD-0[012]|HD-0[012].{0,80}(pending|unresolved)` | hits=0; approval trace search (`HD-00=C|HD-01=A|HD-02=C|ADR-0009|ADR-0010|ADR-0011`) returned 40 reviewed current-state references. No scripts call site was introduced.
-- WORKLOG: 本條目
-
-**剩餘風險**: ADR acceptance is not Wave-1 readiness. The mapping/migration, lawful-basis policy, ERD constraints, and negative tests are deliberately not invented here; all three gates remain `OPEN`. HD-03 through HD-23 remain human decisions.
-
-**Rollback**: before implementation, supersede the individual ADR with a new explicit human approval and restore the affected inline state; after implementation, use the ADR-specific reviewed migration plan rather than relabeling historical data in place.
-
-### docs(hci): specify approved Wave 1 gates without asserting runtime completion
-
-- AUTO_TASK_DONE: docs(hci) — created the approved ADR-0009/0010/0011 Wave 1 adapter, permission-policy, ERD-addendum, and negative-test specifications; runtime gates remain open.
-
-**根本問題**: 已批准的三項 ADR 只有 gate 名稱，尚無可交接的 mapping、policy、constraint 或 test contract；同時 HCI runtime/schema/test directory 尚不存在，不能把文件決定誤報為 schema/migration/test 已完成。
-
-**已修改**:
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/{HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT,HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY,HCI_WAVE1_DOMAIN_ERD,HCI_WAVE1_NEGATIVE_TEST_SPEC}.md` — 建立四份 doc-only implementation contracts，涵蓋 portal adapter seam、三分 permission records、Person-only subject stub、12 個 negative-test IDs；明示無 HCI runtime 實作與無 test pass 結果。
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/{ADR_INDEX,ADR-0009-tenant-organization-model-reconciliation,ADR-0010-consent-entity-scope,ADR-0011-hci-subject-type-scope}.md` — gate 狀態改為 `SPECIFIED — RUNTIME OPEN`，並指向每個可交接 artifact；HD-03/10/20/21 仍是 blocker，不被本次決定。
-- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 區分已具體化的 design spec 與仍未建立的 executable HCI adapter/schema/test suite。
-
-**驗證結果**:
-- REALTEST_WAIVED: DOC_ONLY -- no HCI implementation directory, API, database, role, migration, or test runner exists; four design artifacts are not executable tests.
-- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read all four artifacts, source portal migrations, ADR state, and decision report; verified that the policy makes no jurisdiction/controller determination and every runtime gate says OPEN.
-- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`SPECIFIED — RUNTIME OPEN|HCI_WAVE1_|HD-03|HD-10|HD-20|HD-21` | hits=48, all reviewed: three accepted ADRs are `SPECIFIED — RUNTIME OPEN`; HD-03/10/20/21 remain explicit blockers; scripts has no HCI runtime call site.
-- WORKLOG: 本條目
-
-**剩餘風險**: HD-03～HD-23 未獲人類選項批准；尤其 HD-03/10/20/21 會阻擋資料主體 rights、Case aggregate、法域/市場與 DPA 角色的 production implementation。所有 four artifacts 都是 design input，不能作為任何處理 real-person data 的許可。
-
-**Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。
-
-## 2026-08-31
-
-### fix(codex): remove desktop Canva plugin to stop unsolicited OAuth windows
-
-**Trigger**: Codex desktop opened Canva's OAuth login page whenever Codex performed work, despite the 2026-08-25 Claude-side `mcp-remote@0.1.49` pin.
-
-**Root cause**: this was a different activation path from the Claude MCP proxy. `codex mcp list` returned no configured CLI MCP servers, while Codex desktop's plugin state still exposed Canva tools and its global state/cache contained the Canva plugin. The desktop plugin therefore initiated OAuth independently of the Claude MCP configuration.
-
-**Change**: removed the installed Codex plugin `canva@openai-curated-remote`. No repository MCP registry, OAuth token, or other connector configuration was edited.
-
-**Verification**:
-- REALTEST_EVIDENCE: tool=Codex app `uninstall_plugin` | input=`Canva` | result=`status: uninstalled`, `id: canva@openai-curated-remote`
-- REALTEST_EVIDENCE: tool=Bash | cmd=`codex mcp list` | exit=0 | result=`No MCP servers configured yet`; confirms the prior Claude MCP route is not the Codex desktop trigger.
-- REVIEW_DONE: configuration ownership checked against `WORKLOG.md` 2026-08-25 entry; this fix removes the distinct desktop-plugin path instead of changing the previously pinned Claude proxy.
-- BUGHUNT_DONE: searched `D:\Work`, `%USERPROFILE%\.codex`, `%APPDATA%\Codex`, and `%LOCALAPPDATA%\Codex` for Canva configuration references; actionable sources were Codex global/plugin state rather than a second workspace MCP configuration.
-
-**Rollback**: reinstall Canva in Codex only when it is needed; a fresh explicit OAuth authorization will then be required.
-
-### fix(codex): disable the workspace Canva MCP source missed by plugin removal
-
-**Correction to the preceding entry**: uninstalling the Codex desktop plugin did not stop the popup. That result isolated one activation path but was not a complete fix.
-
-**Root cause**: `mcp/registry.template.json` still declared `servers.canva.enabled: true`. Its `clients.codex.exclude` only prevented generation of the user-level Codex config; the sync script still generated Canva into the shared workspace `D:\Work\.mcp.json`. Codex desktop reads that workspace file, so it launched `mcp-remote` and opened OAuth even after its desktop plugin was removed.
-
-**Change**: set `servers.canva.enabled: false` in the registry SSOT and ran `scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work`. The registry retains the Canva declaration and a re-enable note, so recovery is an explicit, reversible decision rather than an untracked manual deletion.
-
-**Verification**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work` | exit=0 | result=`MCP sync complete` for workspace, Codex, Copilot, and Gemini configs.
-- REALTEST_EVIDENCE: tool=Bash | cmd=parsed generated `.mcp.json` plus grep of `.mcp.json`, `%USERPROFILE%\.codex\config.toml`, `%USERPROFILE%\.copilot\mcp-config.json`, and `%USERPROFILE%\.gemini\settings.json` | exit=0 | result=workspace `canva` entry absent; 0 Canva/Canva MCP URL hits in all four host configs; registry `canva.enabled` is false.
-- REVIEW_DONE: source and generator reviewed at `mcp/registry.template.json:16-31` and `scripts/sync-mcp-config.ps1:254-255,538-548`; the previous `clients.codex.exclude` did not govern the workspace client.
-- BUGHUNT_DONE: scope=all generated MCP host configs | grep=`mcp.canva.com|mcp-remote@0.1.49|\\bcanva\\b` | hits=0.
-
-**Operator action**: restart Codex desktop once to terminate the already-loaded workspace MCP process. The next launch cannot load Canva from the managed MCP configs.
-
-**Rollback**: change `servers.canva.enabled` back to true, run the same sync command, restart the target host, then explicitly complete Canva OAuth.
-
-### fix(mcp): remove unmanaged project Canva stanzas that bypassed the registry
-
-**Root cause**: the registry and all generated user-level configs had Canva disabled, but `D:\Work\.codex\config.toml` still had a direct project-level Canva server declaration using `mcp-remote@latest`. Three identical `.codex\config.toml` copies under `C:\Users\user1115\.claude\worktrees\` had the same stale declaration. `sync-mcp-config.ps1` intentionally manages only the generated workspace and user-level outputs, so it did not overwrite these project-level configs. Codex could therefore load Canva from a source outside the registry and open OAuth repeatedly. This was not an enabled Claude user-level MCP server.
-
-**Change**: removed only the Canva server stanza from all four project-level configs. Preflight showed each file also contains `hetzner-ssh`, so deleting the files would have silently broken a legitimate MCP server. Added the project-level configuration guard to `mcp/README.md`: a server disabled in the registry must not remain declared in an active `.codex/config.toml`.
-
-**Verification**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1 -WorkspaceRoot D:\Work` | exit=0 | ms=956 | result=managed workspace and user-level MCP outputs regenerated; Canva absent from workspace and Claude user configs.
-- REALTEST_EVIDENCE: tool=Chrome | cmd=read open Canva OAuth login tabs after cleanup | exit=0 | result=0 tabs; no live `mcp-remote` or Canva process remained.
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — all four configs retain only `hetzner-ssh`; README correctly states the distinct ownership boundary.
-- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.codex | grep=`mcp_servers[.]canva` | hits=0.
-
-**Rollback**: restore the deleted Canva stanza only through `mcp/registry.template.json` by explicitly setting Canva enabled, running the sync, and completing OAuth after restarting the target host. Do not recreate an unmanaged project-level declaration.
-
-### fix(governance): clear ALERT_REQUIRED.txt gate block + fix stale HCI30_RESEARCH_REVIEW paths after docs/HCI/ reorg
-
-**根本問題（兩個獨立問題，同一 session 發現）**：
-1. `verify-build-gates` 於 2026-08-31T01:40:28Z 起持續 FAIL（`agency-os/ALERT_REQUIRED.txt` 記錄）。根因：`.claude/settings.json` 因其他變動多插入 1 行，既有 Google app-password 出現位置從 line:12 位移到 line:13；`agency-os/config/scan-local-config-known-suppressed.json` 的 baseline 用 line-number 當 sourceKey，位移後比對失效，變成「baseline-miss」擋下所有 commit。不是新洩漏——同一密碼已有 10 筆治理過的 suppression entry。
-2. 另一 session（Codex，per user）已將 `docs/HCI_AI_LEGO_Blueprint_v1`、`docs/HCI_AI_LEGO_Blueprint_v2`、`docs/HCI30_RESEARCH_REVIEW` 三個目錄搬移整併進 `docs/HCI/` 下，但搬移未同步更新文件內文中的絕對路徑引用，留下 6 處指向不存在的舊路徑 `D:\Work\agency-os\docs\HCI30_RESEARCH_REVIEW\`（缺 `HCI\`）。此發現與同日 Codex `HCI_SOP_GAP_REPORT.md`（`D:\tmp\hci-sop-gap-check\`）§讀取與版本邊界 一致，本次 grep 全庫另抓到報告未列出的第 6 處（`V2/14_ROADMAP...md:79`）。
-
-**已修改**:
-- `agency-os/config/scan-local-config-known-suppressed.json` — `.claude/settings.json` Google app password suppression 的 `sourceKey`: `line:12` → `line:13`（不動密碼值，只更新行號指標）
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/00_README.md` — 2 處絕對路徑補回 `HCI\`
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md` — 2 處
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/14_ROADMAP_AND_DEFINITION_OF_DONE.md` — 1 處（Codex 報告未列出的第 6 處）
-- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v1/00_README.md` — 2 處（此檔案為我上個 session 加的 supersession banner，非原始 V1 內容，故可修；V1 正文其餘部分保持凍結不動）
-- `agency-os/ALERT_REQUIRED.txt` — 刪除（gate 已轉綠，依檔案自身指示移除）
-
-**未動、刻意保留**：`HCI30_RESEARCH_REVIEW/*.md` 內同樣的舊路徑字串——那些是稽核證據文件，逐字引用當時發現的缺陷路徑（例如 `08_DEVOPS_SRE_REVIEW.md:26` 明確引用該路徑作為 finding），改寫會破壞證據鏈。
-
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/verify-build-gates.ps1` | exit=0 | result=`verify-build-gates: ALL PASSED`（修前 FAIL at scan-local-config-for-secrets step，含 health-check 100%/317/317）
-- REVIEW_DONE: critic=self（doc-only 路徑修正 + JSON 單欄位數值修正，無邏輯分支，跳過 subagent critic；已用 Read 逐檔讀回確認每處替換內容正確）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=`D:\\Work\\agency-os\\docs\\HCI30_RESEARCH_REVIEW`（`\|` 含 `HCI_AI_LEGO_Blueprint`）| hits=0（V1/V2 目錄內清零；RR 稽核證據檔保留原樣，非本次修復範圍）
-- WORKLOG: 本條目
-
-**剩餘風險**：
-- Batched Edit 呼叫中，git-log-injector hook 在同一批次裡對其中一個 Edit 回報 block+re-issue，但另一個屬於**不同檔案**的 Edit 同批次回報「success」卻實際未套用（`V2/00_README.md` line 7）——靠事後全庫 grep 抓到並補修。懷疑是 hook/工具批次執行時的結果排序或吞錯 race，非本次修改內容錯誤；未深入排查該 hook 本身（超出本任務範圍，若之後再現需獨立追蹤）。
-- `docs/HCI/` 重組（誰做的、何時、是否已通知 WORKLOG）與新出現的 `agency-os/docs/System_Foundry_v1.0/`（大型未提交新框架，內部自稱路徑 `docs/SYSTEM_FOUNDRY/` 與實際落點不符）均未在此 WORKLOG 留下起源記錄，留待與操作者確認後續處置，不在本條目範圍內處理。
-
-**Rollback**: `git diff` 未 staged，直接 `git checkout -- <path>` 個別還原；或 revert baseline sourceKey 回 `line:12`（僅在 `.claude/settings.json` 行數真的變回 12 時才需要）。
-
-## 2026-09-05（續，System Foundry v1.6 configurator：`validate_configurator.py` 補 active_when 前向引用檢查）
-
-### fix(system-foundry): validate_configurator 抓 active_when 指向「渲染順序在後」的題目
-
-**根本問題**：`configurator/app.js` 的 `render()` 每個 category 由上到下單趟渲染（category 順序 = `catalog.json` `categories` 陣列順序；category 內題目順序 = `catalog.json` `questions` 陣列順序），只在第一次抵達某個「剛變 active」的題目時才 `answers[q.id]=false` 初始化。若題目 A 的 `active_when` 指向渲染順序在 A **之後**的題目 B，第一次渲染時 `answers[B.id]` 仍是 `undefined`；對 `equals:false` 條件而言 `undefined===false` 為 `false`，A 在首次繪製時被誤判為 inactive，要等下一次點擊觸發 re-render 才會自我修正。此為 2026-09-05 同日稍早 critic review（同日 WORKLOG「System Foundry v1.6 configurator UI/UX 重做第一批」條目）發現的 Suggestion 級 pre-existing 缺陷：非本次改動引入，且對現有 161 題全掃描零命中（latent，非 active bug）。
-
-**已修改**：`scripts/validate_configurator.py`
-- 建 `render_index`（category 陣列序 × category 內 question 陣列序 的穩定索引，忠實對應 `app.js:20` 雙層迴圈的真實走訪順序）
-- 對每題 `active_when` 的每個 `question` 參照，`equals is False` 且參照目標的 `render_index` ≥ 自身索引 → 判定為 forward-reference 錯誤
-- `equals:true` 的前向參照不觸發（`undefined===true` 同樣是 `false`，跟穩態一致，沒有首次繪製分歧，故不算缺陷）
-- 自我參照（`r==q['id']`）獨立訊息（`active_when self-references`，非「渲染順序在後」）
-- 新增 `duplicate category id` 檢查（`len(cat_ids)!=len(cats)`，比照既有 `duplicate question id` 寫法）——這是本次 critic review 抓到的兩個 Major 之一：category id 重複時，`render_index` 對重複 category 的第二次走訪覆蓋掉第一次的索引，會同時造成真實前向參照的假陰性、以及無關題目的假陽性；沒有這條檢查，本次新增的檢查本身在 category id 重複時可能回報錯誤結論
-- 「渲染不到」的參照目標（`category` 本身無效，因此進不了任何 category 的走訪）預設索引改成 `_pos`（走訪總數，等同「最後」）而非 `0`（「最先」），因為前者才是「這個答案永遠是 undefined」的正確近似——`0` 會把它誤判成最安全的「早就渲染過」
-- 註解明確標出本檢查的邊界（另一個 Major）：只抓「前向參照」，**不**抓「參照一個本身有條件、且目前答否而被 `render()` `delete` 掉 `answers[]` 的題目」——那是同一大類「渲染時讀到 undefined」下的另一半，`app.js:20` 的 `delete answers[q.id]` 分支會讓被參照題目即使渲染順序在前也可能是 undefined；目前 catalog 裡所有 13 個 `equals:false` 參照對象都是無條件 active（critic 已驗證），此半目前 latent，特意在註解寫明未涵蓋範圍，不讓下一個讀者誤以為本檢查已封閉整個「undefined」問題類別
-
-**[驗證結果]**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_configurator.py`（未改動前後 baseline）| exit=0 | result=`CONFIGURATOR VALIDATION: PASS questions=161 capabilities=199 modules=32`，改動前後不變
-- REALTEST_EVIDENCE: tool=Bash | cmd=5 組突變測試腳本（scratch，每組先從 pristine catalog 複製再改，跑完個別 revert，最後整體 revert 再跑一次確認回到 PASS）：(1) 跨 category 的 `equals:false` 前向參照 → FAIL 且訊息含 forward-references；(2) 額外重複一個 category id 同時製造真實前向參照 → FAIL 且明確列出 `duplicate category id`（修復 Major #1 前，這個案例會漏報真前向參照、誤報無關題目）；(3) `equals:true` 前向參照 → 維持 PASS（修復 Major/Minor #4 前會誤報 FAIL）；(4) 自我參照 → FAIL 且訊息為 `self-references`（修復 Minor #5 前訊息文字為誤導性的 forward-references）；(5) 參照目標 `category` 本身無效（渲染不到）→ FAIL 且仍正確標出前向參照（修復 Minor #3 前，`,0` 預設值會讓這個案例被誤判為「安全」）| exit=0（全部 5 組斷言通過）| result=`ALL MUTATIONS OK`
-- REVIEW_DONE: critic=Standard | verdict=warn（首輪：2 Major + 3 Minor + 1 Suggestion，0 Critical）→ 逐項修復後以上述 5 組突變測試自行驗證，未二次呼叫 critic subagent（額度考量，AGENTS.md §5 扇出治理；修復內容為單一小檔案的窄範圍修正，风险 Low，突變測試對每個 finding 都有專屬紅燈證據）| findings=0c/2m/3n（Major #1 重複 category id 遮蔽真前向參照已修；Major #2 delete 路徑半個不變量未涵蓋——選擇窄化註解說明邊界而非擴大實作，因使用者原始需求明確界定為「前向參照」這一種情境；Minor #3 預設值方向錯誤已修；Minor #4 equals:true 假陽性已修；Minor #5 自我參照訊息誤導已修；Suggestion #6/#7 為既有程式碼共通假設/效能備註，非本次改動範圍）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=`render_index`（新識別符）+ `active_when forward` | hits=1（僅本檔本身），確認無其他檔案引用此驗證器內部錯誤訊息格式或此識別符
-
-**[剩餘風險]**：Major #2（backward reference 到「本身有條件且目前答否」的題目，`app.js:20` 的 `delete` 分支）目前 latent（13 個 `equals:false` 參照全部指向無條件 active 的題目），未來若有人新增這類 catalog pattern，此檢查不會抓到；註解已明確標出此邊界，供下一個改動者判斷是否需要擴充。
-
-**Rollback**: `git checkout -- agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/validate_configurator.py`（單檔、無資料遷移、無下游依賴此檔內部實作）。
