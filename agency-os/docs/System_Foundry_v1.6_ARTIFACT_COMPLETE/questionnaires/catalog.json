@@ -235,50 +235,56 @@
       "description": "訂單成立後的出貨、追蹤與物流商相關能力：建立出貨單與貨態追蹤、結帳時比較物流商運費、超商或指定地點取貨、委外倉儲物流商（3PL）代為出貨，不包含物流商 API 串接本身（帳號、標籤格式、webhook 等技術實作細節）。"
     },
     {
-      "id": "mobile_offline",
+      "id": "plm_quality",
       "order": 36,
+      "title": "自有品牌開發與品質",
+      "description": "自有品牌或代工（OEM/ODM）商品從構想、打樣到規格定案的開發流程與物料清單（BOM），以及商品進出貨品質檢驗、瑕疵追蹤與召回，不含實際生產排程或工廠產線的製造執行系統（MES）。"
+    },
+    {
+      "id": "mobile_offline",
+      "order": 37,
       "title": "行動與離線",
       "description": "行動裝置、現場作業與離線能力"
     },
     {
       "id": "globalization",
-      "order": 37,
+      "order": 38,
       "title": "多國與在地化",
       "description": "語言、幣別、時區與資料所在地"
     },
     {
       "id": "ai",
-      "order": 38,
+      "order": 39,
       "title": "AI 與自動化",
       "description": "AI 輔助、生成、決策與代理操作"
     },
     {
       "id": "migration",
-      "order": 39,
+      "order": 40,
       "title": "既有系統與資料遷移",
       "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "regulated",
-      "order": 40,
+      "order": 41,
       "title": "特殊資料與產業",
       "description": "會觸發額外治理或法規研究的領域事實"
     },
     {
       "id": "business_impact",
-      "order": 41,
+      "order": 42,
       "title": "營運影響",
       "description": "描述業務本身的運作方式與影響，不是選工程技術"
     },
     {
       "id": "future",
-      "order": 42,
+      "order": 43,
       "title": "未來規劃",
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
       "id": "custom",
-      "order": 43,
+      "order": 44,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -2583,6 +2589,46 @@
             "equals": true
           }
         ]
+      }
+    },
+    {
+      "id": "Q-PLM-001",
+      "category": "plm_quality",
+      "label": "自有品牌商品開發：從構想、打樣到規格定案",
+      "description": "商品是你自己設計開發的自有品牌或代工（OEM/ODM）商品，需要追蹤從構想、打樣、樣品核可到規格定案、可以量產上架的完整開發流程，不是單純把別人已經做好的商品放上架銷售。不管理實際生產排程或工廠產線（那是製造執行系統 MES 的範疇），只管理開發專案本身的進度與核可。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-PLM-002",
+      "category": "plm_quality",
+      "label": "追蹤自有商品的物料清單（BOM）與規格版本異動",
+      "description": "已核可的自有品牌商品有明確的物料／零組件清單（BOM），列出組成品項、數量與成本參考，規格異動時能追蹤是哪個版本、改了什麼，用於估算成本與變更管理，跟庫存數量本身（「核心資料」類別的庫存／倉儲資料）是不同的資料。只在你有勾選「自有品牌商品開發：從構想、打樣到規格定案」時才有意義——沒有自己開發商品就沒有自己的物料清單可言。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PLM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-QA-001",
+      "category": "plm_quality",
+      "label": "商品進出貨品質檢驗與瑕疵追蹤",
+      "description": "商品進貨（不論是自己開發生產或跟供應商採購來賣）或出貨前需要做品質檢驗，發現瑕疵時要能建立瑕疵紀錄、指派矯正預防措施（CAPA）並追蹤到結案，不是「客戶可主動申請退貨或換貨（RMA）」的流程（那是「退貨與換貨（RMA）」類別，只有客戶不喜歡商品時才會用到；如果你的系統也有 RMA，退回商品的驗收結果會併入這裡的品質紀錄），也不限於你自己開發的商品——單純轉售別人商品一樣有進貨驗收品質檢驗的需求。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-QA-002",
+      "category": "plm_quality",
+      "label": "商品瑕疵召回（Recall）",
+      "description": "已出貨給客戶的商品被發現有安全或品質瑕疵，需要主動聯繫受影響的客戶、比對哪些訂單含有問題商品（以商品/品項為單位，不細分到生產批號）並回收或換貨，是牽涉客戶安全與可能法規通報的高風險流程，不是客戶單純不喜歡商品才申請的一般退貨換貨（RMA）。只在你有勾選「商品進出貨品質檢驗與瑕疵追蹤」時才有意義——沒有品質瑕疵紀錄機制，就無從判斷哪些商品需要召回。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-QA-001",
+        "equals": true
       }
     }
   ]

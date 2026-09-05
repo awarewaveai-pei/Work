@@ -959,7 +959,8 @@
         "A refund or exchange is never executed (via CAP-REFUNDS / inventory restock) before the return request has been approved.",
         "Inventory disposition (restock, quarantine, or dispose) is only recorded after the returned item has actually been received and inspected, never on request or approval alone.",
         "A return request always references a real, already-placed order and product; it cannot be created against an order that does not exist.",
-        "When CAP-SHIPPING is also selected, the return-shipment step (the customer sending the item back) uses that module's shipment/tracking record rather than a separate return-only shipment representation; when CAP-SHIPPING is not selected, return-shipment tracking is out of this module's scope."
+        "When CAP-SHIPPING is also selected, the return-shipment step (the customer sending the item back) uses that module's shipment/tracking record rather than a separate return-only shipment representation; when CAP-SHIPPING is not selected, return-shipment tracking is out of this module's scope.",
+        "When CAP-QUALITY-INSPECTION is also selected, the receiving-inspection step and its result compose with that capability's own Inspection/QualityIssue records instead of a second, parallel inspection concept; when CAP-QUALITY-INSPECTION is not selected, receiving inspection is a simple internal resellable/not-resellable check with no formal defect record."
       ],
       "security": [
         "A return request and its inspection result are only visible to the requesting customer and authorized staff; a customer cannot view or act on another customer's RMA."
@@ -1084,6 +1085,35 @@
       ],
       "recovery": [
         "Shipment, package, and tracking-event records are included in backup scope."
+      ]
+    },
+    "plm_quality": {
+      "purpose": "Track a self-designed or OEM/ODM product's development lifecycle from idea through sample approval to a released specification version and its bill of materials, plus incoming/outgoing quality inspection, defect and corrective-action (CAPA) tracking, and product recall -- distinct from CAP-PRODUCTS, which only holds the resulting sellable listing, and from CAP-VENDOR-MGMT, which this module references for the supplier/manufacturer relationship but does not itself own. Inspection and recall apply to any product in the catalog, self-developed or resold, independent of whether the product-development half of this module is in use at all.",
+      "invariants": [
+        "A specification version, once released (approved for production), is immutable and versioned; a later change creates a new specification version rather than silently rewriting a released one.",
+        "A sample or specification version cannot advance to the next development stage without its own defined sign-off step for that stage actually having occurred.",
+        "A bill of materials line item always references an already-created development project; it cannot exist for a product with no development project record.",
+        "A quality issue's root defect is only recorded after an inspection has actually occurred, never asserted without a corresponding inspection record.",
+        "A recall is only created from a quality issue that has already been confirmed as a defect through inspection; it can never be initiated directly from an unconfirmed report.",
+        "A recall's affected-customer list is derived from actually matching the affected product (at the product/SKU level, not batch/lot -- this catalog has no batch/lot-level tracking capability, so a recall scopes to every order of the affected product/SKU) against real orders (via CAP-ORDERS/CAP-CUSTOMER-DATA), never from an estimated or assumed customer population.",
+        "When CAP-RETURNS is also selected, a customer return's receiving-inspection step composes with this module's own Inspection/QualityIssue records instead of maintaining a second, parallel inspection concept; when CAP-RETURNS is not selected, a customer return's inspection (if any) is out of this module's scope.",
+        "When CAP-FILES is also selected, inspection evidence, defect photos, sample photos, and released specification documents are stored as that module's file records rather than a module-local attachment concept; when CAP-FILES is not selected, evidence capture is limited to this module's own structured fields (checklist results, free-text notes), with no binary attachment storage of its own.",
+        "When CAP-REVIEWS is also selected, a defect reported through a customer product review can be aggregated into the same QualityIssue record as a defect found through inspection, rather than tracked as a separate, parallel complaint category; when CAP-REVIEWS is not selected, review-sourced defect signals are out of this module's scope.",
+        "This module never asserts regulatory/compliance authority over what is or is not compliant, or over recall reporting obligations themselves (compliance authority is out of scope); it only tracks the operational workflow and, per DERIVE-COMPLIANCE-RECALL, triggers the same current-regulatory-research obligation (DER-COMPLIANCE-RESEARCH) already required for other high-stakes categories such as CAP-GOV or CAP-HEALTH-DATA. Selecting recall alone does not raise this project's overall criticality/profile classification (DERIVE-COMPLIANCE-RECALL is deliberately decoupled from the `regulated`/`profile=enterprise` question set that every other DER-COMPLIANCE-RESEARCH trigger belongs to) -- the operational recall workflow and the project's overall regulatory risk posture are tracked as two separate concerns, not conflated into one."
+      ],
+      "security": [
+        "Development-project, sample, specification, and BOM detail (`plm.read`/`plm.manage`) is only visible to authorized staff, never to customers, keeping product-development data separate from the PIM listing copy the customer actually sees.",
+        "Recording an inspection finding (`quality.inspect`) and approving a specification version, sample, or quality-issue disposition for the next stage (`quality.approve`) require separate permissions; a person who can record an inspection finding cannot also approve its disposition without holding the separate approval permission."
+      ],
+      "tests": [
+        "The released-spec-immutability invariant is contract-tested: attempting to modify a released specification version in place is rejected; only creating a new version succeeds.",
+        "The recall-requires-confirmed-defect invariant is contract-tested: attempting to create a recall from a quality issue with no inspection record behind it is rejected."
+      ],
+      "operations": [
+        "Development projects stalled past an expected stage-turnaround time, and quality issues open past an expected CAPA resolution time, are observable."
+      ],
+      "recovery": [
+        "Development project, sample, specification version, BOM, inspection, quality issue, CAPA, and recall records are included in backup scope."
       ]
     }
   }

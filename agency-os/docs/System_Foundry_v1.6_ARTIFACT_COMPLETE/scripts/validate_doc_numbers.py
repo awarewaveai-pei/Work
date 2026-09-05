@@ -9,12 +9,17 @@
 # suggestion #4").
 #
 # Each check below is anchored to a specific, distinctive sentence fragment (not a bare
-# global \d+ regex) so that numbers which are NOT catalog counts -- `2^208` (a theoretical
-# answer-vector count, a different kind of "208"), "1,000 randomized configurations" (a fixed
-# test parameter, not derived from any catalog file), "SHA-256" (a hash algorithm name), and
-# the CHANGELOG's "+43 capabilities, +43 questions" (a historical per-release delta, not a
-# live running total) -- are never touched. The full four-doc grep that produced this exact
-# anchor list is recorded in the WORKLOG entry for this change.
+# global \d+ regex) so that numbers which are NOT catalog counts -- "1,000 randomized
+# configurations" (a fixed test parameter, not derived from any catalog file), "SHA-256" (a
+# hash algorithm name), and the CHANGELOG's "+43 capabilities, +43 questions" (a historical
+# per-release delta, not a live running total) -- are never touched. The full four-doc grep
+# that produced this exact anchor list is recorded in the WORKLOG entry for this change.
+#
+# `2^N` in the assurance report's Scope section IS a live catalog count (the question count,
+# as a theoretical answer-vector exponent) and is checked below -- an earlier version of this
+# comment wrongly called it "a different kind of 208" and exempted it, which let it drift
+# silently through 208->209->212->214->218->222 across five releases before a 2026-09-06
+# critic review caught both the drift and the wrong exemption in the same pass.
 #
 # Ground truth sources:
 #   - question/capability/module/baseline-capability counts: computed directly from the
@@ -154,6 +159,7 @@ def main():
         ('CHANGELOG_v1.6.md', r'all (\d+) single-question cases', [q], 'question count'),
         ('CHANGELOG_v1.6.md', r'Complete (\d+)-artifact planning/assurance package', [module_artifacts], 'per-module artifact count'),
 
+        ('V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md', r'all `2\^(\d+)` theoretical answer vectors', [q], 'question count (as answer-vector exponent)'),
         ('V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md', r'exactly (\d+) blueprint documents', [blueprints], 'blueprint count'),
         ('V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md', r'the (\d+) Foundry baseline capabilities', [baseline_caps], 'baseline capability count'),
         ('V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md', r'locks all (\d+) current capabilities', [caps], 'capability count'),

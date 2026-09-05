@@ -190,6 +190,14 @@
       "derive": [
         "DER-CARRIER-ADAPTER"
       ]
+    },
+    {
+      "id": "DERIVE-COMPLIANCE-RECALL",
+      "when_capability": "CAP-RECALL",
+      "derive": [
+        "DER-COMPLIANCE-RESEARCH",
+        "DER-POLICY-FRESHNESS"
+      ]
     }
   ]
 }

@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-09-06（System Foundry：5個真缺口的第4個 PLM/Quality 落地，首次派兩個獨立critic不同視角平行覆審，其中一個回報BLOCK）
+
+[根因/決策] 承接前三輪（Pricing/Promotions、Fraud/Risk、Logistics/Shipping）確認的5個真缺口，本輪做第4個：PLM/Quality（自有品牌開發+品質檢驗+召回）。設計新增4個capability：`CAP-PRODUCT-DEVELOPMENT`（自有品牌開發流程）、`CAP-BOM`（用料表，requires `[CAP-PRODUCT-DEVELOPMENT]`）、`CAP-QUALITY-INSPECTION`（進出貨品質檢驗+瑕疵追蹤，requires `[CAP-PRODUCTS]`，刻意獨立於`CAP-PRODUCT-DEVELOPMENT`讓純轉售商家也能用）、`CAP-RECALL`（商品召回，requires `[CAP-QUALITY-INSPECTION,CAP-ORDERS,CAP-CUSTOMER-DATA]`）。實作過程agent自己推翻了brief假設的`CAP-APPROVAL`依賴邊（機械查證`CAP-APPROVAL`全庫零跨模組消費者，`CAP-PROCUREMENT`/`CAP-RETURNS`自己的核准步驟都不require它），改為描述層級的intrinsic sign-off寫法；並主動新增`DERIVE-COMPLIANCE-RECALL`（沿用既有7個高風險capability的`DER-COMPLIANCE-RESEARCH`+`DER-POLICY-FRESHNESS`推導樣式），兩項設計決策均明確標記請critic覆審不視為既定。
+
+[critic覆審——首次雙critic不同視角平行覆審] 鑑於ultracode模式啟用、且agent自報的兩項設計決策需要獨立判斷，本輪首次同時派兩個完全獨立的critic session，分別給不同鏡頭：**critic A（機械/resolver正確性）**verdict SHIP WITH MINOR FIXES；**critic B（設計判斷/藍圖完整性，逐字重讀`_47_PLM_Quality.md`全文168行）**verdict **BLOCK**。兩者合併後的真缺陷與已修正項：
+
+- **M1（Major，critic B抓到，已修）**：`CAP-RECALL`的obligations不變量宣稱「比對batch/lot」，但全庫261個capability掃描顯示**沒有任何capability擁有batch/lot層級追蹤**（`CAP-INVENTORY`/`CAP-ORDERS`都只到商品層級），master blueprint:2438確實把Batch列為Quality Management元素但本輪沒有建置——這是「已上線的module contract宣稱一個在任何可達組態下都無法滿足的機制」，跟`8073bd5cb`那輪`CAP-CHARGEBACK`缺`CAP-REFUNDS`同一個class的第4次重演。修法：不新增`CAP-BATCH-TRACKING`（範圍蔓延），改把capability描述、obligations不變量、`Q-QA-002`題目文案三處全部收窄成「以商品/SKU為單位」，並明確排除batch/lot層級追蹤為本輪非目標。
+- **M2（Major，critic B抓到，已修）**：藍圖`_47`章節的Core Dependencies明確列出`Files`（全部51個LEGO文件中只有4個宣告Files為Core Dependency，本章節是其中之一），但本輪跟`CAP-WARRANTY`/`CAP-RETURNS`一樣沒有`CAP-FILES`依賴——critic B指出這個「比照既有慣例排除」的理由**不成立**，因為`_16_Returns_Warranty`章節自己的Core Dependencies從未列過Files，兩者情境不同。修法：在`plm_quality` obligations加一條跨模組不變量（若選了`CAP-FILES`，檢驗證據/瑕疵照片/規格文件走該模組的檔案記錄；若未選，證據僅限本模組結構化欄位）；判斷不需要在`files`模組（通用基礎設施、文字風格極簡、從不點名任何特定消費者）鏡射對稱句，避免破壞其既有的通用寫法慣例。
+- **M3（Major，critic B抓到，已修）**：藍圖`_47:146`唯三條驗收標準之一明確要求「Return/review defect 可彙總 quality issue」——本輪只做了return那一半（雙向），review那一半（`CAP-REVIEWS`）完全沒碰。已在`CAP-QUALITY-INSPECTION`描述與`plm_quality`obligations都補上對稱的跨模組不變量。
+- **m4（Minor，兩個critic都提到，已文件化）**：`DERIVE-COMPLIANCE-RECALL`是史上第一個把`DER-COMPLIANCE-RESEARCH`/`DER-POLICY-FRESHNESS`跟`profile=enterprise`解耦的觸發點（其餘7個既有觸發都活在`configurator_engine.py`的`regulated`問題集合裡，這個沒有）——critic B判斷「不是不該做，是沒寫下來」，已在obligations不變量明確記錄這個刻意的解耦決策，避免未來機械掃描重新質疑。
+- **m5/m6/m7（Minor，已修）**：`CAP-BOM`跟既有`CAP-INVENTORY-COSTING`（存貨計價）語意鄰近但無消歧句，已補；`CAP-QUALITY-INSPECTION`描述用了「supplier」卻不require`CAP-VENDOR-MGMT`（跟同模組sibling `CAP-PRODUCT-DEVELOPMENT`不一致），已補說明句釐清這是敘述性文字非真正宣稱擁有；`Q-QA-001`引用「退貨與換貨」類別跟`Q-RET-001`標籤都被截斷（真實應為「退貨與換貨（RMA）」／「客戶可主動申請退貨或換貨（RMA）」），第6次出現的「跨檔引用要逐字核對」同一個class，已修正。
+
+- **Critic A另抓到一項Major（測試覆蓋率缺口，非本輪獨有）**：`rules/derivation-rules.json`24條規則中，8個既有的`DERIVE-COMPLIANCE-*`規則全部共用同一對`DER-COMPLIANCE-RESEARCH`+`DER-POLICY-FRESHNESS`推導結果——critic A實測逐一移除全部24條規則，發現**14條（含本輪新增的`DERIVE-COMPLIANCE-RECALL`）刪掉後13步verify chain+29個unittest完全不會發現**，因為all-YES覆蓋率斷言只在「一個`DER-*`只有一條規則」時才抓得到誤刪。這不是本輪造成，是既有機械閘一個從未被注意到的盲點，本輪新增的規則只是第14個實例。依「不單點補丁」紀律，開了第4條TASKS.md §D條目（含critic實測列出的完整14條清單），登記待補class級檢查，不在本輪臨時湊一個只保護`DERIVE-COMPLIANCE-RECALL`的專屬斷言。
+- **2^208→2^222修正**：`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md`的`2^208`（理論答案向量數）從`d51624f13`那輪就是真實題數，卻在`validate_doc_numbers.py`的排除清單裡被誤判成「不是目錄計數的另一種208」而永久豁免不檢查——經過208→209→212→214→218→222五次改動全部沒被抓到。已修正文字為`2^222`，並修正腳本裡錯誤的排除理由，新增一條真正的機械檢查（突變測試證明會抓：改回`2^208`會正確FAIL並標出`expected 222, found 208`）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=13步verify chain+`python -m unittest discover -s tests`（agent實作後、兩個critic各自獨立重跑、我套用全部修正後三輪）| exit=0（每一輪、每一步）| result=最終`questions=222 capabilities=261 modules=49 standard_modules=48 pairwise_valid=24525 pairwise_rejected=6(不變) pairwise_total=24531`；`Ran 29 tests...OK`；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=修正M1後親自跑真實`resolve(Q-QA-002)` | exit=0 | result=`CAP-RECALL/CAP-QUALITY-INSPECTION/CAP-ORDERS/CAP-CUSTOMER-DATA`全部`True`，`profile=standard criticality=low`（確認m4記錄的解耦狀態）——文字層級修正未動搖resolver行為
+- REALTEST_EVIDENCE: tool=Bash | cmd=`2^208`→`2^222`新機械檢查突變測試（改回`2^208`）| exit=1 | result=`expected 222 (question count...), found 208`正確攔截，還原後重跑`DOC NUMBERS VALIDATION: PASS`
+- REVIEW_DONE: critic=Standard×2（首次雙獨立critic不同視角平行覆審：A機械正確性 SHIP WITH MINOR FIXES、B設計判斷/藍圖完整性 BLOCK）| verdict=兩份合併後3個Major+1個Major(測試覆蓋率)全部處理（3個文字修正+1個TASKS.md登記）+4個Minor全修 | findings=0c/0m（收尾時）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-PRODUCT-DEVELOPMENT\|CAP-BOM\|CAP-QUALITY-INSPECTION\|CAP-RECALL\|DERIVE-COMPLIANCE-RECALL\|Q-PLM-00[1-2]\|Q-QA-00[1-2]` | hits=每個新id僅在歸屬檔各出現一次，零重複零半寫引用；critic B另跑中英文雙語全庫掃描（35個capability描述是中文，純英文grep會漏檢），確認`CAP-RETURNS`是唯一既有Class-3實例（已修復）
+
+[剩餘風險] TASKS.md §D新增第4條（14條derivation rule測試覆蓋率缺口）待排入，含完整清單；Class 2清單維持7個未實際處理；第9候選Inventory/WMS多倉庫仍待深讀；5個真缺口中已完成4個（Pricing/Promotions、Fraud/Risk、Logistics/Shipping、PLM/Quality），剩餘1個（Merchandising，含分析階段標記為「本報告最有風險的單一依賴邊決策」的`CAP-MERCHANDISING`→`CAP-SEARCH`）待落地。
+
 ## 2026-09-06（System Foundry：5個真缺口的第3個 Logistics/Shipping 落地，critic 抓到「同一名詞跨模組無邊」第三度重演）
 
 [根因/決策] 承接前兩輪（Pricing/Promotions、Fraud/Risk）確認的5個真缺口，本輪做第3個：Logistics/Fulfillment（出貨/物流）。設計新增5個capability：`CAP-SHIPPING`（出貨單建立+貨態追蹤，requires `[CAP-ORDERS,CAP-PRODUCTS]`）、`CAP-SHIPPING-RATES`（運費試算，requires `[CAP-SHIPPING]`）、`CAP-PICKUP-POINT`（超商/取貨點，requires `[CAP-SHIPPING]`）、`CAP-3PL`（委外倉儲代發貨，requires `[CAP-SHIPPING,CAP-INVENTORY]`——跟既有`CAP-DROPSHIP`〔供應商自己出貨〕明確不同，貨權歸屬是判準）、`DER-CARRIER-ADAPTER`（物流商協定隔離層，仿既有`DER-PAYMENT-ADAPTER`）。承接master blueprint把Shipping跟Payments/Accounting/Tax同列「優先串接」清單、但後三者都有實體capability的先例。

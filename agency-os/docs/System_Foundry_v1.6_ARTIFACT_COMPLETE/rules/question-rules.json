@@ -2182,6 +2182,46 @@
       "require": [
         "CAP-3PL"
       ]
+    },
+    {
+      "id": "RULE-Q-PLM-001",
+      "when": {
+        "question": "Q-PLM-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-PRODUCT-DEVELOPMENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-PLM-002",
+      "when": {
+        "question": "Q-PLM-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-BOM"
+      ]
+    },
+    {
+      "id": "RULE-Q-QA-001",
+      "when": {
+        "question": "Q-QA-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-QUALITY-INSPECTION"
+      ]
+    },
+    {
+      "id": "RULE-Q-QA-002",
+      "when": {
+        "question": "Q-QA-002",
+        "equals": true
+      },
+      "require": [
+        "CAP-RECALL"
+      ]
     }
   ]
 }

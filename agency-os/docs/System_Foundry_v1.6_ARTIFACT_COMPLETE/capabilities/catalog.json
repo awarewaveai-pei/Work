@@ -2084,6 +2084,45 @@
         "CAP-SHIPPING"
       ],
       "description": "Carrier/logistics provider integration sits behind an owned adapter boundary, not a direct dependency on any single carrier's API, label format, or tracking webhook shape."
+    },
+    {
+      "id": "CAP-PRODUCT-DEVELOPMENT",
+      "name": "Own-Brand Product Development",
+      "module": "plm_quality",
+      "requires": [
+        "CAP-PRODUCTS",
+        "CAP-VENDOR-MGMT"
+      ],
+      "description": "Tracks a self-designed or OEM/ODM product through its own development lifecycle -- idea, sample, sample approval, and specification version -- up to the point it is approved for production and ready to be listed for sale, distinct from CAP-PRODUCTS, which only holds the resulting sellable listing once development is done. A sample or specification version advances through a defined sign-off step before moving to the next stage, the same intrinsic sign-off-within-a-workflow pattern CAP-PROCUREMENT and CAP-RETURNS already use without depending on the separate, opt-in CAP-APPROVAL engine (which represents a configurable cross-cutting approval-workflow feature, not any process that happens to have a decision point). Requires CAP-VENDOR-MGMT because a self-developed product is made through a supplier/manufacturer relationship this capability references but does not itself own. Does not own actual production scheduling or shop-floor manufacturing execution (a full manufacturing execution system, MES); it stops at 'approved for production'."
+    },
+    {
+      "id": "CAP-BOM",
+      "name": "Bill of Materials",
+      "module": "plm_quality",
+      "requires": [
+        "CAP-PRODUCT-DEVELOPMENT"
+      ],
+      "description": "The materials, components, and quantities that make up a self-developed product are recorded as a bill of materials, used to calculate the product's internal material cost and to track what changed between specification versions. This is an internal costing reference only -- it never decides what a customer is charged at checkout; that pricing decision belongs to CAP-CHANNEL-PRICING/CAP-PROMOTIONS. Also distinct from CAP-INVENTORY-COSTING, which computes inventory value and cost-of-goods-sold from actual stock movements (FIFO/weighted-average) for financial statements; a BOM's material-cost estimate is a design-time reference that may inform, but is not itself, that inventory valuation. Requires CAP-PRODUCT-DEVELOPMENT because a bill of materials only exists for a product this business is itself developing, not a product bought ready-made for resale."
+    },
+    {
+      "id": "CAP-QUALITY-INSPECTION",
+      "name": "Quality Inspection & Defect Tracking",
+      "module": "plm_quality",
+      "requires": [
+        "CAP-PRODUCTS"
+      ],
+      "description": "Incoming or outgoing product inspections record findings against a defined checklist, and a defect found during inspection creates a quality issue that can be assigned a corrective action (CAPA) and tracked through to resolution. Applies to any product in the catalog, whether self-developed or bought ready-made for resale -- inspecting goods received from a supplier does not require having designed the product -- so this deliberately does not require CAP-PRODUCT-DEVELOPMENT. \"Supplier\" here is narrative context (which party shipped the goods being inspected), not an owned entity this capability manages; it deliberately does not require CAP-VENDOR-MGMT (unlike CAP-PRODUCT-DEVELOPMENT, which does, because it actually tracks a supplier relationship for sourcing/development) -- an inspection record references a shipment/receipt, not a vendor profile. When CAP-RETURNS is also selected, the receiving-inspection step of a customer return composes with this capability's own inspection/quality-issue records instead of a second, parallel inspection concept; when CAP-RETURNS is not selected, a returned item's inspection is out of this capability's scope. When CAP-REVIEWS is also selected, a defect reported through a product review can be aggregated into the same quality-issue record rather than tracked as a separate, parallel complaint."
+    },
+    {
+      "id": "CAP-RECALL",
+      "name": "Product Recall",
+      "module": "plm_quality",
+      "requires": [
+        "CAP-QUALITY-INSPECTION",
+        "CAP-ORDERS",
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "A safety or quality defect confirmed through CAP-QUALITY-INSPECTION triggers a recall: the affected product (at the product/SKU level) is matched against which orders -- and therefore which customers -- actually received it, so those customers can be proactively notified and the affected units collected or replaced, distinct from CAP-RETURNS, where the customer initiates contact simply because they no longer want an undamaged product. Requires CAP-ORDERS and CAP-CUSTOMER-DATA because a recall is unexecutable without knowing which orders and customers received the affected product, the same reasoning CAP-CHARGEBACK and CAP-RISK-SCREENING already use for needing to identify a customer. Batch/lot-level traceability (narrowing a recall to only the specific production lot rather than every order of that product/SKU) is explicitly out of scope for this capability -- neither CAP-INVENTORY nor CAP-ORDERS carries lot-level granularity anywhere in this catalog, and adding it would be a real, separate capability, not an implicit part of this one. Does not decide legal/regulatory recall authority or reporting obligations itself -- compliance authority is out of this module's scope -- it only tracks the operational workflow of identifying and reaching affected customers."
     }
   ]
 }

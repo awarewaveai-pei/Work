@@ -687,6 +687,19 @@
         "CAP-SHIPPING-RATES",
         "DER-CARRIER-ADAPTER"
       ]
+    },
+    {
+      "id": "plm_quality",
+      "paths": [
+        "packages/plm-quality",
+        "tests/contract/plm-quality"
+      ],
+      "activated_by": [
+        "CAP-BOM",
+        "CAP-PRODUCT-DEVELOPMENT",
+        "CAP-QUALITY-INSPECTION",
+        "CAP-RECALL"
+      ]
     }
   ]
 }
