@@ -1,0 +1,157 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/reconciliation-record.schema.yaml"
+title: Reconciliation Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ReconciliationRecord` -- the
+  declared `outputs` of `database_data.reconciliation`'s Method
+  Contract. THIRD `database_data`-family typed object, after
+  `BackupRestoreDrillRecord` and `DataLineageRecord`. Atlas's own F21
+  table row formula (L908: "counts/checksums/business
+  invariants->diff->resolve") maps onto this schema's `checks[]` array
+  (one item per count/checksum/business-invariant compared) and the
+  record-level `overall_status` (the "resolve" half of the formula: an
+  unresolved real diff keeps the record from claiming completeness).
+
+  `matches` (and, for `check_type: COUNT`, `diff`) on every check item
+  are COMPUTED by `ai_lego.compute.reconciliation.compare
+  .compute_check_result`, never caller-asserted -- the runtime layer
+  (ai_lego/modules/database_data/reconciliation.py) is the enforcement
+  point; a caller-supplied `matches` that disagrees with the recomputed
+  value is refused at construction and independently re-caught by this
+  method's own gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Reconciliation row (L908): 'counts/checksums/business invariants->diff->resolve'"
+  - "methods/contracts/database_data.reconciliation.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+type: object
+required: [id, version, source_ref, target_ref, checks, overall_status, engine, computation_provenance_ref, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^RECON-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "database_data.reconciliation"
+  source_ref:
+    type: string
+    minLength: 1
+    description: "Which system/dataset is the 'old' side of the comparison (Atlas's own 'counts/checksums/business invariants' formula's implicit left-hand side, e.g. the pre-migration source database)."
+  target_ref:
+    type: string
+    minLength: 1
+    description: "Which system/dataset is the 'new' side of the comparison (e.g. the post-migration target database)."
+  checks:
+    type: array
+    minItems: 1
+    description: "One item per count/checksum/business-invariant compared (Atlas's own three-way vocabulary). REQUIRED non-empty -- a reconciliation record that checks nothing cannot support Atlas's own benefit column claim ('migration 後可證明完整性' -- provable completeness after migration)."
+    items:
+      type: object
+      required: [id, name, check_type, source_value, target_value, matches]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique (within this record's own checks[]) identifier for this comparison -- audit-trail identifiability, the same duplicate-id hygiene database_data.data_lineage's own nodes[] array already established, though the failure mode here is weaker (no shared compute keys by check id the way traces_to_source keys by node id)."
+        name:
+          type: string
+          minLength: 1
+          description: "Human-readable label for what is being compared, e.g. 'row count: orders table' or 'checksum: customer PII column'."
+        check_type:
+          enum: [COUNT, CHECKSUM, BUSINESS_INVARIANT]
+          description: "Atlas's own three-way vocabulary (L908). Determines HOW matches/diff are computed -- see ai_lego.compute.reconciliation.compare.compute_check_result."
+        source_value:
+          type: string
+          description: "The value observed on the source_ref side. For check_type:COUNT this must parse as a finite number (enforced at the runtime layer, not the schema layer -- a schema-level numeric-string pattern would reject legitimate representations like '1_000' or scientific notation)."
+        target_value:
+          type: string
+          description: "The value observed on the target_ref side. Same shape rule as source_value."
+        matches:
+          type: boolean
+          description: "COMPUTED (not caller-asserted): whether source_value and target_value agree, per check_type's own comparison semantics. A caller-supplied value that disagrees with the recomputation is refused at construction (runtime layer)."
+        diff:
+          type: ["number", "null"]
+          description: "COMPUTED, check_type:COUNT only: the EXACT target_value - source_value, computed via decimal.Decimal (never float, which loses precision above 2^53) with no rounding or tolerance of any kind. null for CHECKSUM/BUSINESS_INVARIANT (not a well-defined numeric quantity for an opaque hash or a free-form assertion). See ai_lego.compute.reconciliation.compare's own module docstring for why no tolerance is applied -- a caller who knows a specific discrepancy is expected records that via the check's own resolution field, not a silent numeric guess."
+        resolution:
+          type: object
+          required: [resolved_as_expected, note]
+          description: "OPTIONAL: present only when a human (or an AI acting on a human's behalf) has looked at a check and recorded what the diff means. Absent means 'not yet looked at', not 'no diff' -- a check with matches:true legitimately carries no resolution at all."
+          properties:
+            resolved_as_expected:
+              type: boolean
+              description: "true: the diff (or lack thereof) is understood and acceptable (e.g. 'expected timezone-offset difference'). false: a REAL problem was found and documented -- this does NOT mean the check is 'resolved' in the sense of being fixed, only that it has been looked at and confirmed as a genuine issue. Directly gates overall_status:reconciled -- see method contract preconditions."
+            note:
+              type: string
+              minLength: 1
+              description: "Non-empty explanation of what was found. Required together with resolved_as_expected -- a resolution with no explanation is not a real resolution, the same 'assertion needs a reason' discipline this package's evidence-labeling gates already apply elsewhere."
+  overall_status:
+    enum: [reconciled, open]
+    description: "reconciled requires EVERY check to have matches:true OR a resolution with resolved_as_expected:true -- enforced at the runtime layer (ai_lego/modules/database_data/reconciliation.py), not the schema layer. ONE-DIRECTIONAL, same class of restraint database_data.backup_restore_drill.contract.yaml's own status field already established: a caller may conservatively declare overall_status:open even when every check technically already matches or is resolved (e.g. pending a human sign-off) -- that is a legitimate operational choice, not forbidden by Atlas's own text."
+  engine:
+    const: "local_python_deterministic_compute"
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted, importlib-resolvable path to the pure function that computed every check's matches/diff -- ai_lego.compute.reconciliation.compare.compute_check_result."
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- matches/diff are genuine deterministic compute, not a narrative claim or human opinion."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A reconciled record: one COUNT check matches exactly, one CHECKSUM check matches"
+    value:
+      id: "RECON-2026-09-05-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.reconciliation"
+      source_ref: "legacy_orders_db (pre-migration snapshot)"
+      target_ref: "orders_db_v2 (post-migration)"
+      checks:
+        - id: "CHECK-1"
+          name: "row count: orders table"
+          check_type: COUNT
+          source_value: "48213"
+          target_value: "48213"
+          matches: true
+          diff: 0
+        - id: "CHECK-2"
+          name: "checksum: customer PII column"
+          check_type: CHECKSUM
+          source_value: "d41d8cd98f00b204e9800998ecf8427e"
+          target_value: "d41d8cd98f00b204e9800998ecf8427e"
+          matches: true
+          diff: null
+      overall_status: reconciled
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.reconciliation.compare.compute_check_result"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "An open record: a real COUNT mismatch has been investigated and confirmed as a genuine problem (not expected)"
+    value:
+      id: "RECON-2026-09-05-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.reconciliation"
+      source_ref: "legacy_orders_db (pre-migration snapshot)"
+      target_ref: "orders_db_v2 (post-migration)"
+      checks:
+        - id: "CHECK-1"
+          name: "row count: orders table"
+          check_type: COUNT
+          source_value: "48213"
+          target_value: "48201"
+          matches: false
+          diff: -12
+          resolution: {resolved_as_expected: false, note: "12 orders confirmed lost during migration cutover window -- real data-loss incident, not expected. Opened as a blocking issue before this migration can be signed off."}
+      overall_status: open
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.reconciliation.compare.compute_check_result"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F21 tool table row (L908) directly. Validated against jsonschema Draft202012Validator."
+  note: "The three-way check_type vocabulary is directly transcribed from Atlas's own formula. The reconciled/open pass invariant and the matches/diff recomputation are both enforced at the runtime layer, not the schema layer -- disclosed, not silently unenforced. No mother document was modified."

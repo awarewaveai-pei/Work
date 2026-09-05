@@ -908,6 +908,53 @@ tier_1:
       teaching example. Tier 1, mandated by the actively-running
       implementation slice, same category as the twenty-five entries
       above it.
+  twentyseventh_concrete_entry:
+    # NEW (2026-09-05, same session): twenty-seventh Tier 1 entry, same
+    # additive-key rationale as the twenty-six entries above it.
+    method_id: "database_data.reconciliation"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. THIRD entry
+      from the `database_data` family (F21), after
+      database_data.backup_restore_drill and database_data.data_lineage.
+      Atlas's own F21 table row (L908: "counts/checksums/business
+      invariants->diff->resolve") is this method's primary citation, and
+      L910 redirects all of F21's own step sequences to Execution
+      Contract §28 as sole canonical source -- a critic review of this
+      contract's own first draft caught that it had, again, understated
+      its own due-diligence grep scope (specs/**+methods/** only, ~69
+      hits, not the full spec root's 182), missing real supporting
+      corpus: EC §28's own flow diagram (L1100) carries the IDENTICAL
+      three-way formula, EC §29 (L1135) independently lists "Data
+      Reconciliation" as a required migration assessment item, EC §30
+      (L1154-1176) mandates six Data Integrity Contract elements of
+      which this method covers three (Checksums/Counts/Business
+      Invariants, not Preconditions/Postconditions/Quarantine Policy --
+      disclosed, not silently in scope), and an ACTIVE ADR-005a recipe
+      (recipes/validated/db-migration-expand-contract.recipe.yaml
+      L194-198) already carries a gate-bound "Reconciliation" capability
+      step not yet wired to this new machine_id. No duplicate typed
+      object or method contract found in any of it. A SECOND, unrelated
+      critic finding: the first-draft compute module used `float` for
+      COUNT comparisons, silently losing precision above 2^53 (a real
+      row-count magnitude) and producing a false match with zero
+      tampering -- rewritten to use `decimal.Decimal` with no rounding
+      of any kind. A THIRD finding: the builder never recomputed
+      matches/diff for hand-built checks, so a caller bypassing the
+      per-check builder function could freely assert a false verdict
+      and have it certified `overall_status:reconciled` -- fixed by
+      recomputing and rebuilding every check from its own raw values,
+      the same discipline database_data.data_lineage's own builder
+      already established for hand-built node dicts. See the contract's
+      own compilation_decisions and open_questions for full accounting.
+    source: "methods/contracts/database_data.reconciliation.contract.yaml (built same session as this entry, mints machine_id database_data.reconciliation) + specs/cognitive/typed-objects/reconciliation-record.schema.yaml (new output type) + ai_lego/compute/reconciliation/compare.py (new compute module)"
+    note: >
+      Not placed under `tier_0`: Atlas gives this method exactly one
+      table-row citation (plus the Execution Contract corpus disclosed
+      above), thinner than several Tier 0 examples. Tier 1, mandated by
+      the actively-running implementation slice, same category as the
+      twenty-six entries above it.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

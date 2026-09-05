@@ -1,0 +1,319 @@
+$id: "ai-lego://methods/contracts/database_data.reconciliation.contract.yaml"
+title: "Reconciliation Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Twenty-ninth Method Atlas slice, THIRD from the
+  `database_data` family (F21's own "資料庫／資料套件 (DB / Data Pack)"),
+  after `database_data.backup_restore_drill` (twenty-fifth slice) and
+  `database_data.data_lineage` (twenty-eighth slice).
+
+  Atlas's own F21 tool table gives this method its primary citation
+  (L908: "counts/checksums/business invariants->diff->resolve",
+  benefit "migration 後可證明完整性" -- a migration can be proven
+  complete), and L910 (immediately under the table) redirects ALL of
+  F21's own step sequences to "Execution Contract §28（唯一正本）" as
+  sole canonical source for precise steps -- so Atlas itself names the
+  Execution Contract as this method's real second citation, not an
+  incidental cross-reference.
+
+  CORRECTED post-critic-review: this contract's own first draft claimed
+  a full-spec-root grep found only 9 hits, all an unrelated
+  documentation-consistency sense of "reconcil-", and understated its
+  own scope (it actually ran against `specs/**`+`methods/**` only, ~69
+  hits there -- repeating, on this exact grep-scope point, the SAME
+  understatement a critic review already caught in
+  `database_data.data_lineage.contract.yaml`). The corrected, full
+  spec-root grep (182 hits across 74 files) surfaces real, substantive
+  corpus that the narrower search missed:
+
+  - `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md`
+    §28's own flow diagram (L1100): "Reconciliation（counts / checksums
+    / business invariants —— EC §30 既有要求原樣保留）" -- the IDENTICAL
+    three-way formula as Atlas L908, confirming (not merely by
+    coincidence) that Atlas F21's Reconciliation row and EC §28's own
+    Reconciliation step are the same concept, with EC §28 redirecting
+    to §30 for the detailed requirement.
+  - Same document, §29 "DB Migration Requirements" (L1117-1153), whose
+    own pre-migration assessment checklist independently lists "Data
+    Reconciliation" (L1135) as one of the things a migration must
+    evaluate.
+  - Same document, §30 "Data Integrity Contract" (L1154-1176): a data
+    change must define six elements -- Preconditions / Business
+    Invariants / Postconditions / Checksums / Counts / Reconciliation
+    Query / Quarantine Policy -- and states outright that a migration
+    "完成不能只看 command exit code = 0，必須證明 data invariant = PASS".
+    This method implements the Checksums/Counts/Business-Invariants
+    comparison half of §30's own six elements (the exact half Atlas's
+    F21 row separately names); it does NOT implement Preconditions,
+    Postconditions, or a separate Quarantine Policy field -- disclosed,
+    not silently in scope, see OQ-RECONCILIATION-3.
+  - `recipes/validated/db-migration-expand-contract.recipe.yaml`
+    (L194-198): an ACTIVE, ADR-005a-grounded 15-step recipe already
+    carries a `label: "Reconciliation"` / `ref: reconciliation` /
+    `gate_ref: "data"` capability step. This is a procedural step SLUG
+    in a recipe (`type: capability`), not a typed-object schema or a
+    method contract -- it does NOT define or duplicate
+    `ReconciliationRecord`/`database_data.reconciliation` -- but it IS
+    the natural future consumer of this newly-minted machine_id,
+    disclosed as unwired rather than silently ignored, see
+    OQ-RECONCILIATION-4.
+
+  None of this wider corpus defines a competing TYPED OBJECT or method
+  contract for this concept -- "no duplicate found" still holds -- but
+  the corrected scope changes two things the first draft got wrong:
+  this method's real citation basis is Atlas F21 L908 PLUS Execution
+  Contract §28/§29/§30 (not Atlas alone), and this method covers only
+  half of EC §30's own six mandated elements, not all of what "Data
+  Integrity Contract" names.
+
+  The benefit column's own text ("migration 後可證明完整性") directly
+  implies the real invariant this contract enforces: a record cannot
+  claim `overall_status: reconciled` while any check's own comparison
+  disagrees (a genuine, computed mismatch with no recorded resolution,
+  or a documented resolution that itself says the diff is a REAL
+  problem rather than an expected one) -- "diff->resolve" names a
+  two-step process, and completeness requires the second step to have
+  actually happened for every diff the first step found, not merely
+  that the record's own label says so.
+
+  `matches` (and, for `check_type: COUNT`, `diff`) are GENUINE COMPUTE
+  (`ai_lego.compute.reconciliation.compare.compute_check_result`),
+  never caller-asserted -- the same Trusted Compute discipline every
+  prior CALCULATED_RESULT method in this package already established.
+  A COUNT check's comparison is EXACT numeric subtraction via
+  `decimal.Decimal` (a critic review caught that this module's own
+  first draft used `float`, which silently loses precision above 2^53
+  -- a real row-count magnitude -- producing a false `matches:true` for
+  two genuinely different values with zero tampering; `Decimal` has no
+  such magnitude-dependent loss, and the fixed module applies NO
+  rounding/tolerance of any kind, disclosed in
+  `ai_lego/compute/reconciliation/compare.py`'s own docstring); a
+  CHECKSUM or BUSINESS_INVARIANT check's comparison is exact string
+  equality -- Atlas's own three-way vocabulary genuinely does not share
+  one comparison semantics (a hash is not numerically subtractable), so
+  the compute module implements both branches rather than forcing one
+  shape onto all three. `generate_reconciliation_record` itself
+  RECOMPUTES this for every check and rebuilds a fresh dict from the
+  computed values (mirroring `database_data.data_lineage`'s own
+  rebuild-from-computed-values pattern for `traces_to_source`) --
+  another critic-caught Critical in this slice's first draft found the
+  builder was NOT doing this, storing whatever `matches`/`diff` a
+  hand-built check supplied verbatim.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Reconciliation row (L908): 'counts/checksums/business invariants→diff→resolve', and L910's own redirect to Execution Contract §28 as sole canonical source for step sequences"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 flow diagram (L1100): 'Reconciliation（counts / checksums / business invariants —— EC §30 既有要求原樣保留）' -- the identical three-way formula, confirming this is the same concept as Atlas's own F21 row"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §29 DB Migration Requirements (L1117-1153): 'Data Reconciliation' (L1135) as a required pre-migration assessment item"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1154-1176): six mandated elements (Preconditions/Business Invariants/Postconditions/Checksums/Counts/Reconciliation Query/Quarantine Policy) and the 'exit code 0 is not proof, data invariant = PASS is' standard -- this method covers the Checksums/Counts/Business-Invariants half only, disclosed in OQ-RECONCILIATION-3"
+  - "recipes/validated/db-migration-expand-contract.recipe.yaml (L194-198): existing ADR-005a recipe step 'Reconciliation' (ref: reconciliation, gate_ref: data) -- a procedural slug, not a competing schema, and NOT YET wired to this new machine_id -- see OQ-RECONCILIATION-4"
+  - "methods/registry/method-inventory.yaml Reconciliation entry (L1282-1286): category 'F21 database-data', line field reads 905 -- CORRECTED here to the real L908 position, the same systematic +3 drift already disclosed by database_data.backup_restore_drill.contract.yaml's own OQ-BACKUPDRILL-3 and database_data.data_lineage.contract.yaml's own compilation_decisions, now observed a THIRD time"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a twenty-seventh
+  concrete entry. `id: database_data.reconciliation` mints a new
+  machine_id, THIRD member of the `database_data` family.
+
+id: database_data.reconciliation
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [VALIDATE, DECOMPOSE, DECIDE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method, the same class of gap every thin-table-row method this
+# session built already disclosed). The three-way check vocabulary
+# being compared one at a time is DECOMPOSE; each comparison's own
+# matches/diff verdict is VALIDATE; the resolution step (is a
+# documented diff acceptable or a real problem, does the record as a
+# whole count as reconciled) is DECIDE -- the same class of inferred
+# triple `database_data.backup_restore_drill`'s own
+# select/restore/check/time/record/evidence sequence already used
+# (VALIDATE/DECOMPOSE/MAP there; DECIDE replaces MAP here because this
+# method's own final step is a genuine judgment call on each diff, not
+# a positional mapping of steps to a sequence).
+
+purpose:
+  - prove_source_and_target_data_agree_on_every_declared_check_or_that_every_disagreement_has_been_investigated_and_understood
+inputs:
+  required: [ReconciliationCheckInput]
+  optional: []
+outputs: [ReconciliationRecord]
+preconditions:
+  - "checks is a non-empty list"
+  - "every check's id is unique within the record"
+  - "every check's check_type is one of COUNT, CHECKSUM, BUSINESS_INVARIANT"
+  - "every check's matches (and, for check_type:COUNT, diff) is computed by ai_lego.compute.reconciliation.compare.compute_check_result, never caller-supplied independently of that computation"
+  - "overall_status:reconciled requires, for EVERY check, (matches:true) OR (resolution present AND resolution.resolved_as_expected:true AND resolution.note non-empty)"
+  # The last precondition is directly implied by Atlas's own benefit
+  # column ("migration 後可證明完整性") -- "provably complete" cannot
+  # coexist with an unresolved or confirmed-real diff. Same
+  # "structurally necessary, forbidden-state" class every prior
+  # pass/fail invariant this session built already establishes.
+  #
+  # DELIBERATELY ONE-DIRECTIONAL, same class of restraint
+  # database_data.backup_restore_drill.contract.yaml's own status field
+  # precedent already established: this forbids overall_status:
+  # reconciled when the criteria are not met. It does NOT forbid
+  # overall_status:open when every check already matches or is
+  # resolved-as-expected -- a caller declaring "open" as a conservative
+  # choice (e.g. pending a human sign-off before calling a migration
+  # complete) is a legitimate operational judgment, not something
+  # Atlas's own text forbids.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure database_data.backup_restore_drill
+  # .contract.yaml's own quality field already reasoned through: the
+  # real risk here is a computational-integrity risk (was the
+  # comparison actually run correctly), not an evidence-citation risk
+  # over a narrative claim -- covered by provenance_required +
+  # genuine-compute enforcement, not a separate evidence-labeling
+  # obligation.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Reconciliation row.
+recommended_next: []
+# Atlas gives no explicit 推薦搭配 chain for this method. A real,
+# disclosed (not built) upstream candidate: database_data
+# .expand_contract_migration (F21's own neighboring row, L907,
+# "expand compatible schema->migrate traffic/data->contract old") is
+# the natural producer of the source_ref/target_ref pair this method
+# consumes as input -- see compilation_decisions below.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- it reports on a comparison
+  # already performed elsewhere (the actual counting/checksumming of
+  # source_ref/target_ref happens outside this method's own scope, the
+  # same "record reports on an external observation" class
+  # database_data.backup_restore_drill.contract.yaml's own rollback
+  # field already draws for a real restore performed in an isolated
+  # environment).
+
+compilation_decisions:
+  - question: >
+      Should `database_data.expand_contract_migration` (F21's own
+      neighboring row, L907) also be built in this slice, since its own
+      output naturally produces the source_ref/target_ref pair this
+      method consumes as input?
+    decision: "No -- built as a separate, deliberately deferred candidate (OQ-RECONCILIATION-2), not built in this slice."
+    reasoning: >
+      CORRECTED post-critic-review: this contract's first draft claimed
+      Expand-Contract Migration "has no dedicated Atlas section either"
+      as its reason for deferral -- FALSE. Atlas gives it its own
+      §11.50 (L2354) AND §13.10 "Database Migration Recipe" (L3466),
+      and an ACTIVE, ADR-005a-grounded 15-step recipe already exists
+      (`recipes/validated/db-migration-expand-contract.recipe.yaml`),
+      making it the BEST-documented procedure in this family, not a
+      thin candidate. The real reason for deferral is scope, not
+      thinness: that recipe's own 15 steps span Backup/Restore
+      Validation through Contract Old Schema, of which THIS method
+      only concretely builds the single "Reconciliation" step (L194-198
+      of that recipe) -- building the full orchestrating method in the
+      same slice would mean implementing 14 other steps this contract
+      was never scoped to cover. This contract instead treats
+      source_ref/target_ref as bare caller-supplied strings, which is
+      all the Reconciliation row's own formula actually needs from that
+      upstream concept -- see OQ-RECONCILIATION-2 and
+      OQ-RECONCILIATION-4 for how the two should eventually connect.
+  - question: >
+      Atlas's own formula names three check vocabularies (counts,
+      checksums, business invariants) with genuinely different
+      comparison semantics -- should the schema force all three into
+      one numeric-diff shape, or one string-equality shape, for
+      simplicity?
+    decision: "No -- check_type is a real enum that changes HOW matches/diff are computed (numeric subtraction for COUNT, exact string equality for CHECKSUM/BUSINESS_INVARIANT), not merely a descriptive label."
+    reasoning: >
+      Forcing checksums through numeric subtraction is meaningless (a
+      hash is not a quantity); forcing counts through bare string
+      equality would silently drop the genuinely useful signed `diff`
+      value ("48213 vs 48201" is more actionable than "false").
+      Honoring Atlas's own three-way vocabulary with real, distinct
+      compute paths is the same "don't overreach past what the text
+      actually supports, but don't underreach into one flattened
+      shape either" balance this session's own prior contracts already
+      strike (e.g. database_data.data_lineage's own diagram-vs-table-row
+      disclosure).
+
+open_questions:
+  - id: "OQ-RECONCILIATION-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RECONCILIATION-2"
+    question: >
+      `database_data.expand_contract_migration` (F21's own L907 row)
+      remains unbuilt -- if built later, should its own output feed
+      `source_ref`/`target_ref` here as a soft link (same
+      `related_slo_id`-class pattern `devops_sre.error_budget.contract
+      .yaml` already established for a different cross-method
+      reference), rather than leaving them as bare caller-supplied
+      strings?
+    owner: "operator, or whoever next builds database_data.expand_contract_migration"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-RECONCILIATION-3"
+    question: >
+      Execution Contract §30 "Data Integrity Contract" (L1154-1176)
+      mandates SIX elements for any data change: Preconditions /
+      Business Invariants / Postconditions / Checksums / Counts /
+      Reconciliation Query / Quarantine Policy. This method implements
+      only the Checksums/Counts/Business-Invariants comparison half
+      (via `check_type`) -- Preconditions, Postconditions, and a
+      separate machine-readable Quarantine Policy are NOT fields on
+      `ReconciliationRecord`. Should a future revision add them here,
+      or are they a separate method's own scope (e.g. a broader
+      `database_data.data_integrity_contract`, or fields that belong on
+      `database_data.expand_contract_migration` instead, which is the
+      method that would actually own the full migration lifecycle §30
+      describes)?
+    owner: "operator, or whoever next builds against EC §30's own remaining elements"
+    blocks: "nothing in this file's own validity -- disclosed 3-of-6 coverage, not a silent gap"
+  - id: "OQ-RECONCILIATION-4"
+    question: >
+      `recipes/validated/db-migration-expand-contract.recipe.yaml`
+      (L194-198) already carries a `label: "Reconciliation"` /
+      `ref: reconciliation` capability step, gate-bound
+      (`gate_ref: "data"`), inside an ACTIVE ADR-005a 15-step recipe --
+      but that `ref` is not yet wired to this newly-minted
+      `database_data.reconciliation` machine_id (the recipe/capability-
+      resolution binding mechanism is a separate subsystem this slice
+      did not touch). Should a future revision wire that recipe step to
+      invoke this method, and if so, does the recipe's own
+      `source_ref`/`target_ref` framing (an already-running migration's
+      old/new schema) match this contract's own input shape without
+      further translation?
+    owner: "operator, or whoever next wires recipes/validated/db-migration-expand-contract.recipe.yaml's own capability resolution"
+    blocks: "nothing in this file's own validity -- disclosed unwired state, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F21 tool table row (L908) directly, confirmed against
+    the surrounding table (L897-909) that no dedicated §11.x section
+    exists for THIS row anywhere in Atlas itself (a full-document grep
+    for "Reconciliation" as a heading returns only this table row), and
+    read L910's own redirect to Execution Contract §28 as sole
+    canonical source for step sequences. A first-draft grep against
+    `specs/**`+`methods/**` only (~69 hits) understated its own scope
+    and missed real corpus -- CORRECTED to a genuine full spec-root
+    grep for "reconcil" case-insensitive (182 hits across 74 files):
+    read Execution Contract §28 (L1100, the identical three-way
+    formula), §29 (L1117-1153, "Data Reconciliation" L1135), §30
+    (L1154-1176, six mandated Data Integrity Contract elements), and
+    `recipes/validated/db-migration-expand-contract.recipe.yaml`
+    (L194-198, an existing but unwired "Reconciliation" capability
+    step) in full. None define a competing typed object or method
+    contract for this concept -- no duplicate found -- but all four are
+    now cited as real supporting corpus rather than omitted. Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The three-way check_type
+    vocabulary and the diff->resolve two-step invariant are both
+    directly grounded in Atlas's own cited row and Execution Contract
+    §28/§30's own identical formula; this method covers the Checksums/
+    Counts/Business-Invariants half of EC §30's six elements only
+    (OQ-RECONCILIATION-3), and is not yet wired to the existing recipe
+    step that names it (OQ-RECONCILIATION-4) -- both disclosed
+    compilation choices, not silent omissions. The decision not to
+    also build database_data.expand_contract_migration in this slice is
+    likewise disclosed -- see compilation_decisions above.

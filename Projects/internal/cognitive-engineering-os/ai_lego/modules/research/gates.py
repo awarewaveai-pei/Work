@@ -65,7 +65,12 @@ def evaluate_citation_gate(claims: list[dict[str, Any]], sentence_provenances: l
 
 def evaluate_statistical_gate(statistics: dict[str, Any]) -> tuple[bool, list[Any]]:
     """Contract fail_condition: no resolvable computation_provenance_ref, or epistemic_type/authorship_state inconsistent with genuine compute."""
-    provenance = statistics.get("provenance", {})
+    # `.get("provenance", {})` only substitutes {} when the key is ABSENT -- a hand-tampered record with
+    # `provenance: null` (key present, value None) sails through as None and crashes `.get("epistemic_type")`
+    # below. Caught by a critic review of `database_data.reconciliation` (this gate's sixth reuse): fails
+    # closed instead, the same "malformed input fails closed, does not crash" discipline every gate reusing
+    # this function already claims to honor.
+    provenance = statistics.get("provenance") or {}
     ref = statistics.get("computation_provenance_ref", "")
     resolvable = False
     if isinstance(ref, str) and ref.startswith("ai_lego.compute."):

@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-05（續42，同一 session：Cognitive OS 第二十九個 Method Atlas 切片 — `database_data.reconciliation`，critic 挖出本 session 至今最嚴重的 2 個 Critical）
+
+**觸發**：延續操作者授權（「一直做直到完美完成」）。0 agent（除 critic subagent review）。
+
+**選型**：`database_data` 家族第三個成員。Atlas F21 table 自己的 Reconciliation 列（L908：「counts/checksums/business invariants→diff→resolve」，效益「migration 後可證明完整性」）+ L910 明文把 F21 全部步驟序列導向 Execution Contract §28（唯一正本）——這條指標本身就點名 EC 是第二個必查引用，不是附帶關聯。
+
+**真不變量**：一份記錄不能一邊宣稱 `overall_status:reconciled` 一邊又有真實、未處理的 diff——「diff→resolve」是兩步驟，缺第二步不算完整性證明。
+
+**critic 真跑抓到本 session 至今最嚴重的一輪：2 個 Critical + 5 個 Major + 5 個 Minor**：
+1. **Critical**：compute 模組用 `float()` 解析 COUNT 數值，2^53 以上（真實 row count 量級）與 1e14 以上（金額量級 checksum）靜默精度流失，零竄改就能讓兩個真的不同數值判定相等（`float("9007199254740993")==float("9007199254740992")`）。因為 builder 跟 gate 呼叫同一個函式，兩層「各自獨立」複算出同一個錯答案——正是 `database_data.data_lineage` 自己那輪教訓（共用 predicate 本身錯，兩層一起錯）在新函式裡重演。改用 `decimal.Decimal`（任何量級都精確），並進一步拿掉原本借用 `error_budget` 的 10 位小數四捨五入——Atlas 公式本身沒講容差，發明一個等於自創未言明假設；真正已知的特定誤差改用 `resolution` 欄位處理。
+2. **Critical**：`generate_reconciliation_record` 從沒有真的重算 hand-built check 的 matches/diff——只驗形狀/重複/status 就原樣存入呼叫端提供的值。一個繞過 `check()` builder 的呼叫端可以自由宣稱 `{"matches":true,"diff":0}` 蓋掉真實的巨大落差，並讓這個謊言拿到 `overall_status:reconciled` 認證——直接打臉程式碼裡四處宣稱「不可能」的說法。改成對每個 check 重算並用計算結果重建全新 dict（跟 `data_lineage` 自己 `generate_data_lineage_record` 早就建立、但這個切片自己說有遵循卻其實沒真的照做的模式一致）。
+
+5 個 Major 也全修：(1) `resolution.resolved_as_expected:false`（人工記錄的真問題）原本被 `matches:true` 靜默蓋過——改成 resolution 出現時雙向都以它為準；(2)(3) 引用查證重複了 `data_lineage` 自己那輪已教訓過的同一種 grep 範圍縮水（只查了 `specs/**`+`methods/**`，宣稱「全 spec root 只 9 筆」，真正全 spec root 有 182 筆，遺漏 Execution Contract §28/§29/§30 的真實佐證 + 一支既有但未接線的 ADR-005a recipe 步驟）+ 誤判擱置 `expand_contract_migration` 的理由（宣稱「Atlas 無專屬段落」，其實有 §11.50+§13.10+一支完整 15 步 recipe）；(4) 共用檔案 `modules/research/gates.py` 的 `evaluate_statistical_gate` 對顯式 `provenance:null`（key 存在值是 None）直接崩潰而非 fail-closed——影響本 session 全部 6 次重用，一併修正。5 個 Minor：not-hashable check_type 崩潔非 fail-closed、hand-built 輸入缺 record 欄位/check_type 驗證、`resolved_as_expected` 非 bool 未擋、contract-backlog 註冊宣稱已做但沒做、弱 oracle 測試（只斷言 FAIL 沒釘證據內容）。全數修正並補對應迴歸測試。
+
+**本輪教訓**：本切片第一版明確「主動套用四個既有教訓」寫進自己的 docstring，仍然冒出兩個全新、更嚴重的 bug——證明「我們已經檢查過已知失守模式」不等於「不會有新的」，沒有任何切片薄到可以省略真 critic review。
+
+**[已修改]**：spec-root 新增 `methods/contracts/database_data.reconciliation.contract.yaml`（含修正後的完整引用範圍+開放問題 OQ-1~4）＋`specs/cognitive/typed-objects/reconciliation-record.schema.yaml`＋`contract-backlog.yaml` 新增 `tier_1.twentyseventh_concrete_entry`＋重新產生索引。Product root 新增 `ai_lego/compute/reconciliation/compare.py`（Decimal 精確比對，無容差）＋`ai_lego/modules/database_data/reconciliation.py`（builder 全重算+3 gate）＋`ai_lego/apps/cli/run_reconciliation_slice.py`＋`tests/unit/test_reconciliation.py`（51 tests）＋`docs/TWENTYNINTH_SLICE_DATABASE_DATA_RECONCILIATION.md`。共用檔案修正：`ai_lego/modules/research/gates.py`（`evaluate_statistical_gate` null-provenance fail-closed，影響全部 6 個重用方法）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2771→2774
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONIOENCODING=utf-8 python -m ai_lego.apps.cli.run_reconciliation_slice`（修正後）| exit=0 | result=`PASS database_data.reconciliation: 2 checks, status=reconciled, gates [provenance_required=PASS, genuine_compute=PASS, reconciliation_integrity=PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_reconciliation -v` | exit=0 | result=51 passed（38→51，含 2^53/1e14 精度迴歸+說謊 hand-built check 迴歸+resolution 覆蓋 matches 雙向迴歸+null-provenance 全 gate 鏈迴歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t .`（product root）| exit=0 | ms=68261 | result=**722 tests OK**（709→722，零回歸，含共用 gates.py 修正對其餘 5 個重用方法無副作用）
+- REVIEW_DONE: critic=Standard（真實 subagent，非自審）| verdict=fail(2 Critical, 5 Major)→fixed | findings=2c/5m/5minor（全數修正）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`database_data[.]reconciliation\|ReconciliationRecord\|compute_check_result\|RECONCILIATION_` | hits=全部本切片自己新檔案+本 session transcript 雜訊+lobster-factory 第三方 .venv 向量庫巧合命中（google api discovery json，無關），無過期殘留
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-RECONCILIATION-1`（無機器 id 列，同前兩個 database_data 切片模式）、`OQ-RECONCILIATION-2`（`expand_contract_migration` 未建，soft-link 待定）、`OQ-RECONCILIATION-3`（EC §30 六要素本方法只做 3/6，Preconditions/Postconditions/Quarantine Policy 揭露性排除）、`OQ-RECONCILIATION-4`（既有 recipe `ref: reconciliation` 步驟尚未接線到這個新 machine_id）。皆非阻塞，已揭露非靜默缺口。
+
 ## 2026-09-05（HCI30 ADR-0018 crypto-shredding Wave 1 gates 1/2/3/6 落地，migration 0007，沿用 ADR-0017 已審過的 escape-hatch 機制）
 
 **觸發**：延續操作者標準授權，接續同日稍早 commit `3a555b7f8`（ADR-0017 gate 4）的下一步——佇列裡下一個 ADR，選 ADR-0018 因為它明確依賴剛建立的 `reject_update_delete()` effect-based 機制，上下文銜接成本最低。
