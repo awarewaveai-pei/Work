@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { optionalRendererAuthHeaders } from "@/lib/content/video/renderer-auth";
 
 export const dynamic = "force-dynamic";
 
 function videoServiceHeaders(): Record<string, string> {
-  const token = process.env.VIDEO_SERVICE_SECRET;
-  return token ? { "X-Render-Token": token } : {};
+  return optionalRendererAuthHeaders("quick");
 }
 
 export async function GET() {

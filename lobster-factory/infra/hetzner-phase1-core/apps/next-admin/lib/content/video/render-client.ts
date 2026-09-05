@@ -4,6 +4,7 @@
  * 本模組只做 HTTP 包裝，不做任何渲染邏輯。
  * video-service 負責 TTS + ffmpeg 合成；本模組只傳資料、接結果。
  */
+import { optionalRendererAuthHeaders, resolveRendererAuth } from "./renderer-auth";
 
 /** /render POST body 的場景格式（最小需求；duration 由服務端計算）。 */
 interface RenderScene {
@@ -41,10 +42,8 @@ export type RenderResult =
  * @param baseUrl 服務基礎 URL，預設 VIDEO_SERVICE_URL 環境變數或 http://127.0.0.1:8732
  */
 function svcHeaders(json: boolean): Record<string, string> {
-  const h: Record<string, string> = {};
+  const h: Record<string, string> = { ...optionalRendererAuthHeaders("quick") };
   if (json) h["Content-Type"] = "application/json";
-  const token = process.env.VIDEO_SERVICE_SECRET;
-  if (token) h["X-Render-Token"] = token;
   return h;
 }
 
@@ -118,6 +117,10 @@ export async function submitRender(
   opts?: RenderOpts,
 ): Promise<{ ok: true; jobId: string; serviceCapability?: VideoServiceCapability } | { ok: false; status: number; error: string }> {
   const base = svcBase(baseUrl);
+  const auth = resolveRendererAuth("quick");
+  if (auth.ok === false) {
+    return { ok: false, status: 503, error: "renderer authentication is not configured" };
+  }
   // 多格式：formatAssets + 非空 formats → 送 format_assets（EU 原生多格式）；否則送舊單組 assets。
   const useMulti = !!opts?.formatAssets && Array.isArray(opts?.formats) && opts.formats.length > 0;
   let serviceCapability: VideoServiceCapability | undefined;
@@ -129,7 +132,7 @@ export async function submitRender(
   try {
     const res = await fetch(`${base}/render`, {
       method: "POST",
-      headers: svcHeaders(true),
+      headers: { ...auth.headers, "Content-Type": "application/json" },
       body: JSON.stringify({
         scenes, out_name: outName,
         ...(useMulti
@@ -165,9 +168,11 @@ export type RenderPoll =
 /** 查一次 EU /job 狀態（單一短請求，給 /status 每輪呼叫；不阻塞、不輪詢）。 */
 export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<RenderPoll> {
   const base = svcBase(baseUrl);
+  const auth = resolveRendererAuth("quick");
+  if (auth.ok === false) return { status: "error", error: "renderer authentication is not configured" };
   try {
     const r = await fetch(`${base}/job?jobId=${encodeURIComponent(jobId)}`, {
-      headers: svcHeaders(false),
+      headers: auth.headers,
       signal: AbortSignal.timeout(30_000),
     });
     if (r.status === 404) return { status: "error", error: "render job 不存在（服務可能重啟）" };
