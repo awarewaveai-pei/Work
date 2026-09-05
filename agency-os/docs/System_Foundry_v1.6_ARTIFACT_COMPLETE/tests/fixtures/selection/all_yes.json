@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 218,
+  "active_answer_count": 220,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-3PL",
@@ -119,6 +119,7 @@
     "CAP-MARKETING-AUTOMATION",
     "CAP-MARKETPLACE-SETTLEMENT",
     "CAP-MARKETPLACE-SYNC",
+    "CAP-MERCHANDISING",
     "CAP-MINORS",
     "CAP-MOBILE",
     "CAP-MOQ",
@@ -146,6 +147,7 @@
     "CAP-PREORDER",
     "CAP-PROCUREMENT",
     "CAP-PRODUCT-DEVELOPMENT",
+    "CAP-PRODUCT-FEED",
     "CAP-PRODUCT-MATCHING",
     "CAP-PRODUCT-PASSPORT",
     "CAP-PRODUCTS",
@@ -288,6 +290,7 @@
     "loyalty",
     "marketing",
     "marketplace_ops",
+    "merchandising",
     "migration",
     "mobile",
     "notifications",

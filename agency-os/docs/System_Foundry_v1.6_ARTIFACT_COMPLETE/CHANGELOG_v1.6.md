@@ -10,7 +10,7 @@
 - `generation/module-obligations.json` and `generation/blueprint-map.json`.
 - Static artifact generation validator and multi-angle selection matrix.
 - Golden ALL-NO / ALL-YES selection fixtures.
-- 17 new business-domain modules distilled from an operator-supplied global commerce blueprint, each with full capability/question/rule/obligation coverage: `marketplace_ops`, `b2b`, `subscription_commerce`, `loyalty`, `reviews`, `cross_border`, `oms`, `demand_planning`, `affiliate`, `pos`, `warranty`, `cdp`, `returns`, `promotions`, `risk`, `shipping`, `plm_quality` (+58 capabilities, +57 questions -- `shipping` was the first module in this list where the two deltas diverge, adding one derivation-only capability, `DER-CARRIER-ADAPTER`, with no question of its own; `plm_quality` keeps a 1:1 capability/question delta again, +4/+4).
+- 18 new business-domain modules distilled from an operator-supplied global commerce blueprint, each with full capability/question/rule/obligation coverage: `marketplace_ops`, `b2b`, `subscription_commerce`, `loyalty`, `reviews`, `cross_border`, `oms`, `demand_planning`, `affiliate`, `pos`, `warranty`, `cdp`, `returns`, `promotions`, `risk`, `shipping`, `plm_quality`, `merchandising` (+60 capabilities, +59 questions -- `shipping` was the first module in this list where the two deltas diverge, adding one derivation-only capability, `DER-CARRIER-ADAPTER`, with no question of its own; `plm_quality` and `merchandising` each keep a 1:1 capability/question delta again, +4/+4 and +2/+2 respectively).
 
 ## Fixed
 - A capability can no longer remain simultaneously `DEFERRED` and `CURRENT`; current closure wins deterministically.
@@ -21,4 +21,4 @@
 - Documented blocking status codes were added to the canonical status registry.
 
 ## Assurance
-Release requires ALL-NO, ALL-YES, all 222 single-question cases, exhaustive pairwise interactions, 1,000 randomized configurations, all module reachability/materialization, blueprint applicability, conflict fail-closed behavior, artifact hash verification, E2E, adversarial tests, unit tests, semantic validation, and manifest integrity.
+Release requires ALL-NO, ALL-YES, all 224 single-question cases, exhaustive pairwise interactions, 1,000 randomized configurations, all module reachability/materialization, blueprint applicability, conflict fail-closed behavior, artifact hash verification, E2E, adversarial tests, unit tests, semantic validation, and manifest integrity.

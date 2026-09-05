@@ -2123,6 +2123,26 @@
         "CAP-CUSTOMER-DATA"
       ],
       "description": "A safety or quality defect confirmed through CAP-QUALITY-INSPECTION triggers a recall: the affected product (at the product/SKU level) is matched against which orders -- and therefore which customers -- actually received it, so those customers can be proactively notified and the affected units collected or replaced, distinct from CAP-RETURNS, where the customer initiates contact simply because they no longer want an undamaged product. Requires CAP-ORDERS and CAP-CUSTOMER-DATA because a recall is unexecutable without knowing which orders and customers received the affected product, the same reasoning CAP-CHARGEBACK and CAP-RISK-SCREENING already use for needing to identify a customer. Batch/lot-level traceability (narrowing a recall to only the specific production lot rather than every order of that product/SKU) is explicitly out of scope for this capability -- neither CAP-INVENTORY nor CAP-ORDERS carries lot-level granularity anywhere in this catalog, and adding it would be a real, separate capability, not an implicit part of this one. Does not decide legal/regulatory recall authority or reporting obligations itself -- compliance authority is out of this module's scope -- it only tracks the operational workflow of identifying and reaching affected customers."
+    },
+    {
+      "id": "CAP-MERCHANDISING",
+      "name": "Merchant-Controlled Ranking & Curation",
+      "module": "merchandising",
+      "requires": [
+        "CAP-PRODUCTS",
+        "CAP-INVENTORY"
+      ],
+      "description": "A merchandising rule (boost, bury, pin-to-top, or a curated named featured set) overrides the default product ranking or inclusion on any listing surface -- search results, category/collection browsing, or a featured placement -- distinct from CAP-SEARCH, which only provides full-text retrieval, and CAP-FILTERS, which only lets the customer narrow results by their own chosen criteria. This capability deliberately requires neither: a merchant with only category/filter browsing and no search box, only a search box and no dedicated filter UI, both, or neither, can still curate what ranks where, because a merchandising rule overrides the default listing order regardless of which surface produces that listing. Also distinct from CAP-AI-RECOMMEND, an algorithmically-generated ranking signal, not a merchant-authored override -- the two can coexist without either requiring the other. Requires CAP-INVENTORY because demoting or accurately marking an out-of-stock product is an explicit acceptance criterion of this capability, not an incidental detail, and that needs real, current stock data, never an assumed or stale flag. This only reorders or curates which already-priced products are shown and in what order; it never changes a product's price or what a customer pays -- that decision remains CAP-CHANNEL-PRICING/CAP-PROMOTIONS' scope, which is why this capability carries no Q-COM-001 ('charges customers') gate."
+    },
+    {
+      "id": "CAP-PRODUCT-FEED",
+      "name": "Shopping / Ad Channel Product Feeds",
+      "module": "merchandising",
+      "requires": [
+        "CAP-PRODUCTS",
+        "CAP-INVENTORY"
+      ],
+      "description": "Product price, availability, and each channel's own required attributes are packaged into a feed for an external shopping or advertising channel (e.g. Google Merchant Center, Meta Catalog, Pinterest, TikTok), and feed-quality triage flags rejected products, missing required attributes, and price or availability mismatches the channel reports back, traced to the specific source field responsible rather than reported as an opaque failure. Distinct from CAP-MULTI-MARKETPLACE/CAP-MARKETPLACE-SYNC, where the sale itself completes on a third-party marketplace and price/inventory are kept in sync bidirectionally with it; here the channel only displays the listing or serves an ad, the transaction still completes on the merchant's own storefront, and the feed is a one-way publish the channel never writes back to as authoritative. Also distinct from CAP-CAMPAIGNS, which only tracks an ad campaign's own budget, schedule, and performance, never product-level feed data. Requires CAP-INVENTORY for the same reason CAP-MARKETPLACE-SYNC already requires it: a channel feed publishes current stock availability alongside price, never a stale or assumed value. This only publishes a product's existing, already-resolved price to the channel and flags a channel-reported price mismatch for correction; it never sets or adjusts what a customer pays -- that decision remains CAP-CHANNEL-PRICING/CAP-PROMOTIONS' scope, which is why this capability carries no Q-COM-001 ('charges customers') gate."
     }
   ]
 }

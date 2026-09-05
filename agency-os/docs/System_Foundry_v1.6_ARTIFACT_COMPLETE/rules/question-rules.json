@@ -2222,6 +2222,26 @@
       "require": [
         "CAP-RECALL"
       ]
+    },
+    {
+      "id": "RULE-Q-MERCH-001",
+      "when": {
+        "question": "Q-MERCH-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-MERCHANDISING"
+      ]
+    },
+    {
+      "id": "RULE-Q-FEED-001",
+      "when": {
+        "question": "Q-FEED-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-PRODUCT-FEED"
+      ]
     }
   ]
 }

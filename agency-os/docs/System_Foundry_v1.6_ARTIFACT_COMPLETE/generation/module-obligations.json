@@ -1021,7 +1021,7 @@
         "A coupon code's redemption count and remaining uses are read from a single canonical ledger at the moment of redemption, never from a stale cached count, so the same code cannot be redeemed past its intended limit under concurrent use.",
         "Channel/market price book resolution is deterministic for a given product, channel, and market combination -- never ambiguous between two applicable price book entries with no defined precedence.",
         "A promotion or price book is checked against the product's configured margin floor before the discounted price is allowed to apply; a rule that would price below floor is rejected rather than silently applied at a loss.",
-        "When a marketplace/channel-sync capability (e.g. CAP-MARKETPLACE-SYNC, CAP-MULTI-MARKETPLACE) is also selected, the price book is the resolution authority for what a customer is charged; the sync/connector layer only publishes the already-resolved price outward and never writes a competing price back as authoritative."
+        "When a marketplace/channel-sync or shopping/ad-feed capability (e.g. CAP-MARKETPLACE-SYNC, CAP-MULTI-MARKETPLACE, CAP-PRODUCT-FEED) is also selected, the price book is the resolution authority for what a customer is charged; the sync/connector/feed layer only publishes the already-resolved price outward and never writes a competing price back as authoritative."
       ],
       "security": [
         "Coupon code redemption is rate-limited/monitored to detect brute-force code guessing."
@@ -1114,6 +1114,36 @@
       ],
       "recovery": [
         "Development project, sample, specification version, BOM, inspection, quality issue, CAPA, and recall records are included in backup scope."
+      ]
+    },
+    "merchandising": {
+      "purpose": "Apply merchant-authored ranking overrides (boost, bury, pin-to-top, or a curated named featured set) on top of whatever product listing surface exists -- the default category/collection listing, or the surfaces CAP-SEARCH/CAP-FILTERS provide or narrow when those are also selected -- and publish current product price/availability as a feed to an external shopping or advertising channel (e.g. Google Merchant Center, Meta Catalog) with per-field rejection triage -- distinct from CAP-AI-RECOMMEND, an algorithmic (not merchant-authored) ranking signal this module does not own, and from CAP-MULTI-MARKETPLACE/CAP-MARKETPLACE-SYNC, where the transaction itself completes on a third-party marketplace rather than the merchant's own storefront. If a project selects neither CAP-SEARCH nor CAP-FILTERS, merchandising rules are still authored and versioned against the product catalog; they simply have no runtime listing surface to apply to until one is added.",
+      "invariants": [
+        "A merchandising rule (boost, bury, pin-to-top, or featured-set membership) only changes the display order or inclusion of products already returned by CAP-SEARCH, CAP-FILTERS, or the default listing; it never rewrites a product's own recorded price, description, or stock level -- those remain owned by CAP-PRODUCTS/CAP-INVENTORY/CAP-CHANNEL-PRICING.",
+        "An out-of-stock product is demoted or has its availability marked accurately using CAP-INVENTORY's real, current stock level, never a cached or assumed flag.",
+        "A merchandising rule change is versioned, never silently overwritten in place, so which rule caused a given ranking outcome at a point in time can always be reconstructed.",
+        "A feed rejection is always traced to the specific product field (price, a missing required attribute, or availability) the channel's own rejection response names, never reported as an opaque, unattributed failure.",
+        "When a marketplace/channel-sync capability (CAP-MULTI-MARKETPLACE/CAP-MARKETPLACE-SYNC) is also selected, that capability's own price/inventory sync channel is a separate, transactional third-party marketplace; this module's feed is a one-way, read-only publish to a non-transactional shopping/ad channel and never writes back to or is overridden by the marketplace-sync channel's data.",
+        "Merchandising and feed capabilities function independently of whether CAP-SEARCH or CAP-FILTERS is also selected; a merchant with only category/filter browsing, only full-text search, both, or neither can still curate ranking and publish a feed, because a merchandising rule overrides whatever listing surface exists rather than depending on a specific one.",
+        "When CAP-CHANNEL-PRICING is also selected, the feed publishes the price that capability resolved for the target channel; when it is not selected, the feed publishes the product's own catalog price. A channel-reported price mismatch is always resolved by correcting the source price record (CAP-PRODUCTS or CAP-CHANNEL-PRICING), never by writing a different, feed-local price that the source record disagrees with.",
+        "When CAP-INVENTORY-COSTING or CAP-FINANCIAL-ANALYSIS is also selected, a merchandising rule may weight ranking by product margin as one additional signal; when neither is selected, ranking rules use only catalog, inventory, and merchant-authored signals -- margin-aware ranking is never assumed available.",
+        "AI-suggested merchandising rules or feed-issue diagnoses (when an AI capability is also selected) are advisory only: a suggested rule takes effect only after a human holding `merchandising.manage` approves it, and this module's AI tooling never calls an external channel's API directly -- it only informs a rule or diagnosis that the module's own publish path executes.",
+        "Autocomplete/typeahead query suggestions and synonym/alias mapping (e.g. treating \"sunscreen\" and a brand-specific term as equivalent for ranking and retrieval) are explicitly out of scope for this module in this release -- they are retrieval-time engineering behavior, not a merchant-authored ranking decision, and are not owned by any capability in this catalog yet."
+      ],
+      "security": [
+        "Merchandising rule authoring (`merchandising.manage`) and shopping/ad channel feed configuration (`feed.manage`) require their own permissions, separate from read-only discovery/feed analytics (`discovery.analytics.read`); viewing performance data never implies authority to change ranking rules or feed configuration.",
+        "A merchandising rule (boost, bury, pin, or featured-set membership) can only be authored by staff holding `merchandising.manage`; a customer-facing account can never directly set one.",
+        "Shopping/ad channel API credentials (e.g. Google Merchant Center, Meta Catalog) are scoped per connected channel and revocable independently of other connectors, the same as CAP-MULTI-MARKETPLACE's marketplace credentials."
+      ],
+      "tests": [
+        "The out-of-stock-demotion invariant is contract-tested: a zero-stock product is demoted below, or has its availability marked differently from, an otherwise-equal-ranked in-stock product.",
+        "Feed rejection traceability is contract-tested: a rejected feed item's recorded reason always names a real product field, never an opaque unattributed failure."
+      ],
+      "operations": [
+        "Zero-result search/browse queries and rejected feed item volume are observable and alertable, since both signal a merchandising or catalog-data quality problem needing action."
+      ],
+      "recovery": [
+        "Merchandising rule (including version history) and feed configuration/build-history records are included in backup scope."
       ]
     }
   }

@@ -700,6 +700,17 @@
         "CAP-QUALITY-INSPECTION",
         "CAP-RECALL"
       ]
+    },
+    {
+      "id": "merchandising",
+      "paths": [
+        "packages/merchandising",
+        "tests/contract/merchandising"
+      ],
+      "activated_by": [
+        "CAP-MERCHANDISING",
+        "CAP-PRODUCT-FEED"
+      ]
     }
   ]
 }

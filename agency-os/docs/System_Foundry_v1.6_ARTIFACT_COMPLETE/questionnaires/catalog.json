@@ -241,50 +241,56 @@
       "description": "自有品牌或代工（OEM/ODM）商品從構想、打樣到規格定案的開發流程與物料清單（BOM），以及商品進出貨品質檢驗、瑕疵追蹤與召回，不含實際生產排程或工廠產線的製造執行系統（MES）。"
     },
     {
-      "id": "mobile_offline",
+      "id": "merchandising",
       "order": 37,
+      "title": "商品排序與購物頻道 Feed",
+      "description": "商家對商品在搜尋結果、瀏覽頁與精選區塊的顯示順序做人工或規則覆蓋（加權、降權、置頂、精選清單），以及把商品資料匯出到購物或廣告頻道（如 Google Merchant、Meta Catalog）並追蹤上架品質，不含全文搜尋或篩選本身，也不含商品在第三方電商平台上架銷售。"
+    },
+    {
+      "id": "mobile_offline",
+      "order": 38,
       "title": "行動與離線",
       "description": "行動裝置、現場作業與離線能力"
     },
     {
       "id": "globalization",
-      "order": 38,
+      "order": 39,
       "title": "多國與在地化",
       "description": "語言、幣別、時區與資料所在地"
     },
     {
       "id": "ai",
-      "order": 39,
+      "order": 40,
       "title": "AI 與自動化",
       "description": "AI 輔助、生成、決策與代理操作"
     },
     {
       "id": "migration",
-      "order": 40,
+      "order": 41,
       "title": "既有系統與資料遷移",
       "description": "舊系統、歷史資料與平行運作"
     },
     {
       "id": "regulated",
-      "order": 41,
+      "order": 42,
       "title": "特殊資料與產業",
       "description": "會觸發額外治理或法規研究的領域事實"
     },
     {
       "id": "business_impact",
-      "order": 42,
+      "order": 43,
       "title": "營運影響",
       "description": "描述業務本身的運作方式與影響，不是選工程技術"
     },
     {
       "id": "future",
-      "order": 43,
+      "order": 44,
       "title": "未來規劃",
       "description": "目前不做，但已確定希望未來具備的產品能力"
     },
     {
       "id": "custom",
-      "order": 44,
+      "order": 45,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     }
@@ -2630,6 +2636,22 @@
         "question": "Q-QA-001",
         "equals": true
       }
+    },
+    {
+      "id": "Q-MERCH-001",
+      "category": "merchandising",
+      "label": "商品人工排序與置頂（Merchandising）",
+      "description": "在搜尋結果、分類/瀏覽頁面或首頁精選區塊，商品的顯示順序可以由人工或營運規則覆蓋系統預設排序——例如把特定商品加權往前排、把某商品降到後面、把某商品釘選在最上方，或手動挑出一組商品組成「精選」清單，而不是完全依賴系統自動排序或推薦演算法。跟「全文搜尋」（找不找得到商品）、「進階篩選」（客戶自己設條件縮小範圍）不同，這題是商家自己主動介入排序或曝光結果；跟「AI 推薦 / 預測」也不同，那是系統依演算法自動猜客戶想看什麼，這裡是人工或規則直接設定，不是演算法決定。就算商品清單頁沒有搜尋框或篩選器，商家一樣可以指定顯示順序或做成精選清單，不需要先有全文搜尋或進階篩選功能才能用這個。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-FEED-001",
+      "category": "merchandising",
+      "label": "商品資料匯出到購物／廣告平台（Product Feed）",
+      "description": "把商品的價格、庫存狀態，以及各平台各自要求的欄位，整理成 Google Merchant、Meta Catalog、Pinterest、TikTok 等購物或廣告平台指定的資料格式並定期送出；平台審核後可能回報部分商品被拒絕上架（例如缺少必填欄位、價格或庫存對不上其他資料），系統要能定位到是哪個商品的哪個欄位出了問題。跟「同時在多個電商平台/市集上架同一批商品」不同：那題是商品實際在另一個第三方電商平台或市集上架、交易在那個平台完成；這題的商品交易仍然在自己的網站完成，這些外部平台只負責展示商品或投放廣告，把流量帶回自己的網站。跟「行銷活動管理」也不同：那題管的是廣告活動本身的預算、時程與成效追蹤，這題是商品資料送到平台的正確性與品質。",
+      "answer_type": "boolean",
+      "required_when_active": true
     }
   ]
 }
