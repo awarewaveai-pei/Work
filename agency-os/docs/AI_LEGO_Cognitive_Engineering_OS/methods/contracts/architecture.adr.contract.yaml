@@ -145,16 +145,26 @@ forbidden_transition: []
 # class of honest absence `decision.ahp.contract.yaml`'s own empty
 # forbidden_transition already discloses.
 
-recommended_next: []
+recommended_next: [devops_sre.canary_deployment, devops_sre.blue_green_deployment]
 # F18's own recommended chain (L829-838: Current-state Reconstruction ->
 # C4/DDD -> Quality Attribute Scenarios -> Architecture Options -> ATAM ->
 # Threat Model -> ADR -> Rehearsal -> Canary/Blue-Green -> Verify ->
-# Rollback Window/Close) places ADR mid-chain, but every neighboring
-# method (Threat Model, Rehearsal, Canary/Blue-Green) has no machine_id
-# anywhere in this spec root (grepped, confirmed absent) -- same
-# unresolvable-citation situation `decision.mcda.contract.yaml`'s own
-# empty recommended_next already handled for a schema-constrained-to-
-# machine-ids field. Disclosed as `OQ-ADR-2`.
+# Rollback Window/Close) places ADR mid-chain. STALE CLAIM CORRECTED
+# (found by critic review of `security.stride`, the 44th slice): this
+# field previously claimed "every neighboring method (Threat Model,
+# Rehearsal, Canary/Blue-Green) has no machine_id anywhere in this spec
+# root" -- that was ALREADY false before this correction for two of the
+# three (devops_sre.canary_deployment and devops_sre.blue_green_deployment
+# were both built earlier this session, F19), and is now also false for
+# Threat Model (security.stride, 44th slice). ADR's own recommended_next
+# models FORWARD steps, and Threat Model sits BEFORE ADR in the chain,
+# so its new machine_id does not populate this field -- but Canary/Blue-
+# Green sit AFTER ADR (via the un-built Rehearsal step) and are real,
+# already-built Tier 1 methods, the same "named later in the same
+# recipe, not the immediate next step" precedent
+# `challenge.independent_judge.contract.yaml`'s own recommended_next
+# already establishes. Only Rehearsal remains without a machine_id --
+# see `OQ-ADR-2`.
 
 rollback:
   side_effect_free: true
@@ -229,10 +239,14 @@ open_questions:
   - id: "OQ-ADR-2"
     question: >
       F18's own recommended chain places ADR between a Threat Model step
-      and a Rehearsal step, but neither has a machine_id anywhere in this
-      spec root. Should `recommended_next` be populated once those
-      neighboring methods are built?
-    owner: "operator, or whoever next builds Threat Model / Rehearsal as their own Method Atlas slices"
+      and a Rehearsal step. Threat Model now has a machine_id
+      (`security.stride`, 44th slice) but sits BEFORE ADR, so it does
+      not feed this contract's own (forward-looking) `recommended_next`.
+      Rehearsal still has no machine_id anywhere in this spec root.
+      Should `recommended_next` add a Rehearsal-family method once one
+      is built (alongside the already-populated
+      devops_sre.canary_deployment/blue_green_deployment)?
+    owner: "operator, or whoever next builds Rehearsal as its own Method Atlas slice"
     blocks: "nothing in this file's own validity"
   - id: "OQ-ADR-3"
     question: >

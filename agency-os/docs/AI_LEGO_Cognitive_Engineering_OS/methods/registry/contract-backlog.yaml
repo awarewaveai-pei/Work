@@ -1593,6 +1593,66 @@ tier_1:
       fully represented: nine machine_ids built as separate records
       (this one included) plus one, Schema Compatibility Analysis,
       confirmed already covered by an existing sibling's own stage.
+  fortysecond_concrete_entry:
+    # NEW (2026-09-06, same session): forty-second Tier 1 entry, same
+    # additive-key rationale as the forty-one entries above it. Added
+    # to THIS file in the SAME editing pass that wrote the contract
+    # itself, before any critic round -- the discipline every
+    # `database_data` slice since the registry-registration bug's own
+    # two-slice streak already established, carried forward into this
+    # NEW family from its own first entry.
+    method_id: "security.stride"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FIRST entry
+      from a NEW `security` family (F20's own "資安／隱私套件"), the
+      fourth pack family this session opens after F18 Software
+      Architecture (8 of 10 table rows built, 2 disclosed scope skips
+      -- NOT yet complete), F19 DevOps/SRE (13/13, complete), and F21
+      database_data (9 built + 1 confirmed-covered, complete). Atlas
+      gives this method FOUR citations (F20 table row L882, dedicated
+      §11.44 section L2225-2245 with its own six-category STRIDE
+      vocabulary, the §10 Security recipe row L1112, and §13.11
+      Security Review Recipe L3472-3487, the last found by critic
+      review) plus a FIFTH, load-bearing citation found by searching
+      all three normative documents from the first draft: Execution
+      Contract §32 Security Change Contract (L1231-1260), which
+      mandates a real minimum structure (Assets/Trust Boundaries/Entry
+      Points/Threats/Controls/Residual Risk/Test Evidence) and
+      explicitly names STRIDE as an acceptable method to satisfy it.
+      This record's own field design merges these citations: EC §32's
+      own first three elements frame the review
+      (assets/trust_boundaries/entry_points); Atlas's own DFD formula
+      step is the structural substrate (data_flow_elements, using the
+      standard four-type Yourdon/Gane-Sarson vocabulary, not an
+      invention); each threats[] entry carries EC §32's own remaining
+      four elements scoped per-threat (category via STRIDE's own six-
+      value vocabulary, control/residual_risk/test_evidence, all
+      REQUIRED non-empty strings so an incomplete review state is
+      recorded explicitly rather than by an absent field).
+      `elements_with_no_recorded_threats` is a re-derived structural
+      set-difference (NOT genuine compute -- a structural derivation,
+      the same class database_data.erd's own referential-integrity
+      checks already perform), surfacing Atlas's own "威脅覆蓋完整"
+      benefit as information without enforcing an artificial
+      completeness requirement. This record's own `STRIDE-` id prefix
+      and `version` type are checked at both runtime layers from the
+      first draft.
+    source: "methods/contracts/security.stride.contract.yaml (built same session as this entry, mints machine_id security.stride, opens the security family) + specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: Atlas's own dedicated §11.44 section
+      is thin (a six-item category list plus a one-line formula, no
+      numbered protocol beyond the F20 row's own usage string) --
+      EC §32's own richer structure is what elevates this method's own
+      grounding, the same "table row thin, EC section thick" pattern
+      several `database_data` entries above it already establish.
+      Tier 1, mandated by the actively-running implementation slice,
+      same category as the forty-one entries above it. FIRST entry of
+      a new family -- nine more F20 table rows remain (LINDDUN, Attack
+      Tree, PASTA, DPIA/PIA, Zero Trust Review, Secrets Threat Review,
+      Supply Chain Threat Model, Abuse Case, Security Control Mapping),
+      each an independent future slice, not blocked by this one.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

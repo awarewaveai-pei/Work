@@ -1,0 +1,387 @@
+$id: "ai-lego://methods/contracts/security.stride.contract.yaml"
+title: "STRIDE Threat Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-fourth Method Atlas slice, FIRST member
+  of a NEW `security` family (F20's own "資安／隱私套件 (Security /
+  Privacy Pack)") -- the fourth pack family this session opens, after
+  F18 Software Architecture (8 of 10 table rows built, 2 disclosed
+  scope skips -- DDD explicitly not built per `architecture
+  .event_storming.contract.yaml`, Architecture Trade-off Matrix
+  explicitly skipped per `devops_sre.sli_slo.contract.yaml` -- NOT yet
+  complete), F19 DevOps/SRE (13/13 table rows built, complete), and F21
+  database_data (9 built + 1, Schema Compatibility Analysis, confirmed
+  already covered by a sibling's own stage -- complete).
+
+  Atlas gives this method FOUR citations, broad grep across ALL THREE
+  normative documents from the FIRST draft (the standing discipline
+  every `database_data` slice since the third consecutive due-diligence
+  miss established): (1) the F20 tool table's STRIDE row (L882: purpose
+  "系統化找常見安全威脅"; usage "DFD→Spoofing/Tampering/Repudiation
+  /Information Disclosure/DoS/Elevation"; benefit "威脅覆蓋完整"); (2)
+  a dedicated §11.44 STRIDE 威脅建模 section (L2225-2245: the SAME six
+  categories spelled out in English -- Spoofing, Tampering, Repudiation,
+  Information Disclosure, Denial of Service, Elevation of Privilege --
+  usage "Data Flow Diagram → element-by-element threat enumeration →
+  controls → residual risk", benefit "建立一致、可重複的威脅分析"); (3)
+  the Method Selection Engine's own Security problem-type recipe row
+  (§10, L1112: "Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test"),
+  independently confirming the same Assets→DFD→threat-method→Controls
+  →Test sequence; (4) §13.11 Security Review Recipe (L3472-3487: "Asset
+  Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → LINDDUN →
+  Attack Tree → Secret/Identity Review → Supply Chain Review → Control
+  Mapping → Adversarial Test → Residual Risk → Human Security
+  Approval") -- a THIRD, independent Atlas-side confirmation of the
+  Assets→DFD→Trust-Boundaries ordering (a gap the first draft of this
+  contract missed, caught by critic review; §13.11 also names a
+  review-LEVEL "Residual Risk" step after Control Mapping/Adversarial
+  Test, distinct from this record's own per-THREAT `residual_risk`
+  field -- disclosed as a real, un-modeled gap in `OQ-STRIDE-6`).
+
+  **A fifth, load-bearing citation found by the broadened search**:
+  Execution Contract §32 Security Change Contract (L1231-1260) mandates
+  a REAL minimum structure -- "Assets / Trust Boundaries / Entry Points
+  / Threats / Controls / Residual Risk / Test Evidence" (L1250-1257) --
+  for ANY change touching authn/authz/secrets/crypto/network/egress/
+  tenant-isolation/file-parsing/user-content/AI-tools, and explicitly
+  NAMES STRIDE as one of the methods Method Atlas may use to satisfy
+  it ("Method Atlas 可選 STRIDE／LINDDUN／Attack Tree／PASTA", L1260).
+  This is the authoritative CONTAINER structure; Atlas's own §11.44
+  formula is the STRIDE-SPECIFIC way of filling its own "Threats" step;
+  §13.11 independently confirms the same framing-fields ordering. This
+  record's own field design merges all three: `assets`/`trust
+  _boundaries`/`entry_points` (EC §32's own first three elements,
+  Atlas §13.11's own first three recipe steps) frame the review;
+  `data_flow_elements` (Atlas's own "DFD" step, §13.11's own second
+  step) is the structural substrate; `threats[]` entries carry EC
+  §32's own remaining four elements (category via STRIDE's own six-
+  value vocabulary, plus per-threat `control`/`residual_risk`
+  /`test_evidence`) together in one place, since a completed review's
+  own controls, residual-risk judgment, and test evidence are naturally
+  scoped to the SPECIFIC threat they answer, not the review as a whole.
+
+  Also cross-checked: `specs/execution/risk-tier.schema.yaml`'s own
+  HIGH-tier `required_actions` list already names "Threat Review" as a
+  mandatory gate action (L93) -- a real, confirming cross-reference
+  (this method is what satisfies that gate for STRIDE-chosen reviews),
+  not a duplicate structure (that file models a RISK-TIER POLICY, not
+  threat-review content itself). `specs/cognitive/problem-type
+  .schema.yaml`'s own `security` problem-type entry (L291-296)
+  `recommended_start` is a verbatim transcription of the same §10
+  L1112 recipe row above -- a second confirming cross-reference, not
+  a duplicate.
+
+  Due-diligence search, broad across all three normative documents and
+  the spec root from the first draft: case-insensitive greps for
+  "STRIDE"/"spoofing"/"tampering"/"repudiation"/"elevation of
+  privilege"/"data flow diagram"/"trust boundar"/"entry point"/"threat
+  review". Real neighbours found and confirmed distinct: `specs
+  /execution/handoff.schema.yaml`'s own "trust boundary" (L648, a
+  generic verification-limitation sense -- "content truth is not
+  mechanically checked" -- unrelated to a STRIDE/DFD trust-boundary
+  diagram element); `specs/cognitive/typed-objects/red-team-challenge
+  .schema.yaml` (Atlas §11.23 Red Team, an 11-item generic adversarial-
+  review checklist with a "no final authority" rule -- a DIFFERENT
+  method entirely, not STRIDE's own six fixed threat categories,
+  confirmed by direct read). No existing typed object in `specs
+  /security/` (`key-vault-lifecycle`, `log-redaction-token`,
+  `personal-data-envelope`, `tenant-isolation-controls`) models threat-
+  review content -- all four are narrower, specific security-control
+  records. No duplicate typed object found.
+
+  **A real prose neighbour, found by critic review, not this method's
+  own first-draft search**: `docs/architecture/SECURITY_THREAT_MODEL
+  .md` is this repository's OWN completed STRIDE+LINDDUN review (dated
+  2026-08-29, PROPOSED status), the flagship real-world instance of
+  this exact method inside this spec root. It is NOT a duplicate typed
+  object (it is unstructured markdown, not a machine-validated record),
+  but reading it against this record's own schema surfaces three real,
+  disclosed modeling gaps this contract did not anticipate: (a) its own
+  threat table (§3/§4) carries `Source`/`Severity` columns this
+  record's own `threat` shape has no field for; (b) at least one of its
+  own threats (S2, "人類 Approver session" phishing/hijack) is scoped
+  to a TRUST BOUNDARY, not a `data_flow_elements[]` entry -- this
+  record's own referential-integrity invariant only recognizes the
+  latter; (c) its own `test_evidence`-equivalent row is filled with the
+  literal string "不適用於本階段" (not applicable at this stage) for
+  the ENTIRE review, a review-level disclosure this record's own
+  per-threat `test_evidence` REQUIRED-field design (see
+  compilation_decisions below) would force into being repeated
+  per-threat instead. All three are disclosed as `OQ-STRIDE-6`, not
+  silently unmodeled.
+
+  Real structural invariants that make this record a genuine MODEL:
+  every `threats[]` entry's own `element_name` must name a real
+  `data_flow_elements` entry (referential integrity, the same class
+  `database_data.erd`'s own relationship checks already establish);
+  `category` is Atlas's own closed six-value STRIDE vocabulary,
+  transcribed verbatim; `element_type` is the standard, textbook four-
+  element DFD vocabulary (External Entity / Process / Data Store / Data
+  Flow -- Yourdon/Gane-Sarson notation, the same class of established,
+  non-invented external theory `database_data.normalization`'s own
+  relational-algebra citation already draws on, not this session's own
+  invention). `elements_with_no_recorded_threats` is GENUINE, RE-
+  DERIVED evidence (the `data_flow_elements[]` names with zero
+  `threats[]` entries referencing them) -- surfacing Atlas's own
+  "威脅覆蓋完整" (complete threat coverage) benefit as INFORMATION, not
+  as an enforced completeness requirement (a caller may have genuinely
+  reviewed an element and found no applicable threat).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, STRIDE row (L882): 'DFD→Spoofing/Tampering/Repudiation/Information Disclosure/DoS/Elevation'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.44 STRIDE 威脅建模 (L2225-2245): six categories, 'Data Flow Diagram → element-by-element threat enumeration → controls → residual risk'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Method Selection Engine, Security recipe row (L1112): 'Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487): 'Asset Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → ... → Residual Risk → Human Security Approval' -- third independent confirmation of the Assets/DFD/Trust-Boundaries ordering, also naming a review-LEVEL Residual Risk step this record does not model (OQ-STRIDE-6)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum 'Assets/Trust Boundaries/Entry Points/Threats/Controls/Residual Risk/Test Evidence', explicitly naming STRIDE as an acceptable method"
+  - "specs/execution/risk-tier.schema.yaml HIGH-tier required_actions (L93): 'Threat Review' -- a confirming cross-reference, not a duplicate structure"
+  - "specs/cognitive/problem-type.schema.yaml security problem-type entry (L291-296): recommended_start verbatim-transcribes the same §10 L1112 recipe row -- a second confirming cross-reference"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md (2026-08-29): this repository's own completed STRIDE+LINDDUN review -- a real prose instance, not a duplicate typed object, surfacing three disclosed modeling gaps (OQ-STRIDE-6)"
+  - "methods/registry/method-inventory.yaml STRIDE entry: category 'F20 security', no machine_id -- this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  forty-second concrete entry (added in the same editing pass as this
+  contract). `id: security.stride` mints a new machine_id, FIRST
+  member of a NEW `security` family (F20).
+
+id: security.stride
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Separating a system into DFD elements and enumerating
+# threats per element is DECOMPOSE; assigning each threat its own
+# category/control/residual-risk/evidence is MAP; the referential-
+# integrity check and the no-recorded-threats derivation are VALIDATE
+# -- the same inferred triple `database_data.erd` (and every prior
+# structured-record method this session built) already uses.
+
+purpose:
+  - enumerate_security_threats_against_a_system_element_by_element_using_strides_six_category_vocabulary_and_record_the_ec32_minimum_review_structure
+inputs:
+  required: [AssetSet, DataFlowElementSet]
+  optional: [TrustBoundarySet, EntryPointSet, ThreatSet]
+outputs: [StrideThreatModelRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "assets has at least 1 entry; every entry is a non-empty string (EC §32's own 'Assets' element)"
+  - "trust_boundaries is a required array (may be empty); every entry has a non-empty name and description (EC §32's own 'Trust Boundaries' element)"
+  - "entry_points is a required array (may be empty) of non-empty strings (EC §32's own 'Entry Points' element)"
+  - "data_flow_elements has at least 1 entry; every entry's own element_type is one of {external_entity, process, data_store, data_flow} (the standard four-type DFD vocabulary); name is a non-empty string; names are unique within the record"
+  - "threats is a required array (may be empty); every entry's own element_name must name a real data_flow_elements entry; category is one of Atlas's own six STRIDE values; description/control/residual_risk/test_evidence are all non-empty strings (EC §32's own remaining four elements, scoped per-threat)"
+  - "elements_with_no_recorded_threats is NOT caller-supplied -- the builder computes it internally (the data_flow_elements[] names with zero threats[] entries referencing them), and the gate independently re-derives and compares against the stored value"
+  # Preconditions 1 maps onto 'system_or_component'; 2-4 onto EC §32's
+  # own Assets/Trust Boundaries/Entry Points; 5 onto Atlas's own 'DFD'
+  # formula step; 6 onto 'element-by-element threat enumeration' plus
+  # EC §32's own Threats/Controls/Residual Risk/Test Evidence; 7 onto
+  # Atlas's own '威脅覆蓋完整' benefit, surfaced as evidence not as an
+  # enforced completeness requirement.
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class every prior structural (non-genuine-compute) contract in
+  # this session already reasons through: elements_with_no_recorded
+  # _threats is a structural set-difference derivation (the same kind
+  # database_data.erd's own referential-integrity checks already
+  # perform), not a statistical/numeric CALCULATED RESULT -- genuine
+  #_compute (and the shared evaluate_statistical_gate reuse) is
+  # reserved in this session for numeric/statistical derivations, not
+  # every re-derived structural fact.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no STRIDE row.
+recommended_next: [architecture.adr]
+# Atlas's own F18 recommended chain (L828-842, L836-837: Threat Model
+# -> ADR) AND its own §13.9 High-risk Architecture Change Recipe
+# (L3435-3454, L3445-3447: "ATAM/MCDA -> Threat Model -> Data/Migration
+# Review -> ADR") both independently place a Threat Model step directly
+# before ADR -- a real, citable forward link, not invented.
+# `architecture.adr` is an already-built Tier 1 method. No sibling
+# security method (LINDDUN/PASTA/Attack Tree/Security Control Mapping)
+# has a machine_id yet (see OQ-STRIDE-4/5), so this is the only forward
+# link currently populatable.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- any real remediation a
+  # recorded threat's own control describes happens outside this
+  # method's own scope, the same "record describes an external
+  # analysis" class every prior structural contract's own rollback
+  # field already draws.
+
+compilation_decisions:
+  - question: >
+      Should this record enforce a strict STRIDE-category-per-element-
+      type applicability matrix (e.g. the commonly-taught convention
+      that Data Flow elements cannot meaningfully suffer "Elevation of
+      Privilege")?
+    decision: "No -- any of the six categories may be recorded against any element_type."
+    reasoning: >
+      This convention is real and widely taught, but legitimately
+      VARIES across sources (e.g. whether a Data Store may carry
+      Repudiation depends on whether it is a log store) -- Atlas's own
+      formula and EC §32 both name no such restriction. Enforcing an
+      unstated cross-check here would be exactly the kind of
+      undisclosed-over-constraint class a critic review already caught
+      on `database_data.data_contract` (an invented "always true"
+      restriction with a real counter-example). Disclosed as `OQ
+      -STRIDE-2`, not silently enforced.
+  - question: >
+      Should `control`/`residual_risk`/`test_evidence` be OPTIONAL per
+      threat (allowing a freshly-identified, not-yet-mitigated threat
+      to be recorded without them), or REQUIRED?
+    decision: "REQUIRED (non-empty strings) -- an incomplete state must be recorded as explicit free text (e.g. 'no control implemented yet, accepted risk'), not represented by an absent field."
+    reasoning: >
+      Atlas's own formula names 'controls' and 'residual risk' as
+      steps that follow enumeration, and EC §32 names Controls/
+      Residual Risk/Test Evidence as required elements of a COMPLETED
+      Threat Review, the mandatory gate a HIGH-risk change must pass
+      (risk-tier.schema.yaml's own required_actions). Making these
+      optional would let a genuinely incomplete review pass this
+      record's own gate silently. The same "an absence is an explicit
+      disclosed finding, not an omitted field" discipline `database
+      _data.erd`'s own constraints[] and `database_data.data_contract
+      `'s own quality_notes[] already establish, applied here to
+      per-threat completeness rather than a whole optional array. A
+      real counter-example was checked, not ignored: this repository's
+      own `docs/architecture/SECURITY_THREAT_MODEL.md` (found by
+      critic review) declares its own Test Evidence "不適用於本階段"
+      for the WHOLE review, not per-threat. That is not a contradiction
+      of this decision -- it IS the exact "explicit disclosed text, not
+      an absent field" pattern this record requires, just written once
+      at review scope rather than repeated per-threat (a real, disclosed
+      modeling gap this record's own per-threat-only shape has, see
+      OQ-STRIDE-6, not evidence the REQUIRED decision itself is wrong).
+  - question: >
+      Should `assets`/`entry_points` be cross-validated against
+      `data_flow_elements` (e.g. requiring every entry_point to also
+      appear as a data_flow_elements name)?
+    decision: "No -- the three lists are independently declared, not cross-checked."
+    reasoning: >
+      EC §32 names Assets/Trust Boundaries/Entry Points as a REVIEW
+      FRAMING exercise (what matters, where the boundaries are, where
+      external input arrives) that commonly precedes -- and may be
+      coarser-grained than -- the detailed DFD element list (e.g. 'the
+      public API' as an entry point may correspond to several DFD
+      Process elements). Forcing exact-name equality would invent a
+      1:1 correspondence Atlas and EC do not require. Disclosed as
+      `OQ-STRIDE-3`, not silently unenforced.
+  - question: >
+      Should this method model a full Threat→Control→Evidence
+      TRACEABILITY structure (F20's own separate, still-unbuilt
+      'Security Control Mapping' table row)?
+    decision: "No -- this record's own per-threat control/test_evidence fields are lightweight free text, not a dedicated traceability/audit structure."
+    reasoning: >
+      F20's own LAST table row, Security Control Mapping ("每個威脅對應
+      preventive/detective/recovery control", benefit "控制可稽核、可
+      測"), is a DIFFERENT, dedicated method for exactly this fuller
+      traceability concern. Building that structure here would
+      preempt a future method's own design and duplicate its subject
+      matter before it exists -- the same restraint `database_data
+      .data_quality_dimensions`'s own contract already applied when it
+      declined to absorb Master Plan §35's own different vocabulary.
+      Disclosed as `OQ-STRIDE-5`, a real forward pointer.
+
+open_questions:
+  - id: "OQ-STRIDE-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STRIDE-2"
+    question: >
+      No STRIDE-category-per-element-type applicability matrix is
+      enforced (see compilation_decisions) -- a caller could record an
+      "Elevation of Privilege" threat against a bare Data Flow element,
+      which most STRIDE practitioners would consider inapplicable.
+      Should a future revision add an advisory (non-blocking) check?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-STRIDE-3"
+    question: >
+      `assets`/`entry_points`/`trust_boundaries` are not cross-validated
+      against `data_flow_elements` (see compilation_decisions). Should a
+      future revision add an optional structural link between the two
+      framing lists and the detailed DFD element list?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-STRIDE-4"
+    question: >
+      EC §32 also names LINDDUN/Attack Tree/PASTA as acceptable
+      methods, and F20's own table lists all four plus DPIA/PIA, Zero
+      Trust Review, Secrets Threat Review, Supply Chain Threat Model,
+      Abuse Case, and Security Control Mapping. Should a future
+      revision of THIS contract (or a shared base schema) factor out
+      the EC §32 baseline shape (assets/trust_boundaries/entry_points)
+      so LINDDUN/PASTA/Attack Tree can reuse it structurally, rather
+      than each independently re-declaring the same three fields?
+    owner: "operator, or whoever next builds security.linddun / security.pasta / security.attack_tree"
+    blocks: "nothing in this file's own validity -- a real design question for when a second real instance exists, not solved prematurely"
+  - id: "OQ-STRIDE-5"
+    question: >
+      This record's own per-threat control/test_evidence fields are
+      free text (see compilation_decisions). Should a future
+      `security.security_control_mapping` slice add a structured
+      `control_mapping_ref` soft link here, once that method exists?
+    owner: "operator, or whoever next builds security.security_control_mapping"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STRIDE-6"
+    question: >
+      Three real modeling gaps surfaced by reading this repository's own
+      completed review, `docs/architecture/SECURITY_THREAT_MODEL.md`,
+      against this record's own schema (found by critic review, not
+      this contract's own first draft): (a) no `severity`/`source`
+      field per threat, though SECURITY_THREAT_MODEL.md's own table
+      carries both; (b) `threats[].element_name` may only reference a
+      `data_flow_elements[]` entry, but that document scopes at least
+      one real threat (S2) to a TRUST BOUNDARY instead; (c) no review-
+      LEVEL residual_risk/test_evidence field distinct from the per-
+      threat ones, though both Atlas §13.11 (L3472-3487) and
+      SECURITY_THREAT_MODEL.md's own §6 "Residual Risks" section treat
+      residual risk at the whole-review level too. Should a future
+      revision add optional `severity`/`source` per-threat fields, allow
+      `element_name` to also reference a `trust_boundaries[].name`, and
+      add an optional review-level `residual_risk_summary`/
+      `test_evidence_summary` pair?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F20 tool table row (L882), §11.44 (L2225-2245), the
+    §10 Security recipe row (L1112), §13.11 Security Review Recipe
+    (L3472-3487), and Execution Contract §32 (L1231-1260) directly.
+    Broad case-insensitive grep across all three normative documents
+    and the spec root for "STRIDE"/"spoofing"/"tampering"/"repudiation"
+    /"elevation of privilege"/"data flow diagram"/"trust boundar"
+    /"entry point"/"threat review" -- every non-citation hit read and
+    confirmed distinct (see description above). A critic review
+    independently re-surveyed the same three normative documents PLUS
+    the spec root's own prose docs and found one real load-bearing gap
+    (§13.11, missed by the first draft's narrower grep set) and one
+    real prose neighbour this contract's own search had no way to find
+    (`docs/architecture/SECURITY_THREAT_MODEL.md`, a real-world
+    instance of this method, not matched by any of the grep terms
+    above since it does not use the word "STRIDE" in a way the initial
+    search surfaced as a hit needing individual review) -- both folded
+    in above, both fixed in the same commit as the finding (see
+    OQ-STRIDE-6). Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The six-category STRIDE
+    vocabulary and the "DFD→enumeration→controls→residual risk"
+    formula are directly transcribed from Atlas; EC §32's own seven-
+    element minimum structure is directly transcribed and merged into
+    this record's own field design (not restated as a second,
+    competing structure); §13.11 independently confirms the same
+    Assets/DFD/Trust-Boundaries ordering. The four-type DFD vocabulary
+    is standard, textbook Yourdon/Gane-Sarson notation, not an
+    invention. The no-applicability-matrix, required-per-threat-fields,
+    no-cross-validation, and no-control-mapping-absorption choices are
+    all disclosed compilation decisions -- see compilation_decisions
+    above. Three further real modeling gaps (no severity/source field,
+    threats scoped only to data_flow_elements not trust_boundaries, no
+    review-level residual_risk/test_evidence) are disclosed as
+    OQ-STRIDE-6, found by reading this repository's own real-world
+    STRIDE+LINDDUN review against this record's own schema.

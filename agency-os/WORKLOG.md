@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-09-06（續57，同一 session：Cognitive OS 第四十四個 Method Atlas 切片 — `security.stride`，新 `security` 家族（F20）第一個成員；critic 初稿 verdict **FAIL**——跑時邏輯零破綻（6/6 突變全命中指名測試、本 session 五大復發 bug class 全乾淨），FAIL 全落在治理/查證面，5 Major 全修後 SHIP）
+
+**觸發**：操作者「繼續」，承接 WORKLOG 續56 收官 F21 後列出的候選清單，選 F20 自己表格第一列 STRIDE——也是唯一有 Atlas 專節（§11.44）的 F20 成員，且 Execution Contract §32 明文列 STRIDE 為可選滿足方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
+
+**選型與設計**：Atlas 三筆引用（F20 表格列 L882、§11.44 L2225-2245 六類 STRIDE 詞彙、§10 Security recipe L1112）+ 廣搜找到第四筆載重引用：Execution Contract §32 Security Change Contract（L1231-1260）強制最低 7 要素結構「Assets/Trust Boundaries/Entry Points/Threats/Controls/Residual Risk/Test Evidence」，明文列 STRIDE 為可選方法。欄位設計融合兩者：`assets`/`trust_boundaries`/`entry_points`（EC §32 前三要素）框定審查範圍；`data_flow_elements`（Atlas 自己「DFD」步驟，標準 Yourdon/Gane-Sarson 四型詞彙）是結構基底；`threats[]` 每筆帶 EC §32 剩餘四要素（STRIDE 六類 `category` + 逐筆 `control`/`residual_risk`/`test_evidence`）。純結構性 record（`provenance_required`+1 個 integrity gate `stride_integrity`），非真計算：`elements_with_no_recorded_threats` 是重新推導的結構性差集（哪些 `data_flow_elements[]` 沒有任何 `threats[]` 指向），builder 內部計算非呼叫端提供，gate 獨立重算比對存量值。核心真不變量：每筆 `threats[].element_name` 必須指向真實 `data_flow_elements[]` 條目，建構層（`STRIDE_INVALID_THREATS`）與 gate 層（重算，不信任存量值）雙重檢查。`contract-backlog.yaml` 註冊在跟 contract 同一次編輯就寫入，延續前兩輪吸取的教訓。
+
+**critic 真跑（獨立重查全部三份規範文件+spec root 自己的散文文件、直接 grep 驗證 registry、6 個真突變測試）：初稿 verdict FAIL，但跑時邏輯本身零破綻**——6/6 指名突變全數命中對應測試（拿掉 referential-integrity 檢查、`elements_with_no_recorded_threats` 比對改 `if False`、DFD 名稱唯一性檢查改 `return True`、per-threat 非空檢查砍到剩一欄、gate 刪 `entry_points`/`version` 重驗），本 session 五大復發 bug class（registry 延遲註冊、行號引用錯誤、presence-vs-null 混淆、gate 重推導不完整、測試命名與斷言矛盾）全部驗證乾淨。FAIL 全部落在治理/查證面：
+
+- **M1（已修）**：漏掉 Atlas §13.11 Security Review Recipe（L3472-3487）——第三筆獨立確認 Assets/DFD/Trust-Boundaries 排序，且明文列出 review 層級（非逐筆）的 Residual Risk 步驟，本記錄未建模，原本也未揭露。已補為第四筆 Atlas 引用，未建模落差併入新開 `OQ-STRIDE-6`。
+- **M2（已修）**：漏掉本 repo 自己真實完成的 STRIDE+LINDDUN 審查文件 `docs/architecture/SECURITY_THREAT_MODEL.md`（非重複 typed object，是真實散文範例）。拿本記錄自己的 schema 對照該文件實際內容，讀出三個真實、先前未揭露的建模落差：無 `severity`/`source` 逐筆欄位；該文件至少一筆威脅（S2）掛在 trust boundary 而非 DFD element，本記錄的參照完整性只認後者；該文件的 test_evidence 是整份審查層級寫「不適用於本階段」一次，本記錄逐筆必填的設計會強迫重複填寫。三者併入 `OQ-STRIDE-6`；`control`/`residual_risk`/`test_evidence`「必填」的 compilation_decision 理由段落補上這個真反例並說明為何決定不變。
+- **M3（已修，牽動另一檔案）**：`recommended_next: []` 判準用錯（誤用「同 family 才能連」），且本次新增的 machine_id 讓既有 `architecture.adr.contract.yaml` 的宣稱變假（原文宣稱「Threat Model／Rehearsal／Canary-Blue-Green 三個鄰居都沒有 machine_id」）。修法：`security.stride` 自己的 `recommended_next` 補上 `architecture.adr`（Atlas F18 鏈 L836-837 與 §13.9 L3445-3447 皆將 Threat Model 直接放在 ADR 前）；同 commit 修正 `architecture.adr.contract.yaml` 的過期宣稱——順便發現另兩個鄰居 `devops_sre.canary_deployment`/`blue_green_deployment` 其實本 session 更早就已建成，一併補進其 `recommended_next`（僅剩 Rehearsal 真的還沒有 machine_id，`OQ-ADR-2` 收窄範圍）。
+- **M4（已修）**：「F18 Software Architecture、F19 DevOps/SRE、F21 database_data（三個都已收官）」是假宣稱，逐字寫進三個新檔（`ai_lego/modules/security/__init__.py`、`security.stride.contract.yaml`、`contract-backlog.yaml`）。F18 實際 8/10 列建置+2 列揭露式跳過（DDD、Architecture Trade-off Matrix），非收官；只有 F19（13/13）與 F21（9 建+1 確認覆蓋）真正收官。三處全部修正。
+- **M5（已修）**：漏寫切片文件 `FORTYFOURTH_SLICE_SECURITY_STRIDE.md`，打斷 43 個切片連續無斷點的文件鏈。已補。
+
+Minor 全修：schema `elements_with_no_recorded_threats` 的 items 缺同檔其他欄位都有的 `pattern: "\\S"` 空白字串防護（gate 層重算已能端到端擋住，純 schema 層獨立缺口）；`ai_lego.security`（crypto-shred runtime）與 `ai_lego.modules.security`（本次新開的方法家族）同名無互指——各補一行；`specs/cognitive/problem-type.schema.yaml` 自己 `security` problem-type 條目（L291-296）逐字轉錄同一筆 §10 recipe，是確認性交叉引用卻漏列——已補。
+
+Nit 不修（既存、範圍外，僅記錄）：critic 發現 `SECURITY_THREAT_MODEL.md`（3 處）與 `problem-type.schema.yaml`（1 處）各自既有的行號引用漂移（9-30 行不等），皆非本切片造成；目前無機械機制檢查 contract 引用行號隨母文件編輯是否仍正確，值得另開治本 TASKS 項而非本切片範圍。
+
+**[已修改]**：spec-root 新增 `methods/contracts/security.stride.contract.yaml`＋`specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortysecond_concrete_entry`（跟 contract 同一次編輯寫入）＋修正 `architecture.adr.contract.yaml`（M3）＋重新產生 `SPEC_QUICKREF.md`/`MOTHER_DOC_SECTION_INDEX.md`。Product root 新增 `ai_lego/modules/security/__init__.py`（新家族）＋`ai_lego/modules/security/stride.py`（builder+2 gate）＋`ai_lego/apps/cli/run_stride_slice.py`＋`tests/unit/test_stride.py`（77 tests）＋`docs/FORTYFOURTH_SLICE_SECURITY_STRIDE.md`；修正 `ai_lego/security/__init__.py` 互指註記（m2）。`agency-os/TASKS.md` 切片條目（含修正既有「F18 已收官」誤植）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，critic 修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2818→2821
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_stride_slice` | exit=0 | result=`PASS security.stride: 2 elements, 1 threats, uncovered=['order_database'], gates [2×PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_stride`（修正後重跑）| exit=0 | result=77 OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit -p "test_*.py"`（product root，修正後重跑）| exit=0 | ms=60453 | result=**1624 tests OK**，零回歸
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 `jsonschema.Draft202012Validator` 驗證 `security.stride.contract.yaml` 與修正後 `architecture.adr.contract.yaml` 對 `method.schema.yaml` | exit=0 | result=兩者皆 OK
+- REVIEW_DONE: critic=Standard（真實 subagent，獨立重查三份規範文件+spec root 散文文件+直接 grep registry+6 個真突變測試）| verdict=初稿 FAIL → 5 Major 全修＋數個 Minor 全修 → SHIP | findings=0c/5m/3minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`security[.]stride\|STRIDE-` | hits=8 本切片自己檔案（4 spec-root+4 product-root）+ 3 個既有 log/dispatch 檔案（非治理文件，預期內）+ 1 個 HCI30 文件字面提及泛用 STRIDE 詞彙（`STRIDE-Information-Disclosure` 等分類名，非本次 id prefix，確認無關）；「F18 Software Architecture, F19 DevOps/SRE, and F21 database_data (all three now complete)」假宣稱句型 grep agency-os 零殘留（三處全修）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-STRIDE-1~6` 皆揭露（無 method-inventory.yaml row、無 category-per-element-type 矩陣、無 assets/entry_points 與 data_flow_elements 交叉驗證、未來 LINDDUN/PASTA/Attack Tree 共用 baseline 待設計、Security Control Mapping 建成前無結構化連結、severity/source/trust-boundary-scoped-threat/review-level-residual-risk 三項真實落差待未來修訂）。`SECURITY_THREAT_MODEL.md`／`problem-type.schema.yaml` 既有行號引用漂移已發現未修（範圍外，另開追蹤）。WORKLOG 續56 與 `FORTYTHIRD_SLICE_...md` 頁尾仍殘留「F18 已收官」舊誤植（歷史記錄不回改，僅本條目與 TASKS.md 訂正）。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
+**`security` 家族（F20）**：1/10 建置完成，9 列仍待（LINDDUN／Attack Tree／PASTA／DPIA-PIA／Zero Trust Review／Secrets Threat Review／Supply Chain Threat Model／Abuse Case／Security Control Mapping），各自獨立未來切片，不被本切片阻塞。
+
 ## 2026-09-06（同日第五輪：HCI_RISK_SPEC.md 部分落地——severity-floor detection，解答上一輪 disagreement-propagation 待辦的觸發，critic 覆審抓到 1 Critical+3 Major+3 Minor，同款「安全宣稱被自己文件說的操作步驟證偽」再度出現）
 
 **觸發**：操作者「繼續」，延續同日第四輪結束時我自己提出的候選——`HCI_RISK_SPEC.md`（severity override）。上一輪 TASKS.md 明文留了一個觸發條件：「等真有 trust-read endpoint 或碰 `HCI_RISK_SPEC.md` 時一併決定」disagreement 傳遞問題，本輪碰了 HCI_RISK_SPEC.md，所以先檢視這個觸發（見下方 [已修改]／TASKS.md 更新）。

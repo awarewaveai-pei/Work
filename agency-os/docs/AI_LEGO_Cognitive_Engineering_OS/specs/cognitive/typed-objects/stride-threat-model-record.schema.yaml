@@ -1,0 +1,198 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml"
+title: STRIDE Threat Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StrideThreatModelRecord` --
+  the declared `outputs` of `security.stride`'s Method Contract. FIRST
+  typed object in a NEW `security` family (F20). Atlas's own F20 tool
+  table STRIDE row (L882) AND dedicated §11.44 section (L2225-2245: six
+  categories, "Data Flow Diagram → element-by-element threat
+  enumeration → controls → residual risk") together ground this
+  record's own `data_flow_elements[]`/`threats[]` shape. Execution
+  Contract §32 Security Change Contract (L1231-1260: mandatory minimum
+  "Assets/Trust Boundaries/Entry Points/Threats/Controls/Residual
+  Risk/Test Evidence") grounds `assets`/`trust_boundaries`/
+  `entry_points` plus the four per-threat fields.
+
+  A STRUCTURAL record (`provenance_required` + one integrity gate), not
+  genuine compute: `elements_with_no_recorded_threats` is a re-derived
+  structural set-difference (which `data_flow_elements[]` names have
+  zero `threats[]` entries referencing them), the same class of
+  derivation `database_data.erd`'s own referential-integrity checks
+  already perform -- not a numeric/statistical CALCULATED RESULT.
+
+  Real structural invariants: every `threats[]` entry's own
+  `element_name` must name a real `data_flow_elements` entry;
+  `category` is Atlas's own closed six-value STRIDE vocabulary;
+  `element_type` is the standard four-type DFD vocabulary (External
+  Entity/Process/Data Store/Data Flow) -- both enforced at the runtime
+  layer, not here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, STRIDE row (L882): 'DFD→Spoofing/Tampering/Repudiation/Information Disclosure/DoS/Elevation'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.44 STRIDE 威脅建模 (L2225-2245): six categories"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum structure"
+  - "methods/contracts/security.stride.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  trust_boundary:
+    type: object
+    required: [name, description]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+  data_flow_element:
+    type: object
+    required: [name, element_type]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      element_type:
+        enum: [external_entity, process, data_store, data_flow]
+        description: "The standard four-type DFD vocabulary (Yourdon/Gane-Sarson notation), not an Atlas-specific enum -- textbook, not invented."
+  threat:
+    type: object
+    required: [element_name, category, description, control, residual_risk, test_evidence]
+    additionalProperties: false
+    properties:
+      element_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must name a real entry in this record's own data_flow_elements[] -- enforced at the runtime layer, not here."
+      category:
+        enum: [spoofing, tampering, repudiation, information_disclosure, denial_of_service, elevation_of_privilege]
+        description: "Atlas's own §11.44 six-category STRIDE vocabulary, transcribed verbatim as a machine enum (lower-cased, underscored)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      control:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Controls' element, scoped per-threat. REQUIRED -- an incomplete state is recorded as explicit free text (e.g. 'no control implemented yet'), not an absent field (see method contract compilation_decisions)."
+      residual_risk:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Residual Risk' element, scoped per-threat. Free text: Atlas gives no risk-scoring scheme."
+      test_evidence:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Test Evidence' element, scoped per-threat."
+
+type: object
+required: [id, version, system_or_component, assets, trust_boundaries, entry_points, data_flow_elements, threats, elements_with_no_recorded_threats, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^STRIDE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.stride"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which system or component this threat model covers, e.g. 'checkout-api order processing service'."
+  assets:
+    type: array
+    minItems: 1
+    description: "EC §32's own 'Assets' element -- at least one, e.g. 'customer PII database', 'payment processing credentials'."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  trust_boundaries:
+    type: array
+    default: []
+    description: "EC §32's own 'Trust Boundaries' element. REQUIRED array (may be empty) so an absence is an explicit disclosed finding, the same discipline database_data.erd's own constraints[] already establishes."
+    items:
+      $ref: "#/$defs/trust_boundary"
+  entry_points:
+    type: array
+    default: []
+    description: "EC §32's own 'Entry Points' element."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  data_flow_elements:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'DFD' formula step -- at least one element; names unique within the record (enforced at the runtime layer, not here)."
+    items:
+      $ref: "#/$defs/data_flow_element"
+  threats:
+    type: array
+    default: []
+    description: "Atlas's own 'element-by-element threat enumeration' formula step, carrying EC §32's own Controls/Residual Risk/Test Evidence elements per-threat. REQUIRED array (may be empty) -- a system may be genuinely reviewed and found to have no threats yet identified."
+    items:
+      $ref: "#/$defs/threat"
+  elements_with_no_recorded_threats:
+    type: array
+    default: []
+    description: "GENUINE, RE-DERIVED evidence, not caller-supplied -- the data_flow_elements[] names with zero threats[] entries referencing them. Surfaces Atlas's own '威脅覆蓋完整' (complete threat coverage) benefit as information, not an enforced requirement."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a threat model is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A checkout API threat model: two DFD elements, one threat recorded against the process element, the data store element left with no recorded threat (surfaced, not enforced)"
+    value:
+      id: "STRIDE-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.stride"
+      system_or_component: "checkout-api order processing service"
+      assets: ["customer PII database", "payment processing credentials"]
+      trust_boundaries:
+        - {name: "public internet to API gateway", description: "Unauthenticated external traffic crosses into the authenticated service perimeter here."}
+      entry_points: ["POST /v1/checkout"]
+      data_flow_elements:
+        - {name: "checkout_api_process", element_type: process}
+        - {name: "order_database", element_type: data_store}
+      threats:
+        - {element_name: "checkout_api_process", category: elevation_of_privilege, description: "A malformed request could bypass role checks and process an order as an admin.", control: "Role checks enforced server-side via a shared authorization middleware, not client-supplied claims.", residual_risk: "Low -- middleware is covered by its own unit tests.", test_evidence: "Verified via authorization bypass test suite, run AUTHZ-2026-09-01."}
+      elements_with_no_recorded_threats: ["order_database"]
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal, freshly-scoped review with no threats recorded yet"
+    value:
+      id: "STRIDE-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "security.stride"
+      system_or_component: "internal-reference lookup service"
+      assets: ["country-code reference table"]
+      trust_boundaries: []
+      entry_points: []
+      data_flow_elements:
+        - {name: "lookup_process", element_type: process}
+      threats: []
+      elements_with_no_recorded_threats: ["lookup_process"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F20 tool table row (L882), §11.44 (L2225-2245), and EC §32 (L1231-1260) directly. Validated against jsonschema Draft202012Validator."
+  note: "The six-category STRIDE vocabulary, the DFD formula, and EC §32's own seven-element minimum are directly transcribed. Referential integrity (threats[].element_name against data_flow_elements[]), the four-type DFD vocabulary, and elements_with_no_recorded_threats's own recomputation are enforced at the runtime layer (ai_lego/modules/security/stride.py), not the schema layer. No mother document was modified."
