@@ -60,7 +60,7 @@
 **[rollback]**：單一 commit，`git revert`。
 
 
- — `security.attack_tree`，F20 家族第三個成員、第一個結構性偏離 STRIDE/LINDDUN 共用形狀的成員、本 session 第一個 F20 genuine_compute 方法；critic 真跑 8 個突變+獨立逐行核對三份規範文件：verdict **FAIL**——跑時邏輯零破綻（AND/OR 欄位耦合這個我特別要求排查的 bug class 根本不存在、且早已被自己的測試釘住），FAIL 全部落在「宣稱超出證據」類別，6 Major 全修，過程中自己的修法又親手抓到第二層真 bug）
+## 2026-09-06（續59，同一 session：Cognitive OS 第四十六個 Method Atlas 切片 — `security.attack_tree`，F20 家族第三個成員、第一個結構性偏離 STRIDE/LINDDUN 共用形狀的成員、本 session 第一個 F20 genuine_compute 方法；critic 真跑 8 個突變+獨立逐行核對三份規範文件：verdict **FAIL**——跑時邏輯零破綻（AND/OR 欄位耦合這個我特別要求排查的 bug class 根本不存在、且早已被自己的測試釘住），FAIL 全部落在「宣稱超出證據」類別，6 Major 全修，過程中自己的修法又親手抓到第二層真 bug）
 
 **觸發**：操作者「繼續」，承接 WORKLOG 續58 收尾候選清單，選 Attack Tree——F20 表格第三列，Atlas §12.38 專節+§13.11 recipe 明文緊接 LINDDUN 之後，EC §32 第三個明文並列方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
 
