@@ -2143,6 +2143,24 @@
         "CAP-INVENTORY"
       ],
       "description": "Product price, availability, and each channel's own required attributes are packaged into a feed for an external shopping or advertising channel (e.g. Google Merchant Center, Meta Catalog, Pinterest, TikTok), and feed-quality triage flags rejected products, missing required attributes, and price or availability mismatches the channel reports back, traced to the specific source field responsible rather than reported as an opaque failure. Distinct from CAP-MULTI-MARKETPLACE/CAP-MARKETPLACE-SYNC, where the sale itself completes on a third-party marketplace and price/inventory are kept in sync bidirectionally with it; here the channel only displays the listing or serves an ad, the transaction still completes on the merchant's own storefront, and the feed is a one-way publish the channel never writes back to as authoritative. Also distinct from CAP-CAMPAIGNS, which only tracks an ad campaign's own budget, schedule, and performance, never product-level feed data. Requires CAP-INVENTORY for the same reason CAP-MARKETPLACE-SYNC already requires it: a channel feed publishes current stock availability alongside price, never a stale or assumed value. This only publishes a product's existing, already-resolved price to the channel and flags a channel-reported price mismatch for correction; it never sets or adjusts what a customer pays -- that decision remains CAP-CHANNEL-PRICING/CAP-PROMOTIONS' scope, which is why this capability carries no Q-COM-001 ('charges customers') gate."
+    },
+    {
+      "id": "CAP-MULTI-LOCATION-STOCK",
+      "name": "Multi-Location Stock Tracking",
+      "module": "inventory_ops",
+      "requires": [
+        "CAP-INVENTORY"
+      ],
+      "description": "Stock is held at two or more distinct physical locations (own warehouses, retail stores, or an outsourced 3PL warehouse), and each location carries its own independently tracked available quantity, so availability can be answered per location, stock can be moved between locations through a recorded transfer, and fulfillment can be sourced from a specific location rather than only a single company-wide total. Requires CAP-INVENTORY because a location-level balance is a partition of that capability's own stock record, never a second, parallel stock record. Distinct from CAP-POS-INVENTORY-SYNC/CAP-MARKETPLACE-SYNC, which keep one canonical stock figure consistent across sales channels; this capability partitions that same canonical record across physical locations instead -- the two compose, because a channel can be given the company-wide aggregate across all locations or a declared location subset, and either way there remains exactly one canonical stock record underneath. Deliberately does not require CAP-ORDERS: a merchant can hold stock at, and transfer stock between, multiple warehouses or stores with no order/transaction of any kind ever recorded (e.g. redistributing initial stock across new store locations before the business has taken its first sale), so adding that edge would force a merchant who explicitly answered no to having any orders/transactions into a plan that also enables order-taking. When CAP-ORDERS is also selected, an allocation always names its source location and can never exceed that location's own available quantity -- a per-location no-oversell check, distinct from and stronger than a company-wide aggregate check alone. An inbound receipt (new stock arriving at a location, e.g. from a supplier) is recorded the same way as an inter-location transfer -- a movement into a location's balance -- except it names no source location, only a destination; it is not a separate mechanism. Warehouse-internal execution -- bin/shelf addressing, putaway, pick/pack waves, barcode scanning, lot/serial/expiry tracking -- is explicitly out of scope; this capability only partitions and moves quantities between named locations, not what happens physically inside one."
+    },
+    {
+      "id": "CAP-CYCLE-COUNT",
+      "name": "Inventory Cycle Count",
+      "module": "domain",
+      "requires": [
+        "CAP-INVENTORY"
+      ],
+      "description": "A physical stock count at a location is periodically compared against the system's recorded balance for that same stock, and any discrepancy found is recorded as an explicit, attributable adjustment movement -- who counted, when, and the before/after quantity -- never a silent overwrite of the balance, reinforcing the same immutable-movement-ledger invariant CAP-INVENTORY's own domain obligations already require for every other balance change. Requires only CAP-INVENTORY, not CAP-MULTI-LOCATION-STOCK: a single-location merchant can cycle count their one stock record exactly the same way a multi-location merchant counts each location's balance separately; multiple locations are not a precondition for this capability to be meaningful."
     }
   ]
 }

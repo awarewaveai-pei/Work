@@ -536,7 +536,7 @@
       "id": "Q-DATA-007",
       "category": "records",
       "label": "庫存 / 倉儲資料",
-      "description": "系統需要追蹤商品的庫存數量與倉儲位置。",
+      "description": "系統需要追蹤商品目前還剩多少庫存數量；是否要拆成多個地點分別計算，是後面的獨立問題在處理。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -597,6 +597,30 @@
       "required_when_active": true,
       "active_when": {
         "question": "Q-DATA-009",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DATA-014",
+      "category": "records",
+      "label": "庫存分散在多個地點，各地點的數量分開計算",
+      "description": "庫存不是只看一個全公司總量，而是分成兩個以上實際地點（自己的倉庫、門市，或委外倉儲物流商的倉庫）各自獨立計算可用數量：可以查詢每個地點分別還剩多少，在地點之間做有記錄的調撥，出貨也可以指定從哪個地點出貨。跟「門市庫存需要跟線上庫存即時同步」不同：那題處理的是同一份庫存數字要不要即時同步到多個銷售通路（線上、門市），這題處理的是庫存本身要不要拆成多個實體地點分開計算，兩者可以同時成立（同一個地點的庫存，一樣可以再跟線上通路同步）。不包含倉庫內部的貨架/儲位管理、揀貨/包裝作業排程、條碼掃描或批號/序號追蹤——這些屬於倉儲管理系統（WMS）內部執行細節，這題只處理「地點之間」的庫存數量劃分與調撥，不是「地點內部」怎麼運作。只在你有勾選「庫存 / 倉儲資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-007",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DATA-015",
+      "category": "records",
+      "label": "定期盤點庫存並記錄差異",
+      "description": "定期實地清點庫存，跟系統記錄的數量做比對，把找到的落差當成一筆可追溯的調整異動記下來（誰盤點、什麼時候盤點、盤點前後數量各是多少），而不是直接覆蓋系統顯示的庫存數字。不論庫存有沒有拆分成多個地點都適用，就算只有單一地點的庫存，一樣可以做這件事。只在你有勾選「庫存 / 倉儲資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-007",
         "equals": true
       }
     },

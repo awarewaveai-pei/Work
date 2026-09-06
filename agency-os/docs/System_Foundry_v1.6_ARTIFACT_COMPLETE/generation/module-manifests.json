@@ -132,6 +132,7 @@
         "CAP-BOOKING",
         "CAP-CONTRACTS",
         "CAP-CUSTOMER-DATA",
+        "CAP-CYCLE-COUNT",
         "CAP-FINANCIAL-RECORDS",
         "CAP-INVENTORY",
         "CAP-INVENTORY-COSTING",
@@ -710,6 +711,16 @@
       "activated_by": [
         "CAP-MERCHANDISING",
         "CAP-PRODUCT-FEED"
+      ]
+    },
+    {
+      "id": "inventory_ops",
+      "paths": [
+        "packages/inventory-ops",
+        "tests/contract/inventory-ops"
+      ],
+      "activated_by": [
+        "CAP-MULTI-LOCATION-STOCK"
       ]
     }
   ]

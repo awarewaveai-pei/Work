@@ -12272,3 +12272,21 @@ The existing Director design described a canonical Timeline with artifact refere
 
 [rollback]
 Do not merge the isolated branch. Since the Timeline module has no runtime import or deployment entrypoint, removal of its two new files restores the prior behaviour; existing Quick Engine and manual Remotion template routes remain untouched.
+
+## 2026-09-06 — data-deletion.schema.yaml: EC §31/§30/§65/§66 stale line-number citations corrected
+
+[scope]
+Citation-only fix in `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/data-deletion.schema.yaml`. No schema structure, field, `source_of_truth_for`/`decided_by` content, or golden-test behavior changed — only the EC-document line-number text inside those citations.
+
+[reason]
+The 43rd Method Atlas slice critic (reviewing `database_data.retention_deletion_model`) found `data-deletion.schema.yaml:130` and `:142` citing EC §31 at "L1229-1248"/"L1251", both of which actually fall inside EC §32 (Security Change Contract), not §31. Re-reading `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:1150-1235` directly confirmed real section boundaries: §30 Data Integrity Contract L1154-1180, §31 Data Deletion Contract L1181-1230 (10-step list L1186-1204, "Soft delete 不等於合規刪除" at L1207), §32 starts L1231. Grepping the target file for the same stale-number family (L1225-1251/L1230-1248/L1198-1221/L1211-1221/L2185-2194/L2200-2216) turned up 11 more instances of the identical bug class in the same file — not just the 2 the critic named — covering EC §30 and, further down the document, §65 Content-addressed Evidence and §66 Audit Event (verified against `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2161-2196`: §65 L2161-2175, hash/source/timestamp/producer at L2166-2169; §66 L2176-2195, who/.../result at L2181-2189, "Audit 不記 secret" at L2192). Fixing only the 2 originally-flagged lines while knowingly leaving 11 more instances of the same wrong numbers in the same file would be a partial patch, not a real fix of the underlying citation error.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py` (from `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | result=regenerated SPEC_QUICKREF.md + MOTHER_DOC_SECTION_INDEX.md, no diff after regeneration (`git status --short` showed only the schema file changed)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (same dir) | exit=0 | result=PASSED: 2830, ALL GOLDEN TESTS PASSED
+- REVIEW_WAIVED: DOC_ONLY -- citation/comment-only correction, no schema/validation logic touched; self-verified every new line number against a direct Read of the EC document (L1150-1235 and L2130-2184) before writing it, not against the task description's own claimed numbers
+- BUGHUNT_DONE: scope=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/data-deletion.schema.yaml` | grep=`L1229-1248\|L1225-1251\|L1230-1248\|L1198-1221\|L1211-1221\|L2185-2194\|L2200-2216\|L1251\|L2216` | hits=0 (all 13 stale citations in this file corrected; confirmed via grep after edit)
+- BUGHUNT_SCOPE_NARROW: repo-wide grep for the same stale-number family found the identical bug in 10 OTHER files (ADR-002, SECURITY_THREAT_MODEL.md, PROPOSAL.md 007, `database_data.retention_deletion_model.contract.yaml`, `data-deletion.policy.yaml`, `db-migration-expand-contract.recipe.yaml`, `personal-data-redacted-event.schema.yaml`, `audit.schema.yaml`, `gate.schema.yaml`, `cause-hypothesis-set.schema.yaml`) — out of scope for this task (a single named file, citation-only), not fixed here; flagged via spawn_task for a dedicated follow-up session since fixing 10 files each needing independent re-verification against the EC document would have multiplied this task's scope by 5-10x.
+
+[rollback]
+`git checkout -- agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/execution/data-deletion.schema.yaml` restores the prior (stale-citation) text; no schema behavior depends on the corrected line numbers, so rollback is zero-risk.
