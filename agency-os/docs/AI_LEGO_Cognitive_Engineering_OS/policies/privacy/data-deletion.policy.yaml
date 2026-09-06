@@ -13,7 +13,7 @@ description: >
   the POLICY-LEVEL content EC §31's own prose and ADR-002 never state:
 
   (1) WHEN/under what pathway may a deletion pipeline run be triggered at
-  all. EC §31's own "Authorization" step name (L1230) carries zero further
+  all. EC §31's own "Authorization" step name (L1186) carries zero further
   definition — no request-type or role vocabulary appears anywhere in EC
   §31 or ADR-002. The one piece of this question the mother-document corpus
   DOES pin down is the authority NUMERAL: EC §9's A4 tier ("Irreversible /
@@ -33,7 +33,7 @@ description: >
   `open_questions.OQ-AUTH-1`). This file reuses that gap by reference
   rather than forking it.
 
-  (2) What SLA/timing applies to a deletion request. EC §31 (L1225-1251)
+  (2) What SLA/timing applies to a deletion request. EC §31 (L1181-1207)
   states NO number of any kind — the section is the 10-step diagram plus
   one sentence, "Soft delete 不等於合規刪除," and nothing else (re-read in
   full for this file; confirmed zero timing language). ADR-002's
@@ -65,7 +65,7 @@ description: >
   `$ref`-ed mechanism schema.
 
 source_of_truth_for:
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1225-1251) — re-read in full for this file: confirms zero trigger-role and zero timing/SLA language anywhere in the section, beyond the 10-step diagram and 'Soft delete 不等於合規刪除' (L1251)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1181-1207) — re-read in full for this file: confirms zero trigger-role and zero timing/SLA language anywhere in the section, beyond the 10-step diagram and 'Soft delete 不等於合規刪除' (L1207)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §9 Autonomy / Authority Levels (L515-528) — A4 tier's 'delete production data' worked example, requiring explicit_human_authority; the only mother-document text that pins any part of the trigger question"
   - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Migration/Rollback, Codex-revised (L137-140) — the GDPR Art. 12(3) citation's actual, narrower scope (operational_key_vault_incident remediation target only, not a general per-request SLA)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §100 Global Privacy Engine (L4259-4287) — 'Deletion' as one of 11 abstract Rights (L4268), and '法定期限'/'身分驗證要求' as two of six things '每個 Jurisdiction Pack 決定' (L4280-4287) — the mother-document basis for why this file does not hardcode a single SLA number or role"
@@ -449,7 +449,9 @@ verification:
     file's `$ref`s target. Re-read
     docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md in
     full (154 lines), grepped AI_LEGO_Cognitive_Engineering_Os_Global_
-    Execution_Contract_v1.md §31 (L1225-1251) directly at the source lines
+    Execution_Contract_v1.md §31 (originally L1225-1251 at this file's
+    2026-08-30 authoring time, line numbers only corrected 2026-09-06 to
+    L1181-1207, content unchanged) directly at the source lines
     to confirm zero trigger/SLA language, and EC §9 (L478-529) for the A4
     worked example. Read AI_LEGO_Cognitive_Engineering_Os_Global_Master_
     Plan_v1.md §100 (L4259-4287) directly to confirm the

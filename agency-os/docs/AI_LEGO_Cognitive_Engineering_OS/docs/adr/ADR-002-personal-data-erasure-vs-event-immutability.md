@@ -9,7 +9,7 @@ Date: 2026-08-29
 Phase 1 對抗式驗證（`CONFLICT_REGISTER.yaml` P1-CONFLICT-1，severity: high）已確認一條結構性矛盾，非單一 lens agent 誤判，屬 4 條 high-severity CONFLICT 之首：
 
 - **Statement A**（Master Plan §57 Event-native Architecture，L2546-2566，逐字）：「核心狀態用 Event Ledger，而非只靠 CRUD」，列舉 `DocumentUploaded / ClaimCreated / ...`，「Current State = Events 的 Projection」，「可以 Replay 到任意歷史狀態」。緊接 §58 Immutable-first（L2570-2586）：「原始資料不得直接覆蓋」+ 全域 Content-addressed 儲存 `/objects/sha256/...`。
-- **Statement B**（Execution Contract §31 Data Deletion Contract，L1225-1251，逐字）：Production deletion 流程 `Authorization → Legal Hold Check → Retention Check → Dependency Check → Dry Run → Count/Scope Preview → Approval → Deletion → Verification → Deletion Evidence`；末句：「**Soft delete 不等於合規刪除**」。
+- **Statement B**（Execution Contract §31 Data Deletion Contract，現行行號 L1181-1207，逐字；原引用 L1225-1251 已於 2026-09-06 訂正——非本 ADR 決策內容變更，純屬上游其他提案套用後造成的行號漂移，決策本身不受影響；範圍收斂至十步驟+「末句」本身，不含 2026-08-30 才插入的 §31.1 crypto-shred 分支子節，避免「末句」宣稱失真）：Production deletion 流程 `Authorization → Legal Hold Check → Retention Check → Dependency Check → Dry Run → Count/Scope Preview → Approval → Deletion → Verification → Deletion Evidence`；末句：「**Soft delete 不等於合規刪除**」。
 
 **不相容原因**：事件日誌本質 append-only、`event_id` 不得重用（EC §27 Event/Messaging Contract，L1099-1126，明文「Event ID 不得重用」），刪一筆事件會讓所有下游 projection 從該時間點起與原始計算結果不一致；但「合規刪除」要求真正移除個資內容本身，不能只是遮蔽。全文（MP + EC 兩份共 ~9000 行）Grep 確認 `crypto-shred` / `event redaction` / `tombstone` / `PII` / `data subject` **零命中**——事件溯源系統業界慣用的補救手段完全未被提及，僅 `GDPR` 三字作為 Jurisdiction Pack 的示範清單之一出現（MP L4261, L5392-5406），未與任何技術機制掛鉤。
 
@@ -142,7 +142,7 @@ Correctness/Security/Privacy 等維度目前皆為 **N/A**，因為問題不是�
 ## Evidence
 
 - MP L2546-2566（§57 Event-native Architecture）／L2570-2586（§58 Immutable-first + CAS）／L2639-2664（§61 資料分級）／L4259-4274（§100 Global Privacy Engine Rights Model）／L5637-5656（§148 Encryption & Key Sovereignty）／L5659-5669（§149，標注「未來能力」，與 P1-CONFLICT-3 同源）
-- EC L1099-1126（§27 Event/Messaging Contract）／L1225-1251（§31 Data Deletion Contract）／L1255-1279（§32 Security Change Contract）／L2123-2164（§64 Execution Manifest）／L3143-3160（§112 30-year Replacement Drill）
+- EC L1099-1126（§27 Event/Messaging Contract）／L1181-1207（§31 Data Deletion Contract，行號 2026-09-06 訂正，原 L1225-1251）／L1255-1279（§32 Security Change Contract）／L2123-2164（§64 Execution Manifest）／L3143-3160（§112 30-year Replacement Drill）
 - Method Atlas L825-839（F18 Architecture Change 推薦鏈）／L1784-1808（§11.26 FMEA）／L2234-2276（§11.44 STRIDE / §11.45 LINDDUN）／L2278-2296（§11.46 DPIA/PIA）
 - `.ai/research/phase-1/CONFLICT_REGISTER.yaml` L9-22（P1-CONFLICT-1 原始登錄）
 - Grep 全文確認缺席：`PII`/`data subject`/`crypto-shred`/`tombstone`/`redaction` 在 MP+EC 零命中；`GDPR` 僅作為 Jurisdiction Pack 示範清單出現（MP L4261, L5392-5406），未掛鉤任何技術機制

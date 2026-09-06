@@ -17,11 +17,11 @@ description: >
      input_hash / output_hash / timestamp / user / latency / token_usage /
      cost / validation_score / status / policy_version / knowledge_snapshot.
 
-  2. Execution Contract §66 "Audit Event" (L2200-2216, verified by direct
+  2. Execution Contract §66 "Audit Event" (L2176-2195, verified by direct
      read this session) -- a generic decision-narrative record. EC's own
      words: "至少記錄" (at least record [the following 9 fields]): who /
      what / when / where / why / input / decision / policy / result --
-     plus the explicit rule "Audit 不記 secret" (L2216, Audit MUST NOT
+     plus the explicit rule "Audit 不記 secret" (L2192, Audit MUST NOT
      record secrets).
 
   Neither document cross-references the other; neither states that one
@@ -63,7 +63,7 @@ description: >
 source_of_truth_for:
   - "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 Required Phase-3 Specs (L111, Status: PROPOSED) -- names this exact filename against MP §82; NOT an ADR or registered finding, does not itself govern this file's content"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §82 Execution Audit (L3354-3376) -- capability_run variant, verbatim 17-field list"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §66 Audit Event (L2200-2216) -- decision_narrative variant, verbatim 9-field list, plus 'Audit 不記 secret' (L2216)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §66 Audit Event (L2176-2195) -- decision_narrative variant, verbatim 9-field list, plus 'Audit 不記 secret' (L2192)"
   - "specs/execution/manifest.schema.yaml properties/execution/properties/execution_id, properties/execution/properties/run_id (the ^EX-/^RUN- pattern namespace this file's execution_id/run_id fields reuse verbatim, not hard-$ref -- see compilation_decisions)"
   - "specs/execution/manifest.schema.yaml properties/method_execution_log items (block_id/capability_version/prompt_version/knowledge_snapshot/latency/cost/validation.score -- the exact per-invocation field names and [number,\"null\"] typing this file's capability_run variant reuses verbatim where the concept already has a precedent)"
   - "specs/execution/result.schema.yaml properties/status and specs/execution/status-codes.schema.yaml reference_vocabulary/final_status (read and verified for compatibility per this task's own instruction -- see compilation_decisions for why capability_run.status is deliberately NOT hard-$ref'd to this vocabulary)"
@@ -155,7 +155,7 @@ compilation_decisions:
       `open_questions.OQ-AUDIT-3` in case a dedicated capability-run-status
       enum is ever warranted.
   - question: >
-      EC §66's explicit rule "Audit 不記 secret" (L2216, Audit MUST NOT
+      EC §66's explicit rule "Audit 不記 secret" (L2192, Audit MUST NOT
       record secrets) -- should this be enforced as a JSON Schema
       `not`/`pattern` rejection on the untyped fields (`input`, `decision`,
       `result`, `token_usage`) where a raw secret could plausibly be
@@ -369,7 +369,7 @@ allOf:
       required: [who, what, when, where, why, input, decision, policy, result]
 
 constraints:
-  - "'Audit 不記 secret' (EC §66, L2216) -- an audit_record instance of EITHER record_type MUST NOT contain secret/credential/API-key/password/private-key values in any field (this rule is not scoped to decision_narrative alone just because EC §66 states it in that section -- capability_run's `input_hash`/`output_hash` fields are deliberately CONTENT-ADDRESSED HASHES rather than raw payloads for exactly this reason, so this rule is already structurally satisfied for those two fields by their own typing; `token_usage`/`input`/`decision`/`result` are the untyped fields where a naive implementation COULD accidentally embed a raw secret and are the ones a producer must actively redact before writing). Not schema-enforced (see compilation_decisions) -- producers MUST redact before persisting."
+  - "'Audit 不記 secret' (EC §66, L2192) -- an audit_record instance of EITHER record_type MUST NOT contain secret/credential/API-key/password/private-key values in any field (this rule is not scoped to decision_narrative alone just because EC §66 states it in that section -- capability_run's `input_hash`/`output_hash` fields are deliberately CONTENT-ADDRESSED HASHES rather than raw payloads for exactly this reason, so this rule is already structurally satisfied for those two fields by their own typing; `token_usage`/`input`/`decision`/`result` are the untyped fields where a naive implementation COULD accidentally embed a raw secret and are the ones a producer must actively redact before writing). Not schema-enforced (see compilation_decisions) -- producers MUST redact before persisting."
   - "A `capability_run` record SHOULD NOT populate decision_narrative-only fields (who/what/when/where/why/decision/result), and a `decision_narrative` record SHOULD NOT populate capability_run-only fields (run_id/block_id/capability_version/model/model_version/input_hash/output_hash/user/latency/token_usage/cost/validation_score/status/policy_version/knowledge_snapshot). Not schema-enforced (see compilation_decisions) -- matches data-deletion.schema.yaml's identical-strength convention for its own subject_id/target_refs mutual exclusivity."
 
 open_questions:
@@ -415,7 +415,7 @@ open_questions:
 verification:
   method: >
     Read MP §82 (L3354-3378, including the section boundaries immediately
-    before/after) and EC §66 (L2195-2220, including the section boundaries
+    before/after) and EC §66 (L2171-2199, including the section boundaries
     immediately before/after) in full at the cited lines. Grepped both
     mother documents in full for "capability_version", "who/what/when",
     and "Audit" to confirm the two sections never cross-reference each

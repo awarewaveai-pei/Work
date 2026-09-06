@@ -28,7 +28,7 @@ ADR-002 Consequences「需要新增的規格缺口」第 3 項明文要求：「
 
 ## AFFECTED_SECTIONS
 
-§31 Data Deletion Contract（L1225-1251，插入點在 L1253 的 `---` 分隔線之前）
+§31 Data Deletion Contract（現行行號 L1181-1230；提案套用當下原始十步驟+Soft delete 句為 L1225-1251，插入點在 L1253 的 `---` 分隔線之前——此為套用當下行號，後續其他提案編輯上游內容造成行號漂移，2026-09-06 訂正上方 current 引用，此歷史行號原樣保留）
 
 ## DEPENDENCIES
 
@@ -50,9 +50,9 @@ ADR-002 Consequences「需要新增的規格缺口」第 3 項明文要求：「
 
 - `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:65`（Option A 對應 EC §31 步驟的原始映射）
 - `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:128`（Consequences 規格缺口第 3 項，逐字要求本提案）
-- `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:1225-1253`（本提案讀取的 §31 現況全文）
+- `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:1225-1253`（本提案套用當下讀取的 §31 現況全文；現行行號已漂移為 L1181-1230，見上方 affected_line_ranges 訂正註記）
 - `specs/execution/data-deletion.schema.yaml:148-247`（兩分支 `step_overrides` 機器可讀定義，本提案逐字轉錄其 Dependency Check/Deletion/Verification/Deletion Evidence 措辭）
-- `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2185-2216`（§65 Content-addressed Evidence、§66 Audit Event，`production_row` 分支 Deletion Evidence 步驟引用）
+- `AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:2161-2195`（§65 Content-addressed Evidence、§66 Audit Event，`production_row` 分支 Deletion Evidence 步驟引用；原引用 L2185-2216 已訂正）
 
 ## Diff
 

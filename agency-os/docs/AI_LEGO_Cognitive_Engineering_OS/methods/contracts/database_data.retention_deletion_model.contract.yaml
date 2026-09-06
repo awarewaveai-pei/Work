@@ -117,7 +117,7 @@ description: >
   data class exists, why it is kept, for how long, and what exceptions
   apply). The two are complementary, not overlapping: EC §31's own
   pipeline literally has "Retention Check" and "Legal Hold Check" as
-  STEPS (L1188, L1190) that would consult a policy record shaped like
+  STEPS (L1190, L1188) that would consult a policy record shaped like
   THIS method's own output. `deletion_evidence_ref` below is a
   format-only soft link resolving that real relationship. (2) F21's
   own remaining table row, `Schema Compatibility Analysis` (L903:

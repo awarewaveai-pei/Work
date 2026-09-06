@@ -114,7 +114,7 @@ compilation_decisions:
   - question: >
       `evidence` in EC §69's worked example is a bare `[...]` with no
       element shape given. Should this file define a typed evidence-item
-      object (mirroring how EC §65 Content-addressed Evidence, L2185-2194,
+      object (mirroring how EC §65 Content-addressed Evidence, L2166-2169,
       defines hash/source/timestamp/producer for a different evidence
       concept) rather than leaving it fully untyped?
     decision: "Leave `evidence` untyped (`items: {}`) — do not borrow EC §65's shape."
@@ -296,7 +296,7 @@ open_questions:
     question: >
       Should `gate_result.evidence[]` eventually adopt a typed shape (e.g.
       matching EC §65 Content-addressed Evidence's hash/source/timestamp/
-      producer fields, L2185-2194) for consistency with how other execution
+      producer fields, L2166-2169) for consistency with how other execution
       records represent evidence, or is a fully free-form array intentional
       here? See compilation_decisions above — left open, not decided, since
       EC §69 itself gives no such structure.

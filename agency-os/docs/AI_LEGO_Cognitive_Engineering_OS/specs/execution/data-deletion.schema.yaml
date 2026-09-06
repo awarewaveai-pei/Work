@@ -6,11 +6,11 @@ status: ACTIVE
 
 description: >
   Canonical machine-readable definition of EC §31 Data Deletion Contract
-  (L1225-1251), extended per ADR-002 Consequences item 3 with the branch this
+  (L1181-1230), extended per ADR-002 Consequences item 3 with the branch this
   file exists to add: EC §31's single 10-step pipeline
   (`Authorization → Legal Hold Check → Retention Check → Dependency Check →
   Dry Run → Count/Scope Preview → Approval → Deletion → Verification →
-  Deletion Evidence`, L1230-1248) is followed by BOTH deletion types, but
+  Deletion Evidence`, L1186-1204) is followed by BOTH deletion types, but
   "個資刪除（crypto-shred）" (personal-data deletion via crypto-shred) and
   "一般 production row 刪除" (ordinary production row deletion) resolve to
   two DIFFERENT Verification (and, as ADR-002's Option A section makes
@@ -25,9 +25,9 @@ description: >
   truth for the 10-step sequence itself (unchanged, cited verbatim below).
 
 source_of_truth_for:
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1225-1251) — the 10-step sequence and 'Soft delete 不等於合規刪除' (L1251), unchanged"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1198-1221) — 'Migration 完成不能只看 command exit code = 0. 必須證明 data invariant = PASS' (L1211-1221), the same completion-proof standard this file applies to the production_row branch's Verification step"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §65 Content-addressed Evidence (L2185-2194, hash/source/timestamp/producer) and §66 Audit Event (L2200-2216, who/what/when/where/why/input/decision/policy/result; 'Audit 不記 secret' L2216) — the generic evidence shape the production_row branch's Deletion Evidence step reuses"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1181-1230) — the 10-step sequence and 'Soft delete 不等於合規刪除' (L1207), unchanged"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1154-1180) — 'Migration 完成不能只看 command exit code = 0. 必須證明 data invariant = PASS' (L1167-1177), the same completion-proof standard this file applies to the production_row branch's Verification step"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §65 Content-addressed Evidence (L2166-2169, hash/source/timestamp/producer) and §66 Audit Event (L2176-2195, who/what/when/where/why/input/decision/policy/result; 'Audit 不記 secret' L2192) — the generic evidence shape the production_row branch's Deletion Evidence step reuses"
   - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Context section (L14, EC §31 exact citation) — establishes this file's task boundary"
   - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Option A section (L59-67) — the crypto-shred branch's Dependency Check/Deletion/Verification definitions, transcribed verbatim into `branches.personal_data_crypto_shred` below"
   - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Consequences item 3 (L128) — the two-branch/two-Verification-definition mandate this file implements"
@@ -127,7 +127,7 @@ compilation_decisions:
 # EC §31's own 10-step sequence, cited verbatim, unmodified by this file.
 # ---------------------------------------------------------------------------
 reference_sequence:
-  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 (L1229-1248)"
+  source: "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 (L1186-1204)"
   steps:
     - Authorization
     - Legal Hold Check
@@ -139,7 +139,7 @@ reference_sequence:
     - Deletion
     - Verification
     - Deletion Evidence
-  invariant: "Soft delete 不等於合規刪除 (EC §31, L1251) — applies to BOTH branches below; a status flag flip is never sufficient completion evidence for either."
+  invariant: "Soft delete 不等於合規刪除 (EC §31, L1207) — applies to BOTH branches below; a status flag flip is never sufficient completion evidence for either."
 
 # ---------------------------------------------------------------------------
 # Branch-specific step overrides. Steps not listed here for a branch use EC
@@ -223,14 +223,14 @@ branches:
         definition: >
           Physical removal of the target row(s)/record(s) from storage — a
           real `DELETE`-equivalent operation, not a status flag. EC §31
-          (L1251): "Soft delete 不等於合規刪除" applies to this branch in its
+          (L1207): "Soft delete 不等於合規刪除" applies to this branch in its
           most literal sense — flipping a `deleted: true` column is
           explicitly insufficient.
       Verification:
         definition: >
           POSITIVE proof that the target row(s) are physically absent post-
           deletion (e.g. a count/existence query returns zero), consistent
-          with EC §30 Data Integrity Contract's standard (L1211-1221):
+          with EC §30 Data Integrity Contract's standard (L1167-1177):
           "Migration 完成不能只看 command exit code = 0. 必須證明 data
           invariant = PASS." — an exit code or a "rows affected" count from
           the delete statement itself is not, by itself, this proof; a
@@ -240,9 +240,9 @@ branches:
       Deletion Evidence:
         definition: >
           Generic EC §65 Content-addressed Evidence shape
-          (`hash / source / timestamp / producer`, L2185-2194) and/or EC §66
+          (`hash / source / timestamp / producer`, L2166-2169) and/or EC §66
           Audit Event shape (`who/what/when/where/why/input/decision/
-          policy/result`, L2200-2216) — no `PersonalDataRedacted` event is
+          policy/result`, L2176-2195) — no `PersonalDataRedacted` event is
           emitted for this branch (that event type is specific to the
           crypto-shred branch's subject-correlated redaction record).
 
@@ -394,7 +394,7 @@ deletion_request:
 
 constraints:
   - "Exactly one of `subject_id` (non-null) or `target_refs` (non-empty) MUST be set, determined by `deletion_type`: personal_data_crypto_shred requires subject_id and forbids target_refs; production_row requires target_refs and forbids subject_id."
-  - "`steps[]` MUST cover all 10 `reference_sequence.steps` values in the documented order; a request MUST NOT skip Verification or Deletion Evidence regardless of branch (EC §31, L1251: soft delete is never sufficient for either branch)."
+  - "`steps[]` MUST cover all 10 `reference_sequence.steps` values in the documented order; a request MUST NOT skip Verification or Deletion Evidence regardless of branch (EC §31, L1207: soft delete is never sufficient for either branch)."
   - "A `personal_data_crypto_shred` request's Deletion Evidence step MUST reference both a PersonalDataRedacted event AND a Key Destruction Record (see `branches.personal_data_crypto_shred.step_overrides.Deletion Evidence`) — a single evidence_ref pointing only to the event is incomplete per personal-data-redacted-event.schema.yaml's own constraints."
 
 # ---------------------------------------------------------------------------
@@ -491,8 +491,8 @@ verification:
     Read against ADR-002 full text (Context L14, Option A section L59-67,
     Option C section L75-85, Recommendation, Consequences items 3/4/5/6,
     Codex Oracle 對抗式覆審 section L103-117, Migration/Rollback L133-140,
-    Evidence L142-153), EC §30 (L1198-1221), EC §31 (L1225-1251), EC §65
-    (L2185-2194), EC §66 (L2200-2216),
+    Evidence L142-153), EC §30 (L1154-1180), EC §31 (L1181-1230), EC §65
+    (L2161-2175), EC §66 (L2176-2195),
     docs/architecture/DEVOPS_SRE_PLAN.md §3.2-3.3 (L120-134),
     docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for this file
     (L149). Both scenarios of the Rollback section and both branches'

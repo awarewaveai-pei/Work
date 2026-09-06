@@ -17,24 +17,27 @@ description: >
   with Execution Contract §28 as the designated SSOT location in prose. Per
   that ADR's own status line, an ADR decision does NOT itself edit the
   mother documents — applying it requires the separate ADR-006
-  `.ai/proposals/` flow, which only the operator can advance. EC §28
-  currently STILL shows its original 11-step mermaid (verbatim re-read
-  2026-08-29 to confirm: Baseline -> Backup/Restore Validation ->
-  Compatibility Analysis -> Expand -> Deploy Compatible Code -> Backfill ->
-  Reconciliation -> Traffic Migration -> Observe -> Contract Old Schema ->
-  Close Rollback Window, EC:1129-1157) -- it has NOT yet been edited to
-  match ADR-005a. This file's `steps[]` therefore uses ADR-005a's corrected
-  15-step sequence as the machine-readable SSOT (this is exactly the
-  Wave-7 task per MACHINE_READABLE_SPEC_PLAN.md §2.8 row 175: "機器可讀版
-  本，人類權威版留在 EC §28 prose" -- the human-authoritative prose version
-  staying in EC §28 is explicitly understood to mean the ADR-corrected
-  text, once the ADR-006 proposal lands, not the current unedited mermaid).
+  `.ai/proposals/` flow, which only the operator can advance. At this file's
+  original authoring time (2026-08-29) EC §28 still showed its original
+  11-step mermaid (verbatim re-read that day to confirm: Baseline ->
+  Backup/Restore Validation -> Compatibility Analysis -> Expand -> Deploy
+  Compatible Code -> Backfill -> Reconciliation -> Traffic Migration ->
+  Observe -> Contract Old Schema -> Close Rollback Window, then at
+  EC:1129-1157) -- the ADR-006 proposal had NOT yet landed. **Superseded
+  2026-08-30**: proposal 023 (commit `9d587c082`) applied ADR-005a's edit,
+  and EC §28 (now at L1077-1116) shows the same 15-step sequence this file's
+  `steps[]` already used as its machine-readable SSOT from the start (this
+  was exactly the Wave-7 task per MACHINE_READABLE_SPEC_PLAN.md §2.8 row 175:
+  "機器可讀版本，人類權威版留在 EC §28 prose"). This file's own `steps[]`
+  content required no change once §28 caught up -- only its own citations of
+  §28's location/step-count needed a line-number and status refresh, done
+  2026-09-06 (see OQ-DBMIG-1 below, now resolved).
 
 source_of_truth_for:
   - "docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md Sub-decision (a), 最終建議序列 (L81-115) -- the 15-step sequence this file's steps[] transcribes"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1129-1157, CURRENT unedited 11-step form, cited for context/delta only)"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §29 DB Migration Requirements (L1161-1194) -- Backfill's 5 required properties and the assessment checklist, folded into mandatory_elements below"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1198-1221) -- the 6 required data-change definitions and the 'exit code != proof' rule, folded into mandatory_elements/outputs below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1077-1116, 15-step form per ADR-005a, applied 2026-08-30 by proposal 023 / commit 9d587c082 -- this file's steps[] already matched before that edit landed, see description)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §29 DB Migration Requirements (L1117-1153) -- Backfill's 5 required properties and the assessment checklist, folded into mandatory_elements below"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §30 Data Integrity Contract (L1154-1180) -- the 6 required data-change definitions and the 'exit code != proof' rule, folded into mandatory_elements/outputs below"
   - "specs/execution/risk-tier.schema.yaml tiers.R3.examples (lists 'DB migration' verbatim) -- grounds this file's risk_tier: R3"
   - "specs/execution/gate.schema.yaml -- gate_id value space WAS BLOCKED_PENDING_ROUND2_ADR at this file's original write time; this file's gate_ref placeholders inherited that block, not a new one; RESOLVED 2026-08-30 by docs/adr/ADR-011-platform-gate-ownership-and-unification.md -- see gate.schema.yaml#/gate_catalog and this file's own updated compilation_decisions/steps[].gate_ref below, which already carry real catalog ids"
   - "specs/cognitive/recipe.schema.yaml -- the schema this file's body (id/version/name/steps/etc.) is validated against"
@@ -140,16 +143,16 @@ suited_for:
   - "任何會改變 production 資料庫 schema 的變更 — EC §28: 'DB Migration 是高風險工程，不是 SQL patch'"
 
 not_for:
-  - "未經過此 15 步序列、當作一次性 SQL patch 直接對 production 執行的 schema 變更（EC §28 L1131 verbatim 對比句）"
+  - "未經過此 15 步序列、當作一次性 SQL patch 直接對 production 執行的 schema 變更（EC §28 L1079 verbatim 對比句，行號 2026-09-06 訂正，原 L1131）"
 
 mandatory_elements:
-  - "Backfill 必須 resumable / idempotent / checkpointed / throttled / observable（EC §29 L1184-1188 verbatim）"
-  - "Data Integrity Contract 六項至少定義：Preconditions / Business Invariants / Postconditions / Checksums or Counts / Reconciliation Query / Quarantine Policy（EC §30 L1203-1208 verbatim）"
-  - "Migration 完成判準是 data invariant = PASS，不是 command exit code = 0（EC §30 L1211-1220 verbatim）"
-  - "評估清單：Lock Duration / Table Size / Index Build / Replication Lag / Write Amplification / Disk / Backup / PITR / Foreign Keys / Triggers / ORM Compatibility / Long-running Transactions / Rollback / Data Reconciliation（EC §29 L1166-1179 verbatim）"
+  - "Backfill 必須 resumable / idempotent / checkpointed / throttled / observable（EC §29 L1140-1144 verbatim）"
+  - "Data Integrity Contract 六項至少定義：Preconditions / Business Invariants / Postconditions / Checksums or Counts / Reconciliation Query / Quarantine Policy（EC §30 L1159-1164 verbatim）"
+  - "Migration 完成判準是 data invariant = PASS，不是 command exit code = 0（EC §30 L1167-1177 verbatim）"
+  - "評估清單：Lock Duration / Table Size / Index Build / Replication Lag / Write Amplification / Disk / Backup / PITR / Foreign Keys / Triggers / ORM Compatibility / Long-running Transactions / Rollback / Data Reconciliation（EC §29 L1122-1135 verbatim）"
 
 forbidden_actions:
-  - "未評估直接 destructive ALTER（EC §29 L1190-1194 verbatim: '未評估直接 destructive ALTER'）"
+  - "未評估直接 destructive ALTER（EC §29 L1149 verbatim: '未評估直接 destructive ALTER'）"
 
 steps:
   - label: "Schema Baseline"
@@ -226,19 +229,25 @@ steps:
     necessity: REQUIRED_BY_RISK
 
 outputs:
-  - "data_invariant_pass_proof (EC §30 L1211-1220 — a positive proof artifact, NOT a command exit code)"
+  - "data_invariant_pass_proof (EC §30 L1167-1177 — a positive proof artifact, NOT a command exit code)"
 
 open_questions:
   - id: "OQ-DBMIG-1"
     question: >
-      When ADR-006's `.ai/proposals/` flow actually edits EC §28/Atlas
-      F21/§11.50/§13.10 to match ADR-005a, should this file's
-      source_of_truth_for entry for EC §28 be updated from "CURRENT
-      unedited 11-step form" to cite the new line range directly? Left as a
-      forward pointer rather than a blocking condition — this file's own
-      15-step content does not change either way, only its EC §28 citation
-      would need a line-number refresh.
-    owner: "whoever executes the ADR-006 proposal for ADR-005a"
+      RESOLVED 2026-09-06: proposal 023 (commit `9d587c082`, 2026-08-30)
+      applied ADR-005a's edit to EC §28, which now shows the same 15-step
+      sequence this file's `steps[]` already used. `source_of_truth_for`'s
+      EC §28 entry above is updated from "CURRENT unedited 11-step form" to
+      the new location (L1077-1116) and status. Original question
+      (2026-08-29, preserved): "When ADR-006's `.ai/proposals/` flow actually
+      edits EC §28/Atlas F21/§11.50/§13.10 to match ADR-005a, should this
+      file's source_of_truth_for entry for EC §28 be updated ... to cite the
+      new line range directly?" NOTE: this resolution covers EC §28 only —
+      whether Atlas F21/§11.50/§13.10 (the other four conflicting diagrams
+      named in this file's own `description`) have also been updated to
+      match ADR-005a was NOT re-verified as part of this citation fix; still
+      open if unconfirmed elsewhere.
+    owner: "closed (EC §28 portion); Atlas F21/§11.50/§13.10 portion unverified"
     blocks: "nothing in this file's own validity"
   - id: "OQ-DBMIG-2"
     question: >
@@ -257,8 +266,13 @@ verification:
   method: >
     Read docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md in
     full, including its Evidence section citing five source locations.
-    Re-read EC §28 (L1129-1157), §29 (L1161-1194), §30 (L1198-1221) directly
-    at the cited lines to confirm the CURRENT (unedited) mother-doc content
+    Re-read EC §28 (originally L1129-1157, unedited 11-step form as it stood
+    when this recipe was authored 2026-08-29 -- superseded 2026-08-30 by
+    proposal 023's 11->15 step edit, commit 9d587c082, now at L1077-1116;
+    see OQ-DBMIG-1 below, resolved 2026-09-06),
+    §29 (L1117-1153, line numbers corrected 2026-09-06, content unchanged),
+    §30 (L1154-1180, line numbers corrected 2026-09-06, content unchanged)
+    directly at the cited lines to confirm the CURRENT (unedited) mother-doc content
     and extract the mandatory_elements/forbidden_actions/outputs detail.
     Read specs/execution/risk-tier.schema.yaml tiers.R3.examples to confirm
     "DB migration" is a verbatim listed example before assigning risk_tier:

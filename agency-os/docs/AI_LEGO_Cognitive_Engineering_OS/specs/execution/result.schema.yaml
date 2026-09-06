@@ -16,7 +16,7 @@ description: >
   compiling EC §64's `results{status, gates}` sub-block (L2178-2181, the
   in-manifest stub this file formalizes and expands), EC §69's `gate_result`
   record (L2282-2293), and EC §65's content-addressed evidence record
-  (L2185-2196), while reusing (not redeclaring) EC §70's Final Status
+  (L2163-2172), while reusing (not redeclaring) EC §70's Final Status
   vocabulary via `status-codes.schema.yaml`.
 
   Resolves `.ai/research/phase-0/verified-findings.yaml` CROSS-R-3
@@ -40,7 +40,7 @@ description: >
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §64 Execution Manifest, results{} sub-block (L2178-2181)"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §65 Content-addressed Evidence (L2185-2196)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §65 Content-addressed Evidence (L2161-2175)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §68 Global Gates (L2246-2280, gate_id name pool — not enumerated as an enum here, see compilation_decisions)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §69 Gate Result (L2282-2293)"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §70 Final Status (L2297-2318, vocabulary reused via $ref, not redeclared)"
@@ -275,7 +275,7 @@ definitions:
 
   evidence_ref:
     description: >
-      One content-addressed evidence item, per EC §65 (L2185-2196) verbatim:
+      One content-addressed evidence item, per EC §65 (L2163-2172) verbatim:
       "重要 evidence：hash / source / timestamp / producer... 避免「同名檔案
       內容已變」造成歷史失真" (guards against same-filename-different-content
       history corruption). Used both by this file's top-level `evidence[]`
@@ -695,7 +695,7 @@ open_questions:
 
 verification:
   method: >
-    Read against EC §64 (L2123-2181), §65 (L2185-2196), §68 (L2246-2280),
+    Read against EC §64 (L2123-2181), §65 (L2161-2175), §68 (L2246-2280),
     §69 (L2282-2293), §70 (L2297-2318), §92 (L2766-2782), §121
     (L3332-3396); Atlas §16.3 (L3821-3857); MP §8.3 (L708-712, CROSS-R-3
     context only, not redefined here); `.ai/research/phase-0/verified-findings.yaml`

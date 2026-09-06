@@ -186,7 +186,7 @@ Asset Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → LINDDU
 
 **Master Plan**：L262-275（§1.5 最小爆炸半徑）／L567-568（§6 RBAC/ABAC 定價條列）／L577-601（§7 AI Gateway）／L1116-1129（§14 Knowledge Memory 分層）／L2546-2586（§57-58 Event-native/Immutable-first）／L2639-2664（§61 安全架構分級/路由）／L2668-2673（§62 Zero Trust）／L2772-2790（§66 Supply Chain Security）／L2794-2817（§67 Deployment）／L4259-4278（§100 Global Privacy Engine Rights Model）／L4405-4413（§104 Sovereign Regional Cell）／L5637-5656（§148 Encryption & Key Sovereignty）
 
-**Execution Contract**：L379-476（§8 Risk Tier, R4 Explicit Human Authority）／L478-484（§9 Autonomy/Authority Levels）／L1099-1126（§27 Event/Messaging Contract）／L1225-1251（§31 Data Deletion Contract）／L1255-1284（§32 Security Change Contract）／L1370-1408（§35 Untrusted Content/Prompt Injection Contract）／L2031（第二個 AI 非法律人類 approval）／L2664-2697（§87-88 Provenance of Human Judgment / Reversal Criteria）／L2867-2897（§97 Least Privilege, Tool Broker）
+**Execution Contract**：L379-476（§8 Risk Tier, R4 Explicit Human Authority）／L478-484（§9 Autonomy/Authority Levels）／L1099-1126（§27 Event/Messaging Contract）／L1181-1230（§31 Data Deletion Contract）／L1255-1284（§32 Security Change Contract）／L1370-1408（§35 Untrusted Content/Prompt Injection Contract）／L2031（第二個 AI 非法律人類 approval）／L2664-2697（§87-88 Provenance of Human Judgment / Reversal Criteria）／L2867-2897（§97 Least Privilege, Tool Broker）
 
 **ADR**：`docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`（全文）／`docs/adr/ADR-003-tenant-model-and-cas-isolation.md`（全文）／`docs/adr/ADR-001-scoped-authority-precedence-unification.md`（Execution Manifest 記錄 Atlas content_hash 先例）／`docs/adr/ADR_INDEX.md`
 

@@ -12,7 +12,7 @@ description: >
   TranscriptCorrected / ClaimCreated / ClaimVerified / ClaimRejected /
   StrategyGenerated / StrategyApproved / ArtifactPublished`, L2546-2566) —
   and is the event-sourced form of EC §31 Data Deletion Contract's
-  "Deletion Evidence" step (L1248) for the `personal_data_crypto_shred`
+  "Deletion Evidence" step (L1204) for the `personal_data_crypto_shred`
   branch of `execution/data-deletion.schema.yaml`.
 
   ROLE BOUNDARY (load-bearing, transcribed near-verbatim from ADR-002 Option C
@@ -45,8 +45,8 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §57 Event-native Architecture example event list (L2546-2566) — this schema is the 10th entry the list is missing"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §100 Global Privacy Engine Rights Model (L4259-4278) — anchors the 'Deletion' right (L4268) this event supplies audit evidence for"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §101 Lawful Basis / Consent Registry (L4303-4316) — 'Data Subject' (L4310) is the only mother-document anchor for what `subject_id` identifies; no Domain Model schema exists for it (not one of MP §3's 22 objects, not Tenant #23 either)"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1225-1251) — 'Deletion Evidence' step (L1248) this event instantiates for the crypto-shred branch"
-  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §66 Audit Event (L2200-2216) — minimum audit fields (who/what/when/where/why) and 'Audit 不記 secret' (L2216, audit records MUST NOT contain secrets) — the reason `redacted_fields[]` holds field identifiers, never redacted content"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §31 Data Deletion Contract (L1181-1230) — 'Deletion Evidence' step (L1204) this event instantiates for the crypto-shred branch"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §66 Audit Event (L2176-2195) — minimum audit fields (who/what/when/where/why) and 'Audit 不記 secret' (L2192, audit records MUST NOT contain secrets) — the reason `redacted_fields[]` holds field identifiers, never redacted content"
   - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Option C section (L75-85) — event shape, FMEA table (L79-83), role-boundary reasoning"
   - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md Consequences item 5 (L130) — the event's addition to MP §57 mandated verbatim"
   - "docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for domain/personal-data-redacted-event.schema.yaml (L148) — dependency list (key-vault-lifecycle.schema.yaml, governance/epistemic-label)"
@@ -99,7 +99,7 @@ compilation_decisions:
       event type's PII fields) — that is explicitly a separate, not-yet-done
       piece of follow-up work, not something this compilation file can
       shortcut by inventing a grammar the ADR never specified. Per EC §66's
-      "Audit 不記 secret" (L2216), each element MUST be a field identifier
+      "Audit 不記 secret" (L2192), each element MUST be a field identifier
       (e.g. a field name or dotted path), never the redacted value itself —
       recorded as a `constraints` entry below since it is a real invariant,
       not left to the array's type alone to convey.
@@ -176,7 +176,7 @@ properties:
     description: >
       Field identifiers (names or dotted paths) whose content has been
       rendered permanently unreadable for this subject — NOT the redacted
-      values themselves (EC §66 Audit Event, L2216: "Audit 不記 secret"). See
+      values themselves (EC §66 Audit Event, L2192: "Audit 不記 secret"). See
       compilation_decisions above for why no closed enum/grammar is imposed.
 
   redacted_at:
@@ -194,7 +194,7 @@ properties:
       Soft reference (opaque identifier, no `$ref`) to the specific
       Authorization that permitted this redaction — conceptually the same
       Authorization step instance as `execution/data-deletion.schema.yaml`'s
-      `deletion_request` object (EC §31 first pipeline step, L1230). Not a
+      `deletion_request` object (EC §31 first pipeline step, L1186). Not a
       hard cross-file `$ref`, consistent with this schema suite's convention
       of resolving such links by shared identifier value rather than
       structural coupling.
@@ -212,7 +212,7 @@ properties:
 
 constraints:
   - "This event, by itself, MUST NOT be treated as sufficient evidence of compliant deletion. Compliant deletion for the personal_data_crypto_shred branch additionally requires a corresponding Key Destruction Record from security/key-vault-lifecycle.schema.yaml (Option A) for the same subject_id — see the ROLE BOUNDARY paragraph in the top-level description and ADR-002 Option C's own FMEA finding (Severity: High) for why this event alone recreates P1-CONFLICT-1."
-  - "redacted_fields[] elements MUST be field identifiers only, never the redacted content itself (EC §66, L2216: 'Audit 不記 secret')."
+  - "redacted_fields[] elements MUST be field identifiers only, never the redacted content itself (EC §66, L2192: 'Audit 不記 secret')."
   - "Once emitted, a PersonalDataRedacted event is itself immutable (MP §58 Immutable-first, L2570-2586) — a correction is a new event, not a mutation of this one."
 
 examples:
@@ -254,7 +254,7 @@ verification:
     Read against ADR-002 full text (Context, Option C section L75-85,
     Recommendation, Consequences items 4-5, Migration/Rollback), MP §57
     (L2546-2566), MP §61 (L2639-2664), MP §100 (L4259-4278), MP §101
-    (L4303-4316), EC §31 (L1225-1251), EC §66 (L2200-2216),
+    (L4303-4316), EC §31 (L1181-1230), EC §66 (L2176-2195),
     docs/architecture/MACHINE_READABLE_SPEC_PLAN.md §2.5 row for this file
     (L148). Grep-confirmed (2026-08-29) that no mother document defines a
     "Data Subject" schema, a redacted_fields[] path grammar, or a concrete
