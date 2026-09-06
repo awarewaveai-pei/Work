@@ -10,19 +10,19 @@ const validTimeline = {
   outputProfiles: ["vertical_9_16", "landscape_16_9"],
   tracks: [
     { id: "video_main", kind: "video", items: [
-      { id: "shot_001", startMs: 0, durationMs: 3000, sourceArtifactId: "asset_opening", crop: "cover", transitionOut: "fade", provenance: "generated" },
-      { id: "shot_002", startMs: 3000, durationMs: 3000, sourceArtifactId: "asset_close", crop: "contain", transitionOut: "cut", provenance: "footage" },
+      { id: "shot_001", startMs: 0, durationMs: 3000, sourceArtifactId: "123e4567-e89b-42d3-a456-426614174100", crop: "cover", transitionOut: "fade", provenance: "generated" },
+      { id: "shot_002", startMs: 3000, durationMs: 3000, sourceArtifactId: "123e4567-e89b-42d3-a456-426614174101", crop: "contain", transitionOut: "cut", provenance: "footage" },
     ] },
     { id: "narration", kind: "audio", items: [
-      { id: "voice_001", startMs: 0, durationMs: 6000, sourceArtifactId: "audio_voice", transcriptRef: "transcript_voice" },
+      { id: "voice_001", startMs: 0, durationMs: 6000, sourceArtifactId: "123e4567-e89b-42d3-a456-426614174102", transcriptRef: "123e4567-e89b-42d3-a456-426614174103" },
     ] },
     { id: "captions", kind: "caption", items: [
       { id: "caption_001", startMs: 0, endMs: 3000, text: "新品登場", sourceTranscriptSegmentIds: ["seg_001"] },
       { id: "caption_002", startMs: 3000, endMs: 6000, text: "立即了解更多", sourceTranscriptSegmentIds: ["seg_002"] },
     ] },
   ],
-  styleRef: "style_brand_default",
-  provenance: { recipeId: "recipe_marketing_short", capabilityVersions: { "media.timeline_plan": "1.0.0" }, sourceArtifacts: ["asset_opening", "asset_close", "audio_voice", "transcript_voice"] },
+  styleRef: "123e4567-e89b-42d3-a456-426614174104",
+  provenance: { recipeId: "recipe_marketing_short", capabilityVersions: { "media.timeline_plan": "1.0.0" }, sourceArtifacts: ["123e4567-e89b-42d3-a456-426614174100", "123e4567-e89b-42d3-a456-426614174101", "123e4567-e89b-42d3-a456-426614174102", "123e4567-e89b-42d3-a456-426614174103", "123e4567-e89b-42d3-a456-426614174104"] },
 } as const;
 
 describe("media timeline v1", () => {
@@ -36,7 +36,7 @@ describe("media timeline v1", () => {
       unexpected: true,
       tracks: [{ ...validTimeline.tracks[0], items: [
         { ...validTimeline.tracks[0].items[0], startMs: 1 },
-        { ...validTimeline.tracks[0].items[1], startMs: 2000, sourceArtifactId: "asset_missing" },
+        { ...validTimeline.tracks[0].items[1], startMs: 2000, sourceArtifactId: "123e4567-e89b-42d3-a456-426614174109" },
       ] }],
     });
     expect(result.ok).toBe(false);
@@ -75,7 +75,7 @@ describe("media timeline v1", () => {
     const result = validateMediaTimelineV1({
       ...validTimeline, frameRate: 60,
       tracks: [{ id: "video_long", kind: "video", items: Array.from({ length: 120 }, (_, index) => ({
-        id: `shot_${index}`, startMs: index * 3000, durationMs: 3000, sourceArtifactId: "asset_opening", crop: "cover", transitionOut: "cut", provenance: "generated",
+        id: `shot_${index}`, startMs: index * 3000, durationMs: 3000, sourceArtifactId: "123e4567-e89b-42d3-a456-426614174100", crop: "cover", transitionOut: "cut", provenance: "generated",
       })) }],
     });
     expect(result.ok).toBe(false);

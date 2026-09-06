@@ -35,7 +35,8 @@ export type MediaTimelineV1Validation = { readonly ok: true; readonly value: Med
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
 const CAPABILITY_ID = /^[a-z_]+(\.[a-z_]+)?$/;
-const ARTIFACT = /^(?:asset|audio|transcript|style|recipe)_[A-Za-z0-9_-]{1,120}$/;
+// The existing media_assets primary key is the canonical artifact identifier.
+const ARTIFACT = UUID;
 const SEGMENT = /^seg_[A-Za-z0-9_-]{1,120}$/;
 const MAX_CAPTION_READING_CHARS_PER_SECOND = 22;
 
@@ -96,13 +97,13 @@ export function validateMediaTimelineV1(input: unknown): MediaTimelineV1Validati
   if (!record(input.provenance)) errors.push({ path: "$.provenance", code: "type", message: "必須是 provenance 物件" });
   else {
     allowed(input.provenance, ["recipeId", "capabilityVersions", "sourceArtifacts"], "$.provenance", errors);
-    if (input.provenance.recipeId !== undefined && (typeof input.provenance.recipeId !== "string" || !ARTIFACT.test(input.provenance.recipeId))) errors.push({ path: "$.provenance.recipeId", code: "reference", message: "必須是受控 recipe reference" });
+    if (input.provenance.recipeId !== undefined && (typeof input.provenance.recipeId !== "string" || !ID.test(input.provenance.recipeId))) errors.push({ path: "$.provenance.recipeId", code: "reference", message: "必須是受控 recipe reference" });
     if (!record(input.provenance.capabilityVersions)) errors.push({ path: "$.provenance.capabilityVersions", code: "type", message: "必須是 capability version map" });
     else for (const [capability, version] of Object.entries(input.provenance.capabilityVersions)) if (!CAPABILITY_ID.test(capability) || typeof version !== "string" || version.length === 0 || version.length > 64) errors.push({ path: `$.provenance.capabilityVersions.${capability}`, code: "value", message: "capability ID 與版本必須有效" });
     if (!Array.isArray(input.provenance.sourceArtifacts)) errors.push({ path: "$.provenance.sourceArtifacts", code: "type", message: "必須是 artifact reference 陣列" });
     else input.provenance.sourceArtifacts.forEach((artifact, index) => { const path = `$.provenance.sourceArtifacts[${index}]`; if (typeof artifact !== "string" || !ARTIFACT.test(artifact)) errors.push({ path, code: "reference", message: "必須是受控 artifact reference" }); else if (known.has(artifact)) errors.push({ path, code: "value", message: "artifact reference 不可重複" }); else known.add(artifact); });
   }
-  if (typeof input.styleRef !== "string" || !ARTIFACT.test(input.styleRef)) errors.push({ path: "$.styleRef", code: "reference", message: "必須是受控 style reference" });
+  reference(input.styleRef, known, "$.styleRef", errors);
 
   let maxEnd = 0;
   if (!Array.isArray(input.tracks)) errors.push({ path: "$.tracks", code: "type", message: "必須是 track 陣列" });
