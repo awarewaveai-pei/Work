@@ -12272,3 +12272,41 @@ The existing Director design described a canonical Timeline with artifact refere
 
 [rollback]
 Do not merge the isolated branch. Since the Timeline module has no runtime import or deployment entrypoint, removal of its two new files restores the prior behaviour; existing Quick Engine and manual Remotion template routes remain untouched.
+
+## 2026-09-06 — Cognitive OS golden-suite check: contract<->backlog registration parity
+
+[scope]
+Added check family 7 (`run_contract_backlog_registration_parity`) to `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py`. Closes a systemic gap: nothing mechanically verified that every ACTIVE `methods/contracts/*.contract.yaml` file's own `id` is actually registered in `methods/registry/contract-backlog.yaml` (tier_0 or tier_1) with `contract_status: complete`. No contract or backlog file was modified — the check found zero pre-existing mismatches beyond the two already fixed earlier this session.
+
+[reason]
+The exact same defect shipped twice this session: a contract's own `decided_by`/`mandated_by` field claimed "registered in contract-backlog.yaml tier_1 as the Nth concrete entry" while the actual YAML edit to `contract-backlog.yaml` was never made. First: `database_data.data_contract` (commit `72b47cd0d`, caught by critic review before landing). Second: `database_data.data_quality_dimensions` (caught by critic review in this same session after the contract was already committed claiming the registration; the registration was then added for real, see `contract-backlog.yaml`'s own `fortieth_concrete_entry` comment). Only a critic reading two files by hand caught either occurrence — nothing in the golden suite would have caught a third.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (in `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) on the pre-change file (temporarily set aside via `git stash push -u -m <tag> -- tests/run_golden_tests.py`, then reapplied by exact captured SHA and dropped, per the no-bare-stash rule) | exit=0 | result=PASSED 2830 (6 check families, no family 7 yet)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` after adding the first-draft check family 7 | exit=0 | result=PASSED 2879, ALL GOLDEN TESTS PASSED -- confirms 0 false positives against all 49 existing ACTIVE contracts (45 tier_1 + 4 tier_0; tier_0 deliberately included in the join, not just tier_1, or the check would have false-positived on tier_0's own 4 pre-existing contracts: root_cause.fishbone, stakeholder.regulator, strategy.swot, evidence.triangulation -- verified by hand before writing the check)
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation test 1 (forgotten-registration, the actual shipped defect) -- flipped `security.pasta`'s own `contract-backlog.yaml` entry (`fortyfifth_concrete_entry`) from `contract_status: complete` to `pending`, re-ran the suite | exit=1 | result=`FAILED: 1 - methods\contracts\security.pasta.contract.yaml:163: ACTIVE contract id 'security.pasta' has no contract-backlog.yaml tier_0/tier_1 entry with contract_status: complete ...`; file restored via `git checkout --`, full suite re-run green
+- REVIEW_DONE: critic=Standard (real subagent, not self-review) | verdict=initial fail, fixed | findings=0c/3m/6n -- MAJ-1: the only gate was `status != "ACTIVE": continue`, an unschema'd field trusted blindly, so a status typo/rename silently exempted a contract from checking with zero signal (verified: whole-corpus typo -> passed=0/failures=0, green); MAJ-2: no anti-vacuity floor, unlike every other check family in this file; MAJ-3: only checked contract->registry, not the reverse (a `complete` registry entry whose contract file was deleted/renamed went undetected -- the literal mirror of the shipped defect). Fixed all three plus MIN-1 ("six"->"seven" in the docstring), MIN-2 (non-string `id` guard before `re.escape`), MIN-3 (tier_0 entries now isinstance-guarded like tier_1's already were; `or []`/`or {}` on all container `.get()` calls), MIN-4 (a failed line lookup now omits `:line` instead of fabricating `:1`), MIN-5 (tier_2.explicit_entries asserted never `complete`), plus a duplicate-registration guard (suggestion). Full report requested and reviewed in full; not summarized before acting on it.
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` after applying all critic fixes | exit=0 | result=PASSED 2932, ALL GOLDEN TESTS PASSED (2879 + 4 new always-on assertions + 49 new reverse-direction checks)
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation test 1 repeated against the hardened check | exit=1 | result=same `security.pasta:163` failure as before -- still catches the original defect after hardening
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation test 2 (MAJ-1 fix) -- changed `security.pasta.contract.yaml`'s own `status: ACTIVE` to `status: Active`, re-ran the suite | exit=1 | result=`FAILED: 1 - contract file(s) skipped by check family 7 because their own status field is not exactly 'ACTIVE' ... [('methods\\contracts\\security.pasta.contract.yaml', 'Active')]`; file restored via `git checkout --`
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation test 3 (MAJ-3 fix) -- moved `security.pasta.contract.yaml` aside (simulating "contract deleted after being marked complete"), re-ran the suite | exit=1 | result=`FAILED: 1 - contract-backlog.yaml tier_1.fortyfifth_concrete_entry: method_id 'security.pasta' is contract_status: complete, but no methods/contracts/*.contract.yaml file has that id`; file moved back, `git status --porcelain` confirmed clean
+- BUGHUNT_DONE: scope=`agency-os,scripts` | grep=`run_contract_backlog_registration_parity` | hits=4 (2 in `tests/run_golden_tests.py` itself -- definition + call site -- and 2 in this WORKLOG entry's own narrative; 0 in `scripts`); no other file references the old 6-family count in a way check family 7 breaks -- existing docs cite check families 1/2b/2c/5/6 by their own fixed number, which stays valid since 7 was appended after them, not a renumbering
+
+[rollback]
+`git revert` the commit that adds check family 7 to `run_golden_tests.py`. No contract, backlog, schema, or runtime file is touched by this change; reverting it only removes the new mechanical check, restoring the prior (gap-having) 6-family suite.
+
+
+## 2026-09-06 — Video renderer staging rehearsal runbook
+
+[scope]
+Added `agency-os/docs/video_generator/PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md`, indexed it and linked Phase 1B. No host file, staging container, production container, secret, database, media artifact or deployment was changed.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose --env-file .env.renderer-staging.example -f docker-compose.renderer-staging.yml config --quiet` | exit=0 | result=manifest parsed; Docker client only warned that its local user config was inaccessible.
+- REALTEST_WAIVED: QUERY_ONLY -- the execution environment denied read-only SSH to `145.239.195.47:58122`; no host operation occurred.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; runbook is consistent with `LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md` and the isolated staging manifest.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK|lobster-renderer-staging` | hits=13
+- WORKLOG_DONE: evidence at `agency-os/docs/video_generator/PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md:1-120`.
+
+[rollback]
+Revert the two documentation files changed by this entry. No deployed state exists to roll back.

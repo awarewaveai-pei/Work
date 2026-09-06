@@ -3,7 +3,7 @@
 AI-LEGO Cognitive Engineering OS -- Phase 3 Wave 8 golden test runner.
 
 Resolves MACHINE_READABLE_SPEC_PLAN.md section 3 Build Order: "Wave 8
-tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs six
+tests/ 全目錄（對 Wave 1-7 的每個 schema 寫 golden test）". Runs seven
 independent check families against the built (status: ACTIVE/PROVISIONAL)
 Wave 1-7+ output (plus the Phase 5 Research Mode MVP slice deliverables
 added 2026-08-30: research.qualitative_coding method contract,
@@ -59,6 +59,22 @@ recipe instance):
      documents by section, look shapes up in the quick-ref; a stale index
      is a detector that went quiet, so it fails the suite instead of
      drifting silently the way hand-typed line numbers did).
+  7. Contract <-> backlog registration parity (added 2026-09-06, closing a
+     gap that let the SAME defect ship twice in one session: a contract's
+     own decided_by/mandated_by field claims "registered in
+     contract-backlog.yaml tier_1/tier_0" while the actual registry edit was
+     never made -- database_data.data_contract, commit 72b47cd0d, caught by
+     critic review before landing; database_data.data_quality_dimensions,
+     caught by critic review in this same session, after the false claim was
+     already committed). Every methods/contracts/*.contract.yaml file with
+     status: ACTIVE must have its own `id` present as a `method_id` in
+     contract-backlog.yaml's tier_0 or tier_1 section with
+     contract_status: complete. tier_0 is included alongside tier_1 (the
+     section named in the two known incidents) because the same invariant
+     applies to tier_0's own 4 pre-existing contracts (root_cause.fishbone,
+     stakeholder.regulator, strategy.swot, evidence.triangulation) --
+     checking tier_1 alone would false-positive on exactly those 4, verified
+     by hand before this check was written.
 
 No mother document, ADR, or existing spec/policy file's normative content
 is modified by this file or by running it. Exit code 0 = all checks
@@ -67,6 +83,7 @@ locate the failing fixture/instance).
 """
 import glob
 import os
+import re
 import sys
 import urllib.parse
 
@@ -491,6 +508,130 @@ def run_generated_index_freshness():
     check(rc == 0, "generated spec indexes are STALE -- run `python tests/gen_spec_index.py` and commit docs/architecture/SPEC_QUICKREF.md + MOTHER_DOC_SECTION_INDEX.md")
 
 
+# ---------------------------------------------------------------------------
+# 7. Contract <-> backlog registration parity -- see module docstring family 7.
+#    Catches a contract whose own decided_by/mandated_by text claims
+#    registration in contract-backlog.yaml while the registry edit was never
+#    actually made (database_data.data_contract, commit 72b47cd0d;
+#    database_data.data_quality_dimensions, same session, both caught only by
+#    a critic reading two files by hand -- this check makes that mechanical).
+#
+#    2026-09-06 critic review hardened this beyond the first draft:
+#    - MAJ-1: a contract's own `status` field is not schema-governed, so
+#      trusting `!= "ACTIVE"` to mean "skip, not our concern" let ANY typo/
+#      case/whitespace variant (or a renamed field) silently exempt a
+#      contract from registration checking with zero signal -- the exact
+#      "detector goes silent" failure this file's own docstring calls out
+#      four times. Every non-"ACTIVE" contract is now LISTED and asserted
+#      empty, not silently trusted.
+#    - MAJ-2: added the same non-vacuity floor (`evaluated > 0`) every other
+#      check family in this file already has (see docstring families
+#      1/2b/2c/3/5) -- without it, the corpus-wide typo above would produce
+#      passed=0/failures=0 and report green.
+#    - MAJ-3: the original only checked contract -> registry. A registry
+#      entry marked contract_status: complete whose contract file was
+#      deleted/renamed afterward went undetected -- the exact mirror of the
+#      defect this check exists to catch. Now checked both directions.
+#    - MIN-2/MIN-3: guarded against a non-string/missing `id` (would crash
+#      re.escape) and against tier_0 entries that aren't dicts (tier_1's own
+#      loop already had this guard; tier_0's did not).
+#    - MIN-4: a failed line-number lookup now omits the `:line` suffix
+#      instead of fabricating `:1`.
+#    - MIN-5: tier_2.explicit_entries is a real, separate section
+#      (finance.financial_assumptions, pending per ADR-008) that must never
+#      satisfy this check via a stray contract_status: complete -- asserted,
+#      not just assumed.
+#    - Duplicate-registration guard: two tier_0/tier_1 keys claiming the same
+#      method_id (a plausible copy-paste slip in a file whose Tier 1 entries
+#      are hand-named first_/second_/.../fortyfifth_concrete_entry).
+# ---------------------------------------------------------------------------
+def _first_line_matching(path, pattern):
+    """1-based line number of the first line in `path` matching regex
+    `pattern`, or None. Good enough for these single-line scalar fields
+    (id:, method_id:) -- this corpus never folds them across lines."""
+    rx = re.compile(pattern)
+    with open(path, encoding="utf-8") as f:
+        for i, line in enumerate(f, start=1):
+            if rx.search(line):
+                return i
+    return None
+
+
+def run_contract_backlog_registration_parity():
+    cb_path = os.path.join(ROOT, "methods", "registry", "contract-backlog.yaml")
+    cb = load(cb_path)
+
+    # method_id -> list of (location_label, contract_status) across every
+    # tier_0 list entry and every tier_1 dict entry (first_concrete_entry,
+    # second_concrete_entry, ... -- tier_1 is a mapping of hand-named keys,
+    # not a list, so this walks .items() rather than iterating a list;
+    # non-entry keys like tier_1.status/note are skipped via isinstance).
+    registered = {}
+    for entry in (cb.get("tier_0") or []):
+        if isinstance(entry, dict) and entry.get("method_id"):
+            registered.setdefault(entry["method_id"], []).append(("tier_0", entry.get("contract_status")))
+    for key, entry in (cb.get("tier_1") or {}).items():
+        if isinstance(entry, dict) and entry.get("method_id"):
+            registered.setdefault(entry["method_id"], []).append((f"tier_1.{key}", entry.get("contract_status")))
+
+    # Tier 2 is pending-by-definition (contract-backlog.yaml's own
+    # tier_2.policy) -- a tier_2 entry marked complete would let an ACTIVE
+    # contract's registration satisfy this check via the wrong tier.
+    tier2_complete = [
+        e.get("method_id") for e in ((cb.get("tier_2") or {}).get("explicit_entries") or [])
+        if isinstance(e, dict) and e.get("contract_status") == "complete"
+    ]
+    check(not tier2_complete, f"contract-backlog.yaml tier_2.explicit_entries: {tier2_complete} marked contract_status: complete -- Tier 2 is pending-by-definition per tier_2.policy")
+
+    dup_registrations = {mid: locs for mid, locs in registered.items() if len(locs) > 1}
+    check(not dup_registrations, f"contract-backlog.yaml: method_id registered more than once across tier_0/tier_1: {dup_registrations}")
+
+    contract_files = sorted(glob.glob(os.path.join(ROOT, "methods", "contracts", "*.contract.yaml")))
+    contract_ids = set()
+    non_active = []
+    evaluated = 0
+    for p in contract_files:
+        rel_p = os.path.relpath(p, ROOT)
+        inst = load(p)
+        method_id = inst.get("id")
+        if isinstance(method_id, str) and method_id:
+            contract_ids.add(method_id)
+        status = inst.get("status")
+        if status != "ACTIVE":
+            non_active.append((rel_p, status))
+            continue
+        if not isinstance(method_id, str) or not method_id:
+            continue  # missing/non-string id is already covered by check family 2b
+        evaluated += 1
+        matches = registered.get(method_id, [])
+        complete_matches = [loc for loc, st in matches if st == "complete"]
+        id_line = None
+        if not complete_matches:
+            id_line = _first_line_matching(p, r'^id:\s*[\'"]?' + re.escape(method_id) + r'[\'"]?\s*(?:#.*)?$')
+        loc = f"{rel_p}:{id_line}" if id_line else rel_p
+        check(
+            bool(complete_matches),
+            f"{loc}: ACTIVE contract id {method_id!r} has no contract-backlog.yaml "
+            f"tier_0/tier_1 entry with contract_status: complete (found: "
+            f"{matches if matches else 'no method_id match at all'}) -- the contract's own "
+            f"decided_by/mandated_by field may claim a registration that was never actually "
+            f"written to {os.path.relpath(cb_path, ROOT)} (this exact defect shipped twice: "
+            f"database_data.data_contract commit 72b47cd0d, database_data.data_quality_dimensions same session)",
+        )
+
+    check(evaluated > 0, "check family 7 evaluated zero ACTIVE contracts -- either methods/contracts/ is empty or every contract's own `status` field is missing/misspelled/not exactly 'ACTIVE', silently exempting the whole corpus from registration-parity checking")
+    check(not non_active, f"contract file(s) skipped by check family 7 because their own `status` field is not exactly 'ACTIVE' -- confirm each is a genuine non-ACTIVE contract (e.g. PROVISIONAL), not a status field typo: {non_active}")
+
+    # Reverse direction (critic review MAJ-3): a registry entry claiming
+    # contract_status: complete must point at a contract file that actually
+    # exists with that id, or the registry itself is the one lying (contract
+    # deleted/renamed after being marked complete).
+    for mid, locs in registered.items():
+        complete_locs = [loc for loc, st in locs if st == "complete"]
+        if complete_locs:
+            check(mid in contract_ids, f"contract-backlog.yaml {complete_locs[0]}: method_id {mid!r} is contract_status: complete, but no methods/contracts/*.contract.yaml file has that id")
+
+
 if __name__ == "__main__":
     run_schema_conformance()
     run_recipe_instance_conformance()
@@ -499,6 +640,7 @@ if __name__ == "__main__":
     run_registry_invariants()
     run_search_content_pack_check()
     run_generated_index_freshness()
+    run_contract_backlog_registration_parity()
     run_ref_resolution_smoke()
 
     print(f"PASSED: {passed}")
