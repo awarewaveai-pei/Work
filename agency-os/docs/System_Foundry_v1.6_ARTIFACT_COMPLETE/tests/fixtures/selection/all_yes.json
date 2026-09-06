@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 220,
+  "active_answer_count": 222,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-3PL",
@@ -58,6 +58,7 @@
     "CAP-CUSTOMER-EXPORT",
     "CAP-CUSTOMER-PORTAL",
     "CAP-CUSTOMER-USERS",
+    "CAP-CYCLE-COUNT",
     "CAP-DAM",
     "CAP-DASHBOARD",
     "CAP-DEMAND-FORECAST",
@@ -126,6 +127,7 @@
     "CAP-MULTI-AGENT",
     "CAP-MULTI-APPROVAL",
     "CAP-MULTI-CURRENCY",
+    "CAP-MULTI-LOCATION-STOCK",
     "CAP-MULTI-MARKETPLACE",
     "CAP-MULTI-TENANT",
     "CAP-NONREPEATABLE",
@@ -287,6 +289,7 @@
     "hr",
     "identity",
     "integrations",
+    "inventory_ops",
     "loyalty",
     "marketing",
     "marketplace_ops",

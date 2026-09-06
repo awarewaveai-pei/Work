@@ -332,6 +332,26 @@
       ]
     },
     {
+      "id": "RULE-Q-DATA-014",
+      "when": {
+        "question": "Q-DATA-014",
+        "equals": true
+      },
+      "require": [
+        "CAP-MULTI-LOCATION-STOCK"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-015",
+      "when": {
+        "question": "Q-DATA-015",
+        "equals": true
+      },
+      "require": [
+        "CAP-CYCLE-COUNT"
+      ]
+    },
+    {
       "id": "RULE-Q-WF-001",
       "when": {
         "question": "Q-WF-001",

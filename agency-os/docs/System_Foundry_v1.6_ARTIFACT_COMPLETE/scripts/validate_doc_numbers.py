@@ -144,7 +144,13 @@ def main():
         ('README.md', r'Every selected module receives (\d+) mandatory artifacts', [module_artifacts], 'per-module artifact count'),
         ('README.md', r'(\d+)/(\d+) questionnaire questions have deterministic YES rules', [q, q], 'question count'),
         ('README.md', r'(\d+)/(\d+) standard capabilities are reachable in the ALL-YES configuration', [caps, caps], 'capability count'),
-        ('README.md', r'(\d+) standard LEGO modules are produced by ALL-YES; a (\d+)th `custom`', [standard_modules, modules_total], 'module count'),
+        # (\d+)(?:st|nd|rd|th), not a hardcoded literal "th": a bare "th" suffix is only correct
+        # English for a total ending in 0/4-9/11-13 -- it silently demanded factually wrong prose
+        # ("51th" instead of "51st") the moment inventory_ops pushed modules_total from 50 to 51,
+        # caught while adding that module rather than by any prior review (every earlier release's
+        # total -- 44, 45, ..., 50 -- happened to end in a digit where "th" is also correct
+        # English, so this never surfaced before).
+        ('README.md', r'(\d+) standard LEGO modules are produced by ALL-YES; a (\d+)(?:st|nd|rd|th) `custom`', [standard_modules, modules_total], 'module count'),
         ('README.md', r'All (\d+) questions are tested individually', [q], 'question count'),
         ('README.md', r'All ([\d,]+) question pairs are attempted', [pairwise_total], 'pairwise total'),
         ('README.md', r'Every project gets all (\d+) controlled blueprint sections', [blueprints], 'blueprint count'),
@@ -186,6 +192,24 @@ def main():
             found = num(m.group(i))
             if found != exp:
                 errors.append(f'{relpath}:{line}: expected {exp} ({label}), found {found}')
+
+    # Ordinal-suffix correctness for "a Nth `custom`" in README.md -- the generic checks loop
+    # above only validates the numeric value against expected, never the English suffix word
+    # attached to it, so `(?:st|nd|rd|th)` alone would let "51th" (wrong) pass silently just as
+    # readily as "51st" (right) the moment modules_total's last digit changes. Derive the
+    # grammatically correct suffix from the number itself (11-13 are always "th" regardless of
+    # last digit; otherwise 1/2/3 -> st/nd/rd, else th) and require exactly that one.
+    custom_ordinal_path = ROOT / 'README.md'
+    custom_ordinal_text = custom_ordinal_path.read_text(encoding='utf-8')
+    om = re.search(r'a (\d+)(st|nd|rd|th) `custom`', custom_ordinal_text)
+    if not om:
+        errors.append('README.md: ordinal "custom" module anchor sentence not found (doc wording changed?)')
+    else:
+        n = int(om.group(1))
+        correct_suffix = 'th' if 11 <= (n % 100) <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+        if om.group(2) != correct_suffix:
+            om_line = custom_ordinal_text.count('\n', 0, om.start()) + 1
+            errors.append(f'README.md:{om_line}: expected ordinal suffix "{correct_suffix}" for {n} (module count), found "{om.group(2)}"')
 
     # Structural guard for the "Release commands" reproduction block in the assurance report:
     # every gate script actually invoked by `make verify` (scoped to the verify: prerequisite

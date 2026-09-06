@@ -210,14 +210,18 @@
       "invariants": [
         "Every aggregate/entity has explicit ownership and lifecycle.",
         "Business invariants are enforced close to domain truth.",
-        "Vendor/framework semantics do not leak into the domain."
+        "Vendor/framework semantics do not leak into the domain.",
+        "When CAP-INVENTORY is also selected, a stock balance only changes via an appended, immutable movement record; it is never changed by a direct overwrite of the balance figure itself.",
+        "When CAP-INVENTORY and CAP-ORDERS are both also selected, quantity committed to an order is tracked as a reservation separate from available quantity; cancelling or expiring that order releases the reservation back to available quantity rather than leaving it stranded.",
+        "When CAP-CYCLE-COUNT is also selected, a physical count's discrepancy against the recorded balance is always recorded as an explicit, attributable adjustment movement -- who counted, when, and the before/after quantity -- never a silent overwrite of the balance; this is the same immutable-movement-ledger invariant CAP-INVENTORY itself requires for every other balance change, applied whether the merchant tracks one stock record or, when CAP-MULTI-LOCATION-STOCK is also selected, counts each location's balance separately."
       ],
       "security": [
         "Sensitive domain attributes are classified and access-scoped."
       ],
       "tests": [
         "Invariant/state-transition tests.",
-        "Property tests for critical calculations where useful."
+        "Property tests for critical calculations where useful.",
+        "When CAP-CYCLE-COUNT is also selected, the discrepancy-as-adjustment-movement invariant is contract-tested: a count that differs from the recorded balance produces an attributable adjustment record, never a direct balance overwrite."
       ],
       "operations": [
         "Business-event/audit signals for consequential transitions."
@@ -882,7 +886,8 @@
       "purpose": "Orchestrate order fulfillment logistics (splitting, backordering, preordering, dropshipping) beyond simple single-shipment order records.",
       "invariants": [
         "A split order's child shipments always sum back to the original order's line items and quantities; nothing is lost or duplicated across the split.",
-        "A backordered or preordered line item is never marked fulfilled until the actual stock movement confirming it exists."
+        "A backordered or preordered line item is never marked fulfilled until the actual stock movement confirming it exists.",
+        "When CAP-MULTI-LOCATION-STOCK is also selected, a split order's per-warehouse child shipments each source from that module's own partitioned location balance, never from an unpartitioned company-wide figure; when CAP-MULTI-LOCATION-STOCK is not selected, 'different warehouses' in a split is a descriptive fulfillment-routing label only, with no location-partitioned stock record behind it."
       ],
       "security": [
         "Order-routing decisions (which warehouse/supplier fulfills a split) never leak cross-tenant inventory visibility in a multi-tenant deployment."
@@ -938,7 +943,8 @@
       "purpose": "Support physical retail point-of-sale operations distinct from purely online commerce.",
       "invariants": [
         "In-store inventory and online inventory are reconciled against a single canonical stock record; a sale in either channel decrements the same source of truth.",
-        "A click-and-collect or ship-from-store order is not marked ready/fulfilled until the specific store location confirms the physical action."
+        "A click-and-collect or ship-from-store order is not marked ready/fulfilled until the specific store location confirms the physical action.",
+        "When CAP-MULTI-LOCATION-STOCK is also selected, a click-and-collect or ship-from-store order sources its stock from that specific store's own partitioned location balance -- this module's store-location fulfillment check composes with, and never duplicates, that module's per-location allocation; when CAP-MULTI-LOCATION-STOCK is not selected, 'the specific store location' is a fulfillment-routing distinction only, with no location-partitioned stock record behind it."
       ],
       "security": [
         "Store-level staff access to POS transaction history follows the same role-based access as other customer_service/commerce data; no separate unmanaged cash-handling data model is introduced by this module."
@@ -960,7 +966,8 @@
         "Inventory disposition (restock, quarantine, or dispose) is only recorded after the returned item has actually been received and inspected, never on request or approval alone.",
         "A return request always references a real, already-placed order and product; it cannot be created against an order that does not exist.",
         "When CAP-SHIPPING is also selected, the return-shipment step (the customer sending the item back) uses that module's shipment/tracking record rather than a separate return-only shipment representation; when CAP-SHIPPING is not selected, return-shipment tracking is out of this module's scope.",
-        "When CAP-QUALITY-INSPECTION is also selected, the receiving-inspection step and its result compose with that capability's own Inspection/QualityIssue records instead of a second, parallel inspection concept; when CAP-QUALITY-INSPECTION is not selected, receiving inspection is a simple internal resellable/not-resellable check with no formal defect record."
+        "When CAP-QUALITY-INSPECTION is also selected, the receiving-inspection step and its result compose with that capability's own Inspection/QualityIssue records instead of a second, parallel inspection concept; when CAP-QUALITY-INSPECTION is not selected, receiving inspection is a simple internal resellable/not-resellable check with no formal defect record.",
+        "When CAP-MULTI-LOCATION-STOCK is also selected, a restock disposition increases the balance of the specific location the item was actually received back into, not an unpartitioned company-wide figure; when CAP-MULTI-LOCATION-STOCK is not selected, a restock is a single company-wide balance increase as it is today."
       ],
       "security": [
         "A return request and its inspection result are only visible to the requesting customer and authorized staff; a customer cannot view or act on another customer's RMA."
@@ -1067,7 +1074,7 @@
         "A shipment always references a real, already-placed order; it cannot be created against an order that does not exist.",
         "Shipping rate quoting reads a product's weight and dimensions from CAP-PRODUCTS' own catalog data, never a hardcoded or stale default value.",
         "Per-carrier account credentials, service codes, and label/tracking payload shapes are only ever accessed through DER-CARRIER-ADAPTER; this module's own shipment/tracking domain data never embeds a specific carrier's protocol directly.",
-        "CAP-3PL requires CAP-INVENTORY because the merchant retains ownership of stock held at the 3PL's warehouse; this is never conflated with CAP-DROPSHIP, where the supplier ships its own goods and the merchant never holds that inventory.",
+        "CAP-3PL requires CAP-INVENTORY because the merchant retains ownership of stock held at the 3PL's warehouse; this is never conflated with CAP-DROPSHIP, where the supplier ships its own goods and the merchant never holds that inventory. When CAP-MULTI-LOCATION-STOCK is also selected, the 3PL's warehouse is one of the locations that module partitions stock across, never a stock record kept outside that partition; when CAP-MULTI-LOCATION-STOCK is not selected, the 3PL's warehouse is simply the one place this merchant's stock is held, with no location-partitioned balance to compose with.",
         "Pickup-point/convenience-store delivery still creates and tracks a shipment through the same shipment record as any other delivery destination; it is never a parallel or duplicate shipment representation.",
         "Shipping rate quoting only computes what a carrier would charge to move a package; it never decides what the customer is charged for shipping, discounted, or waived above a threshold -- that pricing decision belongs to the checkout/pricing layer.",
         "When this module is also selected, every other capability whose own description or obligations mentions a shipment (CAP-RETURNS' return-shipment step, CAP-ORDER-SPLIT's per-warehouse shipments, CAP-CLICK-COLLECT's ship-to-customer path) refers to this module's shipment record, never a second parallel shipment representation of its own."
@@ -1144,6 +1151,34 @@
       ],
       "recovery": [
         "Merchandising rule (including version history) and feed configuration/build-history records are included in backup scope."
+      ]
+    },
+    "inventory_ops": {
+      "purpose": "Track stock at the level of an individual physical location -- one or more of the merchant's own warehouses, retail stores, or an outsourced 3PL warehouse -- so a company-wide available quantity is always the sum of location balances, stock can move between locations through a recorded transfer or arrive via an inbound receipt, and fulfillment can be sourced from a named location. Distinct from CAP-INVENTORY, which owns the one canonical stock record itself; this module only partitions and moves that same record across physical locations, it never maintains a second, parallel stock record. Warehouse-internal execution -- bin/shelf addressing, putaway, pick/pack wave planning, barcode scanning, and lot/serial/expiry tracking -- is out of scope; this module partitions and moves quantities between named locations, not what happens physically inside one.",
+      "invariants": [
+        "A company-wide available quantity is always the sum of its location balances; it is never separately maintained or allowed to drift from that sum.",
+        "Stock only moves between locations through a recorded transfer naming its source location, destination location, and quantity. A transfer's source-location decrement and destination-location increment are a single atomic movement pair -- never double-counted at both locations at once, and never lost mid-transfer if interrupted partway through.",
+        "An inbound receipt (new stock arriving at a location, e.g. from a supplier) is recorded as a movement naming only a destination location and quantity, no source -- the same immutable-movement-ledger mechanism a transfer uses, not a separate one.",
+        "When CAP-CYCLE-COUNT is also selected, a physical count's discrepancy at a specific location is recorded as an explicit, attributable adjustment movement against that location's own balance, never a silent overwrite of the company-wide aggregate.",
+        "When CAP-POS, CAP-POS-INVENTORY-SYNC, or CAP-MARKETPLACE-SYNC is also selected, that capability's own 'single canonical stock record' invariant and this module's per-location partition are the same underlying stock record viewed along two different axes -- sales channel and physical location -- never two competing stock records: a sales channel can be given the company-wide aggregate across all locations or a declared location subset, and either way there remains exactly one canonical stock record underneath, partitioned by location, summed for the channel view.",
+        "When CAP-3PL is also selected, the outsourced 3PL's warehouse is one of the locations this module partitions stock across, never a stock record kept outside that partition -- the merchant's own retained ownership of that stock (CAP-3PL's own stated reason for requiring CAP-INVENTORY) is expressed here as one more partitioned location, not a separate accounting.",
+        "When a capability with a fulfilling store location (CAP-POS, CAP-CLICK-COLLECT) or a per-warehouse fulfillment split (CAP-ORDER-SPLIT) is also selected, each fulfilling store or warehouse is likewise one of the locations this module partitions stock across; a click-and-collect, ship-from-store, or split-shipment order sources its stock from that specific location's own balance, never from an unpartitioned company-wide figure.",
+        "When CAP-ORDERS is also selected, an order allocation always names its source location and can never exceed that location's own available quantity -- a per-location no-oversell check, distinct from and stronger than a company-wide aggregate check alone."
+      ],
+      "security": [
+        "Moving or receiving stock at a location (`inventory.transfer`) is a separate permission from recording a single-location adjustment (`inventory.adjust`); holding one does not silently grant the other.",
+        "Creating, renaming, or deactivating a location (`warehouse.manage`) requires a separate, higher permission than recording an everyday adjustment, receipt, or transfer at an existing location."
+      ],
+      "tests": [
+        "The partition invariant is contract-tested: summing every location's balance for a product always equals that product's company-wide available quantity.",
+        "Transfer conservation is contract-tested, including the interrupted-mid-transfer case: a transfer's source-location decrement and destination-location increment are never observed with only one side applied.",
+        "The per-location no-oversell invariant is contract-tested (when CAP-ORDERS is also selected): an allocation request exceeding its named location's own available quantity is rejected even when the company-wide aggregate would have covered it."
+      ],
+      "operations": [
+        "Per-location stock discrepancy and stalled/incomplete transfers are observable, so a transfer that decremented its source but never completed its destination increment is caught rather than silently invisible in the company-wide aggregate."
+      ],
+      "recovery": [
+        "Location, per-location balance, transfer, and receipt records are included in backup scope."
       ]
     }
   }
