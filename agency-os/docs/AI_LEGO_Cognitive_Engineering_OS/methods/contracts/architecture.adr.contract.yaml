@@ -156,11 +156,12 @@ recommended_next: [devops_sre.canary_deployment, devops_sre.blue_green_deploymen
 # root" -- that was ALREADY false before this correction for two of the
 # three (devops_sre.canary_deployment and devops_sre.blue_green_deployment
 # were both built earlier this session, F19), and is now also false for
-# Threat Model, which as of the 45th slice has TWO machine_ids
-# (security.stride, 44th slice; security.linddun, 45th slice -- both
-# independently name this same forward link in their own
-# recommended_next, per Atlas's own §10/§13.11 STRIDE-then-LINDDUN
-# adjacency). ADR's own recommended_next models FORWARD steps, and
+# Threat Model, which as of the 46th slice has THREE machine_ids
+# (security.stride, 44th slice; security.linddun, 45th slice;
+# security.attack_tree, 46th slice -- all three independently name this
+# same forward link in their own recommended_next, per Atlas's own
+# §10/§13.11 STRIDE-then-LINDDUN-then-Attack-Tree adjacency). ADR's own
+# recommended_next models FORWARD steps, and
 # Threat Model sits BEFORE ADR in the chain,
 # so its new machine_id does not populate this field -- but Canary/Blue-
 # Green sit AFTER ADR (via the un-built Rehearsal step) and are real,
@@ -243,12 +244,13 @@ open_questions:
   - id: "OQ-ADR-2"
     question: >
       F18's own recommended chain places ADR between a Threat Model step
-      and a Rehearsal step. Threat Model now has TWO machine_ids
-      (`security.stride`, 44th slice; `security.linddun`, 45th slice)
-      but both sit BEFORE ADR, so neither feeds this contract's own
-      (forward-looking) `recommended_next`. Rehearsal still has no
-      machine_id anywhere in this spec root. Should `recommended_next`
-      add a Rehearsal-family method once one is built (alongside the
+      and a Rehearsal step. Threat Model now has THREE machine_ids
+      (`security.stride`, 44th slice; `security.linddun`, 45th slice;
+      `security.attack_tree`, 46th slice) but all three sit BEFORE ADR,
+      so none feed this contract's own (forward-looking)
+      `recommended_next`. Rehearsal still has no machine_id anywhere in
+      this spec root. Should `recommended_next` add a Rehearsal-family
+      method once one is built (alongside the
       already-populated devops_sre.canary_deployment/blue_green
       _deployment)?
     owner: "operator, or whoever next builds Rehearsal as its own Method Atlas slice"

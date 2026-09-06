@@ -1,0 +1,195 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/attack-tree-record.schema.yaml"
+title: Attack Tree Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AttackTreeRecord` -- the
+  declared `outputs` of `security.attack_tree`'s Method Contract. THIRD
+  typed object in the `security` family (F20), the FIRST to diverge
+  structurally from `stride-threat-model-record.schema.yaml`/`linddun
+  -privacy-threat-model-record.schema.yaml`'s own shared shape: Atlas's
+  own Attack Tree formula (F20 tool table L883, §12.38 L3046-3062) names
+  a recursive goal TREE ("root goal→AND/OR subgoals→cost/skill
+  /detectability"), not a DFD substrate. Execution Contract §32 Security
+  Change Contract (L1231-1260, explicitly naming Attack Tree) grounds
+  `assets`/`trust_boundaries`/`entry_points`, kept identically shaped to
+  the two sibling schemas (a real, confirmed method-agnostic part of EC
+  §32 -- see `methods/contracts/security.attack_tree.contract.yaml`'s
+  own description for why the DFD-based part is NOT shared while this
+  part is).
+
+  The FIRST `genuine_compute` record in the `security` family:
+  `root_aggregate` is a real bottom-up AND/OR tree aggregation over
+  `root`'s own leaf `cost`/`skill`/`detectability` values, NOT caller-
+  supplied -- computed by the builder and independently re-derived by
+  the gate. AND nodes: sum `cost`, worst-case (max-rank) `skill`
+  /`detectability`. OR nodes: cheapest `cost`, best-case (min-rank)
+  `skill`/`detectability`, EACH ATTRIBUTE INDEPENDENTLY across children.
+  Directly implements Atlas's own benefit line ("找最便宜、最可能、最
+  難偵測的攻擊鏈") as a per-attribute BOUND -- NOT necessarily three
+  values drawn from the same single realisable path/chain, a disclosed
+  limitation (see the method contract's own `OQ-ATTACKTREE-5`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Attack Tree row (L883): 'root goal→AND/OR subgoals→cost/skill/detectability'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.38 攻擊樹 (L3046-3062): worked AND/OR tree example"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum structure, explicitly naming Attack Tree"
+  - "methods/contracts/security.attack_tree.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  trust_boundary:
+    type: object
+    required: [name, description]
+    additionalProperties: false
+    properties:
+      name: {type: string, minLength: 1, pattern: "\\S"}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+  internal_node:
+    type: object
+    required: [name, node_type, children]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "A compound goal/subgoal (e.g. Atlas's own worked-example '竊取帳密' / '利用漏洞' / '取得備份'), not an atomic technique."
+      node_type:
+        enum: [AND, OR]
+        description: "AND: attacker needs every child. OR: attacker needs any one child. Required even on single-child nodes (see method contract compilation_decisions)."
+      children:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/attack_node"
+  leaf_node:
+    type: object
+    required: [name, cost, skill, detectability, control, residual_risk, test_evidence]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "An atomic, undecomposed attacker technique (e.g. Atlas's own worked-example 'Phishing' / 'RCE' / 'Misconfigured Storage')."
+      cost:
+        type: number
+        minimum: 0
+        description: "Attacker's own cost to execute this specific technique. Caller's own unit (currency or hours) -- undisclosed, see OQ-ATTACKTREE-2."
+      skill:
+        enum: [low, medium, high]
+        description: "Attacker skill required for this specific technique. A three-value ordinal enum, not an invented numeric scale -- Atlas gives no scale."
+      detectability:
+        enum: [low, medium, high]
+        description: "How easily this specific technique is detected. Same ordinal-enum discipline as skill."
+      control:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Controls' element, scoped to this atomic technique specifically -- not to any ancestor compound goal."
+      residual_risk:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      test_evidence:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+  attack_node:
+    description: "A tree node -- exactly ONE of internal_node (has children) or leaf_node (an atomic technique). Recursive."
+    oneOf:
+      - $ref: "#/$defs/internal_node"
+      - $ref: "#/$defs/leaf_node"
+  aggregate:
+    type: object
+    required: [cost, skill, detectability]
+    additionalProperties: false
+    properties:
+      cost: {type: number, minimum: 0}
+      skill: {enum: [low, medium, high]}
+      detectability: {enum: [low, medium, high]}
+
+type: object
+required: [id, version, system_or_component, assets, trust_boundaries, entry_points, root, root_aggregate, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^ATTACKTREE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.attack_tree"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  assets:
+    type: array
+    minItems: 1
+    description: "EC §32's own 'Assets' element -- at least one."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+  trust_boundaries:
+    type: array
+    default: []
+    description: "EC §32's own 'Trust Boundaries' element. REQUIRED array (may be empty)."
+    items:
+      $ref: "#/$defs/trust_boundary"
+  entry_points:
+    type: array
+    default: []
+    description: "EC §32's own 'Entry Points' element."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+  root:
+    $ref: "#/$defs/attack_node"
+    description: "Atlas's own 'root goal' formula step -- the tree root. Recursive down to leaf techniques."
+  root_aggregate:
+    $ref: "#/$defs/aggregate"
+    description: "GENUINE, RE-DERIVED evidence, not caller-supplied -- the real bottom-up AND/OR aggregation of root's own leaf cost/skill/detectability values."
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- an attack tree is a structured analytical judgment, not a calculated/simulated result (the tree's own STRUCTURE is judgment; only root_aggregate is a calculated result)."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas's own §12.38 worked example: 取得敏感資料 (OR: steal credentials / exploit vuln / get backup), steal-credentials further OR-decomposed into Phishing/Credential Stuffing"
+    value:
+      id: "ATTACKTREE-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.attack_tree"
+      system_or_component: "customer records database"
+      assets: ["customer PII records"]
+      trust_boundaries: []
+      entry_points: ["employee VPN", "public support portal"]
+      root:
+        name: "取得敏感資料"
+        node_type: OR
+        children:
+          - name: "竊取帳密"
+            node_type: OR
+            children:
+              - {name: Phishing, cost: 200, skill: low, detectability: medium, control: "Mandatory phishing-simulation training + email banner for external senders.", residual_risk: "Medium -- training reduces but does not eliminate click-through.", test_evidence: "Quarterly phishing simulation campaign results, 2026-08."}
+              - {name: "Credential Stuffing", cost: 50, skill: low, detectability: low, control: "MFA required for all VPN logins.", residual_risk: "Low -- MFA blocks reuse of stolen credentials alone.", test_evidence: "Pen test confirmed MFA enforcement, 2026-07."}
+          - {name: "利用漏洞", node_type: OR, children: [{name: RCE, cost: 5000, skill: high, detectability: high, control: "WAF + quarterly dependency scanning.", residual_risk: "Low -- no known unpatched RCE as of last scan.", test_evidence: "Dependency scan report, 2026-08-15."}]}
+          - {name: "取得備份", node_type: OR, children: [{name: "Misconfigured Storage", cost: 100, skill: medium, detectability: low, control: "Backup bucket access restricted to CI role, public access blocked by policy.", residual_risk: "Low -- policy enforced, verified by automated drift check.", test_evidence: "Cloud storage policy audit, 2026-09-01."}]}
+      root_aggregate: {cost: 50, skill: low, detectability: low}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal single-leaf tree"
+    value:
+      id: "ATTACKTREE-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "security.attack_tree"
+      system_or_component: "internal-reference lookup service"
+      assets: ["country-code reference table"]
+      trust_boundaries: []
+      entry_points: []
+      root: {name: "read reference table", cost: 10, skill: low, detectability: low, control: "Read-only role, no write path exists.", residual_risk: "Low -- data is non-sensitive reference data.", test_evidence: "Access review, 2026-09-01."}
+      root_aggregate: {cost: 10, skill: low, detectability: low}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F20 tool table row (L883), §12.38 (L3046-3062), and EC §32 (L1231-1260) directly. Validated against jsonschema Draft202012Validator, including the recursive oneOf union."
+  note: "The AND/OR tree formula and its three leaf attributes are directly transcribed from Atlas. The bottom-up aggregation algorithm (AND: sum/max/max; OR: min/min/min) and referential/shape invariants are enforced at the runtime layer (ai_lego/compute/attack_tree/aggregate.py, ai_lego/modules/security/attack_tree.py), not the schema layer -- JSON Schema's own oneOf can validate node SHAPE but not the aggregate VALUE's own correctness. No mother document was modified."

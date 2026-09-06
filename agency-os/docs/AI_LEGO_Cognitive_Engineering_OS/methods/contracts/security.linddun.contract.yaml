@@ -229,6 +229,20 @@ open_questions:
       data_flow_elements, rather than each new method re-declaring it?
     owner: "operator, or whoever next builds security.attack_tree / security.supply_chain_threat_model"
     blocks: "nothing in this file's own validity -- a real design question deferred to real evidence, not solved prematurely"
+    resolved_by: >
+      PARTIALLY CLOSED by `security.attack_tree` (46th slice), the third
+      real instance this question named. Real finding, split by real
+      sub-question (a distinction this question's own text did not
+      originally draw, corrected here): the `data_flow_elements`/DFD-
+      substrate part is CLOSED -- Attack Tree's own Atlas formula has no
+      DFD step at all, proving a shared DFD-based schema would have been
+      WRONG, not merely thin evidence. The `assets`/`trust_boundaries`
+      /`entry_points` framing part is a SEPARATE question (properly
+      `OQ-STRIDE-4`'s own subject, not this one) and remains OPEN --
+      Attack Tree kept those three fields identically shaped, making it
+      a third-for-third identical re-declaration, strengthening rather
+      than closing that part. See `OQ-STRIDE-4`'s own `resolved_by` and
+      `security.attack_tree.contract.yaml`'s own description.
   - id: "OQ-LINDDUN-5"
     question: >
       Same disclosed gaps `OQ-STRIDE-6` already names for STRIDE (no

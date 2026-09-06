@@ -1697,6 +1697,56 @@ tier_1:
       Tree, PASTA, DPIA/PIA, Zero Trust Review, Secrets Threat Review,
       Supply Chain Threat Model, Abuse Case, Security Control Mapping),
       each an independent future slice, not blocked by this one.
+  fortyfourth_concrete_entry:
+    # NEW (2026-09-06, same session): forty-fourth Tier 1 entry, same
+    # additive-key rationale as the forty-three entries above it. Added
+    # to THIS file in the SAME editing pass that wrote the contract
+    # itself, before any critic round.
+    method_id: "security.attack_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. THIRD entry
+      from the `security` family (F20), after security.stride and
+      security.linddun. Atlas gives this method three citations (F20
+      table row L883, dedicated §12.38 section L3046-3062 with a worked
+      AND/OR tree example, and the §10 Security recipe row L1112 --
+      same row the two siblings cite) plus a fourth, §13.11 Security
+      Review Recipe (L3472-3487, confirming LINDDUN-then-Attack-Tree
+      adjacency), a fifth method-pairing confirmation (§28 scenario-
+      routing table L4483: Attack Tree as STRIDE's own recommended
+      secondary method), and a sixth, load-bearing citation shared with
+      both siblings: Execution Contract §32 Security Change Contract
+      (L1231-1260), which names Attack Tree as an acceptable method.
+      THIS IS THE FIRST F20 MEMBER TO STRUCTURALLY DIVERGE from
+      security.stride/security.linddun's own shared shape: Atlas's own
+      Attack Tree formula names a recursive goal TREE, not a DFD
+      substrate -- closing `OQ-STRIDE-4`/`OQ-LINDDUN-4` with a real
+      finding (two DFD-based instances were genuinely too thin evidence
+      for the right shared shape; a third, non-DFD instance proves it).
+      `assets`/`trust_boundaries`/`entry_points` are kept identically
+      shaped (the confirmed method-agnostic part of EC §32); the
+      Threats-equivalent step is a genuine recursive `attack_node` tree
+      (internal nodes: name/node_type/children; leaf nodes: name/cost
+      /skill/detectability/control/residual_risk/test_evidence).
+      `root_aggregate` is this session's FIRST F20 `genuine_compute`:
+      a real bottom-up AND/OR aggregation (AND: sum cost, max skill,
+      max detectability; OR: min cost, min skill, min detectability),
+      directly implementing Atlas's own "cheapest, most likely,
+      hardest-to-detect" benefit line as a computed comparison, not a
+      structural set-difference (STRIDE/LINDDUN's own class) and not a
+      narrative claim.
+    source: "methods/contracts/security.attack_tree.contract.yaml (built same session as this entry, mints machine_id security.attack_tree) + specs/cognitive/typed-objects/attack-tree-record.schema.yaml (new output type) + ai_lego/compute/attack_tree/aggregate.py (new genuine-compute module)"
+    note: >
+      Not placed under `tier_0`: same "table row thin, EC section
+      thick" pattern the two siblings' own notes already establish
+      (§12.38 is a worked example with no numbered protocol beyond it).
+      Tier 1, mandated by the actively-running implementation slice,
+      same category as the forty-three entries above it. THIRD entry of
+      the `security` family -- seven more F20 table rows remain (PASTA,
+      DPIA/PIA, Zero Trust Review, Secrets Threat Review, Supply Chain
+      Threat Model, Abuse Case, Security Control Mapping), each an
+      independent future slice, not blocked by this one.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

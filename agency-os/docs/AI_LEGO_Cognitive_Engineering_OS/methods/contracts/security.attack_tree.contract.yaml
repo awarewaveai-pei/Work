@@ -1,0 +1,384 @@
+$id: "ai-lego://methods/contracts/security.attack_tree.contract.yaml"
+title: "Attack Tree Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-sixth Method Atlas slice, THIRD member of
+  the `security` family (F20's own "資安／隱私套件"), after
+  `security.stride` (44th slice) and `security.linddun` (45th slice).
+
+  Atlas gives this method THREE citations, verified by direct read: (1)
+  the F20 tool table's Attack Tree row (L883: purpose "從攻擊目標展開
+  攻擊路徑"; usage "root goal→AND/OR subgoals→cost/skill/detectability";
+  benefit "找最便宜攻擊路徑"); (2) a dedicated §12.38 攻擊樹 section
+  (L3046-3062: a worked Mermaid `graph TD` example -- "取得敏感資料" root
+  branching into "竊取帳密"/"利用漏洞"/"取得備份", each further
+  decomposing into atomic leaf techniques like Phishing/Credential
+  Stuffing/RCE/Misconfigured Storage. NOTE: the Mermaid diagram itself
+  carries no AND/OR edge labels -- reading the branches as OR is this
+  contract's own sound inference from the surrounding prose ("從
+  attacker goal 反推所有可行路徑", enumerate ALL feasible paths, which
+  implies alternatives, i.e. OR), not a literal transcription of a
+  labelled diagram. Benefit: "可找最便宜、最可能、最難偵測的攻擊鏈");
+  (3) the §10 Security recipe
+  row (L1112, the same row `security.stride`/`security.linddun` already
+  cite: "Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test" --
+  confirming Attack Tree sits third in the same recipe, after LINDDUN).
+  A FOURTH: §13.11 Security Review Recipe (L3472-3487: "... → LINDDUN →
+  Attack Tree → Secret/Identity Review → ..."), independently confirming
+  the same LINDDUN-then-Attack-Tree adjacency. A FIFTH, method-pairing
+  confirmation (§28's own scenario-routing table, L4483: "Security
+  Review | STRIDE | Attack Tree / Red Team | Checklist Only" -- Attack
+  Tree named as STRIDE's own recommended SECONDARY method for security
+  review scenarios, not a competing primary).
+
+  **A sixth, load-bearing citation, the SAME one `security.stride`/
+  `security.linddun` already establish**: Execution Contract §32
+  Security Change Contract (L1231-1260) mandates a real minimum
+  structure -- "Assets / Trust Boundaries / Entry Points / Threats /
+  Controls / Residual Risk / Test Evidence" -- and explicitly NAMES
+  Attack Tree (alongside STRIDE/LINDDUN/PASTA) as an acceptable method
+  ("Method Atlas 可選 STRIDE／LINDDUN／Attack Tree／PASTA", L1260).
+
+  **This is the FIRST F20 member whose own DFD-substrate step genuinely
+  DIVERGES from `security.stride`/`security.linddun`'s own shared shape
+  -- and this answers `OQ-LINDDUN-4` specifically (the DFD-substrate
+  question), NOT `OQ-STRIDE-4` (see below for why those are two
+  DIFFERENT questions this contract's own first draft conflated -- a
+  critic-caught error corrected here).** Atlas's own STRIDE/LINDDUN
+  formulas both explicitly name a DFD substrate ("DFD→..."); Atlas's own
+  Attack Tree formula does NOT -- it names a goal TREE instead ("root
+  goal→AND/OR subgoals→..."). Forcing this record into STRIDE/LINDDUN's
+  own `data_flow_elements[]`/flat `threats[]` shape would have been
+  WRONG, not merely different. `OQ-LINDDUN-4` (which asks specifically
+  about the DFD substrate) is CLOSED by this finding, with a
+  `resolved_by` note added to `security.linddun.contract.yaml`'s own
+  copy in the same commit: no shared DFD-based base schema is factored
+  out, because a real third instance proves the DFD step itself is NOT
+  method-agnostic.
+
+  **`OQ-STRIDE-4` is a DIFFERENT question and is NOT closed by this
+  finding -- it is, if anything, STRENGTHENED, not settled.**
+  `OQ-STRIDE-4`'s own literal text asks only about the three EC §32
+  FRAMING fields (`assets`/`trust_boundaries`/`entry_points`), not the
+  DFD/Threats step. This contract's own field design (see immediately
+  below) KEEPS those same three fields identically shaped to STRIDE/
+  LINDDUN's own -- meaning this is now the THIRD contract independently
+  re-declaring the exact same three-field shape, the precise situation
+  `OQ-STRIDE-4` originally flagged as a candidate for factoring out.
+  Three-for-three identical instances is stronger evidence FOR
+  eventually sharing that specific sub-shape, not evidence against it.
+  `OQ-STRIDE-4` is left OPEN, its own text updated (see
+  `security.stride.contract.yaml`'s own `resolved_by` note, added in
+  this same commit) to record this finding rather than silently
+  drifting out of sync with the sibling file that actually owns it.
+
+  **Field design**: `assets`/`trust_boundaries`/`entry_points` (EC §32's
+  own first three elements) are KEPT, identically shaped to STRIDE/
+  LINDDUN's own fields -- this part of EC §32's baseline genuinely IS
+  method-agnostic (every one of Atlas's four named methods reviews the
+  same kind of system, just enumerates threats differently) -- this is
+  exactly the `OQ-STRIDE-4` situation described above, left open. The
+  "Threats" step is replaced by a genuine recursive TREE (`root`, an
+  `attack_node` -- Atlas's own "root goal→AND/OR subgoals" formula
+  step), where every LEAF node (an atomic, undecomposed attacker
+  technique -- Atlas's own worked example's own "Phishing"/"RCE"/etc.)
+  carries `cost`/`skill`/`detectability` (Atlas's own three formula
+  attributes) PLUS EC §32's own remaining `control`/`residual_risk`
+  /`test_evidence` triple (mapping EC §32's "Controls" element onto the
+  atomic, actually-controllable attacker action -- a real control
+  blocks a SPECIFIC technique like Phishing, not an abstract compound
+  goal like "steal sensitive data"). `root_aggregate` is GENUINE,
+  RE-DERIVED evidence (NOT caller-supplied): a real bottom-up AND/OR
+  tree-aggregation compute -- AND nodes sum `cost` and take the WORST
+  (max) `skill`/`detectability` across children (an attacker needs every
+  step, so the hardest-skill and most-detectable step is the compound
+  plan's own real bottleneck); OR nodes take the cheapest `cost` and the
+  BEST (min) `skill`/`detectability` across children, each of the three
+  attributes minimized INDEPENDENTLY across children -- DIRECTLY
+  implementing Atlas's own benefit line, "找最便宜、最可能、最難偵測的
+  攻擊鏈" ("find the cheapest, most likely, hardest-to-detect attack
+  chain"), as a REAL computed comparison, not a narrative claim, BUT
+  (caught by critic review, disclosed here rather than left implicit)
+  the resulting `root_aggregate` at an OR node is a per-attribute BOUND
+  -- the cheapest cost found anywhere under this node, the lowest skill
+  needed anywhere, the lowest detectability anywhere -- NOT necessarily
+  three attributes drawn from the SAME single child, and therefore NOT
+  necessarily a single realisable attack path/chain (the cheapest child
+  and the stealthiest child may be different children; a genuine
+  cheapest-CHAIN answer requires joint/Pareto selection across the
+  three attributes together, a harder problem out of scope here -- see
+  `OQ-ATTACKTREE-5`). This is `genuine_compute`, the FIRST F20 member to
+  be one -- STRIDE/LINDDUN's own `elements_with_no_recorded_threats` is
+  a structural set-difference, not a numeric/ordinal aggregation.
+
+  `cost` is a real, caller-supplied NUMBER (currency or hours, caller's
+  own unit -- undisclosed which, see compilation_decisions) since
+  Atlas's own "最便宜" (cheapest) benefit requires a genuinely
+  COMPARABLE, summable quantity; `skill`/`detectability` are a three-
+  value ordinal ENUM (low/medium/high), NOT an invented numeric scale --
+  Atlas gives no numeric scale for either, and inventing one would be
+  exactly the "undisclosed over-constraint" class a critic review
+  already caught on `database_data.data_contract`'s own first draft.
+
+  Also cross-checked: broad grep across the whole spec root for "Fault
+  Tree" (Atlas's own L437 row, a DIFFERENT AND/OR-tree method for
+  reliability top-event analysis, not security) found it named in the
+  two `method-inventory.yaml` catalog files (an uncited, un-built
+  F-category row, not a typed object) and once more in
+  `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md:42`
+  (a prose mention of the neighbouring Root Cause & Failure Analysis
+  family, §11.4 -- not a typed object either) -- confirming no existing
+  typed object or module implements it, so there is no risk of
+  confusing this contract's own Attack Tree with it. The two methods
+  are real,
+  textbook-distinct neighbours regardless (same AND/OR tree STRUCTURE,
+  different DOMAIN and different root semantics: a top EVENT that
+  already happened, not an attacker GOAL not yet achieved), not a
+  duplicate. No existing typed object in `specs/security/` models an
+  attack path tree.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Attack Tree row (L883): 'root goal→AND/OR subgoals→cost/skill/detectability'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.38 攻擊樹 (L3046-3062): worked example, 'root goal → AND/OR subgoals → leaf techniques'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Method Selection Engine, Security recipe row (L1112): 'Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test' -- the same row security.stride/security.linddun cite"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487): '... → LINDDUN → Attack Tree → ...'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 scenario-routing table (L4483): 'Security Review | STRIDE | Attack Tree / Red Team | Checklist Only' -- Attack Tree as STRIDE's own recommended secondary method"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum structure, explicitly naming Attack Tree as an acceptable method"
+  - "specs/execution/risk-tier.schema.yaml HIGH-tier required_actions (L93): 'Threat Review' -- a confirming, method-agnostic cross-reference"
+  - "specs/cognitive/problem-type.schema.yaml security problem-type entry (L291-296): recommended_start names Attack Tree in the same recipe"
+  - "methods/registry/method-inventory.yaml Attack Tree entry: category 'F20 security', no machine_id, line field stale (880, pre-existing drift, not this contract's to fix) -- this contract mints a machine_id"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  forty-fourth concrete entry (added in the same editing pass as this
+  contract). `id: security.attack_tree` mints a new machine_id, THIRD
+  member of the `security` family (F20).
+
+id: security.attack_tree
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, COMPUTE, VALIDATE]
+# INFERRED, not cited. Decomposing a goal into AND/OR subgoals down to
+# atomic techniques is DECOMPOSE; attaching cost/skill/detectability
+# and EC §32's remaining triple to each leaf is MAP; the bottom-up
+# AND/OR aggregation is a genuine COMPUTE step (the FIRST F20 member to
+# need one -- STRIDE/LINDDUN's own inferred triple has no COMPUTE,
+# their own re-derivation being a pure structural VALIDATE); the tree-
+# shape and aggregation-recomputation checks are VALIDATE.
+
+purpose:
+  - decompose_an_attacker_goal_into_an_and_or_tree_of_subgoals_down_to_atomic_techniques_and_compute_the_cheapest_least_skilled_least_detectable_aggregate_path
+inputs:
+  required: [AssetSet, AttackGoalTree]
+  optional: [TrustBoundarySet, EntryPointSet]
+outputs: [AttackTreeRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "assets has at least 1 entry; every entry is a non-empty string (EC §32's own 'Assets' element)"
+  - "trust_boundaries is a required array (may be empty); every entry has a non-empty name and description (EC §32's own 'Trust Boundaries' element)"
+  - "entry_points is a required array (may be empty) of non-empty strings (EC §32's own 'Entry Points' element)"
+  - "root is a single attack_node -- either an INTERNAL node (name, node_type in {AND, OR}, children: a non-empty list of attack_node) or a LEAF node (name, cost >= 0, skill/detectability in {low, medium, high}, control/residual_risk/test_evidence all non-empty strings -- EC §32's own remaining triple, scoped per-leaf-technique) -- recursively, up to MAX_TREE_DEPTH (caught by critic review: an actually-unbounded recursive validator raises Python's own RecursionError past a few hundred levels, silently violating this session's own 'fails closed, never crashes' discipline; real attack trees are shallow by their own nature -- Atlas's own worked example is 3 levels -- so a generous bound rejects only pathological input, not real usage)"
+  - "root_aggregate is NOT caller-supplied -- the builder computes it internally via real bottom-up AND/OR aggregation (AND: sum cost, max skill, max detectability; OR: min cost, min skill, min detectability), and the gate independently re-derives and compares against the stored value"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  genuine_compute: true
+  # FIRST F20 member to be genuine_compute: root_aggregate is a real
+  # numeric/ordinal bottom-up tree aggregation (AND: sum/max/max; OR:
+  # min/min/min), directly computing Atlas's own "find the cheapest,
+  # most likely, hardest-to-detect" benefit -- not a narrative claim
+  # needing evidence citations, and not the structural set-difference
+  # class STRIDE/LINDDUN's own elements_with_no_recorded_threats is.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Attack Tree row.
+recommended_next: [architecture.adr]
+# Same forward link security.stride/security.linddun already establish,
+# for the identical reason: Atlas's own F18 chain (L836-837) places a
+# Threat Model step DIRECTLY before ADR; §13.9 (L3445-3447) places one
+# step removed ("Threat Model -> Data/Migration Review -> ADR"), still
+# unambiguously ahead of ADR in the same chain, just not adjacent (a
+# wording correction from this contract's own first draft, which
+# incorrectly claimed §13.9 places it directly before ADR too -- caught
+# by critic review). Attack Tree is Atlas's own THIRD Threat Model
+# method (after STRIDE, LINDDUN, in both §10 L1112 and §13.11
+# L3472-3487), so the same forward link applies without inventing a
+# new one.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural/genuine_compute contract's own rollback field already
+  # draws.
+
+compilation_decisions:
+  - question: >
+      Should `assets`/`trust_boundaries`/`entry_points` be kept
+      identically shaped to `security.stride`/`security.linddun`'s own
+      fields, or redesigned since this method's own "Threats" step
+      diverges (a tree, not a flat DFD-referencing list)?
+    decision: "Kept identically shaped -- only the Threats-equivalent step (root/root_aggregate, replacing data_flow_elements/threats[]) diverges."
+    reasoning: >
+      EC §32 names Assets/Trust Boundaries/Entry Points as a REVIEW
+      FRAMING exercise independent of which threat-enumeration method
+      is chosen underneath it -- the same three fields apply whether the
+      reviewer picks STRIDE, LINDDUN, Attack Tree, or PASTA. This is
+      exactly `OQ-STRIDE-4`'s own subject matter, now re-declared a
+      THIRD time identically -- left OPEN, not closed, as a genuinely
+      strengthened case for eventually factoring it out (see
+      description above). The DFD-substrate step is a SEPARATE
+      question, `OQ-LINDDUN-4`'s own, and IS closed by this contract's
+      own divergent tree shape (see description above).
+  - question: >
+      Should `cost` be a plain number (caller's own unit, undisclosed
+      currency/hours), or should this contract mandate a specific unit?
+    decision: "A plain, non-negative number. No unit is mandated or disclosed in the schema."
+    reasoning: >
+      Atlas gives no unit for 'cost' -- inventing one (e.g. mandating
+      USD) would be a fact this session has no citation for. Leaving it
+      an undisclosed-unit number is honest about the limit (see
+      `OQ-ATTACKTREE-2`) while still enabling the real numeric
+      comparison ('cheapest') Atlas's own benefit line requires --
+      comparisons within a single record are still valid even if the
+      unit is never named, since every leaf in one tree is assumed
+      (not verified) to share the same caller-chosen unit.
+  - question: >
+      Should `skill`/`detectability` be a numeric scale (e.g. 1-5) to
+      allow finer-grained aggregation, or a three-value ordinal enum?
+    decision: "A three-value ordinal enum (low/medium/high), not an invented numeric scale."
+    reasoning: >
+      Atlas names 'skill' and 'detectability' as formula attributes but
+      gives no numeric scale for either. A three-value ordinal enum is
+      the minimal structure that still supports the real max/min
+      aggregation Atlas's own benefit line requires ('worst-case skill
+      needed', 'best-case detectability along the cheapest path')
+      without inventing false numeric precision -- the same
+      'undisclosed over-constraint' class a critic review already
+      caught on `database_data.data_contract`'s own first draft,
+      avoided here proactively.
+  - question: >
+      Should a node with exactly ONE child require a `node_type`
+      (AND/OR), given Atlas's own worked example (§12.38) shows two
+      single-child internal nodes (`利用漏洞→RCE`, `取得備份
+      →Misconfigured Storage`) where AND vs OR is mathematically
+      irrelevant (aggregating one child is the identity function under
+      both sum/min and max/min)?
+    decision: "Yes -- node_type is still required on every internal node, single-child or not."
+    reasoning: >
+      Mathematical irrelevance for THIS tree's own current shape does
+      not mean the field is meaningless -- a reviewer may later ADD a
+      second child to a single-child node (e.g. discovering a second way
+      to achieve 'RCE'), at which point node_type suddenly matters and
+      retrofitting it onto an already-built record would be a breaking
+      schema change. Requiring it uniformly costs nothing (Atlas's own
+      example nodes would trivially declare either AND or OR with
+      identical real behavior) and avoids a real future migration.
+  - question: >
+      Should `control`/`residual_risk`/`test_evidence` also be required
+      on INTERNAL (non-leaf) nodes, matching how EC §32's own triple is
+      required on every entry in `security.stride`/`security.linddun`'s
+      own flat `threats[]`?
+    decision: "No -- only LEAF nodes carry control/residual_risk/test_evidence. Internal nodes carry none of the three."
+    reasoning: >
+      A control blocks a SPECIFIC, atomic attacker technique (e.g. MFA
+      blocks 'Credential Stuffing') -- an internal/compound node like
+      '竊取帳密' (steal credentials) has no single control of its own
+      that isn't already one of its own children's controls; requiring
+      one here would force an artificial, redundant restatement of a
+      child's own control at every ancestor level. This mirrors how a
+      real security control inventory is actually organized (per
+      atomic technique, not per compound goal) and avoids inventing
+      structure Atlas's own worked example never shows (no controls are
+      attached to the intermediate '竊取帳密'/'利用漏洞'/'取得備份'
+      nodes in Atlas's own diagram -- only the leaf techniques would
+      plausibly have one).
+
+open_questions:
+  - id: "OQ-ATTACKTREE-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field -- currently stale, pre-existing drift)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ATTACKTREE-2"
+    question: >
+      `cost` carries no disclosed unit (see compilation_decisions).
+      Should a future revision add an optional `cost_unit` field (e.g.
+      'USD', 'hours') so cross-tree cost comparisons become meaningful,
+      not just within-tree ones?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-ATTACKTREE-3"
+    question: >
+      `assets`/`entry_points`/`trust_boundaries` are not cross-validated
+      against the tree's own leaf techniques (no structural link from a
+      leaf to which asset/entry_point it actually threatens). Should a
+      future revision add an optional link?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-ATTACKTREE-4"
+    question: >
+      This is the first F20 member confirmed structurally DIVERGENT
+      from STRIDE/LINDDUN's own shared DFD substrate (see description
+      above, closing `OQ-LINDDUN-4` specifically -- NOT `OQ-STRIDE-4`,
+      which remains open, see description above for why those are two
+      different questions). Should PASTA (Atlas's own fourth EC §32-
+      named method, a seven-stage risk-centric methodology per its own
+      name) be expected to diverge similarly, or might it turn out
+      closer to the STRIDE/LINDDUN shape? Not solved here -- a real
+      question for whoever next builds `security.pasta`.
+    owner: "operator, or whoever next builds security.pasta"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ATTACKTREE-5"
+    question: >
+      `root_aggregate`'s own three attributes (cost/skill/detectability)
+      are aggregated INDEPENDENTLY at every OR node -- the cheapest cost
+      found anywhere under that node, the lowest skill needed anywhere,
+      the lowest detectability anywhere, each possibly from a DIFFERENT
+      child. The resulting tuple is therefore a per-attribute BOUND, not
+      necessarily three attributes drawn from a single realisable attack
+      path -- a real limitation caught by critic review, not previously
+      disclosed. Recovering a genuine cheapest/stealthiest single CHAIN
+      (as opposed to a per-attribute bound) requires joint/Pareto-
+      efficient selection across the three attributes together, a
+      harder combinatorial problem this session's own attack-tree
+      literature review confirms is a real, separately-studied topic
+      (multi-parameter / Pareto-efficient attack-tree analysis), not
+      solved by this record's own simple bottom-up aggregation. Should a
+      future revision add a genuine joint-selection computation (e.g.
+      also storing which CHILD achieved each node's own aggregate, or a
+      small Pareto-frontier set instead of a single tuple)?
+    owner: "operator, or whoever next revises this contract's own aggregation algorithm"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F20 tool table row (L883), §12.38 (L3046-3062), the
+    §10 Security recipe row (L1112), §13.11 Security Review Recipe
+    (L3472-3487), §28 scenario-routing table (L4483), and Execution
+    Contract §32 (L1231-1260) directly. Broad case-insensitive grep
+    across all three normative documents and the spec root for "Attack
+    Tree"/"attack tree"/"AND/OR"/"subgoal" -- every non-citation hit
+    read and confirmed distinct, including Atlas's own L437 Fault Tree
+    row (a different, reliability-domain AND/OR-tree method, not a
+    duplicate). Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The AND/OR tree formula and its
+    three leaf attributes (cost/skill/detectability) are directly
+    transcribed from Atlas; EC §32's own Assets/Trust Boundaries/Entry
+    Points elements are kept identically shaped to security.stride/
+    security.linddun's own fields (a real, confirmed method-agnostic
+    part of EC §32 -- but see `OQ-STRIDE-4`, left OPEN, not closed, by
+    this contract: three identical re-declarations is now a real case
+    FOR eventually factoring this specific sub-shape out). The Threats-
+    equivalent step is a genuine recursive tree, NOT forced into STRIDE
+    /LINDDUN's own DFD-based shape -- Atlas's own formula gives no DFD
+    step for this method, confirmed by direct read, not assumed
+    (`OQ-LINDDUN-4` IS closed by this specific finding). The
+    cost/skill/detectability aggregation algorithm (AND: sum/max/max;
+    OR: min/min/min, each of the three attributes independently) is
+    genuine compute directly implementing Atlas's own benefit line as a
+    per-attribute BOUND, not a guaranteed single realisable chain (see
+    `OQ-ATTACKTREE-5`) -- disclosed as this session's own first F20
+    genuine_compute contract.

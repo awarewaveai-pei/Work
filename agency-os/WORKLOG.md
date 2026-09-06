@@ -1,5 +1,43 @@
 # Worklog
 
+## 2026-09-06（續59，同一 session：Cognitive OS 第四十六個 Method Atlas 切片 — `security.attack_tree`，F20 家族第三個成員、第一個結構性偏離 STRIDE/LINDDUN 共用形狀的成員、本 session 第一個 F20 genuine_compute 方法；critic 真跑 8 個突變+獨立逐行核對三份規範文件：verdict **FAIL**——跑時邏輯零破綻（AND/OR 欄位耦合這個我特別要求排查的 bug class 根本不存在、且早已被自己的測試釘住），FAIL 全部落在「宣稱超出證據」類別，6 Major 全修，過程中自己的修法又親手抓到第二層真 bug）
+
+**觸發**：操作者「繼續」，承接 WORKLOG 續58 收尾候選清單，選 Attack Tree——F20 表格第三列，Atlas §12.38 專節+§13.11 recipe 明文緊接 LINDDUN 之後，EC §32 第三個明文並列方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
+
+**選型與設計**：**這次動工前主動判斷「鏡射 STRIDE/LINDDUN」是否適用**——讀出 Atlas 自己的 Attack Tree 公式「root goal→AND/OR subgoals→cost/skill/detectability」完全沒有 DFD 步驟（跟 STRIDE/LINDDUN 明文「DFD→...」不同），判定強行套用 DFD-based 形狀會是「錯」不是「只是不同」。欄位設計：`assets`/`trust_boundaries`/`entry_points`（EC §32 前三要素）維持跟兩個手足完全同形狀（這部分確實 method-agnostic）；「Threats」步驟改為真遞迴樹（`root`，internal node 帶 `node_type`∈{AND,OR}+`children`，leaf node 帶 `cost`/`skill`/`detectability`+EC §32 剩餘三要素）。`root_aggregate` 是本 session F20 家族第一個 genuine_compute：真正由下往上 AND/OR 聚合（AND：cost 加總+skill/detectability 取最壞；OR：cost 取最便宜+skill/detectability 各自獨立取最好），新開 compute 模組非重用既有 `evaluate_statistical_gate`。`contract-backlog.yaml` 註冊同一次編輯就寫入。
+
+**critic 真跑（獨立逐行重查全部引用、手動核對 AND/OR 語意、8 個真突變含一個我特別指名要求排查的「OR 欄位耦合」bug class）：verdict FAIL，但跑時邏輯零破綻**——8/8 突變精準命中指名測試，「OR 是否把最便宜 child 的 skill/detectability 也一起帶走（而非各自獨立取最佳）」這個真實、常見的多屬性聚合 bug class 根本不存在，且動工時就已經被自己寫的測試釘住（`test_or_does_not_mix_cheapest_cost_with_a_different_childs_skill`）。FAIL 全部是「宣稱超出證據」：
+
+- **M1（已修，本輪最重要修正）**：頭號主張「這個切片關閉了 OQ-STRIDE-4/OQ-LINDDUN-4」是個方向錯誤的謬誤。`OQ-STRIDE-4` 原文只問 EC §32 三個框架欄位（assets/trust_boundaries/entry_points）是否該拆共用 schema——本切片這三個欄位反而跟兩個手足**三比三完全同形狀**，這是「該拆」的證據更強，不是「永遠不拆」的理由。只有 `OQ-LINDDUN-4`（DFD 基底問題）才是真的被本切片的真實形狀分歧關閉。已在 contract/schema/module 三處全部拆開兩個問題重新論述。
+- **M2（已修）**：`OQ-STRIDE-4`（`security.stride.contract.yaml`）與 `OQ-LINDDUN-4`（`security.linddun.contract.yaml`）自己的檔案仍寫著「open」，本檔卻宣稱已關閉——SSOT 分裂。已在兩個手足檔案各補一段 `resolved_by` 記錄真實結論，同一 commit。
+- **M3（已修，本 session 第三次抓到同一類）**：`architecture.adr.contract.yaml` 的「Threat Model 現有兩個 machine_id」宣稱本切片一上線就過期（現在三個）。這是本 session 第三次抓到這個確切的鄰居計數過期類別（44th 切片修「無 machine_id」、45th 切片修「一個→兩個」、本次「兩個→三個」）——同 commit 修正，不延後。
+- **M4（已修）**：OR 聚合結果被文字描述成「找到一條可實現的最便宜/最隱密攻擊鏈」，但程式碼（正確地）對 cost/skill/detectability 三個屬性各自獨立取最佳值——最便宜的 child 跟最隱密的 child 可能是不同 child，結果是「逐屬性上界」不是單一路徑的組合。程式邏輯本來就對，只是文字宣稱從未揭露這個真限制。已在 contract/schema/module 三處改寫措辭，新開 `OQ-ATTACKTREE-5` 揭露「真正的最便宜鏈需要聯合/Pareto 選擇，本記錄不解決」。
+- **M5（已修，過程中自己抓到第二層真 bug）**：contract 宣稱「遞迴到無限深度」+ gate docstring 宣稱「fails closed 不會 crash」，實測超過約 332 層會觸發 Python `RecursionError`，兩個宣稱同時被證偽。修法：加 `MAX_TREE_DEPTH=100`（Atlas 自己的範例只有 3 層），把 `depth` 參數串進遞迴驗證函式，超過就在遞迴繼續前直接判無效。**加完測試後自己的測試又抓到第二個真 bug**：驗證邏輯本身正確地在深度 101 就停止遞迴，但錯誤訊息裡的 `{root!r}` 仍呼叫 Python 內建遞迴 `repr()` 去描述整個（仍然很深的）原始輸入，一樣觸發 `RecursionError`——這個是我自己寫的迴歸測試抓到的，不是 critic 原本指名的路徑。修法：加 `_shallow_describe()` helper，永遠只描述一層深度，不遞迴進巢狀結構。
+- **M6（已修）**：切片文件與 WORKLOG 條目本身缺件，打斷連續 45 個切片無斷點的文件鏈。已補。
+
+Minor 全修：`_is_nonnegative_number` 原本讓 `cost=float('inf')` 端到端通過（`inf >= 0` 為真），讓「最便宜路徑」失去意義且產生非法 JSON——已加 `math.isfinite()` 明確檢查；「Fault Tree 只在兩個 method-inventory.yaml 出現」的查證宣稱不準確（漏了 `docs/adr/ADR-002-...md:42` 一筆真實散文提及）——已訂正，結論（無 typed object 實作）不受影響；「§13.9 把 Threat Model 直接放在 ADR 前」對 §13.9 本身為假（中間隔了 Data/Migration Review 一步，只有 F18 鏈 L836-837 才是直接）——已訂正。
+
+Nit 全修：module docstring「sum/min/max 都是交換律結合律」對一般 IEEE-754 浮點數不嚴格成立——已訂正為引用本套件釘住的 Python ≥3.12 執行環境（CPython `sum()` 用 Neumaier 補償加總）這個真正原因，並註記若要與版本無關的保證可換 `math.fsum`；「root 用 OR 分支」被寫成 Atlas 自己圖上的標籤，實際上 Mermaid 圖完全沒有 AND/OR 邊標籤——已訂正為揭露這是本契約自己的合理推論，非逐字轉錄。
+
+**[已修改]**：spec-root 新增 `methods/contracts/security.attack_tree.contract.yaml`＋`specs/cognitive/typed-objects/attack-tree-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortyfourth_concrete_entry`（跟 contract 同一次編輯寫入）＋修正 `architecture.adr.contract.yaml`（M3）＋`security.stride.contract.yaml`／`security.linddun.contract.yaml`（M2，各補 `resolved_by`）＋重新產生 `SPEC_QUICKREF.md`/`MOTHER_DOC_SECTION_INDEX.md`。Product root 新增 `ai_lego/compute/attack_tree/__init__.py`＋`aggregate.py`（新 genuine-compute 模組）＋`ai_lego/modules/security/attack_tree.py`（builder+2 gate+`MAX_TREE_DEPTH`+`_shallow_describe`）＋`ai_lego/apps/cli/run_attack_tree_slice.py`＋`tests/unit/test_attack_tree.py`（73 tests）＋`docs/FORTYSIXTH_SLICE_SECURITY_ATTACK_TREE.md`；`ai_lego/modules/security/__init__.py` docstring 補 attack_tree 提及。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2824→2827
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_attack_tree_slice` | exit=0 | result=`PASS security.attack_tree: root_aggregate={'cost': 50, 'skill': 'low', 'detectability': 'low'}, gates [2×PASS], invariant_verified(construction=True, gate=True)`——手動核對 Atlas §12.38 範例：竊取帳密 OR(Phishing 200/low/medium, Credential Stuffing 50/low/low)={50,low,low}，root OR 三支取最小值＝{50,low,low}，吻合
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_attack_tree`（修正後重跑，含新增的 MAX_TREE_DEPTH 邊界測試+infinite/nan cost 測試）| exit=0 | result=73 OK（68→73）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit -p "test_*.py"`（product root，修正後重跑）| exit=0 | ms=65977 | result=**1774 tests OK**（1769→1774，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 `jsonschema.Draft202012Validator` 驗證修正後 `security.attack_tree.contract.yaml`／`security.stride.contract.yaml`／`security.linddun.contract.yaml`／`architecture.adr.contract.yaml` 對 `method.schema.yaml` | exit=0 | result=四者皆 OK
+- REVIEW_DONE: critic=Standard（真實 subagent，獨立重查三份規範文件全部引用行號、手動核對 AND/OR 聚合語意、8 個真突變含一個指名排查的欄位耦合 bug class）| verdict=初稿 FAIL（0 邏輯 bug，6 Major 全落在宣稱面）→ 6 Major 全修＋數個 Minor/Nit 全修 → 修法過程中自己的迴歸測試額外抓到 1 個真 bug（repr 遞迴）一併修 → SHIP | findings=0c/6m/3minor/2nit
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`security[.]attack_tree\|ATTACKTREE-\|TWO machine_ids\|closes.*OQ-STRIDE-4` | hits=15 本切片自己檔案（9 spec-root+6 product-root）+ 3 個既有 log/dispatch 檔案（非治理文件，預期內）；「TWO machine_ids」／「closes OQ-STRIDE-4」等過期宣稱句型 grep agency-os 零殘留（全部已修正）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-ATTACKTREE-1~5` 皆揭露（無 method-inventory.yaml row、cost 無揭露單位、無框架欄位與樹葉交叉驗證、PASTA 是否也會分歧未知、OR 聚合是逐屬性上界非保證單一鏈）。`OQ-STRIDE-4` 明確維持 OPEN（本輪修正的核心結論之一）——三比三相同形狀是「該拆」證據增強而非解決。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
+**`security` 家族（F20）**：3/10 建置完成，7 列仍待（PASTA／DPIA-PIA／Zero Trust Review／Secrets Threat Review／Supply Chain Threat Model／Abuse Case／Security Control Mapping），各自獨立未來切片，不被本切片阻塞。
+
+
 ## 2026-09-06（同日第六輪：HCI_EVIDENCE_QUALITY_SPEC.md 部分落地——per-dimension evidence-quality classification，critic 覆審抓到 2 Critical+4 Major+5 Minor，其中一個 Critical 是真的邏輯 bug（非文件不一致），第一次做到全部 7 個引用行號零錯誤）
 
 **觸發**：操作者「繼續直到系統完成」，延續同日第五輪結束後的候選清單，選 P0-04 剩餘規格裡跟已建好的 pipeline 連結最直接的一個——`HCI_EVIDENCE_QUALITY_SPEC.md`（evidence_refs 早已是每個函式的第一級欄位，但從未定義過任何品質標準）。

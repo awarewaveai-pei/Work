@@ -313,11 +313,26 @@ open_questions:
       Trust Review, Secrets Threat Review, Supply Chain Threat Model,
       Abuse Case, and Security Control Mapping. Should a future
       revision of THIS contract (or a shared base schema) factor out
-      the EC §32 baseline shape (assets/trust_boundaries/entry_points)
-      so LINDDUN/PASTA/Attack Tree can reuse it structurally, rather
-      than each independently re-declaring the same three fields?
+      the EC §32 baseline shape (assets/trust_boundaries/entry_points --
+      NOT data_flow_elements/threats[], a separate question,
+      `OQ-LINDDUN-4`'s own) so LINDDUN/PASTA/Attack Tree can reuse it
+      structurally, rather than each independently re-declaring the
+      same three fields?
     owner: "operator, or whoever next builds security.linddun / security.pasta / security.attack_tree"
     blocks: "nothing in this file's own validity -- a real design question for when a second real instance exists, not solved prematurely"
+    resolved_by: >
+      STILL OPEN as of `security.attack_tree` (46th slice). That
+      contract's own first draft incorrectly claimed to close THIS
+      question (conflating it with `OQ-LINDDUN-4`'s own DFD-substrate
+      question) -- caught by critic review and corrected in
+      `security.attack_tree.contract.yaml`'s own description. The real
+      finding: `security.linddun` AND `security.attack_tree` both kept
+      these exact three fields identically shaped to this contract's
+      own -- three-for-three identical re-declarations, which
+      STRENGTHENS the case for eventually factoring this specific sub-
+      shape out, not a reason to abandon the question. Left open,
+      tracked forward to whoever builds a fourth F20 member or revisits
+      this contract's own scope.
   - id: "OQ-STRIDE-5"
     question: >
       This record's own per-threat control/test_evidence fields are
