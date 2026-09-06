@@ -1653,6 +1653,50 @@ tier_1:
       Tree, PASTA, DPIA/PIA, Zero Trust Review, Secrets Threat Review,
       Supply Chain Threat Model, Abuse Case, Security Control Mapping),
       each an independent future slice, not blocked by this one.
+  fortythird_concrete_entry:
+    # NEW (2026-09-06, same session): forty-third Tier 1 entry, same
+    # additive-key rationale as the forty-two entries above it. Added
+    # to THIS file in the SAME editing pass that wrote the contract
+    # itself, before any critic round.
+    method_id: "security.linddun"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. SECOND entry
+      from the `security` family (F20), immediately after
+      security.stride. Atlas gives this method three citations (F20
+      table row L885, dedicated §11.45 section L2249-2267 with its own
+      seven-dimension LINDDUN vocabulary, and the §10 Security recipe
+      row L1112 -- the same row security.stride cites) plus a fourth,
+      §13.11 Security Review Recipe (L3472-3487), verified from the
+      FIRST draft this time (the exact citation security.stride's own
+      first draft missed and its critic round had to add), plus a
+      fifth, load-bearing citation shared with security.stride:
+      Execution Contract §32 Security Change Contract (L1231-1260),
+      which names LINDDUN alongside STRIDE as an acceptable method.
+      This record's own field shape DELIBERATELY MIRRORS
+      security.stride's own shape (assets/trust_boundaries/entry_points
+      /data_flow_elements/threats[]/elements_with_no_recorded_threats),
+      differing only in threats[].category's own enum (LINDDUN's seven
+      privacy dimensions vs STRIDE's six security categories) --
+      `OQ-STRIDE-4`'s own question about factoring out a shared base
+      schema is revisited here with a real second instance and
+      answered "not yet" (tracked forward as `OQ-LINDDUN-4`), not
+      solved prematurely. `elements_with_no_recorded_threats` is a re-
+      derived structural set-difference (NOT genuine compute), same as
+      security.stride's own. This record's own `LINDDUN-` id prefix and
+      `version` type are checked at both runtime layers from the first
+      draft.
+    source: "methods/contracts/security.linddun.contract.yaml (built same session as this entry, mints machine_id security.linddun) + specs/cognitive/typed-objects/linddun-privacy-threat-model-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0`: same "table row thin, EC section
+      thick" pattern security.stride's own note already establishes.
+      Tier 1, mandated by the actively-running implementation slice,
+      same category as the forty-two entries above it. SECOND entry of
+      the `security` family -- eight more F20 table rows remain (Attack
+      Tree, PASTA, DPIA/PIA, Zero Trust Review, Secrets Threat Review,
+      Supply Chain Threat Model, Abuse Case, Security Control Mapping),
+      each an independent future slice, not blocked by this one.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

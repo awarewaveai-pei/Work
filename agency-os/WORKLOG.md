@@ -1,5 +1,43 @@
 # Worklog
 
+## 2026-09-06（續58，同一 session：Cognitive OS 第四十五個 Method Atlas 切片 — `security.linddun`，F20 家族第二個成員；critic subagent 撞到帳號級 rate limit（Opus session limit）中途失敗，改走本 session 既有的「oracle 斷線不可跳過 review」協定——自己做對抗自審+真跑 5 個突變測試）
+
+**觸發**：操作者「繼續」，承接 WORKLOG 續57 收尾時列出的 F20 候選清單，選 LINDDUN——Atlas §13.11 recipe 明文將其緊接在 STRIDE 之後，EC §32 也明文與 STRIDE 並列為可選方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
+
+**選型與設計**：刻意讓欄位形狀完全鏡射 `security.stride`（assets/trust_boundaries/entry_points/data_flow_elements/threats[]/elements_with_no_recorded_threats），只有 `threats[].category` 詞彙不同（LINDDUN 七個隱私維度而非 STRIDE 六個安全類別）。這正面回答 `security.stride` 自己開的 `OQ-STRIDE-4`（「等第二個真實實例出現再決定是否拆共用 base schema」）——決定「還不拆」，理由記在新開的 `OQ-LINDDUN-4`：兩個實例對「正確的共用抽象長什麼樣」仍是太薄的證據基礎，PASTA（風險導向七階段）與 Attack Tree（樹狀而非扁平清單）將來可能需要完全不同的形狀，現在硬拆比兩個已出貨、已測試記錄各自的重寫成本更高。**本次動工前主動吸取 STRIDE 自己 critic round 才抓到的教訓**：Atlas §13.11 與本 repo 自己的真實文件 `SECURITY_THREAT_MODEL.md` §4 LINDDUN Analysis，**這次從第一版初稿就查證**，不是等 critic 抓到才補。`contract-backlog.yaml` 註冊同一次編輯就寫入。
+
+**critic subagent 中途撞到帳號級 rate limit 失敗**（`error type rate_limit, HTTP 429 ... session limit · resets 5:40am`，model=claude-opus-5）——這是額度斷路器問題非邏輯問題，重試同一個 agent 大概率立即再撞（session 級限制非單次請求限制），也違反操作者「不准無效益派 agents」的明確指示。**依本 session AGENTS.md §4「oracle 全無額度時不跳過 review」既定協定，自己做替代驗證**：
+
+- **獨立重查全部引用行號**（不信任「跟 STRIDE 抄一樣的所以應該對」）：F20 表格列 L885、§11.45 L2249-2267、§10 L1112、§13.11 L3472-3487、EC §32 L1231-1260，全部逐行直接讀出，確認精確吻合。
+- **對 `stride.py` 做正規化字串 diff**（把 STRIDE/LINDDUN 詞彙互換後比對）：整個 builder body 與兩個 gate function 逐行位元相同，只有 `VALID_CATEGORIES` 集合跟命名詞彙不同——證明「刻意鏡射」的設計宣稱是真的，不是自吹自擂，也排除了複製貼上時漏改或弱化邏輯的可能。
+- **真跑 5 個突變測試**（拔掉 referential-integrity 檢查／繞過 `elements_with_no_recorded_threats` 重算比對／拔掉 DFD 名稱唯一性檢查／per-threat 非空欄位檢查砍到剩一個／gate 拔掉 `entry_points` 重驗）：**5/5 精準命中指名的測試**（含一個 subTest 迴圈產生 5 個子失敗），修復後檔案還原跟備份逐位元相同（程式化驗證，非目視）。
+- **直接 grep 驗證 registry 條目真實存在**（`fortythird_concrete_entry`／`method_id: "security.linddun"`），不信任文字宣稱。
+- **順手抓到一個真的後續問題**：`architecture.adr.contract.yaml` 在 STRIDE 切片時寫的「Threat Model 現在有 machine_id（security.stride）」，本切片一上線就會變成不完整宣稱（現在有兩個：`security.stride`＋`security.linddun`）——雖然功能上無影響（兩者皆位於 ADR 之前，不餵入其 `recommended_next`），但放著不改就是下一輪「陳述變假」類別的活教材，已同步修正 `recommended_next` 註解與 `OQ-ADR-2`。
+- **確認未吸收 DPIA/PIA 範疇**：F20 自己 DPIA/PIA 列（L886：processing→necessity/proportionality→risk→controls→approval）是法規必要性評估，跟 LINDDUN 的 DFD 技術性威脅列舉結構完全不同，本記錄未含 proportionality/necessity/approval 任何欄位。
+- **重新獨立確認去重**：`specs/security/` 四個既有 typed object 直接重讀（非假設跟 STRIDE 查過的結果不變），皆非隱私威脅審查內容。
+- **`SECURITY_THREAT_MODEL.md` §4 從第一版就查證**（而非等 critic 抓到）：確認與 STRIDE 自己 `OQ-STRIDE-6` 揭露的三個落差完全相同（無 severity/source 欄位、Lk1 掛在具名資料資產而非嚴格 DFD element、review 層級而非逐筆的 residual risk），直接指向 `OQ-STRIDE-6`（新開 `OQ-LINDDUN-5` 做為指標），非重複揭露。
+
+此自審過程本身沒有發現需要修正的 Critical/Major/Minor（除上述 architecture.adr.contract.yaml 那一項順手修正外）——重點是「證明沒有」而非「假設沒有」。
+
+**[已修改]**：spec-root 新增 `methods/contracts/security.linddun.contract.yaml`＋`specs/cognitive/typed-objects/linddun-privacy-threat-model-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortythird_concrete_entry`（跟 contract 同一次編輯寫入）＋修正 `architecture.adr.contract.yaml`（Threat Model 現有雙 machine_id 的宣稱更新）＋重新產生 `SPEC_QUICKREF.md`/`MOTHER_DOC_SECTION_INDEX.md`。Product root 新增 `ai_lego/modules/security/linddun.py`（builder+2 gate）＋`ai_lego/apps/cli/run_linddun_slice.py`＋`tests/unit/test_linddun.py`（77 tests）＋`docs/FORTYFIFTH_SLICE_SECURITY_LINDDUN.md`；`ai_lego/modules/security/__init__.py` docstring 補 linddun 提及。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2821→2824
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_linddun_slice` | exit=0 | result=`PASS security.linddun: 2 elements, 1 threats, uncovered=['shared_vector_index'], gates [2×PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_linddun` | exit=0 | result=77 OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=自製 mutation driver 腳本（5 個突變逐一注入→跑指名測試→還原→驗證位元相同）| exit=1（每次突變預期紅燈）| result=5/5 精準命中指名測試，`restored == backup: True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit -p "test_*.py"`（product root，修正 architecture.adr 後重跑）| exit=0 | ms=63099 | result=**1701 tests OK**（1624→1701，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 `jsonschema.Draft202012Validator` 驗證 `security.linddun.contract.yaml` 與修正後 `architecture.adr.contract.yaml` 對 `method.schema.yaml` | exit=0 | result=兩者皆 OK
+- REVIEW_DONE: critic=Standard（**額度不足時的自審協定**：獨立重查 5 筆引用行號+對 stride.py 正規化字串 diff 逐行比對+5 個真突變測試+直接 grep registry+獨立重查 dedup+DPIA/PIA 範疇確認+`SECURITY_THREAT_MODEL.md` 直接讀）| verdict=無 Critical/Major/Minor 存活（含一項順手修正）| findings=0c/0m/0minor（1 項主動順手修正，非 finding）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`security[.]linddun\|LINDDUN-` | hits=8 本切片自己檔案（4 spec-root+4 product-root）+ 3 個既有 log/dispatch 檔案（非治理文件，預期內）+ `security.stride.contract.yaml` 自己 OQ-STRIDE-4 前向指稱（預期，STRIDE 切片時就寫好的正向引用）；舊「Threat Model（security.stride, 44th slice）」單數宣稱句型 grep agency-os 零殘留（已修正）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：`OQ-LINDDUN-1~5` 皆揭露，`OQ-LINDDUN-4/5` 直接指向 `OQ-STRIDE-4/6`（同一落差非重複）。`method-inventory.yaml` 自己 LINDDUN 條目的 `line: 882` 本身就是舊漂移（實際 Atlas 現在該行是 STRIDE 內容，LINDDUN 真正在 L885）——既存問題非本切片造成，未修。critic subagent 本次全程未能真正跑（rate limit），本切片的驗證強度依賴自審協定的品質而非獨立第三方視角；額度恢復（5:40am Asia/Taipei）後可考慮補跑一次獨立 critic 覆審作為交叉確認，非阻塞。
+
+**[rollback]**：單一 commit，`git revert`；索引檔 `gen_spec_index.py` 重生。
+
+**`security` 家族（F20）**：2/10 建置完成，8 列仍待（Attack Tree／PASTA／DPIA-PIA／Zero Trust Review／Secrets Threat Review／Supply Chain Threat Model／Abuse Case／Security Control Mapping），各自獨立未來切片，不被本切片阻塞。
+
 ## 2026-09-06（System Foundry：5個真缺口的第5個、也是最後一個 Merchandising 落地，5缺口批次全部完成）
 
 [根因/決策] 承接前四輪（Pricing/Promotions、Fraud/Risk、Logistics/Shipping、PLM/Quality）確認的5個真缺口，本輪做最後第5個：Merchandising（商家人工排序策展）+ Product Feed（購物/廣告頻道商品饋送）。原始缺口分析報告明確標記這是「全批5個缺口中風險最高的單一依賴邊決策」：`CAP-MERCHANDISING`該不該`requires: CAP-SEARCH`？藍圖`applyMerchRules()`跟`searchProducts()`同一份service contract可能暗示依賴，但boost/bury同樣適用於類別瀏覽（本目錄的`CAP-FILTERS`而非`CAP-SEARCH`）。

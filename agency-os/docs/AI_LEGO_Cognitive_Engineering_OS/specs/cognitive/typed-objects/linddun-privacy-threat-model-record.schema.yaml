@@ -1,0 +1,207 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/linddun-privacy-threat-model-record.schema.yaml"
+title: LINDDUN Privacy Threat Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LinddunPrivacyThreatModelRecord`
+  -- the declared `outputs` of `security.linddun`'s Method Contract.
+  SECOND typed object in the `security` family (F20), immediately after
+  `stride-threat-model-record.schema.yaml`. Atlas's own F20 tool table
+  LINDDUN row (L885) AND dedicated §11.45 section (L2249-2267: seven
+  dimensions -- Linkability/Identifiability/Non-repudiation
+  /Detectability/Disclosure/Unawareness/Non-compliance, "DFD → privacy
+  threat category enumeration → controls") ground `data_flow_elements
+  []`/`threats[]`. Execution Contract §32 Security Change Contract
+  (L1231-1260: mandatory minimum "Assets/Trust Boundaries/Entry
+  Points/Threats/Controls/Residual Risk/Test Evidence", explicitly
+  naming LINDDUN) grounds `assets`/`trust_boundaries`/`entry_points`
+  plus the four per-threat fields.
+
+  Field shape DELIBERATELY MIRRORS `stride-threat-model-record.schema
+  .yaml` exactly -- same `$defs` for `trust_boundary`/`data_flow
+  _element`, same top-level required set, same `elements_with_no
+  _recorded_threats` re-derivation discipline -- differing ONLY in
+  `threats[].category`'s own enum (LINDDUN's seven privacy dimensions,
+  not STRIDE's six security categories) and the `id` prefix. See
+  `methods/contracts/security.linddun.contract.yaml`'s own
+  compilation_decisions for why no shared base schema is factored out
+  yet (`OQ-LINDDUN-4`, the direct continuation of `OQ-STRIDE-4`).
+
+  A STRUCTURAL record (`provenance_required` + one integrity gate), not
+  genuine compute -- identical reasoning to `stride-threat-model-record
+  .schema.yaml`'s own: `elements_with_no_recorded_threats` is a re-
+  derived structural set-difference, not a numeric/statistical
+  CALCULATED RESULT.
+
+  Real structural invariants (enforced at the runtime layer, not here):
+  every `threats[]` entry's own `element_name` must name a real
+  `data_flow_elements` entry; `category` is LINDDUN's own closed seven-
+  value vocabulary; `element_type` is the standard four-type DFD
+  vocabulary.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, LINDDUN row (L885): 'DFD→privacy threat categories→controls'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.45 LINDDUN 隱私威脅建模 (L2249-2267): seven dimensions"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum structure, explicitly naming LINDDUN"
+  - "methods/contracts/security.linddun.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  trust_boundary:
+    type: object
+    required: [name, description]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+  data_flow_element:
+    type: object
+    required: [name, element_type]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      element_type:
+        enum: [external_entity, process, data_store, data_flow]
+        description: "The standard four-type DFD vocabulary (Yourdon/Gane-Sarson notation), the same as security.stride's own field."
+  threat:
+    type: object
+    required: [element_name, category, description, control, residual_risk, test_evidence]
+    additionalProperties: false
+    properties:
+      element_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must name a real entry in this record's own data_flow_elements[] -- enforced at the runtime layer, not here."
+      category:
+        enum: [linkability, identifiability, non_repudiation, detectability, disclosure, unawareness, non_compliance]
+        description: "Atlas's own §11.45 seven-dimension LINDDUN vocabulary, transcribed verbatim as a machine enum (lower-cased, underscored)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      control:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Controls' element, scoped per-threat. REQUIRED -- an incomplete state is recorded as explicit free text, not an absent field (see method contract)."
+      residual_risk:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Residual Risk' element, scoped per-threat."
+      test_evidence:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Test Evidence' element, scoped per-threat."
+
+type: object
+required: [id, version, system_or_component, assets, trust_boundaries, entry_points, data_flow_elements, threats, elements_with_no_recorded_threats, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^LINDDUN-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.linddun"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  assets:
+    type: array
+    minItems: 1
+    description: "EC §32's own 'Assets' element -- at least one."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  trust_boundaries:
+    type: array
+    default: []
+    description: "EC §32's own 'Trust Boundaries' element. REQUIRED array (may be empty)."
+    items:
+      $ref: "#/$defs/trust_boundary"
+  entry_points:
+    type: array
+    default: []
+    description: "EC §32's own 'Entry Points' element."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  data_flow_elements:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'DFD' formula step -- at least one element; names unique within the record (enforced at the runtime layer, not here)."
+    items:
+      $ref: "#/$defs/data_flow_element"
+  threats:
+    type: array
+    default: []
+    description: "Atlas's own 'privacy threat category enumeration' formula step, carrying EC §32's own Controls/Residual Risk/Test Evidence elements per-threat. REQUIRED array (may be empty)."
+    items:
+      $ref: "#/$defs/threat"
+  elements_with_no_recorded_threats:
+    type: array
+    default: []
+    description: "GENUINE, RE-DERIVED evidence, not caller-supplied -- the data_flow_elements[] names with zero threats[] entries referencing them."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a privacy threat model is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A memory-retrieval service privacy review: two DFD elements, one Linkability threat recorded against the process element, the data store element left with no recorded threat (surfaced, not enforced)"
+    value:
+      id: "LINDDUN-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.linddun"
+      system_or_component: "cross-project semantic memory retrieval service"
+      assets: ["personal preference embeddings", "cross-project semantic memory index"]
+      trust_boundaries:
+        - {name: "Project A workspace to shared vector index", description: "Queries from one project's workspace reach a vector index shared across all projects."}
+      entry_points: ["POST /v1/memory/query"]
+      data_flow_elements:
+        - {name: "memory_retrieval_process", element_type: process}
+        - {name: "shared_vector_index", element_type: data_store}
+      threats:
+        - {element_name: "memory_retrieval_process", category: linkability, description: "Query results could link a data subject's preferences across otherwise-separate projects/workspaces without their awareness.", control: "Query scope is restricted server-side to the requesting project's own tenant_id filter.", residual_risk: "Medium -- filter is enforced but not yet covered by an automated cross-project leakage test.", test_evidence: "Manual review of the query-scoping middleware, 2026-09-01."}
+      elements_with_no_recorded_threats: ["shared_vector_index"]
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal, freshly-scoped review with no threats recorded yet"
+    value:
+      id: "LINDDUN-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "security.linddun"
+      system_or_component: "internal-reference lookup service"
+      assets: ["country-code reference table"]
+      trust_boundaries: []
+      entry_points: []
+      data_flow_elements:
+        - {name: "lookup_process", element_type: process}
+      threats: []
+      elements_with_no_recorded_threats: ["lookup_process"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F20 tool table row (L885), §11.45 (L2249-2267), §10 (L1112), §13.11 (L3472-3487), and EC §32 (L1231-1260) directly. Validated against jsonschema Draft202012Validator."
+  note: "The seven-dimension LINDDUN vocabulary, the DFD formula, and EC §32's own seven-element minimum are directly transcribed. Referential integrity, the four-type DFD vocabulary, and elements_with_no_recorded_threats's own recomputation are enforced at the runtime layer (ai_lego/modules/security/linddun.py), not the schema layer. No mother document was modified."

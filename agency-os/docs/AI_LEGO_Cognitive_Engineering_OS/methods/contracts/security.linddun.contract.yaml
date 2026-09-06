@@ -1,0 +1,270 @@
+$id: "ai-lego://methods/contracts/security.linddun.contract.yaml"
+title: "LINDDUN Privacy Threat Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-fifth Method Atlas slice, SECOND member
+  of the `security` family (F20's own "資安／隱私套件"), immediately
+  after `security.stride` (44th slice, FIRST member).
+
+  Atlas gives this method THREE citations, verified by direct read
+  (not inherited from `security.stride`'s own citation set without
+  independent re-checking, the specific due-diligence discipline this
+  contract's own sibling's critic round established): (1) the F20 tool
+  table's LINDDUN row (L885: purpose "Privacy threat 分類"; usage
+  "DFD→privacy threat categories→controls"; benefit "補足只做 security
+  不做 privacy"); (2) a dedicated §11.45 LINDDUN 隱私威脅建模 section
+  (L2249-2267: "補 STRIDE 主要偏 security 的不足，專門看 privacy
+  threats", seven dimensions -- Linkability, Identifiability, Non-
+  repudiation, Detectability, Disclosure, Unawareness, Non-compliance
+  -- benefit "避免『系統沒被駭，所以隱私就安全』的錯誤假設"); (3) the
+  Method Selection Engine's own Security problem-type recipe row (§10,
+  L1112: "Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test"), the
+  SAME row `security.stride.contract.yaml` already cites -- confirming
+  LINDDUN sits directly after STRIDE in the same recipe, not a
+  competing or independent sequence. A FOURTH: §13.11 Security Review
+  Recipe (L3472-3487: "... → STRIDE → LINDDUN → Attack Tree → ...")
+  independently confirms the same STRIDE-then-LINDDUN adjacency, this
+  time verified from the FIRST draft of this contract (the exact
+  citation `security.stride`'s own first draft missed and its critic
+  round had to add).
+
+  **A fifth, load-bearing citation, the SAME one `security.stride`
+  already established**: Execution Contract §32 Security Change
+  Contract (L1231-1260) mandates a real minimum structure -- "Assets /
+  Trust Boundaries / Entry Points / Threats / Controls / Residual Risk
+  / Test Evidence" (L1250-1257) -- for ANY change touching authn/authz
+  /secrets/crypto/network/egress/tenant-isolation/file-parsing/user-
+  content/AI-tools, and explicitly NAMES LINDDUN (alongside STRIDE) as
+  one of the methods Method Atlas may use to satisfy it ("Method Atlas
+  可選 STRIDE／LINDDUN／Attack Tree／PASTA", L1260).
+
+  **Field design deliberately mirrors `security.stride`'s own record
+  shape** (assets/trust_boundaries/entry_points/data_flow_elements/
+  threats[]/elements_with_no_recorded_threats), differing ONLY in the
+  `threats[].category` vocabulary (LINDDUN's own seven privacy
+  dimensions, not STRIDE's six security categories) and the `id`
+  prefix/machine_id. This is a DELIBERATE, disclosed design choice, not
+  duplication by omission: `OQ-STRIDE-4` (raised in `security.stride`'s
+  own contract) explicitly asked whether a shared base schema should be
+  factored out "once a second real instance exists" -- LINDDUN IS that
+  second instance, and the answer here is: NOT YET (see
+  compilation_decisions below), same reasoning revisited with real data
+  rather than solved prematurely on the first instance alone.
+
+  Also cross-checked, the SAME confirming cross-references
+  `security.stride.contract.yaml` already establishes (re-verified
+  independently, not inherited): `specs/execution/risk-tier.schema
+  .yaml`'s own HIGH-tier `required_actions` "Threat Review" (L93,
+  method-agnostic -- satisfied by either STRIDE or LINDDUN, or both);
+  `specs/cognitive/problem-type.schema.yaml`'s own `security` problem-
+  type `recommended_start` (L294, the same §10 L1112 row). No existing
+  typed object in `specs/security/` models privacy-threat content (all
+  four -- `key-vault-lifecycle`, `log-redaction-token`, `personal-data
+  -envelope`, `tenant-isolation-controls` -- are narrower security-
+  control records, re-confirmed by direct read, not assumed unchanged
+  since `security.stride`'s own check).
+
+  **This repository's own real prose neighbour, checked from the FIRST
+  draft this time** (the exact class of miss `security.stride`'s own
+  critic round had to catch): `docs/architecture/SECURITY_THREAT_MODEL
+  .md` §4 "LINDDUN Analysis（聚焦個資流）" is a completed, real LINDDUN
+  review using this exact method, with the SAME three modeling gaps
+  already disclosed in `security.stride`'s own `OQ-STRIDE-6` (no
+  severity/source per-threat fields; at least one threat -- Lk1,
+  Linkability -- scoped to a named data asset/flow rather than a
+  `data_flow_elements[]` entry in the strict DFD sense; a review-level,
+  not per-threat, "Residual Risk" framing in its own §6). Rather than
+  re-disclosing the identical gap under a new id, this contract points
+  to `OQ-STRIDE-6` directly (see open_questions below) -- the SAME
+  disclosed limitation, not a second independent one, since the two
+  methods share the identical field shape by design.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, LINDDUN row (L885): 'DFD→privacy threat categories→controls'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.45 LINDDUN 隱私威脅建模 (L2249-2267): seven dimensions -- Linkability/Identifiability/Non-repudiation/Detectability/Disclosure/Unawareness/Non-compliance"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Method Selection Engine, Security recipe row (L1112): 'Assets/DFD→STRIDE/LINDDUN→Attack Tree→Controls→Test' -- the same row security.stride.contract.yaml cites"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487): '... → STRIDE → LINDDUN → Attack Tree → ...' -- confirms LINDDUN follows STRIDE"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum 'Assets/Trust Boundaries/Entry Points/Threats/Controls/Residual Risk/Test Evidence', explicitly naming LINDDUN as an acceptable method"
+  - "specs/execution/risk-tier.schema.yaml HIGH-tier required_actions (L93): 'Threat Review' -- a confirming, method-agnostic cross-reference"
+  - "specs/cognitive/problem-type.schema.yaml security problem-type entry (L291-296): recommended_start names LINDDUN alongside STRIDE in the same recipe"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md SS4 (2026-08-29): this repository's own completed LINDDUN review -- a real prose instance, not a duplicate typed object, sharing security.stride's own OQ-STRIDE-6 disclosed gaps"
+  - "methods/registry/method-inventory.yaml LINDDUN entry: category 'F20 security', no machine_id, line field stale (882, actually STRIDE's current line -- pre-existing drift, not this contract's to fix) -- this contract mints a machine_id"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  forty-third concrete entry (added in the same editing pass as this
+  contract). `id: security.linddun` mints a new machine_id, SECOND
+  member of the `security` family (F20).
+
+id: security.linddun
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited -- the SAME triple security.stride.contract.yaml
+# already uses, for the same structural reasons (decomposing a system
+# into DFD elements is DECOMPOSE; assigning each threat its own
+# category/control/residual-risk/evidence is MAP; referential integrity
+# plus the no-recorded-threats derivation is VALIDATE).
+
+purpose:
+  - enumerate_privacy_threats_against_a_system_element_by_element_using_lindduns_seven_dimension_vocabulary_and_record_the_ec32_minimum_review_structure
+inputs:
+  required: [AssetSet, DataFlowElementSet]
+  optional: [TrustBoundarySet, EntryPointSet, ThreatSet]
+outputs: [LinddunPrivacyThreatModelRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "assets has at least 1 entry; every entry is a non-empty string (EC §32's own 'Assets' element)"
+  - "trust_boundaries is a required array (may be empty); every entry has a non-empty name and description (EC §32's own 'Trust Boundaries' element)"
+  - "entry_points is a required array (may be empty) of non-empty strings (EC §32's own 'Entry Points' element)"
+  - "data_flow_elements has at least 1 entry; every entry's own element_type is one of {external_entity, process, data_store, data_flow} (the standard four-type DFD vocabulary); name is a non-empty string; names are unique within the record"
+  - "threats is a required array (may be empty); every entry's own element_name must name a real data_flow_elements entry; category is one of LINDDUN's own seven values; description/control/residual_risk/test_evidence are all non-empty strings (EC §32's own remaining four elements, scoped per-threat)"
+  - "elements_with_no_recorded_threats is NOT caller-supplied -- the builder computes it internally (the data_flow_elements[] names with zero threats[] entries referencing them), and the gate independently re-derives and compares against the stored value"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class every prior structural (non-genuine-compute) contract in
+  # this session already reasons through: elements_with_no_recorded
+  # _threats is a structural set-difference derivation, not a
+  # statistical/numeric CALCULATED RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no LINDDUN row (re-verified
+# independently, not assumed unchanged from security.stride's own
+# check).
+recommended_next: [architecture.adr]
+# The SAME forward link security.stride.contract.yaml already
+# establishes, and for the identical reason: Atlas's own F18 chain
+# (L836-837) and §13.9 High-risk Architecture Change Recipe
+# (L3445-3447) both place a Threat Model step directly before ADR.
+# LINDDUN is Atlas's own second Threat Model method (immediately after
+# STRIDE in both §10 L1112 and §13.11 L3472-3487), so the same forward
+# link applies without inventing a new one.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      `security.stride`'s own contract raised `OQ-STRIDE-4`: should a
+      shared base schema be factored out for the EC §32 baseline shape
+      (assets/trust_boundaries/entry_points/data_flow_elements) once a
+      second real instance (LINDDUN) exists, so LINDDUN/PASTA/Attack
+      Tree can reuse it structurally instead of each re-declaring the
+      same fields?
+    decision: "Not yet -- this contract independently re-declares the identical field shape in its own schema file, differing only in the category enum. No shared base schema is factored out."
+    reasoning: >
+      Two real instances is still a thin evidence base for the RIGHT
+      shape of a shared abstraction: PASTA (a seven-stage risk-centric
+      methodology per its own name) and Attack Tree (a tree structure,
+      not a flat threats[] list) may turn out to need a meaningfully
+      different shape once actually built, at which point factoring out
+      a base now would either constrain those designs prematurely or
+      need to be reworked anyway. This session's own top-level
+      discipline treats duplication as acceptable until a real third
+      instance PROVES the shape is stable (the same "don't design for
+      hypothetical future requirements" restraint applied throughout
+      this session) -- two nearly-identical schema files is a smaller
+      cost than a wrong abstraction two already-shipped, critic-
+      approved, tested records (STRIDE, and now LINDDUN) would both
+      need reworking around. Revisit at a genuine third DFD-based
+      instance (most likely Attack Tree or a future Supply Chain Threat
+      Model), tracked as `OQ-LINDDUN-4`, the direct continuation of
+      `OQ-STRIDE-4` rather than a fresh independent question.
+  - question: >
+      Should `threats[].element_name` be extended to also allow
+      referencing a `trust_boundaries[].name` (not only a
+      `data_flow_elements[].name`), given `security.stride`'s own
+      `OQ-STRIDE-6` found a real STRIDE threat (S2) scoped to a trust
+      boundary rather than a DFD element in this repository's own
+      `SECURITY_THREAT_MODEL.md`?
+    decision: "No -- element_name continues to reference only data_flow_elements, matching security.stride's own already-shipped design exactly."
+    reasoning: >
+      This repository's own real LINDDUN review (`SECURITY_THREAT_MODEL
+      .md` §4) scopes every one of its own threats to a named data
+      asset/flow (e.g. Lk1: "Personal Preference + Semantic Memory +
+      跨 workspace Vector Index"), not to a trust boundary -- unlike
+      STRIDE's own S2, LINDDUN's own real evidence does not demonstrate
+      this specific gap for THIS method. Extending only LINDDUN's own
+      schema while leaving STRIDE's identical field unextended would
+      create silent structural asymmetry between two records this
+      contract's own description explicitly says "mirror" each other --
+      confusing future maintainers more than the disclosed limitation
+      itself does. Both records carry the SAME disclosed gap
+      (`OQ-STRIDE-6`), to be revisited for BOTH together in a future
+      revision, not fixed asymmetrically here.
+
+open_questions:
+  - id: "OQ-LINDDUN-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line field -- currently stale at 882, which is STRIDE's current line, not LINDDUN's real L885)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LINDDUN-2"
+    question: >
+      No LINDDUN-dimension-per-element-type applicability matrix is
+      enforced (the same disclosed choice `OQ-STRIDE-2` already makes
+      for STRIDE's own six categories, applied here to LINDDUN's own
+      seven). Should a future revision add an advisory check?
+    owner: "operator, or whoever next revises this contract's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-LINDDUN-3"
+    question: >
+      `assets`/`entry_points`/`trust_boundaries` are not cross-validated
+      against `data_flow_elements` (the same disclosed choice
+      `OQ-STRIDE-3` already makes). Should a future revision add an
+      optional structural link?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-LINDDUN-4"
+    question: >
+      Direct continuation of `OQ-STRIDE-4` (see compilation_decisions
+      above): with LINDDUN now a second real DFD-based Threat Model
+      instance, should a THIRD instance (most likely Attack Tree or
+      Supply Chain Threat Model) trigger factoring out a shared EC §32
+      baseline schema for assets/trust_boundaries/entry_points/
+      data_flow_elements, rather than each new method re-declaring it?
+    owner: "operator, or whoever next builds security.attack_tree / security.supply_chain_threat_model"
+    blocks: "nothing in this file's own validity -- a real design question deferred to real evidence, not solved prematurely"
+  - id: "OQ-LINDDUN-5"
+    question: >
+      Same disclosed gaps `OQ-STRIDE-6` already names for STRIDE (no
+      severity/source per-threat fields, no trust-boundary-scoped
+      threats, no review-level residual_risk/test_evidence) apply
+      identically to LINDDUN, confirmed against this repository's own
+      real LINDDUN review (`SECURITY_THREAT_MODEL.md` §4). Should a
+      future revision address both records together?
+    owner: "operator, or whoever next revises security.stride / security.linddun's own field design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+
+verification:
+  method: >
+    Read Atlas's F20 tool table row (L885), §11.45 (L2249-2267), the
+    §10 Security recipe row (L1112), §13.11 Security Review Recipe
+    (L3472-3487), and Execution Contract §32 (L1231-1260) directly --
+    all independently re-verified for THIS contract, not inherited from
+    `security.stride`'s own citations without re-checking. Broad case-
+    insensitive grep across all three normative documents and the spec
+    root for "LINDDUN"/"linkability"/"identifiability"/"non-repudiation"
+    /"detectability"/"disclosure"/"unawareness"/"non-compliance" --
+    every non-citation hit read and confirmed distinct. This
+    repository's own `docs/architecture/SECURITY_THREAT_MODEL.md` §4
+    checked from the FIRST draft (the exact class of miss
+    `security.stride`'s own critic round had to catch, applied
+    proactively here). Validated against specs/cognitive/method
+    .schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The seven-dimension LINDDUN
+    vocabulary is directly transcribed from Atlas §11.45; EC §32's own
+    seven-element minimum structure is directly transcribed and merged
+    into this record's own field design, identically to
+    `security.stride`'s own merge. The record shape deliberately
+    mirrors `security.stride`'s own shape (see description and
+    compilation_decisions above) rather than inventing a divergent one
+    for no citable reason. All disclosed limits either point directly
+    to `security.stride`'s own open_questions (`OQ-STRIDE-4`,
+    `OQ-STRIDE-6`) where the gap is identical, or mint new LINDDUN-
+    specific ids where it is not.
