@@ -321,18 +321,20 @@ open_questions:
     owner: "operator, or whoever next builds security.linddun / security.pasta / security.attack_tree"
     blocks: "nothing in this file's own validity -- a real design question for when a second real instance exists, not solved prematurely"
     resolved_by: >
-      STILL OPEN as of `security.attack_tree` (46th slice). That
-      contract's own first draft incorrectly claimed to close THIS
-      question (conflating it with `OQ-LINDDUN-4`'s own DFD-substrate
-      question) -- caught by critic review and corrected in
-      `security.attack_tree.contract.yaml`'s own description. The real
-      finding: `security.linddun` AND `security.attack_tree` both kept
-      these exact three fields identically shaped to this contract's
-      own -- three-for-three identical re-declarations, which
-      STRENGTHENS the case for eventually factoring this specific sub-
-      shape out, not a reason to abandon the question. Left open,
-      tracked forward to whoever builds a fourth F20 member or revisits
-      this contract's own scope.
+      STILL OPEN as of `security.pasta` (47th slice, the fourth F20
+      member this question itself named as the next checkpoint).
+      `security.attack_tree`'s own first draft (46th slice) incorrectly
+      claimed to close THIS question (conflating it with
+      `OQ-LINDDUN-4`'s own DFD-substrate question) -- caught by critic
+      review and corrected. The real finding, now updated a second
+      time: `security.linddun`, `security.attack_tree`, AND
+      `security.pasta` ALL FOUR kept these exact three fields
+      identically shaped to this contract's own -- FOUR-FOR-FOUR
+      identical re-declarations across every EC §32-named method built
+      so far, further STRENGTHENING the case for eventually factoring
+      this specific sub-shape out, not a reason to abandon the
+      question. Left open, tracked forward to whoever next builds a
+      fifth F20 member or revisits this contract's own scope.
   - id: "OQ-STRIDE-5"
     question: >
       This record's own per-threat control/test_evidence fields are

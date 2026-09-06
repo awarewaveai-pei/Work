@@ -1747,6 +1747,58 @@ tier_1:
       DPIA/PIA, Zero Trust Review, Secrets Threat Review, Supply Chain
       Threat Model, Abuse Case, Security Control Mapping), each an
       independent future slice, not blocked by this one.
+  fortyfifth_concrete_entry:
+    # NEW (2026-09-06, same session): forty-fifth Tier 1 entry, same
+    # additive-key rationale as the forty-four entries above it. Added
+    # to THIS file in the SAME editing pass that wrote the contract
+    # itself, before any critic round.
+    method_id: "security.pasta"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FOURTH entry
+      from the `security` family (F20), after security.stride,
+      security.linddun, and security.attack_tree. Atlas gives this
+      method exactly ONE citation (F20 table row L884: "business→scope
+      →decompose→threat→vulnerability→attack→risk") -- the thinnest
+      grounding of any F20 member so far, with no dedicated section, no
+      worked example, and conspicuously ABSENT from both Atlas's own
+      §10 default recipe (L1112) and §13.11 Security Review Recipe
+      (L3472-3487). The only other citation anywhere in this spec root
+      is Execution Contract §32 (L1231-1260), which names PASTA as a
+      fourth ALTERNATIVE method, not part of the recommended chain.
+      Because Atlas gives no structural detail beyond its own seven-
+      word formula, all per-stage field detail beyond that formula is
+      EXPLICITLY DISCLOSED as grounded in real, external, named PASTA
+      methodology practice (Process for Attack Simulation and Threat
+      Analysis), NOT a mother-document citation -- the same "real
+      practice, not Atlas" class architecture.adr's own `status` field
+      already establishes as precedent. This record is a genuinely
+      THIRD structural shape among F20 members: `stages` is a fixed-
+      length-seven, POSITIONALLY ORDERED tuple (Atlas's own "→" chain
+      is a real dependency order, not a set), directly answering
+      `OQ-ATTACKTREE-4`'s own question (does PASTA resemble STRIDE
+      /LINDDUN, or diverge like Attack Tree?) with "diverges again, in
+      a THIRD direction" -- confirming F20 is genuinely heterogeneous.
+      `assets`/`trust_boundaries`/`entry_points` are kept identically
+      shaped to the three siblings (the confirmed method-agnostic part
+      of EC §32, `OQ-STRIDE-4`'s own still-open subject); EC §32's
+      remaining triple is scoped ONLY to the final `risk` stage (one
+      end-to-end verdict, not many discrete controllable items).
+    source: "methods/contracts/security.pasta.contract.yaml (built same session as this entry, mints machine_id security.pasta) + specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml (new output type)"
+    note: >
+      Not placed under `tier_0` despite Atlas's own single-row citation
+      being the thinnest of any F20 member: EC §32's own richer
+      structure is what elevates this method's own grounding, the same
+      "table row thin, EC section thick" pattern every sibling F20
+      entry above it already establishes -- EC §32 explicitly names
+      PASTA by name, not merely a generic "other methods" catch-all.
+      Tier 1, mandated by the actively-running implementation slice,
+      same category as the forty-four entries above it. FOURTH entry of
+      the `security` family -- six more F20 table rows remain (DPIA
+      /PIA, Zero Trust Review, Secrets Threat Review, Supply Chain
+      Threat Model, Abuse Case, Security Control Mapping), each an
+      independent future slice, not blocked by this one.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

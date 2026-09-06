@@ -329,6 +329,16 @@ open_questions:
       question for whoever next builds `security.pasta`.
     owner: "operator, or whoever next builds security.pasta"
     blocks: "nothing in this file's own validity"
+    resolved_by: >
+      CLOSED by `security.pasta` (47th slice). PASTA diverges from BOTH
+      prior shapes, in a THIRD direction: not STRIDE/LINDDUN's flat DFD-
+      element enumeration, not Attack Tree's own recursive AND/OR tree,
+      but a fixed-length-seven, POSITIONALLY ORDERED pipeline (Atlas's
+      own "->" chain is a real dependency order, enforced via the
+      schema's own `prefixItems`). This confirms F20 is genuinely
+      heterogeneous across all four EC §32-named methods built so far --
+      see `security.pasta.contract.yaml`'s own description and its own
+      `OQ-PASTA-4`.
   - id: "OQ-ATTACKTREE-5"
     question: >
       `root_aggregate`'s own three attributes (cost/skill/detectability)

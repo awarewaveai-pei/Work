@@ -1,0 +1,177 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml"
+title: PASTA Threat Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PastaThreatModelRecord` --
+  the declared `outputs` of `security.pasta`'s Method Contract. FOURTH
+  typed object in the `security` family (F20), a genuinely THIRD
+  structural shape (after `stride-threat-model-record.schema.yaml`
+  /`linddun-privacy-threat-model-record.schema.yaml`'s own shared flat-
+  DFD shape, and `attack-tree-record.schema.yaml`'s own recursive tree):
+  Atlas's own PASTA formula (F20 tool table L884: "business→scope
+  →decompose→threat→vulnerability→attack→risk", the ONLY citation this
+  method has anywhere in the spec root) is a sequential, ORDER-
+  DEPENDENT seven-stage pipeline, not an enumeration or a tree.
+  Execution Contract §32 Security Change Contract (L1231-1260,
+  explicitly naming PASTA) grounds `assets`/`trust_boundaries`
+  /`entry_points`, kept identically shaped to the three sibling
+  schemas.
+
+  `stages` is a fixed-length-seven array: Atlas's own seven-word chain,
+  transcribed verbatim and in its own literal order, as the closed
+  `stage_id` enum -- `business`/`scope`/`decompose`/`threat`
+  /`vulnerability`/`attack`/`risk`. Each of the first six carries only
+  `stage_id`/`summary` (deliberately minimal -- see the method
+  contract's own compilation_decisions for why no richer per-stage
+  sub-structure, e.g. a DFD for the `decompose` stage, is invented
+  here); the final `risk` stage additionally carries EC §32's own
+  remaining triple (`control`/`residual_risk`/`test_evidence`), scoped
+  to this record's own single end-to-end verdict rather than repeated
+  per-stage (PASTA is one pipeline producing one risk verdict, unlike
+  STRIDE/LINDDUN/Attack Tree's own many discrete controllable items).
+
+  A STRUCTURAL record (`provenance_required` + one integrity gate), NOT
+  genuine compute: the real invariant is stage completeness-and-order
+  (all seven present, correctly ordered, no duplication), the same
+  class of structural derivation STRIDE/LINDDUN's own
+  `elements_with_no_recorded_threats` already establishes, enforced at
+  the runtime layer (order itself is NOT checkable by this schema's own
+  `enum`+`minItems`/`maxItems` alone -- see note below).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, PASTA row (L884): 'business→scope→decompose→threat→vulnerability→attack→risk'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum structure, explicitly naming PASTA"
+  - "methods/contracts/security.pasta.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  trust_boundary:
+    type: object
+    required: [name, description]
+    additionalProperties: false
+    properties:
+      name: {type: string, minLength: 1, pattern: "\\S"}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+  process_stage:
+    type: object
+    required: [stage_id, summary]
+    additionalProperties: false
+    properties:
+      stage_id:
+        enum: [business, scope, decompose, threat, vulnerability, attack]
+        description: "One of Atlas's own six PROCESS-step words, transcribed verbatim (the seventh, 'risk', is the distinguished final stage -- see risk_stage below)."
+      summary:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What this stage found/decided. Deliberately free text -- Atlas gives no further structure for this stage, and none is invented here (see method contract's own compilation_decisions)."
+  risk_stage:
+    type: object
+    required: [stage_id, summary, control, residual_risk, test_evidence]
+    additionalProperties: false
+    properties:
+      stage_id:
+        const: risk
+        description: "Atlas's own seventh and final formula word -- the distinguished terminal stage carrying EC §32's own remaining triple."
+      summary:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      control:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "EC §32's own 'Controls' element, scoped to this record's own single end-to-end risk verdict."
+      residual_risk:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      test_evidence:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+type: object
+required: [id, version, system_or_component, assets, trust_boundaries, entry_points, stages, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^PASTA-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.pasta"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  assets:
+    type: array
+    minItems: 1
+    description: "EC §32's own 'Assets' element -- at least one."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+  trust_boundaries:
+    type: array
+    default: []
+    description: "EC §32's own 'Trust Boundaries' element. REQUIRED array (may be empty)."
+    items:
+      $ref: "#/$defs/trust_boundary"
+  entry_points:
+    type: array
+    default: []
+    description: "EC §32's own 'Entry Points' element."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+  stages:
+    type: array
+    minItems: 7
+    maxItems: 7
+    description: >
+      Atlas's own seven-word chain, AS AN ORDERED TUPLE. This schema's own
+      prefixItems pins the LITERAL Atlas order (business, scope,
+      decompose, threat, vulnerability, attack, risk) positionally --
+      stages[0] MUST be a business-stage object, stages[6] MUST be the
+      risk_stage object, and so on. This is deliberately stricter than
+      a same-set-different-order array, matching the method contract's
+      own real invariant (Atlas's '→' is a dependency chain, not a set).
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: business}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: scope}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: decompose}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: threat}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: vulnerability}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: attack}}}]
+      - $ref: "#/$defs/risk_stage"
+    items: false
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a PASTA review is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A payment-gateway PASTA review walking all seven stages in Atlas's own order"
+    value:
+      id: "PASTA-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.pasta"
+      system_or_component: "third-party payment gateway integration"
+      assets: ["cardholder tokenized reference", "merchant settlement records"]
+      trust_boundaries:
+        - {name: "merchant backend to payment gateway", description: "Outbound calls cross into a third-party PCI-scope boundary."}
+      entry_points: ["POST /v1/checkout/charge"]
+      stages:
+        - {stage_id: business, summary: "Protect merchant revenue and PCI compliance posture; a breach here risks card-network fines and loss of processing rights."}
+        - {stage_id: scope, summary: "In scope: the merchant's own charge-initiation service and its outbound call to the gateway. Out of scope: the gateway's own internal infrastructure."}
+        - {stage_id: decompose, summary: "Charge request assembled from cart total -> tokenized card reference attached -> signed request sent to gateway -> webhook callback updates order status."}
+        - {stage_id: threat, summary: "Webhook callback endpoint could be spoofed to falsely mark unpaid orders as paid."}
+        - {stage_id: vulnerability, summary: "Webhook signature verification exists but the shared secret has not been rotated since initial integration."}
+        - {stage_id: attack, summary: "An attacker who obtains the webhook secret (e.g. via a misconfigured log) could forge a paid-order callback for any order id."}
+        - {stage_id: risk, summary: "Medium-high residual risk given the secret rotation gap.", control: "Webhook signature verification enforced; secret stored in the secrets manager, not in application config.", residual_risk: "Medium -- rotation policy not yet automated.", test_evidence: "Manual verification of signature-check code path, 2026-09-01."}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+verification:
+  method: "Read Atlas F20 tool table row (L884) and EC §32 (L1231-1260) directly -- the only two citations this method has. Validated against jsonschema Draft202012Validator, including the positional prefixItems ordering constraint."
+  note: "Atlas's own seven-word chain and its own literal order are directly transcribed. Per-stage summary/control/residual_risk/test_evidence content is free text -- no invented sub-structure beyond Atlas's own formula (see method contract). No mother document was modified."

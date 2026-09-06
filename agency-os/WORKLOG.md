@@ -1,5 +1,71 @@
 # Worklog
 
+## 2026-09-06（System Foundry：第9候選確認為第6個真缺口 Multi-Location Stock 落地 + TASKS.md §D Class 4/5 mutation-coverage 機械閘建成，過程中發現一次委員會治理漏洞：TASKS.md 結案聲明被並行 session 誤 commit、當下無對應檔案）
+
+[背景] 5個真缺口批次（`fec071dad`~`b368c2eba`）完成後，操作者要求繼續處理剩餘兩條線：①第9候選 Inventory/WMS 多倉庫的正式判定；②TASKS.md §D 第4/5條（derivation rule／requires邊測試覆蓋率缺口）的機械閘建置。兩者並行委派，因觸碰的檔案集合幾乎不重疊（第9候選會改`capabilities/catalog.json`等業務檔；機械閘只新增`scripts/test_mutation_coverage.py`+改`Makefile`+`TASKS.md`）。
+
+[第9候選判定：REAL GAP] 正式分析agent逐字讀完`_13_Inventory_WMS.md`全文168行：多倉庫庫存分開計數是藍圖§5明確列出的Public Capability、master blueprint核心資料模型的一級實體，且明確在「Full WMS」非目標清單之外（bin/儲位/揀貨波次/條碼/批號留在範圍外）。原始第9候選的舉證（「跨store不超賣」）其實誤讀——那是跨銷售通路而非跨實體倉庫，已被既有`CAP-MARKETPLACE-SYNC`/`CAP-POS-INVENTORY-SYNC`覆蓋；真正站得住的證據是多倉庫本身（Public Capability條目+Service Contract的location參數+MVP項）。
+
+[實作+第一輪critic覆審] 新增`CAP-MULTI-LOCATION-STOCK`（module `inventory_ops`，requires `[CAP-INVENTORY]`，刻意不require `CAP-ORDERS`——真實反事實測試證明加了會強迫「明確答不做任何訂單交易」的商家也長出訂單能力）+`CAP-CYCLE-COUNT`（盤點）+2個gated questions（`Q-DATA-014`/`Q-DATA-015`）+`Q-DATA-007`描述改寫（不再過度承諾從未實現的「倉儲位置」追蹤，label不變）。獨立critic覆審：**BLOCK**，抓到：
+
+- **Critical（已修，且是本輪最嚴重的發現）**：委派實作agent完工後、critic覆審過程中，**另一個並行session的commit `c0531e71a`（一個跟本次無關的HCI30缺陷修復）意外把我已用`git-stage-hunks.py`精準暫存的TASKS.md 5個System Foundry hunk一併掃進去**——導致git HEAD在那個commit裡已經寫著「§D第3/4/5條✅已結案」，但backing的`capabilities/catalog.json`新增、`test_mutation_coverage.py`新檔、`Makefile`改動全部還停在working tree未commit。這是本系列一路強調的「宣稱與真實不符」類，這次不是我自己的宣稱錯，是shared worktree的hunk意外被別的commit吞掉，但後果一樣：git歷史上出現了一個結案聲明配不上任何實際機制的狀態。**修法**：不試圖改寫別人的commit（違反「禁止改已發布commit」的鐵律），改為立刻把真正的backing檔案（本條目）補commit上去，讓那個聲明變成真的。
+- **Major（已修，用根因解法而非補丁）**：`CAP-CYCLE-COUNT`跟`CAP-MULTI-LOCATION-STOCK`共用`inventory_ops`模組，但兩者互相獨立（一個純盤點的單一倉庫商家可以只選`CAP-CYCLE-COUNT`）——critic實際生成一個只選盤點的專案，讀出`inventory_ops`的obligations整個環繞著「跨地點分攤」「地點間調撥」寫，盤點本身反而一個contract test都沒有。根因修法（critic建議、已採納）：把`CAP-CYCLE-COUNT`改掛到既有`domain`模組（比照`CAP-INVENTORY-COSTING`同樣「只require CAP-INVENTORY」的先例），`inventory_ops`obligations收斂回純粹只服務`CAP-MULTI-LOCATION-STOCK`，問題整個消失而非用hedge語句遮蓋。`domain`模組補一條CAP-CYCLE-COUNT專屬的條件式不變量+contract test。
+- **Major（已修）**：藍圖§5四分之一的「Incoming」（進貨入庫）跟其Service Contract的`receiveStock()`完全沒被承接。判斷不新增第三個capability（避免範圍蔓延），改在`CAP-MULTI-LOCATION-STOCK`描述+obligations補一句：進貨入庫用同一套movement機制記錄，只是沒有來源地點、只有目的地點，不是另一套機制。
+- **Minor全修**：`validate_doc_numbers.py`的module-count序數檢查原本接受`st/nd/rd/th`任一個（模組數51→51st才對，但寫死接受4種都算過，等於沒真的驗證文法）——改成從數字本身推導唯一正確的序數字尾（11-13固定th，其餘看個位數），並用mutation test證明（改成51th會正確FAIL）；`pos`模組「單一canonical庫存記錄」的宣稱原本無條件成立，但`inventory_ops`對應的協調不變量只guard在`CAP-POS-INVENTORY-SYNC`（比pos模組本身窄），已放寬guard範圍；`CAP-ORDER-SPLIT`（拆單到不同倉庫）漏掉在`inventory_ops`的跨模組列舉裡，已補上；`CAP-RETURNS`的restock（退貨入庫）寫入現在已分地點的庫存記錄卻沒有配對不變量，已補。
+
+[Class 4/5機械閘建置+第二輪critic覆審] 新建`scripts/test_mutation_coverage.py`：對全部24條derivation rule跟（當時）177條requires邊逐一在記憶體移除（真實檔案從未寫入，`finally`保證還原），重跑226個單題最小啟用+1000個隨機組態，confirm至少一個組態的resolved plan真的改變。獨立critic對這支新腳本本身做對抗測試：**SHIP WITH MINOR FIXES**，抓到：
+
+- **兩個High（已記錄不倉促修正，開新TASKS.md條目）**：分類器`explain_redundant_edge()`判斷「這條空邊為什麼安全」時，替代路徑證明用了全目錄閉包（含被測邊本身），對7條**其實load-bearing**的邊（`CAP-PAYMENTS→CAP-COMMERCIAL`等）給出錯誤的「可解釋」理由——**重要澄清**：這7條邊在真實PASS輸出裡仍正確歸類在80條load-bearing桶、沒有漏測，問題只在「說明文字」不可信，不是判定本身錯誤。另一個：`forced_prereq_qids()`沒處理`active_when`的`{any:[...]}`分支（目錄現有12個any gate），construct的反例證明一個真正安全的邊會被誤判「unexplained」讓`make verify`對正確的catalog假紅。兩者都是分類器內部圖演算法的正確性問題，需要重新設計而非小改，故意不在本輪倉促動手，開了TASKS.md第6條追蹤。
+- **已修**：一句被獨立驗證證偽的註解（原本聲稱「拿掉1000個隨機組態測試結果不變」，critic實測拿掉後真的抓到一個FAIL，證明隨機組態是必要的，不是defence-in-depth）；TASKS.md措辭「全數人工抽樣覆核」自相矛盾（全部+抽樣），改成「抽樣人工覆核（非全數逐條）」；「不是bug是刻意設計」對全部97條的斷言在2條被證實出錯後改成「絕大多數」。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=14步verify chain（13既有+新`mutation-coverage`）+`python -m unittest discover -s tests`（兩個實作agent各自跑、兩個critic各自獨立重跑、我套用全部修正後最終一輪）| exit=0（每一輪、每一步）| result=最終`questions=226 capabilities=265 modules=51 standard_modules=50 pairwise_valid=25419 pairwise_rejected=6(不變) pairwise_total=25425`；`MUTATION COVERAGE: PASS derivation_rules=24/24 requires_edges=179 total(80/99/0)`；`Ran 29 tests...OK`；`MANIFEST VALIDATION: PASS`
+- REALTEST_EVIDENCE: tool=Bash | cmd=critic真實跑`CAP-ORDERS`反事實測試（disposable copy加邊，答案集合對`Q-DATA-004`=False）| exit=0 | result=`CAP-ORDERS`被強迫拉進plan、`traceability=None`——證實排除`CAP-ORDERS`依賴邊的設計理由成立
+- REALTEST_EVIDENCE: tool=Bash | cmd=修正Major 2後親自跑`resolve({'Q-DATA-007':True,'Q-DATA-015':True})`（純盤點商家）| exit=0 | result=`CAP-CYCLE-COUNT=True`但`modules=['core','domain']`——確認`inventory_ops`模組不再被強迫上身
+- REALTEST_EVIDENCE: tool=Bash | cmd=validate_doc_numbers.py序數檢查mutation test（51st→51th）| exit=1 | result=`expected ordinal suffix "st" for 51, found "th"`正確攔截，還原後重跑PASS
+- REVIEW_DONE: critic=Standard×2（Multi-Location Stock一個獨立critic BLOCK→3個Major全修；mutation-coverage guard另一個獨立critic SHIP WITH MINOR FIXES→2個High登記追蹤+其餘全修）| findings=0c/0m（收尾時，已知的2個High已個別開TASKS.md條目非本次阻斷項）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-MULTI-LOCATION-STOCK\|CAP-CYCLE-COUNT\|Q-DATA-014\|Q-DATA-015\|test_mutation_coverage` | hits=每個新id/新檔僅在歸屬處各出現一次，零重複零半寫引用
+
+[剩餘風險] TASKS.md §D新增第6條（mutation-coverage分類器2個圖演算法缺陷）待排入；既有第3/4/5條的完成度已由本輪重新確認為真（backing檔案已補commit）；Class 2清單維持7個未實際處理；5+1=6個真缺口全數落地（Pricing/Promotions、Fraud/Risk、Logistics/Shipping、PLM/Quality、Merchandising、Multi-Location Stock）。**治理教訓**：shared worktree下用`git-stage-hunks.py`精準暫存自己的hunk仍不能完全避免「別人commit時把已暫存但未commit的東西一併帶走」——下次遇到「另一個agent報告『Makefile/TASKS.md已經在working tree裡』」這種訊號時，應該立刻先跑`git log --oneline -3 -S<關鍵字>`確認宣稱的變更是否真的還沒進HEAD，而非假設「還沒commit」就一定安全。
+
+## 2026-09-06（續60，同一 session：Cognitive OS 第四十七個 Method Atlas 切片 — `security.pasta`，F20 家族第四個成員、Atlas 引用最薄的一個（全 spec root 僅一筆）、第三種結構形狀（固定七階段、位置嚴格排序的 pipeline）；critic verdict **FAIL**：跑時邏輯零破綻（「僅一筆引用」與「schema 位置排序真的有效」兩個關鍵宣稱皆用 5040 種全排列窮舉驗證為真），6 Major 全落在「宣稱超出或落後證據」類別，其中一個 critic 直接動手修正；另在收尾階段自行發現並修復一個與本切片無關但發生在同一份 WORKLOG.md 的資料損毀事故）
+
+**觸發**：操作者「繼續」，承接 WORKLOG 續59 收尾候選清單，選 PASTA——EC §32 第四個明文並列方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
+
+**選型與設計**：Atlas 給這個方法的引用是本 session 目前最薄的——全 spec root 只有一筆（F20 表格列 L884，無專節、無範例），且**確認明確缺席**於 Atlas 自己的 §10 預設 recipe 與 §13.11 Security Review Recipe。因為 Atlas 除了七字公式外不給任何結構細節，本次**明文揭露**每個階段欄位的細部設計是依據真實外部 PASTA 方法論（Process for Attack Simulation and Threat Analysis）常識，非 Atlas 引用——比照 `architecture.adr.contract.yaml` 自己 `status` 欄位「真實實務非母文件引用」的既有先例。設計出本 session 第三種結構形狀：`stages` 是固定長度七、**位置嚴格排序**的陣列（Atlas 自己的「→」鏈是真實依賴順序非集合），schema 用 `prefixItems` 逐位釘死，runtime 獨立重新推導順序不信任存量值。這正面回答 `security.attack_tree.contract.yaml` 自己開的 `OQ-ATTACKTREE-4`（PASTA 會不會也像 Attack Tree 一樣分歧）——答案是「再次分歧，第三個方向」。
+
+**critic 真跑（獨立四方向查證「僅一筆引用」宣稱、對 schema 的 `prefixItems` 排序做 5040 種全排列窮舉、8 個真突變）：verdict FAIL，但兩個關鍵技術宣稱皆為真**——「僅一筆引用」查證屬實（Atlas/EC/MP 三份文件逐一計數：Atlas=1、EC=1、MP=0，且用 Atlas 自己章節標題編號規律的正面證據佐證 PASTA 確實被跳過，非查漏）；`prefixItems` 位置排序機制真的有效（7!=5040 種排列全部窮舉，schema 判定與 runtime 判定零分歧）。FAIL 全部落在「宣稱超出或落後證據」：
+
+- **M1（已修）**：CLI 自己 docstring 宣稱「建了一個 minimal review」，實際程式碼從未真的建——只有 swap 失敗探針，沒有真正的第二筆最小記錄。已比照三個手足切片補上真正的 minimal reference-service 記錄。
+- **M2（已修）**：contract 自己描述把 EC §32 七要素講成「前三個+剩餘三個」，中間漏算了第四個要素「Threats」（三加三等於六不是七）。已補上完整七要素引用，並新增一則 compilation_decision 明講「threat 階段自己的 summary 就是填補 EC §32 Threats 要素的地方」。
+- **M3（已修，本輪最有意思的一個）**：`test_extra_eighth_stage_is_refused` 原本附加的第八個元素是一個 process 階段，會在位置 -1 被「不是合法 risk 階段」擋下，長度檢查本身完全沒被真正測到。**真跑突變驗證**：拔掉長度檢查後原測試仍綠燈（漏洞屬實）；改成附加一個真正合法的 risk 階段後，同一個突變會讓測試變紅——已修正並補一個 gate 層對等測試。
+- **M4/M5（已修）**：`security.attack_tree.contract.yaml` 自己開的 `OQ-ATTACKTREE-4` 沒補 `resolved_by`，跟 `security.stride.contract.yaml` 的 `OQ-STRIDE-4`（明文寫著「留給第四個 F20 成員」）都沒同步更新成本切片的真實結論——SSOT 分裂，本 session 已修過兩次的同一類別。已在兩個手足檔案各補上：`OQ-ATTACKTREE-4` 標記關閉（PASTA 證明第三個分歧方向），`OQ-STRIDE-4` 更新為「四個 F20 成員全部相同形狀，證據更強而非解決」。
+- **M6（critic 直接動手修正）**：`architecture.adr.contract.yaml` 的「Threat Model 現有三個 machine_id」過期——本 session 第四次抓到同一類鄰居計數過期（44th 無→一個、45th 一→二、46th 二→三、47th 三→四）。critic 這次直接動手修正（我事後 grep 直接核實真的改了，不是空口宣稱），且修法不只是數字加一：PASTA 缺席於 STRIDE/LINDDUN/Attack Tree 三者共用的 §10/§13.11 recipe，所以它自己的 forward link 論證改用 EC §32 命名為依據，文字已分開兩種論證。
+
+Minor 全修：`inputs.required` 命名 `PastaStageSet`，跟本契約自己「Atlas 的鏈是順序不是集合」的頭號論點自相矛盾——改名 `PastaStageSequence`，比照 `security.attack_tree.contract.yaml` 自己 `AttackGoalTree`（非 `...Set`）的既有命名紀律；rebuild-not-alias 測試原本只測了 process 階段欄位，risk 階段自己獨立的重建路徑零測試覆蓋——已補並真跑突變驗證確實會抓到；`OQ-PASTA-1` 只揭露 `method-inventory.yaml` 一個過期交叉引用（「EC 第二筆引用在 L1284」），漏了另一個獨立驗證出的過期欄位（該檔自己 PASTA 列的 `line: 881`，Atlas 真正的行號是 L884）——已一併揭露。
+
+**收尾階段意外發現並修復（與本切片無關，屬本 session 稽核責任）**：確認 WORKLOG 續59（`security.attack_tree` 條目）標題被同一檔案的並行 HCI30 session commit（`c0531e71a` 或 `040c58877`）意外截斷，缺了「## 2026-09-06（續59，同一 session：Cognitive OS 第四十六個 Method Atlas 切片」這段前綴，條目本文完全未受影響（逐行 diff 對照 `bdc8e8bcd` 原始 commit 內容確認位元相同）。已在獨立的 `fix(worklog)` commit 單獨修復並推送，不混進本切片的 commit。
+
+**[已修改]**：spec-root 新增 `methods/contracts/security.pasta.contract.yaml`＋`specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortyfifth_concrete_entry`（跟 contract 同一次編輯寫入）＋修正 `architecture.adr.contract.yaml`（M6，critic 直接動手）＋`security.attack_tree.contract.yaml`／`security.stride.contract.yaml`（M4/M5，各補/更新 `resolved_by`）＋重新產生 `SPEC_QUICKREF.md`/`MOTHER_DOC_SECTION_INDEX.md`。Product root 新增 `ai_lego/modules/security/pasta.py`（builder+2 gate）＋`ai_lego/apps/cli/run_pasta_slice.py`（M1 補 minimal record）＋`tests/unit/test_pasta.py`（53 tests，M3 修正長度守衛測試+補 risk 階段 rebuild 測試+補 gate 層長度守衛測試）＋`docs/FORTYSEVENTH_SLICE_SECURITY_PASTA.md`；`ai_lego/modules/security/__init__.py` docstring 補 pasta 提及。獨立 commit：`fix(worklog)` 修復續59標題截斷（與本切片邏輯無關）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，修正後重跑）| exit=0 | result=`ALL GOLDEN TESTS PASSED`，2827→2830
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_pasta_slice` | exit=0 | result=`PASS security.pasta: 7 stages in order ['business', 'scope', 'decompose', 'threat', 'vulnerability', 'attack', 'risk'], gates [2×PASS], invariant_verified(construction=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_pasta`（修正後重跑）| exit=0 | result=53 OK（52→53）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立突變腳本，拔掉長度檢查後重跑 `test_extra_eighth_stage_is_refused` | exit=1（修正前 escaped／修正後正確變紅）| result=證實 M3 修法確實補上長度守衛的真測試覆蓋，檔案還原後位元相同
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit -p "test_*.py"`（product root，修正後重跑）| exit=0 | ms=67736 | result=**1827 tests OK**（1826→1827，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 `jsonschema.Draft202012Validator` 驗證修正後 `security.pasta.contract.yaml`／`security.attack_tree.contract.yaml`／`security.stride.contract.yaml`／`architecture.adr.contract.yaml` 對 `method.schema.yaml` | exit=0 | result=四者皆 OK
+- REVIEW_DONE: critic=Standard（真實 subagent，四方向獨立查證「僅一筆引用」、5040 排列窮舉驗證 `prefixItems` 排序、8 個真突變、其中一項發現直接動手修正並經我事後 grep 核實）| verdict=初稿 FAIL（0 邏輯 bug，6 Major 全屬宣稱面）→ 6 Major 全修＋數個 Minor 全修 → SHIP | findings=0c/6m/3minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`security[.]pasta\|PASTA-\|PastaStageSet` | hits=9 本切片自己檔案（5 spec-root+4 product-root）+ 2 個既有 log/dispatch 檔案（非治理文件，預期內）；`PastaStageSet` 舊名 grep 全庫零殘留（已改名 `PastaStageSequence`）
+- WORKLOG: 本條目
+- 額外：`fix(worklog)` commit 修復續59標題截斷，逐行 diff 對照原始 commit 確認條目本文（非標題）位元相同，未遺失任何內容
+
+**[剩餘風險]**：`OQ-PASTA-1~4` 皆揭露；`OQ-STRIDE-4` 明確維持 OPEN（四比四相同形狀是證據增強而非解決，且是本輪特別更新的內容，非遺漏）。`method-inventory.yaml` 自己 PASTA 列的雙重過期（`L1284`＋`line: 881`）已發現未修，範圍外。
+
+**[rollback]**：兩個獨立 commit（切片本體 + WORKLOG 修復），皆可各自 `git revert`；索引檔 `gen_spec_index.py` 重生。
+
+**`security` 家族（F20）**：4/10 建置完成，6 列仍待（DPIA-PIA／Zero Trust Review／Secrets Threat Review／Supply Chain Threat Model／Abuse Case／Security Control Mapping），各自獨立未來切片，不被本切片阻塞。
+
 ## 2026-09-06（同日第八輪：`dimension_disagreement`——domain 內兩個維度自己互相不同意的訊號，解答 TASKS.md 兩問合一待辦裡的其中一問；critic 覆審抓到 0 Critical+3 Major+5 Minor，其中一個 Major 是把已被上一輪 critic 修正過的「gate 4 改了幾次」計數又錯著寫回去，全修）
 
 **觸發**：操作者明確授權「你做最完美的決定！該增加什麼都去做，因為我不會！」，延續同日第七輪（sparse-array debt 收尾）後的候選清單，選 `agency-os/TASKS.md` 另一則兩問合一的待辦：「disagreement flag 從 dimension 層傳到 domain 層的路徑」。

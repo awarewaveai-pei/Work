@@ -1,0 +1,359 @@
+$id: "ai-lego://methods/contracts/security.pasta.contract.yaml"
+title: "PASTA Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-seventh Method Atlas slice, FOURTH member
+  of the `security` family (F20's own "資安／隱私套件"), after
+  `security.stride` (44th), `security.linddun` (45th), and
+  `security.attack_tree` (46th).
+
+  **Atlas gives this method exactly ONE citation** -- the thinnest
+  grounding of any F20 member built so far. The F20 tool table's PASTA
+  row (L884: purpose "風險導向威脅建模"; usage "business→scope
+  →decompose→threat→vulnerability→attack→risk"; benefit "業務 impact
+  與技術威脅連結"). Broad, independent grep across all three normative
+  documents and the spec root (case-insensitive, "PASTA"/"business
+  objective"/"technical scope"/"application decomposition"
+  /"vulnerability analysis"/"attack modeling"/"risk.{0,10}impact
+  analysis") found NO dedicated section (unlike STRIDE's §11.44,
+  LINDDUN's §11.45, or Attack Tree's §12.38), NO worked example, and NO
+  mention in either the §10 recipe row (L1112: "Assets/DFD→STRIDE
+  /LINDDUN→Attack Tree→Controls→Test" -- PASTA is conspicuously ABSENT
+  from Atlas's own DEFAULT recipe) or §13.11 Security Review Recipe
+  (L3472-3487: "...→STRIDE→LINDDUN→Attack Tree→Secret/Identity Review
+  →..." -- also absent). PASTA is named ONLY twice in this entire spec
+  root: Atlas's own F20 table row, and Execution Contract §32's own
+  closing sentence (L1260: "Method Atlas 可選 STRIDE／LINDDUN／Attack
+  Tree／PASTA") -- the SAME load-bearing citation `security.stride`
+  /`security.linddun`/`security.attack_tree` already establish, listing
+  PASTA as a fourth ALTERNATIVE, not part of the recommended default
+  chain. `docs/architecture/SECURITY_THREAT_MODEL.md` (this
+  repository's own real threat review) explicitly chose STRIDE+LINDDUN
+  and does not use PASTA -- no real-world usage instance exists in this
+  spec root to draw design lessons from, unlike STRIDE/LINDDUN's own
+  due-diligence neighbour. `methods/registry/method-inventory.yaml`'s
+  own note about the Execution Contract (L57) cites a SECOND EC mention
+  of PASTA "at L1284" -- checked directly, this is STALE (EC's own only
+  PASTA mention is at L1260; pre-existing drift in that catalog file,
+  not this contract's to fix, the same class of stale line-number
+  already found and left unfixed in prior F20 slices' own due
+  diligence).
+
+  **Because Atlas gives no structural detail beyond its own seven-word
+  compressed formula, this contract's own field-level detail beyond
+  that formula is EXPLICITLY GROUNDED IN REAL, EXTERNAL, NAMED PASTA
+  METHODOLOGY PRACTICE (Tony UcedaVélez's Process for Attack Simulation
+  and Threat Analysis, the OWASP-documented seven-stage risk-centric
+  threat modeling methodology this Atlas row is unambiguously
+  referencing by name), NOT an Atlas citation** -- disclosed here
+  explicitly, the same "first field justified by real practice, not a
+  mother-document citation" class `architecture.adr.contract.yaml`'s
+  own `status` field already establishes as a precedent for this
+  session. Atlas's own seven-word chain ("business→scope→decompose
+  →threat→vulnerability→attack→risk") maps onto -- and is directly
+  transcribed as -- this record's own `stages[].stage_id` seven-value
+  enum, kept as Atlas's own literal short words (not the real
+  methodology's own fuller stage names, e.g. "Definition of Business
+  Objectives") so the schema's own source-of-truth stays the Atlas
+  citation itself, not an external document this session has no
+  authority to treat as a mother document.
+
+  **This is a genuinely THIRD structural shape among F20 members**
+  (after STRIDE/LINDDUN's shared flat-DFD shape and Attack Tree's own
+  recursive tree): PASTA's own formula is neither a DFD-element
+  enumeration nor an AND/OR tree, but a SEQUENTIAL, ORDER-DEPENDENT
+  seven-stage PIPELINE -- Atlas's own "→" chain is a real dependency
+  order (business objectives before scope, decomposition before threat
+  analysis, and so on), not an unordered set. `stages[]` is therefore a
+  fixed-length-seven array, its own real invariant being that all seven
+  `stage_id` values from Atlas's own chain are present EXACTLY ONCE
+  EACH, IN Atlas's OWN ORDER -- a genuinely different kind of structural
+  invariant than STRIDE/LINDDUN's referential integrity or Attack
+  Tree's recursive shape validity. This is a real, citable THIRD data
+  point directly answering `OQ-ATTACKTREE-4`'s own open question
+  (raised in `security.attack_tree.contract.yaml`: "should PASTA be
+  expected to diverge similarly [to Attack Tree], or might it turn out
+  closer to the STRIDE/LINDDUN shape?") -- PASTA diverges from BOTH
+  prior shapes, in a THIRD distinct direction, further confirming F20
+  is a genuinely heterogeneous method family, not a candidate for one
+  shared base schema beyond the EC §32 framing triplet (`OQ-STRIDE-4`'s
+  own still-open subject).
+
+  **Field design, ALL SEVEN of EC §32's own elements accounted for
+  explicitly** (caught by critic review: an earlier draft of this
+  description named only "the remaining triple" after the first three,
+  silently skipping element #4, "Threats" -- corrected here):
+  `assets`/`trust_boundaries`/`entry_points` (EC §32's own first three
+  elements) are KEPT, identically shaped to the three siblings' own
+  fields -- the same confirmed method-agnostic part of EC §32 every
+  prior F20 contract already establishes. EC §32's own FOURTH element,
+  "Threats", is filled by the `threat` stage's own `summary` -- a
+  single free-text finding, not a structured `threats[]`/tree the way
+  STRIDE/LINDDUN/Attack Tree fill it, a real and disclosed consequence
+  of PASTA's own pipeline shape (see compilation_decisions). The six
+  PROCESS stages (`business`/`scope`/`decompose`/`threat`
+  /`vulnerability`/`attack`) each carry only `stage_id`/`summary` --
+  deliberately minimal, since Atlas's own formula names the STAGES, not
+  any per-stage sub-structure, and inventing one (e.g. a structured
+  Application Decomposition DFD sub-object, which the real external
+  PASTA methodology's own Stage 3 does use) would be exactly the
+  "undisclosed over-constraint" class a critic review already caught on
+  `database_data.data_contract`'s own first draft. The FINAL `risk`
+  stage additionally carries EC §32's own remaining THREE elements
+  (`control`/`residual_risk`/`test_evidence`) -- PASTA is a single END-
+  TO-END review producing ONE overall risk verdict (Atlas's own "risk"
+  stage IS literally "Risk & Impact Analysis" in the real methodology
+  this formula word abbreviates), unlike STRIDE/LINDDUN/Attack Tree's
+  own MANY discrete per-threat/per-leaf controls -- so EC §32's triple
+  is scoped to the review's own single terminal verdict, not repeated
+  six times across stages that have no individual "control" of their
+  own (Atlas's own formula shows no controls attached to the business
+  /scope/decompose/threat/vulnerability/attack stages individually,
+  the same restraint `security.attack_tree.contract.yaml`'s own
+  compilation_decisions already applies to its internal, non-leaf
+  nodes).
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity
+  gate), NOT `genuine_compute` -- Atlas's own benefit line ("業務
+  impact 與技術威脅連結") is a qualitative traceability claim, not a
+  numeric/ordinal computation like Attack Tree's own cost/skill
+  /detectability aggregation; the real invariant here is STRUCTURAL
+  completeness-and-order (all seven stages present, correctly ordered,
+  none skipped, none duplicated), the same class of derivation
+  STRIDE/LINDDUN's own `elements_with_no_recorded_threats` already
+  establishes, not a new numeric class.
+
+  Also cross-checked, the SAME confirming cross-references the three
+  siblings already establish (re-verified independently): `specs
+  /execution/risk-tier.schema.yaml`'s own HIGH-tier `required_actions`
+  "Threat Review" (L93, method-agnostic -- satisfied by any of the four
+  EC §32-named methods). `specs/cognitive/problem-type.schema.yaml`'s
+  own `security` problem-type `recommended_start` (L294) does NOT name
+  PASTA (it transcribes the same §10 L1112 default recipe, which itself
+  excludes PASTA) -- a real, disclosed asymmetry, not an omission this
+  contract needs to fix (that file's own scope is Atlas's own DEFAULT
+  recommendation, not the full acceptable-method list). No existing
+  typed object in `specs/security/` (`key-vault-lifecycle`, `log
+  -redaction-token`, `personal-data-envelope`, `tenant-isolation
+  -controls`) models a staged risk-centric review -- all four are
+  narrower, specific security-control records, re-confirmed by direct
+  read.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, PASTA row (L884): 'business→scope→decompose→threat→vulnerability→attack→risk'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): mandatory minimum 'Assets/Trust Boundaries/Entry Points/Threats/Controls/Residual Risk/Test Evidence' (all SEVEN elements), explicitly naming PASTA as an acceptable method (the ONLY other citation in this entire spec root) -- element #4, Threats, is filled by the 'threat' stage's own summary (see description and compilation_decisions)"
+  - "specs/execution/risk-tier.schema.yaml HIGH-tier required_actions (L93): 'Threat Review' -- a confirming, method-agnostic cross-reference"
+  - "methods/registry/method-inventory.yaml PASTA entry: category 'F20 security', no machine_id -- this contract mints one; that file's own cross-reference to a second EC mention 'at L1284' is stale (EC's only real PASTA mention is L1260), pre-existing drift not fixed here"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  forty-fifth concrete entry (added in the same editing pass as this
+  contract). `id: security.pasta` mints a new machine_id, FOURTH
+  member of the `security` family (F20). The per-stage field detail
+  beyond Atlas's own seven-word formula is grounded in the real,
+  externally-named PASTA methodology this formula abbreviates (Process
+  for Attack Simulation and Threat Analysis), NOT a mother-document
+  citation -- disclosed throughout, the same class of decision
+  `architecture.adr.contract.yaml`'s own `status` field already
+  establishes as precedent.
+
+id: security.pasta
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited. Atlas's own "decompose" formula word is itself
+# literally DECOMPOSE; assigning each stage its own summary (and the
+# final stage its own control/residual_risk/test_evidence) is MAP; the
+# stage-completeness-and-order check is VALIDATE. No COMPUTE step --
+# unlike security.attack_tree, this record derives no numeric/ordinal
+# value.
+
+purpose:
+  - walk_a_system_through_pastas_own_seven_ordered_stages_from_business_objectives_to_a_final_risk_and_impact_verdict_and_record_the_ec32_minimum_review_structure
+inputs:
+  required: [AssetSet, PastaStageSequence]
+  # PastaStageSequence, not "...Set" (caught by critic review): this
+  # contract's own headline argument is that Atlas's own "->" chain is
+  # a real dependency ORDER, not an unordered set -- naming the input
+  # type "Set" would contradict that in the one place a reader would
+  # look first. security.attack_tree.contract.yaml's own
+  # AttackGoalTree (not AttackNodeSet) already establishes this
+  # shape-accurate-naming discipline.
+  optional: [TrustBoundarySet, EntryPointSet]
+outputs: [PastaThreatModelRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "assets has at least 1 entry; every entry is a non-empty string (EC §32's own 'Assets' element)"
+  - "trust_boundaries is a required array (may be empty); every entry has a non-empty name and description (EC §32's own 'Trust Boundaries' element)"
+  - "entry_points is a required array (may be empty) of non-empty strings (EC §32's own 'Entry Points' element)"
+  - "stages is EXACTLY the seven entries {business, scope, decompose, threat, vulnerability, attack, risk}, one each, IN THAT ORDER -- no omission, no duplication, no reordering (Atlas's own '→' chain is a real dependency order, not an unordered set)"
+  - "each of the first six stages (business/scope/decompose/threat/vulnerability/attack) has a non-empty summary -- the 'threat' stage's own summary is what fills EC §32's own fourth element, Threats; the final risk stage additionally has non-empty control/residual_risk/test_evidence (EC §32's own remaining three elements, scoped to this record's own single terminal verdict, not repeated per-stage)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class every prior structural (non-genuine-compute) F20
+  # contract already reasons through: stage-completeness-and-order is
+  # a structural derivation (the same class STRIDE/LINDDUN's own
+  # elements_with_no_recorded_threats already establishes), not a
+  # statistical/numeric CALCULATED RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no PASTA row.
+recommended_next: [architecture.adr]
+# Same forward link security.stride/security.linddun/security.attack_tree
+# already establish, for the identical reason: Atlas's own F18 chain
+# (L836-837) places a Threat Model step directly before ADR. PASTA is
+# Atlas's own FOURTH EC §32-named Threat Model method, so the same
+# forward link applies without inventing a new one -- even though PASTA
+# itself is absent from Atlas's own §10/§13.11 DEFAULT recipe (see
+# description above), it is still unambiguously a Threat Model method
+# by EC §32's own naming, which is what grounds this forward link.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      EC §32's own minimum structure has SEVEN elements (Assets/Trust
+      Boundaries/Entry Points/Threats/Controls/Residual Risk/Test
+      Evidence), not three plus a "remaining triple" -- an earlier
+      draft of this contract's own description silently skipped element
+      #4, Threats (caught by critic review). Which of PASTA's own
+      stages fills it?
+    decision: "The 'threat' stage's own summary fills EC §32's Threats element -- a single free-text finding, not a structured threats[]/tree."
+    reasoning: >
+      This is a real, disclosed CONSEQUENCE of PASTA's own pipeline
+      shape, not an oversight: STRIDE/LINDDUN represent Threats as a
+      flat, referentially-checked list; Attack Tree represents it as a
+      recursive tree; PASTA's own formula gives Threat Analysis exactly
+      one stage, so its own natural representation is exactly one
+      summary. Forcing a structured threats[] list onto a single-stage
+      formula word would fabricate structure Atlas never gives for this
+      method. Every EC §32 element is now traceable in this contract's
+      own field design: Assets/Trust Boundaries/Entry Points ->
+      assets/trust_boundaries/entry_points; Threats -> the 'threat'
+      stage's own summary; Controls/Residual Risk/Test Evidence -> the
+      final 'risk' stage's own triple.
+  - question: >
+      Atlas gives PASTA only a seven-word compressed formula, no
+      dedicated section, no worked example. Should this contract invent
+      richer per-stage sub-structure (e.g. a DFD-based Application
+      Decomposition sub-object for the 'decompose' stage, matching the
+      real external PASTA methodology's own Stage 3 practice), or stay
+      minimal?
+    decision: "Stay minimal -- each of the six process stages carries only stage_id/summary, no invented sub-structure."
+    reasoning: >
+      The real external PASTA methodology (which this Atlas row
+      abbreviates) does use a DFD for its own Stage 3, and structured
+      sub-processes for others -- but Atlas ITSELF gives none of this
+      detail, and this session's own governing discipline treats Atlas
+      (plus Master Plan and EC) as the mother documents, not external
+      named methodologies. Importing the real methodology's own richer
+      structure here would silently promote an external, uncited
+      source to mother-document status. Minimal, disclosed structure
+      (see `OQ-PASTA-2`) leaves room for a future revision informed by
+      an explicit operator decision to treat the external methodology
+      as authoritative, rather than this contract quietly deciding it.
+  - question: >
+      Should EC §32's own control/residual_risk/test_evidence triple be
+      repeated on EVERY stage (matching STRIDE/LINDDUN/Attack Tree's
+      own per-threat/per-leaf placement), or scoped only to the final
+      'risk' stage?
+    decision: "Scoped only to the final risk stage."
+    reasoning: >
+      STRIDE/LINDDUN/Attack Tree all enumerate MANY discrete threats or
+      leaf techniques, each independently controllable -- EC §32's own
+      triple naturally repeats once per discrete item. PASTA's own
+      formula names ONE end-to-end pipeline producing ONE overall risk
+      verdict (its own final stage IS literally 'Risk & Impact
+      Analysis'); the five stages before it (business objectives
+      through attack modeling) are process steps building toward that
+      verdict, not independently controllable findings of their own --
+      Atlas's own formula attaches no controls to them individually.
+      Forcing the triple onto every stage would fabricate six
+      redundant, contentless 'control' fields for stages that have no
+      real controls of their own to name.
+  - question: >
+      Should `stages` be a caller-supplied array validated for the
+      right SET of seven ids (order-independent), or a fixed-length-
+      seven array validated for the right ORDER too?
+    decision: "Order matters -- stages[0] must be 'business', stages[1] 'scope', ..., stages[6] 'risk', exactly Atlas's own chain order."
+    reasoning: >
+      Atlas's own formula is written with '→' (a directed chain), not a
+      set or an unordered list -- the same distinction this contract's
+      own description already draws against STRIDE/LINDDUN's own
+      unordered threats[]. A caller providing the seven stages out of
+      order (e.g. doing threat analysis before defining technical
+      scope) would not have genuinely followed PASTA's own real,
+      dependency-ordered process, even if all seven stage_ids are
+      technically present -- checking order is not an invented
+      over-constraint, it is the one real invariant Atlas's own
+      notation actually asserts.
+
+open_questions:
+  - id: "OQ-PASTA-1"
+    question: "id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, its own stale 'L1284' second-EC-mention cross-reference corrected, AND its own stale 'line: 881' for the PASTA row itself corrected -- Atlas's real PASTA row is L884, the whole nearby F20 block in that file is off by 3)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-PASTA-2"
+    question: >
+      This contract deliberately keeps each of the six process stages
+      minimal (stage_id/summary only), declining to import the real
+      external PASTA methodology's own richer per-stage structure (see
+      compilation_decisions). Should a future revision, on explicit
+      operator instruction to treat that external methodology as
+      authoritative, add per-stage sub-structure (e.g. a DFD-based
+      decomposition object for the 'decompose' stage)?
+    owner: "operator, or whoever next revises this contract's own scope with explicit authorization to cite the external PASTA methodology as a source"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-PASTA-3"
+    question: >
+      `assets`/`entry_points`/`trust_boundaries` are not cross-validated
+      against the stages' own content (no structural link from, e.g.,
+      the 'scope' stage's own summary back to a specific entry_points
+      entry). Should a future revision add an optional link?
+    owner: "operator, or whoever next revises this contract's own scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-PASTA-4"
+    question: >
+      With PASTA now a real THIRD structural shape among F20 members
+      (flat-DFD, recursive-tree, ordered-stage-pipeline), directly
+      answering `OQ-ATTACKTREE-4`'s own question with "diverges again,
+      in a third direction" -- does this settle the broader question of
+      whether ANY shared F20 base schema (beyond the EC §32 framing
+      triplet, `OQ-STRIDE-4`'s own still-open subject) is worth
+      pursuing? Not solved here -- a real question for whoever next
+      surveys all built F20 members once more are built (DPIA/PIA, Zero
+      Trust Review, Secrets Threat Review, Supply Chain Threat Model,
+      Abuse Case, Security Control Mapping remain).
+    owner: "operator, or whoever next builds a fifth F20 member or surveys the family as a whole"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F20 tool table row (L884) and Execution Contract §32
+    (L1231-1260) directly -- the ONLY two citations that exist for this
+    method anywhere in this spec root, confirmed by broad case-
+    insensitive grep across all three normative documents and the spec
+    root for "PASTA"/"business objective"/"technical scope"
+    /"application decomposition"/"vulnerability analysis"/"attack
+    modeling"/"risk.{0,10}impact analysis" -- every non-citation hit
+    read and confirmed distinct (none found beyond the two citations
+    and the two catalog/prose mentions already discussed above).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own seven-word chain is
+    directly transcribed as the `stages[].stage_id` enum, in Atlas's
+    own literal order; EC §32's own Assets/Trust Boundaries/Entry
+    Points elements are kept identically shaped to the three siblings'
+    own fields. All per-stage structural detail beyond Atlas's own
+    seven words is explicitly disclosed as grounded in real, external,
+    named PASTA methodology practice, not a mother-document citation
+    (see description and compilation_decisions above) -- the minimal,
+    non-inventing choice given that grounding is disclosed, not
+    silently presented as if Atlas specified it.

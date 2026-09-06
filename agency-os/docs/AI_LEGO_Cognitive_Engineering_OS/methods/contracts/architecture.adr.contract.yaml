@@ -156,11 +156,16 @@ recommended_next: [devops_sre.canary_deployment, devops_sre.blue_green_deploymen
 # root" -- that was ALREADY false before this correction for two of the
 # three (devops_sre.canary_deployment and devops_sre.blue_green_deployment
 # were both built earlier this session, F19), and is now also false for
-# Threat Model, which as of the 46th slice has THREE machine_ids
+# Threat Model, which as of the 47th slice has FOUR machine_ids
 # (security.stride, 44th slice; security.linddun, 45th slice;
-# security.attack_tree, 46th slice -- all three independently name this
-# same forward link in their own recommended_next, per Atlas's own
-# §10/§13.11 STRIDE-then-LINDDUN-then-Attack-Tree adjacency). ADR's own
+# security.attack_tree, 46th slice; security.pasta, 47th slice -- all
+# four independently name this same forward link in their own
+# recommended_next. The first three are grounded in Atlas's own
+# §10/§13.11 STRIDE-then-LINDDUN-then-Attack-Tree adjacency; PASTA is
+# ABSENT from both of those recipes and grounds the same forward link
+# on Execution Contract §32's own naming of it as a Threat Review
+# method instead -- see `security.pasta.contract.yaml`'s own
+# recommended_next comment). ADR's own
 # recommended_next models FORWARD steps, and
 # Threat Model sits BEFORE ADR in the chain,
 # so its new machine_id does not populate this field -- but Canary/Blue-
@@ -244,9 +249,10 @@ open_questions:
   - id: "OQ-ADR-2"
     question: >
       F18's own recommended chain places ADR between a Threat Model step
-      and a Rehearsal step. Threat Model now has THREE machine_ids
+      and a Rehearsal step. Threat Model now has FOUR machine_ids
       (`security.stride`, 44th slice; `security.linddun`, 45th slice;
-      `security.attack_tree`, 46th slice) but all three sit BEFORE ADR,
+      `security.attack_tree`, 46th slice; `security.pasta`, 47th slice)
+      but all four sit BEFORE ADR,
       so none feed this contract's own (forward-looking)
       `recommended_next`. Rehearsal still has no machine_id anywhere in
       this spec root. Should `recommended_next` add a Rehearsal-family

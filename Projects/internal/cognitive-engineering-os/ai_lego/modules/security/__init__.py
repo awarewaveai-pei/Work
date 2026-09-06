@@ -4,7 +4,9 @@ own DevOps／SRE／可靠性套件 (13/13, complete), and F21's own database_dat
 covered, complete). Tenants: ``security.stride`` (see ``stride.py``), ``security.linddun`` (see
 ``linddun.py`` -- deliberately mirrors ``stride.py``'s own shape, see its own module docstring),
 ``security.attack_tree`` (see ``attack_tree.py`` -- the FIRST F20 member to structurally DIVERGE from the
-stride/linddun shared shape, and the first F20 ``genuine_compute`` module).
+stride/linddun shared shape, and the first F20 ``genuine_compute`` module), ``security.pasta`` (see
+``pasta.py`` -- a genuinely THIRD structural shape: a fixed-length, positionally-ordered seven-stage
+pipeline, neither the stride/linddun flat-DFD shape nor attack_tree's own recursive tree).
 
 Not to be confused with ``ai_lego.security`` (crypto-shred key-lifecycle runtime infrastructure, a
 different concern under a same-named path segment)."""
