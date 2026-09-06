@@ -19,6 +19,13 @@ description: >
   is the tracking table for that 3-tier strategy; it does not itself contain
   any method.schema.yaml contract content.
 
+  **Authoring standard (2026-09-06 operator directive)**: any new Tier 1
+  entry from here on follows `../METHOD_ATLAS_SLICE_LEAN_STANDARD.md` --
+  real citations/dedup-check/two-layer invariants/tests stay mandatory;
+  the long prose (`compilation_decisions` reasoning paragraphs,
+  `open_questions` essays, a standalone per-slice doc, per-slice full
+  regression runs) is cut. Read that file before writing a new contract.
+
   This file records ONLY what this task actually verified or was explicitly
   told not to guess -- it does not fabricate a Tier 1 list or enumerate all
   284 Tier 2 entries as individual records here. method-inventory.yaml already
