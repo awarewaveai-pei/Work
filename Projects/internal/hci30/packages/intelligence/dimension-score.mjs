@@ -34,9 +34,11 @@ export function normalizeDimensionScore(entry, index) {
   return { dimension, value, evidence_refs: evidenceRefs };
 }
 
-// Shared duplicate-dimension check, same reasoning: both rollupTrustDomains
-// and detectSeverityFloor take the full 14-dimension input and must reject
-// the same malformed shape (two entries for one dimension) the same way.
+// Shared duplicate-dimension check, same reasoning: rollupTrustDomains,
+// detectSeverityFloor, and classifyEvidenceQuality (HCI_EVIDENCE_QUALITY_SPEC.md,
+// added later the same day -- this module's genuine third consumer) all
+// take the full 14-dimension input and must reject the same malformed
+// shape (two entries for one dimension) the same way.
 export function assertNoDuplicateDimensions(normalized) {
   const seen = new Set();
   for (const entry of normalized) {

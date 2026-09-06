@@ -304,8 +304,14 @@ second time through a different texture.
 This spec deliberately does not define, and a future implementer must not
 silently invent inline here:
 
-- **Source independence** across a single dimension's evidence inputs →
-  `HCI_EVIDENCE_QUALITY_SPEC.md` (not yet written).
+- **Source independence** across a single dimension's evidence inputs —
+  **update, 2026-09-06**: `HCI_EVIDENCE_QUALITY_SPEC.md` (partial) now
+  classifies a dimension's evidence as `SINGLE_SOURCE`/`MULTIPLE_SOURCES`
+  by distinct ref count, but explicitly does **not** claim independence
+  (a genuine independence check needs the `source_relationships` lineage
+  graph, `06_HCI30_PUBLIC_INTELLIGENCE.md` §Source independence, still
+  unimplemented at this layer). True source independence remains open in
+  that same file's own out-of-scope list.
 - **Contradiction** between evidence inputs (two sources disagreeing about
   the same dimension) → `HCI_CONTRADICTION_SPEC.md` (not yet written) — a
   separate P0-04 sibling from evidence quality, not folded into it.

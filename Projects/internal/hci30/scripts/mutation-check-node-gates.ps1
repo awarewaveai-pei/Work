@@ -167,6 +167,28 @@ $mutations = @(
      find = ".filter((other) => other !== dimension && DIMENSION_TO_DOMAIN[other] === domain)"
      replace = '.filter((other) => DIMENSION_TO_DOMAIN[other] === domain)'
      test = 'tests/unit/intelligence/detect-severity-floor.test.mjs' }
+
+  @{ id = 'evidence-quality-shift-threshold'
+     file = 'packages/intelligence/classify-evidence-quality.mjs'
+     find = 'const SINGLE_SOURCE_COUNT = 1;'
+     replace = 'const SINGLE_SOURCE_COUNT = 2;'
+     test = 'tests/unit/intelligence/classify-evidence-quality.test.mjs' }
+
+  @{ id = 'evidence-quality-invert-labels'
+     file = 'packages/intelligence/classify-evidence-quality.mjs'
+     find = "const quality = distinctRefCount <= SINGLE_SOURCE_COUNT ? 'SINGLE_SOURCE' : 'MULTIPLE_SOURCES';"
+     replace = "const quality = distinctRefCount <= SINGLE_SOURCE_COUNT ? 'MULTIPLE_SOURCES' : 'SINGLE_SOURCE';"
+     test = 'tests/unit/intelligence/classify-evidence-quality.test.mjs' }
+
+  # Regression guard for critic review 2026-09-06 C2: counting raw
+  # evidence_refs.length instead of distinct-ref count let a genuinely
+  # single-sourced dimension (one ref repeated) escape the SINGLE_SOURCE
+  # label. This mutation reverts exactly that fix.
+  @{ id = 'evidence-quality-count-raw-length-not-distinct'
+     file = 'packages/intelligence/classify-evidence-quality.mjs'
+     find = 'const distinctRefCount = new Set(entry.evidence_refs).size;'
+     replace = 'const distinctRefCount = entry.evidence_refs.length;'
+     test = 'tests/unit/intelligence/classify-evidence-quality.test.mjs' }
 )
 
 function New-MutationSandbox {

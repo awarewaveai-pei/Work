@@ -87,7 +87,9 @@ propagation gap.
 Given the same 14-already-resolved-dimension-value input `rollupTrustDomains`
 takes (`{dimension, value, evidence_refs}[]`, validated via
 `packages/intelligence/dimension-score.mjs`, shared with the roll-up
-function — a third consumer of that validation shape):
+function — a second consumer of that validation shape; this line
+originally miscounted it as "a third", corrected here — see
+`dimension-score.mjs`'s own header for the count):
 
 - A dimension crosses the severity floor when its `value` is `VERY_LOW`
   (rank 1) — the worst representable band, not `LOW`. `LOW` is a
@@ -125,8 +127,12 @@ exactly why that number is thinner than it looks.
 ## Verification
 
 - `packages/intelligence/dimension-score.mjs` — the shared
-  `{dimension, value, evidence_refs}` validator, extracted here on its
-  third real consumer (`rollupTrustDomains`, now this file).
+  `{dimension, value, evidence_refs}` validator. Extracted from
+  `rollup-trust-domains.mjs` for this file's second consumer (this text
+  originally said "third", a miscount fixed after a critic review); a
+  genuine third consumer, `classify-evidence-quality.mjs`
+  (`HCI_EVIDENCE_QUALITY_SPEC.md`), was added in a later commit the same
+  day.
 - `packages/intelligence/detect-severity-floor.mjs` — the function itself.
 - `tests/unit/intelligence/dimension-score.test.mjs` — the shared
   validator's own tests, migrated out of `rollup-trust-domains.test.mjs`'s

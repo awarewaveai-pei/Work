@@ -74,6 +74,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Shared dimension-score validator tests failed 
 node --test (Join-Path $root 'tests/unit/intelligence/detect-severity-floor.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Severity-floor detection tests failed (HCI_RISK_SPEC.md).' }
 
+# HCI_EVIDENCE_QUALITY_SPEC.md (partial): per-dimension evidence-quality
+# classification by distinct evidence-ref count -- SINGLE_SOURCE vs
+# MULTIPLE_SOURCES, never a corroboration claim this codebase cannot
+# verify. Node-level, Docker-free.
+node --test (Join-Path $root 'tests/unit/intelligence/classify-evidence-quality.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Evidence-quality classification tests failed (HCI_EVIDENCE_QUALITY_SPEC.md).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.

@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-09-06（同日第六輪：HCI_EVIDENCE_QUALITY_SPEC.md 部分落地——per-dimension evidence-quality classification，critic 覆審抓到 2 Critical+4 Major+5 Minor，其中一個 Critical 是真的邏輯 bug（非文件不一致），第一次做到全部 7 個引用行號零錯誤）
+
+**觸發**：操作者「繼續直到系統完成」，延續同日第五輪結束後的候選清單，選 P0-04 剩餘規格裡跟已建好的 pipeline 連結最直接的一個——`HCI_EVIDENCE_QUALITY_SPEC.md`（evidence_refs 早已是每個函式的第一級欄位，但從未定義過任何品質標準）。
+
+**動工前先讀既有文件**（吸取前五輪「聲稱之前先 grep」的教訓，這次真的先做）：`06_HCI30_PUBLIC_INTELLIGENCE.md` §Source quality／§Source independence（S1-S6 階層、「URL count is not independent-source count」、`source_relationships`/`cites`/`derived_from`/`original_source` 既有機制、ADR-0026 已有真實 schema）+ `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md` §Public intelligence display（既有的 `VERIFIED FACT`/`CORROBORATED REPORT`/`SINGLE-SOURCE REPORT` 詞彙）。也先查了一個看似相關但其實無關的既有文件（`HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY.md` 的「Minimum evidence」欄——那是不同概念，指法律記錄需要哪些欄位才算完整，不是「幾筆證據才算有支撐」），避免誤用。
+
+**初版設計**：`detectSingleSourceEvidence`——只偵測 exactly 1 筆 evidence_refs 的維度並標記 `SINGLE_SOURCE`，2 筆以上的維度完全不出現在輸出（同 `detectSeverityFloor`「只回報例外」的既有慣例）。**送 critic 獨立覆審，抓到 2 個 Critical**（本輪是這五輪以來 Critical 數最多的一次，但其中一個是真正的邏輯 bug，不是單純文件不一致）：
+
+- **C1**：spec 文件明明白白寫了兩種標籤（`SINGLE_SOURCE`／`MULTIPLE_SOURCES`），worked example 也提到第二個維度「因為 3 筆證據所以標 MULTIPLE_SOURCES」——但程式碼從頭到尾只實作了 `SINGLE_SOURCE` 的偵測，2+ 筆的維度被直接 `.filter()` 掉，`MULTIPLE_SOURCES` 這個字串在整個 codebase 裡只出現在文件跟一個 mutation 的「變異後」字串裡，從未被程式真的吐出來過——spec 自己的 worked example 20 行後就自證了矛盾。**全面重新設計**：從「只回報例外」改成「回報每一個存在的維度」（改名 `classifyEvidenceQuality`/`classify-evidence-quality.mjs`），因為「證據品質」是每個維度都相關的資訊，不像 severity/disagreement 那樣是例外狀況；沉默不回報會讓「這維度沒問題」跟「這維度輸入裡根本不存在」無法區分。
+- **C2**：門檻比對用 `evidence_refs.length`（陣列原始長度），不是去重後的獨立筆數——同一個 URL 被引用兩次（`combineMethodFindings` 合併多個 method 時的真實情境）會讓真正只有一個來源的維度逃過 `SINGLE_SOURCE` 標記，且跟 `rollup-trust-domains.mjs` 自己「去重後聯集」的既有慣例（`HCI_TRUST_DOMAIN_SPEC.md` 稱之為 the deduplicated union）不一致。改用 `new Set(evidence_refs).size`。
+
+**4 個 Major**：**M1** spec 兩處宣稱「這裡沒有新門檻常數」，下一行就宣告了一個（`SINGLE_SOURCE_COUNT = 1`）——這正是上一輪 HCI_RISK_SPEC.md C1 教訓（具名常數配 `===`）原封不動再犯一次，只是這次連「沒有常數」都講錯了。刪除自相矛盾的宣稱，改用 `<=`。**M2**：一個叫「不同 domain 都會回報」的測試餵了非預設組合，卻只用 `Set` 比對維度名稱，`domain`／`value` 欄位完全沒驗證——3 個相關 mutation 全部存活，改成完整 `deepEqual`。**M3**：前兩輪各自都同步了 4-5 個關聯文件，這輪一開始完全沒做——全部補齊。**M4**：宣稱「借用既有詞彙」卻同時發明了語料庫裡零先例的 `MULTIPLE_SOURCES`，且把 `SINGLE-SOURCE REPORT` 改寫成 `SINGLE_SOURCE`（拿掉連字號跟 REPORT 後綴）——這個轉寫本身也是命名判斷，Status 段落原本沒揭露，已補上明確拆分（哪部分是可從文字推導、哪部分是操作者一般授權下的命名判斷）。
+
+**5 個 Minor 全修**：「ladder」用詞不準（`19` 文件從未這樣稱呼，只是 example states 列表）；未揭露「1 筆證據可能聚合多個真實來源」這個保守方向的不對稱性；`quality` 欄位在舊設計下是死欄位（C1 修完後不再是）；`HCI_RISK_SPEC.md` 自己殘留的「第三個消費者」計數錯誤（上一輪已修過同款錯誤但漏了這一處，本輪順手修正，順便更新成現在真的有第三個消費者的事實）；`dimension-score.mjs` 三個消費者對稀疏陣列輸入會拋出未經處理的原始 TypeError——評估後這個修法需要同時碰兩個已出貨檔案（`rollup-trust-domains.mjs`／`detect-severity-floor.mjs`），非本輪範圍，另開追蹤待辦而非塞進本次 commit。
+
+**這是第三次出現「安全宣稱被自己文件的操作步驟或 worked example 證偽」**（HCI_CONFIDENCE_SPEC.md C1 → HCI_RISK_SPEC.md C1 → 這次 C1），但也是第一次**引用行號零錯誤**（7 個文件引用全部逐行核對通過）——動工前先讀文件、寫完先 grep 確認宣稱為真，這兩個習慣本輪確實內化了；但「宣稱某個功能存在卻沒真的實作完」這個更深層的模式還沒解決，需要往後每次動筆寫「這裡回報 X」之類的句子時，寫完當場就 grep 確認 X 真的被吐出來過。
+
+**[已修改]**
+- 新增：`Projects/internal/hci30/docs/intelligence/HCI_EVIDENCE_QUALITY_SPEC.md`
+- 新增：`Projects/internal/hci30/packages/intelligence/classify-evidence-quality.mjs`
+- 新增：`Projects/internal/hci30/tests/unit/intelligence/classify-evidence-quality.test.mjs`
+- 修改：`Projects/internal/hci30/packages/intelligence/dimension-score.mjs`（消費者計數註解更新）
+- 修改：`Projects/internal/hci30/scripts/{test-wave1-local.ps1,mutation-check-node-gates.ps1}`
+- 修改：`Projects/internal/hci30/README.md`
+- 修改：`Projects/internal/hci30/docs/intelligence/{HCI_TRUST_DOMAIN_SPEC.md,HCI_RISK_SPEC.md}`（回填答案、修正消費者計數）
+- 修改：`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/21_HCI_TOP_TIER_GAP_ANALYSIS.md`（第四次 partial closure 記錄）
+- 修改：`agency-os/TASKS.md`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/*.test.mjs tests/unit/intelligence/*.test.mjs`（`Projects/internal/hci30`）| exit=0 | result=137/137 pass（critic 修復前 13 個新測試，重新設計後補到 14 個涵蓋兩種標籤+去重案例）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/mutation-check-node-gates.ps1` | exit=0 | result=`All 21/21 Node-gate mutations killed.`（含 C2 的 regression-guard mutation：把去重比對改回原始長度必須被抓到）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File Projects/internal/hci30/scripts/test-wave1-local.ps1` | exit=0 | ms=~35000 | result=`HCI Wave 1 local suite PASSED`，全流程重跑綠燈
+- REVIEW_DONE: critic=Standard（真實 subagent，實際刪減程式碼跑 mutation 驗證，非憑代碼推論）| verdict=2 Critical/4 Major/5 Minor，全修 | findings=2c/4m/5minor
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os | grep=`detectSingleSourceEvidence\|detect-single-source-evidence\|classifyEvidenceQuality\|classify-evidence-quality\|SINGLE_SOURCE_COUNT\|HCI_EVIDENCE_QUALITY_SPEC` | hits=13（舊名僅存於 TASKS.md 的歷史敘述中，正確；新名 12 處皆本輪新建/修改檔案，皆預期內）
+- WORKLOG: 本條目
+
+**[剩餘風險]**
+- `dimension-score.mjs` 三個消費者對稀疏陣列輸入的原始 TypeError，已列 TASKS.md 追蹤，非本輪引入
+- P0-04 剩三份規格（Permission/Contradiction/Time Decay）+ 前四份各自剩餘未關閉部分仍未寫，已列 TASKS.md OQ
+- 真正的 source independence（`source_relationships` 血緣圖）完全不在本輪範圍——`MULTIPLE_SOURCES` 刻意不宣稱獨立性
+
+**[rollback]** 純新增，`git revert` 即可；無 schema/migration/prod 變更。
+
 ## 2026-09-06（續58，同一 session：Cognitive OS 第四十五個 Method Atlas 切片 — `security.linddun`，F20 家族第二個成員；critic subagent 撞到帳號級 rate limit（Opus session limit）中途失敗，改走本 session 既有的「oracle 斷線不可跳過 review」協定——自己做對抗自審+真跑 5 個突變測試）
 
 **觸發**：操作者「繼續」，承接 WORKLOG 續57 收尾時列出的 F20 候選清單，選 LINDDUN——Atlas §13.11 recipe 明文將其緊接在 STRIDE 之後，EC §32 也明文與 STRIDE 並列為可選方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
