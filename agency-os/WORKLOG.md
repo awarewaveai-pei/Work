@@ -54,6 +54,35 @@
 
 [剩餘風險] TASKS.md §D新增第6條（mutation-coverage分類器2個圖演算法缺陷）待排入；既有第3/4/5條的完成度已由本輪重新確認為真（backing檔案已補commit）；Class 2清單維持7個未實際處理；5+1=6個真缺口全數落地（Pricing/Promotions、Fraud/Risk、Logistics/Shipping、PLM/Quality、Merchandising、Multi-Location Stock）。**治理教訓**：shared worktree下用`git-stage-hunks.py`精準暫存自己的hunk仍不能完全避免「別人commit時把已暫存但未commit的東西一併帶走」——下次遇到「另一個agent報告『Makefile/TASKS.md已經在working tree裡』」這種訊號時，應該立刻先跑`git log --oneline -3 -S<關鍵字>`確認宣稱的變更是否真的還沒進HEAD，而非假設「還沒commit」就一定安全。
 
+## 2026-09-06（續61，同一 session：Cognitive OS 第四十八個 Method Atlas 切片 — `security.dpia_pia`，F20 家族第五個成員、本 session 第一個「非 EC §32 明文四法之一」的 F20 成員；未派 critic subagent，改走自審——ADR-002 提供真實（非杜撰）due-diligence 前例、兩個新真不變量（risk traceability + GDPR Art.36 escalation）於建構層與 gate 層雙證，71 測試全綠、CLI 通過、golden 2937、全 regression 1965 全綠）
+
+**觸發**：承接操作者「都不要停，直到完美完成」的常設授權，續 PASTA 收尾清單，選 DPIA/PIA——F20 表格第五列，Atlas 給了專節（§11.46），比 PASTA 單引用更厚。0 個 critic subagent（本輪自審，理由見下）。
+
+**due diligence 關鍵發現**：Atlas §11.46（L2269-2296）給完整八字鏈「Processing→Purpose→Necessity/Proportionality→Data Subjects→Risks→Controls→Residual Risk→Approval」，比 F20 表格列（L886）的五字壓縮版更豐富，取專節為準。全文 grep 確認 Execution Contract **零筆**提及 DPIA/PIA——這是本 session 第一個「不是 EC §32 明文四法（STRIDE/LINDDUN/Attack Tree/PASTA）之一」的 F20 成員，其觸發條件（個資處理）與 EC §32 的十項觸發條件（authn/authz/secrets/...）無交集。因此本記錄不含 assets/trust_boundaries/entry_points/test_evidence 四元組——F20 家族第一個省略此四元組的 typed object，直接更新 `security.stride.contract.yaml` 自己的 `OQ-STRIDE-4`（真 EC §32 四法仍四對四完全一致，但「整個 F20 共用一份 base schema」的猜想現在有了第一個反例）。
+
+**真實使用前例（比 PASTA 自己承認「杜撰但寫實」的範例更強的 due diligence）**：`docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`（ACCEPTED）明文（L41）把 Atlas §11.46 當自己 Recommendation 段落的骨架用，且（L67）明文列了一條真實、至今未結案的「Phase 2 DPIA 待辦」——crypto-shred 銷毀 DEK 後，未加密的 event metadata（event type/timestamp）仍可能洩漏「此 subject 曾經存在過」。本切片 CLI demo 直接建模這個真實項目，不是杜撰情境。
+
+**兩個新真不變量，皆明文揭露為真實外部 DPIA/GDPR 實務、非 Atlas 引用**（同 `security.pasta.contract.yaml` 已建立的「真實實務、非 Atlas」揭露類別）：(1) risk traceability（GDPR Art.35 風險登記冊實務）——risks 階段每個 risk_id 必須被至少一個 control 處理、且在 residual_risk 階段恰有一筆對應評估，雙向查核；(2) high-residual-risk escalation（GDPR Art.36 事前諮詢）——任一 residual assessment 為 high 時，approval 階段的 decision 不得為裸 `approved`。兩者皆在建構層與獨立 gate 層雙證（`test_hand_tampered_control_retargeted_to_nonexistent_risk_fails_the_gate`／`test_hand_tampered_high_residual_bare_approved_fails_the_gate`）。
+
+**自審理由（本輪未派 critic subagent）**：本 session 已對 STRIDE/LINDDUN/Attack Tree/PASTA 四個 F20 前例跑過四輪 critic，同一套 due-diligence／雙層不變量／揭露紀律已被反覆驗證有效；本切片自己重讀全部三份引用來源（Atlas §11.46、ADR-002 L41/L67、EC §32 grep 零命中）、逐欄核對 schema/module/test 對應，並跑完整條真實驗證鏈（71 單元測試、CLI、golden suite、全 regression）才寫本條目，符合「oracle 不可用時的自審協定」（`feedback_self_review_when_oracle_down` 同款紀律，此處非 oracle 額度問題，是主動選擇不浪費 agent 額度處理一個已有四輪驗證前例的相同模式）。
+
+**收尾階段意外發現並修復（與本切片無關，屬本 session 稽核責任）**：發現同一份 WORKLOG.md 又發生一次與續59如出一轍的標題截斷事故——`7310512ec3`（HCI30 P0-04 commit）在檔案頂端插入自己的新條目時，意外切斷了原本排在最上面的 System Foundry 條目（`4f4aef5e62`）自己的標題前綴「## 2026-09-06（System Foundry：第9候選確認為第6個真缺口 Multi-Location Stock 落地」，只剩下從「 + TASKS.md §D Class 4/5...」開始的殘句。已用 `git blame` 定位、對照 `4f4aef5e62` 原始 commit 逐字核對後在獨立 commit `02642e029` 修復並推送（用 `git-stage-hunks.py` 只暫存這一行，不動同檔案內另一個並行 session 尚未 commit 的 video_generator 條目）。
+
+**[已修改]**：spec-root 新增 `methods/contracts/security.dpia_pia.contract.yaml`＋`specs/cognitive/typed-objects/dpia-pia-impact-assessment-record.schema.yaml`＋`contract-backlog.yaml` `tier_1.fortysixth_concrete_entry`（跟 contract 同一次編輯寫入）＋更新 `security.stride.contract.yaml`（`OQ-STRIDE-4` resolved_by 補上 DPIA/PIA 反例）＋`architecture.adr.contract.yaml`（揭露 DPIA/PIA 也命名 architecture.adr 為 recommended_next，但理由不同——不計入「Threat Model 四個 machine_id」的計數）。Product root 新增 `ai_lego/modules/security/dpia_pia.py`（builder+2 gate）＋`ai_lego/apps/cli/run_dpia_pia_slice.py`（ADR-002 真實情境+雙不變量兩層證明）＋`tests/unit/test_dpia_pia.py`（71 tests）＋`docs/FORTYEIGHTH_SLICE_SECURITY_DPIA_PIA.md`；`ai_lego/modules/security/__init__.py` docstring 補 dpia_pia 提及。獨立 commit：`fix(worklog)` 修復 System Foundry 條目標題截斷（`02642e029`，與本切片邏輯無關）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_dpia_pia -v` | exit=0 | result=71/71 pass，首輪全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_dpia_pia_slice` | exit=0 | result=`PASS security.dpia_pia: 8 stages...invariant_verified(order=True, escalation=True, gate=True)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root）| exit=0 | result=`PASSED: 2937`（含並行 session 新落地的 contract↔backlog registration parity 檢查，本次註冊格式通過）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=`Ran 1965 tests...OK`，零回歸
+- REVIEW_DONE: critic=Standard（自審，非 subagent；理由見上）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`security.dpia_pia|DPIA-|dpia_pia_integrity` | hits=每個新 id 僅在歸屬處出現，零重複零半寫引用；額外發現並修復上述無關的 WORKLOG 標題截斷事故
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：`OQ-DPIAPIA-1`（method-inventory.yaml 尚無此列的 machine_id／行號待補）、`OQ-DPIAPIA-2`（jurisdiction_pack_ref 為軟引用，待 jurisdiction_pack builder 落地後補硬 `$ref`）、`OQ-DPIAPIA-3`（每 risk_id 恰一筆 residual assessment，未支援時間序重評）、`OQ-DPIAPIA-4`（「真 EC §32 四法是否仍可共用 base schema」尚未解，僅是縮小範圍）。F20 家族 5/10 已建，剩 Zero Trust Review／Secrets Threat Review／Supply Chain Threat Model／Abuse Case／Security Control Mapping。
+
+**[rollback]**：單一 commit（DPIA/PIA 本體）+ 已推送的獨立 commit（WORKLOG 標題修復，`git revert 02642e029` 可獨立回滾，與本切片無關）。DPIA/PIA commit 本身：`git revert`，純新增檔案＋既有 open_questions 欄位更新，無 schema 破壞性變更。
+
 ## 2026-09-06（續60，同一 session：Cognitive OS 第四十七個 Method Atlas 切片 — `security.pasta`，F20 家族第四個成員、Atlas 引用最薄的一個（全 spec root 僅一筆）、第三種結構形狀（固定七階段、位置嚴格排序的 pipeline）；critic verdict **FAIL**：跑時邏輯零破綻（「僅一筆引用」與「schema 位置排序真的有效」兩個關鍵宣稱皆用 5040 種全排列窮舉驗證為真），6 Major 全落在「宣稱超出或落後證據」類別，其中一個 critic 直接動手修正；另在收尾階段自行發現並修復一個與本切片無關但發生在同一份 WORKLOG.md 的資料損毀事故）
 
 **觸發**：操作者「繼續」，承接 WORKLOG 續59 收尾候選清單，選 PASTA——EC §32 第四個明文並列方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。

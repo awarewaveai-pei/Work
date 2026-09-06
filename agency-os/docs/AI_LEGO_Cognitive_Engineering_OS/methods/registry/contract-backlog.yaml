@@ -1800,6 +1800,52 @@ tier_1:
       Threat Model, Abuse Case, Security Control Mapping), each an
       independent future slice, not blocked by this one.
 
+  fortysixth_concrete_entry:
+    # NEW (2026-09-06, same session): forty-sixth Tier 1 entry, same
+    # additive-key rationale as the forty-five entries above it. Added
+    # to THIS file in the SAME editing pass that wrote the contract
+    # itself, before any critic round.
+    method_id: "security.dpia_pia"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      Same class of justification as every entry above. FIFTH entry
+      from the `security` family (F20), after security.stride,
+      security.linddun, security.attack_tree, and security.pasta.
+      Atlas gives this method its OWN DEDICATED section (§11.46,
+      L2269-2296: "Processing→Purpose→Necessity/Proportionality→Data
+      Subjects→Risks→Controls→Residual Risk→Approval") -- richer
+      grounding than PASTA's own single-citation case. Grep-confirmed
+      ZERO mentions of DPIA/PIA anywhere in the Execution Contract --
+      the FIRST F20 member built this session that is NOT one of EC
+      §32's own four named Threat Review methods (STRIDE/LINDDUN
+      /Attack Tree/PASTA); its own trigger is personal-data processing,
+      not EC §32's authn/authz/secrets/crypto/etc list. Consequently
+      this is the first F20 typed object to omit the
+      assets/trust_boundaries/entry_points/test_evidence triplet
+      entirely, real disclosed evidence updating
+      `security.stride.contract.yaml`'s own `OQ-STRIDE-4`. Real usage
+      precedent in THIS repository: `docs/adr/ADR-002-personal-data
+      -erasure-vs-event-immutability.md` (ACCEPTED) explicitly used
+      Atlas §11.46 as its own Recommendation-section skeleton and
+      named a real, still-open "Phase 2 DPIA 待辦" this contract's own
+      CLI demo models directly -- stronger due diligence than PASTA's
+      own fabricated-but-realistic example. Two invariants beyond
+      stage completeness-and-order, both real external DPIA/GDPR
+      practice disclosed as such (not Atlas): risk-to-control-to
+      -residual traceability (Art. 35), and high-residual-risk
+      escalation (Art. 36 Prior Consultation) -- neither reducible to
+      any prior F20 member's own real invariant, a genuinely FOURTH
+      structural sub-variant among F20 members.
+    source: "methods/contracts/security.dpia_pia.contract.yaml (built same session as this entry, mints machine_id security.dpia_pia) + specs/cognitive/typed-objects/dpia-pia-impact-assessment-record.schema.yaml (new output type)"
+    note: >
+      Tier 1, mandated by the actively-running implementation slice,
+      same category as the forty-five entries above it. FIFTH entry of
+      the `security` family -- five more F20 table rows remain (Zero
+      Trust Review, Secrets Threat Review, Supply Chain Threat Model,
+      Abuse Case, Security Control Mapping), each an independent future
+      slice, not blocked by this one.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

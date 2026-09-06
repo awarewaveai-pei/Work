@@ -175,6 +175,20 @@ recommended_next: [devops_sre.canary_deployment, devops_sre.blue_green_deploymen
 # `challenge.independent_judge.contract.yaml`'s own recommended_next
 # already establishes. Only Rehearsal remains without a machine_id --
 # see `OQ-ADR-2`.
+#
+# UPDATED (48th slice, security.dpia_pia): a FIFTH F20 method now also
+# names architecture.adr as its own recommended_next, but for a
+# GENUINELY DIFFERENT reason, disclosed rather than folded into the
+# "Threat Model has FOUR machine_ids" count above -- DPIA/PIA is
+# grep-confirmed ABSENT from EC §32 entirely, so it is NOT a fifth
+# Threat Model machine_id (that count stays FOUR). Its own forward link
+# rests instead on a real usage precedent this repository already has:
+# `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`
+# (ACCEPTED) used Atlas §11.46's own DPIA/PIA formula AS the skeleton
+# for that ADR's own Recommendation section -- i.e. DPIA/PIA content
+# feeding an ADR DURING drafting, not a prior Threat-Model-step-before
+# -ADR sequencing. See `security.dpia_pia.contract.yaml`'s own
+# description ("Note on causal direction") for the full disclosure.
 
 rollback:
   side_effect_free: true

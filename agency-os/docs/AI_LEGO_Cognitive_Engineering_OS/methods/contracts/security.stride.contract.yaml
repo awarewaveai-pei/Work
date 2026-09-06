@@ -321,20 +321,28 @@ open_questions:
     owner: "operator, or whoever next builds security.linddun / security.pasta / security.attack_tree"
     blocks: "nothing in this file's own validity -- a real design question for when a second real instance exists, not solved prematurely"
     resolved_by: >
-      STILL OPEN as of `security.pasta` (47th slice, the fourth F20
-      member this question itself named as the next checkpoint).
-      `security.attack_tree`'s own first draft (46th slice) incorrectly
-      claimed to close THIS question (conflating it with
-      `OQ-LINDDUN-4`'s own DFD-substrate question) -- caught by critic
-      review and corrected. The real finding, now updated a second
-      time: `security.linddun`, `security.attack_tree`, AND
+      STILL OPEN as of `security.dpia_pia` (48th slice, the fifth F20
+      member built this session), UPDATED with the first genuine
+      COUNTER-example. `security.attack_tree`'s own first draft (46th
+      slice) incorrectly claimed to close THIS question (conflating it
+      with `OQ-LINDDUN-4`'s own DFD-substrate question) -- caught by
+      critic review and corrected. Through `security.pasta` (47th
+      slice), `security.linddun`, `security.attack_tree`, AND
       `security.pasta` ALL FOUR kept these exact three fields
       identically shaped to this contract's own -- FOUR-FOR-FOUR
       identical re-declarations across every EC §32-named method built
-      so far, further STRENGTHENING the case for eventually factoring
-      this specific sub-shape out, not a reason to abandon the
-      question. Left open, tracked forward to whoever next builds a
-      fifth F20 member or revisits this contract's own scope.
+      so far. `security.dpia_pia` (48th slice) BREAKS this pattern: it
+      is grep-confirmed absent from EC §32 entirely (its own trigger is
+      personal-data processing, not EC §32's list), and its own record
+      carries NONE of assets/trust_boundaries/entry_points. This
+      narrows the real question rather than resolving it: a shared
+      base schema for the EC §32 triplet remains PLAUSIBLE across the
+      FOUR true EC §32-named Threat Review methods (still four-for-four
+      there), but is now CONFIRMED NOT universal across all of F20 --
+      DPIA/PIA is real, disclosed evidence that F20 as a whole is not a
+      single-shape family. Left open at the narrower scope, tracked
+      forward to whoever next surveys the four EC §32 members
+      specifically, or builds a sixth F20 member.
   - id: "OQ-STRIDE-5"
     question: >
       This record's own per-threat control/test_evidence fields are

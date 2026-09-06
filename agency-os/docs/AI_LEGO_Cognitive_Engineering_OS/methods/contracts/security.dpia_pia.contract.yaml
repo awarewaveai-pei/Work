@@ -1,0 +1,359 @@
+$id: "ai-lego://methods/contracts/security.dpia_pia.contract.yaml"
+title: "DPIA/PIA Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Forty-eighth Method Atlas slice, FIFTH member
+  of the `security` family (F20's own "資安／隱私套件"), after
+  `security.stride` (44th), `security.linddun` (45th),
+  `security.attack_tree` (46th), and `security.pasta` (47th).
+
+  **Atlas gives this method its own DEDICATED section, §11.46
+  (L2269-2296)** -- richer grounding than PASTA's own single-citation
+  case, comparable to STRIDE's §11.44/LINDDUN's §11.45. Full name: DPIA
+  = Data Protection Impact Assessment, PIA = Privacy Impact Assessment.
+  Formula: `Processing → Purpose → Necessity/Proportionality → Data
+  Subjects → Risks → Controls → Residual Risk → Approval` (EIGHT words,
+  L2278-2287), plus a "全球化要求" line (L2289-2290): "由 Jurisdiction
+  Pack 決定何時 mandatory、誰有 authority、適用哪個版本法規." The F20
+  tool table's own row (L886) gives a COMPRESSED five-word summary
+  ("processing→necessity/proportionality→risk→controls→approval") --
+  the dedicated section is the richer, more detailed source and is
+  treated as authoritative for this contract's own `stages` shape, the
+  table row treated as a compressed pointer only (the same
+  detail-precedence this session already applies whenever a dedicated
+  section and a table row disagree in granularity).
+
+  **DPIA/PIA is the FIRST F20 member built this session that is NOT
+  one of Execution Contract §32's own four named Threat Review
+  methods.** Broad, independent grep across the Execution Contract
+  found ZERO mentions of "DPIA" or "PIA" anywhere in that document --
+  EC §32's own closing sentence names exactly "STRIDE／LINDDUN／Attack
+  Tree／PASTA" (L1260), no fifth option. DPIA/PIA's own trigger is
+  privacy-specific ("processing of personal data"), genuinely distinct
+  from EC §32's own trigger list (authn/authz/secrets/crypto/network
+  /egress/tenant isolation/file parsing/user content/AI tools,
+  L1233-1245) -- a personal-data processing activity may exist with
+  none of those ten triggers present, and conversely an EC §32 change
+  may involve zero personal data. Consequently this record carries
+  NONE of `assets`/`trust_boundaries`/`entry_points`/`test_evidence` --
+  the first F20 typed object to omit that triplet, directly updating
+  `security.stride.contract.yaml`'s own `OQ-STRIDE-4` (see
+  compilation_decisions and that file's own `resolved_by`).
+
+  **Real usage precedent in THIS repository, stronger due diligence
+  than PASTA's own admittedly-fabricated-but-realistic example**:
+  `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`
+  (Status: ACCEPTED, 2026-08-29) explicitly names "DPIA/PIA 使用方式
+  （Method Atlas §11.46...）作為 Recommendation 段落骨架" (L41) --
+  Atlas §11.46's own formula was already used, informally, as the
+  structural skeleton for that ADR's own Recommendation section. That
+  same ADR's own Option A analysis (L67) explicitly flags a REAL, still
+  -open backlog item: "Identifiability 維度未完全歸零...建議列入 Phase
+  2 DPIA 待辦而非本 ADR 阻塞項" -- unencrypted event metadata (event
+  type, timestamp) surviving DEK destruction can leak the fact that a
+  subject "once existed" even after crypto-shredding. This contract's
+  own CLI demo models THIS real, named, still-open item -- not a
+  fabricated scenario, directly closing the "no real-world usage
+  instance" gap `security.pasta.contract.yaml`'s own due diligence had
+  to disclose as a limit.
+
+  **Note on causal direction**: unlike STRIDE/LINDDUN/Attack Tree/PASTA
+  (whose own real-world placement is BEFORE an ADR, feeding a Threat
+  Model step that an ADR then records), ADR-002's own real usage shows
+  DPIA/PIA's formula being used DURING/INSIDE the ADR-writing process
+  itself (as the Recommendation section's own skeleton), not as a
+  separate artifact produced first and then referenced. This contract's
+  own `recommended_next: [architecture.adr]` is kept for consistency
+  with every sibling F20 contract, but the reasoning is disclosed as
+  genuinely different, not copy-pasted: a completed DPIA/PIA record
+  (especially one reaching `approved_with_conditions` or `escalated`)
+  is real input an ADR's own Recommendation section can cite, matching
+  ADR-002's own real precedent, rather than STRIDE/LINDDUN/Attack
+  Tree/PASTA's own "Threat Model step precedes ADR in F18's chain"
+  reasoning.
+
+  **Two invariants beyond stage completeness-and-order, both real
+  external DPIA/GDPR practice, NOT an Atlas citation** (same "real
+  practice, not Atlas" disclosure class `security.pasta.contract.yaml`
+  already establishes as precedent, itself following
+  `architecture.adr.contract.yaml`'s own `status` field):
+
+  1. **Risk traceability** -- every `risk_id` in the `risks` stage must
+     be addressed by at least one `controls` entry and have EXACTLY ONE
+     `residual_risk` assessment; no dangling or orphaned entries in
+     either direction. Standard DPIA/GDPR Art. 35 risk-register
+     practice.
+  2. **High-residual-risk escalation** -- if any residual assessment's
+     `residual_risk_level` is `high`, the `approval` stage's own
+     `decision` may not be bare `approved`. Grounded in GDPR Article 36
+     "Prior Consultation": a controller may not approve outright when
+     high residual risk to data subjects remains without consulting the
+     supervisory authority, attaching conditions, or declining to
+     proceed.
+
+  **A fourth structural sub-variant among F20 members**: shares PASTA's
+  own "fixed-length, positionally-ordered pipeline" class (both use
+  `prefixItems`), but ADDS a genuinely new invariant dimension --
+  cross-stage REFERENTIAL completeness (risk_id traceable through
+  control and residual assessment) and a CONDITIONAL business rule
+  (escalation gated on residual severity) -- neither of which PASTA's
+  own pure-ordering invariant, STRIDE/LINDDUN's own flat gap-detection,
+  nor Attack Tree's own numeric aggregation already covers. This is a
+  real, citable data point for `OQ-PASTA-4`'s own open question (is F20
+  genuinely heterogeneous, or could a shared base schema serve it) --
+  DPIA/PIA's own two extra invariants are NOT structurally reducible to
+  any prior F20 member's own real invariant.
+
+  **Jurisdiction Pack**: Atlas §11.46's own "全球化要求" line names
+  Jurisdiction Pack as the mandatory-or-not decider. `specs/jurisdiction
+  /pack.schema.yaml` already exists (a Wave 4 typed object, built
+  independently of this session's own F20 slice work) but has NO
+  ai_lego Python builder yet -- confirmed by grep, `jurisdiction` is
+  referenced only in `ai_lego/core/domain/tenant.py`'s own
+  `home_jurisdiction` field, nowhere else. This contract's own
+  `approval` stage carries an OPTIONAL, NULLABLE `jurisdiction_pack_ref`
+  (soft reference, pattern `^JPACK-`, no hard `$ref` since no builder
+  exists to validate against) -- the FIRST F20 security-family method
+  to touch that concept at all, disclosed as a soft, forward-looking
+  reference rather than a fully wired integration (see open_questions).
+
+  Confirmed distinct from every existing `specs/security/` typed object
+  (`key-vault-lifecycle`, `log-redaction-token`, `personal-data
+  -envelope`, `tenant-isolation-controls`) and from
+  `specs/jurisdiction/context.schema.yaml` (that file's own "Project
+  /Processing Activity" mentions are raw pre-resolution INPUT signals,
+  not a staged impact-assessment record) -- re-confirmed by direct read.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.46 (L2269-2296): 'Processing → Purpose → Necessity/Proportionality → Data Subjects → Risks → Controls → Residual Risk → Approval', plus the F20 tool table row (L886)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md (ACCEPTED, L41, L67): real usage precedent naming Atlas §11.46 as a Recommendation-section skeleton, and a real, still-open 'Phase 2 DPIA 待辦' this contract's own CLI demo models"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 (L1231-1260): grep-confirmed ZERO mentions of DPIA/PIA -- the negative evidence this contract's own 'not an EC §32 method' claim rests on"
+  - "specs/jurisdiction/pack.schema.yaml: the Jurisdiction Pack typed object this contract's own approval.jurisdiction_pack_ref soft-references (no ai_lego builder exists yet)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a forty-sixth
+  concrete entry (added in the same editing pass as this contract).
+  `id: security.dpia_pia` mints a new machine_id, FIFTH member of the
+  `security` family (F20). The risk/control/residual_risk per-stage
+  array shapes and the escalation rule are grounded in real, external
+  DPIA/GDPR practice (Art. 35 risk-register traceability, Art. 36 prior
+  consultation), NOT a mother-document citation -- disclosed throughout,
+  same class of decision `security.pasta.contract.yaml`'s own per-stage
+  field detail already establishes as precedent.
+
+id: security.dpia_pia
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited. Same reasoning as security.pasta: staging the
+# eight-step chain is DECOMPOSE, assigning per-stage content is MAP, the
+# stage-completeness-and-order PLUS risk-traceability PLUS escalation
+# checks are all VALIDATE (referential/conditional derivations, not a
+# numeric COMPUTE step).
+
+purpose:
+  - walk_a_personal_data_processing_activity_through_atlas_own_eight_ordered_dpia_pia_stages_from_processing_to_a_final_approval_decision_with_full_risk_to_control_to_residual_traceability
+inputs:
+  required: [ProcessingActivityDescriptor, DpiaPiaStageSequence]
+  # DpiaPiaStageSequence, not "...Set" -- same shape-accurate-naming
+  # discipline security.attack_tree's AttackGoalTree and
+  # security.pasta's PastaStageSequence already establish: Atlas's own
+  # "→" chain is a real dependency order, not an unordered set.
+  optional: []
+outputs: [DpiaPiaImpactAssessmentRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "stages is EXACTLY the eight entries {processing, purpose, necessity_proportionality, data_subjects, risks, controls, residual_risk, approval}, one each, IN THAT ORDER -- Atlas's own '→' chain is a real dependency order, not an unordered set"
+  - "each of the first four stages (processing/purpose/necessity_proportionality/data_subjects) has a non-empty summary"
+  - "the risks stage has at least one well-shaped risk entry (risk_id, description, likelihood, severity, affected_rights)"
+  - "the controls stage has at least one well-shaped control entry, and EVERY control's mitigates_risk_ids references a risk_id that exists in the risks stage"
+  - "the residual_risk stage has EXACTLY ONE assessment per risk_id declared in the risks stage -- no dangling risk (zero assessments) and no duplicate assessment (more than one)"
+  - "the approval stage has non-empty approver_role/approver_name/decision_date, decision is one of {approved, approved_with_conditions, escalated, rejected}, and if ANY residual assessment's residual_risk_level is 'high', decision is NOT bare 'approved' (GDPR Art. 36 prior-consultation grounding)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class as security.pasta: stage-completeness-and-order,
+  # risk-traceability, and the escalation rule are all structural
+  # /referential derivations, not a statistical/numeric CALCULATED
+  # RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no DPIA/PIA row.
+recommended_next: [architecture.adr]
+# Kept for consistency with all four sibling F20 contracts, but the
+# reasoning is genuinely different -- see description's own "Note on
+# causal direction": ADR-002's real precedent shows DPIA/PIA content
+# feeding an ADR's own Recommendation section DURING drafting, not a
+# prior Threat-Model-step-before-ADR sequencing (security.stride's own
+# F18-chain-position reasoning does not apply here, since DPIA/PIA is
+# not an EC §32 / F18 Threat Model method at all).
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Atlas's own F20 table row (L886) gives a COMPRESSED five-word
+      summary ("processing→necessity/proportionality→risk→controls
+      →approval"), silently merging Purpose into Processing and
+      collapsing Risks/Data Subjects into fewer words, while the
+      dedicated §11.46 section (L2278-2287) gives the fuller
+      EIGHT-word chain. Which is authoritative for this contract's own
+      `stages` shape?
+    decision: "The dedicated §11.46 section's own eight-word chain is authoritative; the table row is treated as a compressed pointer only."
+    reasoning: >
+      Every prior F20 slice that had BOTH a table row and a dedicated
+      section (STRIDE §11.44, LINDDUN §11.45) already treated the
+      dedicated section as the richer, authoritative source, the table
+      row as a summary index -- this contract applies the same
+      precedence, not a new rule. The table row's own five-word
+      compression is lossy (Purpose and Processing are visibly distinct
+      concepts in the dedicated section's own prose, L2280 vs L2279),
+      so treating it as authoritative would silently discard two of
+      Atlas's own eight named steps (Purpose, Data Subjects) that the
+      dedicated section explicitly names.
+  - question: >
+      Execution Contract §32 grounds `assets`/`trust_boundaries`/
+      `entry_points` for all four prior F20 members, all of which
+      identically re-declare that triplet (`OQ-STRIDE-4`'s own
+      running "N-for-N identical" evidence). Grep confirms EC §32 never
+      mentions DPIA/PIA. Should this contract invent an equivalent
+      framing triplet anyway (for consistency with its four siblings),
+      or omit it?
+    decision: "Omit it entirely -- this record carries none of assets/trust_boundaries/entry_points/test_evidence."
+    reasoning: >
+      Inventing an EC §32-shaped framing triplet for a method EC §32
+      never names would be exactly the "undisclosed over-constraint"
+      class a critic review already caught on
+      `database_data.data_contract`'s own first draft -- fabricating
+      structure no mother document specifies, merely for
+      cross-sibling cosmetic consistency. DPIA/PIA's own real framing
+      concept (per Atlas §11.46's own "全球化要求" line) is Jurisdiction
+      Pack applicability, not Assets/Trust Boundaries/Entry Points --
+      a genuinely different kind of framing, modeled instead as the
+      approval stage's own `jurisdiction_pack_ref`. This is real,
+      disclosed evidence that F20 is not uniformly EC §32-shaped,
+      directly updating `security.stride.contract.yaml`'s own
+      `OQ-STRIDE-4` (see that file's own `resolved_by`).
+  - question: >
+      Should the `risks`/`controls`/`residual_risk` stages each carry
+      a SINGLE object (matching PASTA's own single terminal risk
+      verdict), or an ARRAY of entries per stage?
+    decision: "An array of entries per stage, with cross-stage risk_id traceability enforced at the runtime layer."
+    reasoning: >
+      PASTA's own single-verdict scoping is a real, disclosed
+      consequence of ITS OWN formula naming exactly one end-to-end
+      pipeline producing one risk verdict (its compilation_decisions
+      say so explicitly). DPIA/PIA's own real external practice (GDPR
+      Art. 35 DPIAs, ICO/CNIL templates) universally enumerates
+      MULTIPLE distinct risks per assessment, each independently
+      controlled and separately residual-risk-assessed -- collapsing
+      to a single risk entry would understate the real methodology
+      this Atlas row grounds, the same "real practice, not Atlas"
+      class already disclosed for the per-stage field detail overall.
+      This also gives this record a genuinely NEW invariant class
+      (referential completeness across three sibling arrays) beyond
+      what any prior F20 member's own real invariant already covers.
+  - question: >
+      Should the high-residual-risk escalation rule be schema-enforced
+      (a JSON Schema `if`/`then` conditional) or runtime-enforced?
+    decision: "Runtime-enforced only, at both the construction (builder) and gate (re-derivation) layers -- not attempted in the JSON Schema."
+    reasoning: >
+      The rule spans two DIFFERENT stages (residual_risk's own
+      `assessments[].residual_risk_level` and approval's own
+      `decision`) inside a `prefixItems` tuple -- JSON Schema 2020-12
+      has no clean mechanism to write a conditional across two
+      different array positions without extreme fragility (a `contains`
+      /`if` combination reaching across sibling prefixItems entries).
+      The same reasoning `security.attack_tree.contract.yaml` already
+      applied to its own recursive AND/OR aggregation (a real invariant
+      the schema alone cannot express, verified instead at the runtime
+      layer with a two-layer construction+gate check) applies here.
+  - question: >
+      Should `jurisdiction_pack_ref` be REQUIRED (forcing every DPIA
+      /PIA record to name an applicable Jurisdiction Pack, matching
+      Atlas §11.46's own "由 Jurisdiction Pack 決定" framing) or
+      OPTIONAL?
+    decision: "Optional and nullable."
+    reasoning: >
+      `specs/jurisdiction/pack.schema.yaml` exists but has NO ai_lego
+      Python builder yet (confirmed by grep) -- making the field
+      required would force every caller of this brand-new method to
+      first construct a Jurisdiction Pack object this session's own
+      codebase cannot yet build end-to-end, an premature hard
+      dependency on unbuilt infrastructure. Optional, soft-referenced
+      (pattern-checked only, no hard `$ref`) keeps this contract
+      usable standalone today while leaving room for a future revision
+      to tighten it once a `jurisdiction_pack` builder exists (see
+      open_questions).
+
+open_questions:
+  - id: "OQ-DPIAPIA-1"
+    question: "id mints a machine_id method-inventory.yaml never carried, and that file's own DPIA/PIA row (line: 883) is stale by the same +3 offset already disclosed for its neighboring F20 rows (real Atlas line is L886) -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-DPIAPIA-2"
+    question: >
+      `jurisdiction_pack_ref` is a soft, optional, pattern-only reference
+      because no `jurisdiction_pack` ai_lego builder exists yet. Should a
+      future revision, once that builder is built, (a) add a hard
+      `$ref` into its output schema and (b) make the field required,
+      closing the gap between Atlas §11.46's own "由 Jurisdiction Pack
+      決定 mandatory" framing and this record's own current
+      optional-soft-reference treatment?
+    owner: "operator, or whoever next builds a jurisdiction_pack ai_lego module"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-DPIAPIA-3"
+    question: >
+      This contract's own risk-traceability invariant requires EXACTLY
+      ONE residual assessment per risk_id. Real DPIA practice sometimes
+      re-assesses residual risk over TIME (e.g. quarterly review finds
+      a NEW residual level for the same risk) -- should a future
+      revision allow multiple time-stamped residual assessments per
+      risk_id (most-recent-wins), rather than exactly one?
+    owner: "operator, or whoever next revises this contract's own scope with a real time-series DPIA re-assessment requirement"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-DPIAPIA-4"
+    question: >
+      With DPIA/PIA now a FOURTH structural sub-variant among F20
+      members, and the FIRST to omit the EC §32 framing triplet
+      entirely -- does this settle `OQ-STRIDE-4`'s own question (is
+      that triplet worth factoring into a shared F20 base schema)? Not
+      fully: DPIA/PIA's own omission strengthens the case that NO
+      single base schema serves ALL of F20, but the narrower question
+      -- whether the FOUR true EC §32 Threat Review methods
+      (STRIDE/LINDDUN/Attack Tree/PASTA) alone might still share a
+      base schema for that triplet -- remains open, now with one
+      additional confirmed non-member (DPIA/PIA) rather than a
+      resolution either way.
+    owner: "operator, or whoever next surveys the F20 family as a whole (Zero Trust Review, Secrets Threat Review, Supply Chain Threat Model, Abuse Case, Security Control Mapping remain)"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.46 (L2269-2296) in full, plus the F20 table row
+    (L886). Grep-confirmed ZERO mentions of "DPIA"/"PIA" anywhere in
+    the Execution Contract (case-sensitive and case-insensitive).
+    Read `docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md`
+    in full (Status, Method Used, Options Considered, Recommendation,
+    Consequences) to confirm the real usage precedent and the exact
+    still-open "Phase 2 DPIA 待辦" wording this contract's own CLI demo
+    models. Grep-confirmed `jurisdiction` appears in exactly one
+    ai_lego Python file (`core/domain/tenant.py`, `home_jurisdiction`)
+    before choosing the soft-reference design for
+    `jurisdiction_pack_ref`. Read all four existing `specs/security/`
+    typed objects and `specs/jurisdiction/context.schema.yaml` directly
+    to confirm no duplication. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own eight-word §11.46
+    chain is directly transcribed as the `stages[].stage_id` enum, in
+    Atlas's own literal order. The risk/control/residual_risk array
+    shapes and the high-residual-risk escalation rule are explicitly
+    disclosed as grounded in real, external DPIA/GDPR practice (Art.
+    35/Art. 36), not a mother-document citation.

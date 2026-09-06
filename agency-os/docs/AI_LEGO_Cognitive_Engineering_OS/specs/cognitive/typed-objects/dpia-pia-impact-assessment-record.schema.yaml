@@ -1,0 +1,268 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/dpia-pia-impact-assessment-record.schema.yaml"
+title: DPIA/PIA Impact Assessment Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DpiaPiaImpactAssessmentRecord`
+  -- the declared `outputs` of `security.dpia_pia`'s Method Contract.
+  FIFTH typed object in the `security` family (F20), and the FIRST F20
+  member that is NOT one of Execution Contract §32's own four named
+  Threat Review methods (STRIDE/LINDDUN/Attack Tree/PASTA) -- DPIA/PIA's
+  own trigger is personal-data processing, not EC §32's own authn/authz
+  /secrets/crypto/network/egress/tenant-isolation/file-parsing/user
+  -content/AI-tools list. See the method contract's own description for
+  the full due-diligence trail (Atlas §11.46, L2269-2296; this
+  repository's own real usage precedent in ADR-002).
+
+  Atlas's own §11.46 formula (`Processing → Purpose → Necessity
+  /Proportionality → Data Subjects → Risks → Controls → Residual Risk
+  → Approval`, EIGHT words) is transcribed verbatim as `stages`, a
+  fixed-length-eight, POSITIONALLY ORDERED tuple -- the same "ordered
+  pipeline" structural class `pasta-threat-model-record.schema.yaml`
+  already establishes (Atlas's own "→" is a real dependency chain, not
+  a set), enforced via `prefixItems` exactly as that sibling schema
+  does.
+
+  Because `assets`/`trust_boundaries`/`entry_points` are an EC §32
+  artifact and DPIA/PIA is not an EC §32 method, this record carries
+  NONE of them -- the first F20 typed object to omit that triplet (see
+  the method contract's own `resolved_by` update to
+  `security.stride.contract.yaml`'s `OQ-STRIDE-4`).
+
+  Two invariants beyond stage completeness-and-order, BOTH grounded in
+  real, external, named DPIA/GDPR practice (not an Atlas citation,
+  disclosed as such -- the same class `security.pasta.contract.yaml`'s
+  own per-stage field detail already establishes as precedent):
+
+  1. RISK TRACEABILITY -- every `risk_id` declared in the `risks` stage
+     must be mitigated by at least one entry in the `controls` stage AND
+     have EXACTLY ONE residual assessment in the `residual_risk` stage;
+     conversely every `risk_id` referenced BY a control or a residual
+     assessment must exist in `risks`. Standard DPIA/GDPR Art. 35
+     practice (a risk register with no dangling or orphaned entries),
+     not an Atlas-specified structure -- Atlas's own eight words name
+     the STAGES, not this cross-stage referential rule.
+  2. HIGH-RESIDUAL-RISK ESCALATION -- if any residual assessment's own
+     `residual_risk_level` is `high`, the `approval` stage's own
+     `decision` may NOT be bare `approved` (it must be
+     `approved_with_conditions`, `escalated`, or `rejected`). Grounded
+     in GDPR Article 36 "Prior Consultation" (a controller may not wave
+     through approval when high residual risk to data subjects remains
+     without either consulting the supervisory authority, attaching
+     conditions, or declining to proceed) -- again real external
+     regulatory practice, not an Atlas citation.
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity
+  gate), NOT `genuine_compute` -- both invariants are set-membership
+  /referential derivations (the same class STRIDE/LINDDUN's own
+  `elements_with_no_recorded_threats` already establishes), not a
+  numeric/ordinal computation like `attack-tree-record.schema.yaml`'s
+  own cost/skill/detectability aggregation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.46 (L2269-2296): 'Processing → Purpose → Necessity/Proportionality → Data Subjects → Risks → Controls → Residual Risk → Approval', and the F20 tool table row (L886)"
+  - "docs/adr/ADR-002-personal-data-erasure-vs-event-immutability.md (ACCEPTED): real usage precedent naming Atlas §11.46 as its own Recommendation-section skeleton, and a real, still-open 'Phase 2 DPIA 待辦' this record's own CLI demo models"
+  - "methods/contracts/security.dpia_pia.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  narrative_stage:
+    type: object
+    required: [stage_id, summary]
+    additionalProperties: false
+    properties:
+      stage_id:
+        enum: [processing, purpose, necessity_proportionality, data_subjects]
+        description: "Four of Atlas's own eight §11.46 formula words, transcribed verbatim. Deliberately minimal (stage_id/summary only), the same restraint security.pasta.contract.yaml's own compilation_decisions already applies to its own six process stages -- Atlas names the STAGES, not any per-stage sub-structure."
+      summary:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+  risk_entry:
+    type: object
+    required: [risk_id, description, likelihood, severity, affected_rights]
+    additionalProperties: false
+    properties:
+      risk_id:
+        type: string
+        pattern: "^RISK-"
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      likelihood: {enum: [low, medium, high]}
+      severity: {enum: [low, medium, high]}
+      affected_rights:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1, pattern: "\\S"}
+        description: "Which data-subject right(s) this risk threatens (e.g. 'right to erasure', 'freedom from discrimination'). Free text -- no mother document defines a closed rights taxonomy this could enum against."
+
+  risks_stage:
+    type: object
+    required: [stage_id, risks]
+    additionalProperties: false
+    properties:
+      stage_id: {const: risks}
+      risks:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/risk_entry"}
+
+  control_entry:
+    type: object
+    required: [control_id, description, mitigates_risk_ids]
+    additionalProperties: false
+    properties:
+      control_id:
+        type: string
+        pattern: "^CTRL-"
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      mitigates_risk_ids:
+        type: array
+        minItems: 1
+        items: {type: string, pattern: "^RISK-"}
+        description: "Every entry must reference a risk_id declared in the risks stage -- checked at the runtime layer (schema alone cannot cross-reference a sibling array)."
+
+  controls_stage:
+    type: object
+    required: [stage_id, controls]
+    additionalProperties: false
+    properties:
+      stage_id: {const: controls}
+      controls:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/control_entry"}
+
+  residual_assessment:
+    type: object
+    required: [risk_id, residual_likelihood, residual_severity, residual_risk_level, accepted_by]
+    additionalProperties: false
+    properties:
+      risk_id:
+        type: string
+        pattern: "^RISK-"
+        description: "Must reference a risk_id declared in the risks stage, exactly once each -- checked at the runtime layer."
+      residual_likelihood: {enum: [low, medium, high]}
+      residual_severity: {enum: [low, medium, high]}
+      residual_risk_level: {enum: [low, medium, high]}
+      accepted_by: {type: string, minLength: 1, pattern: "\\S"}
+
+  residual_risk_stage:
+    type: object
+    required: [stage_id, assessments]
+    additionalProperties: false
+    properties:
+      stage_id: {const: residual_risk}
+      assessments:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/residual_assessment"}
+
+  approval_stage:
+    type: object
+    required: [stage_id, approver_role, approver_name, decision, decision_date, conditions, jurisdiction_pack_ref]
+    additionalProperties: false
+    properties:
+      stage_id: {const: approval}
+      approver_role: {type: string, minLength: 1, pattern: "\\S"}
+      approver_name: {type: string, minLength: 1, pattern: "\\S"}
+      decision: {enum: [approved, approved_with_conditions, escalated, rejected]}
+      decision_date: {type: string, minLength: 1, pattern: "\\S"}
+      conditions:
+        type: array
+        default: []
+        items: {type: string, minLength: 1, pattern: "\\S"}
+      jurisdiction_pack_ref:
+        type: ["string", "null"]
+        default: null
+        pattern: "^JPACK-"
+        description: >
+          Soft reference to `specs/jurisdiction/pack.schema.yaml`'s own
+          `jurisdiction_pack.pack_id` -- Atlas §11.46's own "全球化要求"
+          line ("由 Jurisdiction Pack 決定何時 mandatory、誰有 authority、
+          適用哪個版本法規"). Optional and nullable: no ai_lego builder
+          for `jurisdiction_pack` exists yet to hard-`$ref` against (see
+          method contract's own open_questions).
+
+type: object
+required: [id, version, system_or_component, stages, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^DPIA-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.dpia_pia"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  stages:
+    type: array
+    minItems: 8
+    maxItems: 8
+    description: >
+      Atlas's own eight-word §11.46 chain, AS AN ORDERED TUPLE, mirroring
+      pasta-threat-model-record.schema.yaml's own prefixItems discipline.
+      stages[0] MUST be the processing stage, stages[7] MUST be the
+      approval stage, and so on -- Atlas's '→' is a dependency chain, not
+      a set.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/narrative_stage"}, {properties: {stage_id: {const: processing}}}]
+      - allOf: [{$ref: "#/$defs/narrative_stage"}, {properties: {stage_id: {const: purpose}}}]
+      - allOf: [{$ref: "#/$defs/narrative_stage"}, {properties: {stage_id: {const: necessity_proportionality}}}]
+      - allOf: [{$ref: "#/$defs/narrative_stage"}, {properties: {stage_id: {const: data_subjects}}}]
+      - $ref: "#/$defs/risks_stage"
+      - $ref: "#/$defs/controls_stage"
+      - $ref: "#/$defs/residual_risk_stage"
+      - $ref: "#/$defs/approval_stage"
+    items: false
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a DPIA/PIA review is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A DPIA/PIA for ADR-002's own real, still-open 'Phase 2 DPIA 待辦' -- the residual Identifiability risk from crypto-shredded personal-data fields in the Event Ledger"
+    value:
+      id: "DPIA-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.dpia_pia"
+      system_or_component: "Event Ledger personal-data fields under ADR-002 Option A (crypto-shredding)"
+      stages:
+        - {stage_id: processing, summary: "Personal-data fields (Confidential/Restricted classification) stored inline in append-only Event Ledger payloads, encrypted per-subject with a Data Encryption Key (DEK)."}
+        - {stage_id: purpose, summary: "Event-sourced audit trail and replay-based system reconstruction (EC §112 30-year survivability); the personal-data fields are incidental payload content, not the processing's own primary purpose."}
+        - {stage_id: necessity_proportionality, summary: "Crypto-shredding (DEK destruction) is the only ADR-002 option satisfying both regulator-recognized irreversible deletion and zero disruption to event schema/replay -- proportionate given EC §31's own deletion-contract constraint."}
+        - {stage_id: data_subjects, summary: "End users whose personal-data fields appear in event payloads across any tenant; no special category (Art. 9) data identified in this scope."}
+        - stage_id: risks
+          risks:
+            - {risk_id: "RISK-001", description: "Unencrypted event metadata (event type, timestamp) survives DEK destruction and can leak the fact that a given subject 'once existed', even though payload content is unreadable.", likelihood: medium, severity: medium, affected_rights: ["right to erasure (completeness of erasure)"]}
+        - stage_id: controls
+          controls:
+            - {control_id: "CTRL-001", description: "AES-256 per-subject DEK; DEK destruction recorded in an independent Key Destruction Record audit log; all known references re-attempt decrypt post-destruction to confirm failure (EC §31 Verification step).", mitigates_risk_ids: ["RISK-001"]}
+        - stage_id: residual_risk
+          assessments:
+            - {risk_id: "RISK-001", residual_likelihood: medium, residual_severity: low, residual_risk_level: medium, accepted_by: "Data Protection Steward (Phase 2 DPIA backlog owner)"}
+        - {stage_id: approval, approver_role: "Data Protection Steward", approver_name: "TBD (Phase 2 DPIA backlog item, ADR-002 §Recommendation)", decision: approved_with_conditions, decision_date: "2026-09-06", conditions: ["Track metadata-residual-identifiability closure as a named Phase 2 DPIA backlog item, not a silent acceptance"], jurisdiction_pack_ref: null}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+verification:
+  method: >
+    Read Atlas §11.46 (L2269-2296) directly -- the method's own dedicated
+    section -- and ADR-002 in full (its own Method Used and Recommendation
+    sections) for the real usage precedent. Validated against
+    jsonschema.Draft202012Validator, including the positional prefixItems
+    ordering constraint. Cross-stage risk-traceability and the escalation
+    rule are NOT expressible in JSON Schema alone (no cross-array
+    reference mechanism) -- both are enforced at the runtime layer only
+    (see method contract and `ai_lego/modules/security/dpia_pia.py`).
+  note: >
+    Atlas's own eight-word chain and its own literal order are directly
+    transcribed. The risk/control/residual_risk per-stage array shapes
+    and the escalation rule are disclosed as grounded in real, external
+    DPIA/GDPR practice, not Atlas -- see method contract's own
+    compilation_decisions. No mother document was modified.

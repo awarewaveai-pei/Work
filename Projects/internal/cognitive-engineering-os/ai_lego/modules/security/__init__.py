@@ -6,7 +6,11 @@ covered, complete). Tenants: ``security.stride`` (see ``stride.py``), ``security
 ``security.attack_tree`` (see ``attack_tree.py`` -- the FIRST F20 member to structurally DIVERGE from the
 stride/linddun shared shape, and the first F20 ``genuine_compute`` module), ``security.pasta`` (see
 ``pasta.py`` -- a genuinely THIRD structural shape: a fixed-length, positionally-ordered seven-stage
-pipeline, neither the stride/linddun flat-DFD shape nor attack_tree's own recursive tree).
+pipeline, neither the stride/linddun flat-DFD shape nor attack_tree's own recursive tree),
+``security.dpia_pia`` (see ``dpia_pia.py`` -- the FIRST F20 member that is NOT one of Execution Contract
+§32's own four named Threat Review methods; shares pasta.py's own ordered-pipeline class but adds
+cross-stage risk-to-control-to-residual traceability and a high-residual-risk escalation rule, both
+grounded in real external DPIA/GDPR practice, not Atlas).
 
 Not to be confused with ``ai_lego.security`` (crypto-shred key-lifecycle runtime infrastructure, a
 different concern under a same-named path segment)."""
