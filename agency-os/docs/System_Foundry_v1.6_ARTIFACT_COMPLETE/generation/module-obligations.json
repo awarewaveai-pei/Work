@@ -887,7 +887,8 @@
       "invariants": [
         "A split order's child shipments always sum back to the original order's line items and quantities; nothing is lost or duplicated across the split.",
         "A backordered or preordered line item is never marked fulfilled until the actual stock movement confirming it exists.",
-        "When CAP-MULTI-LOCATION-STOCK is also selected, a split order's per-warehouse child shipments each source from that module's own partitioned location balance, never from an unpartitioned company-wide figure; when CAP-MULTI-LOCATION-STOCK is not selected, 'different warehouses' in a split is a descriptive fulfillment-routing label only, with no location-partitioned stock record behind it."
+        "When CAP-MULTI-LOCATION-STOCK is also selected, a split order's per-warehouse child shipments each source from that module's own partitioned location balance, never from an unpartitioned company-wide figure; when CAP-MULTI-LOCATION-STOCK is not selected, 'different warehouses' in a split is a descriptive fulfillment-routing label only, with no location-partitioned stock record behind it.",
+        "When CAP-SHIPPING is also selected, a split order's child shipments are records in that module's own shipment/tracking system, not a second, parallel shipment concept local to this module; when CAP-SHIPPING is not selected, a 'shipment' here is a fulfillment-routing label only, with no tracking-number/carrier record behind it."
       ],
       "security": [
         "Order-routing decisions (which warehouse/supplier fulfills a split) never leak cross-tenant inventory visibility in a multi-tenant deployment."
@@ -944,7 +945,8 @@
       "invariants": [
         "In-store inventory and online inventory are reconciled against a single canonical stock record; a sale in either channel decrements the same source of truth.",
         "A click-and-collect or ship-from-store order is not marked ready/fulfilled until the specific store location confirms the physical action.",
-        "When CAP-MULTI-LOCATION-STOCK is also selected, a click-and-collect or ship-from-store order sources its stock from that specific store's own partitioned location balance -- this module's store-location fulfillment check composes with, and never duplicates, that module's per-location allocation; when CAP-MULTI-LOCATION-STOCK is not selected, 'the specific store location' is a fulfillment-routing distinction only, with no location-partitioned stock record behind it."
+        "When CAP-MULTI-LOCATION-STOCK is also selected, a click-and-collect or ship-from-store order sources its stock from that specific store's own partitioned location balance -- this module's store-location fulfillment check composes with, and never duplicates, that module's per-location allocation; when CAP-MULTI-LOCATION-STOCK is not selected, 'the specific store location' is a fulfillment-routing distinction only, with no location-partitioned stock record behind it.",
+        "When CAP-SHIPPING is also selected, a ship-from-store order's shipment is a record in that module's own shipment/tracking system, not a second, parallel shipment concept local to this module; when CAP-SHIPPING is not selected, 'ship the order to them' is a fulfillment-routing description only, with no tracking-number/carrier record behind it."
       ],
       "security": [
         "Store-level staff access to POS transaction history follows the same role-based access as other customer_service/commerce data; no separate unmanaged cash-handling data model is introduced by this module."
