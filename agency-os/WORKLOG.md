@@ -26,7 +26,7 @@
 **[rollback]**：單一 commit，`git revert`；純新增檔案 + 既有文件訂正，無 schema 變更。
 
 
- + TASKS.md §D Class 4/5 mutation-coverage 機械閘建成，過程中發現一次委員會治理漏洞：TASKS.md 結案聲明被並行 session 誤 commit、當下無對應檔案）
+## 2026-09-06（System Foundry：第9候選確認為第6個真缺口 Multi-Location Stock 落地 + TASKS.md §D Class 4/5 mutation-coverage 機械閘建成，過程中發現一次委員會治理漏洞：TASKS.md 結案聲明被並行 session 誤 commit、當下無對應檔案）
 
 [背景] 5個真缺口批次（`fec071dad`~`b368c2eba`）完成後，操作者要求繼續處理剩餘兩條線：①第9候選 Inventory/WMS 多倉庫的正式判定；②TASKS.md §D 第4/5條（derivation rule／requires邊測試覆蓋率缺口）的機械閘建置。兩者並行委派，因觸碰的檔案集合幾乎不重疊（第9候選會改`capabilities/catalog.json`等業務檔；機械閘只新增`scripts/test_mutation_coverage.py`+改`Makefile`+`TASKS.md`）。
 
