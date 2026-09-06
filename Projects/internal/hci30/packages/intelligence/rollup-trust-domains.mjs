@@ -16,6 +16,31 @@ const DOMAIN_DIMENSIONS = Object.freeze(
   }, {}),
 );
 
+// HCI_TRUST_DOMAIN_SPEC.md §Domain-internal disagreement (TASKS.md,
+// 2026-09-06 second half): a domain's two assigned dimensions can each be
+// well-evidenced but land on a materially different band (e.g.
+// Reliability/fulfillment=HIGH, Predictability=VERY_LOW under
+// OPERATIONAL) -- averaging them into one MODERATE without disclosure
+// would hide exactly the kind of internal inconsistency
+// combine-method-findings.mjs's own `disagreement` flag already refuses to
+// hide one layer down (HCI_CONFIDENCE_SPEC.md §Combination rule,
+// 19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:17, "Do not average lens
+// disagreement away").
+//
+// Deliberately a SEPARATE, independently-named constant from
+// combine-method-findings.mjs's own DISAGREEMENT_SPREAD_THRESHOLD, not a
+// shared import, even though both currently equal 2 -- the two compare
+// structurally different things (N methods measuring ONE dimension there,
+// vs. TWO DIFFERENT dimensions under one domain here), and
+// dimension-score.mjs's own header already establishes this package's
+// precedent against forcing a shared constant OR VALIDATOR across
+// coincidentally similar-looking comparisons (that header's own example is
+// a shared validator/shape, not a shared constant -- critic review,
+// 2026-09-06, which caught this comment dropping the qualifier). If a
+// future revision needs these to diverge, neither module has to touch the
+// other to do it.
+const DOMAIN_DIMENSION_SPREAD_THRESHOLD = 2;
+
 // HCI_TRUST_DOMAIN_SPEC.md's own worked function: 14 already-resolved
 // dimension values in, 0-7 domain values out (a domain with none of its
 // assigned dimensions present is omitted entirely, never defaulted to
@@ -43,11 +68,18 @@ export function rollupTrustDomains(dimensionScores) {
     // `=== assigned.length` only because every domain currently has
     // exactly 2 assigned dimensions, an invariant nothing enforced).
     const coverage = present.length === assigned.length ? 'FULL' : 'PARTIAL';
+    const ranks = present.map((entry) => BAND_RANK[entry.value]);
+    // With only one dimension present, spread is trivially 0 (max === min)
+    // and dimension_disagreement is correctly `false` by this same
+    // formula -- no separate PARTIAL-coverage branch needed, the same "the
+    // general formula already produces the right degenerate answer"
+    // pattern meanRankBand's own single-rank case already relies on below.
+    const dimensionDisagreement = (Math.max(...ranks) - Math.min(...ranks)) >= DOMAIN_DIMENSION_SPREAD_THRESHOLD;
     // meanRankBand is a correct pass-through for a single rank (mean of one
     // number is itself), so no separate present.length === 1 branch is
     // needed here -- verified by band-scale.test.mjs's own single-rank case.
-    const value = meanRankBand(present.map((entry) => BAND_RANK[entry.value]));
-    domains.push({ domain, value, coverage, evidence_refs: evidenceRefs });
+    const value = meanRankBand(ranks);
+    domains.push({ domain, value, coverage, dimension_disagreement: dimensionDisagreement, evidence_refs: evidenceRefs });
   }
 
   return { domains };

@@ -41,7 +41,7 @@ TrustDomain has no real columns yet (§Context, fact 2); these gates sequence en
 1. **Wave 1 — schema-name lint, CI-blocking.** New script `scripts/check-no-universal-trust-column.ps1` (does not yet exist) scans every file under `Projects/internal/hci30/database/migrations/*.sql` and fails the run if it finds a column matching `overall_score|composite_trust|aggregate_trust|universal_trust|^trust_score$` on any table unless that table also carries a non-null `domain` column. Wired into `Projects/internal/hci30/scripts/test-wave1-local.ps1` alongside the existing 51-assertion suite (`governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md:46-48`).
 2. **Wave 1 ERD extension, before `TRUST_DOMAIN` rows carry a value.** `governance/wave1/HCI_WAVE1_DOMAIN_ERD.md` gains a `domain` column requirement on the `TrustDomain` row (`HCI_WAVE1_DOMAIN_ERD.md:17`) restricted to the seven `04_HCI30_PRODUCT_SPEC.md:59-65` names, plus `UNIQUE (tenant_id, person_id, domain)` — explicitly never `UNIQUE (tenant_id, person_id)` alone, which would force exactly one slot per Person. Test id `TRUST-NEG-01` (new, added to `HCI_WAVE1_NEGATIVE_TEST_SPEC.md`): inserting a `kind='TRUST_DOMAIN'` row with `domain` null is rejected.
 3. **Wave 1, same migration.** Test id `TRUST-NEG-02` (new): two `kind='TRUST_DOMAIN'` rows for the same `(tenant_id, person_id)` with two different `domain` values both persist successfully — proving the schema is structurally capable of holding the full vector, not merely one slot that happens to be unfilled.
-4. **Wave 5 (Intelligence math v1 — the P0-04 roll-up work named at `04_HCI30_PRODUCT_SPEC.md:87`).** Contract test `TRUST-NEG-03` (new, in `packages/contracts/`, same pattern as `Projects/internal/hci30/packages/contracts/validate-request.mjs`): any Person-trust read response is validated against a schema requiring a `domains: []` array of `{domain, value, evidence_refs}` entries; a response carrying a bare top-level numeric `trust_score` or `overall_trust` field fails validation. CI-blocking before any trust-read endpoint ships.
+4. **Wave 5 (Intelligence math v1 — the P0-04 roll-up work named at `04_HCI30_PRODUCT_SPEC.md:87`).** Contract test `TRUST-NEG-03` (new, in `packages/contracts/`, same pattern as `Projects/internal/hci30/packages/contracts/validate-request.mjs`): any Person-trust read response is validated against a schema requiring a `domains: []` array of `{domain, value, evidence_refs}` entries **— this original shape is superseded twice below (see "Implementation note (2026-09-06, P0-04 Trust-Domain roll-up formula landed, gate 4 corrected)" and, later, "Implementation note (2026-09-06, gate 4 domain-internal disagreement...)"); current shape is `{domain, value, coverage, dimension_disagreement, evidence_refs}`**; a response carrying a bare top-level numeric `trust_score` or `overall_trust` field fails validation. CI-blocking before any trust-read endpoint ships.
 5. **Wave 5.** Method-catalog registry check `METHOD-CONTRACT-NEG-01` (new): for every method declaring the Method Contract fields at `05_HCI30_INTELLIGENCE_METHODS.md:151-167`, if `outputs` touches more than one `domain`, `decision_weight` must be expressed per-domain, not as a single scalar; a method definition with a cross-domain scalar `decision_weight` fails registry validation and cannot be loaded.
 
 Gates 1–3 are schema-adjacent and can land alongside the existing Wave 1 synthetic skeleton without waiting on P0-04. Gates 4–5 gate the specific Wave 5 deliverable that would otherwise be the first place a universal score could be introduced.
@@ -272,8 +272,10 @@ roll-up formula; a math team must still define that.
   evidence_refs}] }` **— superseded by the "Implementation note (2026-09-06,
   P0-04 Trust-Domain roll-up formula landed, gate 4 corrected)" below, which
   adds a required `coverage` field and changes `value` from a number to a
-  band; this paragraph is left as the historical record of what shipped
-  first**; rejects a bare top-level field matching
+  band, and superseded again by the later "Implementation note (2026-09-06,
+  gate 4 domain-internal disagreement...)" below, which adds a required
+  `dimension_disagreement` field; this paragraph is left as the historical
+  record of what shipped first**; rejects a bare top-level field matching
   `overall_score|composite_trust|aggregate_trust|universal_trust|trust_score`
   (gate 1's own SQL-column list) **plus `overall_trust`**, which this gate's
   own text (item 4 above) names but the SQL-column list never had reason to
@@ -395,7 +397,11 @@ value itself. `tests/unit/contracts/validate-trust-domain-response.test.mjs`
 updated to match (13→17 assertions). No consumer of gate 4 existed yet (no
 real trust-read endpoint), so this correction has zero migration cost —
 the cheapest point at which to catch it, and a self-caught cross-check
-rather than a defect an external review found.
+rather than a defect an external review found. **This shape — `{domain,
+value, coverage, evidence_refs}` — is itself superseded by the later
+"Implementation note (2026-09-06, gate 4 domain-internal disagreement...)"
+below, which adds a required `dimension_disagreement` field; left here as
+the historical record of what shipped at this point.**
 
 Verification: `tests/unit/intelligence/assessment-dimensions.test.mjs`
 proves the 14-dimension partition is exhaustive and non-overlapping
@@ -551,6 +557,72 @@ Final tally: **99/99 Node assertions** across all seven contract/intelligence
 test files (up from 96 pre-review); `mutation-check-node-gates.ps1` 15/15
 killed including the new baseline gate; full `test-wave1-local.ps1` run
 green end-to-end.
+
+## Implementation note (2026-09-06, gate 4 domain-internal disagreement — second correction to the "Implementation note (2026-09-06, P0-04 Trust-Domain roll-up formula landed, gate 4 corrected)" shape above)
+
+Recorded here rather than editing that note above, same rationale as every
+prior implementation note in this file: preserve the historical record of
+what shipped at each point.
+
+`HCI_TRUST_DOMAIN_SPEC.md` §Domain-internal disagreement adds a
+`dimension_disagreement: boolean` to every domain entry gate 4 accepts —
+`true` when a domain's two assigned dimensions' bands have a rank spread
+`>= 2` (an independently-named threshold, not shared with
+`combine-method-findings.mjs`'s own `DISAGREEMENT_SPREAD_THRESHOLD`, since
+the two compare structurally different things), `false` otherwise
+(including always `false` under `PARTIAL` coverage, where there is nothing
+to compare). **This is gate 4's second shape revision, not its first** —
+the note above already made the first (bare number → band + `coverage`).
+Gate 4's shape is now `{domain, value, coverage, dimension_disagreement,
+evidence_refs}`.
+
+**This does not answer, and must not be read as answering, a separate
+still-open question** (raised by `HCI_CONFIDENCE_SPEC.md`'s own C1 finding
+the same day as the first gate-4 correction): whether a dimension's own
+upstream cross-method `disagreement` flag (from `combineMethodFindings`,
+one layer below this roll-up) should itself propagate into a domain's
+output. `dimension_disagreement` is computed purely from the two
+dimensions' already-resolved values — it has no visibility into whether
+either value was itself produced from disagreeing method findings. Tracked
+separately in `TASKS.md`.
+
+**Independent critic review** found **0 Critical, 3 Major, 5 Minor**, all
+fixed before commit:
+- **Major**: this ADR's own gate 4 text (item 4 above, `{domain, value,
+  evidence_refs}`) and the first correction's shape statement had no
+  supersession pointer forward to this note, unlike every prior gate-4
+  shape change in this file — an implementer following the existing
+  pointer chain would build a shape gate 4 now rejects. Fixed: added.
+- **Major**: `21_HCI_TOP_TIER_GAP_ANALYSIS.md`'s own note on this change
+  originally claimed it "answers one half of the model disagreement
+  concern" — false; the corpus's one concrete model-disagreement example
+  (`19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:19-21`) spans two different
+  domains (`OPERATIONAL`, `FINANCIAL`), which `dimension_disagreement`
+  structurally cannot flag (it only ever compares within one domain).
+  Fixed: that item is now stated as still wholly open.
+- **Major**: `HCI_CONFIDENCE_SPEC.md` and `TASKS.md` both said gate 4 had
+  now been revised "a third time" — miscounted; this is the second
+  revision. Fixed in both files, and in `HCI_RISK_SPEC.md`'s own
+  now-stale "gate 4 has changed once so far" sentence (a pre-existing
+  claim this change's own gate-4 touch made newly wrong).
+- 5 Minor: several negative gate-4 tests omitted `dimension_disagreement`
+  from otherwise-valid fixtures, which happened to still throw their
+  intended error for an earlier reason but no longer isolated a single
+  defect (fixed by adding the field to all seven); the spec's own "always
+  false under PARTIAL coverage" claim was stated in terms of `coverage`
+  while the code keys off dimension count directly, which would diverge
+  under a future widened partition (restated, plus a disclosure that gate
+  4 does not couple the two fields); a code comment mis-cited
+  `dimension-score.mjs`'s precedent as being about a shared constant when
+  it is about a shared validator/shape; the two full-14-dimension loop
+  tests already had the right inputs to assert `dimension_disagreement`
+  for all 7 domains but did not; a stale `test-wave1-local.ps1` comment
+  still called the roll-up formula "unspecified."
+
+Final tally: **161/161 Node assertions** (up from 154 pre-review, +7);
+`mutation-check-node-gates.ps1` **27/27 killed** (up from 24, +3, each
+proven to flip a specific test red); full `test-wave1-local.ps1` run green
+end-to-end (no SQL-layer change).
 
 ## Evidence
 

@@ -13,7 +13,7 @@ import { TRUST_DOMAINS, FORBIDDEN_AGGREGATE_KEY } from './trust-domains.mjs';
 const VALUE_BANDS = new Set(['VERY_LOW', 'LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
 const COVERAGE_VALUES = new Set(['FULL', 'PARTIAL']);
 
-const DOMAIN_ENTRY_KEYS = new Set(['domain', 'value', 'coverage', 'evidence_refs']);
+const DOMAIN_ENTRY_KEYS = new Set(['domain', 'value', 'coverage', 'dimension_disagreement', 'evidence_refs']);
 
 function validateDomainEntry(entry, index) {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`domains[${index}] must be an object`);
@@ -27,13 +27,15 @@ function validateDomainEntry(entry, index) {
   if (!TRUST_DOMAINS.includes(entry.domain)) throw new Error(`domains[${index}]: invalid domain: ${entry.domain}`);
   if (!VALUE_BANDS.has(entry.value)) throw new Error(`domains[${index}]: invalid value band: ${entry.value}`);
   if (!COVERAGE_VALUES.has(entry.coverage)) throw new Error(`domains[${index}]: invalid coverage: ${entry.coverage}`);
+  if (typeof entry.dimension_disagreement !== 'boolean') throw new Error(`domains[${index}]: dimension_disagreement must be a boolean`);
   if (!Array.isArray(entry.evidence_refs) || entry.evidence_refs.length === 0) throw new Error(`domains[${index}]: evidence_refs must be a non-empty array`);
   for (const ref of entry.evidence_refs) if (typeof ref !== 'string' || ref.trim() === '') throw new Error(`domains[${index}]: evidence_refs must contain only non-empty strings`);
 }
 
 // TRUST-NEG-03 (ADR-0004 gate 4, "Required implementation gates" item 4):
 // any Person-trust read response is validated against a schema requiring a
-// `domains: []` array of {domain, value, coverage, evidence_refs} entries;
+// `domains: []` array of {domain, value, coverage, dimension_disagreement,
+// evidence_refs} entries;
 // a response carrying a bare top-level numeric trust_score/overall_trust
 // (or any semantic equivalent) fails validation. CI-blocking before any
 // trust-read endpoint ships. There is no real endpoint yet -- the roll-up

@@ -25,8 +25,8 @@ test('TRUST-NEG-03: rejects aggregate_trust and universal_trust', () => {
 test('accepts a well-formed multi-domain vector', () => {
   const response = {
     domains: [
-      { domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['ev-1'] },
-      { domain: 'FINANCIAL', value: 'LOW', coverage: 'PARTIAL', evidence_refs: ['ev-2', 'ev-3'] },
+      { domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'] },
+      { domain: 'FINANCIAL', value: 'LOW', coverage: 'PARTIAL', dimension_disagreement: true, evidence_refs: ['ev-2', 'ev-3'] },
     ],
   };
   assert.deepEqual(validateTrustDomainResponse(response), response);
@@ -38,28 +38,28 @@ test('accepts an empty domains vector', () =>
 test('rejects two entries for the same domain (the one-slot-per-Person shape ADR-0004 forbids)', () =>
   assert.throws(() => validateTrustDomainResponse({
     domains: [
-      { domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['ev-1'] },
-      { domain: 'OPERATIONAL', value: 'LOW', coverage: 'FULL', evidence_refs: ['ev-2'] },
+      { domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'] },
+      { domain: 'OPERATIONAL', value: 'LOW', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-2'] },
     ],
   }), /duplicate domain/));
 
 test('rejects an invalid domain name', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OVERALL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['ev-1'] }] }), /invalid domain/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OVERALL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'] }] }), /invalid domain/));
 
 test('rejects a domain entry with no evidence_refs (the evidence-linked requirement)', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: [] }] }), /evidence_refs/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: [] }] }), /evidence_refs/));
 
 test('rejects a numeric value (ADR-0032: bands only, no bare numbers until calibration evidence exists)', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 0.75, coverage: 'FULL', evidence_refs: ['ev-1'] }] }), /invalid value band/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 0.75, coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'] }] }), /invalid value band/));
 
 test('rejects an unrecognized band string', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'EXTREMELY_HIGH', coverage: 'FULL', evidence_refs: ['ev-1'] }] }), /invalid value band/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'EXTREMELY_HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'] }] }), /invalid value band/));
 
 test('rejects a missing coverage property', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', evidence_refs: ['ev-1'] }] }), /invalid coverage: undefined/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', dimension_disagreement: false, evidence_refs: ['ev-1'] }] }), /invalid coverage: undefined/));
 
 test('rejects an invalid coverage value', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULLY', evidence_refs: ['ev-1'] }] }), /invalid coverage: FULLY/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULLY', dimension_disagreement: false, evidence_refs: ['ev-1'] }] }), /invalid coverage: FULLY/));
 
 test('rejects a response with no domains property', () =>
   assert.throws(() => validateTrustDomainResponse({}), /missing required property: domains/));
@@ -86,19 +86,35 @@ test('rejects a null entry in domains', () =>
 
 test('TRUST-NEG-03: rejects a domain entry carrying an aggregate field nested inside the vector (m1 -- previously misrouted as a generic unknown-property error)', () =>
   assert.throws(() => validateTrustDomainResponse({
-    domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['ev-1'], overall_score: 62 }],
+    domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'], overall_score: 62 }],
   }), /TRUST-NEG-03/));
 
 test('rejects a domain entry carrying an unrelated unknown property (not a forbidden name)', () =>
   assert.throws(() => validateTrustDomainResponse({
-    domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['ev-1'], notes: 'x' }],
+    domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['ev-1'], notes: 'x' }],
   }), /unknown property: notes/));
 
 test('rejects evidence_refs given as a bare string instead of an array', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: 'ev-1' }] }), /evidence_refs/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: 'ev-1' }] }), /evidence_refs/));
 
 test('rejects evidence_refs containing a non-string element', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: [null] }] }), /evidence_refs/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: [null] }] }), /evidence_refs/));
 
 test('rejects evidence_refs containing a blank string', () =>
-  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['   '] }] }), /evidence_refs/));
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: false, evidence_refs: ['   '] }] }), /evidence_refs/));
+
+// dimension_disagreement (TASKS.md, 2026-09-06 second half): domain-internal
+// disagreement between a domain's two assigned dimensions' bands.
+
+test('rejects a missing dimension_disagreement property', () =>
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', evidence_refs: ['ev-1'] }] }), /dimension_disagreement must be a boolean/));
+
+test('rejects a non-boolean dimension_disagreement value', () =>
+  assert.throws(() => validateTrustDomainResponse({ domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: 'true', evidence_refs: ['ev-1'] }] }), /dimension_disagreement must be a boolean/));
+
+test('accepts dimension_disagreement true or false', () => {
+  const trueCase = { domains: [{ domain: 'OPERATIONAL', value: 'HIGH', coverage: 'FULL', dimension_disagreement: true, evidence_refs: ['ev-1'] }] };
+  const falseCase = { domains: [{ domain: 'FINANCIAL', value: 'LOW', coverage: 'PARTIAL', dimension_disagreement: false, evidence_refs: ['ev-2'] }] };
+  assert.deepEqual(validateTrustDomainResponse(trueCase), trueCase);
+  assert.deepEqual(validateTrustDomainResponse(falseCase), falseCase);
+});

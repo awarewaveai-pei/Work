@@ -35,9 +35,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Trust-domain enum drift check failed (ADR-0004
 # ADR-0004 gate 4 (TRUST-NEG-03): any Person-trust read response must be a
 # domains: [] vector, never a bare top-level trust_score/overall_trust (or
 # semantic equivalent). Node-level, Docker-free -- there is no real
-# trust-read endpoint yet (the roll-up formula, P0-04, is still
-# unspecified); this validator exists so the first one built cannot
-# introduce the forbidden shape unnoticed.
+# trust-read endpoint yet, though the roll-up formula that would feed one
+# (P0-04, HCI_TRUST_DOMAIN_SPEC.md) has been specified since 2026-09-06
+# (critic review, same day, which caught this comment stale the moment the
+# formula shipped); this validator exists so the first real endpoint built
+# cannot introduce the forbidden shape unnoticed.
 node --test (Join-Path $root 'tests/unit/contracts/validate-trust-domain-response.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Trust-domain response validator tests failed (ADR-0004 gate 4).' }
 

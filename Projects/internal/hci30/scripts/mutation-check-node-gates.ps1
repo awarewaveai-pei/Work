@@ -91,6 +91,14 @@ $mutations = @(
      replace = ''
      test = 'tests/unit/contracts/validate-trust-domain-response.test.mjs' }
 
+  # dimension_disagreement (TASKS.md, 2026-09-06 second half): domain-internal
+  # disagreement between a domain's two assigned dimensions.
+  @{ id = 'gate4-drop-dimension-disagreement-boolean-check'
+     file = 'packages/contracts/validate-trust-domain-response.mjs'
+     find = 'if (typeof entry.dimension_disagreement !== ''boolean'') throw new Error(`domains[${index}]: dimension_disagreement must be a boolean`);'
+     replace = ''
+     test = 'tests/unit/contracts/validate-trust-domain-response.test.mjs' }
+
   @{ id = 'gate5-drop-outputs-forbidden-name-check'
      file = 'packages/contracts/validate-method-contract.mjs'
      find = 'if (FORBIDDEN_AGGREGATE_KEY.test(key)) throw new Error(`ADR-0004: forbidden cross-domain field in outputs: ${key}`);'
@@ -124,6 +132,21 @@ $mutations = @(
      file = 'packages/intelligence/rollup-trust-domains.mjs'
      find = "const coverage = present.length === assigned.length ? 'FULL' : 'PARTIAL';"
      replace = "const coverage = 'FULL';"
+     test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
+
+  # dimension_disagreement (TASKS.md, 2026-09-06 second half): domain-internal
+  # disagreement between a domain's two assigned dimensions, independently
+  # thresholded from combine-method-findings.mjs's own disagreement flag.
+  @{ id = 'rollup-lower-dimension-disagreement-threshold-to-zero'
+     file = 'packages/intelligence/rollup-trust-domains.mjs'
+     find = 'const DOMAIN_DIMENSION_SPREAD_THRESHOLD = 2;'
+     replace = 'const DOMAIN_DIMENSION_SPREAD_THRESHOLD = 0;'
+     test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
+
+  @{ id = 'rollup-weaken-dimension-disagreement-boundary'
+     file = 'packages/intelligence/rollup-trust-domains.mjs'
+     find = 'const dimensionDisagreement = (Math.max(...ranks) - Math.min(...ranks)) >= DOMAIN_DIMENSION_SPREAD_THRESHOLD;'
+     replace = 'const dimensionDisagreement = (Math.max(...ranks) - Math.min(...ranks)) > DOMAIN_DIMENSION_SPREAD_THRESHOLD;'
      test = 'tests/unit/intelligence/rollup-trust-domains.test.mjs' }
 
   @{ id = 'band-scale-force-round-up-tie-break'

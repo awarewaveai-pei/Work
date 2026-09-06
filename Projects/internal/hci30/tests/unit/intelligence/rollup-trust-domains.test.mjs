@@ -51,6 +51,12 @@ test('every domain computes a real mean, not a hardcoded value, the last dimensi
     assert.ok(row, `no row for ${domain}`);
     assert.equal(row.value, 'HIGH', `${domain}: expected HIGH (mean of MODERATE+VERY_HIGH), got ${row.value}`);
     assert.equal(row.coverage, 'FULL');
+    // MODERATE(3) + VERY_HIGH(5) = spread 2, at the dimension_disagreement
+    // threshold -- exercises the field across all 7 domains, not only the
+    // domains dedicated tests below construct directly (critic review,
+    // 2026-09-06, same "free coverage left on the table" shape this file's
+    // own header already documents once for `value`).
+    assert.equal(row.dimension_disagreement, true, `${domain}: expected dimension_disagreement=true (spread 2)`);
   }
 });
 
@@ -62,6 +68,8 @@ test('evidence_refs pair order follows ASSESSMENT_DIMENSIONS position for every 
     ]);
     const row = result.domains.find((d) => d.domain === domain);
     assert.deepEqual(row.evidence_refs, [`ev-${firstDim}`, `ev-${secondDim}`], `${domain}: pair order wrong`);
+    // HIGH + HIGH = spread 0, across all 7 domains.
+    assert.equal(row.dimension_disagreement, false, `${domain}: expected dimension_disagreement=false (spread 0)`);
   }
 });
 
@@ -73,17 +81,65 @@ test('worked example from the spec: HIGH + MODERATE -> MODERATE (mean 3.5, round
   const operational = result.domains.find((d) => d.domain === 'OPERATIONAL');
   assert.equal(operational.value, 'MODERATE');
   assert.equal(operational.coverage, 'FULL');
+  assert.equal(operational.dimension_disagreement, false); // spread 1 (HIGH=4, MODERATE=3), below the threshold
   assert.deepEqual(operational.evidence_refs, ['ev-1', 'ev-2']);
 });
 
-test('one of two dimensions present -> PARTIAL coverage, value is that dimension alone', () => {
+test('one of two dimensions present -> PARTIAL coverage, value is that dimension alone, dimension_disagreement is always false (nothing to compare)', () => {
   const result = rollupTrustDomains([
     { dimension: 'RELIABILITY_FULFILLMENT', value: 'VERY_HIGH', evidence_refs: ['ev-1'] },
   ]);
   const operational = result.domains.find((d) => d.domain === 'OPERATIONAL');
   assert.equal(operational.value, 'VERY_HIGH');
   assert.equal(operational.coverage, 'PARTIAL');
+  assert.equal(operational.dimension_disagreement, false);
   assert.deepEqual(operational.evidence_refs, ['ev-1']);
+});
+
+// HCI_TRUST_DOMAIN_SPEC.md §Domain-internal disagreement (TASKS.md,
+// 2026-09-06 second half): a domain's two assigned dimensions landing on
+// materially different bands must be disclosed as a parallel signal, not
+// silently averaged away -- same "Do not average lens disagreement away"
+// principle combine-method-findings.mjs's own `disagreement` flag already
+// applies one layer down, applied here across dimensions instead of across
+// methods. Independently-thresholded (DOMAIN_DIMENSION_SPREAD_THRESHOLD),
+// not the same constant as combine-method-findings.mjs's own threshold.
+
+test('a spread of exactly 1 (the boundary just below the threshold) does not flag dimension_disagreement', () => {
+  const result = rollupTrustDomains([
+    { dimension: 'COMPETENCE', value: 'LOW', evidence_refs: ['ev-1'] },
+    { dimension: 'LEARNING_ADAPTABILITY', value: 'MODERATE', evidence_refs: ['ev-2'] },
+  ]);
+  const competence = result.domains.find((d) => d.domain === 'COMPETENCE');
+  assert.equal(competence.dimension_disagreement, false);
+});
+
+test('a spread of exactly 2 (the threshold itself) flags dimension_disagreement', () => {
+  const result = rollupTrustDomains([
+    { dimension: 'COMPETENCE', value: 'LOW', evidence_refs: ['ev-1'] },
+    { dimension: 'LEARNING_ADAPTABILITY', value: 'HIGH', evidence_refs: ['ev-2'] },
+  ]);
+  const competence = result.domains.find((d) => d.domain === 'COMPETENCE');
+  assert.equal(competence.dimension_disagreement, true);
+});
+
+test('a maximal spread of 4 (VERY_LOW vs VERY_HIGH) flags dimension_disagreement, value still rolls up to MODERATE', () => {
+  const result = rollupTrustDomains([
+    { dimension: 'COMPETENCE', value: 'VERY_LOW', evidence_refs: ['ev-1'] },
+    { dimension: 'LEARNING_ADAPTABILITY', value: 'VERY_HIGH', evidence_refs: ['ev-2'] },
+  ]);
+  const competence = result.domains.find((d) => d.domain === 'COMPETENCE');
+  assert.equal(competence.dimension_disagreement, true);
+  assert.equal(competence.value, 'MODERATE'); // mean 3, exact -- the aggregation rule itself is unchanged
+});
+
+test('identical bands (zero spread) never flag dimension_disagreement', () => {
+  const result = rollupTrustDomains([
+    { dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1'] },
+    { dimension: 'LEARNING_ADAPTABILITY', value: 'HIGH', evidence_refs: ['ev-2'] },
+  ]);
+  const competence = result.domains.find((d) => d.domain === 'COMPETENCE');
+  assert.equal(competence.dimension_disagreement, false);
 });
 
 test('zero of two dimensions present -> the domain does not appear at all, never defaults to MODERATE', () => {

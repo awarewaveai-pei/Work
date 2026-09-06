@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-09-06（同日第八輪：`dimension_disagreement`——domain 內兩個維度自己互相不同意的訊號，解答 TASKS.md 兩問合一待辦裡的其中一問；critic 覆審抓到 0 Critical+3 Major+5 Minor，其中一個 Major 是把已被上一輪 critic 修正過的「gate 4 改了幾次」計數又錯著寫回去，全修）
+
+**觸發**：操作者明確授權「你做最完美的決定！該增加什麼都去做，因為我不會！」，延續同日第七輪（sparse-array debt 收尾）後的候選清單，選 `agency-os/TASKS.md` 另一則兩問合一的待辦：「disagreement flag 從 dimension 層傳到 domain 層的路徑」。
+
+**先拆問題再動手**：原待辦把兩個不同問題混在一起——①「domain 內兩個維度自己互相不同意」（inter-dimension spread，比較同一 domain 底下兩個已賦值維度的值）②「dimension 層的 cross-method disagreement 該不該往上傳」（`combineMethodFindings` 回傳的 `disagreement` 欄位本身要不要傳進 `rollupTrustDomains`）。判斷①有明確、低風險、可獨立驗證的答案（純從已有輸入計算，不需發明新資料結構），②需要先回答「flag 語意要不要被信任傳遞」這個更深的設計問題，且 `HCI_CONFIDENCE_SPEC.md` 前一輪已明確記錄「留給下一次真有 consumer 逼出決定時處理」——選①先做，②繼續誠實留 OPEN，不強行答兩題湊一次關閉。
+
+**實作**：`rollup-trust-domains.mjs` 新增 `dimension_disagreement: boolean`——比較該 domain 兩個已賦值維度的 rank spread，`>= 2` 則 `true`（同 `HCI_CONFIDENCE_SPEC.md` `DISAGREEMENT_SPREAD_THRESHOLD` 的「spread 1 是正常量測差異，spread 2+ 是實質不同結論」邊界，但**故意用獨立命名的新常數** `DOMAIN_DIMENSION_SPREAD_THRESHOLD`，不共用 import——兩者比較的對象結構不同（N 個 method 對一個 dimension vs. 一個 domain 底下兩個不同 dimension），`dimension-score.mjs` 已有「不強行共用巧合相似的比較」先例）。只有一個維度存在時同一公式自然回傳 `false`（單元素陣列 max=min），無需特判。gate 4 白名單＋型別檢查同步加欄位（第二次修訂 gate 4 契約，第一次是 `9888bd5d7` 的 ADR-0032 band 修正）。
+
+**送 critic 獨立覆審（1 個 agent，完整讀 8 個檔案＋主動延伸讀 ADR-0004／19 文件／HCI_RISK_SPEC.md 等 7 份既有檔案核對引用）**，抓到 0 Critical + 3 Major + 5 Minor：
+
+- **Major 1（已修）**：ADR-0004 本身（gate 4 的正式定義文件）完全沒提到 `dimension_disagreement`——其 gate 4 原文（item 4）與前一輪的 shape 說明段落都只寫 `{domain,value,coverage,evidence_refs}`，且前一輪已建立「shape 改了要留 supersession pointer 往前指」的慣例（`:272-275`→`:354`），本輪卻沒跟著做，會讓照 ADR 原文/前一輪筆記建構請求的實作者撞上非預期的 `dimension_disagreement must be a boolean`。修法：ADR-0004 新增第三段 Implementation note（含 0C+3M+5m 完整覆審記錄），並在 item 4 原文與前一輪 shape 段落各補一句 supersession pointer 往前指向新 note。
+- **Major 2（已修）**：`21_HCI_TOP_TIER_GAP_ANALYSIS.md` 我自己寫的更新筆記宣稱「解答了『model disagreement』疑慮的一半」——查證後為假：語料庫唯一具體的 model disagreement 範例（`19:19-21`，Reliability=OPERATIONAL vs Incentive Alignment=FINANCIAL）橫跨兩個不同 domain，而 `dimension_disagreement` 結構上只能比較**同一 domain 內**的兩個維度，永遠碰不到這個範例。修正為明確維持該項「完全 OPEN」，不再宣稱「半解」。
+- **Major 3（已修，且是本輪最值得記取的一次）**：`HCI_CONFIDENCE_SPEC.md` 與 `TASKS.md` 都寫「gate 4 現在改了第三次」——查 `git log` 確認錯誤，實際只改過兩次（`9888bd5d7` band 修正 + 本輪）。這個計數本身在**上一輪**（HCI_RISK_SPEC.md 那輪）已經被 critic 抓到並修正過一次（TASKS.md 該輪紀錄：「『第三次修改 gate 4』計數錯（實際目前只改過一次）」），本輪等於把已修正的錯誤重新寫回去——**同一類錯誤第二次發生，改用「每次觸碰 gate 4 都重新核實 git log，而非沿用上一輪心算的數字」**。連帶修正 `HCI_RISK_SPEC.md:55` 一句因本輪真的改了 gate 4 而變成過期的「gate 4 目前只改過一次」舊句。
+
+5 個 Minor 全修：7 個 gate 4 負面測試的 fixture 漏掉 `dimension_disagreement`（今天雖仍因其他欄位先觸發錯誤而不影響斷言，但不再獨立隔離單一缺陷，日後改動順序會變成誤導性失敗）——全部補齊；spec 原文用 `coverage=PARTIAL` 描述「只有一個維度」情境，但程式碼實際依賴的是維度數量本身，兩者只在現行固定 2-per-domain partition 下剛好等價——已改用維度數量描述規則，並揭露 gate 4 本身不會（也不能）耦合 `coverage`／`dimension_disagreement` 兩欄位一致性；程式碼註解誤引 `dimension-score.mjs` 的先例只講「共用常數」，實際原文講的是「共用 validator/shape」——已訂正；兩個既有全 7-domain 迴圈測試（`value` 用的那兩個）原本就餵了對的輸入卻沒順手斷言 `dimension_disagreement`——本檔自己 header 已經記過一次同款「該測的沒測到」（M2，對 `value`），這次一樣的缺口在新欄位上重演，已補；`test-wave1-local.ps1` 一句「roll-up 公式仍未定義」的舊註解，早在 P0-04 那輪就已過期，本輪順手修正。
+
+**[已修改]**：`packages/intelligence/rollup-trust-domains.mjs`（新增 `dimension_disagreement` 計算＋獨立常數）／`packages/contracts/validate-trust-domain-response.mjs`（gate 4 白名單＋型別檢查）／`tests/unit/intelligence/rollup-trust-domains.test.mjs`（4 個新測試＋2 個既有迴圈測試補斷言）／`tests/unit/contracts/validate-trust-domain-response.test.mjs`（3 個新測試＋7 個既有 fixture 補欄位）／`scripts/mutation-check-node-gates.ps1`（新增 3 個 mutation）／`scripts/test-wave1-local.ps1`（修正過期註解）／`docs/intelligence/HCI_TRUST_DOMAIN_SPEC.md`（新增 §Domain-internal disagreement、header 補第三類決策、§Layering 更新、§Verification／§Rollback 補充）／`docs/intelligence/HCI_CONFIDENCE_SPEC.md`（更新「已知缺口」揭露，訂正改動次數計數）／`docs/intelligence/HCI_RISK_SPEC.md`（訂正過期的 gate 4 改動次數句）／`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0004-no-universal-human-trust-score.md`（新增 Implementation note＋2 處 supersession pointer）／`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/21_HCI_TOP_TIER_GAP_ANALYSIS.md`（訂正 overclaim，移到正確時序位置）／`agency-os/TASKS.md`（該待辦拆兩問，①已解②仍 OPEN，訂正繁簡與計數）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/*.test.mjs tests/unit/contracts/*.test.mjs` | exit=0 | result=161/161 pass（前次 commit 154，本輪 +7）
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`powershell -File scripts/mutation-check-node-gates.ps1` | exit=0 | result=27/27 mutation 全殺，含 baseline no-op gate（前次 commit 24，本輪 +3：`gate4-drop-dimension-disagreement-boolean-check`／`rollup-lower-dimension-disagreement-threshold-to-zero`／`rollup-weaken-dimension-disagreement-boundary`）
+- REVIEW_DONE: critic=Standard（真實 subagent，完整讀 8 個變動檔＋主動延伸讀 7 份既有檔案交叉核對引用與計數）| verdict=0 Critical+3 Major+5 Minor，全修 | findings=0c/3m/5minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`dimension_disagreement\|DOMAIN_DIMENSION_SPREAD_THRESHOLD` | hits=confirmed all references are the intended new field/constant across code/tests/docs; no stale references to the old 4-field gate-4 shape remain outside the explicitly-preserved historical-record paragraphs in ADR-0004
+- WORKLOG: 本條目
+
+**[剩餘風險]**：②（dimension 層 cross-method disagreement 該不該往上傳）仍誠實留 OPEN，本輪未動；`HCI_TRUST_DOMAIN_SPEC.md` 揭露的「gate 4 不耦合 coverage/dimension_disagreement」是刻意設計，非缺陷，但意味著一個格式合法卻邏輯不可能出現的組合（`{coverage:'PARTIAL', dimension_disagreement:true}`）能通過 gate 4——已在文件明確揭露，非隱藏。
+
+**[rollback]**：單一 commit，`git revert`；純新增欄位，無 schema／無 consumer，零遷移成本。
+
+
 ## 2026-09-06（同日第七輪：HCI30 sparse-array TypeError debt 收尾——`normalizeDimensionScores`/`normalizeEvidenceRefs` 兩個共用驗證器落地，critic 覆審抓到比原債更嚴重的獨立同類洞（M1：假陽性而非崩潰）+ 我自己 TASKS.md 收尾文字裡的兩個假宣稱（M2），全修）
 
 **觸發**：操作者明確授權「你做最完美的決定！該增加什麼都去做，因為我不會！」，延續 P0-04 系列六輪工作後的候選清單。挑本輪最小、風險最低、範圍最明確的一項先做：`agency-os/TASKS.md` 兩則待辦之一，`dimension-score.mjs` 三個消費者（`rollupTrustDomains`/`detectSeverityFloor`/`classifyEvidenceQuality`）對稀疏陣列（sparse array）輸入拋出未經處理的原始 TypeError，前兩輪皆因「修法會同時碰三個已出貨檔案」而遞延。
@@ -12151,3 +12181,28 @@ The archived files described the retired single-process Python content publisher
 
 [rollback]
 Move `README.md` and `video_generator_plan.md` from `_archive_legacy_p7_2026-09-06/` back to `docs/video_generator/`, then restore the prior root README and adoption-matrix references from version control. This archival operation is filesystem-only and reversible.
+
+## 2026-09-06 — Video Timeline v1 contract (isolated branch)
+
+[scope]
+Added only the renderer-neutral Timeline v1 contract and its unit tests in `D:\Worktrees\media-video-phase0`, branch `codex/media-video-phase0`. Updated current video-generator documentation in this folder with the delivery receipt and truthful phase status. No production container, database, R2 object, renderer route, VideoStudio UI, WordPress, Postiz, secret or deployment changed.
+
+**Code commit:** `4f6b574a7` — `feat(video): define artifact-backed Timeline v1 contract`.
+**Follow-up code commit:** `a53021d85` — `fix(video): enforce existing LEGO capability ID grammar`.
+
+**Follow-up code commit:** `6fa054f20` — Timeline source artifact references were corrected from an invented `asset_*` pattern to the existing `media_assets.id` UUID identity after checking `packages/db/migrations/0011_ops_console_control_plane.sql:35-54`; targeted unit test and typecheck passed before commit.
+**Follow-up code commit:** `0cf46d201` — `feat(video): add non-rendering Timeline preflight`.
+
+[reason]
+The existing Director design described a canonical Timeline with artifact references and video/audio/caption tracks, while live Remotion accepts renderer-specific scene props. Directly connecting a new Timeline branch to that route would bypass durable `video_jobs`, artifact, QA and release recovery. The contract must therefore become a tested boundary before any renderer adapter is enabled.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test` in `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\next-admin` | exit=0 | result=64 files, 709 tests passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run typecheck` in the same directory | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git -C D:\Worktrees\media-video-phase0 diff --check` | exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n; reviewed the artifact-reference invariant and corrected capability-ID validation to allow registered dotted IDs such as `media.timeline_plan`.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`toDynamicSlideshowRenderRequest|visual.url|media_timeline_plan` | hits=0
+- WORKLOG_DONE: evidence for contract at `apps/next-admin/lib/content/video/timeline-v1.ts:1-142`; tests at `apps/next-admin/lib/content/video/__tests__/timeline-v1.test.ts:1-75`; bounded delivery record at `docs/video_generator/PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md:1-53`.
+
+[rollback]
+Do not merge the isolated branch. Since the Timeline module has no runtime import or deployment entrypoint, removal of its two new files restores the prior behaviour; existing Quick Engine and manual Remotion template routes remain untouched.

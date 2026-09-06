@@ -19,7 +19,14 @@ which found the original version of this header conflated them):
    `ADR-0004`'s own "Decision authority: Operator-delegated" precedent —
    not because `04:87` says no sign-off is needed for them.
 
-Operator may supersede either with a later explicit decision.
+**Update, 2026-09-06 (later the same day)**: §Domain-internal disagreement
+(below) adds a third decision, of the same *kind* as #2 above (a
+product/definition judgment under the operator's general HCI30-architecture
+delegation, not `04:87`'s narrower aggregation-math licence) — whether and
+how a domain's two assigned dimensions disagreeing with each other should
+be surfaced.
+
+Operator may supersede any of these with a later explicit decision.
 
 Path per `21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-04 (Mathematical
 Specifications): this file closes the **Trust-Domain-to-Assessment-Dimension
@@ -137,12 +144,23 @@ about the Reliability/fulfillment *dimension* combine."
 ranks with a disclosed `disagreement` flag, the same shape this spec's own
 domain-level formula uses. This spec's own input — "the already-resolved
 14 dimension-level values" — now rests on a real, tested mechanism rather
-than an assumed one. One seam remains genuinely open, not silently closed:
+than an assumed one.
+
+**Update (2026-09-06, later the same day): the two-part ambiguity this
+seam raised is now half-answered, narrowed, not silently closed.**
 `combineMethodFindings`'s output carries a `disagreement` flag that
-`rollupTrustDomains`'s input contract (below) has no field for, so it is
-silently dropped if fed straight through today — see
-`HCI_CONFIDENCE_SPEC.md`'s own disclosure of this gap, tracked in
-`TASKS.md`.
+`rollupTrustDomains`'s input contract (`normalizeDimensionScore`, via
+`dimension-score.mjs`) has no field for and silently ignores if fed
+straight through — that specific propagation question (**should a
+dimension's own cross-method disagreement travel up into its domain's
+output?**) is still open, tracked in `TASKS.md`, and is not what the
+paragraph below answers. What `rollupTrustDomains` now does answer is a
+different, adjacent question raised at the same time: **do a domain's own
+two assigned dimensions disagree with EACH OTHER** (see §Domain-internal
+disagreement, below) — an inter-dimension comparison, not a
+cross-method-disagreement pass-through. Confusing the two would be exactly
+the kind of "this closes that" overclaim this file's own critic reviews
+have repeatedly had to correct elsewhere in this document.
 
 ## Roll-up formula (14 → 7)
 
@@ -299,6 +317,84 @@ domain across a representative set of band combinations plus the pair
 order for all 7 domains, rather than re-asserting all 25 combinations a
 second time through a different texture.
 
+## Domain-internal disagreement
+
+**Status: operator-delegated design decision** (per this file's own header
+authority split — this is a product/definition judgment, not the
+aggregation-math question `04:87` licenses without sign-off), made
+2026-09-06 in response to a `TASKS.md` item this file's own §Layering
+section raised earlier the same day.
+
+A domain's two assigned dimensions can each be well-evidenced but land on a
+materially different band — e.g. `Reliability/fulfillment = HIGH`,
+`Predictability = VERY_LOW` under Operational Trust. §Aggregation rule's
+mean-of-ranks still rolls this up to `MODERATE`; averaging it away with no
+disclosure would hide exactly the kind of internal inconsistency
+`HCI_CONFIDENCE_SPEC.md`'s own `disagreement` flag already refuses to hide
+one layer down (`19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:17`, "Do not
+average lens disagreement away") — the same principle, applied here across
+a domain's two dimensions rather than across a dimension's method findings.
+
+**Rule**: every domain entry carries a `dimension_disagreement: boolean`,
+computed directly from how many of the domain's assigned dimensions are
+present (not from the `coverage` field, even though the two happen to
+covary for today's fixed 2-per-domain partition — see the disclosure
+below). With two dimensions present, it is `true` if their rank spread
+(§Aggregation rule's `VERY_LOW=1 .. VERY_HIGH=5` encoding) is `>= 2` — the
+same "spread of 1 is ordinary variation, spread of 2+ is a materially
+different conclusion" boundary `HCI_CONFIDENCE_SPEC.md`'s
+`DISAGREEMENT_SPREAD_THRESHOLD` uses. With fewer than two dimensions
+present, there is nothing to compare, so `dimension_disagreement` is always
+`false` — the same formula produces this correctly without a separate
+branch (a single-element, or empty, rank array's max and min are equal,
+spread 0).
+
+**Disclosure (critic review, 2026-09-06)**: an earlier version of this
+rule stated the fewer-than-two case in terms of `coverage = PARTIAL`
+specifically. That is correct only because every domain currently has
+exactly 2 assigned dimensions (§Roll-up formula's partition), so "fewer
+than all assigned dimensions present" and "fewer than two present" mean
+the same thing today. If a future revision widens a domain to 3+
+dimensions (the scenario `HCI_RISK_SPEC.md`'s own `detectSeverityFloor`
+test suite already builds a sandbox for), a domain with `coverage =
+PARTIAL` (missing at least one of 3) could still have 2 dimensions present
+and a real spread to report — the code (keyed off dimension count, not
+`coverage`) already handles this correctly; the stated rule above now does
+too. Gate 4 itself does not, and cannot, enforce any coupling between
+`coverage` and `dimension_disagreement` — it validates each independently
+and accepts any combination, including ones that cannot arise from
+`rollupTrustDomains` under today's fixed partition (e.g. `{coverage:
+'PARTIAL', dimension_disagreement: true}`), the same "gate validates
+shape, not provenance" boundary this file's other fields already have.
+
+**Deliberately a separate, independently-named threshold constant**
+(`DOMAIN_DIMENSION_SPREAD_THRESHOLD` in `rollup-trust-domains.mjs`), not a
+shared import from `combine-method-findings.mjs`'s
+`DISAGREEMENT_SPREAD_THRESHOLD`, even though both currently equal 2 — the
+two compare structurally different things (N methods measuring **one**
+dimension there, vs. **two different** dimensions under one domain here).
+`dimension-score.mjs`'s own header already establishes this package's
+precedent against forcing a shared constant or validator across
+coincidentally similar-looking comparisons; the same reasoning applies
+here. If a future revision needs the two thresholds to diverge, neither
+module has to touch the other to do it.
+
+**What this does not answer** (see the §Layering update above): whether a
+dimension's own upstream cross-method `disagreement` flag
+(`combineMethodFindings`'s output) should itself propagate into a domain's
+output is a separate, still-open question, tracked in `TASKS.md`.
+`dimension_disagreement` is computed entirely from the dimension **values**
+already present in `rollupTrustDomains`'s input — it has no visibility into
+whether either dimension's own value was itself produced from disagreeing
+method findings.
+
+Worked example: `Competence = VERY_LOW (1)`, `Learning/adaptability =
+VERY_HIGH (5)` → spread 4 → `dimension_disagreement = true`, `value =
+MODERATE` (mean 3, exact) — the aggregation rule itself is unchanged; this
+is purely an additional disclosed signal alongside it, the same
+non-overriding pattern `detectSeverityFloor` already uses for the
+single-dimension-VERY_LOW case (§Explicitly out of scope, below).
+
 ## Explicitly out of scope (forward references to their own P0-04 specs)
 
 This spec deliberately does not define, and a future implementer must not
@@ -360,18 +456,30 @@ into this file's scope.
 - `tests/unit/intelligence/rollup-trust-domains.test.mjs` — value and
   `PARTIAL`/`FULL` coverage assertions across a representative set of band
   combinations for every domain, the pair-order assertion for all 7
-  domains, the 0-of-2 omission case, and an end-to-end composition test
-  proving the roll-up's own output always passes gate 4's
-  `validateTrustDomainResponse` unchanged. The exhaustive all-25-combination
-  rank-arithmetic test itself lives in
+  domains, the 0-of-2 omission case, `dimension_disagreement` boundary
+  cases (spread 0/1/2/4, and always-`false` under `PARTIAL` coverage), and
+  an end-to-end composition test proving the roll-up's own output always
+  passes gate 4's `validateTrustDomainResponse` unchanged. The exhaustive
+  all-25-combination rank-arithmetic test itself lives in
   `tests/unit/intelligence/band-scale.test.mjs`, against the shared
   primitive both this file and `combine-method-findings.mjs` call.
+- `tests/unit/contracts/validate-trust-domain-response.test.mjs` — gate 4
+  now also rejects a missing or non-boolean `dimension_disagreement` and
+  accepts both `true` and `false`.
+- `scripts/mutation-check-node-gates.ps1` — 3 mutations specific to
+  `dimension_disagreement` (dropping gate 4's boolean check, lowering the
+  spread threshold to 0, and weakening the boundary comparison from `>=` to
+  `>`), each proven to flip the corresponding test red.
 
 ## Rollback
 
 Purely additive, pre-code (no real trust-read endpoint or method catalog
 consumes this yet): reverting this spec and its two new modules removes the
-formula entirely with no migration and no data to reconcile. A future
+formula entirely with no migration and no data to reconcile. Same for
+`dimension_disagreement` specifically: reverting it means removing one
+field from gate 4's whitelist and one computed value from
+`rollupTrustDomains`'s output object — no schema change, no consumer to
+migrate. A future
 change to the partition table requires updating `assessment-dimensions.mjs`'s
 `DIMENSION_TO_DOMAIN` map and re-running that file's own tests; a future
 change to the tie-break rule requires updating `band-scale.mjs` and

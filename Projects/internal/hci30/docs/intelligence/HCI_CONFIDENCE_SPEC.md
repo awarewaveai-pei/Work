@@ -120,21 +120,34 @@ directly cannot miss it.
 consumer-independent guarantee that does not hold and is falsified by this
 file's own worked example below)**: `rollupTrustDomains`'s input contract
 (`HCI_TRUST_DOMAIN_SPEC.md` §Aggregation rule) is
-`{dimension, value, evidence_refs}` — it has no `disagreement` field, and
-`validate-trust-domain-response.mjs`'s `DOMAIN_ENTRY_KEYS` whitelist would
-reject one if added without a corresponding gate-4 change. So feeding
-`combineMethodFindings`'s output into `rollupTrustDomains` today **silently
-drops `disagreement`** at that seam — the exact "papers over a real
-disagreement" failure this spec exists to prevent, reappearing one layer
-up, for domain-level rather than dimension-level consumers. This is a
-genuine open gap, not a solved one: propagating disagreement from the
-dimension layer up through the domain layer and gate 4 is deliberately
-**not** done in this change (it would mean revising gate 4's already-
-shipped, already-reviewed contract a third time, and deciding a further
-question — how does a domain roll up a disagreement flag across its own
-two dimensions? — that has no answer yet). Tracked as an open item in
-`TASKS.md`, owned by whichever future spec resolves domain-level
-disagreement propagation.
+`{dimension, value, evidence_refs}` — it has no `disagreement` field. So
+feeding `combineMethodFindings`'s output into `rollupTrustDomains` today
+**silently drops `disagreement`** at that seam — the exact "papers over a
+real disagreement" failure this spec exists to prevent, reappearing one
+layer up, for domain-level rather than dimension-level consumers. **This
+remains a genuine open gap, not a solved one, even after the update below**:
+propagating *this specific flag* — a dimension's own record of whether the
+method findings that produced it disagreed — from the dimension layer up
+through the domain layer and gate 4 is still deliberately not done.
+
+**Update (2026-09-06, later the same day, partial and adjacent, not a
+resolution of the paragraph above)**: `rollupTrustDomains` now computes and
+gate 4 now accepts a domain-level `dimension_disagreement` boolean
+(`HCI_TRUST_DOMAIN_SPEC.md` §Domain-internal disagreement) — gate 4's
+contract has in fact now been revised a second time (the first being
+`9888bd5d7`'s ADR-0032 band correction), contrary to what an
+earlier version of this paragraph anticipated. **This is not the same
+question as the one this paragraph names, and does not answer it**:
+`dimension_disagreement` is computed purely from the two dimensions'
+already-resolved **values** (does `Reliability/fulfillment` disagree with
+`Predictability`?), with no visibility into whether either dimension's own
+value was itself produced from disagreeing method findings. A dimension
+whose own `combineMethodFindings` call had `disagreement = true` can still
+roll up into a domain with `dimension_disagreement = false` (if its
+resulting value happens to sit close to its sibling dimension's value), and
+vice versa. The question this paragraph originally raised — should a
+dimension's own cross-method `disagreement` flag itself travel upward into
+its domain's output — remains open, tracked in `TASKS.md`.
 
 Worked example: `payment-history: HIGH`, `communication-timeliness: LOW`
 for `RELIABILITY_FULFILLMENT` → ranks `[4, 2]`, mean 3, `value = MODERATE`,

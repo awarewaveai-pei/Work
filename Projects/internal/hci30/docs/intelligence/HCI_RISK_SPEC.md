@@ -52,10 +52,17 @@ considered:
   the same grounds `HCI_TRUST_DOMAIN_SPEC.md` already used to reject a
   weighted many-to-many matrix: it reintroduces exactly the kind of
   ad hoc, undisclosed value-shaping the mean-of-ranks formula was built to
-  avoid, and it would be a second change to gate 4's contract to
-  accommodate an aggregation-formula tweak rather than a genuinely new
-  kind of information (gate 4 has changed once for this reason so far —
-  `9888bd5d7`'s ADR-0032 band correction). `HCI_CONFIDENCE_SPEC.md`'s own
+  avoid, and it would accommodate an aggregation-formula tweak rather than
+  a genuinely new kind of information — a different justification from
+  either of gate 4's two changes so far (`9888bd5d7`'s ADR-0032 band
+  correction, and `HCI_TRUST_DOMAIN_SPEC.md` §Domain-internal
+  disagreement's later `dimension_disagreement` field, 2026-09-06 — neither
+  reshapes an existing value, both add disclosure). A hypothetical
+  value-override would be gate 4's **third** change overall, but still its
+  **first** of this specific undisclosed-value-shaping kind — updated here
+  after the second change landed, so this count does not go stale again
+  (critic review, 2026-09-06, which caught this sentence undercounting by
+  one after the `dimension_disagreement` addition). `HCI_CONFIDENCE_SPEC.md`'s own
   C1 finding (critic review, 2026-09-06) did not itself recommend leaving
   gate 4 alone — it found a false safety claim ("disagreement is never
   silently droppable") that the spec's own worked example disproved; not
