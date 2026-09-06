@@ -45,6 +45,17 @@ describe("media timeline v1", () => {
     ]));
   });
 
+  it("uses the established LEGO capability-ID grammar for provenance", () => {
+    const result = validateMediaTimelineV1({
+      ...validTimeline,
+      provenance: { ...validTimeline.provenance, capabilityVersions: { "Media.timeline_plan": "1.0.0" } },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok === false) expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "$.provenance.capabilityVersions.Media.timeline_plan", code: "value" }),
+    ]));
+  });
+
   it("rejects captions that are out of order or unreadably fast", () => {
     const result = validateMediaTimelineV1({
       ...validTimeline,
