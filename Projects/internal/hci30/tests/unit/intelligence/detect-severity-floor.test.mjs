@@ -111,6 +111,7 @@ test('siblings reports every other dimension in the domain, not just one, if the
 
   await fs.copyFile(path.join(contractsDir, 'trust-domains.mjs'), path.join(tmpContracts, 'trust-domains.mjs'));
   await fs.copyFile(path.join(packagesDir, 'band-scale.mjs'), path.join(tmpIntelligence, 'band-scale.mjs'));
+  await fs.copyFile(path.join(packagesDir, 'evidence-refs.mjs'), path.join(tmpIntelligence, 'evidence-refs.mjs'));
   await fs.copyFile(path.join(packagesDir, 'dimension-score.mjs'), path.join(tmpIntelligence, 'dimension-score.mjs'));
   await fs.copyFile(path.join(packagesDir, 'detect-severity-floor.mjs'), path.join(tmpIntelligence, 'detect-severity-floor.mjs'));
 
@@ -160,4 +161,13 @@ if (Object.keys(DIMENSION_TO_DOMAIN).length !== ASSESSMENT_DIMENSIONS.length) th
   ]);
 
   await fs.rm(tmpDir, { recursive: true, force: true });
+});
+
+// Regression for the sparse-array hole bug (TASKS.md, fixed 2026-09-06):
+// detectSeverityFloor itself, not just normalizeDimensionScores in
+// isolation, must reject a hole with a clean validation error (critic
+// review, 2026-09-06 m1).
+test('rejects a sparse-array hole in the input with a clean validation error, not a crash', () => {
+  const sparse = [, { dimension: 'RELIABILITY_FULFILLMENT', value: 'VERY_LOW', evidence_refs: ['ev-1'] }];
+  assert.throws(() => detectSeverityFloor(sparse), /dimensionScores\[0\] must be an object/);
 });

@@ -150,10 +150,40 @@ $mutations = @(
      replace = 'const disagreement = spread > DISAGREEMENT_SPREAD_THRESHOLD;'
      test = 'tests/unit/intelligence/combine-method-findings.test.mjs' }
 
+  # Same sparse-array regression guard as dimension-score.mjs's own entry
+  # above, for this module's independent copy of the same bug (fixed
+  # 2026-09-06).
+  @{ id = 'combine-findings-revert-array-from-to-direct-map'
+     file = 'packages/intelligence/combine-method-findings.mjs'
+     find = 'const normalized = Array.from(findings).map(normalizeFinding);'
+     replace = 'const normalized = findings.map(normalizeFinding);'
+     test = 'tests/unit/intelligence/combine-method-findings.test.mjs' }
+
+  # Regression guard for the MORE dangerous variant of the sparse-array bug
+  # (critic review, 2026-09-06 M1): a hole inside evidence_refs itself was
+  # silently skipped by a direct .map(), never validated at all -- not a
+  # crash, a false pass. This mutation reverts the fix in the shared
+  # evidence-refs.mjs extracted the same pass.
+  @{ id = 'evidence-refs-revert-array-from-to-direct-map'
+     file = 'packages/intelligence/evidence-refs.mjs'
+     find = 'return Array.from(refsInput).map((ref) => {'
+     replace = 'return refsInput.map((ref) => {'
+     test = 'tests/unit/intelligence/evidence-refs.test.mjs' }
+
   @{ id = 'dimension-score-drop-duplicate-check'
      file = 'packages/intelligence/dimension-score.mjs'
      find = 'if (seen.has(entry.dimension)) throw new Error(`duplicate dimension in input: ${entry.dimension}`);'
      replace = ''
+     test = 'tests/unit/intelligence/dimension-score.test.mjs' }
+
+  # Regression guard for the sparse-array hole bug (TASKS.md, fixed
+  # 2026-09-06): reverting Array.from back to a direct .map() must make the
+  # sparse-array test above fail (a raw TypeError instead of the clean
+  # "must be an object" error node:assert/strict's /regex/ match rejects).
+  @{ id = 'dimension-score-revert-array-from-to-direct-map'
+     file = 'packages/intelligence/dimension-score.mjs'
+     find = 'const normalized = Array.from(dimensionScores).map(normalizeDimensionScore);'
+     replace = 'const normalized = dimensionScores.map(normalizeDimensionScore);'
      test = 'tests/unit/intelligence/dimension-score.test.mjs' }
 
   @{ id = 'severity-floor-lower-threshold-to-low'

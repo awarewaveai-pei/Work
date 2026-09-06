@@ -1,7 +1,7 @@
 import { TRUST_DOMAINS } from '../contracts/trust-domains.mjs';
 import { ASSESSMENT_DIMENSIONS, DIMENSION_TO_DOMAIN } from './assessment-dimensions.mjs';
 import { BAND_RANK, meanRankBand } from './band-scale.mjs';
-import { normalizeDimensionScore, assertNoDuplicateDimensions } from './dimension-score.mjs';
+import { normalizeDimensionScores } from './dimension-score.mjs';
 
 // Group each domain's assigned dimensions once, derived from
 // DIMENSION_TO_DOMAIN rather than hand-duplicated, so the two files cannot
@@ -24,9 +24,7 @@ const DOMAIN_DIMENSIONS = Object.freeze(
 // satisfying P0-04's own "independent implementations ... produce
 // equivalent outputs" requirement by construction.
 export function rollupTrustDomains(dimensionScores) {
-  if (!Array.isArray(dimensionScores)) throw new Error('dimensionScores must be an array');
-  const normalized = dimensionScores.map(normalizeDimensionScore);
-  assertNoDuplicateDimensions(normalized);
+  const normalized = normalizeDimensionScores(dimensionScores);
 
   const byDimension = new Map(normalized.map((entry) => [entry.dimension, entry]));
   const domains = [];

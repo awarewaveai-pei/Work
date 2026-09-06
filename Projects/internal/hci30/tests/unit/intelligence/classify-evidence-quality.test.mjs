@@ -100,3 +100,29 @@ test('rejects a dimension entry with no evidence_refs', () =>
 
 test('rejects a non-array input', () =>
   assert.throws(() => classifyEvidenceQuality('HIGH'), /must be an array/));
+
+// Regression for the sparse-array hole bug (TASKS.md, fixed 2026-09-06):
+// classifyEvidenceQuality itself, not just normalizeDimensionScores in
+// isolation, must reject a hole in the outer array with a clean validation
+// error (critic review, 2026-09-06 m1).
+test('rejects a sparse-array hole in the outer input with a clean validation error, not a crash', () => {
+  const sparse = [, { dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1'] }];
+  assert.throws(() => classifyEvidenceQuality(sparse), /dimensionScores\[0\] must be an object/);
+});
+
+// Flagship regression for critic review 2026-09-06 M1 -- the actually
+// dangerous variant of the sparse-array bug, found while reviewing the
+// fix above: a hole inside evidence_refs itself (not the outer
+// dimensionScores array) was previously skipped by a direct .map() and
+// left completely unvalidated, so `new Set(entry.evidence_refs).size`
+// would count the hole as one distinct value and mislabel a genuinely
+// single-source dimension as MULTIPLE_SOURCES -- a false claim about
+// evidence strength, silently produced, not a crash. Must now throw
+// instead of ever reaching that mislabeled output.
+test('a hole inside evidence_refs is rejected, not silently counted as an extra distinct source', () => {
+  const sparseRefs = [, 'ev-1']; // one real ref, one hole -- must NOT classify as MULTIPLE_SOURCES
+  assert.throws(
+    () => classifyEvidenceQuality([{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: sparseRefs }]),
+    /evidence_refs must contain only non-empty strings/,
+  );
+});

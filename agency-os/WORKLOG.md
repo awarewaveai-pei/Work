@@ -1,6 +1,36 @@
 # Worklog
 
-## 2026-09-06（續59，同一 session：Cognitive OS 第四十六個 Method Atlas 切片 — `security.attack_tree`，F20 家族第三個成員、第一個結構性偏離 STRIDE/LINDDUN 共用形狀的成員、本 session 第一個 F20 genuine_compute 方法；critic 真跑 8 個突變+獨立逐行核對三份規範文件：verdict **FAIL**——跑時邏輯零破綻（AND/OR 欄位耦合這個我特別要求排查的 bug class 根本不存在、且早已被自己的測試釘住），FAIL 全部落在「宣稱超出證據」類別，6 Major 全修，過程中自己的修法又親手抓到第二層真 bug）
+## 2026-09-06（同日第七輪：HCI30 sparse-array TypeError debt 收尾——`normalizeDimensionScores`/`normalizeEvidenceRefs` 兩個共用驗證器落地，critic 覆審抓到比原債更嚴重的獨立同類洞（M1：假陽性而非崩潰）+ 我自己 TASKS.md 收尾文字裡的兩個假宣稱（M2），全修）
+
+**觸發**：操作者明確授權「你做最完美的決定！該增加什麼都去做，因為我不會！」，延續 P0-04 系列六輪工作後的候選清單。挑本輪最小、風險最低、範圍最明確的一項先做：`agency-os/TASKS.md` 兩則待辦之一，`dimension-score.mjs` 三個消費者（`rollupTrustDomains`/`detectSeverityFloor`/`classifyEvidenceQuality`）對稀疏陣列（sparse array）輸入拋出未經處理的原始 TypeError，前兩輪皆因「修法會同時碰三個已出貨檔案」而遞延。
+
+**根因**：`dimensionScores.map(normalizeDimensionScore)` 對帶洞陣列（如 `[, {dimension:'COMPETENCE',...}]`）會依 JS 規格跳過洞（`.map()` 不對缺席索引呼叫 callback），洞原封不動留在 `normalized` 裡；下游 `assertNoDuplicateDimensions` 的 `for...of` 依疊代器協定把洞讀成 `undefined`，讀取 `.dimension` 時崩潰成未經處理的 `TypeError`，而非乾淨的驗證錯誤。`combine-method-findings.mjs` 自己的 `findings.map(normalizeFinding)` 有獨立同款洞。
+
+**修法**：`Array.from(input).map(fn)` 取代 `input.map(fn)`——`Array.from` 會把每個洞先變成顯式 `undefined` 才進 map，讓既有的「必須是物件」驗證錯誤正常攔截，而非留給下游崩潰。順手把三個消費者逐字重複（byte-for-byte 相同，抽出前先核對過）的 isArray-check→map→assertNoDuplicateDimensions 序列合併成 `dimension-score.mjs` 新增的 `normalizeDimensionScores()`，修法只需存在一處而非三處。
+
+**送 critic 獨立覆審（1 個 agent，完整讀 8 個檔案）**，抓到 0 Critical + 2 Major + 3 Minor：
+
+- **M1（已修，本輪最嚴重發現）**：同一 bug class 在 `evidence_refs` 自己的驗證（`dimension-score.mjs` 與 `combine-method-findings.mjs` 兩處逐字重複）還有第二個未修實例，而且更危險——洞不是崩潰，是**完全跳過驗證、悄悄放行**。實測：`evidence_refs:[, 'ev-1']` 不拋錯，回傳 `evidence_refs:[null,'ev-1']`；`classifyEvidenceQuality` 的 `new Set(entry.evidence_refs).size` 把洞算成一個獨立值，讓一個真正只有 1 筆真實證據的維度被誤標成 `MULTIPLE_SOURCES`——這是系統對外**宣稱證據強度**的欄位被證偽，比原本要修的 crash 更嚴重（crash 是 fail-closed 且大聲；這是 fail-open 且無聲，正是 AGENTS.md「最惡樣態」那一類）。修法：兩處重複抽成新檔 `packages/intelligence/evidence-refs.mjs`（`normalizeEvidenceRefs`），同用 `Array.from` 修復；順帶關掉 `[,]`（長度 1、零真實元素，原本能繞過「非空陣列」檢查）這個邊界案例。
+- **M2（已修）**：critic 核實我自己寫進 `TASKS.md` 準備收尾用的兩個宣稱皆為假——「25/25 mutation 全殺（含既有 23）」實際數字是 23/23（含既有 21）；「四個消費者各補一個帶洞陣列迴歸測試」實際只有 2 個測試（`normalizeDimensionScores`/`combineMethodFindings` 各一），另外三個消費者（`rollupTrustDomains`/`detectSeverityFloor`/`classifyEvidenceQuality`）本身零覆蓋。**修法非只改數字，是把宣稱補成事實**：四個消費者（含 `combineMethodFindings`）各補一個 consumer-level 帶洞陣列迴歸測試，關掉「舊三行區塊被重新內聯後全綠」這個缺口；`agency-os/TASKS.md` 改寫成 diff `test(` 計數逐檔核實過的真實數字。
+- **m1（併入 M2 修法一起關）**：三個 consumer test 原本零 sparse-array 保護——同一輪 M2 修法已補齊。
+- **m2（已修）**：`dimension-score.mjs` 一處註解仍寫著三個消費者「都」直接呼叫 `assertNoDuplicateDimensions`，重構後其實只剩 `dimension-score.mjs` 自己內部呼叫——已訂正為「僅供 test 直接驗證」。
+- **m3（記錄不修）**：critic 過程中偵測到有並行 session 正在對同一 worktree 做操作（`git status` 前後兩次回報不一致），已在 commit 前重跑 `node --test` + 確認樹狀態穩定，非本次修復範圍的 bug。
+
+**[已修改]**：`packages/intelligence/dimension-score.mjs`（新增 `normalizeDimensionScores`，改用 `normalizeEvidenceRefs`）／`rollup-trust-domains.mjs`／`detect-severity-floor.mjs`／`classify-evidence-quality.mjs`（三者改呼叫 `normalizeDimensionScores`）／`combine-method-findings.mjs`（改用 `normalizeEvidenceRefs`）／新增 `evidence-refs.mjs`（`normalizeEvidenceRefs`）；`tests/unit/intelligence/{dimension-score,combine-method-findings,rollup-trust-domains,detect-severity-floor,classify-evidence-quality}.test.mjs` 各補迴歸測試＋新增 `evidence-refs.test.mjs`（8 個測試）；`detect-severity-floor.test.mjs` 既有的 3-per-domain sandbox 補 copy 新檔 `evidence-refs.mjs`（否則 sandbox import 會失敗，過程中真的抓到這個遺漏）；`scripts/mutation-check-node-gates.ps1` 新增 3 個 mutation（`dimension-score`/`combine-findings`/`evidence-refs` 各一，還原成直接 `.map()`）；`agency-os/TASKS.md` 兩則待辦（898/待辦編號，899 收尾段）改寫為事實核實過的關閉狀態。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/*.test.mjs tests/unit/contracts/*.test.mjs` | exit=0 | result=154/154 pass（前次 commit 137，本輪 +17，逐檔 diff `test(` 呼叫計數核實非估計）
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`powershell -File scripts/mutation-check-node-gates.ps1` | exit=0 | result=24/24 mutation 全殺，含 baseline no-op gate（前次 commit 21，本輪 +3：`dimension-score-revert-array-from-to-direct-map`／`combine-findings-revert-array-from-to-direct-map`／`evidence-refs-revert-array-from-to-direct-map`）
+- REVIEW_DONE: critic=Standard（真實 subagent，完整讀 8 個檔案、實測多組帶洞陣列輸入、逐一核對 23 個既有 mutation 字串精確匹配）| verdict=0 Critical+2 Major+3 Minor，全修 | findings=0c/2m/3minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`normalizeDimensionScore\b\|assertNoDuplicateDimensions\|evidenceRefsInput` | hits=confirmed all remaining call sites are the intended internal-only usages inside dimension-score.mjs/evidence-refs.mjs after the extraction; no stale external references to the removed inline blocks
+- WORKLOG: 本條目
+
+**[剩餘風險]**：無新增風險——本輪是純債務清償，未變更任何既有欄位語意或 gate 4/5 契約。`agency-os/TASKS.md` 另一則待辦（disagreement flag 從 dimension 層傳到 domain 層）仍待下一輪。
+
+**[rollback]**：單一 commit，`git revert`。
+
+
+ — `security.attack_tree`，F20 家族第三個成員、第一個結構性偏離 STRIDE/LINDDUN 共用形狀的成員、本 session 第一個 F20 genuine_compute 方法；critic 真跑 8 個突變+獨立逐行核對三份規範文件：verdict **FAIL**——跑時邏輯零破綻（AND/OR 欄位耦合這個我特別要求排查的 bug class 根本不存在、且早已被自己的測試釘住），FAIL 全部落在「宣稱超出證據」類別，6 Major 全修，過程中自己的修法又親手抓到第二層真 bug）
 
 **觸發**：操作者「繼續」，承接 WORKLOG 續58 收尾候選清單，選 Attack Tree——F20 表格第三列，Atlas §12.38 專節+§13.11 recipe 明文緊接 LINDDUN 之後，EC §32 第三個明文並列方法。1 個 critic subagent（遵守操作者明確指示：不准一次無效益派出多個 agents）。
 
@@ -12104,3 +12134,20 @@ Hostinger nameserver 改回 `ns1.dns-parking.com` / `ns2.dns-parking.com`；CF z
 - REALTEST_WAIVED: DOC_ONLY -- report generation; no executable code changed
 - REVIEW_WAIVED: DOC_ONLY -- monthly review document; prose review only
 - BUGHUNT_WAIVED: DOC_ONLY -- no code modified
+
+## 2026-09-06 — Video legacy-document archival
+
+[scope]
+Archived only two retired P7 documents from `docs/video_generator/` into `docs/video_generator/_archive_legacy_p7_2026-09-06/`: `README.md` and `video_generator_plan.md`. Created a new current `docs/video_generator/README.md` and the archive manifest. No production source, renderer, database, R2 object, WordPress, Postiz, secret, scheduled task, or deployment was changed.
+
+[reason]
+The archived files described the retired single-process Python content publisher, old Supabase schema and direct publishing/scheduling path. The current platform uses VideoStudio, wp-bridge and Postiz. Retaining those files at the live documentation root made obsolete instructions discoverable as if current.
+
+[verification]
+- Confirmed the current root README points to the platform plans and explicitly prohibits execution of archived P7 instructions.
+- Confirmed `LEGACY_REFERENCE_ADOPTION_MATRIX.md` now points to the archived README for its historical evidence.
+- Confirmed archive manifest lists exactly the two moved documents and records that legacy Python source files were deliberately not moved or executed.
+- `git diff --check -- agency-os/docs/video_generator` passed.
+
+[rollback]
+Move `README.md` and `video_generator_plan.md` from `_archive_legacy_p7_2026-09-06/` back to `docs/video_generator/`, then restore the prior root README and adoption-matrix references from version control. This archival operation is filesystem-only and reversible.

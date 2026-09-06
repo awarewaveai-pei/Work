@@ -159,3 +159,14 @@ test('end-to-end: rollupTrustDomains output always passes gate 4 (validateTrustD
   const emptyResult = rollupTrustDomains([]);
   assert.deepEqual(validateTrustDomainResponse(emptyResult), emptyResult);
 });
+
+// Regression for the sparse-array hole bug (TASKS.md, fixed 2026-09-06):
+// rollupTrustDomains itself, not just normalizeDimensionScores in
+// isolation, must reject a hole with a clean validation error -- guards
+// against this consumer's own call site silently regressing back to a
+// direct .map() (critic review, 2026-09-06 m1, which found no consumer-level
+// test protected this after the shared fix landed).
+test('rejects a sparse-array hole in the input with a clean validation error, not a crash', () => {
+  const sparse = [, { dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1'] }];
+  assert.throws(() => rollupTrustDomains(sparse), /dimensionScores\[0\] must be an object/);
+});

@@ -132,3 +132,14 @@ test('rejects a non-array findings argument', () =>
 
 test('rejects a non-object finding entry', () =>
   assert.throws(() => combineMethodFindings('COMPETENCE', [null]), /must be an object/));
+
+// Regression for the same sparse-array hole bug fixed in
+// dimension-score.mjs's normalizeDimensionScores (TASKS.md, 2026-09-06):
+// `[, {...}]` has a real hole at index 0, which .map() skips but a
+// downstream for...of (the duplicate-method_id loop) reads as `undefined`,
+// previously crashing with an unguarded TypeError instead of throwing this
+// module's own clean "must be an object" validation error.
+test('rejects a sparse-array hole with a clean validation error, not a crash', () => {
+  const sparse = [, { method_id: 'method-a', value: 'HIGH', evidence_refs: ['ev-1'] }];
+  assert.throws(() => combineMethodFindings('COMPETENCE', sparse), /findings\[0\] must be an object/);
+});

@@ -1,5 +1,5 @@
 import { ASSESSMENT_DIMENSIONS, DIMENSION_TO_DOMAIN } from './assessment-dimensions.mjs';
-import { normalizeDimensionScore, assertNoDuplicateDimensions } from './dimension-score.mjs';
+import { normalizeDimensionScores } from './dimension-score.mjs';
 
 // HCI_EVIDENCE_QUALITY_SPEC.md §Rule: a genuinely revisable threshold, not
 // "no threshold at all" (critic review, 2026-09-06 M1 -- a prior version
@@ -38,9 +38,7 @@ const SINGLE_SOURCE_COUNT = 1;
 // calls, no hidden state. Ordered by ASSESSMENT_DIMENSIONS position (not
 // input order), same convention as the sibling detectors.
 export function classifyEvidenceQuality(dimensionScores) {
-  if (!Array.isArray(dimensionScores)) throw new Error('dimensionScores must be an array');
-  const normalized = dimensionScores.map(normalizeDimensionScore);
-  assertNoDuplicateDimensions(normalized);
+  const normalized = normalizeDimensionScores(dimensionScores);
 
   const byDimension = new Map(normalized.map((entry) => [entry.dimension, entry]));
 

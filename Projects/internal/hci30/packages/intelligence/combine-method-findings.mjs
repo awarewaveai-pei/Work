@@ -1,5 +1,6 @@
 import { ASSESSMENT_DIMENSIONS } from './assessment-dimensions.mjs';
 import { BAND_RANK, BANDS, meanRankBand } from './band-scale.mjs';
+import { normalizeEvidenceRefs } from './evidence-refs.mjs';
 
 // HCI_CONFIDENCE_SPEC.md §Combination rule: a spread of 1 (adjacent bands,
 // e.g. LOW/MODERATE) is ordinary measurement variation; a spread of 2 or
@@ -17,14 +18,9 @@ function normalizeFinding(finding, index) {
   if (!finding || typeof finding !== 'object' || Array.isArray(finding)) throw new Error(`findings[${index}] must be an object`);
   const methodId = finding.method_id;
   const value = finding.value;
-  const evidenceRefsInput = finding.evidence_refs;
   if (typeof methodId !== 'string' || methodId.trim() === '') throw new Error(`findings[${index}]: method_id must be a non-empty string`);
   if (!BANDS.includes(value)) throw new Error(`findings[${index}]: invalid band: ${value}`);
-  if (!Array.isArray(evidenceRefsInput) || evidenceRefsInput.length === 0) throw new Error(`findings[${index}]: evidence_refs must be a non-empty array`);
-  const evidenceRefs = evidenceRefsInput.map((ref) => {
-    if (typeof ref !== 'string' || ref.trim() === '') throw new Error(`findings[${index}]: evidence_refs must contain only non-empty strings`);
-    return ref;
-  });
+  const evidenceRefs = normalizeEvidenceRefs(finding.evidence_refs, 'findings', index);
   return { method_id: methodId, value, evidence_refs: evidenceRefs };
 }
 
@@ -38,7 +34,15 @@ function normalizeFinding(finding, index) {
 export function combineMethodFindings(dimension, findings) {
   if (!ASSESSMENT_DIMENSIONS.includes(dimension)) throw new Error(`invalid dimension: ${dimension}`);
   if (!Array.isArray(findings) || findings.length === 0) throw new Error('findings must be a non-empty array');
-  const normalized = findings.map(normalizeFinding);
+  // Array.from, not a direct .map(normalizeFinding): the same sparse-array
+  // hole bug fixed in dimension-score.mjs's normalizeDimensionScores this
+  // same pass (TASKS.md, 2026-09-06) exists here independently -- a sparse
+  // `findings` array (e.g. `[, {...}]`) would otherwise skip the hole
+  // during map, then crash with an unguarded TypeError when the
+  // duplicate-method_id loop below reads it via for...of. Array.from fills
+  // the hole with `undefined` so normalizeFinding's own object-shape guard
+  // catches it as an ordinary validation error instead.
+  const normalized = Array.from(findings).map(normalizeFinding);
 
   const seenMethods = new Set();
   for (const finding of normalized) {

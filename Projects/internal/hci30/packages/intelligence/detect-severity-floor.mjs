@@ -1,6 +1,6 @@
 import { ASSESSMENT_DIMENSIONS, DIMENSION_TO_DOMAIN } from './assessment-dimensions.mjs';
 import { BAND_RANK } from './band-scale.mjs';
-import { normalizeDimensionScore, assertNoDuplicateDimensions } from './dimension-score.mjs';
+import { normalizeDimensionScores } from './dimension-score.mjs';
 
 // HCI_RISK_SPEC.md §Severity floor rule: VERY_LOW only, not LOW -- LOW is
 // ordinary weak-but-not-alarming signal; including it would fire too often
@@ -46,9 +46,7 @@ function findSiblingDimensions(dimension, byDimension) {
 // critic review, 2026-09-06 M4), consistent with `siblings` above and
 // with the rest of this package's ordering conventions.
 export function detectSeverityFloor(dimensionScores) {
-  if (!Array.isArray(dimensionScores)) throw new Error('dimensionScores must be an array');
-  const normalized = dimensionScores.map(normalizeDimensionScore);
-  assertNoDuplicateDimensions(normalized);
+  const normalized = normalizeDimensionScores(dimensionScores);
 
   const byDimension = new Map(normalized.map((entry) => [entry.dimension, entry]));
 
