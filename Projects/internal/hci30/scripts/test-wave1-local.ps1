@@ -70,6 +70,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Method-finding-to-dimension combination tests 
 node --test (Join-Path $root 'tests/unit/intelligence/dimension-score.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Shared dimension-score validator tests failed (packages/intelligence/dimension-score.mjs).' }
 
+# Shared evidence_refs validator (extracted from dimension-score.mjs and
+# combine-method-findings.mjs, 2026-09-06 -- was missing from this runner
+# entirely until this line, a real gap found while wiring in a later file).
+node --test (Join-Path $root 'tests/unit/intelligence/evidence-refs.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Shared evidence_refs validator tests failed (packages/intelligence/evidence-refs.mjs).' }
+
 # HCI_RISK_SPEC.md (partial): severity-floor detection -- a VERY_LOW
 # dimension is surfaced as a parallel signal, never used to override a
 # Trust Domain average. Node-level, Docker-free.
@@ -82,6 +88,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Severity-floor detection tests failed (HCI_RIS
 # verify. Node-level, Docker-free.
 node --test (Join-Path $root 'tests/unit/intelligence/classify-evidence-quality.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Evidence-quality classification tests failed (HCI_EVIDENCE_QUALITY_SPEC.md).' }
+
+# 04_HCI30_PRODUCT_SPEC.md:138's blocking precondition (bias-check required
+# before finalizing EXIT/PROCEED_WITH_CONTROLS at Stage 4+) -- NOT a P0-04
+# spec and NOT HCI_PERMISSION_SPEC.md itself (see that file for why); a
+# separate, already-fully-specified, previously-unimplemented gate.
+node --test (Join-Path $root 'tests/unit/intelligence/bias-check-gate.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Bias-check blocking-gate tests failed (04_HCI30_PRODUCT_SPEC.md:138).' }
 
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is

@@ -42,9 +42,13 @@ here, not silently absorbed):
   trace back to one underlying source. That is exactly why `MULTIPLE_SOURCES`
   is used instead of `CORROBORATED` (see §Rule).
 - **Contradiction between evidence inputs** — `HCI_CONTRADICTION_SPEC.md`
-  (not yet written).
-- **Time decay of evidence relevance** — `HCI_TIME_DECAY_SPEC.md` (not yet
-  written).
+  — **update, 2026-09-06**: now exists, records its own blocker (the
+  shared `evidence_refs` opaque-string shape has no Claim-content field to
+  compare) rather than a rule.
+- **Time decay of evidence relevance** — `HCI_TIME_DECAY_SPEC.md` —
+  **update, 2026-09-06**: same as above, now exists recording its own
+  blocker (the schema has the needed timestamps since ADR-0017; the
+  shared evidence-ref shape does not carry them through).
 - **Source quality grading** (the S1-S6 hierarchy,
   `06_HCI30_PUBLIC_INTELLIGENCE.md:153-166`) — every evidence ref is
   treated as equally weighted here; none are graded.

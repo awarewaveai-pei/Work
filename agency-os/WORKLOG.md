@@ -1,6 +1,32 @@
 # Worklog
 
-## 2026-09-06（System Foundry：第9候選確認為第6個真缺口 Multi-Location Stock 落地 + TASKS.md §D Class 4/5 mutation-coverage 機械閘建成，過程中發現一次委員會治理漏洞：TASKS.md 結案聲明被並行 session 誤 commit、當下無對應檔案）
+## 2026-09-06（同日第九輪：P0-04 剩餘三份規格判定不可速成、改寫成誠實 OPEN 狀態文件，順手關掉相鄰的 Decision bias-check blocking gate；critic 覆審抓到 1 Critical+6 Major+9 Minor，Critical 是本 session 第三次「未 grep 先宣稱不存在」）
+
+**觸發**：操作者明確授權「你做最完美的決定！該增加什麼都去做，因為我不會！」，延續第八輪後的候選清單，處理 P0-04 剩下三份規格。
+
+**判斷**：`HCI_PERMISSION_SPEC.md`（trust profile→permission 映射是商業/風險容忍判斷）、`HCI_CONTRADICTION_SPEC.md`／`HCI_TIME_DECAY_SPEC.md`（皆需要拓寬共用 `evidence_refs: string[]` opaque 字串形狀，四個既有消費函式的真實資料模型發明，非速成可解）三份都判定不可速成，各自改寫成精確記錄阻塞點的誠實 OPEN 文件而非硬答。調查 Permission 時另外發現一個真正可關、規格早已完整、全 repo 零實作的相鄰缺口——`04_HCI30_PRODUCT_SPEC.md:138`「Stage 4+ 的 EXIT/PROCEED_WITH_CONTROLS 決策 finalize 前必須完成 bias-check」——新 `packages/intelligence/bias-check-gate.mjs` + `docs/intelligence/HCI_DECISION_BIAS_CHECK_GATE.md` 落地，反覆明確揭露這不是在解 Permission（輸入只有 stage/decision 兩個既有 enum，不碰 Trust Domain profile）。順手發現並補上 `evidence-refs.test.mjs`（第七輪建立卻從未接進 `test-wave1-local.ps1`）的接線缺口。
+
+**送 critic 獨立覆審，抓到 1 Critical + 6 Major + 9 Minor，詳見 `agency-os/TASKS.md` 同日第九輪條目**（含四個檔案的完整修法記錄）。摘要：
+
+- **C1（最嚴重）**：`HCI_PERMISSION_SPEC.md` 原文宣稱「Permission entity 在整個 corpus 零定義形狀、零 permission level enum」——**假宣稱**，`19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:100` 明文定義七級具名 enum（P0-P6），`02_PRODUCT_BOUNDARIES.md:59` 明文定義其語意。此假宣稱擴散進 4 個檔案（含治理文件 `21_HCI_TOP_TIER_GAP_ANALYSIS.md`）才被抓到。**這是本 session 第三次「未 grep 先宣稱某物不存在」**——自訂的「絕不宣稱某物不存在卻沒 grep 確認」紀律本身沒能防住第三次發生，值得記取：即使明確自我要求過的紀律，高信心的負面宣稱（「零定義」「zero 什麼什麼」）在動筆當下還是要停下來真的跑一次 grep，不能靠「聽起來合理」通過。全部 4 個檔案已改寫，判斷（留 OPEN）不變，理由修正；並記錄一個真陷阱——Permission tier（P0-P6）跟 Collaboration Stage（0-6）標籤重疊但索引不對齊。
+- **6 個 Major**：不存在的檔名引用、過期逐字引號（本 session 已抓過同類一次，此為第二次重演）、假的「Tracked in TASKS.md」宣稱（本行即補上的追蹤）、兩份已出貨姊妹 spec 的過期前向引用、`DECISION_OUTPUTS` 是第二份無漂移保護的 JS-vs-SQL enum 副本（比照既有 `trust-domains.test.mjs` 補一個對 migration 0005 的 drift 測試）、entity 清單引錯行數。
+- **9 個 Minor**：捏造的逐字引號、測試數字灌水（161 誤植，實際跟 evidence_refs 形狀直接相關的是 83）、dedup 邏輯歸錯檔案、「every function」對消費者清單而言為假（漏了 `dimension-score.mjs`）、檔頭措辭與內文自相矛盾、grep 範圍宣稱錯置、既有 migration 註解（`0005:214-217` 明文把 bias-check precondition 延後給 HD-19/HD-21）未對帳、mutation 覆蓋缺口（`assertValidDecision` 從未被證明是活的）、裸檔名引用易誤讀。
+
+**[已修改]**：新 `packages/intelligence/bias-check-gate.mjs`＋`tests/unit/intelligence/bias-check-gate.test.mjs`（20 測試）＋`docs/intelligence/HCI_DECISION_BIAS_CHECK_GATE.md`；新 `docs/intelligence/{HCI_PERMISSION_SPEC,HCI_CONTRADICTION_SPEC,HCI_TIME_DECAY_SPEC}.md`；`scripts/mutation-check-node-gates.ps1`（+6 mutation）；`scripts/test-wave1-local.ps1`（接線 bias-check-gate + 補接線遺漏的 evidence-refs）；`docs/intelligence/{HCI_TRUST_DOMAIN_SPEC,HCI_EVIDENCE_QUALITY_SPEC,HCI_RISK_SPEC}.md`（同步／訂正）；`README.md`；`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/21_HCI_TOP_TIER_GAP_ANALYSIS.md`（訂正 C1 假宣稱）；`agency-os/TASKS.md`（本輪完整記錄，含三份 OPEN 規格的追蹤條目）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/*.test.mjs tests/unit/contracts/*.test.mjs` | exit=0 | result=181/181 pass（前次 commit 161，本輪 +20）
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`powershell -File scripts/mutation-check-node-gates.ps1` | exit=0 | result=33/33 mutation 全殺（前次 commit 27，本輪 +6）
+- REVIEW_DONE: critic=Standard（真實 subagent，完整讀 12+ 個檔案，主動延伸讀 19/02/07/04/05 五份既有規格文件＋migration 0005 逐行核對每個引用）| verdict=1 Critical+6 Major+9 Minor，全修 | findings=1c/6m/9minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`checkbox exercise\|HCI_PERMISSION_SPEC_STATUS\|no defined shape` | hits=0（修復後全庫掃描確認假宣稱與捏造引號零殘留）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：三份 OPEN 規格（Permission/Contradiction/Time Decay）仍待操作者/產品層級決策才能真正落地，非本輪能解；`0005:214-217` 的 HD-19/HD-21 延後決定與本輪 bias-check gate 的關係已在文件對帳但實際 ADR 尚未寫。
+
+**[rollback]**：單一 commit，`git revert`；純新增檔案 + 既有文件訂正，無 schema 變更。
+
+
+ + TASKS.md §D Class 4/5 mutation-coverage 機械閘建成，過程中發現一次委員會治理漏洞：TASKS.md 結案聲明被並行 session 誤 commit、當下無對應檔案）
 
 [背景] 5個真缺口批次（`fec071dad`~`b368c2eba`）完成後，操作者要求繼續處理剩餘兩條線：①第9候選 Inventory/WMS 多倉庫的正式判定；②TASKS.md §D 第4/5條（derivation rule／requires邊測試覆蓋率缺口）的機械閘建置。兩者並行委派，因觸碰的檔案集合幾乎不重疊（第9候選會改`capabilities/catalog.json`等業務檔；機械閘只新增`scripts/test_mutation_coverage.py`+改`Makefile`+`TASKS.md`）。
 
@@ -12310,3 +12336,86 @@ Added `agency-os/docs/video_generator/PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOO
 
 [rollback]
 Revert the two documentation files changed by this entry. No deployed state exists to roll back.
+
+## 2026-09-06 — Media QA and Release gate contract
+
+[scope]
+Added `agency-os/docs/video_generator/PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md`, indexed it, linked the Phase 4 plan, and added the required `media_qa_reports` evidence record to the Phase 2 additive schema design. No source module, migration, media analysis, renderer, UI, R2 object, WordPress, Postiz, secret, service or deployment changed.
+
+[reason]
+The current success state records a rendered media asset but has no immutable QA evidence or Release gate. Without a candidate checksum, detector/profile version and finding evidence, a boolean pass or renderer response cannot prove that a video is suitable for delivery.
+
+[verification]
+- REALTEST_WAIVED: DOC_ONLY -- the contract deliberately makes no executable change.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; cross-read the QA gate against the current baseline audit, Phase 2 reference/release model and Phase 4 transcript contract.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT|media_qa_reports|release_blocked` | hits=11
+- WORKLOG_DONE: evidence is at `agency-os/docs/video_generator/PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md:1-89` and `agency-os/docs/video_generator/PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md:22-51`.
+
+[rollback]
+Revert the four documentation files changed by this entry. There is no runtime path to roll back; the existing Quick Engine and manual Remotion behavior stay unchanged.
+
+## 2026-09-06 — Short-drama Bible and footage EDP contract
+
+[scope]
+Added `agency-os/docs/video_generator/PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`, indexed it, linked the Phase 5 plan, and reserved `media_story_bible_versions` and `media_edit_plan_versions` in the Phase 2 additive data contract. No source module, migration, UI, provider call, render, asset write, service or deployment changed.
+
+[reason]
+The existing VideoStudio draft format has neither episodic continuity nor an editable footage decision format. Allowing either path to produce renderer-specific payloads would bypass the Timeline, QA and Release boundaries already established for the platform.
+
+[verification]
+- REALTEST_WAIVED: DOC_ONLY -- the contract deliberately makes no executable change.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; cross-read the document contract against the Timeline receipt, Phase 2 reference model and Phase 4 QA gate.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT|media_story_bible_versions|media_edit_plan_versions` | hits=6
+- WORKLOG_DONE: evidence is at `agency-os/docs/video_generator/PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md:1-78` and `agency-os/docs/video_generator/PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md:22-50`.
+
+[rollback]
+Revert the four documentation files changed by this entry. There is no runtime path to roll back; existing VideoStudio behavior remains unchanged.
+
+## 2026-09-06 — Delivery, outcomes and commercial-mode contract
+
+[scope]
+Added `agency-os/docs/video_generator/PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md`, indexed it, and linked the Phase 6 plan. It defines the Release-only WordPress/Postiz adapters, durable delivery attempts, append-only outcome snapshots, and self-use/SaaS/enterprise-BYO provider boundary. No Postiz integration, WordPress update, publication, billing, provider invocation, migration, service or deployment changed.
+
+[reason]
+The existing WordPress and social routes have no immutable Release receipt, idempotent delivery ledger, outcome history or provider/entitlement governance. A commercial surface must reuse the same tenant, QA and Release boundaries instead of creating a parallel publisher or credit ledger.
+
+[verification]
+- REALTEST_WAIVED: DOC_ONLY -- the contract deliberately makes no executable change.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; cross-read the contract against the baseline delivery routes, the legacy publisher prohibition and the Phase 2 release/reference model.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT|media.collect_outcomes|media_delivery_attempts` | hits=7
+- WORKLOG_DONE: evidence is at `agency-os/docs/video_generator/PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md:1-67` and `agency-os/docs/video_generator/MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md:157-187`.
+
+[rollback]
+Revert the three documentation files changed by this entry. There is no runtime path to roll back; existing WordPress and Postiz routes remain unchanged.
+
+## 2026-09-06 — Transcript v1 isolated candidate discarded
+
+[scope]
+A worker-neutral Transcript v1 validator and tests were created and tested only in `D:\Worktrees\media-video-phase0`, then removed before delivery because the sandbox denied writing the worktree Git index at `D:\Work\.git\worktrees\media-video-phase0\index.lock`. No source change remains in that worktree, and no receipt or plan claims it as delivered.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run transcript-v1 --no-cache` + `npx tsc --noEmit --incremental false` + `npx vitest run --no-cache` | exit=0 | result=target 3 tests passed; full suite 65 files, 712 tests passed before candidate removal
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; candidate contained no runtime import or external call.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`PHASE_4A_TRANSCRIPT_V1_CONTRACT_RECEIPT|transcript-v1.ts` | hits=1 (this WORKLOG entry only; 0 source/document after removal)
+- WORKLOG_DONE: the candidate and its temporary receipt were deliberately removed; current implementation truth remains the Phase 4 design contract only.
+
+[rollback]
+No rollback is needed: the candidate source and temporary documentation receipt were removed. Existing committed isolated Timeline implementation and all production paths remain unchanged.
+
+## 2026-09-06 — Video Whisper transcript and caption contract
+
+[scope]
+Added `agency-os/docs/video_generator/PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`, linked it from the current video document index and phase plan, and extended the Phase 2 additive data contract with transcript-version and caption-rendition records. The documents define the transcript/caption/review/QA boundary needed before using local Whisper in VideoStudio. No source module, migration, renderer, VideoStudio UI, R2 object, WordPress, Postiz, secret, service or production deployment changed.
+
+[reason]
+The existing meeting worker has timed Whisper segments and SRT output, but the active video service only divides narration text by character count before ffmpeg `drawtext`. Calling the former directly from a video route, or treating the latter as recognition timestamps, would create an unversioned, non-tenant-scoped and non-recoverable subtitle path.
+
+[verification]
+- REALTEST_WAIVED: DOC_ONLY -- this delivery changes only Markdown contracts; executable media behavior is intentionally unchanged.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; read back the complete contract and checked every implementation statement against `apps/meeting-service/lib/transcribe.py:127-181`, `apps/meeting-service/pipeline.py:124-143`, and `apps/video-service/pipeline.py:303-412`.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT|media.transcribe_local|word_timestamps` | hits=13
+- WORKLOG_DONE: document evidence is at `agency-os/docs/video_generator/PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md:1-103` and `agency-os/docs/video_generator/PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md:18-47`; baseline and delivery-plan status were updated in the same change.
+- `git diff --check -- agency-os/docs/video_generator` passed after the document was added.
+
+[rollback]
+Revert the five documentation changes (`README.md`, `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`, `CURRENT_BASELINE_AND_GAP_AUDIT.md`, `PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md`, and `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`). Since no runtime path changed, the existing Quick Engine, manual Remotion and ffmpeg subtitle behavior continue unchanged.

@@ -24,8 +24,11 @@ consumes. Still open (not solved here, not silently absorbed):
   lifecycle-bearing object this file does not create. This file is a pure
   function operating on already-resolved dimension values, not a schema or
   a workflow.
-- **Risk-to-Permission mapping** — `HCI_PERMISSION_SPEC.md` (not yet
-  written).
+- **Risk-to-Permission mapping** — `HCI_PERMISSION_SPEC.md` — **update,
+  2026-09-06**: now exists, records its own blocker (the Permission tier
+  enum is defined, `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:100`, but the
+  trust-profile-to-tier mapping is a business/risk-tolerance judgment, not
+  a derivable formula) rather than a rule.
 - **Collaboration-stage-aware severity** (whether a `VERY_LOW` matters more
   at Stage 4+ than Stage 0-1, `04_HCI30_PRODUCT_SPEC.md` §Collaboration
   stages) — not addressed; this file's detection is stage-agnostic.

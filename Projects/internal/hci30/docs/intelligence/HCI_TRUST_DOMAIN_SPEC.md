@@ -409,10 +409,18 @@ silently invent inline here:
   unimplemented at this layer). True source independence remains open in
   that same file's own out-of-scope list.
 - **Contradiction** between evidence inputs (two sources disagreeing about
-  the same dimension) → `HCI_CONTRADICTION_SPEC.md` (not yet written) — a
-  separate P0-04 sibling from evidence quality, not folded into it.
+  the same dimension) → `HCI_CONTRADICTION_SPEC.md` — **update, 2026-09-06**:
+  that file now exists but honestly records why it remains unwritten (the
+  shared `evidence_refs: string[]` opaque-reference shape has no Claim-content
+  field to compare, a data-model gap, not a formula gap) rather than
+  containing a rule — a separate P0-04 sibling from evidence quality, not
+  folded into it.
 - **Time decay** of evidence relevance before it feeds a dimension →
-  `HCI_TIME_DECAY_SPEC.md` (not yet written).
+  `HCI_TIME_DECAY_SPEC.md` — **update, 2026-09-06**: same as above, now
+  exists recording its own blocker (the schema has the needed timestamps
+  since `ADR-0017`; the shared evidence-ref shape does not carry them
+  through, and the actual decay function is an undecided parameter, not a
+  derivable one).
 - **Cross-method combination within one dimension** (multiple methods
   bearing on the same Assessment Dimension) — **update, 2026-09-06**:
   `HCI_CONFIDENCE_SPEC.md` (partial) and
@@ -438,7 +446,22 @@ silently invent inline here:
   entity, Risk-to-Permission mapping, stage-aware severity) remain open in
   that file's own out-of-scope list.
 - **Permission implications** of a given Trust Domain profile →
-  `HCI_PERMISSION_SPEC.md` (not yet written).
+  `HCI_PERMISSION_SPEC.md` — **update, 2026-09-06**: now exists recording
+  why it remains unwritten. **Correction (critic review, same day)**: an
+  earlier version of this note falsely claimed the `Permission` entity "has
+  no defined shape anywhere in the corpus" — false;
+  `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md:100` defines a seven-tier
+  enum (`P0`-`P6`) and `02_PRODUCT_BOUNDARIES.md:59` defines its
+  semantics. What is genuinely undefined, and what actually blocks this
+  file, is the mapping from a Trust Domain profile to one of those
+  already-named tiers — a business/risk-tolerance judgment, not a
+  derivable formula (see `HCI_PERMISSION_SPEC.md` for the full corrected
+  reasoning, including a real Stage-vs-tier index-mismatch trap this
+  correction surfaced). A closely related but distinct gap —
+  `04_HCI30_PRODUCT_SPEC.md:138`'s bias-check blocking precondition on
+  Decision finalization, which does not itself
+  touch a Trust Domain profile — was found adjacent to this and closed;
+  see `HCI_DECISION_BIAS_CHECK_GATE.md`.
 
 Each of the above is tracked as an open item in `TASKS.md` rather than
 solved here, so the gap stays honestly visible instead of quietly absorbed

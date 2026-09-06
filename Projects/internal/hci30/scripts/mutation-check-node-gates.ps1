@@ -242,6 +242,51 @@ $mutations = @(
      find = 'const distinctRefCount = new Set(entry.evidence_refs).size;'
      replace = 'const distinctRefCount = entry.evidence_refs.length;'
      test = 'tests/unit/intelligence/classify-evidence-quality.test.mjs' }
+
+  # 04_HCI30_PRODUCT_SPEC.md:138 bias-check blocking gate (2026-09-06).
+  @{ id = 'bias-gate-lower-min-stage-to-zero'
+     file = 'packages/intelligence/bias-check-gate.mjs'
+     find = 'const MIN_GATED_STAGE = 4;'
+     replace = 'const MIN_GATED_STAGE = 0;'
+     test = 'tests/unit/intelligence/bias-check-gate.test.mjs' }
+
+  @{ id = 'bias-gate-add-proceed-to-gated-decisions'
+     file = 'packages/intelligence/bias-check-gate.mjs'
+     find = "const GATED_DECISIONS = new Set(['EXIT', 'PROCEED_WITH_CONTROLS']);"
+     replace = "const GATED_DECISIONS = new Set(['EXIT', 'PROCEED_WITH_CONTROLS', 'PROCEED']);"
+     test = 'tests/unit/intelligence/bias-check-gate.test.mjs' }
+
+  @{ id = 'bias-gate-treat-incomplete-as-complete'
+     file = 'packages/intelligence/bias-check-gate.mjs'
+     find = 'return BIAS_CHECK_FIELDS.every((field) => typeof biasCheck[field] === ''boolean'');'
+     replace = 'return true;'
+     test = 'tests/unit/intelligence/bias-check-gate.test.mjs' }
+
+  @{ id = 'bias-gate-drop-null-shortcircuit'
+     file = 'packages/intelligence/bias-check-gate.mjs'
+     find = 'if (biasCheck === null || biasCheck === undefined) return false;'
+     replace = ''
+     test = 'tests/unit/intelligence/bias-check-gate.test.mjs' }
+
+  # Regression guard for critic review 2026-09-06 m8: none of the four
+  # mutations above proved assertValidDecision (the GOOD_PERSON/BAD_PERSON
+  # rejection, 04_HCI30_PRODUCT_SPEC.md:131-136) is load-bearing.
+  @{ id = 'bias-gate-drop-decision-validation'
+     file = 'packages/intelligence/bias-check-gate.mjs'
+     find = 'if (!DECISION_OUTPUTS.includes(decision)) throw new Error(`invalid decision: ${decision}`);'
+     replace = ''
+     test = 'tests/unit/intelligence/bias-check-gate.test.mjs' }
+
+  # Regression guard for critic review 2026-09-06 M5: DECISION_OUTPUTS is a
+  # second, independent JS-side copy of migration 0005's `outcome` CHECK
+  # values with no prior drift protection -- same class of bug
+  # trust-domains-corrupt-governance-power already guards against for
+  # TRUST_DOMAINS vs migration 0011.
+  @{ id = 'bias-gate-corrupt-decision-outputs'
+     file = 'packages/intelligence/bias-check-gate.mjs'
+     find = "'PROCEED', 'PROCEED_WITH_CONTROLS', 'LIMIT_ACCESS', 'PAUSE', 'REVIEW_REQUIRED', 'EXIT',"
+     replace = "'PROCEED', 'PROCEED_WITH_CONTROLS', 'LIMIT_ACCESS', 'PAUSE', 'REVIEW_REQUIRED', 'EXITED',"
+     test = 'tests/unit/intelligence/bias-check-gate.test.mjs' }
 )
 
 function New-MutationSandbox {
