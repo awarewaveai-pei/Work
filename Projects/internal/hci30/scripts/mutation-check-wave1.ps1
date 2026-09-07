@@ -40,6 +40,7 @@ $upMig10  = Join-Path $root 'database/migrations/0010_wave1_epistemic_label_up.s
 $upMig11  = Join-Path $root 'database/migrations/0011_wave1_trust_domain_scope_up.sql'
 $upMig12  = Join-Path $root 'database/migrations/0012_wave1_subject_record_payload_up.sql'
 $upMig13  = Join-Path $root 'database/migrations/0013_wave1_key_issuance_up.sql'
+$upMig14  = Join-Path $root 'database/migrations/0014_wave1_decision_recording_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -911,6 +912,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig11)  -ne 0) { throw 'mutation harness: 0011 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig12)  -ne 0) { throw 'mutation harness: 0012 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig13)  -ne 0) { throw 'mutation harness: 0013 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig14)  -ne 0) { throw 'mutation harness: 0014 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

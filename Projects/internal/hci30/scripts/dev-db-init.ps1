@@ -35,15 +35,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Dev PostgreSQL did not become healthy.' }
 # per-migration). Update this alongside the loop bound below whenever a new
 # migration lands, same maintenance the project already accepts for the
 # equivalent $upMigN lists in test-wave1-local.ps1/mutation-check-wave1.ps1.
-$check = & docker @composeArgs exec -T db psql -tA -U hci_owner -d $db -c "SELECT to_regprocedure('hci.mint_encryption_key()')"
-if ($check -match 'mint_encryption_key') {
-  Write-Host 'Schema already applied (hci.mint_encryption_key exists, migration 0013) -- skipping migrations, DB left as-is.'
+$check = & docker @composeArgs exec -T db psql -tA -U hci_owner -d $db -c "SELECT to_regprocedure('hci.record_decision(uuid,uuid,text,text)')"
+if ($check -match 'record_decision') {
+  Write-Host 'Schema already applied (hci.record_decision exists, migration 0014) -- skipping migrations, DB left as-is.'
   exit 0
 }
 
-Write-Host 'Applying Wave 1 schema (13 migrations + synthetic fixtures)...'
+Write-Host 'Applying Wave 1 schema (14 migrations + synthetic fixtures)...'
 $db2 = Join-Path $root 'database'
-1..13 | ForEach-Object {
+1..14 | ForEach-Object {
   $n = '{0:D4}' -f $_
   $f = Get-ChildItem -LiteralPath (Join-Path $db2 'migrations') -Filter "${n}_*_up.sql" | Select-Object -First 1
   Invoke-SqlFile -Path $f.FullName -Label "migration $n up"

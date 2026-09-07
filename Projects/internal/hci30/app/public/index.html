@@ -2,81 +2,137 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HCI-30 — Cases (dev)</title>
+<title>HCI-30 — Trust Report (dev)</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
-  h1 { font-size: 1.3rem; }
-  h2 { font-size: 1.05rem; margin-top: 2rem; }
-  .note { background: #fff8e1; border: 1px solid #e0c26a; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1.5rem; }
-  .tenant-switch button { padding: 0.4rem 1rem; margin-right: 0.5rem; cursor: pointer; }
-  .tenant-switch button.active { background: #1a1a1a; color: #fff; }
-  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-  th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; font-size: 0.85rem; vertical-align: top; }
-  th { background: #f5f5f5; }
-  code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
-  a.case-link { cursor: pointer; color: #1a56db; text-decoration: underline; }
-  #detail { display: none; }
-  #list { display: block; }
-  form.record-form { display: grid; gap: 0.5rem; max-width: 500px; margin-top: 0.75rem; }
-  form.record-form label { font-size: 0.85rem; font-weight: 600; }
-  form.record-form input, form.record-form select, form.record-form textarea { padding: 0.4rem; font-size: 0.85rem; }
-  .back { cursor: pointer; color: #1a56db; }
-  .band-VERY_HIGH, .band-HIGH { color: #0a7d34; font-weight: 600; }
-  .band-MODERATE { color: #8a6d00; font-weight: 600; }
-  .band-LOW, .band-VERY_LOW { color: #b3261e; font-weight: 600; }
-  .err { color: #b3261e; font-size: 0.85rem; }
+  :root {
+    --very-high: #0a7d34; --high: #4caf50; --moderate: #b8860b; --low: #d97706; --very-low: #c0392b;
+    --bg: #f4f5f7; --card: #fff; --border: #e2e4e9; --text: #1a1d23; --muted: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0 0 3rem; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem; }
+  .note { background: #fff8e1; border: 1px solid #e0c26a; padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.82rem; margin-bottom: 1.25rem; color: #665200; }
+  .tenant-switch { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+  .tenant-switch button { padding: 0.4rem 1rem; border: 1px solid var(--border); background: var(--card); border-radius: 20px; cursor: pointer; font-size: 0.85rem; }
+  .tenant-switch button.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 2rem 0 0.75rem; }
+  .case-grid { display: grid; gap: 0.75rem; }
+  .case-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; cursor: pointer; transition: box-shadow .15s; }
+  .case-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .case-card .title { font-weight: 600; }
+  .case-card .meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.2rem; }
+  .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+  .badge.status-OPEN { background: #e3f2ee; color: var(--very-high); }
+  .badge.status-ACTIVE { background: #e3f2ee; color: var(--very-high); }
+  .badge.status-CLOSED { background: #eee; color: var(--muted); }
+
+  .band-VERY_HIGH, .band-HIGH { background: #e6f4ea; color: var(--very-high); }
+  .band-MODERATE { background: #fdf3d9; color: var(--moderate); }
+  .band-LOW { background: #fdeee0; color: var(--low); }
+  .band-VERY_LOW { background: #fbe2e0; color: var(--very-low); }
+  .band-badge { display: inline-block; padding: 0.2rem 0.7rem; border-radius: 12px; font-size: 0.78rem; font-weight: 700; }
+
+  .back { cursor: pointer; color: #1a56db; font-size: 0.85rem; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; }
+
+  .decision-banner { border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0; border: 1px solid var(--border); }
+  .decision-banner.outcome-PROCEED { background: #e6f4ea; border-color: #b7dfc3; }
+  .decision-banner.outcome-PROCEED_WITH_CONTROLS { background: #fdf3d9; border-color: #ead9a0; }
+  .decision-banner.outcome-LIMIT_ACCESS { background: #fdf3d9; border-color: #ead9a0; }
+  .decision-banner.outcome-PAUSE { background: #fdeee0; border-color: #f0cba3; }
+  .decision-banner.outcome-REVIEW_REQUIRED { background: #fdeee0; border-color: #f0cba3; }
+  .decision-banner.outcome-EXIT { background: #fbe2e0; border-color: #eab5b0; }
+  .decision-banner .outcome-label { font-weight: 700; font-size: 1.05rem; }
+  .decision-banner .rationale { margin-top: 0.35rem; font-size: 0.9rem; }
+  .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.4rem; }
+
+  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.75rem; }
+  .domain-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; }
+  .domain-card .domain-name { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .domain-card .domain-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.35rem; }
+  .domain-card.unknown { border-style: dashed; color: var(--muted); }
+
+  .insight-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  .insight-col h3 { font-size: 0.8rem; margin: 0 0 0.5rem; }
+  .insight-col ul { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; }
+  .insight-col.strengths h3 { color: var(--very-high); }
+  .insight-col.risks h3 { color: var(--very-low); }
+  .insight-col.unknowns h3 { color: var(--muted); }
+
+  .record-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1.1rem; margin-bottom: 0.6rem; }
+  .record-card .kind-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+  .record-card .content { margin-top: 0.3rem; font-size: 0.9rem; }
+  .record-card .quality-tag { display: inline-block; margin-top: 0.4rem; font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 8px; background: #eee; color: var(--muted); }
+
+  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1.1rem; margin-top: 1rem; }
+  details.add-panel summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+  form.inline-form { display: grid; gap: 0.55rem; max-width: 520px; margin-top: 0.85rem; }
+  form.inline-form label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+  form.inline-form input, form.inline-form select, form.inline-form textarea { padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
+  form.inline-form button { justify-self: start; padding: 0.5rem 1.1rem; border: none; border-radius: 6px; background: var(--text); color: #fff; cursor: pointer; font-size: 0.85rem; }
+  .err { color: var(--very-low); font-size: 0.82rem; }
+  .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
 </style>
 </head>
 <body>
+<div class="wrap">
 
 <div id="list">
-  <h1>HCI-30 Wave 1 — Cases (synthetic dev data)</h1>
-  <div class="note">
-    Real API (<code>GET /api/hci/v1/cases?tenant=a|b</code>) &rarr; real Postgres, RLS-enforced (ADR-0016).
-    No auth layer exists yet, so the tenant is an explicit switch below rather than a disguised login.
-  </div>
+  <h1>HCI-30 — Trust Reports</h1>
+  <p class="subtitle">Synthetic dev data. Real API + real RLS-enforced Postgres, not a mock.</p>
+  <div class="note">No auth layer exists yet, so the tenant is an explicit switch below rather than a disguised login.</div>
   <div class="tenant-switch">
     <button id="btn-a" onclick="loadList('a')">Tenant A</button>
     <button id="btn-b" onclick="loadList('b')">Tenant B</button>
   </div>
-  <table id="cases">
-    <thead><tr><th>id</th><th>purpose</th><th>status</th><th>risk_tier</th><th>opened_at</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <div class="case-grid" id="cases"></div>
 </div>
 
-<div id="detail">
+<div id="detail" style="display:none">
   <p><span class="back" onclick="showList()">&larr; back to cases</span></p>
   <h1 id="d-title"></h1>
-  <p id="d-meta"></p>
+  <p class="subtitle" id="d-meta"></p>
 
-  <h2>Trust Domain roll-up (computed live from Assessment records below)</h2>
-  <p style="font-size:0.85rem;color:#555">packages/intelligence/rollup-trust-domains.mjs, real formula, not a mock. A domain with no ASSESSMENT evidence yet simply does not appear here — never defaulted to MODERATE.</p>
-  <table id="d-rollup"><thead><tr><th>domain</th><th>band</th><th>coverage</th><th>disagreement</th></tr></thead><tbody></tbody></table>
+  <div id="d-decision-banner"></div>
 
-  <h2>Decisions</h2>
-  <table id="d-decisions"><thead><tr><th>outcome</th><th>rationale</th><th>recorded</th></tr></thead><tbody></tbody></table>
+  <h2>Trust Domains</h2>
+  <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
+  <div class="domain-grid" id="d-domains"></div>
 
-  <h2>Evidence / Claims / Assessments / Trust Domains</h2>
-  <table id="d-records"><thead><tr><th>kind</th><th>person</th><th>payload</th></tr></thead><tbody></tbody></table>
+  <div class="insight-cols" style="margin-top:1.5rem">
+    <div class="insight-col strengths"><h3>Top Strengths</h3><ul id="d-strengths"></ul></div>
+    <div class="insight-col risks"><h3>Material Risks</h3><ul id="d-risks"></ul></div>
+    <div class="insight-col unknowns"><h3>Unknowns</h3><ul id="d-unknowns"></ul></div>
+  </div>
 
-  <h2>Add a record</h2>
-  <form class="record-form" onsubmit="return submitRecord(event)">
-    <label for="f-person">Person</label>
-    <select id="f-person"></select>
-    <label for="f-kind">Kind</label>
-    <select id="f-kind" onchange="renderKindFields()">
-      <option value="EVIDENCE">EVIDENCE</option>
-      <option value="CLAIM">CLAIM</option>
-      <option value="ASSESSMENT">ASSESSMENT</option>
-    </select>
-    <p style="font-size:0.8rem;color:#555;margin:0">TRUST_DOMAIN is intentionally not directly creatable here -- it is the computed roll-up above (ADR-0004: trust must be evidence-linked, never hand-asserted).</p>
-    <div id="f-kind-fields"></div>
-    <button type="submit">Create</button>
-    <div id="f-err" class="err"></div>
-  </form>
+  <h2>Record a Decision</h2>
+  <div id="d-decision-form-wrap"></div>
+
+  <h2>Evidence &amp; Claims</h2>
+  <div id="d-records"></div>
+
+  <details class="add-panel">
+    <summary>+ Add a research finding</summary>
+    <form class="inline-form" onsubmit="return submitRecord(event)">
+      <label for="f-person">Person</label>
+      <select id="f-person"></select>
+      <label for="f-kind">Kind</label>
+      <select id="f-kind" onchange="renderKindFields()">
+        <option value="EVIDENCE">EVIDENCE</option>
+        <option value="CLAIM">CLAIM</option>
+        <option value="ASSESSMENT">ASSESSMENT</option>
+      </select>
+      <p style="font-size:0.78rem;color:#777;margin:0">TRUST_DOMAIN is intentionally not directly creatable — it is the computed roll-up above (ADR-0004: trust must be evidence-linked, never hand-asserted).</p>
+      <div id="f-kind-fields"></div>
+      <button type="submit">Add finding</button>
+      <div id="f-err" class="err"></div>
+    </form>
+  </details>
 </div>
 
+</div>
 <script>
 let currentTenant = 'a';
 let currentCaseId = null;
@@ -85,9 +141,11 @@ const DIMENSIONS = ['INTEGRITY_CONSISTENCY','RELIABILITY_FULFILLMENT','COMPETENC
   'BOUNDARY_RESPECT','RECIPROCITY_FAIRNESS','CONFLICT_REPAIR','POWER_BEHAVIOR','INCENTIVE_ALIGNMENT',
   'RISK_EXTERNALIZATION','INFORMATION_GOVERNANCE','LEARNING_ADAPTABILITY','CONTEXT_STABILITY','PREDICTABILITY'];
 const BANDS = ['VERY_LOW','LOW','MODERATE','HIGH','VERY_HIGH'];
+const OUTCOMES = ['PROCEED','PROCEED_WITH_CONTROLS','LIMIT_ACCESS','PAUSE','REVIEW_REQUIRED','EXIT'];
 
 function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
 function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
+function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
 async function loadList(tenant) {
   currentTenant = tenant;
@@ -95,15 +153,13 @@ async function loadList(tenant) {
   document.getElementById('btn-' + tenant).classList.add('active');
   const res = await fetch('/api/hci/v1/cases?tenant=' + tenant);
   const body = await res.json();
-  const tbody = document.querySelector('#cases tbody');
-  tbody.innerHTML = '';
-  if (!res.ok) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + (body.detail || body.title) + '</td></tr>'; return; }
-  for (const c of body.data) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><a class="case-link" onclick="openCase('${c.id}')">${c.id}</a></td><td>${c.purpose}</td><td>${c.status}</td><td>${c.risk_tier}</td><td>${c.opened_at}</td>`;
-    tbody.appendChild(tr);
-  }
-  if (body.data.length === 0) tbody.innerHTML = '<tr><td colspan="5">(no rows visible to this tenant)</td></tr>';
+  const grid = document.getElementById('cases');
+  if (!res.ok) { grid.innerHTML = `<p class="err">Error: ${esc(body.detail || body.title)}</p>`; return; }
+  grid.innerHTML = body.data.length ? body.data.map(c => `
+    <div class="case-card" onclick="openCase('${c.id}')">
+      <div class="title">${esc(c.purpose)} <span class="badge status-${c.status}">${c.status}</span></div>
+      <div class="meta">${c.id} &middot; risk ${c.risk_tier} &middot; opened ${new Date(c.opened_at).toLocaleDateString()}</div>
+    </div>`).join('') : '<p class="empty">No cases visible to this tenant.</p>';
 }
 
 async function openCase(caseId) {
@@ -112,33 +168,79 @@ async function openCase(caseId) {
   showDetail();
 }
 
+function bandBadge(value) {
+  return `<span class="band-badge band-${value}">${value.replace('_',' ')}</span>`;
+}
+
 async function refreshDetail() {
   const res = await fetch(`/api/hci/v1/cases/${currentCaseId}?tenant=${currentTenant}`);
   const body = await res.json();
   if (!res.ok) { alert('Error: ' + (body.detail || body.title)); return; }
 
-  document.getElementById('d-title').textContent = body.case.purpose + ' (' + body.case.id + ')';
-  document.getElementById('d-meta').textContent = `status=${body.case.status} risk_tier=${body.case.risk_tier} opened_at=${body.case.opened_at}`;
+  document.getElementById('d-title').textContent = body.case.purpose;
+  document.getElementById('d-meta').textContent = `${body.case.id} · status ${body.case.status} · risk ${body.case.risk_tier} · opened ${new Date(body.case.opened_at).toLocaleDateString()}`;
 
-  const rollupBody = document.querySelector('#d-rollup tbody');
-  rollupBody.innerHTML = body.rollup.domains.length
-    ? body.rollup.domains.map(d => `<tr><td>${d.domain}</td><td class="band-${d.value}">${d.value}</td><td>${d.coverage}</td><td>${d.dimension_disagreement}</td></tr>`).join('')
-    : '<tr><td colspan="4">(no Assessment records yet -- add one below)</td></tr>';
+  const bannerEl = document.getElementById('d-decision-banner');
+  if (body.decisions.length) {
+    const d = body.decisions[0];
+    bannerEl.innerHTML = `<div class="decision-banner outcome-${d.outcome}">
+      <div class="outcome-label">${d.outcome.replace(/_/g,' ')}</div>
+      <div class="rationale">${esc(d.rationale)}</div>
+      <div class="when">Recorded ${new Date(d.valid_from).toLocaleString()}</div>
+    </div>`;
+  } else {
+    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">No decision recorded yet — review the evidence below, then record one.</span></div>`;
+  }
 
-  const decBody = document.querySelector('#d-decisions tbody');
-  decBody.innerHTML = body.decisions.length
-    ? body.decisions.map(d => `<tr><td>${d.outcome}</td><td>${d.rationale}</td><td>${d.valid_from}</td></tr>`).join('')
-    : '<tr><td colspan="3">(no decision recorded yet)</td></tr>';
+  const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q.quality]));
+  document.getElementById('d-domain-note').textContent = body.rollup.domains.length
+    ? 'Computed live from Assessment records below (packages/intelligence/rollup-trust-domains.mjs) — never a hand-typed score.'
+    : '';
+  const allDomains = ['OPERATIONAL','COMPETENCE','CONFIDENTIALITY','FINANCIAL','STRATEGIC','REPUTATIONAL','GOVERNANCE_POWER'];
+  const byDomain = Object.fromEntries(body.rollup.domains.map(d => [d.domain, d]));
+  document.getElementById('d-domains').innerHTML = allDomains.map(name => {
+    const d = byDomain[name];
+    if (!d) return `<div class="domain-card unknown"><div class="domain-name">${name.replace('_',' ')}</div><div class="domain-meta">No evidence yet</div></div>`;
+    return `<div class="domain-card">
+      <div class="domain-name">${name.replace('_',' ')}</div>
+      ${bandBadge(d.value)}
+      <div class="domain-meta">${d.coverage.toLowerCase()} coverage${d.dimension_disagreement ? ' · disagreement' : ''}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('d-strengths').innerHTML = body.strengths.length
+    ? body.strengths.map(s => `<li>${s.domain.replace('_',' ')} (${s.value.replace('_',' ')})</li>`).join('')
+    : '<li class="empty">None yet</li>';
+  document.getElementById('d-risks').innerHTML = body.risks.length
+    ? body.risks.map(s => `<li>${s.domain.replace('_',' ')} (${s.value.replace('_',' ')})</li>`).join('')
+    : '<li class="empty">None yet</li>';
+  document.getElementById('d-unknowns').innerHTML = body.unknowns.length
+    ? body.unknowns.map(u => `<li>${u.replace('_',' ')}</li>`).join('')
+    : '<li class="empty">All domains have evidence</li>';
+
+  document.getElementById('d-decision-form-wrap').innerHTML = `
+    <form class="inline-form" onsubmit="return submitDecision(event)">
+      <label for="dec-outcome">Outcome</label>
+      <select id="dec-outcome">${OUTCOMES.map(o => `<option>${o}</option>`).join('')}</select>
+      <label for="dec-rationale">Rationale</label>
+      <textarea id="dec-rationale" rows="2"></textarea>
+      <button type="submit">Record decision</button>
+      <div id="dec-err" class="err"></div>
+    </form>`;
 
   const personById = Object.fromEntries(body.persons.map(p => [p.id, p.display_label]));
-  const recBody = document.querySelector('#d-records tbody');
-  recBody.innerHTML = body.records.length
-    ? body.records.map(r => `<tr><td>${r.kind}</td><td>${personById[r.person_id] || r.person_id}</td><td><code>${JSON.stringify(r.payload)}</code></td></tr>`).join('')
-    : '<tr><td colspan="3">(none yet)</td></tr>';
+  const recordsEl = document.getElementById('d-records');
+  recordsEl.innerHTML = body.records.length ? body.records.map(r => {
+    const text = r.payload.content || `${r.payload.dimension || ''} = ${r.payload.value || ''}`.trim();
+    const quality = qualityByDim[r.payload.dimension];
+    return `<div class="record-card">
+      <span class="kind-tag">${r.kind} · ${esc(personById[r.person_id] || r.person_id)}</span>
+      <div class="content">${esc(text)}</div>
+      ${quality ? `<span class="quality-tag">${quality.replace('_',' ').toLowerCase()}</span>` : ''}
+    </div>`;
+  }).join('') : '<p class="empty">No evidence, claims, or assessments recorded yet.</p>';
 
-  const personSelect = document.getElementById('f-person');
-  personSelect.innerHTML = body.persons.map(p => `<option value="${p.id}">${p.display_label} (${p.id})</option>`).join('');
-
+  document.getElementById('f-person').innerHTML = body.persons.map(p => `<option value="${p.id}">${esc(p.display_label)}</option>`).join('');
   renderKindFields();
 }
 
@@ -149,11 +251,11 @@ function renderKindFields() {
     el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>`;
   } else if (kind === 'CLAIM') {
     el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>
-      <label for="f-evref">Evidence ref (Evidence/Claim record id this cites)</label><input id="f-evref">`;
+      <label for="f-evref">Evidence ref (an Evidence/Claim record id this cites)</label><input id="f-evref">`;
   } else if (kind === 'ASSESSMENT') {
     el.innerHTML = `<label for="f-dimension">Dimension</label><select id="f-dimension">${DIMENSIONS.map(d => `<option>${d}</option>`).join('')}</select>
       <label for="f-value">Band</label><select id="f-value">${BANDS.map(b => `<option>${b}</option>`).join('')}</select>
-      <label for="f-evref">Evidence ref (Evidence/Claim record id backing this)</label><input id="f-evref">`;
+      <label for="f-evref">Evidence ref (an Evidence/Claim record id backing this)</label><input id="f-evref">`;
   }
 }
 
@@ -174,6 +276,21 @@ async function submitRecord(evt) {
   const errEl = document.getElementById('f-err');
   if (!res.ok) { errEl.textContent = body.detail || body.title; return false; }
   errEl.textContent = '';
+  await refreshDetail();
+  return false;
+}
+
+async function submitDecision(evt) {
+  evt.preventDefault();
+  const outcome = document.getElementById('dec-outcome').value;
+  const rationale = document.getElementById('dec-rationale').value;
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/decisions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, outcome, rationale }),
+  });
+  const body = await res.json();
+  const errEl = document.getElementById('dec-err');
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return false; }
   await refreshDetail();
   return false;
 }

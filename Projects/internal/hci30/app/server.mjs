@@ -6,6 +6,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { validateSubjectRecordPayload } from '../packages/contracts/validate-subject-record-payload.mjs';
 import { rollupTrustDomains } from '../packages/intelligence/rollup-trust-domains.mjs';
+import { classifyEvidenceQuality } from '../packages/intelligence/classify-evidence-quality.mjs';
+import { TRUST_DOMAINS } from '../packages/contracts/trust-domains.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -131,9 +133,29 @@ app.get('/api/hci/v1/cases/:caseId', async (req, res) => {
     // expected, which nothing could supply until today.
     const dimensionScores = records.filter(r => r.kind === 'ASSESSMENT').map(r => r.payload);
     let rollup = { domains: [] };
-    try { rollup = rollupTrustDomains(dimensionScores); } catch (err) { rollup = { domains: [], error: err.message }; }
+    let evidenceQuality = [];
+    try {
+      rollup = rollupTrustDomains(dimensionScores);
+      // packages/intelligence/classify-evidence-quality.mjs -- SINGLE_SOURCE
+      // vs MULTIPLE_SOURCES by distinct evidence-ref count, never a
+      // corroboration claim this layer cannot verify (HCI_EVIDENCE_QUALITY_SPEC.md).
+      evidenceQuality = classifyEvidenceQuality(dimensionScores);
+    } catch (err) { rollup = { domains: [], error: err.message }; }
 
-    res.json({ case: caseRows[0], persons, records, decisions, rollup });
+    // Derived directly from the real roll-up, not a separate invented
+    // signal: HCI_TRUST_DOMAIN_SPEC.md's own band scale (VERY_LOW..VERY_HIGH)
+    // read as strength (HIGH/VERY_HIGH) or risk (LOW/VERY_LOW), matching the
+    // Subject Dashboard's "Top Strengths"/"Material Risks" sections
+    // (19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md). "Unknowns" is the
+    // complement: which of the 7 domains have no Assessment evidence at all
+    // yet -- never silently treated as MODERATE, matching that spec's
+    // §Score semantics the roll-up formula itself already enforces.
+    const strengths = rollup.domains.filter(d => d.value === 'HIGH' || d.value === 'VERY_HIGH');
+    const risks = rollup.domains.filter(d => d.value === 'LOW' || d.value === 'VERY_LOW');
+    const coveredDomains = new Set(rollup.domains.map(d => d.domain));
+    const unknowns = TRUST_DOMAINS.filter(d => !coveredDomains.has(d));
+
+    res.json({ case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns });
   } catch (err) {
     problem(res, 500, 'Internal Server Error', err.message);
   }
@@ -174,6 +196,50 @@ app.post('/api/hci/v1/cases/:caseId/records', async (req, res) => {
     // Postgres error.code (e.g. '23503' FK violation for an unknown
     // case_id/person_id) -- passed through rather than swallowed, per
     // api/API_CONTRACT_STANDARD.md#errors.
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
+const DECISION_OUTCOMES = ['PROCEED', 'PROCEED_WITH_CONTROLS', 'LIMIT_ACCESS', 'PAUSE', 'REVIEW_REQUIRED', 'EXIT'];
+// 19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md §Decision visualization -- the
+// six real, already-decided outcome values, not invented for this demo.
+const REVIEWER_LABEL = 'Demo Reviewer (this app)';
+
+async function findOrCreateReviewerPrincipal(role) {
+  // hci.principals.display_name (migrations/0008) -- NOT display_label,
+  // hci.persons's column for the same concept. Caught by a real 409, not
+  // caught while writing this the first time.
+  const { rows } = await queryAsTenant(role, 'SELECT id FROM hci.principals WHERE display_name = $1 LIMIT 1', [REVIEWER_LABEL]);
+  if (rows.length > 0) return rows[0].id;
+  const id = crypto.randomUUID();
+  await queryAsTenant(role, 'INSERT INTO hci.principals (id, tenant_id, display_name) VALUES ($1, $2, $3)', [id, TENANT_IDS[Object.keys(TENANT_ROLES).find(k => TENANT_ROLES[k] === role)], REVIEWER_LABEL]);
+  return id;
+}
+
+app.post('/api/hci/v1/cases/:caseId/decisions', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { outcome, rationale } = req.body || {};
+  if (!DECISION_OUTCOMES.includes(outcome)) return problem(res, 400, 'Bad Request', `outcome must be one of: ${DECISION_OUTCOMES.join(', ')}`);
+  if (typeof rationale !== 'string' || rationale.trim() === '') return problem(res, 400, 'Bad Request', 'rationale is required');
+  // No Collaboration Stage is modelled anywhere in this app yet, so the
+  // Stage-4+ bias-check blocking precondition
+  // (docs/intelligence/HCI_DECISION_BIAS_CHECK_GATE.md,
+  // packages/intelligence/bias-check-gate.mjs) is NOT enforced here --
+  // disclosed, not silently skipped. hci.record_decision() itself (migration
+  // 0014) is the real gate this endpoint does enforce: cross-tenant
+  // case_id/principal_id is rejected inside that SECURITY DEFINER function,
+  // not just assumed safe because this app only ever passes its own tenant's
+  // ids.
+  try {
+    const principalId = await findOrCreateReviewerPrincipal(t.role);
+    const { rows } = await queryAsTenant(
+      t.role,
+      'SELECT hci.record_decision($1, $2, $3, $4) AS id',
+      [req.params.caseId, principalId, outcome, rationale]
+    );
+    res.status(201).json({ id: rows[0].id, outcome, rationale });
+  } catch (err) {
     problem(res, 409, 'Conflict', err.message);
   }
 });
