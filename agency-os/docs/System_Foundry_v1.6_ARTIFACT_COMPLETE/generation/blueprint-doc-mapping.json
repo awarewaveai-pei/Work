@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "source_pack": "agency-os/docs/Composable AI Commerce OS/Composable_AI_Commerce_OS_LEGO_Documentation_Pack",
+  "source_manifest": "agency-os/docs/Composable AI Commerce OS/Composable_AI_Commerce_OS_LEGO_Documentation_Pack/manifest.json",
+  "built_from": "reports/commerce-os-blueprint-gap-audit-2026-09-07.md (module<->CAP correspondence) + generation/module-manifests.json activated_by lists",
+  "mapping": {
+    "identity": ["Composable AI Commerce OS_02_Platform_Core.md"],
+    "tenant": ["Composable AI Commerce OS_02_Platform_Core.md"],
+    "domain": [
+      "Composable AI Commerce OS_09_PIM_PXM.md",
+      "Composable AI Commerce OS_10_Commerce_Hub.md",
+      "Composable AI Commerce OS_13_Inventory_WMS.md",
+      "Composable AI Commerce OS_17_Loyalty_Reviews_UGC.md",
+      "Composable AI Commerce OS_21_Finance_Treasury.md",
+      "Composable AI Commerce OS_50_Work_Management_Approvals.md"
+    ],
+    "workflow": [
+      "Composable AI Commerce OS_26_Automation_Workflow_Policy.md",
+      "Composable AI Commerce OS_45_Experimentation_Feature_Flags.md",
+      "Composable AI Commerce OS_50_Work_Management_Approvals.md"
+    ],
+    "files": ["Composable AI Commerce OS_08_Content_Studio_DAM.md"],
+    "search": ["Composable AI Commerce OS_42_Search_Merchandising_Discovery.md"],
+    "analytics": [
+      "Composable AI Commerce OS_21_Finance_Treasury.md",
+      "Composable AI Commerce OS_22_Accounting_Tax.md",
+      "Composable AI Commerce OS_24_Analytics_Data_Platform.md"
+    ],
+    "commercial": ["Composable AI Commerce OS_36_SaaS_Billing_Entitlements.md"],
+    "payments": ["Composable AI Commerce OS_20_Payments_Fraud_Risk.md"],
+    "notifications": ["Composable AI Commerce OS_30_Communication_Connectors.md"],
+    "integrations": [
+      "Composable AI Commerce OS_29_Connector_Runtime_Standard.md",
+      "Composable AI Commerce OS_31_Commerce_Marketplace_Connectors.md",
+      "Composable AI Commerce OS_32_CRM_Marketing_Social_Connectors.md",
+      "Composable AI Commerce OS_33_Payment_Logistics_Finance_Connectors.md"
+    ],
+    "globalization": ["Composable AI Commerce OS_22_Accounting_Tax.md"],
+    "ai": [
+      "Composable AI Commerce OS_25_AI_Copilot_Agents.md",
+      "Composable AI Commerce OS_49_Agentic_Commerce.md"
+    ],
+    "portals": ["Composable AI Commerce OS_48_Customer_Portal_Self_Service.md"],
+    "compliance": ["Composable AI Commerce OS_37_Security_Privacy_Observability.md"],
+    "content": ["Composable AI Commerce OS_08_Content_Studio_DAM.md"],
+    "customer_service": ["Composable AI Commerce OS_04_Customer_Service.md"],
+    "marketing": ["Composable AI Commerce OS_06_Marketing_Growth.md"],
+    "procurement": ["Composable AI Commerce OS_14_Procurement_Supplier.md"],
+    "sales": ["Composable AI Commerce OS_05_CRM_Sales.md"],
+    "social": ["Composable AI Commerce OS_07_Social_Community.md"],
+    "marketplace_ops": ["Composable AI Commerce OS_11_Marketplace_Operations.md"],
+    "b2b": ["Composable AI Commerce OS_18_B2B_Wholesale.md"],
+    "subscription_commerce": ["Composable AI Commerce OS_43_Subscription_Commerce.md"],
+    "loyalty": ["Composable AI Commerce OS_17_Loyalty_Reviews_UGC.md"],
+    "reviews": ["Composable AI Commerce OS_17_Loyalty_Reviews_UGC.md"],
+    "cross_border": ["Composable AI Commerce OS_23_Cross_Border_Compliance.md"],
+    "oms": ["Composable AI Commerce OS_12_OMS_Order_Orchestration.md"],
+    "demand_planning": ["Composable AI Commerce OS_46_Demand_Planning_Forecasting.md"],
+    "affiliate": ["Composable AI Commerce OS_44_Creator_Affiliate_Influencer.md"],
+    "pos": ["Composable AI Commerce OS_19_POS_Retail.md"],
+    "returns": ["Composable AI Commerce OS_16_Returns_Warranty_After_Sales.md"],
+    "warranty": ["Composable AI Commerce OS_16_Returns_Warranty_After_Sales.md"],
+    "cdp": ["Composable AI Commerce OS_03_Identity_CDP_Consent.md"],
+    "promotions": ["Composable AI Commerce OS_41_Pricing_Promotions.md"],
+    "risk": ["Composable AI Commerce OS_20_Payments_Fraud_Risk.md"],
+    "shipping": ["Composable AI Commerce OS_15_Logistics_Fulfillment.md"],
+    "plm_quality": ["Composable AI Commerce OS_47_PLM_Quality.md"],
+    "merchandising": ["Composable AI Commerce OS_42_Search_Merchandising_Discovery.md"],
+    "inventory_ops": ["Composable AI Commerce OS_13_Inventory_WMS.md"]
+  },
+  "unmapped_platform_shape": ["core", "web", "mobile", "desktop", "api", "cli", "custom"],
+  "unmapped_no_blueprint_doc": {
+    "offline": "no Commerce OS doc covers device offline-sync/conflict; mobile-platform concern, not a business domain in the pack",
+    "migration": "no Commerce OS doc covers legacy-system migration; Foundry kernel/migration-plan concern, not in the 50-doc business pack",
+    "hr": "no HR/payroll/recruitment doc exists among the 51 pack files",
+    "reliability": "no Commerce OS doc covers SRE/uptime/blast-radius; Foundry kernel/SRE-DR template concern, not in the 50-doc business pack"
+  }
+}

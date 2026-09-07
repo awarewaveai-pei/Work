@@ -1,0 +1,1386 @@
+{
+  "schema_version": "1.0.0",
+  "source_pack": "agency-os/docs/Composable AI Commerce OS/Composable_AI_Commerce_OS_LEGO_Documentation_Pack",
+  "docs": {
+    "02_Platform_Core": {
+      "source_file": "Composable AI Commerce OS_02_Platform_Core.md",
+      "sections": {
+        "definition_of_done": {
+          "heading": "8. Core Acceptance",
+          "content": "- Tenant isolation test。\n- Identity merge/unmerge audited。\n- Connector can register capabilities without Core code change。\n- Module can register permissions/events/routes without leaking internals。"
+        }
+      },
+      "section_count": 1
+    },
+    "03_Identity_CDP_Consent": {
+      "source_file": "Composable AI Commerce OS_03_Identity_CDP_Consent.md",
+      "sections": {
+        "service_contract": {
+          "heading": "7. Public Services",
+          "content": "```text\nfindContactByIdentity()\nlinkIdentity()\nmergeContacts()\nunmergeContacts()\nrecordConsent()\nwithdrawConsent()\ngetCustomerTimeline()\n```"
+        }
+      },
+      "section_count": 1
+    },
+    "04_Customer_Service": {
+      "source_file": "Composable AI Commerce OS_04_Customer_Service.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Conversation\n- Message\n- Ticket\n- InternalNote\n- AssignmentRule（後期）"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nopenConversation(contact, channel)\nappendMessage(conversationId, normalizedMessage)\nreply(conversationId, content)\nassign(conversationId, userOrTeam)\ncloseConversation(conversationId)\ncreateTicket(conversationId, issue)\ngetCustomerContext(contactId)\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nconversation.created\nconversation.assigned\nconversation.closed\nmessage.received\nmessage.sent\nticket.created\nticket.resolved\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ncontact.merged\nidentity.linked\norder.updated\nshipment.updated\nconnector.failed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ninbox.read\nconversation.read\nconversation.reply\nconversation.assign\nconversation.close\nticket.read\nticket.manage\ncontact.read\ncommerce.read\nai.use\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Message 必須 Normalize 後才進 Domain\n- Raw webhook payload 保留在 Connector runtime，不污染 Message schema\n- Conversation 不等於外部 thread\n- Agent reply 永遠走 Messaging service\n- 敏感動作不能由 AI 自動執行"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "客服只開這套系統，就能處理第一條 Golden Flow：LINE 客戶詢問訂單 → 顯示客戶與訂單 → AI 建議 → 真人送出 → 留下完整稽核紀錄。"
+        }
+      },
+      "section_count": 8
+    },
+    "05_CRM_Sales": {
+      "source_file": "Composable AI Commerce OS_05_CRM_Sales.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Lead\n- Deal\n- Pipeline\n- PipelineStage\n- Activity\n- LeadScore"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreateLead(contactId, source)\nqualifyLead(leadId)\ncreateDeal(contactId, pipelineId)\nmoveDeal(dealId, stageId)\nrecordActivity(contactId, activity)\nscoreLead(contactId)\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nlead.created\nlead.qualified\ndeal.created\ndeal.stage_changed\ndeal.won\ndeal.lost\ncrm.activity.created\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ncontact.created\nmessage.received\norder.paid\ncampaign.clicked\nreview.created\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ncrm.read\ncrm.lead.manage\ncrm.deal.manage\ncrm.pipeline.manage\ncrm.activity.write\ncrm.export\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Contact 為 Core canonical identity\n- 外部 CRM 只能以 Connector mapping 連結\n- CRM 不直接修改 Commerce Order\n- Lead score 規則需 versioned"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "能以 Core Contact 為中心管理 Lead → Deal → Won 的完整銷售流程，並可由客服、行銷與 Commerce 事件驅動。"
+        }
+      },
+      "section_count": 8
+    },
+    "06_Marketing_Growth": {
+      "source_file": "Composable AI Commerce OS_06_Marketing_Growth.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Segment\n- Campaign\n- Journey\n- JourneyNode\n- AudienceSnapshot\n- Touchpoint"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nevaluateSegment(segmentId)\ncreateCampaign()\nlaunchCampaign(campaignId)\nenterJourney(contactId, journeyId)\nrecordTouchpoint()\ngetAttribution(orderId)\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nsegment.entered\nsegment.exited\ncampaign.started\ncampaign.sent\ncampaign.clicked\njourney.entered\njourney.completed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ncontact.updated\norder.created\norder.paid\ncart.abandoned\nmessage.received\nreview.created\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nmarketing.read\nsegment.manage\ncampaign.manage\ncampaign.send\njourney.manage\naudience.export\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- 未有有效 consent 不可送出該目的訊息\n- Audience snapshot 要可重現\n- Connector delivery receipt 正規化\n- Campaign content 與 delivery transport 分離"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "能從 Customer 360 產生 audience，經 consent 檢查送出 campaign，並把結果閉環回 Customer 與 Revenue。"
+        }
+      },
+      "section_count": 8
+    },
+    "07_Social_Community": {
+      "source_file": "Composable AI Commerce OS_07_Social_Community.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- SocialPost\n- SocialSchedule\n- CommunityInteraction\n- SocialMetric"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nschedulePost()\napprovePost()\npublishPost()\ncancelPost()\ningestEngagement()\ngetPerformance()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nsocial.post.scheduled\nsocial.post.published\nsocial.post.failed\nsocial.engagement.received\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ncontent.asset.approved\ncampaign.started\nbrand.policy.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nsocial.read\nsocial.create\nsocial.approve\nsocial.publish\nsocial.analytics.read\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Publishing provider 可替換\n- Customer-service DM 不屬於 Social inbox\n- 所有 asset 必須引用 DAM asset id"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "可由 Content → Approval → Postiz/native → Publish → Analytics 完成一條 social content flow。"
+        }
+      },
+      "section_count": 8
+    },
+    "08_Content_Studio_DAM": {
+      "source_file": "Composable AI Commerce OS_08_Content_Studio_DAM.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Asset\n- AssetVersion\n- BrandProfile\n- Template\n- CreativeJob"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreateAsset()\ngenerateAsset()\ncreateVariant()\napproveAsset()\nsearchAssets()\nattachUsageRights()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\ncontent.asset.created\ncontent.asset.generated\ncontent.asset.approved\ncontent.asset.expired\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ncampaign.created\nproduct.updated\nbrand.policy.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ncontent.read\ncontent.create\ncontent.generate\ncontent.approve\nbrand.manage\nasset.delete\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- 所有生成結果保留 model/prompt/version metadata\n- Asset binary 與 metadata 分離\n- 使用權與到期日不可遺失\n- Downstream 只引用 asset id"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "內容從生成到審核、版本、授權、分發皆有完整生命週期。"
+        }
+      },
+      "section_count": 8
+    },
+    "09_PIM_PXM": {
+      "source_file": "Composable AI Commerce OS_09_PIM_PXM.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- ProductFamily\n- Attribute\n- Taxonomy\n- ProductContent\n- ChannelProfile\n- CompletenessScore"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ngetProductContent()\nsetAttribute()\nlocalizeProduct()\nbuildChannelPayload()\nvalidateCompleteness()\nmapCategory()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\npim.product.updated\npim.completeness.changed\npim.channel_ready\npim.validation_failed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nproduct.created\nasset.approved\ncompliance.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\npim.read\npim.edit\npim.publish\ntaxonomy.manage\nattribute.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Product identity 與 platform listing id 分離\n- Channel-specific title/description 不覆蓋 canonical content\n- 所有 mapping versioned"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "任何商品只維護一次 canonical identity，並能輸出多市場、多語言、多 Channel listing。"
+        }
+      },
+      "section_count": 8
+    },
+    "10_Commerce_Hub": {
+      "source_file": "Composable AI Commerce OS_10_Commerce_Hub.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Store\n- CommerceCustomerRef\n- Order\n- OrderItem\n- OrderStatusMap"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nfindCustomer(contactId, storeId)\ngetOrders(contactId)\ngetOrder(orderId)\nlistStores()\nnormalizeOrder(providerOrder)\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\norder.imported\norder.updated\norder.cancelled\norder.refunded\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nidentity.linked\nconnector.connected\nproduct.mapped\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ncommerce.read\ncommerce.order.read\ncommerce.customer.read\ncommerce.connector.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Order != provider raw order\n- External ids 存 mapping\n- V1 read-only first\n- Status mapping 必須可 version"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "至少兩個 commerce providers 共用同一 Order/Customer service contract，且 Consumer module 不含 provider-specific conditional。"
+        }
+      },
+      "section_count": 8
+    },
+    "11_Marketplace_Operations": {
+      "source_file": "Composable AI Commerce OS_11_Marketplace_Operations.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- MarketplaceListing\n- Offer\n- ListingIssue\n- MarketplaceAccountHealth\n- ChannelMap"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\npublishListing()\nupdateOffer()\nsyncListingStatus()\ngetListingIssues()\ngetSellerHealth()\nreconcileMarketplace()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nlisting.published\nlisting.failed\nlisting.rejected\nseller.health.changed\nmarketplace.settlement.available\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\npim.channel_ready\ninventory.changed\npricing.changed\nconnector.failed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nmarketplace.read\nlisting.manage\nlisting.publish\npricing.manage\nseller_health.read\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- 平台限制以 capability 表達\n- Listing 與 Product 分離\n- 發布需通過 PIM validation\n- 平台 write 操作全部 audited"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "可集中看到並修復多 Marketplace listing 狀態，而不把平台特有欄位污染 PIM canonical schema。"
+        }
+      },
+      "section_count": 8
+    },
+    "12_OMS_Order_Orchestration": {
+      "source_file": "Composable AI Commerce OS_12_OMS_Order_Orchestration.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- FulfillmentPlan\n- Allocation\n- OrderException\n- RoutingRule"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nplanFulfillment(orderId)\nallocate(orderId)\nreroute(orderId)\nsplitOrder(orderId)\nraiseException()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\norder.allocated\norder.split\nfulfillment.planned\norder.exception.created\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.imported\ninventory.changed\nwarehouse.disabled\nshipment.failed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\noms.read\noms.allocate\noms.override\noms.rules.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Inventory quantity 不由 OMS 擁有\n- 每次 allocation 有可追蹤決策原因\n- Override 必須 audited"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "能對 normalized Order 產生可追蹤 fulfillment plan，且不直接控制庫存 ledger 或 carrier API。"
+        }
+      },
+      "section_count": 8
+    },
+    "13_Inventory_WMS": {
+      "source_file": "Composable AI Commerce OS_13_Inventory_WMS.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Warehouse\n- InventoryBalance\n- StockMovement\n- Reservation\n- Transfer\n- Bin"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ngetAvailability(sku, location)\nreserve()\nreleaseReservation()\nadjustStock()\ntransfer()\nreceiveStock()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\ninventory.changed\ninventory.low\ninventory.reserved\ninventory.released\nstock.received\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.allocated\norder.cancelled\nreturn.received\npurchase_order.received\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ninventory.read\ninventory.adjust\ninventory.transfer\nwarehouse.manage\ninventory.audit\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- 所有數量變動必須來自 immutable movement\n- 禁止直接 UPDATE balance\n- Reservation 與 Available 分離"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "庫存數量具備可稽核 movement ledger、reservation 與一致性測試。"
+        }
+      },
+      "section_count": 8
+    },
+    "14_Procurement_Supplier": {
+      "source_file": "Composable AI Commerce OS_14_Procurement_Supplier.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Supplier\n- PurchaseOrder\n- PurchaseRequest\n- SupplierQuote"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreatePurchaseRequest()\napprovePurchaseRequest()\ncreatePurchaseOrder()\nconfirmPO()\nrecordETA()\nreceivePO()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\npurchase_request.created\npurchase_order.created\npurchase_order.confirmed\npurchase_order.received\nsupplier.eta.changed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ninventory.low\nforecast.reorder_suggested\nquality.issue.created\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nprocurement.read\nprocurement.request\nprocurement.approve\npurchase_order.manage\nsupplier.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- PO approval threshold 走 Policy engine\n- Cost 版本化\n- 收貨改 Inventory，不直接改 balance"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "能把補貨需求轉成有審核、有 ETA、有收貨結果的 PO workflow。"
+        }
+      },
+      "section_count": 8
+    },
+    "15_Logistics_Fulfillment": {
+      "source_file": "Composable AI Commerce OS_15_Logistics_Fulfillment.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Shipment\n- Package\n- TrackingEvent\n- CarrierService"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ngetRates()\ncreateShipment()\ngetLabel()\ncancelShipment()\ntrackShipment()\nfindPickupPoints()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nshipment.created\nshipment.label_created\nshipment.in_transit\nshipment.delivered\nshipment.exception\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nfulfillment.planned\norder.cancelled\nreturn.approved\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nlogistics.read\nshipment.create\nshipment.cancel\nshipment.override\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Tracking event normalized\n- Carrier-specific service codes 不進 Core\n- Label binary 放 object storage"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "Carrier 被抽象成 Logistics Connector，Shipment lifecycle 不依賴特定物流商。"
+        }
+      },
+      "section_count": 8
+    },
+    "16_Returns_Warranty_After_Sales": {
+      "source_file": "Composable AI Commerce OS_16_Returns_Warranty_After_Sales.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- ReturnRequest\n- RMA\n- Inspection\n- WarrantyClaim\n- RepairCase"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nrequestReturn()\napproveReturn()\nreceiveReturn()\ninspectReturn()\napproveRefund()\ncreateWarrantyClaim()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nreturn.requested\nreturn.approved\nreturn.received\nreturn.inspected\nwarranty.claimed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.delivered\nmessage.received\nshipment.delivered\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nreturns.read\nreturns.approve\nreturns.inspect\nwarranty.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Refund 與 inventory action 分開\n- 高額 refund 走 approval\n- 每次 disposition audited"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "任何退貨都可從 customer request 追到 disposition / refund / restock。"
+        }
+      },
+      "section_count": 8
+    },
+    "17_Loyalty_Reviews_UGC": {
+      "source_file": "Composable AI Commerce OS_17_Loyalty_Reviews_UGC.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- LoyaltyAccount\n- PointEntry\n- Tier\n- Reward\n- Review\n- Referral"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nearnPoints()\nredeemPoints()\nevaluateTier()\nrequestReview()\nmoderateReview()\ncreateReferral()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nloyalty.points.earned\nloyalty.tier.changed\nreview.created\nreview.approved\nreferral.converted\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.paid\norder.refunded\ncustomer.birthday\nreturn.completed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nloyalty.read\nloyalty.adjust\nloyalty.rules.manage\nreviews.moderate\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Points 必須 ledger-based\n- Review moderation 可追蹤\n- Marketplace review constraints 由 connector capability 控制"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "從 order → loyalty → review → repeat purchase 建立可量測閉環。"
+        }
+      },
+      "section_count": 8
+    },
+    "18_B2B_Wholesale": {
+      "source_file": "Composable AI Commerce OS_18_B2B_Wholesale.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- B2BAccount\n- Catalog\n- Quote\n- BuyerAssignment\n- PaymentTerm"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreateB2BAccount()\nassignBuyer()\ngetCatalog()\ncreateQuote()\napproveQuote()\ncheckCredit()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nb2b.account.created\nquote.created\nquote.accepted\ncredit.limit_changed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ncompany.created\norder.paid\npayment.overdue\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nb2b.read\nb2b.account.manage\nquote.manage\ncredit.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Company != Contact\n- Credit write 高風險\n- Price book 與 consumer price 分離"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "可以在不破壞 D2C 模型的前提下處理一個公司、多採購人與 negotiated pricing。"
+        }
+      },
+      "section_count": 8
+    },
+    "19_POS_Retail": {
+      "source_file": "Composable AI Commerce OS_19_POS_Retail.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Register\n- Shift\n- POSSession\n- Receipt"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nopenShift()\ncreatePOSCart()\ncheckout()\nreturnInStore()\ncloseShift()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\npos.shift.opened\npos.sale.completed\npos.return.completed\npos.shift.closed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\ninventory.changed\nloyalty.updated\ncustomer.merged\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\npos.sell\npos.return\npos.discount.override\npos.shift.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Offline resilience 後期\n- POS sale 仍是 Commerce Order\n- Discount override audited"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "門市交易成為同一 Customer / Order / Inventory ecosystem 的一部分。"
+        }
+      },
+      "section_count": 8
+    },
+    "20_Payments_Fraud_Risk": {
+      "source_file": "Composable AI Commerce OS_20_Payments_Fraud_Risk.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Payment\n- Refund\n- Dispute\n- RiskDecision"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nauthorize()\ncapture()\nrefund()\nvoid()\ngetPayment()\nevaluateRisk()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\npayment.authorized\npayment.captured\npayment.failed\nrefund.completed\nchargeback.opened\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.created\nreturn.approved\nfraud.signal.received\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\npayments.read\npayments.capture\npayments.refund\nrisk.review\nrisk.rules.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Refund 高風險，需要 policy\n- 不要存完整卡號\n- PSP raw risk score 需映射但保留來源"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "Payment lifecycle 與 provider 分離，且所有高風險寫入有政策與稽核。"
+        }
+      },
+      "section_count": 8
+    },
+    "21_Finance_Treasury": {
+      "source_file": "Composable AI Commerce OS_21_Finance_Treasury.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Settlement\n- Payout\n- Expense\n- CostAllocation\n- ContributionMargin"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncalculateOrderEconomics()\nreconcilePayout()\nrecordExpense()\ngetCashPosition()\ngetProfitability()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nfinance.reconciliation.completed\nfinance.margin.changed\npayout.reconciled\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.paid\nrefund.completed\nmarketplace.settlement.available\nshipment.created\nad.spend.recorded\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nfinance.read\nfinance.expense.manage\nfinance.reconcile\nfinance.export\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Finance metric 與 Accounting ledger 分離\n- 所有成本來源可追溯\n- 跨幣別需保存原幣與 base currency"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "管理者可從 sale 看見真正淨貢獻，而不只 GMV。"
+        }
+      },
+      "section_count": 8
+    },
+    "22_Accounting_Tax": {
+      "source_file": "Composable AI Commerce OS_22_Accounting_Tax.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Account\n- JournalEntry\n- JournalLine\n- Period\n- ARInvoice\n- APBill"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\npostJournal()\nclosePeriod()\ngetTrialBalance()\ngetPnL()\nexportToAccountingProvider()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\njournal.posted\nperiod.closed\ninvoice.issued\nbill.recorded\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\npayout.reconciled\nexpense.recorded\nrefund.completed\ntax.invoice.issued\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\naccounting.read\njournal.post\nperiod.close\naccounting.export\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Posted journal immutable；透過 reversal 修正\n- Legal entity scope\n- Currency rate source versioned"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "Business OS 與正式會計之間有清楚、可稽核的橋接，不讓 Finance projection 假裝成 ledger。"
+        }
+      },
+      "section_count": 8
+    },
+    "23_Cross_Border_Compliance": {
+      "source_file": "Composable AI Commerce OS_23_Cross_Border_Compliance.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- TradeProfile\n- ComplianceRecord\n- Certification\n- DPPRecord\n- CustomsDocument"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nclassifyProduct()\nvalidateMarketCompliance()\nbuildCustomsData()\ngenerateCommercialInvoice()\ngetDPPData()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\ncompliance.validation_failed\ncompliance.approved\ndpp.updated\ncustoms.document.generated\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nproduct.updated\nmarket.enabled\norder.ready_to_ship\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ncompliance.read\ncompliance.manage\ncompliance.approve\ntrade.export\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- AI classification 必須 human-verifiable\n- 法規來源版本化\n- 過期 certification 要阻止 publish/shipping when required"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "商品進入新市場前，有可驗證的 trade/compliance readiness。"
+        }
+      },
+      "section_count": 8
+    },
+    "24_Analytics_Data_Platform": {
+      "source_file": "Composable AI Commerce OS_24_Analytics_Data_Platform.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Metric\n- Dimension\n- DataContract\n- DataQualityCheck\n- Snapshot"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ngetMetric()\nqueryMetrics()\nregisterDataContract()\nrunDataQualityChecks()\npublishDataset()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\ndata.quality.failed\nmetric.anomaly.detected\ndataset.updated\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\n* domain events via analytics pipeline\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nanalytics.read\nanalytics.export\nmetric.manage\ndata_quality.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Metric definitions versioned\n- Operational DB 不直接當 BI warehouse 長期方案\n- PII classification"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "所有重要 KPI 有唯一定義、來源與品質檢查。"
+        }
+      },
+      "section_count": 8
+    },
+    "25_AI_Copilot_Agents": {
+      "source_file": "Composable AI Commerce OS_25_AI_Copilot_Agents.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- AIProvider\n- Prompt\n- Tool\n- Agent\n- Evaluation\n- UsageBudget"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncomplete()\ninvokeTool()\nrunAgent()\nevaluateOutput()\nenforceBudget()\nselectModel()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nai.request.completed\nai.tool.invoked\nai.agent.action_requested\nai.evaluation.failed\nai.budget.exceeded\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nbusiness events selected by agent subscriptions\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nai.use\nai.prompt.manage\nai.agent.manage\nai.tool.manage\nai.audit.read\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- AI 不能直接 SQL\n- AI 不能直接叫 Woo/LINE API\n- 高風險 write 必須 approval\n- 每個 tool call 可追蹤"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "AI 只透過受控 tools 操作 Business OS，所有讀寫皆有權限、風險級別與 audit。"
+        }
+      },
+      "section_count": 8
+    },
+    "26_Automation_Workflow_Policy": {
+      "source_file": "Composable AI Commerce OS_26_Automation_Workflow_Policy.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Automation\n- WorkflowRun\n- Step\n- Approval\n- Policy"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nevaluateTrigger()\nstartWorkflow()\nexecuteStep()\nrequestApproval()\nevaluatePolicy()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nworkflow.started\nworkflow.completed\nworkflow.failed\napproval.requested\napproval.approved\npolicy.denied\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nAny registered domain event\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nautomation.read\nautomation.manage\napproval.act\npolicy.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Workflow 不直接 SQL\n- Action 必須可 idempotent\n- Policy precedes high-risk write"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "跨 Module automation 由統一 engine 控制，任何高風險動作先過 policy/approval。"
+        }
+      },
+      "section_count": 8
+    },
+    "29_Connector_Runtime_Standard": {
+      "source_file": "Composable AI Commerce OS_29_Connector_Runtime_Standard.md",
+      "sections": {},
+      "section_count": 0
+    },
+    "30_Communication_Connectors": {
+      "source_file": "Composable AI Commerce OS_30_Communication_Connectors.md",
+      "sections": {
+        "lego_test": {
+          "heading": "6. Golden Connector Test",
+          "content": "LINE 與 WhatsApp 必須能同時進同一 Inbox，Customer Service module 不需要 provider-specific branch。"
+        }
+      },
+      "section_count": 1
+    },
+    "31_Commerce_Marketplace_Connectors": {
+      "source_file": "Composable AI Commerce OS_31_Commerce_Marketplace_Connectors.md",
+      "sections": {},
+      "section_count": 0
+    },
+    "32_CRM_Marketing_Social_Connectors": {
+      "source_file": "Composable AI Commerce OS_32_CRM_Marketing_Social_Connectors.md",
+      "sections": {},
+      "section_count": 0
+    },
+    "33_Payment_Logistics_Finance_Connectors": {
+      "source_file": "Composable AI Commerce OS_33_Payment_Logistics_Finance_Connectors.md",
+      "sections": {},
+      "section_count": 0
+    },
+    "36_SaaS_Billing_Entitlements": {
+      "source_file": "Composable AI Commerce OS_36_SaaS_Billing_Entitlements.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Plan\n- Subscription\n- Entitlement\n- UsageMeter\n- InvoiceRef"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncheckEntitlement()\nrecordUsage()\nchangePlan()\nstartTrial()\nsuspendForBilling()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nsubscription.started\nsubscription.changed\nentitlement.changed\nusage.limit_reached\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\npayment.failed\norganization.created\nmodule.installed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nbilling.read\nbilling.manage\nplan.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Feature access 永遠 query entitlement service\n- 不要 UI-only gating\n- Billing provider 可替換"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "任何付費功能都由統一 entitlement service 控制，不散落 hard-coded checks。"
+        }
+      },
+      "section_count": 8
+    },
+    "37_Security_Privacy_Observability": {
+      "source_file": "Composable AI Commerce OS_37_Security_Privacy_Observability.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- AuditLog\n- RetentionPolicy\n- SecurityEvent\n- Incident"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nauthorize()\naudit()\nstoreSecretRef()\nexportSubjectData()\ndeleteSubjectData()\nreportHealth()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nsecurity.permission_denied\nsecurity.suspicious_activity\nincident.created\nprivacy.deletion_completed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nconnector.failed\nlogin.failed\npolicy.denied\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nsecurity.audit.read\nsecurity.settings.manage\nprivacy.export\nprivacy.delete\nincident.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- organization scope mandatory\n- Never log raw secrets\n- PII in logs minimized\n- Sensitive exports audited"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "這個模組完成前必須通過：\n\n1. **Remove Test** — 停用本模組後，Core 與其他模組仍可啟動。\n2. **Replace Test** — 外部 Provider 可替換，不需修改本模組 Domain。\n3. **Boundary Test** — 不可直接讀寫其他模組擁有的資料表。\n4. **Event Test** — 跨模組 side effects 透過 public service 或 event 發生。\n5. **Tenant Test** — 所有資料都必須 organization scoped。\n6. **Audit Test** — 敏感 write action 都可追蹤。\n7. **Contract Test** — 對外 contract 有自動化測試。"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "任何資料讀寫都有 tenant/permission boundary；任何故障可定位 organization/connector/request。"
+        }
+      },
+      "section_count": 8
+    },
+    "41_Pricing_Promotions": {
+      "source_file": "Composable AI Commerce OS_41_Pricing_Promotions.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- PriceBook\n- PriceEntry\n- Promotion\n- PromotionRule\n- Coupon"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ngetPrice(context)\nevaluatePromotion(cartContext)\ncreatePromotion()\npublishPriceBook()\nvalidateMarginFloor()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nprice.changed\npromotion.started\npromotion.ended\ncoupon.redeemed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nproduct.created\nmarket.enabled\ncustomer.segment.changed\ncost.changed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\npricing.read\npricing.manage\npromotion.manage\npromotion.approve\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- 價格決策可重現\n- Money 使用 currency-aware type\n- Marketplace price 寫入經 Connector"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "價格與促銷可跨 Commerce provider 使用同一套 domain contract。"
+        }
+      },
+      "section_count": 8
+    },
+    "42_Search_Merchandising_Discovery": {
+      "source_file": "Composable AI Commerce OS_42_Search_Merchandising_Discovery.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- SearchProfile\n- MerchRule\n- Recommendation\n- ProductFeed\n- FeedIssue"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nsearchProducts()\ngetRecommendations()\napplyMerchRules()\nbuildFeed()\nvalidateFeed()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nsearch.no_results\nfeed.generated\nfeed.rejected\nrecommendation.clicked\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\npim.product.updated\ninventory.changed\nprice.changed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nsearch.manage\nmerchandising.manage\nfeed.manage\ndiscovery.analytics.read\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Search index 是 projection，不是 source of truth\n- Feed errors 回到 PIM fields\n- Ranking rules versioned"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "商品在網站、feed 與 AI discovery surface 都由同一 canonical data 供給。"
+        }
+      },
+      "section_count": 8
+    },
+    "43_Subscription_Commerce": {
+      "source_file": "Composable AI Commerce OS_43_Subscription_Commerce.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Subscription\n- SubscriptionPlan\n- Cycle\n- SubscriptionChange"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreateSubscription()\nrenew()\npause()\nresume()\nchangePlan()\ncancel()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nsubscription.started\nsubscription.renewed\nsubscription.payment_failed\nsubscription.paused\nsubscription.cancelled\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\npayment.captured\npayment.failed\ncustomer.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nsubscription.read\nsubscription.manage\nsubscription.override\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Customer subscription 與本 SaaS billing 分離\n- Provider 可替換\n- Billing dates timezone-safe"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "訂閱從 start 到 renewal/cancel 有獨立 lifecycle，不依賴單一 PSP。"
+        }
+      },
+      "section_count": 8
+    },
+    "44_Creator_Affiliate_Influencer": {
+      "source_file": "Composable AI Commerce OS_44_Creator_Affiliate_Influencer.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Creator\n- AffiliateProgram\n- CommissionRule\n- Seeding\n- UGCRight"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nenrollCreator()\ncreateAffiliateLink()\nattributeSale()\ncalculateCommission()\ngrantUsageRight()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\ncreator.enrolled\naffiliate.sale_attributed\ncommission.accrued\nugc.right.expiring\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.paid\ncontent.asset.created\ncampaign.started\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ncreator.read\ncreator.manage\naffiliate.manage\ncommission.approve\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- UGC usage rights 有期限/市場\n- Commission 可重建\n- Payout 與 commission calculation 分離"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "Creator 合作從 outreach 到 revenue/commission/UGC rights 可完整追蹤。"
+        }
+      },
+      "section_count": 8
+    },
+    "45_Experimentation_Feature_Flags": {
+      "source_file": "Composable AI Commerce OS_45_Experimentation_Feature_Flags.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- FeatureFlag\n- Experiment\n- Variant\n- Assignment"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nevaluateFlag()\nassignVariant()\nstartExperiment()\nstopExperiment()\ngetExperimentResult()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nexperiment.exposed\nexperiment.converted\nflag.changed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nanalytics.metric.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nexperiment.read\nexperiment.manage\nflag.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Assignment deterministic\n- Exposure logging\n- Metric definition frozen during analysis"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "高風險產品改動可小流量 rollout 並用一致 metrics 驗證。"
+        }
+      },
+      "section_count": 8
+    },
+    "46_Demand_Planning_Forecasting": {
+      "source_file": "Composable AI Commerce OS_46_Demand_Planning_Forecasting.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Forecast\n- ReorderSuggestion\n- PlanningPolicy"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nforecastDemand()\ncalculateReorderPoint()\nsuggestPurchase()\ndetectOverstock()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nforecast.updated\nforecast.stockout_risk\nforecast.reorder_suggested\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.paid\ninventory.changed\nsupplier.eta.changed\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nplanning.read\nplanning.manage\nplanning.override\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Forecast versioned\n- Manual override preserved\n- AI suggestion 不直接發 PO"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "缺貨與補貨由可追溯 forecast 推導，而非人工猜測。"
+        }
+      },
+      "section_count": 8
+    },
+    "47_PLM_Quality": {
+      "source_file": "Composable AI Commerce OS_47_PLM_Quality.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- DevelopmentProject\n- BOM\n- Sample\n- SpecVersion\n- QualityIssue\n- CAPA"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreateDevelopmentProject()\napproveSample()\nreleaseSpec()\nrecordInspection()\ncreateQualityIssue()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nproduct.sample.approved\nproduct.spec.released\nquality.issue.created\nquality.recall.started\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nsupplier.created\nreturn.inspected\nreview.created\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nplm.read\nplm.manage\nquality.inspect\nquality.approve\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Released spec immutable/versioned\n- PIM consumes released data only\n- Recall high-risk workflow"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "產品設計資料與 marketplace marketing content 清楚分離，且品質回饋可閉環。"
+        }
+      },
+      "section_count": 8
+    },
+    "48_Customer_Portal_Self_Service": {
+      "source_file": "Composable AI Commerce OS_48_Customer_Portal_Self_Service.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- PortalSession\n- SelfServiceRequest"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\nauthenticateCustomer()\ngetPortalHome()\nrequestReturn()\nupdatePreferences()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nportal.login\nportal.self_service.completed\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\norder.updated\nticket.updated\nshipment.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ncustomer.self.read\ncustomer.self.write\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- 只能讀自己的 canonical Contact scope\n- 高風險變更二次驗證\n- 不暴露 internal notes"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "低風險查詢與申請可由客戶自己完成，且沿用同一 domain services。"
+        }
+      },
+      "section_count": 8
+    },
+    "49_Agentic_Commerce": {
+      "source_file": "Composable AI Commerce OS_49_Agentic_Commerce.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- AgentMandate\n- AgentSession\n- AgentRequest"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ndiscoverProducts()\ngetOffer()\ncreateCheckoutIntent()\nsubmitAgentOrder()\nverifyMandate()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\nagent.session.created\nagent.order.requested\nagent.action.denied\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nprice.changed\ninventory.changed\norder.updated\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\nagentcommerce.read\nagentcommerce.checkout\nagentcommerce.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Agent != human Contact\n- Every agent action ties to principal/mandate\n- No bypass of payment/policy"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "AI buyer 成為一種受控 client，而不是繞過既有 Business OS 的特殊通道。"
+        }
+      },
+      "section_count": 8
+    },
+    "50_Work_Management_Approvals": {
+      "source_file": "Composable AI Commerce OS_50_Work_Management_Approvals.md",
+      "sections": {
+        "domain_objects": {
+          "heading": "6. Primary Domain Objects",
+          "content": "- Task\n- Project\n- Approval\n- ChecklistItem"
+        },
+        "service_contract": {
+          "heading": "7. Public Service Contract",
+          "content": "```text\ncreateTask()\nassignTask()\ncompleteTask()\nrequestApproval()\napprove()\nreject()\n```"
+        },
+        "events_published": {
+          "heading": "8. Events Published",
+          "content": "```text\ntask.created\ntask.completed\napproval.requested\napproval.approved\napproval.rejected\n```"
+        },
+        "events_consumed": {
+          "heading": "9. Events Consumed",
+          "content": "```text\nAny module may create tasks/approvals through public service\n```"
+        },
+        "permissions": {
+          "heading": "10. Permissions",
+          "content": "```text\ntask.read\ntask.manage\napproval.act\nproject.manage\n```"
+        },
+        "data_rules": {
+          "heading": "15. Data & Integration Rules",
+          "content": "- Task stores reference to domain object, not copies it\n- Approval decision immutable/audited"
+        },
+        "lego_test": {
+          "heading": "20. LEGO Test",
+          "content": "1. Remove Test\n2. Replace Test\n3. Boundary Test\n4. Event Test\n5. Tenant Test\n6. Audit Test\n7. Contract Test"
+        },
+        "definition_of_done": {
+          "heading": "21. Definition of Done",
+          "content": "所有需要人介入的跨模組流程有共用工作層，而不是各自造輪子。"
+        }
+      },
+      "section_count": 8
+    }
+  }
+}
