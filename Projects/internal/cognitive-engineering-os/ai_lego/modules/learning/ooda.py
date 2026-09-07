@@ -28,9 +28,11 @@ PLAN/DO/CHECK/ACT) with a cross-cycle continuity invariant
 (`pdca.py:118-135`, PDCA_LEARNING_CONTINUITY_VIOLATED) OODA has none of.
 
 NOTE: this docstring's original "OQ-OODA-2" label predates the contract
-yaml and collides with that file's own unrelated, still-open OQ-OODA-2
-(cycles[] array design, owner: operator) -- different question, do not
-conflate.
+yaml and collided with that file's own unrelated OQ-OODA-2 (cycles[]
+array design) -- different question, not the same as this due-diligence
+re-run. That real OQ-OODA-2 was RESOLVED 2026-09-08 (operator decision:
+kept one-record-per-cycle, no cycles[] array) -- see the contract
+yaml's own `open_questions`.
 
 Boyd's OODA loop (well-documented military/competitive-strategy origin,
 disclosed here as OUTSIDE knowledge, not Atlas-cited beyond L3011's own

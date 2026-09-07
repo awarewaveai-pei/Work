@@ -67,7 +67,7 @@ compilation_decisions:
 
 open_questions:
   - "OQ-OODA-1: cognitive_primitives [FRAME, INFER, DECIDE] is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
-  - "OQ-OODA-2: Should repeated OODA cycles (the 'loop' in 'OODA Loop') become a cycles[] array like PDCA instead of one-record-per-cycle? Deferred -- L3007's diagram gives no loop-back detail to ground it.（owner: operator）"
+  - "OQ-OODA-2: RESOLVED (2026-09-08). Kept one-record-per-cycle (no cycles[] array) -- operator decision: revisit only if/when a real cross-cycle use case appears, not speculatively.（owner: operator）"
   - "OQ-OODA-3: duplicate observations[].id within one OBSERVE stage is not separately rejected (grounding still resolves via set membership).（owner: operator）"
   - "OQ-OODA-4: RESOLVED. F17 now 8/9 built (this batch also shipped build_measure_learn/after_action_review/post_mortem); remaining: Prediction Tracking.（owner: operator）"
 

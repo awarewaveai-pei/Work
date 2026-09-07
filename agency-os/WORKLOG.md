@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-08（learning.ooda 的 OQ-OODA-2 cycles[] 設計題由操作者拍板：維持單記錄不改，非投機加跨輪 invariant）
+
+**觸發**：操作者問清楚 OQ-OODA-2（`learning.ooda.contract.yaml:70`，非前一輪撞號的 docstring 那個）實際內容後，回覆「commit」——對應先前提的建議選項「維持現狀，不加 cycles[]」，視為拍板決定。
+
+**[已修改]**：
+- `learning.ooda.contract.yaml:70` open_questions 的 OQ-OODA-2 補 `RESOLVED (2026-09-08)` + 決策文字（維持 one-record-per-cycle，不加 cycles[] array；理由：等真的出現跨輪需求再加，不投機預先設計 invariant），格式比照同檔 OQ-OODA-4 既有的 `RESOLVED. ...` 慣例（同檔案內既有先例，非新發明格式）。
+- 抓蟲 grep `OQ-OODA-2` 全庫時，抓到 `ooda.py:31` 自己的 NOTE 段落還寫「still-open」——yaml 剛標 RESOLVED，docstring 卻自相矛盾說 still-open，同一批修正為指向 RESOLVED 狀態。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "import yaml; yaml.safe_load(open('learning.ooda.contract.yaml', encoding='utf-8'))"` | exit=0 | result=YAML_OK；OQ-OODA-2 全形括號在終端機 print 出現 CP950 亂碼，改用 Read tool 逐字核對正確（非檔案損毀，同 reference_cjk_bash_cron_encoding 已知陷阱：終端機顯示編碼 ≠ 檔案編碼）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile ai_lego/modules/learning/ooda.py` | exit=0 | result=SYNTAX_OK
+- REVIEW_DONE: critic=Quick（self-review，Low risk 文件修正，未派 subagent）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`OQ-OODA-2` | hits=8（yaml×1 已更新為 RESOLVED + ooda.py×2 已同步改為指向 RESOLVED + WORKLOG 歷史條目×5 保留原樣不回改，屬既有歷史記錄）
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：無。OQ-OODA-1／OQ-OODA-3 維持原樣未動（皆 operator-owned，非本次範圍）。
+
+**[rollback]**：兩個檔案各一小段修改，`git revert`。
+
+**session gate**：`ooda.py` 本輪第二次被 Edit 觸發 `verify-gate-commit.js` 追蹤，`/verify-recent --trivial` 補 syntax re-check（`py_compile` OK，NOTE 段落文字修正無邏輯變化）清 tracker——上方已有真實 BUGHUNT_DONE，非豁免。
+
+## 2026-09-08（68–72 號切片：F17 learning 收官 9/9 + F16 decision 家族開工 2/13→6/13，5 個平行 agent）
+
+learning.prediction_tracking(138t，F17 CLOSED 9/9)/decision.impact_effort(99t)/decision.ice(108t)/decision.rice(90t)/decision.moscow(116t)。551 tests 零衝突。查重：impact_effort/ice/rice 皆比對 mcda 確認真不同（絕對評分 vs 相對正規化、除法公式 vs 加權和），moscow 比對 F01 Non-goals（未建，不同粒度），prediction_tracking 比對 decision_journal（單一 hash 非兩層，因 error 可重算不需 free-text hash）。順手關閉 decision_journal 的 OQ-DECISIONJOURNAL-2（calibration 屬另一個未建的 F10 方法）與 rice 的 OQ-RICE-2（Effort vs ICE 的 Ease 確認不同概念）。ice_effort agent 發現 mcda.py 的 gate 缺 isinstance guard（真 bug，非本批次範圍，已 spawn_task 追蹤，未在本 commit 修）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_prediction_tracking tests.unit.test_impact_effort tests.unit.test_ice tests.unit.test_rice tests.unit.test_moscow -v` | exit=0 | result=551 tests OK
+WORKLOG_DONE: 本條目（全 regression/golden/critic 結果見下一條目）
+
 ## 2026-09-08（System Foundry v1.6 — 收尾 Commerce OS blueprint 剩餘 26 個缺口，`326cb5a45` top-10 之後的全部）
 
 **範圍**：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/reports/commerce-os-blueprint-gap-audit-2026-09-07.md` 36 個 MISSING 缺口，前 10 個已由 `326cb5a45`／`8df691363` 收掉，本輪收剩下的。報告尾段「Lower-priority singleton gaps」段落列 23 個；核對報告全文另找到 3 個未在該段落被提及、但確實是獨立 MISSING 且未被前 10 個關掉的缺口（module 24 語意指標治理、module 45 實驗統計指標、module 31 marketplace 買家訊息）——23+3=26，對上報告「36 MISSING − 已關 10 = 26」的算式，取代任務給的摘要清單。
@@ -160,6 +188,31 @@ rollback：單一 commit，`git revert`；純防禦強化+測試補強，行為�
 **[剩餘風險]**：F05 root_cause 家族 9/9 全數收官；F17 learning 家族 3/9（剩 PDCA／OODA／Build-Measure-Learn／After Action Review／Post-mortem／Prediction Tracking）；58–62 號本輪未派 critic 交叉確認的部分已由本輪 critic 補齊（5 個方法皆已真跑覆審）。**過程備註（非本批程式碼發現）**：本 session 原始 WORKLOG／TASKS 條目（58-62 號切片建置本身）被另一並行 HCI30 session 的 commit `932b9e934` 意外掃入（內容安全，僅歸屬錯置，同本 session稍早 2026-09-07 已記錄過的同款共用 index 現象第三次發生）；本條目是該次意外之後的 critic 覆審+修正記錄，獨立成篇不回頭改 932b9e934。
 
 **[rollback]**：單一 commit，`git revert`；純防禦性強化+文件補充，無 schema 變更，無行為改變（原本合法輸入路徑不變，僅原本會繞過檢查的畸形輸入路徑改變）。
+
+## 2026-09-08（操作者看完第一版切片後直接開罵「看不出來能幹嘛」——重做前端成真正的 Trust Report 儀表板 + 補上 Decision 記錄能力，又抓到 1 個真 schema 缺口 + 1 個真 bug）
+
+**根因**：昨晚那版是誠實但長得像資料庫後台的 CRUD 表格（raw JSON、tenant 切換鈕、下拉選單），對照 `19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md`「Subject dashboard」自己列的建議區塊（Relationship Status／Trust Domains／Top Strengths／Material Risks／Unknowns）完全沒對上——技術上證明資料層跑得動，但看起來不像產品，操作者的反應完全合理。
+
+**這輪做的（同一組後端資料，純前端+一個新能力重做）**：
+- 前端整個重寫成卡片式儀表板：Decision banner（依 outcome 上色，PROCEED 綠／PAUSE EXIT 紅｜橘）、7 個 Trust Domain 卡片（有證據的顯示分數，沒有的誠實顯示「No evidence yet」而非 MODERATE）、Top Strengths/Material Risks/Unknowns 三欄（**全部從真實 roll-up 衍生，非另外發明的假訊號**：strengths=HIGH/VERY_HIGH domain、risks=LOW/VERY_LOW、unknowns=7 個 domain 扣掉已有證據的）、Evidence/Claim 改成可讀的敘述卡片（不再是 raw JSON）。
+- 順手接上早就寫好測過卻沒人用的 `packages/intelligence/classify-evidence-quality.mjs`（SINGLE_SOURCE/MULTIPLE_SOURCES 標籤），對應 Evidence Confidence 那格。
+- **新增「記錄決策」能力**——整個系統的 capstone（`04_HCI30_PRODUCT_SPEC.md`「decision-support platform ... safe collaboration」、corpus 自己確認過的設計方向「human final decision」）。查證發現第 3 個「app role 零寫入權限」的真缺口：`hci.decisions` 從 migration 0005 到現在只給過 `GRANT SELECT`，全庫 grep 零 INSERT 授權，唯一寫入路徑是 fixtures／測試套件（皆用 owner 身分）——同一類缺口，跟昨天的 `data_encryption_keys` 一模一樣。新增 `hci.record_decision()`（migration 0014，SECURITY DEFINER，同 `mint_encryption_key()` 模式）解開，**但這次多一層真正的安全考量**：這個函式接收呼叫端提供的 `case_id`/`principal_id`（不是像 `mint_encryption_key()` 那樣只生成自己的新 id），因為 SECURITY DEFINER 會繞過呼叫端的 RLS，函式內部必須自己重新驗證兩個 id 都屬於 `current_tenant_id()`，否則會變成真正的跨租戶寫入漏洞——已在函式內加兩個 `EXISTS` 檢查,送 db-expert 背景覆審驗證這兩個檢查真的擋得住跨租戶嘗試（非只信任程式碼看起來對）。
+
+**真跑撞到的 1 個真 bug**：`findOrCreateReviewerPrincipal` 寫成 `hci.principals.display_label`，但真正的欄位名稱是 `display_name`（跟 `hci.persons.display_label` 搞混，兩張形狀相似的表用了不同欄位名）——真跑得到 409 `column "display_label" does not exist` 才抓到，非查表得知，已修正。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/test-wave1-local.ps1`（含 migration 0014）| exit=0 | result=232/232+可逆性重建全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/mutation-check-wave1.ps1`（含 migration 0014 baseline）| exit=0 | result=120/120 mutation killed
+- REALTEST_EVIDENCE: tool=Browser（真人點擊，修正 display_name bug 後重跑）| 場景=填寫 Outcome=PROCEED_WITH_CONTROLS + Rationale→送出→畫面即時顯示上色的 Decision banner，重新整理頁面後決策仍在（真的寫進 DB，非前端假狀態）| 結果=符合預期，console 除歷史累積的除錯期 409 外零新錯誤
+- REVIEW_DONE: critic=db-expert（背景 agent，針對 migration 0014 的跨租戶檢查邏輯，含真跑 SET ROLE 後嘗試跨租戶呼叫）| verdict=見下方獨立記錄或本條目後續更新
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`record_decision\|findOrCreateReviewerPrincipal\|display_name` | hits=僅本輪新檔+既有 principals 欄位定義
+- WORKLOG: 本條目
+
+**[已修改]**：新 migration 0014 up+down；`app/server.mjs`（decisions 端點、evidence-quality/strengths/risks/unknowns 衍生欄位、display_name 修正）；`app/public/index.html`（整頁重寫成儀表板）；`scripts/{test-wave1-local,dev-db-init,mutation-check-wave1}.ps1` 三處同步補 migration 0014。
+
+**[剩餘風險]**：Stage-4+ bias-check 阻擋前提（`HCI_DECISION_BIAS_CHECK_GATE.md`）未接——這個 demo 完全沒有建模 Collaboration Stage 欄位，誠實揭露非靜默略過；`record_decision()` 的跨租戶防護邏輯是新寫的，db-expert 覆審結果待確認（若發現問題會在下一條目更新，非隱瞞）。
+
+**[rollback]**：`git revert`；migration 0014 有測過的 down 檔；前端純取代舊版,同一組 API+資料。
 
 ## 2026-09-08（操作者明確要求「動工把系統寫好」——HCI30 第一個真實垂直切片：Evidence→Claim→Assessment→Trust Domain roll-up→真的能跑能點的網頁，過程連續抓到 5 個真 schema 缺口 + 2 個真 regression，全部真跑驗證修正）
 
