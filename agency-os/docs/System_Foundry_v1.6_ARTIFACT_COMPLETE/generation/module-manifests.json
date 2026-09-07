@@ -138,6 +138,7 @@
         "CAP-INVENTORY-COSTING",
         "CAP-ORDERS",
         "CAP-ORG-DATA",
+        "CAP-PRODUCT-ATTRIBUTES",
         "CAP-PRODUCT-MATCHING",
         "CAP-PRODUCTS",
         "CAP-PROJECTS",
@@ -154,6 +155,7 @@
         "CAP-APPROVAL",
         "CAP-COMMENTS",
         "CAP-ESIGN",
+        "CAP-FEATURE-FLAGS",
         "CAP-MULTI-APPROVAL",
         "CAP-REALTIME-COLLAB",
         "CAP-SCHEDULING",
@@ -195,6 +197,7 @@
       "activated_by": [
         "CAP-ANALYTICS",
         "CAP-DASHBOARD",
+        "CAP-DATA-QUALITY",
         "CAP-EXPORT",
         "CAP-FINANCIAL-ANALYSIS",
         "CAP-FINANCIAL-STATEMENTS",
@@ -264,7 +267,8 @@
         "CAP-EXT-STORAGE",
         "CAP-EXTERNAL-API",
         "CAP-IDP",
-        "CAP-IMPORT-EXPORT"
+        "CAP-IMPORT-EXPORT",
+        "DER-WEBHOOK-IDEMPOTENCY"
       ]
     },
     {
@@ -300,6 +304,7 @@
         "tests/contract/ai"
       ],
       "activated_by": [
+        "CAP-AGENTIC-COMMERCE",
         "CAP-AI",
         "CAP-AI-CLASSIFY",
         "CAP-AI-EXTERNAL",
@@ -355,6 +360,7 @@
       ],
       "activated_by": [
         "CAP-BIOMETRIC",
+        "CAP-DATA-RETENTION",
         "CAP-FINANCIAL-DECISION",
         "CAP-GEOLOCATION",
         "CAP-GOV",
@@ -362,6 +368,7 @@
         "CAP-LEGAL-RECORD",
         "CAP-MINORS",
         "CAP-RESIDENCY",
+        "CAP-RIGHT-TO-ERASURE",
         "DER-COMPLIANCE-RESEARCH",
         "DER-POLICY-FRESHNESS"
       ]
@@ -411,6 +418,7 @@
         "CAP-CSAT",
         "CAP-KNOWLEDGE-BASE",
         "CAP-LIVE-CHAT",
+        "CAP-OMNICHANNEL-MESSAGING",
         "CAP-SLA-TRACKING",
         "CAP-TICKETING"
       ]
@@ -437,6 +445,7 @@
       ],
       "activated_by": [
         "CAP-AB-TESTING",
+        "CAP-CAMPAIGN-ATTRIBUTION",
         "CAP-CAMPAIGNS",
         "CAP-EMAIL-MARKETING",
         "CAP-LEAD-GEN",
@@ -454,6 +463,7 @@
         "CAP-3WAY-MATCH",
         "CAP-CONTRACT-RENEWAL",
         "CAP-PROCUREMENT",
+        "CAP-SUPPLIER-MOQ",
         "CAP-VENDOR-MGMT"
       ]
     },

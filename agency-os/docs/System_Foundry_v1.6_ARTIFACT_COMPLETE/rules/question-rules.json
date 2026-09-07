@@ -352,6 +352,26 @@
       ]
     },
     {
+      "id": "RULE-Q-DATA-016",
+      "when": {
+        "question": "Q-DATA-016",
+        "equals": true
+      },
+      "require": [
+        "CAP-PRODUCT-ATTRIBUTES"
+      ]
+    },
+    {
+      "id": "RULE-Q-DATA-017",
+      "when": {
+        "question": "Q-DATA-017",
+        "equals": true
+      },
+      "require": [
+        "CAP-DATA-QUALITY"
+      ]
+    },
+    {
       "id": "RULE-Q-WF-001",
       "when": {
         "question": "Q-WF-001",
@@ -429,6 +449,16 @@
       },
       "require": [
         "CAP-ESIGN"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-009",
+      "when": {
+        "question": "Q-WF-009",
+        "equals": true
+      },
+      "require": [
+        "CAP-FEATURE-FLAGS"
       ]
     },
     {
@@ -1022,6 +1052,16 @@
       ]
     },
     {
+      "id": "RULE-Q-AI-011",
+      "when": {
+        "question": "Q-AI-011",
+        "equals": true
+      },
+      "require": [
+        "CAP-AGENTIC-COMMERCE"
+      ]
+    },
+    {
       "id": "RULE-Q-PAY-009",
       "when": {
         "question": "Q-PAY-009",
@@ -1079,6 +1119,26 @@
       },
       "require": [
         "CAP-CUSTOMER-EXPORT"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-006",
+      "when": {
+        "question": "Q-MIG-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-DATA-RETENTION"
+      ]
+    },
+    {
+      "id": "RULE-Q-MIG-007",
+      "when": {
+        "question": "Q-MIG-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-RIGHT-TO-ERASURE"
       ]
     },
     {
@@ -1384,6 +1444,16 @@
       ]
     },
     {
+      "id": "RULE-Q-MKT-007",
+      "when": {
+        "question": "Q-MKT-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-CAMPAIGN-ATTRIBUTION"
+      ]
+    },
+    {
       "id": "RULE-Q-CS-001",
       "when": {
         "question": "Q-CS-001",
@@ -1441,6 +1511,16 @@
       },
       "require": [
         "CAP-CALL-CENTER"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-009",
+      "when": {
+        "question": "Q-CS-009",
+        "equals": true
+      },
+      "require": [
+        "CAP-OMNICHANNEL-MESSAGING"
       ]
     },
     {
@@ -1651,6 +1731,16 @@
       },
       "require": [
         "CAP-3WAY-MATCH"
+      ]
+    },
+    {
+      "id": "RULE-Q-PROC-005",
+      "when": {
+        "question": "Q-PROC-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUPPLIER-MOQ"
       ]
     },
     {

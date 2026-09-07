@@ -2160,6 +2160,94 @@
         "CAP-INVENTORY"
       ],
       "description": "A physical stock count at a location is periodically compared against the system's recorded balance for that same stock, and any discrepancy found is recorded as an explicit, attributable adjustment movement -- who counted, when, and the before/after quantity -- never a silent overwrite of the balance, reinforcing the same immutable-movement-ledger invariant CAP-INVENTORY's own domain obligations already require for every other balance change. Requires only CAP-INVENTORY, not CAP-MULTI-LOCATION-STOCK: a single-location merchant can cycle count their one stock record exactly the same way a multi-location merchant counts each location's balance separately; multiple locations are not a precondition for this capability to be meaningful."
+    },
+    {
+      "id": "CAP-OMNICHANNEL-MESSAGING",
+      "name": "全通路訊息平台整合",
+      "module": "customer_service",
+      "requires": [],
+      "description": "客戶可以透過 LINE 官方帳號、WhatsApp Business、Telegram、Instagram/Messenger 等外部通訊平台傳訊息給客服，不同平台的對話統一進到同一個收件匣供客服回覆與追蹤，跟只能在自家網站或 App 裡即時打字對話的 CAP-LIVE-CHAT 不同，也不是 CAP-TICKETING 把問題建成工單追蹤的方式。"
+    },
+    {
+      "id": "CAP-AGENTIC-COMMERCE",
+      "name": "Agentic Commerce Delegated Checkout",
+      "module": "ai",
+      "requires": [
+        "CAP-PAYMENTS",
+        "CAP-ORDERS"
+      ],
+      "description": "A third-party AI shopping agent, acting on a customer's behalf under a verifiable, scoped purchase mandate the customer explicitly grants (spending limit, product scope, expiry), can create a checkout intent and place an order without a human directly operating the storefront UI; the mandate is verified and its scope checked before any order is created. Distinct from CAP-AI-EXTERNAL/CAP-MULTI-AGENT, which model this system's own AI calling out or coordinating internally -- here an external agent acts inward, the opposite direction."
+    },
+    {
+      "id": "CAP-DATA-RETENTION",
+      "name": "Data Retention Policy",
+      "module": "compliance",
+      "requires": [
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "Each category of stored personal data has an explicit, enforced retention period after which it is automatically archived or deleted, rather than being kept indefinitely by default."
+    },
+    {
+      "id": "CAP-RIGHT-TO-ERASURE",
+      "name": "Right to Erasure",
+      "module": "compliance",
+      "requires": [
+        "CAP-CUSTOMER-DATA"
+      ],
+      "description": "A customer or data-subject-access request can trigger deletion of that person's personal data across the system's records, not just a single table, fulfilling GDPR/CCPA erasure obligations rather than only supporting export (see CAP-CUSTOMER-EXPORT, which lets a customer take a copy of their data but does not delete it)."
+    },
+    {
+      "id": "CAP-CAMPAIGN-ATTRIBUTION",
+      "name": "行銷活動歸因分析",
+      "module": "marketing",
+      "requires": [
+        "CAP-CAMPAIGNS",
+        "CAP-ORDERS"
+      ],
+      "description": "追蹤客戶在成交前接觸過哪些行銷活動與管道，依規則把最終成交分配歸因到這些接觸點，判斷哪個活動真正帶來業績，而不是只看最後一次點擊。跟 CAP-AFFILIATE-ATTRIBUTION 不同：那是專門追蹤聯盟連結／推薦碼成交的歸因，這裡是涵蓋所有行銷活動與管道的一般性歸因分析。"
+    },
+    {
+      "id": "CAP-FEATURE-FLAGS",
+      "name": "Feature Flags / Progressive Rollout",
+      "module": "workflow",
+      "requires": [],
+      "description": "Engineering features can be toggled on/off or rolled out to a percentage of users via runtime configuration rather than a code deploy, with per-user/segment targeting and a control-group holdout for measuring impact. Distinct from CAP-AB-TESTING, which is scoped specifically to marketing-content tests (landing pages/emails), not general engineering rollout, targeting, or statistical holdouts."
+    },
+    {
+      "id": "CAP-PRODUCT-ATTRIBUTES",
+      "name": "Product Attribute & Taxonomy Governance",
+      "module": "domain",
+      "requires": [
+        "CAP-PRODUCTS"
+      ],
+      "description": "Products carry a structured, governed set of attributes (e.g. color, size, material) and are mapped into a category/taxonomy tree, with attribute definitions and category mappings managed centrally rather than as free-text fields per product. Distinct from CAP-PRODUCTS, which only asserts that a product catalog exists as a domain entity, with no claim about attribute or taxonomy governance."
+    },
+    {
+      "id": "CAP-DATA-QUALITY",
+      "name": "Data Completeness & Quality Scoring",
+      "module": "analytics",
+      "requires": [
+        "CAP-PRODUCTS"
+      ],
+      "description": "Records (starting with the product catalog) are automatically checked against completeness and quality rules -- required fields present, values well-formed, no contradictory data -- and given a completeness/quality score, surfacing what's missing or wrong proactively rather than only discovering it when a downstream channel or process fails. Distinct from CAP-PRODUCT-FEED's feed-quality triage, which only flags issues a specific external shopping/ad channel reports back after publish."
+    },
+    {
+      "id": "DER-WEBHOOK-IDEMPOTENCY",
+      "name": "Inbound Webhook Idempotency",
+      "module": "integrations",
+      "requires": [
+        "FOUND-ROLLBACK"
+      ],
+      "description": "Every inbound webhook from an external connector (messaging platform, third-party API, or bulk import/export integration) is verified and processed idempotently -- a redelivered or duplicate webhook event never produces a duplicate side effect."
+    },
+    {
+      "id": "CAP-SUPPLIER-MOQ",
+      "name": "供應商最低訂購量與交貨前置時間",
+      "module": "procurement",
+      "requires": [
+        "CAP-VENDOR-MGMT"
+      ],
+      "description": "記錄每個供應商對特定品項要求的最低訂購量（下單至少要訂多少），以及供應商報價的交貨前置時間（下單後大約多久會到貨），下採購單時可以據此判斷數量門檻與預估到貨時間。跟 CAP-MOQ 方向相反：CAP-MOQ 是本公司要求買方客戶至少要訂多少（b2b 模組），這裡是供應商要求本公司至少要訂多少，兩者不可互相取代。"
     }
   ]
 }

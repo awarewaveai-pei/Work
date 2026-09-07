@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-09-07（System Foundry v1.6 — Commerce OS gap audit 前 10 高優先缺口補齊：10 個新 capability + 9 個新問題 + 3 個新 derivation rule，全 verify chain 綠燈）
+
+**根因**：`reports/System_Foundry_v1.6_ARTIFACT_COMPLETE/reports/commerce-os-blueprint-gap-audit-2026-09-07.md` 掃 Commerce OS 50-module blueprint 對 capability catalog（218 項核對），36 項 MISSING，操作者核准補前 10 個（依跨 module 重複出現或是該 module 核心任務排序）。
+
+**新增 10 個 capability**（`capabilities/catalog.json`，module 語言比照該 module 既有慣例：customer_service/marketing/procurement 中文，ai/compliance/analytics/integrations/domain 英文）：
+1. `CAP-OMNICHANNEL-MESSAGING`（customer_service）— LINE OA/WhatsApp/Telegram/Instagram Messenger 全通路訊息收件匣，區別於僅站內即時對話的 `CAP-LIVE-CHAT`。問題 `Q-CS-009`（無 active_when，同層 `Q-CS-006`）。
+2. `CAP-AGENTIC-COMMERCE`（ai）— 第三方 AI 購物代理人持客戶授權（scoped mandate）代下單結帳，方向與既有 `CAP-AI-EXTERNAL`/`CAP-MULTI-AGENT`（本系統 AI 對外）相反。`requires: [CAP-PAYMENTS, CAP-ORDERS]`；問題 `Q-AI-011` 依 `test_payment_commercial_gating.py` 既有模式（比照 `Q-PAY-002`）`active_when` 掛 `Q-PAY-001`（自身鏈已含 `Q-COM-001`）。
+3. `CAP-DATA-RETENTION`（compliance）— 個人資料保留期限政策。`requires: [CAP-CUSTOMER-DATA]`；問題 `Q-MIG-006` 掛 `Q-DATA-001`。
+4. `CAP-RIGHT-TO-ERASURE`（compliance）— GDPR/CCPA 刪除權，區別於既有只做匯出的 `CAP-CUSTOMER-EXPORT`。`requires: [CAP-CUSTOMER-DATA]`；問題 `Q-MIG-007` 掛 `Q-DATA-001`。
+5. `CAP-CAMPAIGN-ATTRIBUTION`（marketing）— 一般行銷多觸點歸因，區別於聯盟連結專屬的 `CAP-AFFILIATE-ATTRIBUTION`。`requires: [CAP-CAMPAIGNS, CAP-ORDERS]`；問題 `Q-MKT-007` 掛 `Q-MKT-002`。
+6. `CAP-FEATURE-FLAGS`（workflow）— 工程功能旗標／漸進發布／統計對照組，區別於行銷內容限定的 `CAP-AB-TESTING`。`requires: []`；問題 `Q-WF-009` 無 active_when。
+7. `CAP-PRODUCT-ATTRIBUTES`（domain）— PIM 屬性/分類治理，區別於只斷言目錄存在的 `CAP-PRODUCTS`。`requires: [CAP-PRODUCTS]`；問題 `Q-DATA-016` 掛 `Q-DATA-003`。
+8. `CAP-DATA-QUALITY`（analytics）— 商品資料完整度/品質評分，區別於僅限外部購物頻道回報的 `CAP-PRODUCT-FEED` feed-quality triage。`requires: [CAP-PRODUCTS]`；問題 `Q-DATA-017` 掛 `Q-DATA-003`。
+9. `DER-WEBHOOK-IDEMPOTENCY`（integrations）— 通用 inbound webhook 冪等處理，比照 `DER-PAYMENT-IDEMPOTENCY` 模式，`requires: [FOUND-ROLLBACK]`；無自身問題，由 3 條新 `rules/derivation-rules.json` 規則各自從 `CAP-OMNICHANNEL-MESSAGING`／`CAP-EXTERNAL-API`／`CAP-IMPORT-EXPORT` 三個獨立 trigger 各自 derive（比照既有 `DERIVE-COMPLIANCE-*` 多 trigger 同 target 樣式）。
+10. `CAP-SUPPLIER-MOQ`（procurement）— 供應商對本公司的最低訂購量與交貨前置時間，方向與既有 `CAP-MOQ`（本公司對客戶的批發最低訂購量）相反，刻意用不同 ID 避免混淆。`requires: [CAP-VENDOR-MGMT]`；問題 `Q-PROC-005` 掛 `Q-PROC-002`。
+
+**同步修改**：`questionnaires/catalog.json`（+9 題）、`rules/question-rules.json`（+9 條 1:1 規則）、`rules/derivation-rules.json`（+3 條）、`generation/module-manifests.json`（10 個 capability 各自加進所屬 module 的 `activated_by` 排序清單）、`tests/fixtures/selection/all_no.json`（`active_answer_count` 126→128，2 題無 active_when 恆常可見）、`tests/fixtures/selection/all_yes.json`（重新用真實 `resolve()` 輸出產生：275 capabilities／231 answers／modules/profile/criticality 不變）、`README.md`／`QUALITY_STRENGTH_MATRIX.md`／`CHANGELOG_v1.6.md`／`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md`（`validate_doc_numbers.py` 鎖定的手寫題數/capability數/pairwise 數字全部更新，含 `all_yes.json` 行號引用隨檔案變長同步修正）、`manifest.json`（`regenerate_integrity.py --write`，最後一步）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_versions.py && python scripts/validate_foundry.py && python scripts/validate_semantics.py && python scripts/validate_configurator.py && python scripts/validate_artifact_generation.py && python scripts/validate_contract_fixtures.py && python scripts/run_adversarial_contract_tests.py && python scripts/test_bootstrap_e2e.py && python scripts/test_configurator_e2e.py && python scripts/test_configurator_http_e2e.py && python scripts/test_selection_matrix.py && python scripts/test_mutation_coverage.py && python scripts/test_payment_commercial_gating.py && python scripts/validate_manifest.py && python scripts/validate_doc_numbers.py`（15 個 gate script，等同 `make verify`，本機無 `make` 逐條跑）| exit=0 | result=全部 PASS：`SELECTION MATRIX: PASS questions=235 ... all_yes_caps=275`；`MUTATION COVERAGE: PASS derivation_rules=27/27 load-bearing; requires_edges=188 total (77 load-bearing, 111 structurally-redundant, 0 unexplained)`（10 個新 capability 的新增 edge 全部落在既有兩種已知分類，無 unexplained）；`PAYMENT/COMMERCIAL GATING: PASS structural_class1=0 structural_class2=0 keyword_flagged=0`；`DOC NUMBERS VALIDATION: PASS questions=235 capabilities=275 ...`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -v` | exit=0 | result=Ran 38 tests in 2.320s, OK（含 `test_manifest_passes`，integrity manifest 重產後綠燈）
+- REVIEW_DONE: 自審（oracle 額度未查，本輪風險等級 Medium/非 auth/crypto/個資金流核心，抽查關鍵 claim 已足）——逐一核對 10 個新 capability 的 `requires` 是否為真實依賴（非硬掰）、9 個新問題的 `active_when` 鏈是否正確掛上既有付款/商業 gate（尤其 item 2 比照 `Q-PAY-002` 模式僅需掛 `Q-PAY-001` 因其自身鏈已含 `Q-COM-001`）、`勾選「...」` 引用逐一核對與被引問題 label 逐字相符（`test_payment_commercial_gating.py`／`validate_configurator.py` 的 m11 quote-chain check 已機械覆蓋，非僅目視）、CAP-MOQ vs CAP-SUPPLIER-MOQ 方向刻意不同 ID 未誤合併。
+- BUGHUNT_DONE: scope=agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE（10 個新 ID 逐一 grep，見下）| grep=`CAP-OMNICHANNEL-MESSAGING\|CAP-AGENTIC-COMMERCE\|CAP-DATA-RETENTION\|CAP-RIGHT-TO-ERASURE\|CAP-CAMPAIGN-ATTRIBUTION\|CAP-FEATURE-FLAGS\|CAP-PRODUCT-ATTRIBUTES\|CAP-DATA-QUALITY\|DER-WEBHOOK-IDEMPOTENCY\|CAP-SUPPLIER-MOQ` | hits=每個 ID 僅出現在其歸屬檔（catalog／question-rules 或 derivation-rules／module-manifests／all_yes.json golden fixture），零重複定義、零孤兒引用
+- BUGHUNT_SCOPE_NARROW: 本次改動完全侷限在 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 目錄樹內（無 `scripts/` 根目錄、無 `.claude/`、無 `lobster-factory` 觸及），故未額外掃 `scripts`,`.claude` 根——已用 `agency-os` 全域 grep 確認新 ID 無外洩到該目錄樹以外的文件引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：`reports/weekly/weekly-automation-LATEST.md`／`weekly-summary-2026-09-07.md` 仍寫舊的「226 questions, 265 capabilities」——這兩份是本 session 之前自動產生的週報快照（非 `validate_doc_numbers.py` 檢查範圍），下次週報自動化重跑會覆蓋，不手動改動歷史快照。gap 報告點名的其餘 26 個較低優先缺口（含 module 13 `CAP-MULTI-LOCATION-STOCK` 已確認非真缺口）明確不在本輪範圍。
+
+**[rollback]**：單一功能性加法（新 ID、新問題、新規則），未修改任何既有 capability/question/rule 的行為；`git revert` 即可，無 schema 遷移、無外部部署影響（System Foundry 本身尚未對外部署，純本機 configurator）。
+
 ## 2026-09-07（Cognitive OS 58–62 號切片 critic 覆審（scoped，normal risk tier）—— 0 Critical/0 Major，2 Minor 全修：change_analysis 記錄層 causal-claim 檢查補齊 closed key set、decision_journal docstring 補 provenance 排除理由）
 
 **觸發**：`git commit` 被 `verify-gate-commit.js` 擋（17 個 product-root 檔本 session 從未經過 /verify-recent），依規跑 syntax→critic→real exec test。critic scope=normal risk tier，依風險分級規則抽查關鍵 claim（此輪實際做了更深：5 個方法全部通篇讀完+3 個自己動手的對抗探針，非僅抽查）。

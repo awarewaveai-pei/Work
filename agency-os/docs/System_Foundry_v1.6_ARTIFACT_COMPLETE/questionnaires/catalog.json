@@ -625,6 +625,30 @@
       }
     },
     {
+      "id": "Q-DATA-016",
+      "category": "records",
+      "label": "商品屬性與分類治理",
+      "description": "商品需要有結構化、統一管理的屬性（例如顏色、尺寸、材質）跟分類/類目樹的對應，這些屬性定義跟分類規則是集中維護的，不是每個商品各自填寫的自由文字欄位。只在你有勾選「產品 / 商品 / 服務資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-003",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DATA-017",
+      "category": "records",
+      "label": "商品資料完整度與品質檢查",
+      "description": "系統要能自動檢查商品資料是否完整、格式是否正確（例如必填欄位有沒有填、資料有沒有互相矛盾），並給出一個完整度/品質分數，讓你在資料出問題時能主動發現，而不是等到匯到外部平台失敗才知道。只在你有勾選「產品 / 商品 / 服務資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-003",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-WF-001",
       "category": "workflow",
       "label": "多步驟狀態流程",
@@ -689,6 +713,14 @@
       "category": "workflow",
       "label": "電子簽核 / 簽名",
       "description": "文件需要具有法律效力的電子簽名，而不是只用一個「同意」按鈕。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-WF-009",
+      "category": "workflow",
+      "label": "功能旗標／漸進式功能發布",
+      "description": "工程團隊需要能用設定開關某個功能，或只先開放給一小部分使用者測試，不用重新部署程式碼就能調整開放範圍，並能設一組對照組使用者比較有無這個功能的差異，跟只針對行銷頁面或郵件跑兩個版本比較成效的行銷內容 A/B 測試不同。",
       "answer_type": "boolean",
       "required_when_active": true
     },
@@ -1304,6 +1336,18 @@
       "required_when_active": true
     },
     {
+      "id": "Q-AI-011",
+      "category": "ai",
+      "label": "允許第三方 AI 購物代理人代客戶結帳",
+      "description": "客戶可以事先授權一個外部的 AI 購物助理（不是本系統自己的 AI），在客戶明確給定的權限範圍內（例如金額上限、可購買的商品範圍、授權有效期限）代替客戶在本系統下單結帳，系統會先驗證這個授權是否有效、範圍是否涵蓋這筆交易，才建立訂單，不是任何外部程式都能直接下單。只在你有勾選「線上付款」時才有意義——沒有線上付款能力，就沒有可以代收的金流。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PAY-001",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-PAY-009",
       "category": "payments",
       "label": "收據/發票拍照辨識記帳",
@@ -1362,6 +1406,30 @@
       "description": "系統需要能讓客戶把自己的完整資料匯出帶走，例如未來要換系統時使用。",
       "answer_type": "boolean",
       "required_when_active": true
+    },
+    {
+      "id": "Q-MIG-006",
+      "category": "migration",
+      "label": "資料保留政策與保存期限",
+      "description": "系統要能針對客戶等個人資料明確定義保留多久，逾期後自動封存或刪除，而不是資料無限期留著不主動處理。只在你有勾選「客戶 / 聯絡人資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MIG-007",
+      "category": "migration",
+      "label": "客戶資料刪除權（被遺忘權）",
+      "description": "客戶可以要求刪除自己在系統裡的個人資料，系統要能實際執行跨資料表的刪除或去識別化，而不是只能匯出、不能真正刪除，符合 GDPR／個資法等法規的刪除權要求。只在你有勾選「客戶 / 聯絡人資料」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DATA-001",
+        "equals": true
+      }
     },
     {
       "id": "Q-PORT-001",
@@ -1696,6 +1764,18 @@
       }
     },
     {
+      "id": "Q-MKT-007",
+      "category": "marketing",
+      "label": "行銷活動歸因分析",
+      "description": "系統要能追蹤客戶在成交前接觸過哪些行銷活動或管道，並把最終的成交依規則分配歸因到這些接觸點，用來判斷哪個行銷活動真正帶來業績，而不是只看最後一次點擊，跟聯盟連結／推薦碼專屬的成交歸因是不同機制。只在你有勾選「行銷活動管理」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKT-002",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-CS-001",
       "category": "customer_service",
       "label": "客服工單系統",
@@ -2012,6 +2092,18 @@
       }
     },
     {
+      "id": "Q-PROC-005",
+      "category": "procurement",
+      "label": "供應商最低訂購量與交貨前置時間",
+      "description": "記錄每個供應商對特定品項要求的最低訂購量（下單至少要訂多少），以及供應商報價的交貨前置時間（下單後大約多久會到貨），下採購單時可以據此判斷數量門檻與預估到貨時間，跟「批發」情境裡本公司要求買方客戶的最低訂購量方向相反：這裡是供應商要求本公司至少要訂多少。只在你有勾選「供應商資料管理」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-PROC-002",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-CS-007",
       "category": "customer_service",
       "label": "即時客服優先由 AI 回覆",
@@ -2034,6 +2126,14 @@
         "question": "Q-CS-006",
         "equals": true
       }
+    },
+    {
+      "id": "Q-CS-009",
+      "category": "customer_service",
+      "label": "全通路訊息平台整合（LINE／WhatsApp／Telegram／Messenger）",
+      "description": "客戶可以透過 LINE 官方帳號、WhatsApp Business、Telegram、Instagram/Messenger 等外部通訊平台傳訊息給客服，不同平台的對話統一進到同一個收件匣供客服回覆與追蹤，跟只能在自家網站或 App 裡即時打字對話的即時線上客服對話不同。",
+      "answer_type": "boolean",
+      "required_when_active": true
     },
     {
       "id": "Q-MKTOPS-001",

@@ -198,6 +198,27 @@
         "DER-COMPLIANCE-RESEARCH",
         "DER-POLICY-FRESHNESS"
       ]
+    },
+    {
+      "id": "DERIVE-WEBHOOK-MESSAGING",
+      "when_capability": "CAP-OMNICHANNEL-MESSAGING",
+      "derive": [
+        "DER-WEBHOOK-IDEMPOTENCY"
+      ]
+    },
+    {
+      "id": "DERIVE-WEBHOOK-EXTERNAL-API",
+      "when_capability": "CAP-EXTERNAL-API",
+      "derive": [
+        "DER-WEBHOOK-IDEMPOTENCY"
+      ]
+    },
+    {
+      "id": "DERIVE-WEBHOOK-IMPORT-EXPORT",
+      "when_capability": "CAP-IMPORT-EXPORT",
+      "derive": [
+        "DER-WEBHOOK-IDEMPOTENCY"
+      ]
     }
   ]
 }
