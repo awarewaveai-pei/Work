@@ -1,105 +1,30 @@
-# 全自動內容發佈系統（原型 — 部分已退役）
+# Media Production LEGO Platform
 
-> **⚠️ P6 退役公告（2026-06-16）**
-> 直連發佈與排程主控已移除，請勿再執行本資料夾的 Python 主控：
-> - 🗑️ `publisher.py`（10 平台直連發佈）— 違反 R1（與 Postiz 雙套社群發佈）+ R4（繞過 wp-bridge Ed25519 簽章）。**社群發佈一律走 Postiz；WordPress 一律走 wp-bridge 簽章發佈。**
-> - 🗑️ `master_controller.py`（cron 自動發佈主控）+ `cron_setup.sh`（其排程安裝器）— 編排已收斂進 next-admin `lib/content/pipeline.ts`（P4 headless 編排器，draft-first）。
-> 本資料夾**保留為 P7 影片生成參考**：`full_pipeline_v3.py`（文章→影片）及其依賴（`topic_fetcher.py` / `quality_control.py` / `growth.py` / `config.py` / `setup.sql`）僅作影片微服務移植參考，不再作為發佈執行入口。
-> SSOT：`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` §10 P6。
+這是現行影片平台的文件入口。它描述既有 VideoStudio 的安全演進，不是舊 Python 自動發佈系統的執行說明。
 
-## 檔案說明
+## 現行文件
 
-| 檔案 | 用途 |
-|---|---|
-| `config.py` | 所有設定集中在這裡（P7 參考） |
-| `setup.sql` | Supabase 建表 SQL（P7 參考） |
-| `topic_fetcher.py` | 自動抓熱門議題（P7 參考） |
-| `full_pipeline_v3.py` | 文章→影片主腳本（**P7 影片參考，保留**） |
-| `quality_control.py` | 品質控制（P7 參考） |
-| `growth.py` | 成長功能（P7 參考） |
+- `CURRENT_BASELINE_AND_GAP_AUDIT.md`：已驗證的既有能力與缺口。
+- `MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`：四個領域、Capability 契約與長期架構。
+- `MEDIA_CAPABILITY_ADOPTION_AND_PROMOTION_CATALOG.md`：正式 LEGO ID 映射、別名隔離與 ACTIVE promotion packet。
+- `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`：分期交付與驗收。
+- `PHASE_0_ISOLATION_AND_CHANGE_CONTROL.md`：隔離、備份與變更管制。
+- `PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md`：既有素材、Timeline、Release 與安全刪除的資料契約及 migration gate。
+- `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`：本機 Whisper 轉錄、可校對字幕、審片與 Release 接線契約；尚未接入既有出片路徑。
+- `PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md`：技術／字幕／編輯／權利 QA 的證據、waiver 與 Release gate 契約；尚未執行媒體分析或阻擋發布。
+- `PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`：短劇 Bible 與實拍 Edit Decision Plan 如何安全匯入 Timeline、QA 與 Release；尚未接入 UI 或 renderer。
+- `PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md`：WordPress、Postiz、成效回饋、自用／SaaS／企業 BYO API 的交付與治理契約；尚未發布或啟用商業模式。
+- `LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`：正式環境盤點與 staging 建置條件。
+- `PHASE_1A_IMPLEMENTATION_RECEIPT.md`、`PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md`、`PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`：已完成但尚未部署的隔離交付。
+- `PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md`：Timeline→dynamic-slideshow 的 fail-closed 編譯器與 renderer 語意保留；已在隔離分支提交，尚未接到出片路徑。
+- PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md：把既有 video_jobs 演進為可恢復執行紀錄的 additive schema、驗收與 rollback 包；尚未建立 migration。
+- PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md：renderer idempotency、private R2 receipt、restart reconciliation 與 no-double-render 驗收；尚未實作。
+- `PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md`：正式 renderer 的 staging canary、驗收與 rollback gate；尚未執行。
+- `_handoff_2026-09-07/README.md`：Phase 0 隔離分支的已驗證 Git bundle、雜湊、提交範圍與整合前置條件；另有 `media-video-phase0-plus-timeline-remotion-166e0372b.bundle` 作為包含編譯器的不可變交接包；兩者均尚未合併或部署。
+- `LEGACY_REFERENCE_ADOPTION_MATRIX.md`：舊 P7 參考碼的採用與禁止清單。
 
-## 安裝
+## 封存文件
 
-```bash
-sudo apt install ffmpeg fonts-noto-cjk
-pip install -r requirements.txt   # moviepy 已鎖 1.0.3（程式用 1.x API，2.x 會炸）
-```
+`_archive_legacy_p7_2026-09-06/` 儲存不再作為現行操作、設計或部署依據的 P7 單機原型文件。不得依據其中內容執行 Python、SQL、cron、直接 WordPress 發佈或直接社群發佈。
 
-## 設定步驟
-
-1. `setup.sql` → Supabase SQL Editor 執行
-2. **密鑰走環境變數（不再編輯 config.py）**：`cp .env.example .env` → 填值 → 載入：
-   ```bash
-   set -a; source .env; set +a        # Linux/macOS
-   ```
-   沒填的欄位對應功能會自動略過，不會報錯。
-3. YouTube OAuth → 放 client_secrets.json 到同資料夾
-4. Freepik 素材 → 下載後放到 assets/backgrounds/ 和 assets/characters/
-
-> **密鑰原則**：所有 key 從環境變數讀取，禁止寫進 `config.py` / commit 進 git。
-> 本機可由 vault（`mcp/user-env.ps1`）注入；VPS cron 用 systemd `EnvironmentFile`。
-
-## 執行（已退役 — 見頂部 P6 公告）
-
-~~`python master_controller.py` / cron 排程~~ 已於 P6 移除。發佈與編排改走生產路徑：
-
-- **內容編排**：next-admin `lib/content/pipeline.ts`（`byKind` article→quality→publish，draft-first）。
-- **WordPress 發佈**：wp-bridge 簽章發佈（`lib/content/publish/wordpress-core.ts`，draft-first 紅線）。
-- **社群發佈**：Postiz（唯一社群發佈路徑，P5）。
-
-本資料夾僅保留作 P7 影片生成（`full_pipeline_v3.py`）移植參考，不再直接排程執行。
-
-## 平台設定說明
-
-### WordPress
-後台 → 使用者 → 編輯個人資料 → 應用程式密碼 → 新增
-
-### YouTube OAuth
-1. Google Cloud Console → 建立專案
-2. 啟用 YouTube Data API v3
-3. 建立 OAuth 憑證（桌面應用程式）
-4. 下載 JSON → 改名為 client_secrets.json
-
-### Instagram / Facebook / Threads
-需要 Meta Business 帳號 + Meta for Developers
-
-### Bluesky
-登入 bsky.social → 設定 → 應用程式密碼
-
-### Reddit
-reddit.com/prefs/apps → 建立 app（script 類型）
-
-### TikTok
-developers.tiktok.com → 申請 Content Posting API
-
-### Pinterest
-developers.pinterest.com → 建立 app → 取得 access token
-
-### LinkedIn
-linkedin.com/developers → 建立 app → 申請 w_member_social 權限
-
-## 重要行為（v3 修正後）
-
-- **IG / Pinterest**：發圖前會先把第一張場景圖上傳到 **WordPress 媒體庫**取得公開 URL（兩平台 API 都強制要公開 URL）。所以這兩個平台需要 WordPress 設定正確才會發。
-- **TikTok**：未審核（unaudited）的 app 只能 `SELF_ONLY`，預設即此。app 通過 audit 後才把 `TIKTOK_PRIVACY=PUBLIC_TO_EVERYONE`。
-- **Reddit**：自動發文易被當 spam ban，**預設關閉**。確認目標 subreddit 規則允許後，設 `REDDIT_ENABLE=true` + `REDDIT_SUBREDDITS=...`。
-- **冪等**：同一主題重跑時，已成功（`publish_log.status=done`）的平台會自動略過，不會重傳 YouTube 造成重複影片。
-- **成本**：Claude 費用依實際 token 用量計算（非寫死），記入 `cost_log`。
-- **JSON 穩健性**：Claude 回傳非合法 JSON 時自動重試（最多 2 次）再失敗才中止該主題。
-
-## 每月費用估算
-
-| 項目 | 費用 |
-|---|---|
-| Claude API | ~$1.5–3 |
-| DALL-E 3 | ~$3–6 |
-| VPS 伺服器 | $5–10 |
-| 其他 | $0 |
-| **總計** | **$10–20** |
-
-## 圖片來源優先順序
-
-1. Pixabay API（免費，自動抓卡通插圖）
-2. DALL-E 3 API（$0.04/張，找不到時用）
-3. Freepik 素材庫（手動準備，放 assets/ 資料夾）
-4. 純色背景（備用）
+現行發布路徑是：WordPress 經 wp-bridge；社群經 Postiz；影片產物需經既有 VideoStudio 與後續 Release/QA 流程。

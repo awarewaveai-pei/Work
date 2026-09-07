@@ -12549,3 +12549,52 @@ Revert the four documentation files changed by this entry. No runtime path exist
 ## 2026-09-07
 
 - 01:07 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-07.md
+
+## 2026-09-07 — Phase 1B-4 renderer attempt protocol
+
+[scope]
+Added agency-os/docs/video_generator/PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md and linked it from the video index, Phase 1 delivery plan and lifecycle package. The contract defines a private R2 receipt, conditional claim, request fingerprint, idempotency conflict, lease reconciliation and no-double-render proof before any renderer route changes. No source module, R2 bucket, credential, migration, service, Postiz/WordPress action or deployment changed.
+
+[reason]
+Current video-service generates a new process-local job ID per render submit, while render-draft submits external compute before it creates its local ticket. A timeout, restart or database failure therefore cannot prove whether work was accepted. Retrying this boundary without a durable renderer attempt receipt can duplicate compute.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test -- job-lifecycle renderer-auth renderer-client-auth video-status-tenant reconcile-classify registry-video-blocks video-out-name pick-primary-output | exit=0 | ms=675 | result=8 files and 57 tests passed; npm run typecheck and docker compose renderer staging config --quiet also exited 0 without starting a container.
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n; review found delete permission in the initial receipt credential scope, corrected to dedicated private bucket with read/write-only scope and an explicit no-delete rule.
+- BUGHUNT_DONE: scope=D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory | grep=PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL|renderer-attempt-receipts|X-Render-Idempotency-Key|request_fingerprint 必須回 HTTP 409 | hits=5
+- WORKLOG_DONE: evidence is at agency-os/docs/video_generator/PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md:1-99, agency-os/docs/video_generator/MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md:51, and apps/video-service/server.py:265-323 in the isolated worktree.
+- git diff --check -- agency-os/docs/video_generator agency-os/WORKLOG.md passed.
+
+[rollback]
+Revert the four documentation files changed by this entry. No runtime path exists to roll back. A future v1 renderer rollback disables its feature flag while preserving receipts and video job evidence; R2 bucket or credential changes need separate High-risk approval.
+
+## 2026-09-07 — Video Phase 0 verified integration handoff
+
+[scope]
+Created and verified `agency-os/docs/video_generator/_handoff_2026-09-07/media-video-phase0.bundle`, then indexed its manifest. The artifact carries only the eight isolated Phase 0 commits from `codex/media-video-phase0`; it is not merged, deployed, or applied to the host. A read-only renderer topology check was also completed. No production compose file, container, database, R2 bucket, credential, source checkout, WordPress or Postiz state changed.
+
+[verification]
+- REALTEST_EVIDENCE: `git -C D:\\Work bundle verify agency-os/docs/video_generator/_handoff_2026-09-07/media-video-phase0.bundle` exited 0; contained ref=`0cf46d201f189645a38b42b5472e34255cb8d0bd`, prerequisite=`8570b74f07e3c7cd119d747c285f5055f3184742`, SHA-256=`2f360d87d8d2a1419a8d950df11f61d80f24acf33f2fcde27ef5ebd97eacb28d`.
+- REALTEST_EVIDENCE: read-only SSH to `ubuntu@145.239.195.47:58122` found healthy `lobster-video-service` and `lobster-remotion-service` under compose project `render-services`, working directory `/root/render-services`, with renderer ports bound to `127.0.0.1:8732` and `127.0.0.1:8733`.
+- REALTEST_EVIDENCE: focused video suite passed 8 files / 57 tests; `next-admin` typecheck and staging compose config validation passed before handoff creation.
+- GATE_BLOCKED: the managed Cloudflare API wrapper returned HTTP 401 `Invalid API Token` for `GET /client/v4/user/tokens/verify`; no R2 receipt bucket or credential action was attempted. Staging receipt provisioning requires a valid separately governed Cloudflare credential.
+- WORKLOG_DONE: integration evidence is at `agency-os/docs/video_generator/_handoff_2026-09-07/README.md:1-29`; deployment topology and staging boundary are in `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+Delete only the local handoff bundle and its manifest if the handoff is superseded; no system state needs rollback. The isolated branch and deployed VideoStudio remain unchanged.
+
+## 2026-09-07 — Timeline-to-Remotion compiler candidate
+
+[scope]
+Committed `166e0372b` to the existing isolated `codex/media-video-phase0` branch. It adds a pure Timeline v1 to `dynamic-slideshow` compiler, its focused tests, and Remotion SceneSeries support for compiler-emitted crop/transition semantics. No main-branch merge, deployment, route wiring, UI change, database migration, renderer request, R2 object, external publication or production host change occurred.
+
+[verification]
+- REALTEST_EVIDENCE: next-admin `npm test -- timeline-v1 timeline-remotion renderer-client-auth` passed 3 files / 13 tests; `npm run typecheck` passed.
+- REALTEST_EVIDENCE: remotion-service `npm run build` passed (`tsc -p tsconfig.server.json`).
+- REALTEST_EVIDENCE: `git diff --check` passed before commit; commit=`166e0372b318dc59fcd4b11360990f0b9e1ecb1b`.
+- REALTEST_EVIDENCE: `git bundle verify` passed for `media-video-phase0-plus-timeline-remotion-166e0372b.bundle`; SHA-256=`7f5bef1030605823a8c81c3a475a86bc052353fb315a5fdf9f7a65c0cdc0b91a`, required base=`8570b74f07e3c7cd119d747c285f5055f3184742`.
+- REVIEW_BOUNDARY: compiler intentionally rejects captions, footage, unsupported multi-track audio, gaps and unresolved/non-HTTPS artifacts rather than silently changing output. It is not connected to `POST /api/video/remotion-render`.
+- WORKLOG_DONE: design, code evidence, commands and rollback are in `agency-os/docs/video_generator/PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md:1-43`.
+
+[rollback]
+Before integration, do not merge `166e0372b`. After integration, revert that one commit and keep the Director capability disabled; current Quick Engine and manual Remotion workflows remain available.
