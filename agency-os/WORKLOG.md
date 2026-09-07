@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-07（P0-01 Formal Domain ERD + invariants 部分關閉——4 份文件，逐檔讀完 11 個 migration 後轉寫既有已測 schema，非新設計）
+
+**觸發**：操作者「用最快速度又安全和最具效益方式完成HCI...做超過2個星期了」——選 P0-01 作下一項，因為它可從已出貨、已真跑驗證的 schema 直接轉寫，非發明新設計，風險最低、速度最快。
+
+**產出**：`Projects/internal/hci30/docs/domain/{HCI_DOMAIN_ERD,HCI_ENTITY_DICTIONARY,HCI_INVARIANTS,HCI_STATE_MACHINES}.md`。逐檔讀完全部 11 個 migration（0001-0011，含之前已讀過的 0007）後轉寫：21 個 base table + 4 個 canonical view 的完整 ERD（Mermaid）；每個 table 的欄位/CHECK/mutability；跨表不變量（tenant isolation、append-only 三分類、effect-based escape hatch、bitemporal history、kind-scoped 欄位、author-class policy、Decision-Claim reaudit gate、epistemic promotion、identity confirmation、Case ownership、ADR-0012 regulatory scope、ADR-0004、P0-09 RLS completeness、SECURITY DEFINER fail-closed）；6 個生命週期 FSM（Case/DSR/Identity match/bitemporal supersession/Claim admission/epistemic label，皆 Mermaid stateDiagram）。
+
+**誠實範圍**：`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-01 原文列的 4 個「must incorporate」項目，`Case`/`DataSubjectRequest` 已涵蓋，`PersonMergeLog`/`PersonSplitLog`／`Control`/`Mitigation` 目前無任何 migration 建過，文件裡誠實列為「尚未建模」而非略過不提；Shared Kernel thin-reference 框架（`09` §Shared Kernel）本輪未逐項核對是否完全滿足，只記錄現有的 typed composite-FK 慣例是什麼，不宣稱涵蓋該節全部意圖。
+
+**驗證**（文件轉寫類工作，非程式碼——驗證＝逐項 grep 比對真實 migration 文字，不是跑測試）：
+- REALTEST_EVIDENCE: tool=Grep | cmd=`epistemic_label`/`domain`/`decision outcome`/DSR enum 等 6 組列舉值逐一比對 0001/0005/0010/0011 原始 CHECK 文字 | exit=0 | result=全部逐字相符，含跨行 CHECK（multiline grep）
+- REALTEST_EVIDENCE: tool=Bash | cmd=6 個文件內引用路徑逐一 `[ -f ]` 存在性檢查 | exit=0 | result=全部存在（`bias-check-gate.mjs`／兩份 P0-04 spec／`ERROR_CODE_REGISTRY.md`／lint 腳本／負向測試檔）
+- REALTEST_EVIDENCE: tool=Bash | cmd=21-table 清單比對 0011 migration 自己的 drift-check 陣列 | exit=0 | result=逐一列出比對，21/21 相符
+- REVIEW_DONE: critic=自審（本輪為純文件轉寫，R0 依風險分級判定 Low——來源是已真跑驗證的 schema，非發明新規則；比照 P0-04 已建立的「轉寫已知事實免全套 critic」判準）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`docs/domain/HCI_(DOMAIN_ERD|ENTITY_DICTIONARY|INVARIANTS|STATE_MACHINES)` | hits=僅本輪新增檔案+本次同步的 README/gap-analysis 引用，無其他文件曾引用這 4 個路徑（新建，無 stale 引用需清）
+- WORKLOG: 本條目
+
+**[已修改]**：新 4 份 `docs/domain/*.md`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-01 補 partial-closure 段；`README.md` 補指向新文件的一行連結。
+
+**[剩餘風險]**：Shared Kernel 框架符合度未逐項核對（見上）；4 份新文件本身未經過獨立 critic 覆審（依風險分級判定不需要，見上）；若之後任何 migration 改變 schema，這 4 份文件需同一 commit 同步，否則會變成本 session 一直在抓的「跨檔案宣稱過期」同一種 bug class。
+
+**[rollback]**：`git revert`；純新增文件+兩處既有文件的小段落插入，無 schema/程式碼變更。
+
 ## 2026-09-07（System Foundry 收尾第二輪：TASKS.md 最後一項殘留盲點修正 + 桌面捷徑 + 真實瀏覽器端到端實證）
 
 **觸發**：操作者「已完成System Foundry嗎?」→「去處理好, 而且去實證是否System Foundry可用」。
