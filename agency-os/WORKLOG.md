@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-07（AGENTS.md 第三次瘦身：操作者裁定「只要 AI 能 100% 遵循、不要冗長」；規則零遺失、事故敘事移 APPENDIX、§5 寫法分級併入 §9）
+
+**觸發**：操作者「agent.md 只要AI能看懂並100%遵循就好 不要冗長廢話 而且整個檔案再次做最佳整理整合 不能出任何差錯」。
+
+**改動**：
+- `agency-os/AGENTS.md`：12800→12381 chars；§0–§9 編號與標題不變（CLAUDE.md／hooks 以編號引用）。移出 5 段日期事故敘事（§4 critic 深度、§5 Workflow 99 agent、§5 Docker 探索、§8 細節只留一處、§9 62-65% 散文）；§5「寫法分級」與「file:line 查證」兩條併入 §9 書面產出（同主題只留一處）；§4 critic 用量／深度合成一條並與 §5「例外 A 每 commit 最多 1 個」互指；保留並行 session 未 commit 的 §5「完成 → /clear」修改。
+- `agency-os/docs/operations/AGENTS_APPENDIX.md`：+124 行——「2026-09-07 第三次瘦身移出本文的事故依據」（每條對應 § 與日期）+ 瘦身前全文逐字存檔（標題降階、去 Auto-Synced 區塊，避免 doc-sync 誤抓第二個 marker）。
+- `/doc-sync` 跑過 exit=0；`docs/CHANGE_IMPACT_MATRIX.md`／`TOOL_TRIGGER_MAP.md`／`cursor-enterprise-rules-index.md`／`new-doc-linkage-checklist.md` 只有 `_Last synced_` 時間戳變動，一併 commit。
+
+**驗證（機械 diff 取代 prose review）**：
+- backtick token 集合 HEAD vs NEW 雙向差集 = ∅（154 個路徑／腳本／格式字串全保留）；`## ` 標題序列相同；bold 標籤僅少 6 個＝刻意合併者。
+- 全 repo（排除 worktrees／Backups／archive）33 個 `AGENTS.md §…` 活引用：HEAD 未解析 10、NEW 未解析 10，回歸 0（那 10 個是 2026-09-04 前舊段名，原本就懸空，本次不擴大範圍）。
+- 16 個裸腳本／hook 名逐一 find 存在（`safe-infra-patch.sh` 在 VPS 端，同舊檔）；BOM+LF 保留；APPENDIX Auto-Synced marker 仍唯一；無 U+FFFD。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python token/anchor/regression diff + powershell scripts/doc-sync-automation.ps1 -AutoDetect | exit=0 | ms=9000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審＝上述機械 diff；DOC_ONLY 不派 critic agent，依本次新 §4 規則）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,runbooks,CLAUDE.md | grep=AGENTS\.md\s*§ | hits=33
+
+**剩餘風險**：10 個既有懸空 §舊段名（ao-close.md／ao-resume.md 的「快速續接文字」、high-risk-bash-warn.js 的「緊急流程觸發」、repeat-failure-guard.js 的「失敗重試紀律.」等）指向 2026-09-04 前標題，APPENDIX 存檔可查但字面不同；屬歷史債，未動。
+
+**rollback**：`git revert <本 commit>`；或 `git show HEAD~1:agency-os/AGENTS.md > agency-os/AGENTS.md`。
+
 ## 2026-09-06（同日第十輪：P0-09 RLS enforcement gate 部分關閉 + mutation harness 全重建→BEGIN/ROLLBACK 隔離；db-expert 覆審 1 Critical+4 Major 全修；順手訂 AGENTS.md 兩條書面精簡規則）
 
 **觸發**：操作者「有辦法不要再用那個慢到極點的模式 馬上建立起來嗎」——`mutation-check-wave1.ps1` 每個 mutation 重建整個 11-migration schema，125 個 mutation 背景跑逾時（>590 秒未跑完）。

@@ -1,12 +1,12 @@
 ﻿# AGENTS.md - Agency Operating Rules
 
-> **精簡版（2026-09-04 第二次瘦身）**。本檔經 `CLAUDE.md` 首行 `@agency-os/AGENTS.md` 每輪整份注入 prompt，只留每輪都要用的規則。條文末尾的 `§名` 指向 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md)（理由、案例、機制細節與**精簡前逐字全文**，仍為強制）；觸發語／路由／hooks 清單在 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)。規則寫法：一行「做什麼」＋至多一行「為什麼」；事故敘事一律進 APPENDIX 或 WORKLOG，不進本檔。其他文件引用 `AGENTS.md §舊段名` 時，到 APPENDIX「精簡前全文存檔」找同名標題。
+> **精簡版（2026-09-07 第三次瘦身）**。經 `CLAUDE.md` 首行 `@agency-os/AGENTS.md` 每輪整份注入 prompt，只留每輪都要用的規則。條文末 `§名` 指向 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md)（理由、案例、機制細節、精簡前逐字全文，仍為強制）；觸發語／路由／hooks 清單在 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)。寫法：一行「做什麼」＋至多一行「為什麼」；事故敘事一律進 APPENDIX 或 WORKLOG，不進本檔。他檔引用 `AGENTS.md §舊段名` 時，到 APPENDIX「精簡前全文存檔」找同名標題。
 
 ## 0. 硬事實（違反即事故，每次先讀）
 
-- **唯一主機 `ks-aw-01` = `145.239.195.47`，SSH `-p 58122`**。SG + EU 已於 2026-08-31 全數整併到此機；`149.202.64.114`／`5.223.93.113`／`204.168.175.41` 皆已退租，SSH 過去直接失敗，**無回退主機**。拓樸正本 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)；搬機唯一正本 [`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)。
+- **唯一主機 `ks-aw-01` = `145.239.195.47`，SSH `-p 58122`**。SG + EU 已於 2026-08-31 整併到此機；`149.202.64.114`／`5.223.93.113`／`204.168.175.41` 皆已退租，**無回退主機**。拓樸正本 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)；搬機唯一正本 [`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)。
 - **ClickHouse 鎖 `25.7.x`**，禁升 latest／24.x。
-- **部署**只走目標機本機 `/root/lobster-phase1/scripts/sg-deploy.sh`（內建 npm test → healthcheck → HTTP smoke → 失敗自動 rollback），**勿**直接 git pull；test 紅先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test`。新增可部署服務必齊 6 項（test gate／healthcheck／smoke／rollback／notification／typecheck）§新部署路徑強制清單。
+- **部署**只走目標機本機 `/root/lobster-phase1/scripts/sg-deploy.sh`（npm test → healthcheck → HTTP smoke → 失敗自動 rollback），**勿**直接 git pull；test 紅先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test`。新增可部署服務必齊 6 項（test gate／healthcheck／smoke／rollback／notification／typecheck）§新部署路徑強制清單。
 - **Secrets**：`scripts/secrets-vault.ps1 -Action get -Name <KEY>` 只回遮罩值；實值走各機 `mcp/user-env.ps1`（不進 git，由 `mcp/user-env.template.ps1` 生成）；**禁硬編**。
 - **Trigger.dev 憑證不可互換**：`tr_pat_*` = CLI deploy（`TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（`TRIGGER_ACCESS_TOKEN`）。
 - **Routing 三件套同一 PR 同步**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md`。
@@ -58,20 +58,19 @@
 - 機械閘只驗證據行**格式存在**，不驗內容真實；唯一內容驗真是 `bughunt-oracle`。閘全部 **fail-open**（閘壞 = 放行 + 寫 `~/.claude/verify-gate-failures.log`），改 hooks 後必跑 `bash scripts/test-hooks.sh`。§已知信任邊界
 - 閘擋「忘記做」不擋「做錯」→ 補這個缺口靠外部模型。**唯一入口 `/codex-review`**（`.claude/commands/codex-review.md`，內含 ORACLE gate artifact 落地）；`scripts/codex-oracle.ps1` 為官方指令連續失敗 ≥2 次的備援。ORACLE gate：staged 含 source 檔時要求當日且晚於最後改檔的 `agency-os/reports/oracle/` artifact；豁免寫 `- ORACLE_WAIVED: <理由>`。§ORACLE gate
 - **額度斷路器**：任何 oracle 呼叫前 `scripts/oracle-quota.ps1 -Action check -Tool <codex|critic>`，exit 3 = 直接 fallback 不連線；回覆含 `429`／`rate limit`／`usage limit`／`try again at` → 立刻 `-Action set`（無時間 `-Hours 5`），本 session 不再碰同一工具；成功後 `-Action clear`。
-- **oracle 全無額度時不跳過 review**：書面對抗自審 + 突變測試證據（拔 guard → 指名測試變紅 → 還原變綠）+ WORKLOG `ORACLE_WAIVED`。每 commit 一個 critic，深淺依 `.claude/commands/review.md` tier；多代理只用在 auth／crypto／個資。**critic 覆審深度同樣依風險分級**：真碰 auth／crypto／個資／金流才要求對每個 claim 全面重新獨立推導；其餘中低風險項目抽查 2–3 個關鍵 claim 即可，不必每次整份重跑（2026-09-06 稽核：非金流的設定分類邏輯仍要求全面重新獨立推導，成本加倍卻未提升發現率）。
+- **oracle 全無額度時不跳過 review**：書面對抗自審 + 突變測試證據（拔 guard → 指名測試變紅 → 還原變綠）+ WORKLOG `ORACLE_WAIVED`。
+- **critic 用量與深度依風險分級**：每 commit 一個 critic，深淺依 `.claude/commands/review.md` tier；多代理（2 個以上）只用在 auth／crypto／個資／金流。真碰 auth／crypto／個資／金流才要求對每個 claim 全面重新獨立推導；其餘中低風險項目抽查 2–3 個關鍵 claim，不整份重跑。§跨模型 oracle
 - **同一 reviewer 對同一段 code 連續回報 2 次 → 第 3 次修正前先寫不變量分析**，不得以「範圍小」跳過。
 - 分工：寫入 `D:\Work` 者負責完整 R0/R4 證據鏈（Codex 寫入時 hooks 不會跑，須手動等價執行 git log／風險分級／驗證／WORKLOG／commit）；大量讀檔／跨檔掃描優先 Codex；設計取捨歸操作者。**禁止**：裸 `codex exec`（漏 `-o` 噴 ~120KB）；用 `chatgpt-*`／`gemini-*`／`grok-*` MCP 當 oracle（按 token 計費）；未 Grep 驗證 `file:line` 就採用 finding；Claude 與 Codex 同時改同一檔。給 Codex 的 prompt 只放 Decision／Constraints／Files／Acceptance。§跨模型 oracle
 
 ## 5. Context 與 agent 用量
 
-- **一任務一 session**：完成 → AO-CLOSE → `/clear`（狀態在檔案不在對話）；進行中不 clear，變鈍用 `/compact`；任務結束主動提醒操作者 `/clear`。
+- **一任務一 session**：完成 → `/clear`（狀態在檔案不在對話）；進行中不 clear，變鈍用 `/compact`；任務結束主動提醒操作者 `/clear`。
 - **讀法分級**：要改／要驗證的檔**整檔讀**（片段最常漏檔頂全域設定）；只確認一個事實用 grep；20+ 檔掃模式交 Codex；大 log 先 `grep`／`tail`；外部 CLI 輸出一律導檔再取。摘要的邊界 = 問題的邊界。設計討論每三輪自問「該落地成文件了嗎」。§Session 衛生
-- **寫法分級**：規格／contract／decision record 的說明文字預設精簡——做了什麼＋一句話為什麼；不寫逐條 reasoning 散文、不為每個小任務配一份平行獨立文件、不要同一份內容在兩處各寫一次全文。**讀者是 Claude/Codex 等 AI agent，不是人類敘事讀者**——不需要銜接語氣、不需要起承轉合，事實密度優先於行文流暢。**判準**：如果 critic 覆審抓到的持續是揭露/引用完整性問題而不是邏輯錯誤，代表散文沒在防禦品質——那段可以砍，`file:line` 查證本身不能砍（見下條，兩者是不同類別）。新系統／新檔案格式開工前，先假設會發生同一種膨脹，不必等它發生兩次才裁定。**舊檔案不回改**——已出貨且內容正確的舊版散文屬歷史記錄，追溯重寫是純耗工無實益，只套用在新寫的內容。實例：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md`（該系統專屬部分留在那邊，不搬進本檔）。
-- **`file:line` 查證不受上一條影響**：這是驗證機制不是文書，成本是「跑一個 grep」不是「寫一段話」，砍了會讓未驗證的宣稱直接出貨（本 session 實例：差點引用不存在的檔案、critic 抓到「宣稱超出證據」的錯，皆靠這條擋下）。可以砍的是查證*之後*描述查證過程的敘事文字，查證動作本身不行。
-- **扇出（機械閘 `subagent-budget.js`，SSOT `mcp/claude-userlevel/hooks/rules/`）**：Agent tool 20 分鐘滑動視窗 0–5 放行、6–10 需 prompt 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`、>10 無條件 block（被擋重試也計入）。**Workflow tool 已在 `permissions.deny` 整個關閉**（`mcp/claude-userlevel/settings.template.json` + `scripts/wire-remote-hooks.sh` 兩處鏡像，`tests/hooks/settings-deny-parity.test.mjs` 守）：它的 `agent()` fan-out 在背景跑，PreToolUse 看不到，閘只能驗自報估計；2026-09-03 一次 Workflow 派 99 個 agent 燒光額度。多代理一律走 Agent tool 的固定角色模板；`subagent-budget.js` 的 Workflow 分支保留為縱深防禦。
-- **禁止按項目複製角色**：N 個 finding／檔案各配 agent（1:N）一律禁止，閘擋不到（N 在腳本跑到一半才知道）。**agent 數跟角色走**：理解／執行／critic／獨立觀點／整合，固定 4–5 個；真正獨立可切割的工作分批塞 ≤10 個 agent。**讀資料預設主 agent 自己讀**；例外 A 獨立驗證 critic 每 commit 最多 1 個；例外 B >100KB 純調查最多 1 agent 或 Codex，產出寫檔附 `file:line`。§Agent 扇出治理
+- **扇出（機械閘 `subagent-budget.js`，SSOT `mcp/claude-userlevel/hooks/rules/`）**：Agent tool 20 分鐘滑動視窗 0–5 放行、6–10 需 prompt 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`、>10 無條件 block（被擋重試也計入）。**Workflow tool 已在 `permissions.deny` 整個關閉**（`mcp/claude-userlevel/settings.template.json` + `scripts/wire-remote-hooks.sh` 兩處鏡像，`tests/hooks/settings-deny-parity.test.mjs` 守）：它的 `agent()` fan-out 在背景跑，PreToolUse 看不到，閘只能驗自報估計。多代理一律走 Agent tool 的固定角色模板；`subagent-budget.js` 的 Workflow 分支保留為縱深防禦。
+- **禁止按項目複製角色**：N 個 finding／檔案各配 agent（1:N）一律禁止，閘擋不到（N 在腳本跑到一半才知道）。**agent 數跟角色走**：理解／執行／critic／獨立觀點／整合，固定 4–5 個；真正獨立可切割的工作分批塞 ≤10 個 agent。**讀資料預設主 agent 自己讀**；例外 A 獨立驗證 critic 每 commit 最多 1 個（§4）；例外 B >100KB 純調查最多 1 agent 或 Codex，產出寫檔附 `file:line`。§Agent 扇出治理
 - **失敗重試**：同一件事同一方式失敗兩次 = 停，讀錯誤換方法；換法仍敗第二次 → 問一題說明兩種失敗。機械閘 `repeat-failure-guard.js` 同一 Bash 文字第 3 次 BLOCK，首行 `# RETRY-JUSTIFIED: <什麼變了>` 解鎖。
-- **本機服務／Docker 探索**：一次調查全程一個 container／連線到底，不要每個假設就開一個新 compose project（每次起停 10-20 秒，2026-09-06 案例連開 3 個）；改動前先讀既有腳本的等價邏輯（如 `Reset-Schema`／`Initialize-Baseline`），不要在 Bash 手動重打一遍已經寫好的 migration-apply 迴圈。
+- **本機服務／Docker 探索**：一次調查全程一個 container／連線到底，不要每個假設就開一個新 compose project；改動前先讀既有腳本的等價邏輯（如 `Reset-Schema`／`Initialize-Baseline`），不在 Bash 手動重打已寫好的 migration-apply 迴圈。
 
 ## 6. 執行安全與 Auto-Repair 紅線
 
@@ -100,7 +99,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - **AO-RESUME**：hook `ao-resume-on-prompt.ps1` 自動跑 `ao-resume.ps1 -FullMainlineParity`（300 秒去重）→ 讀 `.agency-state/ao-resume-hook-last.json` 回報 §0–§8（SSOT `.claude/commands/ao-resume.md`）。同時跑 smoke → `reports/status/smoke-LATEST.json`：**直接讀 `overall`／`blind_spots`，不心算**；`blind_spots` 非空 = 偵測器啞了 = WARN。禁止叫使用者手動 pull。§AO-RESUME 判讀規則
 - **AO-CLOSE**（收工／晚安／bye／done／先這樣／走了）：**預授權**——WORKLOG 證據行、`memory/CONVERSATION_MEMORY.md`、`memory/daily/`、`reports/ao-close|ao-resume/`、`ao-close.ps1` 直接執行，不逐項問。gate 擋下自補重跑；behind remote 自跑 `git pull --ff-only origin main`。health < 100% 自修後重跑，修不好列具體項問一題；**禁止**提議 `-AllowNonPerfectHealth`。唯一可問：push 被拒需人介入。SSOT `.claude/commands/ao-close.md`、`docs/operations/end-of-day-checklist.md`。
 - **Git**：直接在 `main`；衝突以較新 commit 時間為準（`git log -1 --format=%ci`），禁機械 `-X ours/theirs`。遠端 harness 指派分支的 session 用該分支並開 draft PR，不算違規。
-- **記憶**：日記 `memory/daily/YYYY-MM-DD.md`；長期 `memory/CONVERSATION_MEMORY.md`；禁敏感資訊。**文件**：決策→WORKLOG；任務→TASKS；里程碑→CONVERSATION_MEMORY；治理改動查 `docs/CHANGE_IMPACT_MATRIX.md`，新治理文件跑 `scripts/register-new-governance-doc.ps1`；ADR → `docs/architecture/decisions/ADR_INDEX.md`；deploy drift `/check-drift`；治理 drift 月巡 `scripts/check-governance-docs-drift.ps1`。**細節只留一處**：critic 覆審／完成紀錄的完整發現寫在 WORKLOG 一次；TASKS.md 對應條目只留 3–5 行摘要＋指向該 WORKLOG 日期區塊，不得兩邊各寫一份全文（2026-09-06 稽核：單一 TASKS 條目曾膨脹到 2000+ 字，跟 WORKLOG 內容重複）。
+- **記憶**：日記 `memory/daily/YYYY-MM-DD.md`；長期 `memory/CONVERSATION_MEMORY.md`；禁敏感資訊。**文件**：決策→WORKLOG；任務→TASKS；里程碑→CONVERSATION_MEMORY；治理改動查 `docs/CHANGE_IMPACT_MATRIX.md`，新治理文件跑 `scripts/register-new-governance-doc.ps1`；ADR → `docs/architecture/decisions/ADR_INDEX.md`；deploy drift `/check-drift`；治理 drift 月巡 `scripts/check-governance-docs-drift.ps1`。**細節只留一處**：critic 覆審／完成紀錄的完整發現寫在 WORKLOG 一次；TASKS.md 對應條目只留 3–5 行摘要＋指向該 WORKLOG 日期區塊，不得兩邊各寫一份全文。
 - **編碼**：走 Google Drive 的 `.md`（`memory/*.md`、`CREDENTIALS.md`）必 UTF-8 + BOM（export/import 腳本自動加）；repo 內 `.md` 免 BOM。
 - 若有 `BOOTSTRAP.md` 先照做。Cursor 已於 2026-08-26 退場，歷史 WORKLOG 敘述保留。
 
@@ -108,7 +107,8 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 
 繁體中文；先結論後步驟；指令貼完整可執行版本含路徑與預期結果；長任務每 15 分鐘回報。**caveman 壓縮永久預設**（去 filler／問候／解釋，技術名詞原文），僅不可逆操作確認（刪資料／deploy／reboot）時暫回完整說明。
 
-**書面產出比照壓縮，讀者是下一個 AI／自己，不是人類**：code comment 只寫「未來讀者會踩的坑」1-3 行，調查過程／設計心路歷程一律進 WORKLOG 不進 code；WORKLOG／TASKS.md 多發現用條列（C1/M1/m1...），不用逗號散文黏成一段；姐妹文件間用連結／引用檔名+行號，不重述背景或重寫同一份規則；一個事實只在一個地方描述細節，其他地方一行+連結（2026-09-06 實測：同一改動散文佔新增行數 62-65%，且改一次要同步 4-5 個檔案正是重工主因）。
+**書面產出比照壓縮，讀者是 Claude/Codex 等 AI agent，不是人類敘事讀者**（不需銜接語氣、起承轉合，事實密度優先於行文流暢）：規格／contract／decision record 說明預設「做了什麼＋一句話為什麼」，不寫逐條 reasoning 散文、不為每個小任務配平行獨立文件、同一內容不在兩處各寫全文；code comment 只寫「未來讀者會踩的坑」1-3 行，調查過程／設計心路歷程進 WORKLOG 不進 code；WORKLOG／TASKS.md 多發現用條列（C1/M1/m1...），不用逗號散文黏成一段；姐妹文件間用連結／檔名+行號，不重述背景或重寫同一份規則；一個事實只在一處描述細節，其他地方一行+連結。**判準**：critic 覆審抓到的持續是揭露/引用完整性問題而非邏輯錯誤 = 散文沒在防禦品質，可砍。新系統／新檔案格式開工前先假設會發生同一種膨脹，不必等發生兩次才裁定。**舊檔案不回改**：已出貨且正確的舊版散文是歷史記錄，只套用在新寫內容。實例：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md`（該系統專屬部分留在那邊，不搬進本檔）。
+**`file:line` 查證不受上一條影響**：它是驗證機制不是文書（成本是跑一個 grep，不是寫一段話），砍了會讓未驗證的宣稱直接出貨；可砍的是查證*之後*描述查證過程的敘事，查證動作本身不行。
 
 ## Related Documents (Auto-Synced)
 - `docs/CHANGE_IMPACT_MATRIX.md`
@@ -124,5 +124,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-04 14:48:33 UTC_
+_Last synced: 2026-09-07 05:35:40 UTC_
 
