@@ -445,7 +445,7 @@
     "experience/HUMAN_CENTERED_SYSTEM_STANDARD.md": "9c16d69d8f36f26e8647ed1789eb98923f600a7dd8a64ba34361032c605fbc7a",
     "generation/blueprint-map.json": "bb7418a37561bebf8c3c5e55ff33cf22cda95bbb46688571fd442fdf1cd03e42",
     "generation/module-manifests.json": "cf0baa2e8ddf2319c364fb4838cfe0e06a25128741030a9cae9b88e905946ad0",
-    "generation/module-obligations.json": "3be3d51a135c8ecd7d7c7d36ad59318f6dc7b8a23949e25fffd378e279d70521",
+    "generation/module-obligations.json": "d5d3e2632e8a5a5edb93a25d2c3d5dac5e903e2902259506ce263d7cbd73885b",
     "generators/contracts/IMPLEMENTATION_GENERATION_CONTRACT.md": "4156439605e8229bf862dc9b6e6aeb4280f448a4544489327c49b3f982c5e355",
     "generators/repository/EXECUTABLE_BOOTSTRAP_STANDARD.md": "866f9b88527f89c8a5e8dca69f720b0a68483de248da679612dd421c5a12d7e4",
     "generators/repository/REPOSITORY_SKELETON_CONTRACT.md": "929c60f3cc1786415368a2815c1093398c258b6eeb94aace781cf48af6b968d3",

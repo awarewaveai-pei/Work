@@ -213,22 +213,27 @@
         "Vendor/framework semantics do not leak into the domain.",
         "When CAP-INVENTORY is also selected, a stock balance only changes via an appended, immutable movement record; it is never changed by a direct overwrite of the balance figure itself.",
         "When CAP-INVENTORY and CAP-ORDERS are both also selected, quantity committed to an order is tracked as a reservation separate from available quantity; cancelling or expiring that order releases the reservation back to available quantity rather than leaving it stranded.",
-        "When CAP-CYCLE-COUNT is also selected, a physical count's discrepancy against the recorded balance is always recorded as an explicit, attributable adjustment movement -- who counted, when, and the before/after quantity -- never a silent overwrite of the balance; this is the same immutable-movement-ledger invariant CAP-INVENTORY itself requires for every other balance change, applied whether the merchant tracks one stock record or, when CAP-MULTI-LOCATION-STOCK is also selected, counts each location's balance separately."
+        "When CAP-CYCLE-COUNT is also selected, a physical count's discrepancy against the recorded balance is always recorded as an explicit, attributable adjustment movement -- who counted, when, and the before/after quantity -- never a silent overwrite of the balance; this is the same immutable-movement-ledger invariant CAP-INVENTORY itself requires for every other balance change, applied whether the merchant tracks one stock record or, when CAP-MULTI-LOCATION-STOCK is also selected, counts each location's balance separately.",
+        "When CAP-PRODUCT-ATTRIBUTES is also selected, a product's attribute values are validated against centrally defined attribute definitions and category/taxonomy mappings, never stored as free-text fields that bypass that governance."
       ],
       "security": [
-        "Sensitive domain attributes are classified and access-scoped."
+        "Sensitive domain attributes are classified and access-scoped.",
+        "When CAP-PRODUCT-ATTRIBUTES is also selected, attribute-definition and taxonomy-mapping edits are restricted to a governance role distinct from general product-catalog edit access."
       ],
       "tests": [
         "Invariant/state-transition tests.",
         "Property tests for critical calculations where useful.",
-        "When CAP-CYCLE-COUNT is also selected, the discrepancy-as-adjustment-movement invariant is contract-tested: a count that differs from the recorded balance produces an attributable adjustment record, never a direct balance overwrite."
+        "When CAP-CYCLE-COUNT is also selected, the discrepancy-as-adjustment-movement invariant is contract-tested: a count that differs from the recorded balance produces an attributable adjustment record, never a direct balance overwrite.",
+        "When CAP-PRODUCT-ATTRIBUTES is also selected, attribute-validation and category-mapping rejection paths are contract-tested for values outside their governed definition."
       ],
       "operations": [
-        "Business-event/audit signals for consequential transitions."
+        "Business-event/audit signals for consequential transitions.",
+        "When CAP-PRODUCT-ATTRIBUTES is also selected, products missing required attributes for their assigned category are observable as a data-quality signal."
       ],
       "recovery": [
         "State corrections preserve audit/history.",
-        "Migrations protect semantic meaning, not only columns."
+        "Migrations protect semantic meaning, not only columns.",
+        "When CAP-PRODUCT-ATTRIBUTES is also selected, attribute-definition and taxonomy-mapping changes are versioned so existing product data can be re-validated against a prior definition if a mapping change proves incorrect."
       ]
     },
     "workflow": {
@@ -477,25 +482,30 @@
       "invariants": [
         "AI output is not treated as verified fact without evidence.",
         "Model/provider/version and input evidence are reproducible for consequential outputs.",
-        "Tool/action authority is explicit and risk-derived."
+        "Tool/action authority is explicit and risk-derived.",
+        "When CAP-AGENTIC-COMMERCE is also selected, an external agent's checkout intent is honored only if its purchase mandate (spending limit, product scope, expiry) is verified as unexpired and unexceeded before order creation, never after."
       ],
       "security": [
         "Prompt/context injection defenses.",
         "Data minimization and provider policy.",
-        "Tool permission boundary and secret isolation."
+        "Tool permission boundary and secret isolation.",
+        "When CAP-AGENTIC-COMMERCE is also selected, mandate scope (spending limit, product scope, expiry) is checked server-side on every checkout intent, never trusted from agent-supplied claims alone."
       ],
       "tests": [
         "Golden/adversarial prompts.",
         "Authority/tool negatives.",
         "Model/provider fallback.",
-        "Counterfactual tests for consequential decisions."
+        "Counterfactual tests for consequential decisions.",
+        "When CAP-AGENTIC-COMMERCE is also selected, mandate-boundary tests cover an agent attempting to exceed spending limit, buy outside product scope, or act after mandate expiry -- each rejected."
       ],
       "operations": [
-        "Quality, cost, latency, refusal/failure, provider/model version signals."
+        "Quality, cost, latency, refusal/failure, provider/model version signals.",
+        "When CAP-AGENTIC-COMMERCE is also selected, agent-initiated orders are distinguishable from human-initiated orders in audit/observability signals."
       ],
       "recovery": [
         "Disable/fallback/rollback model or prompt version.",
-        "Compensate/revert AI actions where reversible."
+        "Compensate/revert AI actions where reversible.",
+        "When CAP-AGENTIC-COMMERCE is also selected, a customer can revoke an agent's mandate at any time, immediately blocking further checkout intents under it."
       ]
     },
     "migration": {
@@ -638,23 +648,28 @@
       "invariants": [
         "Every support interaction is attributable to a ticket or logged conversation.",
         "SLA clocks pause/resume deterministically on defined status transitions.",
-        "Customer satisfaction data is linked to the resolved ticket it measures."
+        "Customer satisfaction data is linked to the resolved ticket it measures.",
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, conversations from every connected external platform (LINE, WhatsApp Business, Telegram, Instagram/Messenger) resolve into the same unified inbox record, never a per-platform parallel inbox."
       ],
       "security": [
         "Support agents access only the customer data scoped to their assigned tickets/tenant.",
-        "Call/chat transcripts follow the same data-residency rules as other customer data."
+        "Call/chat transcripts follow the same data-residency rules as other customer data.",
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, external-platform message content and customer identifiers follow the same access-scoping as other customer data, regardless of source platform."
       ],
       "tests": [
         "SLA breach detection is tested against clock-pause edge cases.",
-        "Ticket assignment/escalation paths are contract-tested."
+        "Ticket assignment/escalation paths are contract-tested.",
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, cross-platform inbox unification is contract-tested: messages from two different connected platforms for the same customer land in one conversation thread, not two."
       ],
       "operations": [
         "SLA compliance rate and ticket backlog are observable.",
-        "Escalation paths have a defined on-call linkage."
+        "Escalation paths have a defined on-call linkage.",
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, per-platform connector health (delivery failure, webhook lag) is observable independent of overall ticket/SLA metrics."
       ],
       "recovery": [
         "An abandoned live-chat session preserves the transcript up to disconnect.",
-        "Ticket data is included in backup scope."
+        "Ticket data is included in backup scope.",
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, a disconnected external-platform connector does not lose in-flight message history; reconnection resumes into the same conversation thread."
       ]
     },
     "hr": {

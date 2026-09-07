@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-09-07（System Foundry v1.6 — 生成輸出深度驗證：非缺 domain object，是 3 個新 capability 的 obligation 敘述漏補）
+
+**任務範圍**：驗證前一輪補齊的 10 個 capability（`326cb5a45`）在真實生成物（非 catalog 存在性）裡是否有實質內容，非重跑 audit、非全 50 module。
+
+**根因分析**：讀 `foundry_generate.py` 全檔確認工具設計＝capability-driven 治理骨架生成器（`QUALITY_STRENGTH_MATRIX.md` 「Project bootstrap: safe bounded scaffold」），非 domain-object/API-contract 逐字重現器——`module_doc_text()` 9 份 module 文件全是固定樣板文字＋`module-obligations.json` 的 purpose/invariants/security/tests/operations/recovery 清單，從未產生 schema stub、function signature 或 event 清單；`docs/blueprint/*.md` 的來源模板是 `templates/TOP_TIER_SYSTEM_BLUEPRINT/`（73 份通用架構章節），跟 Commerce OS 50-module pack（`Composable AI Commerce OS_*.md`）是完全不同的文件集，寫入內容只是通用樣板段落，不讀取 blueprint 內文。故「生成物有沒有 Domain Objects/Public Service Contract/Events/Permissions」對這個工具不是有效判準；有效判準＝選中的 capability 有沒有正確出現在該 module 的 `activated_capabilities`／`module_reasons`，以及 obligations 文字是否反映該 capability 的核心概念。
+
+**實測**：直接呼叫 `configurator_engine.resolve()` + `foundry_generate.generate()`（略過 HTTP server），啟用 `cross_border`／`b2b`／`subscription_commerce`／`marketplace_ops`／`customer_service`／`CAP-OMNICHANNEL-MESSAGING`／`CAP-AGENTIC-COMMERCE`／`CAP-PRODUCT-ATTRIBUTES` 全部子能力問題，生成 `generated/commerce-os-sample-full-v2/`。抽樣 6 個 module（`cross_border`／`b2b`／`shipping`／`customer_service`／`ai`／`domain`）逐一核對 `MODULE_MANIFEST.json` 的 `activated_capabilities` 與 `foundry-plan.json` 的 `module_reasons`：全部正確、無遺漏、無錯置。
+
+**發現的真缺口**：`326cb5a45` 只改了 `capabilities/catalog.json`／`module-manifests.json`，沒同步更新 `generation/module-obligations.json`——`b2b`／`shipping`／既有 `domain`（CAP-INVENTORY/CAP-CYCLE-COUNT）的 obligations 已有「When CAP-X is also selected」慣例句式把該 capability 的核心語意寫進 invariants/security/tests/operations/recovery，但 `ai`（CAP-AGENTIC-COMMERCE）／`customer_service`（CAP-OMNICHANNEL-MESSAGING）／`domain`（CAP-PRODUCT-ATTRIBUTES）三個新 capability 完全沒有對應句子——`ai` module 的 obligations 停留在泛用「AI/LLM/agent capability with bounded authority」，`customer_service` 停留在泛用「ticketing, live support」，隻字未提 mandate 驗證／全通路收件匣統一／屬性治理這些新 capability 的存在理由。這是任務範圍內 3 個 capability 的真缺口，其餘 7 個新 capability（`CAP-DATA-RETENTION`／`CAP-RIGHT-TO-ERASURE`／`CAP-CAMPAIGN-ATTRIBUTION`／`CAP-FEATURE-FLAGS`／`CAP-DATA-QUALITY`／`DER-WEBHOOK-IDEMPOTENCY`／`CAP-SUPPLIER-MOQ`）同根因但明確不在本輪抽樣範圍，留待下次觸碰對應 module 時一併補。
+
+**修法**：`generation/module-obligations.json` 的 `ai`／`customer_service`／`domain` 三個 module 各補 5 條「When CAP-X is also selected」句式（invariants/security/tests/operations/recovery 各 1 條），比照 `b2b`／`shipping` 既有慣例，逐字對照 `capabilities/catalog.json` 該 capability 的 `description` 欄位寫（mandate 驗證範圍、跨平台收件匣統一、屬性/分類治理），非泛泛而談。`manifest.json` 用 `regenerate_integrity.py --write` 同步重算 `module-obligations.json` 的 hash。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_versions.py && python scripts/validate_foundry.py && python scripts/validate_semantics.py && python scripts/validate_configurator.py && python scripts/validate_artifact_generation.py && python scripts/validate_contract_fixtures.py && python scripts/run_adversarial_contract_tests.py && python scripts/test_bootstrap_e2e.py && python scripts/test_configurator_e2e.py && python scripts/test_configurator_http_e2e.py && python scripts/test_selection_matrix.py && python scripts/test_mutation_coverage.py && python scripts/test_payment_commercial_gating.py && python scripts/validate_manifest.py && python scripts/validate_doc_numbers.py`（15 個 gate script）| exit=0 | result=全部 PASS（`validate_manifest.py` 第一次跑因 `module-obligations.json` 改動回報 `hash drift`，`regenerate_integrity.py --write` 後重跑轉 PASS）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests` | exit=0 | result=Ran 38 tests, OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=直接呼叫 `configurator_engine.resolve()`+`foundry_generate.generate()` 產生 `generated/commerce-os-sample-full-v2/`，`grep -l "is also selected" ai/*.md customer_service/*.md domain/*.md` | exit=0 | result=修補後 3 個 module 的 00/01/03/05/06/07 文件都出現新句子，`MODULE_MANIFEST.json` 的 `activated_capabilities` 含 `CAP-AGENTIC-COMMERCE`／`CAP-OMNICHANNEL-MESSAGING`／`CAP-PRODUCT-ATTRIBUTES`
+- REVIEW_DONE: critic=Quick 自審（oracle 額度未查，本輪風險 Low：純文件敘述補強，非邏輯/安全/金流變更，抽查已足）——確認新增句式的 capability 語意逐字對照 `catalog.json` description 沒有無中生有；確認未動任何既有句子；確認 JSON 語法有效（`json.load` 成功、`validate_manifest`/`validate_configurator` 綠燈即結構正確性的機械證據）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`CAP-AGENTIC-COMMERCE is also selected\|CAP-OMNICHANNEL-MESSAGING is also selected\|CAP-PRODUCT-ATTRIBUTES is also selected` | hits=僅 `module-obligations.json` 本體 3 處定義＋生成物裡的展開副本（`generated/` 已 gitignore，不進 git），無其他檔案殘留舊版文字
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：其餘 7 個新 capability 的 obligations 同根因未補（明確列於上方，非遺漏，是本輪範圍外）；`generated/` 下本輪產生的 3 個測試用輸出目錄（`commerce-os-sample-full-v2` 等）留在磁碟上未刪，已確認 gitignore 涵蓋，不影響 commit。
+
+**[結論]**（回答操作者原問題）：System Foundry v1.6 能否用 capability closure 架構 Composable AI Commerce OS 並讓 operator 選模組範圍——**Yes**，`resolve()`+`generate()` 對本輪測試的 8 個目標 module（含全部子能力）產生正確、無遺漏、無錯置的 capability 歸屬與治理骨架；**唯一 Partially 保留項**＝該工具本質是治理骨架生成器不是 domain-model/API-spec 生成器，若未來期待「生成物直接含 TradeProfile/getDPPData() 這類 blueprint pack 的具體 domain object/function signature」，那是設計外的新需求，需要新的 generation 層（把 Commerce OS 50-doc pack 內容接進 `generation/` 而非停留在 `templates/TOP_TIER_SYSTEM_BLUEPRINT/`），非本次任務範圍，未驗證。
+
+**[rollback]**：純文件敘述加法，`git revert` 即可；`manifest.json` 的 hash 同步回退。無 schema/API/deploy 影響。
+
 ## 2026-09-07（58–62 號切片 critic 覆審修正：2 Minor 全修）
 
 critic scope=normal tier，spot-check。verdict SHIP WITH MINOR FIXES，0C/0M/2Minor。
