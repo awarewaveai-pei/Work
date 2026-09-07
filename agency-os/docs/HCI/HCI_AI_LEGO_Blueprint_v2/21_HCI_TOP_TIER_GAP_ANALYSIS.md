@@ -123,6 +123,8 @@ A rehearsed, cross-box (not same-box) restore drill, passed before Wave 4 admits
 
 A narrow runbook — not the full BYOK/envelope-encryption architecture, which stays P1-04 — covering what happens if a key/KMS credential is compromised during the build phase. See `11_SECURITY_PRIVACY_GOVERNANCE.md` §Encryption.
 
+**Partial closure (2026-09-07)**: ADR-0022's own required implementation gates are ADR-0022 gate 1 only (of 5) — `security/crypto/KEY_ROTATION_AND_COMPROMISE.md`, the runbook artifact itself (DEK→KEK→master hierarchy diagram, routine-rotation procedure, compromise-response procedure, drill-record section — all 4 required headers present). ADR-0022 gates 2-5 (the `tenant_keks` schema, `KEY-ROT-01`, `KEY-COMPROMISE-DRILL-01` + its mutation check, and the Wave-4 blocking-precondition edit) remain OPEN and are **not** attempted here — real cryptographic key-management logic deserves its own careful, real-Docker-verified pass, not a rushed continuation of a documentation batch. Nothing in the schema enforces this runbook yet; `hci.data_encryption_keys.key_material` still holds a raw (unwrapped) DEK exactly as ADR-0018 Wave 1 shipped it.
+
 ## P0-12 Data Subject Rights — pending scope decision
 
 **RESOLVED — ADR-0014 (`HD-03=A`)** makes DataSubjectRequest a P0 entity. The remaining gate is executable synthetic event-lifecycle and tenant-isolation evidence; this does not authorize real-person processing.

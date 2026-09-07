@@ -2,7 +2,7 @@
 
 Canonical product root: `D:\Work\Projects\internal\hci30\`. HCI runtime code belongs here; architecture, ADR, and research records remain under `D:\Work\agency-os\docs\HCI\`.
 
-Start with `docs\HCI30_DELIVERY_PLAN.md` for architecture and gates, then `docs\HCI30_EXECUTION_PLAN.md` for the ordered implementation backlog. For the schema as actually shipped — every table, every cross-cutting rule, every lifecycle — see `docs\domain\{HCI_DOMAIN_ERD,HCI_ENTITY_DICTIONARY,HCI_INVARIANTS,HCI_STATE_MACHINES}.md` (P0-01). Evidence tamper-evidence mapping (P0-03): `security\evidence-integrity\HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`.
+Start with `docs\HCI30_DELIVERY_PLAN.md` for architecture and gates, then `docs\HCI30_EXECUTION_PLAN.md` for the ordered implementation backlog. For the schema as actually shipped — every table, every cross-cutting rule, every lifecycle — see `docs\domain\{HCI_DOMAIN_ERD,HCI_ENTITY_DICTIONARY,HCI_INVARIANTS,HCI_STATE_MACHINES}.md` (P0-01). Evidence tamper-evidence mapping (P0-03): `security\evidence-integrity\HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`. Key-rotation/compromise runbook (P0-11, ADR-0022 gate 1 of 5 — schema/tests are gates 2-5, not yet built): `security\crypto\KEY_ROTATION_AND_COMPROMISE.md`.
 
 This is an **isolated, synthetic-only PostgreSQL 15.8 test skeleton**. It has no host-port mapping, production configuration, portal integration, real-person fixture, or deployment path.
 

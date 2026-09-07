@@ -1,5 +1,55 @@
 # Worklog
 
+## 2026-09-07（P0-11 Key-rotation runbook——ADR-0022 已完整設計 5 個 gate，本輪只做 gate 1 文件，gate 2-5 schema/測試誠實不趕）
+
+**背景**：ADR-0022（已 ACCEPTED，2026-09-02）早已完整設計 DEK→KEK→master 三層金鑰階層、runbook 必要的 4 個章節標題、5 個 gate 的確切測試 ID（`KEY-RUNBOOK-EXISTS-01`/`SCHEMA-KEK-01`/`KEY-ROT-01`/`KEY-COMPROMISE-DRILL-01`）。本輪只完成 gate 1（runbook 文件本身），非發明新設計，是把 ADR 已決定的內容轉寫成 ADR 自己指定格式的產出物。
+
+**刻意不做的部分**：gate 2-5（`tenant_keks` schema migration、真實金鑰包裹/輪替邏輯、compromise drill 測試+對應 mutation-check）本輪不碰。理由：這是真實加密金鑰管理邏輯，值得自己一輪完整的 real-Docker 驗證，不該為了趕本輪速度而倉促做——ADR-0022 自己的 §Consequences 講得很清楚：目標是「對『金鑰外洩怎麼辦』有可測試的真答案，而非一個文件化的缺口」，倉促做出來的 gate 2-5 若只是看起來完整，正是 RT-07 點名要避免的失敗模式。
+
+**產出**：`Projects/internal/hci30/security/crypto/KEY_ROTATION_AND_COMPROMISE.md`——4 個必要章節（Key hierarchy／Routine rotation／Compromise response／Drill record，逐字符合 `KEY-RUNBOOK-EXISTS-01` 未來會檢查的標題）+ 明確列出 gate 2-5 尚未建的清單。
+
+**驗證**：純文件轉寫已 ACCEPTED 的 ADR 決定，逐項核對兩個具體行號引用（`11_SECURITY_PRIVACY_GOVERNANCE.md:39`／`:56`）與 ADR-0022 原文一致；4 個必要章節標題逐字比對 ADR-0022 gate 1 原文要求。
+
+- REALTEST_EVIDENCE: tool=Grep | cmd=核對 4 個必要 header 逐字相符 + 2 個行號引用內容相符 | exit=0 | result=全部相符
+- REVIEW_DONE: critic=自審（Low risk，轉寫已 ACCEPTED 的 ADR 決定成文件，非發明）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`security/crypto/KEY_ROTATION_AND_COMPROMISE` | hits=僅本輪新檔+README/gap-analysis 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 `security/crypto/KEY_ROTATION_AND_COMPROMISE.md`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-11 補 partial-closure 段（明確標示僅 gate 1/5）；`README.md` 補一行連結。
+
+**[剩餘風險]**：gate 2-5 全部未建，schema 目前完全不強制這份 runbook——`hci.data_encryption_keys.key_material` 仍是 ADR-0018 Wave 1 出貨時的原始（未包裹）DEK，這份文件本身零技術約束力，純程序文件。
+
+**[rollback]**：`git revert`；純新增文件，無 schema 變更。
+
+## 2026-09-07（Cognitive OS 第 58–62 個 Method Atlas 切片 — 5 個平行 agent 收 F05 root_cause 家族（9/9，收官）+ 推進 F17 learning 家族（1/9→3/9），第三輪批次）
+
+**觸發**：操作者「繼續完成 Cognitive Engineering OS」。查現況：F05（root_cause）6/9、F17（learning）1/9。3 個 agent 收 F05 剩餘三列（Event Tree、Change Analysis、Barrier Analysis），2 個 agent 推進 F17（Kill Criteria、Decision Journal，緊接已建的 reversal_criteria）。5 個 agent 同時派（20 分鐘視窗 5/5，未逾額）。查證「challenge 家族三成員已完工不再列入候選」（TASKS.md 878 行舊註）：讀 WORKLOG 續22/續40 確認這是操作者裁定的刻意窄範圍（只認 §11.24「Blue Team→Red Team→Independent Judge」明文 pairing 三個成員為「該家族」，非 F12 表格全部 10 列）——非過期宣稱，尊重原裁定不重開。
+
+**5 個平行結果**：
+- `root_cause.event_tree`——103 測試。真不變量：outcome path 每個 barrier_id 需在記錄內真實存在、path 需是宣告的有序 barriers 序列的位置一致前綴（跳過/錯序即「幽靈結果」）。查重：跟已建的 `fault_tree`（向後 AND/OR 分解）方向相反（Event Tree 從單一起始事件向前，經有序 barrier 序列分支）；跟 `bow_tie` 的扁平無序 controls[] 也不同（無法表達「barrier 2 只在特定路徑下才有意義」的位置相依性）。
+- `root_cause.change_analysis`——101 測試。真不變量：**結構性+執行期雙重**因果聲稱阻擋（schema 完全沒有 `caused_by`/`root_cause` 欄位 + runtime denylist 檢查，兩者皆在建構層與 gate 層獨立擋）直接對應 Atlas 原文「變更不等於因果」誤用警告；每個 change 需 before/after 兩側皆非空且真實不同。查重：跟 `causal.dag` 不同層（那是因果角色圖，這是扁平排序清單），沿用其 evidence-labeling 紀律非結構。
+- `root_cause.barrier_analysis`——72 測試，**F05 收官（9/9）**。真不變量：無責怪個人欄位（結構性排除，非文字掃描——刻意拒絕誤判率高的 NLP 式檢查）對應 Atlas 原文「避免責怪個人」誤用警告；failure_modes 的 barrier_ref 需指向記錄內真實 barrier。查重：跟剛建的 `bow_tie`（owner+test 究責不變量）結構相反——單線性事後診斷鏈 vs 對稱式多控制措施地景圖。
+- `learning.kill_criteria`——31 測試。真不變量：max_loss/max_time/min_quality 三維度至少一個需有具體值、每個 threshold 需有 owner。查重：跟已建的 `reversal_criteria` 不同——封閉三值 enum+單向停止動作 vs 開放文字指標+呼叫端指定雙向 operator，Atlas §16.1 Idea Object 的 `decision` 區塊把 `kill_criteria`／`reversal_conditions` 列為兩個獨立欄位，直接文本佐證非別名。
+- `learning.decision_journal`——141 測試。真不變量：≥2 個選項且恰一個 chosen（單一選項不算真決策）；**兩階段 hash 防篡改機制**（stage1 五欄位建構時算 sha256、`record_outcome()` 函式簽名結構上無法碰這五欄位、gate 獨立重算比對）對應 Atlas 原文「防 hindsight bias」——查證 repo 既有 `event_ledger.py`（不同子系統無耦合）與 `epistemic-label.schema.yaml` 的 `LOCKED_DECISION`（純政策旗標無執行碼）皆不滿足「gate 獨立重推」要求，故新建機制而非套用不合適的既有物。
+
+**整合過程中的意外插曲**：`gen_spec_index.py` 第一次執行後 `run_golden_tests.py` 仍報 STALE（另一並行 session 在兩次指令間動了一個來源檔案，屬正常共享 repo 現象非 bug）——立即重跑一次確認乾淨，未強行忽略警告。
+
+**整合**（本 session 執行，5 個 agent 皆依指示未動 registry 共用檔）：核實 25 個新檔全部存在磁碟上 → 5 個新模組測試合併跑 448 測試零衝突 → 全 regression 3131（2683→3131，+448）→ 註冊 `contract-backlog.yaml`（`fiftyseventh`～`sixtyfirst_concrete_entry`）→ 順手修正 `method-inventory.yaml` 這 5 列＋F17 兩列既有行號誤植（Decision Journal 803→806、Kill Criteria 805→808，皆 grep 對照 Atlas 原文重新核實）→ `root_cause`/`learning` 兩個 `__init__.py` docstring 更新 → golden suite 3012 全過。
+
+**[已修改]**：新 25 個檔（5×contract.yaml + 5×schema.yaml + 5×module.py + 5×CLI + 5×test）+ `contract-backlog.yaml`／`method-inventory.yaml`／`root_cause/__init__.py`／`learning/__init__.py`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md`（生成物）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_event_tree tests.unit.test_change_analysis tests.unit.test_barrier_analysis tests.unit.test_kill_criteria tests.unit.test_decision_journal -v` | exit=0 | result=448 tests OK（103+101+72+31+141，零衝突）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=Ran 3131 tests in 165.094s，OK（2683→3131，+448 全新，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，index 重產後複跑）| exit=0 | result=PASSED 3012，ALL GOLDEN TESTS PASSED
+- REVIEW_DONE: critic=自審（5 個 agent 各自查重＋我逐一核實 25 個新檔案存在＋grep 每個新 machine_id 零殘留半寫引用＋2 個 agent 自己在建構過程中抓到並修正真 bug：change_analysis 的排序邏輯讓 correlation_strength 蓋過 temporal_proximity、decision_journal 的兩處非可序列化輸入導致原始 crash 而非 fail-closed）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`root_cause\.event_tree\|root_cause\.change_analysis\|root_cause\.barrier_analysis\|learning\.kill_criteria\|learning\.decision_journal` | hits=每個新 id 僅在歸屬檔+registry 出現，零重複零半寫引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：F05 root_cause 家族 9/9 全數收官；F17 learning 家族 3/9（剩 PDCA／OODA／Build-Measure-Learn／After Action Review／Post-mortem／Prediction Tracking）；各方法自己的 open_questions 維持一行版於各自 contract 檔；49–62 號共 14 個方法本輪皆未派 critic 交叉確認（自審+平行 agent 互相不知彼此存在），非阻塞。
+
+**[rollback]**：單一 commit，`git revert`；純新增檔案+既有 registry 欄位更正，無 schema 破壞性變更。
+
 ## 2026-09-07（P0-03 Evidence tamper-evidence 部分關閉——5 個必要元素逐一對照已出貨 schema，2 全關+1 半關+2 誠實留 OPEN，同一根因）
 
 **產出**：`Projects/internal/hci30/security/evidence-integrity/HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`。5 個必要元素：immutable audit refs（append-only 雙層，已關）、correction lineage（ADR-0017 bitemporal supersession，已關）、crypto-shredding（ADR-0018 key table/reference/tombstoning function 已建，只差 DSR lifecycle→`record_erasure()` 接線是 Wave 4）、content hash（Source 層級 `source_snapshots.content_hash` 已關，Evidence 內容層級卡在「還沒有真實 payload 欄位」）、hash-chain/Merkle（gap analysis 原文「where justified」本身是條件式，今天誠實答案是「還不到需要的時候」）。後兩者同一根因：Evidence/Claim 的真實 payload 欄位形狀是懸而未決的產品決策，非本輪該發明。
