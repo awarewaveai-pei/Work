@@ -558,7 +558,7 @@
     "scripts/schema_runtime.py": "3ee2b2859c70ba8820ec997b6b1b40384fb52e543a1df8516b4803a9b9de9e2b",
     "scripts/semantic.py": "0311e27d9525ea612d1944d359a4a0b9c1290203910a697d2dec6e773fa9f793",
     "scripts/serve_configurator.py": "de6592aeb2a93013e59e31c01cf8ceac33fda8c056e5816c273c12fbddfd0754",
-    "scripts/start_server.ps1": "69e18cf5c933a1135edb28de8bf5ff49f65b1eff045149ce9665cc849696b533",
+    "scripts/start_server.ps1": "995ac9c53b18c54fcab16b676086fe9ead3478a5e611bbb775d6721d83d946c9",
     "scripts/test_bootstrap_e2e.py": "15a8999cb644f9f9b7e7df084c9f523f47d3869ad3b85f31fafe0d3449b85d75",
     "scripts/test_configurator_e2e.py": "6935b0725b4359c8f272fe9ba9298022404ea58119178f6830a186fc84d24383",
     "scripts/test_configurator_http_e2e.py": "a53319cfb5e14ae3e493fa8f4505d12847f1071344e4a50a479ede9a5cb927d8",
