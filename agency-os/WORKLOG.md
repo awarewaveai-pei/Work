@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-09-07（Docker Desktop watchdog 根治：永生輪詢行程→每分鐘 reconcile 排程；critic 覆審 2 Critical+5 Major 全修；AO-RESUME smoke 新增 docker_watchdog 偵測器）
+
+**觸發**：操作者「真正修好 Docker watchdog，別再手動 recovery」（2026-09-06 手動 recovery 兩次）。
+
+**根因（全部實證）**：
+- Watchdog 排程 `LastTaskResult=0xC000013A`（行程被終止）、`RestartCount=0`、只在登入觸發 → 死一次就死到下次登入；08:33 登入後某時死亡，21:24 出事時無人在看。
+- 雙重啟動入口：`HKCU\...\Run\Docker Desktop` 直接啟動（繞過 preflight）與 Preflight 排程在登入時互搶 → Preflight `LastResult=1`。Docker 自身 `AutoStart:false`，該值為殘留。
+- 上游：backend log `vpnkit-bridge` 終止（`0x40010004`）→ backend 死 → socket 留下 → 下次啟動 `rename engine.sock → .stale: The file cannot be accessed`（4.89 + Windows AF_UNIX 平台 bug，不可修，只能自動恢復）。
+
+**改動**（`scripts/`）：
+- 新 `docker-desktop-runtime-common.ps1`：行程名單補 4.89 實際的 `com.docker.build`/`docker-agent`；liveness 改 fail-closed（查詢出錯視為活著）+ named-pipe 交叉驗證（`dockerDesktop*`/`dockerBackendApiServer`，kernel 物件不會 stale）。
+- `docker-desktop-runtime-preflight.ps1`：具名 mutex 一次只跑一個；rename 後再驗一次，Docker 剛活起來就改回去（`ROLLED-BACK:`）。
+- `watch-docker-desktop-runtime.ps1` 重寫為 reconcile pass：preflight → `watchdog.relaunch-pending` 標記 → 未見 Docker 活著就重啟（10 分鐘冷卻＝檔案 mtime，不解析內容；`watchdog.paused`/`-NoRelaunch` 可關）→ 最後才做 Run-key 清理；每步 try/catch 記 `*-FAILED:`；heartbeat + actions-only log（1 MB 輪替）。
+- 新 `register-docker-desktop-runtime-tasks.ps1`（兩個排程的 SSOT，之前只存在於機器 task store）：Watchdog 每 1 分鐘 TimeTrigger（無 `-RepetitionDuration`＝此 build 的無限；`[TimeSpan]::MaxValue` 被 26100 拒絕 `0x80041318`）、limit 2 分、無 logon trigger；Preflight 登入觸發、restart 3x。
+- `test-docker-desktop-runtime-preflight.ps1`：8→21 情境（rollback-after-rename、corrupt stamp、two-crashes、relaunch-failed-then-retried、race、NoRelaunch、Run-key 沙盒 key）。
+- `check-smoke-tests.ps1`：Check 6 `docker_watchdog`（heartbeat >5 分鐘＝WARN+blind spot；無排程的機器＝skip 非 blind）。
+- `runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md` 重寫；memory `reference_docker_desktop_stale_socket_recovery`。
+
+**critic 覆審（真跑 6 個突變 + 3 個沙盒探針）2 Critical + 5 Major 全修**：C1 cooldown 檔 0-byte/損毀 → 永久停止重啟且無 log（改用 mtime）；C2 無 try/catch 且 registry 步驟先跑（重排 + 逐步 catch + pending 標記）；M1 liveness fail-open + 只靠行程名（fail-closed + named pipes）；M2 rename 競態無回滾（post-rename rollback）；M3 兩個守衛突變存活（補 race/two-crashes 情境，突變殺掉）；M4 watchdog 也有 logon trigger＝再度雙重啟動、無互斥（拿掉 trigger + mutex）；M5 沒人看 watchdog（smoke Check 6）。Minor 修：runbook「elevated」自相矛盾、行程清單、log 讀法、情境數字面值→動態、log 輪替、limit 2 分、去 RestartCount、`-Quiet` 註明手動用。未修（記 TASKS）：封存目錄不自動清（維持 rename-only，資料安全優先）、Run 值改寫成守衛啟動器的建議（維持刪除，runbook 註明 UI 開關互動）。
+
+**自己抓到的**：`Write-Output` 汙染布林回傳（`-not @('SKIP',$false)`→重啟穿越冷卻）；`ReleaseMutex` 未取得就釋放（上線 3 分鐘內 live log 記 3 次 `PREFLIGHT-FAILED`，重試機制照設計運作，零資料影響）；dot-source 的函式蓋掉測試替身（改「未定義才定義」）；StrictMode 下函式回傳陣列展開後 `.Count` 炸。
+
+**資料安全**：只改名 `Docker\run`/`docker-secrets-engine`（0-byte socket），從不碰 VHDX/volumes/containers/settings；21 情境每例驗 VHDX 哨兵 hash；全程未停 Docker（10 個 trigger 容器不動）。**未驗證**：乾淨 Quit 是否也留 socket（無法停 live stack 測）→ 冷卻 + paused 標記為保險。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=`scripts/test-docker-desktop-runtime-preflight.ps1` | exit=0 | result=21/21 PASS（含 critic 指名的 2 個突變殺手情境）
+- REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`register-docker-desktop-runtime-tasks.ps1` + `Start-ScheduledTask` ×3 + 75 秒等待 | exit=0 | result=Preflight/Watchdog `LastResult=0`；Watchdog 自主重複觸發（LastRun 01:19:02→01:19:54）；首跑即 `RUNKEY-REMOVED`，Run 值消失；live `Docker\run` 4 項不動；`docker ps` 10 不變
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`check-smoke-tests.ps1` | exit=0 | result=`Smoke: PASS ... docker_wd=ok:heartbeat_0m`，`blind_spots=[]`
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`audit-cp950-traps.ps1 -File` ×6 + Parser::ParseFile ×6 | exit=0 | result=全部 CLEAN / parse ok
+- REVIEW_DONE: critic=Standard（真實 subagent，6 突變 + 3 沙盒探針 + live 唯讀查證）| verdict=2 Critical+5 Major+10 Minor → C/M 全修、Minor 8 修 2 記錄 | findings=2c/5m/10minor
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=`每 2 秒\|watch-docker-desktop-runtime\|Docker Desktop Runtime (Watchdog\|Preflight)\|client_mail\|docker_watchdog` | hits=「每 2 秒」僅存於歷史 WORKLOG（不改寫）；無任何文件列舉 smoke 檢查清單需補第 6 項；runbook 已重寫；`REMOTE_WORKSTATION_STARTUP.md` 無 Docker 段落（新機路徑＝runbook 指向 register 腳本）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：乾淨 Quit 留 socket 的行為未驗證（若是，Quit 後 ≤10 分鐘會被重啟；`watchdog.paused` 可關）；封存目錄手動清；單機，換機時跑 register 腳本。
+
+**[rollback]**：`git revert`；排程還原 = 重跑舊版 register（或 `Register-ScheduledTask -Xml` 本輪前匯出的 `task-*-ORIGINAL.xml`，已在 scratchpad）；Run 值還原 `Set-ItemProperty HKCU:\...\Run 'Docker Desktop' 'C:\Program Files\Docker\Docker\Docker Desktop.exe'`。
+
 ## 2026-09-07（AGENTS.md 第三次瘦身：操作者裁定「只要 AI 能 100% 遵循、不要冗長」；規則零遺失、事故敘事移 APPENDIX、§5 寫法分級併入 §9）
 
 **觸發**：操作者「agent.md 只要AI能看懂並100%遵循就好 不要冗長廢話 而且整個檔案再次做最佳整理整合 不能出任何差錯」。
