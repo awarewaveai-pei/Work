@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-09-07（58–62 號切片 critic 覆審修正：2 Minor 全修）
+
+critic scope=normal tier，spot-check。verdict SHIP WITH MINOR FIXES，0C/0M/2Minor。
+
+- `change_analysis.py`：record 層 denylist 只擋字面拼字（`caused_by` 等），camelCase/複數變體（`causedBy`/`root_causes`）繞過。改用 closed key set（`_KNOWN_RECORD_KEYS`），同 entry 層作法。舊 denylist 分支變成 dead code 已移除。+2 回歸測試。
+- `decision_journal.py`：docstring 補一句解釋 `provenance` 為何不在 hash 範圍。+1 測試補 nested non-serializable evidence provenance 案例（critic 已實跑驗證機制正確，僅補顯式測試）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_change_analysis tests.unit.test_decision_journal -v` | exit=0 | result=245 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | result=3134 tests OK（3131→3134，+3，零回歸）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | result=PASSED 3012
+REVIEW_DONE: critic=Standard（真跑 448+3131 測試、5 CLI、3 個自建 adversarial probe）| verdict=SHIP WITH MINOR FIXES → 全修 | findings=0c/0m/2minor
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`_KNOWN_RECORD_KEYS\|unserializable_extra` | hits=僅歸屬檔
+WORKLOG_DONE: 本條目
+
+rollback：單一 commit，`git revert`；純防禦強化+測試補強，行為不變（合法輸入路徑不受影響）。
+
 ## 2026-09-07（System Foundry v1.6 — Commerce OS gap audit 前 10 高優先缺口補齊：10 個新 capability + 9 個新問題 + 3 個新 derivation rule，全 verify chain 綠燈）
 
 **根因**：`reports/System_Foundry_v1.6_ARTIFACT_COMPLETE/reports/commerce-os-blueprint-gap-audit-2026-09-07.md` 掃 Commerce OS 50-module blueprint 對 capability catalog（218 項核對），36 項 MISSING，操作者核准補前 10 個（依跨 module 重複出現或是該 module 核心任務排序）。
@@ -52,6 +68,31 @@
 **[剩餘風險]**：F05 root_cause 家族 9/9 全數收官；F17 learning 家族 3/9（剩 PDCA／OODA／Build-Measure-Learn／After Action Review／Post-mortem／Prediction Tracking）；58–62 號本輪未派 critic 交叉確認的部分已由本輪 critic 補齊（5 個方法皆已真跑覆審）。**過程備註（非本批程式碼發現）**：本 session 原始 WORKLOG／TASKS 條目（58-62 號切片建置本身）被另一並行 HCI30 session 的 commit `932b9e934` 意外掃入（內容安全，僅歸屬錯置，同本 session稍早 2026-09-07 已記錄過的同款共用 index 現象第三次發生）；本條目是該次意外之後的 critic 覆審+修正記錄，獨立成篇不回頭改 932b9e934。
 
 **[rollback]**：單一 commit，`git revert`；純防禦性強化+文件補充，無 schema 變更，無行為改變（原本合法輸入路徑不變，僅原本會繞過檢查的畸形輸入路徑改變）。
+
+## 2026-09-07（P0-06 API + Event contracts——跨端點合約慣例，非端點清單；找到 RLS 真實機制非假設；event 命名留誠實 OPEN）
+
+**產出**：`Projects/internal/hci30/api/{API_CONTRACT_STANDARD.md, openapi/hci-v1.yaml, asyncapi/hci-events-v1.yaml, errors/ERROR_MAPPING.md}`。刻意不寫端點清單——全庫零 API 端點決策，列出即發明產品範圍；改寫跨端點都要遵守的合約慣例，每條自帶 CLOSED／CONVENTION／OPEN 三態標記。
+
+**CLOSED（重用既有決定）**：host/版本（ADR-0003，`servers` 陣列單一 entry `https://api.aware-wave.com`，滿足該 ADR gate 1 字面要求）；併發控制（重用 bitemporal supersession 既有 `subject_records_supersedes_unique`／`H1008`，兩個並發 supersede 在 DB 層本來就會撞，API 只需把 `23505`/`H1008` 翻譯成 `409`，未發明新鎖機制）；錯誤（重用 `database/ERROR_CODE_REGISTRY.md` 既有 `H1xxx` SQLSTATE，`errors/ERROR_MAPPING.md` 只加 HTTP status 這一個軸，不重新定義語意）。
+
+**真查出的關鍵機制（未假設）**：tenant context 在 RLS 層是靠 `hci.current_tenant_id()` 認**目前的 Postgres role**（對照 `hci.app_tenant_bindings`，`0001_wave1_synthetic_up.sql:283-291`），不是 `SET LOCAL app.tenant_id` 這類 session variable——API/worker 層之後要做的是每個請求 `SET ROLE` 到呼叫者綁定的 tenant role，這是連線池設計的真實限制，非本輪新決定。`hci.principals`（`0008_wave1_field_author_class_policy_up.sql:381-393`）是 P0-07 留白的 `actor_id` 部分先例——真實存在、tenant-scoped，但缺 ADR-0025 要求的 `actor_class` 欄位，未接進任何表的寫入路徑，仍算 OPEN。
+
+**CONVENTION（業界標準機制，非產品判斷）**：pagination（cursor-based）／idempotency（`Idempotency-Key` header，具象化 `12_DEPLOYMENT_API_AND_MULTI_TENANCY.md:72-74` 早已決定但未機制化的期望）／webhook 簽章（`X-HCI-Signature` HMAC-SHA256，秘鑰生命週期重用 `12_...md:80-82` 既有決定）／版本淘汰（`Sunset`/`Deprecation` header，RFC 8594）。
+
+**OPEN，誠實未裁決**：auth scope 對應哪個 Permission tier（P0-04 已判定是商業/風險容忍判斷非公式，這裡不代為決定）；event 命名/版本慣例——`16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md` item 11 明文「Still open」，本輪只在 `asyncapi/hci-events-v1.yaml` 提案一個延伸 AI LEGO 既有 `cognitive.run.completed` 慣例的範例頻道（`hci.data_subject_request.resolved`，重用真實 shipped 的 `event_type='RESOLVED'`），不逕自裁決為最終決定。`schemas/`（gap-analysis 原文列的獨立目錄）刻意未建——型別定義直接寫在 OpenAPI/AsyncAPI 自己的 `components`/`payload`，避免同一形狀兩處維護,比照 P0-09 的路徑偏離揭露慣例。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "import yaml; yaml.safe_load(open('api/openapi/hci-v1.yaml'))..."` 逐一解析新 2 份 YAML | exit=0 | result=2/2 語法正確
+- REALTEST_EVIDENCE: tool=Grep | cmd=核對每個引用行號（ADR-0003/`12_...md`/`19_...md:100`/migration 行號/`16_...md` item 11）逐一存在性查證，非憑記憶 | exit=0 | result=全部命中，行號精確
+- REVIEW_DONE: critic=自審（Low risk，轉寫既有決定+業界慣例，非發明產品範圍；唯一新機制發現〔Postgres-role-based tenancy〕已逐行核對 migration 原始碼）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`hci30/api/\|API_CONTRACT_STANDARD\|ERROR_MAPPING.md` | hits=僅本輪新檔+README/gap-analysis 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 4 份 `Projects/internal/hci30/api/**`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-06 補 partial-closure 段；`README.md` 補一行連結。
+
+**[剩餘風險]**：端點清單完全未定（本項目刻意不做的部分,非缺口）；ADR-0003 其餘 3 個 Wave-3 CI gate（negative routing smoke test／gateway 純淨度 grep／service-placement inventory row）仍 OPEN,屬 infra/CI 工作非文件；event 命名慣例是提案非決定,下一個要用到的 session 需先確認是否採用。
+
+**[rollback]**：`git revert`；純新增文件+既有文件補段落,無 schema/程式碼變更。
 
 ## 2026-09-07（P0-05 Machine-readable policy——5 份 YAML，2 項比預期更完整已驗證，1 項核心缺口誠實未建）
 

@@ -1,0 +1,46 @@
+asyncapi: 3.0.0
+info:
+  title: HCI Events
+  version: "1.0"
+  description: >
+    Skeleton only (P0-06 partial closure). Full event catalog and the
+    naming/versioning standard itself are OPEN
+    (16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md item 11). One worked channel
+    proves a proposed convention is machine-readable; it is a proposal for
+    the next decision-maker to ratify or reject, not a ratified decision.
+channels:
+  hci.data_subject_request.resolved:
+    description: >
+      Proposed convention: hci.<entity>.<past_tense_event>, extending AI
+      LEGO's already-decided cognitive.run.completed pattern
+      (10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:87). Reuses the real
+      event_type='RESOLVED' enum value already shipped in
+      hci.data_subject_request_events
+      (database/migrations/0001_wave1_synthetic_up.sql:176) rather than
+      inventing a new event vocabulary.
+    messages:
+      resolved:
+        $ref: '#/components/messages/DataSubjectRequestEvent'
+operations:
+  onDataSubjectRequestResolved:
+    action: receive
+    channel:
+      $ref: '#/channels/hci.data_subject_request.resolved'
+components:
+  messages:
+    DataSubjectRequestEvent:
+      description: >
+        Envelope shape reuses hci.data_subject_request_events columns
+        directly (database/migrations/0001_wave1_synthetic_up.sql:174-179)
+        rather than inventing a parallel event schema.
+      payload:
+        type: object
+        required: [tenant_id, request_id, event_type, detail, created_at]
+        properties:
+          tenant_id: { type: string, format: uuid }
+          request_id: { type: string, format: uuid }
+          event_type:
+            type: string
+            enum: [RECEIVED, REVIEW_STARTED, RESOLVED, REJECTED, CORRECTION_LINEAGE_RECORDED, ERASURE_RECORDED]
+          detail: { type: string }
+          created_at: { type: string, format: date-time }

@@ -1,0 +1,131 @@
+openapi: 3.1.0
+info:
+  title: HCI API
+  version: "1.0"
+  description: >
+    Skeleton only (P0-06 partial closure, 21_HCI_TOP_TIER_GAP_ANALYSIS.md).
+    Endpoint inventory is undecided product scope -- see
+    ../API_CONTRACT_STANDARD.md "What this file does NOT close". This file
+    proves the shared conventions are machine-readable via one worked
+    example (Case read), not a complete surface. No HCI API server exists
+    yet; nothing here is deployed.
+servers:
+  - url: https://api.aware-wave.com   # ADR-0003 gate 1: exactly one entry, this host
+paths:
+  /hci/v1/cases/{case_id}:
+    get:
+      summary: Get a Case (worked example only -- not a claim this endpoint is scheduled)
+      security:
+        - bearerAuth: ["hci:cases:read"]
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Case' }
+        '404':
+          $ref: '#/components/responses/ProblemJson'
+    patch:
+      summary: Update a Case (worked example -- demonstrates Idempotency-Key + concurrency conventions only)
+      security:
+        - bearerAuth: ["hci:cases:write"]
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Case' }
+        '409':
+          description: Concurrent supersession collision -- see ../API_CONTRACT_STANDARD.md#concurrency
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        default:
+          $ref: '#/components/responses/ProblemJson'
+  /hci/v1/cases:
+    get:
+      summary: List Cases (worked example -- demonstrates pagination convention only)
+      security:
+        - bearerAuth: ["hci:cases:read"]
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Case' }
+                  next_cursor:
+                    type: string
+                    nullable: true
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Scope string convention "hci:<resource>:<action>" -- see
+        ../API_CONTRACT_STANDARD.md#auth-scopes. Scope-to-Permission-tier
+        gating is OPEN, not encoded here.
+  parameters:
+    CursorParam:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+      description: Required on POST/PATCH. See ../API_CONTRACT_STANDARD.md#idempotency.
+  schemas:
+    Case:
+      type: object
+      description: >
+        Field subset for illustration only -- full shape is
+        docs/domain/HCI_ENTITY_DICTIONARY.md, not duplicated here.
+      properties:
+        id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        status: { type: string }
+    Problem:
+      type: object
+      description: >
+        RFC 7807 problem+json. "code" is a real H1xxx SQLSTATE from
+        database/ERROR_CODE_REGISTRY.md -- meanings are not redefined here.
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          description: H1xxx SQLSTATE, see database/ERROR_CODE_REGISTRY.md and ../errors/ERROR_MAPPING.md
+  responses:
+    ProblemJson:
+      description: Error response, see ../API_CONTRACT_STANDARD.md#errors
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
