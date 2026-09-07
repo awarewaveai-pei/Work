@@ -1,0 +1,89 @@
+$id: "ai-lego://methods/contracts/learning.ooda.contract.yaml"
+title: "OODA Method Contract"
+status: ACTIVE
+
+description: >
+  learning.ooda, family learning, Atlas F17 L802 ("OODA | 快速動態決策 |
+  Observe→Orient→Decide→Act | 高變動環境"), §12.35 L3002-3011. Distinct
+  from PDCA (L3011: decision tempo vs process stability). Invariants:
+  (1) stage_type sequence exactly OBSERVE,ORIENT,DECIDE,ACT; (2) stage
+  timestamps non-decreasing; (3) ORIENT.observation_refs resolve to real
+  OBSERVE.observations[].id in the same record.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L802): 'OODA | 快速動態決策 | Observe→Orient→Decide→Act | 高變動環境'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.35 OODA循環／觀察導向決策循環 (L3002-3011)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.34 PDCA (L2989-2999) -- L3011 is the due-diligence distinction from this method"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs this. learning.ooda mints new machine_id, F17 6th member
+  after reversal_criteria/kill_criteria/decision_journal/pdca/after_action_review.
+  Registered in contract-backlog.yaml tier_1 by orchestrating session, not this file.
+
+id: learning.ooda
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [FRAME, INFER, DECIDE]
+# INFERRED, not cited -- Atlas gives no composition formula. All 3 confirmed
+# real values in specs/cognitive/primitive.schema.yaml's CANONICAL_KERNEL enum.
+
+purpose:
+  - run_a_rapid_observe_orient_decide_act_decision_cycle_under_volatility
+
+inputs:
+  required: []
+  optional: []
+# Leaf method, same class as learning.pdca: stages are raw human/AI-supplied content.
+
+outputs: [OODACycleRecord]
+
+preconditions:
+  - "stages[] has exactly 4 entries, stage_type sequence OBSERVE,ORIENT,DECIDE,ACT"
+  - "stage timestamps non-decreasing from OBSERVE through ACT"
+  - "ORIENT.observation_refs[] each resolve to a real OBSERVE.observations[].id in the same record"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition: []
+recommended_next: []
+# Atlas gives no worked detail for either -- same open-question class as every sibling Tier 1 contract.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of PDCA (same family, adjacent Atlas row)?"
+    decision: "No -- L3011 distinguishes decision-tempo (OODA) from process-stability (PDCA)."
+  - question: "Model ORIENT as a plain narrative stage or a structurally-grounded one?"
+    decision: "Grounded -- observation_refs must resolve to real OBSERVE.observations[].id (Boyd's Orient-is-decisive emphasis, outside knowledge, disclosed in ai_lego/modules/learning/ooda.py)."
+  - question: "One cycle per record (like a fixed 4-stage shape) or N cycles (cycles[] array like PDCA)?"
+    decision: "One fixed cycle -- Atlas's own L3007 diagram has no loop-back arrow, unlike PDCA's L2994."
+  - question: "Is timestamp monotonicity an Atlas-cited requirement?"
+    decision: "No -- derived, so compute_cycle_tempo_seconds (operationalizing L3011's 'decision tempo') stays meaningful."
+
+open_questions:
+  - "OQ-OODA-1: cognitive_primitives [FRAME, INFER, DECIDE] is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+  - "OQ-OODA-2: Should repeated OODA cycles (the 'loop' in 'OODA Loop') become a cycles[] array like PDCA instead of one-record-per-cycle? Deferred -- L3007's diagram gives no loop-back detail to ground it.（owner: operator）"
+  - "OQ-OODA-3: duplicate observations[].id within one OBSERVE stage is not separately rejected (grounding still resolves via set membership).（owner: operator）"
+  - "OQ-OODA-4: RESOLVED. F17 now 8/9 built (this batch also shipped build_measure_learn/after_action_review/post_mortem); remaining: Prediction Tracking.（owner: operator）"
+
+verification:
+  method: >
+    Grepped Atlas for OODA/Observe.*Orient.*Decide.*Act -- L802 table row,
+    L3002-3011 §12.35 section, L3011 PDCA distinction (confirmed non-duplicate).
+    Read learning.pdca.contract.yaml + pdca.py (complete, 338 lines) and
+    root_cause.fault_tree.py in full for the two-layer gate pattern before
+    evaluating the existing ooda.py (396 lines, written by a prior session
+    before a mid-batch API rate-limit crash unrelated to code correctness;
+    verified sound on full re-read, built on top rather than rewritten).
+    Validated against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document modified. L802/L3007's formula is transcribed
+    verbatim. The 4-fixed-stage (not cycles[]) shape and the
+    observation_refs grounding invariant are compilation decisions, not
+    textually cited.

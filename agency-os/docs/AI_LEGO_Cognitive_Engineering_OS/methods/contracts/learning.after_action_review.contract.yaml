@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/learning.after_action_review.contract.yaml"
+title: "After Action Review Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, learning family (F17), after reversal_criteria/kill_criteria/decision_journal/pdca.
+  Atlas F17 L804: "After Action Review | 比較預期與實際 | Expected? Actual? Why? Next? | 快速組織學習".
+  Not in EC/Master Plan; only other mention is F19 Game Day row (L858, formula ends "...→AAR").
+  Single-stage retrospective, no hash-lock (unlike decision_journal's two-stage design).
+  2 invariants: why_factors >=2 entries/>=3 words each/no dup-after-normalize; next_actions >=1 owned entry.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L804): 'After Action Review | 比較預期與實際 | Expected? Actual? Why? Next? | 快速組織學習'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F19 table row (L858): Game Day formula '...→recover→AAR', the only other Atlas mention"
+  - "methods/contracts/learning.decision_journal.contract.yaml (same family, read in full to determine structural distinctness -- see compilation_decisions)"
+  - "methods/contracts/devops_sre.game_day.contract.yaml (embeds the same 4 Atlas L804 keys as its own `aar` phase output; its OQ-GAMEDAY-2 asks whether a future F17 object should be referenced by it -- resolved from this side, see compilation_decisions)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  methods/registry/contract-backlog.yaml tier_1, same class of
+  justification as every sibling entry. id: learning.after_action_review
+  mints a new machine_id, 4th learning family (F17) member.
+
+id: learning.after_action_review
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [COMPARE, CAUSE, LEARN]
+# INFERRED not cited. COMPARE/LEARN from Atlas L804's own description/benefit columns; CAUSE from
+# root_cause-family vocabulary (Why prompt).
+
+purpose:
+  - compare_expected_versus_actual_outcome_and_extract_owned_next_actions
+
+inputs:
+  required: []
+  optional: [ActivityRef]
+# Leaf method, same shape as learning.decision_journal: expected/actual/
+# why_factors/next_actions are raw retrospective content, not references
+# to a pre-existing typed object that must resolve first. ActivityRef
+# stays optional free text -- an AAR does not require a formal prior
+# decision or activity record to exist (due-diligence finding, see
+# compilation_decisions).
+
+outputs: [AfterActionReviewRecord]
+
+preconditions:
+  - "why_factors has >= 2 entries, each >= 3 whitespace-separated words, and no two entries normalize (case/whitespace-insensitive) to the same text"
+  - "next_actions has >= 1 entry and every entry names a non-empty owner"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # expected/actual/why/next are retrospective narrative content the
+  # author supplies directly, not claims sourced from an EvidenceSet
+  # input -- same reasoning learning.kill_criteria's own contract gives
+  # for its forward-looking thresholds.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas gives no worked detail for either -- same open-question class as
+# every sibling Tier 1 contract.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Distinct method or near-duplicate of learning.decision_journal (both compare expected/forecast vs actual)?"
+    decision: "Distinct -- decision_journal is 1 decision/>=2 options/hash-locked pre-outcome (防 hindsight bias); AAR is any completed activity, no options structure, retrospective-only, no hash-lock (快速組織學習)."
+  - question: "Single-stage, or decision_journal's two-stage stage1-then-outcome design?"
+    decision: "Single-stage -- AAR is written after the outcome is already known, so there is no pre-outcome state to hash-lock."
+  - question: "How to check 'Why?' is genuine multi-factor analysis without fake NLP semantic checking?"
+    decision: "2 syntactic floors: >=2 why_factors entries, each >=3 whitespace-separated words, no two equal after case/whitespace normalize (root_cause.kepner_tregoe's own _normalize technique)."
+  - question: "Per-item provenance on why_factors/next_actions, matching kill_criteria's per-threshold provenance?"
+    decision: "No -- one record-level provenance only, matching decision_journal's own options[] (no per-item provenance)."
+  - question: "devops_sre.game_day's OQ-GAMEDAY-2 asks whether its embedded aar phase object should reference this method once built. Retrofit game_day?"
+    decision: "No, resolved not executed (game_day's files out of this task's scope). game_day's aar stays embedded -- a narrower phase-output nested in a bigger drill record; nothing blocks a caller separately building an AfterActionReviewRecord from a completed game day's own expected/actual values."
+
+open_questions:
+  - "OQ-AAR-1: Should ActivityRef be upgraded to a hard pattern or $ref once a real Activity/Task record commonly exists at AAR-write time, matching OQ-DECISIONJOURNAL-1's own open question for a sibling method?（owner: operator）"
+  - "OQ-AAR-2: MIN_WHY_FACTORS=2 and MIN_WHY_FACTOR_WORDS=3 are this file's own disclosed, arbitrary-but-documented thresholds -- no Atlas worked example gives a number.（owner: operator）"
+  - "OQ-AAR-3: cognitive_primitives [COMPARE, CAUSE, LEARN] is this file's own inference (COMPARE/LEARN transcribed from Atlas's own L804 description/benefit columns, CAUSE borrowed from the root_cause family vocabulary), not a cited Atlas §4 composition formula.（owner: operator）"
+  - "OQ-AAR-4: the >=3-word floor is a plain str.split() on whitespace (ai_lego/modules/learning/after_action_review.py _word_count) -- CJK text with no inter-word spacing counts as one token and is rejected by the same floor an equivalent-length English sentence would pass (regression-locked: tests/unit/test_after_action_review.py WhyAnalysisInvariantTests.test_cjk_text_with_no_whitespace_is_word_floor_blind_spot). Should a future revision add a CJK-aware character-count fallback?（owner: operator）"
+
+verification:
+  method: >
+    Grepped Atlas case-insensitively for After Action Review/AAR (2 hits: L804 table row, L858 Game
+    Day formula's final phase; no dedicated section beyond those). Read decision_journal.py in full
+    (distinctness, see compilation_decisions), fault_tree.py and kill_criteria.py (gate/ownership house
+    style). Found game_day.py's embedded aar (identical 4 keys) and its OQ-GAMEDAY-2 via own grep for
+    "after_action_review" across ai_lego/ -- resolved above. Grepped specs/** and ai_lego/ for
+    after_action_review/AfterActionReview/快速組織學習 -- zero pre-existing hits beyond game_day's
+    embedded keys. Validated against method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document modified. why_factors/next_actions structured-list shape, the 2-factor/3-word/
+    ownership invariants, and the single-stage design are disclosed compilation decisions, not cited.

@@ -1,0 +1,201 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/pdca-cycle-record.schema.yaml"
+title: PDCA Cycle Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `PDCACycleRecord`, outputs of `learning.pdca`. Atlas F17 L801 ("PDCA |
+  持續改善 | Plan→Do→Check→Act | 穩定流程長期改進"), L2994 loop formula.
+  `cycles[]` = the loop. Stage order (PLAN,DO,CHECK,ACT) fixed, expressed
+  via `prefixItems`. Cross-cycle continuity (cycle N>1 PLAN references
+  cycle N-1 ACT) not schema-expressible -- runtime gate,
+  `PDCA_LEARNING_CONTINUITY_VIOLATED` (`ai_lego/modules/learning/pdca.py`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L801)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.34 (L2989-2999)"
+  - "methods/contracts/learning.pdca.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  action_item:
+    type: object
+    required: [id, description]
+    additionalProperties: false
+    description: "One concrete Act-stage output -- what a later cycle's PLAN may carry forward by id."
+    properties:
+      id:
+        type: string
+        pattern: "^ACTION-"
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+  stage_plan:
+    type: object
+    required: [stage_name, description, provenance, carried_forward_action_item_ids]
+    additionalProperties: false
+    properties:
+      stage_name: {const: PLAN}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      carried_forward_action_item_ids:
+        type: [array, "null"]
+        minItems: 1
+        items: {type: string, pattern: "^ACTION-"}
+        description: >
+          null for cycle 1 (nothing precedes it). Non-empty for cycle N>1 --
+          every id MUST resolve to a real action_items[].id in cycle N-1's
+          own ACT stage (PDCA_LEARNING_CONTINUITY_VIOLATED if not; runtime
+          layer only, see file description).
+
+  stage_do:
+    type: object
+    required: [stage_name, description, provenance]
+    additionalProperties: false
+    properties:
+      stage_name: {const: DO}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  stage_check:
+    type: object
+    required: [stage_name, description, provenance]
+    additionalProperties: false
+    properties:
+      stage_name: {const: CHECK}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  stage_act:
+    type: object
+    required: [stage_name, description, provenance, action_items]
+    additionalProperties: false
+    properties:
+      stage_name: {const: ACT}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      action_items:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/action_item"}
+        description: "Real Deming Act output -- what is standardized or adjusted. Never empty: an Act stage with nothing concrete cannot feed a later cycle's PLAN."
+
+  cycle:
+    type: object
+    required: [cycle_number, stages]
+    additionalProperties: false
+    properties:
+      cycle_number:
+        type: integer
+        minimum: 1
+        description: "MUST equal this cycle's 1-based position in the record's own cycles[] (sequential, no gaps/duplicates) -- runtime layer only, see PDCA_INVALID_CYCLES."
+      stages:
+        type: array
+        minItems: 1
+        prefixItems:
+          - $ref: "#/$defs/stage_plan"
+          - $ref: "#/$defs/stage_do"
+          - $ref: "#/$defs/stage_check"
+          - $ref: "#/$defs/stage_act"
+        items: false
+        description: "1-4 entries, position i MUST satisfy prefixItems[i] -- this IS the ordered-prefix invariant, expressed declaratively (see file description). May terminate early (cycle still in progress); never reordered, never longer than 4."
+
+type: object
+required: [id, version, process_under_improvement, cycles, provenance]
+additionalProperties: false
+properties:
+  id:
+    type: string
+    pattern: "^PDCA-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "learning.pdca"
+  process_under_improvement:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The process/system under continuous improvement -- Atlas's own literal '穩定流程' (stable process)."
+  cycles:
+    type: array
+    minItems: 1
+    items: {$ref: "#/$defs/cycle"}
+    description: "ORDER-SIGNIFICANT: index i+1 is cycle i's own cycle_number, and cycle i+1's PLAN (if any) references cycle i's ACT."
+  provenance:
+    description: "epistemic_type commonly HUMAN_OPINION or AI_INFERENCE -- process narrative, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed), grounded in this repo's own real
+      2026-09-07 fix (agency-os/WORKLOG.md "Docker Desktop watchdog 根治"
+      entry; scripts/register-docker-desktop-runtime-tasks.ps1;
+      scripts/check-smoke-tests.ps1 Check 6 docker_watchdog). Cycle 1 closes
+      the original blind spot; cycle 2 (in progress, PLAN+DO only) carries
+      forward cycle 1's own disclosed follow-up finding.
+    value:
+      id: "PDCA-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "learning.pdca"
+      process_under_improvement: "Docker Desktop daemon watchdog system, primary workstation (LAPTOP-R7I86OR5)"
+      cycles:
+        - cycle_number: 1
+          stages:
+            - stage_name: PLAN
+              description: "Root-cause the 2026-09-06 incident: daemon died once and stayed dead until next login, nobody watching -- plan a per-minute reconcile task plus a smoke-test detector."
+              provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+              carried_forward_action_item_ids: null
+            - stage_name: DO
+              description: "Implement watch-docker-desktop-runtime.ps1 (per-minute reconcile) via register-docker-desktop-runtime-tasks.ps1, and check-smoke-tests.ps1 Check 6 (docker_watchdog)."
+              provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+            - stage_name: CHECK
+              description: "Verified: watchdog restarts a killed daemon within one minute; smoke Check 6 surfaces WARN when the watchdog's own guard state is unhealthy."
+              provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+            - stage_name: ACT
+              description: "Standardize the watchdog+Check6 pair as permanent baseline monitoring; adjust scope next cycle to cover WSL2 backend health, not just daemon liveness."
+              provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+              action_items:
+                - {id: "ACTION-001", description: "Standardize: keep the per-minute watchdog + smoke Check 6 pair as permanent baseline monitoring."}
+                - {id: "ACTION-002", description: "Adjust: watchdog only checks daemon liveness, not WSL2 backend health specifically -- extend monitoring scope next cycle."}
+        - cycle_number: 2
+          stages:
+            - stage_name: PLAN
+              description: "Extend watchdog scope to WSL2 backend health, per cycle 1's own ACTION-002 finding."
+              provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+              carried_forward_action_item_ids: ["ACTION-002"]
+            - stage_name: DO
+              description: "In progress: drafting a WSL2-backend-specific health probe."
+              provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal single-cycle, single-stage (PLAN only) in-progress record."
+    value:
+      id: "PDCA-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "learning.pdca"
+      process_under_improvement: "internal weekly retro process"
+      cycles:
+        - cycle_number: 1
+          stages:
+            - stage_name: PLAN
+              description: "Plan a shorter retro format."
+              provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+              carried_forward_action_item_ids: null
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F17 table row (L801) and §12.34 (L2989-2999) directly. Grepped WORKLOG.md/scripts to independently confirm the worked example's own facts before citing them. Validated against jsonschema Draft202012Validator."
+  note: >
+    No mother document was modified. L801/L2994's formula is transcribed
+    directly. The prefixItems-as-ordered-prefix design, the
+    carried_forward_action_item_ids cross-reference, and action_item's
+    minimal id+description shape are compilation decisions (see method
+    contract), not textually cited.

@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/learning.build_measure_learn.contract.yaml"
+title: "Build-Measure-Learn Method Contract"
+status: ACTIVE
+
+description: >
+  learning.build_measure_learn, family learning, Atlas F17 L803
+  ("Build–Measure–Learn | 產品探索 | build smallest test→measure→learn |
+  減少先建後驗證"). No dedicated section beyond the row; not in EC §32.
+  Invariants: (1) measure/learn cross-reference build/measure by id;
+  (2) build.cut_scope discloses what "smallest" left out.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L803): 'Build–Measure–Learn | 產品探索 | build smallest test→measure→learn | 減少先建後驗證'"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs this. learning.build_measure_learn mints new machine_id,
+  F17 member built this batch alongside pdca/ooda. Registered in
+  contract-backlog.yaml tier_1 by orchestrating session, not this file.
+
+id: learning.build_measure_learn
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [FRAME, VALIDATE, LEARN]
+# INFERRED, not cited -- same inference learning.pdca's own contract makes.
+# FRAME=scope the smallest test, VALIDATE=Measure, LEARN=Learn.
+
+purpose:
+  - run_one_build_measure_learn_iteration_with_stages_cross_referenced
+
+inputs:
+  required: []
+  optional: []
+# Leaf method, same class as decision_journal/pdca/kill_criteria/reversal_criteria:
+# build/measure/learn content is raw human/AI-supplied, not a reference to a
+# pre-existing typed object.
+
+outputs: [BuildMeasureLearnCycle]
+
+preconditions:
+  - "measure.build_ref equals build.artifact_id"
+  - "learn.metric_refs is non-empty and every id resolves to a measure.metrics[].id"
+  - "build.cut_scope is a non-empty list of non-empty strings"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition: []
+recommended_next: []
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of F15's Prototype/MVP/PoC/A-B-Test tools?"
+    decision: "No -- due-diligence grep found zero F15-grounded method built anywhere in ai_lego/ (no experiment/validation module family exists); F15 rows are single-experiment mechanics, this is F17's own build-measure-learn iteration record."
+  - question: "One record per iteration, or a PDCA-style cycles[] loop?"
+    decision: "One iteration per record -- L803's own formula has no trailing repeat arrow, unlike PDCA's L2994 '...->Act->...'."
+  - question: "How is 'Measure references Build' enforced?"
+    decision: "build.artifact_id / measure.build_ref id cross-reference, same dangling-reference discipline as fault_tree.gate_ref / ooda.observation_refs."
+  - question: "How is 'Learn cites Measure's actual data' enforced?"
+    decision: "learn.metric_refs must be non-empty and every id must resolve to a real measure.metrics[].id -- empty or unresolved is opinion, not data-grounded learning."
+  - question: "How is the literal word 'smallest' operationalized?"
+    decision: "build.cut_scope non-empty list -- the build stage must name what was deliberately left out to stay minimal."
+  - question: "Does a metric carry a caller-supplied comparison operator or threshold, like kill_criteria/reversal_criteria?"
+    decision: "No -- out of scope. A metric is an observed id/name/value/unit/provenance tuple; interpreting it is Learn's own job, not a structural field."
+
+open_questions:
+  - "OQ-BUILDMEASURELEARN-1: cognitive_primitives [FRAME, VALIDATE, LEARN] is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+  - "OQ-BUILDMEASURELEARN-2: No chaining field to a prior iteration (e.g. previous_iteration_ref) -- real Lean Startup practice loops; this method models exactly one pass per L803's own formula, deferred not silently dropped.（owner: operator）"
+  - "OQ-BUILDMEASURELEARN-3: F17 remaining after this batch (pdca/ooda/build_measure_learn): After Action Review, Post-mortem, Prediction Tracking.（owner: operator）"
+
+verification:
+  method: >
+    Grepped Atlas for Build/Measure/Learn/BML -- only L803 table row hits
+    (no dedicated section: L2989-3025 read directly, confirms §12.34
+    PDCA/§12.35 OODA/§12.36 Decision Journal run back-to-back with none
+    between). Grepped ai_lego/modules/ and methods/contracts/ for
+    MVP/prototype/A-B/experiment as machine_ids or schema titles -- zero
+    F15-grounded method exists (only devops_sre.chaos_engineering's
+    unrelated chaos-experiment and a hypothetical "validation.experiment"
+    example name in fault_tree.py's own docstring, never built). Read
+    reversal_criteria.py/kill_criteria.py/decision_journal.py/pdca.py/
+    fault_tree.py in full before writing. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema Draft202012Validator.
+  note: >
+    No mother document modified. L803's formula is transcribed verbatim.
+    artifact_id/build_ref/metric_refs cross-references and cut_scope are
+    compilation decisions, not textually cited.

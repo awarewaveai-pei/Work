@@ -1,0 +1,99 @@
+$id: "ai-lego://methods/contracts/learning.post_mortem.contract.yaml"
+title: "Post-mortem Method Contract"
+status: ACTIVE
+
+description: >
+  learning.post_mortem, F17, 8th member. Atlas L805: timeline→impact→causes→
+  actions, "防重發、非 blame". Distinct from root_cause.barrier_analysis
+  (single-cause F05 diagnostic vs whole-incident F17 retrospective, see
+  compilation_decisions). Invariants: no-blame closed key sets
+  (timeline/causes), causes trace to timeline, actions have owners.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 tool table, Post-mortem row (L805): 'timeline→impact→causes→actions', benefit '防重發、非 blame'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §55 Incident Mode (L1888-1923): 15-step pipeline, Post-mortem is the terminal step"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.8 Production Incident Recipe (L3407-3423): Mermaid diagram, Post-mortem terminal, immediately after Barrier Analysis"
+  - "methods/contracts/root_cause.barrier_analysis.contract.yaml and ai_lego/modules/root_cause/barrier_analysis.py (both read in full): due-diligence comparison target, and the source of the NO-BLAME closed-key-set mechanism this contract reuses"
+  - "ai_lego/modules/learning/kill_criteria.py: same-family ownership-gate pattern (shape check separate from non-empty-owner check) this contract's action-ownership invariant follows"
+  - "ai_lego/modules/root_cause/fault_tree.py: shape/referential-integrity gate-splitting pattern this contract's causes/timeline_ref check follows"
+  - "methods/registry/method-inventory.yaml Post-mortem entry (L1053-1057): category F17 learning, line field reads 802 -- CORRECTED here to the real L805 position, the same systematic +3 drift disclosed by 9 prior contracts (most recently devops_sre.game_day)"
+  - "specs/cognitive/primitive.schema.yaml L66-90 -- the 24-value canonical kernel this contract's own cognitive_primitives draws from"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives this method one table row, transcribed
+  directly below. `id: learning.post_mortem` mints a new machine_id, 4th
+  concrete F17 entry alongside reversal_criteria/kill_criteria/decision_journal.
+
+id: learning.post_mortem
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [DECOMPOSE, CAUSE, LEARN]
+# INFERRED, not cited -- Atlas gives no composition formula. DECOMPOSE=timeline
+# reconstruction, CAUSE=causes stage, LEARN=actions stage (Atlas's own benefit
+# "防重發"). Verified against the real 24-value kernel
+# (specs/cognitive/primitive.schema.yaml L66-90).
+
+purpose:
+  - retrospectively_learn_from_an_incident_via_timeline_impact_causes_and_owned_preventive_actions_without_attributing_blame_to_an_individual
+inputs:
+  required: []
+  optional: [BarrierAnalysisRecord, FaultTreeRecord]
+  # Leaf method (raw human/AI-supplied content), same class as decision_journal/
+  # pdca. The two optional refs are SOFT (format-only, id-prefix only) via each
+  # causes[] entry's own source_analysis_ref -- not a hard typed-object input.
+outputs: [PostMortemRecord]
+preconditions:
+  - "record_id (POSTMORTEM- prefix), incident_name, impact_description are non-empty strings; version is a string"
+  - "timeline has >=1 entry; every entry has a unique T- prefixed event_id, non-empty timestamp, non-empty description -- closed key set, no field for a named individual"
+  - "causes has >=1 entry; every entry has a unique C- prefixed cause_id, non-empty description, a timeline_ref resolving to a real timeline[] event in the SAME record, and an optional source_analysis_ref -- closed key set, no field for a named individual"
+  - "actions has >=1 entry; every entry has a unique A- prefixed action_id, non-empty description, and a non-empty owner"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas §22.3's own gate table (grep-confirmed) has no Post-mortem row.
+recommended_next: []
+# Post-mortem is EC §55's own terminal pipeline step -- nothing Atlas-cited follows it.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of root_cause.barrier_analysis (both touch 'no blame')?"
+    decision: "No -- barrier_analysis is a single-cause F05 diagnostic chain; post_mortem is a whole-incident F17 retrospective, terminal step of EC §55's pipeline, AFTER diagnostic tools already ran."
+  - question: "How does 'causes' relate to prior diagnostic tools (Fishbone/Fault Tree/Barrier Analysis/5 Whys)?"
+    decision: "Optional per-cause source_analysis_ref soft link (format-only, unconstrained prefix) -- references, does not re-implement, root-cause diagnosis."
+    reasoning: "A single fixed prefix can't work (causes may originate from any root_cause-family method); hard-coupling this module to every sibling's prefix constant would need an edit here every time a new one is added."
+  - question: "Does the NO-BLAME closed-key-set (barrier_analysis's own mechanism) extend to actions[].owner?"
+    decision: "No -- no-blame applies to timeline[]/causes[] only. actions[].owner is FORWARD-looking accountability (who prevents recurrence), not fault attribution."
+  - question: "Enforce timeline[] chronological ordering or a timestamp format?"
+    decision: "No -- out of scope, disclosed as OQ-POSTMORTEM-1."
+  - question: "Gate granularity: one bundled gate (fault_tree style) or one gate per invariant (kill_criteria style)?"
+    decision: "One gate per invariant (structure/referential_integrity/action_ownership) -- same-family kill_criteria precedent, and the task's own 3 invariants are analytically distinct."
+
+open_questions:
+  - "OQ-POSTMORTEM-1: timeline[] entries are not checked for chronological order, and timestamp is an unconstrained non-empty string (no ISO 8601 format enforcement). A future revision could add both.（owner: operator）"
+  - "OQ-POSTMORTEM-2: source_analysis_ref is a free-form soft link, not validated against any real record or closed prefix set. A future ledger-level cross-record check could verify it resolves.（owner: operator）"
+  - "OQ-POSTMORTEM-3: F17 learning family status at build time: 5 of 9 built before this contract (reversal_criteria/kill_criteria/decision_journal/pdca/ooda -- ooda/pdca not yet reflected in contract-backlog.yaml/method-inventory.yaml per learning.pdca.contract.yaml's own OQ-PDCA-3), this contract adds a 6th. Remaining: Build-Measure-Learn, After Action Review, Prediction Tracking.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Grepped Atlas for post-mortem/postmortem (case-insensitive) across the whole
+    spec root -- L805 table row, EC §55 L1888-1923, Atlas §13.8 L3407-3423,
+    devops_sre.game_day.contract.yaml's own prior citation of all three. Read
+    root_cause.barrier_analysis.contract.yaml and barrier_analysis.py in full
+    for the due-diligence distinctness check and the no-blame mechanism. Read
+    kill_criteria.py in full for the ownership-gate pattern. Read fault_tree.py
+    in full for the shape/referential-integrity gate-splitting pattern this
+    contract's own causes/timeline_ref check follows. Confirmed via
+    method_resolver.py that method resolution scans methods/contracts/*.contract.yaml
+    directly, not contract-backlog.yaml (so this contract alone is sufficient for
+    the CLI/tests to resolve, no shared-file edit required). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 4-stage formula (timeline/
+    impact/causes/actions) is transcribed directly into preconditions above.
+    The soft-link source_analysis_ref, the no-blame/ownership split between
+    causes and actions, and the 4-gate granularity are disclosed compilation
+    decisions, not further mother-document citations.

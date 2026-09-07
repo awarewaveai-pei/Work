@@ -1,0 +1,197 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/build-measure-learn-cycle.schema.yaml"
+title: Build-Measure-Learn Cycle
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `BuildMeasureLearnCycle`, output of `learning.build_measure_learn`. Atlas
+  F17 L803. ONE iteration (build+measure+learn), not a container of many --
+  L803's own arrow has no trailing repeat, unlike PDCA's L2994. The
+  cross-reference invariants (measure.build_ref -> build.artifact_id;
+  learn.metric_refs -> measure.metrics[].id) are runtime-gate-only, not
+  schema-expressible beyond string patterns -- see
+  `ai_lego/modules/learning/build_measure_learn.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L803)"
+  - "methods/contracts/learning.build_measure_learn.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  metric:
+    type: object
+    required: [id, name, value, unit, provenance]
+    additionalProperties: false
+    description: "One measured data point Build's output was measured on."
+    properties:
+      id:
+        type: string
+        pattern: "^METRIC-"
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      value:
+        type: number
+        description: "No sign/range constraint -- Atlas gives no worked numeric convention for this row (unlike kill_criteria's own closed dimension set)."
+      unit:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Required -- a bare number is not comparable (same discipline kill_criteria's own unit field establishes)."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  build_stage:
+    type: object
+    required: [description, artifact_id, cut_scope, provenance]
+    additionalProperties: false
+    properties:
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      artifact_id:
+        type: string
+        pattern: "^ARTIFACT-"
+        description: "What measure.build_ref must resolve to (runtime gate BUILDMEASURELEARN_MEASURE_BUILD_REF_UNRESOLVED if it does not)."
+      cut_scope:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1, pattern: "\\S"}
+        description: "What was deliberately left out to keep the test 'smallest' (Atlas L803's own word) -- runtime gate BUILDMEASURELEARN_UNDISCLOSED_CUTS if empty."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  measure_stage:
+    type: object
+    required: [description, build_ref, metrics, provenance]
+    additionalProperties: false
+    properties:
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      build_ref:
+        type: string
+        pattern: "^ARTIFACT-"
+        description: "MUST equal build.artifact_id (see file description)."
+      metrics:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/metric"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  learn_stage:
+    type: object
+    required: [conclusion, metric_refs, provenance]
+    additionalProperties: false
+    properties:
+      conclusion:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      metric_refs:
+        type: array
+        minItems: 1
+        items: {type: string, pattern: "^METRIC-"}
+        description: "Every id MUST resolve to a real measure.metrics[].id -- runtime gate BUILDMEASURELEARN_LEARN_CITES_NOTHING_MEASURED if empty or unresolved. A Learn stage citing nothing measured is opinion, not learning."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+type: object
+required: [id, version, product_under_exploration, build, measure, learn, provenance]
+additionalProperties: false
+properties:
+  id:
+    type: string
+    pattern: "^BML-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "learning.build_measure_learn"
+  product_under_exploration:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The product/feature under exploration -- Atlas's own '產品探索' (product exploration)."
+  build:
+    $ref: "#/$defs/build_stage"
+  measure:
+    $ref: "#/$defs/measure_stage"
+  learn:
+    $ref: "#/$defs/learn_stage"
+  provenance:
+    description: "epistemic_type commonly DECISION (the Learn stage's own conclusion) or HUMAN_OPINION -- process narrative, not itself a single calculated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed), grounded in this repo's own real
+      2026-08-17 meeting-pipeline benchmark (memory note
+      project_meeting_to_ppt_pipeline: BU5.m4a, 60-minute real recording,
+      RTX 5060 / i7-13700HX). The smallest test that could settle
+      "is a pure-CPU self-hosted EU VPS route viable" -- one real recording
+      run through transcription+diarization on both GPU and CPU, nothing
+      downstream (PPT/coach/summary) built yet.
+    value:
+      id: "BML-2026-08-17-001"
+      version: "1.0.0"
+      generated_by_method: "learning.build_measure_learn"
+      product_under_exploration: "會議錄音→逐字稿/PPT/報告教練 pipeline -- EU VPS 純 CPU 自架路線 vs 本機 GPU 路線"
+      build:
+        description: "以真實 60 分鐘餐敘錄音（BU5.m4a）跑 faster-whisper large-v3 轉錄 + pyannote 3.1 講者分離，GPU／CPU 各跑一次，作為判斷純 CPU 自架是否可行的最小測試。"
+        artifact_id: "ARTIFACT-2026-08-17-BU5-TRANSCRIBE-DIARIZE-RUN"
+        cut_scope:
+          - "PPT/報告教練/會議記錄產出階段未測 -- 本次只測轉錄+講者分離兩步"
+          - "摘要階段人工回路未自動化（操作者要求零額外花費、只用訂閱額度）"
+          - "多語言/多講者規模未涵蓋 -- 單一 60 分鐘中文餐敘錄音樣本"
+          - "180 秒短切片 benchmark 刻意排除 -- 已知會嚴重低估吞吐，一律用完整檔"
+        provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+      measure:
+        description: "量測轉錄與講者分離在 GPU／CPU 兩種硬體路徑下的 realtime 倍率。"
+        build_ref: "ARTIFACT-2026-08-17-BU5-TRANSCRIBE-DIARIZE-RUN"
+        metrics:
+          - {id: "METRIC-001", name: "whisper_transcription_speed_gpu", value: 7.0, unit: "x_realtime", provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}}
+          - {id: "METRIC-002", name: "pyannote_diarization_speed_gpu", value: 24.4, unit: "x_realtime", provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}}
+          - {id: "METRIC-003", name: "whisper_transcription_speed_cpu", value: 0.3, unit: "x_realtime", provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}}
+        provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+      learn:
+        conclusion: "GPU 路線本機零費用且夠快（7.0x/24.4x realtime）；CPU-only 0.3x（60 分鐘要 3.6 小時）不可行 -- EU VPS 純 CPU 自架路線判死，改本機 GPU 路線。"
+        metric_refs: ["METRIC-001", "METRIC-002", "METRIC-003"]
+        provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+  - description: "A minimal single-metric record."
+    value:
+      id: "BML-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "learning.build_measure_learn"
+      product_under_exploration: "internal tool onboarding flow"
+      build:
+        description: "One-page static mock of the new onboarding screen, no backend."
+        artifact_id: "ARTIFACT-2026-09-07-002"
+        cut_scope: ["Backend/API integration not built -- static mock only"]
+        provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      measure:
+        description: "Time-to-first-click in a 5-person hallway test."
+        build_ref: "ARTIFACT-2026-09-07-002"
+        metrics:
+          - {id: "METRIC-001", name: "median_time_to_first_click_seconds", value: 12, unit: "seconds", provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}}
+        provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+      learn:
+        conclusion: "12s median is within the 15s target -- proceed to a real backend."
+        metric_refs: ["METRIC-001"]
+        provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+verification:
+  method: "Read Atlas F17 table row (L803) directly; confirmed no dedicated section exists (L2989-3025 read in full). Independently verified the worked example's own numbers against memory note project_meeting_to_ppt_pipeline before citing them. Validated against jsonschema Draft202012Validator."
+  note: >
+    No mother document was modified. L803's formula is transcribed
+    directly. The artifact_id/build_ref/metric_refs cross-reference fields
+    and cut_scope are compilation decisions (see method contract), not
+    textually cited.

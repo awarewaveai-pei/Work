@@ -1031,30 +1031,35 @@ by_document:
         has_contract: false
         contract_status: pending
       - name: "PDCA"
-        line: 798
-        category: "F17 learning"
-        has_contract: false
-        contract_status: pending
-      - name: "OODA"
-        line: 799
-        category: "F17 learning"
-        has_contract: false
-        contract_status: pending
-      - name: "Build–Measure–Learn"
-        line: 800
-        category: "F17 learning"
-        has_contract: false
-        contract_status: pending
-      - name: "After Action Review"
         line: 801
         category: "F17 learning"
-        has_contract: false
-        contract_status: pending
-      - name: "Post-mortem"
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.pdca"
+      - name: "OODA"
         line: 802
         category: "F17 learning"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.ooda"
+      - name: "Build–Measure–Learn"
+        line: 803
+        category: "F17 learning"
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.build_measure_learn"
+      - name: "After Action Review"
+        line: 804
+        category: "F17 learning"
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.after_action_review"
+      - name: "Post-mortem"
+        line: 805
+        category: "F17 learning"
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.post_mortem"
       - name: "Decision Journal"
         line: 806
         category: "F17 learning"

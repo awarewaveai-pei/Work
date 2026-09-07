@@ -1974,6 +1974,46 @@ tier_1:
     source: "methods/contracts/learning.decision_journal.contract.yaml + specs/cognitive/typed-objects/decision-journal-entry.schema.yaml"
     note: "62nd Method Atlas slice. 141 tests pass. F17 learning family: 3 of 9 table rows built (reversal_criteria/kill_criteria/decision_journal); remaining: PDCA, OODA, Build-Measure-Learn, After Action Review, Post-mortem, Prediction Tracking."
 
+  sixtysecond_concrete_entry:
+    method_id: "learning.pdca"
+    contract_status: complete
+    tier: 1
+    mandated_by: "4th `learning` (F17) member, row L801. Distinct from ooda (process stability vs decision tempo, L3011). Invariants: cycles[] stages ordered PLAN/DO/CHECK/ACT; cycle N>1 references cycle N-1's ACT.action_items[]."
+    source: "methods/contracts/learning.pdca.contract.yaml + specs/cognitive/typed-objects/pdca-cycle-record.schema.yaml"
+    note: "63rd slice. 127 tests pass."
+
+  sixtythird_concrete_entry:
+    method_id: "learning.ooda"
+    contract_status: complete
+    tier: 1
+    mandated_by: "5th `learning` (F17) member, row L802. Distinct from pdca (single fixed cycle, decision tempo, not a cycles[] loop). Invariants: stage sequence OBSERVE/ORIENT/DECIDE/ACT; timestamps non-decreasing; ORIENT.observation_refs resolve to real OBSERVE.observations[]."
+    source: "methods/contracts/learning.ooda.contract.yaml + specs/cognitive/typed-objects/ooda-cycle-record.schema.yaml"
+    note: "64th slice. 126 tests pass."
+
+  sixtyfourth_concrete_entry:
+    method_id: "learning.build_measure_learn"
+    contract_status: complete
+    tier: 1
+    mandated_by: "6th `learning` (F17) member, row L803. No F15 experiment-family method exists in repo to overlap with. Invariants: measure.build_ref/learn.metric_refs cross-reference build/measure by id; build.cut_scope discloses what 'smallest' left out."
+    source: "methods/contracts/learning.build_measure_learn.contract.yaml + specs/cognitive/typed-objects/build-measure-learn-cycle.schema.yaml"
+    note: "65th slice. 120 tests pass."
+
+  sixtyfifth_concrete_entry:
+    method_id: "learning.after_action_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: "7th `learning` (F17) member, row L804. Distinct from decision_journal (single-stage, no hash-lock, retrospective-only). Answers devops_sre.game_day's OQ-GAMEDAY-2: game_day's embedded aar stays embedded, this is the standalone method. Invariants: why_factors >=2 (>=3-word, no dup); next_actions >=1 owned."
+    source: "methods/contracts/learning.after_action_review.contract.yaml + specs/cognitive/typed-objects/after-action-review-record.schema.yaml"
+    note: "66th slice. 74 tests pass."
+
+  sixtysixth_concrete_entry:
+    method_id: "learning.post_mortem"
+    contract_status: complete
+    tier: 1
+    mandated_by: "8th `learning` (F17) member, row L805. Distinct from root_cause.barrier_analysis (F05 single-cause diagnostic vs F17 whole-incident retrospective); reuses its no-blame closed-key-set for timeline[]/causes[], NOT for actions[] (ownership != blame). Invariants: causes[].timeline_ref resolves to real timeline[]; actions[] owned."
+    source: "methods/contracts/learning.post_mortem.contract.yaml + specs/cognitive/typed-objects/post-mortem-record.schema.yaml"
+    note: "67th slice. 88 tests pass. F17 learning family: 8 of 9 built; remaining: Prediction Tracking."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

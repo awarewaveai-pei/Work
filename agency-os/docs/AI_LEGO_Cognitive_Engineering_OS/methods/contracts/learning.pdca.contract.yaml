@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/learning.pdca.contract.yaml"
+title: "PDCA Method Contract"
+status: ACTIVE
+
+description: >
+  learning.pdca, family learning, Atlas F17 L801 ("PDCA | 持續改善 |
+  Plan→Do→Check→Act | 穩定流程長期改進"), §12.34 L2989-2999. Distinct
+  from OODA (L3011). Invariants: (1) stages ordered-prefix of
+  PLAN,DO,CHECK,ACT; (2) cycle N>1 PLAN carries >=1 action_item id
+  from cycle N-1 ACT.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L801): 'PDCA | 持續改善 | Plan→Do→Check→Act | 穩定流程長期改進'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.34 戴明循環／PDCA循環 (L2989-2999)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.35 OODA (L3002-3011) -- L3011 is the due-diligence distinction from this method"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs this. learning.pdca mints new machine_id, F17 4th member
+  after reversal_criteria/kill_criteria/decision_journal. Registered in
+  contract-backlog.yaml tier_1 by orchestrating session, not this file.
+
+id: learning.pdca
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [FRAME, VALIDATE, LEARN]
+# INFERRED, not cited -- Atlas gives no composition formula. FRAME=Plan,
+# VALIDATE=Check, LEARN=Act feeding the next Plan.
+
+purpose:
+  - run_a_plan_do_check_act_improvement_cycle_with_learnings_carried_forward
+
+inputs:
+  required: []
+  optional: []
+# Leaf method, same class as learning.decision_journal: cycles/stages are
+# raw human/AI-supplied content, not references to a pre-existing typed object.
+
+outputs: [PDCACycleRecord]
+
+preconditions:
+  - "each cycle's stages[] is a non-empty ordered prefix of PLAN,DO,CHECK,ACT"
+  - "cycle N>1's PLAN.carried_forward_action_item_ids is non-empty and every id resolves to cycle N-1's ACT.action_items[].id"
+  - "cycle 1's PLAN.carried_forward_action_item_ids is null"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition: []
+recommended_next: []
+# Atlas gives no worked detail for either -- same open-question class as every sibling Tier 1 contract.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of OODA (same family, adjacent Atlas row)?"
+    decision: "No -- L3011 distinguishes process-stability (PDCA) from decision-tempo (OODA)."
+  - question: "Model one cycle or N cycles per record?"
+    decision: "N cycles (cycles[] array) -- L2994 defines PDCA as a loop; a single cycle can't express loop-back."
+  - question: "How is 'stages occur in PDCA order' enforced?"
+    decision: "Ordered-prefix check (event_tree pattern); schema also expresses it via fixed prefixItems."
+  - question: "How does cycle N reference cycle N-1's learnings, structurally?"
+    decision: "PLAN.carried_forward_action_item_ids[] must resolve to cycle N-1 ACT.action_items[].id."
+  - question: "Does every action_item need a standardize-or-adjust disposition field (real Deming Act semantics)?"
+    decision: "No -- out of scope. id+description only, same as decision_journal.option()."
+
+open_questions:
+  - "OQ-PDCA-1: cognitive_primitives [FRAME, VALIDATE, LEARN] is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+  - "OQ-PDCA-2: Should DO/CHECK stages carry structured fields (e.g. CHECK.measured_result) beyond description? Deferred -- not required by this task's two invariants.（owner: operator）"
+  - "OQ-PDCA-3: RESOLVED. F17 now 8/9 built (this batch also shipped ooda/build_measure_learn/after_action_review/post_mortem); remaining: Prediction Tracking.（owner: operator）"
+
+verification:
+  method: >
+    Grepped Atlas for PDCA/Plan.*Do.*Check.*Act/戴明/Deming -- L801 table
+    row, L2989-2999 §12.34 section, L3011 OODA distinction (confirmed
+    non-duplicate). Grepped ai_lego/ and the whole Atlas doc root for an
+    existing cyclic-loop method -- none found; contract-backlog.yaml L1975
+    lists PDCA as an unbuilt remaining item. Read event_tree.py and
+    fault_tree.py in full for the ordered-prefix and fail-closed gate
+    patterns before writing. Independently grepped agency-os/WORKLOG.md and
+    scripts/ to verify the CLI's own worked scenario (Docker Desktop
+    watchdog fix, 2026-09-07 entry) before citing it. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema Draft202012Validator.
+  note: >
+    No mother document modified. L801/L2994's formula is transcribed
+    verbatim. cycles[] array, the carried_forward_action_item_ids
+    cross-reference, and the fixed STAGE_ORDER constant are compilation
+    decisions, not textually cited.

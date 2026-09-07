@@ -1,0 +1,204 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/ooda-cycle-record.schema.yaml"
+title: OODA Cycle Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `OODACycleRecord`, outputs of `learning.ooda`. Atlas F17 L802 ("OODA |
+  快速動態決策 | Observe→Orient→Decide→Act | 高變動環境"), L3007 diagram
+  (no loop-back arrow, unlike PDCA's L2994 -- one fixed 4-stage cycle per
+  record, not a `cycles[]` array). Stage order fixed via `prefixItems`.
+  Timestamp monotonicity and ORIENT.observation_refs grounding are not
+  schema-expressible -- runtime gates in `ai_lego/modules/learning/ooda.py`
+  (`OODA_NONMONOTONIC_TIMESTAMPS` / `OODA_ORIENT_NOT_GROUNDED`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L802)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.35 (L3002-3011)"
+  - "methods/contracts/learning.ooda.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  observation:
+    type: object
+    required: [id, content, provenance]
+    additionalProperties: false
+    description: "One OBSERVE-stage data point. ORIENT.observation_refs[] resolve against these ids (runtime gate, not schema-expressible -- see file description)."
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      content:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  stage_observe:
+    type: object
+    required: [stage_type, content, timestamp, provenance, observations]
+    additionalProperties: false
+    properties:
+      stage_type: {const: OBSERVE}
+      content: {type: string, minLength: 1, pattern: "\\S"}
+      timestamp: {type: string, format: date-time}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      observations:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/observation"}
+        description: "Raw data points gathered this stage. Never empty -- an OBSERVE stage with nothing observed grounds no later ORIENT."
+
+  stage_orient:
+    type: object
+    required: [stage_type, content, timestamp, provenance, observation_refs, mental_model_update]
+    additionalProperties: false
+    properties:
+      stage_type: {const: ORIENT}
+      content: {type: string, minLength: 1, pattern: "\\S"}
+      timestamp: {type: string, format: date-time}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      observation_refs:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+        description: "MUST each resolve to a real observations[].id in this same record's OBSERVE stage -- OODA_ORIENT_NOT_GROUNDED if not (runtime layer only, see file description). Boyd's own Orient-is-decisive emphasis, operationalized structurally, not left decorative."
+      mental_model_update:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What understanding changed because of observation_refs. An ORIENT stage citing no real update is an unexplained decision, not orientation."
+
+  stage_decide:
+    type: object
+    required: [stage_type, content, timestamp, provenance]
+    additionalProperties: false
+    properties:
+      stage_type: {const: DECIDE}
+      content: {type: string, minLength: 1, pattern: "\\S"}
+      timestamp: {type: string, format: date-time}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  stage_act:
+    type: object
+    required: [stage_type, content, timestamp, provenance]
+    additionalProperties: false
+    properties:
+      stage_type: {const: ACT}
+      content: {type: string, minLength: 1, pattern: "\\S"}
+      timestamp: {type: string, format: date-time}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+type: object
+required: [id, version, situation, stages, provenance]
+additionalProperties: false
+properties:
+  id:
+    type: string
+    pattern: "^OODA-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "learning.ooda"
+  situation:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The volatile situation this cycle responds to -- Atlas's own literal '高變動環境' (high-volatility environment)."
+  stages:
+    type: array
+    minItems: 4
+    maxItems: 4
+    prefixItems:
+      - $ref: "#/$defs/stage_observe"
+      - $ref: "#/$defs/stage_orient"
+      - $ref: "#/$defs/stage_decide"
+      - $ref: "#/$defs/stage_act"
+    items: false
+    description: "Exactly 4 entries, position i MUST satisfy prefixItems[i] -- one complete OBSERVE->ORIENT->DECIDE->ACT cycle per record (see file description on why this is not a cycles[] array like PDCA)."
+  provenance:
+    description: "epistemic_type commonly HUMAN_OPINION or AI_INFERENCE -- decision narrative, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed), grounded in this repo's own real
+      2026-04-20 incident (runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md):
+      wordpress-ubuntu-4gb-sin-1 (5.223.93.113) CPU 99.7%/swap 91.5%, root
+      cause an XMRig miner planted via an exposed PostgreSQL port. Stage
+      timestamps are same-day but illustrative -- the runbook records the
+      date, not intraday clock times.
+    value:
+      id: "OODA-2026-04-20-001"
+      version: "1.0.0"
+      generated_by_method: "learning.ooda"
+      situation: "wordpress-ubuntu-4gb-sin-1 (5.223.93.113): CPU 99.7%, swap 91.5%, root cause unknown"
+      stages:
+        - stage_type: OBSERVE
+          content: "CPU 99.7%/swap 91.5% sustained; ps aux shows a running xmrig-6.24.0 process; supavisor exposes PostgreSQL port 5432 on 0.0.0.0."
+          timestamp: "2026-04-20T09:00:00Z"
+          provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null}
+          observations:
+            - {id: "OBS-1", content: "CPU 99.7%, swap 91.5% sustained on wordpress-ubuntu-4gb-sin-1", provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null}}
+            - {id: "OBS-2", content: "ps aux | grep xmrig shows a running xmrig-6.24.0 process", provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null}}
+            - {id: "OBS-3", content: "supavisor container binds PostgreSQL port 5432 to 0.0.0.0, not 127.0.0.1; default Supabase password never changed", provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null}}
+        - stage_type: ORIENT
+          content: "This is not a resource-exhaustion bug -- it is an active intrusion through the exposed database port."
+          timestamp: "2026-04-20T09:02:00Z"
+          provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+          observation_refs: ["OBS-2", "OBS-3"]
+          mental_model_update: "xmrig running (OBS-2) plus PostgreSQL exposed with an unchanged default password (OBS-3) means the attack path is COPY/pg_cron command execution through the open port, not a runaway legitimate process -- fixing CPU alone would not close the entry point."
+        - stage_type: DECIDE
+          content: "Kill the miner immediately, then close the actual entry point (port binding + password rotation), not just the CPU symptom."
+          timestamp: "2026-04-20T09:05:00Z"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+        - stage_type: ACT
+          content: "kill -9 the xmrig PID; rm -rf the xmrig binary directory; rebind PostgreSQL to 127.0.0.1 in docker-compose.yml; rotate all Supabase internal passwords; ufw deny 5432/5433."
+          timestamp: "2026-04-20T09:20:00Z"
+          provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal record: 1 observation, ORIENT grounded on it, generic DECIDE/ACT."
+    value:
+      id: "OODA-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "learning.ooda"
+      situation: "A single upstream API call started timing out intermittently mid-incident."
+      stages:
+        - stage_type: OBSERVE
+          content: "3 consecutive timeouts on the payment-webhook endpoint."
+          timestamp: "2026-09-07T00:00:00Z"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+          observations:
+            - {id: "OBS-1", content: "3 consecutive timeouts on payment-webhook", provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}}
+        - stage_type: ORIENT
+          content: "Likely the upstream provider, not our own service -- other endpoints are unaffected."
+          timestamp: "2026-09-07T00:01:00Z"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+          observation_refs: ["OBS-1"]
+          mental_model_update: "Isolated to one upstream dependency, not a general outage -- narrows the fix to a fallback/retry policy for that one integration."
+        - stage_type: DECIDE
+          content: "Switch to the cached fallback for this endpoint for the next 10 minutes."
+          timestamp: "2026-09-07T00:02:00Z"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - stage_type: ACT
+          content: "Fallback flag enabled; alert posted to on-call channel."
+          timestamp: "2026-09-07T00:03:00Z"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F17 table row (L802) and §12.35 (L3002-3011) directly. Grepped runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md + agency-os/WORKLOG.md:12080 to independently confirm the worked example's own facts before citing them. Validated against jsonschema Draft202012Validator."
+  note: >
+    No mother document was modified. L802/L3007's formula is transcribed
+    directly. The 4-fixed-stage (not cycles[]) shape, prefixItems-as-order,
+    and observation/observation_refs grounding shape are compilation
+    decisions (see method contract), not textually cited.

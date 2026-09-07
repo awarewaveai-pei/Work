@@ -1,0 +1,188 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/post-mortem-record.schema.yaml"
+title: Post-mortem Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical definition of `PostMortemRecord`, learning.post_mortem's declared
+  outputs (F17 learning family, 4th concrete entry). Atlas F17 L805:
+  "Post-mortem | 事故後學習 | timeline→impact→causes→actions | 防重發、非
+  blame" -- this method's only citation. Terminal step of EC §55's incident
+  pipeline (L1888-1923) and Atlas §13.8's Production Incident Recipe
+  (L3407-3423), both after diagnostic tools already ran.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 tool table, Post-mortem row (L805)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §55 Incident Mode (L1888-1923)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.8 Production Incident Recipe (L3407-3423)"
+  - "methods/contracts/learning.post_mortem.contract.yaml"
+  - "specs/cognitive/typed-objects/barrier-analysis-record.schema.yaml -- the no-blame closed-key-set mechanism this record's timeline[]/causes[] shape reuses"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  timeline_entry:
+    type: object
+    required: [event_id, timestamp, description]
+    additionalProperties: false
+    description: "One incident timeline event. Closed key set -- no field for a named individual/person (NO-BLAME invariant)."
+    properties:
+      event_id:
+        type: string
+        pattern: "^T-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      timestamp:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Recommended ISO 8601. Not format-validated -- see contract OQ-POSTMORTEM-1."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What happened at this point in the incident."
+
+  cause_entry:
+    type: object
+    required: [cause_id, description, timeline_ref]
+    additionalProperties: false
+    description: "One causal factor. Closed key set -- no field for a named individual/person (NO-BLAME invariant). Systemic description only."
+    properties:
+      cause_id:
+        type: string
+        pattern: "^C-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The SYSTEMIC causal factor, never an individual's name or role."
+      timeline_ref:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must name a real timeline[].event_id IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+      source_analysis_ref:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "OPTIONAL soft link (format-only, unconstrained prefix) to a prior root-cause diagnostic record (e.g. a BarrierAnalysisRecord or FaultTreeRecord id) that diagnosed this cause -- references, does not re-implement, that diagnosis. Existence not verified -- see contract OQ-POSTMORTEM-2."
+
+  action_entry:
+    type: object
+    required: [action_id, description, owner]
+    additionalProperties: false
+    description: "One preventive action (Atlas's own benefit, 防重發). owner is FORWARD-looking accountability for the fix, never fault attribution -- the no-blame closed key set applies to timeline_entry/cause_entry only, deliberately not here."
+    properties:
+      action_id:
+        type: string
+        pattern: "^A-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The preventive action itself."
+      owner:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Who is accountable for actually doing this action -- enforced non-empty at the runtime layer, not merely typed here."
+
+type: object
+required: [id, version, incident_name, timeline, impact_description, causes, actions, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^POSTMORTEM-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "learning.post_mortem"
+  incident_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The incident this post-mortem covers."
+  timeline:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'timeline' stage -- must exist before causes can be meaningfully traced to it."
+    items:
+      $ref: "#/$defs/timeline_entry"
+  impact_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own 'impact' stage."
+  causes:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'causes' stage. Every entry's timeline_ref must resolve within THIS record -- enforced at the runtime layer."
+    items:
+      $ref: "#/$defs/cause_entry"
+  actions:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'actions' stage (防重發). Every entry requires a real owner -- enforced at the runtime layer."
+    items:
+      $ref: "#/$defs/action_entry"
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a post-mortem's own timeline/impact/causes/actions is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Grounded in this repo's own real, currently-enforced rule (AGENTS.md R0:
+      "git log -10 before every Edit", memory note feedback_git_log_before_edit.md,
+      real 2026-05-22 14:38 incident date). Specific sub-timestamps/wording are
+      disclosed-invented, not a verbatim historical transcript.
+    value:
+      id: "POSTMORTEM-2026-05-22-001"
+      version: "1.0.0"
+      generated_by_method: "learning.post_mortem"
+      incident_name: "2026-05-22 concurrent-session rework incident (git log not checked before Edit)"
+      timeline:
+        - event_id: "T-001"
+          timestamp: "2026-05-22T14:38:00+08:00"
+          description: "Session A begins editing agency-os/WORKLOG.md without first running git log --oneline -10"
+        - event_id: "T-002"
+          timestamp: "2026-05-22T14:41:00+08:00"
+          description: "Concurrent Session B had already pushed a commit touching the same file minutes earlier"
+        - event_id: "T-003"
+          timestamp: "2026-05-22T14:52:00+08:00"
+          description: "Session A's push rejected; merge conflict discovered, manual reconciliation required"
+        - event_id: "T-004"
+          timestamp: "2026-05-22T15:10:00+08:00"
+          description: "Rework complete"
+      impact_description: "~30 minutes of duplicated edit plus manual conflict reconciliation on one file; no data loss."
+      causes:
+        - cause_id: "C-001"
+          description: "No pre-Edit git log check, so a concurrent session's already-pushed commit to the same file went unseen"
+          timeline_ref: "T-001"
+        - cause_id: "C-002"
+          description: "No mechanical enforcement existed yet to block an Edit before a git log check"
+          timeline_ref: "T-002"
+          source_analysis_ref: "BARRIER-2026-05-22-001"
+      actions:
+        - action_id: "A-001"
+          description: "Codify 'git log --oneline -10 before every Edit' as a standing AGENTS.md R0 rule"
+          owner: "operator"
+        - action_id: "A-002"
+          description: "Add git-log-injector.js mechanical gate blocking the first Edit until git log has been shown"
+          owner: "operator"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+verification:
+  method: >
+    Read Atlas F17 tool table row (L805), EC §55 (L1888-1923), Atlas §13.8
+    (L3407-3423) directly. Read barrier-analysis-record.schema.yaml in full to
+    confirm the no-blame closed-key-set mechanism this schema reuses. Validated
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 4-stage formula is transcribed
+    into this schema's structure. The source_analysis_ref soft link and the
+    no-blame/ownership split between causes and actions are disclosed
+    compilation decisions -- see method contract compilation_decisions.

@@ -1,0 +1,176 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/after-action-review-record.schema.yaml"
+title: After Action Review Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `AfterActionReviewRecord` -- outputs of `learning.after_action_review`. Atlas F17 L804:
+  "After Action Review | 比較預期與實際 | Expected? Actual? Why? Next? | 快速組織學習".
+  Single-stage, no tamper-evidence (unlike decision-journal-entry.schema.yaml's hash-locked shape) --
+  see the method contract's own compilation_decisions.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L804): 'After Action Review | 比較預期與實際 | Expected? Actual? Why? Next? | 快速組織學習'"
+  - "methods/contracts/learning.after_action_review.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Low-risk compilation choices, same bar every
+  sibling typed-object schema in this directory documents (see
+  compilation_decisions below for the two disclosure-worthy ones: the
+  why_factors/next_actions structured-list shape, and the no-per-item-
+  provenance choice).
+
+compilation_decisions:
+  - question: "Bare strings for Why/Next (matching game_day's embedded aar), or structured lists?"
+    decision: "Structured lists (why_factors[]/next_actions[], id+description) -- same list-of-dict-with-id shape every sibling schema uses; this is the canonical gated F17 method, game_day's aar stayed a lighter bare-string phase output."
+  - question: "Per-item provenance on why_factors/next_actions, matching kill-criteria-set.schema.yaml?"
+    decision: "No -- one record-level provenance only, matching decision-journal-entry.schema.yaml's options[]."
+  - question: "What floor makes 'Why?' genuine multi-factor analysis without fake NLP?"
+    decision: "minItems:2 here (schema-level); per-item >=3-word floor and cross-item duplicate-after-normalize check are not JSON-Schema-expressible, enforced by the Python builder+gate instead."
+
+type: object
+required: [id, version, expected, actual, why_factors, next_actions, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^AAR-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling typed-object schema in this directory (DJ-/KCS-/RCS-/FAULTTREE-)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "learning.after_action_review"
+
+  activity_ref:
+    type: ["string", "null"]
+    default: null
+    description: >
+      Free-text reference to the completed activity this review covers,
+      if a formal record exists. Kept OPTIONAL and free-text, not a hard
+      `$ref` -- an AAR does not require a formal prior decision or
+      activity record to exist (Atlas gives no such precondition; this
+      is a lighter-weight retrospective than learning.decision_journal's
+      own optional decision_ref). See open_questions.
+
+  expected:
+    type: string
+    minLength: 1
+    description: "Atlas L804 prompt 1: what was expected to happen. Free text; this method takes no position on required structure beyond non-empty."
+
+  actual:
+    type: string
+    minLength: 1
+    description: "Atlas L804 prompt 2: what actually happened. Free text."
+
+  why_factors:
+    type: array
+    minItems: 2
+    description: >
+      Atlas L804 prompt 3 ("Why?"), structured as >= 2 distinct
+      contributing factors -- see the method contract's own invariant
+      #1 (AAR_INSUFFICIENT_WHY_ANALYSIS): each entry must also carry >=
+      3 whitespace-separated words and no two entries may normalize
+      (case/whitespace-insensitive) to the same text, both enforced by
+      the Python builder + gate, not expressible here.
+    items:
+      type: object
+      required: [id, description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Local id, unique within this record's why_factors list."
+        description:
+          type: string
+          minLength: 1
+          description: "One contributing factor explaining the expected/actual delta."
+
+  next_actions:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L804 prompt 4 ("Next?"). Every entry names a non-empty
+      `owner` -- see the method contract's own invariant #2
+      (AAR_NO_OWNED_ACTION): a lesson with no owner to act on it is a
+      wasted retrospective, same "unowned == decorative, not a real
+      control" discipline learning.kill_criteria's own ownership
+      invariant and root_cause.bow_tie's own OWNER/TEST invariant
+      already establish elsewhere in this package.
+    items:
+      type: object
+      required: [id, description, owner]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Local id, unique within this record's next_actions list."
+        description:
+          type: string
+          minLength: 1
+          description: "One concrete action to take as a result of this review."
+        owner:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Required, non-empty -- AAR_NO_OWNED_ACTION at construction, ownership gate independently re-derives it."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed): an AAR on this same repo's own
+      2026-09-06 F05 root_cause family completion batch (git log
+      9fd8a5d3a, "F05 root_cause family complete (9/9)... 5 methods
+      built in parallel").
+    value:
+      id: "AAR-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "learning.after_action_review"
+      activity_ref: "F05 root_cause family completion batch (5 methods, parallel session)"
+      expected: "5 methods would land in one parallel session with zero rework, matching the two prior lean-standard batches' own velocity."
+      actual: "All 5 methods landed and every test suite passed, but root_cause.barrier_analysis needed a second due-diligence pass against root_cause.bow_tie's own owner/test invariant before its distinct no-blame invariant was accepted."
+      why_factors:
+        - {id: "WHY-1", description: "Barrier Analysis's own no-blame invariant was not obvious from the Atlas one-line table row alone"}
+        - {id: "WHY-2", description: "Due diligence against bow_tie required a full second file read mid-batch, not planned upfront"}
+      next_actions:
+        - {id: "ACT-1", description: "Flag near-duplicate-risk methods for a mandatory full-sibling-read step before builder code starts, not after", owner: "operator"}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+  - description: "A minimal record: exactly 2 why_factors, exactly 1 next_action, no activity_ref."
+    value:
+      id: "AAR-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "learning.after_action_review"
+      activity_ref: null
+      expected: "The weekly client backup verification script would complete inside its 30-minute cron window."
+      actual: "The script ran 52 minutes and was killed by the cron timeout, leaving that week's backup unverified."
+      why_factors:
+        - {id: "WHY-1", description: "Backup archive size grew past last quarter's baseline without the timeout being revisited"}
+        - {id: "WHY-2", description: "Verification re-downloads the full archive instead of checksumming the existing local copy"}
+      next_actions:
+        - {id: "ACT-1", description: "Switch verification to a local checksum compare and raise the cron timeout as a stopgap", owner: "devops_lead"}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-AAR-1"
+    question: "Should `activity_ref` be upgraded to a hard pattern or $ref once a real Activity/Task record commonly exists at AAR-write time?"
+    owner: "operator, or whoever next wires this method's output to a real Activity record"
+    blocks: "nothing in this file's own validity -- free text remains schema-legal either way"
+
+verification:
+  method: >
+    Read Atlas L804 at the grep-confirmed line. Read devops_sre.game_day.py and its OQ-GAMEDAY-2
+    (already-embedded bare-string use of these same 4 keys) before finalizing the structured-list
+    design -- see compilation_decisions. Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document modified. why_factors/next_actions shape, the 2-item/owner minimums, and
+    no-per-item-provenance are disclosed compilation decisions; the per-item >=3-word floor and
+    duplicate check are Python-layer invariants (ai_lego/modules/learning/after_action_review.py).

@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-08（63–67 號切片 critic 覆審：3 Minor 全修）
+
+critic scope=normal tier。verdict SHIP，0C/0M/3Minor（crash-resume merge 遺留的過期引用+一份 description 超長）：post_mortem.contract.yaml description 9→5 行；ooda.py 開頭「4th member」訂正「6th」；ooda.py 一處過期行號引用改用 symbol name。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ooda -v` | exit=0 | result=126 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | result=PASSED 3037
+REVIEW_DONE: critic=Standard（真跑 535 測試+5 CLI+全 16 檔讀完）| verdict=SHIP → 3 Minor 全修 | findings=0c/0m/3minor
+WORKLOG_DONE: 本條目
+
+## 2026-09-08（63–67 號切片：F17 learning 家族 3/9→8/9，5 個平行 agent）
+
+pdca(127t)/ooda(126t)/build_measure_learn(120t)/after_action_review(74t)/post_mortem(88t)。535 tests 零衝突，全 regression 3669，golden 3037。查重：pdca vs ooda（cycles[] loop vs 單次 tempo）、bml vs F15（repo 無 F15 方法可比）、aar vs decision_journal（單階段無 hash-lock）+ 解答 game_day 的 OQ-GAMEDAY-2、post_mortem 複用 barrier_analysis 的無責怪 key-set（僅 timeline/causes，actions 不套用）。5 個 agent 中 pdca/ooda 承接前一輪撞 API session limit 的殘留檔（模組已寫但未完成 contract/schema/test），驗證後補完非重寫。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_pdca tests.unit.test_ooda tests.unit.test_build_measure_learn tests.unit.test_after_action_review tests.unit.test_post_mortem -v` | exit=0 | result=535 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"` | exit=0 | result=3669 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | result=PASSED 3037
+REVIEW_DONE: critic=自審（5 agent 各自查重+我逐一核實 22 新檔存在+grep 零殘留） | verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`learning\.pdca\|learning\.ooda\|learning\.build_measure_learn\|learning\.after_action_review\|learning\.post_mortem` | hits=29（25 歸屬檔+registry+__init__+game_day 1 筆合法引用）
+WORKLOG_DONE: 本條目
+
+rollback：單一 commit，`git revert`；純新增+registry 更正，無破壞性變更。
+
 ## 2026-09-07（learning.ooda docstring — OQ-OODA-2 狀態修正：重跑的是 due-diligence 比對，不是 contract yaml 自己那個撞號的 OQ-OODA-2）
 
 **觸發**：交接指示「pdca.py 已建好（127 tests），把 ooda.py:11-16 docstring 提到的『OQ-OODA-2 重跑比對』關閉」。R0 開工前 Glob 確認 `learning.ooda.contract.yaml` 是否存在，`find` 第一次跑空手（工具問題，非檔案真不存在）——差點直接照原指示把 docstring 標「OQ-OODA-2 CLOSED」出貨。

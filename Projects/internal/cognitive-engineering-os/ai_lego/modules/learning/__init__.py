@@ -1,7 +1,8 @@
-"""F17 learning/reversal family. Tenants: ``learning.reversal_criteria`` (see ``reversal_criteria.py``),
-``learning.kill_criteria`` (see ``kill_criteria.py`` -- closed 3-value threshold dimension enum and
-one-directional stop action, distinct from reversal_criteria's open-text bidirectional indicator),
-``learning.decision_journal`` (see ``decision_journal.py`` -- two-stage, hash-tamper-evident capture of
-context/options/evidence/forecast/confidence before an outcome is known, Atlas's own "防 hindsight bias")
--- three of the 9-row F17 table built; remaining: PDCA, OODA, Build-Measure-Learn, After Action Review,
-Post-mortem, Prediction Tracking."""
+"""F17 learning/reversal family -- 8 of 9 built. Tenants: ``learning.reversal_criteria`` (open-text bidirectional
+indicator), ``learning.kill_criteria`` (closed 3-value threshold enum, one-directional stop, distinct from
+reversal_criteria), ``learning.decision_journal`` (two-stage hash-tamper-evident forecast/confidence, "防
+hindsight bias"), ``learning.pdca`` (cycles[] loop, process stability), ``learning.ooda`` (single fixed cycle,
+decision tempo, distinct from pdca), ``learning.build_measure_learn`` (single iteration, not a cycles[] loop),
+``learning.after_action_review`` (single-stage retrospective, distinct from decision_journal; answers
+devops_sre.game_day's OQ-GAMEDAY-2), ``learning.post_mortem`` (reuses root_cause.barrier_analysis's no-blame
+key-set for timeline/causes, not for actions). Remaining: Prediction Tracking."""
