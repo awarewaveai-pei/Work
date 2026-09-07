@@ -39,6 +39,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import requests
 
+from auth_policy import authentication_required
 import config
 import pipeline
 
@@ -47,8 +48,11 @@ PORT = int(os.getenv("VIDEO_SERVICE_PORT", "8732"))
 MAX_ASSET_BYTES = int(os.getenv("RENDER_MAX_ASSET_MB", "200")) * 1024 * 1024
 MAX_SCENES = int(os.getenv("RENDER_MAX_SCENES", "30"))
 MAX_BODY_BYTES = int(os.getenv("RENDER_MAX_BODY_KB", "256")) * 1024  # JSON 很小（素材是 URL/路徑非內嵌）
-# 認證：跨機部署時 /render 要 X-Render-Token == RENDER_AUTH_TOKEN。未設 = 本機/dev 放行。
+# 認證：/render、/generate-job、/job 皆要求 X-Render-Token。
+# 空 token 只允許顯式 loopback-only 本機開發，啟動時驗證。
 RENDER_AUTH_TOKEN = os.getenv("RENDER_AUTH_TOKEN", "")
+ALLOW_INSECURE_LOCAL_RENDER = os.getenv("ALLOW_INSECURE_LOCAL_RENDER", "").lower() == "true"
+AUTH_REQUIRED = True
 # R2 共用憑證（與 next-admin 共享同一組 API token + account）
 R2_API_TOKEN = os.getenv("R2_API_TOKEN", "")
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
@@ -79,8 +83,8 @@ def _r2_put(object_key: str, data: bytes, content_type: str, bucket: str, public
 
 
 def _authed(handler: "BaseHTTPRequestHandler") -> bool:
-    """RENDER_AUTH_TOKEN 有設 → 比對 X-Render-Token（constant-time）；未設 → 放行（本機/dev）。"""
-    if not RENDER_AUTH_TOKEN:
+    """Compare the renderer token after the startup policy has validated it."""
+    if not AUTH_REQUIRED:
         return True
     return hmac.compare_digest(handler.headers.get("X-Render-Token", ""), RENDER_AUTH_TOKEN)
 
@@ -513,15 +517,19 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    global AUTH_REQUIRED
+    AUTH_REQUIRED = authentication_required(
+        render_auth_token=RENDER_AUTH_TOKEN,
+        host=HOST,
+        allow_insecure_local_render=ALLOW_INSECURE_LOCAL_RENDER,
+    )
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     config.TEMP_DIR.mkdir(parents=True, exist_ok=True)
-    if HOST != "127.0.0.1" and not RENDER_AUTH_TOKEN:
-        print("[WARN] 綁非 localhost 但未設 RENDER_AUTH_TOKEN — /render 將無認證對外暴露！")
     srv = ThreadingHTTPServer((HOST, PORT), _Handler)
     generate_ready = "✓" if (CLAUDE_API_KEY and PEXELS_API_KEY) else "✗ (missing CLAUDE_API_KEY/PEXELS_API_KEY)"
     print(f"video-service on http://{HOST}:{PORT} "
           f"storage={'r2' if _r2_video_configured() else 'local'} "
-          f"/generate-job={generate_ready}")
+          f"/generate-job={generate_ready} auth={'required' if AUTH_REQUIRED else 'local-development'}")
     srv.serve_forever()
 
 

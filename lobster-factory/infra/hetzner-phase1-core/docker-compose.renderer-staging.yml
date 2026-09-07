@@ -1,0 +1,84 @@
+# Isolated renderer staging. Never attach these services to production networks.
+# Usage:
+#   docker compose -p lobster-renderer-staging --env-file .env.renderer-staging \
+#     -f docker-compose.renderer-staging.yml build
+#   docker compose -p lobster-renderer-staging --env-file .env.renderer-staging \
+#     -f docker-compose.renderer-staging.yml up -d
+#
+# The env file is machine-local and ignored by Git. It must use staging-only
+# R2 credentials and a staging render token; do not copy production secrets.
+
+services:
+  video-service:
+    build:
+      context: ./apps/video-service
+      dockerfile: Dockerfile
+    image: lobster-video-service:staging
+    container_name: lobster-staging-video-service
+    restart: "no"
+    environment:
+      VIDEO_SERVICE_HOST: "0.0.0.0"
+      VIDEO_SERVICE_PORT: "8732"
+      RENDER_AUTH_TOKEN: ${RENDER_AUTH_TOKEN:?RENDER_AUTH_TOKEN is required}
+      R2_API_TOKEN: ${R2_API_TOKEN:?R2_API_TOKEN is required}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}
+      R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:?R2_VIDEO_BUCKET is required}
+      R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:?R2_VIDEO_PUBLIC_BASE is required}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:?CLAUDE_API_KEY is required}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:?PEXELS_API_KEY is required}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      RENDER_MAX_SCENES: "2"
+      RENDER_MAX_ASSET_MB: "20"
+    ports:
+      - "127.0.0.1:9732:8732"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8732/health',timeout=4).getcode()==200 else 1)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+          cpus: "2.00"
+    networks:
+      - renderer-staging
+
+  remotion-service:
+    build:
+      context: ./apps/remotion-service
+      dockerfile: Dockerfile
+    image: lobster-remotion-service:staging
+    container_name: lobster-staging-remotion-service
+    restart: "no"
+    environment:
+      REMOTION_PORT: "8733"
+      RENDER_AUTH_TOKEN: ${RENDER_AUTH_TOKEN:?RENDER_AUTH_TOKEN is required}
+      R2_API_TOKEN: ${R2_API_TOKEN:?R2_API_TOKEN is required}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}
+      R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:?R2_VIDEO_BUCKET is required}
+      R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:?R2_VIDEO_PUBLIC_BASE is required}
+      CHROMIUM_FLAGS: "--no-sandbox --disable-dev-shm-usage"
+    ports:
+      - "127.0.0.1:9733:8733"
+    tmpfs:
+      - /dev/shm:size=512m
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8733/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "2.00"
+    networks:
+      - renderer-staging
+
+networks:
+  renderer-staging:
+    name: lobster-renderer-staging-net
+    internal: true

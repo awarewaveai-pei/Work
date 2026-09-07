@@ -13,23 +13,29 @@ import os from "os";
 import fs from "fs";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import { evaluateRendererAuthPolicy } from "./auth-policy";
 
 const app = express();
 app.use(express.json({ limit: "4mb" }));
 
 const PORT = parseInt(process.env.REMOTION_PORT ?? "8733", 10);
+const HOST = process.env.REMOTION_HOST ?? "0.0.0.0";
 const AUTH_TOKEN = process.env.RENDER_AUTH_TOKEN ?? "";
+const ALLOW_INSECURE_LOCAL_RENDER = process.env.ALLOW_INSECURE_LOCAL_RENDER === "true";
 const R2_API_TOKEN = process.env.R2_API_TOKEN ?? "";
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? "";
 const R2_VIDEO_BUCKET = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
 const R2_VIDEO_PUBLIC_BASE = (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/$/, "");
 
-// NOTE: missing AUTH_TOKEN causes the service to fail-OPEN (all /render accepted).
-// This relies on the EU VPS firewall / nginx restricting port 8733 externally.
-// Always set RENDER_AUTH_TOKEN in production.
-if (!AUTH_TOKEN) {
-  console.warn("[remotion] WARN: RENDER_AUTH_TOKEN is not set — all /render requests accepted without auth. Set this in production.");
+const authPolicy = evaluateRendererAuthPolicy({
+  token: AUTH_TOKEN,
+  host: HOST,
+  allowInsecureLocalRender: ALLOW_INSECURE_LOCAL_RENDER,
+});
+if (authPolicy.ok === false) {
+  throw new Error(authPolicy.error);
 }
+const AUTH_REQUIRED = authPolicy.authRequired;
 if (!R2_API_TOKEN || !R2_ACCOUNT_ID || !R2_VIDEO_PUBLIC_BASE) {
   console.warn("[remotion] WARN: R2 credentials incomplete — uploads will fail. Check R2_API_TOKEN / R2_ACCOUNT_ID / R2_VIDEO_PUBLIC_BASE.");
 }
@@ -143,7 +149,7 @@ function requireAuth(
   res: express.Response,
   next: express.NextFunction
 ): void {
-  if (!AUTH_TOKEN) return next();
+  if (!AUTH_REQUIRED) return next();
   // Support X-Render-Token header or Authorization: Bearer <token>
   const xToken = (req.headers["x-render-token"] as string | undefined)?.trim() ?? "";
   const authHeader = (req.headers["authorization"] as string | undefined) ?? "";
@@ -326,8 +332,8 @@ app.get("/status/:jobId", requireAuth, (req: express.Request, res: express.Respo
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[remotion] service listening on :${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`[remotion] service listening on ${HOST}:${PORT} auth=${AUTH_REQUIRED ? "required" : "local-development"}`);
   getBundle().catch((err) =>
     console.error("[remotion] pre-warm bundle error:", err)
   );
