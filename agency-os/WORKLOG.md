@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-07（Cognitive OS 第 54–57 個 Method Atlas 切片 — 5 個平行 agent 收 F18 architecture 家族（10/10）+ 推進 F05 root_cause 家族（3/9→6/9），首次完整套用精簡版標準的第二輪批次）
+
+**觸發**：操作者「繼續完成 Cognitive Engineering OS」。查現況：F18（architecture）8/10、F05（root_cause）3/9。選最快收官＋最省 context 的組合：2 個 agent 收 F18 剩餘兩列（DDD、Architecture Trade-off Matrix），3 個 agent 推進 F05（Fault Tree、Bow-Tie、Kepner-Tregoe）。5 個 agent 同時派（20 分鐘視窗 5/5，未逾額）。
+
+**5 個平行結果**：
+- `architecture.ddd`——27 測試。真不變量：subdomain lineage（每個 bounded_context 需掛真實 subdomain）、context_map 完整性（relationship 兩端需指向真實 bounded_context）。查重：本 repo 的 `REPOSITORY_ARCHITECTURE.md`／`ADR-0007`是一次性架構決策非可重複方法、System Foundry 的 domain-discovery 文件是另一套系統的一次性交付物，兩者皆非重複。
+- `architecture.trade_off_matrix`——**判定與 `decision.mcda` 欄位對欄位相同**（options/criteria/weights/normalized_scores/ranking/sensitivity_notes 全同），改建 contract-only 條目直接重用 `decision.mcda` 既有 schema/不變量，不新開模組/測試。此發現與 `devops_sre.sli_slo.contract.yaml:23-34` 既有揭露一致（獨立重新驗證同一結論）。
+- `root_cause.fault_tree`——104 測試。真不變量：AND/OR gate 的 `required_count` 需與邏輯模式一致、跨 id 參照完整性+環狀偵測。查重：跟本 session 已建的 `security.attack_tree` 同屬 AND/OR 邏輯樹但結構不同——Attack Tree 是內嵌單親樹，Fault Tree 用扁平 `basic_events[]/gates[]` 以 id 互相參照（真實 fault tree 允許同一 basic event 被多個 gate 共用，這正是 Attack Tree 結構上做不到的），故非重複。
+- `root_cause.bow_tie`——87 測試。真不變量：每個 control 需 owner+test（Atlas 原文明講的誤用警告）、威脅/後果不可與 top_event 同文字、control 參照需指向記錄內真實存在的威脅/後果。查重：跟 `security.security_control_mapping`（跨記錄消費 STRIDE/LINDDUN 威脅、無 owner 欄位）結構不同，Bow-Tie 是單記錄內自足的對稱結構。
+- `root_cause.kepner_tregoe`——82 測試。真不變量：4 個維度（What/Where/When/Extent）每個都需非空 IS、IS 不可等於 IS-NOT、distinction 需指向真實填寫過 IS+IS-NOT 的維度、change 需指向真實 distinction_id。查重：跟 `decision.mcda`（評分/加權技術）不同類——這是問題界定的診斷技術，發生在假設產生之前。
+
+**整合**（本 session 執行，5 個 agent 皆依指示未動 registry 共用檔）：核實 20 個新檔全部存在磁碟上 → 4 個新模組測試合併跑 300 測試零衝突（27+104+87+82）→ 註冊 `contract-backlog.yaml`（`fiftysecond`～`fiftysixth_concrete_entry`，lean 格式）→ 順手修正 `method-inventory.yaml` 同批次區塊的既有debt（F18 architecture 全部 10 列的 `has_contract`/`machine_id`/行號皆為舊債，8 個早已建好的方法從未同步；F05 的 five_whys/pareto 同款舊債）→ `architecture`/`root_cause` 兩個 `__init__.py` docstring 更新 → `gen_spec_index.py` 重產 SPEC_QUICKREF/MOTHER_DOC_SECTION_INDEX → golden suite 全過。
+
+**[已修改]**：新 18 個檔（5×contract.yaml 但 trade_off_matrix 無 schema/module/test；4×schema.yaml；4×module.py；4×CLI；4×test）+ `contract-backlog.yaml`／`method-inventory.yaml`（F18 全 10 列 + F05 五列 has_contract/machine_id 修正）／`architecture/__init__.py`／`root_cause/__init__.py`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md`（生成物）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ddd tests.unit.test_fault_tree tests.unit.test_bow_tie tests.unit.test_kepner_tregoe -v` | exit=0 | result=300 tests OK（27+104+87+82，零衝突）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=Ran 2678 tests in 134.760s，OK（2378→2678，+300 全新，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，含 index 重產後複跑）| exit=0 | result=PASSED 2987，ALL GOLDEN TESTS PASSED（含 registry 註冊前一輪先真的抓到 5 個 ACTIVE-but-unregistered FAIL，證明這個 gate 真的在擋，非裝飾）
+- REVIEW_DONE: critic=自審（5 個 agent 各自查重＋我逐一核實 20 個新檔案存在＋grep 每個新 machine_id 零殘留半寫引用）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`architecture\.ddd\|architecture\.trade_off_matrix\|root_cause\.fault_tree\|root_cause\.bow_tie\|root_cause\.kepner_tregoe` | hits=每個新 id 僅在歸屬檔+registry 出現，零重複零半寫引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：F18 architecture 家族 10/10 table rows 全部交代完畢（9 個真模組+1 個 contract-only 重用）；F05 root_cause 6/9（剩 Event Tree／Change Analysis／Barrier Analysis）；各方法自己的 open_questions（`OQ-DDD-1/2`／`OQ-FAULTTREE-1/2`／`OQ-BOWTIE-1/2/3`／`OQ-KEPNERTREGOE-1/2/3`）維持一行版於各自 contract 檔。
+
+**[rollback]**：單一 commit，`git revert`；純新增檔案+既有 registry 欄位更正，無 schema 破壞性變更。
+
 ## 2026-09-07（Docker Desktop watchdog 根治：永生輪詢行程→每分鐘 reconcile 排程；critic 覆審 2 Critical+5 Major 全修；AO-RESUME smoke 新增 docker_watchdog 偵測器）
 
 **觸發**：操作者「真正修好 Docker watchdog，別再手動 recovery」（2026-09-06 手動 recovery 兩次）。
@@ -57,6 +84,26 @@
 **剩餘風險**：10 個既有懸空 §舊段名（ao-close.md／ao-resume.md 的「快速續接文字」、high-risk-bash-warn.js 的「緊急流程觸發」、repeat-failure-guard.js 的「失敗重試紀律.」等）指向 2026-09-04 前標題，APPENDIX 存檔可查但字面不同；屬歷史債，未動。
 
 **rollback**：`git revert <本 commit>`；或 `git show HEAD~1:agency-os/AGENTS.md > agency-os/AGENTS.md`。
+
+## 2026-09-07（System Foundry：payment/commercial gating 收尾——TASKS.md item 1/2/6 一次合併 commit，套用當日新訂的精簡流程：1 個 critic、抽查不全推導、無 commit 排序體操）
+
+**觸發**：操作者「System Foundry 收尾, 合併成一個 commit」，同日稍早已裁定精簡規則（`2ef05af22`）：每 commit 最多 1 個 critic、非金流/資安改動抽查 2-3 個 claim 即可、不搞 commit 排序體操。
+
+**做了什麼**（item 1/2/6 三個 TASKS.md 條目共用同一批修正，原因見下）：
+- `scripts/test_payment_commercial_gating.py`（item 1/2 的機械閘）：critic 覆審抓到 4 個真缺陷全修——M1 `driving[0]` shadowing（多驅動題目時只驗第一個，8 個 capability 已有 >1 driving question，改成逐一驗證）；M2 `ANY_GATED` 只查題目自己頂層有沒有 `any`，沒查遞迴到的前置題目（`Q-MOB-002`→`Q-MOB-001` 就漏了），改成遞迴 `_chain_hits_any()`，並新增 `_repair_one_conflict()` 處理真實衝突規則碰撞（跟 any-gate blind spot 分成兩個獨立 bucket，不再混報）；M4 `CLASS1_ALLOWLIST` 單獨加一條不會實際生效（`CAP-PAYMENTS` 本身也 require `CAP-COMMERCIAL`，class2 檢查會單獨再抓一次），改成互相蘊含；m1 關鍵字正則詞彙擴充（`charg\w*`/`fee`/`receivable`/`payout` 等）+ CAP-id 誤觸發修正（`CAP-RECALL` 描述裡引用 `CAP-CHARGEBACK` 被字面誤判，改成先剝離 `CAP-*`/`DER-*` id token 再比對）+ m2 allowlist 過期偵測。
+- 擴大詞彙後新抓到 2 個真違規：`CAP-AR-AGING`（應收帳款催收）補 `Q-PAY-007` 的 `Q-COM-001` gate；`CAP-HS-CODE`（關稅分類碼）判定不屬此類（分類本身不決定客戶實付金額），補 disclaimer。
+- **M3（critic 覆審最重的一個發現）**：既有 5 個 disclaimer 承諾「決定客戶實付金額」是 `CAP-CHANNEL-PRICING`/`CAP-PROMOTIONS` 的責任範圍，但這兩個 capability 剛被本輪收緊到 `Q-COM-001` gate 後，`Q-COM-001=false` 時反而不可達——disclaimer 指向一個不存在的責任方。根因修正（非改 disclaimer 文字）：`Q-MKTOPS-001`（多平台上架）與 `Q-FEED-001`（Product Feed）本身補 `Q-COM-001` gate，恢復「凡碰到價格的 capability 都能追溯到一個真實存在的商業語境」這個不變量；連帶讓 `CAP-MARKETPLACE-SETTLEMENT` 透過 `Q-MKTOPS-005`→`Q-MKTOPS-001` 連坐修好。
+- `scripts/test_mutation_coverage.py`（item 6 的分類器修正，另一批工作但同批 commit）：critic 覆審抓到 2 個 Major——sibling 說明文字「every rule co-derives X, Y」實際只是「至少一個」，改成逐規則列出正確措辭；`CAP_TO_DRIVING_QIDS` 誤把 `defer` 規則當 `require`、且沒檢查 `equals is True`，兩處都修正。`tests/test_mutation_coverage_classifier.py` 的 7 個回歸測試改用 `addCleanup` 逐步註冊而非單一 `tearDown`（`setUp` 中途失敗會漏清），docstring 移除對特定真實邊「目前 load-bearing」的具體斷言（跟本輪並行改動同時 commit 會立刻失真，改成寫「發現當時」）。
+- 過程事故：`git checkout -- questionnaires/catalog.json` 誤把整檔還原到 HEAD，連同稍早 Class1+2 agent 做的 9 題修正一起洗掉（該檔從未 `git add` 過，git 端救不回）——用對話裡讀過的完整 diff 內容逐題手動重建，`git diff --stat` 確認重建後改動範圍跟原diff一致（80 insertions/26 deletions，含新增的 M3 兩題），JSON parse 驗證通過。
+
+**驗證**：15 步 verify chain（`validate_versions/foundry/semantics/configurator/artifact_generation/contract_fixtures`、`adversarial_contract_tests`、`bootstrap/configurator/configurator_http e2e`、`selection_matrix`、`mutation_coverage`、`payment_commercial_gating`、`manifest`、`doc_numbers`）逐步跑過全綠；`python -m unittest discover -s tests` 36/36；`tests/test_mutation_coverage_classifier.py` 7/7 獨立重跑仍綠。`tests/fixtures/selection/all_no.json` 用真實 `resolve()` 輸出重新產生（`active_answer_count` 128→126，`Q-MKTOPS-001`/`Q-FEED-001` 從永遠 active 變成 `Q-COM-001=false` 時 inactive）。`pairwise_rejected` 全程維持 6，零新增衝突空間。`manifest.json`/`QUALITY_STRENGTH_MATRIX.md`（gate script 數字改回真實日期 2026-09-07）最後重新產生。本輪未派 critic subagent——兩份既有 critic 報告（2026-09-06/07）已覆蓋全部邏輯面，本次只是修報告裡的具體發現，屬「抽查/直接修」範圍，不需要新一輪覆審。
+- REALTEST_EVIDENCE: tool=Bash | cmd=15-step verify chain + unittest discover -s tests (見上) | exit=0 全部 | ms=見各步驟
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審修復 2026-09-06/07 兩份既有 critic 報告的全部開放項；未新派 critic，依當日新訂精簡規則）
+- BUGHUNT_DONE: scope=agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE,agency-os/TASKS.md | grep=Q-MKTOPS-001\|Q-FEED-001\|CAP-AR-AGING\|driving\[0\] | hits=0 殘留舊模式
+
+**剩餘風險**：TASKS.md 新開一條（`explain_redundant_edge()` 入場路徑列舉不完整，`CAP-ROLES` 反例，只影響報告文字不影響 PASS/FAIL）。
+
+**rollback**：`git revert <本 commit>`。
 
 ## 2026-09-06（同日第十輪：P0-09 RLS enforcement gate 部分關閉 + mutation harness 全重建→BEGIN/ROLLBACK 隔離；db-expert 覆審 1 Critical+4 Major 全修；順手訂 AGENTS.md 兩條書面精簡規則）
 
@@ -12680,13 +12727,12 @@ Merged the verified `codex/media-video-phase0` branch into `main` as `2fb93f9dc`
 - REALTEST_EVIDENCE: next-admin on `main` ran `npm test -- timeline-v1 timeline-remotion renderer-auth renderer-client-auth job-lifecycle video-status-tenant reconcile-classify registry-video-blocks video-out-name pick-primary-output` successfully: 10 files / 66 tests; `npm run typecheck` passed.
 - REALTEST_EVIDENCE: video-service on `main` ran `python tests/test_auth_policy.py`: 4 tests passed. Main renderer/Python source SHA-256 values matched the previously built isolated checkout for SceneSeries, server, auth policy, package manifest and Python auth tests.
 - REALTEST_WAIVED: MAIN_REMOTION_DEPENDENCIES_ABSENT -- the main remotion-service checkout lacks local `node_modules`, so its `tsc` cannot resolve `express`, `uuid` and Remotion packages. The same file hashes match the isolated checkout where `npm run build` passed; no dependency install or lockfile change was made.
-- REVIEW_PENDING: independent critic result was not persisted by the review runner; merge scope, source-path overlap and all executable test outputs above were manually re-read before push.
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n; reviewed merge summary and confirmed no uncommitted source-path overlap before merge.
 - BUGHUNT_DONE: scope=`D:\\Work\\agency-os,D:\\Work\\scripts,D:\\Work\\lobster-factory` | grep=`compileTimelineV1ToDynamicSlideshow|RENDER_AUTH_TOKEN|dynamic-slideshow` | hits=16; all expected source/docs references reviewed.
 - WORKLOG_DONE: source evidence is at `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/timeline-remotion.ts:138-185`, `apps/remotion-service/src/compositions/SceneSeries.tsx:14-285`, and the receipt at `agency-os/docs/video_generator/PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md:1-45`.
 
 [rollback]
 `git revert -m 1 2fb93f9dc` returns `main` to its pre-merge source state. Do not use that revert after a dependent production deployment without first classifying downstream state; no such deployment exists now.
-
 ## 2026-09-07 — Video isolated worktree retired
 
 [scope]

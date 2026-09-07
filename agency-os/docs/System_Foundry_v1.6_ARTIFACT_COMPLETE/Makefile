@@ -1,4 +1,4 @@
-.PHONY: validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage test manifest doc-numbers verify
+.PHONY: validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage payment-commercial-gating test manifest doc-numbers verify
 validate:
 	python scripts/validate_versions.py
 	python scripts/validate_foundry.py
@@ -22,10 +22,12 @@ selection-matrix:
 	python scripts/test_selection_matrix.py
 mutation-coverage:
 	python scripts/test_mutation_coverage.py
+payment-commercial-gating:
+	python scripts/test_payment_commercial_gating.py
 test:
 	python -m unittest discover -s tests -v
 manifest:
 	python scripts/validate_manifest.py
 doc-numbers:
 	python scripts/validate_doc_numbers.py
-verify: validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage test manifest doc-numbers
+verify: validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage payment-commercial-gating test manifest doc-numbers

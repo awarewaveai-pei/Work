@@ -1581,7 +1581,7 @@
         "CAP-INVENTORY",
         "CAP-MULTI-MARKETPLACE"
       ],
-      "description": "Inventory levels and prices are kept automatically in sync across all connected marketplaces from one canonical source."
+      "description": "Inventory levels and prices are kept automatically in sync across all connected marketplaces from one canonical source. This only propagates an already-decided price so every connected marketplace shows the same number; it never sets or adjusts what a customer pays -- that decision remains CAP-CHANNEL-PRICING/CAP-PROMOTIONS' scope, which is why this capability carries no Q-COM-001 ('charges customers') gate."
     },
     {
       "id": "CAP-REPRICING",
@@ -1739,9 +1739,9 @@
       "name": "Gift Cards / Store Credit",
       "module": "loyalty",
       "requires": [
-        "CAP-PAYMENTS"
+        "CAP-COMMERCIAL"
       ],
-      "description": "Customers can hold and redeem store credit or gift card balances."
+      "description": "Customers can hold and redeem store credit or gift card balances. Requires CAP-COMMERCIAL, not CAP-PAYMENTS specifically: a gift card balance is redeemed against a transaction total regardless of whether the underlying purchase (of the card itself, or of what it's redeemed for) is paid online or offline."
     },
     {
       "id": "CAP-REVIEWS",
@@ -1800,7 +1800,7 @@
         "CAP-CROSS-BORDER",
         "CAP-PRODUCTS"
       ],
-      "description": "Products carry a customs tariff classification code (HS code) as part of their master data, since it directly affects the duty rate."
+      "description": "Products carry a customs tariff classification code (HS code) as part of their master data, since it directly affects the duty rate. This only assigns a classification code to the product; it never computes or sets what the customer pays -- that calculation is CAP-LANDED-COST's scope, which is why this capability carries no Q-COM-001 ('charges customers') gate: HS classification applies to any cross-border product movement, commercial or not."
     },
     {
       "id": "CAP-LANDED-COST",
@@ -1808,10 +1808,9 @@
       "module": "cross_border",
       "requires": [
         "CAP-CROSS-BORDER",
-        "CAP-PAYMENTS",
         "CAP-TAX"
       ],
-      "description": "The system calculates import duties/taxes so the customer sees the total landed cost, not just the product price."
+      "description": "The system calculates import duties/taxes so the customer sees the total landed cost, not just the product price. Requires CAP-TAX (which itself requires CAP-COMMERCIAL), not CAP-PAYMENTS directly: showing the landed-cost total is a calculation/display concern independent of whether the order is ultimately paid online or through an offline channel."
     },
     {
       "id": "CAP-PRODUCT-PASSPORT",

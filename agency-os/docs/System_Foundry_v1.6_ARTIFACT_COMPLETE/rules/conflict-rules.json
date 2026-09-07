@@ -47,19 +47,19 @@
       "message": "訂閱制與「不向客戶收費」互相矛盾。"
     },
     {
-      "id": "CONFLICT-RETURNS-NO-CHARGE",
+      "id": "CONFLICT-RETURNS-NO-PAY",
       "if_all": [
         {
           "question": "Q-RET-001",
           "equals": true
         },
         {
-          "question": "Q-COM-001",
+          "question": "Q-PAY-001",
           "equals": false
         }
       ],
       "code": "CONFIGURATION_CONTRADICTION",
-      "message": "客戶退貨換貨（RMA）需要先向客戶收費，跟「不向客戶收費」互相矛盾。"
+      "message": "客戶退貨換貨（RMA）需要先有線上付款能力。"
     },
     {
       "id": "CONFLICT-REFUND-NO-PAY",
@@ -92,19 +92,19 @@
       "message": "跨公司共同案件需要多家公司使用。"
     },
     {
-      "id": "CONFLICT-SUBC-NO-CHARGE",
+      "id": "CONFLICT-SUBC-NO-PAY",
       "if_all": [
         {
           "question": "Q-SUBC-001",
           "equals": true
         },
         {
-          "question": "Q-COM-001",
+          "question": "Q-PAY-001",
           "equals": false
         }
       ],
       "code": "CONFIGURATION_CONTRADICTION",
-      "message": "賣訂閱制商品給終端客戶，代表你會向客戶收費，跟「不向客戶收費」互相矛盾。"
+      "message": "賣訂閱制商品給終端客戶的定期扣款，需要先有線上付款能力。"
     },
     {
       "id": "CONFLICT-DUNNING-NO-PAY",

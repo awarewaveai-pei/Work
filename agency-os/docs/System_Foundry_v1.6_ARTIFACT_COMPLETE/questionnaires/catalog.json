@@ -973,12 +973,14 @@
       "id": "Q-PAY-007",
       "category": "payments",
       "label": "應收帳款帳齡與催收提醒",
-      "description": "系統要能追蹤每筆應收帳款逾期多久（例如逾期 30/60/90 天以上），記錄到期時間，並在客戶還沒付款時主動提醒或升級處理，而不是要人工一筆一筆確認誰還沒付錢、該催了沒有。只在你有勾選「會計 / 財務紀錄」時才有意義。",
+      "description": "系統要能追蹤每筆應收帳款逾期多久（例如逾期 30/60/90 天以上），記錄到期時間，並在客戶還沒付款時主動提醒或升級處理，而不是要人工一筆一筆確認誰還沒付錢、該催了沒有。只在你有勾選「會計 / 財務紀錄」且「向客戶收費」時才有意義——沒有向客戶收費就沒有客戶應收帳款可催收。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-DATA-009",
-        "equals": true
+        "all": [
+          { "question": "Q-DATA-009", "equals": true },
+          { "question": "Q-COM-001", "equals": true }
+        ]
       }
     },
     {
@@ -2037,9 +2039,13 @@
       "id": "Q-MKTOPS-001",
       "category": "marketplace_ops",
       "label": "同時在多個電商平台/市集上架同一批商品",
-      "description": "你的商品同時在兩個以上的第三方電商平台或市集銷售（例如同時在 Shopee、Amazon、蝦皮上架同一批貨），不是只有自己的官網或單一平台。",
+      "description": "你的商品同時在兩個以上的第三方電商平台或市集銷售（例如同時在 Shopee、Amazon、蝦皮上架同一批貨），不是只有自己的官網或單一平台。只在你有勾選「向客戶收費」時才有意義——純自用或內部展示的商品資料庫沒有多平台鋪貨的問題。",
       "answer_type": "boolean",
-      "required_when_active": true
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
     },
     {
       "id": "Q-MKTOPS-002",
@@ -2057,12 +2063,14 @@
       "id": "Q-MKTOPS-003",
       "category": "marketplace_ops",
       "label": "需要依競爭對手價格自動調整售價",
-      "description": "系統要能參考競爭對手在同一平台的售價，自動調整你的售價以維持競爭力，但不能低於你設定的最低毛利。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。",
+      "description": "系統要能參考競爭對手在同一平台的售價，自動調整你的售價以維持競爭力，但不能低於你設定的最低毛利。只在你有勾選「同時在多個電商平台/市集上架同一批商品」且「向客戶收費」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-MKTOPS-001",
-        "equals": true
+        "all": [
+          { "question": "Q-MKTOPS-001", "equals": true },
+          { "question": "Q-COM-001", "equals": true }
+        ]
       }
     },
     {
@@ -2101,12 +2109,14 @@
       "id": "Q-B2B-002",
       "category": "b2b",
       "label": "不同企業客戶有不同的協議價格",
-      "description": "同樣的商品，不同企業客戶可能談到不同價格（例如量大的客戶有更低單價），不是所有人看到同一個價格。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "description": "同樣的商品，不同企業客戶可能談到不同價格（例如量大的客戶有更低單價），不是所有人看到同一個價格。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」且「向客戶收費」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-B2B-001",
-        "equals": true
+        "all": [
+          { "question": "Q-B2B-001", "equals": true },
+          { "question": "Q-COM-001", "equals": true }
+        ]
       }
     },
     {
@@ -2125,12 +2135,14 @@
       "id": "Q-B2B-004",
       "category": "b2b",
       "label": "客戶會先詢價再下單",
-      "description": "企業客戶通常先提出詢價，你報價之後對方才確認下單，不是直接照網站標價下單。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」時才有意義。",
+      "description": "企業客戶通常先提出詢價，你報價之後對方才確認下單，不是直接照網站標價下單。只在你有勾選「客戶包含企業採購，流程跟一般消費者不同」且「向客戶收費」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-B2B-001",
-        "equals": true
+        "all": [
+          { "question": "Q-B2B-001", "equals": true },
+          { "question": "Q-COM-001", "equals": true }
+        ]
       }
     },
     {
@@ -2161,11 +2173,11 @@
       "id": "Q-SUBC-001",
       "category": "subscription_commerce",
       "label": "賣訂閱制商品或服務給終端客戶",
-      "description": "你賣給客戶的是需要定期續訂的商品或服務（例如訂閱盒、月費服務），不是這套系統本身要不要跟你收費的那個問題（那是另一類「商業模式」問題）。只在你有勾選「向客戶收費」時才有意義。",
+      "description": "你賣給客戶的是需要定期續訂的商品或服務（例如訂閱盒、月費服務），不是這套系統本身要不要跟你收費的那個問題（那是另一類「商業模式」問題）。只在你有勾選「線上付款」時才有意義——訂閱制的定期扣款依賴系統已串接的線上金流，純線下收款無法自動扣款。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-COM-001",
+        "question": "Q-PAY-001",
         "equals": true
       }
     },
@@ -2249,9 +2261,13 @@
       "id": "Q-LOY-004",
       "category": "loyalty",
       "label": "提供儲值金或禮品卡",
-      "description": "客戶可以預先儲值或持有禮品卡餘額，之後消費時折抵。",
+      "description": "客戶可以預先儲值或持有禮品卡餘額，之後消費時折抵。只在你有勾選「向客戶收費」時才有意義——純自用系統沒有客戶儲值消費的問題。",
       "answer_type": "boolean",
-      "required_when_active": true
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
     },
     {
       "id": "Q-REV-001",
@@ -2325,12 +2341,14 @@
       "id": "Q-XB-003",
       "category": "cross_border",
       "label": "需要計算關稅並顯示到岸總價",
-      "description": "客戶下單時要能看到含關稅/進口稅在內的實際總價，而不是只看到商品售價、關稅另外通知。只在你有勾選「商品跨國銷售且涉及進出口關務」時才有意義。",
+      "description": "客戶下單時要能看到含關稅/進口稅在內的實際總價，而不是只看到商品售價、關稅另外通知。只在你有勾選「商品跨國銷售且涉及進出口關務」且「向客戶收費」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-XB-001",
-        "equals": true
+        "all": [
+          { "question": "Q-XB-001", "equals": true },
+          { "question": "Q-COM-001", "equals": true }
+        ]
       }
     },
     {
@@ -2469,11 +2487,11 @@
       "id": "Q-RET-001",
       "category": "returns",
       "label": "客戶可主動申請退貨或換貨（RMA）",
-      "description": "客戶單純不想要商品（不是商品有瑕疵）時，可以在購買後提出退貨或換貨申請，經核准、退回驗貨後才進入退款或換貨，是一套完整流程，不是「商品有瑕疵才適用」的保固，也不只是把錢退回的退款。只在你有勾選「向客戶收費」時才有意義——純自用系統沒有客戶退貨的問題。",
+      "description": "客戶單純不想要商品（不是商品有瑕疵）時，可以在購買後提出退貨或換貨申請，經核准、退回驗貨後才進入退款或換貨，是一套完整流程，不是「商品有瑕疵才適用」的保固，也不只是把錢退回的退款。只在你有勾選「線上付款」時才有意義——這裡的退貨流程最終會走到系統的線上退款機制，純線下收款或純自用系統都沒有對應的退款能力。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
-        "question": "Q-COM-001",
+        "question": "Q-PAY-001",
         "equals": true
       }
     },
@@ -2525,9 +2543,13 @@
       "id": "Q-PROMO-001",
       "category": "promotions",
       "label": "促銷折扣與優惠券",
-      "description": "需要規劃並執行限時折扣、優惠券、滿額折抵等促銷活動，系統要能在結帳時計算折扣後金額並記錄每張優惠券的使用情形。跟「行銷」類別的「行銷活動管理」不同：那題管的是活動預算、時程與成效追蹤，這題是實際把價格折下去的機制；跟「會員忠誠度與獎勵」類別的「提供會員點數或獎勵機制」、「提供儲值金或禮品卡」也不同，那些是持續累積的回頭客回饋，這題是當下直接折價。",
+      "description": "需要規劃並執行限時折扣、優惠券、滿額折抵等促銷活動，系統要能在結帳時計算折扣後金額並記錄每張優惠券的使用情形。跟「行銷」類別的「行銷活動管理」不同：那題管的是活動預算、時程與成效追蹤，這題是實際把價格折下去的機制；跟「會員忠誠度與獎勵」類別的「提供會員點數或獎勵機制」、「提供儲值金或禮品卡」也不同，那些是持續累積的回頭客回饋，這題是當下直接折價。只在你有勾選「向客戶收費」時才有意義——純自用系統不需要促銷折扣機制。",
       "answer_type": "boolean",
-      "required_when_active": true
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
     },
     {
       "id": "Q-PROMO-002",
@@ -2545,9 +2567,13 @@
       "id": "Q-PROMO-003",
       "category": "promotions",
       "label": "同一商品在不同通路或市場賣不同價格",
-      "description": "同一項商品依銷售通路（例如自有官網 vs. 電商平台）或依市場（例如不同國家）預先設定不同價格，是一份價目表本身的設定。跟「企業客戶與批發」類別的「不同企業客戶有不同的協議價格」不同：那題是針對個別客戶談出來的價格，這題是依通路/市場整批設定的價目表；跟「多平台市集營運」類別的「需要依競爭對手價格自動調整售價」也不同：那題是依競爭對手動態自動調整，這題是主動預先規劃、不隨競爭對手變動的定價。",
+      "description": "同一項商品依銷售通路（例如自有官網 vs. 電商平台）或依市場（例如不同國家）預先設定不同價格，是一份價目表本身的設定。跟「企業客戶與批發」類別的「不同企業客戶有不同的協議價格」不同：那題是針對個別客戶談出來的價格，這題是依通路/市場整批設定的價目表；跟「多平台市集營運」類別的「需要依競爭對手價格自動調整售價」也不同：那題是依競爭對手動態自動調整，這題是主動預先規劃、不隨競爭對手變動的定價。只在你有勾選「向客戶收費」時才有意義——純自用系統沒有依通路/市場訂價的問題。",
       "answer_type": "boolean",
-      "required_when_active": true
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
     },
     {
       "id": "Q-RISK-001",
@@ -2673,9 +2699,13 @@
       "id": "Q-FEED-001",
       "category": "merchandising",
       "label": "商品資料匯出到購物／廣告平台（Product Feed）",
-      "description": "把商品的價格、庫存狀態，以及各平台各自要求的欄位，整理成 Google Merchant、Meta Catalog、Pinterest、TikTok 等購物或廣告平台指定的資料格式並定期送出；平台審核後可能回報部分商品被拒絕上架（例如缺少必填欄位、價格或庫存對不上其他資料），系統要能定位到是哪個商品的哪個欄位出了問題。跟「同時在多個電商平台/市集上架同一批商品」不同：那題是商品實際在另一個第三方電商平台或市集上架、交易在那個平台完成；這題的商品交易仍然在自己的網站完成，這些外部平台只負責展示商品或投放廣告，把流量帶回自己的網站。跟「行銷活動管理」也不同：那題管的是廣告活動本身的預算、時程與成效追蹤，這題是商品資料送到平台的正確性與品質。",
+      "description": "把商品的價格、庫存狀態，以及各平台各自要求的欄位，整理成 Google Merchant、Meta Catalog、Pinterest、TikTok 等購物或廣告平台指定的資料格式並定期送出；平台審核後可能回報部分商品被拒絕上架（例如缺少必填欄位、價格或庫存對不上其他資料），系統要能定位到是哪個商品的哪個欄位出了問題。跟「同時在多個電商平台/市集上架同一批商品」不同：那題是商品實際在另一個第三方電商平台或市集上架、交易在那個平台完成；這題的商品交易仍然在自己的網站完成，這些外部平台只負責展示商品或投放廣告，把流量帶回自己的網站。跟「行銷活動管理」也不同：那題管的是廣告活動本身的預算、時程與成效追蹤，這題是商品資料送到平台的正確性與品質。只在你有勾選「向客戶收費」時才有意義——這裡的 feed 是拿去投遞購物廣告或比價平台，目的是促成交易，不是單純的內容展示。",
       "answer_type": "boolean",
-      "required_when_active": true
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-001",
+        "equals": true
+      }
     }
   ]
 }

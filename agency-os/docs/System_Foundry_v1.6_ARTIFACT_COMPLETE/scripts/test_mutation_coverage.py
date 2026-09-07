@@ -160,36 +160,70 @@ def plans_differ(a, b):
 # redundant regardless of which specific capabilities are involved, so future edges of the same
 # shape are covered automatically. Anything empirically dead that matches none of them is
 # unexplained and fails the check by name.
-def closure_requires(cid, seen=None):
+#
+# `exclude_edge`, threaded through every closure_requires() call from explain_redundant_edge(),
+# is not optional decoration: the alternate-path proof for an edge (cap_id, dep_id) has to be a
+# path that survives *without* that edge, mirroring what the empirical mutation sweep above
+# already does (exclude one thing, re-run). Searching the full, unmodified graph instead lets a
+# path loop back out through cap_id's own requires list and "discover" dep_id via the very edge
+# being investigated -- a 2026-09-06 critic review found a concrete case: closure_requires(cid)
+# over the full graph can walk cid -> ... -> cap_id -> dep_id, where that last hop *is* the edge
+# under test, and the classifier would misreport a genuinely load-bearing edge as redundant.
+def closure_requires(cid, exclude_edge=None, seen=None):
     seen = seen if seen is not None else set()
     if cid in seen or cid not in CAPMAP: return seen
     seen.add(cid)
     for dep in CAPMAP[cid].get('requires', []):
-        closure_requires(dep, seen)
+        if exclude_edge is not None and (cid, dep) == exclude_edge: continue
+        closure_requires(dep, exclude_edge, seen)
     return seen
 
 CAP_TO_DRIVING_QIDS = {}
 for _r in QRULES:
-    for _cid in _r.get('require', []) + _r.get('defer', []):
+    if _r['when'].get('equals') is not True: continue
+    for _cid in _r.get('require', []):
         CAP_TO_DRIVING_QIDS.setdefault(_cid, []).append(_r['when']['question'])
 
-def forced_prereq_qids(qid, acc=None):
-    # Questions transitively forced to True by qid's own active_when chain (an 'any' branch is
-    # never "forced" -- only one side needs to hold -- so it's deliberately not walked here;
-    # that only makes this function under-report forced prerequisites, which only makes
-    # explain_redundant_edge() *more* conservative, never falsely exculpatory).
-    acc = acc if acc is not None else set()
-    cond = QMAP[qid].get('active_when')
-    def walk(c):
-        if not c: return
-        if 'question' in c:
-            pq = c['question']
-            if c.get('equals') is True and pq not in acc:
-                acc.add(pq); forced_prereq_qids(pq, acc)
-        elif 'all' in c:
-            for x in c['all']: walk(x)
-    walk(cond)
-    return acc
+def _forced_by_condition(cond, seen):
+    """The FULL, transitively-expanded set of qids guaranteed True whenever `cond` holds -- each
+    directly-named question plus everything forced (recursively) by that question's own
+    active_when chain -- combined with configurator_engine.eval_condition()'s real semantics:
+    'all' is AND (every element holds simultaneously, so the guaranteed set is the UNION of what
+    each element transitively guarantees); 'any' is OR (only one, unknown, element holds, so only
+    what is guaranteed by EVERY branch -- the INTERSECTION of each branch's *fully expanded* set --
+    is genuinely forced, since the branch that actually fired could be any one of them). The
+    expansion has to happen before the intersection, not after: two `any` branches can be
+    different immediate questions that only converge on a shared ancestor deeper in each one's own
+    active_when chain, and intersecting only the immediate layer would miss that shared ancestor
+    entirely. Treating 'any' like 'all' (union instead of intersection) would smuggle an
+    or-semantics condition through as if it were and-semantics and falsely over-claim a forced
+    prerequisite; not walking 'any' at all (the previous behaviour) under-reports instead, which is
+    why any capability whose only driving question sits behind an `any` gate always fell through to
+    "unexplained" (a hard FAIL) even when genuinely, safely redundant. `seen` guards against a
+    cyclical active_when chain re-entering the same question during one expansion; it is local to
+    each branch (not shared across `any` siblings), since a fact forced only by one branch must not
+    suppress correctly recomputing it for a different branch."""
+    if not cond: return set()
+    if 'question' in cond:
+        if cond.get('equals') is not True: return set()
+        pq = cond['question']
+        if pq in seen: return {pq}
+        return {pq} | _forced_by_condition(QMAP[pq].get('active_when'), seen | {pq})
+    if 'all' in cond:
+        out = set()
+        for c in cond['all']: out |= _forced_by_condition(c, seen)
+        return out
+    if 'any' in cond:
+        branches = [_forced_by_condition(c, seen) for c in cond['any']]
+        if not branches: return set()
+        out = set(branches[0])
+        for b in branches[1:]: out &= b
+        return out
+    return set()
+
+def forced_prereq_qids(qid):
+    # Questions transitively forced to True by qid's own active_when chain.
+    return _forced_by_condition(QMAP[qid].get('active_when'), frozenset({qid}))
 
 def explain_redundant_edge(cap_id, dep_id):
     """Returns a one-line reason if (cap_id, dep_id) is structurally redundant via a mechanism
@@ -197,14 +231,35 @@ def explain_redundant_edge(cap_id, dep_id):
     if dep_id in FOUNDATION:
         return f'{dep_id} is a FOUND-* foundation capability, unconditionally present in every plan'
     if cap_id.startswith('DER-'):
-        triggers = [r['when_capability'] for r in DRULES if cap_id in r['derive']]
-        if dep_id in triggers:
+        deriving_rules = [r for r in DRULES if cap_id in r['derive']]
+        triggers = [r['when_capability'] for r in deriving_rules]
+        # Only a genuine single-trigger uniqueness if EVERY rule that can derive cap_id shares
+        # the same when_capability == dep_id -- if a second rule derives cap_id from a different
+        # trigger, cap_id can come into existence without dep_id via that rule, and the "own
+        # derivation trigger" claim is false for that route (2026-09-06 critic counterexample:
+        # DER-AI-AUTHORITY/DER-AI-TOOLS are each derived by both DERIVE-AI-WRITE, when_capability
+        # CAP-AI-WRITE, *and* DERIVE-AI-EXT, when_capability CAP-AI-EXTERNAL -- dep_id CAP-AI-WRITE
+        # being one of the two triggers does not mean it is guaranteed by the other).
+        if triggers and all(t == dep_id for t in triggers):
             return f'{cap_id} can only ever be derived once {dep_id} is already active (its own derivation trigger)'
-        for r in DRULES:
-            if cap_id in r['derive']:
-                for sib in r['derive']:
-                    if sib != cap_id and dep_id in CAPMAP.get(sib, {}).get('requires', []):
-                        return f'{dep_id} is also required by sibling {sib}, co-derived by the same rule {r["id"]}'
+        # Sibling co-derivation is only a valid explanation if it holds no matter which rule
+        # actually fires: EVERY rule that can derive cap_id must also co-derive, in that same
+        # rule, some sibling capability that independently requires dep_id.
+        if deriving_rules and all(
+            any(sib != cap_id and dep_id in CAPMAP.get(sib, {}).get('requires', []) for sib in r['derive'])
+            for r in deriving_rules
+        ):
+            # Per-rule, not "every rule shares sibling X": two different rules deriving cap_id can
+            # each have their OWN covering sibling (2026-09-06 critic counterexample: rule A
+            # derives [cap_id, S1], rule B derives [cap_id, S2] -- claiming "every rule co-derives
+            # S1 and S2" would be false for both). State only what's actually guaranteed: for each
+            # rule, AT LEAST ONE of its co-derived siblings requires dep_id.
+            per_rule = [(r['id'], sorted(sib for sib in r['derive']
+                                          if sib != cap_id and dep_id in CAPMAP.get(sib, {}).get('requires', [])))
+                        for r in deriving_rules]
+            detail = '; '.join(f'{rid} co-derives {"/".join(sibs)}' for rid, sibs in per_rule)
+            return (f'every rule that can derive {cap_id} also co-derives, in that same rule, at '
+                    f'least one sibling that independently requires {dep_id} ({detail})')
     # cap_id itself (not necessarily a DER-* capability) may TRIGGER a derivation rule whose
     # derived DER-* capabilities transitively require dep_id -- e.g. CAP-AI-EXTERNAL triggers
     # DERIVE-AI-EXT, which derives DER-AI-AUTHORITY, which requires CAP-AI-WRITE, which requires
@@ -213,17 +268,34 @@ def explain_redundant_edge(cap_id, dep_id):
     for r in DRULES:
         if r['when_capability'] == cap_id:
             for cid in r['derive']:
-                if dep_id in closure_requires(cid):
+                if dep_id in closure_requires(cid, exclude_edge=(cap_id, dep_id)):
                     return f'{dep_id} is reachable via {r["id"]}\'s own derived {cid} -> ... -> {dep_id} chain'
+    # KNOWN GAP (2026-09-06, second independent critic review, agency-os/TASKS.md System Foundry
+    # "explain_redundant_edge() entry-path enumeration" item): this shape and the two DER-*
+    # shapes above only enumerate ONE way cap_id can enter a plan -- a question rule directly
+    # requiring it. They do not check whether a DIFFERENT capability's own `requires` closure, or
+    # a derivation rule's `derive` list, can also pull cap_id in without forcing dep_id (real
+    # counterexample: CAP-ROLES -> CAP-IDENTITY is empirically load-bearing because
+    # CAP-B2B-BUYER-ROLES independently `requires: [CAP-B2B, CAP-ROLES]` through its own
+    # active_when chain, which never forces CAP-IDENTITY -- yet every question rule that directly
+    # selects CAP-ROLES happens to also force CAP-IDENTITY, so this function wrongly calls it
+    # explained). A prior attempt at fixing this by also checking every OTHER capability's
+    # `requires`-graph closure for dep_id, without ALSO checking that other capability's own
+    # active_when-forced chain, broke 8 currently-correct redundant classifications into false
+    # unexplained FAILs on the real catalog -- reverted rather than shipped, per this repo's own
+    # rule against a rushed fix with a larger blast radius than the bug it fixes. The empirical
+    # PASS/FAIL verdict this file exists to produce is NOT affected by this gap (that check
+    # mutates the real edge and re-resolves, so CAP-ROLES->CAP-IDENTITY is correctly counted
+    # load-bearing regardless) -- only this explanatory string can be wrong.
     driving = CAP_TO_DRIVING_QIDS.get(cap_id, [])
     if driving:
         for qid in driving:
             forced = forced_prereq_qids(qid)
             reached = any(
-                dep_id in closure_requires(cid)
+                dep_id in closure_requires(cid, exclude_edge=(cap_id, dep_id))
                 for fq in forced
-                for rule in QRULES if rule['when']['question'] == fq
-                for cid in rule.get('require', []) + rule.get('defer', [])
+                for rule in QRULES if rule['when']['question'] == fq and rule['when'].get('equals') is True
+                for cid in rule.get('require', [])
             )
             if not reached:
                 return None
