@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HCI-30 — Cases (dev)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; }
+  .note { background: #fff8e1; border: 1px solid #e0c26a; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .tenant-switch button { padding: 0.4rem 1rem; margin-right: 0.5rem; cursor: pointer; }
+  .tenant-switch button.active { background: #1a1a1a; color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; font-size: 0.85rem; vertical-align: top; }
+  th { background: #f5f5f5; }
+  code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  a.case-link { cursor: pointer; color: #1a56db; text-decoration: underline; }
+  #detail { display: none; }
+  #list { display: block; }
+  form.record-form { display: grid; gap: 0.5rem; max-width: 500px; margin-top: 0.75rem; }
+  form.record-form label { font-size: 0.85rem; font-weight: 600; }
+  form.record-form input, form.record-form select, form.record-form textarea { padding: 0.4rem; font-size: 0.85rem; }
+  .back { cursor: pointer; color: #1a56db; }
+  .band-VERY_HIGH, .band-HIGH { color: #0a7d34; font-weight: 600; }
+  .band-MODERATE { color: #8a6d00; font-weight: 600; }
+  .band-LOW, .band-VERY_LOW { color: #b3261e; font-weight: 600; }
+  .err { color: #b3261e; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div id="list">
+  <h1>HCI-30 Wave 1 — Cases (synthetic dev data)</h1>
+  <div class="note">
+    Real API (<code>GET /api/hci/v1/cases?tenant=a|b</code>) &rarr; real Postgres, RLS-enforced (ADR-0016).
+    No auth layer exists yet, so the tenant is an explicit switch below rather than a disguised login.
+  </div>
+  <div class="tenant-switch">
+    <button id="btn-a" onclick="loadList('a')">Tenant A</button>
+    <button id="btn-b" onclick="loadList('b')">Tenant B</button>
+  </div>
+  <table id="cases">
+    <thead><tr><th>id</th><th>purpose</th><th>status</th><th>risk_tier</th><th>opened_at</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div id="detail">
+  <p><span class="back" onclick="showList()">&larr; back to cases</span></p>
+  <h1 id="d-title"></h1>
+  <p id="d-meta"></p>
+
+  <h2>Trust Domain roll-up (computed live from Assessment records below)</h2>
+  <p style="font-size:0.85rem;color:#555">packages/intelligence/rollup-trust-domains.mjs, real formula, not a mock. A domain with no ASSESSMENT evidence yet simply does not appear here — never defaulted to MODERATE.</p>
+  <table id="d-rollup"><thead><tr><th>domain</th><th>band</th><th>coverage</th><th>disagreement</th></tr></thead><tbody></tbody></table>
+
+  <h2>Decisions</h2>
+  <table id="d-decisions"><thead><tr><th>outcome</th><th>rationale</th><th>recorded</th></tr></thead><tbody></tbody></table>
+
+  <h2>Evidence / Claims / Assessments / Trust Domains</h2>
+  <table id="d-records"><thead><tr><th>kind</th><th>person</th><th>payload</th></tr></thead><tbody></tbody></table>
+
+  <h2>Add a record</h2>
+  <form class="record-form" onsubmit="return submitRecord(event)">
+    <label for="f-person">Person</label>
+    <select id="f-person"></select>
+    <label for="f-kind">Kind</label>
+    <select id="f-kind" onchange="renderKindFields()">
+      <option value="EVIDENCE">EVIDENCE</option>
+      <option value="CLAIM">CLAIM</option>
+      <option value="ASSESSMENT">ASSESSMENT</option>
+    </select>
+    <p style="font-size:0.8rem;color:#555;margin:0">TRUST_DOMAIN is intentionally not directly creatable here -- it is the computed roll-up above (ADR-0004: trust must be evidence-linked, never hand-asserted).</p>
+    <div id="f-kind-fields"></div>
+    <button type="submit">Create</button>
+    <div id="f-err" class="err"></div>
+  </form>
+</div>
+
+<script>
+let currentTenant = 'a';
+let currentCaseId = null;
+
+const DIMENSIONS = ['INTEGRITY_CONSISTENCY','RELIABILITY_FULFILLMENT','COMPETENCE','COMMUNICATION_QUALITY',
+  'BOUNDARY_RESPECT','RECIPROCITY_FAIRNESS','CONFLICT_REPAIR','POWER_BEHAVIOR','INCENTIVE_ALIGNMENT',
+  'RISK_EXTERNALIZATION','INFORMATION_GOVERNANCE','LEARNING_ADAPTABILITY','CONTEXT_STABILITY','PREDICTABILITY'];
+const BANDS = ['VERY_LOW','LOW','MODERATE','HIGH','VERY_HIGH'];
+
+function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
+function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
+
+async function loadList(tenant) {
+  currentTenant = tenant;
+  document.querySelectorAll('.tenant-switch button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + tenant).classList.add('active');
+  const res = await fetch('/api/hci/v1/cases?tenant=' + tenant);
+  const body = await res.json();
+  const tbody = document.querySelector('#cases tbody');
+  tbody.innerHTML = '';
+  if (!res.ok) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + (body.detail || body.title) + '</td></tr>'; return; }
+  for (const c of body.data) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><a class="case-link" onclick="openCase('${c.id}')">${c.id}</a></td><td>${c.purpose}</td><td>${c.status}</td><td>${c.risk_tier}</td><td>${c.opened_at}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (body.data.length === 0) tbody.innerHTML = '<tr><td colspan="5">(no rows visible to this tenant)</td></tr>';
+}
+
+async function openCase(caseId) {
+  currentCaseId = caseId;
+  await refreshDetail();
+  showDetail();
+}
+
+async function refreshDetail() {
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}?tenant=${currentTenant}`);
+  const body = await res.json();
+  if (!res.ok) { alert('Error: ' + (body.detail || body.title)); return; }
+
+  document.getElementById('d-title').textContent = body.case.purpose + ' (' + body.case.id + ')';
+  document.getElementById('d-meta').textContent = `status=${body.case.status} risk_tier=${body.case.risk_tier} opened_at=${body.case.opened_at}`;
+
+  const rollupBody = document.querySelector('#d-rollup tbody');
+  rollupBody.innerHTML = body.rollup.domains.length
+    ? body.rollup.domains.map(d => `<tr><td>${d.domain}</td><td class="band-${d.value}">${d.value}</td><td>${d.coverage}</td><td>${d.dimension_disagreement}</td></tr>`).join('')
+    : '<tr><td colspan="4">(no Assessment records yet -- add one below)</td></tr>';
+
+  const decBody = document.querySelector('#d-decisions tbody');
+  decBody.innerHTML = body.decisions.length
+    ? body.decisions.map(d => `<tr><td>${d.outcome}</td><td>${d.rationale}</td><td>${d.valid_from}</td></tr>`).join('')
+    : '<tr><td colspan="3">(no decision recorded yet)</td></tr>';
+
+  const personById = Object.fromEntries(body.persons.map(p => [p.id, p.display_label]));
+  const recBody = document.querySelector('#d-records tbody');
+  recBody.innerHTML = body.records.length
+    ? body.records.map(r => `<tr><td>${r.kind}</td><td>${personById[r.person_id] || r.person_id}</td><td><code>${JSON.stringify(r.payload)}</code></td></tr>`).join('')
+    : '<tr><td colspan="3">(none yet)</td></tr>';
+
+  const personSelect = document.getElementById('f-person');
+  personSelect.innerHTML = body.persons.map(p => `<option value="${p.id}">${p.display_label} (${p.id})</option>`).join('');
+
+  renderKindFields();
+}
+
+function renderKindFields() {
+  const kind = document.getElementById('f-kind').value;
+  const el = document.getElementById('f-kind-fields');
+  if (kind === 'EVIDENCE') {
+    el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>`;
+  } else if (kind === 'CLAIM') {
+    el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>
+      <label for="f-evref">Evidence ref (Evidence/Claim record id this cites)</label><input id="f-evref">`;
+  } else if (kind === 'ASSESSMENT') {
+    el.innerHTML = `<label for="f-dimension">Dimension</label><select id="f-dimension">${DIMENSIONS.map(d => `<option>${d}</option>`).join('')}</select>
+      <label for="f-value">Band</label><select id="f-value">${BANDS.map(b => `<option>${b}</option>`).join('')}</select>
+      <label for="f-evref">Evidence ref (Evidence/Claim record id backing this)</label><input id="f-evref">`;
+  }
+}
+
+async function submitRecord(evt) {
+  evt.preventDefault();
+  const kind = document.getElementById('f-kind').value;
+  const person_id = document.getElementById('f-person').value;
+  let payload = {};
+  if (kind === 'EVIDENCE') payload = { content: document.getElementById('f-content').value };
+  else if (kind === 'CLAIM') payload = { content: document.getElementById('f-content').value, evidence_refs: [document.getElementById('f-evref').value] };
+  else if (kind === 'ASSESSMENT') payload = { dimension: document.getElementById('f-dimension').value, value: document.getElementById('f-value').value, evidence_refs: [document.getElementById('f-evref').value] };
+
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/records`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, kind, person_id, payload }),
+  });
+  const body = await res.json();
+  const errEl = document.getElementById('f-err');
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return false; }
+  errEl.textContent = '';
+  await refreshDetail();
+  return false;
+}
+
+loadList('a');
+</script>
+</body>
+</html>

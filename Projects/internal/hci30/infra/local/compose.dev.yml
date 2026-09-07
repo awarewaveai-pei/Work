@@ -1,0 +1,28 @@
+# Persistent local dev database for app/ -- separate from compose.test.yml,
+# which intentionally has NO host port mapping (its own design invariant for
+# the ephemeral CI/mutation-check runner, see README.md). This file exists
+# because a dev web app running on the HOST needs a real, stable port to
+# connect to; compose.test.yml stays untouched.
+#
+# Still synthetic-only: 127.0.0.1-only port binding (never 0.0.0.0), same
+# postgres:15.8 image and schema, no production data path. Bring up with
+# `docker compose -f infra/local/compose.dev.yml -p hci30dev up -d`, apply
+# migrations once (scripts/dev-db-init.ps1), leave it running.
+services:
+  db:
+    image: postgres:15.8
+    environment:
+      POSTGRES_DB: hci_wave1_synthetic
+      POSTGRES_USER: hci_owner
+      POSTGRES_PASSWORD: ${HCI_DEV_DB_PASSWORD:?dev runner must provide a generated password}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - hci-wave1-dev-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hci_owner -d hci_wave1_synthetic"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+volumes:
+  hci-wave1-dev-pgdata:

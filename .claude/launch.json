@@ -14,6 +14,12 @@
         "agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generated"
       ],
       "port": 8765
+    },
+    {
+      "name": "hci30-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Projects/internal/hci30/app", "start"],
+      "port": 4030
     }
   ]
 }

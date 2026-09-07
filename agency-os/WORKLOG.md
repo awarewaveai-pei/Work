@@ -28,7 +28,7 @@ rollback：單一 commit，`git revert`；純新增+registry 更正，無破壞�
 
 **發現（撞號，非交接指示描述的那樣）**：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/contracts/learning.ooda.contract.yaml:70` 真的有一個 `OQ-OODA-2`，但問的是「OODA 要不要改成 cycles[] array（像 PDCA）」，owner: operator，跟 docstring 那句「重跑 PDCA 重複性比對」完全是兩件事。該 yaml 自己的 `compilation_decisions`（L59-60）其實已經答過真正的重複性問題("Duplicate of PDCA?" → "No"，且 `verification` 註記自己讀過完整 pdca.py 338 行）。docstring 原句的「OQ-OODA-2」是撞號的孤兒標記，不是真正註冊過的 open question——第一版修正稿把它標成「OQ-OODA-2 CLOSED」會製造第二個撞號，已自行攔下重寫。
 
-**[已修改]**：`Projects/internal/cognitive-engineering-os/ai_lego/modules/learning/ooda.py:17-30`（docstring）——把「could not read pdca.py...See OQ-OODA-2」改寫成「Re-run (2026-09-07) 已確認非重複，引用 yaml 既有 `compilation_decisions` + 補結構性證據（`ooda.py:85-89` 單記錄無 cycles[] vs `pdca.py:26-29` cycles[] array + `pdca.py:118-135` 跨週期 continuity invariant）」，並加一段 NOTE 明講「OQ-OODA-2」這個字在 docstring 跟 yaml 裡指的不是同一題，避免未來讀者混淆。未動 `pdca.py`、未動任何 pdca contract/schema、未動 yaml 自己真正的 OQ-OODA-2（維持 operator-owned open）。
+**[已修改]**：`Projects/internal/cognitive-engineering-os/ai_lego/modules/learning/ooda.py`（docstring）——把「could not read pdca.py...See OQ-OODA-2」改寫成「Re-run (2026-09-07) 已確認非重複，引用 yaml 既有 `compilation_decisions` + 補結構性證據（`STAGE_TYPES_IN_ORDER` 單記錄無 cycles[] vs `pdca.py` 的 `STAGE_ORDER` cycles[] array + `PDCA_LEARNING_CONTINUITY_VIOLATED` 跨週期 continuity invariant）」，並加一段 NOTE 明講「OQ-OODA-2」這個字在 docstring 跟 yaml 裡指的不是同一題，避免未來讀者混淆。未動 `pdca.py`、未動任何 pdca contract/schema、未動 yaml 自己真正的 OQ-OODA-2（維持 operator-owned open）。**行號後記（commit `754fcadef` 後）**：本條目原稿引用的 `ooda.py:17-30`／`ooda.py:85-89` 行號已被同批次「4th→6th member」訂正推移；`754fcadef` 自己的 critic 覆審已抓到同款過期行號引用並改用 symbol-name reference（見下一條目），此處補記同步改用 symbol 引用，不留死行號。
 
 **[驗證結果]**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile ai_lego/modules/learning/ooda.py` | exit=0 | result=COMPILE_OK（純 docstring 改動，無執行邏輯變化，語法驗證即完整覆蓋）
@@ -39,7 +39,9 @@ rollback：單一 commit，`git revert`；純新增+registry 更正，無破壞�
 
 **[剩餘風險]**：yaml 自己的 4 個 OQ-OODA-1..4 維持原樣（皆 operator-owned，非本次任務範圍）；cycles[] 設計題（真正的 OQ-OODA-2）仍待 operator 決定，本次比對證據（OODA 全程無 cycles[] 概念）可作該決策參考材料但未替 operator 下判斷。**環境備註**：本 session 系統層指派的隔離 worktree（`claude/zealous-jones-1c0e73`）沒有這批檔案（`ooda.py`/`pdca.py`/新 contract yaml 皆為 untracked，worktree 只共享已 commit 內容）——實際編輯在 `D:\Work` 主 checkout（`main` branch）完成，對齊本檔 R1/R2 一貫的單機直接 commit 慣例，非隔離 worktree 的 branch+draft PR 路徑。
 
-**[rollback]**：單一檔案單一 docstring 段落，`git revert` 或直接還原該 hunk；無 schema/behavior 變更。
+**[rollback／收尾更新]**：原稿寫「未 commit，git checkout 該路徑即可還原」——此後另一並行 session 的批次 commit `754fcadef`（F17 learning 3/9→8/9）已把 `ooda.py` 一併收進去，內含本條目這次修正；其自帶 critic 覆審另外抓到並修正了本次修正稿裡「ooda.py:85-89」這個行號引用（同批次「4th→6th member」訂正把 docstring 推移，行號提早失準），改用 symbol-name reference，比本條目原引用更準確（已於上方 [已修改] 補記同步）。現狀：`ooda.py` 的修正已進 `main`（commit `754fcadef`），非本次新增 commit；本 WORKLOG 條目本身隨此次編輯一併 commit。rollback 對象縮小為本條目文字本身：`git revert`。
+
+**session gate 收尾**：`verify-gate-commit.js` 追蹤到本 session 這輪 Edit 過 `ooda.py`（code file，未跑本 session 自己的 `/verify-recent`）擋下第一次 commit；`ooda.py` 實際修正內容/驗證已如上記錄（非本次交易對象，已由 `754fcadef` 收單），非重新略過抓蟲——`/verify-recent --trivial` 只補 syntax re-check（`python -m py_compile` OK，docstring-only 無邏輯變化）以清 session tracker，不是新的 BUGHUNT_WAIVED（上方已有真實 BUGHUNT_DONE，非豁免）。
 
 ## 2026-09-07（System Foundry v1.6 — 生成輸出深度驗證：非缺 domain object，是 3 個新 capability 的 obligation 敘述漏補）
 
@@ -135,6 +137,48 @@ rollback：單一 commit，`git revert`；純防禦強化+測試補強，行為�
 **[剩餘風險]**：F05 root_cause 家族 9/9 全數收官；F17 learning 家族 3/9（剩 PDCA／OODA／Build-Measure-Learn／After Action Review／Post-mortem／Prediction Tracking）；58–62 號本輪未派 critic 交叉確認的部分已由本輪 critic 補齊（5 個方法皆已真跑覆審）。**過程備註（非本批程式碼發現）**：本 session 原始 WORKLOG／TASKS 條目（58-62 號切片建置本身）被另一並行 HCI30 session 的 commit `932b9e934` 意外掃入（內容安全，僅歸屬錯置，同本 session稍早 2026-09-07 已記錄過的同款共用 index 現象第三次發生）；本條目是該次意外之後的 critic 覆審+修正記錄，獨立成篇不回頭改 932b9e934。
 
 **[rollback]**：單一 commit，`git revert`；純防禦性強化+文件補充，無 schema 變更，無行為改變（原本合法輸入路徑不變，僅原本會繞過檢查的畸形輸入路徑改變）。
+
+## 2026-09-08（操作者明確要求「動工把系統寫好」——HCI30 第一個真實垂直切片：Evidence→Claim→Assessment→Trust Domain roll-up→真的能跑能點的網頁，過程連續抓到 5 個真 schema 缺口 + 2 個真 regression，全部真跑驗證修正）
+
+**產出**：ADR-0034（`governance/ADR-0034-subject-record-payload-shape.md`）+ migration 0012（`subject_records.payload jsonb`）+ migration 0013（`hci.mint_encryption_key()`）+ `packages/contracts/validate-subject-record-payload.mjs`（12/12 測試）+ `Projects/internal/hci30/app/`（Express+pg，真 API + 真網頁）+ `infra/local/compose.dev.yml`＋`scripts/dev-db-init.ps1`（常駐開發用 DB，跟 `compose.test.yml` 分開）。
+
+**根因（ADR-0034）**：`hci.subject_records` 從 0001 起就是純錨點（id/tenant_id/person_id/subject_type/subject_id/kind），零內容欄位——P0-03 那輪已經點名「payload 形狀是懸而未決的產品決策」，但直到操作者要求真的把系統接起來，才真正卡住：連 `hci.decisions.rationale` 都是真文字，但上游 Evidence/Claim/Assessment 沒有東西可以寫、可以讓那個 rationale 引用。決策：一個通用 `payload jsonb`（不是四個 kind 專屬欄位或四張表——跟 subject_records 本身走多型表是同一個理由,tenant isolation/append-only/RLS 只寫一次),形狀驗證放在 application 層（`validate-subject-record-payload.mjs`）不是 DB CHECK。
+
+**db-expert 覆審 migration 0012（背景 agent，750 秒），抓到 1 Major**：原始版本只在 `subject_records` 加了 `payload`，沒同步 `evidence_current`/`claims_current`/`assessments_current` 三個 view + `evidence_as_of()`/`claims_as_of()`/`assessments_as_of()` 三個 function——這六個是 0005/0009/0010 自己定的「schema 讀取正典路徑」，0005 自己的規則是「加欄位是兩邊同步的決定，不是一邊」，0009 就因為同款疏漏修過一次（當時也是 Major）。修法：六個物件全部補 `payload`；down-migration 也對稱補回「drop 前先把六個物件還原成 0012 之前的定義」，否則 `DROP COLUMN payload` 會直接因為 view/function 依賴而炸掉（db-expert 在隔離 replica 上真的重現了這個錯誤訊息才寫進報告，不是空猜）。**ADD COLUMN 安全性也是實測，非查文件**：db-expert 在 20 萬列的隔離複本上真跑，`relfilenode`/`pg_relation_size` 前後不變、1.222ms、`pg_attribute.atthasmissing=t`，確認 PG15 對 `jsonb NOT NULL DEFAULT` 走 fast-default 路徑不重寫整表。
+
+**真跑瀏覽器串出第一個 CRUD 迴圈時，連續撞到 3 個沒人事先想到的真缺口**（皆為 schema 本來就有、我事先沒查全的既有規則，不是我發明的新規則）：
+1. `subject_records_author_class_required`（ADR-0019，migration 0008）：EVIDENCE 必須 `DETERMINISTIC`、CLAIM 必須 `LLM_ASSISTED_HUMAN_REVIEW_REQUIRED`/`HUMAN_ONLY`、ASSESSMENT 必須 `PROBABILISTIC`/以上兩者之一——原本的 INSERT 完全沒帶這欄位，409 才發現。
+2. CLAIM 還另外需要 `claim_state`（`DRAFT`/`ASSESSMENT_CANDIDATE`）+ `human_spotcheck_status`（`PENDING`/`APPROVED`/`REJECTED`）兩個 CLAIM-scoped 必填欄位（同一個 migration 0008）——表單新建的 Claim 用 `DRAFT`+`PENDING`，誠實反映「剛建立、還沒人審過」，不假裝已核准。
+3. **最大的一個**：`subject_records_key_required_for_evidence_claim`（migration 0007）要求 EVIDENCE/CLAIM 必須有 `encryption_key_ref` 指到 `hci.data_encryption_keys` 一筆真實 row——但那張表**故意**對 `hci_app_test_a/b` 零授權（連 SELECT 都沒有，migration 0007 自己的註解寫明「not SELECT, not INSERT, nothing」），唯一建過 key 的地方是 fixtures 檔（用 owner 身分跑）。等於：**沒有任何 application-role 路徑能建立新的 EVIDENCE/CLAIM**，這正是 P1-04「Key architecture」0% 完成這件事的具體後果，不是我這輪碰壞的。修法比照 `hci.tombstone_evidence()` 的既有模式：新增一個窄範圍 `SECURITY DEFINER` function `hci.mint_encryption_key()`,只做一件事——用呼叫者自己的 `hci.current_tenant_id()`（不接受呼叫端指定 tenant_id,防止越權）建一筆 key,回傳 id。刻意不做 P1-04 完整的 envelope-encryption/KEK-rotation/BYOK,同 ADR-0022 runbook「gate 1 vs gate 2-5」的範圍拆法。
+
+**真跑 `test-wave1-local.ps1` 全套時，migration 0012/0013 自己又抓到 2 個真 regression（既有的通用 catalog 掃描斷言抓到的，不是我新寫的斷言）**：① `DEFINER-RLS-FAILCLOSED-01`——新的 `mint_encryption_key()` 是 SECURITY DEFINER 卻沒設 `row_security=off`（`tombstone_evidence()` 早就這樣做,0009 修過,我抄了一半漏了一半）；② `FUNCTION-SEARCHPATH-01`——重寫三個 `*_as_of()` function 時漏了 `SECURITY INVOKER SET search_path = hci, pg_temp`（從 `\df+` 輸出手動轉寫時弄丟的）。兩個都修正後 `test-wave1-local.ps1` 232/232 全綠、`mutation-check-wave1.ps1` **120/120 全殺**（含 `reset-definer-row-security`/`reset-function-search-path` 這兩個既有通用 mutation，證明修正是真的被既有測試盯住，不是巧合過關）。
+
+**真跑瀏覽器完整驗證迴圈**（非模擬）：Tenant A/B 切換→RLS 真的隔離（3 筆 vs 1 筆，逐字對過 psql 直查結果）；開一個 OPEN case→建 EVIDENCE→建引用它的 CLAIM→建兩筆 ASSESSMENT（COMPETENCE=HIGH、RELIABILITY_FULFILLMENT=HIGH）→畫面上**即時算出** Trust Domain roll-up（OPERATIONAL=HIGH、COMPETENCE=HIGH，皆 PARTIAL coverage，重用既有已測過的 `packages/intelligence/rollup-trust-domains.mjs`，非重新發明公式）；對一個 CLOSED case 建記錄→正確被 `hci.require_open_or_active_case()`（H1011）擋下,錯誤訊息正確顯示在畫面上。真人點擊路徑（非 javascript_tool 捷徑）也驗過一輪：case 連結點擊、表單填寫、Create 按鈕,全部用 `computer`/`form_input` 真實互動,非直接呼叫 JS function。順手修一個小 a11y 缺口：表單 `<label>` 原本沒有 `for`/`id` 關聯,補上後連瀏覽器工具的元素定位也一併變準。
+
+**刻意不做**：`TRUST_DOMAIN` 不開放直接建立——ADR-0004「trust 必須連著證據,不能憑空宣告」,現有的即時 roll-up 已經是正確答案,手動建一筆 TRUST_DOMAIN row 反而違背這條不變量,不是漏做。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/contracts/validate-subject-record-payload.test.mjs` | exit=0 | result=12/12 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/test-wave1-local.ps1`（含 migration 0012/0013 正向套用 + down/up 可逆性重建）| exit=0 | result=232/232 assertion PASS,"HCI Wave 1 local suite PASSED"
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/mutation-check-wave1.ps1` | exit=0 | result=120/120 mutation killed,含新兩個 regression 對應的 mutation
+- REALTEST_EVIDENCE: tool=Browser（preview_start + computer/form_input/find,非 javascript_tool 捷徑）| 場景=真人點擊建 Evidence→Claim→2 Assessment→即時 roll-up、CLOSED case 正確拒絕、Tenant A/B RLS 隔離 | 結果=全部符合預期,console 除偵錯期間的 2 個預期中 409 外零錯誤
+- REVIEW_DONE: critic=db-expert（背景 agent,750 秒,對 migration 0012 獨立覆審,真跑 20 萬列隔離複本 + 隔離 schema 探針,非只讀 SQL）| verdict=1 Major 已修 | findings=0c/1m（已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,.claude | grep=`mint_encryption_key\|subject_record_payload\|validate-subject-record-payload` | hits=僅本輪新檔+README/launch.json 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 `governance/ADR-0034-subject-record-payload-shape.md`；新 4 個 migration 檔（0012/0013 up+down，皆含 db-expert/自審修正版本）；新 `packages/contracts/validate-subject-record-payload.mjs` + 測試；新 `Projects/internal/hci30/app/**`（server.mjs/package.json/public/index.html/README.md）；新 `infra/local/compose.dev.yml` + `scripts/dev-db-init.ps1`；`scripts/test-wave1-local.ps1` 補 migration 0012/0013 三處呼叫點；`.claude/launch.json` 補 `hci30-app` 條目；`Projects/internal/hci30/README.md` 補一段連結。
+
+**[剩餘風險]**：`hci.mint_encryption_key()` 是 Wave 1 最小夠用版本,非 P1-04 完整金鑰架構（envelope encryption/KEK rotation/BYOK 仍 0%）；CLAIM 的 human-review 流程（`claim_state`→`ASSESSMENT_CANDIDATE`、spot-check 核准）本表單完全沒碰,只是誠實地不跟既有 gate 衝突；`pg_dumpall --roles-only` 式的通用 key/role 管理仍是未來工作；`npm audit`：3 個中等 `qs`/`body-parser` transitive DoS,`npm audit fix` 未能自動解（跨 major）,本機 `127.0.0.1`-only 純合成資料 demo 判定風險可接受,未強制升版,已在 TASKS.md 記錄。
+
+**[rollback]**：`git revert`；migration 0012/0013 皆有測過的 down 檔（含 view/function 對稱還原,非只 drop column）；`app/` 純新增,關掉 preview server 即可,不影響任何既有服務。
+
+**附錄（同日，commit 前 critic 覆審 `test-wave1-local.ps1`/`dev-db-init.ps1` 兩個腳本編輯，抓到 2 個真問題已修）**：① **`scripts/mutation-check-wave1.ps1` 有自己獨立硬編的 migration 清單,這輪漏更新**——它的 `Initialize-Baseline` 停在 0011,代表我稍早跑的「120/120 mutation killed」其實是對**沒有 0012/0013 的舊 schema**跑的,不是對真正上線的新程式碼跑的,宣稱不實。已補 `$upMig12`/`$upMig13` + baseline 呼叫,重跑一次,**120/120 對包含 0012/0013 的真實 schema 重新確認**（既有 mutation 數不變,因為還沒為兩個新的權限面——`subject_records` 欄位級 GRANT 限制、`mint_encryption_key()` 的 `REVOKE ALL FROM PUBLIC`——另外寫新 mutation,這是誠實留的追蹤項,見 TASKS.md,非本輪隨手補）。② `scripts/dev-db-init.ps1` 的冪等檢查只認 `hci.cases`（migration 0002 就有的表）,不是最新 migration 的標記——代表如果有人在既有的常駐 volume 上重跑這支 script,會誤判「schema 已套用」而**靜默跳過 0012/0013**,回報成功但資料庫實際上少兩個 migration。已改認 `hci.mint_encryption_key`（目前最新,migration 0013）,並實際查證本輪的常駐 dev DB 確實已有 0012/0013（`\df`/`\d` 直查,非假設)。`test-wave1-local.ps1` 也順手修正兩處過期成「eleven/0001-0011」的註解字串（非邏輯改動）。
+
+**驗證（附錄）**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose ... psql -c "\df hci.mint_encryption_key" -c "\d hci.subject_records"`（對常駐 dev DB 直查）| exit=0 | result=`mint_encryption_key` 存在、`payload jsonb not null` 存在,確認先前修正已套用到真正在跑的 DB
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/mutation-check-wave1.ps1`（修正 Initialize-Baseline 後重跑）| exit=0 | result=120/120 mutation killed,這次是對含 0012/0013 的真實 schema
+- REVIEW_DONE: critic=Standard（背景 agent,442 秒,針對本輪編輯的 `test-wave1-local.ps1`/`dev-db-init.ps1` 兩檔覆審,非泛讀）| verdict=2 Major 已修+2 Minor 已修 | findings=0c/2m（已修）
+- WORKLOG: 本附錄
 
 ## 2026-09-07（P0-10 cross-box restore drill——真跑 GitHub Actions 兩台獨立 runner，第一次跑就抓到自己 drill 設計的真 bug；順手解決 P0-08 遺留的 ADR-0026/ADR-0018 追蹤項）
 

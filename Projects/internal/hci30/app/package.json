@@ -1,0 +1,14 @@
+{
+  "name": "hci30-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "First real vertical slice on the HCI-30 Wave 1 schema: one API route, one page. Synthetic dev data only -- see infra/local/compose.dev.yml.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}
