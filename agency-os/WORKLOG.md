@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-09-06（同日第十輪：P0-09 RLS enforcement gate 部分關閉 + mutation harness 全重建→BEGIN/ROLLBACK 隔離；db-expert 覆審 1 Critical+4 Major 全修；順手訂 AGENTS.md 兩條書面精簡規則）
+
+**觸發**：操作者「有辦法不要再用那個慢到極點的模式 馬上建立起來嗎」——`mutation-check-wave1.ps1` 每個 mutation 重建整個 11-migration schema，125 個 mutation 背景跑逾時（>590 秒未跑完）。
+
+**改動**：
+- `wave1-negative-tests.sql` 新增 `RLS-COMPLETENESS-01/02`（whole-schema catalog gate，抓「忘記開 RLS」＋「開了但沒 policy」）+ `RLS-OWN-02`（`hci.tenants` 正向讀）。232 assertion。
+- `mutation-check-wave1.ps1`：`Reset-Schema`（DROP SCHEMA+重跑 11 個 migration/mutation）→ `Initialize-Baseline`（跑一次）+ `Test-Mutation`（每個 mutation 一個 `BEGIN...ROLLBACK`）。590+ 秒（逾時未跑完）→ 72 秒。
+
+**db-expert 獨立覆審，真跑 Docker 復現非推論，1 Critical+4 Major**：
+- C1：豁免述詞誤用 column-scoped `information_schema.columns` 而非 table-scoped——欄位級 grant（`SELECT (id, payload)` 不含 `tenant_id`）會讓零 RLS 的表逃過檢查。改 `has_any_column_privilege`。
+- M1：`relkind='r'` 漏 partitioned table（`'p'`，支援 RLS）——改 `IN ('r','p')`。
+- M2：`hci.tenants`（欄位 `id` 非 `tenant_id`）drop policy 後整套 suite 仍全綠（fail-closed，`RLS-LEAK-02` 測不出）——補 `RLS-OWN-02`。
+- M3：新 mutation 對閘門零鑑別力（`disable-cases-rls` 跟既有 mutation 行為重複；沒有 mutation 真的演練「新表忘記 RLS」頭條主張）——換成 `noforce-cases-rls`+`add-tenant-table-without-rls`+`drop-source-terms-rls-policy`+`drop-tenants-rls-policy`。
+- M4：`RLS-COMPLETENESS-02` 只驗「有 policy」不驗邏輯（`USING (false)` 也會過）——改驗 policy shape（`current_tenant_id()` 需在 `qual`/`with_check`，`PERMISSIVE`/`ALL`/`{public}`）。
+
+**修復自身又抓到一個真 bug**：`add-tenant-table-without-rls` 用 `clock_timestamp()` 想避開無關的 `BITEMP-SCOPE-01`，真跑發現該 gate 認字面 `now()`——改用 `now()`。
+
+**同輪順手**：操作者指出書面產出佔改動 62-65%（自己 diff 驗證），且同一改動要同步 4-7 個檔案是重工主因——寫進 `agency-os/AGENTS.md` §5／§9 兩條永久規則（書面產出比照 caveman 壓縮，讀者是 AI 不是人；Docker/DB 探索全程一個 container、不手動重打既有腳本邏輯），不靠這個對話的記憶，未來 session 自動看到。
+
+**[已修改]**：
+- `Projects/internal/hci30/database/tests/wave1-negative-tests.sql`（+`RLS-COMPLETENESS-01/02`/`RLS-OWN-02`，232 assertion）
+- `Projects/internal/hci30/scripts/mutation-check-wave1.ps1`（執行引擎重寫；10 個既有 mutation 補 expect；4 個新/改 mutation；m1/m2/m3 診斷強化）
+- `Projects/internal/hci30/README.md`／`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/21_HCI_TOP_TIER_GAP_ANALYSIS.md`／`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`（P0-09 現況同步）
+- `agency-os/AGENTS.md`（§5 Docker 探索紀律、§9 書面產出壓縮，2 條新規則）
+- `agency-os/TASKS.md`（本輪記錄）
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`scripts/test-wave1-local.ps1` | exit=0 | result=`HCI Wave 1 local suite PASSED`，232/232 assertion + reversibility
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=`scripts/mutation-check-wave1.ps1` | exit=0 | ms=72667 | result=`All 120 mutations killed`（前次 117，C1/M1/M2/M3 修復+4 新 mutation 淨增 3）
+- REVIEW_DONE: critic=db-expert（Standard，真實 subagent，1702 行負向測試檔+1029 行引擎全讀，Docker 拋棄式容器實測非推論）| verdict=1 Critical+4 Major+6 Minor/Suggestion，Critical+Major 全修，Minor 部分修（m1/m2/m3 已修，m4/m5/m6 追蹤不阻斷）| findings=1c/4m/6minor
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`RLS-OWN-02\|has_any_column_privilege\|rls_probe_table\|Reset-Schema\|RLS-COMPLETENESS` | hits=新 symbol 僅在歸屬檔出現；`Reset-Schema` 殘留提及僅存在於已結案的歷史 WORKLOG/TASKS 條目（不改寫）與 1 份治理 spec 文件（已補 Superseded 訂正段落）
+- WORKLOG: 本條目
+
+**[剩餘風險]**：db-expert m5（`SELECT...INTO` 缺 `STRICT`，`wave1-negative-tests.sql:113/294`）、m6（`SOURCE-RLS-01` 涵蓋兩表、mutation 失敗簽名相同）皆既有、非本次引入，追蹤於 TASKS.md 不阻斷；8 個已上線 migration 檔的 table-inventory drift guard 同款 `relkind='r'` 漏洞，目前零 partitioned table 故未動已上線檔案。RLS-COMPLETENESS 系列證明「RLS 有裝且 policy 邏輯正確」，仍不等於「每張新表都被真的讀寫測過」——功能性 `RLS-LEAK-NN` 每張新表仍需個別補。
+
+**[rollback]**：單一 commit，`git revert`；純測試基礎設施+文件，無 schema 變更。
+
 ## 2026-09-06（同日第九輪：P0-04 剩餘三份規格判定不可速成、改寫成誠實 OPEN 狀態文件，順手關掉相鄰的 Decision bias-check blocking gate；critic 覆審抓到 1 Critical+6 Major+9 Minor，Critical 是本 session 第三次「未 grep 先宣稱不存在」）
 
 **觸發**：操作者明確授權「你做最完美的決定！該增加什麼都去做，因為我不會！」，延續第八輪後的候選清單，處理 P0-04 剩下三份規格。

@@ -69,6 +69,7 @@
 - **扇出（機械閘 `subagent-budget.js`，SSOT `mcp/claude-userlevel/hooks/rules/`）**：Agent tool 20 分鐘滑動視窗 0–5 放行、6–10 需 prompt 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`、>10 無條件 block（被擋重試也計入）。**Workflow tool 已在 `permissions.deny` 整個關閉**（`mcp/claude-userlevel/settings.template.json` + `scripts/wire-remote-hooks.sh` 兩處鏡像，`tests/hooks/settings-deny-parity.test.mjs` 守）：它的 `agent()` fan-out 在背景跑，PreToolUse 看不到，閘只能驗自報估計；2026-09-03 一次 Workflow 派 99 個 agent 燒光額度。多代理一律走 Agent tool 的固定角色模板；`subagent-budget.js` 的 Workflow 分支保留為縱深防禦。
 - **禁止按項目複製角色**：N 個 finding／檔案各配 agent（1:N）一律禁止，閘擋不到（N 在腳本跑到一半才知道）。**agent 數跟角色走**：理解／執行／critic／獨立觀點／整合，固定 4–5 個；真正獨立可切割的工作分批塞 ≤10 個 agent。**讀資料預設主 agent 自己讀**；例外 A 獨立驗證 critic 每 commit 最多 1 個；例外 B >100KB 純調查最多 1 agent 或 Codex，產出寫檔附 `file:line`。§Agent 扇出治理
 - **失敗重試**：同一件事同一方式失敗兩次 = 停，讀錯誤換方法；換法仍敗第二次 → 問一題說明兩種失敗。機械閘 `repeat-failure-guard.js` 同一 Bash 文字第 3 次 BLOCK，首行 `# RETRY-JUSTIFIED: <什麼變了>` 解鎖。
+- **本機服務／Docker 探索**：一次調查全程一個 container／連線到底，不要每個假設就開一個新 compose project（每次起停 10-20 秒，2026-09-06 案例連開 3 個）；改動前先讀既有腳本的等價邏輯（如 `Reset-Schema`／`Initialize-Baseline`），不要在 Bash 手動重打一遍已經寫好的 migration-apply 迴圈。
 
 ## 6. 執行安全與 Auto-Repair 紅線
 
@@ -104,6 +105,8 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 ## 9. 語言與輸出
 
 繁體中文；先結論後步驟；指令貼完整可執行版本含路徑與預期結果；長任務每 15 分鐘回報。**caveman 壓縮永久預設**（去 filler／問候／解釋，技術名詞原文），僅不可逆操作確認（刪資料／deploy／reboot）時暫回完整說明。
+
+**書面產出比照壓縮，讀者是下一個 AI／自己，不是人類**：code comment 只寫「未來讀者會踩的坑」1-3 行，調查過程／設計心路歷程一律進 WORKLOG 不進 code；WORKLOG／TASKS.md 多發現用條列（C1/M1/m1...），不用逗號散文黏成一段；姐妹文件間用連結／引用檔名+行號，不重述背景或重寫同一份規則；一個事實只在一個地方描述細節，其他地方一行+連結（2026-09-06 實測：同一改動散文佔新增行數 62-65%，且改一次要同步 4-5 個檔案正是重工主因）。
 
 ## Related Documents (Auto-Synced)
 - `docs/CHANGE_IMPACT_MATRIX.md`

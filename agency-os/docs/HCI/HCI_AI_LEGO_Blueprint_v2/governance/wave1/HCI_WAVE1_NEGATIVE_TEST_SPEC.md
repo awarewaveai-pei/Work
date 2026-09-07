@@ -492,6 +492,16 @@ baseline. Fixed by adding explicit `DROP ROLE IF EXISTS`/`DROP EXTENSION IF
 EXISTS` cleanup to `Reset-Schema` itself, verified by re-running: both new
 mutations killed correctly on the corrected baseline.
 
+**Superseded (2026-09-06, P0-09 RLS enforcement gate)**: `Reset-Schema` and
+its per-mutation `DROP SCHEMA` + full 11-migration replay no longer exist.
+`scripts/mutation-check-wave1.ps1` now builds the baseline schema once
+(`Initialize-Baseline`) and isolates each mutation with a single
+`BEGIN ... ROLLBACK` transaction instead (`Test-Mutation`) — real-Docker
+confirmed `CREATE ROLE`/`CREATE EXTENSION` roll back cleanly under this
+model, so the defensive cleanup this entry describes is no longer needed
+either; a fresh connection to the untouched baseline replaces it. Same
+mutation list, same exact-match semantics, ~10x faster on a full run.
+
 **Execution evidence (2026-09-05, Source provenance addition).**
 `migrations/0004_wave1_source_provenance_up.sql` added `hci.source_snapshots`
 + `hci.source_relationships`; `scripts/test-wave1-local.ps1` ran green on the

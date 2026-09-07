@@ -28,7 +28,6 @@ $db = 'hci_wave1_synthetic'
 
 $compose  = Join-Path $root 'infra/local/compose.test.yml'
 $upMig    = Join-Path $root 'database/migrations/0001_wave1_synthetic_up.sql'
-$downMig  = Join-Path $root 'database/migrations/0001_wave1_synthetic_down.sql'
 $upMig2   = Join-Path $root 'database/migrations/0002_wave1_case_aggregate_up.sql'
 $upMig3   = Join-Path $root 'database/migrations/0003_wave1_regulatory_market_scope_up.sql'
 $upMig4   = Join-Path $root 'database/migrations/0004_wave1_source_provenance_up.sql'
@@ -116,7 +115,12 @@ $mutations = @(
 
   @{ id = 'disable-rls-on-persons'
      sql = 'ALTER TABLE hci.persons NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.persons DISABLE ROW LEVEL SECURITY;'
-     expect = @('RLS-LEAK-01') }
+     # RLS-COMPLETENESS-01 joined every disable-rls-on-* mutation's expect
+     # list 2026-09-06 (P0-09): it is a whole-schema catalog gate, so it
+     # correctly fires alongside each table's own named RLS-LEAK-NN test,
+     # not instead of it. Real-Docker run confirmed the exact addition per
+     # mutation, not estimated.
+     expect = @('RLS-LEAK-01','RLS-COMPLETENESS-01') }
 
   @{ id = 'allow-person-repoint-after-confirm'
      sql = 'CREATE OR REPLACE FUNCTION hci.require_identity_verification() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.match_state = ''MATCH_CONFIRMED'' AND NOT EXISTS (SELECT 1 FROM hci.identity_verifications v WHERE v.tenant_id = NEW.tenant_id AND v.candidate_id = NEW.id AND v.method IN (''DETERMINISTIC'',''HUMAN'') AND v.evidence_ref IS NOT NULL) THEN RAISE EXCEPTION USING ERRCODE = ''H1004'', MESSAGE = ''x''; END IF; RETURN NEW; END $fn$;'
@@ -229,7 +233,8 @@ $mutations = @(
   # the suite would previously have gone red if it were dropped.
   @{ id = 'disable-rls-on-cases'
      sql = 'ALTER TABLE hci.cases NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.cases DISABLE ROW LEVEL SECURITY;'
-     expect = @('RLS-LEAK-03') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('RLS-LEAK-03','RLS-COMPLETENESS-01') }
 
   # ADR-0012 (Regulatory market scope, HD-20) gate 1/2 - 2026-09-05. Only two
   # mutations, not the three the ADR's gate 4 originally asked for: there is
@@ -259,9 +264,12 @@ $mutations = @(
      expect = @('ARCH-PEER-02','CRYPTO-NOEXTERNAL-01') }
 
   # ADR-0002 gate 3. A role name matching the naming convention a future
-  # cognitive-engineering-os integration would plausibly use. Cleaned up by
-  # Reset-Schema (not here) since roles outlive DROP SCHEMA - see that
-  # function's comment.
+  # cognitive-engineering-os integration would plausibly use. Needs no
+  # cleanup of its own: this engine wraps every mutation's application and
+  # assertion run in one transaction that always ROLLBACKs (Test-Mutation),
+  # and CREATE ROLE - a global, non-schema-scoped object that used to outlive
+  # the old engine's per-mutation DROP SCHEMA reset - does not survive that
+  # ROLLBACK either (real-Docker check, 2026-09-06).
   @{ id = 'create-cognitive-named-role'
      sql = 'CREATE ROLE cognitive_os_reader NOLOGIN;'
      expect = @('ARCH-PEER-02b') }
@@ -269,10 +277,11 @@ $mutations = @(
   # ADR-0026 (Claim/Source tenant ownership, HD-16) - 2026-09-05.
   @{ id = 'disable-rls-on-sources'
      sql = 'ALTER TABLE hci.sources NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.sources DISABLE ROW LEVEL SECURITY;'
-     expect = @('SOURCE-RLS-01') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('SOURCE-RLS-01','RLS-COMPLETENESS-01') }
   @{ id = 'disable-rls-on-source-snapshots'
      sql = 'ALTER TABLE hci.source_snapshots NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.source_snapshots DISABLE ROW LEVEL SECURITY;'
-     expect = @('SOURCE-RLS-01') }
+     expect = @('SOURCE-RLS-01','RLS-COMPLETENESS-01') }
   # Proves TRUNCATE-02-FK is still load-bearing now that THREE independent
   # FKs reference subject_records (data_subject_request_targets's typed FK,
   # source_relationships.claim_id, and - since migration 0008 -
@@ -309,10 +318,12 @@ $mutations = @(
   # as every other table in that loop.
   @{ id = 'disable-rls-on-subject-lawful-basis-records'
      sql = 'ALTER TABLE hci.subject_lawful_basis_records NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.subject_lawful_basis_records DISABLE ROW LEVEL SECURITY;'
-     expect = @('CONSENT-RLS-01') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('CONSENT-RLS-01','RLS-COMPLETENESS-01') }
   @{ id = 'disable-rls-on-source-terms-records'
      sql = 'ALTER TABLE hci.source_terms_records NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.source_terms_records DISABLE ROW LEVEL SECURITY;'
-     expect = @('CONSENT-RLS-02') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('CONSENT-RLS-02','RLS-COMPLETENESS-01') }
 
   # ADR-0017 (Bitemporal scope, HD-06) - 2026-09-05. Constraint names below
   # are explicit (0005 migration, post-db-expert-review) rather than resolved
@@ -403,7 +414,8 @@ $mutations = @(
   # base table's own RLS is enabled to begin with.
   @{ id = 'disable-rls-on-decisions'
      sql = 'ALTER TABLE hci.decisions NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.decisions DISABLE ROW LEVEL SECURITY;'
-     expect = @('RLS-LEAK-04','BITEMP-VIEWRLS-01') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('RLS-LEAK-04','BITEMP-VIEWRLS-01','RLS-COMPLETENESS-01') }
   # All four views, not just two (critic review): BITEMP-VIEWRLS-01 now
   # checks all four, so all four must be mutated together to prove none of
   # them is silently exempt from the "one code shape" assumption.
@@ -437,7 +449,15 @@ $mutations = @(
   # ADR-0018 (Crypto-shredding for erasure, HD-07) - 2026-09-05.
   @{ id = 'grant-key-table-select'
      sql = 'GRANT SELECT ON hci.data_encryption_keys TO hci_app_test_a;'
-     expect = @('CRYPTO-KEYGRANT-01') }
+     # RLS-COMPLETENESS-01/02 both joined 2026-09-06 (P0-09): this table's own
+     # zero-RLS design (migration 0007 gate 1) is deliberately safe only
+     # because it also holds zero grants -- the moment this mutation grants
+     # SELECT, the table becomes visible to hci_app_test_a's
+     # information_schema.columns view with tenant_id present, zero RLS, and
+     # zero policy, correctly tripping both completeness checks alongside
+     # CRYPTO-KEYGRANT-01 rather than being masked by it. Real-Docker run
+     # confirmed both, not estimated.
+     expect = @('CRYPTO-KEYGRANT-01','RLS-COMPLETENESS-01','RLS-COMPLETENESS-02') }
   @{ id = 'drop-key-required-check'
      sql = 'ALTER TABLE hci.subject_records DROP CONSTRAINT subject_records_key_required_for_evidence_claim;'
      expect = @('CRYPTO-KEYREQ-01') }
@@ -505,7 +525,8 @@ $mutations = @(
      expect = @('NEG-HD08-02','NEG-HD08-06','DECISION-CLAIMS-CROSSTENANT-01-GATE','DECISION-CLAIMS-KIND-01-GATE') }
   @{ id = 'disable-rls-on-principals'
      sql = 'ALTER TABLE hci.principals NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.principals DISABLE ROW LEVEL SECURITY;'
-     expect = @('RLS-LEAK-05') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('RLS-LEAK-05','RLS-COMPLETENESS-01') }
   @{ id = 'drop-principals-tenant-immutable-trigger'
      sql = 'DROP TRIGGER principals_tenant_immutable ON hci.principals;'
      expect = @('TENANT-IMMUTABLE-02') }
@@ -523,7 +544,8 @@ $mutations = @(
      expect = @('TRUNCATE-06') }
   @{ id = 'disable-rls-on-decision-claims'
      sql = 'ALTER TABLE hci.decision_claims NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.decision_claims DISABLE ROW LEVEL SECURITY;'
-     expect = @('RLS-LEAK-06') }
+     # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     expect = @('RLS-LEAK-06','RLS-COMPLETENESS-01') }
 
   # db-expert review (2026-09-05) findings C1/C2/C3/M2 - each mutation below
   # is a surgical CREATE OR REPLACE reproducing the current real function
@@ -773,6 +795,50 @@ $mutations = @(
   @{ id = 'add-universal-trust-column'
      sql = 'ALTER TABLE hci.subject_records ADD COLUMN overall_score numeric;'
      expect = @('TRUST-NO-AGGREGATE-COLUMN-01') }
+  # P0-09: RLS-COMPLETENESS-01/02 (21_HCI_TOP_TIER_GAP_ANALYSIS.md). db-expert
+  # review (2026-09-06) found 'disable-cases-rls' (DISABLE alone) and the
+  # pre-existing 'disable-rls-on-cases' (NO FORCE + DISABLE) are behaviorally
+  # identical here - hci_owner is superuser, so FORCE is a no-op either way -
+  # making the newer one zero-signal duplication. Replaced with NO FORCE
+  # alone, which isolates COMPLETENESS-01 on its own (app-role visibility is
+  # unaffected, so RLS-LEAK-03 stays green) - real-Docker verified.
+  @{ id = 'noforce-cases-rls'
+     sql = 'ALTER TABLE hci.cases NO FORCE ROW LEVEL SECURITY;'
+     expect = @('RLS-COMPLETENESS-01') }
+  # Isolates COMPLETENESS-02 alone: source_terms_records has only one
+  # positive-or-negative reader (CONSENT-RLS-02, a NOT EXISTS), which fails
+  # closed and stays green - unlike hci.cases below, nothing else touches
+  # this table. Real-Docker verified.
+  @{ id = 'drop-source-terms-rls-policy'
+     sql = 'DROP POLICY tenant_isolation ON hci.source_terms_records;'
+     expect = @('RLS-COMPLETENESS-02') }
+  # The one mutation that actually exercises P0-09's headline claim: a brand
+  # new tenant-scoped table with a real grant and zero RLS, the exact shape a
+  # future migration could introduce. Without this, "a future table that
+  # forgets RLS gets caught" was an assertion, not evidence - db-expert
+  # review (2026-09-06) named this gap directly. created_at must default via
+  # literal `now()`, not clock_timestamp() (the review's own suggestion,
+  # which real-Docker caught as wrong): BITEMP-SCOPE-01 requires
+  # `column_default LIKE 'now()%'` specifically, so clock_timestamp()
+  # collided with that unrelated gate instead of avoiding it.
+  @{ id = 'add-tenant-table-without-rls'
+     sql = 'CREATE TABLE hci.rls_probe_table (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, created_at timestamptz NOT NULL DEFAULT now()); GRANT SELECT ON hci.rls_probe_table TO hci_app_test_a;'
+     expect = @('RLS-COMPLETENESS-01','RLS-COMPLETENESS-02') }
+  # RLS left enabled+forced with the policy itself gone fails CLOSED (denies
+  # every row, including the owning tenant's), so every later assertion that
+  # inserts/updates/reads hci.cases affects zero rows instead of erroring,
+  # cascading into this real, observed 15-assertion blast radius alongside
+  # RLS-COMPLETENESS-02 itself. Real-Docker verified, not estimated.
+  @{ id = 'drop-cases-rls-policy'
+     sql = 'DROP POLICY tenant_isolation ON hci.cases;'
+     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-03','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02') }
+  # RLS-OWN-02 (db-expert M2): hci.tenants is scoped by `id`, not `tenant_id`,
+  # so it is invisible to every mutation above. Dropping its own policy fails
+  # CLOSED - RLS-LEAK-02 (tenant B invisible) stays green - which is exactly
+  # the blind spot RLS-OWN-02's positive same-tenant read exists to catch.
+  @{ id = 'drop-tenants-rls-policy'
+     sql = 'DROP POLICY tenant_registry_isolation ON hci.tenants;'
+     expect = @('RLS-OWN-02') }
 )
 
 $project = "hcimut$PID"
@@ -796,36 +862,40 @@ function Invoke-SqlFile {
   Get-Content -Raw -Encoding UTF8 -LiteralPath $Path | & docker @composeArgs exec -T db psql -q -v ON_ERROR_STOP=1 -U hci_owner -d $db 2>&1 | Out-Null
   return $LASTEXITCODE
 }
-function Invoke-Sql {
-  param([Parameter(Mandatory)][string]$Sql)
-  $ErrorActionPreference = 'Continue'
-  & docker @composeArgs exec -T db psql -q -v ON_ERROR_STOP=1 -U hci_owner -d $db -c $Sql 2>&1 | Out-Null
-  return $LASTEXITCODE
-}
-function Get-FailedAssertions {
-  $ErrorActionPreference = 'Continue'
-  $out = & docker @composeArgs exec -T db psql -tAq -U hci_owner -d $db -c "SELECT COALESCE(string_agg(test_id, ',' ORDER BY id), '') FROM hci_test.results WHERE outcome = 'FAIL'" 2>$null
-  return ($out | Out-String).Trim()
-}
-function Reset-Schema {
-  if ((Invoke-SqlFile -Path $downMig)  -ne 0) { throw 'mutation harness: down migration failed' }
-  # Roles are cluster-wide and extensions are database-wide (not
-  # schema-wide), so DROP SCHEMA (the down migration above) never removes
-  # either - unlike every other mutation in this file, 'enable-dblink-
-  # extension' and 'create-cognitive-named-role' create objects that would
-  # otherwise persist into every mutation that runs after them in the same
-  # container lifetime, corrupting their baselines. Found for real, not
-  # reasoned about: the first run of this file after adding both mutations
-  # reported 'enable-dblink-extension' killed correctly, then
-  # 'create-cognitive-named-role' WEAK with ARCH-PEER-02 (not
-  # ARCH-PEER-02b) as the unexpected failure - the still-installed dblink
-  # extension from the PRIOR mutation, not the role this mutation actually
-  # adds. Defensive cleanup here (not inside either mutation's own SQL, which
-  # only runs once) keeps every Reset-Schema call - including the initial
-  # baseline run - starting from a truly clean cluster regardless of
-  # mutation order.
-  if ((Invoke-Sql -Sql 'DROP ROLE IF EXISTS cognitive_os_reader;') -ne 0) { throw 'mutation harness: role cleanup failed' }
-  if ((Invoke-Sql -Sql 'DROP EXTENSION IF EXISTS dblink;') -ne 0) { throw 'mutation harness: extension cleanup failed' }
+
+# ============================================================================
+# Per-mutation isolation: BEGIN...ROLLBACK, not schema teardown+rebuild.
+# ============================================================================
+# The original engine called Reset-Schema (DROP the whole hci schema, then
+# replay all 11 migrations + fixtures + harness) before EVERY one of 125+
+# mutations, because each mutation's SQL and the negative-test file both ran
+# as their own separately-committing `psql -c`/`psql <file` invocation - nothing
+# rolled back, so only a full rebuild could return to a clean baseline for the
+# next mutation. Real-Docker timing (2026-09-06, P0-09) measured that
+# rebuild-per-mutation cost as the dominant cost of this entire script.
+#
+# Postgres DDL is transactional, including every shape this file's mutations
+# use (ALTER TABLE, DROP POLICY/TRIGGER/CONSTRAINT, CREATE OR REPLACE
+# FUNCTION, GRANT/REVOKE) - real-Docker check confirmed this also holds for
+# the two mutations that create session/database-global objects
+# ('create-cognitive-named-role', 'enable-dblink-extension'): neither survives
+# a ROLLBACK, so the OLD engine's Reset-Schema no longer needs the manual
+# 'DROP ROLE IF EXISTS'/'DROP EXTENSION IF EXISTS' cleanup it carried
+# specifically because ITS mutations committed immediately outside any
+# transaction. The baseline schema is now built exactly ONCE
+# (Initialize-Baseline below); every mutation instead runs as ONE psql
+# invocation shaped BEGIN; <mutation sql>; <repin sql>; <assertions>; <summary
+# query>; ROLLBACK - so the database is provably back to the untouched
+# baseline before the next mutation's connection even opens, with no rebuild
+# in between. SET (not SET LOCAL) ROLE inside a transaction that rolls back is
+# itself rolled back too (documented Postgres behavior, confirmed real-Docker)
+# - the negative-test file's own `SET ROLE hci_app_test_a; ... RESET ROLE;`
+# pairing needs no adjustment to run safely inside this wrapper. The
+# reverse constraint (db-expert review, 2026-09-06, m3): a mutation's `sql`
+# must itself run inside a transaction block, so CONCURRENTLY forms
+# (CREATE/REINDEX INDEX CONCURRENTLY), VACUUM, CREATE DATABASE, and CREATE
+# TABLESPACE cannot appear in one - none do today.
+function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig)    -ne 0) { throw 'mutation harness: 0001 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig2)   -ne 0) { throw 'mutation harness: 0002 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig3)   -ne 0) { throw 'mutation harness: 0003 up migration failed' }
@@ -841,51 +911,136 @@ function Reset-Schema {
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }
 
+# The negative-test file itself ends in `SELECT hci_test.finish($N);`, which
+# RAISEs on any failure (by design, for the standalone/CI-facing run this
+# same file also serves via test-wave1-local.ps1). A RAISE inside this
+# engine's wrapping transaction would abort it before the summary query
+# below ever runs, so that trailing report/finish section is stripped here -
+# this engine reads hci_test.results directly instead. Splitting on the
+# file's own '--- assertion results ---' marker (rather than hand-copying an
+# assertion count that would silently drift from the real file) keeps this
+# extraction tied to the file's actual current shape.
+$sqlTestsRaw = Get-Content -Raw -Encoding UTF8 -LiteralPath $sqlTests
+# Anchored to the FULL `\echo '...'` line, not the bare phrase inside it - a
+# bare-phrase IndexOf cuts the substring off after the phrase but before that
+# line's own closing quote, leaving a genuinely unterminated quoted string
+# fed to psql (found by real run, 2026-09-06: psql/Postgres itself reported
+# "unterminated quoted string", surfaced as a docker.exe stderr line).
+$markerIndex = $sqlTestsRaw.IndexOf("\echo '--- assertion results ---'")
+if ($markerIndex -lt 0) { throw "fast mutation engine: could not find the assertion-results \echo line in $sqlTests; this engine's text-splitting assumption is stale" }
+$sqlAssertionsOnly = [regex]::Replace($sqlTestsRaw.Substring(0, $markerIndex), '(?ms)(\r?\n-- -{5,}\s*)+\z', '')
+$finishMatch = [regex]::Match($sqlTestsRaw, 'hci_test\.finish\((\d+)\)')
+if (-not $finishMatch.Success) { throw "fast mutation engine: could not find hci_test.finish(N) in $sqlTests to determine the expected assertion count" }
+$expectedTotal = [int]$finishMatch.Groups[1].Value
+
+# Runs one mutation's isolated probe and returns @{ Applied; Total; FailedList; RawTail }.
+# Applied=$false means the mutation SQL itself could not be executed against
+# the current schema (a genuine authoring error, e.g. a renamed constraint) -
+# distinct from, and checked before, whether the resulting assertions matched
+# expectations.
+function Test-Mutation {
+  param($Mutation)
+  $sb = New-Object System.Text.StringBuilder
+  [void]$sb.AppendLine('BEGIN;')
+  [void]$sb.AppendLine($Mutation.sql)
+  # CREATE OR REPLACE FUNCTION replaces a function's config (proconfig)
+  # wholesale, so a mutation that rewrites a body silently strips the
+  # search_path / row_security pins 0009 applied with ALTER FUNCTION and
+  # trips the generic FUNCTION-SEARCHPATH-01 / DEFINER-RLS-FAILCLOSED-01
+  # assertions as collateral - found by real run, 2026-09-05. A body-
+  # rewriting mutation therefore names the function(s) it rewrites in
+  # `repin`, and the config is re-applied here so the mutation removes
+  # only the one behaviour it targets. search_path is re-pinned on every
+  # rewritten function; row_security=off ONLY on SECURITY DEFINER ones -
+  # on a SECURITY INVOKER trigger function fired by the application role
+  # it is not harmless at all: the role's policy-filtered lookup becomes
+  # a hard error instead ("query would be affected by row-level security
+  # policy"), which real-Docker turned up as six IDENTITY-NEG collateral
+  # hits on 'allow-person-repoint-after-confirm' (2026-09-05). That is the
+  # same fail-closed semantics 0009 wants for definers, and exactly the
+  # wrong thing for an invoker. The two mutations whose *target* is this
+  # config ('reset-definer-row-security', 'reset-function-search-path')
+  # carry no repin.
+  foreach ($fn in @($Mutation.repin)) {
+    if (-not $fn) { continue }
+    [void]$sb.AppendLine("ALTER FUNCTION $fn SET search_path = hci, pg_temp; DO `$rp`$ BEGIN IF (SELECT prosecdef FROM pg_proc WHERE oid = '$fn'::regprocedure) THEN EXECUTE 'ALTER FUNCTION $fn SET row_security = off'; END IF; END `$rp`$;")
+  }
+  # db-expert review (2026-09-06, m2): a lone sentinel between "mutation
+  # applied" and "assertions ran" turns three previously-conflated failure
+  # causes (mutation SQL itself, a repin statement, or a bare non-assertion
+  # statement inside the assertions block erroring under ON_ERROR_STOP) into
+  # two distinguishable stages, instead of one misleading fixed message.
+  [void]$sb.AppendLine("SELECT '>>>APPLIED>>>';")
+  [void]$sb.Append($sqlAssertionsOnly)
+  [void]$sb.AppendLine("SELECT '>>>RESULT>>>' || count(*) || '|' || coalesce(string_agg(test_id, ',' ORDER BY id) FILTER (WHERE outcome = 'FAIL'), '') FROM hci_test.results;")
+  [void]$sb.AppendLine('ROLLBACK;')
+  # db-expert review (2026-09-06, m1): the old engine's per-mutation schema
+  # rebuild made a residue check moot; this engine's isolation is entirely
+  # ROLLBACK, so this proves each run actually leaves nothing behind, in the
+  # same round trip, on the same connection ROLLBACK just ran on.
+  [void]$sb.AppendLine("SELECT '>>>CLEAN>>>' || count(*) FROM hci_test.results;")
+
+  $ErrorActionPreference = 'Continue'
+  $out = $sb.ToString() | & docker @composeArgs exec -T db psql -tAq -U hci_owner -d $db 2>&1
+  $ErrorActionPreference = 'Stop'
+  $outText = ($out | Out-String)
+  # Sentinels (rather than bare patterns like '<int>|...') avoid ever
+  # misreading a stray numeric line from psql/docker noise as a real summary
+  # row.
+  $rawTail = ($outText -split "`n" | Select-Object -Last 15) -join "`n"
+  if (-not [regex]::Match($outText, '>>>APPLIED>>>').Success) {
+    return @{ Applied = $false; Total = 0; FailedList = @(); RawTail = $rawTail; Stage = 'mutation-or-repin' }
+  }
+  $resultMatch = [regex]::Match($outText, '>>>RESULT>>>(\d+)\|([^\r\n]*)')
+  if (-not $resultMatch.Success) {
+    return @{ Applied = $false; Total = 0; FailedList = @(); RawTail = $rawTail; Stage = 'assertions-block' }
+  }
+  $cleanMatch = [regex]::Match($outText, '>>>CLEAN>>>(\d+)')
+  if (-not $cleanMatch.Success -or $cleanMatch.Groups[1].Value -ne '0') {
+    throw "mutation '$($Mutation.id)': rollback left $($cleanMatch.Groups[1].Value) residual row(s) in hci_test.results - isolation broken, results from here on are not trustworthy"
+  }
+  $failedList = @($resultMatch.Groups[2].Value -split ',' | Where-Object { $_ -ne '' })
+  return @{ Applied = $true; Total = [int]$resultMatch.Groups[1].Value; FailedList = $failedList; RawTail = '' }
+}
+
 $problems = @()
 try {
   & docker @composeArgs up -d --wait
   if ($LASTEXITCODE -ne 0) { throw 'Synthetic PostgreSQL did not become healthy.' }
 
+  Initialize-Baseline
+
   # Control run: unmutated schema must be fully green. If this is red, every
   # mutation result below would be meaningless.
-  Reset-Schema
-  if ((Invoke-SqlFile -Path $sqlTests) -ne 0) {
-    throw "baseline suite failed on an unmutated schema; failing assertions: $(Get-FailedAssertions)"
+  $baseline = Test-Mutation -Mutation @{ sql = 'SELECT 1;'; repin = @() }
+  if (-not $baseline.Applied) { throw "baseline probe itself could not run:`n$($baseline.RawTail)" }
+  if ($baseline.Total -ne $expectedTotal) { throw "baseline ran $($baseline.Total) assertions, expected $expectedTotal (a test was skipped, or added without updating hci_test.finish(N))" }
+  if ($baseline.FailedList.Count -gt 0) {
+    throw "baseline suite failed on an unmutated schema; failing assertions: $($baseline.FailedList -join ',')"
   }
   Write-Host 'baseline: suite green on unmutated schema'
 
   foreach ($m in $mutations) {
-    Reset-Schema
-    if ((Invoke-Sql -Sql $m.sql) -ne 0) { throw "mutation '$($m.id)' could not be applied; its SQL no longer matches the schema" }
-    # CREATE OR REPLACE FUNCTION replaces a function's config (proconfig)
-    # wholesale, so a mutation that rewrites a body silently strips the
-    # search_path / row_security pins 0009 applied with ALTER FUNCTION and
-    # trips the generic FUNCTION-SEARCHPATH-01 / DEFINER-RLS-FAILCLOSED-01
-    # assertions as collateral - found by real run, 2026-09-05. A body-
-    # rewriting mutation therefore names the function(s) it rewrites in
-    # `repin`, and the config is re-applied here so the mutation removes
-    # only the one behaviour it targets. search_path is re-pinned on every
-    # rewritten function; row_security=off ONLY on SECURITY DEFINER ones -
-    # on a SECURITY INVOKER trigger function fired by the application role
-    # it is not harmless at all: the role's policy-filtered lookup becomes
-    # a hard error instead ("query would be affected by row-level security
-    # policy"), which real-Docker turned up as six IDENTITY-NEG collateral
-    # hits on 'allow-person-repoint-after-confirm' (2026-09-05). That is the
-    # same fail-closed semantics 0009 wants for definers, and exactly the
-    # wrong thing for an invoker. The two mutations whose *target* is this
-    # config ('reset-definer-row-security', 'reset-function-search-path')
-    # carry no repin.
-    foreach ($fn in @($m.repin)) {
-      if (-not $fn) { continue }
-      $repinSql = "ALTER FUNCTION $fn SET search_path = hci, pg_temp; DO `$rp`$ BEGIN IF (SELECT prosecdef FROM pg_proc WHERE oid = '$fn'::regprocedure) THEN EXECUTE 'ALTER FUNCTION $fn SET row_security = off'; END IF; END `$rp`$;"
-      if ((Invoke-Sql -Sql $repinSql) -ne 0) { throw "mutation '$($m.id)': repin of $fn failed" }
+    $result = Test-Mutation -Mutation $m
+
+    if (-not $result.Applied) {
+      # db-expert review (2026-09-06, m2): Stage distinguishes "the mutation
+      # SQL itself failed" (its SQL no longer matches the schema) from "the
+      # mutation applied fine but a bare statement inside the assertions
+      # block errored" (a real assertions-file bug, not a stale mutation).
+      $reason = if ($result.Stage -eq 'assertions-block') { 'mutation applied, but the assertions block itself errored on a bare statement' } else { 'mutation SQL (or a repin statement) could not be applied; its SQL no longer matches the schema' }
+      $problems += "$($m.id): $reason"
+      Write-Host "  UNAPPLIED $($m.id) [$($result.Stage)]:`n$($result.RawTail)"
+      continue
     }
+    if ($result.Total -ne $expectedTotal) {
+      $problems += "$($m.id): ran $($result.Total) assertions, expected $expectedTotal (this mutation changed how many assertions execute, not just their outcome)"
+      Write-Host "  MISCOUNT $($m.id) - ran $($result.Total), expected $expectedTotal"
+      continue
+    }
+    $failedList = $result.FailedList
 
-    $exit = Invoke-SqlFile -Path $sqlTests
-    $failed = Get-FailedAssertions
-    $failedList = @($failed -split ',' | Where-Object { $_ -ne '' })
-
-    if ($exit -eq 0) {
+    if ($failedList.Count -eq 0) {
       $problems += "$($m.id): suite still PASSED with the control removed (assertions are vacuous)"
       Write-Host "  VACUOUS  $($m.id)"
       continue
@@ -899,7 +1054,7 @@ try {
       $problems += "$($m.id): expected exactly [$($m.expect -join ', ')] to fail; missing=[$($missing -join ', ')] unexpected=[$($extra -join ', ')]"
       Write-Host "  WEAK     $($m.id) - missing: [$($missing -join ', ')] unexpected: [$($extra -join ', ')]"
     } else {
-      Write-Host "  killed   $($m.id) -> $failed"
+      Write-Host "  killed   $($m.id) -> $($failedList -join ',')"
     }
   }
 }

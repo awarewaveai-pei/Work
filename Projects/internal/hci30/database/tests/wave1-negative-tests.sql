@@ -1622,7 +1622,91 @@ SELECT hci_test.expect_true('TRUST-NO-AGGREGATE-COLUMN-01',
   'no cross-domain aggregate column may exist on hci.subject_records (ADR-0004)');
 
 -- ---------------------------------------------------------------------------
+-- P0-09 (RLS enforcement gate, 21_HCI_TOP_TIER_GAP_ANALYSIS.md): whole-schema
+-- catalog gate. Every RLS-LEAK/SOURCE-RLS/CONSENT-RLS assertion above proves
+-- one NAMED table's isolation functionally; this catches a FUTURE
+-- tenant-scoped table nobody wrote a named test for.
+--
+-- db-expert review (2026-09-06) found the first version's exemption was
+-- narrower than its own comment claimed: filtering by
+-- information_schema.columns' tenant_id row is a per-COLUMN privilege
+-- check, not per-table -- a table granted e.g. `SELECT (id, payload)`
+-- without `tenant_id` would read as exempt while still being readable with
+-- zero RLS (real Postgres repro). Fixed with has_any_column_privilege
+-- (table-scoped: "does this role have any access to this table at all").
+-- relkind IN ('r','p') for the same reason -- 'r' alone silently excludes
+-- partitioned tables, which do support RLS (also real-repro'd).
+-- has_any_column_privilege checks the CURRENT role, so this still must run
+-- as hci_app_test_a and not the owner (everything after RESET ROLE, line
+-- ~959, runs as hci_owner, whose superuser privilege sees every table).
+--
+-- hci.app_tenant_bindings and hci.data_encryption_keys hold zero grants of
+-- any kind to hci_app_test_a/b (migration 0001 and 0007 gate 1's own
+-- comments), so has_any_column_privilege correctly excludes both. hci.tenants
+-- is scoped by `id`, not `tenant_id`, so it needs its own assertion
+-- (RLS-OWN-02 below) instead.
+SET ROLE hci_app_test_a;
+SELECT hci_test.expect_true('RLS-COMPLETENESS-01',
+  $q$SELECT NOT EXISTS (
+       SELECT 1
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'hci' AND c.relkind IN ('r','p')
+          AND EXISTS (SELECT 1 FROM pg_attribute a
+                       WHERE a.attrelid = c.oid AND a.attname = 'tenant_id'
+                         AND a.attnum > 0 AND NOT a.attisdropped)
+          AND has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')
+          AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
+     )$q$,
+  'every hci table with a tenant_id column and any grant to this role must have RLS both enabled and forced');
+
+-- Policy EXISTENCE is not policy CORRECTNESS (db-expert M4): `USING (false)`,
+-- a policy scoped `TO` a different role, or `FOR SELECT` only would all pass
+-- a bare "at least one policy" check while leaving the table wrong (either
+-- leaking, or fail-closed to its own tenant). Every policy this schema's
+-- declarative loop generates (migration 0001) is the same shape --
+-- PERMISSIVE, all commands, PUBLIC role, current_tenant_id() in both USING
+-- and WITH CHECK (grep-verified against every CREATE POLICY across
+-- migrations 0001/0002/0004/0005/0008) -- so this asserts that shape, not
+-- just presence.
+SELECT hci_test.expect_true('RLS-COMPLETENESS-02',
+  $q$SELECT NOT EXISTS (
+       SELECT 1
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'hci' AND c.relkind IN ('r','p')
+          AND EXISTS (SELECT 1 FROM pg_attribute a
+                       WHERE a.attrelid = c.oid AND a.attname = 'tenant_id'
+                         AND a.attnum > 0 AND NOT a.attisdropped)
+          AND has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_policies p
+             WHERE p.schemaname = 'hci' AND p.tablename = c.relname
+               AND p.permissive = 'PERMISSIVE' AND p.cmd = 'ALL' AND p.roles = '{public}'
+               AND p.qual ~ 'current_tenant_id' AND p.with_check ~ 'current_tenant_id')
+     )$q$,
+  'every hci table with a tenant_id column and any grant to this role must have a current_tenant_id() policy covering all commands and roles');
+
+-- hci.tenants is scoped by `id`, not `tenant_id`, so neither query above
+-- names it. db-expert review (2026-09-06) found a real blind spot:
+-- RLS-LEAK-02 (line 27) only proves cross-tenant rows stay invisible, and
+-- dropping tenant_registry_isolation leaves that true (FORCE ROW LEVEL
+-- SECURITY with no policy denies every row, not just other tenants') --
+-- nothing else in this file does a positive same-tenant read against this
+-- table. Mirrors RLS-OWN-01's positive-read check for hci.persons (line 19).
+SELECT hci_test.expect_true('RLS-OWN-02',
+  $q$SELECT EXISTS (SELECT 1 FROM hci.tenants WHERE id = '11111111-1111-1111-1111-111111111111')$q$,
+  'own tenant registry row must remain readable');
+
+-- Restores the owner context hci_test.finish() requires below (that
+-- function's own EXECUTE grant list does not include hci_app_test_a/b --
+-- 00_test_harness.sql's final GRANT block only covers expect_sqlstate/
+-- expect_success/expect_true), matching the role this file was already in
+-- at the point RLS-COMPLETENESS-01 temporarily left it.
+RESET ROLE;
+
+-- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(229);
+SELECT hci_test.finish(232);
