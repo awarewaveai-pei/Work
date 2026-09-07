@@ -1,0 +1,198 @@
+name: HCI-30 — Wave 1 cross-box restore drill (P0-10)
+
+# P0-10 (21_HCI_TOP_TIER_GAP_ANALYSIS.md) requires a REHEARSED, CROSS-BOX
+# restore drill before Wave 4 admits real tenant data --
+# 13_TESTING_REPLAY_ROLLBACK_AND_SRE.md:60 explicitly rejects a same-box
+# verify as sufficient. The laptop this repo is normally developed on has no
+# second non-production box available (the only other machine is ks-aw-01,
+# production -- mixing synthetic HCI data onto it would violate this
+# product's own test/prod isolation, see Projects/internal/hci30/README.md).
+# Two independent GitHub Actions jobs, each on its own freshly-provisioned
+# runner VM, is a genuine second box: job "produce-dump" and job
+# "restore-and-verify" never share a filesystem, only an uploaded artifact.
+#
+# What this proves: a pg_dump taken from a fully-migrated Wave 1 schema,
+# with zero access to the source container, restores on an unrelated
+# machine into a schema that still enforces every RLS policy/trigger/grant
+# (the existing wave1-negative-tests.sql suite re-run against the RESTORED
+# database, not just "pg_restore exited 0").
+#
+# What this does NOT prove: restore timing/RPO/RTO at real data volume
+# (this is the synthetic Wave 1 fixture set, not production scale), or
+# restore of anything beyond the `hci` schema (no other AwareWave service's
+# data is in scope here).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Projects/internal/hci30/database/**'
+      - 'Projects/internal/hci30/infra/local/compose.test.yml'
+      - '.github/workflows/hci30-restore-drill.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: hci30-restore-drill-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PGHOST: localhost
+  PGPORT: 5432
+  PGUSER: hci_owner
+  PGDATABASE: hci_wave1_synthetic
+  HCI_ROOT: Projects/internal/hci30
+
+jobs:
+  produce-dump:
+    name: Source box — migrate, seed, dump
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15.8
+        env:
+          POSTGRES_DB: hci_wave1_synthetic
+          POSTGRES_USER: hci_owner
+          POSTGRES_PASSWORD: drill-source-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hci_owner -d hci_wave1_synthetic"
+          --health-interval 2s --health-timeout 2s --health-retries 30
+    env:
+      PGPASSWORD: drill-source-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Ensure postgresql-client (psql/pg_dump/pg_dumpall) is present
+        run: |
+          if ! command -v pg_dump >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+
+      - name: Apply all 11 Wave 1 migrations + synthetic fixtures
+        run: |
+          set -e
+          cd "$HCI_ROOT/database"
+          for f in migrations/0001_wave1_synthetic_up.sql \
+                   migrations/0002_wave1_case_aggregate_up.sql \
+                   migrations/0003_wave1_regulatory_market_scope_up.sql \
+                   migrations/0004_wave1_source_provenance_up.sql \
+                   migrations/0005_wave1_bitemporal_history_up.sql \
+                   migrations/0006_wave1_bitemporal_scope_fence_up.sql \
+                   migrations/0007_wave1_crypto_shredding_up.sql \
+                   migrations/0008_wave1_field_author_class_policy_up.sql \
+                   migrations/0009_wave1_adr0019_hardening_up.sql \
+                   migrations/0010_wave1_epistemic_label_up.sql \
+                   migrations/0011_wave1_trust_domain_scope_up.sql \
+                   fixtures/0001_synthetic.sql; do
+            echo "-- applying $f"
+            psql -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Record pre-dump row-count marker
+        run: |
+          set -e
+          cd "$HCI_ROOT/database"
+          for t in tenants cases subject_records principals data_subject_requests data_subject_request_events; do
+            printf '%s|' "$t"
+            psql -tA -c "SELECT count(*) FROM hci.$t"
+          done | tee /tmp/marker-source.txt
+
+      - name: pg_dump (custom format, hci schema's owning database)
+        run: pg_dump -Fc -f /tmp/hci-wave1.dump
+
+      - name: pg_dumpall --roles-only (documented for a future generic-replay drill, not consumed by this one)
+        run: pg_dumpall --roles-only --no-role-passwords -f /tmp/roles.sql
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hci-wave1-drill-artifacts
+          path: |
+            /tmp/hci-wave1.dump
+            /tmp/roles.sql
+            /tmp/marker-source.txt
+          retention-days: 14
+
+  restore-and-verify:
+    name: Target box (different runner) — restore, verify
+    needs: produce-dump
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15.8
+        env:
+          POSTGRES_DB: hci_wave1_synthetic
+          POSTGRES_USER: hci_owner
+          POSTGRES_PASSWORD: drill-target-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hci_owner -d hci_wave1_synthetic"
+          --health-interval 2s --health-timeout 2s --health-retries 30
+    env:
+      PGPASSWORD: drill-target-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Ensure postgresql-client (psql/pg_restore) is present
+        run: |
+          if ! command -v pg_restore >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: hci-wave1-drill-artifacts
+          path: /tmp
+
+      - name: Recreate the two app roles the dump's GRANTs reference
+        # pg_dump is DATABASE-scoped; ROLE objects are CLUSTER-scoped and are
+        # not inside /tmp/hci-wave1.dump. The target cluster's own init
+        # already creates hci_owner (POSTGRES_USER above), matching source --
+        # replaying full roles.sql would collide on that one. Real finding
+        # from designing this drill, not assumed going in: a generic restore
+        # runbook must handle cluster-vs-database dump scope explicitly.
+        run: |
+          set -e
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE hci_app_test_a NOLOGIN NOBYPASSRLS;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE hci_app_test_b NOLOGIN NOBYPASSRLS;"
+
+      - name: pg_restore into the fresh target database
+        run: pg_restore -v --clean --if-exists --no-owner -d hci_wave1_synthetic /tmp/hci-wave1.dump
+
+      - name: Run the existing negative-test suite against the RESTORED schema
+        run: |
+          set -e
+          cd "$HCI_ROOT/database"
+          psql -v ON_ERROR_STOP=1 -f tests/00_test_harness.sql
+          psql -v ON_ERROR_STOP=1 -f tests/wave1-negative-tests.sql
+
+      - name: Compare post-restore row counts to the source marker
+        run: |
+          set -e
+          cd "$HCI_ROOT/database"
+          for t in tenants cases subject_records principals data_subject_requests data_subject_request_events; do
+            printf '%s|' "$t"
+            psql -tA -c "SELECT count(*) FROM hci.$t"
+          done | tee /tmp/marker-target.txt
+          diff /tmp/marker-source.txt /tmp/marker-target.txt \
+            && echo "MARKER MATCH: restored row counts equal source row counts, per table" \
+            || (echo "MARKER MISMATCH -- restore lost or duplicated rows" && exit 1)
+
+      - name: Write run summary
+        if: always()
+        run: |
+          {
+            echo "### HCI-30 Wave 1 restore drill";
+            echo "Source runner and target runner are separate GitHub Actions jobs (separate VMs) -- see workflow header for why this satisfies P0-10's cross-box requirement given no second non-production box exists today.";
+            echo "";
+            echo "| table | source count | target count |";
+            echo "|---|---|---|";
+            paste -d'|' /tmp/marker-source.txt /tmp/marker-target.txt | awk -F'|' '{print "| " $1 " | " $2 " | " $4 " |"}';
+          } >> "$GITHUB_STEP_SUMMARY"
