@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-09-07（5 個 opus-pinned subagent 拔除 model 欄位，改吃呼叫當下 session 的模型 —— 額度根因排查：critic 高頻 mandatory review 是週限制早鯨盡的主因，非工作量問題）
+
+**觸發**：操作者提出「加 local model 分擔工作，額度太緊」，查 session transcript（08-24 至今，63 個 session/jsonl，約 4.2 億 tokens）發現 opus 佔 18.6%（8,376 次 assistant turn），`WORKLOG.md` 逐字記錄多筆「critic subagent...撞到帳號級 rate limit，model=claude-opus-5」429（08-31/09-03~09-07 幾乎每天），操作者當場回報「週限制已用 74%，剩 4 天重置」。根因鎖定：`critic.md`/`db-expert.md`/`debugger.md`/`planner.md`/`vuln-verifier.md` 五個 agent frontmatter 寫死 `model: opus`，AGENTS.md §4 R2 又強制「每 commit 一個 critic」（過去兩週 commit 日均 ~35 個，區間 15-92，`WORKLOG.md` 內「critic 覆審/critic subagent」字樣文字提及 442 次）——GPT 原提的「local model 分擔 implementation」方案打錯瓶頸，implementation 對應的是 Sonnet（60.7% token占比），不是撞到 429 的 Opus。
+
+**方案取捨**：原提案為 critic 降預設 sonnet + `review.md` Deep tier（>100行或碰 auth/payment/rls/migration/secrets 等）明確 override 回 opus，分級處理。操作者裁定更簡單：5 個全拔 model 欄位，改吃呼叫當下 session 的模型，不留任何 agent 層級預設，一致性優先於自動分級。
+
+**已改**：`.claude/agents/{critic,db-expert,debugger,planner,vuln-verifier}.md` frontmatter 各刪一行 `model: opus`，其餘 tools/description/內文不動。
+
+**風險已告知，操作者知情選擇**：db-expert（RLS/migration 審查）、vuln-verifier（資安驗證）過去在 opus 下抓到真洞（例：Supabase `revoke all...from public` 未涵蓋 `anon`/`authenticated` 獨立預設 grant）。拔除後這兩者的審查強度會跟著呼叫當下主線模型走，不再保證最強——若主線常駐 sonnet，高風險審查的把關力道會比之前弱。操作者知情後選擇一致性/簡單性優先於自動按風險分級，非誤操作。
+
+- REALTEST_WAIVED: NA -- 純刪 5 行 YAML frontmatter，無邏輯改動；grep 確認 5 檔皆無殘留 `model: opus`（exit 1）+ 確認 `.claude/settings.json` 無全域 model 覆寫，故 fallback 至「inherits parent session model」為 harness 文件化預設行為，非猜測。活體行為驗證（真派一次觀察實際跑什麼模型）延後到下次真實派工——操作者週限制剩 26%/4 天，不消耗真實 quota 做合成測試。
+- REVIEW_WAIVED: DOC_ONLY -- 5 檔各刪 1 行、無邏輯/行為分支改動，規模與風險不對稱，不值得在操作者當下額度緊繃時再花一次 critic quota 覆審自己。
+- BUGHUNT_DONE: scope=D:\Work(**/*.md 全庫)+ .claude/agents/ + .claude/settings.json | grep=`model.{0,3}opus`（全庫 .md，找殘留敘述引用）+ `model: opus`（限 agents 目錄，找漏改）+ `"model"`（限 settings.json，找全域覆寫） | hits=0、0、0（settings.json 未含 model 鍵）
+- 順手發現（非本次範圍，未動，已 spawn_task task_44a205d1）：`C:\Users\user1115\.claude\bash-commands.log:2178` 疑似明文 Anthropic API key（格式 `sk-ant-api03-...`），2026-05-08 遺留，在 repo 外不會被 commit，但仍是明文憑證外洩，已排獨立任務查證/輪替。
+
 ## 2026-09-07（Cognitive OS 54–57 號切片 critic 覆審（scoped，normal risk tier）—— 2 Major 全修：DDD 三個 gate 補 fail-closed、Fault Tree 誇大安全宣稱改寫、3 份 contract 修過期 registry 宣稱、Trade-off Matrix 補測試）
 
 **觸發**：`git commit` 被 `verify-gate-commit.js` 擋（14 個 product-root 檔本 session 從未經過 /verify-recent），依規跑 syntax→critic→real exec test。critic scope=normal risk tier（無 auth/crypto/PII/金流），依 2026-09-06 風險分級規則抽查每方法 2-3 個關鍵 claim，非整份重跑。
