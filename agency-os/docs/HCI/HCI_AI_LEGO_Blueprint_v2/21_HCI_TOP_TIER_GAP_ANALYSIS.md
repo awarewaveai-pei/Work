@@ -107,6 +107,8 @@ Threats: SSRF, malicious redirects, malware, decompression bombs, web prompt inj
 
 Expected result: all external research content is treated as hostile input.
 
+**Partial closure (2026-09-07)**: 3 of 4 files written as substantive transcriptions of already-ACCEPTED ADRs and research-review findings (`Projects/internal/hci30/security/threat-models/`) — `TM_PUBLIC_INTELLIGENCE.md` (SSRF/ADR-0029, prompt injection, source-poisoning/SEO-manipulation as a genuinely undecided scoring parameter, investigation-footprint as a genuinely undecided mechanism), `TM_AI_ANALYSIS.md` (cross-references AI LEGO's own TB-1/T2/E4 threat rows per the Must-Not-Duplicate boundary rather than re-deriving them), `TM_MULTI_TENANCY.md` (ADR-0016 RLS mandate, ADR-0026 tenant-scoped Claim/Source ownership, ADR-0028 bulk-export control — and surfaced, without resolving, a stale blocking-rationale in ADR-0026's own implementation note now contradicted by ADR-0018's later-landed gate 3, see TASKS.md follow-up). `TM_FILE_INGESTION.md` is honestly left as a "blocked on a nonexistent product feature" record — malware/decompression-bomb/malicious-MIME threats have no file-upload feature anywhere in the corpus to attach to; not invented.
+
 ## P0-09 RLS enforcement gate *(new in V2, elevated from V1's Testing chapter)*
 
 Path: `D:\Work\Projects\internal\hci30\tests\architecture\test_cross_tenant_isolation.*`. A CI-blocking test connecting as a tenant-scoped non-superuser role, asserting zero cross-tenant rows returned for every RESTRICTED table, on every migration.

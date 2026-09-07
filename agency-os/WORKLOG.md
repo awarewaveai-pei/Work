@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-09-07（P0-08 Threat models——4 份，3 份實質轉寫已決 ADR，1 份誠實留空；副產品抓到 ADR-0026 舊筆記已過期）
+
+**產出**：`Projects/internal/hci30/security/threat-models/{TM_PUBLIC_INTELLIGENCE,TM_FILE_INGESTION,TM_AI_ANALYSIS,TM_MULTI_TENANCY}.md`。
+
+**TM_PUBLIC_INTELLIGENCE.md**：SSRF/惡意重導（SEC-05，設計已決 ADR-0029——獨立網路隔離 fetch runner，implementation gates 全開）、web prompt injection（SEC-04，設計已決——untrusted-content 包裝+output-schema 驗證+二次人工覆核，跟 AI LEGO 自己 TB-1/T2/E4 同一機制未定狀態）、source poisoning/SEO manipulation/synthetic evidence/domain impersonation（SEC-15，歸為 source-independence threshold 未決，真開放非發明）、investigation-footprint detectability（SEC-13，需求已定但無 ADR 選機制，真開放）。
+
+**TM_AI_ANALYSIS.md**：不重寫 AI LEGO 自己的 threat model，直接引用其 TB-1/T2/E4 三列（`SECURITY_THREAT_MODEL.md:86,105,118`）+ 其自己記錄的懸而未決項（`:149`，Knowledge Memory 寫入路徑的 untrusted-content 標記存續機制）；另記錄 SEC-12（AI coding agent 標準憑證存取權限缺乏 access-control actor 分類，這是治理範疇非 HCI schema gate）。
+
+**TM_MULTI_TENANCY.md**：RLS 從 V1「where appropriate」裁量文字（SEC-06）到 V2 ADR-0016 強制+CI gate（結構關閉，functional 部分仍需個別 `RLS-LEAK-NN`）；ADR-0026 tenant-scoped Claim/Source 決定（拒絕 reviewer 自己建議的 shared-cache Option B，理由是會破壞 ADR-0016 的強制 RLS 不變量且無法乾淨支援 ADR-0014 的刪除追溯）；ADR-0028 bulk-export 節流控制。
+
+**TM_FILE_INGESTION.md**：誠實留空——全庫（含 research review、v1/v2 blueprint、hci30 本身）grep `file upload`/`attachment upload`/`malware scan`/`ClamAV`/`MIME type` 零命中（除本條目自己的 gap-analysis 那一行）。Malware/decompression-bomb/malicious-MIME 沒有檔案上傳功能可依附，寫緩解機制等於發明產品範圍，比照 P0-04 三份 OPEN spec 的紀律。
+
+**副產品發現（撰寫時抓到，非本輪深挖）**：ADR-0026 自己的「Implementation note」（2026-09-05）寫「the only decided erasure mechanism (crypto-shredding) is ADR-0018, still SPECIFIED — RUNTIME OPEN」——查 `governance/ADR_INDEX.md` 現況，ADR-0018 已是 `SYNTHETIC GATE VERIFIED (Wave 1 gates 1,2,3,6)`，gate 3 建了 `hci.tombstone_evidence()`（重用 ADR-0017 的 escape-hatch 機制，141/141+63/63 mutation 全過，2026-09-05）——這看起來正是 ADR-0026 blocking 理由所說「不存在」的 append-only 例外路徑。**未深入重驗證**：`tombstone_evidence()` 是否真的覆蓋 Claim/Source/SourceSnapshot、是否有真實 DSR 呼叫路徑——這是下一個碰 ADR-0026/`DSR-CLAIM-DELETE-01` 的 session 該做的事，本輪只誠實記錄發現的矛盾，不臆測結論。已寫入 TASKS.md 追蹤。
+
+**驗證**（純轉寫+交叉引用，逐項核對來源）：
+- REALTEST_EVIDENCE: tool=Grep | cmd=核對每個 ADR 編號/檔名/section 標題逐字存在 | exit=0 | result=撰寫時發現並修正 2 處引用錯誤（`Raw content storage` 誤指 07 檔案，實際在 06；`§HCI Must Not Duplicate` 大小寫跟實際 header `## HCI must not duplicate` 不符）
+- REVIEW_DONE: critic=自審（Low risk，轉寫已 ACCEPTED 的 ADR/research-review 決定，非發明；File Ingestion 一份是「查無來源故誠實留空」而非轉寫）| verdict=pass | findings=0c/0m（2 處引用錯誤已自行抓到修正，見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`security/threat-models/TM_` | hits=僅本輪新檔+README/gap-analysis 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 4 份 `security/threat-models/*.md`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-08 補 partial-closure 段；`README.md` 補一行連結；`TASKS.md` 新增追蹤（ADR-0026/ADR-0018 矛盾）。
+
+**[剩餘風險]**：File Ingestion 完全 OPEN（等產品決策）；source-independence threshold（SEC-15）、investigation-footprint 機制（SEC-13）皆真開放；ADR-0026/ADR-0018 矛盾未解——`DSR-CLAIM-DELETE-01` 現況可能已可解但未驗證。
+
+**[rollback]**：`git revert`；純新增文件+既有文件補段落，無 schema 變更。
+
 ## 2026-09-07（P0-11 Key-rotation runbook——ADR-0022 已完整設計 5 個 gate，本輪只做 gate 1 文件，gate 2-5 schema/測試誠實不趕）
 
 **背景**：ADR-0022（已 ACCEPTED，2026-09-02）早已完整設計 DEK→KEK→master 三層金鑰階層、runbook 必要的 4 個章節標題、5 個 gate 的確切測試 ID（`KEY-RUNBOOK-EXISTS-01`/`SCHEMA-KEK-01`/`KEY-ROT-01`/`KEY-COMPROMISE-DRILL-01`）。本輪只完成 gate 1（runbook 文件本身），非發明新設計，是把 ADR 已決定的內容轉寫成 ADR 自己指定格式的產出物。
