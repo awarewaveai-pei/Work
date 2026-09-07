@@ -1,0 +1,466 @@
+$id: "ai-lego://methods/contracts/security.supply_chain_threat_model.contract.yaml"
+title: "Supply Chain Threat Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Fifty-first Method Atlas slice (this session), a
+  SIXTH member of the `security` family (F20's own "資安／隱私套件"), after
+  `security.stride` (44th), `security.linddun` (45th), `security.attack_tree`
+  (46th), `security.pasta` (47th), and `security.dpia_pia` (48th). Built
+  concurrently with four sibling F20 members (Zero Trust Review, Secrets
+  Threat Review, Abuse Case, Security Control Mapping) by independent
+  sessions -- this file does not depend on, or conflict with, any of them.
+
+  **DUPLICATION CHECK PERFORMED FIRST, BEFORE ANY FIELD DESIGN (mandatory
+  precondition for this slice)**: `docs/adr/ADR-015-supply-chain-security
+  -tooling-selection.md` (ACCEPTED 2026-08-30) and its ratified artifact
+  `policies/security/supply-chain-security.policy.yaml` (ACTIVE) already
+  exist and cover "supply chain security" by name. Read both in full before
+  writing this file. Confirmed DIFFERENT LAYER, genuinely additive, not a
+  duplicate: ADR-015 is a ONE-TIME, SINGLETON STATIC TOOL/VENDOR SELECTION
+  decision -- "which SBOM format" (CycloneDX), "which signing mechanism"
+  (Sigstore/cosign keyless), "which SLSA target level" (L2 now, L3 at Phase
+  4 CI/CD build-out), "which vulnerability-scan tool and threshold policy"
+  (Grype + Dependabot, CVSS/EPSS/KEV-tiered). Its own `verification.note`
+  (supply-chain-security.policy.yaml:265-269) is explicit that this is ALL
+  it covers. Nowhere does it, or its ADR, ask or answer "does THIS SPECIFIC
+  system's software supply chain actually implement source→dependency→CI
+  →artifact→registry→deploy→sign/verify correctly, stage by stage, for a
+  given system or component under review" -- that is a PER-REVIEW RECORD
+  question, the same class of gap every prior F20 Threat Model method fills
+  for its own trigger (STRIDE for authn/authz/etc, DPIA/PIA for personal
+  -data processing). `policies/security/supply-chain-security.policy.yaml`
+  is a single, whole-document, tooling-selection policy (`type: object`, no
+  per-instance records, no `id`/record-identity field at all) -- structurally
+  incapable of representing "the 2026-09-06 review of System X's supply
+  chain," the same way `zero-trust.policy.yaml` (a static IdP/OIDC tooling
+  decision) is a genuinely different layer from `security.zero_trust_review`
+  (a sibling F20 slice's own per-access REVIEW record). This contract is
+  therefore additive: it grounds its own per-stage field richness in
+  ADR-015's REAL ratified tool choices via a SOFT reference (see
+  `sign_verify.verification_method`'s own description), not invented
+  placeholder tool names -- the same soft-reference pattern
+  `security.dpia_pia.contract.yaml`'s own `jurisdiction_pack_ref` already
+  establishes, required here for the identical technical reason:
+  `ai_lego/core/contracts/schema_contracts.py` only globs `spec_root/specs/`
+  (`schema_contracts.py:28`, `specs_dir.rglob("*.yaml")`) into its `$ref`
+  registry -- `policies/security/supply-chain-security.policy.yaml` lives
+  under `policies/`, NOT `specs/`, so a hard `$ref` into it would not
+  resolve, confirmed by direct read of that indexing code, not assumed.
+
+  **Grounding citations, THREE independent mother-document mentions of the
+  same underlying flow, with genuinely DIFFERENT stage counts/wording --
+  disclosed, not silently reconciled** (see `compilation_decisions` for the
+  full reasoning on which is authoritative for what):
+  1. Atlas F20 tool table, Supply Chain Threat Model row (L889): "source
+     →dependency→CI→artifact→registry→deploy→sign/verify" -- SEVEN words,
+     no dedicated section anywhere in Atlas (broad case-insensitive grep for
+     "supply chain"/"supply-chain" across the Atlas document found exactly
+     two OTHER hits, both non-structural: §13.11 Security Review Recipe
+     (L3482, "→ Supply Chain Review →", ONE step in a longer 12-step
+     recipe, not itself decomposed) and §27's gate table (L4378, "Identity
+     /Secrets/Supply Chain 有控制與測試" -- a Security Gate criterion
+     naming supply chain as one of three areas needing "controls and
+     tests", not a stage breakdown). This F20 table row is Atlas's own
+     ONLY structural breakdown of this method, the situation
+     `security.pasta.contract.yaml` already establishes precedent for
+     (compressed formula, no dedicated section) -- treated here as
+     AUTHORITATIVE for this record's own `stages[].stage_id` closed enum,
+     transcribed verbatim and in Atlas's own literal order, per that
+     precedent.
+  2. Master Plan §66 "Supply Chain Security" (L2740-2756): "Source→Signed
+     Commit→CI→SBOM→Dependency Scan→Artifact Signing→Verified Deployment"
+     (also seven stages, but DIFFERENT wording and, critically, places
+     signing/verification content at position 2 AND 6, ending in "Verified
+     Deployment" as the terminal stage) plus "Production 只接受 Signed
+     Artifact" (L2758).
+  3. Execution Contract §34 "Supply Chain Contract" (L1304-1343): "Source
+     →Commit→Dependencies→Build→SBOM→Scan→Sign→Registry→Deploy" (NINE
+     stages -- splits Atlas's "CI" into Commit+Build, has no explicit
+     "Artifact" stage, and places "Sign" at position 7, BEFORE Registry
+     /Deploy) plus "Production 只部署：verified artifact" (L1328-1332) plus
+     a concrete, named 7-item "新增 dependency 要考慮" checklist (L1334-1342:
+     maintenance / license / vulnerability history / replaceability /
+     transitive dependencies / size／performance / long-term support).
+
+  **Honest, disclosed cross-document inconsistency, NOT silently smoothed
+  over**: all three citations name a "sign"/"verify"/"signed" concept, but
+  Atlas's own literal word order places it LAST, after `deploy` -- reading
+  this as real-time pipeline causality would put verification AFTER
+  production deployment, which contradicts BOTH Master Plan §66's own
+  "Verified Deployment" (verification bundled INTO the deploy step, not
+  after it) and EC §34's own "Sign" at position 7 of 9, well BEFORE
+  "Registry"/"Deploy" (positions 8-9). This is not this contract's error to
+  silently fix by reordering Atlas's own words (that would be exactly the
+  "invented sub-structure" class every prior F20 contract's own
+  compilation_decisions already refuses to do) -- it is read as evidence
+  that this record models a RETROSPECTIVE REVIEW's own documentation order
+  (the same category every other F20 Threat Model record already is: a
+  review artifact, not a live execution log), where the `sign_verify` stage
+  is the review's own TERMINAL FINDING about whether verification/signing
+  controls existed and held, not a claim about the literal runtime instant
+  verification occurred relative to deployment. The real invariant this
+  contract enforces (see below) is stated field-locally within that one
+  terminal stage precisely so it does not depend on resolving this
+  cross-document ordering conflict.
+
+  **Structural shape**: a SEVENTH F20 member overall, sharing PASTA's/DPIA
+  -PIA's own "fixed-length, positionally-ordered pipeline" class
+  (`prefixItems`, same as those two siblings). Like DPIA/PIA, this record
+  carries NONE of `assets`/`trust_boundaries`/`entry_points`/`test_evidence`
+  -- confirmed by direct grep of Execution Contract §32 (L1231-1260), whose
+  own closing sentence names exactly "STRIDE／LINDDUN／Attack Tree／PASTA",
+  no fifth or sixth option, and whose own trigger list (L1233-1245: authn,
+  authz, secrets, crypto, network, egress, tenant isolation, file parsing,
+  user content, AI tools) never mentions supply chain, dependencies,
+  CI/CD, or build in any form. This is the SECOND F20 member confirmed
+  genuinely absent from EC §32 entirely (after `security.dpia_pia`, the
+  48th slice, the first) -- directly updating `security.stride.contract
+  .yaml`'s own `OQ-STRIDE-4` (see `resolved_by` text this contract's own
+  final report proposes verbatim, not written into that file directly per
+  this session's own write-scope boundary).
+
+  **Two invariants beyond stage completeness-and-order, BOTH grounded in
+  real, external mother-document citations (NOT invented, NOT the
+  ADR-015/policy tooling-selection layer)**:
+  1. **Dependency-consideration completeness** -- the `dependency` stage's
+     own `dependency_entries[]` must have at least one entry, and every
+     entry's own `considerations` object must carry all SEVEN of EC §34's
+     own named dimensions (L1334-1342), each a non-empty string:
+     `maintenance`/`license`/`vulnerability_history`/`replaceability`
+     /`transitive_dependencies`/`size_performance`/`long_term_support`.
+     This is the one stage this contract gives RICHER structure than a
+     bare `stage_id`/`summary` (unlike PASTA's own deliberately-minimal
+     six process stages) -- a real, disclosed CONSEQUENCE of EC §34
+     actually naming seven concrete sub-dimensions for this exact stage,
+     the same "real citation, not invention" test PASTA's own
+     compilation_decisions already applies in the opposite direction (stay
+     minimal WHEN no further detail is cited; add structure WHEN it is).
+  2. **Production-verified-artifact gate** -- the terminal `sign_verify`
+     stage's own `production_deployment_occurred` (boolean) may not be
+     `true` while `artifact_verified` (boolean) is `false`. Grounded in
+     TWO INDEPENDENT, CONVERGING mother-document citations (stronger than
+     any single-citation invariant in this F20 family so far):
+     EC §34 L1328-1332 ("Production 只部署：verified artifact") AND Master
+     Plan §66 L2758 ("Production 只接受 Signed Artifact") -- two different
+     documents, same rule, same conclusion. Enforced at the runtime layer
+     only (construction + independent gate), not the JSON Schema, by
+     explicit compilation decision (see below) -- unlike DPIA/PIA's own
+     escalation rule, this one COULD be expressed as a single-object JSON
+     Schema `if`/`then` (both fields live in the same `sign_verify` stage
+     object, not across two different `prefixItems` positions the way
+     DPIA/PIA's residual_risk/approval split is), but is kept runtime-only
+     for a different, disclosed reason: to avoid the SAME business rule
+     existing in two independently-maintained places (schema and Python)
+     that could silently drift apart over this record's own 30-year
+     evolution horizon.
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity gate),
+  NOT `genuine_compute` -- Atlas's own benefit line ("降 dependency/artifact
+  compromise") is a qualitative risk-reduction claim, the same class
+  STRIDE/LINDDUN/PASTA/DPIA-PIA's own structural derivations already
+  establish, not a numeric/ordinal computation like Attack Tree's own
+  cost/skill/detectability aggregation.
+
+  Confirmed distinct from every existing `specs/security/` typed object
+  (`key-vault-lifecycle`, `log-redaction-token`, `personal-data-envelope`,
+  `tenant-isolation-controls`) by direct grep for "supply chain"/"registry"
+  /"dependency scan"/"sbom" across that directory -- zero hits beyond an
+  unrelated ADR-governance-process mention in `key-vault-lifecycle.schema
+  .yaml:515`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Supply Chain Threat Model row (L889): 'source→dependency→CI→artifact→registry→deploy→sign/verify' -- the ONLY structural breakdown Atlas gives this method, transcribed verbatim as this record's own `stages[].stage_id` enum and literal order"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487, 'Supply Chain Review' at L3482): confirming cross-reference that Supply Chain Review is a real step in Atlas's own broader security review sequence, not itself decomposed there"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §34 Supply Chain Contract (L1304-1343): 'Production 只部署：verified artifact' (L1328-1332, grounds the production-verified-artifact-gate invariant) and the 7-item dependency-consideration checklist (L1334-1342, grounds `dependency_entries[].considerations`)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §66 Supply Chain Security (L2740-2758): 'Production 只接受 Signed Artifact' (L2758) -- the SECOND, independently-converging citation grounding the same production-verified-artifact-gate invariant"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260): grep-confirmed ZERO mention of supply chain/dependencies/CI/build anywhere in its own ten-item trigger list, and its own closing sentence names exactly four methods, not this one -- the negative evidence this contract's own 'not an EC §32 method' claim rests on"
+  - "docs/adr/ADR-015-supply-chain-security-tooling-selection.md (ACCEPTED 2026-08-30) + policies/security/supply-chain-security.policy.yaml (ACTIVE): the sibling, DIFFERENT-LAYER static tooling-selection artifact this contract's own duplication-check description confirms is additive to, not duplicative of, this per-review record -- soft-referenced from `sign_verify.verification_method`, no hard `$ref` (that policy lives under `policies/`, not `specs/`, confirmed by direct read of `ai_lego/core/contracts/schema_contracts.py:24-28`)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content of this method contract itself (ADR-015 governs
+  the SEPARATE tooling-selection policy this contract is confirmed additive
+  to, not this file). Registered in `methods/registry/contract-backlog.yaml`
+  `tier_1` as a new concrete entry (exact ordinal number to be assigned by
+  whoever next edits that file, since four sibling F20 contracts are being
+  added by independent concurrent sessions this same session -- see this
+  contract's own final report for the verbatim entry text). `id:
+  security.supply_chain_threat_model` mints a new machine_id, SIXTH member
+  of the `security` family (F20). The `dependency_entries[].considerations`
+  shape and the production-verified-artifact-gate invariant are both
+  grounded in real Execution Contract / Master Plan citations (§34, §66),
+  NOT the ADR-015 tooling-selection layer and NOT invented -- disclosed
+  throughout, the same class of decision `security.pasta.contract.yaml`'s
+  own per-stage field detail and `security.dpia_pia.contract.yaml`'s own
+  GDPR-grounded invariants already establish as precedent.
+
+id: security.supply_chain_threat_model
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited. Same reasoning as security.pasta/security.dpia_pia:
+# staging the seven-step chain is DECOMPOSE, assigning per-stage content
+# (including the dependency_entries[] considerations) is MAP, and the
+# stage-completeness-and-order PLUS dependency-consideration-completeness
+# PLUS production-verified-artifact-gate checks are all VALIDATE
+# (structural/referential/conditional derivations, not a numeric COMPUTE
+# step).
+
+purpose:
+  - walk_a_software_supply_chain_through_atlas_own_seven_ordered_stages_from_source_to_a_final_sign_verify_finding_confirming_dependency_considerations_were_recorded_and_production_deployment_never_outran_artifact_verification
+inputs:
+  required: [SupplyChainSubjectDescriptor, SupplyChainStageSequence]
+  # SupplyChainStageSequence, not "...Set" -- same shape-accurate-naming
+  # discipline security.pasta's own PastaStageSequence and security.dpia_pia's
+  # own DpiaPiaStageSequence already establish: Atlas's own "→" chain is a
+  # real dependency order, not an unordered set. SupplyChainSubjectDescriptor
+  # names the system/component under review, the same role
+  # ProcessingActivityDescriptor plays for security.dpia_pia.
+  optional: []
+outputs: [SupplyChainThreatModelRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "stages is EXACTLY the seven entries {source, dependency, ci, artifact, registry, deploy, sign_verify}, one each, IN THAT ORDER -- Atlas's own F20 table row (L889) '→' chain is a real dependency order, not an unordered set"
+  - "each of source/ci/artifact/registry/deploy has a non-empty summary"
+  - "the dependency stage has at least one well-shaped dependency_entries[] entry (non-empty name, and a considerations object with ALL SEVEN EC §34 (L1334-1342) dimensions non-empty: maintenance/license/vulnerability_history/replaceability/transitive_dependencies/size_performance/long_term_support)"
+  - "the sign_verify stage has a non-empty summary, boolean artifact_verified, boolean production_deployment_occurred, and a non-empty verification_method; production_deployment_occurred may not be true while artifact_verified is false (EC §34 L1328-1332 'Production 只部署：verified artifact', independently converging with Master Plan §66 L2758 'Production 只接受 Signed Artifact')"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class as security.pasta/security.dpia_pia: stage-completeness
+  # -and-order, dependency-consideration-completeness, and the production
+  # -verified-artifact gate are all structural/referential/conditional
+  # derivations, not a statistical/numeric CALCULATED RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table (L4142-4155) has no Supply Chain Threat Model
+# row -- confirmed by direct read, same class of confirmation every prior
+# F20 sibling's own contract already performs.
+recommended_next: [architecture.adr]
+# Atlas's own F18 Architecture Change chain (L830-841) places "Threat Model"
+# directly before "ADR" (L836-837) -- this method's own NAME literally
+# contains "Threat Model", making this the MOST direct application of that
+# forward link of any F20 member so far (STRIDE/LINDDUN/Attack Tree/PASTA
+# needed no extra justification either; DPIA/PIA needed a disclosed
+# different reasoning since it is not itself named a Threat Model method --
+# this one needs neither hedge).
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural F20 contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      ADR-015 (ACCEPTED) and `policies/security/supply-chain-security
+      .policy.yaml` (ACTIVE) already exist and are literally titled
+      "Supply Chain Security". Before designing a single field, is this
+      new method contract a duplicate?
+    decision: "No -- confirmed additive after reading both files in full. See description's own DUPLICATION CHECK section for the complete reasoning."
+    reasoning: >
+      ADR-015/the policy file are a SINGLETON, STATIC TOOL-SELECTION
+      decision (SBOM format, signing mechanism, SLSA target, vuln-scan
+      tooling/thresholds) -- a "which vendor/standard did we pick" layer,
+      structurally a single whole-document object with no record-identity
+      field, incapable of representing a per-system, per-review record.
+      This contract is a "did THIS system's supply chain actually follow
+      the seven-stage flow correctly, with real dependency-consideration
+      and production-verification evidence" REVIEW RECORD -- the same
+      distinction `policies/security/zero-trust.policy.yaml` (static
+      IdP/OIDC selection) already draws against `security.zero_trust
+      _review` (a sibling F20 slice's own per-access review). Grounding
+      this contract's own field richness in ADR-015's real tool choices
+      via a soft reference (not inventing placeholder tool names) is the
+      correct way to be additive without duplicating.
+  - question: >
+      Three mother-document citations exist for this same underlying flow
+      (Atlas F20 row: 7 stages; Master Plan §66: 7 stages, different
+      words; EC §34: 9 stages, different words and a different Sign
+      position) -- which is authoritative for `stages[].stage_id`?
+    decision: "Atlas's own F20 table row (L889) is authoritative for stage identity/order. Master Plan §66 and EC §34 are used ONLY to ground two additional cross-cutting invariants (dependency-consideration completeness, production-verified-artifact gate), never to re-shape or reorder the stage list itself."
+    reasoning: >
+      Every prior F20 member's own `stages[].stage_id` enum is drawn from
+      ATLAS specifically (never from Master Plan or EC) -- this contract
+      follows that same family-wide convention rather than picking
+      whichever of the three documents happens to have the most detail.
+      Silently merging three DIFFERENT stage lists into one invented
+      "best of all three" chain would fabricate a fourth ordering no
+      mother document actually states, a worse error than picking one
+      real, citable source and disclosing the other two as unreconciled.
+      This is a genuinely different situation from `security.dpia_pia`'s
+      own "dedicated section vs. table row" precedent (both of THOSE
+      citations were the SAME document, Atlas, one richer than the
+      other) -- here the two richer alternatives are DIFFERENT documents
+      with materially different stage counts and orderings, not a
+      richer/thinner pair from the same source.
+  - question: >
+      Atlas's own literal word order places `sign/verify` AFTER `deploy`
+      (the LAST of the seven words) -- read as real pipeline causality,
+      this contradicts both Master Plan §66 (verification bundled into
+      the terminal "Verified Deployment" step) and EC §34 (Sign at
+      position 7 of 9, well before Registry/Deploy). Should this
+      contract silently reorder Atlas's own words to match the more
+      operationally sensible sequence the other two documents suggest?
+    decision: "No -- transcribe Atlas's own literal order verbatim, and disclose the cross-document ordering conflict explicitly instead of silently resolving it."
+    reasoning: >
+      Silently reordering Atlas's own words would be exactly the
+      "invented sub-structure/order beyond what the citation specifies"
+      class every prior F20 contract's own compilation_decisions already
+      refuses (e.g. security.pasta's own refusal to reorder its own
+      seven-word chain even though the real external PASTA methodology
+      might suggest richer structure). The disclosed resolution is that
+      this record documents a RETROSPECTIVE REVIEW's own stage-by-stage
+      account (the same category every other F20 Threat Model record
+      already is), not a live execution log asserting real-time causal
+      ordering -- the production-verified-artifact-gate invariant is
+      therefore written to be field-local within the single `sign_verify`
+      stage object, so its own correctness does not depend on resolving
+      which document's literal stage ordering is operationally "more
+      correct".
+  - question: >
+      Should the `dependency` stage stay minimal (`stage_id`/`summary`
+      only, matching PASTA's own six process stages and this contract's
+      own source/ci/artifact/registry/deploy stages), or carry richer
+      structure?
+    decision: "Richer structure -- dependency_entries[], each with a considerations object carrying all seven of EC §34's own named dimensions."
+    reasoning: >
+      This is the one stage a mother document (EC §34, L1334-1342) gives
+      CONCRETE further detail for -- a real, disclosed asymmetry, not an
+      arbitrary design choice. Every OTHER stage in this record stays
+      minimal because no mother document names any further sub-structure
+      for source/CI/artifact/registry/deploy/sign_verify's own summary
+      content beyond what appears in Atlas's own seven-word chain --
+      the identical "stay minimal absent a real citation, add structure
+      when one exists" discipline `security.pasta.contract.yaml`'s own
+      compilation_decisions already establishes, applied here in the
+      direction that adds rather than withholds structure because the
+      citation genuinely exists for this one stage.
+  - question: >
+      Should the production-verified-artifact-gate invariant
+      (`production_deployment_occurred` implies `artifact_verified`) be
+      expressed in the JSON Schema (a same-object `if`/`then`, since both
+      fields live in the single `sign_verify` stage object, unlike DPIA
+      /PIA's own cross-`prefixItems`-position escalation rule) or kept
+      runtime-only?
+    decision: "Runtime-only (construction + independent gate), matching the family-wide two-layer discipline every prior F20 sibling already applies to its own real invariants -- not additionally duplicated into the JSON Schema."
+    reasoning: >
+      Unlike `security.dpia_pia.contract.yaml`'s own reasoning (JSON
+      Schema 2020-12 genuinely CANNOT cleanly express a conditional
+      spanning two different `prefixItems` positions), this rule COULD be
+      written as a single-object `if`/`then` here -- disclosed honestly
+      rather than claiming the same schema-level impossibility DPIA/PIA
+      cites. The real reason to still keep it runtime-only is different:
+      writing the SAME business rule in two independently-maintained
+      places (a JSON Schema conditional AND a Python predicate) creates a
+      second copy that could silently drift out of sync with the first
+      over this record's own 30-year evolution horizon (Atlas's own "30
+      年可演化" fitness criterion, §24 gate table L4372) -- one
+      authoritative enforcement point, exercised at both the construction
+      and the independent gate layer (two LAYERS of the SAME rule, not
+      two DIFFERENT copies of it), is the safer long-term shape.
+  - question: >
+      Should `sign_verify.verification_method` hard-`$ref` into
+      `policies/security/supply-chain-security.policy.yaml`'s own
+      `signing.mechanism` (`const: "Sigstore/cosign"`), the way a fully
+      -wired integration would?
+    decision: "No -- a soft, free-text reference only, with a description pointing at the real policy file's own const value."
+    reasoning: >
+      Confirmed by direct read of `ai_lego/core/contracts/schema_contracts
+      .py:24-28`: `SchemaContracts` only globs `spec_root/specs/` into its
+      `$ref` registry. `policies/security/supply-chain-security.policy
+      .yaml` lives under `policies/`, not `specs/` -- a hard `$ref` there
+      would not resolve, the identical technical constraint this
+      session's own task briefing already disclosed and this contract
+      independently re-confirmed rather than merely trusting. The SAME
+      soft-reference pattern `security.dpia_pia.contract.yaml`'s own
+      `jurisdiction_pack_ref` already establishes for an analogous
+      cross-directory, non-`specs/`-indexed target.
+
+open_questions:
+  - id: "OQ-SUPPLYCHAINTM-1"
+    question: "id mints a machine_id method-inventory.yaml never carried, and that file's own Supply Chain Threat Model row (line: 886) is stale by the same +3 offset already disclosed for its neighboring F20 rows (real Atlas line is L889) -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-SUPPLYCHAINTM-2"
+    question: >
+      Three mother documents give three DIFFERENT stage counts/orderings
+      for the same underlying supply-chain flow (Atlas F20 row: 7; Master
+      Plan §66: 7, different words; EC §34: 9, different words and Sign
+      position) -- see compilation_decisions for why Atlas's own row was
+      chosen as authoritative for `stages[].stage_id` and the other two
+      used only for cross-cutting invariants. Should a future revision, on
+      explicit operator instruction, reconcile all three into one unified
+      canonical stage list (likely requiring an ADR, since it would be a
+      real architectural decision about which mother document's own
+      wording wins, not a compilation detail this contract has authority
+      to settle unilaterally)?
+    owner: "operator, or whoever next revises this contract's own scope with explicit authorization to reconcile the three citations"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-SUPPLYCHAINTM-3"
+    question: >
+      `sign_verify.verification_method` is a soft, free-text reference to
+      `policies/security/supply-chain-security.policy.yaml`'s own
+      `signing.mechanism` (currently `const: "Sigstore/cosign"`) because
+      that policy file lives under `policies/`, not `specs/`, and is
+      therefore outside `SchemaContracts`'s own `$ref` registry. Should a
+      future revision of `schema_contracts.py` (or a relocation of
+      `policies/security/` under `specs/`) enable a hard `$ref` here,
+      closing the same soft-reference gap `security.dpia_pia.contract
+      .yaml`'s own `OQ-DPIAPIA-2` already discloses for
+      `jurisdiction_pack_ref`?
+    owner: "operator, or whoever next revises schema_contracts.py's own indexing scope"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-SUPPLYCHAINTM-4"
+    question: >
+      With `security.supply_chain_threat_model` now a SECOND F20 member
+      confirmed genuinely absent from EC §32 entirely (after
+      `security.dpia_pia`, the first) -- does this settle
+      `security.stride.contract.yaml`'s own `OQ-STRIDE-4` (is the EC §32
+      assets/trust_boundaries/entry_points triplet worth a shared F20 base
+      schema)? Not fully: two independent non-members now exist, further
+      strengthening the case that NO single base schema serves ALL of
+      F20, but the narrower question -- whether the FOUR true EC §32
+      Threat Review methods alone (STRIDE/LINDDUN/Attack Tree/PASTA)
+      might still share a base schema for that triplet -- remains exactly
+      as open as `security.dpia_pia.contract.yaml`'s own `OQ-DPIAPIA-4`
+      already left it. This contract's own final report proposes the
+      exact verbatim text for `security.stride.contract.yaml`'s own
+      `OQ-STRIDE-4.resolved_by` field to record this second data point --
+      not written directly, per this session's own write-scope boundary
+      (siblings' own contract files are read-only to this slice).
+    owner: "operator, or whoever next surveys the F20 family as a whole once Zero Trust Review/Secrets Threat Review/Abuse Case/Security Control Mapping (built concurrently this same session by independent agents) also land"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read `docs/adr/ADR-015-supply-chain-security-tooling-selection.md` and
+    `policies/security/supply-chain-security.policy.yaml` in FULL before
+    any field design, to perform the mandatory duplication check (see
+    description). Read Atlas's F20 tool table row (L889), broad case
+    -insensitive grep for "supply chain"/"供應鏈" across the full Atlas
+    document (confirmed exactly three hits: the F20 row, §13.11's Supply
+    Chain Review recipe step at L3482, and §27's gate-table criterion at
+    L4378 -- no dedicated section). Read Execution Contract §32 (L1231-1260,
+    grep-confirmed no supply-chain trigger and no fifth/sixth named
+    method), §34 Supply Chain Contract (L1304-1343, in full), and Master
+    Plan §66 Supply Chain Security (L2740-2758, in full) directly. Read all
+    four existing `specs/security/` typed objects directly (grep-confirmed
+    zero supply-chain/registry/dependency-scan/SBOM hits beyond an
+    unrelated governance-process mention) to confirm no duplication.
+    Read `ai_lego/core/contracts/schema_contracts.py` (L24-28) directly to
+    independently re-confirm the `policies/` vs `specs/` indexing boundary
+    rather than merely trusting the task briefing's own claim of it.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document, ADR, or the sibling `policies/security/supply
+    -chain-security.policy.yaml` was modified. Atlas's own seven-word F20
+    row is directly transcribed as the `stages[].stage_id` enum, in
+    Atlas's own literal order, WITHOUT silently reordering it to match the
+    other two mother documents' own different orderings (see
+    compilation_decisions for the full disclosure). The
+    `dependency_entries[].considerations` shape and the production
+    -verified-artifact-gate invariant are explicitly disclosed as grounded
+    in Execution Contract §34 and Master Plan §66 (real, converging,
+    two-document citations), NOT Atlas and NOT the ADR-015 tooling
+    -selection layer.

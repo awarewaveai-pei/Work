@@ -1,0 +1,443 @@
+$id: "ai-lego://methods/contracts/security.security_control_mapping.contract.yaml"
+title: "Security Control Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Fifty-third Method Atlas slice, TENTH and LAST
+  member of the `security` family (F20's own "資安／隱私套件"), CLOSING F20
+  10/10 -- after `security.stride` (44th), `security.linddun` (45th),
+  `security.attack_tree` (46th), `security.pasta` (47th), `security.dpia_pia`
+  (48th), and four further F20 members built concurrently in this same
+  session (Zero Trust Review, Secrets Threat Review, Supply Chain Threat
+  Model, Abuse Case -- 49th-52nd). This contract does not depend on, read,
+  or reference any of those four concurrent siblings' own files or outputs.
+
+  Atlas gives this method exactly ONE citation, its own F20 tool table row
+  (L891: "Threat→Control→Evidence", usage "每個威脅對應
+  preventive/detective/recovery control", benefit "控制可稽核、可測") -- the
+  THINNEST of all ten F20 rows. Grep-confirmed (case-insensitive, across
+  §11.x/§12.x/§13.x) NO dedicated section exists for this method, unlike
+  STRIDE's own §11.44, LINDDUN's own §11.45, or DPIA/PIA's own §11.46.
+
+  **The central design question this contract resolves, investigated before
+  any field was written**: should this method be (a) a genuine DOWNSTREAM
+  CONSUMER of an already-built sibling threat-model record (re-classifying
+  ITS OWN existing threats' controls), or (b) a STANDALONE record with its
+  own from-scratch threats[]/controls[] arrays, independent of any prior
+  record? Three real, independent citations ground choice (a):
+
+  1. Atlas's own F20 row (L891) reads "每個威脅對應" (literally: EACH THREAT
+     maps to a control) -- grammatically presupposing threats that ALREADY
+     EXIST elsewhere, not a method that discovers threats itself the way
+     STRIDE/LINDDUN/PASTA/Attack Tree each independently do.
+  2. Atlas §13.11 Security Review Recipe (L3472-3487) is a REAL, ALREADY-
+     CITED-BY-A-SIBLING sequencing chain: "Asset Inventory → Data Flow
+     Diagram → Trust Boundaries → STRIDE → LINDDUN → Attack Tree →
+     Secret/Identity Review → Supply Chain Review → Control Mapping →
+     Adversarial Test → Residual Risk → Human Security Approval." Control
+     Mapping's own recipe position is IMMEDIATELY AFTER every
+     threat-producing method the recipe names -- a positional citation for
+     consumption, not independent discovery.
+  3. `security.stride.contract.yaml`'s own `compilation_decisions` (its
+     fourth entry, verified by direct read) explicitly DECLINED to build "a
+     full Threat→Control→Evidence TRACEABILITY structure" inside STRIDE
+     itself, naming Security Control Mapping BY NAME as "a DIFFERENT,
+     dedicated method for exactly this fuller traceability concern -- ...
+     the same restraint `database_data.data_quality_dimensions`'s own
+     contract already applied." That same file's own `OQ-STRIDE-5`
+     explicitly anticipated: "Should a future `security.security_control
+     _mapping` slice add a structured `control_mapping_ref` soft link
+     here, once that method exists?" -- this contract's own
+     `source_record_id`/`control_mappings[]` design directly answers that
+     question (see `resolved_by` below).
+
+  Option (b) (standalone) was seriously considered and rejected: it would
+  duplicate threats[] content STRIDE/LINDDUN already model, invent a SECOND
+  place a "threat" can be described (contradicting the "one clear owner per
+  concern" discipline this whole session already applies -- e.g.
+  `security.stride.contract.yaml`'s own fourth compilation_decision refusing
+  to absorb Control Mapping's future concern INTO itself, for the identical
+  reason in reverse), and would silently ignore Atlas's own §13.11
+  sequencing evidence, which is a real citation, not this contract's own
+  invention.
+
+  **Which siblings can be consumed -- verified by direct read, not
+  assumed**: `stride-threat-model-record.schema.yaml` and
+  `linddun-privacy-threat-model-record.schema.yaml` are CONFIRMED to expose
+  an IDENTICAL flat `threats[]` shape (`required: [element_name, category,
+  description, control, residual_risk, test_evidence]`, verbatim in both
+  files -- only the `category` enum vocabulary differs, six STRIDE
+  categories vs. LINDDUN's seven privacy categories). `attack-tree-record
+  .schema.yaml` (a recursive AND/OR tree -- a "threat" there is a `leaf_node`
+  reached only by walking the tree, no flat list) and
+  `pasta-threat-model-record.schema.yaml` (a single fixed-length
+  `prefixItems` pipeline with exactly ONE terminal `risk` stage carrying
+  control/residual_risk/test_evidence for the WHOLE review, not per-threat)
+  are CONFIRMED, by direct read of both schemas, structurally incompatible
+  with this shape. `source_record_type` is therefore a closed two-value
+  enum (`stride`/`linddun`), not an open string or a five-way enum padded
+  out to match F20's full threat-review roster -- a disclosed, evidence-
+  based scope limit (see `open_questions`), not an oversight.
+
+  **Structurally NEW among F20 members, and among every ai_lego module built
+  this session** (confirmed by grep across every `ai_lego/modules/*/*.py`
+  gate function signature -- zero prior hits of an extra parameter beyond
+  `(record, validator, timestamp)`): every prior F20 typed object is
+  SELF-CONTAINED -- every field its own gate needs lives inside its own
+  record. This is the FIRST method whose own core invariant is a REFERENCE
+  to a DIFFERENT record's raw content. Two real invariants, both two-layer:
+
+  1. WITHIN-RECORD referential integrity -- every `control_mappings[]`
+     entry's own `control_id` must name a real `controls[].control_id` (the
+     same class STRIDE's own `threats[].element_name` ->
+     `data_flow_elements[].name` check already establishes).
+  2. CROSS-RECORD referential integrity (the genuinely new class) -- every
+     `control_mappings[]` entry's own `source_threat_index` must name a
+     REAL entry in the EXTERNAL source record's own `threats[]`, and its
+     own denormalized `source_threat_element_name`/`source_threat_category`
+     must MATCH what is actually stored there. The BUILDER always performs
+     this fully (it requires the real, raw external `source_record` as an
+     argument -- there is no other way to construct this record at all).
+     The GATE performs it fully too when the SAME raw external record is
+     passed to its own OPTIONAL `source_record` keyword (proven by
+     `run_security_control_mapping_slice.py`'s own hand-tamper test); when
+     it is not supplied, the gate still re-derives a real, weaker, fully
+     self-contained invariant instead of skipping silently: that
+     `control_mappings[]`'s own covered `source_threat_index` values and
+     `source_threats_with_no_control_mapping`'s own indices together cover
+     EXACTLY `0..source_threat_count-1` with no overlap and no gap.
+     `source_threat_count` (a new, third field beyond what a first pass at
+     this design considered) exists specifically to close a real hole this
+     contract's own author found while writing the fallback check: without
+     an independently-stored total, deleting the LAST entry from
+     `source_threats_with_no_control_mapping` could leave the REMAINING
+     indices looking accidentally contiguous from `0` -- a real,
+     self-caught tamper class the self-contained mode would otherwise miss,
+     disclosed here rather than silently shipped.
+
+  `source_threats_with_no_control_mapping` is GENUINE, RE-DERIVED evidence
+  (never caller-supplied) -- the source record's own `threats[]` indices
+  with zero `control_mappings[]` entries referencing them, the exact same
+  "surfaced as information, not enforced" discipline
+  `stride-threat-model-record.schema.yaml`'s own
+  `elements_with_no_recorded_threats` already establishes, applied here to
+  CONTROL coverage instead of THREAT coverage -- directly satisfying
+  Atlas's own "控制可稽核、可測" (auditable and testable) benefit line as a
+  measurable completeness signal, not merely a design slogan.
+
+  **Evidence is a STRUCTURED record, not the free-text `test_evidence`
+  string every sibling F20 threat entry carries** -- `{description,
+  verified_by, verified_date}`, all required non-empty strings. This is a
+  disclosed, deliberate departure from every sibling's own free-text
+  evidence field: Atlas's own benefit line for THIS method specifically is
+  "控制可稽核、可測" (auditable AND testable), which a bare description does
+  not make concretely checkable (who verified it, when). See
+  `compilation_decisions` for the full reasoning.
+
+  A STRUCTURAL record (`provenance_required` + one integrity gate), NOT
+  `genuine_compute`: both invariants are set-membership/referential
+  derivations, the same class STRIDE's own `elements_with_no_recorded
+  _threats` and DPIA/PIA's own risk-traceability check already establish --
+  not a numeric/statistical CALCULATED RESULT.
+
+  Due-diligence search performed before writing a single field: read Atlas's
+  F20 table row (L891) directly; grepped §11.x/§12.x/§13.x case-
+  insensitively for "control mapping"/"threat.*control.*evidence"/
+  "preventive"/"detective"/"recovery" (real neighbours found: L439 Bow-Tie's
+  own "prevention/recovery" -- a DIFFERENT method, threat->event->
+  consequences, not this method's own threat->control->evidence chain,
+  confirmed distinct by direct read; L937 F23's own "Obligation-to-Control
+  Mapping" -- a DIFFERENT family (F23 legal/compliance), obligation->
+  control->owner->evidence->test, a real sibling PATTERN not a duplicate
+  SUBJECT, confirmed distinct); read all five already-built F20 sibling
+  contracts and typed-object schemas in full (stride, linddun, attack_tree,
+  pasta, dpia_pia) to confirm the threats[] shape comparison above; read
+  `methods/registry/method-inventory.yaml`'s own Security Control Mapping
+  entry (L1232-1236, `line: 888`) and confirmed the same +3 line-offset bug
+  every neighbouring F20 row in that file already discloses (STRIDE's own
+  entry there reads `line: 879` against the real L882, the identical +3
+  gap) -- real Atlas line is L891, not L888.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Security Control Mapping row (L891): 'Threat→Control→Evidence', usage '每個威脅對應 preventive/detective/recovery control', benefit '控制可稽核、可測' -- this method's ONLY citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487): 'STRIDE → LINDDUN → Attack Tree → Secret/Identity Review → Supply Chain Review → Control Mapping → Adversarial Test → Residual Risk → Human Security Approval' -- the sequencing citation grounding the CONSUMPTION design"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155): grep-confirmed no Security Control Mapping row -- forbidden_transition: [] is a verified absence, not an unchecked default"
+  - "methods/contracts/security.stride.contract.yaml compilation_decisions (fourth entry) and OQ-STRIDE-5: explicitly named this method as the dedicated future home of Threat→Control→Evidence traceability and anticipated a soft control_mapping_ref link -- this contract's own source_record_id/control_mappings[] design directly resolves it"
+  - "specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml (L68-100) and linddun-privacy-threat-model-record.schema.yaml (L78-100): confirmed identical threats[] shape, the two consumable source_record_type values"
+  - "specs/cognitive/typed-objects/attack-tree-record.schema.yaml and pasta-threat-model-record.schema.yaml: confirmed structurally incompatible with the flat threats[] shape (recursive tree; single fixed-length pipeline verdict respectively) -- grounds the closed two-value source_record_type enum"
+  - "methods/registry/method-inventory.yaml Security Control Mapping entry (L1232-1236, stale line: 888 -- real Atlas line L891, the same +3 offset every neighbouring F20 row in that file already discloses)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. This contract's own `id: security
+  .security_control_mapping` mints a new machine_id, TENTH and LAST member
+  of the `security` family (F20), closing that family 10/10. The
+  consumption design (option (a) over standalone option (b)) and the
+  closed two-value `source_record_type` enum are this contract's own
+  compilation decisions, grounded in the three citations and two schema
+  reads above -- not an ADR-level ruling.
+
+id: security.security_control_mapping
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [MAP, RELATE, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for this
+# method -- it has no dedicated section at all). Deliberately DIFFERENT
+# from every other F20 member's own [DECOMPOSE, MAP, VALIDATE] triple: this
+# is the FIRST F20 method (and the first structural method built this
+# session, confirmed by a spot grep of the family's own cognitive_primitives
+# lines) whose own real work does NOT include a DECOMPOSE step, because the
+# decomposition already happened in the upstream STRIDE/LINDDUN record this
+# method consumes. Its own two real operations are: RELATE (a real kernel
+# primitive, specs/cognitive/primitive.schema.yaml L75 -- establishing the
+# Threat<->Control edge control_mappings[] IS) and MAP (assigning each
+# control its own preventive/detective/recovery category). VALIDATE covers
+# both the within-record and cross-record referential-integrity checks plus
+# the source_threats_with_no_control_mapping derivation.
+
+purpose:
+  - classify_an_existing_threat_models_own_recorded_controls_into_preventive_detective_recovery_categories_with_structured_auditable_evidence_and_surface_which_threats_still_lack_a_mapped_control
+inputs:
+  required: [StrideThreatModelRecord_or_LinddunPrivacyThreatModelRecord, ControlSet]
+  # Soft reference (free-text names per method.schema.yaml's own convention
+  # for this field), not an enum -- the actual constraint (stride OR
+  # linddun) is enforced by this record's own source_record_type field, not
+  # by this string.
+  optional: []
+outputs: [SecurityControlMappingRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "source_record_type is one of {stride, linddun} -- the only two F20 siblings confirmed to expose an identical flat threats[] shape"
+  - "source_record is a real, well-shaped external record of that type (id correctly prefixed STRIDE-/LINDDUN-, a non-empty threats[] list of entries each carrying a non-empty element_name and category) -- this method's own precondition input, not caller-asserted metadata"
+  - "controls has at least 1 entry; every entry's own control_id is unique within the record and CTRL- prefixed, category is one of Atlas's own literal three words {preventive, detective, recovery}, description is non-empty, and evidence is a structured {description, verified_by, verified_date} record, all three non-empty"
+  - "control_mappings has at least 1 entry; every entry's own source_threat_index is in range for source_record's own threats[], its denormalized source_threat_element_name/source_threat_category genuinely match what source_record actually has at that index (CROSS-RECORD referential integrity), and its control_id names a real controls[] entry (WITHIN-RECORD referential integrity); no duplicate (source_threat_index, control_id) pair"
+  - "source_threat_count and source_threats_with_no_control_mapping are NOT caller-supplied -- the builder computes both internally from the real source_record, and the gate independently re-derives and compares against the stored values (fully, when the same raw source_record is supplied to it; via a weaker but still real self-contained partition check when it is not)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class every prior structural (non-genuine-compute) F20 contract
+  # already reasons through: both invariants are structural/referential
+  # derivations (the same kind STRIDE's own elements_with_no_recorded
+  # _threats and DPIA/PIA's own risk-traceability check already perform),
+  # not a statistical/numeric CALCULATED RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table (L4142-4155) has no Security Control Mapping
+# row -- grep-confirmed directly, not assumed by copying the sibling
+# pattern.
+recommended_next: [challenge.red_team]
+# A DIFFERENT reasoning than all five prior F20 siblings' own shared
+# `[architecture.adr]` choice (grounded in F18's own Threat-Model-before-ADR
+# chain / §13.9, neither of which names Control Mapping specifically). This
+# is the FIRST F20 member with a LITERAL, SPECIFIC Atlas-named successor:
+# §13.11's own recipe (L3483-3484) reads "...→ Control Mapping → Adversarial
+# Test →...". `challenge.red_team` (9th slice, already built; Atlas §11.23,
+# an 11-item generic adversarial-review checklist -- confirmed by
+# `security.stride.contract.yaml`'s own due-diligence text, "a DIFFERENT
+# method entirely, not STRIDE's own six fixed threat categories") is Atlas's
+# own dedicated adversarial-review method, the best available real-world
+# match for the recipe's own "Adversarial Test" step -- disclosed as an
+# INFERENCE (Atlas never literally writes "Red Team" at L3484's own recipe
+# line), not a verbatim citation, in OQ-SCM-4 below.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural contract's own rollback field already draws. Any real
+  # remediation a mapped control's own evidence describes happens outside
+  # this method's own scope.
+
+compilation_decisions:
+  - question: >
+      Should this method be a genuine DOWNSTREAM CONSUMER of an existing
+      sibling threat-model record (re-classifying ITS OWN existing threats'
+      controls), or a STANDALONE record with its own from-scratch
+      threats[]/controls[] arrays?
+    decision: "Consumer (option a) -- source_record_id/source_record_type reference an EXTERNAL StrideThreatModelRecord or LinddunPrivacyThreatModelRecord; this record has no threats[] of its own."
+    reasoning: >
+      See description above for the full three-citation due-diligence
+      trail (Atlas's own '每個威脅對應' grammar, §13.11's own sequencing,
+      and security.stride.contract.yaml's own explicit forward-pointer).
+      The standalone alternative was seriously considered and rejected: it
+      would duplicate content STRIDE/LINDDUN already own, violate the
+      "one clear owner per concern" discipline security.stride.contract
+      .yaml's own fourth compilation_decision already applies in the
+      opposite direction (declining to absorb THIS method's own concern
+      INTO itself), and would silently ignore the §13.11 sequencing
+      evidence.
+  - question: >
+      Which F20 siblings can plausibly serve as source_record_type -- all
+      five already-built threat-model methods (STRIDE/LINDDUN/Attack
+      Tree/PASTA/DPIA-PIA), or a narrower set?
+    decision: "Exactly two: stride and linddun -- confirmed by direct read of all five sibling schemas to be the only pair sharing an identical flat threats[] shape."
+    reasoning: >
+      Attack Tree's own record is a recursive AND/OR tree (a 'threat' is a
+      leaf_node reached only by tree traversal, no flat list to index into)
+      -- structurally incompatible with this record's own index-addressed
+      control_mappings[] design. PASTA's own record is a single
+      fixed-length seven-stage prefixItems pipeline with exactly ONE
+      terminal 'risk' stage carrying control/residual_risk/test_evidence
+      for the WHOLE review, not per-threat -- there is no plural threats[]
+      to map controls against at all. DPIA/PIA's own record already
+      carries its OWN risks[]/controls[]/residual_risk[] traceability
+      structure (a DIFFERENT, already-complete Threat[risk]->Control->
+      Residual chain, GDPR-grounded, not Atlas-grounded) -- mapping THIS
+      method's own preventive/detective/recovery vocabulary onto DPIA/PIA's
+      own risk entries would require inventing a translation this
+      contract's own due diligence found no citation for. Extending
+      source_record_type to a five-way enum padded out to match F20's full
+      threat-review roster, when three of the five are confirmed
+      incompatible or already self-sufficient, would be exactly the kind
+      of undisclosed over-reach a critic review already caught elsewhere
+      in this session (an invented correspondence with no real textual or
+      structural basis). Disclosed as a real, evidence-based scope limit in
+      `OQ-SCM-2`, not silently narrowed.
+  - question: >
+      Should the Threat→Control edge (`control_mappings[]`) and the
+      Control→Evidence record (`controls[]`) be ONE combined array (each
+      entry carrying its own full control description AND evidence AND
+      which threat it addresses), or TWO separate, cross-referenced arrays?
+    decision: "Two separate arrays, cross-referenced by control_id -- the same 'separate stages, cross-referenced by id' shape security.dpia_pia.contract.yaml's own risks[]/controls[]/residual_risk[] triple already establishes as a legitimate class."
+    reasoning: >
+      A control's own preventive/detective/recovery nature and its own
+      evidence are properties of the CONTROL itself, not of any one
+      threat it happens to mitigate (a WAF is always preventive regardless
+      of which threat is being discussed). Combining the two into one
+      per-mapping record would force the SAME control's description and
+      evidence to be re-typed once per threat it protects -- both a real
+      duplication-of-truth risk (the two copies could silently drift) and
+      a failure to model the real-world case this design explicitly wants
+      to support: ONE shared control (e.g. a WAF) legitimately mitigating
+      SEVERAL different threats (many-to-many), and conversely one threat
+      legitimately needing SEVERAL different controls (defense in depth,
+      e.g. one preventive + one detective control for the same threat).
+      Neither direction is restricted to exactly one.
+  - question: >
+      Should `evidence` be the same flat free-text string every sibling
+      F20 threat's own `test_evidence` field already uses, for consistency
+      with the rest of the family, or a structured object?
+    decision: "A structured {description, verified_by, verified_date} object -- a deliberate departure from the family-wide free-text convention."
+    reasoning: >
+      Atlas's own benefit line for THIS method specifically, and ONLY this
+      method among all ten F20 rows, is "控制可稽核、可測" (auditable AND
+      testable) -- a stronger, more specific claim than any sibling's own
+      benefit line makes about its own test_evidence field. A bare
+      description string does not make an audit trail concretely
+      checkable (WHO verified it, WHEN); the structured fields do, at the
+      cost of a real, disclosed asymmetry with the rest of the family (see
+      `OQ-SCM-3`). This is the SAME class of "real practice, not Atlas
+      literal text" grounding security.pasta.contract.yaml's own per-stage
+      field detail and security.dpia_pia.contract.yaml's own two GDPR-
+      grounded invariants already establish as session precedent -- Atlas
+      names the BENEFIT (auditable, testable), not the exact field shape
+      that satisfies it; this contract chose the shape.
+  - question: >
+      Should the gate's own cross-record check REQUIRE the real
+      source_record to be supplied every time (refusing to evaluate at all
+      without it), or degrade gracefully to a weaker, self-contained check?
+    decision: "Degrade gracefully -- source_record is an OPTIONAL gate keyword; when absent, a real (weaker) self-contained partition check runs instead of the gate refusing to run."
+    reasoning: >
+      A gate signature of `(record, validator, timestamp)` alone, with no
+      extra parameter, is the uniform convention EVERY prior F20 (and
+      every other) gate function in this codebase already follows
+      (grep-confirmed, zero exceptions) -- a caller invoking this gate
+      through any generic, method-agnostic pipeline built against that
+      convention would have no way to also supply a second record.
+      Refusing to evaluate at all in that case would make this method's
+      own gate less available than every sibling's, for a caller who has
+      no way to know a second argument even exists. The self-contained
+      fallback is not merely "return PASS unconditionally" -- it is a
+      REAL, independently-useful invariant (index-partition completeness),
+      strengthened by storing `source_threat_count` specifically so it
+      cannot be defeated by deleting the last unmapped entry (a real gap
+      this contract's own author found and closed while writing the
+      check, not merely asserted safe). The weaker mode's own remaining
+      limit (a sufficiently determined single-shot forgery that edits
+      `source_threat_count` AND the index sets consistently together would
+      still pass) is disclosed honestly in `OQ-SCM-1`, not hidden -- the
+      same "catches inconsistent tampering, not omniscient forgery" threat
+      model every sibling gate in this family already assumes.
+
+open_questions:
+  - id: "OQ-SCM-1"
+    question: >
+      The gate's own self-contained fallback mode (no source_record
+      supplied) catches a hand-tamperer who edits control_mappings[] or
+      source_threats_with_no_control_mapping WITHOUT also consistently
+      updating source_threat_count, but cannot catch one who edits ALL
+      THREE fields together to tell a consistent false story (e.g.
+      shrinking source_threat_count to match a shrunk, falsely-complete
+      coverage claim). Should a future revision add a signed/hashed
+      binding between this record and its own source_record's real content
+      (e.g. a content hash of the source record's threats[] array) to
+      close this residual gap?
+    owner: "operator, or whoever next revises this contract's own gate design"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap; the SAME class every sibling gate's own 'does not trust stored values, but assumes single-field not omniscient tampering' threat model already carries"
+  - id: "OQ-SCM-2"
+    question: >
+      source_record_type is a closed two-value enum (stride/linddun) today.
+      If a future F20 member (one of the four built concurrently this
+      session -- Zero Trust Review, Secrets Threat Review, Supply Chain
+      Threat Model, Abuse Case -- or a future revision of Attack
+      Tree/PASTA/DPIA-PIA) is later found to ALSO expose a flat,
+      index-addressable threats[]-equivalent shape, should
+      source_record_type be extended to include it?
+    owner: "operator, or whoever next surveys those four concurrently-built siblings' own final shapes against this record's own consumption design"
+    blocks: "nothing in this file's own validity -- this contract deliberately did NOT read those four siblings' own in-progress files to avoid depending on file-write ordering between concurrently-running agents, the same concurrent-build caution method.schema.yaml's own compilation_decisions already documents for cognitive_primitives"
+  - id: "OQ-SCM-3"
+    question: >
+      This record's own evidence field is a structured object, a real
+      asymmetry with every sibling F20 threat's own flat test_evidence
+      string. Should a future revision retrofit the SAME structured shape
+      onto STRIDE/LINDDUN/Attack Tree/PASTA/DPIA-PIA's own per-threat
+      test_evidence fields, for family-wide consistency?
+    owner: "operator, or whoever next revises the F20 family's own evidence-field shape as a whole"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-SCM-4"
+    question: >
+      recommended_next names challenge.red_team as an INFERRED match for
+      §13.11's own literal 'Adversarial Test' recipe step -- Atlas never
+      writes the words 'Red Team' at that specific recipe line. Should a
+      future revision confirm this mapping against a dedicated Atlas
+      citation, or introduce a distinct 'Adversarial Test' method instead
+      of reusing Red Team for this purpose?
+    owner: "operator, or whoever next revises this contract's own recommended_next"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-SCM-5"
+    question: "id mints a machine_id method-inventory.yaml never carried, and that file's own Security Control Mapping row (line: 888) is stale by the same +3 offset every neighbouring F20 row in that file already discloses (real Atlas line is L891) -- should method-inventory.yaml be updated (has_contract:true, machine_id, corrected line)?"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F20 tool table row (L891) directly -- this method's ONLY
+    citation. Grep-confirmed (case-insensitive) across §11.x/§12.x/§13.x
+    that no dedicated section exists. Read Atlas §13.11 Security Review
+    Recipe (L3472-3487) and Atlas §22.3 Method-specific Gate table
+    (L4142-4155) directly. Grepped Atlas for "control mapping"/"preventive"
+    /"detective"/"recovery" and read every non-citation hit to confirm
+    distinctness (Bow-Tie L439, F23's own Obligation-to-Control Mapping
+    L937 -- both confirmed different methods/families, not duplicates).
+    Read all five already-built F20 sibling contracts and typed-object
+    schemas (stride, linddun, attack_tree, pasta, dpia_pia) in full to
+    confirm the threats[] shape comparison and the standalone-vs-consumer
+    design decision. Grepped every ai_lego/modules/*/*.py gate function
+    signature for an extra parameter beyond (record, validator, timestamp)
+    -- zero hits -- before disclosing this contract's own cross-record gate
+    design as genuinely new. Read method-inventory.yaml's own Security
+    Control Mapping entry and confirmed the +3 line-offset pattern against
+    its own STRIDE neighbour entry. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own three-word usage/benefit
+    phrase (L891) is transcribed verbatim as the category enum and the
+    evidence-auditability design rationale. The consumption design, the
+    closed two-value source_record_type enum, the two-separate-arrays
+    shape, the structured evidence object, and the gate's own two-tier
+    (full / self-contained) design are all disclosed compilation decisions
+    grounded in real citations and direct schema reads -- see
+    compilation_decisions above -- not Atlas's own explicit structural
+    instruction, since Atlas gives this method no dedicated section to
+    transcribe a formula from. Both real invariants are enforced at the
+    runtime layer (ai_lego/modules/security/security_control_mapping.py),
+    not the schema layer -- JSON Schema alone cannot check membership
+    against an array in a DIFFERENT document.

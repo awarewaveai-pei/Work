@@ -1,0 +1,243 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/supply-chain-threat-model-record.schema.yaml"
+title: Supply Chain Threat Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SupplyChainThreatModelRecord` --
+  the declared `outputs` of `security.supply_chain_threat_model`'s Method
+  Contract. SIXTH typed object in the `security` family (F20), and the
+  SECOND F20 member confirmed genuinely absent from Execution Contract
+  §32's own four named Threat Review methods (after
+  `dpia-pia-impact-assessment-record.schema.yaml`) -- this record carries
+  NONE of `assets`/`trust_boundaries`/`entry_points`/`test_evidence`.
+
+  DIFFERENT LAYER from, and additive to, the sibling singleton policy
+  `policies/security/supply-chain-security.policy.yaml` (ACTIVE, ratified
+  by `docs/adr/ADR-015-supply-chain-security-tooling-selection.md`): that
+  file is a STATIC TOOL-SELECTION decision (SBOM format, signing mechanism,
+  SLSA target, vuln-scan tooling) with no record-identity field at all --
+  this schema is a PER-REVIEW RECORD (`id`, `system_or_component`, a
+  specific `stages[]` walk-through) capable of representing "the review of
+  System X's supply chain on date Y". See the method contract's own
+  description for the full duplication-check reasoning.
+
+  Atlas's own F20 tool table row (L889, the ONLY structural breakdown Atlas
+  gives this method -- no dedicated section exists) gives the seven-word
+  chain `source→dependency→CI→artifact→registry→deploy→sign/verify`,
+  transcribed verbatim as `stages`, a fixed-length-seven, POSITIONALLY
+  ORDERED tuple -- the same "ordered pipeline" structural class
+  `pasta-threat-model-record.schema.yaml` and
+  `dpia-pia-impact-assessment-record.schema.yaml` already establish
+  (Atlas's own "→" is a real dependency chain, not a set), enforced via
+  `prefixItems` exactly as those two siblings do. `sign/verify`'s own
+  internal slash is transcribed as one compound snake_case stage_id,
+  `sign_verify` -- the same treatment
+  `dpia-pia-impact-assessment-record.schema.yaml`'s own
+  `necessity_proportionality` already gives a slash-compound Atlas word.
+
+  Five of the seven stages (`source`/`ci`/`artifact`/`registry`/`deploy`)
+  are deliberately minimal (`stage_id`/`summary` only) -- Atlas gives no
+  further structure for them, and none is invented here (the same
+  restraint `security.pasta.contract.yaml`'s own compilation_decisions
+  already applies to its own six process stages). TWO stages carry richer,
+  citation-grounded structure, NEITHER from Atlas itself:
+
+  1. `dependency` -- `dependency_entries[]`, each with a `considerations`
+     object carrying all SEVEN of Execution Contract §34's own named
+     dimensions (L1334-1342, "新增 dependency 要考慮"): `maintenance`
+     /`license`/`vulnerability_history`/`replaceability`
+     /`transitive_dependencies`/`size_performance`/`long_term_support`.
+  2. `sign_verify` (the terminal stage) -- `artifact_verified` (boolean),
+     `production_deployment_occurred` (boolean), `verification_method`
+     (free text, softly referencing
+     `policies/security/supply-chain-security.policy.yaml`'s own
+     `signing.mechanism`). The real invariant --
+     `production_deployment_occurred` may not be `true` while
+     `artifact_verified` is `false` -- is grounded in TWO independently
+     -converging mother-document citations: EC §34 L1328-1332 ("Production
+     只部署：verified artifact") and Master Plan §66 L2758 ("Production
+     只接受 Signed Artifact"). NOT expressed in this schema (a same-object
+     `if`/`then` IS technically possible here, unlike DPIA/PIA's own
+     cross-`prefixItems` escalation rule) -- kept runtime-only by
+     deliberate compilation decision, to avoid the same rule existing in
+     two independently-maintained places that could drift apart over this
+     record's own 30-year evolution horizon. See the method contract's own
+     compilation_decisions for the full reasoning, and for the honest
+     disclosure that Atlas's own literal word order places `sign_verify`
+     AFTER `deploy` -- read as a retrospective review's own account, not a
+     live-execution causality claim (this record's own terminal-stage
+     invariant is field-local for exactly this reason).
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity
+  gate), NOT `genuine_compute`: both invariants (dependency-consideration
+  completeness, the production-verified-artifact gate) are structural
+  /conditional derivations, the same class
+  `pasta-threat-model-record.schema.yaml`'s own stage-order check and
+  `dpia-pia-impact-assessment-record.schema.yaml`'s own escalation rule
+  already establish -- not a numeric/ordinal computation like
+  `attack-tree-record.schema.yaml`'s own cost/skill/detectability
+  aggregation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Supply Chain Threat Model row (L889): 'source→dependency→CI→artifact→registry→deploy→sign/verify'"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §34 Supply Chain Contract (L1304-1343): the 7-item dependency-consideration checklist and the 'Production 只部署：verified artifact' rule"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §66 Supply Chain Security (L2740-2758): the second, converging 'Production 只接受 Signed Artifact' citation"
+  - "methods/contracts/security.supply_chain_threat_model.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  process_stage:
+    type: object
+    required: [stage_id, summary]
+    additionalProperties: false
+    properties:
+      stage_id:
+        enum: [source, ci, artifact, registry, deploy]
+        description: "Five of Atlas's own seven F20-row words, transcribed verbatim. Deliberately minimal -- Atlas gives no further structure for these, and none is invented here."
+      summary:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+  dependency_considerations:
+    type: object
+    required: [maintenance, license, vulnerability_history, replaceability, transitive_dependencies, size_performance, long_term_support]
+    additionalProperties: false
+    description: "Execution Contract §34's own 7-item '新增 dependency 要考慮' checklist (L1334-1342), transcribed verbatim as field names."
+    properties:
+      maintenance: {type: string, minLength: 1, pattern: "\\S"}
+      license: {type: string, minLength: 1, pattern: "\\S"}
+      vulnerability_history: {type: string, minLength: 1, pattern: "\\S"}
+      replaceability: {type: string, minLength: 1, pattern: "\\S"}
+      transitive_dependencies: {type: string, minLength: 1, pattern: "\\S"}
+      size_performance: {type: string, minLength: 1, pattern: "\\S", description: "EC §34's own single bullet 'size／performance' -- transcribed as one compound field, the same slash-compound-to-one-field treatment this schema's own sign_verify stage_id and the sibling dpia-pia schema's necessity_proportionality both already apply."}
+      long_term_support: {type: string, minLength: 1, pattern: "\\S"}
+
+  dependency_entry:
+    type: object
+    required: [name, considerations]
+    additionalProperties: false
+    properties:
+      name: {type: string, minLength: 1, pattern: "\\S"}
+      considerations:
+        $ref: "#/$defs/dependency_considerations"
+
+  dependency_stage:
+    type: object
+    required: [stage_id, dependency_entries]
+    additionalProperties: false
+    properties:
+      stage_id: {const: dependency}
+      dependency_entries:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/dependency_entry"}
+
+  sign_verify_stage:
+    type: object
+    required: [stage_id, summary, artifact_verified, production_deployment_occurred, verification_method]
+    additionalProperties: false
+    properties:
+      stage_id:
+        const: sign_verify
+        description: "Atlas's own seventh and final F20-row word 'sign/verify', transcribed as one compound snake_case stage_id -- the same slash-compound treatment dpia-pia's own necessity_proportionality already establishes."
+      summary: {type: string, minLength: 1, pattern: "\\S"}
+      artifact_verified:
+        type: boolean
+        description: "Whether the deployed/registry-pushed artifact's signature/provenance was actually verified -- EC §34 L1328-1332 / Master Plan §66 L2758's own 'verified/signed artifact' requirement."
+      production_deployment_occurred:
+        type: boolean
+        description: "Whether this review's own subject reached production. The real invariant (production_deployment_occurred=true requires artifact_verified=true) is enforced at the runtime layer only -- see method contract's own compilation_decisions for why it is not additionally duplicated here as a JSON Schema if/then."
+      verification_method:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: >
+          Free text describing HOW verification was performed (e.g. 'cosign
+          signature verify against Sigstore transparency log'). SOFT
+          reference to `policies/security/supply-chain-security.policy
+          .yaml`'s own `signing.mechanism` (currently `const:
+          "Sigstore/cosign"`) -- no hard `$ref`, since that policy file
+          lives under `policies/`, not `specs/`, and is therefore outside
+          `SchemaContracts`'s own `$ref` registry (confirmed by direct read
+          of `ai_lego/core/contracts/schema_contracts.py:24-28`). Same
+          soft-reference pattern
+          `dpia-pia-impact-assessment-record.schema.yaml`'s own
+          `jurisdiction_pack_ref` already establishes.
+
+type: object
+required: [id, version, system_or_component, stages, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^SCTM-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.supply_chain_threat_model"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  stages:
+    type: array
+    minItems: 7
+    maxItems: 7
+    description: >
+      Atlas's own seven-word F20 row (L889), AS AN ORDERED TUPLE, mirroring
+      pasta-threat-model-record.schema.yaml's and
+      dpia-pia-impact-assessment-record.schema.yaml's own prefixItems
+      discipline. stages[0] MUST be the source stage, stages[6] MUST be the
+      sign_verify stage, and so on -- Atlas's '→' is a dependency chain,
+      not a set. This literal order is transcribed WITHOUT reconciling it
+      against Master Plan §66's or Execution Contract §34's own different
+      stage orderings for the same underlying flow -- see the method
+      contract's own compilation_decisions for the full, disclosed
+      cross-document inconsistency.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: source}}}]
+      - $ref: "#/$defs/dependency_stage"
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: ci}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: artifact}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: registry}}}]
+      - allOf: [{$ref: "#/$defs/process_stage"}, {properties: {stage_id: {const: deploy}}}]
+      - $ref: "#/$defs/sign_verify_stage"
+    items: false
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a Supply Chain Threat Model review is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A real review of this repository's own ai_lego package release pipeline, all seven stages in Atlas's own order, production deployment gated on artifact verification"
+    value:
+      id: "SCTM-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.supply_chain_threat_model"
+      system_or_component: "ai_lego package release pipeline"
+      stages:
+        - {stage_id: source, summary: "GitHub repository, main branch protected, two-reviewer rule enforced for merges touching ai_lego/."}
+        - stage_id: dependency
+          dependency_entries:
+            - name: "jsonschema"
+              considerations:
+                maintenance: "Actively maintained, multiple releases per year, large user base."
+                license: "MIT -- compatible with this project's own licensing."
+                vulnerability_history: "No open CVEs at time of review; last CVE (2021) already patched upstream and pinned version is well past it."
+                replaceability: "Low switching cost -- Draft202012Validator interface is narrow and already isolated behind SchemaContracts."
+                transitive_dependencies: "Two small transitive deps (attrs, pyrsistent), both widely used and independently reviewed."
+                size_performance: "Pure-Python, negligible install size, validation cost is not a hot path in this codebase."
+                long_term_support: "Reference implementation of the JSON Schema spec itself -- unlikely to be abandoned."
+        - {stage_id: ci, summary: "GitHub Actions runs the full unit test suite and jsonschema validation on every push and PR."}
+        - {stage_id: artifact, summary: "sdist and wheel built via the standard build backend from the tagged commit."}
+        - {stage_id: registry, summary: "Internal package index; no public PyPI publication at this stage."}
+        - {stage_id: deploy, summary: "Pulled by internal runtime images at container build time, pinned to an exact version."}
+        - {stage_id: sign_verify, summary: "GitHub Artifact Attestations generated for the built wheel; internal image build verifies the attestation before accepting the artifact.", artifact_verified: true, production_deployment_occurred: true, verification_method: "GitHub Artifact Attestations (Sigstore/cosign-backed, per policies/security/supply-chain-security.policy.yaml signing.mechanism) verified at image-build time before the artifact is accepted."}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+verification:
+  method: "Read Atlas F20 tool table row (L889) directly -- the only structural breakdown this method has. Read Execution Contract §34 (L1304-1343) and Master Plan §66 (L2740-2758) directly for the two grounding invariants. Validated against jsonschema Draft202012Validator, including the positional prefixItems ordering constraint."
+  note: "Atlas's own seven-word chain and its own literal order are directly transcribed, without reconciling against the other two mother documents' own different orderings (disclosed, not silently fixed). The dependency_entries[].considerations shape and the sign_verify stage's own two boolean fields are explicitly disclosed as grounded in Execution Contract §34 and Master Plan §66, not Atlas and not the sibling ADR-015 tooling-selection policy. No mother document was modified."

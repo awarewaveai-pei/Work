@@ -1,0 +1,341 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/security-control-mapping-record.schema.yaml"
+title: Security Control Mapping Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SecurityControlMappingRecord` --
+  the declared `outputs` of `security.security_control_mapping`'s Method
+  Contract. TENTH and LAST typed object in the `security` family (F20's own
+  "資安／隱私套件"), closing F20 10/10. Atlas's own F20 tool table row
+  (L891: "Threat→Control→Evidence", usage "每個威脅對應
+  preventive/detective/recovery control", benefit "控制可稽核、可測") is this
+  method's ONLY citation -- the thinnest of all ten F20 rows, no dedicated
+  section exists (grep-confirmed absent from §11.x/§12.x/§13.x).
+
+  **Structurally NEW among F20 members**: every prior F20 typed object
+  (`stride-threat-model-record`, `linddun-privacy-threat-model-record`,
+  `attack-tree-record`, `pasta-threat-model-record`,
+  `dpia-pia-impact-assessment-record`) is a SELF-CONTAINED analysis --
+  every field it needs to validate itself lives inside its own record. This
+  record is the FIRST F20 member (confirmed by grep across every
+  `ai_lego/modules/*/*.py` gate function signature -- zero prior hits) whose
+  own core invariant is a REFERENCE to a DIFFERENT record's own raw content:
+  `source_record_id`/`source_record_type` name an EXISTING
+  `StrideThreatModelRecord` or `LinddunPrivacyThreatModelRecord` (the only two
+  F20 siblings directly confirmed, by reading both schemas, to expose an
+  IDENTICAL flat `threats[]` shape -- `required: [element_name, category,
+  description, control, residual_risk, test_evidence]`, verbatim in both
+  files), and every `control_mappings[]` entry classifies ONE of that
+  source record's own `threats[]` entries into Atlas's own literal
+  three-word `category` vocabulary (`preventive`/`detective`/`recovery`)
+  plus a structured, auditable `evidence` record -- directly satisfying
+  Atlas's own "控制可稽核、可測" (auditable and testable) benefit line, which
+  a bare free-text field (the shape every sibling's own per-threat
+  `test_evidence` already uses) would not make concretely checkable.
+
+  **Grounds for the CONSUMPTION design** (not a standalone, from-scratch
+  threats[]/controls[] record -- see method contract's own
+  `compilation_decisions` for the full due-diligence comparison against the
+  standalone alternative):
+  1. Atlas's own F20 table row (L891) reads "每個威脅對應" (EACH THREAT maps
+     to...) -- grammatically presupposing threats that ALREADY EXIST, not a
+     method that discovers threats itself.
+  2. Atlas §13.11 Security Review Recipe (L3472-3487) is a REAL SEQUENCING
+     citation: "...→ STRIDE → LINDDUN → Attack Tree → Secret/Identity Review
+     → Supply Chain Review → Control Mapping → Adversarial Test →..." --
+     Control Mapping's own recipe position is IMMEDIATELY AFTER the
+     threat-producing methods, consuming their output.
+  3. `security.stride.contract.yaml`'s own `compilation_decisions`
+     (its fourth entry) explicitly DECLINED to build a
+     "Threat→Control→Evidence TRACEABILITY structure" itself, naming
+     Security Control Mapping BY NAME as "a DIFFERENT, dedicated method for
+     exactly this fuller traceability concern" -- and its own `OQ-STRIDE-5`
+     explicitly anticipated "a future `security.security_control_mapping`
+     slice add[ing] a structured `control_mapping_ref` soft link" once this
+     method existed. This record directly resolves that open question (see
+     method contract's own `resolved_by`).
+
+  Two REAL invariants, both two-layer (construction + gate,
+  re-derived from raw fields, not trusted):
+  1. WITHIN-RECORD referential integrity: every `control_mappings[]` entry's
+     own `control_id` must name a real `controls[].control_id` (the same
+     class `stride-threat-model-record`'s own `threats[].element_name` ->
+     `data_flow_elements[].name` check already establishes, one record
+     later in the chain).
+  2. CROSS-RECORD referential integrity (the genuinely NEW class): every
+     `control_mappings[]` entry's own `source_threat_index` must name a
+     REAL entry in the EXTERNAL source record's own `threats[]` array, and
+     its own denormalized `source_threat_element_name`/
+     `source_threat_category` must MATCH what is actually stored there --
+     enforced by the Python BUILDER against the real, raw external record
+     (`ai_lego/modules/security/security_control_mapping.py`,
+     `generate_security_control_mapping_record`'s own `source_record`
+     parameter) and, WHEN the same raw external record is supplied to it,
+     by the GATE too (`evaluate_security_control_mapping_integrity_gate`'s
+     own OPTIONAL `source_record` keyword) -- disclosed honestly as
+     OPTIONAL at the gate layer (no prior F20 gate signature takes an extra
+     parameter at all, confirmed by grep), because a gate re-checking a
+     STORED record in isolation cannot, by construction, reach outside its
+     own JSON payload to fetch a sibling record's live content. When
+     `source_record` is NOT supplied, the gate still re-derives a real,
+     weaker, fully self-contained invariant: that `control_mappings[]`'s own
+     covered threat indices and `source_threats_with_no_control_mapping`'s
+     own indices partition a contiguous `0..N-1` range with no overlap and
+     no gap -- see method contract's own `compilation_decisions` and
+     `open_questions` for the full honest disclosure of this two-tier gate
+     design.
+
+  `source_threats_with_no_control_mapping` is GENUINE, RE-DERIVED evidence
+  (not caller-supplied) -- the source record's own `threats[]` indices with
+  zero `control_mappings[]` entries referencing them -- the exact same
+  "surfaced as information, not enforced as a completeness requirement"
+  discipline `stride-threat-model-record.schema.yaml`'s own
+  `elements_with_no_recorded_threats` already establishes, applied here to
+  CONTROL coverage instead of THREAT coverage.
+
+  A STRUCTURAL record (`provenance_required` + one integrity gate), NOT
+  `genuine_compute`: both invariants above are set-membership/referential
+  derivations, the same class `stride-threat-model-record`'s own
+  `elements_with_no_recorded_threats` and `dpia-pia-impact-assessment-record`'s
+  own risk-traceability check already establish -- not a numeric/statistical
+  CALCULATED RESULT.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Security Control Mapping row (L891): 'Threat→Control→Evidence', usage '每個威脅對應 preventive/detective/recovery control', benefit '控制可稽核、可測' -- the method's ONLY citation, no dedicated section exists"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487): 'STRIDE → LINDDUN → Attack Tree → Secret/Identity Review → Supply Chain Review → Control Mapping → Adversarial Test → Residual Risk → Human Security Approval' -- the real sequencing citation grounding the CONSUMPTION design"
+  - "specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml (L68-100): the threats[] shape (element_name/category/description/control/residual_risk/test_evidence) this record's own source_record_type: stride consumes, verbatim-confirmed identical to LINDDUN's own"
+  - "specs/cognitive/typed-objects/linddun-privacy-threat-model-record.schema.yaml (L78-100): the threats[] shape this record's own source_record_type: linddun consumes, confirmed identical in shape to STRIDE's own (only the category enum vocabulary differs)"
+  - "methods/contracts/security.stride.contract.yaml compilation_decisions (fourth entry) and OQ-STRIDE-5: explicitly named this method as the dedicated future home of Threat→Control→Evidence traceability, and anticipated a soft `control_mapping_ref` link -- this record's own `source_record_id`/`control_mappings[]` design directly resolves it"
+  - "methods/contracts/security.security_control_mapping.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  evidence_record:
+    type: object
+    required: [description, verified_by, verified_date]
+    additionalProperties: false
+    description: >
+      A STRUCTURED evidence record, not the flat free-text `test_evidence`
+      string every sibling F20 threat entry carries -- a deliberate
+      compilation decision (see method contract): Atlas's own benefit line
+      for THIS method specifically is "控制可稽核、可測" (auditable AND
+      testable), which a bare description string does not make concretely
+      checkable (who verified it, when). `verified_by`/`verified_date` make
+      the audit trail a real, present field, not implied prose.
+    properties:
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      verified_by:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      verified_date:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+  control_entry:
+    type: object
+    required: [control_id, category, description, evidence]
+    additionalProperties: false
+    properties:
+      control_id:
+        type: string
+        pattern: "^CTRL-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      category:
+        enum: [preventive, detective, recovery]
+        description: "Atlas's own literal three-word F20 usage-column vocabulary (L891: 'preventive/detective/recovery control'), transcribed verbatim as a closed machine enum. Belongs to the CONTROL itself (not per-mapping): a control's own preventive/detective/recovery nature is intrinsic (e.g. a WAF is always preventive), not dependent on which specific threat it happens to be mapped against -- see method contract compilation_decisions."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      evidence:
+        $ref: "#/$defs/evidence_record"
+
+  control_mapping_entry:
+    type: object
+    required: [source_threat_index, source_threat_element_name, source_threat_category, control_id]
+    additionalProperties: false
+    description: >
+      The Threat→Control EDGE. `source_threat_index`/`element_name`/
+      `category` are a denormalized POINTER into the EXTERNAL source
+      record's own `threats[]` array (index-addressed because neither
+      STRIDE's nor LINDDUN's own `threat` shape carries a unique per-threat
+      id field -- confirmed by direct read of both schemas -- so position is
+      the only unambiguous handle). `element_name`/`category` are carried
+      here too purely for human readability and as a genuine consistency
+      check target (the runtime layer confirms they match what the index
+      actually resolves to in the real source record when it is supplied),
+      not as the primary key.
+    properties:
+      source_threat_index:
+        type: integer
+        minimum: 0
+      source_threat_element_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      source_threat_category:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      control_id:
+        type: string
+        pattern: "^CTRL-"
+        description: "Must name a real entry in this record's own controls[] -- enforced at the runtime layer, not here. Many-to-many: one control may mitigate several source threats (a shared control), and one source threat may be mitigated by several controls (defense in depth) -- neither direction is restricted to exactly one."
+
+  unmapped_source_threat:
+    type: object
+    required: [source_threat_index, source_threat_element_name, source_threat_category]
+    additionalProperties: false
+    description: "Same three denormalized pointer fields as control_mapping_entry, minus control_id (there is none, by definition, for an unmapped threat)."
+    properties:
+      source_threat_index: {type: integer, minimum: 0}
+      source_threat_element_name: {type: string, minLength: 1, pattern: "\\S"}
+      source_threat_category: {type: string, minLength: 1, pattern: "\\S"}
+
+type: object
+required: [id, version, system_or_component, source_record_id, source_record_type, source_threat_count, controls, control_mappings, source_threats_with_no_control_mapping, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^SCM-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.security_control_mapping"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Independently declared, not cross-checked for exact-string equality against source_record's own system_or_component -- same 'no invented 1:1 correspondence' restraint security.stride.contract.yaml's own OQ-STRIDE-3 already applies to assets/entry_points vs data_flow_elements."
+  source_record_id:
+    type: string
+    pattern: "^(STRIDE|LINDDUN)-"
+    description: "Soft reference (pattern-checked, not a hard $ref -- the same class dpia-pia-impact-assessment-record.schema.yaml's own jurisdiction_pack_ref already establishes) to the EXTERNAL StrideThreatModelRecord or LinddunPrivacyThreatModelRecord this mapping covers. MUST equal that record's own top-level id -- enforced at the runtime layer when the real record is supplied to the builder."
+  source_record_type:
+    enum: [stride, linddun]
+    description: "The only two F20 siblings directly confirmed (by reading both schemas) to expose an identical flat threats[] shape addressable by this record's own control_mappings[] design. Attack Tree (a recursive AND/OR tree, no flat threats[] list) and PASTA (a single fixed-length pipeline with ONE terminal risk verdict, not per-threat) are confirmed, by direct read of both schemas, structurally incompatible with this shape -- disclosed as a real scope limit in open_questions, not silently ignored."
+  source_threat_count:
+    type: integer
+    minimum: 1
+    description: "The TOTAL number of threats[] entries in the external source_record at construction time (len(source_record['threats'])), re-derived and compared fresh by the builder every time. Exists so the gate's own WEAKER, self-contained mode (no live source_record supplied) has an authoritative N to check control_mappings[]/source_threats_with_no_control_mapping's own combined index coverage against, instead of reconstructing N purely from whichever indices happen to still be present -- closing a real gap where deleting the LAST unmapped entry could otherwise leave the remaining indices looking accidentally contiguous."
+  controls:
+    type: array
+    minItems: 1
+    description: "The Control→Evidence half of Atlas's own 'Threat→Control→Evidence' chain. A control catalog entry may exist even before every threat it could mitigate is mapped (see open_questions)."
+    items:
+      $ref: "#/$defs/control_entry"
+  control_mappings:
+    type: array
+    minItems: 1
+    description: "The Threat→Control half of Atlas's own chain -- at least one real mapping, or this record has nothing to say. No duplicate (source_threat_index, control_id) pair -- enforced at the runtime layer, not here."
+    items:
+      $ref: "#/$defs/control_mapping_entry"
+  source_threats_with_no_control_mapping:
+    type: array
+    default: []
+    description: "GENUINE, RE-DERIVED evidence, not caller-supplied -- the source record's own threats[] indices with zero control_mappings[] entries referencing them. Surfaces Atlas's own '控制可稽核、可測' benefit as a completeness SIGNAL (which threats still lack an audited, tested control), the same 'information, not an enforced requirement' discipline stride-threat-model-record.schema.yaml's own elements_with_no_recorded_threats already establishes."
+    items:
+      $ref: "#/$defs/unmapped_source_threat"
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a control classification and its evidence-sufficiency judgment is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      A checkout API's own STRIDE record (the SAME real example
+      stride-threat-model-record.schema.yaml's own first example carries,
+      id STRIDE-2026-09-06-001, one threat against checkout_api_process)
+      fully covered by TWO controls (preventive + detective, defense in
+      depth) -- source_threats_with_no_control_mapping is empty because
+      that STRIDE record's own single threat is fully mapped.
+    value:
+      id: "SCM-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.security_control_mapping"
+      system_or_component: "checkout-api order processing service, control-mapping pass"
+      source_record_id: "STRIDE-2026-09-06-001"
+      source_record_type: stride
+      source_threat_count: 1
+      controls:
+        - control_id: "CTRL-001"
+          category: preventive
+          description: "Role checks enforced server-side via a shared authorization middleware, not client-supplied claims."
+          evidence: {description: "Authorization bypass test suite, run AUTHZ-2026-09-01, zero bypasses found.", verified_by: "Security Engineering", verified_date: "2026-09-01"}
+        - control_id: "CTRL-002"
+          category: detective
+          description: "Anomalous role-elevation attempts against checkout_api_process are alerted via the audit log pipeline within 5 minutes."
+          evidence: {description: "Alert fired and confirmed within SLA during the same AUTHZ-2026-09-01 red-team exercise.", verified_by: "Security Engineering", verified_date: "2026-09-01"}
+      control_mappings:
+        - {source_threat_index: 0, source_threat_element_name: "checkout_api_process", source_threat_category: "elevation_of_privilege", control_id: "CTRL-001"}
+        - {source_threat_index: 0, source_threat_element_name: "checkout_api_process", source_threat_category: "elevation_of_privilege", control_id: "CTRL-002"}
+      source_threats_with_no_control_mapping: []
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: >
+      A minimal LINDDUN-sourced record with TWO threats, only the first
+      mapped -- source_threats_with_no_control_mapping genuinely surfaces
+      the second, unmapped one as information, not a validation failure.
+    value:
+      id: "SCM-2026-09-06-002"
+      version: "1.0.0"
+      generated_by_method: "security.security_control_mapping"
+      system_or_component: "shared vector index privacy review, control-mapping pass"
+      source_record_id: "LINDDUN-2026-09-06-001"
+      source_record_type: linddun
+      source_threat_count: 2
+      controls:
+        - control_id: "CTRL-001"
+          category: preventive
+          description: "Query embeddings are k-anonymized before being written to the shared vector index."
+          evidence: {description: "k-anonymity parameter audit, k=25 minimum enforced in the ingestion pipeline.", verified_by: "Privacy Engineering", verified_date: "2026-09-06"}
+      control_mappings:
+        - {source_threat_index: 0, source_threat_element_name: "shared_vector_index", source_threat_category: "identification", control_id: "CTRL-001"}
+      source_threats_with_no_control_mapping:
+        - {source_threat_index: 1, source_threat_element_name: "shared_vector_index", source_threat_category: "linkability"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: >
+    Read Atlas F20 tool table row (L891) directly -- the method's ONLY
+    citation, confirmed by grep across §11.x/§12.x/§13.x that no dedicated
+    section exists. Read Atlas §13.11 Security Review Recipe (L3472-3487)
+    directly for the sequencing evidence grounding the consumption design.
+    Read both stride-threat-model-record.schema.yaml and
+    linddun-privacy-threat-model-record.schema.yaml in full to confirm their
+    threats[] shapes are identical (both require exactly
+    [element_name, category, description, control, residual_risk,
+    test_evidence]). Read attack-tree-record.schema.yaml and
+    pasta-threat-model-record.schema.yaml in full to confirm they are
+    structurally incompatible with this shape (recursive tree; single
+    fixed-length pipeline verdict respectively) before excluding them from
+    source_record_type. Grepped every ai_lego/modules/*/*.py gate function
+    signature for an extra parameter beyond (record, validator, timestamp)
+    -- zero hits -- before disclosing this record's own cross-record gate
+    design as genuinely new. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator... (record schema itself validated with
+    the same tool).
+  note: >
+    No mother document was modified. Atlas's own three-word usage/benefit
+    phrase (L891) is transcribed verbatim as the category enum and as the
+    evidence-must-be-auditable-and-testable design rationale. The
+    consumption design (source_record_id/source_record_type referencing an
+    EXTERNAL sibling record rather than a standalone threats[]/controls[]
+    array) is a disclosed compilation decision grounded in three real
+    citations (Atlas's own grammar, §13.11's sequencing, and
+    security.stride.contract.yaml's own explicit forward-pointer), not
+    Atlas's own explicit structural instruction -- Atlas gives this method
+    no dedicated section to transcribe a formula from. Both real invariants
+    (within-record control_id referential integrity, cross-record
+    source_threat_index/element_name/category integrity) are enforced at
+    the runtime layer (ai_lego/modules/security/security_control_mapping.py),
+    not the schema layer -- JSON Schema alone cannot check membership
+    against an ARRAY IN A DIFFERENT DOCUMENT.

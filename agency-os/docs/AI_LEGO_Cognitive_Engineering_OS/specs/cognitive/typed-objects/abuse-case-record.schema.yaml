@@ -1,0 +1,265 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/abuse-case-record.schema.yaml"
+title: Abuse Case Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AbuseCaseRecord` -- the
+  declared `outputs` of `security.abuse_case`'s Method Contract. Ninth
+  of Atlas's own ten F20 table rows by table position; see the method
+  contract's own description for the full due-diligence trail (Atlas
+  F20 table row L890, the ONLY citation for this method; this
+  repository's own two real usage precedents in
+  docs/architecture/SECURITY_THREAT_MODEL.md).
+
+  Atlas's own five-word F20 row ("actor→goal→abuse flow→controls
+  →detection") is transcribed verbatim as `stages`, a fixed-length
+  -five, POSITIONALLY ORDERED tuple -- the same "ordered pipeline"
+  structural class `pasta-threat-model-record.schema.yaml` and
+  `dpia-pia-impact-assessment-record.schema.yaml` already establish,
+  enforced via `prefixItems` exactly as those sibling schemas do.
+
+  UNLIKE those two siblings, the THIRD stage (`abuse_flow`) itself
+  nests a VARIABLE-length ordered sub-array of narrated steps (no fixed
+  Atlas-given step vocabulary exists to enforce a fixed count against,
+  unlike DPIA/PIA's own fixed eight-stage vocabulary) -- and Atlas's
+  own chain names NO terminal decision/verdict element (contrast DPIA
+  /PIA's own "Approval" and PASTA's own "Risk" verdict); an Abuse Case
+  record is a completed DESCRIPTIVE artifact, not a decision gate.
+
+  Because `assets`/`trust_boundaries`/`entry_points`/`test_evidence`
+  are an EC §32 artifact and Abuse Case is grep-confirmed absent from
+  BOTH EC §32's own four named Threat Review methods AND Atlas's own
+  §13.11 Security Review Recipe, this record carries NONE of them --
+  the SECOND F20 typed object (after DPIA/PIA) to omit that quad (see
+  the method contract's own description and `open_questions` for the
+  proposed `security.stride.contract.yaml` `OQ-STRIDE-4` update).
+
+  ONE real invariant, in TWO independent directions, grounded DIRECTLY
+  in Atlas's own citation (a stronger basis than DPIA/PIA's own two
+  invariants, which are disclosed as real external GDPR/DPIA practice,
+  NOT an Atlas citation): Atlas's own chain names `controls` and
+  `detection` as TWO SEPARATE, DISTINCT final elements, not one merged
+  "mitigation" step. Consequently, EVERY `step_id` declared in the
+  `abuse_flow` stage MUST be addressed by AT LEAST ONE `controls` entry
+  AND, INDEPENDENTLY, by AT LEAST ONE `detection` entry; conversely
+  every `addresses_step_ids` entry inside a control or a detection MUST
+  reference a real, declared `step_id`. A step with a control but zero
+  detection (or vice versa) is an INCOMPLETE abuse case under this
+  schema -- collapsing the two arrays into one would silently discard
+  one of Atlas's own five named chain elements.
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity
+  gate), NOT `genuine_compute` -- the dual completeness invariant is a
+  set-membership/referential derivation, the same class STRIDE/LINDDUN's
+  own `elements_with_no_recorded_threats` and DPIA/PIA's own
+  risk-traceability already establish, not a numeric/ordinal
+  computation like `attack-tree-record.schema.yaml`'s own cost/skill
+  /detectability aggregation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Abuse Case row (L890): 'actor→goal→abuse flow→controls→detection', benefit '補足正常 use case' -- the ONLY citation for this method"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md T1 row + docs/adr/ADR-015-supply-chain-security-tooling-selection.md Sub-decision (b): real, CLOSED abuse case (Sigstore keyless signing control + Rekor transparency-log detection) this record's own CLI demo models, and which VALIDATES against this schema"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md T2/E4/Uw1 rows + Prioritized Threat List item 6: real, STILL-OPEN abuse case (a control exists, but explicitly no landed detection mechanism) this record's own CLI demo models, and which is REFUSED by this schema's own runtime-enforced invariant"
+  - "methods/contracts/security.abuse_case.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  narrative_stage:
+    type: object
+    required: [stage_id, summary]
+    additionalProperties: false
+    properties:
+      stage_id:
+        enum: [actor, goal]
+        description: "Two of Atlas's own five §F20-row words, transcribed verbatim. Deliberately minimal (stage_id/summary only), the same restraint security.pasta.contract.yaml's and security.dpia_pia.contract.yaml's own compilation_decisions already apply -- Atlas names the STAGES, not any per-stage sub-structure (see OQ-ABUSECASE-3 for the disclosed limit against richer external misuse-case methodology)."
+      summary:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+  abuse_flow_step:
+    type: object
+    required: [step_id, description]
+    additionalProperties: false
+    properties:
+      step_id:
+        type: string
+        pattern: "^STEP-"
+      description: {type: string, minLength: 1, pattern: "\\S"}
+
+  abuse_flow_stage:
+    type: object
+    required: [stage_id, steps]
+    additionalProperties: false
+    properties:
+      stage_id: {const: abuse_flow}
+      steps:
+        type: array
+        minItems: 1
+        description: "VARIABLE-length ordered array, declared in narrated (attacker-performed) order. No fixed count or vocabulary -- Atlas gives none for this method's own third chain element. step_id values must be unique within one abuse_flow (checked at the runtime layer, not expressible as a pure JSON Schema constraint here)."
+        items: {$ref: "#/$defs/abuse_flow_step"}
+
+  control_entry:
+    type: object
+    required: [control_id, description, addresses_step_ids]
+    additionalProperties: false
+    properties:
+      control_id:
+        type: string
+        pattern: "^CTRL-"
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      addresses_step_ids:
+        type: array
+        minItems: 1
+        items: {type: string, pattern: "^STEP-"}
+        description: "Every entry must reference a step_id declared in the abuse_flow stage -- checked at the runtime layer (schema alone cannot cross-reference a sibling array)."
+
+  controls_stage:
+    type: object
+    required: [stage_id, controls]
+    additionalProperties: false
+    properties:
+      stage_id: {const: controls}
+      controls:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/control_entry"}
+
+  detection_entry:
+    type: object
+    required: [detection_id, description, addresses_step_ids]
+    additionalProperties: false
+    properties:
+      detection_id:
+        type: string
+        pattern: "^DET-"
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      addresses_step_ids:
+        type: array
+        minItems: 1
+        items: {type: string, pattern: "^STEP-"}
+        description: "Every entry must reference a step_id declared in the abuse_flow stage -- checked at the runtime layer, same as controls above. INDEPENDENT of controls_stage's own coverage -- Atlas names detection as its own distinct chain element, not a subtype of controls."
+
+  detection_stage:
+    type: object
+    required: [stage_id, detections]
+    additionalProperties: false
+    properties:
+      stage_id: {const: detection}
+      detections:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/detection_entry"}
+
+type: object
+required: [id, version, system_or_component, stages, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^ABUSE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.abuse_case"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The system/component under review AND, doubling as Atlas's own benefit line ('補足正常 use case'), an implicit reference to the normal use case this abuse case complements -- no separate field invented for that (see method contract's own compilation_decisions)."
+  stages:
+    type: array
+    minItems: 5
+    maxItems: 5
+    description: >
+      Atlas's own five-word F20 row, AS AN ORDERED TUPLE, mirroring
+      pasta-threat-model-record.schema.yaml's and dpia-pia-impact
+      -assessment-record.schema.yaml's own prefixItems discipline.
+      stages[0] MUST be the actor stage, stages[4] MUST be the
+      detection stage, and so on -- Atlas's '→' is a dependency chain,
+      not a set.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/narrative_stage"}, {properties: {stage_id: {const: actor}}}]
+      - allOf: [{$ref: "#/$defs/narrative_stage"}, {properties: {stage_id: {const: goal}}}]
+      - $ref: "#/$defs/abuse_flow_stage"
+      - $ref: "#/$defs/controls_stage"
+      - $ref: "#/$defs/detection_stage"
+    items: false
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- an abuse case review is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A real, CLOSED abuse case: SECURITY_THREAT_MODEL.md's own T1 threat (Supply Chain 簽章金鑰 tampering), closed by ADR-015's keyless signing control and its own Rekor transparency-log detection mechanism"
+    value:
+      id: "ABUSE-2026-09-06-SC-001"
+      version: "1.0.0"
+      generated_by_method: "security.abuse_case"
+      system_or_component: "CI/CD Artifact Signing & Deployment Pipeline (Source→Signed Commit→CI→SBOM→Dependency Scan→Artifact Signing→Verified Deployment, Master Plan §66)"
+      stages:
+        - {stage_id: actor, summary: "External attacker, or a compromised CI credential holder, able to interact with the CI/CD pipeline -- e.g. one who has phished or exfiltrated a long-lived signing key, or an insider with CI access (SECURITY_THREAT_MODEL.md T1, P1-GAP-SEC-2 / P1-RISK-SEC-4)."}
+        - {stage_id: goal, summary: "Get a malicious or unauthorized artifact accepted as 'Verified Deployment' by the pipeline's own signature gate, or obtain long-lived signing key material for reuse in a future forgery, without detection."}
+        - stage_id: abuse_flow
+          steps:
+            - {step_id: "STEP-1", description: "Attacker attempts to obtain or exfiltrate a long-lived CI artifact-signing private key -- the classic supply-chain key-theft target SECURITY_THREAT_MODEL.md T1 names as P1-RISK-SEC-4."}
+            - {step_id: "STEP-2", description: "Attacker uses (or attempts to forge, absent a real key) a signature over a malicious artifact, presenting it to the deployment gate as 'Verified Deployment'."}
+            - {step_id: "STEP-3", description: "If the forged/stolen-key artifact passes the gate, it is deployed to production, achieving the actor's goal undetected."}
+        - stage_id: controls
+          controls:
+            - {control_id: "CTRL-001", description: "ADR-015 Sub-decision (b): Sigstore/cosign KEYLESS signing via GitHub Artifact Attestations (OIDC short-lived credentials + Fulcio) -- no long-lived private key exists in the system to steal, structurally eliminating STEP-1's own attack surface rather than merely mitigating it.", addresses_step_ids: ["STEP-1"]}
+            - {control_id: "CTRL-002", description: "ADR-015 Sub-decision (c): GitHub Artifact Attestations reach SLSA Build L2 by default on GitHub-hosted runners -- the deployment gate verifies a real Sigstore/cosign signature and its OIDC-issued Fulcio certificate before accepting an artifact as 'Verified Deployment', refusing a forged or unsigned artifact at STEP-2/STEP-3.", addresses_step_ids: ["STEP-2", "STEP-3"]}
+        - stage_id: detection
+          detections:
+            - {detection_id: "DET-001", description: "Sigstore keyless signing (ADR-015 Sub-decision (b)) requires a live OIDC-authenticated request against Fulcio at sign time and publishes the resulting signature event to Rekor, a public append-only transparency log -- named explicitly in SECURITY_THREAT_MODEL.md's own T1 row ('OIDC 短期憑證 + Fulcio + Rekor 透明日誌'). Because no static key file exists to steal silently (STEP-1), any real signing attempt is a live, audit-visible OIDC/Fulcio event; and any artifact reaching 'Verified Deployment' (STEP-2/STEP-3) without a matching Rekor entry is a detectable anomaly on transparency-log audit.", addresses_step_ids: ["STEP-1", "STEP-2", "STEP-3"]}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal abuse case for a low-stakes internal service, single step, single control, single detection"
+    value:
+      id: "ABUSE-2026-09-06-MIN-001"
+      version: "1.0.0"
+      generated_by_method: "security.abuse_case"
+      system_or_component: "Internal read-only reference-data lookup service"
+      stages:
+        - {stage_id: actor, summary: "A caller with valid but overly broad read credentials attempting to enumerate the entire reference dataset beyond legitimate need."}
+        - {stage_id: goal, summary: "Bulk-exfiltrate the full reference dataset via repeated legitimate-looking read calls."}
+        - stage_id: abuse_flow
+          steps:
+            - {step_id: "STEP-1", description: "Caller issues a high volume of sequential read requests covering the full ID space of the reference table."}
+        - stage_id: controls
+          controls:
+            - {control_id: "CTRL-001", description: "Rate limiting on the read endpoint caps requests per credential per minute.", addresses_step_ids: ["STEP-1"]}
+        - stage_id: detection
+          detections:
+            - {detection_id: "DET-001", description: "Read-endpoint access logs are monitored for anomalous request-volume spikes per credential; a spike above the rate limit's own historical baseline triggers an alert.", addresses_step_ids: ["STEP-1"]}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: >
+    Read the F20 tool table's Abuse Case row (L890) directly -- the
+    method's own only citation. Read docs/architecture/SECURITY_
+    THREAT_MODEL.md in full and docs/adr/ADR-015-supply-chain-security
+    -tooling-selection.md in full for the real usage precedents.
+    Validated against jsonschema.Draft202012Validator, including the
+    positional prefixItems ordering constraint. Cross-array referential
+    completeness (every abuse_flow step_id addressed by at least one
+    control AND at least one detection, both directions) is NOT
+    expressible in JSON Schema alone (no cross-array reference
+    mechanism) -- enforced at the runtime layer only (see method
+    contract and `ai_lego/modules/security/abuse_case.py`).
+  note: >
+    No mother document was modified. Atlas's own five-word chain and
+    its own literal order are directly transcribed. The dual controls
+    -AND-detection completeness invariant is disclosed as grounded
+    DIRECTLY in Atlas's own two distinct named chain elements (a
+    stronger citation basis than DPIA/PIA's own two invariants, which
+    are real external GDPR/DPIA practice, not Atlas). Both examples are
+    drawn from this repository's own real, already-written threat
+    model, not invented for this file -- the T2/E4/Uw1 scenario that
+    this schema's own invariant REFUSES is deliberately NOT included
+    here as an example (every example above validates and passes every
+    real gate); it lives instead in
+    `ai_lego/apps/cli/run_abuse_case_slice.py` and
+    `tests/unit/test_abuse_case.py` as a construction-time refusal
+    demonstration.

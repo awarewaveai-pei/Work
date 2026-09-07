@@ -10,7 +10,11 @@ pipeline, neither the stride/linddun flat-DFD shape nor attack_tree's own recurs
 ``security.dpia_pia`` (see ``dpia_pia.py`` -- the FIRST F20 member that is NOT one of Execution Contract
 §32's own four named Threat Review methods; shares pasta.py's own ordered-pipeline class but adds
 cross-stage risk-to-control-to-residual traceability and a high-residual-risk escalation rule, both
-grounded in real external DPIA/GDPR practice, not Atlas).
+grounded in real external DPIA/GDPR practice, not Atlas), ``security.zero_trust_review``,
+``security.secrets_threat_review``, ``security.supply_chain_threat_model``, ``security.abuse_case``, and
+``security.security_control_mapping`` (see each module's own docstring) -- **F20 complete, 10/10**.
+``security_control_mapping.py`` is the family's first downstream CONSUMER, taking an existing
+``security.stride``/``security.linddun`` record as real input rather than describing a system from scratch.
 
 Not to be confused with ``ai_lego.security`` (crypto-shred key-lifecycle runtime infrastructure, a
 different concern under a same-named path segment)."""

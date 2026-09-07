@@ -1,0 +1,312 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/zero-trust-review-record.schema.yaml"
+title: Zero Trust Review Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ZeroTrustReviewRecord` -- the
+  declared `outputs` of `security.zero_trust_review`'s Method Contract.
+  SIXTH typed object in the `security` family (F20), and the SECOND F20
+  member (after `security.dpia_pia`) that is NOT one of Execution
+  Contract §32's own four named Threat Review methods -- see the method
+  contract's own description for the full due-diligence trail (Atlas
+  F20 table row L887, Atlas's own dedicated §12.37 L3027-3042, Master
+  Plan §62 L2636-2657, grep-confirmed zero EC mentions of "Zero Trust"
+  anywhere).
+
+  Atlas's own F20 table row formula
+  ("subject/workload/resource→authn/authz→short-lived credential
+  →audit") is transcribed as `stages`, a fixed-length-FOUR, POSITIONALLY
+  ORDERED tuple via `prefixItems` -- the same "ordered pipeline"
+  structural class `pasta-threat-model-record.schema.yaml` and
+  `dpia-pia-impact-assessment-record.schema.yaml` already establish, but
+  with a genuinely NEW sub-variant: position 1 (`identity_context`) is
+  itself a REQUIRED SET of three distinct, parallel sub-entities
+  (`subject`/`workload`/`resource`), not a single narrative or array
+  field -- Atlas's own "/"-joined notation names three simultaneous
+  concerns, not a 3-step sub-sequence.
+
+  Master Plan §62's own distinctive chain steps (Mutual Authentication,
+  Resource Access) and Atlas §12.37's own distinctive checklist items
+  (Least privilege, the "continuous" qualifier on logging/audit) are
+  folded in as real per-stage field enrichment within the table row's
+  own four positions -- see the method contract's own
+  `compilation_decisions` for why this is enrichment, not additional
+  top-level stages.
+
+  Because no source names `assets`/`trust_boundaries`/`entry_points`
+  for this method, this record carries NONE of them -- the SECOND F20
+  typed object to omit that triplet (after `dpia-pia-impact-assessment
+  -record.schema.yaml`), for a disclosed, more nuanced reason (this
+  method's own subject matter genuinely overlaps EC §32's own trigger
+  vocabulary, unlike DPIA/PIA's orthogonal privacy trigger, but EC §32's
+  own closing sentence is still a closed four-method list that does not
+  name this method -- see the method contract's own description).
+
+  Two invariants beyond stage completeness-and-order:
+
+  1. STAGE-1 REQUIRED SET -- `identity_context` must carry all three of
+     `subject`/`workload`/`resource`, each independently well-shaped.
+     Atlas's own F20 table row (L887).
+  2. FORBIDDEN CREDENTIAL DENYLIST -- `credential_issuance.credential_type`
+     may never be `shared_password` / `long_lived_api_key` /
+     `hardcoded_secret`, transcribed verbatim from Master Plan §62's own
+     explicit "禁止" list (L2652-2656). Unlike DPIA/PIA's own two
+     invariants (both cross-`prefixItems`-sibling referential
+     derivations JSON Schema cannot express), THIS one is a
+     single-field denylist -- expressed HERE via `not: {enum: [...]}`
+     AND re-checked at the runtime construction/gate layer, defense in
+     depth (see method contract's own `compilation_decisions`).
+
+  Three OPTIONAL, NULLABLE, FREE-TEXT (deliberately NOT `const`) soft
+  references to `policies/security/zero-trust.policy.yaml`'s own
+  ratified singleton values (ADR-016, ACCEPTED) -- `identity_context
+  .subject.idp_ref` (Zitadel, self-hosted), `identity_context.workload
+  .workload_identity_strategy_ref` ("cloud-native workload identity +
+  short-lived-credential mTLS"), `access_decision.pdp_engine_ref`
+  (Cedar). Free text, not `const`, so a genuine NON-compliance finding
+  (e.g. a legacy access path using a different engine) remains
+  representable rather than schema-illegal -- see method contract's own
+  compilation_decisions for the full reasoning. No hard `$ref` into the
+  policy file itself: `ai_lego/core/contracts/schema_contracts.py:23-36`
+  only indexes `spec_root/specs/**/*.yaml` into its registry;
+  `policies/security/zero-trust.policy.yaml` lives outside that walk
+  and could never resolve as a `$ref` target, independently re-verified
+  by direct read.
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity
+  gate), NOT `genuine_compute` -- both invariants are structural/set
+  -membership derivations, the same class STRIDE/LINDDUN/PASTA/DPIA
+  -PIA's own structural invariants already establish, not a numeric
+  /ordinal computation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Zero Trust Review row (L887): 'subject/workload/resource→authn/authz→short-lived credential→audit'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.37 (L3027-3042): unordered six-item checklist, folded in as per-stage enrichment"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §62 (L2636-2657): ordered six-step chain plus explicit forbidden-credential list (L2652-2656), the latter transcribed verbatim as the credential_type denylist"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §61 (L2607-2632): 資料分級 Public/Internal/Confidential/Restricted, reused for `resource.sensitivity_classification`"
+  - "docs/adr/ADR-016-zero-trust-workload-identity-and-pdp-selection.md + policies/security/zero-trust.policy.yaml: the three ratified values this record's own soft-reference fields quote"
+  - "methods/contracts/security.zero_trust_review.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  subject_identity:
+    type: object
+    required: [subject_id, description, idp_ref]
+    additionalProperties: false
+    properties:
+      subject_id: {type: string, minLength: 1, pattern: "\\S"}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      idp_ref:
+        type: ["string", "null"]
+        default: null
+        description: >
+          Soft reference to `policies/security/zero-trust.policy.yaml`'s
+          own `idp_provider.provider` (ratified value: `Zitadel`,
+          self-hosted -- ADR-016 Sub-decision a). Free text, not
+          `const`: records the IdP THIS specific subject actually
+          authenticated through -- a value other than "Zitadel" is a
+          real, representable non-compliance finding, not a schema
+          violation. `null` when the review did not investigate this
+          reference at all.
+
+  workload_identity_entity:
+    type: object
+    required: [workload_id, description, workload_identity_strategy_ref]
+    additionalProperties: false
+    properties:
+      workload_id: {type: string, minLength: 1, pattern: "\\S"}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      workload_identity_strategy_ref:
+        type: ["string", "null"]
+        default: null
+        description: >
+          Soft reference to `policies/security/zero-trust.policy.yaml`'s
+          own `workload_identity.strategy` (ratified value:
+          "cloud-native workload identity + short-lived-credential
+          mTLS" -- ADR-016 Sub-decision b, SPIFFE explicitly deferred).
+          Free text, not `const`, same non-compliance-representable
+          reasoning as `idp_ref` above.
+
+  resource_entity:
+    type: object
+    required: [resource_id, description, sensitivity_classification]
+    additionalProperties: false
+    properties:
+      resource_id: {type: string, minLength: 1, pattern: "\\S"}
+      description: {type: string, minLength: 1, pattern: "\\S"}
+      sensitivity_classification:
+        enum: [Public, Internal, Confidential, Restricted]
+        description: "Execution Contract §61 資料分級 (L2607-2632), reused verbatim -- the only EC content this record touches (not the §32 framing triplet, which this record does not carry)."
+
+  identity_context_stage:
+    type: object
+    required: [stage_id, subject, workload, resource]
+    additionalProperties: false
+    properties:
+      stage_id: {const: identity_context}
+      subject: {$ref: "#/$defs/subject_identity"}
+      workload: {$ref: "#/$defs/workload_identity_entity"}
+      resource: {$ref: "#/$defs/resource_entity"}
+    description: >
+      Atlas's own "subject/workload/resource" (F20 table row, L887) --
+      "/"-joined, i.e. a REQUIRED SET of three distinct, parallel
+      entities under simultaneous verification, not a 3-step
+      sub-sequence. All three required; no ordering asserted among
+      them (unlike the tuple's own outer four-position ordering).
+
+  access_decision_stage:
+    type: object
+    required: [stage_id, authn_method, authn_verified, authz_decision, least_privilege_confirmed, pdp_engine_ref]
+    additionalProperties: false
+    properties:
+      stage_id: {const: access_decision}
+      authn_method: {type: string, minLength: 1, pattern: "\\S"}
+      authn_verified: {type: boolean}
+      authz_decision: {enum: [permit, deny]}
+      least_privilege_confirmed:
+        type: boolean
+        description: "Atlas §12.37's own 'Least privilege' checklist item (L3038), folded in as real per-stage enrichment beyond the table row's bare 'authz' word."
+      pdp_engine_ref:
+        type: ["string", "null"]
+        default: null
+        description: >
+          Soft reference to `policies/security/zero-trust.policy.yaml`'s
+          own `pdp_engine.engine` (ratified value: `Cedar` -- ADR-016
+          Sub-decision c), also grounded in Master Plan §62's own
+          "Policy Decision" step (L2647) and Atlas §12.37's own
+          "Explicit policy decision" item (L3039). Free text, not
+          `const`: records the engine THIS decision actually used --
+          a non-Cedar value is a real, representable finding, not a
+          schema violation.
+
+  credential_issuance_stage:
+    type: object
+    required: [stage_id, credential_type, ttl_seconds, issued_at, mutual_authentication_confirmed]
+    additionalProperties: false
+    properties:
+      stage_id: {const: credential_issuance}
+      credential_type:
+        type: string
+        pattern: "^[a-z][a-z0-9_]*$"
+        not: {enum: [shared_password, long_lived_api_key, hardcoded_secret]}
+        description: >
+          Master Plan §62's own explicit "禁止" denylist (L2652-2656) --
+          Shared Password / Long-lived API Key / Hard-coded Secret --
+          transcribed as three canonical snake_case values and DENIED
+          outright at the schema layer (re-checked at the runtime
+          construction/gate layer too, defense in depth). Any OTHER
+          slug (e.g. `mtls_short_lived_cert`, `oauth_token`,
+          `spiffe_svid`) is legal -- Atlas's own F20 row (L887) and
+          Master Plan §62's own "Short-lived Credentials" step (L2645)
+          name a required PROPERTY (short-lived), not a closed
+          allowlist of mechanisms.
+      ttl_seconds:
+        type: integer
+        minimum: 1
+        description: "Real short-lived-credential practice, not an Atlas-cited number -- no citation names an actual threshold; only a positive-integer floor is enforced (see method contract's own compilation_decisions)."
+      issued_at: {type: string, minLength: 1, pattern: "\\S"}
+      mutual_authentication_confirmed:
+        type: boolean
+        description: "Master Plan §62's own 'Mutual Authentication' step (L2643), folded in here -- tightly coupled to the ratified mTLS-based workload_identity_strategy_ref."
+
+  audit_trail_stage:
+    type: object
+    required: [stage_id, audit_log_ref, continuous_monitoring_confirmed, resource_access_granted]
+    additionalProperties: false
+    properties:
+      stage_id: {const: audit_trail}
+      audit_log_ref: {type: string, minLength: 1, pattern: "\\S"}
+      continuous_monitoring_confirmed:
+        type: boolean
+        description: "Atlas §12.37's own 'Continuous logging / audit' item (L3040) -- the 'continuous' qualifier is real content beyond the table row's bare 'audit' word."
+      resource_access_granted:
+        type: boolean
+        description: "Master Plan §62's own terminal 'Resource Access' step (L2649) -- whether access to the resource named in identity_context was actually granted following the policy decision."
+
+type: object
+required: [id, version, system_or_component, stages, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^ZTR-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "security.zero_trust_review"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  stages:
+    type: array
+    minItems: 4
+    maxItems: 4
+    description: >
+      Atlas's own F20 table row (L887), AS AN ORDERED TUPLE. stages[0]
+      MUST be identity_context, stages[1] access_decision, stages[2]
+      credential_issuance, stages[3] audit_trail -- Atlas's own '→' is
+      a dependency chain, not a set (though stages[0]'s OWN internal
+      subject/workload/resource trio IS an unordered set -- see
+      identity_context_stage above).
+    prefixItems:
+      - $ref: "#/$defs/identity_context_stage"
+      - $ref: "#/$defs/access_decision_stage"
+      - $ref: "#/$defs/credential_issuance_stage"
+      - $ref: "#/$defs/audit_trail_stage"
+    items: false
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a Zero Trust Review is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An ILLUSTRATIVE, fully-compliant Zero Trust Review, grounded in ADR-016's own real ratified values -- NOT a claim that a real deployed access path was reviewed (ADR-016's own Migration section states infrastructure build-out is future work, not yet done)"
+    value:
+      id: "ZTR-2026-09-06-001"
+      version: "1.0.0"
+      generated_by_method: "security.zero_trust_review"
+      system_or_component: "AI agent invoking a Method Atlas capability against the tenant Event Ledger, as specified to comply with ADR-016 once its ratified infrastructure is deployed"
+      stages:
+        - stage_id: identity_context
+          subject: {subject_id: "agent:cognitive-os-runtime-001", description: "AI agent executing an ai_lego method invocation on behalf of a tenant operator.", idp_ref: "Zitadel"}
+          workload: {workload_id: "workload:ai-lego-method-executor", description: "The method-execution workload process that performs the invocation.", workload_identity_strategy_ref: "cloud-native workload identity + short-lived-credential mTLS"}
+          resource: {resource_id: "resource:event-ledger-nordbrook", description: "The tenant's append-only Event Ledger.", sensitivity_classification: Confidential}
+        - stage_id: access_decision
+          authn_method: "mTLS client certificate, issued by the cloud-native workload identity provider"
+          authn_verified: true
+          authz_decision: permit
+          least_privilege_confirmed: true
+          pdp_engine_ref: "Cedar"
+        - stage_id: credential_issuance
+          credential_type: "mtls_short_lived_cert"
+          ttl_seconds: 3600
+          issued_at: "2026-09-06T00:00:00Z"
+          mutual_authentication_confirmed: true
+        - stage_id: audit_trail
+          audit_log_ref: "ledger://nordbrook/audit/2026-09-06-001"
+          continuous_monitoring_confirmed: true
+          resource_access_granted: true
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+verification:
+  method: >
+    Read Atlas's F20 table row (L887), Atlas's own dedicated §12.37
+    (L3027-3042), and Master Plan §62 (L2636-2657) directly. Read
+    ADR-016 and `policies/security/zero-trust.policy.yaml` in full
+    before writing any soft-reference field. Validated against
+    jsonschema.Draft202012Validator, including the positional
+    prefixItems ordering constraint and the credential_type denylist.
+    The stage-1 required-set shape and the denylist are BOTH also
+    enforced at the runtime layer (see method contract and
+    `ai_lego/modules/security/zero_trust_review.py`), defense in depth.
+  note: >
+    Atlas's own four-position F20 table row chain is directly
+    transcribed as `stages[].stage_id`. Master Plan §62's own explicit
+    forbidden-credential list is transcribed verbatim as the
+    credential_type denylist. Master Plan §62's and Atlas §12.37's own
+    remaining distinctive content are disclosed as per-stage field
+    enrichment, not presented as if the table row itself named them.
+    No mother document was modified.

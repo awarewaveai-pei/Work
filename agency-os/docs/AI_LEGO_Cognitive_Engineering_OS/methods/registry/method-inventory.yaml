@@ -1185,55 +1185,65 @@ by_document:
         has_contract: false
         contract_status: pending
       - name: "STRIDE"
-        line: 879
-        category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "Attack Tree"
-        line: 880
-        category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "PASTA"
-        line: 881
-        category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "LINDDUN"
         line: 882
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "DPIA / PIA"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.stride"
+      - name: "Attack Tree"
         line: 883
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "Zero Trust Review"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.attack_tree"
+      - name: "PASTA"
         line: 884
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "Secrets Threat Review"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.pasta"
+      - name: "LINDDUN"
         line: 885
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "Supply Chain Threat Model"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.linddun"
+      - name: "DPIA / PIA"
         line: 886
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "Abuse Case"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.dpia_pia"
+      - name: "Zero Trust Review"
         line: 887
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
-      - name: "Security Control Mapping"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.zero_trust_review"
+      - name: "Secrets Threat Review"
         line: 888
         category: "F20 security"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.secrets_threat_review"
+      - name: "Supply Chain Threat Model"
+        line: 889
+        category: "F20 security"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.supply_chain_threat_model"
+      - name: "Abuse Case"
+        line: 890
+        category: "F20 security"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.abuse_case"
+      - name: "Security Control Mapping"
+        line: 891
+        category: "F20 security"
+        has_contract: true
+        contract_status: complete
+        machine_id: "security.security_control_mapping"
       - name: "ERD"
         line: 896
         category: "F21 database-data"

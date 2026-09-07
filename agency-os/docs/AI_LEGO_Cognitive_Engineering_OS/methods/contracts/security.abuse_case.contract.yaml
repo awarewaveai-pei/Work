@@ -1,0 +1,507 @@
+$id: "ai-lego://methods/contracts/security.abuse_case.contract.yaml"
+title: "Abuse Case Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. Fifty-second Method Atlas slice (task-assigned
+  ordinal), NINTH of Atlas's own TEN F20 table rows by table position
+  (STRIDE, Attack Tree, PASTA, LINDDUN, DPIA/PIA, Zero Trust Review,
+  Secrets Threat Review, Supply Chain Threat Model, **Abuse Case**,
+  Security Control Mapping -- L882-891). Four other F20 rows (Zero Trust
+  Review, Secrets Threat Review, Supply Chain Threat Model, Security
+  Control Mapping) are being built CONCURRENTLY by separate agents in
+  this same session -- this file does not assert a specific relative
+  build-order or "Nth security-family member" ordinal among them (only
+  the task-assigned "52nd Method Atlas slice overall", which is fixed
+  regardless of sibling commit timing), to avoid a claim that could go
+  stale the moment a sibling agent's own commit lands.
+
+  **Atlas gives this method exactly ONE citation** -- the F20 tool
+  table's own row (L890: purpose "從惡意使用者角度描述濫用"; usage
+  "actor→goal→abuse flow→controls→detection"; benefit "補足正常 use
+  case"). Broad, independent grep across the Method Atlas, the Master
+  Plan, and the Execution Contract (case-sensitive and
+  case-insensitive, "Abuse Case"/"misuse case"/"惡意使用者"/"abuse
+  flow"/"濫用") found NO dedicated section (unlike STRIDE's §11.44,
+  LINDDUN's §11.45, or DPIA/PIA's §11.46), NO worked example, and NO
+  second mention anywhere in either mother document. This is the SAME
+  "thinnest grounding" class `security.pasta.contract.yaml` already
+  establishes, one citation only -- re-confirmed independently for this
+  method rather than assumed from that precedent.
+
+  **Confirmed absent from BOTH of Atlas's own security recipes, not
+  just from Execution Contract §32's four named Threat Review
+  methods**: EC §32's own closing sentence (L1260, re-verified by
+  direct read) names exactly "STRIDE／LINDDUN／Attack Tree／PASTA", no
+  fifth option -- Abuse Case is absent, the SAME class of absence
+  `security.dpia_pia.contract.yaml` already established for DPIA/PIA.
+  Additionally, and NEWLY confirmed for this method specifically (Atlas
+  §13.11 Security Review Recipe, L3472-3487, re-read directly at its
+  CURRENT line numbers rather than trusting a stale citation): "Asset
+  Inventory → Data Flow Diagram → Trust Boundaries → STRIDE → LINDDUN →
+  Attack Tree → Secret/Identity Review → Supply Chain Review → Control
+  Mapping → Adversarial Test → Residual Risk → Human Security Approval"
+  -- a twelve-step recipe that ALSO never names Abuse Case (nor DPIA
+  /PIA). Abuse Case's own trigger (modeling a malicious actor's usage of
+  an ALREADY-DEFINED normal use case, per its own benefit line "補足
+  正常 use case") is a genuinely different kind of artifact from EC
+  §32's authn/authz/secrets/crypto/network/egress/tenant-isolation
+  /file-parsing/user-content/AI-tools trigger list -- it presupposes a
+  use-case model already exists to be complemented, not a system-wide
+  Threat Review gate of its own. Consequently, following
+  `security.dpia_pia.contract.yaml`'s own precedent and reasoning
+  exactly, this record carries NONE of
+  `assets`/`trust_boundaries`/`entry_points`/`test_evidence` -- the
+  SECOND F20 typed object (after DPIA/PIA) to omit that quad entirely,
+  further narrowing `security.stride.contract.yaml`'s own `OQ-STRIDE-4`
+  (see `open_questions` below for the exact `resolved_by` text this
+  file proposes appending there).
+
+  **Confirmed distinct from every existing `specs/security/` typed
+  object** (`key-vault-lifecycle`, `log-redaction-token`,
+  `personal-data-envelope`, `tenant-isolation-controls`), re-confirmed
+  by direct full read: all four are narrower, specific security-CONTROL
+  records (a key lifecycle state machine, a token shape, an encryption
+  envelope, an isolation-model decision record) -- none models an
+  actor-goal-flow narrative review of the kind this method's own
+  "actor→goal→abuse flow→controls→detection" chain names. No
+  duplication found.
+
+  **Real usage precedent in THIS repository, drawn from an ALREADY
+  -DOCUMENTED threat, not invented from scratch (same due-diligence
+  bar `security.dpia_pia.contract.yaml`'s own ADR-002 precedent
+  already sets, itself stronger than `security.pasta.contract.yaml`'s
+  own admittedly-fabricated example)**:
+  `docs/architecture/SECURITY_THREAT_MODEL.md` (Status: PROPOSED,
+  2026-08-29, this repository's own real STRIDE+LINDDUN threat review)
+  names TWO real scenarios this contract's own CLI demo models
+  directly, chosen because they land on OPPOSITE sides of this
+  contract's own central invariant (see below):
+
+  1. **T1 (Tampering, Supply Chain 簽章金鑰) / `docs/adr/ADR-015
+     -supply-chain-security-tooling-selection.md`** -- a REAL, CLOSED
+     threat: an attacker (or compromised CI credential) attempting to
+     steal a long-lived CI signing key or forge a "Verified Deployment"
+     signature. ADR-015 Sub-decision (b) (ACCEPTED 2026-08-30) adopts
+     Sigstore/cosign KEYLESS signing via GitHub Artifact Attestations
+     (OIDC short-lived credentials + Fulcio) -- SECURITY_THREAT_MODEL
+     .md's own T1 row (UPDATED 2026-08-30) states this "結構性改變原始
+     威脅...keyless 簽章不存在需要長期保管的 CI 簽章私鑰...改用 OIDC
+     短期憑證 + Fulcio + Rekor 透明日誌", explicitly naming Rekor's
+     public, append-only transparency log as the mechanism that makes
+     every real signing event independently auditable. This is a
+     genuine abuse case with BOTH a real control (no static key exists
+     to steal) AND a real, named detection mechanism (Rekor transparency
+     log) -- it VALIDATES cleanly against this contract's own
+     completeness invariant (see below).
+  2. **T2 / E4 / Uw1 (Tampering / Elevation of Privilege / Unawareness,
+     Untrusted Content → AI 決策流 → Knowledge Memory)** -- a REAL,
+     STILL-OPEN gap, Prioritized Threat List item 6
+     ("須在記憶子系統 ingestion pipeline 設計前解決"): a prompt-injection
+     attacker manipulates an AI agent's tool-call decision and/or
+     poisons Knowledge Memory with attacker-controlled content that
+     persists as if verified. SECURITY_THREAT_MODEL.md's own T2
+     Residual Risk column is explicit: "原則存在但無落地機制：無
+     untrusted span 標記方案，無說明該標記能否在寫入 Knowledge Memory
+     後存活" -- EC §35's structural principle (Policy/System
+     Instructions ≠ Retrieved Source Data) exists, but NO landed
+     detection mechanism exists for this abuse pathway anywhere in this
+     repository. Modeled faithfully (not weakened or strengthened to
+     make a point), this abuse case is REFUSED by this contract's own
+     construction-time invariant -- not because the record is malformed,
+     but because Atlas's own two named final chain elements (`controls`
+     AND `detection`) are genuinely, honestly NOT both present for this
+     real, disclosed gap. This is a STRONGER due-diligence result than
+     either `security.pasta` or `security.dpia_pia` achieved: rather
+     than merely finding a real scenario that happens to validate, this
+     slice's own CLI demo proves its invariant is not toothless by
+     showing it correctly REFUSE a genuine, currently-open gap this
+     repository's own threat model already discloses.
+
+  **The core real invariant, directly grounded in Atlas's own citation
+  itself (STRONGER grounding than DPIA/PIA's own two invariants, which
+  are disclosed as real EXTERNAL GDPR practice, NOT an Atlas citation)**:
+  Atlas's own F20 row literally lists `controls` and `detection` as TWO
+  SEPARATE, DISTINCT final chain elements, not one merged
+  "mitigation" step. This contract therefore requires, for EVERY step
+  declared in the `abuse_flow` stage: (a) at least one `controls` entry
+  whose `addresses_step_ids` names that step (forward AND reverse
+  referential completeness, the same class `security.dpia_pia
+  .contract.yaml`'s own risk-to-control traceability already
+  establishes), AND (b) SEPARATELY, at least one `detection` entry
+  whose own `addresses_step_ids` names that step. Collapsing these into
+  one merged "mitigation" array (as an earlier draft of this
+  description considered, then rejected -- see `compilation_decisions`)
+  would silently discard one of Atlas's own five named chain elements,
+  the exact "undisclosed over-constraint by omission" class a critic
+  review already caught on `database_data.data_contract`'s own first
+  draft (there by ADDING unstated structure; here the analogous
+  mistake would be REMOVING stated structure).
+
+  **A genuinely new structural sub-variant among F20 members**: shares
+  PASTA/DPIA-PIA's own "fixed-length, positionally-ordered pipeline"
+  class (`prefixItems`, five stages here), but the THIRD stage
+  (`abuse_flow`) itself nests a VARIABLE-length, freely-many-steps
+  ordered sub-array (unlike DPIA/PIA's fixed eight-stage vocabulary, an
+  abuse flow's own step count is scenario-specific, not Atlas-fixed),
+  and the completeness invariant runs in TWO independent directions
+  over that same nested array (`controls` AND `detection` each
+  independently required to fully cover it), rather than DPIA/PIA's
+  single risk-to-control-to-residual chain. Also genuinely different
+  from PASTA/DPIA-PIA in the other direction: Atlas's own five-word
+  chain names NO terminal decision/verdict stage (no "approval", no
+  final "risk" verdict) -- an Abuse Case record is a completed
+  DESCRIPTIVE artifact, not a decision gate, and this contract does not
+  invent one (see `compilation_decisions`).
+
+  This is a STRUCTURAL record (`provenance_required` + one integrity
+  gate), NOT `genuine_compute` -- the dual completeness invariant is a
+  set-membership/referential derivation, the same class STRIDE/LINDDUN's
+  own `elements_with_no_recorded_threats` and DPIA/PIA's own
+  risk-traceability already establish, not a numeric/ordinal
+  computation like Attack Tree's own cost/skill/detectability
+  aggregation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F20 tool table, Abuse Case row (L890): 'actor→goal→abuse flow→controls→detection', benefit '補足正常 use case' -- the ONLY citation for this method anywhere in the spec root"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 (L1231-1260): grep-confirmed ZERO mentions of Abuse Case -- the negative evidence this contract's own 'not an EC §32 method' claim rests on"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.11 Security Review Recipe (L3472-3487, current lines re-verified directly): the twelve-step default recipe, ALSO absent Abuse Case -- second, independent piece of negative evidence"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md T1 row (Tampering, Supply Chain 簽章金鑰) and docs/adr/ADR-015-supply-chain-security-tooling-selection.md Sub-decision (b): real, CLOSED abuse case with both a real control and a real, named detection mechanism (Rekor transparency log) -- this contract's own CLI demo models it directly, and it VALIDATES"
+  - "docs/architecture/SECURITY_THREAT_MODEL.md T2/E4/Uw1 rows and Prioritized Threat List item 6: real, STILL-OPEN abuse case with a control but explicitly NO landed detection mechanism -- this contract's own CLI demo models it directly, and it is REFUSED by this contract's own construction-time invariant, proving that invariant is not toothless"
+  - "specs/security/key-vault-lifecycle.schema.yaml, log-redaction-token.schema.yaml, personal-data-envelope.schema.yaml, tenant-isolation-controls.schema.yaml: all four read directly, confirmed none models an actor-goal-flow abuse review"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` (see
+  `open_questions` for the exact proposed entry text -- NOT written by
+  this file, per this task's own hard constraint against editing that
+  shared registry directly, to avoid a naming/numbering collision with
+  the four sibling agents concurrently registering their own entries in
+  the same file this session). `id: security.abuse_case` mints a new
+  machine_id. The step-level dual completeness invariant
+  (controls-AND-detection, both directions) is grounded DIRECTLY in
+  Atlas's own F20 row (two distinct named chain elements), not in
+  external practice -- a stronger citation basis than
+  `security.dpia_pia.contract.yaml`'s own two invariants, which are
+  explicitly disclosed as real GDPR/DPIA practice, NOT an Atlas
+  citation.
+
+id: security.abuse_case
+version: "1.0.0"
+family: security
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited -- same reasoning class security.pasta/security.dpia_pia
+# already establish: staging the five-element chain (and the abuse_flow's own
+# variable-length step sequence) is DECOMPOSE; assigning per-stage/per-step
+# content (actor summary, goal summary, control/detection descriptions) is
+# MAP; the dual step-coverage completeness check is VALIDATE (a referential
+# derivation, not a numeric COMPUTE step -- no aggregation like Attack Tree's
+# own cost/skill/detectability rollup).
+
+purpose:
+  - model_a_malicious_actors_goal_and_ordered_abuse_flow_through_atlas_own_five_chain_elements_from_actor_to_detection_with_every_abuse_flow_step_traceable_to_at_least_one_control_and_separately_to_at_least_one_detection_mechanism
+inputs:
+  required: [TargetSystemDescriptor, AbuseCaseStageSequence]
+  # AbuseCaseStageSequence, not "...Set" -- same shape-accurate-naming
+  # discipline security.attack_tree's AttackGoalTree, security.pasta's
+  # PastaStageSequence, and security.dpia_pia's DpiaPiaStageSequence already
+  # establish: Atlas's own "→" chain is a real dependency order, not an
+  # unordered set. TargetSystemDescriptor plays the same role
+  # ProcessingActivityDescriptor plays for security.dpia_pia -- the thing
+  # `system_or_component` names (here, doubling as the "normal use case"
+  # Atlas's own benefit line says this method complements -- see
+  # `compilation_decisions` on why no separate field was invented for that).
+  optional: []
+outputs: [AbuseCaseRecord]
+preconditions:
+  - "system_or_component is a non-empty string"
+  - "stages is EXACTLY the five entries {actor, goal, abuse_flow, controls, detection}, one each, IN THAT ORDER -- Atlas's own '→' chain is a real dependency order, not an unordered set"
+  - "the actor and goal stages each have a non-empty summary"
+  - "the abuse_flow stage has at least one step, each with a unique step_id (prefix STEP-) and a non-empty description -- steps are declared in narrated (attacker-performed) order"
+  - "the controls stage has at least one well-shaped control entry, and EVERY control's addresses_step_ids references a step_id that exists in the abuse_flow stage"
+  - "EVERY step_id declared in the abuse_flow stage is addressed by at least one control -- no abuse-flow step may be left with zero mitigating controls"
+  - "the detection stage has at least one well-shaped detection entry, and EVERY detection's addresses_step_ids references a step_id that exists in the abuse_flow stage"
+  - "EVERY step_id declared in the abuse_flow stage is ALSO addressed by at least one detection entry, INDEPENDENTLY of the controls check above -- Atlas's own chain names controls and detection as two distinct final elements, not one merged 'mitigation' step; a step with a control but zero detection (or vice versa) is an INCOMPLETE abuse case under this contract"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class every prior structural (non-genuine_compute) F20 contract
+  # already establishes: the dual step-coverage completeness check is a
+  # structural/referential derivation, not a statistical/numeric CALCULATED
+  # RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Abuse Case row.
+recommended_next: [architecture.adr]
+# Same forward link every sibling F20 contract already establishes, for a
+# reason genuinely closer to security.dpia_pia's own disclosed reasoning than
+# to security.stride/linddun/attack_tree/pasta's own F18-chain-before-ADR
+# reasoning: Abuse Case is NOT one of EC §32's four named Threat Review
+# methods (see description), so it is not itself the "Threat Model" step
+# Atlas's own F18 Architecture Change chain (L830-842, "...-> Threat Model ->
+# ADR -> ...") names. Rather, a COMPLETED Abuse Case record that surfaces a
+# step with insufficient control/detection coverage (the T2/E4/Uw1 real
+# example this contract's own CLI demo models) is exactly the kind of finding
+# an ADR's own Recommendation section would decide how to close -- the same
+# "real content feeds an ADR's drafting, not a formal pre-ADR gate step"
+# relationship security.dpia_pia.contract.yaml already discloses for its own
+# real ADR-002 precedent.
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior
+  # structural contract's own rollback field already draws.
+
+compilation_decisions:
+  - question: >
+      Should `controls` and `detection` be merged into a single
+      `mitigations[]` array (each entry optionally flagged
+      preventive/detective), matching how a reader might casually
+      summarize "controls and detection are both just mitigations"?
+    decision: "No -- kept as two separate stages, each independently required to fully cover every abuse_flow step."
+    reasoning: >
+      Atlas's own F20 row writes the chain as "...→controls→detection",
+      two distinct words in two distinct chain positions, not one word.
+      Merging them would silently discard one of Atlas's own five named
+      chain elements -- the same class of undisclosed structural
+      change a critic review already caught (in the opposite direction,
+      by ADDING unstated structure) on `database_data.data_contract`'s
+      own first draft. It also directly determines this contract's own
+      real invariant: the T1 (supply chain) real scenario has both a
+      real control and a real, separately-named detection mechanism
+      (Rekor transparency log); the T2/E4/Uw1 real scenario has a
+      control but explicitly NO detection mechanism per
+      SECURITY_THREAT_MODEL.md's own Residual Risk column. A merged
+      `mitigations[]` field would have let the T2/E4/Uw1 scenario pass
+      with its single EC §35 "control" alone, silently hiding the exact
+      gap Prioritized Threat List item 6 names as still unsolved.
+  - question: >
+      Should this contract invent an EC §32-shaped
+      assets/trust_boundaries/entry_points/test_evidence framing quad
+      (matching STRIDE/LINDDUN/Attack Tree/PASTA), or omit it (matching
+      DPIA/PIA)?
+    decision: "Omit it entirely, following security.dpia_pia.contract.yaml's own precedent."
+    reasoning: >
+      Grep-confirmed (re-verified independently for this method, not
+      assumed from the DPIA/PIA precedent) that EC §32's own closing
+      sentence (L1260) never names Abuse Case, and that Atlas's own
+      §13.11 Security Review Recipe (L3472-3487, current lines) ALSO
+      never names it -- a second, independent piece of negative
+      evidence DPIA/PIA's own contract did not have available (DPIA/PIA
+      is simply absent from EC §32; this method is absent from BOTH EC
+      §32 AND Atlas's own default recipe). Inventing the quad anyway,
+      purely for cross-sibling cosmetic consistency with
+      STRIDE/LINDDUN/Attack Tree/PASTA, would be exactly the kind of
+      fabricated structure this session's own governing discipline
+      (and the `database_data.data_contract` critic-review precedent)
+      already forbids.
+  - question: >
+      Should a terminal decision/verdict stage (an "approval", matching
+      DPIA/PIA, or a final risk verdict, matching PASTA) be added, for
+      consistency with those two sibling pipelines?
+    decision: "No -- Atlas's own five-word chain ends at 'detection', with no decision/verdict word. No terminal stage is invented."
+    reasoning: >
+      DPIA/PIA's own eight-word chain literally ends in "Approval";
+      PASTA's own seven-word chain literally ends in "Risk" (Risk &
+      Impact Analysis, a verdict). Abuse Case's own five-word chain
+      ends in "detection" -- a descriptive, not a decision-bearing,
+      final element. Inventing an approval/verdict stage neither
+      sibling's own real citation gives THIS method would be the same
+      "undisclosed over-constraint" class already disclosed and
+      avoided elsewhere in this family. An Abuse Case record is
+      therefore a completed descriptive artifact on its own; any
+      decision about what to do with its findings belongs to the
+      downstream ADR this contract's own `recommended_next` already
+      names, not to a stage invented here.
+  - question: >
+      Should `abuse_flow`'s own steps be a FIXED-length, positionally
+      -ordered tuple (matching how the outer five-stage `stages` array
+      itself is ordered via `prefixItems`), or a variable-length
+      ordered array?
+    decision: "Variable-length ordered array (minItems: 1, no fixed count or fixed vocabulary)."
+    reasoning: >
+      The OUTER five-element chain is Atlas's own fixed, named
+      vocabulary (actor/goal/abuse_flow/controls/detection) -- the same
+      class of fixed vocabulary DPIA/PIA's own eight named stages and
+      PASTA's own seven named stages already are, correctly enforced
+      via `prefixItems`. An individual abuse flow's own STEPS, by
+      contrast, are scenario-specific free narrative (a phishing-based
+      abuse flow and a rate-limit-bypass abuse flow have completely
+      different step counts and content) -- Atlas gives no fixed
+      per-step vocabulary to enforce, so forcing a fixed length here
+      would fabricate structure Atlas never specifies. Step UNIQUENESS
+      (no duplicate step_id within one abuse_flow) is still enforced,
+      the same restraint DPIA/PIA's own duplicate-risk_id check already
+      establishes for ITS OWN variable-cardinality risks/controls
+      /residual_risk arrays.
+  - question: >
+      Should `system_or_component` be supplemented with a SEPARATE
+      field explicitly naming "the normal use case this abuse case
+      complements", directly echoing Atlas's own benefit line ("補足
+      正常 use case")?
+    decision: "No separate field invented -- system_or_component's own description is written to explicitly double as that reference."
+    reasoning: >
+      Every sibling F20 typed object (STRIDE/LINDDUN/Attack
+      Tree/PASTA/DPIA-PIA) already uses `system_or_component` (or an
+      equivalent single framing field) as the one thing the whole
+      record is about. Adding a second, overlapping field purely to
+      echo Atlas's own five-word benefit phrase more literally would
+      duplicate that single framing concept under two names with no
+      real behavioral difference -- the same restraint PASTA's own
+      compilation_decisions already applies when declining to invent
+      per-stage sub-structure Atlas does not itself specify.
+
+open_questions:
+  - id: "OQ-ABUSECASE-1"
+    question: >
+      id mints a machine_id `method-inventory.yaml` never carried --
+      that file's own Abuse Case row (`methods/registry/method
+      -inventory.yaml:1227`, `line: 887`) is stale by the same +3 line
+      offset already disclosed for its neighboring F20 rows (Atlas's
+      real Abuse Case row is L890, re-verified directly). Should
+      `method-inventory.yaml` be updated (`has_contract: true`,
+      `machine_id: security.abuse_case`, corrected `line: 890`)? Exact
+      proposed diff (NOT applied by this file, per this task's hard
+      constraint against editing that shared registry):
+        - name: "Abuse Case"
+          line: 890
+          category: "F20 security"
+          has_contract: true
+          machine_id: "security.abuse_case"
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ABUSECASE-2"
+    question: >
+      This file's own `decided_by` deliberately does NOT write a
+      `methods/registry/contract-backlog.yaml` entry, unlike every
+      prior F20 slice's own SAME-editing-pass registration -- four
+      sibling agents are concurrently registering their OWN entries in
+      that exact file this session (confirmed: `git status` shows
+      `security.secrets_threat_review.contract.yaml` and
+      `security.supply_chain_threat_model.contract.yaml` /
+      `security.zero_trust_review.contract.yaml` already written
+      concurrently), and this task's own hard constraint forbids
+      editing that shared file. The highest existing entry at the time
+      of this file's own writing is `tier_1.fortysixth_concrete_entry`
+      (`security.dpia_pia`) -- the exact next key name
+      (`fortyseventh_concrete_entry` or later) depends on merge order
+      among the five concurrently-written entries and cannot be safely
+      assigned by this file alone. Proposed entry body (content only;
+      final key name and insertion point are the operator's or a
+      follow-up pass's call):
+        method_id: "security.abuse_case"
+        contract_status: complete
+        tier: 1
+        mandated_by: >
+          Same class of justification as every entry above. NINTH of
+          Atlas's own TEN F20 table rows by table position (after
+          STRIDE/Attack Tree/PASTA/LINDDUN/DPIA-PIA and, depending on
+          merge order, some subset of the four sibling F20 members
+          built concurrently this session). Atlas gives this method
+          exactly ONE citation (F20 table row, L890) -- the same
+          "thinnest grounding" class security.pasta already
+          establishes. Grep-confirmed absent from BOTH EC §32's own
+          four named Threat Review methods AND Atlas's own §13.11
+          twelve-step Security Review Recipe -- a second, independent
+          piece of negative evidence beyond security.dpia_pia's own
+          single-absence finding. Consequently omits the
+          assets/trust_boundaries/entry_points/test_evidence quad,
+          the SECOND F20 typed object (after DPIA/PIA) to do so. Real
+          usage precedent drawn from docs/architecture/SECURITY_
+          THREAT_MODEL.md: T1/ADR-015 (real, CLOSED case -- Sigstore
+          keyless signing control + Rekor transparency-log detection,
+          VALIDATES) and T2/E4/Uw1/Prioritized-Threat-List-item-6
+          (real, STILL-OPEN case -- a control exists but NO detection
+          mechanism is landed, REFUSED by this contract's own
+          construction-time invariant). The dual step-coverage
+          completeness invariant (every abuse_flow step needs BOTH a
+          control AND a detection entry, checked independently) is
+          grounded DIRECTLY in Atlas's own two-word chain ending, a
+          stronger citation basis than security.dpia_pia's own two
+          invariants (disclosed as real external GDPR practice, not
+          Atlas).
+        source: "methods/contracts/security.abuse_case.contract.yaml (built same session as this entry, mints machine_id security.abuse_case) + specs/cognitive/typed-objects/abuse-case-record.schema.yaml (new output type)"
+        note: >
+          Tier 1. NINTH of Atlas's own ten F20 table rows. Exact count
+          of "how many security-family members now exist" depends on
+          how many of the four concurrently-built sibling entries have
+          also landed by the time this entry is actually inserted --
+          not asserted here to avoid a stale claim.
+    owner: "operator, to reconcile all five concurrently-written contract-backlog.yaml entries into non-colliding keys in one pass"
+    blocks: "nothing in this file's own validity -- this contract is complete and independently valid without a backlog registration entry"
+  - id: "OQ-ABUSECASE-3"
+    question: >
+      Real external requirements-engineering practice for misuse/abuse
+      cases (Sindre & Opdahl, 2005, "Eliciting security requirements
+      with misuse cases") models the actor with richer sub-structure
+      (skill level, resources, motivation as distinct fields) than this
+      contract's own minimal `actor` stage (a single free-text
+      `summary`). Should a future revision, on explicit operator
+      instruction to treat that external methodology as authoritative
+      (the same class of decision `security.pasta.contract.yaml`'s own
+      `OQ-PASTA-2` already leaves open for PASTA's own richer external
+      methodology), add that per-actor sub-structure?
+    owner: "operator, or whoever next revises this contract's own scope with explicit authorization to cite an external abuse/misuse-case methodology as a source"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-ABUSECASE-4"
+    question: >
+      This contract does not require `control_id`/`detection_id`
+      uniqueness within their own respective stages (matching
+      security.dpia_pia.contract.yaml's own identical restraint for
+      `control_id` -- that file also does not check for duplicate
+      `control_id` values). Should a future revision add that check,
+      for both contracts together, as a shared parity fix rather than
+      an Abuse-Case-specific one?
+    owner: "operator, or whoever next surveys DPIA/PIA and Abuse Case together for parity"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-ABUSECASE-5"
+    question: >
+      With Abuse Case now a genuinely new structural sub-variant (a
+      fixed five-element outer chain containing one variable-length
+      inner ordered sub-pipeline, with a DUAL independent completeness
+      invariant over two sibling arrays rather than DPIA/PIA's single
+      risk-to-control-to-residual chain) -- does this settle
+      `OQ-DPIAPIA-4`'s / `OQ-PASTA-4`'s own still-open question (is any
+      shared F20 base schema, beyond the narrower EC §32 framing
+      triplet, worth pursuing)? Not solved here -- a real question for
+      whoever next surveys ALL TEN F20 members once the four
+      concurrently-building siblings also land.
+    owner: "operator, or whoever next surveys the complete, ten-member F20 family"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read the F20 tool table's Abuse Case row (L890) directly. Grep
+    -confirmed (case-sensitive and case-insensitive, "Abuse Case"
+    /"misuse case"/"惡意使用者"/"abuse flow"/"濫用") across
+    AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md,
+    AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md, and
+    AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md --
+    ZERO hits beyond the one F20 table row, method-inventory.yaml, and
+    contract-backlog.yaml's own forward-looking notes in sibling F20
+    contracts. Read EC §32 (L1231-1260) directly at its current lines,
+    confirmed the closing sentence names exactly four methods, no
+    Abuse Case. Read Atlas §13.11 Security Review Recipe at its CURRENT
+    lines (L3472-3487, re-verified directly rather than trusting a
+    stale citation from another file) -- confirmed Abuse Case (and
+    DPIA/PIA) absent from its twelve steps too. Read
+    docs/architecture/SECURITY_THREAT_MODEL.md in full; read
+    docs/adr/ADR-015-supply-chain-security-tooling-selection.md and
+    policies/security/supply-chain-security.policy.yaml in full to
+    confirm the T1/Rekor real-scenario citation precisely (Rekor itself
+    is named in SECURITY_THREAT_MODEL.md's own T1 row, not invented by
+    this file). Read all four existing `specs/security/` typed objects
+    directly, confirmed no duplication. Validated against
+    specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own five-word chain is
+    directly transcribed as the `stages[].stage_id` enum, in Atlas's
+    own literal order. The dual controls-AND-detection completeness
+    invariant is grounded directly in Atlas's own two distinct named
+    chain elements, disclosed as a stronger citation basis than DPIA
+    /PIA's own two invariants (real external practice, not Atlas). The
+    two real CLI-demo scenarios (T1/ADR-015, validates; T2/E4/Uw1
+    /Prioritized-Threat-List-item-6, refused) are both transcribed from
+    this repository's own existing, already-written threat-model
+    document -- neither is invented for this task.

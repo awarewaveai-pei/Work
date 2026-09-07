@@ -1853,6 +1853,47 @@ tier_1:
       Abuse Case, Security Control Mapping), each an independent future
       slice, not blocked by this one.
 
+  fortyseventh_concrete_entry:
+    # 2026-09-06, lean standard (methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md).
+    method_id: "security.zero_trust_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: "6th `security` family member. F20 row L887 + Atlas §12.37 + MP §62. NOT an EC §32 method (grep-confirmed). Real invariants: stage-1 required set {subject,workload,resource}; forbidden-credential denylist from MP §62's own '禁止' list. Soft-references real ADR-016/zero-trust.policy.yaml values (Zitadel/Cedar/mTLS), not duplicative of that static config layer."
+    source: "methods/contracts/security.zero_trust_review.contract.yaml + specs/cognitive/typed-objects/zero-trust-review-record.schema.yaml"
+    note: "49th Method Atlas slice. 97 tests pass."
+
+  fortyeighth_concrete_entry:
+    method_id: "security.secrets_threat_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: "7th `security` family member. F20 row L888 (6-stage chain). Confirmed additive to specs/security/key-vault-lifecycle.schema.yaml (models one vault's state, not a lifecycle review) and EC §33 (prose only, no machine-checkable predicate before this). Real invariants: exposure-triggers-revocation-flow (EC §33 STOP/REVOKE/INVESTIGATE/RESUME, one-directional); crypto_key secrets must soft-defer to key-vault-lifecycle's own key_id."
+    source: "methods/contracts/security.secrets_threat_review.contract.yaml + specs/cognitive/typed-objects/secrets-threat-review-record.schema.yaml"
+    note: "50th Method Atlas slice. 89 tests pass. Builder self-corrected a fabricated reverse-direction invariant during construction, caught by its own test suite."
+
+  fortyninth_concrete_entry:
+    method_id: "security.supply_chain_threat_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: "8th `security` family member. F20 row L889 (7-stage chain). Confirmed additive to ADR-015/supply-chain-security.policy.yaml (static tool-selection layer, not a per-review record). Real invariants: dependency-consideration completeness (EC §34's 7-item checklist); production-verified-artifact gate (EC §34 + MP §66, converging citations)."
+    source: "methods/contracts/security.supply_chain_threat_model.contract.yaml + specs/cognitive/typed-objects/supply-chain-threat-model-record.schema.yaml"
+    note: "51st Method Atlas slice. 76 tests pass."
+
+  fiftieth_concrete_entry:
+    method_id: "security.abuse_case"
+    contract_status: complete
+    tier: 1
+    mandated_by: "9th `security` family member. F20 row L890 (5-stage chain: actor/goal/abuse_flow/controls/detection). Not an EC §32 method, not in Atlas §13.11's own recipe either (second independent absence). Real invariant: every abuse_flow step needs BOTH a controls entry AND a detection entry (Atlas names them as two distinct chain elements), checked both directions, both layers. CLI demo uses two real scenarios from this repo's own SECURITY_THREAT_MODEL.md (one passes, one is genuinely refused for lacking detection)."
+    source: "methods/contracts/security.abuse_case.contract.yaml + specs/cognitive/typed-objects/abuse-case-record.schema.yaml"
+    note: "52nd Method Atlas slice. 73 tests pass."
+
+  fiftyfirst_concrete_entry:
+    method_id: "security.security_control_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: "10th and LAST `security` family member -- F20 complete (10/10). F20 row L891 (Threat→Control→Evidence). Design: a genuine downstream CONSUMER of existing security.stride/security.linddun records (Atlas's own '每個威脅對應' phrasing presupposes existing threats; §13.11 recipe sequences this method right after the threat-producing ones; security.stride's own OQ-STRIDE-5 anticipated this exact link). source_record_type is a closed {stride,linddun} enum (Attack Tree/PASTA are structurally incompatible, disclosed not silently excluded). Real invariants: within-record referential integrity; cross-record validation against the real external source STRIDE/LINDDUN record (first ai_lego gate to take an optional extra parameter for this)."
+    source: "methods/contracts/security.security_control_mapping.contract.yaml + specs/cognitive/typed-objects/security-control-mapping-record.schema.yaml"
+    note: "53rd Method Atlas slice. 78 tests pass. F20 security family: 10 of 10 built."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

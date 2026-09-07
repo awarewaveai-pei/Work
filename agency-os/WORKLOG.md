@@ -54,6 +54,31 @@
 
 [剩餘風險] TASKS.md §D新增第6條（mutation-coverage分類器2個圖演算法缺陷）待排入；既有第3/4/5條的完成度已由本輪重新確認為真（backing檔案已補commit）；Class 2清單維持7個未實際處理；5+1=6個真缺口全數落地（Pricing/Promotions、Fraud/Risk、Logistics/Shipping、PLM/Quality、Merchandising、Multi-Location Stock）。**治理教訓**：shared worktree下用`git-stage-hunks.py`精準暫存自己的hunk仍不能完全避免「別人commit時把已暫存但未commit的東西一併帶走」——下次遇到「另一個agent報告『Makefile/TASKS.md已經在working tree裡』」這種訊號時，應該立刻先跑`git log --oneline -3 -S<關鍵字>`確認宣稱的變更是否真的還沒進HEAD，而非假設「還沒commit」就一定安全。
 
+## 2026-09-06（續62，同一 session：F20 資安家族收官（10/10）—— 5 個平行 agent 同時建 Zero Trust Review／Secrets Threat Review／Supply Chain Threat Model／Abuse Case／Security Control Mapping，操作者裁定「文書砍到只剩重點」後首次套用精簡版標準）
+
+**觸發**：操作者對「一個一個做要幾個月」表達不滿，要求加速但不降品質。裁定：獨立可切割的方法用 Agent tool 平行派（5 個，20 分鐘視窗內免問額度用滿），文書砍到一行講重點（散文式 `compilation_decisions`／`open_questions`／逐個獨立 slice 文件／逐個跑全套 regression 全部砍），真查證／兩層不變量／真測試不准省。新標準落地：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md`。
+
+**5 個平行結果**：全部 5 個都各自做了真查證再動工，2 個明確確認「不是重複」（Zero Trust Review vs 既有 ADR-016/zero-trust.policy.yaml——那是全系統一次性工具選型，這是逐流程審查記錄，不同層）、（Supply Chain Threat Model vs 既有 ADR-015/supply-chain-security.policy.yaml，同款差異）；Secrets Threat Review 也查了 `key-vault-lifecycle.schema.yaml`＋EC §33，確認既有物件只管單一 vault 狀態、EC §33 只是散文、都沒有機器可查的流程審查，確認可建。5 個測試數：Zero Trust Review 97／Secrets Threat Review 89／Supply Chain Threat Model 76／Abuse Case 73／Security Control Mapping 78，合計 413，5 個一起跑零衝突。
+
+**真發現**：
+- Security Control Mapping 是家族第一個**下游消費者**——不是憑空描述系統，而是吃既有 `security.stride`／`security.linddun` 記錄當真輸入，逐一比對其 `threats[]` 做 preventive/detective/recovery 分類＋evidence 掛勾（`source_record_type` 限 `{stride, linddun}`，Attack Tree/PASTA 結構不相容已揭露非疏漏）。這條路徑在 `security.stride` 自己的 `OQ-STRIDE-5` 早就預告過。
+- Secrets Threat Review 建構時**自己抓到自己寫錯的反向不變量**（誤加「沒曝光就不准動 revocation flow」，被自己寫的真實情境測試打回票，當場修正並在文件揭露）。
+- F20 十個成員最終盤點：**4 個 EC §32 明文方法（STRIDE/LINDDUN/Attack Tree/PASTA）四比四共用 assets/trust_boundaries/entry_points 三元組；剩 6 個（DPIA-PIA + 這 5 個）六比六完全不含**——`OQ-STRIDE-4` 收斂：F20 整體沒有共用 base schema，四個真 EC §32 方法之間有沒有仍是開放問題。
+
+**整合**：核實 20 個新檔全部存在磁碟上（不只信 agent 回報）→ 5 個 test module 合併跑 413 測試零衝突 → 精簡版註冊進 `contract-backlog.yaml`（`fortyseventh`～`fiftyfirst_concrete_entry`，一行 `mandated_by`，不寫散文）→ 修正 `method-inventory.yaml` 這 5 列＋順手補修同區塊 STRIDE/LINDDUN/Attack Tree/PASTA/DPIA-PIA 五列的舊 `has_contract: false` 遺留債（本來就在同一個 F20 區塊，一次修完）→ `security.stride.contract.yaml` `OQ-STRIDE-4` 改寫成一段收斂結論，不留三份各自的長版 `resolved_by` → `architecture.adr.contract.yaml` 機器 ID 計數更新（Threat Model 仍是 FOUR，另外 5 個非 EC§32 方法各自理由已在各自 contract 揭露，一行帶過）→ golden suite 2962 全過 → 全 regression 待確認。
+
+**[已修改]**：新 10 個檔（5×contract.yaml + 5×schema.yaml）+ 新 10 個 product-root 檔（5×module.py + 5×CLI + 5×test，其中 CLI/test 各自獨立檔非成對縮寫）+ `contract-backlog.yaml`／`method-inventory.yaml`／`security.stride.contract.yaml`／`architecture.adr.contract.yaml`／`ai_lego/modules/security/__init__.py`（精簡版更新）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_zero_trust_review tests.unit.test_secrets_threat_review tests.unit.test_supply_chain_threat_model tests.unit.test_abuse_case tests.unit.test_security_control_mapping -q` | exit=0 | result=413 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 2962
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=Ran 2378 tests in 119.290s, OK（1965→2378，+413 全新，零回歸）
+- REVIEW_DONE: critic=自審（5 個 agent 各自查重＋我逐一核實檔案存在＋spot-check 兩個高風險設計：Secrets Threat Review 反向不變量修正／Security Control Mapping 跨記錄驗證）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`RECORD_ID_PREFIX = "(ZTR|SECR|SCTM|ABUSE|SCM)-"` | hits=5 個各自唯一，零重複前綴
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：全 regression 尚未跑完確認；5 個新方法各自的獨立 slice 文件仍照舊格式產生（agent 派出時精簡標準尚未定案），不回改；`OQ-DPIAPIA-4`／新方法各自 open_questions 維持一行版，細節見各 contract 檔自己。
+
 ## 2026-09-06（續61，同一 session：Cognitive OS 第四十八個 Method Atlas 切片 — `security.dpia_pia`，F20 家族第五個成員、本 session 第一個「非 EC §32 明文四法之一」的 F20 成員；未派 critic subagent，改走自審——ADR-002 提供真實（非杜撰）due-diligence 前例、兩個新真不變量（risk traceability + GDPR Art.36 escalation）於建構層與 gate 層雙證，71 測試全綠、CLI 通過、golden 2937、全 regression 1965 全綠）
 
 **觸發**：承接操作者「都不要停，直到完美完成」的常設授權，續 PASTA 收尾清單，選 DPIA/PIA——F20 表格第五列，Atlas 給了專節（§11.46），比 PASTA 單引用更厚。0 個 critic subagent（本輪自審，理由見下）。
@@ -12448,6 +12473,41 @@ The existing meeting worker has timed Whisper segments and SRT output, but the a
 
 [rollback]
 Revert the five documentation changes (`README.md`, `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`, `CURRENT_BASELINE_AND_GAP_AUDIT.md`, `PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md`, and `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`). Since no runtime path changed, the existing Quick Engine, manual Remotion and ffmpeg subtitle behavior continue unchanged.
+
+## 2026-09-06 — Media LEGO canonical capability catalog
+
+[scope]
+Added `agency-os/docs/video_generator/MEDIA_CAPABILITY_ADOPTION_AND_PROMOTION_CATALOG.md`, indexed it, and reconciled video documents to one canonical `media.<verb>_<noun>` capability namespace. No global media contract or registry record was promoted to ACTIVE; no source, worker, provider, database, renderer, Postiz, WordPress or deployment changed.
+
+[reason]
+Cross-document inspection found historical multi-dot identifiers and verb-family drift, including `media.transcribe.local`, `media.render.quick` and `media.deliver.*`. Those labels violate the established one-dot grammar or point to ambiguous behavior, so they could not safely enter the fail-closed resolver.
+
+[verification]
+- REALTEST_WAIVED: DOC_ONLY -- capability mapping changes no executable runtime.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; catalog was checked against global grammar, ADR-023 resolver rules, Timeline receipt and current phase contracts.
+- BUGHUNT_DONE: scope=`D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory` | grep=`MEDIA_CAPABILITY_ADOPTION_AND_PROMOTION_CATALOG|media.render_quick|media.delivery_social` | hits=19
+- WORKLOG_DONE: canonical mapping is at `agency-os/docs/video_generator/MEDIA_CAPABILITY_ADOPTION_AND_PROMOTION_CATALOG.md:1-66`; multi-dot IDs outside its alias quarantine were verified at zero.
+
+[rollback]
+Revert the four documentation files changed by this entry. This leaves the current system unchanged; no capability was enabled or disabled.
+
+## 2026-09-06 — Phase 1B-2 durable video-job schema package
+
+[scope]
+Added agency-os/docs/video_generator/PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md and linked it from the video index and Phase 1 delivery plan. Corrected the Phase 1B lifecycle rollback rule: feature rollback disables the new path while retaining additive schema and event evidence. No SQL migration, source module, database write, renderer call, Postiz/WordPress action, secret, host action or production deployment changed.
+
+[reason]
+The current video_jobs table only records short-lived running/done/error progress. The durable lifecycle contract already exists as pure code, but a later executor would otherwise have no database-enforced idempotency, lease, tenant-consistent transition evidence or non-destructive recovery rule. The package keeps video_jobs as the one business record and uses video_job_events only as append-only evidence.
+
+[verification]
+- REALTEST_WAIVED: DOC_ONLY -- this package deliberately defines no executable migration, route, worker or external side effect.
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n; manual contract review found the first draft relied on repository-only event tenant validation, then required UNIQUE (id, organization_id) plus composite foreign key and a conditional durable-row CHECK before acceptance.
+- BUGHUNT_DONE: scope=D:\Work\agency-os,D:\Work\scripts,D:\Worktrees\media-video-phase0\lobster-factory | grep=PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE|video_job_events|UNIQUE (id, organization_id)|Its remaining executor | hits=3
+- WORKLOG_DONE: evidence is at agency-os/docs/video_generator/PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md:1-106, agency-os/docs/video_generator/PHASE_1B_DURABLE_QUICK_ENGINE_JOB_LIFECYCLE.md:94-98 and agency-os/docs/video_generator/MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md:51.
+- git diff --check -- agency-os/docs/video_generator agency-os/WORKLOG.md passed.
+
+[rollback]
+Revert the four documentation files changed by this entry. No runtime path exists to roll back. For the future schema implementation, normal rollback is feature-flag disable with evidence retained; destructive schema cleanup remains a separate High-risk approval.
 
 ## 2026-09-07
 
