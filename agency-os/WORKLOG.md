@@ -12686,3 +12686,16 @@ Merged the verified `codex/media-video-phase0` branch into `main` as `2fb93f9dc`
 
 [rollback]
 `git revert -m 1 2fb93f9dc` returns `main` to its pre-merge source state. Do not use that revert after a dependent production deployment without first classifying downstream state; no such deployment exists now.
+
+## 2026-09-07 — Video isolated worktree retired
+
+[scope]
+After explicit approval, removed the clean local `D:\Worktrees\media-video-phase0` worktree and `codex/media-video-phase0` branch. Source is already reachable from `origin/main`; no runtime, deployment, database or external state changed.
+
+[verification]
+- REALTEST_EVIDENCE: `git -C D:\Work merge-base --is-ancestor d1fac1e57 origin/main` exited 0 before removal.
+- REALTEST_EVIDENCE: after removal, `Test-Path D:\Worktrees\media-video-phase0` returned false; `git -C D:\Work worktree list` and `git -C D:\Work branch --list codex/media-video-phase0` contain neither retired entry.
+- WORKLOG_DONE: status index and bundle boundary are corrected in `agency-os/docs/video_generator/README.md` and `_handoff_2026-09-07/README.md`.
+
+[rollback]
+No local rollback needed: `origin/main` retains integrated source and the historical bundle remains under `agency-os/docs/video_generator/_handoff_2026-09-07/`.

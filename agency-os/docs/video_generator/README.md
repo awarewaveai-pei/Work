@@ -1,6 +1,7 @@
 # Media Production LEGO Platform
 
-這是現行影片平台的文件入口。它描述既有 VideoStudio 的安全演進，不是舊 Python 自動發佈系統的執行說明。
+**正式程式來源：** `origin/main`；影片基礎程式已於 `2fb93f9dc` 整合，尚未部署。
+**文件入口：** 本目錄；production VideoStudio 與 WordPress／Postiz 未因該整合變更。
 
 ## 現行文件
 
@@ -20,7 +21,7 @@
 - PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md：把既有 video_jobs 演進為可恢復執行紀錄的 additive schema、驗收與 rollback 包；尚未建立 migration。
 - PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md：renderer idempotency、private R2 receipt、restart reconciliation 與 no-double-render 驗收；尚未實作。
 - `PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md`：正式 renderer 的 staging canary、驗收與 rollback gate；尚未執行。
-- `_handoff_2026-09-07/README.md`：Phase 0 隔離分支的已驗證 Git bundle、雜湊、提交範圍與整合前置條件；最新版 `media-video-phase0-plus-timeline-remotion-2026-09-07.bundle` 含編譯器與空白覆蓋框修正；均尚未合併或部署。
+- `_handoff_2026-09-07/README.md`：歷史 Git bundle、雜湊與整合證據；原隔離分支已整合至 `2fb93f9dc`，本機 worktree 已退休，未部署。
 - `LEGACY_REFERENCE_ADOPTION_MATRIX.md`：舊 P7 參考碼的採用與禁止清單。
 
 ## 封存文件

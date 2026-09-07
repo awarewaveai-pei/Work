@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | `media-video-phase0.bundle` | `0cf46d201f189645a38b42b5472e34255cb8d0bd` | `2f360d87d8d2a1419a8d950df11f61d80f24acf33f2fcde27ef5ebd97eacb28d` | Phase 0, renderer auth/lifecycle contracts, staging compose and Timeline structural preflight. |
 | `media-video-phase0-plus-timeline-remotion-166e0372b.bundle` | `166e0372b318dc59fcd4b11360990f0b9e1ecb1b` | `7f5bef1030605823a8c81c3a475a86bc052353fb315a5fdf9f7a65c0cdc0b91a` | The first bundle plus the Timeline→Remotion compiler and DynamicSlideshow crop/transition support. |
-| `media-video-phase0-plus-timeline-remotion-2026-09-07.bundle` | `d1fac1e57d49b864ec891756554049baa4b54e88` | `0db059621a813fbf1a97ca2f4840c859f37493a78429a0dd183bb11a58537559` | Latest compiler bundle; adds the empty-text overlay correction. Use this bundle for integration. |
+| `media-video-phase0-plus-timeline-remotion-2026-09-07.bundle` | `d1fac1e57d49b864ec891756554049baa4b54e88` | `0db059621a813fbf1a97ca2f4840c859f37493a78429a0dd183bb11a58537559` | Latest historical compiler evidence; adds the empty-text overlay correction. |
 
 ## Phase 0 included commits
 
@@ -23,7 +23,7 @@
 
 ## Safety boundary
 
-This bundle does not contain a database migration, a renderer protocol implementation, R2 credentials, a production compose overwrite, or any deploy action. It must be merged into main by a Git identity that can write the repository index, reviewed, then deployed only through /root/lobster-phase1/scripts/sg-deploy.sh.
+This bundle contains no database migration, renderer protocol implementation, R2 credential, production compose overwrite or deploy action. Its source was merged into `main` by `2fb93f9dc`; any future deployment still uses `/root/lobster-phase1/scripts/sg-deploy.sh`.
 
 ## Verification completed before Phase 0 bundle
 
@@ -41,4 +41,4 @@ Before enabling Phase 1B runtime code, create a staging-only private R2 receipt 
 - `git -C D:\\Work bundle verify agency-os/docs/video_generator/_handoff_2026-09-07/media-video-phase0-plus-timeline-remotion-2026-09-07.bundle` passed.
 - Next-admin: Timeline/Remotion focused suite passed 3 files / 13 tests; typecheck passed.
 - Remotion service: `npm run build` passed.
-- Neither bundle is merged or deployed. Use the compiler bundle only after the Phase 1B and Phase 2 gates named above; it deliberately does not wire Timeline submission to the renderer.
+- The bundle is historical evidence, not a deployable path. `2fb93f9dc` still deliberately does not wire Timeline submission to the renderer; Phase 1B and Phase 2 gates remain required.
