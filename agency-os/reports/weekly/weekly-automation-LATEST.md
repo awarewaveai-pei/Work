@@ -1,107 +1,162 @@
-# Weekly Summary — 2026-08-31
+# Weekly Summary 2026-09-07
 
-**Generated**: 2026-08-31T01:08:47Z (remote-weekly-agent)
-**Period**: 2026-08-25 to 2026-08-31
-**Prev report**: 2026-08-24 (covered 2026-08-18 to 2026-08-24)
-
----
-
-## 🏆 本週最大里程碑
-
-### ✅ 單機整併完成（2026-08-28/30）
-SG + EU 雙機全數搬至 `ks-aw-01`（`149.202.64.114`）。舊 Hetzner 主機 `5.223.93.113`（SG）與 `204.168.175.41`（EU）已於 2026-08-30 在 Hetzner Cloud console 永久刪除退租，不可逆。10+29 個容器、13 條 DNS 記錄全部遷移到位，15/15 端點健康，RAM 使用 11G/62G。
-
-### ✅ Soulful Expression 網站切換完成（2026-08-28）
-切換耗時 78 秒。DNS PATCH 成功，流量經 `x-soulful-cache` header 驗證已走新機，強制郵件測試 row id=97 通過。觀察期至 2026-09-04，之後進行 Hostinger origin 鎖定與舊 authorized_keys 清理。
+**Generated**: 2026-09-07T01:07Z (remote-weekly-agent)
+**Period**: 2026-09-01 to 2026-09-07
+**Prev report**: 2026-08-31 (covered 2026-08-25 to 2026-08-31)
 
 ---
 
-## ✅ 本週完成事項
+## Completed this week
 
-### 基礎設施
-| 日期 | 事項 |
+### 2026-09-04 — Governance & Cognitive OS real stack
+
+| Area | Item |
 |------|------|
-| 2026-08-27 | ks-aw-01 auto-reboot + boot health notify 服務部署 |
-| 2026-08-27 | Soulful 備份重拉（288 tables, 767MB tarball, R2 WORM lock） |
-| 2026-08-27 | 備份腳本 3 個 bug 修正（retention bug 會刪掉還原演練驗證過的備份） |
-| 2026-08-28 | **Soulful cutover COMPLETE**（78 秒、DNS 切換、流量驗證） |
-| 2026-08-28 | **SG+EU 全機整併至 ks-aw-01**（10+29 容器、13 DNS、15/15 健康） |
-| 2026-08-28 | OVH Edge Network Firewall 8 條規則啟用（all state=ok）+ rDNS 設定 |
-| 2026-08-29 | Netdata Cloud ks-aw-01 claim（3/3 Live） |
-| 2026-08-30 | **舊 Hetzner 主機永久刪除**（5.223.93.113 + 204.168.175.41，不可逆） |
-| 2026-08-30 | Netdata Cloud 舊 SG/EU 節點移除 |
-| 2026-08-30 | Redis 密碼強化（lobster-redis / postiz-redis / soulful-redis） |
-| 2026-08-30 | Let's Encrypt 孤兒帳號清理（dry-run: 5 certs 全 PASS） |
-| 2026-08-30 | 各健康腳本確認已為單機設定（check-capacity/backup/auto-reboot/deploy-drift） |
+| Governance | AGENTS.md 2nd trimming: 48.7KB → 20.5KB; full text archived to AGENTS_APPENDIX.md |
+| Governance | Workflow tool blocked in `permissions.deny` (template + wire-remote-hooks.sh + parity test) — closes 99-agent fan-out incident class |
+| Governance | Retired IP cleanup across 12 files (old SG 5.223.93.113 / EU 204.168.175.41 references) |
+| Governance | `high-risk-bash-warn.js` updated with active prod host 145.239.195.47; mutation-verified |
+| Governance | PowerShell 7.6.5 container install instructions added to CLAUDE.md |
+| Cognitive OS | Ollama 0.33.3 + gemma3:4b + AIGateway (Ollama/Anthropic BYOK) deployed as full real LLM stack |
+| Cognitive OS | `--coding local-llm`: open/axial/selective coding all model-generated (non-fixture) |
+| Cognitive OS | `--transcription meeting-service`: speechbrain 1.1.0→1.1.1 (Windows path bug fixed) |
+| Cognitive OS | Tests: 131 → 190; all new gates have mutation tests |
+| Cognitive OS | ADR-024 + quota circuit breaker + repeat-failure gate + RUNNABLE_DEMOS registered |
 
-### 安全 / 資安
-| 日期 | 事項 |
+### 2026-09-05 — System Foundry v1.6 + Method Atlas slices 29–33
+
+| Area | Item |
 |------|------|
-| 2026-08-25 | ClickHouse 第 5 次事故解決（4 輪對抗式審查，11 findings，10 真實；`override.xml` source config 修正） |
-| 2026-08-28 | OVH Edge Network Firewall 8 規則（SYN flood / ICMP / UDP 防護） |
-| 2026-08-30 | Redis 密碼強化（原為空密碼，現已設定強密碼） |
+| System Foundry | UI/UX first batch: 27 sections reordered (WHO→WHAT→Business→Ops→Tech), categories merged, group rendering |
+| System Foundry | 7 new financial capabilities: OCR accounting, AR aging/collections, bank reconciliation, inventory valuation, auto financial statements, financial analysis |
+| System Foundry | External review: 4 findings fixed (manifest git ls-files, schema_runtime $ref, test_selection_matrix ValueError) |
+| System Foundry | critic 2C+5M+6m all fixed; clean-checkout 12-step verify chain passed |
+| Hooks | `git-commit-scope-guard.js` v5: heredoc + git log pathspec bug fixed; 155/155 hook tests green |
+| Cognitive OS (slice 29) | `database_data.reconciliation`: 2 Critical (float precision, builder never recomputed check) |
+| Cognitive OS (slice 30) | `database_data.expand_contract_migration`: same Critical class re-caught and fixed |
+| Cognitive OS (slice 31) | `devops_sre.capacity_model`: 2 Critical (gate recomputes output without re-validating input) |
+| Cognitive OS (slice 32) | `devops_sre.release_readiness_review`: same gate defect recaught; due-diligence gaps |
+| Cognitive OS (slice 33) | `devops_sre.runbook_execution`: first slice to proactively apply prior lessons; 394,400-shape oracle proof |
+| Cognitive OS total | devops_sre family: 8 members (largest); total 33 slices; 896 tests; golden suite 2786 |
 
-### 文件 / 治理
-| 日期 | 事項 |
-|------|------|
-| 2026-08-30 | DEPLOY_ROLLBACK_RUNBOOK.md / CLOUDFLARE-WAF-SETUP.md / origin-lockdown.md 更新為新拓樸 |
-| 2026-08-30 | ADR-017~020 通過（Codex 起草、Claude 驗真、操作者接受） |
-| 2026-08-30 | 新 hook：git-add-scope-tracker + git-commit-scope-guard（22 tests，2C+5M critic findings 修正） |
-| 2026-08-31 | GOVERNED_SYSTEM_BUILD_SOP.md §10–§15 補完（通用治理 SOP） |
-| 2026-08-31 | ALERT_REQUIRED.txt 假警報解除（health 恢復 100%） |
+### 2026-09-06 — Massive day: HCI30, Cognitive OS F20, System Foundry gaps
 
-### AI-LEGO Cognitive Engineering OS
-| 日期 | 事項 |
-|------|------|
-| 2026-08-25 | Phase 3 第 5 批：`method-resolution.schema.yaml` 補建 `policy_context`/`regulatory_exposure`（P1-GAP-LEGAL-7 解） |
-| 2026-08-30 | **Phase 3 Machine-readable Foundation COMPLETE**（851/851 golden tests） |
-| 2026-08-30 | `document-registry.schema.yaml` 建立；10 個 typed-objects 延後 |
-| 2026-08-30 | P1-GAP-LEGAL-1（Legal Freshness SLA 4 層）解決 |
-| 2026-08-30 | 4 條 codex-review 真實 finding 修正（authority.schema.yaml / network-egress.yaml / Master Plan / Program Plan） |
+#### HCI30 Wave 1 (9 rounds)
 
----
+| Round | Item |
+|-------|------|
+| 3 | `mutation-check-node-gates.ps1`: 12/12 mutations killed; 2 commit rounds of Node gate coverage |
+| 4 | `HCI_CONFIDENCE_SPEC.md` partial: method-finding combination; critic 51-mutation scan: 1C+8M+7m all fixed |
+| 5 | `HCI_RISK_SPEC.md` partial: severity-floor detection; 1C+3M+3m all fixed |
+| 6 | `HCI_EVIDENCE_QUALITY_SPEC.md` partial: per-dimension classification; 2C+4M+5m; first time all 7 citation line numbers correct |
+| 7 | Sparse-array debt: `normalizeDimensionScores` + `normalizeEvidenceRefs` (silent fail-open fix — critical class); tests 137→154; 3 mutations added |
+| 8 | `dimension_disagreement` field in rollup-trust-domains; tests 154→161; 3 mutations added; ADR-0004 updated |
+| 9 | P0-04 3 OPEN specs (Permission/Contradiction/Time Decay — cannot be rushed); `bias-check-gate.mjs` + 20 tests; 161→181 tests; 33→33 mutations |
+| Security | C1 fix: `HCI_PERMISSION_SPEC.md` false claim "zero Permission enum definitions" — P0-P6 enum existed in corpus; propagated false claim repaired across 4 files |
 
-## 🔴 未解風險 / 阻塞項
+#### Cognitive OS F20 Security family
 
-| 優先 | 項目 | 狀態 |
-|------|------|------|
-| 🔴 | **Codex stop-time review gate 停用**（2026-08-25 額度耗盡，重啟時間：2026-08-31 12:41 PM UTC） | 今日到期，待手動重啟 |
-| 🔴 | **HF_TOKEN 輪換**（2026-08-27 明文進入對話紀錄） | 操作者需在 HuggingFace settings 操作 |
-| 🔴 | **Soulful 後切換清理**（origin 鎖 CF CIDR / 舊 Hostinger authorized_keys 刪除） | 觀察期 2026-09-04 才可做 |
-| 🔴 | **Defender 木馬複盤**（逾期 70 天） | 持續積壓 |
-| 🟠 | `video/[id]` DELETE 無引用檢查（破圖 bug） | 已知，未修 |
-| 🟠 | `cf-iprefresh` 偵測器已 error 14+ 天 | 無讀者 |
-| 🟠 | Phase 4 Check 1/Check 2 假綠燈（容器無 `gh`） | 已知，未修 |
-| 🟠 | `cloudflare-realip.conf` 靜態網段無偵測器 | 已知漂移風險 |
-| 🟡 | trigger-redis 密碼未設（env var 名稱未確認，風險接受） | 留待確認 |
-| 🟡 | ClickHouse/MinIO 預設密碼未驗證 | 留待確認 |
-| 🟡 | 10 個 staging 孤兒 / 1969.7 MB 待清理 | 決策待定 |
+| Slice | Item |
+|-------|------|
+| 46 `security.attack_tree` | F20 #3; genuine AND/OR compute; critic FAIL→SHIP; 6 Major all fixed; recursion depth guard (M5 found 2nd layer bug) |
+| 47 `security.pasta` | F20 #4; fixed 7-stage pipeline; 5040-permutation exhaustive sort verify; critic FAIL→SHIP; 6 Major all fixed; 1 critic directly applied fix |
+| 48 `security.dpia_pia` | F20 #5; non-EC§32 member; GDPR Art.35 risk traceability + Art.36 escalation invariants; 71 tests; ADR-002 real use case |
+| F20 total | 5/10 complete (STRIDE/LINDDUN/Attack Tree/PASTA/DPIA-PIA); 6 remaining: Zero Trust/Secrets Threat/Supply Chain/Abuse Case/Security Control Mapping |
 
----
+#### System Foundry — real gaps closed
 
-## 📊 系統健康快照（2026-08-31 01:08 UTC）
-
-- **伺服器**: ks-aw-01（`149.202.64.114`）— 單機架構，前機已刪
-- **容器**: 39 個（原 SG 10 + 原 EU 29）
-- **記憶體**: ~11G / 62G
-- **備份**: Soulful 767MB（R2 WORM）；EU 備份保留政策 bug 已修
-- **Netdata**: 3/3 Live（已 claim ks-aw-01）
-- **OVH 防火牆**: 8 rules active, all state=ok
-- **Let's Encrypt**: 5 certs 健康（dry-run PASS）
-- **Redis**: 3/4 已密碼強化（trigger-redis 風險接受）
+| Item | Detail |
+|------|--------|
+| Slices 1–5 | Pricing/Promotions, Fraud/Risk, Logistics/Shipping, PLM/Quality, Merchandising — all landed |
+| Slice 6 | Multi-Location Stock (CAP-MULTI-LOCATION-STOCK + CAP-CYCLE-COUNT); CAP-CYCLE-COUNT module redesign after critic BLOCK |
+| mutation-coverage gate | 24 derivation rules + 179 requires edges; 1000 random config samples; `make verify` PASS |
+| Final state | capabilities=265, modules=51, questions=226, pairwise_valid=25419, pairwise_rejected=6 |
 
 ---
 
-## 📅 下週重點
+## Open tasks
 
-1. **Codex gate 重啟**（今日：2026-08-31 12:41 PM UTC 後）
-2. **Soulful 後切換清理**（2026-09-04 起：CF origin 鎖 + Hostinger authorized_keys 刪除）
-3. **HF_TOKEN 輪換**（操作者執行）
-4. **AI-LEGO Phase 4 啟動**（Phase 3 已完，Phase 4 gated 等操作者指令）
-5. **Defender 木馬複盤**（逾期 70 天，安全紅線）
-6. `video/[id]` DELETE 無引用檢查修正
-7. Phase 4 偵測器假綠燈修正（容器補裝 `gh`）
+### Security / Credentials (🔴 all require human action)
+
+- **🔴 Trojan:Win32/PowhidSubExec.B** — overdue 80+ days (orig. 2026-06-17), source/cleanup pending
+- **🔴 HF_TOKEN明文** (2026-08-27) — rotate pending; 3rd occurrence of same mask-apply-after-read pattern
+- **🔴 2026-08-15 transcript credential leak** — 3 tokens to rotate
+- **🔴 `claude_desktop_config.json`** — 6 plaintext API keys, no governance
+- **🟠 Codex stop-time review gate** — still disabled since 2026-08-25
+
+### Migration / Infrastructure (🔴 hard deadlines)
+
+- **🔴 Soulful off Hostinger by 2026-11-12** (machine purchase deadline: 2026-09-30)
+  - EU: Supabase (highest risk, go-last), Trigger.dev, n8n, Postiz, MainWP, Uptime Kuma, Remotion/Video service
+  - SG: next-admin, WordPress+DB, Node API, oracle-web, Redis, Grafana/Loki/Promtail
+  - Pre-condition: Soulful backups must be reliable before migration
+- **🔴 Soulful backups: 5/10 recent failures** (last backup 2026-08-24 = FAIL)
+- **🔴 EU backup retention deleted drill-verified backups** — needs fix before migration
+- **🔴 `video/[id]` DELETE has no reference check** — live Soulful article already broken (404 video embed)
+- **🟠 EU origin not locked to Cloudflare** (step B pending)
+- **🟠 `cf-iprefresh` detector erroring for 14+ days, no readers**
+
+### Product / Client
+
+- **Postiz OAuth app review**: Meta IG+FB / Reddit / LinkedIn — manual human submission required
+- **Postiz draft cleanup**: delete test draft ID `cmqo1wijz0005p58ncl1mtssr`
+- **Postiz client Hub link**: operator must connect Bluesky integration in ops/clients
+- **Customer service U6 Chatwoot** — gate lifted (2026-08-30), just not started yet
+- **POD A2 confirm phase** — 🔴 payment pipeline; needs explicit authorization before any work
+- **Canvas editor browser testing** — operator must test (Claude cannot log in)
+- **Mockup Studio diagnosis** — awaiting operator symptom details
+- **Scenery Travel Mongolia** — awaiting client card payment for Cloudways
+
+### Technical Debt
+
+- **System Foundry**: 6 capabilities still pull in `CAP-PAYMENTS` even when operator answers "no online payments"
+- **HCI30 OPEN specs**: Permission/Contradiction/Time Decay — blocked on operator/product decisions (not code problems)
+- **mutation-coverage gate**: 2 graph algorithm defects in `explain_redundant_edge()`/`forced_prereq_qids()` (tracked, not urgent)
+- **Phase 4 Check 1/2**: 12 weeks of fake PASS in cloud; now honest SKIP; decision needed (option C: accept SKIP recommended)
+- **DOM testing infra**: next-admin has no jsdom/testing-library; 3 confirmed bugs uncatchable by current tests
+- **10 staging orphans**: 1969.7MB (4 unregistered, 3 deprovisioned, 6 DB-only); SG disk 67% (48G/75G)
+- **Cursor references**: 10 docs still instruct operator to "open in Cursor" (Cursor retired 2026-08-26)
+- **SECURITY DEFINER functions**: anon/authenticated gap could be silently reopened by future DROP+CREATE
 
 ---
 
-*Auto-generated by remote-weekly-agent on 2026-08-31T01:08:47Z*
+## System health
+
+> Note: integrated-status-LATEST.md was generated 2026-08-29 (9 days ago). No newer integrated status available from this session.
+
+| Component | Status |
+|-----------|--------|
+| Host | ks-aw-01 (145.239.195.47, SSH -p 58122) — single-machine era post 2026-08-30 |
+| Old hosts | SG (5.223.93.113) + EU (204.168.175.41) permanently deleted 2026-08-30 |
+| SG disk | 67% used (48G/75G) — staging orphan cleanup needed |
+| Soulful backups | 🔴 5/10 failures, last run failed |
+| Codex oracle | Quota restricted; stop-time review gate disabled |
+| Phase 4 detectors | Check 1/2 = SKIP in cloud (honest); local = PASS |
+| HCI30 tests | 181/181 pass (Node); 33 mutations all killed |
+| Cognitive OS | 1965 tests OK (Python product root); 48 slices total |
+| System Foundry | 226 questions, 265 capabilities — golden suite all PASS |
+
+---
+
+## Risks & blockers
+
+1. **🔴 CRITICAL — Backup reliability**: Soulful 5/10 backups failing. Migration impossible without reliable backup. Hard deadline 2026-11-12.
+2. **🔴 CRITICAL — Live site damage**: Soulful published article with broken video embed (DELETE without reference check). Customer-visible.
+3. **🔴 CRITICAL — Machine purchase deadline**: Must buy dedicated machine by 2026-09-30 to enable EU→dedicated migration.
+4. **🔴 HIGH — Credential exposure**: HF_TOKEN + 3 items from 2026-08-15 unrotated for 1–3 weeks.
+5. **🟠 MEDIUM — Governance**: 3 HCI30 specs OPEN; blocked on operator/product input (Permission trust profiles, Contradiction model, Time Decay).
+6. **🟠 MEDIUM — Oracle gap**: Codex quota restricted; stop-time review gate disabled; backup review path = self-review + mutation tests only.
+7. **🟠 MEDIUM — Parallel session governance**: WORKLOG header truncation happened twice on 2026-09-06 (parallel sessions committing during active sessions); `git add -A` in AO-CLOSE sweeps in-progress files from other sessions.
+
+---
+
+## Memory highlights
+
+- **Single-host epoch**: All 39 containers now on ks-aw-01 since 2026-08-30. No fallback host. Infra runbooks updated.
+- **Cognitive OS milestone**: 48 Method Atlas slices total; F20 security family 5/10 complete. Real Ollama LLM stack working for research pipeline (non-fixture).
+- **System Foundry v1.6**: 265 capabilities, 226 questions, 6 real gaps closed, mutation-coverage gate covers all 179 requires edges.
+- **HCI30 Wave 1**: tests grew 137→181 in one day (2026-09-06); 9 separate rounds of work; 3 OPEN specs require operator input.
+- **Anti-pattern #3**: "Claim non-existence without grep" caught for 3rd time in same session. P0-P6 Permission enum existed in corpus; false claim propagated to 4 files before being caught.
+- **Anti-pattern: WORKLOG truncation**: Parallel sessions committing to WORKLOG truncated each other's section headers twice on 2026-09-06. Fixed in separate commits each time. Root cause: `git add -A` cross-contamination.
+- **Security family design discovery**: F20 has at least 3 distinct structural shapes (per-element STRIDE/LINDDUN, genuine-compute AttackTree, fixed-pipeline PASTA) and first non-EC§32 member (DPIA/PIA).
+- **Key operator decisions pending**: Soulful machine purchase (deadline 9/30), HCI30 Permission/Contradiction/Time Decay specs, DOM testing infra, Phase 4 Check 1/2 approach.

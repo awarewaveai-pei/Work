@@ -12448,3 +12448,7 @@ The existing meeting worker has timed Whisper segments and SRT output, but the a
 
 [rollback]
 Revert the five documentation changes (`README.md`, `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`, `CURRENT_BASELINE_AND_GAP_AUDIT.md`, `PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md`, and `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`). Since no runtime path changed, the existing Quick Engine, manual Remotion and ffmpeg subtitle behavior continue unchanged.
+
+## 2026-09-07
+
+- 01:07 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-07.md
