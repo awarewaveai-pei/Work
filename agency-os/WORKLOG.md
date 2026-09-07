@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-07（learning.ooda docstring — OQ-OODA-2 狀態修正：重跑的是 due-diligence 比對，不是 contract yaml 自己那個撞號的 OQ-OODA-2）
+
+**觸發**：交接指示「pdca.py 已建好（127 tests），把 ooda.py:11-16 docstring 提到的『OQ-OODA-2 重跑比對』關閉」。R0 開工前 Glob 確認 `learning.ooda.contract.yaml` 是否存在，`find` 第一次跑空手（工具問題，非檔案真不存在）——差點直接照原指示把 docstring 標「OQ-OODA-2 CLOSED」出貨。
+
+**發現（撞號，非交接指示描述的那樣）**：`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/contracts/learning.ooda.contract.yaml:70` 真的有一個 `OQ-OODA-2`，但問的是「OODA 要不要改成 cycles[] array（像 PDCA）」，owner: operator，跟 docstring 那句「重跑 PDCA 重複性比對」完全是兩件事。該 yaml 自己的 `compilation_decisions`（L59-60）其實已經答過真正的重複性問題("Duplicate of PDCA?" → "No"，且 `verification` 註記自己讀過完整 pdca.py 338 行）。docstring 原句的「OQ-OODA-2」是撞號的孤兒標記，不是真正註冊過的 open question——第一版修正稿把它標成「OQ-OODA-2 CLOSED」會製造第二個撞號，已自行攔下重寫。
+
+**[已修改]**：`Projects/internal/cognitive-engineering-os/ai_lego/modules/learning/ooda.py:17-30`（docstring）——把「could not read pdca.py...See OQ-OODA-2」改寫成「Re-run (2026-09-07) 已確認非重複，引用 yaml 既有 `compilation_decisions` + 補結構性證據（`ooda.py:85-89` 單記錄無 cycles[] vs `pdca.py:26-29` cycles[] array + `pdca.py:118-135` 跨週期 continuity invariant）」，並加一段 NOTE 明講「OQ-OODA-2」這個字在 docstring 跟 yaml 裡指的不是同一題，避免未來讀者混淆。未動 `pdca.py`、未動任何 pdca contract/schema、未動 yaml 自己真正的 OQ-OODA-2（維持 operator-owned open）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile ai_lego/modules/learning/ooda.py` | exit=0 | result=COMPILE_OK（純 docstring 改動，無執行邏輯變化，語法驗證即完整覆蓋）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -c "^    def test_\|^def test_" tests/unit/test_pdca.py` | exit=0 | result=127（驗證交接指示「127 tests passing」宣稱屬實，非照抄未查證）
+- REVIEW_DONE: critic=Quick（self-review，Low risk 文件修正，未派 subagent）| verdict=pass（自審中攔到 1 個原本會出貨的錯誤：把 docstring 的 OQ-OODA-2 誤標關閉，撞號 yaml 自己真正、仍開放、operator-owned 的 OQ-OODA-2；修正後才 ship）| findings=0c/1m(自抓自修)/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`OQ-OODA-2` | hits=3（yaml×1 未動 + ooda.py×2 新 NOTE，無漏改、無其他檔案有 stale 引用；`agency-os/TASKS.md` 同步查過，無命中）
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：yaml 自己的 4 個 OQ-OODA-1..4 維持原樣（皆 operator-owned，非本次任務範圍）；cycles[] 設計題（真正的 OQ-OODA-2）仍待 operator 決定，本次比對證據（OODA 全程無 cycles[] 概念）可作該決策參考材料但未替 operator 下判斷。**環境備註**：本 session 系統層指派的隔離 worktree（`claude/zealous-jones-1c0e73`）沒有這批檔案（`ooda.py`/`pdca.py`/新 contract yaml 皆為 untracked，worktree 只共享已 commit 內容）——實際編輯在 `D:\Work` 主 checkout（`main` branch）完成，對齊本檔 R1/R2 一貫的單機直接 commit 慣例，非隔離 worktree 的 branch+draft PR 路徑。
+
+**[rollback]**：單一檔案單一 docstring 段落，`git revert` 或直接還原該 hunk；無 schema/behavior 變更。
+
 ## 2026-09-07（System Foundry v1.6 — 生成輸出深度驗證：非缺 domain object，是 3 個新 capability 的 obligation 敘述漏補）
 
 **任務範圍**：驗證前一輪補齊的 10 個 capability（`326cb5a45`）在真實生成物（非 catalog 存在性）裡是否有實質內容，非重跑 audit、非全 50 module。
@@ -13173,3 +13192,25 @@ After explicit approval, removed the clean local `D:\Worktrees\media-video-phase
 
 [rollback]
 No local rollback needed: `origin/main` retains integrated source and the historical bundle remains under `agency-os/docs/video_generator/_handoff_2026-09-07/`.
+
+## 2026-09-07 — System Foundry v1.6：真實 blueprint 內容抽取管線（不再只吐通用治理樣板）
+
+[scope]
+`foundry_generate.py` 過去每個 module 只輸出通用治理樣板（invariants/security/tests 等），不含 `Composable AI Commerce OS` 50 份 blueprint 文件的真實 Domain Objects/Service Contract/Events/Permissions/Data Rules/LEGO Test/DoD 內容。新增機械式（非 LLM）抽取管線，依 client 選擇的 module 範圍決定生成內容，不強塞完整 50-module 內容給小型客戶。
+
+- `generation/blueprint-doc-mapping.json`：51 個 generation module -> Commerce OS blueprint 檔名對照表（依 `reports/commerce-os-blueprint-gap-audit-2026-09-07.md` 的 CAP<->doc 對應 + `module-manifests.json` 的 `activated_by` 交叉核對）。40 個 business module 有對照（多數 1:1，如 `b2b`→18、`cross_border`→23、`shipping`→15；少數 1:N，如 `domain`→6 份、`analytics`→3 份、`payments`/`risk` 共用 20）；11 個明確不對照（7 個 platform-shape：`core/web/mobile/desktop/api/cli/custom`；4 個 pack 裡無對應文件：`offline/migration/hr/reliability`，理由寫在 JSON `unmapped_no_blueprint_doc`）。
+- `scripts/extract_blueprint_content.py`：解析 42 份被對照到的 blueprint doc，用「數字前綴剝除後的標題文字完全比對」（非子字串、非原始編號）比對 8 種 canonical section，逐字複製 body 到 `generation/blueprint-architecture-content.json`（42 docs，38 份有命中至少一個 section；4 份 connector 目錄型文件 `29/31/32/33` 因結構不符合 8 種 section 標題，命中 0 個，保留空紀錄以利追溯，非 bug）。
+- `foundry_generate.py`：`write_module_package` 對每個被選中且有 mapping 的 module 額外寫 `docs/modules/<mid>/BLUEPRINT_ARCHITECTURE.md`（合併其所有對照 doc 的抽取內容）；若 module 未對照或所有對照 doc 命中 0 section，不寫檔、不留 placeholder（`module_architecture_text()` 回傳 `None`）。此檔不列入 `MODULE_DOCS`（非強制 10-artifact 之一），因此不影響 `validate_doc_numbers.py` 的既有 10-artifact 斷言。
+- Capability 層級過濾（任務允許的加分項）：查核 `capabilities/catalog.json` 275 筆 description 純英文敘述，未含 Service Contract 裡的函式名稱字面文字（如 `classifyProduct()` 與 `CAP-HS-CODE` 的對應是任務描述人讀出來的語意判斷，非 catalog 資料裡可 grep 到的字串）。判定「不可廉價機械推導」，依任務明文指示不強做，維持 module 層級為 floor。
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/extract_blueprint_content.py` | exit=0 | ms=300（實際輸出 `docs=42 with_sections=38 empty=4`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=自寫驗證腳本產生 config(a) 全 NO（`modules=['core']`）vs config(b) 強制開 `cross_border+b2b+marketplace_ops+subscription_commerce`（`modules=9 個含全部 4 target`）並生成兩份輸出 | exit=0 | ms=約 8000 — config(a) 4 個 target module 的 `BLUEPRINT_ARCHITECTURE.md` 全部不存在（0/4）；config(b) 全部存在（4/4）；抽取內容逐字包含於對應原始 blueprint doc（`extracted_content in source_doc_text` 三處抽查 `18_B2B_Wholesale`/`43_Subscription_Commerce`/`23_Cross_Border_Compliance` 皆 `True`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests`（38 tests）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=15 個 gate script 全跑（`validate_versions/validate_foundry/validate_semantics/validate_configurator/validate_artifact_generation/validate_contract_fixtures/run_adversarial_contract_tests/test_bootstrap_e2e/test_configurator_e2e/test_configurator_http_e2e/test_selection_matrix/test_mutation_coverage/test_payment_commercial_gating/validate_manifest/validate_doc_numbers`）| exit=0 全 PASS（`test_selection_matrix`: pairwise_valid=27489, random=1000 全過；`validate_doc_numbers`: module_artifacts=10 未變，因新檔非強制 artifact）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/regenerate_integrity.py --write` 後 `validate_manifest.py` | exit=0 PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0/0/2（2 個 minor 記錄於此：(1) `integrations` module 對照到的 4 份 connector 目錄文件實際 0 section 命中，該 module 最終不會產出 `BLUEPRINT_ARCHITECTURE.md`——誠實結果非 bug，已在 mapping 追蹤；(2) `globalization` 只弱對照到 `22_Accounting_Tax.md` 的 multi-currency 段落，未涵蓋 i18n/RTL/timezone，因 pack 內無專屬 globalization 文件，已如實不強做）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`BLUEPRINT_ARCHITECTURE|blueprint-doc-mapping|blueprint-architecture-content|extract_blueprint_content` | hits=3（`foundry_generate.py`/`extract_blueprint_content.py`/`CHANGELOG_v1.6.md`，皆為本次新增，無殘留舊引用衝突）
+
+[rollback]
+`git revert` 本次 commit：移除 `generation/blueprint-doc-mapping.json`、`generation/blueprint-architecture-content.json`、`scripts/extract_blueprint_content.py`，並還原 `foundry_generate.py`/`manifest.json`/`CHANGELOG_v1.6.md`。既有 10-artifact 生成路徑完全不受影響（新增檔案為條件式附加，非取代）。

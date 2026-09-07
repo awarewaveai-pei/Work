@@ -3,11 +3,50 @@ from __future__ import annotations
 from pathlib import Path
 import argparse, json, tempfile, shutil, os, datetime, hashlib
 from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name, EXPECTED_BLUEPRINT_COUNT
+from extract_blueprint_content import doc_id as bp_doc_id
 
 MODULE_DOCS=[
  '00_REQUIREMENTS.md','01_ARCHITECTURE.md','02_CONTRACTS.md','03_SECURITY.md','04_DATA_AND_MIGRATION.md',
  '05_TEST_STRATEGY.md','06_OBSERVABILITY_AND_SRE.md','07_ROLLBACK_AND_RECOVERY.md','08_IMPLEMENTATION_BACKLOG.md'
 ]
+
+# canonical extraction key (extract_blueprint_content.SECTION_ALIASES) -> display title
+BP_SECTION_TITLES={
+ 'domain_objects':'Domain Objects','service_contract':'Public Service Contract',
+ 'events_published':'Events Published','events_consumed':'Events Consumed',
+ 'permissions':'Permissions','data_rules':'Data Rules','lego_test':'LEGO Test',
+ 'definition_of_done':'Definition of Done',
+}
+
+def blueprint_content_maps():
+    mapping=load('generation/blueprint-doc-mapping.json')['mapping']
+    content=load('generation/blueprint-architecture-content.json')['docs']
+    return mapping,content
+
+# Real blueprint architecture content, mechanically extracted (extract_blueprint_content.py) --
+# not the generic governance boilerplate in MODULE_DOCS. Returns None (write nothing, no
+# placeholder) when the module has no mapping, or every mapped doc matched zero sections.
+def module_architecture_text(mid,bp_mapping,bp_content):
+    blocks=[]
+    for fname in bp_mapping.get(mid,[]):
+        did=bp_doc_id(fname); entry=bp_content.get(did)
+        if not entry or not entry['sections']: continue
+        lines=[f'## {did}','',f'Source: `{entry["source_file"]}`','']
+        for key,title in BP_SECTION_TITLES.items():
+            sec=entry['sections'].get(key)
+            if not sec: continue
+            lines += [f'### {title}','',sec['content'],'']
+        blocks.append('\n'.join(lines).rstrip())
+    if not blocks: return None
+    header=f"""# {mid} — Blueprint Architecture Reference
+
+Status: **EXTRACTED_FROM_BLUEPRINT**
+Foundry: `{VERSION}`
+Module: `{mid}`
+Source pack: `agency-os/docs/Composable AI Commerce OS/Composable_AI_Commerce_OS_LEGO_Documentation_Pack`
+
+Content below is mechanically extracted (verbatim, unedited) from the matched blueprint doc(s) via `scripts/extract_blueprint_content.py`. It is real architecture content, not generic governance boilerplate. Regenerate from source if the blueprint docs change; do not hand-edit."""
+    return header+'\n\n'+'\n\n'.join(blocks)
 
 # newline='\n' pinned on both writers: every byte Foundry writes here is later sha256-hashed
 # (sha256_file below, and verify_artifact_manifest in test_selection_matrix.py) and is meant to
@@ -104,11 +143,13 @@ Module: `{mid}`
 """
     return common+'\n'+body
 
-def write_module_package(stage,mid,plan,module_manifest,obl,caps):
+def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content):
     d=stage/'docs/modules'/mid
     d.mkdir(parents=True,exist_ok=True)
     for role in MODULE_DOCS:
         write(d/role,module_doc_text(mid,role,plan,obl,caps))
+    arch_text=module_architecture_text(mid,bp_mapping,bp_content)
+    if arch_text is not None: write(d/'BLUEPRINT_ARCHITECTURE.md',arch_text)
     manifest={
       'schema_version':'1.0.0','module_id':mid,'status':'SELECTED','purpose':obl['purpose'],
       'activated_capabilities':[x for x in plan['module_reasons'].get(mid,[]) if x in caps],
@@ -243,10 +284,11 @@ def generate(plan,answers,custom,out_root):
     try:
         module_data={m['id']:m for m in load('generation/module-manifests.json')['modules']}
         obligations=load('generation/module-obligations.json')['modules']; caps,_=cap_maps()
+        bp_mapping,bp_content=blueprint_content_maps()
         for mid in plan['modules']:
             if mid not in module_data: raise ValueError('unknown generation module '+mid)
             if mid not in obligations: raise ValueError('missing module obligations '+mid)
-            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps)
+            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps,bp_mapping,bp_content)
         for rel in ['.foundry/intake','.foundry/resolution','.foundry/handoffs','.foundry/verification','.foundry/migration-history','docs/requirements','docs/blueprint']:
             (stage/rel).mkdir(parents=True,exist_ok=True)
         now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
