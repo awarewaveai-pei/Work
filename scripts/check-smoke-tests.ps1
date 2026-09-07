@@ -19,6 +19,10 @@
     4. n8n workflow failures (GET n8n/api/v1/executions?status=error — last 24h)
     5. Client outbound mail  (SSH soulful -> wp_fsmpt_email_logs; failures last 7d
        AND days since last successful send) — CRITICAL
+    6. Local Docker Desktop watchdog liveness (laptop only; heartbeat age of the
+       'Docker Desktop Runtime Watchdog' task, runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md)
+       — CRITICAL where the task exists: a dead watchdog is exactly the 2026-09-06
+       failure (two manual recoveries while nobody noticed it had died)
   ops-console-smoke skipped here — requires TenantId which varies by tenant.
   Run /smoke-test manually for full DoD including ops-console.
 #>
@@ -369,18 +373,49 @@ password=%s
     $noEvidence["client_mail"] = $true
 }
 
+# --- Check 6: local Docker Desktop watchdog liveness ---
+# Only this laptop registers the task (scripts/register-docker-desktop-runtime-tasks.ps1);
+# elsewhere "skip:no_task" is a true skip, not a blind spot. Where the task exists, a
+# stale/missing heartbeat means the self-healing loop is dead -> no evidence -> WARN.
+try {
+    $wdTask = Get-ScheduledTask -TaskName "Docker Desktop Runtime Watchdog" -ErrorAction SilentlyContinue
+    if ($null -eq $wdTask) {
+        $results["docker_watchdog"] = "skip:no_task"
+    } else {
+        $hb = Join-Path $env:LOCALAPPDATA "Docker\watchdog.heartbeat"
+        if ($wdTask.State -eq "Disabled") {
+            $results["docker_watchdog"]    = "warn:task_disabled"
+            $noEvidence["docker_watchdog"] = $true
+        } elseif (-not (Test-Path -LiteralPath $hb)) {
+            $results["docker_watchdog"]    = "warn:no_heartbeat"
+            $noEvidence["docker_watchdog"] = $true
+        } else {
+            $ageMin = [int]((Get-Date) - (Get-Item -LiteralPath $hb).LastWriteTime).TotalMinutes
+            if ($ageMin -gt 5) {
+                $results["docker_watchdog"]    = "warn:heartbeat_${ageMin}m_old"
+                $noEvidence["docker_watchdog"] = $true
+            } else {
+                $results["docker_watchdog"] = "ok:heartbeat_${ageMin}m"
+            }
+        }
+    }
+} catch {
+    $results["docker_watchdog"]    = "warn:exception"
+    $noEvidence["docker_watchdog"] = $true
+}
+
 # --- Verdict ---
 # Computed BEFORE the JSON write so the report carries the conclusion. Without it every
 # reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
 # by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail")
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog")
 
 # Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
 # monitoring has stopped, so reporting PASS would repeat the mistake that caused the
 # 2026-08-03 mail outage: FluentSMTP's own failure notice travelled through wp_mail, so
 # the alarm died with the channel it was watching. A detector that goes quiet must be
 # louder than one that reports nothing wrong.
-$criticalChecks = @("client_mail")
+$criticalChecks = @("client_mail","docker_watchdog")
 
 $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
 # Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and
@@ -409,6 +444,6 @@ if ($blindSpots.Count -gt 0) {
     $blindNote = " | BLIND: " + (($blindSpots | ForEach-Object { "$_=$($results[$_])" }) -join ",")
 }
 
-Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5}{6} ==" -f `
-    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"], $blindNote) -ForegroundColor $colour
+Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5} | docker_wd={6}{7} ==" -f `
+    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"], $results["docker_watchdog"], $blindNote) -ForegroundColor $colour
 exit 0
