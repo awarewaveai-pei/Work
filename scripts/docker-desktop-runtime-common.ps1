@@ -1,4 +1,4 @@
-# Shared by docker-desktop-runtime-preflight.ps1 and watch-docker-desktop-runtime.ps1.
+# Shared by docker-desktop-runtime-preflight.ps1.
 # Dot-source only; no side effects.
 Set-StrictMode -Version Latest
 

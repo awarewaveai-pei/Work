@@ -19,10 +19,9 @@
     4. n8n workflow failures (GET n8n/api/v1/executions?status=error — last 24h)
     5. Client outbound mail  (SSH soulful -> wp_fsmpt_email_logs; failures last 7d
        AND days since last successful send) — CRITICAL
-    6. Local Docker Desktop watchdog liveness (laptop only; heartbeat age of the
-       'Docker Desktop Runtime Watchdog' task, runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md)
-       — CRITICAL where the task exists: a dead watchdog is exactly the 2026-09-06
-       failure (two manual recoveries while nobody noticed it had died)
+    6. Local Docker Desktop launch guard (laptop only; 'Docker Desktop Runtime
+       Preflight' task enabled and no HKCU Run bypass,
+       runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md) — CRITICAL where the task exists
   ops-console-smoke skipped here — requires TenantId which varies by tenant.
   Run /smoke-test manually for full DoD including ops-console.
 #>
@@ -373,30 +372,50 @@ password=%s
     $noEvidence["client_mail"] = $true
 }
 
-# --- Check 6: local Docker Desktop watchdog liveness ---
-# Only this laptop registers the task (scripts/register-docker-desktop-runtime-tasks.ps1);
-# elsewhere "skip:no_task" is a true skip, not a blind spot. Where the task exists, a
-# stale/missing heartbeat means the self-healing loop is dead -> no evidence -> WARN.
+# --- Check 6: local Docker Desktop launch guard (laptop only) ---
+# runbooks/DOCKER-DESKTOP-LOCAL-RECOVERY.md: no background task relaunches Docker
+# (2026-09-07: a "resume from sleep" trigger was tried and found to never actually
+# fire - Kernel-Power EventID 107 fires on SLEEP ENTRY here, not on resume - so the
+# guard is launch-time only). Holds iff the logon Preflight task is enabled, it is
+# not stuck failing, no HKCU Run value launches Docker directly, and the per-user
+# shortcuts point at the guard. Machines without the task: "skip:no_task" is a true
+# skip, not a blind spot.
 try {
-    $wdTask = Get-ScheduledTask -TaskName "Docker Desktop Runtime Watchdog" -ErrorAction SilentlyContinue
-    if ($null -eq $wdTask) {
+    $pfTask = Get-ScheduledTask -TaskName "Docker Desktop Runtime Preflight" -ErrorAction SilentlyContinue
+    if ($null -eq $pfTask) {
         $results["docker_watchdog"] = "skip:no_task"
     } else {
-        $hb = Join-Path $env:LOCALAPPDATA "Docker\watchdog.heartbeat"
-        if ($wdTask.State -eq "Disabled") {
-            $results["docker_watchdog"]    = "warn:task_disabled"
-            $noEvidence["docker_watchdog"] = $true
-        } elseif (-not (Test-Path -LiteralPath $hb)) {
-            $results["docker_watchdog"]    = "warn:no_heartbeat"
-            $noEvidence["docker_watchdog"] = $true
-        } else {
-            $ageMin = [int]((Get-Date) - (Get-Item -LiteralPath $hb).LastWriteTime).TotalMinutes
-            if ($ageMin -gt 5) {
-                $results["docker_watchdog"]    = "warn:heartbeat_${ageMin}m_old"
-                $noEvidence["docker_watchdog"] = $true
-            } else {
-                $results["docker_watchdog"] = "ok:heartbeat_${ageMin}m"
+        $pfInfo  = Get-ScheduledTaskInfo -TaskName "Docker Desktop Runtime Preflight" -ErrorAction SilentlyContinue
+        $run     = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -ErrorAction SilentlyContinue
+        $bypass  = [bool]($run -and ($run.PSObject.Properties.Name -contains "Docker Desktop"))
+        $wscriptExe = Join-Path $env:SystemRoot "System32\wscript.exe"
+        $guardArgs  = '//B //Nologo "' + (Join-Path $root "scripts\docker-desktop-runtime-hidden-launch.vbs") + '" "' + (Join-Path $root "scripts\docker-desktop-runtime-preflight.ps1") + '" -StartDesktop'
+        $shPaths = @(
+            (Join-Path ([Environment]::GetFolderPath("Desktop")) "Docker Desktop.lnk")
+            (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Docker Desktop.lnk")
+        )
+        $unguardedShortcut = $false
+        try {
+            $wsh = New-Object -ComObject WScript.Shell
+            foreach ($lnk in $shPaths) {
+                if (-not (Test-Path -LiteralPath $lnk)) { continue }
+                $s = $wsh.CreateShortcut($lnk)
+                if (-not (($s.TargetPath -ieq $wscriptExe) -and ($s.Arguments -eq $guardArgs))) { $unguardedShortcut = $true }
             }
+        } catch { $unguardedShortcut = $true }
+        if ($pfTask.State -eq "Disabled") {
+            $results["docker_watchdog"]    = "warn:preflight_task_disabled"
+            $noEvidence["docker_watchdog"] = $true
+        } elseif ($null -ne $pfInfo -and $pfInfo.LastTaskResult -ne 0 -and $pfInfo.LastTaskResult -ne 267011) {
+            # 267011 = 0x41303 (task has not yet run, e.g. right after registration).
+            $results["docker_watchdog"]    = "warn:last_result_$($pfInfo.LastTaskResult)"
+            $noEvidence["docker_watchdog"] = $true
+        } elseif ($bypass) {
+            $results["docker_watchdog"] = "warn:run_key_bypasses_guard"
+        } elseif ($unguardedShortcut) {
+            $results["docker_watchdog"] = "warn:shortcut_unguarded"
+        } else {
+            $results["docker_watchdog"] = "ok:guarded"
         }
     }
 } catch {
