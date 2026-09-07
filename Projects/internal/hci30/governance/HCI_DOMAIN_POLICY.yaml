@@ -1,0 +1,68 @@
+# HCI Domain Policy — P0-05, 1 of 5
+#
+# Foundational, domain-wide rules. Transcribed from already-ACCEPTED ADRs
+# and `11_SECURITY_PRIVACY_GOVERNANCE.md`, not invented. `status` values:
+#   schema_enforced       - a real DB constraint/trigger/RLS policy exists today
+#   ci_gate_enforced       - a CI-blocking test exists today
+#   decided_implementation_open - ADR ACCEPTED, no runtime gate built yet
+#   advisory_only          - stated rule, no enforcement mechanism named anywhere
+# A rule below being present in this file does NOT by itself mean it is
+# enforced — read `status` on each entry. Existence here makes a rule
+# machine-*readable*; only `schema_enforced`/`ci_gate_enforced` rules are
+# machine-*enforced* today.
+
+version: 1
+source: "agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/11_SECURITY_PRIVACY_GOVERNANCE.md"
+
+data_classification:
+  levels: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED]
+  default_for_person_analysis_data: RESTRICTED
+  distinct_from: "Permission (access-control axis) -- see 02_PRODUCT_BOUNDARIES.md §Core Domain Objects; the two axes are orthogonal, do not conflate"
+  status: advisory_only
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:43-52"
+
+tenant_isolation:
+  rule: "every tenant-owned table carries tenant_id NOT NULL, forced DB-level RLS, and a CI-blocking cross-tenant read/write test under a non-owner non-superuser role"
+  adr: ADR-0016
+  hd: HD-05=A
+  status: schema_enforced
+  evidence: "RLS-COMPLETENESS-01/02 (database/tests/wave1-negative-tests.sql) + per-table RLS-LEAK-NN tests"
+  open_scope: "production deployment and portal integration remain open"
+
+customer_data_ownership:
+  rule: "customer data belongs to the customer subject to contract and applicable law"
+  defaults:
+    - "no cross-tenant person reputation database"
+    - "no training on enterprise evidence without explicit lawful authorization"
+    - "no resale of customer evidence"
+    - "no hidden public reputation score"
+  status: advisory_only
+  note: "the public-intelligence-specific instance of the first default (Claim/Source tenant-scoping) IS schema_enforced -- see HCI_PUBLIC_INTELLIGENCE_POLICY.yaml, ADR-0026"
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:82-86"
+
+admin_principle:
+  rule: "administrative authority does not automatically imply content access"
+  technical_control_required:
+    - "mandatory query-level audit logging (pgaudit or equivalent) for any DB session not originating from the application's service role, with alerting on RESTRICTED-table reads outside normal app patterns"
+    - "minimal BREAK_GLASS_ACCESS.md: time-bound elevation + mandatory justification + audit event, pulled forward to Wave 2"
+  status: decided_implementation_open
+  why_now: "direct Postgres/superuser access bypasses RLS and the application layer entirely -- a live, present-tense gap given the current solo-operator-plus-AI-agents reality, not a future-hire hypothetical"
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:35-39"
+
+ai_agent_credentials:
+  rule: "the standing-credential pattern (AI coding agents with routine SSH/DB access under CLAUDE.md/AGENTS.md governance) does NOT extend to the HCI production instance"
+  adr: ADR-0025
+  hd: HD-15
+  requirements:
+    - "synthetic/dev HCI stays fully open to agents"
+    - "no agent holds a standing credential to HCI production DB, host, or key material"
+    - "the only path is the Wave 2 break-glass procedure, extended to distinguish actor_class=agent from human"
+  status: decided_implementation_open
+  open_gates: ["reserved-name convention", "CI credential-absence scan", "break-glass agent clause"]
+  related_open_threat: "TM_AI_ANALYSIS.md's 'AI agents as an access-control actor' section (SEC-12) -- this policy is the ADR-level decision that section's threat still needs a runtime gate for"
+
+authentication_authorization_baseline:
+  authentication: ["MFA", "short-lived sessions", "strong service-account separation", "enterprise SSO", "SCIM where applicable"]
+  authorization: ["RBAC", "ABAC", "least privilege", "need-to-know", "just-in-time admin access"]
+  status: advisory_only
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:27-33"

@@ -85,6 +85,8 @@ Path: `D:\Work\Projects\internal\hci30\governance\{HCI_DOMAIN_POLICY.yaml, HCI_H
 
 Expected result: safety is enforceable, not advisory prose.
 
+**Partial closure (2026-09-07)**: all 5 files written, transcribing already-ACCEPTED ADRs rather than inventing new policy. Several rules turned out to be further along than the gap-analysis text implied: ADR-0019's cross-model authorship gate and ADR-0012's regulatory jurisdiction/purpose exclusions are both `SYNTHETIC GATE VERIFIED` with real functions/constraints and passing Docker-verified test suites, not merely decided. The one item this file was written specifically to close — the self-reflection→formal-trust-domain forbidden-transition enforcement — is **honestly NOT closed**: `HCI_METHOD_POLICY.yaml`'s `self_reflection_forbidden_transition` entry names the exact gate design (following AI LEGO's own per-method `forbidden_transition` naming convention) but no trigger/constraint exists yet preventing a self-reflection method's output from reaching a TrustDomain-scoped table — a rule is now machine-*readable*, not yet machine-*enforced*, and the file says so plainly rather than papering over it. Several other rules across the 5 files (protected-attribute exclusion, employment/HR boundary, purpose limitation, severe-evidence dual control, admin/break-glass, AI-agent credentials, data-protection roles) remain `advisory_only` or `decided_implementation_open` — named accurately per-rule, not glossed with one file-level status.
+
 ## P0-06 API + Event contracts
 
 Path: `D:\Work\Projects\internal\hci30\api\{openapi\hci-v1.yaml, asyncapi\hci-events-v1.yaml, schemas\, errors\}`. Define auth scopes, tenant context, pagination, idempotency, errors, concurrency, versioning, webhook signatures, deprecation.

@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-07（P0-05 Machine-readable policy——5 份 YAML，2 項比預期更完整已驗證，1 項核心缺口誠實未建）
+
+**產出**：`Projects/internal/hci30/governance/{HCI_DOMAIN_POLICY,HCI_HIGH_IMPACT_POLICY,HCI_PROTECTED_DATA_POLICY,HCI_PUBLIC_INTELLIGENCE_POLICY,HCI_METHOD_POLICY}.yaml`。每條規則自帶 `status`（`schema_enforced`／`ci_gate_enforced`／`code_enforced`／`decided_implementation_open`／`advisory_only`）欄位，不是檔案整體一個狀態。
+
+**HCI_DOMAIN_POLICY.yaml**：data classification／tenant isolation（ADR-0016，schema_enforced）／customer data ownership defaults／admin principle+break-glass（ADR-0025 相關）／AI agent credentials（ADR-0025，跟今天稍早 TM_AI_ANALYSIS.md 的 SEC-12 開放威脅是同一個決策層）。
+
+**HCI_HIGH_IMPACT_POLICY.yaml**：Employment/HR boundary；cross-model authorship gate（ADR-0019）——**查 ADR_INDEX 現況發現全部 5 個 gate 都已 `SYNTHETIC GATE VERIFIED`（208/208+101/101 mutation，2026-09-05），比 ADR_INDEX 自己開頭「Last reviewed」摘要行寫的「2,3,4,5-human-half」更完整——摘要行本身過期，已在 YAML 裡註記但不去改 ADR_INDEX.md 本身（超出本輪範圍）**；bias-check gate（已建，code_enforced）。
+
+**HCI_PROTECTED_DATA_POLICY.yaml**：protected attributes（advisory_only，找不到對應 CI gate）；regulatory scope（ADR-0012，**同樣查出比預期更完整**——`hci.tenants.jurisdiction`/`hci.cases.purpose` 兩個真實 constraint，88/88+28/28 mutation 綠燈；順手抓到並修正一個引用陷阱：ADR-0012 原文 Decision 段寫的欄位位置是 `hci.tenant_authorizations.purpose`，但 ADR 自己的 Implementation note 已重新錨定到 `hci.cases.purpose`——YAML 只引用現況錨點,避免重蹈 P0-08 那次 ADR-0026 舊筆記過期的同款坑）；data protection roles（ADR-0030，decided_implementation_open）。
+
+**HCI_PUBLIC_INTELLIGENCE_POLICY.yaml**：purpose limitation／severe-evidence dual control／investigation footprint（跟 TM_PUBLIC_INTELLIGENCE.md 交叉引用不重複）／Claim-Source tenant scoping（ADR-0026，schema_enforced，同步引用今天稍早在 TM_MULTI_TENANCY.md 記錄的 ADR-0026/0018 矛盾追蹤）／content isolation／outbound fetch isolation（皆交叉引用 TM_PUBLIC_INTELLIGENCE.md 不重複全文）。
+
+**HCI_METHOD_POLICY.yaml**（本項目要關的核心）：HCI must not duplicate／AI LEGO must not own／No Universal Human Trust Score（ADR-0004，schema_enforced，直接沿用 P0-01 那輪已驗證過的 `HCI_INVARIANTS.md` 內容，不重新查證）／**self-reflection forbidden-transition——誠實記錄為 `NOT_YET_BUILT`**：規則本身很明確（`05_HCI30_INTELLIGENCE_METHODS.md:146-147`「Forbidden: enterprise trust scoring, automatic risk decisions, protected-class inference」），AI LEGO 自己的 `forbidden_transition` 命名慣例也已找到真實案例可依循（`policy-inventory.yaml:948` 的 Fishbone gate），但這是**per-method 命名慣例，不是一個共用函式**——HCI 自己專屬的 gate（`forbidden_transition: SelfReflectionOutput -> FormalTrustDomainScore`）今天不存在，寫這份 YAML 不等於裝上這個約束，檔案自己講清楚「規則機器可讀≠機器可執行」，並記錄了關閉條件（trigger/應用層檢查 + 對應 negative test，比照 ADR-0004 已驗證過的 schema+catalog-assertion 雙機制模式）。ADR-0032 人格方法處置（decided_implementation_open）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "import yaml; ..."` 逐一 `yaml.safe_load` 5 份檔案 | exit=0 | result=5/5 全部語法正確可解析
+- REALTEST_EVIDENCE: tool=Grep | cmd=核對每個引用的 script/檔案真實存在（`check-no-universal-trust-column.ps1`／`bias-check-gate.mjs`）+ 每個 ADR 現況狀態逐一查 `ADR_INDEX.md` 而非憑記憶 | exit=0 | result=全部存在；過程中抓到 3 處認知落差（ADR-0019/ADR-0012 比預期完整、ADR-0026 欄位錨點已搬遷），逐一修正
+- REVIEW_DONE: critic=自審（Low risk，轉寫已 ACCEPTED 決定為結構化 YAML，非發明；核心新規則誠實標記未建非發明存在）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`governance/HCI_.*_POLICY\.yaml` | hits=僅本輪新檔+README/gap-analysis 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 5 份 `governance/*.yaml`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-05 補 partial-closure 段；`README.md` 補一行連結。
+
+**[剩餘風險]**：self-reflection forbidden-transition gate 完全未建，是本項目名義上要關的核心缺口；protected attributes 排除規則找不到對應 CI gate（advisory_only）；ADR_INDEX.md 自己的「Last reviewed」摘要行過期未修（超出本輪範圍，已在 YAML 註記留給下一個碰 ADR_INDEX 的 session）。
+
+**[rollback]**：`git revert`；純新增文件+既有文件補段落，無 schema 變更。
+
 ## 2026-09-07（P0-07 Tenant-context standard——3/8 欄位可轉寫已決 ADR-0009，5/8 全庫零先例誠實留 OPEN）
 
 **產出**：`Projects/internal/hci30/packages/contracts/tenant-context/TENANT_CONTEXT_STANDARD.md`。

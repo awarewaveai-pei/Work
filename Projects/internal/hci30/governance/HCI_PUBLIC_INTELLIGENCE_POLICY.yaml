@@ -1,0 +1,49 @@
+# HCI Public Intelligence Policy — P0-05, 4 of 5
+#
+# Rules specific to the Wave 6 web-fetch/claim-extraction pipeline. See
+# HCI_DOMAIN_POLICY.yaml header for the `status` vocabulary. Threat-actor
+# framing for this same pipeline lives in
+# `security/threat-models/TM_PUBLIC_INTELLIGENCE.md` (P0-08) — not repeated
+# here to avoid the two documents drifting out of sync.
+
+version: 1
+source: "06_HCI30_PUBLIC_INTELLIGENCE.md, 11_SECURITY_PRIVACY_GOVERNANCE.md §Purpose limitation/§Severe-evidence dual control"
+
+purpose_limitation:
+  rule: "a required purpose-attestation field is captured at Person-record creation"
+  research_modes: [Quick Search, Standard Research, Deep Due Diligence, Continuous Monitoring]
+  restriction: "Continuous Monitoring is restricted to Team/Enterprise tiers with an explicit ToS acknowledgment, backed by volume/anomaly detection feeding a trust-and-safety queue"
+  why: "HCI Personal (single-user private vault) + unrestricted Continuous Monitoring is structurally capable of enabling covert surveillance of a non-consenting private individual regardless of stated intent"
+  status: decided_implementation_open
+  source_line: "06_HCI30_PUBLIC_INTELLIGENCE.md §Research modes"
+
+severe_evidence_dual_control:
+  rule: "severe negative evidence (allegations, legal matters, governance concerns with high downstream decision weight) requires maker-checker (dual-control) review before contributing to a formal Assessment"
+  rationale: "a proportionate insider-threat control matching this document's mandate to actively hunt for underestimated risk, without over-building process for low-stakes evidence"
+  status: decided_implementation_open
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:121-123"
+
+investigation_footprint:
+  rule: "HCI's research activity against a Subject should not itself be detectable by that Subject"
+  status: decided_implementation_open
+  note: "requirement identified, no ADR has picked a mechanism yet -- see security/threat-models/TM_PUBLIC_INTELLIGENCE.md §Investigation-footprint detectability for the full account; not duplicated here"
+
+claim_source_tenant_scoping:
+  rule: "Claim, Source, and SourceSnapshot are tenant-scoped records, never shared or deduplicated at the record level across tenants -- closes the tension between re-crawl cost and the no-cross-tenant-reputation-DB default"
+  adr: ADR-0026
+  status: schema_enforced
+  evidence:
+    tests: ["RLS-CLAIM-01 (write-side)", "SOURCE-RLS-01 (read-side)"]
+    verified: "102/102 assertions + 37/37 mutations killed, 2026-09-05"
+  still_open: "DSR-CLAIM-DELETE-01 (gate 3) -- see security/threat-models/TM_MULTI_TENANCY.md for the full account, including a discovered-but-unresolved staleness in this ADR's own blocking rationale"
+
+content_authenticity_and_isolation:
+  rule: "fetched web content is untrusted by default; wrapped, never concatenated into a prompt carrying system instructions; baseline authenticity check (hash/EXIF, reverse-search corroboration for high-stakes claims) runs before evidence admission"
+  status: decided_implementation_open
+  note: "full detail in security/threat-models/TM_PUBLIC_INTELLIGENCE.md §Web prompt injection and TM_AI_ANALYSIS.md; not duplicated here"
+
+outbound_fetch_isolation:
+  rule: "the Wave 6 fetch step runs in a dedicated, network-isolated worker; Trigger.dev orchestrates but never fetches"
+  adr: ADR-0029
+  status: decided_implementation_open
+  note: "full detail in security/threat-models/TM_PUBLIC_INTELLIGENCE.md §SSRF / malicious redirects; not duplicated here"

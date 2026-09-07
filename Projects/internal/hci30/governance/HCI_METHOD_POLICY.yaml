@@ -1,0 +1,50 @@
+# HCI Method Policy — P0-05, 5 of 5
+#
+# Cognitive-method governance: what HCI must not duplicate from AI LEGO, and
+# the self-reflection -> formal-trust-domain boundary this file exists
+# specifically to convert from prose into an enforceable gate (P0-05's own
+# "Must incorporate, new in V2" item 2). See HCI_DOMAIN_POLICY.yaml header
+# for the `status` vocabulary.
+
+version: 1
+source: "09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md §HCI must not duplicate, 05_HCI30_INTELLIGENCE_METHODS.md §Self-reflection"
+
+hci_must_not_duplicate:
+  rule: "where AI LEGO already provides a general capability, HCI integrates rather than reimplements"
+  capabilities: [Red Team, ACH, Premortem, "generic Decision Matrix", "generic Root Cause", "workflow replay", "cross-model convergence", "generic handoff", "model routing", "method selection framework"]
+  status: advisory_only
+  source_line: "09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md:100"
+
+ai_lego_must_not_own:
+  rule: "AI LEGO must not own: HCI Person records, HCI relationships, HCI trust scores, HCI public claims, HCI cooperation decisions"
+  status: advisory_only
+  source_line: "09_AI_LEGO_COGNITIVE_OS_BOUNDARY.md:96-98"
+
+no_universal_human_trust_score:
+  rule: "TrustDomain data is always domain-scoped (tenant_id, person_id, domain) and evidence-linked, pinned to the same Person -- no aggregate/composite/universal trust column may exist without an unconditionally-NOT-NULL domain column"
+  adr: ADR-0004
+  status: schema_enforced
+  evidence:
+    ci_lint: "scripts/check-no-universal-trust-column.ps1"
+    live_catalog_assertion: "TRUST-NO-AGGREGATE-COLUMN-01"
+    forbidden_column_pattern: "overall_score|composite_trust|aggregate_trust|universal_trust|^trust_score$"
+  note: "two independent mechanisms (lint + live-catalog) so a lint-text change alone cannot silently reopen this -- see docs/domain/HCI_INVARIANTS.md for the full account"
+
+self_reflection_forbidden_transition:
+  rule: "self-reflection frameworks (personal reflection, analyst bias awareness, communication reflection) must never feed formal enterprise trust scoring, automatic risk decisions, or protected-class inference"
+  source_line: "05_HCI30_INTELLIGENCE_METHODS.md:146-147"
+  allowed_self_reflection_outputs: ["personal reflection", "analyst bias awareness", "communication reflection"]
+  forbidden_destinations: ["enterprise trust scoring", "automatic risk decisions", "protected-class inference"]
+  enforcement_design:
+    pattern_to_follow: "AI LEGO's own forbidden_transition naming convention, already used per-method in its contract gates (e.g. Fishbone's 'forbidden_transition: CauseHypothesisSet -> FinalCausalFact', agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/.ai/research/phase-0/policy-inventory.yaml:948) -- this is a per-method gate-naming pattern, not one shared library function to call"
+    hci_gate_name_if_built: "forbidden_transition: SelfReflectionOutput -> FormalTrustDomainScore"
+  status: NOT_YET_BUILT
+  honest_gap: "this is the precise gap this policy file was written to close, and it is not closed by this file's existence alone. The rule is now machine-readable (this YAML); it is not yet machine-enforced -- no HCI-specific gate/trigger/constraint exists today preventing a self-reflection method's output from being written into a TrustDomain-scoped table. Writing the actual gate is real code work (a trigger or application-layer check keyed on method_id/category, per §Method contract's own method_id/category fields) that this documentation-transcription pass did not attempt, matching the same discipline applied to ADR-0022's gates 2-5 and ADR-0026's gate 3 elsewhere in this batch of work -- naming the gap precisely rather than rushing an unverified constraint."
+  what_would_close_this: "a migration adding a trigger (or the application layer, once one exists) that inspects self-reflection-category method outputs before any write into a TrustDomain-scoped table, plus a negative test proving a self-reflection output cannot reach that table even via a direct insert -- mirroring the no_universal_human_trust_score entry above's two-mechanism (schema + catalog-assertion) pattern"
+
+adr0032_personality_method_disposition:
+  rule: "Big Five = IPIP-NEO-120 (third_party_inferred one grade below self_report); MBTI-style typing REMOVED; Enneagram ungraded self-reflection only; Zi Wei Dou Shu/Bazi REMOVED from any third-party-targeting path (self-only entertainment, third_party_allowed=false immutable); qualitative confidence bands (ICD 203) replace bare percentages until Confidence Algorithm v1 ships"
+  adr: ADR-0032
+  hd: HD-23
+  status: decided_implementation_open
+  open_gates: ["method-contract schema", "grade-delta trigger", "MBTI/Enneagram/third-party-invocation gates", "confidence-band gate"]

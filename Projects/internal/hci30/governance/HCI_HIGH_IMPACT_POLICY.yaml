@@ -1,0 +1,63 @@
+# HCI High-Impact Policy — P0-05, 2 of 5
+#
+# Employment/HR-adjacent decisions and the cross-model authorship gate. See
+# HCI_DOMAIN_POLICY.yaml header for the `status` vocabulary.
+
+version: 1
+source: "11_SECURITY_PRIVACY_GOVERNANCE.md §Employment / HR boundary, 10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md §Cross-model gate by risk"
+
+employment_hr_boundary:
+  rule: "HCI may support decision-making but must not become an autonomous engine for: Hire, Fire, Promotion, Compensation"
+  high_impact_employment_requirements:
+    - human_review
+    - explainable_evidence
+    - local_policy_jurisdiction_check
+    - protected_attribute_exclusion
+    - decision_logging
+  regulatory_note: "plausibly intersects US FCRA (consumer-reporting-agency-adjacent) and EU AI Act high-risk profiling (Annex III point 4) -- see HCI_PROTECTED_DATA_POLICY.yaml §regulatory_scope, ADR-0012"
+  status: advisory_only
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:74-80"
+
+cross_model_authorship_gate:
+  rule: "every field is classified into exactly one authorship tier; an unenumerated field defaults to HUMAN_ONLY until amended"
+  adr: ADR-0019
+  hd: HD-08
+  tiers:
+    MUST_BE_DETERMINISTIC:
+      - "identity MATCH_CONFIRMED for RESTRICTED subjects"
+      - "evidence admission-state transitions"
+      - "retention/deletion enforcement"
+      - "protected-attribute filtering"
+      - "all locked-record writes"
+    MAY_BE_PROBABILISTIC:
+      - "source-quality grading"
+      - "confidence scores (kept separate per §Confidence separation, never collapsed into one number)"
+    MAY_BE_LLM_ASSISTED_WITH_HUMAN_REVIEW_FLAG:
+      - "synthesis"
+      - "hypothesis generation"
+      - "AI LEGO cognitive-method outputs"
+    MUST_NEVER_BE_LLM_ALONE:
+      - "final PROCEED/PAUSE/EXIT decision"
+      - "any employment-adjacent output"
+      - "UNKNOWN/HYPOTHESIS -> SOURCE_FACT promotion"
+      - "any locked-record write"
+  additional_gates_v2:
+    - "every AI-generated claim requires a human spot-check before Assessment-candidate admission, regardless of case risk tier"
+    - "LOW-tier-cleared claims are re-audited when a case's risk tier is later elevated"
+  status: schema_enforced
+  evidence:
+    functions: ["hci.enforce_field_author_class()", "hci.enforce_claim_state_admission()", "hci.flag_claims_on_risk_elevation()", "hci.enforce_decision_reaudit_gate()"]
+    tables: ["hci.decision_claims", "hci.principals", "epistemic_label + epistemic_verifier_principal_id on hci.subject_records"]
+    migrations: ["0008_wave1_field_author_class_policy_up.sql", "0009_wave1_adr0019_hardening_up.sql", "0010_wave1_epistemic_label_up.sql"]
+    verified: "208/208 assertions + 101/101 mutations killed, 2026-09-05 -- all 5 of ADR-0019's own named gates SYNTHETIC GATE VERIFIED per governance/ADR_INDEX.md"
+  index_staleness_note: "ADR_INDEX.md's own top-of-file 'Last reviewed' summary line (line 5) undercounts this as '2,3,4,5-human-principal-half landed' -- its own later per-ADR detail row (line 77) shows all 5 gates landed as of 0010's same-day closure. Not fixed here (out of scope for a P0-05 policy pass); flagged as a small governance-doc drift for whoever next touches ADR_INDEX.md's header."
+
+bias_check_gate:
+  rule: "Stage 4+ EXIT/PROCEED_WITH_CONTROLS decisions must complete a bias-check before finalize; 'completed' does not mean every question answered YES -- an honest NO also counts as completed"
+  source: "04_HCI30_PRODUCT_SPEC.md:138, implemented as docs/intelligence/HCI_DECISION_BIAS_CHECK_GATE.md"
+  status: code_enforced
+  evidence:
+    file: "Projects/internal/hci30/packages/intelligence/bias-check-gate.mjs"
+    functions: ["requiresBiasCheck", "isBiasCheckComplete", "assertBiasCheckGate"]
+    verified: "181/181 Node assertions, 33/33 mutations killed, 2026-09-06"
+  scope_note: "input is only {stage, decision} -- does not touch Trust Domain profile data at all; not a P0-04 spec"

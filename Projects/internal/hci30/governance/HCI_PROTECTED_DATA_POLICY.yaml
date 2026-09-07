@@ -1,0 +1,39 @@
+# HCI Protected-Data Policy — P0-05, 3 of 5
+#
+# Protected attributes, regulatory market scope, and data-protection roles.
+# See HCI_DOMAIN_POLICY.yaml header for the `status` vocabulary.
+
+version: 1
+source: "11_SECURITY_PRIVACY_GOVERNANCE.md §Protected data restrictions/§Regulatory Scope/§Data Protection Roles"
+
+protected_attributes:
+  rule: "formal scoring must not use irrelevant protected/sensitive traits"
+  excluded_categories: ["race", "religion", "sexual orientation", "health conditions", "private sex life", "political affiliation", "similar sensitive categories"]
+  inference_prohibition: "AI must not infer these from face, voice, name, or communications for HCI decisions"
+  status: advisory_only
+  note: "no named CI gate or schema constraint found for this rule specifically -- distinct from ADR-0019's field-authorship gates, which are schema_enforced but govern a different axis (who/what may write a field, not which traits may feed scoring)"
+  source_line: "11_SECURITY_PRIVACY_GOVERNANCE.md:68-72"
+
+regulatory_scope:
+  rule: "V1 excludes (a) tenants/Subjects in the EU/EEA/UK, and (b) employment/credit/housing/insurance/other FCRA-adjacent purposes"
+  adr: ADR-0012
+  hd: HD-20 / REG-01
+  enforcement_mechanism: "a jurisdiction deny-list on hci.tenants + a purpose allow-list, database CHECK constraints rejecting excluded values at write time -- not contractual, not prose"
+  status: schema_enforced
+  evidence:
+    columns: ["hci.tenants.jurisdiction (deny-list)", "hci.cases.purpose (allow-list)"]
+    migration: "0003_wave1_regulatory_market_scope_up.sql"
+    verified: "88/88 assertions + 28/28 mutations killed, 2026-09-05"
+    anchor_correction: "the ADR's own original Decision text named hci.tenant_authorizations.purpose; the ADR's own later Implementation note re-anchored this to hci.cases.purpose once Case existed as a real table -- this file cites the current anchor, not the superseded one"
+  deliberately_not_built: "an H1012 trigger -- the ADR's own Implementation note found CHECK constraints alone have no bypass, making a trigger redundant"
+  still_open: ["Wave 6 CONTMON-PURPOSE-01", "Wave 9 market-expansion lock"]
+  exit_condition: "entering either excluded class requires a compliance program and a superseding ADR -- not a config flag flip"
+
+data_protection_roles:
+  rule: "Aware Wave is a data PROCESSOR for tenant-directed research, and a data CONTROLLER for two self-determined activities: operating the Public Intelligence pipeline, and operating the DataSubjectRequest channel"
+  adr: ADR-0030
+  hd: HD-21 / REG-02
+  requirement: "every processing activity carries a recorded role; the customer DPA template reflects processor for tenant-directed work and discloses controller for the other two"
+  status: decided_implementation_open
+  open_gates: ["Data Protection Roles Memo", "controller_role schema column", "DPA template"]
+  caveat: "design determination pending qualified-counsel review before any real-person processing"
