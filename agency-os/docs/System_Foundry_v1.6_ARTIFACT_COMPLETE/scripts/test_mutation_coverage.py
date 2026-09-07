@@ -225,6 +225,75 @@ def forced_prereq_qids(qid):
     # Questions transitively forced to True by qid's own active_when chain.
     return _forced_by_condition(QMAP[qid].get('active_when'), frozenset({qid}))
 
+REVERSE_REQUIRES = {}
+for _c in CAPS:
+    for _dep in _c.get('requires', []):
+        REVERSE_REQUIRES.setdefault(_dep, []).append(_c['id'])
+
+def _own_question_path_forces(cid, dep_id, exclude_edge):
+    """True if EVERY driving question of cid transitively forces a rule that requires dep_id
+    (excluding exclude_edge) -- same check explain_redundant_edge() applies to cap_id itself,
+    factored out so _reverse_requirers_force_dep can apply it to a reverse-requirer too. A
+    capability with no driving question at all returns False here (nothing to guarantee via this
+    route) -- callers combine it with closure_requires for the full picture."""
+    driving = CAP_TO_DRIVING_QIDS.get(cid, [])
+    if not driving:
+        return False
+    return all(
+        any(
+            dep_id in closure_requires(rcid, exclude_edge=exclude_edge)
+            for fq in forced_prereq_qids(qid)
+            for rule in QRULES if rule['when']['question'] == fq and rule['when'].get('equals') is True
+            for rcid in rule.get('require', [])
+        )
+        for qid in driving
+    )
+
+def _cap_guarantees_dep(cid, dep_id, exclude_edge, seen, origin):
+    """True if dep_id is guaranteed present whenever cid is present in a plan, through ANY of
+    cid's own entry mechanisms (excluding exclude_edge): its requires-closure; its own
+    question-driven path, if it has one (ALL of its driving questions must force dep_id, since
+    any single one of them alone can select cid); every derivation rule that can derive cid (a
+    DER-* capability's only way to exist is that its when_capability trigger was ALREADY present,
+    so this recurses on the trigger, not on cid's own closure/question path); and, when none of
+    those apply, cid's own reverse-requirers, recursively. A capability can be pulled in by more
+    than one of these mechanisms at once, and ALL that apply must be safe -- any one of them alone
+    is enough to introduce cid.
+
+    `origin` is the capability whose own entry path explain_redundant_edge() already verified
+    safe BEFORE starting this walk -- revisiting it here (e.g. a DER-* capability whose trigger IS
+    origin, such as DER-PAYMENT-ADAPTER's trigger being CAP-PAYMENTS itself) is not a new risk:
+    that DER-* capability can only exist as a side effect of origin already being present via a
+    mechanism already proven safe, and any OTHER, unsafe way origin might become present is
+    independently caught by this same reverse-requirers walk over origin's own entries. Revisiting
+    any OTHER capability via `seen` means a genuine cycle (none exist in this catalog today) and
+    fails closed rather than risk a false 'safe'."""
+    if cid == origin:
+        return True
+    if cid in seen:
+        return False
+    seen = seen | {cid}
+    if dep_id in closure_requires(cid, exclude_edge=exclude_edge):
+        return True
+    driving = CAP_TO_DRIVING_QIDS.get(cid, [])
+    if driving and not _own_question_path_forces(cid, dep_id, exclude_edge):
+        return False
+    deriving_rules = [r for r in DRULES if cid in r['derive']]
+    if deriving_rules and not all(
+        _cap_guarantees_dep(r['when_capability'], dep_id, exclude_edge, seen, origin) for r in deriving_rules
+    ):
+        return False
+    requirers = REVERSE_REQUIRES.get(cid, [])
+    if requirers and not all(_cap_guarantees_dep(r, dep_id, exclude_edge, seen, origin) for r in requirers):
+        return False
+    return bool(driving or deriving_rules or requirers)
+
+def _reverse_requirers_force_dep(cid, dep_id, exclude_edge):
+    """True if EVERY capability that (directly) `requires` cid guarantees dep_id is present
+    whenever IT is present (see _cap_guarantees_dep). No reverse-requirers at all vacuously holds
+    True (there is nothing else that could smuggle cid into a plan without dep_id)."""
+    return all(_cap_guarantees_dep(r, dep_id, exclude_edge, {cid}, cid) for r in REVERSE_REQUIRES.get(cid, []))
+
 def explain_redundant_edge(cap_id, dep_id):
     """Returns a one-line reason if (cap_id, dep_id) is structurally redundant via a mechanism
     independent of this specific edge, else None (meaning: genuinely unexplained)."""
@@ -270,37 +339,39 @@ def explain_redundant_edge(cap_id, dep_id):
             for cid in r['derive']:
                 if dep_id in closure_requires(cid, exclude_edge=(cap_id, dep_id)):
                     return f'{dep_id} is reachable via {r["id"]}\'s own derived {cid} -> ... -> {dep_id} chain'
-    # KNOWN GAP (2026-09-06, second independent critic review, agency-os/TASKS.md System Foundry
-    # "explain_redundant_edge() entry-path enumeration" item): this shape and the two DER-*
-    # shapes above only enumerate ONE way cap_id can enter a plan -- a question rule directly
-    # requiring it. They do not check whether a DIFFERENT capability's own `requires` closure, or
-    # a derivation rule's `derive` list, can also pull cap_id in without forcing dep_id (real
-    # counterexample: CAP-ROLES -> CAP-IDENTITY is empirically load-bearing because
-    # CAP-B2B-BUYER-ROLES independently `requires: [CAP-B2B, CAP-ROLES]` through its own
-    # active_when chain, which never forces CAP-IDENTITY -- yet every question rule that directly
-    # selects CAP-ROLES happens to also force CAP-IDENTITY, so this function wrongly calls it
-    # explained). A prior attempt at fixing this by also checking every OTHER capability's
-    # `requires`-graph closure for dep_id, without ALSO checking that other capability's own
-    # active_when-forced chain, broke 8 currently-correct redundant classifications into false
-    # unexplained FAILs on the real catalog -- reverted rather than shipped, per this repo's own
-    # rule against a rushed fix with a larger blast radius than the bug it fixes. The empirical
-    # PASS/FAIL verdict this file exists to produce is NOT affected by this gap (that check
-    # mutates the real edge and re-resolves, so CAP-ROLES->CAP-IDENTITY is correctly counted
-    # load-bearing regardless) -- only this explanatory string can be wrong.
     driving = CAP_TO_DRIVING_QIDS.get(cap_id, [])
-    if driving:
-        for qid in driving:
-            forced = forced_prereq_qids(qid)
-            reached = any(
-                dep_id in closure_requires(cid, exclude_edge=(cap_id, dep_id))
-                for fq in forced
-                for rule in QRULES if rule['when']['question'] == fq and rule['when'].get('equals') is True
-                for cid in rule.get('require', [])
-            )
-            if not reached:
-                return None
-        return f'every question that selects {cap_id} is active_when-gated behind a question that already requires {dep_id}'
-    return None
+    if not driving:
+        return None
+    own_path_ok = all(
+        any(
+            dep_id in closure_requires(cid, exclude_edge=(cap_id, dep_id))
+            for fq in forced_prereq_qids(qid)
+            for rule in QRULES if rule['when']['question'] == fq and rule['when'].get('equals') is True
+            for cid in rule.get('require', [])
+        )
+        for qid in driving
+    )
+    if not own_path_ok:
+        return None
+    # 2026-09-07 fix (second independent critic review, TASKS.md "explain_redundant_edge()
+    # entry-path enumeration" item): the check above only proves dep_id is forced along cap_id's
+    # OWN question-driven entry path. cap_id can ALSO enter a plan through a completely different
+    # capability's `requires` edge (capability_closure() pulls it in transitively) -- real
+    # counterexample: CAP-ROLES -> CAP-IDENTITY's own question path forces CAP-IDENTITY correctly,
+    # but CAP-B2B-BUYER-ROLES independently `requires: [CAP-B2B, CAP-ROLES]` through a driving
+    # question chain that never forces CAP-IDENTITY, so CAP-ROLES can enter WITHOUT CAP-IDENTITY
+    # via that route. _reverse_requirers_force_dep verifies every such alternate entry point
+    # ALSO guarantees dep_id -- through its own requires-closure OR its own question-driven path,
+    # recursively -- before the edge counts as explained. A prior attempt only checked the
+    # reverse-requirer's requires-closure and skipped its own question-driven path, which broke 8
+    # currently-correct redundant classifications into false unexplained FAILs on the real catalog
+    # (reverted rather than shipped); this version's own regression check re-verifies the full
+    # 103-edge redundant set is unchanged before this fix is trusted (see tests/).
+    if not _reverse_requirers_force_dep(cap_id, dep_id, (cap_id, dep_id)):
+        return None
+    return (f'every question that selects {cap_id} is active_when-gated behind a question that '
+            f'already requires {dep_id}, and every other capability that also requires {cap_id} '
+            f'independently guarantees {dep_id} too')
 
 def main():
     # Precompute one baseline (unmutated) resolve() per question's minimal-activation config,

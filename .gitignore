@@ -181,3 +181,13 @@ agency-os/Backups/
 # 且可能讓人讀到與原始碼不一致的舊 bytecode。
 __pycache__/
 *.py[cod]
+
+# System Foundry's own generated-project output (scripts/serve_configurator.py's
+# --output-root default, and foundry_generate.py's default) -- real user output, not
+# source, and every configurator run creates a new one (2026-09-07: first hit when an
+# empirical end-to-end test run left a generated project in the working tree).
+agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generated/
+# start_server.ps1 (desktop-shortcut launcher) redirects the server's stdout/stderr
+# here every time someone runs it -- runtime output, not source.
+agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/server.log
+agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/server.err.log

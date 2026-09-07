@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-07（System Foundry 收尾第二輪：TASKS.md 最後一項殘留盲點修正 + 桌面捷徑 + 真實瀏覽器端到端實證）
+
+**觸發**：操作者「已完成System Foundry嗎?」→「去處理好, 而且去實證是否System Foundry可用」。
+
+**修正 `explain_redundant_edge()` 反向 requirer 入場路徑**：新增 `_cap_guarantees_dep()`/`_reverse_requirers_force_dep()`，對每個反向 requirer 遞迴驗證 dep_id 是否被獨立保證（requires 閉包／question-rule 路徑／derivation trigger 三種入場機制皆涵蓋）。`CAP-ROLES->CAP-IDENTITY` 正確變回 unexplained。**過程中真的重演了上一項警告過的同一個坑**：第一版把 `DER-PAYMENT-ADAPTER`/`DER-PAYMENT-IDEMPOTENCY`/`DER-PAYMENT-RECON`（trigger 就是被測 cap_id 自己的 DER-* 反向 requirer）誤判不安全，178 條邊裡 3 條從 explained 掉回 unexplained（`MUTATION COVERAGE: FAIL`）；根因是遞迴 cycle-guard 沒區分「繞回最外層已驗證安全的 origin」跟「真正的循環」，加 `origin` 參數區分後修正。修正前後對 103 條 redundant 邊逐條比對，集合完全一致（regression=0）。9 個回歸測試（含新的 `ReverseRequirerEntryPathTests` 2 個），`git stash` 還原前兩者皆正確報錯，證明非空跑。
+
+**桌面捷徑**：`scripts/start_server.ps1`（新，配對既有 `apps/meeting-service/start_server.ps1` 慣例：偵測埠是否已監聽→避免重複啟動、`Start-Process` 脫鉤、輪詢等 server 起來再開瀏覽器）+ 桌面捷徑「啟動 System Foundry.lnk」。**第一版有真實 bug**：`Write` 工具存檔未帶 UTF-8 BOM，PowerShell 5.1（`WindowsPowerShell\v1.0`，非 `pwsh`）沒 BOM 會用系統 ANSI（CP950）誤讀腳本裡的中文字，造成字串結尾判斷錯位、`ParserError: TerminatorExpectedAtEndOfString`——這正是本 repo `reference_cjk_bash_cron_encoding` 記憶點名的同一個坑，這次是自己真的踩到。補 BOM 後重新實測：直接跑腳本＋雙擊真正的 `.lnk`（`Start-Process` 觸發，非模擬），兩次都在 2 秒內偵測到埠監聽、HTTP 200。
+
+**真實瀏覽器端到端實證（不是跑內部驗證腳本，是像真使用者一樣用）**：透過 Browser pane 開 `http://127.0.0.1:8765`，逐題點選一個真實電商情境（外部客戶使用／瀏覽器介面／使用者帳號＋自行註冊／客戶資料／商品資料／訂單資料／庫存資料／向客戶收費／線上付款），點「驗證並預覽」與「送出並生成」。`/api/resolve` 回傳的 plan 正確產出 `CAP-COMMERCIAL`／`CAP-IDENTITY`／`CAP-PAYMENTS` 等 10 個使用者選擇的 capability，且**推導出的 derived capability 剛好就是本輪修正的核心對象**（`DER-PAYMENT-ADAPTER`/`DER-PAYMENT-IDEMPOTENCY`/`DER-PAYMENT-RECON`）——證明這不是純理論邊界案例，是真實可達的組態。`/api/generate` 在磁碟上產出 180 個真實檔案（`.foundry/` 控制平面、7 個模組的 `apps/`、73 個 blueprint 章節正確分類 64 ACTIVE/9 NOT_APPLICABLE），`generation-coverage.json` 自我檢查通過。新增 `.gitignore` 規則排除 `generated/` 輸出目錄與 `scripts/server*.log`（跑一次配置器就會產生，不該進 repo）。
+
+**驗證**：15 步 verify chain 全綠；`python -m unittest discover -s tests` 38/38（36→38，新增 2 個回歸測試）；`manifest.json`/`QUALITY_STRENGTH_MATRIX.md`（15 gate scripts + 38 unit tests，日期更新為 2026-09-07）最後重新產生。
+- REALTEST_EVIDENCE: tool=Bash | cmd=15-step verify chain + unittest discover -s tests | exit=0 全部
+- REALTEST_EVIDENCE: tool=Bash(powershell) | cmd=Start-Process 'C:\Users\user1115\Desktop\啟動 System Foundry.lnk' 後輪詢埠 8765 | exit=0 | result=listening=True after 2s, HTTP 200
+- REALTEST_EVIDENCE: tool=Browser | cmd=真實瀏覽器點選問卷→/api/resolve→/api/generate | exit=200/200 | result=180 個真實檔案，plan 含本次修正對象 DER-PAYMENT-ADAPTER 等三個 capability
+- REVIEW_DONE: critic=自審（3 個獨立反例重跑：CAP-ROLES 誤判修正、DER-PAYMENT-ADAPTER 自我回歸重演與修正、103 條 redundant 邊逐條 diff）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE,agency-os/TASKS.md | grep=REVERSE_REQUIRES\|_cap_guarantees_dep\|start_server.ps1 | hits=0 殘留舊模式
+
+**剩餘風險**：無已知開放項——TASKS.md「System Foundry v1.6」段落全部 `[x]`。捷徑本身的中文檔名/路徑跨機可能不一致（僅本機 `user1115` 桌面路徑，換人或換機需重建）。
+
+**rollback**：`git revert <本 commit>`；捷徑本身刪除 `C:\Users\user1115\Desktop\啟動 System Foundry.lnk` 即可，不影響 repo。
+
+
 ## 2026-09-07（Docker watchdog 第三輪：event trigger 從未真正開過火（RecordId 證據）+ Docker 非單一實例應用（真跑洩漏一個 process）→ 拿掉整個背景排程，回到純 guard-on-launch）
 
 **觸發**：critic 覆審抓到「Kernel-Power 107 在這台機器是睡眠時寫入，不是喚醒」，RecordId 序列證據確鑿；且該事件觸發從註冊以來一次都沒真的開過火。

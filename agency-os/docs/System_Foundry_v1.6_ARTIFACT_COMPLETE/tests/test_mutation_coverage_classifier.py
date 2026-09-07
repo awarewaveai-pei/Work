@@ -182,5 +182,108 @@ class AnyGateForcedPrereqTests(unittest.TestCase):
         self.assertIn('TEST-CAP-Y', reason)
 
 
+class ReverseRequirerEntryPathTests(unittest.TestCase):
+    """Bug 3 (2026-09-07, second independent critic review, TASKS.md "explain_redundant_edge()
+    entry-path enumeration" item): explain_redundant_edge() only checked whether dep_id is forced
+    along cap_id's OWN question-driven entry path. cap_id can also enter a plan through a
+    completely different capability's `requires` edge (capability_closure() pulls it in
+    transitively) without that alternate route forcing dep_id -- real counterexample:
+    CAP-ROLES -> CAP-IDENTITY's own question path forces CAP-IDENTITY correctly, but
+    CAP-B2B-BUYER-ROLES independently `requires: [CAP-B2B, CAP-ROLES]` through a driving question
+    chain that never forces CAP-IDENTITY. TEST-CAP-X/TEST-CAP-Y/TEST-SIBLING below mirror that
+    shape. A companion shape (TEST-DER-REV below) checks that a DER-* reverse-requirer whose own
+    derivation trigger IS cap_id itself is correctly recognized as safe rather than a false
+    positive from the fix (mirrors the real DER-PAYMENT-ADAPTER -> CAP-PAYMENTS shape, found
+    while regression-testing this exact fix)."""
+
+    def setUp(self):
+        tmc.QMAP['TEST-QY'] = {'id': 'TEST-QY'}
+        self.addCleanup(tmc.QMAP.pop, 'TEST-QY', None)
+        tmc.QMAP['TEST-QX'] = {'id': 'TEST-QX'}
+        self.addCleanup(tmc.QMAP.pop, 'TEST-QX', None)
+        tmc.QMAP['TEST-QSIB'] = {'id': 'TEST-QSIB'}
+        self.addCleanup(tmc.QMAP.pop, 'TEST-QSIB', None)
+
+        rule_y = {'id': 'TEST-RULE-QY', 'when': {'question': 'TEST-QY', 'equals': True},
+                  'require': ['TEST-CAP-Y']}
+        tmc.QRULES.append(rule_y)
+        self.addCleanup(tmc.QRULES.remove, rule_y)
+        rule_x = {'id': 'TEST-RULE-QX', 'when': {'question': 'TEST-QX', 'equals': True},
+                  'require': ['TEST-CAP-X']}
+        tmc.QRULES.append(rule_x)
+        self.addCleanup(tmc.QRULES.remove, rule_x)
+        rule_sib = {'id': 'TEST-RULE-QSIB', 'when': {'question': 'TEST-QSIB', 'equals': True},
+                    'require': ['TEST-SIBLING']}
+        tmc.QRULES.append(rule_sib)
+        self.addCleanup(tmc.QRULES.remove, rule_sib)
+
+        tmc.CAP_TO_DRIVING_QIDS.setdefault('TEST-CAP-X', []).append('TEST-QX')
+        self.addCleanup(lambda: tmc.CAP_TO_DRIVING_QIDS['TEST-CAP-X'].remove('TEST-QX'))
+        tmc.CAP_TO_DRIVING_QIDS.setdefault('TEST-SIBLING', []).append('TEST-QSIB')
+        self.addCleanup(lambda: tmc.CAP_TO_DRIVING_QIDS['TEST-SIBLING'].remove('TEST-QSIB'))
+
+        # TEST-CAP-X's OWN path must force TEST-CAP-Y (mirrors CAP-ROLES's own question path
+        # correctly forcing CAP-IDENTITY): TEST-QX's active_when forces TEST-QY-FORCED, which a
+        # rule requires TEST-CAP-Y from.
+        tmc.QMAP['TEST-QX']['active_when'] = {'question': 'TEST-QY-FORCED', 'equals': True}
+        tmc.QMAP['TEST-QY-FORCED'] = {'id': 'TEST-QY-FORCED'}
+        self.addCleanup(tmc.QMAP.pop, 'TEST-QY-FORCED', None)
+        rule_yforced = {'id': 'TEST-RULE-QYFORCED', 'when': {'question': 'TEST-QY-FORCED', 'equals': True},
+                        'require': ['TEST-CAP-Y']}
+        tmc.QRULES.append(rule_yforced)
+        self.addCleanup(tmc.QRULES.remove, rule_yforced)
+
+        tmc.CAPMAP['TEST-CAP-X'] = {'id': 'TEST-CAP-X', 'requires': ['TEST-CAP-Y']}
+        self.addCleanup(tmc.CAPMAP.pop, 'TEST-CAP-X', None)
+        tmc.CAPMAP['TEST-CAP-Y'] = {'id': 'TEST-CAP-Y', 'requires': []}
+        self.addCleanup(tmc.CAPMAP.pop, 'TEST-CAP-Y', None)
+        # TEST-SIBLING also requires TEST-CAP-X, but through a driving question (TEST-QSIB) whose
+        # chain never forces TEST-CAP-Y -- the unsafe alternate entry point.
+        tmc.CAPMAP['TEST-SIBLING'] = {'id': 'TEST-SIBLING', 'requires': ['TEST-CAP-X']}
+        self.addCleanup(tmc.CAPMAP.pop, 'TEST-SIBLING', None)
+        # TEST-DER-REV is derived once TEST-CAP-X is already active (trigger == TEST-CAP-X, the
+        # edge's own cap_id) and also requires TEST-CAP-X -- mirrors DER-PAYMENT-ADAPTER's real
+        # shape (requires CAP-PAYMENTS, derived when_capability CAP-PAYMENTS).
+        tmc.CAPMAP['TEST-DER-REV'] = {'id': 'TEST-DER-REV', 'requires': ['TEST-CAP-X']}
+        self.addCleanup(tmc.CAPMAP.pop, 'TEST-DER-REV', None)
+        der_rev = {'id': 'TEST-DERIVE-REV', 'when_capability': 'TEST-CAP-X', 'derive': ['TEST-DER-REV']}
+        tmc.DRULES.append(der_rev)
+        self.addCleanup(tmc.DRULES.remove, der_rev)
+
+        # REVERSE_REQUIRES is a precomputed index built once from CAPS at import time -- it does
+        # not re-derive from CAPMAP, so the reverse edges above must be registered here too.
+        tmc.REVERSE_REQUIRES.setdefault('TEST-CAP-X', []).append('TEST-SIBLING')
+        self.addCleanup(lambda: tmc.REVERSE_REQUIRES['TEST-CAP-X'].remove('TEST-SIBLING'))
+        tmc.REVERSE_REQUIRES.setdefault('TEST-CAP-X', []).append('TEST-DER-REV')
+        self.addCleanup(lambda: tmc.REVERSE_REQUIRES['TEST-CAP-X'].remove('TEST-DER-REV'))
+
+    def test_unsafe_sibling_reverse_requirer_blocks_the_explanation(self):
+        # With TEST-SIBLING present (unsafe entry point), the edge must NOT be explained even
+        # though TEST-CAP-X's own path is safe -- mirrors the real CAP-ROLES/CAP-B2B-BUYER-ROLES
+        # counterexample this bug was found from.
+        reason = tmc.explain_redundant_edge('TEST-CAP-X', 'TEST-CAP-Y')
+        self.assertIsNone(
+            reason, f'an unsafe alternate entry point (TEST-SIBLING) was ignored, falsely '
+            f'explaining the edge: {reason!r}')
+
+    def test_der_reverse_requirer_via_own_trigger_is_not_a_false_positive(self):
+        # Remove the unsafe sibling; only the DER-* reverse-requirer (whose trigger is cap_id
+        # itself) remains. This must NOT be treated as an additional unsafe entry point -- it can
+        # only exist as a side effect of TEST-CAP-X already being present via its own (safe) path.
+        tmc.CAPMAP.pop('TEST-SIBLING', None)
+        tmc.CAP_TO_DRIVING_QIDS['TEST-SIBLING'].remove('TEST-QSIB')
+        tmc.REVERSE_REQUIRES['TEST-CAP-X'].remove('TEST-SIBLING')
+        try:
+            reason = tmc.explain_redundant_edge('TEST-CAP-X', 'TEST-CAP-Y')
+            self.assertIsNotNone(
+                reason, 'a DER-* reverse-requirer whose own derivation trigger is cap_id itself '
+                'was wrongly treated as an unsafe entry point (regression on the real '
+                'DER-PAYMENT-ADAPTER -> CAP-PAYMENTS shape)')
+        finally:
+            tmc.CAPMAP['TEST-SIBLING'] = {'id': 'TEST-SIBLING', 'requires': ['TEST-CAP-X']}
+            tmc.CAP_TO_DRIVING_QIDS['TEST-SIBLING'].append('TEST-QSIB')
+            tmc.REVERSE_REQUIRES['TEST-CAP-X'].append('TEST-SIBLING')
+
+
 if __name__ == '__main__':
     unittest.main()
