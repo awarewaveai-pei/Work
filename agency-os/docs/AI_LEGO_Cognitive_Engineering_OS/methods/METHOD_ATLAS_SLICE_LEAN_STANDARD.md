@@ -16,6 +16,7 @@
 3. **`open_questions`**：舊版每條配 owner／blocks／完整脈絡。新標準：**一行一條**，格式 `OQ-<NAME>-N: <問題>（owner: 通常是 operator）`。
 4. **獨立 slice 文件**（`docs/FORTYEIGHTH_SLICE_...md` 這類）：**不再逐一開檔**。改成在 WORKLOG 條目裡用 3–5 行交代：做了什麼／real invariant 是什麼／測試結果／有沒有發現重複風險。WORKLOG 本身就是查詢紀錄，不需要第二份平行文件。
 5. **每個切片獨立跑一次全套 regression／golden**：改成**每批（如 5 個平行方法）跑一次**，不是每個方法各跑一次。
+6. **逐個方法維護 `method-inventory.yaml`**：**不再當必要步驟**。這份登記表已經爛了 44 個方法都沒人管，也沒因此出過任何真實問題——它不是真正的資料來源，`contract-backlog.yaml` 才是。恰好在改同一區塊時可以順手修，但不必為了它單獨開一個編輯步驟。
 
 ## 不變的產出（每個方法還是要有這 4 個檔案）
 
