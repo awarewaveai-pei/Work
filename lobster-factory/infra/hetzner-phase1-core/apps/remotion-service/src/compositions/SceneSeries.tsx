@@ -15,6 +15,9 @@ export interface SceneItem {
   text: string;
   durationInSeconds: number;
   logoUrl?: string;
+  /** Timeline v1 compiler output. Omitted values preserve the original manual-template behaviour. */
+  crop?: "cover" | "contain";
+  transitionOut?: "cut" | "fade" | "slide_left" | "slide_right";
 }
 
 // ── Private slide renderer ────────────────────────────────────────────────────
@@ -25,7 +28,8 @@ const Slide: React.FC<{
   logoUrl?: string;
   slideIndex: number;
   bgColor: string;
-}> = ({ imageUrl, text, logoUrl, slideIndex, bgColor }) => {
+  crop?: "cover" | "contain";
+}> = ({ imageUrl, text, logoUrl, slideIndex, bgColor, crop = "cover" }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -92,7 +96,7 @@ const Slide: React.FC<{
           >
             <Img
               src={imageUrl}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              style={{ width: "100%", height: "100%", objectFit: crop }}
             />
           </div>
         ) : (
@@ -184,6 +188,21 @@ const SlideIn: React.FC<{ fromLeft: boolean; children: React.ReactNode }> = ({
   );
 };
 
+const FadeIn: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const opacity = interpolate(frame, [0, Math.max(1, Math.round(fps * 0.5))], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+  return <AbsoluteFill style={{ opacity, overflow: "hidden" }}>{children}</AbsoluteFill>;
+};
+
+function outgoingTransition(scene: SceneItem, index: number): NonNullable<SceneItem["transitionOut"]> {
+  // Existing free-form DynamicSlideshow requests had no transition field and alternated
+  // slide directions. Keep that behaviour; Timeline v1 emits an explicit policy.
+  return scene.transitionOut ?? (index % 2 === 0 ? "slide_left" : "slide_right");
+}
+
 // ── Duration helper (use in calculateMetadata and Composition static fallback) ─
 // Timing model:
 //   - Each scene's Sequence starts at sum(previous pure durations).
@@ -233,38 +252,39 @@ export const SceneSeries: React.FC<{
     const start = cursor;
     cursor += sceneFrames;
     const isLast = i === scenes.length - 1;
+    const transition = outgoingTransition(scene, i);
     // Outgoing scenes get extra transitionFrames so the incoming SlideIn spring can
     // complete while the outgoing scene is still visible beneath it (slide-in over static,
     // not a cross-fade — the incoming scene is a later DOM sibling, so it renders on top).
-    const duration = isLast ? sceneFrames : sceneFrames + transitionFrames;
-    return { scene, start, duration };
+    const duration = isLast || transition === "cut" ? sceneFrames : sceneFrames + transitionFrames;
+    return { scene, start, duration, transition };
   });
 
   return (
     <AbsoluteFill style={{ backgroundColor }}>
-      {sceneLayout.map(({ scene, start, duration }, i) => (
+      {sceneLayout.map(({ scene, start, duration }, i) => {
+        const incomingTransition = i === 0 ? "cut" : sceneLayout[i - 1].transition;
+        const slide = (
+          <Slide
+            imageUrl={scene.imageUrl}
+            text={scene.text}
+            logoUrl={scene.logoUrl}
+            slideIndex={i}
+            bgColor={backgroundColor}
+            crop={scene.crop}
+          />
+        );
+        const content = i === 0 || incomingTransition === "cut"
+          ? slide
+          : incomingTransition === "fade"
+            ? <FadeIn>{slide}</FadeIn>
+            : <SlideIn fromLeft={incomingTransition === "slide_left"}>{slide}</SlideIn>;
+        return (
         <Sequence key={i} from={start} durationInFrames={duration}>
-          {i === 0 ? (
-            <Slide
-              imageUrl={scene.imageUrl}
-              text={scene.text}
-              logoUrl={scene.logoUrl}
-              slideIndex={i}
-              bgColor={backgroundColor}
-            />
-          ) : (
-            <SlideIn fromLeft={i % 2 !== 0}>
-              <Slide
-                imageUrl={scene.imageUrl}
-                text={scene.text}
-                logoUrl={scene.logoUrl}
-                slideIndex={i}
-                bgColor={backgroundColor}
-              />
-            </SlideIn>
-          )}
+          {content}
         </Sequence>
-      ))}
+        );
+      })}
       {audioUrl && <Audio src={audioUrl} />}
     </AbsoluteFill>
   );
