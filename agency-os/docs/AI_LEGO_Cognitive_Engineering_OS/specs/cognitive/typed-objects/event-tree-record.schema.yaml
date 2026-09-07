@@ -1,0 +1,218 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/event-tree-record.schema.yaml"
+title: Event Tree Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `EventTreeRecord` -- the declared
+  `outputs` of `root_cause.event_tree`'s Method Contract. Atlas's own F05
+  tool table Event Tree row (L438): "從起始事件推結果｜event→barriers
+  success/fail→outcomes｜評估防護層｜不同於 Fault Tree".
+
+  STRUCTURAL OPPOSITE of `fault-tree-record.schema.yaml` (Atlas's own misuse
+  warning, transcribed literally above): Fault Tree decomposes an
+  already-occurred top event BACKWARD through AND/OR logic gates down to
+  basic causes (a flat DAG, shared nodes legal, list order carries no
+  meaning). Event Tree starts from a single `initiating_event` and walks
+  FORWARD through an ORDERED `barriers[]` sequence -- no gates, no AND/OR,
+  no shared nodes -- where each `outcomes[].path` names, in POSITION order,
+  which barriers were crossed and whether each held (`success`) or failed
+  (`failure`), terminating in a distinct outcome. `barriers[]` list order IS
+  semantically the barrier's position in the sequence -- unlike
+  `fault-tree-record.schema.yaml`'s own id-cross-referenced flat lists,
+  where order is irrelevant and only the id matters. Also distinct from
+  `bow-tie-analysis-record.schema.yaml`'s own RIGHT side: Bow-Tie's
+  `controls[]` is a flat, UNORDERED list where each entry independently
+  names one `target_id` with no relationship to any other control -- it
+  cannot express "barrier 2 only matters if barrier 1 was reached a certain
+  way"; Event Tree's entire structure exists to express exactly that. See
+  `ai_lego/modules/root_cause/event_tree.py`'s own module docstring for the
+  full due-diligence read of both sibling files.
+
+  TWO real invariants, enforced at the runtime layer
+  (`ai_lego/modules/root_cause/event_tree.py`), not the schema layer (JSON
+  Schema cannot express "this array must be an ordered prefix of that other
+  array"):
+  1. Referential integrity (`EVENTTREE_DANGLING_BARRIER_REFERENCE`) -- every
+     `path[].barrier_id` must resolve to a real `barriers[].barrier_id` in
+     this same record.
+  2. Ordered-prefix reachability / no phantom outcome
+     (`EVENTTREE_PATH_NOT_ORDERED_PREFIX`) -- every `path`, position by
+     position, must equal an actual prefix of the declared `barriers[]`
+     sequence (length 1..len(barriers), never out of order, never skipping
+     a position).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Event Tree row (L438): '從起始事件推結果｜event→barriers success/fail→outcomes｜評估防護層｜不同於 Fault Tree'"
+  - "methods/contracts/root_cause.event_tree.contract.yaml"
+  - "specs/cognitive/typed-objects/fault-tree-record.schema.yaml -- the due-diligence comparison target confirming this is the structural opposite (backward AND/OR decomposition vs forward ordered-barrier propagation), not a re-skin"
+  - "specs/cognitive/typed-objects/bow-tie-analysis-record.schema.yaml -- second due-diligence comparison target confirming its own flat, unordered controls[] cannot express barrier sequencing, so this is not a duplicate of its own right (mitigation) side either"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  initiating_event:
+    type: object
+    required: [description]
+    additionalProperties: false
+    properties:
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The single event this whole analysis starts from, already having occurred (e.g. 'Docker Desktop daemon crashes / socket goes stale') -- Atlas's own literal '起始事件' (initiating event)."
+
+  barrier:
+    type: object
+    required: [barrier_id, description]
+    additionalProperties: false
+    description: "One protective layer/safety function in the ORDERED sequence -- list position (index) IS the barrier's position; there is no separate order field."
+    properties:
+      barrier_id:
+        type: string
+        pattern: "^BAR-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What this barrier is and what holding/failing means for it (e.g. 'automated per-minute watchdog attempts to restart the daemon')."
+
+  path_step:
+    type: object
+    required: [barrier_id, result]
+    additionalProperties: false
+    description: "One position in an outcome's own path -- which barrier, and whether it held."
+    properties:
+      barrier_id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "MUST reference a real barriers[].barrier_id in this SAME record (EVENTTREE_DANGLING_BARRIER_REFERENCE if not), AND the full path's own barrier_id sequence MUST equal an ordered prefix of the declared barriers[] sequence (EVENTTREE_PATH_NOT_ORDERED_PREFIX if not) -- both enforced at the runtime layer."
+      result:
+        enum: [success, failure]
+        description: "Atlas's own literal 'success/fail' vocabulary (L438), transcribed verbatim as a closed two-value enum."
+      probability:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: "OPTIONAL conditional probability of THIS branch (this success or this failure), given the path already reached this barrier. Atlas gives no numeric formula for Event Tree -- omitted means qualitative-only analysis, same disclosed scope fault-tree-record.schema.yaml's own optional basic_event.probability establishes for its family. When every step of one outcome's own path carries one, ai_lego.modules.root_cause.event_tree.outcome_probability computes their product -- Atlas's own '評估防護層' (evaluate protective layers) benefit line, made quantitative."
+
+  outcome:
+    type: object
+    required: [outcome_id, description, path]
+    additionalProperties: false
+    properties:
+      outcome_id:
+        type: string
+        pattern: "^OUT-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The terminal consequence this path leads to (e.g. 'daemon recovers automatically, no human paged')."
+      path:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/path_step"}
+        description: "Ordered walk through the barrier sequence that produces this outcome. MUST be an actual prefix of barriers[] (EVENTTREE_PATH_NOT_ORDERED_PREFIX) -- length may be less than len(barriers) (a path may terminate early once its outcome is already determined; a real, disclosed pruned-tree practice, see method contract compilation_decisions), but never longer, never out of order, never skipping a position."
+
+type: object
+required: [id, version, system_under_analysis, initiating_event, barriers, outcomes, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^EVENTTREE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "root_cause.event_tree"
+  system_under_analysis:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  initiating_event:
+    $ref: "#/$defs/initiating_event"
+  barriers:
+    type: array
+    minItems: 1
+    items: {$ref: "#/$defs/barrier"}
+    description: "ORDER-SIGNIFICANT: index i is barrier i's position in the sequence every outcomes[].path is checked against."
+  outcomes:
+    type: array
+    minItems: 1
+    items: {$ref: "#/$defs/outcome"}
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- an event tree's own STRUCTURE (which barriers, in what order, which outcomes) is a structured analytical judgment, not a calculated/simulated result, the same class fault-tree-record.schema.yaml's own provenance note already documents for its own tree."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed): a Docker Desktop daemon crash on
+      the primary workstation, grounded in this repo's own real watchdog
+      system (agency-os/WORKLOG.md 2026-09-07 entry "Docker Desktop watchdog
+      根治"; scripts/register-docker-desktop-runtime-tasks.ps1;
+      scripts/check-smoke-tests.ps1:386-418's own docker_watchdog Check 6,
+      added by that same 2026-09-07 fix because the earlier system had no
+      detection barrier at all). Three barriers in order: automated
+      per-minute watchdog restart, the smoke-test docker_watchdog detector
+      surfacing a WARN if the watchdog itself is unhealthy, then manual
+      operator intervention once paged. Four outcomes: watchdog recovers
+      alone (length-1 path, terminates early), watchdog fails but detection
+      + manual recovery succeed (full length-3 path), watchdog fails,
+      detected, but manual recovery fails (full length-3 path), and
+      watchdog fails with detection ALSO blind -- the real historical
+      failure mode this repo's own 2026-09-07 fix closed (length-2 path,
+      terminates early: nobody was ever paged, so barrier 3 never applies).
+    value:
+      id: "EVENTTREE-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "root_cause.event_tree"
+      system_under_analysis: "Docker Desktop daemon watchdog system, primary workstation (LAPTOP-R7I86OR5)"
+      initiating_event: {description: "Docker Desktop daemon crashes / socket goes stale (vpnkit-bridge backend termination leaves a stale engine.sock)"}
+      barriers:
+        - {barrier_id: "BAR-WATCHDOG", description: "Per-minute reconcile task (watch-docker-desktop-runtime.ps1) detects the dead daemon and attempts an automated restart"}
+        - {barrier_id: "BAR-SMOKE-DETECT", description: "Daily smoke test docker_watchdog Check 6 (check-smoke-tests.ps1) surfaces a WARN if the watchdog's own guard state is unhealthy"}
+        - {barrier_id: "BAR-MANUAL", description: "Operator, having been alerted by the smoke WARN, manually recovers the daemon"}
+      outcomes:
+        - outcome_id: "OUT-AUTO-RECOVERED"
+          description: "Watchdog restarts the daemon successfully; no human paged"
+          path: [{barrier_id: "BAR-WATCHDOG", result: success, probability: 0.9}]
+        - outcome_id: "OUT-DETECTED-MANUAL-RECOVERED"
+          description: "Watchdog fails; smoke detects it; operator manually recovers"
+          path: [{barrier_id: "BAR-WATCHDOG", result: failure, probability: 0.1}, {barrier_id: "BAR-SMOKE-DETECT", result: success, probability: 0.95}, {barrier_id: "BAR-MANUAL", result: success, probability: 0.9}]
+        - outcome_id: "OUT-DETECTED-UNRESOLVED"
+          description: "Watchdog fails; smoke detects it; operator does not resolve it in time"
+          path: [{barrier_id: "BAR-WATCHDOG", result: failure, probability: 0.1}, {barrier_id: "BAR-SMOKE-DETECT", result: success, probability: 0.95}, {barrier_id: "BAR-MANUAL", result: failure, probability: 0.1}]
+        - outcome_id: "OUT-UNDETECTED-UNRESOLVED"
+          description: "Watchdog fails AND smoke itself is blind -- the real pre-2026-09-07 failure mode (died once, stayed dead until next login); nobody was ever paged, so manual intervention never applies"
+          path: [{barrier_id: "BAR-WATCHDOG", result: failure, probability: 0.1}, {barrier_id: "BAR-SMOKE-DETECT", result: failure, probability: 0.05}]
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal single-barrier, single-outcome tree."
+    value:
+      id: "EVENTTREE-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "root_cause.event_tree"
+      system_under_analysis: "internal reference lookup service"
+      initiating_event: {description: "Upstream dependency times out"}
+      barriers: [{barrier_id: "BAR-RETRY", description: "Automatic retry with backoff"}]
+      outcomes: [{outcome_id: "OUT-RECOVERED", description: "Retry succeeds", path: [{barrier_id: "BAR-RETRY", result: success}]}]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F05 tool table row (L438) directly. Read fault_tree.py and bow_tie.py in full for due-diligence structural comparison. Validated against jsonschema Draft202012Validator."
+  note: >
+    No mother document was modified. The "event→barriers success/fail→
+    outcomes" formula and "success/fail" vocabulary are directly
+    transcribed from Atlas's own L438 row. The ordered-list-with-position-
+    significance field design, path-as-ordered-prefix shape, and optional
+    per-step probability are Phase 3 compilation decisions (see the method
+    contract's own compilation_decisions), not textually cited. Referential
+    integrity and ordered-prefix reachability are enforced at the runtime
+    layer (ai_lego/modules/root_cause/event_tree.py), not the schema layer
+    -- JSON Schema can validate node SHAPE but not "this array is a prefix
+    of that other array", the same split fault-tree-record.schema.yaml's
+    own verification note already documents for its own graph invariants.

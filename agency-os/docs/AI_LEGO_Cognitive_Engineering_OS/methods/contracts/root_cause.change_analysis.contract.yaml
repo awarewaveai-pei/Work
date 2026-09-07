@@ -1,0 +1,140 @@
+$id: "ai-lego://methods/contracts/root_cause.change_analysis.contract.yaml"
+title: "Change Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry, mandated by the actively-running Cognitive OS
+  runtime slice. Atlas F05 tool table, Change Analysis row (L441): "找故障
+  前後變更 | before/after→change list→correlation | 快速縮小範圍 | 變更不等於
+  因果". No dedicated Atlas section beyond the table row (grep-confirmed
+  across the Atlas itself; L1109/L3412/L4473 are an Incident-response
+  routing chain and two diagram/table mentions, not a protocol). A SECOND
+  normative document independently confirms and sharpens the same workflow
+  position: Execution Contract §55 "Incident Mode" (L1888-1919) places
+  "Change Analysis" right after "Current-state Reconstruction" and right
+  before "Root Cause Hypotheses" in its own incident-response pipeline --
+  this contract's `baseline` field is that "Current-state Reconstruction"
+  step's own before/after output, and `recommended_next` below is that
+  "Root Cause Hypotheses" step made concrete. Eighth of the F05 table's 9
+  rows, seventh built. Core invariant: every listed change must carry both
+  a before_state and an after_state (Atlas's own "before/after→change list"
+  formula), and neither a change entry nor the record itself may assert a
+  causal claim -- only correlation_strength/temporal_proximity descriptors
+  exist anywhere in the type, operationalizing the row's own misuse warning
+  ("變更不等於因果") as a structural incapacity, not a runtime-only promise.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Change Analysis row (L441)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L1109 (§28-adjacent Incident-response routing row: 'Incident | Timeline→Change Analysis→Fault/Fishbone→Barrier→CAPA | Persona') and L4473 (§28 scenario table: 'Incident 突然發生 | Change Analysis | Fault Tree / Fishbone | Persona') -- both routing mentions, not a dedicated protocol section; grep-confirmed no other Change Analysis hit exists anywhere in the Atlas"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §55 'Incident Mode' (L1888-1919): 'Declare → Contain → Freeze Evidence → Timeline → Current-state Reconstruction → Change Analysis → Root Cause Hypotheses → Evidence → Mitigation → Fix → Regression → Rehearsal → Deploy → Verify → Post-mortem' -- a SECOND, independent normative document naming this exact method by exact name, at the exact same pipeline position Atlas L1109 names, found by grepping all 3 normative documents (Atlas, Master Plan, Execution Contract) for 'Change Analysis', not the Atlas alone -- corrects an initial pass that grepped only the Atlas file"
+  - "methods/contracts/causal.dag.contract.yaml and ai_lego/modules/causal/dag.py -- this suite's own existing correlation-vs-causation discipline (Atlas L1683 'don't silently write correlation as causation'), read in full as due diligence before deciding this contract's own misuse-guard mechanism"
+  - "methods/contracts/root_cause.fault_tree.contract.yaml -- closest sibling by construction: same family, same table-row-only sourcing class, same two-layer construction+gate invariant discipline"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered as a Tier 1 concrete entry, same
+  class of justification as every other F05 sibling built this session.
+  id: root_cause.change_analysis mints a new machine_id, seventh member of
+  the root_cause family (F05) built (eighth of the table's 9 rows).
+
+id: root_cause.change_analysis
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [COMPARE, DECOMPOSE, VALIDATE]
+# INFERRED, not cited -- Atlas gives no composition formula for this method
+# (unlike Fishbone's cited "DECOMPOSE + GROUP + CAUSE_HYPOTHESIS", Atlas
+# L187). COMPARE is the before/after framing itself (primitive.schema.yaml
+# L74, already used by SWOT's own cited formula); DECOMPOSE is enumerating
+# the change list; VALIDATE is the correlation assessment, held deliberately
+# short of a causal claim.
+
+purpose:
+  - enumerate_changes_between_a_before_and_after_system_state_and_rank_their_correlation_with_an_observed_fault
+
+inputs:
+  required: [ProblemStatement]
+  optional: [EvidenceSet]
+
+outputs: [ChangeAnalysisRecord]
+
+preconditions:
+  - "every changes[] entry carries both a non-empty before_state and a non-empty after_state (an entry with only one side is an unqualified observation, not a change)"
+  - "every changes[] entry's before_state and after_state are genuinely different (an entry where they are identical describes no actual change)"
+  - "no changes[] entry, and no field anywhere in the record, asserts a causal claim (caused_by / root_cause / confirmed_cause / causal_link / cause / is_cause / causation) -- Atlas F05 L441's own misuse warning ('變更不等於因果'); only correlation_strength and temporal_proximity descriptors are legal"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # A changes[] entry claiming EVIDENCE-backed correlation must actually cite
+  # supporting_evidence_refs -- same real structural check causal.dag's own
+  # identical gate uses for the SAME reason (Atlas L1683), the most on-point
+  # precedent for this method's own misuse warning.
+
+forbidden_transition:
+  - "ChangeAnalysisRecord -> RootCauseFact (direct)"
+# Declarative documentation of the same principle the structural guard above
+# already enforces mechanically -- NOT wired to a runtime "attempt_promote"
+# function the way root_cause.fishbone's CauseHypothesisSet.promotion is,
+# because ChangeAnalysisRecord deliberately has no promotion field/pipeline
+# to enforce at runtime (see compilation_decisions and OQ-CHANGEANALYSIS-1).
+# root-cause-fact.schema.yaml's own legal_promotion_path.validation_methods_applied
+# enum is deliberately NOT extended to include root_cause.change_analysis --
+# doing so would contradict the very discipline this contract exists to
+# establish (see OQ-CHANGEANALYSIS-4). That schema file is not modified by
+# this contract.
+
+recommended_next:
+  - root_cause.fishbone
+  - root_cause.fault_tree
+# Atlas's own Incident-response chain (L1109): "Timeline→Change Analysis→
+# Fault/Fishbone→Barrier→CAPA". Execution Contract §55 (L1905-1907)
+# independently confirms with a more specific label: "...→Change Analysis→
+# Root Cause Hypotheses→..." -- Fishbone's own declared output IS
+# CauseHypothesisSet (root_cause.fishbone.contract.yaml outputs), so both
+# named methods are cited verbatim by TWO documents as the real next step,
+# not inferred by analogy the way most other F05 siblings' recommended_next
+# lists had to be.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Runtime-only self-attestation, or a structural schema incapacity, for the causation guard?"
+    decision: "Structural: no caused_by/root_cause/confirmed_cause/causal_link field is defined anywhere in change-analysis-record.schema.yaml (additionalProperties:false at both the record and change-entry level); the runtime module adds an explicit denylist check as a second, hand-tamper-resistant layer, matching this family's established two-layer discipline rather than trusting schema shape alone."
+  - question: "Should before_state==after_state be legal on a change entry?"
+    decision: "No -- CHANGEANALYSIS_DEGENERATE_CHANGE_ENTRY refuses it; an entry claiming to be a 'change' whose two states are identical describes no actual change, not merely an incomplete one."
+  - question: "Full ProblemStatement input, or a bare fault_description string, matching root_cause.fault_tree's own precedent?"
+    decision: "Bare fault_description/system_under_analysis strings at the runtime layer (this contract still declares ProblemStatement as the logical required input, family convention). Atlas's own Incident-chain (L1109) names 'Timeline' as the true upstream artifact, but no Timeline typed object exists anywhere in this spec root (grep-confirmed) -- see OQ-CHANGEANALYSIS-3."
+  - question: "Free-form or closed enum for correlation_strength/temporal_proximity?"
+    decision: "Closed enums (4-value / 5-value). Atlas gives no explicit vocabulary here -- disclosed compilation invention, same honesty class as causal-dag-analysis.schema.yaml's TREATMENT/OUTCOME endpoints -- but a closed vocabulary is what makes the ranking helper and the gate's re-derivation genuinely mechanical rather than free-text guesswork."
+
+open_questions:
+  - "OQ-CHANGEANALYSIS-1: forbidden_transition above is declarative only -- ChangeAnalysisRecord has no promotion field/pipeline the way CauseHypothesisSet does, so there is no runtime attempt_promote_* function to block. Is the structural incapacity (no causal field can exist) plus the runtime CHANGEANALYSIS_FORBIDDEN_CAUSAL_CLAIM_FIELD guard sufficient, or should a future pass add a formal promotion-refusal function even with nothing real yet calling it?（owner: operator）"
+  - "OQ-CHANGEANALYSIS-2: correlation_strength/temporal_proximity are qualitative closed enums, not a numeric/statistical correlation measure. Should a future revision add a quantitative variant if a real use case with actual time-series data appears?（owner: operator）"
+  - "OQ-CHANGEANALYSIS-3: inputs.required names ProblemStatement (family convention) even though Atlas's own Incident-chain (L1109) names 'Timeline' as the true upstream artifact, and no Timeline typed object exists in this spec root. Should a future pass define one?（owner: operator）"
+  - "OQ-CHANGEANALYSIS-4: root-cause-fact.schema.yaml's legal_promotion_path.validation_methods_applied enum is deliberately NOT extended to name root_cause.change_analysis (that schema file is untouched by this contract) -- should its own description gain an explicit note documenting the exclusion as deliberate, not an oversight, next time that file is touched for another reason?（owner: operator, or whoever next edits root-cause-fact.schema.yaml）"
+
+verification:
+  method: >
+    Read Atlas F05 tool table (L430-442) directly; grep-confirmed no
+    dedicated Change Analysis section exists beyond the table row and the
+    two routing mentions (L1109, L4473) within the Atlas. A follow-up grep
+    of ALL THREE normative documents (Atlas, Master Plan, Execution
+    Contract) for "Change Analysis" -- not the Atlas alone -- found one more
+    hit, Execution Contract §55 L1905 (see source_of_truth_for), which was
+    then read in full context (L1888-1962) and folded into this contract's
+    description/recommended_next. Read ai_lego/modules/causal/dag.py and
+    methods/contracts/causal.dag.contract.yaml in full as due diligence on
+    this suite's existing correlation-vs-causation discipline before
+    choosing this contract's own misuse-guard mechanism. Read
+    ai_lego/modules/root_cause/fault_tree.py and fishbone.py as the closest
+    structural and promotion-boundary precedents. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The before/after→change-list→
+    correlation formula and the "變更不等於因果" misuse warning are
+    transcribed verbatim from Atlas's own L441 row; the ChangeAnalysisRecord
+    field design (baseline/changes/temporal_proximity/correlation_strength),
+    the closed enums, and the forbidden-causal-field denylist are Phase 3
+    compilation decisions, explicitly flagged above, not textually cited.

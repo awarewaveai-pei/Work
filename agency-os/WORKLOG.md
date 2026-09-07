@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-07（Cognitive OS 58–62 號切片 critic 覆審（scoped，normal risk tier）—— 0 Critical/0 Major，2 Minor 全修：change_analysis 記錄層 causal-claim 檢查補齊 closed key set、decision_journal docstring 補 provenance 排除理由）
+
+**觸發**：`git commit` 被 `verify-gate-commit.js` 擋（17 個 product-root 檔本 session 從未經過 /verify-recent），依規跑 syntax→critic→real exec test。critic scope=normal risk tier，依風險分級規則抽查關鍵 claim（此輪實際做了更深：5 個方法全部通篇讀完+3 個自己動手的對抗探針，非僅抽查）。
+
+**critic verdict：SHIP WITH MINOR FIXES，0 Critical，0 Major，2 Minor 全修**：
+- Minor 1（已修）：`root_cause.change_analysis` 的記錄層（非 changes[] 條目層）因果聲稱阻擋只查字面拼寫的 denylist（`caused_by`／`root_cause`...），camelCase（`causedBy`）或未列複數（`root_causes`）變體會繞過——critic 實測活生生繞過成功。條目層本來就用 closed key set（任何未知 key 一律拒絕）不受影響。修法：記錄層也改用 closed key set（`_KNOWN_RECORD_KEYS`），與條目層同一套紀律，原本字面 denylist 檢查變成無法觸及的死碼一併移除；補 2 個新測試鎖定 camelCase／未列複數兩種繞過方式、修正 2 個既有測試的過期斷言字串（reason 文字變了，FAIL 判定不變）。
+- Minor 2（已修）：`learning.decision_journal` 的 `STAGE1_HASHED_FIELDS` docstring 解釋了為何排除 id/version/decision_ref，但沒交代為何記錄自己的頂層 `provenance` 也被排除（critic 查證邏輯正確——只是沒寫原因，讀者需自己推敲）。補一段話明講：跟 5 個 Atlas 命名元素無關、是誰填的 metadata 不是決策當下內容、evidence 項目各自的 provenance 有被涵蓋（巢狀在有 hash 的 evidence 欄位內）。
+- Suggestion 落地一項：`decision_journal` 兩個既有「fail-closed 非 crash」測試只驗淺層案例（provenance 本身非 dict），critic 自己動手驗證更深案例（provenance 內巢狀不可序列化值）機制本身沒問題只是測試沒明講——補 1 個測試把這條隱性覆蓋明講出來。其餘 2 個 Suggestion（Atlas usage/benefit 欄位標籤誤植、`pasta.py.bak` 殘留檔）純美觀/非本批產物，不落地。
+
+**[已修改]**：`ai_lego/modules/root_cause/change_analysis.py`（記錄層 closed key set 取代死碼式 denylist）、`ai_lego/modules/learning/decision_journal.py`（docstring 補充）、`tests/unit/test_change_analysis.py`（+2 新測試+2 修正斷言）、`tests/unit/test_decision_journal.py`（+1 新測試）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_change_analysis tests.unit.test_decision_journal -v` | exit=0 | result=245 tests OK（103+142，含全部新增/修正測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=Ran 3134 tests in 270.836s，OK（3131→3134，+3，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，index 重產後複跑）| exit=0 | result=PASSED 3012，ALL GOLDEN TESTS PASSED
+- REVIEW_DONE: critic=Standard（真實 subagent，17 檔+5 contract+5 schema+3 手足既有 schema+3 個核心 primitive 檔全讀，3 個自己動手的對抗探針含直接活生生繞過驗證、真跑 448+3131 全部測試兩輪）| verdict=SHIP WITH MINOR FIXES → 全部落地 | findings=0c/0m/2minor(已修)/3suggestion(1落地2不落地)
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`_KNOWN_RECORD_KEYS\|causedBy\|root_causes\|unserializable_extra` | hits=每個新 symbol 僅在歸屬檔出現，零重複零半寫引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：F05 root_cause 家族 9/9 全數收官；F17 learning 家族 3/9（剩 PDCA／OODA／Build-Measure-Learn／After Action Review／Post-mortem／Prediction Tracking）；58–62 號本輪未派 critic 交叉確認的部分已由本輪 critic 補齊（5 個方法皆已真跑覆審）。**過程備註（非本批程式碼發現）**：本 session 原始 WORKLOG／TASKS 條目（58-62 號切片建置本身）被另一並行 HCI30 session 的 commit `932b9e934` 意外掃入（內容安全，僅歸屬錯置，同本 session稍早 2026-09-07 已記錄過的同款共用 index 現象第三次發生）；本條目是該次意外之後的 critic 覆審+修正記錄，獨立成篇不回頭改 932b9e934。
+
+**[rollback]**：單一 commit，`git revert`；純防禦性強化+文件補充，無 schema 變更，無行為改變（原本合法輸入路徑不變，僅原本會繞過檢查的畸形輸入路徑改變）。
+
 ## 2026-09-07（P0-05 Machine-readable policy——5 份 YAML，2 項比預期更完整已驗證，1 項核心缺口誠實未建）
 
 **產出**：`Projects/internal/hci30/governance/{HCI_DOMAIN_POLICY,HCI_HIGH_IMPACT_POLICY,HCI_PROTECTED_DATA_POLICY,HCI_PUBLIC_INTELLIGENCE_POLICY,HCI_METHOD_POLICY}.yaml`。每條規則自帶 `status`（`schema_enforced`／`ci_gate_enforced`／`code_enforced`／`decided_implementation_open`／`advisory_only`）欄位，不是檔案整體一個狀態。

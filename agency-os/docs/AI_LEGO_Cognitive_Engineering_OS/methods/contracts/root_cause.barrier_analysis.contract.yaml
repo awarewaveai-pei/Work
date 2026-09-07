@@ -1,0 +1,143 @@
+$id: "ai-lego://methods/contracts/root_cause.barrier_analysis.contract.yaml"
+title: "Barrier Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  root_cause.barrier_analysis, F05 root_cause family (siblings: fishbone/
+  five_whys/pareto/fault_tree/bow_tie/kepner_tregoe). Atlas F05 table row
+  (L442), the ONLY citation: "Hazard→Target→Barrier→failure", usage "聚焦
+  系統控制", purpose "找本應阻止事件的控制失效", misuse "避免責怪個人" --
+  no dedicated section exists (grep-confirmed absent from the whole Atlas
+  file). NOT an EC §32 method (§32 L1260 names only STRIDE/LINDDUN/Attack
+  Tree/PASTA; also absent from Atlas's own §22.3 gate table, L4142-4155).
+  Core invariant: the record's own schema structurally has NO field for
+  attributing failure to a named individual (Atlas's own misuse warning,
+  made mechanical, not merely documented) -- only to the BARRIER itself; a
+  second invariant requires every failure_mode to reference a real barrier
+  in the SAME record. See compilation_decisions for the due-diligence check
+  against root_cause.bow_tie's own structurally different (symmetric,
+  accountability-invariant) shape.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Barrier Analysis row (L442): 'Hazard→Target→Barrier→failure', usage '聚焦系統控制', purpose '找本應阻止事件的控制失效', misuse '避免責怪個人' -- this method's ONLY citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L1109 §incident-playbook row: 'Timeline→Change Analysis→Fault/Fishbone→Barrier→CAPA' -- confirms real usage context as a single-incident, post-hoc diagnostic step feeding CAPA, not a proactive multi-control landscape map"
+  - "methods/contracts/root_cause.bow_tie.contract.yaml and ai_lego/modules/root_cause/bow_tie.py (both read in full): due-diligence comparison target -- confirmed a genuinely distinct method (see compilation_decisions)"
+  - "ai_lego/modules/root_cause/fault_tree.py -- referential-integrity gate pattern (FAULTTREE_DANGLING_REFERENCE) this contract's own BARRIER_DANGLING_FAILURE_REFERENCE invariant follows"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md:1260 -- '可選 STRIDE / LINDDUN / Attack Tree / PASTA', Barrier Analysis absent, grounding this contract's 'not an EC §32 method' claim"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155): grep-confirmed no dedicated Barrier Analysis row (only a Fishbone row for this family)"
+  - "methods/registry/contract-backlog.yaml fiftysixth_concrete_entry note (root_cause.kepner_tregoe): F05 status before this contract was 6 of 9 built, Barrier Analysis one of 3 remaining (Event Tree, Change Analysis, Barrier Analysis) -- independently re-confirmed by this contract's own grep sweep"
+  - "specs/cognitive/primitive.schema.yaml L66-90 -- the 24-value canonical kernel this contract's own cognitive_primitives draws from (TRACE is NOT in this kernel; CAUSE/DECOMPOSE/VALIDATE are, L71/76/87)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives this method exactly one table row
+  -- purpose/usage/benefit/misuse in four short phrases, transcribed
+  directly below. `id: root_cause.barrier_analysis` mints a new machine_id,
+  seventh concrete F05 entry alongside fishbone/five_whys/pareto/fault_tree/
+  bow_tie/kepner_tregoe.
+
+id: root_cause.barrier_analysis
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [DECOMPOSE, CAUSE, VALIDATE]
+# INFERRED, not cited (Atlas gives no §9 composition formula for Barrier
+# Analysis). Verified against the real 24-value kernel
+# (specs/cognitive/primitive.schema.yaml L66-90) before use -- TRACE was
+# considered and rejected, NOT a kernel member. Breaking the incident into
+# hazard/target/barrier/failure-mode elements is DECOMPOSE; diagnosing WHY
+# the barrier failed is CAUSE (this method's own core purpose, "找本應阻止
+#事件的控制失效"); the referential-integrity + no-blame structural checks
+# are VALIDATE.
+
+purpose:
+  - diagnose_why_a_specific_barrier_failed_to_protect_its_target_from_a_hazard_without_attributing_failure_to_an_individual
+inputs:
+  required: [HazardDescriptor, TargetDescriptor, BarrierSet]
+  optional: []
+outputs: [BarrierAnalysisRecord]
+preconditions:
+  - "system_or_incident, hazard_description, and target_description are non-empty strings"
+  - "barriers has at least 1 entry; every entry has a unique B- prefixed barrier_id and a non-empty description; the entry shape is a CLOSED key set (barrier_id, description only) -- structurally no field exists anywhere for attributing failure to a named individual"
+  - "failure_modes has at least 1 entry; every entry has a unique FM- prefixed failure_mode_id, a non-empty description (the SYSTEMIC reason the barrier failed), and a barrier_ref naming a real barriers[].barrier_id -- a dangling reference is refused; the entry shape is likewise a CLOSED key set (failure_mode_id, barrier_ref, description only)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Both invariants are structural/set-membership derivations (closed key
+  # set with no blame field, referential integrity), the same class
+  # root_cause.bow_tie's and root_cause.fault_tree's own invariants already
+  # establish -- not a statistical/numeric CALCULATED RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table (grep-confirmed, L4142-4155) has no Barrier
+# Analysis row.
+recommended_next: [root_cause.fishbone]
+# A real, disclosed next-step relationship grounded in Atlas L1109's own
+# incident playbook ('Timeline→Change Analysis→Fault/Fishbone→Barrier→CAPA'):
+# Barrier Analysis diagnoses THIS barrier's failure; Fishbone is Atlas's own
+# adjacent step in the same playbook row for broader root-cause
+# categorization feeding CAPA. Not a copied sibling default.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Is root_cause.barrier_analysis redundant with the already-built root_cause.bow_tie (both analyze control/barrier failure around an event)?"
+    decision: "Distinct methods, both kept. Bow-Tie is a self-contained, SYMMETRIC record -- threats[] (left) AND consequences[] (right) both hang off ONE top_event, core invariant is ACCOUNTABILITY (every control needs owner+test). Barrier Analysis is a single LINEAR chain (Hazard->Target->Barrier->failure) diagnosing why one or more already-failed barriers failed, core invariant is NO-BLAME (the shape structurally has no individual-attribution field) -- the opposite thrust from Bow-Tie's own owner-mandate."
+    reasoning: >
+      Verified by direct read of ai_lego/modules/root_cause/bow_tie.py (full
+      file, 283 lines) and bow-tie-analysis-record.schema.yaml (full file):
+      every controls[] entry there REQUIRES a named owner
+      (BOWTIE_CONTROL_MISSING_OWNER) -- the opposite of Atlas L442's own
+      misuse warning for THIS method ("避免責怪個人", avoid blaming
+      individuals). Bow-Tie has no hazard/target vocabulary and no
+      single-barrier-failure-diagnosis concept; it maps a full two-sided
+      threat/consequence landscape with no post-hoc "which one already
+      failed" framing. Atlas's own L1109 incident-playbook row places
+      Barrier Analysis AFTER Fault Tree/Fishbone and BEFORE CAPA in a
+      single-incident retrospective -- a different usage context from
+      Bow-Tie's proactive landscape-mapping role (Bow-Tie has no equivalent
+      playbook citation). Confirmed genuinely distinct scope, not
+      overlapping.
+  - question: "How should the '避免責怪個人' (avoid blaming individuals) misuse warning actually be enforced -- a runtime text scan for blame-shaped language, or something else?"
+    decision: "STRUCTURAL only: barriers[]/failure_modes[] entries have a closed key set (additionalProperties: false at the schema layer, an exact-set-equality check at the runtime layer) with no field anywhere for a named individual/person. A runtime free-text NLP scan for blame-shaped language was considered and rejected as false-positive-prone, undisclosed-scope over-engineering; the structural absence is disclosed here as the real, sole mechanism."
+  - question: "Should barriers[] allow more than one entry (a layered-defense set), or exactly one to match Atlas's own singular 'Barrier' wording?"
+    decision: "More than one allowed (minItems: 1, no maximum) -- the real, catchable bug class this method exists to gate (a failure_mode referencing a barrier that is not really in this record) only exists when barriers[] can hold more than one entry; a hard cap of 1 would make BARRIER_DANGLING_FAILURE_REFERENCE untestable against a real 'wrong barrier, right record' mistake. See OQ-BARRIERANALYSIS-1 for the disclosed open question this creates against Atlas's own literal singular phrasing."
+  - question: "Should barriers[]/failure_modes[] be flat, id-cross-referenced lists, or should a failure_mode nest inside its own barrier entry?"
+    decision: "Flat arrays, cross-referenced by barrier_ref -- same 'separate stages, cross-referenced by id' shape root_cause.fault_tree's own basic_events/gates pair and root_cause.bow_tie's own controls[] already establish; the referential-integrity check (BARRIER_DANGLING_FAILURE_REFERENCE) is only a meaningful, catchable bug class in a flat cross-referenced shape, mirroring FAULTTREE_DANGLING_REFERENCE."
+
+open_questions:
+  - id: "OQ-BARRIERANALYSIS-1"
+    question: "This contract allows multiple barriers[] per record (a layered-defense shape) even though Atlas's own L442 phrasing names a single 'Barrier' -- is the current multi-barrier + per-failure-mode-reference shape the right generalization (closer to the real-world DOE Barrier Analysis method, which enumerates a whole layered barrier set), or should a future revision cap barriers[] at exactly 1?（owner: operator）"
+  - id: "OQ-BARRIERANALYSIS-2"
+    question: "method-inventory.yaml's own Barrier Analysis row was NOT updated in this pass (out of scope per orchestrator instruction -- shared file, other concurrent agents touching related registrations) -- a follow-up integration pass should set has_contract:true/machine_id:root_cause.barrier_analysis/line:442.（owner: operator, integration pass）"
+  - id: "OQ-BARRIERANALYSIS-3"
+    question: "F05 root_cause family status verified by this session at build time: 6 of 9 built BEFORE this contract (fishbone/five_whys/pareto/fault_tree/bow_tie/kepner_tregoe), this contract adds a 7th. Event Tree and Change Analysis were NOT observed built as of this read -- whether they land from concurrent agents in the same batch (making F05 9/9) must be confirmed by the integration pass, not assumed from this session alone.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Read Atlas F05 tool table row (L442) directly -- this method's ONLY
+    citation, confirmed by grep (case-insensitive "barrier") across the
+    entire Atlas file: only L438 (a DIFFERENT row, Event Tree, whose own
+    formula happens to also use the word "barriers"), L442 (this row), L1109
+    (an incident-playbook row citing "Barrier" as one step), and L3417 (a
+    Mermaid diagram node) exist -- no dedicated prose section. Read EC L1260
+    directly; confirmed it names exactly STRIDE/LINDDUN/Attack Tree/PASTA.
+    Read Atlas §22.3 (L4142-4155) directly; confirmed no dedicated Barrier
+    Analysis row. Read ai_lego/modules/root_cause/bow_tie.py and
+    root_cause.bow_tie.contract.yaml in full for the due-diligence
+    distinctness comparison. Read ai_lego/modules/root_cause/fault_tree.py
+    in full for the referential-integrity gate pattern this contract's own
+    invariant follows. Grepped the whole ai_lego runtime tree and the whole
+    methods/ directory (case-insensitive "barrier") -- zero hits besides
+    root_cause/__init__.py's own docstring listing Barrier Analysis as
+    remaining, and contract-backlog.yaml/method-inventory.yaml recording the
+    same "remaining" status -- no existing implementation collides. Read
+    specs/cognitive/primitive.schema.yaml's own 24-value kernel enum
+    (L66-90) directly before selecting cognitive_primitives -- confirmed
+    DECOMPOSE/CAUSE/VALIDATE are kernel members. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own four-phrase table row is
+    transcribed directly into purpose/preconditions/quality above. The
+    flat-cross-referenced-lists design, the structural no-blame mechanism,
+    and the multi-barrier generalization are disclosed compilation
+    decisions, not further mother-document citations.

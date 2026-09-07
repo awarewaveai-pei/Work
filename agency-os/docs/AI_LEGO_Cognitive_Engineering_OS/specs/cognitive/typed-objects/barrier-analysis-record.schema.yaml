@@ -1,0 +1,217 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/barrier-analysis-record.schema.yaml"
+title: Barrier Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BarrierAnalysisRecord` -- the
+  declared `outputs` of `root_cause.barrier_analysis`'s Method Contract (F05
+  root_cause family, seventh concrete entry alongside fishbone/five_whys/
+  pareto/fault_tree/bow_tie/kepner_tregoe). Atlas's own F05 tool table row
+  (L442: "Hazard→Target→Barrier→failure", usage "聚焦系統控制", purpose "找
+  本應阻止事件的控制失效", misuse "避免責怪個人") is this method's ONLY
+  citation.
+
+  A single incident chain: one `hazard_description` (the initiating threat)
+  threatens one `target_description` (the asset/outcome being protected), a
+  set of `barriers[]` stand between them (the systemic controls meant to
+  stop the hazard from reaching the target), and `failure_modes[]` diagnoses
+  which barrier(s) actually failed and why. Unlike
+  `bow-tie-analysis-record.schema.yaml` (a SYMMETRIC record -- `threats[]`
+  left AND `consequences[]` right of one `top_event_description`, core
+  invariant ACCOUNTABILITY via a mandatory control `owner`+`test`), this is
+  a single LINEAR chain, and its own core invariant is the structural
+  OPPOSITE: NO field anywhere for attributing failure to a named individual
+  -- see
+  `methods/contracts/root_cause.barrier_analysis.contract.yaml`
+  `compilation_decisions` for the full due-diligence distinctness check
+  against that sibling.
+
+  Two REAL invariants, both two-layer (construction + gate, re-derived from
+  raw fields, not trusted):
+  1. NO-BLAME structural invariant -- Atlas's own literal misuse warning
+     ("避免責怪個人") made mechanical: `barriers[]` and `failure_modes[]`
+     entries each have a CLOSED key set (`additionalProperties: false`)
+     with NO field for a named individual/person -- only the BARRIER itself
+     is ever named. This is the DELIBERATE, disclosed enforcement mechanism
+     (structural absence), not a runtime free-text scan for blame-shaped
+     language, which would be false-positive-prone, undisclosed-scope NLP.
+  2. Chain connectivity invariant -- `hazard_description`/
+     `target_description` must be non-empty, and every `failure_modes[]`
+     entry's own `barrier_ref` must name a REAL `barriers[].barrier_id`
+     living inside THIS SAME record -- a dangling reference is a real
+     integrity bug, not a warning, the same class
+     `fault-tree-record.schema.yaml`'s own referenced-id invariant already
+     establishes.
+
+  Both invariants are enforced at the runtime layer
+  (`ai_lego/modules/root_cause/barrier_analysis.py`), not the schema layer
+  alone -- JSON Schema 2020-12 cannot express "this id must resolve
+  elsewhere in this same array" natively; the schema below only pins the
+  per-field shape (id prefixes, non-empty strings, the closed key sets that
+  make the no-blame invariant structurally true).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Barrier Analysis row (L442): 'Hazard→Target→Barrier→failure', usage '聚焦系統控制', purpose '找本應阻止事件的控制失效', misuse '避免責怪個人' -- this method's ONLY citation, no dedicated section exists"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L1109 incident-playbook row: 'Timeline→Change Analysis→Fault/Fishbone→Barrier→CAPA' -- real usage context"
+  - "methods/contracts/root_cause.barrier_analysis.contract.yaml"
+  - "specs/cognitive/typed-objects/bow-tie-analysis-record.schema.yaml -- the due-diligence comparison target confirming this is a distinct, linear-chain (not symmetric) shape with an opposite-thrust invariant"
+  - "specs/cognitive/typed-objects/fault-tree-record.schema.yaml -- the referential-integrity pattern (flat, id-cross-referenced lists) this record's own barriers[]/failure_modes[] pair follows"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  barrier_entry:
+    type: object
+    required: [barrier_id, description]
+    additionalProperties: false
+    description: >
+      One systemic control standing between the hazard and the target.
+      The CLOSED key set is itself half of the NO-BLAME structural
+      invariant -- there is no field here for a named individual/person,
+      only the control itself.
+    properties:
+      barrier_id:
+        type: string
+        pattern: "^B-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The systemic control itself (e.g. 'deploy-approval-gate'), never a person."
+
+  failure_mode_entry:
+    type: object
+    required: [failure_mode_id, barrier_ref, description]
+    additionalProperties: false
+    description: >
+      Diagnoses why ONE barrier failed. The CLOSED key set is the other
+      half of the NO-BLAME structural invariant -- no field here for a
+      named individual/person, only `barrier_ref` (the systemic control)
+      and a `description` of the SYSTEMIC failure mode.
+    properties:
+      failure_mode_id:
+        type: string
+        pattern: "^FM-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      barrier_ref:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must name a real barriers[].barrier_id IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The SYSTEMIC reason the barrier failed (e.g. 'gate configuration allowed a bypass path'), never an individual's name or role -- Atlas's own '避免責怪個人' (avoid blaming individuals) misuse warning."
+
+type: object
+required: [id, version, system_or_incident, hazard_description, target_description, barriers, failure_modes, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^BARRIER-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "root_cause.barrier_analysis"
+  system_or_incident:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The system or incident this analysis addresses."
+  hazard_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The initiating hazard/threat -- Atlas's own 'Hazard' in 'Hazard→Target→Barrier→failure'."
+  target_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What the barrier(s) were meant to protect -- Atlas's own 'Target' in the same chain."
+  barriers:
+    type: array
+    minItems: 1
+    description: "The systemic control(s) standing between hazard and target -- at least one, or this record has nothing to diagnose."
+    items:
+      $ref: "#/$defs/barrier_entry"
+  failure_modes:
+    type: array
+    minItems: 1
+    description: "Which barrier(s) actually failed and why (systemically) -- Atlas's own 'failure' stage. No coverage requirement: nothing here requires every barrier to have a failure_mode, only that every DECLARED failure_mode reference a real barrier."
+    items:
+      $ref: "#/$defs/failure_mode_entry"
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a barrier analysis's own hazard/target/barrier/failure-mode set is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed): grounded in this repo's own real
+      deploy pipeline (agency-os/AGENTS.md:9 -- sg-deploy.sh, npm test ->
+      healthcheck -> HTTP smoke -> auto-rollback). Hazard: an unreviewed
+      change reaching prod. Target: the prod environment. Two barriers;
+      one diagnosed failure mode (the deploy-approval gate's own bypass
+      path), the second barrier deliberately left un-diagnosed -- nothing
+      here requires full coverage.
+    value:
+      id: "BARRIER-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "root_cause.barrier_analysis"
+      system_or_incident: "sg-deploy.sh production deploy pipeline, unauthorized deploy incident"
+      hazard_description: "An unreviewed code change is pushed toward the production deploy path"
+      target_description: "Production environment (ks-aw-01 lobster-phase1 services)"
+      barriers:
+        - barrier_id: "B-001"
+          description: "Deploy-approval gate requiring a second reviewer's sign-off before sg-deploy.sh runs against prod"
+        - barrier_id: "B-002"
+          description: "npm test gate inside sg-deploy.sh, must pass before healthcheck/smoke proceed"
+      failure_modes:
+        - failure_mode_id: "FM-001"
+          barrier_ref: "B-001"
+          description: "Gate configuration allowed a direct SSH deploy path that bypassed the second-reviewer check entirely -- a process/tooling gap, not a specific reviewer's individual failure"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal single-barrier, single-failure-mode record"
+    value:
+      id: "BARRIER-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "root_cause.barrier_analysis"
+      system_or_incident: "internal reference lookup service"
+      hazard_description: "Stale cache entry served to a caller"
+      target_description: "Reference table read consistency"
+      barriers:
+        - barrier_id: "B-001"
+          description: "Cache invalidation job"
+      failure_modes:
+        - failure_mode_id: "FM-001"
+          barrier_ref: "B-001"
+          description: "Invalidation job silently stopped running with no alert on its own absence"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: >
+    Read Atlas F05 tool table row (L442) directly -- the method's ONLY
+    citation, no dedicated section exists (grep-confirmed case-insensitive
+    "barrier" across the whole Atlas file: only L438 a different row/L442
+    this row/L1109 an incident-playbook row/L3417 a Mermaid node). Read
+    bow-tie-analysis-record.schema.yaml in full to confirm this record's
+    own linear-chain, no-blame-structural design is a genuinely distinct
+    shape. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator (for the method contract); this record
+    schema itself validated with the same tool.
+  note: >
+    No mother document was modified. Atlas's own four-phrase table row
+    (chain vocabulary, no-blame misuse warning) is transcribed directly
+    into this schema's structure. The flat barriers[]/failure_modes[]
+    cross-referenced design (allowing more than one barrier per record) is
+    a disclosed compilation decision -- see method contract
+    `compilation_decisions`/`open_questions` -- not Atlas's own explicit
+    structural instruction, since Atlas gives this method no dedicated
+    section to transcribe a formula from. Both real invariants (no-blame
+    closed key set, chain connectivity/referential integrity) are enforced
+    at the runtime layer (`ai_lego/modules/root_cause/barrier_analysis.py`),
+    not the schema layer.

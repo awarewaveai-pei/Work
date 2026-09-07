@@ -1,0 +1,143 @@
+$id: "ai-lego://methods/contracts/learning.decision_journal.contract.yaml"
+title: "Decision Journal Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry, mandated by the actively-running Cognitive OS
+  runtime slice. Second member of the `learning` family (F17), after
+  `learning.reversal_criteria`. Atlas F17 table row (L806, grep-verified):
+  "Decision Journal | 記錄當時資訊與信心 |
+  context/options/evidence/forecast/confidence | 防 hindsight bias", plus a
+  dedicated §12.36 (L3015-3025): capture context/evidence/options/
+  confidence WHILE the outcome is unknown. Not cited in EC or Master Plan
+  (Atlas-only, same situation as `learning.reversal_criteria`). Two real
+  invariants, both checked at construction and independently re-derived at
+  a gate: (1) >= 2 options with exactly one `chosen` (a one-option record
+  was never a decision); (2) the 5 Atlas-named stage-1 fields become
+  tamper-evident via a content hash the moment the entry is built,
+  independent of whether an outcome is ever attached -- the actual
+  mechanism this method exists to provide. Due diligence performed before
+  designing invariant #2 (existing `EventLedger` append-only ledger and
+  `provenance.locked` axis both considered, neither technically enforces a
+  re-derivable check) is recorded in full in
+  `ai_lego/modules/learning/decision_journal.py`'s own module docstring,
+  not repeated here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L806)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.36 決策日誌／決策紀錄 (L3015-3025)"
+  - "methods/registry/method-inventory.yaml 'Decision Journal' entry (F17 learning, L1055-1059) -- no machine_id recorded there; this contract mints one, same situation learning.reversal_criteria's own contract was in"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: learning.decision_journal` mints a new
+  machine_id, second member of the `learning` family (F17). Registered in
+  methods/registry/contract-backlog.yaml tier_1, same class of
+  justification as every sibling entry (mandated by the actively-running
+  implementation slice) -- registration itself performed by the
+  orchestrating session integrating this batch, not by this file.
+
+id: learning.decision_journal
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [DECIDE, FORECAST, REFLECT]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. DECIDE: exactly one of >= 2 recorded options is marked chosen.
+# FORECAST: Atlas's own field name, borrowed directly (also used verbatim
+# by computation.monte_carlo's own cognitive_primitives). REFLECT: the
+# later outcome-vs-forecast comparison this method's own two-stage design
+# (record_outcome) exists to enable, same primitive
+# architecture.adr/learning.reversal_criteria already use for a comparable
+# "later re-evaluation" concept.
+
+purpose:
+  - capture_decision_time_context_options_evidence_forecast_and_confidence_before_the_outcome_is_known
+
+inputs:
+  required: []
+  optional: [DecisionRef]
+# NEW DESIGN. Unlike learning.reversal_criteria (whose whole job is
+# monitoring a decision made elsewhere, DecisionRef required), this method
+# is a leaf: context/options/evidence/forecast/confidence are raw
+# human/AI-supplied content captured at decision time, not references to
+# pre-existing typed objects that must resolve first. DecisionRef stays
+# optional free text for cross-linking to a formal Decision record if one
+# exists -- see open_questions.
+
+outputs: [DecisionJournalEntry]
+
+preconditions:
+  - "options has >= 2 entries, unique ids, and exactly one entry has chosen == true"
+  - "stage1_integrity_hash is computed over exactly {context, options, evidence, forecast, confidence} at construction, and re-verified against the entry's own current raw fields before record_outcome will attach anything"
+  - "an entry accepts at most one outcome, ever -- record_outcome refuses a second call"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition: []
+# Atlas §12.36 gives no explicit forbidden-transition worked example (grep-
+# confirmed: the section is 11 lines, purpose + 3 bullet benefits, no
+# transition language). Same open-question class as learning.reversal_criteria's own contract.
+
+recommended_next: [learning.reversal_criteria]
+# A journaled decision is exactly what learning.reversal_criteria's own
+# DecisionRef input is meant to point at (that contract's own inputs.required:
+# [DecisionRef]) -- same "validated output becomes the next method's real
+# input" reasoning root_cause.fault_tree's own contract already establishes
+# for architecture.adr, applied here to the F17 family's own two built members.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should evidence require minItems: 1, matching every sibling list field in this package?"
+    decision: "No -- evidence may legally be an empty array."
+    reasoning: >
+      A decision genuinely made on scant gathered evidence is real,
+      honestly-recordable content for a hindsight-bias journal (arguably
+      the most calibration-relevant entry this method exists to capture),
+      not a malformed record -- disclosed divergence, not an oversight.
+  - question: "Reuse an existing mechanism for the hindsight-bias invariant (EventLedger's append-only JSONL log, or provenance.locked's LOCKED_DECISION axis), or design a new one?"
+    decision: "New: a sha256_json content-hash (stage1_integrity_hash / outcome_integrity_hash) computed at each stage and independently re-derived by the gate."
+    reasoning: >
+      EventLedger is a different subsystem (execution event log, not a
+      per-record field) no sibling builder module depends on for its own
+      construction-time validation; provenance.locked is a policy flag no
+      code in this repository technically enforces, not a structural,
+      re-derivable, tamper-evident check a hand-edited dict could be
+      independently verified against. Neither satisfies "the gate
+      independently re-derives from raw fields" on its own -- see the
+      method module's own docstring for the full due-diligence trail.
+  - question: "Percentage [0,100] or probability [0,1] scale for confidence?"
+    decision: "Percentage [0, 100]."
+  - question: "Should record_outcome accept a second call to revise a previously-recorded outcome?"
+    decision: "No -- DECISIONJOURNAL_OUTCOME_ALREADY_RECORDED refuses it unconditionally."
+
+open_questions:
+  - "OQ-DECISIONJOURNAL-1: Should DecisionRef be upgraded to a hard ^DEC- pattern or $ref once a real Decision record commonly exists at journal-entry time, matching OQ-REVERSALCRITERIA-1's own open question for a sibling method?（owner: operator）"
+  - "OQ-DECISIONJOURNAL-2: Atlas L809's sibling row 'Prediction Tracking' (prediction→horizon→actual→error→改善calibration) looks like a natural consumer of many entries' outcome values (a calibration curve across a whole journal). Should that cross-entry aggregation become a future learning.prediction_tracking method, or be added to this one?（owner: operator）"
+  - "OQ-DECISIONJOURNAL-3: cognitive_primitives [DECIDE, FORECAST, REFLECT] is this file's own inference, not a cited Atlas composition formula.（owner: operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written）"
+
+verification:
+  method: >
+    Read Atlas F17 table (L797-809) and §12.36 (L3015-3025) directly at
+    grep-confirmed line numbers; grepped the whole Atlas file for "Decision
+    Journal" to confirm no further section exists beyond the table row and
+    §12.36 (2 hits total: L806, L3015). Grepped EC and Master Plan for
+    "Decision Journal" (zero hits, confirmed Atlas-only). Grepped
+    method-inventory.yaml and both mother documents for any existing
+    machine_id before minting `learning.decision_journal` (none found).
+    Grepped ai_lego/ and the whole Method Atlas doc root for "immutable" /
+    "frozen" / "write-once" / "append-only" / "tamper" before designing
+    the hindsight-bias mechanism (see compilation_decisions and the method
+    module's own docstring for the full trail). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own L806 5-element list
+    (context/options/evidence/forecast/confidence) is transcribed directly
+    as this method's `outputs` typed object's stage-1 fields; the
+    2-option/exactly-one-chosen invariant, the confidence scale, and the
+    entire hash-based tamper-evidence mechanism are this file's own
+    disclosed compilation decisions, not textually cited.

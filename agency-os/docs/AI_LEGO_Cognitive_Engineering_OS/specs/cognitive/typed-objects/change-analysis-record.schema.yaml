@@ -1,0 +1,260 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/change-analysis-record.schema.yaml"
+title: Change Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ChangeAnalysisRecord` -- the
+  declared `outputs` of `root_cause.change_analysis`'s Method Contract.
+  Atlas F05 tool table, Change Analysis row (L441): "找故障前後變更 |
+  before/after→change list→correlation | 快速縮小範圍 | 變更不等於因果".
+
+  STRUCTURAL misuse guard (the row's own "變更不等於因果" / change-is-not-
+  causation warning, operationalized as a type-level incapacity rather than
+  a runtime-only promise): this schema defines NO `caused_by` / `root_cause`
+  / `confirmed_cause` / `causal_link` field anywhere. Every change entry may
+  only carry a `correlation_strength` (closed qualitative enum) and a
+  `temporal_proximity` (closed qualitative enum) -- neither can express a
+  causation claim, only how closely and how strongly a change co-occurred
+  with the fault. `additionalProperties: false` on both the top-level record
+  and the `change_entry`/`baseline` `$defs` makes adding such a field a
+  schema violation. The runtime layer
+  (`ai_lego/modules/root_cause/change_analysis.py`) independently re-checks
+  raw dicts against a denylist of causal-claim key names
+  (`CHANGEANALYSIS_FORBIDDEN_CAUSAL_CLAIM_FIELD`) as a second,
+  hand-tamper-resistant layer -- the same defense-in-depth split
+  `fault-tree-record.schema.yaml`'s own gate-mode/referential-integrity
+  invariants use for their own structural guarantees, applied here to a
+  guarantee about which FIELDS may exist rather than how existing fields
+  relate.
+
+  STRUCTURAL completeness guard (Atlas's own "before/after→change list"
+  formula): every `changes[]` entry requires BOTH `before_state` and
+  `after_state` -- an entry with only one side is an unqualified
+  observation, not a change. A further, genuinely distinct check (not
+  expressible in JSON Schema's own vocabulary, hence runtime-only) refuses
+  an entry whose two states are identical (`CHANGEANALYSIS_DEGENERATE_CHANGE_ENTRY`)
+  -- a "change" that names no actual difference.
+
+  Due diligence: `causal-dag-analysis.schema.yaml` already gives this suite
+  a dedicated correlation-vs-causation discipline for a DIFFERENT method
+  (`causal.dag`, a causal-role GRAPH). This file's own shape is
+  deliberately NOT a re-skin of that one -- Change Analysis is a flat,
+  ranked LIST of discrete before/after deltas against one fault, not a
+  graph of causal-role nodes/edges; see `root_cause.change_analysis.contract.yaml`
+  `compilation_decisions` for the full reasoning.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Change Analysis row (L441): '找故障前後變更 | before/after→change list→correlation | 快速縮小範圍 | 變更不等於因果'"
+  - "methods/contracts/root_cause.change_analysis.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "methods/contracts/causal.dag.contract.yaml and specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml -- this suite's own existing correlation-vs-causation precedent, read as due diligence, deliberately not copied (see description)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: direct transcription of the
+  cited Atlas table row plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should ChangeAnalysisRecord's own causal discipline reuse causal-dag-analysis.schema.yaml's role/edge shape?"
+    decision: "No -- a distinct, flat ranked-list shape (baseline + changes[]), not a graph. Change Analysis is a triage tool over discrete before/after deltas against one fault (Atlas L441), not a causal-role graph (Atlas L1665-1687); forcing the graph shape here would invent structure Atlas never describes for this method."
+  - question: "Should correlation_strength/temporal_proximity be free-form strings or closed enums?"
+    decision: "Closed enums (4-value / 5-value respectively). Atlas gives no explicit vocabulary for either -- disclosed compilation invention, same honesty class as causal-dag-analysis.schema.yaml's own TREATMENT/OUTCOME endpoints -- but a closed vocabulary is what makes the runtime's ranking helper and the gate's re-derivation genuinely mechanical."
+  - question: "Should before_state==after_state be schema-rejectable (a JSON Schema cross-field check) or runtime-only?"
+    decision: "Runtime-only (CHANGEANALYSIS_DEGENERATE_CHANGE_ENTRY) -- JSON Schema Draft 2020-12 has no native two-property-equality constraint without a custom keyword this project does not use elsewhere; same split fault-tree-record.schema.yaml's own verification note already documents for FAULTTREE_GATE_MODE_MISMATCH (schema validates shape, the runtime layer validates cross-field arithmetic)."
+
+$defs:
+  baseline:
+    type: object
+    required: [before_state, after_state]
+    additionalProperties: false
+    properties:
+      before_state:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Overall system state before the change window (e.g. 'checkout error rate 0.1%, p99 latency 220ms')."
+      after_state:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Overall system state once the fault was observed (e.g. 'checkout error rate 40%, p99 latency 4100ms')."
+  change_entry:
+    type: object
+    required: [id, description, before_state, after_state, temporal_proximity, correlation_strength, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique within this record's changes[] list (e.g. CA-001-C1)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What changed, in one sentence (e.g. 'nginx upstream_timeout config value')."
+      before_state:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "This specific item's own value/state before the change. Required -- see top-level description's completeness guard."
+      after_state:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "This specific item's own value/state after the change. Required, and MUST differ from before_state (CHANGEANALYSIS_DEGENERATE_CHANGE_ENTRY, runtime-enforced -- see compilation_decisions) -- see top-level description's completeness guard."
+      temporal_proximity:
+        enum: [IMMEDIATELY_BEFORE, SHORTLY_BEFORE, DISTANT_BEFORE, CONCURRENT, AFTER_FAULT]
+        description: >
+          How close in time this change was to the fault being investigated.
+          AFTER_FAULT is legal (e.g. a change initially suspected as
+          pre-fault, later confirmed to have happened during incident
+          response) but ranks lowest in `rank_changes_by_correlation` --
+          a change cannot have TRIGGERED a fault that already started,
+          though it may still legitimately correlate for other reasons
+          (e.g. it made the incident worse). Compilation invention, not
+          Atlas-cited -- see compilation_decisions.
+      correlation_strength:
+        enum: [NONE, WEAK, MODERATE, STRONG]
+        description: >
+          Qualitative assessment of how strongly this change co-occurs with
+          the fault. NEVER a claim that this change CAUSED the fault --
+          see the top-level description's structural misuse guard.
+          Compilation invention, not Atlas-cited -- see compilation_decisions.
+      provenance:
+        description: "Per-entry, per Atlas's own general provenance discipline -- same per-item granularity cause-hypothesis-set.schema.yaml#/hypotheses and causal-dag-analysis.schema.yaml#/edges both already use."
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items:
+          type: string
+          pattern: "^E-[0-9]+$"
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory uses. A STRONG/MODERATE correlation_strength entry whose provenance.epistemic_type is EVIDENCE and cites none here fails the contract's own evidence_labeling_required gate (CHANGEANALYSIS runtime layer)."
+
+type: object
+required: [id, version, system_under_analysis, fault_description, baseline, changes, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CHANGEANALYSIS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as fault-tree-record.schema.yaml's FAULTTREE- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "root_cause.change_analysis"
+
+  system_under_analysis:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The system/service this analysis investigates. Same field name and role as fault-tree-record.schema.yaml's own field -- see that method contract's own compilation_decisions for why the runtime layer takes this directly rather than a full ProblemStatement object reference."
+
+  fault_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The fault/incident this analysis explains -- Atlas L441's own '故障' (the thing changes are being searched for a correlate of)."
+
+  baseline:
+    $ref: "#/$defs/baseline"
+    description: "Atlas L441's own top-level 'before/after' framing -- the overall system state, distinct from each individual changes[] entry's own before_state/after_state pair."
+
+  changes:
+    type: array
+    minItems: 1
+    description: "Atlas L441's own 'change list' -- one or more discrete before/after deltas, each independently ranked by correlation. Every entry MUST carry both before_state and after_state, and neither entry nor the record itself may carry a causal-claim field -- both enforced at the runtime layer (construction AND independent gate), not merely by this schema's own additionalProperties:false (see top-level description)."
+    items:
+      $ref: "#/$defs/change_entry"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Invented-but-realistic (disclosed): a checkout-service incident correlated with a config deploy, grounded in this repo's own real deploy pipeline vocabulary (agency-os/AGENTS.md:9)."
+    value:
+      id: "CHANGEANALYSIS-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "root_cause.change_analysis"
+      system_under_analysis: "checkout-service"
+      fault_description: "Checkout error rate spiked from 0.1% to 40% starting 14:02 UTC"
+      baseline:
+        before_state: "checkout error rate 0.1%, p99 latency 220ms"
+        after_state: "checkout error rate 40%, p99 latency 4100ms"
+      changes:
+        - id: "CA-001-C1"
+          description: "nginx upstream_timeout config value"
+          before_state: "30s"
+          after_state: "5s"
+          temporal_proximity: IMMEDIATELY_BEFORE
+          correlation_strength: STRONG
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-701"]
+        - id: "CA-001-C2"
+          description: "on-call engineer roster rotation"
+          before_state: "engineer A on call"
+          after_state: "engineer B on call"
+          temporal_proximity: DISTANT_BEFORE
+          correlation_strength: NONE
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+  - description: "A minimal single-change record"
+    value:
+      id: "CHANGEANALYSIS-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "root_cause.change_analysis"
+      system_under_analysis: "internal reference lookup service"
+      fault_description: "Reference table returns stale data"
+      baseline:
+        before_state: "cache hit ratio 98%, data freshness < 1 minute"
+        after_state: "cache hit ratio 98%, data freshness > 3 days"
+      changes:
+        - id: "CA-002-C1"
+          description: "cache invalidation cron job status"
+          before_state: "running every 60s"
+          after_state: "silently stopped"
+          temporal_proximity: CONCURRENT
+          correlation_strength: STRONG
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_GENERATED, locked: null }
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-CHANGEANALYSISRECORD-1"
+    question: >
+      `correlation_strength`/`temporal_proximity` are qualitative closed
+      enums with no numeric weight. Should a future revision add an optional
+      numeric correlation coefficient field for callers with real
+      time-series data, alongside (not replacing) the qualitative enum?
+    owner: "operator, or whoever next has a real quantitative use case"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F05 tool table row (L441) directly. Read
+    causal-dag-analysis.schema.yaml and fault-tree-record.schema.yaml in
+    full before designing this file's own shape (due diligence: confirmed
+    this is a genuinely different structural shape from both, not a
+    re-skin). Validated against jsonschema Draft202012Validator (required
+    fields present, id pattern satisfied, both enums closed,
+    additionalProperties:false rejects an unlisted key including every
+    denylisted causal-claim name at both the record and change_entry level).
+  note: >
+    No mother document was modified. The before/after→change-list→
+    correlation formula and the "變更不等於因果" misuse warning are
+    transcribed verbatim from Atlas's own L441 row. The baseline/changes
+    field design, both closed enums, and the deliberate absence of any
+    causal-claim field are Phase 3 compilation decisions, explicitly
+    flagged above, not textually cited. Referential invariants
+    (before/after completeness, non-degeneracy, the causal-claim denylist)
+    are enforced at the runtime layer
+    (`ai_lego/modules/root_cause/change_analysis.py`), not the schema
+    layer -- JSON Schema can validate node SHAPE but not cross-field
+    string inequality, the same split fault-tree-record.schema.yaml's own
+    verification note already documents for its own runtime-enforced
+    invariants.

@@ -411,8 +411,9 @@ by_document:
       - name: "Event Tree"
         line: 438
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "root_cause.event_tree"
       - name: "Bow-Tie"
         line: 439
         category: "F05 root_cause"
@@ -428,13 +429,15 @@ by_document:
       - name: "Change Analysis"
         line: 441
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "root_cause.change_analysis"
       - name: "Barrier Analysis"
         line: 442
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "root_cause.barrier_analysis"
       - name: "JTBD"
         line: 460
         category: "F06 human_insight"
@@ -1053,20 +1056,22 @@ by_document:
         has_contract: false
         contract_status: pending
       - name: "Decision Journal"
-        line: 803
+        line: 806
         category: "F17 learning"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.decision_journal"
       - name: "Reversal Criteria"
         line: 804
         category: "F17 learning"
         has_contract: false
         contract_status: pending
       - name: "Kill Criteria"
-        line: 805
+        line: 808
         category: "F17 learning"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "learning.kill_criteria"
       - name: "Prediction Tracking"
         line: 806
         category: "F17 learning"

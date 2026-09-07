@@ -1,0 +1,250 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/decision-journal-entry.schema.yaml"
+title: Decision Journal Entry
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DecisionJournalEntry` -- the
+  declared `outputs` of `learning.decision_journal`'s Method Contract
+  (methods/contracts/learning.decision_journal.contract.yaml, `outputs:
+  [DecisionJournalEntry]`). A sixth structural shape in this package: a
+  two-STAGE, tamper-evident record -- `context`/`options`/`evidence`/
+  `forecast`/`confidence` written at decision time (stage 1, hashed into
+  `stage1_integrity_hash`), with an OPTIONAL `outcome` (stage 2) attached
+  later, itself hashed into `outcome.outcome_integrity_hash`. See
+  `ai_lego/modules/learning/decision_journal.py`'s module docstring for the
+  full due-diligence trail and design rationale (existing `EventLedger`
+  append-only mechanism and `provenance.locked` axis both considered and
+  found insufficient before this file's two hash fields were added).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L806): 'Decision Journal | 記錄當時資訊與信心 | context/options/evidence/forecast/confidence | 防 hindsight bias'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.36 決策日誌／決策紀錄 (L3015-3025)"
+  - "methods/contracts/learning.decision_journal.contract.yaml (outputs, preconditions, quality)"
+  - "ai_lego/core/support.py (sha256_json/canonical_json -- the hash primitives this file's two integrity-hash fields record the result of)"
+
+decided_by: >
+  No ADR governs this file. Low-risk compilation choices, same bar every
+  sibling typed-object schema in this directory documents (see
+  compilation_decisions below for the two genuinely disclosure-worthy
+  ones: the empty-evidence-list divergence, and the confidence-scale
+  choice).
+
+compilation_decisions:
+  - question: "Should `evidence` require `minItems: 1`, matching every sibling list field in this directory (fault-tree-record's basic_events, reversal-criteria-set's criteria, swot-analysis's factors)?"
+    decision: "No -- `evidence` may legally be an empty array."
+    reasoning: >
+      Those siblings' lists ARE their method's whole output; empty means
+      nothing was produced. A Decision Journal entry honestly recording
+      that a real decision was made on very little gathered evidence is
+      valid, useful content -- arguably the most calibration-relevant case
+      this method exists to capture (confident despite thin evidence is
+      exactly the pattern §12.36's own "improve decision calibration"
+      benefit wants surfaced, not hidden behind a forced-nonempty rule).
+  - question: "What scale should `confidence` use -- [0,1] probability (matching fault-tree-record's own `probability` field) or [0,100] percentage?"
+    decision: "[0, 100] percentage."
+    reasoning: >
+      Matches how a decision-time confidence is actually stated in
+      practice ("I'm 70% confident") and Atlas's own sibling row's
+      "Prediction Tracking | prediction→horizon→actual→error | 改善
+      calibration" (L809) convention this method's `forecast`/`confidence`
+      pair is a lighter-weight instance of. A disclosed, arbitrary-but-
+      documented choice, same class every sibling schema's own scale
+      decisions already are.
+  - question: "Which fields does `stage1_integrity_hash` actually cover?"
+    decision: "Exactly Atlas L806's own 5 named elements: context, options, evidence, forecast, confidence. Not id/version/decision_ref."
+    reasoning: >
+      Ties the hash's scope directly and legibly to Atlas's own definition
+      of what this method captures, rather than an arbitrary superset. id/
+      version/decision_ref are identifiers/cross-references, a different
+      (and lower-stakes) integrity concern than the decision-time content
+      itself -- see the contract's own disclosure.
+  - question: "Should attaching an outcome be a field a caller can just set on the stage-1 dict, or a dedicated typed sub-object with its own integrity hash?"
+    decision: "A dedicated `outcome` object, itself carrying `outcome_integrity_hash`."
+    reasoning: >
+      A bare field a caller can just set is exactly what a hindsight-biased
+      actor CAN silently edit after the fact with no trace. Giving the
+      outcome the same hash treatment as stage 1 closes the second-order
+      tamper (editing the recorded outcome itself, not just the original
+      forecast) -- see the method module's own docstring for the full
+      mechanism.
+
+type: object
+required: [id, version, context, options, evidence, forecast, confidence, provenance, outcome, stage1_integrity_hash]
+properties:
+
+  id:
+    type: string
+    pattern: "^DJ-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as reversal-criteria-set.schema.yaml's RCS- prefix. Deliberately distinct from decision.schema.yaml's own ^DEC- prefix (a DecisionJournalEntry is not a Decision record -- see decision_ref below)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "learning.decision_journal"
+
+  decision_ref:
+    type: ["string", "null"]
+    default: null
+    description: >
+      Free-text reference to a `Decision` (specs/decision/decision.schema.yaml)
+      this entry documents, if one exists as a formal record. Kept OPTIONAL
+      and free-text, not a hard `$ref` -- same reasoning
+      `reversal-criteria-set.schema.yaml#/properties/decision_ref` already
+      gives for a sibling method: this method's own scope is producing and
+      later completing a self-contained journal entry, not constructing or
+      mutating a full Decision record. See open_questions.
+
+  context:
+    type: string
+    minLength: 1
+    description: "Atlas L806 element 1: the situational background at decision time. Free text; this method takes no position on required structure beyond non-empty."
+
+  options:
+    type: array
+    minItems: 2
+    description: >
+      Atlas L806 element 2 (plural). Schema-level partial enforcement of
+      this method's invariant #1 (minItems:2 here; the "exactly one
+      chosen" half is expressed below via contains/minContains/
+      maxContains -- Draft 2020-12 -- as belt-and-suspenders alongside the
+      Python builder's own construction-time check and independent gate,
+      not a replacement for either).
+    items:
+      type: object
+      required: [id, description, chosen]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Local id, unique within this entry's options list."
+        description:
+          type: string
+          minLength: 1
+        chosen:
+          type: boolean
+          description: "Exactly one option in the array must be true -- see the array-level contains constraint."
+    contains:
+      properties: { chosen: { const: true } }
+      required: [chosen]
+    minContains: 1
+    maxContains: 1
+
+  evidence:
+    type: array
+    description: "Atlas L806 element 3. EMPTY IS LEGAL -- see compilation_decisions (deliberate divergence from every sibling list field in this directory)."
+    items:
+      type: object
+      required: [id, content, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+          description: "The evidence itself (what was known), not a reference to it."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        source:
+          type: string
+          description: "Required (by the method's evaluate_evidence_labeling_required_gate, not this schema) to be non-empty when provenance.epistemic_type == SOURCE_FACT."
+
+  forecast:
+    type: string
+    minLength: 1
+    description: "Atlas L806 element 4: the free-text prediction of what will happen, recorded before the outcome is known."
+
+  confidence:
+    type: number
+    minimum: 0
+    maximum: 100
+    description: "Atlas L806 element 5. Percentage scale -- see compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  stage1_integrity_hash:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+    description: "sha256_json hex digest over exactly {context, options, evidence, forecast, confidence} as they existed at stage-1 construction. Re-derived and compared by evaluate_hindsight_bias_integrity_gate on every gate run -- see compilation_decisions and the method module's own docstring."
+
+  outcome:
+    type: ["object", "null"]
+    default: null
+    description: "STAGE 2, attached later via record_outcome() -- null until (and unless) the outcome is known. Write-once: never overwritten once set (enforced by the method module, not by this schema alone)."
+    required: [actual_result, provenance, recorded_at, outcome_integrity_hash]
+    additionalProperties: false
+    properties:
+      actual_result:
+        type: string
+        minLength: 1
+        description: "Free-text description of what actually happened, recorded once known."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      recorded_at:
+        type: string
+        minLength: 1
+        description: "When the outcome was observed/recorded -- itself part of the tamper-evidence hash (see outcome_integrity_hash), since backdating this field to hide how long hindsight had to creep in before recording would defeat the same purpose this whole record exists for."
+      outcome_integrity_hash:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+        description: "sha256_json hex digest over exactly {actual_result, recorded_at} as they existed when record_outcome() attached this outcome."
+
+examples:
+  - description: "Stage 1 only -- a synthetic architecture decision, outcome not yet known (same invented-but-realistic scenario the CLI slice uses)."
+    value:
+      id: "DJ-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "learning.decision_journal"
+      decision_ref: null
+      context: "Cognitive OS Phase 5 runtime needs a queue backend for the manifest-execution retry path before the next slice batch starts."
+      options:
+        - { id: "OPT-A", description: "Adopt a managed queue service (external dependency, less code to operate)", chosen: false }
+        - { id: "OPT-B", description: "Build a minimal file-backed queue inside ai_lego/compute (no new external dependency, more code to maintain)", chosen: true }
+      evidence:
+        - { id: "EV-1", content: "Current runtime has zero external network dependencies outside the spec root read.", provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null }, source: "ai_lego/core codebase inspection, 2026-09-07" }
+        - { id: "EV-2", content: "Assumed retry volume will stay low (< 100/day) based on current manifest step counts.", provenance: { epistemic_type: ASSUMPTION, authorship_state: HUMAN_ORIGINAL, locked: null } }
+      forecast: "The file-backed queue will handle real load without needing the managed service for at least 2 quarters."
+      confidence: 65
+      provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION }
+      stage1_integrity_hash: "189c6d41f7eb4750dc375d236b6ec8fbec9dba1974402c137be20b6fed4b5717"
+      outcome: null
+
+open_questions:
+  - id: "OQ-DECISIONJOURNAL-1"
+    question: "Should `decision_ref` be upgraded to a hard `^DEC-` pattern or $ref once a real Decision record commonly exists at journal-entry time, matching OQ-REVERSALCRITERIA-1's own open question for a sibling method?"
+    owner: "operator, or whoever next wires this method's output to a real Decision record"
+    blocks: "nothing in this file's own validity -- free text remains schema-legal either way"
+  - id: "OQ-DECISIONJOURNAL-2"
+    question: "Atlas L809's sibling row 'Prediction Tracking' (prediction→horizon→actual→error→改善calibration) looks like a natural consumer of many DecisionJournalEntry.outcome values across entries (a calibration curve: stated confidence vs actual hit rate). Should that cross-entry aggregation live in a future learning.prediction_tracking method, or be added to this one?"
+    owner: "operator, or whoever next builds calibration analysis over a set of entries"
+    blocks: "nothing in this file's own validity -- this method's own scope stays one entry at a time"
+
+verification:
+  method: >
+    Read Atlas L806 (F17 table row) and §12.36 (L3015-3025) directly at the
+    cited, grep-confirmed lines. Grepped the full spec root for existing
+    "immutable"/"frozen"/"write-once"/"append-only" mechanisms before
+    designing stage1_integrity_hash/outcome_integrity_hash (found
+    event_ledger.py and provenance.locked; both examined and found
+    insufficient -- see decision_journal.py's own module docstring for the
+    full trail). Validated against jsonschema Draft202012Validator,
+    including the array-level contains/minContains/maxContains constraint
+    on `options`.
+  note: >
+    No mother document was modified to produce this file. The
+    `stage1_integrity_hash` value in the worked example above is a REAL
+    ``sha256_json`` digest of that example's own context/options/evidence/
+    forecast/confidence values (computed via
+    ``ai_lego.core.support.sha256_json``, not hand-typed) -- the test suite
+    loads this example and re-derives the same hash via
+    ``evaluate_hindsight_bias_integrity_gate`` as a live regression guard,
+    so this file cannot silently drift out of sync with the hashing
+    algorithm it documents.

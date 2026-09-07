@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/learning.kill_criteria.contract.yaml"
+title: "Kill Criteria Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry, mandated by the actively-running Cognitive OS
+  runtime slice. Atlas F17 tool table, Kill Criteria row (L808): "事前定義
+  停止條件 | max loss/time/quality threshold | 控制下行風險". No dedicated
+  Atlas section beyond the table row (grep-confirmed: only L2408
+  Pilot/Kill/Reversal pairing and L4501 rule 10 otherwise mention "Kill
+  Criteria"; §16.1 Idea Object's own `decision` sub-block, L3740, names the
+  field `kill_criteria` as a bare ellipsis). Second `learning` family (F17)
+  member, immediately after `learning.reversal_criteria` in the same
+  table -- structurally adjacent but genuinely distinct (see
+  compilation_decisions). Core invariant: at least one of
+  max_loss/max_time/min_quality must carry a concrete value, and every
+  threshold names a non-empty owner -- both checked at construction and
+  independently re-derived at the gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L808): 'Kill Criteria | 事前定義停止條件 | max loss/time/quality threshold | 控制下行風險'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.1 Idea Object, decision sub-block (L3737-3741): `kill_criteria` (L3740) ellipsis field, sibling to `reversal_conditions` (L3741) -- both listed as separate fields, not aliases"
+  - "methods/contracts/learning.reversal_criteria.contract.yaml (same family, structurally adjacent -- read in full to independently confirm the sibling distinction, see compilation_decisions)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  methods/registry/contract-backlog.yaml tier_1, same class of
+  justification as every sibling entry (mandated by the actively-running
+  implementation slice). id: learning.kill_criteria mints a new
+  machine_id, second member of the learning family (F17), after
+  learning.reversal_criteria.
+
+id: learning.kill_criteria
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [DEFINE, VALIDATE, COMMIT]
+# INFERRED, not cited -- Atlas gives no composition formula for this
+# method (same gap reversal_criteria's own primitives disclose).
+# Deliberately NOT [VALIDATE, REFLECT, LEARN] (reversal_criteria's own
+# set): Kill Criteria's triggered action is a one-directional stop, not a
+# REFLECT-and-possibly-continue loop -- see compilation_decisions.
+
+purpose:
+  - define_stop_conditions_that_trigger_termination
+
+inputs:
+  required: [DecisionRef]
+  # Same free-text-reference scope limit as learning.reversal_criteria's
+  # own DecisionRef (see that contract's OQ-REVERSALCRITERIA-1): this
+  # method's own scope is producing thresholds that could be attached to a
+  # Decision or Idea record, not constructing/mutating either itself.
+
+outputs: [KillCriteriaSet]
+
+preconditions:
+  - "at least one of max_loss/max_time/min_quality is set with a concrete, comparable value"
+  - "every threshold names a non-empty owner"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning as reversal_criteria: thresholds are forward-looking
+  # COMMITMENTS, not backward-looking evidence-cited claims.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas gives no worked detail for either -- same open-question class as
+# every sibling Tier 1 contract.
+
+rollback:
+  side_effect_free: true
+  # Defining stop thresholds has no described external side effect;
+  # INVOKING a triggered threshold would, but that action is out of this
+  # method's own scope (same split reversal_criteria's own rollback
+  # rationale draws, see its OQ-REVERSALCRITERIA-2).
+
+compilation_decisions:
+  - question: "Is Kill Criteria a genuine distinct method, or a near-duplicate of learning.reversal_criteria?"
+    decision: "Genuinely distinct. Reversal Criteria's own row (L807) is an open indicator/condition/action vocabulary with a revisable action (Atlas §11.33's own worked example: re_review, a re-evaluation); Kill Criteria's row (L808) is a closed three-dimension vocabulary (max_loss/max_time/min_quality) with an inherently one-directional stop action. Atlas's own §16.1 Idea Object lists both as separate sibling fields (L3740/L3741, not aliases) -- see source_of_truth_for."
+  - question: "Array of dimension-tagged threshold entries, or a flat 3-slot object (one optional field per dimension)?"
+    decision: "Array (thresholds[]), each entry independently owned and dimension-tagged -- matches this suite's established shape for N independently-owned items (reversal_criteria's own criteria[]) and supports realistic multi-threshold cases a flat object cannot (e.g. a soft and a hard max_loss tier)."
+  - question: "Does a threshold need a caller-supplied comparison operator, like reversal_criteria's own structured_rule.operator?"
+    decision: "No -- breach direction is derived from dimension alone (max_loss/max_time breach at-or-above the value; min_quality breaches at-or-below it). Unlike reversal_criteria's open-ended free-text indicator (no inherent direction), Kill Criteria's three dimensions are Atlas's own closed vocabulary, each with exactly one sensible direction."
+  - question: "Should each threshold carry a required free-text action field, matching reversal_criteria's own required action?"
+    decision: "Optional stop_action, not required -- Atlas's L808 formula column names no action for Kill Criteria (unlike L807's explicit '...→action' for Reversal Criteria); the triggered action is inherent in the method's own name (stop/terminate), not a per-threshold decision the way Reversal's re_review-vs-escalate choice is."
+  - question: "Should an owner be required even though Atlas's own L808 formula column names no owner (unlike Reversal Criteria's L807)?"
+    decision: "Yes -- same cross-suite discipline reversal_criteria's own actionable gate and bow_tie's OWNER/TEST invariant (Atlas F05 misuse warning, '控制措施要有 owner/test') already apply: an unowned threshold cannot actually be invoked when crossed, decorative rather than a real control."
+
+open_questions:
+  - "OQ-KILLCRITERIA-1: Should DecisionRef be upgraded to a hard ^DEC-/^IDEA- pattern or $ref, now that both decision.schema.yaml and a possible future idea.schema.yaml could anchor it?（owner: operator）"
+  - "OQ-KILLCRITERIA-2: Should this method's own scope grow an explicit invoke/terminate workflow once a threshold is crossed, the same open question reversal_criteria's own OQ-REVERSALCRITERIA-2 leaves for its re-review action?（owner: operator）"
+  - "OQ-KILLCRITERIA-3: cognitive_primitives: [DEFINE, VALIDATE, COMMIT] is this file's own inference, not a cited Atlas composition formula -- same open question class as every sibling contract.（owner: operator）"
+
+verification:
+  method: >
+    Grepped the full Atlas file for "Kill Criteria" (3 hits: L808 table
+    row, L2408 Pilot/Kill/Reversal pairing, L4501 rule 10) and separately
+    for the literal field name kill_criteria (1 hit: L3740, Idea Object
+    decision sub-block) -- no dedicated §11.x section exists (grep for
+    ^##.*[Kk]ill: zero matches). Read Atlas L797-810 (F17 table) and
+    L3684-3745 (§16 Typed Object Model intro + §16.1 Idea Object) directly
+    at the cited lines. Read ai_lego/modules/learning/reversal_criteria.py
+    in full, plus its contract and schema, to determine structural
+    distinctness (see compilation_decisions). Grepped the full specs/**
+    tree for kill_criteria/KillCriteria/max_loss/max_time/min_quality/
+    停損/止損 -- zero pre-existing schema hits, so this mints a genuinely new
+    typed object. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The three-dimension formula is
+    transcribed from Atlas's own literal L808 row; the array-of-thresholds
+    field design, the derived (non-operator) breach direction, and the
+    owner requirement are Phase 3 compilation decisions disclosed above,
+    not textually cited.

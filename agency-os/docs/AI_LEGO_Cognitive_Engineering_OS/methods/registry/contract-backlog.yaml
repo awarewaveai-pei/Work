@@ -1934,6 +1934,46 @@ tier_1:
     source: "methods/contracts/root_cause.kepner_tregoe.contract.yaml + specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml"
     note: "57th Method Atlas slice. 82 tests pass. F05 root_cause family: 6 of 9 table rows built (fishbone/five_whys/pareto/fault_tree/bow_tie/kepner_tregoe); remaining: Event Tree, Change Analysis, Barrier Analysis."
 
+  fiftyseventh_concrete_entry:
+    method_id: "root_cause.event_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: "7th `root_cause` family (F05) member. F05 row L438 (initiating event -> ordered barriers success/fail -> outcomes). Atlas's own misuse warning is literally 'not the same as Fault Tree' -- confirmed structurally opposite: forward ordered-barrier propagation from one initiating_event vs Fault Tree's backward AND/OR decomposition of a top event; also confirmed distinct from Bow-Tie's flat unordered controls[] (cannot express position-dependent barrier sequencing). Real invariants: every outcome path barrier_id resolves to a real barriers[] entry in the same record; every outcome path is a position-consistent prefix of the declared ordered barrier sequence (a reordered/skipped path is a phantom outcome)."
+    source: "methods/contracts/root_cause.event_tree.contract.yaml + specs/cognitive/typed-objects/event-tree-record.schema.yaml"
+    note: "58th Method Atlas slice. 103 tests pass."
+
+  fiftyeighth_concrete_entry:
+    method_id: "root_cause.change_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "8th `root_cause` family (F05) member. F05 row L441 (before/after -> change list -> correlation), independently re-confirmed by Execution Contract Sec55 L1905's Incident Mode chain. Atlas's own misuse warning is literally 'a change is not the same as causation' -- enforced structurally (schema defines no caused_by/root_cause field anywhere) AND by an independent runtime denylist check on both construction and gate (same defense-in-depth discipline causal.dag's own evidence-labeling gate already established for a different method shape). Real invariants: the causal-claim-field denylist; every change entry needs both a non-empty before AND after side that genuinely differ (a one-sided or identical-sides entry is not a real change)."
+    source: "methods/contracts/root_cause.change_analysis.contract.yaml + specs/cognitive/typed-objects/change-analysis-record.schema.yaml"
+    note: "59th Method Atlas slice. 101 tests pass."
+
+  fiftyninth_concrete_entry:
+    method_id: "root_cause.barrier_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "9th and LAST `root_cause` family (F05) member -- F05 complete (9/9). F05 row L442 (Hazard->Target->Barrier->failure). Confirmed distinct from root_cause.bow_tie (read in full): Bow-Tie is a symmetric multi-control landscape record with an owner+test ACCOUNTABILITY invariant; Barrier Analysis is a single linear post-hoc failure-diagnosis chain with a structurally OPPOSITE no-blame invariant (Atlas's own misuse warning: 'avoid blaming individuals'). Real invariants: no field for named-individual blame exists anywhere in the closed key set (structural, not a text-scanning heuristic); every failure_modes[].barrier_ref must resolve to a real barriers[] entry in the same record."
+    source: "methods/contracts/root_cause.barrier_analysis.contract.yaml + specs/cognitive/typed-objects/barrier-analysis-record.schema.yaml"
+    note: "60th Method Atlas slice. 72 tests pass. F05 root_cause family: 9 of 9 table rows built (fishbone/five_whys/pareto/fault_tree/bow_tie/kepner_tregoe/event_tree/change_analysis/barrier_analysis) -- COMPLETE."
+
+  sixtieth_concrete_entry:
+    method_id: "learning.kill_criteria"
+    contract_status: complete
+    tier: 1
+    mandated_by: "2nd `learning` family (F17) member, immediately after learning.reversal_criteria in the same Atlas table row pair (L807/L808) -- Atlas's own Sec16.1 Idea Object decision block lists kill_criteria and reversal_conditions as two separate sibling fields, direct textual proof they are not aliases. Confirmed distinct from reversal_criteria (read in full): closed 3-value dimension enum (max_loss/max_time/min_quality) vs reversal's open-text indicator; one-directional stop derived from dimension alone vs reversal's caller-supplied bidirectional operator. Real invariants: at least one of the 3 named threshold dimensions must carry a concrete value; every threshold needs a non-empty owner."
+    source: "methods/contracts/learning.kill_criteria.contract.yaml + specs/cognitive/typed-objects/kill-criteria-set.schema.yaml"
+    note: "61st Method Atlas slice. 31 tests pass."
+
+  sixtyfirst_concrete_entry:
+    method_id: "learning.decision_journal"
+    contract_status: complete
+    tier: 1
+    mandated_by: "3rd `learning` family (F17) member. F17 row (context/options/evidence/forecast/confidence), benefit column literally '防 hindsight bias'. Grepped for an existing immutable/write-once pattern before designing one (event_ledger.py = different subsystem, no sibling coupling; epistemic-label.schema.yaml's LOCKED_DECISION axis = a policy flag with no enforcing code) -- neither satisfied gate-independent-re-derivation, so a new sha256-hash-based two-stage tamper-evident mechanism was built reusing existing core.support hashing primitives. Real invariants: >=2 options with exactly one chosen (a one-option record was never a decision); stage-1 forecast/confidence fields are hash-locked at construction and independently re-verified at gate time, structurally un-editable by record_outcome()."
+    source: "methods/contracts/learning.decision_journal.contract.yaml + specs/cognitive/typed-objects/decision-journal-entry.schema.yaml"
+    note: "62nd Method Atlas slice. 141 tests pass. F17 learning family: 3 of 9 table rows built (reversal_criteria/kill_criteria/decision_journal); remaining: PDCA, OODA, Build-Measure-Learn, After Action Review, Post-mortem, Prediction Tracking."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

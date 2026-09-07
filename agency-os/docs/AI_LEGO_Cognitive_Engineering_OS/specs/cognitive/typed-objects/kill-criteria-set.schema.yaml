@@ -1,0 +1,147 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/kill-criteria-set.schema.yaml"
+title: Kill Criteria Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `KillCriteriaSet` -- the
+  declared `outputs` of `learning.kill_criteria`'s Method Contract. Atlas's
+  own F17 tool table Kill Criteria row (L808): "事前定義停止條件 | max
+  loss/time/quality threshold | 控制下行風險" -- no dedicated section beyond
+  the table row (grep-confirmed).
+
+  Second `learning` family member, structurally closest to
+  `reversal-criteria-set.schema.yaml` (both pre-commit thresholds against
+  motivated reasoning) but deliberately shaped DIFFERENTLY: `dimension` is
+  a CLOSED three-value enum (Atlas's own L808 formula names exactly
+  max_loss/max_time/min_quality), not an open free-text `indicator`, and
+  breach direction is DERIVED from `dimension` alone rather than a
+  caller-supplied operator -- see the method contract's own
+  compilation_decisions for the full comparison against
+  `learning.reversal_criteria`.
+
+  Grep-verified before minting (2026-09-07): no existing schema anywhere in
+  `specs/**` models kill_criteria/max_loss/max_time/min_quality/停損/止損
+  under any name. Atlas's own only other literal mention of the field name
+  `kill_criteria` (§16.1 Idea Object `decision` sub-block, L3740) is a bare
+  ellipsis with no shape given, directly adjacent to `reversal_conditions`
+  (L3741) -- this file resolves that ellipsis, the same relationship
+  `reversal-criteria-set.schema.yaml` has to `reversal_conditions`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L808)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §16.1 Idea Object, decision sub-block (L3737-3741): `kill_criteria` (L3740) ellipsis field this schema resolves, sibling to `reversal_conditions` (L3741)"
+  - "methods/contracts/learning.kill_criteria.contract.yaml (outputs, preconditions, quality, and the array-shape/enum/owner-requirement compilation_decisions this schema implements)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents -- see the method contract's own compilation_decisions for the array-shape/enum/owner-requirement decisions themselves, not repeated here."
+
+type: object
+required: [id, version, decision_ref, thresholds, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^KCS-"
+    description: "NEW DESIGN. Same id-prefix convention as reversal-criteria-set.schema.yaml's own RCS- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "learning.kill_criteria"
+
+  decision_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Free-text reference to the Decision or Idea record this set monitors
+      (specs/decision/decision.schema.yaml, or Atlas §16.1's own
+      `decision.kill_criteria` slot, L3740). Same free-text-not-hard-$ref
+      scope limit as reversal-criteria-set.schema.yaml's own decision_ref
+      -- see OQ-KILLCRITERIA-1 in the method contract.
+
+  thresholds:
+    type: array
+    minItems: 1
+    description: >
+      One or more independently-owned stop thresholds. Atlas's own L808
+      closed vocabulary: at least one of max_loss/max_time/min_quality
+      must carry a concrete value for this set to ever be able to fire
+      (KILLCRITERIA_NO_THRESHOLD_DEFINED at construction, threshold_coverage
+      gate independently re-derives it).
+    items:
+      type: object
+      required: [id, dimension, value, unit, owner, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this set (e.g. KCS-001-T1)."
+        dimension:
+          type: string
+          enum: [max_loss, max_time, min_quality]
+          description: >
+            Atlas L808's own closed vocabulary. Determines breach direction
+            (see kill_criteria.py's evaluate_threshold_breach) -- max_loss/
+            max_time breach at-or-above `value`, min_quality breaches
+            at-or-below it.
+        value:
+          type: number
+          description: "Concrete, comparable threshold value."
+        unit:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What `value` is measured in (e.g. USD, days, score_pct) -- a bare number is not comparable without one."
+        owner:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Required, non-empty -- KILLCRITERIA_UNOWNED_THRESHOLD at construction, ownership gate independently re-derives it. See method contract's own preconditions."
+        stop_action:
+          type: string
+          description: "Optional free text describing what concretely happens when this threshold is crossed (e.g. 'cancel vendor contract'). NOT required, unlike reversal_criteria's own required `action` -- see method contract's compilation_decisions."
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Invented-but-realistic (disclosed): a client hosting-migration pilot with independently-owned max_loss and max_time thresholds, grounded in this repo's own recurring multi-provider theme (project_multi_provider_provisioning memory note)."
+    value:
+      id: "KCS-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "learning.kill_criteria"
+      decision_ref: "DEC-2026-09-07-002: 試點新客戶案使用替代主機商（非 Hetzner）"
+      thresholds:
+        - {id: "KCS-2026-09-07-001-T1", dimension: max_loss, value: 2000, unit: USD, owner: ops_lead, stop_action: "終止試點，遷回原主機商", provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+        - {id: "KCS-2026-09-07-001-T2", dimension: max_time, value: 21, unit: days, owner: devops_lead, provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+  - description: "A minimal single-threshold set (quality floor only, no stop_action supplied)."
+    value:
+      id: "KCS-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "learning.kill_criteria"
+      decision_ref: "DEC-2026-09-07-003: 內部工具 beta 測試"
+      thresholds:
+        - {id: "KCS-2026-09-07-002-T1", dimension: min_quality, value: 80, unit: score_pct, owner: product_lead, provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+verification:
+  method: "Read Atlas F17 table row (L808) and §16.1 Idea Object (L3684-3745) directly at the cited lines. Grepped specs/** for kill_criteria/max_loss/max_time/min_quality/停損/止損 -- zero pre-existing hits. Validated against jsonschema Draft202012Validator."
+  note: >
+    No mother document was modified. `kill_criteria`'s own Atlas mention
+    (L3740) is a bare ellipsis with no field shape -- every field below is
+    NEW DESIGN grounded in the F17 table row's own three-word formula
+    (L808) plus this suite's cross-method owner discipline (method
+    contract's own preconditions), not a second literal transcription the
+    way reversal-criteria-set.schema.yaml could transcribe Atlas's own
+    worked YAML example.

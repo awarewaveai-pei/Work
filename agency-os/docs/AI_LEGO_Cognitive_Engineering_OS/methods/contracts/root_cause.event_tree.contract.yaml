@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/root_cause.event_tree.contract.yaml"
+title: "Event Tree Method Contract"
+status: ACTIVE
+
+description: >
+  root_cause.event_tree, F05 root_cause family, 7th concrete entry (after
+  fishbone/five_whys/pareto/fault_tree/bow_tie/kepner_tregoe; Change
+  Analysis/Barrier Analysis remain). Atlas F05 table row (L438), ONLY
+  citation: "從起始事件推結果｜event→barriers success/fail→outcomes｜評估
+  防護層｜不同於 Fault Tree" -- no dedicated section exists. Not an EC §32
+  method (§32 L1231-1262, closing line L1260 names only STRIDE/LINDDUN/
+  Attack Tree/PASTA). Core invariant: every outcome's path is a position-
+  consistent prefix of the ordered barriers[] sequence, every referenced
+  barrier_id resolves in-record -- the structural opposite of fault_tree's
+  backward AND/OR decomposition, enforced at construction and gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Event Tree row (L438): '從起始事件推結果｜event→barriers success/fail→outcomes｜評估防護層｜不同於 Fault Tree' -- the ONLY citation for this method anywhere in the spec root (grep-confirmed case-insensitively, whole file, single hit)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1262): closing line L1260 names exactly STRIDE/LINDDUN/Attack Tree/PASTA -- Event Tree is absent, grounding this contract's 'not an EC §32 method' claim"
+  - "methods/contracts/root_cause.fault_tree.contract.yaml + ai_lego/modules/root_cause/fault_tree.py (both read in full) -- the due-diligence comparison target Atlas's own misuse warning ('不同於 Fault Tree') names directly"
+  - "ai_lego/modules/root_cause/bow_tie.py (read in full) -- second due-diligence comparison target, confirmed distinct (see compilation_decisions)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: root_cause.event_tree` mints a new
+  machine_id, 7th concrete F05 entry. This file never wrote to
+  contract-backlog.yaml/method-inventory.yaml/root_cause/__init__.py per the
+  task's own constraint against editing shared registries while sibling
+  agents touched the same family folder concurrently -- the orchestrating
+  session integrates registration afterward.
+
+id: root_cause.event_tree
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited. Walking the initiating event forward through an
+# ordered barrier sequence is DECOMPOSE; attaching success/failure (and
+# optional probability) to each step is MAP; referential integrity +
+# ordered-prefix reachability are VALIDATE.
+
+purpose:
+  - trace_an_initiating_event_forward_through_an_ordered_barrier_sequence_to_derive_distinct_outcomes
+inputs:
+  required: [ProblemStatement]
+  optional: [EvidenceSet]
+outputs: [EventTreeRecord]
+preconditions:
+  - "every outcomes[].path barrier_id resolves to a real barriers[].barrier_id in the same record (no dangling reference)"
+  - "every outcomes[].path, position by position, equals an actual prefix of the declared barriers[] sequence -- length 1..len(barriers), never out of order, never skipping a position"
+  - "barrier_id is unique within barriers[]; outcome_id is unique within outcomes[]"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas gives no worked forbidden-transition example for this method.
+recommended_next: [architecture.adr]
+# Same forward link root_cause.fault_tree's own contract already establishes
+# for a confirmed structural analysis result: once barrier effectiveness is
+# evaluated, the next real step is a decision record (add/strengthen a
+# barrier, accept residual risk), not another root_cause hypothesis method.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Reuse fault_tree's flat id-cross-referenced DAG shape, or a new ordered-sequence shape?"
+    decision: "New ordered-sequence shape -- barriers[] is a flat list whose INDEX is semantically its position (unlike fault_tree's gates[], where list order carries no meaning); Atlas's own 'event→barriers...→outcomes' formula is inherently sequential, not a graph."
+  - question: "Must every outcome's path traverse ALL barriers, or may it terminate early once determined?"
+    decision: "May terminate early (path length 1..len(barriers)) -- a real, disclosed pruned-event-tree practice; a path must still be an exact ordered PREFIX, so early termination never skips or reorders a barrier."
+  - question: "Require outcomes to exhaustively cover every success/failure combination (2^n completeness)?"
+    decision: "No -- out of scope for this contract's 2 structural invariants (dangling reference + ordered-prefix reachability); tracked as OQ-EVENTTREE-2 rather than silently expanded."
+  - question: "Mandate a numeric probability on every path step, matching classic quantitative ETA?"
+    decision: "Optional, same as fault_tree's basic_event.probability -- qualitative-only trees stay legal; when present on every step of one outcome, event_tree.outcome_probability computes their product (Atlas's own '評估防護層' benefit, made quantitative)."
+  - question: "Reuse ProblemStatement as the required input type (fault_tree's own precedent) or invent a bespoke placeholder (bow_tie's own precedent)?"
+    decision: "Reuse ProblemStatement -- an initiating_event is conceptually 'a problem that already started to unfold', the same class fault_tree's own top_event is; mirrors the closer sibling, not the more distant one."
+
+open_questions:
+  - "OQ-EVENTTREE-1: task brief's own framing called this Atlas table row '7th of 9' -- grep-verified WRONG before writing anything (Atlas L438 is row 5 of 9: fishbone/5-whys/pareto/fault_tree/**event_tree**/bow-tie/kepner-tregoe/change-analysis/barrier-analysis). No action needed; recorded per R4 claim-before-verify.（owner: operator）"
+  - "OQ-EVENTTREE-2: outcomes need not exhaustively cover every success/failure combination across barriers -- should a future revision add a completeness gate (WARN, not a hard invariant) for a record leaving a reachable combination undeclared?（owner: operator）"
+  - "OQ-EVENTTREE-3: probability lives on each path STEP (the branch taken), not as a success-rate on the barrier itself (which would need success+failure summing to 1, extra invariant surface) -- should a future revision add that stricter, more classically-ETA-faithful shape?（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-insensitively for "event tree"/
+    "event.tree" -- one hit, the F05 table row (L438); confirmed no
+    dedicated section exists. Read EC §32 (L1231-1262) directly; confirmed
+    its closing line (L1260) names exactly STRIDE/LINDDUN/Attack Tree/PASTA.
+    Read ai_lego/modules/root_cause/fault_tree.py and bow_tie.py in full for
+    the due-diligence structural-distinctness comparison (see
+    compilation_decisions). Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own single-line formula and
+    "success/fail" vocabulary are transcribed verbatim into purpose/
+    preconditions. The ordered-sequence field design, pruned-path length
+    bound, and optional per-step probability are Phase 3 compilation
+    decisions disclosed above, not further textual citations.
