@@ -1,0 +1,127 @@
+$id: "ai-lego://methods/contracts/architecture.ddd.contract.yaml"
+title: "Domain-Driven Design (DDD) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry, ninth `architecture` family (F18) member. Atlas
+  F18 table row (L818) gives a real worked pipeline: "subdomain→bounded
+  context→context map". §11.35 (L2020-2038) gives only a bare 6-concept
+  list (Ubiquitous Language, Subdomain, Bounded Context, Context Map,
+  Aggregate, Domain Event), no pipeline -- the table row IS the pipeline,
+  same grounding tier `architecture.event_storming.contract.yaml`'s own
+  description already cited when it chose Event Storming over DDD for
+  that earlier slice (this contract now builds DDD on the strength of the
+  table row alone). Two real structural invariants enforced: a
+  bounded_context with no subdomain lineage is meaningless (carved from
+  nothing); a context_map relationship pointing at a nonexistent
+  bounded_context is a real integrity bug. `BoundedContextMap` is a NEW
+  output type; due diligence found no duplicate (see verification).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 軟體架構套件 tool table, DDD row (L818): 'subdomain→bounded context→context map'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.35 領域驅動設計（Domain-Driven Design / DDD）(L2020-2038) -- 6-concept list, benefits"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` (exact key assigned by
+  the integrating session to avoid a concurrent-edit collision on that
+  shared file -- see WORKLOG entry for this slice). `id: architecture.ddd`
+  is a NEW machine_id; `family: architecture` reuses F18's existing label,
+  the same convention every `architecture.*` sibling already applies.
+
+id: architecture.ddd
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [DECOMPOSE, MAP, RELATE]
+# INFERRED, not cited -- same honesty tier as every sibling's own inferred
+# set. DECOMPOSE (domain -> subdomains), MAP (subdomains -> bounded
+# contexts), RELATE (context_map relationships) directly match the table
+# row's own 3-stage pipeline.
+
+purpose:
+  - manage_complex_domain_semantics_via_bounded_contexts
+# Atlas L818 verbatim sense: "用 bounded context 管理複雜 domain".
+
+inputs:
+  required:
+    - DomainDescription
+  optional: []
+
+outputs:
+  - BoundedContextMap
+# NEW output type (see typed-objects/bounded-context-map.schema.yaml).
+
+preconditions:
+  - "at least 1 subdomain supplied (a domain decomposition with zero subdomains models nothing)"
+  - "every bounded_context references at least 1 subdomain it was carved from, and every referenced subdomain id is real (DDD_BOUNDED_CONTEXT_NO_SUBDOMAIN_LINEAGE / DDD_BOUNDED_CONTEXT_UNKNOWN_SUBDOMAIN)"
+  - "every context_map relationship's pattern is one of the 9 standard DDD context-mapping patterns (Partnership, Shared Kernel, Customer-Supplier, Conformist, Anticorruption Layer, Open Host Service, Published Language, Separate Ways, Big Ball of Mud -- Evans 2003 / Vernon 2013, not Atlas-cited) (DDD_INVALID_CONTEXT_MAP_PATTERN)"
+  - "every context_map relationship references two bounded_contexts that actually exist in the record (DDD_CONTEXT_MAP_UNKNOWN_BOUNDED_CONTEXT)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning class as architecture.system_context_model: a bounded-
+  # context map is structured architectural documentation (AI_INFERENCE /
+  # HUMAN_OPINION), not an empirical claim needing per-field evidence
+  # citations -- real risk here is structural integrity (dangling
+  # references), already enforced via preconditions/gates.
+
+forbidden_transition: []
+# Atlas §22.3 has no DDD row -- honest absence, same as every architecture
+# sibling.
+
+recommended_next: [architecture.event_storming]
+# F18's own recommended chain (L829-838) places C4/DDD immediately before
+# the diagram introduces Event Storming's own workshop step. Deliberately
+# conservative: only the one directly-adjacent, already-built sibling.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should subdomain type (core/supporting/generic) be modeled?"
+    decision: "Optional 3-value enum on each subdomain, sourced from real DDD practice (Evans 2003), not required, not Atlas-cited."
+  - question: "Should context_map relationships use a closed pattern enum or free text?"
+    decision: "Closed 9-value enum of the standard DDD context-mapping patterns -- real, external, named practice, same 'real practice, not Atlas' disclosure class architecture.adr's own status field already established."
+  - question: "Should self-referential context_map entries (from_context_id == to_context_id) be forbidden?"
+    decision: "Not enforced as a third invariant -- left unconstrained (OQ-DDD-1), same restraint architecture.event_storming applied to relationship-type-pair legality instead of inventing an unsupported rule."
+
+open_questions:
+  - "OQ-DDD-1: Should a future revision forbid self-referential context_map entries (from_context_id == to_context_id), or is that a legitimate degenerate case with no real DDD meaning either way?（owner: operator）"
+  - "OQ-DDD-2: Should subdomain.type (core/supporting/generic) become required once an operator wants queryable subdomain classification?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas L818 (F18 table row) and §11.35 (L2020-2038) directly.
+    Grepped agency-os/ and Projects/internal/cognitive-engineering-os/
+    exhaustively for "bounded context"/"aggregate"/"ubiquitous
+    language"/"subdomain"/"context map" before writing -- real hits found
+    only as (a) this repository's OWN one-time architectural decisions
+    about ITS OWN modular-monolith layout (docs/architecture/
+    REPOSITORY_ARCHITECTURE.md's "Bounded Context Analysis" section,
+    docs/HCI/.../ADR-0007-modular-monolith-first.md) -- a different layer
+    (a one-time decision record, not a repeatable per-project method,
+    same class distinction Zero Trust Review vs ADR-016 already
+    established), (b) a free-text/enum field VALUE inside unrelated typed
+    objects (specs/execution/current-state.schema.yaml's "Affected
+    Bounded Context", specs/execution/change-plan.schema.yaml's "New
+    Bounded Context" -- DDD-concept references, not a bounded-context-map
+    record's own shape, the same non-duplicate class
+    architecture.event_storming.contract.yaml's own verification already
+    found for these same two files), and (c) System Foundry v1.6's own
+    `docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/methodology/
+    04_DOMAIN_DISCOVERY.md` / `templates/.../09_BOUNDED_CONTEXTS.md` --
+    a different system entirely (a one-time, per-generated-system
+    blueprint deliverable produced by a separate questionnaire-driven
+    framework, not a repeatable, gated, schema-validated Cognitive OS
+    method record). No duplicate of this record's own shape found.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 3-stage pipeline is transcribed
+    from Atlas L818; the 9-pattern context-mapping vocabulary and the
+    subdomain-type enum are sourced from real, external, named DDD
+    practice (Evans 2003; Vernon 2013), disclosed as compilation
+    decisions, not presented as Atlas-given.

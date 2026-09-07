@@ -1894,6 +1894,46 @@ tier_1:
     source: "methods/contracts/security.security_control_mapping.contract.yaml + specs/cognitive/typed-objects/security-control-mapping-record.schema.yaml"
     note: "53rd Method Atlas slice. 78 tests pass. F20 security family: 10 of 10 built."
 
+  fiftysecond_concrete_entry:
+    method_id: "architecture.ddd"
+    contract_status: complete
+    tier: 1
+    mandated_by: "9th `architecture` family (F18) member. F18 row L818 (subdomain→bounded context→context map). Confirmed additive to REPOSITORY_ARCHITECTURE.md's own Bounded-Context Analysis and ADR-0007 (one-time decisions about this repo's own layout, not a repeatable per-project method) and to System Foundry's DOMAIN_DISCOVERY/BOUNDED_CONTEXTS docs (different system, one-time blueprint deliverable). Real invariants: subdomain lineage (every bounded_context must reference a real subdomain); context_map referential integrity (every relationship's from/to must resolve to a real bounded_context)."
+    source: "methods/contracts/architecture.ddd.contract.yaml + specs/cognitive/typed-objects/bounded-context-map.schema.yaml"
+    note: "54th Method Atlas slice. 27 tests pass."
+
+  fiftythird_concrete_entry:
+    method_id: "architecture.trade_off_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Architecture family's Tier-1 entry for F18 row L825 (criteria->weights->options->risk/sensitivity). Investigated and confirmed field-for-field identical to decision.mcda's own pipeline (options/criteria/weights/normalized_scores/ranking/sensitivity_notes) -- same finding independently reached twice: once already disclosed at devops_sre.sli_slo.contract.yaml:23-34, re-verified fresh this session. Contract-only: outputs reuse decision.mcda's own MCDAAnalysis typed object and its existing two-layer invariants (weights sum to 1.0, no-automatic-authority-claim). No new schema/module/CLI -- duplicate-avoidance decision, not a gap."
+    source: "methods/contracts/architecture.trade_off_matrix.contract.yaml (mints machine_id architecture.trade_off_matrix, reuses decision.mcda's mcda-analysis.schema.yaml)"
+    note: "F18 architecture family: 10 of 10 table rows accounted for (9 built modules + this 1 confirmed-duplicate reuse)."
+
+  fiftyfourth_concrete_entry:
+    method_id: "root_cause.fault_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: "4th `root_cause` family (F05) member. F05 row L437 (AND/OR logic decomposition of a top event). Confirmed structurally distinct from security.attack_tree (same AND/OR-gate class, but Fault Tree uses flat basic_events[]/gates[] cross-referenced by id -- a DAG allowing one basic event to feed multiple gates for shared common causes -- vs Attack Tree's embedded single-parent tree; security.attack_tree.contract.yaml:124-139 had already dismissed Fault Tree as non-duplicate when built). Real invariants: gate-mode/required_count consistency (AND needs all children, OR needs exactly 1); referential integrity + cycle detection across every id reference."
+    source: "methods/contracts/root_cause.fault_tree.contract.yaml + specs/cognitive/typed-objects/fault-tree-record.schema.yaml"
+    note: "55th Method Atlas slice. 104 tests pass."
+
+  fiftyfifth_concrete_entry:
+    method_id: "root_cause.bow_tie"
+    contract_status: complete
+    tier: 1
+    mandated_by: "5th `root_cause` family (F05) member. F05 row L439 (threats->event->consequences, left=prevention/right=mitigation). Confirmed distinct from security.security_control_mapping (SCM is a cross-record consumer of external STRIDE/LINDDUN threats with no owner field or top_event; Bow-Tie is fully self-contained and symmetric around one top_event_description). Real invariants: every control needs a non-empty owner AND test (Atlas's own literal misuse warning); threat/consequence text cannot equal the top_event; every control's side+target_id must resolve to a real threat/consequence in the same record."
+    source: "methods/contracts/root_cause.bow_tie.contract.yaml + specs/cognitive/typed-objects/bow-tie-analysis-record.schema.yaml"
+    note: "56th Method Atlas slice. 87 tests pass."
+
+  fiftysixth_concrete_entry:
+    method_id: "root_cause.kepner_tregoe"
+    contract_status: complete
+    tier: 1
+    mandated_by: "6th `root_cause` family (F05) member. F05 row L440 (Is/Is-Not differential analysis, What/Where/When/Extent). Confirmed distinct from decision.mcda (scoring/weighting technique vs. a diagnostic problem-specification technique used before cause hypotheses even exist) -- single Atlas citation, no dedicated section, grep-confirmed. Real invariants: non-empty IS per dimension; IS must genuinely differ from IS-NOT (case/whitespace-insensitive); fixed 4-dimension positional set (WHAT/WHERE/WHEN/EXTENT); every distinction must cite a dimension with both IS and IS-NOT filled in; every change must reference a real distinction_id."
+    source: "methods/contracts/root_cause.kepner_tregoe.contract.yaml + specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml"
+    note: "57th Method Atlas slice. 82 tests pass. F05 root_cause family: 6 of 9 table rows built (fishbone/five_whys/pareto/fault_tree/bow_tie/kepner_tregoe); remaining: Event Tree, Change Analysis, Barrier Analysis."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

@@ -1,0 +1,121 @@
+$id: "ai-lego://methods/contracts/root_cause.bow_tie.contract.yaml"
+title: "Bow-Tie Method Contract"
+status: ACTIVE
+
+description: >
+  root_cause.bow_tie, F05 root_cause family (siblings: fishbone/five_whys/
+  pareto). Atlas F05 table row (L439), the ONLY citation: "threats→event→
+  consequences", usage "左防止、右緩解", benefit "同時管理 prevention/
+  recovery", misuse "控制措施要有 owner/test" -- no dedicated section
+  exists (grep-confirmed absent from §11.x/§12.x/§13.x). NOT an EC §32
+  method (§32 L1260 names only STRIDE/LINDDUN/Attack Tree/PASTA). Core
+  invariant: every control needs a non-empty owner AND test (Atlas's own
+  misuse warning, enforced not merely documented); every threat/consequence
+  must stay textually distinct from the top event; every control's
+  side+target reference must resolve WITHIN this same record -- see
+  compilation_decisions for the due-diligence check against
+  security.security_control_mapping's own cross-record design.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Bow-Tie row (L439): 'threats→event→consequences', usage '左防止、右緩解', benefit '同時管理 prevention/recovery', misuse '控制措施要有 owner/test' -- this method's ONLY citation"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1262): closing sentence L1260 names exactly STRIDE/LINDDUN/Attack Tree/PASTA -- Bow-Tie is absent, grounding this contract's 'not an EC §32 method' claim"
+  - "methods/contracts/security.security_control_mapping.contract.yaml and ai_lego/modules/security/security_control_mapping.py (both read in full): due-diligence comparison target -- confirmed a genuinely distinct method (see compilation_decisions)"
+  - "methods/registry/method-inventory.yaml Bow-Tie entry -- was stale by 1 (line: 438) against the real grep-confirmed Atlas L439; corrected to line:439/has_contract:true/machine_id:root_cause.bow_tie in the same integration pass that registered this contract (2026-09-07, see OQ-BOWTIE-1)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives this method exactly one table row
+  -- purpose/usage/benefit/misuse in four short phrases, transcribed
+  directly below. `id: root_cause.bow_tie` mints a new machine_id, fourth
+  concrete F05 entry alongside fishbone/five_whys/pareto.
+
+id: root_cause.bow_tie
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4 composition formula for Bow-Tie).
+# Splitting the top event into left threats / right consequences is
+# DECOMPOSE; assigning each control its own side+target+owner+test is MAP;
+# the two real invariants (owner/test presence, distinctness + referential
+# integrity) are both VALIDATE.
+
+purpose:
+  - map_prevention_and_mitigation_controls_with_a_mandatory_owner_and_test_against_a_single_top_events_own_left_side_threats_and_right_side_consequences
+inputs:
+  required: [ThreatSet, TopEventDescriptor, ConsequenceSet]
+  optional: []
+outputs: [BowTieAnalysisRecord]
+preconditions:
+  - "system_or_component and top_event_description are non-empty strings"
+  - "threats has at least 1 entry; every entry has a unique T- prefixed threat_id and a non-empty description that is NOT identical (after whitespace-trim) to top_event_description"
+  - "consequences has at least 1 entry; every entry has a unique C- prefixed consequence_id and a non-empty description that is NOT identical (after whitespace-trim) to top_event_description"
+  - "controls has at least 1 entry; every entry has a unique CTRL- prefixed control_id, side in {prevention, mitigation}, non-empty description, non-empty owner, non-empty test, and a target_id naming a real threats[].threat_id (side=prevention) or consequences[].consequence_id (side=mitigation) -- a dangling reference is refused"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Both invariants are structural/set-membership derivations (owner/test
+  # presence, distinctness + referential integrity), the same class
+  # security.security_control_mapping's own invariants already establish --
+  # not a statistical/numeric CALCULATED RESULT.
+forbidden_transition: []
+# Atlas §22.3's own gate table (grep-confirmed) has no Bow-Tie row.
+recommended_next: [security.security_control_mapping]
+# A real, disclosed next-step relationship, not a copied sibling default:
+# Bow-Tie's own controls[] carry owner/test but no structured, auditable
+# evidence record (description/verified_by/verified_date) -- Atlas's own
+# dedicated home for that fuller Threat→Control→Evidence traceability is
+# security.security_control_mapping (F20 row L891), confirmed by direct
+# read of that contract's own due-diligence text.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should controls[] nest inside each threat/consequence entry, or be a flat array cross-referenced by side+target_id?"
+    decision: "Flat array, cross-referenced by side+target_id -- same 'separate stages, cross-referenced by id' shape security.security_control_mapping's own controls[]/control_mappings[] pair already establishes."
+  - question: "Is root_cause.bow_tie redundant with the already-built security.security_control_mapping (both classify controls against a threat)?"
+    decision: "Distinct methods, both kept. Bow-Tie is a self-contained, symmetric threats/top-event/consequences record with a mandatory owner+test accountability invariant; security.security_control_mapping is a cross-record CONSUMER of an external STRIDE/LINDDUN record's threats[], classified into preventive/detective/recovery with structured auditable evidence, no owner field anywhere, and no top_event/consequences concept at all."
+    reasoning: >
+      Verified by direct read of ai_lego/modules/security/security_control_mapping.py
+      (full file) and security-control-mapping-record.schema.yaml (full
+      file): neither has an `owner` field, a `top_event`, or a
+      `consequences[]` array -- its whole shape is threat->control->evidence
+      for ONE side (classifying threats an upstream STRIDE/LINDDUN record
+      already found), never a two-sided prevention/mitigation bowtie around
+      a single event. Atlas's own two table rows are grammatically distinct
+      too: F20 L891 "每個威脅對應...control" (each threat maps to a
+      control) vs F05 L439 "threats→event→consequences" (a full causal
+      bowtie shape with a named central event neither threats nor controls
+      alone capture). Confirmed genuinely distinct scope, not overlapping.
+  - question: "Should control_id be required unique within the record, matching every sibling method's own control-uniqueness discipline, even though Atlas states no explicit rule for Bow-Tie specifically?"
+    decision: "Yes -- a duplicate control_id would let one control's own owner/test silently overwrite another's meaning; uniqueness is enforced at construction and gate, same as threat_id/consequence_id."
+
+open_questions:
+  - id: "OQ-BOWTIE-1"
+    question: "RESOLVED (2026-09-07): method-inventory.yaml's Bow-Tie row was stale (line: 438, has_contract:false) against the real grep-confirmed Atlas line L439 -- updated in the same integration pass that registered this contract to line:439/has_contract:true/machine_id:root_cause.bow_tie.（owner: operator）"
+  - id: "OQ-BOWTIE-2"
+    question: "Atlas's usage column says '右緩解' (mitigation) but the benefit column says 'prevention/recovery' -- this contract uses 'mitigation' as the literal side enum value (the more precise usage-column word); should a future revision accept 'recovery' as an accepted alias?（owner: operator）"
+  - id: "OQ-BOWTIE-3"
+    question: "One control entry addresses exactly one target_id (a simpler design than security.security_control_mapping's own many-to-many controls[]/control_mappings[] split) -- a control protecting several threats needs several entries today. Should a future revision adopt the fuller split design instead?（owner: operator，或下一個修訂本 contract 的 session）"
+
+verification:
+  method: >
+    Read Atlas F05 tool table row (L439) directly -- this method's ONLY
+    citation. Grep-confirmed (case-insensitive) across §11.x/§12.x/§13.x
+    that no dedicated Bow-Tie section exists. Read EC §32 (L1231-1262)
+    directly; confirmed its closing sentence (L1260) names exactly
+    STRIDE/LINDDUN/Attack Tree/PASTA. Read
+    ai_lego/modules/security/security_control_mapping.py and
+    security.security_control_mapping.contract.yaml in full for the
+    due-diligence distinctness comparison. Read method-inventory.yaml's own
+    Bow-Tie row and confirmed the line:438 vs real L439 offset by direct
+    grep. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own four-phrase table row is
+    transcribed directly into purpose/preconditions/quality above. The
+    flat-controls-array design, the owner/test invariant's exact field
+    names, and control_id uniqueness are disclosed compilation decisions
+    grounded in security.security_control_mapping's own precedent and
+    Atlas's own literal misuse-warning text, not further mother-document
+    citations.

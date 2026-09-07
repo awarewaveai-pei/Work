@@ -1,0 +1,147 @@
+$id: "ai-lego://methods/contracts/architecture.trade_off_matrix.contract.yaml"
+title: "Architecture Trade-off Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 entry, `architecture` family (F18). Atlas's ONLY citation is the
+  F18 table row (L825: "criteria→weights→options→risk/sensitivity",
+  purpose "比較候選架構") -- no dedicated §11.x section, grep-confirmed.
+
+  Core finding, re-verified by direct read of both files before this
+  contract was written: this row is field-for-field identical to
+  `decision.mcda`'s own already-built pipeline (Options/Criteria/Weights/
+  Sensitivity, same names, same order-immaterial shape --
+  `decision.mcda.contract.yaml` L112-118, `mcda-analysis.schema.yaml`
+  L126-205). `devops_sre.sli_slo.contract.yaml` (L23-34) and
+  `contract-backlog.yaml`'s `eighteenth_concrete_entry.mandated_by`
+  (L655-659) already recorded this exact finding while checking F18 for
+  reuse candidates before opening a different family -- this contract is
+  the first DEDICATED record of it under this method's own machine_id, not
+  a second, independent investigation reaching a different answer.
+
+  No new invariant: this contract mints a machine_id and a Tier 1 registry
+  entry only. `outputs: [MCDAAnalysis]` reuses `decision.mcda`'s own
+  already-built typed object verbatim -- no new schema, module, CLI, or
+  test is written (duplicate-avoidance decision, not an oversight; see
+  `compilation_decisions`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 tool table, Architecture Trade-off Matrix row (L825): 'criteria→weights→options→risk/sensitivity｜透明呈現取捨' -- this method's ONLY citation, no dedicated section (grep-confirmed absent)"
+  - "methods/contracts/decision.mcda.contract.yaml -- the method contract whose pipeline this row duplicates; inputs (L112-118), forbidden_transition (L161-174)"
+  - "specs/cognitive/typed-objects/mcda-analysis.schema.yaml -- the typed object this contract's outputs reuse verbatim, no new schema minted"
+  - "methods/contracts/devops_sre.sli_slo.contract.yaml (L23-34) -- prior session's own due-diligence finding of the same structural identity, independently re-confirmed here"
+  - "methods/registry/contract-backlog.yaml eighteenth_concrete_entry.mandated_by (L655-659) -- the same finding recorded a second time, inside a DIFFERENT method's registry entry, that this contract now gives its own dedicated home"
+  - "methods/registry/method-inventory.yaml Architecture Trade-off Matrix entry -- carried no machine_id when this file was written (was L1112-1116, category 'F18 architecture'); the same integration pass that registered this contract updated the row to has_contract:true/machine_id:architecture.trade_off_matrix/line:825 (2026-09-07, see OQ-TOM-2)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155): grep-confirmed no dedicated Architecture Trade-off Matrix row -- only an MCDA row (L4154), inherited here since outputs ARE MCDAAnalysis records"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: architecture.trade_off_matrix` mints a
+  new machine_id, `family: architecture` reused as-is from every other F18
+  member. The reuse-not-rebuild decision is this contract's own compilation
+  decision, grounded in the direct schema/contract reads cited above, not
+  an ADR-level ruling -- same evidentiary standard every sibling F18
+  contract in this directory already applies to its own compilation
+  decisions.
+
+id: architecture.trade_off_matrix
+version: "1.0.0"
+family: architecture
+
+cognitive_primitives: [COMPARE, WEIGHT, CALCULATE, PRIORITIZE]
+# IDENTICAL to decision.mcda.contract.yaml's own set (L93) -- same real
+# operations, same domain-neutral method, applied here to Atlas L825's own
+# subject (candidate architectures) rather than a re-derived set.
+
+purpose:
+  - score_and_rank_candidate_architectures_against_weighted_multi_criteria
+# Same operation as decision.mcda's own purpose
+# (score_and_rank_options_against_weighted_multi_criteria), narrowed to
+# Atlas L825's own usage column: "比較候選架構" (compare candidate
+# architectures).
+
+inputs:
+  required: [Options, Criteria, RawScores, Weights]
+  optional: []
+# IDENTICAL to decision.mcda.contract.yaml's own inputs (L112-118) --
+# Options here are candidate architectures (Atlas L825's own "options"
+# stage), not a new input shape.
+
+outputs: [MCDAAnalysis]
+# REUSES decision.mcda's own already-built typed object
+# (specs/cognitive/typed-objects/mcda-analysis.schema.yaml) verbatim. This
+# contract mints NO architecture-trade-off-matrix-*.schema.yaml -- see
+# description/compilation_decisions for why a new type would be
+# undisclosed duplication, not new scope.
+
+preconditions:
+  - "identical to decision.mcda.contract.yaml's own preconditions (every criterion carries a direction; weights are non-negative and sum to 1.0, tolerance 1e-6; every raw_scores entry references a known option_id and criterion_id) -- not restated here as a second, driftable copy; enforced by the same ai_lego/modules/decision/mcda.py this method's runtime output is actually generated by"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Inherited, not independently declared: this method's own runtime
+  # output IS an MCDAAnalysis record produced by decision.mcda's own
+  # generate_mcda_analysis, so it carries decision.mcda's own quality
+  # profile automatically.
+
+forbidden_transition:
+  - "Automatic Authority"
+# Inherited, not independently re-derived: outputs ARE MCDAAnalysis
+# records, so Atlas §22.3 L4154's own MCDA row (the only citation) already
+# applies transitively -- enforced by
+# ai_lego/modules/decision/mcda.py::assert_no_automatic_authority_claim and
+# mcda-analysis.schema.yaml's own additionalProperties:false. §22.3's own
+# gate table (L4142-4155, grep-confirmed) has no separate Architecture
+# Trade-off Matrix row of its own.
+
+recommended_next: [architecture.adr]
+# Same reasoning class every other F18 sibling's own recommended_next
+# already uses -- a trade-off decision naturally feeds an ADR
+# (architecture.adr, already built). INFERRED, not literally cited at
+# L825.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should this method get its own new typed object / module / CLI / test, or reuse decision.mcda's already-built pipeline?"
+    decision: "Reuse -- this contract mints a machine_id and Tier 1 registry entry for Atlas L825's own row only; a caller invoking 'Architecture Trade-off Matrix' calls decision.mcda's own generate_mcda_analysis with candidate architectures as options[]."
+  - question: "Is this the first time this reuse finding was made in this codebase?"
+    decision: "No -- devops_sre.sli_slo.contract.yaml already disclosed the identical finding while surveying F18 before opening a different family; this contract gives that finding its own dedicated machine_id-bearing home rather than re-deriving a different answer."
+
+open_questions:
+  - id: "OQ-TOM-1"
+    question: "If a future Atlas revision gives this method a dedicated §11.x section with a genuinely new field beyond decision.mcda's own pipeline (e.g. a structured per-option risk field distinct from sensitivity_notes), should a real module/typed-object be built then?（owner: operator, or whoever next reads Atlas for additional Architecture Trade-off Matrix content）"
+  - id: "OQ-TOM-2"
+    question: "RESOLVED (2026-09-07). method-inventory.yaml updated to has_contract:true/machine_id:architecture.trade_off_matrix/line:825 in the same integration pass that registered this contract.（owner: operator）"
+  - id: "OQ-TOM-3"
+    question: "This is the only ACTIVE contract in the suite with zero automated test coverage of its own (critic finding, 2026-09-07) -- its entire value is a cross-file identity claim against decision.mcda, the easiest kind of claim to silently rot. tests/unit/test_mcda.py now asserts the resolver resolves this machine_id and its inputs/outputs/forbidden_transition/cognitive_primitives still equal decision.mcda's own -- should coverage go further (e.g. a golden-suite check) if decision.mcda's contract ever changes shape?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas L825 (F18 table row) directly -- confirmed no dedicated
+    §11.x section exists for this method (F18's own §11.x subsections
+    cover C4/DDD/Event Storming/ADR/ATAM only; Fitness Functions/Strangler
+    Fig/Trade-off Matrix/Dependency Mapping are table-row-only, the same
+    class quality_attribute_scenario.contract.yaml already discloses for
+    its own row). Read decision.mcda.contract.yaml and
+    mcda-analysis.schema.yaml in full: confirmed field-for-field identity
+    (Options/Criteria/Weights/Sensitivity all present under the same
+    names, same order-immaterial shape). Read devops_sre.sli_slo.contract.yaml
+    (L23-34) and contract-backlog.yaml's own eighteenth_concrete_entry
+    mandated_by (L655-659): both already record this exact finding, made
+    while surveying F18 for reuse candidates before a different family was
+    opened. Grepped specs/cognitive/typed-objects/ for
+    "trade-off"/"tradeoff"/"architecture matrix" -- no existing or
+    competing typed object found. Grepped Atlas §22.3's gate table
+    (L4142-4155) directly -- confirmed no dedicated row exists (only MCDA,
+    L4154, inherited transitively). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. This is a duplicate-avoidance,
+    contract-only entry, disclosed as such -- not a genuine-compute slice.
+    `outputs`/`inputs`/`forbidden_transition` are transcribed verbatim from
+    `decision.mcda.contract.yaml` (same underlying method, same runtime
+    type), not re-derived from Atlas independently; `purpose` is the one
+    field narrowed to Atlas L825's own usage text.

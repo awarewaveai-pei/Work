@@ -1,0 +1,130 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/bounded-context-map.schema.yaml"
+title: Bounded Context Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BoundedContextMap` -- the
+  declared `outputs` of `architecture.ddd`'s Method Contract (methods/
+  contracts/architecture.ddd.contract.yaml, `outputs: [BoundedContextMap]`).
+  Ninth `architecture`-family typed object. Atlas's own F18 table row
+  (L818) 3-stage pipeline ("subdomain→bounded context→context map") maps
+  onto `subdomains[]` -> `bounded_contexts[]` (each carrying `subdomain_ids`
+  lineage back to `subdomains[]`) -> `context_map[]` (each relationship
+  referencing two `bounded_contexts[]` entries by id). Two structural
+  invariants this schema cannot itself express are runtime, not schema,
+  checks -- see `ai_lego/modules/architecture/ddd.py`: every
+  bounded_context must have real subdomain lineage, and every context_map
+  relationship must reference two bounded_contexts that actually exist.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F18 軟體架構套件 tool table, DDD row (L818)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.35 領域驅動設計（Domain-Driven Design / DDD）(L2020-2038) -- concept list"
+  - "methods/contracts/architecture.ddd.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should subdomain.type (core/supporting/generic) be a required or optional field?"
+    decision: "Optional 3-value enum, sourced from real DDD practice (Evans 2003), not Atlas-cited -- see method contract's own compilation_decisions."
+  - question: "Should context_map[].pattern be a closed enum or free text?"
+    decision: "Closed 9-value enum of the standard DDD context-mapping patterns (Partnership, Shared Kernel, Customer-Supplier, Conformist, Anticorruption Layer, Open Host Service, Published Language, Separate Ways, Big Ball of Mud) -- real, external, named practice, not an Atlas citation."
+
+type: object
+required: [id, version, domain_description, subdomains, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^BCM-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling typed-object schema's own id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "architecture.ddd"
+
+  domain_description:
+    type: string
+    minLength: 1
+    description: "The real domain this map decomposes -- the method contract's own required DomainDescription input."
+
+  subdomains:
+    type: array
+    minItems: 1
+    description: "Atlas L818's own first pipeline stage. Structurally necessary non-emptiness: a decomposition with zero subdomains models nothing."
+    items:
+      type: object
+      required: [id, label]
+      properties:
+        id: {type: string}
+        label: {type: string}
+        type:
+          enum: [core, supporting, generic]
+          description: "Optional real-DDD-practice classification (Evans 2003), not Atlas-cited -- see compilation_decisions."
+
+  bounded_contexts:
+    type: array
+    default: []
+    description: "Atlas L818's own second pipeline stage. Each entry's subdomain_ids is where the first real structural invariant lives: a bounded_context carved from nothing (empty subdomain_ids, or subdomain_ids pointing at a subdomain id that does not exist in subdomains[]) is meaningless -- enforced at runtime, see ai_lego/modules/architecture/ddd.py."
+    items:
+      type: object
+      required: [id, label, subdomain_ids]
+      properties:
+        id: {type: string}
+        label: {type: string}
+        subdomain_ids:
+          type: array
+          minItems: 1
+          items: {type: string}
+
+  context_map:
+    type: array
+    default: []
+    description: "Atlas L818's own third pipeline stage. Each relationship's pattern is one of the 9 standard DDD context-mapping patterns; from_context_id/to_context_id must both reference real bounded_contexts[] entries -- a relationship pointing at a nonexistent context is a real integrity bug, enforced at runtime."
+    items:
+      type: object
+      required: [pattern, from_context_id, to_context_id]
+      properties:
+        pattern:
+          enum: [partnership, shared_kernel, customer_supplier, conformist, anticorruption_layer, open_host_service, published_language, separate_ways, big_ball_of_mud]
+          description: "The 9 standard DDD context-mapping patterns (Evans 2003; Vernon 2013), not Atlas-cited."
+        from_context_id: {type: string}
+        to_context_id: {type: string}
+        notes:
+          type: string
+          description: "Optional free-text description of the relationship's own real-world rationale."
+
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a bounded-context map is structured architectural documentation, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A minimal 2-subdomain, 2-context map: a Core (Order Management) subdomain carved into its own bounded context, a Supporting (Payments) subdomain carved into a second context, connected by a Customer-Supplier relationship."
+    value:
+      id: "BCM-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "architecture.ddd"
+      domain_description: "電商平台：訂單管理與金流服務"
+      subdomains:
+        - {id: "SD1", label: "Order Management", type: core}
+        - {id: "SD2", label: "Payments", type: supporting}
+      bounded_contexts:
+        - {id: "BC1", label: "Order Context", subdomain_ids: ["SD1"]}
+        - {id: "BC2", label: "Payment Context", subdomain_ids: ["SD2"]}
+      context_map:
+        - {pattern: customer_supplier, from_context_id: "BC1", to_context_id: "BC2", notes: "Order Context 是上游，決定退款/付款請求的介面"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-BOUNDEDCONTEXTMAP-1"
+    question: "Should context_map[] forbid self-referential entries (from_context_id == to_context_id)? Same open question the method contract's own OQ-DDD-1 raises."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: "Read Atlas L818 and §11.35 (L2020-2038) directly. Validated against jsonschema Draft202012Validator."
+  note: "The 3-stage pipeline is transcribed from Atlas L818. The subdomain.type enum and context_map.pattern enum are sourced from real, external, named DDD practice (Evans 2003; Vernon 2013), disclosed as compilation decisions, not literal Atlas citations. No mother document was modified."

@@ -146,6 +146,26 @@ class SpecConformanceTests(unittest.TestCase):
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
+    def test_architecture_trade_off_matrix_stays_a_true_duplicate_of_mcda(self):
+        """architecture.trade_off_matrix (F18 row L825) was deliberately registered as a contract-only entry
+        that reuses this method's own pipeline/schema instead of building a second module (critic-confirmed
+        field-for-field identity, 2026-09-07, OQ-TOM-3) -- the highest-risk part of that decision is silent
+        drift if decision.mcda's own contract shape ever changes underneath it without anyone re-checking.
+        Guards both halves: the resolver can still resolve the reused machine_id, and its contract's
+        inputs/outputs/forbidden_transition/cognitive_primitives still equal this contract's own."""
+        import yaml
+
+        live = MethodCatalog.from_spec_root(self.spec_root)
+        resolved = live.resolve(["architecture.trade_off_matrix"])
+        self.assertIsNone(resolved["blocked"])
+
+        contracts_dir = self.spec_root / "methods" / "contracts"
+        mcda_contract = yaml.safe_load((contracts_dir / "decision.mcda.contract.yaml").read_text(encoding="utf-8"))
+        tom_contract = yaml.safe_load((contracts_dir / "architecture.trade_off_matrix.contract.yaml").read_text(encoding="utf-8"))
+        for field in ("inputs", "outputs", "forbidden_transition", "cognitive_primitives"):
+            with self.subTest(field=field):
+                self.assertEqual(tom_contract[field], mcda_contract[field], f"architecture.trade_off_matrix.{field} drifted from decision.mcda.{field}")
+
     def test_empty_catalog_blocks_mcda_the_same_way_it_blocks_the_other_slices(self):
         empty = MethodCatalog.empty("snapshot:no-method-contracts")
         with self.assertRaisesRegex(InvariantViolation, f"{METHOD_RESOLUTION_BLOCKED}.*{METHOD_ID}"):

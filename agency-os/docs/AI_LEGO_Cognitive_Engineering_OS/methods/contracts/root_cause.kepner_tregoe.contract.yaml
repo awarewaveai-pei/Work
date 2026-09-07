@@ -1,0 +1,106 @@
+$id: "ai-lego://methods/contracts/root_cause.kepner_tregoe.contract.yaml"
+title: "Kepner-Tregoe Problem Specification Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F05 root_cause family. Atlas's ONLY citation is the F05 table row
+  (L440: "Is/Is Not 差異分析｜What/Where/When/Extent｜降低憑直覺猜測｜適合
+  troubleshooting") -- grep-confirmed the single "Kepner" hit in the whole
+  Atlas file, no dedicated section (unlike root_cause.five_whys's §11.5).
+  The 2x4 IS/IS-NOT grid and the downstream distinctions/changes stages are
+  real, external Kepner-Tregoe "Problem Analysis" methodology (Kepner &
+  Tregoe, The New Rational Manager), disclosed as such rather than invented
+  from the one-line citation. Core invariant: every dimension needs a
+  non-empty IS, and a present IS-NOT must genuinely differ from its own IS.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Kepner-Tregoe row (L440): 'Is/Is Not 差異分析｜What/Where/When/Extent｜降低憑直覺猜測｜適合 troubleshooting' -- the ONLY citation for this method anywhere in the spec root"
+  - "Kepner, C.H. & Tregoe, B.B., The New Rational Manager -- real external methodology for the IS/IS-NOT problem-specification grid and its downstream distinctions/changes analysis; Atlas's own row cites the grid's four dimensions and purpose but not this deeper structure"
+  - "methods/contracts/root_cause.fishbone.contract.yaml -- same family, same ProblemStatement entry-point type reused here rather than a new input type invented"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml -- the required input type reused"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives only a one-row citation; the
+  fuller IS/IS-NOT + distinctions/changes structure is compiled from real,
+  well-documented external KT methodology rather than invented from
+  nothing, disclosed per this suite's own honesty discipline (same class
+  as security.abuse_case's OQ-ABUSECASE-3, security.pasta's OQ-PASTA-2).
+  `id: root_cause.kepner_tregoe` mints a new machine_id.
+  method-inventory.yaml's own "Kepner–Tregoe" row carried none when this
+  file was written -- the same integration pass that registered this
+  contract in contract-backlog.yaml also updated that row to
+  has_contract:true/machine_id:root_cause.kepner_tregoe/line:440 (2026-09-07,
+  see OQ-KEPNERTREGOE-1/2 for the resolved history: this file itself never
+  wrote to either shared registry, per the task's own hard constraint
+  against editing them while other agents touched the same family folder
+  concurrently).
+
+id: root_cause.kepner_tregoe
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [DECOMPOSE, COMPARE, VALIDATE]
+# INFERRED, not cited. The fixed 2x4 grid across 4 dimensions is DECOMPOSE;
+# pairing each dimension's IS against its IS-NOT is COMPARE; deriving a
+# distinction only from a dimension that genuinely has both is VALIDATE.
+
+purpose:
+  - specify_a_problem_via_is_is_not_differential_comparison_across_what_where_when_extent
+inputs:
+  required: [ProblemStatement]
+  optional: []
+outputs: [KepnerTregoeProblemSpecification]
+preconditions:
+  - "problem_statement.status == validated"
+  - "dimensions is EXACTLY the four entries {WHAT, WHERE, WHEN, EXTENT}, one each, IN THAT ORDER -- Atlas's own literal 'What/Where/When/Extent' citation order"
+  - "every dimension's is field is a non-empty string -- an unknown IS makes the technique meaningless (Atlas's own benefit line, '降低憑直覺猜測', presumes a known IS to compare against)"
+  - "when a dimension's is_not field is present, it must NOT be identical (case/whitespace-insensitive) to that dimension's own is field -- an identical pair is a no-op, not a comparison"
+  - "every distinction references a dimension that has BOTH a non-empty is AND a non-empty is_not recorded -- a distinction cannot be derived from a dimension never filled in"
+  - "every change references an existing distinction_id"
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (only the single
+# thin table row) -- left genuinely empty rather than inventing one.
+recommended_next: [root_cause.five_whys, causal.dag]
+# Same "candidate cause -> validation" downstream relationship
+# root_cause.fishbone's own recommended_next already establishes for this
+# family -- a completed KT specification's distinctions/changes are exactly
+# the kind of candidate-cause material Five Whys or Causal DAG validate next.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the 4 dimensions be a free-form array or a fixed, positionally-ordered set?"
+    decision: "Fixed: exactly WHAT, WHERE, WHEN, EXTENT, one each, in Atlas's own literal citation order -- the same positionally-ordered pipeline class security.pasta/security.abuse_case already establish for their own Atlas-cited chains."
+  - question: "Must every dimension carry both IS and IS-NOT at construction time?"
+    decision: "No -- only IS is unconditionally required; IS-NOT is required only for a dimension a distinction later cites, since real KT practice often characterizes IS before IS-NOT is known."
+  - question: "Require an existing ProblemStatement input (Fishbone's own precedent) or stand alone (Atlas's own KT row cites no input)?"
+    decision: "Require ProblemStatement -- reuses the family's already-established entry-point type instead of inventing a second, competing one."
+
+open_questions:
+  - "OQ-KEPNERTREGOE-1: RESOLVED (2026-09-07). method-inventory.yaml's Kepner–Tregoe row was stale (line 420, cited Atlas line 439, real line 440, has_contract:false) -- updated in the same integration pass that registered this contract to line:440/has_contract:true/machine_id:root_cause.kepner_tregoe.（owner: operator）"
+  - "OQ-KEPNERTREGOE-2: RESOLVED (2026-09-07). Registered in contract-backlog.yaml as tier_1.fiftysixth_concrete_entry (this file itself never wrote to that shared registry, per the task's own hard constraint against editing it while sibling agents touched the same family folder concurrently -- the orchestrating session did so afterward).（owner: operator）"
+  - "OQ-KEPNERTREGOE-3: real KT Problem Analysis continues past distinctions/changes into possible-causes/most-probable-cause/verification -- left to root_cause.five_whys/causal.dag (this contract's own recommended_next) rather than extended here. Should a future revision merge that stage in directly instead?（owner: operator, or whoever next surveys root_cause family completeness）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for "Kepner" -- one hit, the F05 table row
+    (L440). Read the F05 table and its neighboring rows directly. Read
+    root_cause.fishbone.contract.yaml, root_cause.five_whys.contract.yaml,
+    and decision.mcda.contract.yaml in full to confirm no overlap (MCDA is
+    a scoring/weighting technique that forbids automatic decision
+    authority; KT is a diagnostic differential-comparison technique that
+    specifies a problem before cause hypotheses are even generated --
+    different tool family, confirmed by direct read of both, not assumed).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The single Atlas citation is
+    transcribed verbatim into purpose/inputs. The 2x4 grid dimension names
+    and the distinctions/changes downstream structure are real external KT
+    methodology, explicitly disclosed as such (not presented as an Atlas
+    citation) -- same honesty discipline every sibling Tier 1 contract in
+    this directory already applies to its own thinner-grounded fields.

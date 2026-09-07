@@ -1,0 +1,114 @@
+$id: "ai-lego://methods/contracts/root_cause.fault_tree.contract.yaml"
+title: "Fault Tree Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry, mandated by the actively-running Cognitive OS
+  runtime slice. Atlas F05 tool table, Fault Tree row (L437): "AND/OR 邏輯
+  分解 top event | top event→basic events→gates | 高風險可靠性分析 | 需清楚
+  邏輯與假設". No dedicated Atlas section beyond the table row (grep-
+  confirmed across all three normative documents; L3413/L4473 are a diagram
+  node and a routing-table mention, not a protocol). Same AND/OR-tree
+  STRUCTURE as `security.attack_tree`, different domain (reliability, a top
+  event already happened) and different shape (flat id-referenced
+  basic_events/gates, not embedded nesting -- see compilation_decisions).
+  Core invariant: every gate's `required_count` must match its own
+  `gate_type` (AND = all children, OR = any one), and every id referenced
+  anywhere must resolve, acyclically, within the record's own
+  basic_events/gates lists -- both checked at construction and
+  independently re-derived at the gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Fault Tree row (L437)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L3413 (Mermaid diagram node 'Fishbone / Fault Tree') and L4473 (§28 scenario table, 'Incident 突然發生 | Change Analysis | Fault Tree / Fishbone | Persona') -- both routing mentions, not a dedicated protocol section"
+  - "methods/contracts/security.attack_tree.contract.yaml (same AND/OR-tree structural family, different domain -- its own description already cross-checked and dismissed Fault Tree as a duplicate; independently re-confirmed here)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  methods/registry/contract-backlog.yaml tier_1, same class of
+  justification as every F05/F20 sibling entry (mandated by the actively-
+  running implementation slice). id: root_cause.fault_tree mints a new
+  machine_id, fourth member of the root_cause family (F05), after
+  root_cause.fishbone, root_cause.five_whys, and root_cause.pareto.
+
+id: root_cause.fault_tree
+version: "1.0.0"
+family: root_cause
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited -- Atlas gives no composition formula for this
+# method. Decomposing a top event into AND/OR gates down to basic events is
+# DECOMPOSE; attaching gate_type/required_count/probability is MAP; the
+# referential-integrity and gate-mode-consistency checks are VALIDATE. No
+# COMPUTE token: unlike security.attack_tree's genuine cost/skill
+# /detectability aggregation, required_count is a structural consistency
+# check, not a numeric aggregation (evaluate_top_event's own bottom-up
+# boolean propagation is COMPUTE-shaped but is a bonus scenario-evaluation
+# helper, not one of this contract's declared `outputs`).
+
+purpose:
+  - decompose_a_top_event_into_and_or_logic_gates_down_to_basic_events_for_reliability_analysis
+
+inputs:
+  required: [ProblemStatement]
+  optional: [EvidenceSet]
+
+outputs: [FaultTreeRecord]
+
+preconditions:
+  - "top_event.gate_ref references a real gates[].id in the same record (never a bare basic_events[].id)"
+  - "every gates[].children entry references a real gates[].id or basic_events[].id in the same record (no dangling reference), and the resulting reference graph is acyclic"
+  - "every gates[].required_count equals len(children) when gate_type is AND, or equals 1 when gate_type is OR"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition: []
+# Atlas gives no worked forbidden-transition example for this method
+# (unlike Fishbone's CauseHypothesisSet -> FinalCausalFact). Left genuinely
+# empty rather than inventing one to match that sibling's shape.
+
+recommended_next: [architecture.adr]
+# Same forward link security.attack_tree's own contract already
+# establishes for a confirmed structural analysis result: once a fault
+# tree's own top event and its causal gates are validated, the next real
+# step is a decision record (a fix, a mitigating control, an accepted
+# residual risk), not another root_cause-family hypothesis-generation
+# method.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Embed children inline (security.attack_tree's own shape) or reference them by id in flat lists?"
+    decision: "Flat lists (basic_events[], gates[]) cross-referenced by id, not embedded nesting."
+  - question: "Should required_count be caller-supplied (validated) or purely derived from gate_type at construction?"
+    decision: "Caller-supplied and validated -- so a hand-tampered mismatch is a real, catchable invariant violation, not structurally impossible by construction."
+  - question: "Mandate a numeric probability on every basic_event, matching classic quantitative FTA?"
+    decision: "Optional -- Atlas's own L437 caution names clear logic/assumptions, not a mandated probability model; qualitative-only fault trees are legal."
+
+open_questions:
+  - "OQ-FAULTTREE-1: Should a future revision add minimal-cut-set enumeration (a genuine_compute Boolean-algebra reduction over the gate graph), matching Atlas's own reliability-analysis benefit line more fully than this contract's structural-consistency-only scope?（owner: operator, or whoever next revises this contract's own scope）"
+  - "OQ-FAULTTREE-2: gate_type is restricted to AND/OR only (no k-out-of-n voting gate) -- Atlas's own L437 literally says 'AND/OR', no voting gate is cited; should a future revision add one if a real use case needs it?（owner: operator）"
+  - "OQ-FAULTTREE-3: `_cycle_violations`/`fires` in fault_tree.py are exponential (not polynomial) on a maximally-shared DAG -- measured 20 gates / max path 61 -> ~6s (critic 2026-09-07). Fix is a three-color DFS + visited-set memo (O(V+E)); deferred because real Atlas worked examples are shallow/narrow enough for it not to matter today and a rushed rewrite risks a worse correctness bug than the perf issue it fixes（owner: operator, tracked in agency-os/TASKS.md）."
+
+verification:
+  method: >
+    Read Atlas F05 tool table (L430-442) directly; grep-confirmed no
+    dedicated Fault Tree section exists beyond the table row and the two
+    routing mentions (L3413, L4473) -- the same finding
+    security.attack_tree.contract.yaml's own description already recorded
+    when it cross-checked "Fault Tree" while building the neighbouring
+    security family; independently re-confirmed here by a second grep pass
+    plus a fresh grep across the whole ai_lego runtime tree (zero hits for
+    fault_tree/FaultTree/FAULTTREE before this contract). Read
+    ai_lego/modules/security/attack_tree.py in full to determine structural
+    distinctness (see compilation_decisions). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The AND/OR gate formula is transcribed
+    from Atlas's own literal L437 row; the flat-list-with-references field
+    design and the required_count field are Phase 3 compilation decisions
+    disclosed above, not textually cited.

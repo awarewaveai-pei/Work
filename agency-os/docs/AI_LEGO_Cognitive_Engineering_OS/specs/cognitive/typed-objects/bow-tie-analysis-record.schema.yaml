@@ -1,0 +1,239 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/bow-tie-analysis-record.schema.yaml"
+title: Bow-Tie Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BowTieAnalysisRecord` -- the
+  declared `outputs` of `root_cause.bow_tie`'s Method Contract (F05
+  root_cause family, fourth concrete entry alongside fishbone/five_whys/
+  pareto). Atlas's own F05 tool table row (L439: "threats→event→
+  consequences", usage "左防止、右緩解", benefit "同時管理 prevention/
+  recovery", misuse "控制措施要有 owner/test") is this method's ONLY
+  citation.
+
+  A single top event (`top_event_description`) sits between a LEFT side of
+  `threats[]` (causes, each defended by `side: prevention` controls) and a
+  RIGHT side of `consequences[]` (results, each addressed by
+  `side: mitigation` controls). Unlike
+  `security-control-mapping-record.schema.yaml` (a CROSS-RECORD consumer
+  that classifies an EXTERNAL StrideThreatModelRecord/
+  LinddunPrivacyThreatModelRecord's own `threats[]`), this record is fully
+  SELF-CONTAINED: every `controls[].target_id` must resolve to a
+  `threats[].threat_id` or `consequences[].consequence_id` that lives
+  inside THIS SAME record -- see
+  `methods/contracts/root_cause.bow_tie.contract.yaml` `compilation_decisions`
+  for the full due-diligence distinctness check against that sibling.
+
+  Two REAL invariants, both two-layer (construction + gate, re-derived from
+  raw fields, not trusted):
+  1. OWNER/TEST invariant -- Atlas's own literal misuse warning ("控制措施
+     要有 owner/test") transcribed as a hard requirement: every
+     `controls[]` entry (either side) must carry a non-empty `owner` AND a
+     non-empty `test` field. A control with neither is not a real control
+     per Atlas's own definition, just a wish.
+  2. STRUCTURAL invariant -- every `threats[]`/`consequences[]` entry's own
+     `description` must be genuinely distinct (after whitespace-trim) from
+     `top_event_description` (a threat/consequence cannot BE the top event
+     it is supposed to cause/result from), AND every `controls[]` entry's
+     own `side`+`target_id` must name a REAL entry on the matching side --
+     `prevention` controls resolve against `threats[].threat_id`,
+     `mitigation` controls resolve against `consequences[].consequence_id`.
+     A dangling reference is a real integrity bug, not a warning.
+
+  Both invariants are enforced at the runtime layer
+  (`ai_lego/modules/root_cause/bow_tie.py`), not the schema layer alone --
+  JSON Schema 2020-12 cannot express "this string must differ from that
+  sibling field's string" or "this id must exist elsewhere in this same
+  array" natively; the schema below only pins the per-field shape
+  (id prefixes, the `side` enum, non-empty strings).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Bow-Tie row (L439): 'threats→event→consequences', usage '左防止、右緩解', benefit '同時管理 prevention/recovery', misuse '控制措施要有 owner/test' -- this method's ONLY citation, no dedicated section exists"
+  - "methods/contracts/root_cause.bow_tie.contract.yaml"
+  - "specs/cognitive/typed-objects/security-control-mapping-record.schema.yaml -- the due-diligence comparison target confirming this is a distinct, self-contained (not cross-record) shape"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  threat_entry:
+    type: object
+    required: [threat_id, description]
+    additionalProperties: false
+    description: "One LEFT-side cause of the top event. Atlas's own '左防止' (left = prevention) -- defended by controls[] entries with side: prevention."
+    properties:
+      threat_id:
+        type: string
+        pattern: "^T-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must NOT be identical (after whitespace-trim) to top_event_description -- enforced at the runtime layer."
+
+  consequence_entry:
+    type: object
+    required: [consequence_id, description]
+    additionalProperties: false
+    description: "One RIGHT-side result of the top event. Atlas's own '右緩解' (right = mitigation) -- addressed by controls[] entries with side: mitigation."
+    properties:
+      consequence_id:
+        type: string
+        pattern: "^C-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must NOT be identical (after whitespace-trim) to top_event_description -- enforced at the runtime layer."
+
+  control_entry:
+    type: object
+    required: [control_id, side, target_id, description, owner, test]
+    additionalProperties: false
+    description: >
+      A single prevention (left) or mitigation (right) control. `owner`/
+      `test` are Atlas's own literal misuse-warning fields ('控制措施要有
+      owner/test'), REQUIRED non-empty strings -- not optional metadata.
+      One control entry addresses exactly one target_id; a control that in
+      the real world protects several threats/consequences is represented
+      as several entries (a disclosed, simpler design than
+      `security-control-mapping-record.schema.yaml`'s own many-to-many
+      controls[]/control_mappings[] split -- see method contract
+      `compilation_decisions`/`open_questions`).
+    properties:
+      control_id:
+        type: string
+        pattern: "^CTRL-"
+        description: "Unique within this record -- enforced at the runtime layer, not here."
+      side:
+        enum: [prevention, mitigation]
+        description: "Atlas's own literal '左防止、右緩解' (left=prevention, right=mitigation) vocabulary, transcribed verbatim as a closed machine enum."
+      target_id:
+        type: string
+        description: "Must name a real threats[].threat_id (side: prevention) or consequences[].consequence_id (side: mitigation) IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      owner:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own literal misuse-warning field ('控制措施要有 owner/test'). REQUIRED non-empty -- a control with no owner is not a real control per Atlas's own definition."
+      test:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own literal misuse-warning field ('控制措施要有 owner/test'). REQUIRED non-empty -- a control with no test/verification is not a real control per Atlas's own definition."
+
+type: object
+required: [id, version, system_or_component, top_event_description, threats, consequences, controls, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^BOWTIE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "root_cause.bow_tie"
+  system_or_component:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  top_event_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The single central event Atlas's own row names as 'event' in 'threats→event→consequences'."
+  threats:
+    type: array
+    minItems: 1
+    description: "The LEFT half of Atlas's own chain -- at least one real cause, or this record has nothing to prevent."
+    items:
+      $ref: "#/$defs/threat_entry"
+  consequences:
+    type: array
+    minItems: 1
+    description: "The RIGHT half of Atlas's own chain -- at least one real result, or this record has nothing to mitigate."
+    items:
+      $ref: "#/$defs/consequence_entry"
+  controls:
+    type: array
+    minItems: 1
+    description: "Prevention (left) and mitigation (right) controls, cross-referenced by side+target_id -- Atlas's own '同時管理 prevention/recovery' (simultaneously manage prevention/recovery) benefit line."
+    items:
+      $ref: "#/$defs/control_entry"
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a bow-tie's threat/consequence/control set is a structured analytical judgment, not a calculated/simulated result."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      A synthetic NORDBROOK multi-tenant SaaS scenario: unauthorized
+      cross-tenant data access as the top event, two left-side threats each
+      with one prevention control, and two right-side consequences -- one
+      covered by a mitigation control, one deliberately left uncovered (a
+      real, disclosed gap this record can represent; nothing in this schema
+      requires full coverage).
+    value:
+      id: "BOWTIE-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "root_cause.bow_tie"
+      system_or_component: "multi-tenant SaaS platform, tenant data isolation review"
+      top_event_description: "Unauthorized cross-tenant data access"
+      threats:
+        - threat_id: "T-001"
+          description: "Multi-tenant query missing a tenant_id filter due to an ORM misconfiguration"
+        - threat_id: "T-002"
+          description: "Shared service account credentials reused across tenant boundaries"
+      consequences:
+        - consequence_id: "C-001"
+          description: "Tenant A's customer PII exposed to Tenant B's application logic"
+        - consequence_id: "C-002"
+          description: "Regulatory breach-notification obligation triggered under GDPR"
+      controls:
+        - control_id: "CTRL-001"
+          side: prevention
+          target_id: "T-001"
+          description: "Row-Level Security (RLS) policy enforced at the Postgres layer on every tenant-scoped table."
+          owner: "Platform Security"
+          test: "RLS policy test suite RLS-2026-09-06, run against every tenant-scoped table."
+        - control_id: "CTRL-002"
+          side: prevention
+          target_id: "T-002"
+          description: "Per-tenant scoped service credentials; no shared service account crosses a tenant boundary."
+          owner: "Platform Security"
+          test: "Credential scope audit CRED-2026-09-01."
+        - control_id: "CTRL-003"
+          side: mitigation
+          target_id: "C-001"
+          description: "Audit logging pipeline captures every cross-tenant query attempt with alerting within 5 minutes."
+          owner: "Security Engineering"
+          test: "Alert fired and confirmed within SLA during red-team exercise AUTHZ-2026-09-01."
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+verification:
+  method: >
+    Read Atlas F05 tool table row (L439) directly -- the method's ONLY
+    citation, no dedicated section exists. Read
+    security-control-mapping-record.schema.yaml in full to confirm this
+    record's own self-contained (not cross-record) design is a genuinely
+    distinct shape. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator (for the method contract); this
+    record schema itself validated with the same tool.
+  note: >
+    No mother document was modified. Atlas's own four-phrase table row
+    (chain shape, left/right side vocabulary, owner/test misuse warning) is
+    transcribed directly into this schema's structure. The flat
+    one-control-per-target design, the self-contained (non-cross-record)
+    reference model, and the closed two-value `side` enum are disclosed
+    compilation decisions -- see method contract `compilation_decisions`/
+    `open_questions` -- not Atlas's own explicit structural instruction,
+    since Atlas gives this method no dedicated section to transcribe a
+    formula from. Both real invariants (owner/test presence, structural
+    distinctness + referential integrity) are enforced at the runtime layer
+    (`ai_lego/modules/root_cause/bow_tie.py`), not the schema layer.

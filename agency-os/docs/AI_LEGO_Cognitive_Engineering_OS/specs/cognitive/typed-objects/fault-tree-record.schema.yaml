@@ -1,0 +1,167 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/fault-tree-record.schema.yaml"
+title: Fault Tree Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FaultTreeRecord` -- the declared
+  `outputs` of `root_cause.fault_tree`'s Method Contract. Atlas's own F05
+  tool table Fault Tree row (L437): "AND/OR 邏輯分解 top event | top
+  event→basic events→gates | 高風險可靠性分析 | 需清楚邏輯與假設".
+
+  Same AND/OR-gate STRUCTURE as `attack-tree-record.schema.yaml` (the FIRST
+  security-family typed object to use one), deliberately shaped DIFFERENTLY:
+  `basic_events`/`gates` are FLAT lists cross-referenced by id (a DAG), not
+  an embedded recursive tree -- a real fault tree routinely reuses the SAME
+  basic event under multiple gates (a shared common cause), which an
+  embedded shape cannot express without duplicating the event's own record.
+  This flat shape is also what makes a dangling reference (a `children`
+  entry naming no real node) a real, representable defect worth gating --
+  structurally impossible in `attack-tree-record.schema.yaml`'s own
+  embedded nodes.
+
+  `required_count` on every gate is GENUINE, hand-tamperable evidence, not
+  a derived/computed field the schema itself can verify (JSON Schema has no
+  cross-field arithmetic) -- the runtime layer
+  (`ai_lego/modules/root_cause/fault_tree.py`) enforces AND ⇒
+  `required_count == len(children)`, OR ⇒ `required_count == 1` at both
+  construction and gate, same split `attack-tree-record.schema.yaml`'s own
+  `root_aggregate` note already documents for its own runtime-enforced
+  invariant.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Fault Tree row (L437): 'AND/OR 邏輯分解 top event | top event→basic events→gates | 高風險可靠性分析 | 需清楚邏輯與假設'"
+  - "methods/contracts/root_cause.fault_tree.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  basic_event:
+    type: object
+    required: [id, description]
+    additionalProperties: false
+    properties:
+      id: {type: string, minLength: 1, pattern: "\\S"}
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "An atomic, undecomposed failure mode (e.g. 'power loss', 'CI test gate misconfigured') -- not a compound event; compounds are gates."
+      probability:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: "OPTIONAL quantitative FTA probability of occurrence. Atlas gives no numeric formula for Fault Tree -- omitted means qualitative-only analysis, honoring Atlas's own L437 caution ('需清楚邏輯與假設', need clear logic and assumptions, not a mandated probability model)."
+  gate:
+    type: object
+    required: [id, description, gate_type, required_count, children]
+    additionalProperties: false
+    properties:
+      id: {type: string, minLength: 1, pattern: "\\S"}
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The intermediate or top event this gate represents (e.g. 'broken deploy reaches customers undetected')."
+      gate_type:
+        enum: [AND, OR]
+        description: "AND: this event requires EVERY child. OR: requires ANY ONE child. Atlas's own L437 formula: 'AND/OR 邏輯分解 top event'."
+      required_count:
+        type: integer
+        minimum: 1
+        description: "How many children must occur/fire for this gate to fire. MUST equal len(children) when gate_type is AND, MUST equal 1 when gate_type is OR -- a real structural invariant enforced at the runtime layer (FAULTTREE_GATE_MODE_MISMATCH), not caller self-attestation the schema itself can check."
+      children:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1, pattern: "\\S"}
+        description: "IDs referencing either another gate (gates[].id) or a basic_event (basic_events[].id) -- a flat cross-reference, not embedded nesting, so a basic_event CAN legitimately appear under multiple gates (a shared common cause), unlike attack-tree-record.schema.yaml's own embedded-node shape. Every entry MUST resolve to a real id in the SAME record (FAULTTREE_DANGLING_REFERENCE) and the resulting reference graph MUST be acyclic (FAULTTREE_CYCLE_DETECTED) -- both enforced at the runtime layer, not by this schema."
+  top_event:
+    type: object
+    required: [description, gate_ref]
+    additionalProperties: false
+    properties:
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The failure event this whole analysis explains, already having occurred (e.g. 'broken production deploy reached customers undetected') -- the reliability-analysis root, distinct from attack-tree-record.schema.yaml's own attacker GOAL not yet achieved."
+      gate_ref:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "ID of the gate (gates[].id) whose firing represents this top event occurring. MUST reference a real gate, never a bare basic_event -- Atlas's own formula always decomposes the top event through a gate."
+
+type: object
+required: [id, version, system_under_analysis, top_event, basic_events, gates, provenance]
+properties:
+  id:
+    type: string
+    pattern: "^FAULTTREE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "root_cause.fault_tree"
+  system_under_analysis:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+  top_event:
+    $ref: "#/$defs/top_event"
+  basic_events:
+    type: array
+    minItems: 1
+    items: {$ref: "#/$defs/basic_event"}
+  gates:
+    type: array
+    minItems: 1
+    items: {$ref: "#/$defs/gate"}
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- a fault tree's own STRUCTURE (which gates/events, how they connect) is a structured analytical judgment, not a calculated/simulated result, the same class attack-tree-record.schema.yaml's own provenance note already documents for its own tree."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Invented-but-realistic (disclosed): a broken production deploy reaching customers undetected, grounded in this repo's own deploy pipeline (agency-os/AGENTS.md:9 -- npm test -> healthcheck -> HTTP smoke -> auto-rollback). OR(test gate skipped, AND(healthcheck blind, smoke blind), rollback broken)."
+    value:
+      id: "FAULTTREE-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "root_cause.fault_tree"
+      system_under_analysis: "sg-deploy.sh production deploy pipeline"
+      top_event:
+        description: "Broken production deploy reaches customers undetected"
+        gate_ref: "GATE-TOP"
+      basic_events:
+        - {id: "BE-TEST-SKIPPED", description: "npm test gate silently skipped in CI", probability: 0.02}
+        - {id: "BE-HEALTHCHECK-BLIND", description: "healthcheck endpoint does not exercise the broken code path", probability: 0.1}
+        - {id: "BE-SMOKE-BLIND", description: "HTTP smoke test does not exercise the broken code path", probability: 0.1}
+        - {id: "BE-ROLLBACK-BROKEN", description: "auto-rollback trigger itself is disabled or broken", probability: 0.01}
+      gates:
+        - {id: "GATE-TOP", description: "Broken production deploy reaches customers undetected", gate_type: OR, required_count: 1, children: ["BE-TEST-SKIPPED", "GATE-DETECTION-FAILED", "BE-ROLLBACK-BROKEN"]}
+        - {id: "GATE-DETECTION-FAILED", description: "Both automated detection layers fail to catch the defect", gate_type: AND, required_count: 2, children: ["BE-HEALTHCHECK-BLIND", "BE-SMOKE-BLIND"]}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A minimal single-gate, single-basic-event tree"
+    value:
+      id: "FAULTTREE-2026-09-07-002"
+      version: "1.0.0"
+      generated_by_method: "root_cause.fault_tree"
+      system_under_analysis: "internal-reference lookup service"
+      top_event: {description: "Reference table returns stale data", gate_ref: "GATE-MIN"}
+      basic_events: [{id: "BE-CACHE-NOT-INVALIDATED", description: "Cache invalidation job silently stopped running"}]
+      gates: [{id: "GATE-MIN", description: "Reference table returns stale data", gate_type: OR, required_count: 1, children: ["BE-CACHE-NOT-INVALIDATED"]}]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F05 tool table row (L437) directly. Validated against jsonschema Draft202012Validator."
+  note: >
+    No mother document was modified. The AND/OR gate formula and the
+    top-event/basic-event/gate vocabulary are directly transcribed from
+    Atlas's own L437 row. The flat-list-with-id-references field design,
+    `required_count`, and `probability` are Phase 3 compilation decisions
+    (see the method contract's own `compilation_decisions`), not textually
+    cited. Referential/acyclicity/gate-mode invariants are enforced at the
+    runtime layer (`ai_lego/modules/root_cause/fault_tree.py`), not the
+    schema layer -- JSON Schema can validate node SHAPE but not cross-field
+    arithmetic or graph reachability, the same split
+    `attack-tree-record.schema.yaml`'s own verification note already
+    documents for `root_aggregate`.

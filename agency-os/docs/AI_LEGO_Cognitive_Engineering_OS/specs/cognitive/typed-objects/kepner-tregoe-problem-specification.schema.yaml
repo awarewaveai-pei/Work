@@ -1,0 +1,250 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml"
+title: Kepner-Tregoe Problem Specification
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `KepnerTregoeProblemSpecification`
+  -- the declared `outputs` of `root_cause.kepner_tregoe`'s Method Contract.
+  Atlas's F05 table row (L440) names the 2x4 grid's four dimensions
+  (What/Where/When/Extent) and its purpose (Is/Is Not differential
+  comparison) but gives no worked example and no field-level shape -- the
+  `dimensions[]`/`distinctions[]`/`changes[]` structure below is compiled
+  from real, external Kepner-Tregoe "Problem Analysis" methodology (Kepner
+  & Tregoe, The New Rational Manager), disclosed as such rather than
+  presented as an Atlas citation (see the method contract's own
+  `description` for the full grounding trail).
+
+  `dimensions` is a fixed-length-four, POSITIONALLY ORDERED tuple
+  (WHAT/WHERE/WHEN/EXTENT, Atlas's own literal citation order), enforced
+  via `prefixItems` exactly as `abuse-case-record.schema.yaml`'s own
+  `stages` field and its siblings (`pasta-threat-model-record.schema.yaml`,
+  `dpia-pia-impact-assessment-record.schema.yaml`) already establish for
+  their own Atlas-cited chains.
+
+  ONE real invariant this schema CAN express structurally: each dimension
+  entry requires a non-empty `is`, and an `is_not`, when present, must be a
+  non-empty string (JSON Schema has no native cross-field "not equal to a
+  sibling field" operator, so the IS != IS-NOT check itself, and the
+  distinction-references-a-complete-dimension / change-references-an
+  -existing-distinction referential checks, are runtime-layer invariants --
+  see `ai_lego/modules/root_cause/kepner_tregoe.py`, which enforces them at
+  construction AND independently via a gate that re-derives from raw
+  fields, same two-layer discipline every sibling module in this family
+  already uses).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F05 tool table, Kepner-Tregoe row (L440) -- the ONLY citation for this method"
+  - "Kepner, C.H. & Tregoe, B.B., The New Rational Manager -- real external methodology for the dimensions[]/distinctions[]/changes[] structure, disclosed as non-Atlas grounding"
+  - "methods/contracts/root_cause.kepner_tregoe.contract.yaml"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml (problem_statement_ref)"
+  - "specs/cognitive/typed-objects/abuse-case-record.schema.yaml (prefixItems positionally-ordered pipeline convention reused here)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should distinction-references-complete-dimension and change-references-existing-distinction be expressed as JSON Schema constraints?"
+    decision: "No -- JSON Schema cannot cross-reference sibling array entries without a verbose, brittle per-index if/then; left as runtime-layer invariants, same limitation cause-hypothesis-set.schema.yaml's own promotion field and abuse-case-record.schema.yaml's own addresses_step_ids already accepted."
+    reasoning: "Same class of honest schema-vs-runtime split every sibling typed-object file in this directory already documents rather than fabricating an unenforceable expression grammar."
+  - question: "Should is_not be required alongside is for every dimension?"
+    decision: "No -- is_not is optional per dimension; only is is required. See the method contract's own compilation_decisions for the real-practice reasoning."
+
+type: object
+required: [id, version, problem_statement_ref, dimensions, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^KTPS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  problem_statement_ref:
+    type: string
+    pattern: "^PROB-"
+    description: "Required input per the method contract (inputs.required: [ProblemStatement]) -- real $ref to the sibling type, same family entry-point reuse root_cause.fishbone's own CauseHypothesisSet.problem_statement_ref already establishes."
+    $ref: "ai-lego://specs/cognitive/typed-objects/problem-statement.schema.yaml#/properties/id"
+
+  generated_by_method:
+    type: string
+    default: "root_cause.kepner_tregoe"
+
+  dimensions:
+    type: array
+    minItems: 4
+    maxItems: 4
+    description: >
+      Atlas's own four-word F05-row citation ("What/Where/When/Extent"), AS
+      AN ORDERED TUPLE -- dimensions[0] MUST be WHAT, dimensions[3] MUST be
+      EXTENT, and so on. Atlas's own citation order is a fixed vocabulary,
+      not a set, mirroring abuse-case-record.schema.yaml's own `stages`
+      discipline.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHAT}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHERE}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHEN}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: EXTENT}}}]
+    items: false
+
+  distinctions:
+    type: array
+    description: >
+      Real external KT methodology, NOT Atlas-cited (see top-level
+      description). What is genuinely different between IS and IS-NOT for
+      a given dimension. OPTIONAL -- a specification may exist before any
+      distinction has been drawn.
+    items: {$ref: "#/$defs/distinction_entry"}
+
+  changes:
+    type: array
+    description: >
+      Real external KT methodology, NOT Atlas-cited. What changed around
+      the time of a given distinction. OPTIONAL, and each entry references
+      a distinction_id -- checked at the runtime layer (schema alone
+      cannot cross-reference a sibling array; see compilation_decisions).
+    items: {$ref: "#/$defs/change_entry"}
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  dimension_entry:
+    type: object
+    required: [dimension, is, provenance]
+    additionalProperties: false
+    properties:
+      dimension:
+        type: string
+        enum: [WHAT, WHERE, WHEN, EXTENT]
+      is:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The observed fact for this dimension. Non-empty is the ONE schema-enforceable half of the core invariant -- see top-level description."
+      is_not:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "A genuinely comparable but unaffected case for the SAME dimension. OPTIONAL (omit rather than send an empty string when not yet characterized). Must differ from `is` -- runtime-layer check, see top-level description."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+
+  distinction_entry:
+    type: object
+    required: [distinction_id, dimension, description, provenance]
+    additionalProperties: false
+    properties:
+      distinction_id:
+        type: string
+        pattern: "^DIST-"
+      dimension:
+        type: string
+        enum: [WHAT, WHERE, WHEN, EXTENT]
+        description: "Must reference a dimensions[] entry that has BOTH a non-empty is AND a non-empty is_not -- runtime-layer check (KEPNERTREGOE_DISTINCTION_DIMENSION_INCOMPLETE)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+
+  change_entry:
+    type: object
+    required: [change_id, distinction_id, description, provenance]
+    additionalProperties: false
+    properties:
+      change_id:
+        type: string
+        pattern: "^CHG-"
+      distinction_id:
+        type: string
+        pattern: "^DIST-"
+        description: "Must reference a distinctions[] entry that actually exists in this same record -- runtime-layer check (KEPNERTREGOE_CHANGE_UNKNOWN_DISTINCTION)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+
+examples:
+  - description: "A complete KT specification: all 4 dimensions filled, one distinction drawn from a complete dimension, one change tracing to it"
+    value:
+      id: "KTPS-2026-09-07-001"
+      version: "1.0.0"
+      problem_statement_ref: "PROB-2026-09-07-001"
+      generated_by_method: "root_cause.kepner_tregoe"
+      dimensions:
+        - dimension: WHAT
+          is: "mutation-check-wave1.ps1 完整 SQL mutation sweep 執行超時"
+          is_not: "mutation-check-node-gates.ps1 或其他 PowerShell 腳本沒有超時"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-701"]
+        - dimension: WHERE
+          is: "在 ks-aw-01 遠端 SSH session 執行"
+          is_not: "在筆電本機執行同一支腳本正常完成"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-702"]
+        - dimension: WHEN
+          is: "腳本從 19925 bytes 擴充到 81481 bytes 之後才開始超時"
+          is_not: "擴充前的版本在同一台主機上執行不會超時"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-703"]
+        - dimension: EXTENT
+          is: "連續 3 次執行都超時"
+          is_not: "本機執行 0 次超時"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+      distinctions:
+        - distinction_id: "DIST-001"
+          dimension: WHEN
+          description: "超時只在腳本擴充後、且只在遠端主機上出現"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      changes:
+        - change_id: "CHG-001"
+          distinction_id: "DIST-001"
+          description: "mutation sweep 新增大量案例，每個案例都需一次 SSH round-trip"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-KEPNERTREGOEPS-1"
+    question: >
+      `dimension_entry.is_not`'s "must differ from is" check is
+      case/whitespace-insensitive at the runtime layer (see
+      ai_lego/modules/root_cause/kepner_tregoe.py). Should a future
+      revision express a looser or stricter equivalence (e.g. semantic
+      near-duplicates)? Left as exact-after-normalization, the same
+      restraint against inventing an unneeded fuzzy-matching layer this
+      suite applies elsewhere.
+    owner: "operator, or whoever next needs a richer equivalence check"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F05 table Kepner-Tregoe row (L440) directly. Read
+    abuse-case-record.schema.yaml in full as the prefixItems / $defs
+    convention template. Validated against jsonschema Draft202012Validator
+    (required fields present, id/problem_statement_ref/distinction_id/
+    change_id patterns satisfied, dimensions prefixItems order enforced,
+    additionalProperties:false on every $defs object verified to actually
+    reject an unknown key).
+  note: >
+    `dimensions`'s four values and citation order are transcribed verbatim
+    from Atlas L440. `distinctions`/`changes` and their field shapes are
+    real external KT methodology, explicitly flagged as non-Atlas
+    grounding above, not presented as mother-document content. No mother
+    document was modified to produce this file.

@@ -1,5 +1,58 @@
 # Worklog
 
+## 2026-09-07（Cognitive OS 54–57 號切片 critic 覆審（scoped，normal risk tier）—— 2 Major 全修：DDD 三個 gate 補 fail-closed、Fault Tree 誇大安全宣稱改寫、3 份 contract 修過期 registry 宣稱、Trade-off Matrix 補測試）
+
+**觸發**：`git commit` 被 `verify-gate-commit.js` 擋（14 個 product-root 檔本 session 從未經過 /verify-recent），依規跑 syntax→critic→real exec test。critic scope=normal risk tier（無 auth/crypto/PII/金流），依 2026-09-06 風險分級規則抽查每方法 2-3 個關鍵 claim，非整份重跑。
+
+**critic verdict：SHIP WITH MINOR FIXES，0 Critical，2 Major 落地本 commit，1 Major 誠實揭露不倉促修**：
+- M1（已修）：`architecture/ddd.py` 三個 gate 是本批唯一非 fail-closed 者——遇到畸形 record（非 dict／`bounded_context` 缺 `id`）直接 crash 而非回 `FAIL`，且恰好炸在 lineage 違規那個該擋住的 case 上。補 `isinstance` guard + 全面改安全 `.get()`，比照三個手足既有寫法；順手補回原本只在建構層擋、gate 層沒重推的 2 個 precondition（`DDD_NO_SUBDOMAINS`／`DDD_INVALID_CONTEXT_MAP_PATTERN`）；新增 4 個對應測試（27→31，含直接 crash 復現）。
+- M2（已修，非阻塞的 Minor 一併帶做）：3 份 contract（bow_tie／kepner_tregoe／trade_off_matrix）內建構時揭露「registry 尚未更新」的宣稱，被本 session 同一輪的 registry 整合動作推翻成假——6 處全部改寫成 RESOLVED 並記真實現況；`root_cause.kepner_tregoe.py` builder 補 `problem_statement` 形狀驗證（原本 builder 會收下自己 gate 端會拒絕的 record，兩層不對稱）；`architecture.trade_off_matrix`（本批唯一零測試的 ACTIVE contract）在 `test_mcda.py` 補一個欄位對欄位 identity 守則測試，防止未來 `decision.mcda` 改形狀時無聲失真。
+- M3（誠實揭露，刻意不倉促修，追蹤於 TASKS.md + `OQ-FAULTTREE-3`）：`root_cause/fault_tree.py` 的 `MAX_GATE_DEPTH` 安全宣稱誇大——critic 實測一個高度共用節點的 diamond DAG（20 gates，最長 path 61，遠低於 100 上限）耗時 ~6 秒，是指數複雜度不是多項式。已把兩處誇大宣稱改寫成誠實敘述（明確揭露「不是多項式界」），治本修法（三色 DFS + memo，O(V+E)）留待追蹤——依 AGENTS.md R0 補丁判準，倉促重寫演算法核心的風險比原效能問題更大。
+
+**[已修改]**：`ai_lego/modules/architecture/ddd.py`（fail-closed+2 precondition）、`ai_lego/modules/root_cause/fault_tree.py`（2 處誠實敘述改寫，邏輯不變）、`ai_lego/modules/root_cause/kepner_tregoe.py`（builder 補驗證）、`tests/unit/test_ddd.py`（+4）、`tests/unit/test_mcda.py`（+1）、`methods/contracts/{root_cause.bow_tie,root_cause.kepner_tregoe,architecture.trade_off_matrix}.contract.yaml`（6 處過期宣稱訂正+對應 OQ 標 RESOLVED，新增 `OQ-FAULTTREE-3`／`OQ-TOM-3`）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ddd tests.unit.test_fault_tree tests.unit.test_bow_tie tests.unit.test_kepner_tregoe tests.unit.test_mcda -v` | exit=0 | result=327 tests OK（300+22 既有+5 新增）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=Ran 2683 tests in 207.355s，OK（2678→2683，+5，零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，含 index 重產）| exit=0 | result=PASSED 2987，ALL GOLDEN TESTS PASSED
+- REVIEW_DONE: critic=Standard（真實 subagent，scope=normal risk tier 抽查式，14 檔+5 contract+4 schema 全讀，含真跑 mutation battery 驗兩層不變量獨立性、真跑效能量測驗證 M3、逐欄核對 trade_off_matrix vs decision.mcda 欄位相同）| verdict=SHIP WITH MINOR FIXES → 全部落地 | findings=0c/2m(已修)/1m(誠實揭露不修)/5minor+suggestion
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`KEPNERTREGOE_INVALID_PROBLEM_STATEMENT\|OQ-FAULTTREE-3\|OQ-TOM-3\|has_no_subdomains\|invalid_context_map_patterns` | hits=每個新 symbol 僅在歸屬檔出現，零重複零半寫引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：`OQ-FAULTTREE-3`（fault_tree 演算法真治本修法待排入，見 TASKS.md 新追蹤條目）；critic Minor/Suggestion 5 項未逐一落地（builder/gate 共用 predicate 重構、cycle-vs-depth 訊息誤導改標、CLI 敘事補齊）——皆非阻塞，記於 critic 原始報告，未來若重訪這 4 個檔案可一併處理。
+
+**[rollback]**：單一 commit，`git revert`；純既有邏輯的防禦性強化+文件訂正，無 schema 變更，無行為改變（原本合法輸入的路徑完全不變，只有原本會 crash 或錯誤放行的畸形輸入路徑改變）。
+
+## 2026-09-07（Docker watchdog 第二輪：PowerShell 視窗每分鐘跳出→停用；改事件驅動——喚醒觸發、零輪詢；捷徑改走守衛）
+
+**觸發**：操作者「現在 powershell 一直跳出來」「每分鐘跑一次太智障」「有比這更好的嗎」。
+
+**錯在哪**：`powershell.exe -WindowStyle Hidden` 在互動 session 排程下仍先建 console 再隱藏＝每次執行閃一下；每分鐘跑一次；我只驗 `LastResult`/heartbeat，沒看螢幕。立即 `Disable-ScheduledTask` 止血。
+
+**根因再往下挖（4 天 host log × System 事件記錄）**：backend 只死過兩次（9/5 05:32:29Z、9/6 06:00:04Z），兩次都對上 Kernel-Power 42（進入睡眠）±5 秒；睡眠外零死亡 → 觸發點＝睡眠時 WSL 被終止。上游 desktop-feedback#460（4.77 起未修，4.89 仍在），9 月 release notes 無此修正 → 升級非解法。
+
+**最終設計（事件驅動）**：
+- Watchdog 排程改 Kernel-Power **107（喚醒）+90 秒**觸發（CIM `MSFT_TaskEventTrigger`），零輪詢；`-PollingMinutes` 可選。動作不變（`watch-docker-desktop-runtime.ps1 -Once`）。
+- 兩個排程 action 改走新 `docker-desktop-runtime-hidden-launch.vbs`（`WScript.Shell.Run` windowStyle 0，從不建視窗）。
+- 桌面／開始功能表 `Docker Desktop.lnk` 改指守衛啟動器（`-RetargetShortcuts`，圖示不變；原目標記於 runbook）。
+- smoke `docker_watchdog` 改驗「兩個排程 enabled + 無 Run-key 繞過」＝`ok:guarded`。
+- 中間版本（每分鐘、5 分鐘輪詢）廢除；runbook 第三次重寫（機制每變一次就同步，否則下次恢復照錯的做）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`register-docker-desktop-runtime-tasks.ps1 -RetargetShortcuts` + `-Show` + `Start-ScheduledTask` | exit=0 | result=Watchdog `MSFT_TaskEventTrigger` Kernel-Power 107 delay PT1M30S；手動觸發 `LastResult=0`、heartbeat 8s；兩捷徑 guarded=True；Run bypass=False；`docker ps` 10 不變
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=守衛捷徑指令端到端（Docker 活著→SKIP）| exit=0 | result=exit 0、未啟動第二個 Docker
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`check-smoke-tests.ps1` | exit=0 | result=`docker_wd=ok:guarded`，PASS
+- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=harness | exit=0 | result=21/21（reconcile 邏輯未動，回歸）
+- REVIEW_DONE: critic=Quick（register 腳本／vbs launcher／smoke 條件／捷徑改寫）| verdict=見下方 critic 段 | findings=見下方
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=`every 1 minute\|每分鐘\|PollSeconds 2\|heartbeat_.*m_old\|docker_watchdog` | hits=watch 腳本兩處 comment 同步；runbook 重寫；smoke 只剩新條件；上一輪條目為歷史
+- WORKLOG: 本條目
+
+**未能由我驗證**：視窗不再跳出（操作者目視）；喚醒觸發真的開火（需一次真實睡眠→喚醒，之後 `-Show` 看 LastRun）。
+
+**[剩餘風險]**：乾淨 Quit 後若遇喚醒且 socket 殘留會被重啟（`watchdog.paused` 可關）；非睡眠情境的死亡靠捷徑守衛不自動重啟。
+
+**[rollback]**：`git revert`；`Unregister-ScheduledTask` 兩個排程；捷徑目標還原見 runbook。
+
 ## 2026-09-07（Cognitive OS 第 54–57 個 Method Atlas 切片 — 5 個平行 agent 收 F18 architecture 家族（10/10）+ 推進 F05 root_cause 家族（3/9→6/9），首次完整套用精簡版標準的第二輪批次）
 
 **觸發**：操作者「繼續完成 Cognitive Engineering OS」。查現況：F18（architecture）8/10、F05（root_cause）3/9。選最快收官＋最省 context 的組合：2 個 agent 收 F18 剩餘兩列（DDD、Architecture Trade-off Matrix），3 個 agent 推進 F05（Fault Tree、Bow-Tie、Kepner-Tregoe）。5 個 agent 同時派（20 分鐘視窗 5/5，未逾額）。

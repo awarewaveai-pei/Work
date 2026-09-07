@@ -393,42 +393,45 @@ by_document:
       - name: "5 Whys"
         line: 434
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
         machine_id: "root_cause.five_whys"
       - name: "Pareto"
         line: 435
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
         machine_id: "root_cause.pareto"
       - name: "Fault Tree"
-        line: 436
-        category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
-      - name: "Event Tree"
         line: 437
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
-      - name: "Bow-Tie"
+        has_contract: true
+        contract_status: complete
+        machine_id: "root_cause.fault_tree"
+      - name: "Event Tree"
         line: 438
         category: "F05 root_cause"
         has_contract: false
         contract_status: pending
-      - name: "Kepner–Tregoe"
+      - name: "Bow-Tie"
         line: 439
         category: "F05 root_cause"
-        has_contract: false
-        contract_status: pending
-      - name: "Change Analysis"
+        has_contract: true
+        contract_status: complete
+        machine_id: "root_cause.bow_tie"
+      - name: "Kepner–Tregoe"
         line: 440
+        category: "F05 root_cause"
+        has_contract: true
+        contract_status: complete
+        machine_id: "root_cause.kepner_tregoe"
+      - name: "Change Analysis"
+        line: 441
         category: "F05 root_cause"
         has_contract: false
         contract_status: pending
       - name: "Barrier Analysis"
-        line: 441
+        line: 442
         category: "F05 root_cause"
         has_contract: false
         contract_status: pending
@@ -1070,55 +1073,65 @@ by_document:
         has_contract: false
         contract_status: pending
       - name: "C4 Model"
-        line: 814
-        category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Domain-Driven Design (DDD)"
-        line: 815
-        category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Event Storming"
-        line: 816
-        category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Architecture Decision Record (ADR)"
         line: 817
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "ATAM"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.system_context_model"
+      - name: "Domain-Driven Design (DDD)"
         line: 818
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Quality Attribute Scenario"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.ddd"
+      - name: "Event Storming"
         line: 819
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Architecture Fitness Functions"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.event_storming"
+      - name: "Architecture Decision Record (ADR)"
         line: 820
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Strangler Fig Pattern"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.adr"
+      - name: "ATAM"
         line: 821
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Architecture Trade-off Matrix"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.atam"
+      - name: "Quality Attribute Scenario"
         line: 822
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
-      - name: "Dependency Mapping"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.quality_attribute_scenario"
+      - name: "Architecture Fitness Functions"
         line: 823
         category: "F18 architecture"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.fitness_functions"
+      - name: "Strangler Fig Pattern"
+        line: 824
+        category: "F18 architecture"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.strangler_fig"
+      - name: "Architecture Trade-off Matrix"
+        line: 825
+        category: "F18 architecture"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.trade_off_matrix"
+      - name: "Dependency Mapping"
+        line: 826
+        category: "F18 architecture"
+        has_contract: true
+        contract_status: complete
+        machine_id: "architecture.dependency_mapping"
       - name: "SLI/SLO/SLA"
         line: 847
         category: "F19 devops-sre"
