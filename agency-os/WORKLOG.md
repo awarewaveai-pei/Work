@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-07（P0-07 Tenant-context standard——3/8 欄位可轉寫已決 ADR-0009，5/8 全庫零先例誠實留 OPEN）
+
+**產出**：`Projects/internal/hci30/packages/contracts/tenant-context/TENANT_CONTEXT_STANDARD.md`。
+
+**3 個關閉**：`tenant_id`——HCI 自己不可變 identifier，已實作（ADR-0016 每張 tenant-owned table `tenant_id NOT NULL`+forced RLS）。`organization_id`——**不是 HCI 自己的概念**，是 portal 的客戶身份記錄，僅透過 `organization_product_subscriptions.external_tenant_id` 這個 nullable 非 FK seam 橋接，HCI 從不直接查 portal DB 或建跨產品 FK（`HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md` §Adapter mapping）——刻意記下這個澄清，因為 adapter contract 自己的「Canonical meanings」表格明文警告過這正是容易搞混的一組概念。`workspace_id`——關係規則已定（一個 Workspace 恰屬於一個 HCI Tenant），但 schema 未建：grep `docs/domain/HCI_ENTITY_DICTIONARY.md`（P0-01 逐檔讀完全部 11 個 migration 的詳盡清單）零 Workspace entity。
+
+**5 個誠實留 OPEN**：`actor_id`／`service_account_id`／`request_id`（通用 API 呼叫追蹤語意）／`data_region`／`policy_context`。逐一查證 ADR-0009 全文＋全部 11 個 migration：五個詞全部零命中，唯一例外是 schema 裡確實有一個 `request_id` 欄位（`hci.data_subject_request_events`／`hci.data_subject_request_targets`，`0001_wave1_synthetic_up.sql:175,181`）——但那是「屬於哪一個 Data Subject Request」的網域專屬外鍵，跟這裡要的「每次 API 呼叫一個追蹤 ID」是不同語意，特別記下避免未來誤判成同一件事已經做過。其餘四個完全零先例——這些是 auth-gateway／API 層的屬性（誰在呼叫、哪個司法管轄區、什麼 entitlement/edition 政策），P0-06（API + Event contracts）不存在前寫具體形狀等於發明 API 層設計，超出這輪範圍。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Grep | cmd=`actor_id\|service_account\|data_region\|policy_context\|request_id` 對 ADR-0009 全文+全部 migration | exit=1（ADR-0009 零命中，符合預期）/ exit=0（migration 僅 DSR 專屬 request_id，非本標準要的通用語意）| result=如上
+- REVIEW_DONE: critic=自審（Low risk，3 個轉寫已 ACCEPTED 決定，5 個誠實留空非發明）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`TENANT_CONTEXT_STANDARD` | hits=僅本輪新檔+README/gap-analysis 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 `packages/contracts/tenant-context/TENANT_CONTEXT_STANDARD.md`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-07 補 partial-closure 段；`README.md` 補一行連結。
+
+**[剩餘風險]**：5/8 欄位完全未設計，等 P0-06 落地才有東西可依附；`workspace_id` 只是關係規則非 schema，真正建表時才會知道是否需要調整。
+
+**[rollback]**：`git revert`；純新增文件，無 schema 變更。
+
 ## 2026-09-07（P0-08 Threat models——4 份，3 份實質轉寫已決 ADR，1 份誠實留空；副產品抓到 ADR-0026 舊筆記已過期）
 
 **產出**：`Projects/internal/hci30/security/threat-models/{TM_PUBLIC_INTELLIGENCE,TM_FILE_INGESTION,TM_AI_ANALYSIS,TM_MULTI_TENANCY}.md`。

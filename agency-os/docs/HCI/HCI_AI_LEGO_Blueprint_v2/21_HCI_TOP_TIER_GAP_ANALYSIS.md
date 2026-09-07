@@ -99,6 +99,8 @@ Path: `D:\Work\Projects\internal\hci30\packages\contracts\tenant-context\TENANT_
 
 Expected result: tenant identity cannot disappear between gateway, worker, DB, event, export, or AI request.
 
+**Partial closure (2026-09-07)**: 3 of 8 fields closed. `tenant_id` is fully implemented (ADR-0016, every tenant-owned table). `organization_id` is closed as "not HCI's own concept" — it is the portal's, bridged only through the nullable `external_tenant_id` seam, never a direct query or FK (`governance/wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md`). `workspace_id` is closed as a decided relationship rule (a Workspace belongs to exactly one Tenant) with no schema backing yet — no `Workspace` entity exists in `docs/domain/HCI_ENTITY_DICTIONARY.md`'s exhaustive 11-migration inventory. The other 5 fields (`actor_id`, `service_account_id`, `request_id` in the generic tracing sense, `data_region`, `policy_context`) have zero prior design anywhere — they are API/auth-gateway properties that cannot be meaningfully specified before P0-06 exists, honestly left OPEN rather than invented. See `Projects/internal/hci30/packages/contracts/tenant-context/TENANT_CONTEXT_STANDARD.md`.
+
 ## P0-08 Public Intelligence threat model
 
 Path: `D:\Work\Projects\internal\hci30\security\threat-models\{TM_PUBLIC_INTELLIGENCE.md, TM_FILE_INGESTION.md, TM_AI_ANALYSIS.md, TM_MULTI_TENANCY.md}`.
