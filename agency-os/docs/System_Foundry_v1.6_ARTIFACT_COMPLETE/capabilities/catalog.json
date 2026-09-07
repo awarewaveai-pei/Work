@@ -2248,6 +2248,239 @@
         "CAP-VENDOR-MGMT"
       ],
       "description": "記錄每個供應商對特定品項要求的最低訂購量（下單至少要訂多少），以及供應商報價的交貨前置時間（下單後大約多久會到貨），下採購單時可以據此判斷數量門檻與預估到貨時間。跟 CAP-MOQ 方向相反：CAP-MOQ 是本公司要求買方客戶至少要訂多少（b2b 模組），這裡是供應商要求本公司至少要訂多少，兩者不可互相取代。"
+    },
+    {
+      "id": "CAP-CANNED-REPLY",
+      "name": "罐頭訊息／快速回覆範本",
+      "module": "customer_service",
+      "requires": [],
+      "description": "客服人員可在工單或對話中直接套用預先寫好的罐頭訊息／快速回覆範本，不需每次重新輸入常見問題的答案；跟 CAP-AI-GENERATE 每次即時生成內容不同，這裡是人工維護的固定文字範本庫。"
+    },
+    {
+      "id": "CAP-DOC-TEMPLATES",
+      "name": "文件範本自動產生",
+      "module": "customer_service",
+      "requires": [
+        "CAP-KNOWLEDGE-BASE"
+      ],
+      "description": "可以用預先定義好的文件範本，帶入變數自動產生標準化文件（例如常見問題頁面、政策公告、說明手冊），不需每次手動重新排版撰寫；跟 CAP-KNOWLEDGE-BASE 收錄固定知識文章不同，這裡是動態帶入變數產生文件的能力，且依附於知識庫已存在為前提。"
+    },
+    {
+      "id": "CAP-CAPTIONING",
+      "name": "AI 字幕／隱藏式字幕生成",
+      "module": "content",
+      "requires": [
+        "CAP-VIDEO-PRODUCTION"
+      ],
+      "description": "影片可以自動產生多語言字幕／隱藏式字幕並對齊時間軸，不需人工逐句聽打與翻譯；跟一般性 AI 生成（CAP-AI-GENERATE）或介面語系支援（CAP-I18N）不同，這裡專門處理影片時間軸對齊字幕，且依附於影片內容已產出為前提。"
+    },
+    {
+      "id": "CAP-CHANNEL-MAPPING",
+      "name": "Marketplace Taxonomy/Attribute Mapping",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-MULTI-MARKETPLACE",
+        "CAP-PRODUCT-ATTRIBUTES"
+      ],
+      "description": "Maps the merchant's own governed product category/attribute structure (CAP-PRODUCT-ATTRIBUTES) to each connected marketplace's own, differently-shaped taxonomy and required-attribute schema, so a listing satisfies that marketplace's specific category/attribute rules. Distinct from CAP-MULTI-MARKETPLACE, which only syncs the listing/offer itself, not the category/attribute translation between two different taxonomies."
+    },
+    {
+      "id": "CAP-LISTING-ISSUES",
+      "name": "Marketplace Listing Error Handling",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-MULTI-MARKETPLACE"
+      ],
+      "description": "Collects and categorizes a connected marketplace's listing rejection, review-failure, or policy-violation responses so the merchant knows exactly which field or rule caused the rejection and can fix and resubmit it. Distinct from CAP-PRODUCT-FEED's feed-quality triage, which is scoped to non-transactional shopping/ad feed channels (Google Merchant Center, Meta Catalog), not transactional marketplace listings (Amazon, Shopee, etc.)."
+    },
+    {
+      "id": "CAP-MARKETPLACE-MESSAGING",
+      "name": "Marketplace Buyer Messaging",
+      "module": "marketplace_ops",
+      "requires": [
+        "CAP-MULTI-MARKETPLACE"
+      ],
+      "description": "Buyer-seller messages sent through a connected marketplace's own native messaging system (e.g. Amazon Seller Messaging, Shopee Chat) are received and replied to within that marketplace's own policy and response-time rules. Distinct from CAP-LIVE-CHAT (in-site chat) and CAP-TICKETING (internal ticket workflow), neither of which represents a marketplace's own buyer-messaging channel."
+    },
+    {
+      "id": "CAP-ORDER-MERGE",
+      "name": "Order Merge",
+      "module": "oms",
+      "requires": [
+        "CAP-ORDERS"
+      ],
+      "description": "Multiple separate orders (e.g. placed separately by the same customer, or destined for the same fulfillment location) can be combined into a single fulfillment/shipment unit before pick-pack -- the inverse operation of CAP-ORDER-SPLIT -- and the merged shipment always traces back to every original order it was merged from."
+    },
+    {
+      "id": "CAP-FULFILLMENT-ROUTING",
+      "name": "Fulfillment Routing Rules",
+      "module": "oms",
+      "requires": [
+        "CAP-ORDERS"
+      ],
+      "description": "An order line is automatically routed to whichever warehouse, store, or 3PL fulfillment source a configured rule set determines (e.g. nearest location, lowest stock-holding cost, availability), and can be manually rerouted afterward if the originally assigned source becomes unavailable; distinct from CAP-ORDER-SPLIT, which only divides an order's lines across multiple shipments without deciding which source fulfills each one."
+    },
+    {
+      "id": "CAP-ORDER-EXCEPTION",
+      "name": "Order Exception Management",
+      "module": "oms",
+      "requires": [
+        "CAP-ORDERS"
+      ],
+      "description": "An order-fulfillment problem (failed allocation, fulfillment-source rejection, address/inventory mismatch) is raised as an explicit, trackable exception record requiring resolution, rather than the order silently stalling in an undefined state or only surfacing as an unattributed FOUND-ERROR log entry."
+    },
+    {
+      "id": "CAP-POS-RECEIPT",
+      "name": "POS Receipt Generation",
+      "module": "pos",
+      "requires": [
+        "CAP-POS"
+      ],
+      "description": "A point-of-sale transaction produces a printed or emailed receipt itemizing the purchased line items, tax, and payment method at the moment of sale; distinct from CAP-INVOICES, which is scoped to formal billable business transactions, not point-of-sale receipts."
+    },
+    {
+      "id": "CAP-AI-PROMPT-REGISTRY",
+      "name": "AI Prompt Registry",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": "Prompts used to drive AI features are stored, versioned, and reused from a central registry rather than hardcoded inline per call site, so a prompt change is tracked and attributable to a specific prompt version rather than an untraceable inline edit."
+    },
+    {
+      "id": "CAP-AI-OUTPUT-EVAL",
+      "name": "AI Output Evaluation",
+      "module": "ai",
+      "requires": [
+        "CAP-AI"
+      ],
+      "description": "AI-generated outputs are automatically scored against defined quality/correctness criteria (golden test sets, rubric-based grading) before or after being surfaced, so a quality regression from a model, prompt, or provider change is caught rather than only discovered by end users."
+    },
+    {
+      "id": "CAP-AI-CITATION",
+      "name": "AI Answer Source Citation",
+      "module": "ai",
+      "requires": [
+        "CAP-AI-SEARCH"
+      ],
+      "description": "An AI-generated answer surfaces the specific source document(s)/passage(s) it was derived from as a user-facing citation, so the answer's provenance is traceable and verifiable by the end user -- distinct from FOUND-EVIDENCE, which only requires that evidence exist and be reproducible internally for governance purposes, not that it be surfaced to the end user as a citation."
+    },
+    {
+      "id": "CAP-WORKFLOW-RETRY",
+      "name": "Workflow Step Retry",
+      "module": "workflow",
+      "requires": [
+        "CAP-STATE-WORKFLOW"
+      ],
+      "description": "A failed automation workflow step -- any step, not only the payment- and AI-specific idempotent retries DER-PAYMENT-IDEMPOTENCY/DER-AI-IDEMPOTENCY already cover -- can be automatically retried with a defined backoff/limit, or resumed manually from the point of failure, without re-executing already-completed steps or duplicating their side effects."
+    },
+    {
+      "id": "CAP-POLICY-ENGINE",
+      "name": "Business Policy Engine",
+      "module": "workflow",
+      "requires": [
+        "CAP-STATE-WORKFLOW"
+      ],
+      "description": "Business rules (eligibility conditions, thresholds, approval-routing logic) are authored and evaluated as declarative policy definitions consumed by workflow steps, rather than hardcoded per workflow, so a policy change does not require a code change to the workflow that consumes its result."
+    },
+    {
+      "id": "CAP-CHECKLIST",
+      "name": "Task Checklist / Sub-tasks",
+      "module": "workflow",
+      "requires": [
+        "CAP-TASKS"
+      ],
+      "description": "A task can have an ordered list of checklist sub-items that are each independently checked off, with the parent task's completion optionally requiring every sub-item to be checked; distinct from CAP-TASKS' own single task-level assignment and status."
+    },
+    {
+      "id": "CAP-EXPERIMENT-METRICS",
+      "name": "Experiment Results & Statistical Metrics",
+      "module": "workflow",
+      "requires": [
+        "CAP-FEATURE-FLAGS"
+      ],
+      "description": "A running experiment's variant groups (as defined by CAP-FEATURE-FLAGS' rollout/targeting/holdout mechanism) are measured against defined success metrics with statistical-significance calculation (sample size, confidence interval), producing a result a decision-maker can act on; distinct from CAP-FEATURE-FLAGS itself, which only controls exposure, never measures outcome."
+    },
+    {
+      "id": "CAP-2FA",
+      "name": "Two-Factor Authentication (2FA/MFA)",
+      "module": "identity",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": "A user can enable a second authentication factor (TOTP authenticator app, SMS/email one-time code) in addition to their password, and the system can require it at login; distinct from CAP-SSO, which delegates authentication to an external enterprise identity provider rather than adding a second factor to this system's own credential."
+    },
+    {
+      "id": "CAP-CONNECTOR-QUOTA",
+      "name": "Per-Connector Usage Entitlement",
+      "module": "commercial",
+      "requires": [
+        "CAP-USAGE-METERING"
+      ],
+      "description": "Each connected third-party integration/connector carries its own usage quota as a distinct entitlement dimension (e.g. one plan allows 2 connected marketplaces, another allows 10), checked and enforced independently from the account's other usage-metering dimensions."
+    },
+    {
+      "id": "CAP-AUTOCOMPLETE",
+      "name": "Search Autocomplete / Typeahead",
+      "module": "search",
+      "requires": [
+        "CAP-SEARCH"
+      ],
+      "description": "As a user types a search query, the system suggests likely completions or matching terms in real time before the query is submitted, drawn from the same indexed catalog CAP-SEARCH queries against; distinct from CAP-SEARCH's own retrieval of an already-submitted query."
+    },
+    {
+      "id": "CAP-SUBC-CHURN",
+      "name": "Subscription Churn Analytics",
+      "module": "subscription_commerce",
+      "requires": [
+        "CAP-SUBSCRIPTION-COMMERCE"
+      ],
+      "description": "Subscriber cancellation/non-renewal is tracked and analyzed to compute a churn rate and surface at-risk subscribers (e.g. by usage decline or repeated failed payment attempts) before they cancel, rather than only recording the cancellation event after the fact."
+    },
+    {
+      "id": "CAP-CREATOR-SEEDING",
+      "name": "Creator Product Seeding",
+      "module": "affiliate",
+      "requires": [
+        "CAP-INFLUENCER"
+      ],
+      "description": "Product units can be gifted or shipped to a creator or influencer at no cost, as part of a seeding campaign, tracked against that creator's own record distinct from a paid affiliate commission transaction."
+    },
+    {
+      "id": "CAP-UGC-LICENSING",
+      "name": "UGC Usage Rights Licensing",
+      "module": "affiliate",
+      "requires": [
+        "CAP-INFLUENCER"
+      ],
+      "description": "A creator's submitted content (photo, video, post) can have an explicit usage-rights grant recorded -- scope, duration, and channels the merchant is permitted to reuse it on -- before the merchant reuses that content in its own marketing, rather than assuming implicit permission from the partnership relationship alone. Distinct from CAP-UGC, which only stores/serves user-generated content generically and does not track reuse permission."
+    },
+    {
+      "id": "CAP-INVENTORY-OVERSTOCK",
+      "name": "Overstock Detection",
+      "module": "demand_planning",
+      "requires": [
+        "CAP-DEMAND-FORECAST"
+      ],
+      "description": "Stock significantly exceeding projected demand for its holding-cost/shelf-life horizon is automatically flagged as overstock, using the same forecast CAP-DEMAND-FORECAST already produces, so a merchant can act (mark down for clearance, reallocate stock, or halt further reordering) before capital is tied up in excess inventory."
+    },
+    {
+      "id": "CAP-INVENTORY-AGING",
+      "name": "Inventory Aging",
+      "module": "demand_planning",
+      "requires": [
+        "CAP-INVENTORY"
+      ],
+      "description": "Each stock unit/batch's time-in-stock since receipt is tracked and surfaced by age band (e.g. 0-30/31-60/60+ days), distinct from CAP-AR-AGING, which ages receivables, not physical stock."
+    },
+    {
+      "id": "CAP-METRIC-GOVERNANCE",
+      "name": "Semantic Metric Governance",
+      "module": "analytics",
+      "requires": [
+        "CAP-ANALYTICS"
+      ],
+      "description": "A business metric (e.g. \"active customer\", \"units shipped per week\") is defined once as a named, versioned calculation registered centrally, and every report, dashboard, or data-warehouse consumer resolves that metric from the same registered definition, rather than each consumer recomputing its own ad hoc version that can silently disagree with another."
     }
   ]
 }

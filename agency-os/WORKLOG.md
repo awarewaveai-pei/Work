@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-08（System Foundry v1.6 — 收尾 Commerce OS blueprint 剩餘 26 個缺口，`326cb5a45` top-10 之後的全部）
+
+**範圍**：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/reports/commerce-os-blueprint-gap-audit-2026-09-07.md` 36 個 MISSING 缺口，前 10 個已由 `326cb5a45`／`8df691363` 收掉，本輪收剩下的。報告尾段「Lower-priority singleton gaps」段落列 23 個；核對報告全文另找到 3 個未在該段落被提及、但確實是獨立 MISSING 且未被前 10 個關掉的缺口（module 24 語意指標治理、module 45 實驗統計指標、module 31 marketplace 買家訊息）——23+3=26，對上報告「36 MISSING − 已關 10 = 26」的算式，取代任務給的摘要清單。
+
+**新增 26 個 capability**（id｜module｜對應報告項目）：
+`CAP-CANNED-REPLY`(customer_service,04)、`CAP-DOC-TEMPLATES`(customer_service,27)、`CAP-CAPTIONING`(content,08)、`CAP-CHANNEL-MAPPING`(marketplace_ops,11)、`CAP-LISTING-ISSUES`(marketplace_ops,11)、`CAP-MARKETPLACE-MESSAGING`(marketplace_ops,31 額外項)、`CAP-ORDER-MERGE`(oms,12)、`CAP-FULFILLMENT-ROUTING`(oms,12)、`CAP-ORDER-EXCEPTION`(oms,12)、`CAP-POS-RECEIPT`(pos,19)、`CAP-AI-PROMPT-REGISTRY`(ai,25)、`CAP-AI-OUTPUT-EVAL`(ai,25)、`CAP-AI-CITATION`(ai,27)、`CAP-WORKFLOW-RETRY`(workflow,26)、`CAP-POLICY-ENGINE`(workflow,26)、`CAP-CHECKLIST`(workflow,50)、`CAP-EXPERIMENT-METRICS`(workflow,45 額外項)、`CAP-2FA`(identity,37)、`CAP-CONNECTOR-QUOTA`(commercial,36)、`CAP-AUTOCOMPLETE`(search,42)、`CAP-SUBC-CHURN`(subscription_commerce,43)、`CAP-CREATOR-SEEDING`(affiliate,44)、`CAP-UGC-LICENSING`(affiliate,44)、`CAP-INVENTORY-OVERSTOCK`(demand_planning,46)、`CAP-INVENTORY-AGING`(demand_planning,46)、`CAP-METRIC-GOVERNANCE`(analytics,24 額外項)。
+
+**同步落地**（一次到位，避免重演 `326cb5a45`／`8df691363` 分兩次補 obligations 的錯）：26 個新 question（多數 `active_when` 指向對應依賴 capability 的既有問題，比照 `Q-DATA-016` 模式；`CAP-CANNED-REPLY` 因 `requires:[]` 且比照 `CAP-OMNICHANNEL-MESSAGING` 前例維持無條件出題）、26 條 question-rule、`module-manifests.json` 26 處 `activated_by` 插入（各模組重新字母排序）、`module-obligations.json` 14 個模組各補 5 條「When CAP-X is also selected」句式（invariants/security/tests/operations/recovery 各一，逐字對照該 capability `description`）。
+
+**過程中抓到並修正 1 個真設計缺陷**（非任務要求，跑 pairwise gate 時發現）：原設計把 `Q-AI-012`／`Q-AI-013`（prompt registry／output eval）gate 在 `Q-AI-001`、`Q-AI-014`（citation）gate 在 `Q-AI-002`，跟既有 `Q-AI-003`~`Q-AI-010` 全部無條件出題的慣例不符，且與既有 `Q-FUT-004`（「目前完全不做 AI，但未來會做」，其 active_when 要求 `Q-AI-001`~`Q-AI-010` 全部 False）產生 3 組新的 pairwise 衝突（`test_selection_matrix.py` pairwise_rejected 6→9）。根因：這三個 capability 的 `requires` 邊本身已經透過 `capability_closure()` 保證依賴會被自動拉入，不需要再用 `active_when` 重複表達依賴，比照既有 AI 子功能問題慣例移除 `active_when`（連帶移除描述文字裡多餘的「只在你有勾選...時才有意義」子句），問題改回無條件出題，衝突消失，pairwise_rejected 驗證恢復 6（跟改動前基準值一致，非巧合達標）。
+
+**驗證**：`tests/fixtures/selection/all_no.json`／`all_yes.json` 皆用真實 `resolve()` 輸出重新產生（非手改），`manifest.json` 用 `regenerate_integrity.py --write` 重算 hash；`README.md`／`QUALITY_STRENGTH_MATRIX.md`／`CHANGELOG_v1.6.md`／`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` 的題數（235→261）、capability 數（275→301）、pairwise 總數（27,495→33,930）、`all_yes.json` fixture 行號引用（`3-279`/`280-331`→`3-305`/`306-357`）全數對照 `validate_doc_numbers.py` 的 anchor 正則逐一改。順手修正 `merchandising` 模組 obligations 裡一句因新增 `CAP-AUTOCOMPLETE` 而變過時的宣稱（原句聲稱 autocomplete「not owned by any capability in this catalog yet」，拆成兩句：autocomplete 現由 `CAP-AUTOCOMPLETE`（search 模組）擁有；同義詞/別名對應仍未被任何 capability 涵蓋，保留原句該部分）。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/validate_versions.py && python scripts/validate_foundry.py && python scripts/validate_semantics.py && python scripts/validate_configurator.py && python scripts/validate_artifact_generation.py && python scripts/validate_contract_fixtures.py && python scripts/run_adversarial_contract_tests.py && python scripts/test_bootstrap_e2e.py && python scripts/test_configurator_e2e.py && python scripts/test_configurator_http_e2e.py && python scripts/test_selection_matrix.py && python scripts/test_mutation_coverage.py && python scripts/test_payment_commercial_gating.py && python -m unittest discover -s tests && python scripts/validate_manifest.py && python scripts/validate_doc_numbers.py`（於 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 下執行，15 個 gate script + 38 個 unittest）| exit=0 | result=全部 PASS：`questions=261 capabilities=301 modules=51`、`SELECTION MATRIX: PASS ... pairwise_valid=33924 pairwise_rejected=6 ... all_yes_caps=301`、`MUTATION COVERAGE: PASS ... requires_edges=214 total (80 load-bearing, 134 structurally-redundant, 0 unexplained)`、`PAYMENT/COMMERCIAL GATING: PASS ... keyword_flagged=0`、`Ran 38 tests ... OK`、`MANIFEST VALIDATION: PASS`、`DOC NUMBERS VALIDATION: PASS`
+- REVIEW_DONE: critic=Quick 自審（風險 Low：純 capability/questionnaire/obligations 資料與文件數字，非 auth/payment/crypto runtime 程式碼變更，`test_mutation_coverage.py`／`test_payment_commercial_gating.py` 本身即為這個系統內建的對抗式自審機制，已跑出 0 unexplained/0 flagged）| verdict=pass | findings=0c/0m/1minor（上述 Q-AI-012/013/014 gating 設計缺陷，發現當下即修正，非留待後續）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`\b235\b\|\b275\b`（限 System_Foundry_v1.6_ARTIFACT_COMPLETE 內 .md/.json，排除 gitignored `generated/` 與行號引用誤判）+ `CAP-CANNED-REPLY\|CAP-METRIC-GOVERNANCE\|CAP-2FA` 全 repo 掃描（確認新 capability id 未被其他文件/腳本引用而需要同步） | hits=0
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：`agency-os/docs/Composable AI Commerce OS/` 原始藍圖文件本身未改（本輪只補 System Foundry 這端的能力目錄，不改寫藍圖規格文件，符合前一輪慣例）；`CHANGELOG_v1.6.md` 的「Added」清單未追加本輪 26 個 capability 的條目（比照 `326cb5a45` 前例，該次也只改了 Assurance 行數字，未在 Added 清單另立條目，非遺漏）。
+
+**[rollback]**：純新增 capability/question/rule/obligations 資料 + 文件數字同步，`git revert` 即可；無 schema 破壞性變更，`manifest.json` hash 隨 revert 一併回退。
+
 ## 2026-09-08（63–67 號切片 critic 覆審：3 Minor 全修）
 
 critic scope=normal tier。verdict SHIP，0C/0M/3Minor（crash-resume merge 遺留的過期引用+一份 description 超長）：post_mortem.contract.yaml description 9→5 行；ooda.py 開頭「4th member」訂正「6th」；ooda.py 一處過期行號引用改用 symbol name。

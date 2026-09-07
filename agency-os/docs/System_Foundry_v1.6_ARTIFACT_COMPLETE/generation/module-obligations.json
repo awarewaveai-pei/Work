@@ -161,24 +161,29 @@
       "invariants": [
         "Identity proof, authentication, authorization, and entitlement are separate concerns.",
         "Sessions and credentials have explicit lifecycle and revocation.",
-        "Least privilege is default."
+        "Least privilege is default.",
+        "When CAP-2FA is also selected, a second-factor requirement, once enabled for an account, cannot be silently bypassed by any login path; disabling it requires an explicit, auditable action by the account owner or an authorized administrator."
       ],
       "security": [
         "Credential hashing/secure federation.",
         "Session fixation/hijack protections.",
-        "MFA/SSO controls when selected."
+        "MFA/SSO controls when selected.",
+        "When CAP-2FA is also selected, second-factor secrets/seeds are stored with the same never-logged, never-in-source-control protection this module's own security obligation already requires for credentials generally."
       ],
       "tests": [
         "Login/logout/session revocation.",
         "Privilege escalation negatives.",
-        "Role boundary tests."
+        "Role boundary tests.",
+        "When CAP-2FA is also selected, login is contract-tested for the second-factor-required path, including a rejected/expired code case."
       ],
       "operations": [
-        "Auth failure/anomaly monitoring without secret leakage."
+        "Auth failure/anomaly monitoring without secret leakage.",
+        "When CAP-2FA is also selected, repeated second-factor failures are observable as part of this module's existing auth anomaly monitoring."
       ],
       "recovery": [
         "Emergency credential/session revocation.",
-        "Identity-provider fallback/lockout recovery where relevant."
+        "Identity-provider fallback/lockout recovery where relevant.",
+        "When CAP-2FA is also selected, a locked-out user's second-factor recovery (backup codes or authorized administrator reset) follows the same emergency credential recovery path this module's own recovery obligation already requires."
       ]
     },
     "tenant": {
@@ -241,24 +246,44 @@
       "invariants": [
         "State transitions are explicit and validated.",
         "Approval identity/time/reason are auditable.",
-        "Duplicate delivery cannot cause duplicate business effects."
+        "Duplicate delivery cannot cause duplicate business effects.",
+        "When CAP-WORKFLOW-RETRY is also selected, retrying a failed step never re-executes an already-completed step in the same run or duplicates that step's side effects, the same duplicate-delivery invariant this module already requires generally.",
+        "When CAP-POLICY-ENGINE is also selected, a policy definition's version is recorded against every consequential decision it produced, so which policy version produced a given workflow outcome is always reconstructable.",
+        "When CAP-CHECKLIST is also selected, a parent task configured to require full checklist completion cannot be marked complete while any sub-item remains unchecked.",
+        "When CAP-EXPERIMENT-METRICS is also selected, an experiment's reported result is always computed from the same variant-assignment records CAP-FEATURE-FLAGS produced for that experiment, never a separately-tracked, potentially-diverging assignment log."
       ],
       "security": [
         "Authorization is checked per transition, not only per screen.",
-        "High-impact approvals enforce required authority/dual control."
+        "High-impact approvals enforce required authority/dual control.",
+        "When CAP-WORKFLOW-RETRY is also selected, manually forcing a resume/retry from a failed step requires the same transition-authorization check as any other state transition in this module.",
+        "When CAP-POLICY-ENGINE is also selected, authoring or editing a policy definition requires a separate, higher authority than merely triggering the workflow that consumes it.",
+        "When CAP-CHECKLIST is also selected, checking off a sub-item follows the same assignment/authorization scope as the parent task.",
+        "When CAP-EXPERIMENT-METRICS is also selected, experiment result data is only visible to staff holding experiment-review authority, distinct from ordinary feature-flag toggle access."
       ],
       "tests": [
         "Valid/invalid transition matrix.",
         "Concurrent transition/idempotency tests.",
-        "Approval revocation/cancellation paths."
+        "Approval revocation/cancellation paths.",
+        "When CAP-WORKFLOW-RETRY is also selected, retry-without-duplication is contract-tested: retrying a step with an external side effect must not repeat that side effect.",
+        "When CAP-POLICY-ENGINE is also selected, policy evaluation is contract-tested against a boundary-condition fixture (e.g. a threshold exactly at its limit).",
+        "When CAP-CHECKLIST is also selected, the require-full-completion invariant is contract-tested: marking the parent task complete with an unchecked sub-item is rejected.",
+        "When CAP-EXPERIMENT-METRICS is also selected, statistical-significance calculation is contract-tested against a known-input/known-output fixture (a case that should, and a case that should not, reach significance)."
       ],
       "operations": [
         "Stuck/failed workflow visibility.",
-        "Transition latency and failure signals."
+        "Transition latency and failure signals.",
+        "When CAP-WORKFLOW-RETRY is also selected, retry counts and exhausted-retry failures are observable alongside this module's existing stuck/failed workflow visibility.",
+        "When CAP-POLICY-ENGINE is also selected, policy evaluation failures/exceptions are observable.",
+        "When CAP-CHECKLIST is also selected, tasks with stalled/incomplete checklists past an expected timeframe are observable.",
+        "When CAP-EXPERIMENT-METRICS is also selected, running experiments approaching or past their planned sample-size/duration are observable."
       ],
       "recovery": [
         "Compensating transitions or explicit irreversible boundary.",
-        "Resume/retry semantics are deterministic."
+        "Resume/retry semantics are deterministic.",
+        "When CAP-WORKFLOW-RETRY is also selected, a workflow that exhausts its retry limit surfaces as a failure requiring explicit resolution, never silently abandoned.",
+        "When CAP-POLICY-ENGINE is also selected, policy definitions are versioned and included in backup scope, so a bad policy change can be rolled back without a code deploy.",
+        "When CAP-CHECKLIST is also selected, checklist sub-item state and history are included in backup scope alongside the parent task.",
+        "When CAP-EXPERIMENT-METRICS is also selected, experiment configuration and result history are included in backup scope."
       ]
     },
     "files": {
@@ -290,21 +315,26 @@
       "invariants": [
         "Search index is derived unless explicitly justified otherwise.",
         "Index can be rebuilt from authoritative sources.",
-        "Authorization filtering cannot be bypassed by search."
+        "Authorization filtering cannot be bypassed by search.",
+        "When CAP-AUTOCOMPLETE is also selected, autocomplete suggestions are derived from the same index CAP-SEARCH itself queries against; they never diverge into a second, separately-maintained suggestion source that can fall out of sync with actual search results."
       ],
       "security": [
-        "Search results obey the same object authorization model."
+        "Search results obey the same object authorization model.",
+        "When CAP-AUTOCOMPLETE is also selected, autocomplete suggestions obey the same object-authorization filtering this module's own security obligation already requires for full search results -- a suggestion never leaks the existence of an object the requesting user could not otherwise see."
       ],
       "tests": [
         "Rebuild consistency.",
         "Unauthorized-result exclusion.",
-        "Index lag behavior."
+        "Index lag behavior.",
+        "When CAP-AUTOCOMPLETE is also selected, authorization filtering on suggestions is contract-tested the same way this module's own unauthorized-result-exclusion test already covers full search results."
       ],
       "operations": [
-        "Index lag, failure, size, query latency."
+        "Index lag, failure, size, query latency.",
+        "When CAP-AUTOCOMPLETE is also selected, autocomplete query latency is observable alongside this module's existing index/query latency signals."
       ],
       "recovery": [
-        "Deterministic rebuild/reindex procedure."
+        "Deterministic rebuild/reindex procedure.",
+        "When CAP-AUTOCOMPLETE is also selected, autocomplete suggestions are rebuilt by the same deterministic reindex procedure this module's own recovery obligation already requires, never a separate rebuild path."
       ]
     },
     "analytics": {
@@ -312,22 +342,27 @@
       "invariants": [
         "Metric definitions are versioned and reproducible.",
         "Analytics is not an accidental source of transactional truth.",
-        "Exports respect authorization and data minimization."
+        "Exports respect authorization and data minimization.",
+        "When CAP-METRIC-GOVERNANCE is also selected, a registered metric's calculation is versioned and every consumer resolves the same registered version; a report never silently recomputes its own diverging definition of a metric that is already centrally registered -- the same metric-definition-versioning invariant this module already requires generally, made concrete for named business metrics."
       ],
       "security": [
         "Row/tenant access controls.",
-        "Sensitive exports are auditable."
+        "Sensitive exports are auditable.",
+        "When CAP-METRIC-GOVERNANCE is also selected, editing a registered metric's definition requires the same authority as other analytics configuration, distinct from merely consuming it in a report."
       ],
       "tests": [
         "Metric reconciliation.",
         "Authorization on reports/exports.",
-        "Time-zone/currency correctness where applicable."
+        "Time-zone/currency correctness where applicable.",
+        "When CAP-METRIC-GOVERNANCE is also selected, metric resolution is contract-tested across two different consumers (e.g. a dashboard and an export) to confirm both resolve the identical registered definition."
       ],
       "operations": [
-        "Pipeline freshness and reconciliation signals."
+        "Pipeline freshness and reconciliation signals.",
+        "When CAP-METRIC-GOVERNANCE is also selected, a metric definition change's rollout to all consumers is observable."
       ],
       "recovery": [
-        "Rebuild derived aggregates from source data."
+        "Rebuild derived aggregates from source data.",
+        "When CAP-METRIC-GOVERNANCE is also selected, metric definitions are versioned and included in backup scope, so a bad definition change can be rolled back without recomputing historical reports from scratch."
       ]
     },
     "commercial": {
@@ -335,23 +370,28 @@
       "invariants": [
         "Entitlement is separate from payment-provider state.",
         "Commercial state transitions are explicit and auditable.",
-        "Product capability gates are centrally defined."
+        "Product capability gates are centrally defined.",
+        "When CAP-CONNECTOR-QUOTA is also selected, a per-connector quota is checked and enforced as its own entitlement dimension, independent of the account's other usage-metering dimensions; exceeding one connector's quota never silently borrows headroom from another."
       ],
       "security": [
         "Entitlement checks are server-side authoritative.",
-        "Administrative overrides require audit/authority."
+        "Administrative overrides require audit/authority.",
+        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota enforcement is server-side authoritative, the same as this module's own entitlement-check obligation already requires generally."
       ],
       "tests": [
         "Edition/entitlement matrix.",
         "Subscription lifecycle.",
-        "Trial expiry/grace period."
+        "Trial expiry/grace period.",
+        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota enforcement is contract-tested at and just above the connector's own limit, independent of other usage-metering dimensions."
       ],
       "operations": [
-        "Entitlement mismatch and lifecycle failure monitoring."
+        "Entitlement mismatch and lifecycle failure monitoring.",
+        "When CAP-CONNECTOR-QUOTA is also selected, accounts approaching a per-connector quota limit are observable for upsell/upgrade follow-up."
       ],
       "recovery": [
         "Provider outage does not silently corrupt entitlement truth.",
-        "Manual correction is audited and reversible."
+        "Manual correction is audited and reversible.",
+        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota configuration is included in backup scope."
       ]
     },
     "payments": {
@@ -483,29 +523,44 @@
         "AI output is not treated as verified fact without evidence.",
         "Model/provider/version and input evidence are reproducible for consequential outputs.",
         "Tool/action authority is explicit and risk-derived.",
-        "When CAP-AGENTIC-COMMERCE is also selected, an external agent's checkout intent is honored only if its purchase mandate (spending limit, product scope, expiry) is verified as unexpired and unexceeded before order creation, never after."
+        "When CAP-AGENTIC-COMMERCE is also selected, an external agent's checkout intent is honored only if its purchase mandate (spending limit, product scope, expiry) is verified as unexpired and unexceeded before order creation, never after.",
+        "When CAP-AI-PROMPT-REGISTRY is also selected, a consequential AI output's prompt version is retrievable from the registry, satisfying this module's own reproducibility invariant for prompt/version evidence.",
+        "When CAP-AI-OUTPUT-EVAL is also selected, an evaluation score is computed from the same golden/adversarial prompt sets this module's own testing obligation already requires, never a separate, undocumented rubric.",
+        "When CAP-AI-CITATION is also selected, a surfaced citation always resolves to a real, currently-accessible source document/passage; a citation to a deleted or inaccessible source is never silently shown as if still valid."
       ],
       "security": [
         "Prompt/context injection defenses.",
         "Data minimization and provider policy.",
         "Tool permission boundary and secret isolation.",
-        "When CAP-AGENTIC-COMMERCE is also selected, mandate scope (spending limit, product scope, expiry) is checked server-side on every checkout intent, never trusted from agent-supplied claims alone."
+        "When CAP-AGENTIC-COMMERCE is also selected, mandate scope (spending limit, product scope, expiry) is checked server-side on every checkout intent, never trusted from agent-supplied claims alone.",
+        "When CAP-AI-PROMPT-REGISTRY is also selected, editing a registered prompt requires the same tool/action authority boundary as other AI configuration changes.",
+        "When CAP-AI-OUTPUT-EVAL is also selected, evaluation results feeding an automated model/prompt rollback decision are themselves logged and reviewable, not a silent automatic action with no audit trail.",
+        "When CAP-AI-CITATION is also selected, a citation never surfaces a source document/passage the requesting user is not themselves authorized to view, even if the underlying AI-search index includes it."
       ],
       "tests": [
         "Golden/adversarial prompts.",
         "Authority/tool negatives.",
         "Model/provider fallback.",
         "Counterfactual tests for consequential decisions.",
-        "When CAP-AGENTIC-COMMERCE is also selected, mandate-boundary tests cover an agent attempting to exceed spending limit, buy outside product scope, or act after mandate expiry -- each rejected."
+        "When CAP-AGENTIC-COMMERCE is also selected, mandate-boundary tests cover an agent attempting to exceed spending limit, buy outside product scope, or act after mandate expiry -- each rejected.",
+        "When CAP-AI-PROMPT-REGISTRY is also selected, prompt version resolution is contract-tested to confirm a call site always resolves the registry's current (or explicitly pinned) version, never a stale cached copy.",
+        "When CAP-AI-OUTPUT-EVAL is also selected, a deliberately-degraded model/prompt fixture is contract-tested to confirm the evaluation score actually drops and is detected.",
+        "When CAP-AI-CITATION is also selected, citation-authorization filtering is contract-tested: an answer drawing on a source the user cannot access must not cite it."
       ],
       "operations": [
         "Quality, cost, latency, refusal/failure, provider/model version signals.",
-        "When CAP-AGENTIC-COMMERCE is also selected, agent-initiated orders are distinguishable from human-initiated orders in audit/observability signals."
+        "When CAP-AGENTIC-COMMERCE is also selected, agent-initiated orders are distinguishable from human-initiated orders in audit/observability signals.",
+        "When CAP-AI-PROMPT-REGISTRY is also selected, prompt version usage and rollout are observable alongside this module's existing quality/cost/latency signals.",
+        "When CAP-AI-OUTPUT-EVAL is also selected, evaluation score trend over time is observable alongside this module's existing quality/cost/latency signals.",
+        "When CAP-AI-CITATION is also selected, answers with zero resolvable citations are observable as a quality signal."
       ],
       "recovery": [
         "Disable/fallback/rollback model or prompt version.",
         "Compensate/revert AI actions where reversible.",
-        "When CAP-AGENTIC-COMMERCE is also selected, a customer can revoke an agent's mandate at any time, immediately blocking further checkout intents under it."
+        "When CAP-AGENTIC-COMMERCE is also selected, a customer can revoke an agent's mandate at any time, immediately blocking further checkout intents under it.",
+        "When CAP-AI-PROMPT-REGISTRY is also selected, prompt version history is included in backup scope and can be rolled back independently of the model/provider rollback this module already requires.",
+        "When CAP-AI-OUTPUT-EVAL is also selected, a sustained evaluation-score regression triggers the same disable/fallback/rollback path this module's own recovery obligation already requires for model or prompt version issues.",
+        "When CAP-AI-CITATION is also selected, citation-to-source linkage is rebuildable from the same source index CAP-AI-SEARCH itself is rebuilt from."
       ]
     },
     "migration": {
@@ -628,19 +683,24 @@
       "invariants": [
         "A published brand asset has a traceable approval record before external use.",
         "Asset versioning preserves prior approved versions, not just the latest.",
-        "Digital asset management does not become a second source of truth for files already owned by the files module."
+        "Digital asset management does not become a second source of truth for files already owned by the files module.",
+        "When CAP-CAPTIONING is also selected, a generated caption/subtitle track is versioned alongside the video asset it was generated from, never silently regenerated over a prior human-corrected version."
       ],
       "security": [
-        "Asset access/download follows the same authorization model as other stored files."
+        "Asset access/download follows the same authorization model as other stored files.",
+        "When CAP-CAPTIONING is also selected, caption/subtitle files follow the same access/download authorization as the video asset they belong to."
       ],
       "tests": [
-        "Approval-workflow gating is contract-tested (unapproved assets cannot be marked published)."
+        "Approval-workflow gating is contract-tested (unapproved assets cannot be marked published).",
+        "When CAP-CAPTIONING is also selected, caption timing alignment is contract-tested against a known-duration source clip."
       ],
       "operations": [
-        "Content production throughput and pending-approval backlog are observable."
+        "Content production throughput and pending-approval backlog are observable.",
+        "When CAP-CAPTIONING is also selected, caption generation failures/low-confidence transcriptions are observable for human review."
       ],
       "recovery": [
-        "Approved asset history is included in backup scope."
+        "Approved asset history is included in backup scope.",
+        "When CAP-CAPTIONING is also selected, a human-corrected caption/subtitle track is included in backup scope and never overwritten by a later automatic regeneration without an explicit re-run request."
       ]
     },
     "customer_service": {
@@ -649,27 +709,37 @@
         "Every support interaction is attributable to a ticket or logged conversation.",
         "SLA clocks pause/resume deterministically on defined status transitions.",
         "Customer satisfaction data is linked to the resolved ticket it measures.",
-        "When CAP-OMNICHANNEL-MESSAGING is also selected, conversations from every connected external platform (LINE, WhatsApp Business, Telegram, Instagram/Messenger) resolve into the same unified inbox record, never a per-platform parallel inbox."
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, conversations from every connected external platform (LINE, WhatsApp Business, Telegram, Instagram/Messenger) resolve into the same unified inbox record, never a per-platform parallel inbox.",
+        "When CAP-CANNED-REPLY is also selected, a canned-reply template's content can only be edited by staff holding support-content authority, and every use of one is attributable to the sending agent the same as a manually-typed reply.",
+        "When CAP-DOC-TEMPLATES is also selected, a generated document's variable substitution is derived from real, current record data at generation time, never a stale cached copy silently reused across generations."
       ],
       "security": [
         "Support agents access only the customer data scoped to their assigned tickets/tenant.",
         "Call/chat transcripts follow the same data-residency rules as other customer data.",
-        "When CAP-OMNICHANNEL-MESSAGING is also selected, external-platform message content and customer identifiers follow the same access-scoping as other customer data, regardless of source platform."
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, external-platform message content and customer identifiers follow the same access-scoping as other customer data, regardless of source platform.",
+        "When CAP-CANNED-REPLY is also selected, canned-reply templates are stored and access-scoped the same as other support content, never exposed to customers as an editable object.",
+        "When CAP-DOC-TEMPLATES is also selected, editing a document template requires the same support-content authority as editing a knowledge-base article, distinct from merely triggering a generation from an existing template."
       ],
       "tests": [
         "SLA breach detection is tested against clock-pause edge cases.",
         "Ticket assignment/escalation paths are contract-tested.",
-        "When CAP-OMNICHANNEL-MESSAGING is also selected, cross-platform inbox unification is contract-tested: messages from two different connected platforms for the same customer land in one conversation thread, not two."
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, cross-platform inbox unification is contract-tested: messages from two different connected platforms for the same customer land in one conversation thread, not two.",
+        "When CAP-CANNED-REPLY is also selected, sending a canned reply is contract-tested to confirm it produces the same attributable conversation/ticket entry as a manually-typed reply.",
+        "When CAP-DOC-TEMPLATES is also selected, template variable substitution is contract-tested against a record with a missing/null field to confirm it fails visibly rather than generating a document with a silently blank value."
       ],
       "operations": [
         "SLA compliance rate and ticket backlog are observable.",
         "Escalation paths have a defined on-call linkage.",
-        "When CAP-OMNICHANNEL-MESSAGING is also selected, per-platform connector health (delivery failure, webhook lag) is observable independent of overall ticket/SLA metrics."
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, per-platform connector health (delivery failure, webhook lag) is observable independent of overall ticket/SLA metrics.",
+        "When CAP-CANNED-REPLY is also selected, canned-reply usage frequency is observable to identify which templates need updating.",
+        "When CAP-DOC-TEMPLATES is also selected, document generation failures are observable and alertable."
       ],
       "recovery": [
         "An abandoned live-chat session preserves the transcript up to disconnect.",
         "Ticket data is included in backup scope.",
-        "When CAP-OMNICHANNEL-MESSAGING is also selected, a disconnected external-platform connector does not lose in-flight message history; reconnection resumes into the same conversation thread."
+        "When CAP-OMNICHANNEL-MESSAGING is also selected, a disconnected external-platform connector does not lose in-flight message history; reconnection resumes into the same conversation thread.",
+        "When CAP-CANNED-REPLY is also selected, canned-reply templates are included in backup scope.",
+        "When CAP-DOC-TEMPLATES is also selected, document templates and their version history are included in backup scope."
       ]
     },
     "hr": {
@@ -784,20 +854,35 @@
       "invariants": [
         "A SKU's inventory and price on any connected marketplace is always derived from the canonical product/inventory record, never edited independently per marketplace.",
         "Automated repricing never sets a price below the merchant's configured minimum margin floor.",
-        "Marketplace settlement reconciliation flags any payout that does not match expected revenue minus fees/refunds/penalties; it never silently accepts a mismatch."
+        "Marketplace settlement reconciliation flags any payout that does not match expected revenue minus fees/refunds/penalties; it never silently accepts a mismatch.",
+        "When CAP-CHANNEL-MAPPING is also selected, a marketplace-specific category/attribute mapping is derived from the canonical product/attribute record (CAP-PRODUCT-ATTRIBUTES); it never becomes a second, independently-edited copy of the product's own attributes.",
+        "When CAP-LISTING-ISSUES is also selected, a listing rejection is always traced to the specific field or rule the marketplace's own response names, never reported as an opaque unattributed failure -- the same traceability CAP-PRODUCT-FEED's own feed-rejection invariant already requires for shopping/ad channels.",
+        "When CAP-MARKETPLACE-MESSAGING is also selected, a marketplace buyer message and its reply remain that marketplace's own conversation record; it is never merged into or duplicated as an internal ticket/live-chat conversation without an explicit, separate linkage."
       ],
       "security": [
-        "Marketplace API credentials are scoped per connected account and revocable independently of other connectors."
+        "Marketplace API credentials are scoped per connected account and revocable independently of other connectors.",
+        "When CAP-CHANNEL-MAPPING is also selected, authoring a category/attribute mapping rule requires the same marketplace-operations authority as other per-marketplace configuration.",
+        "When CAP-LISTING-ISSUES is also selected, per-marketplace rejection detail is only visible to authorized marketplace-operations staff.",
+        "When CAP-MARKETPLACE-MESSAGING is also selected, per-marketplace messaging credentials are scoped and revocable independently of other connected marketplace accounts, the same as this module's other marketplace API credentials."
       ],
       "tests": [
         "Repricing logic is contract-tested against the minimum-margin floor with an adversarial case at the floor boundary.",
-        "Settlement reconciliation is contract-tested with an intentionally mismatched payout fixture that must be flagged, not silently reconciled."
+        "Settlement reconciliation is contract-tested with an intentionally mismatched payout fixture that must be flagged, not silently reconciled.",
+        "When CAP-CHANNEL-MAPPING is also selected, mapping resolution is contract-tested for a product missing a marketplace-required attribute, which must be flagged rather than published with a blank value.",
+        "When CAP-LISTING-ISSUES is also selected, rejection-reason traceability is contract-tested with a fixture rejection response that must resolve to a real, named product field.",
+        "When CAP-MARKETPLACE-MESSAGING is also selected, a marketplace's own response-time policy deadline is contract-tested for the alerting path when it is about to be missed."
       ],
       "operations": [
-        "Per-marketplace account health (rate limits, policy warnings, sync failures) is observable and alertable."
+        "Per-marketplace account health (rate limits, policy warnings, sync failures) is observable and alertable.",
+        "When CAP-CHANNEL-MAPPING is also selected, unmapped or partially-mapped categories/attributes per connected marketplace are observable.",
+        "When CAP-LISTING-ISSUES is also selected, rejected-listing volume per marketplace and per rejection reason is observable and alertable.",
+        "When CAP-MARKETPLACE-MESSAGING is also selected, per-marketplace message response-time compliance is observable and alertable."
       ],
       "recovery": [
-        "A marketplace connector outage does not block order intake from other channels; queued listing/price updates retry once the connector recovers."
+        "A marketplace connector outage does not block order intake from other channels; queued listing/price updates retry once the connector recovers.",
+        "When CAP-CHANNEL-MAPPING is also selected, mapping rule configuration is included in backup scope.",
+        "When CAP-LISTING-ISSUES is also selected, listing rejection/resolution history is included in backup scope.",
+        "When CAP-MARKETPLACE-MESSAGING is also selected, marketplace buyer message history is included in backup scope."
       ]
     },
     "b2b": {
@@ -825,19 +910,24 @@
       "invariants": [
         "A subscription's next billing date and product/plan are always derived from its own recorded lifecycle state, never recomputed ad hoc from unrelated order history.",
         "A failed recurring payment triggers the dunning process before the subscription is cancelled; it is never silently cancelled on the first failure.",
-        "A pause, plan change, or cancellation takes effect on a recorded effective date, never applied retroactively to already-fulfilled cycles."
+        "A pause, plan change, or cancellation takes effect on a recorded effective date, never applied retroactively to already-fulfilled cycles.",
+        "When CAP-SUBC-CHURN is also selected, a computed churn rate is always reproducible from the subscription lifecycle's own recorded cancellation/non-renewal events, never a manually-edited number."
       ],
       "security": [
-        "Stored payment methods used for recurring billing follow the same PCI-scope boundary as one-time payments (DER-PAYMENT-ADAPTER); no local plaintext storage."
+        "Stored payment methods used for recurring billing follow the same PCI-scope boundary as one-time payments (DER-PAYMENT-ADAPTER); no local plaintext storage.",
+        "When CAP-SUBC-CHURN is also selected, at-risk-subscriber signals are only visible to authorized staff, never surfaced to the subscriber themselves in a way that could reveal internal retention scoring."
       ],
       "tests": [
-        "Dunning/retry logic is contract-tested across the full failed-payment-to-cancellation sequence."
+        "Dunning/retry logic is contract-tested across the full failed-payment-to-cancellation sequence.",
+        "When CAP-SUBC-CHURN is also selected, churn-rate calculation is contract-tested against a known lifecycle-event fixture with a hand-verified expected rate."
       ],
       "operations": [
-        "Upcoming renewals, failed-payment recovery rate, and churn are observable."
+        "Upcoming renewals, failed-payment recovery rate, and churn are observable.",
+        "When CAP-SUBC-CHURN is also selected, churn rate trend and at-risk subscriber count are observable, extending this module's own upcoming-renewal/failed-payment-recovery observability."
       ],
       "recovery": [
-        "Subscription lifecycle state and billing history are included in backup scope."
+        "Subscription lifecycle state and billing history are included in backup scope.",
+        "When CAP-SUBC-CHURN is also selected, churn analytics history is included in backup scope."
       ]
     },
     "loyalty": {
@@ -903,56 +993,91 @@
         "A split order's child shipments always sum back to the original order's line items and quantities; nothing is lost or duplicated across the split.",
         "A backordered or preordered line item is never marked fulfilled until the actual stock movement confirming it exists.",
         "When CAP-MULTI-LOCATION-STOCK is also selected, a split order's per-warehouse child shipments each source from that module's own partitioned location balance, never from an unpartitioned company-wide figure; when CAP-MULTI-LOCATION-STOCK is not selected, 'different warehouses' in a split is a descriptive fulfillment-routing label only, with no location-partitioned stock record behind it.",
-        "When CAP-SHIPPING is also selected, a split order's child shipments are records in that module's own shipment/tracking system, not a second, parallel shipment concept local to this module; when CAP-SHIPPING is not selected, a 'shipment' here is a fulfillment-routing label only, with no tracking-number/carrier record behind it."
+        "When CAP-SHIPPING is also selected, a split order's child shipments are records in that module's own shipment/tracking system, not a second, parallel shipment concept local to this module; when CAP-SHIPPING is not selected, a 'shipment' here is a fulfillment-routing label only, with no tracking-number/carrier record behind it.",
+        "When CAP-ORDER-MERGE is also selected, a merged shipment's line items always sum back to every original order it was merged from; nothing is lost or duplicated across the merge, the same conservation invariant this module's own order-split reconciliation already requires in reverse.",
+        "When CAP-FULFILLMENT-ROUTING is also selected, a routing decision is always traceable to the specific rule that produced it, never an opaque unexplained assignment.",
+        "When CAP-ORDER-EXCEPTION is also selected, an order-fulfillment problem always produces an explicit exception record with a defined resolution state; an order is never left silently stalled with no trackable record of why."
       ],
       "security": [
-        "Order-routing decisions (which warehouse/supplier fulfills a split) never leak cross-tenant inventory visibility in a multi-tenant deployment."
+        "Order-routing decisions (which warehouse/supplier fulfills a split) never leak cross-tenant inventory visibility in a multi-tenant deployment.",
+        "When CAP-ORDER-MERGE is also selected, merging orders across two different customers is rejected; only orders belonging to the same customer or destined for the same fulfillment location may be merged.",
+        "When CAP-FULFILLMENT-ROUTING is also selected, manually rerouting an order's assigned fulfillment source requires the same authority as other order-routing decisions; it is never available to an unauthenticated or customer-facing actor.",
+        "When CAP-ORDER-EXCEPTION is also selected, resolving an exception record requires the same order-management authority as other order-routing decisions."
       ],
       "tests": [
-        "Order-split reconciliation (children sum to parent) is contract-tested."
+        "Order-split reconciliation (children sum to parent) is contract-tested.",
+        "When CAP-ORDER-MERGE is also selected, merge reconciliation (a merged shipment sums back to every original order) is contract-tested, mirroring this module's existing order-split reconciliation test.",
+        "When CAP-FULFILLMENT-ROUTING is also selected, routing-rule resolution is contract-tested against a fixture where the originally preferred source is unavailable, confirming fallback to the next rule-defined source.",
+        "When CAP-ORDER-EXCEPTION is also selected, exception creation is contract-tested for each of its triggering failure types (allocation failure, source rejection, address/inventory mismatch)."
       ],
       "operations": [
-        "Aging backorders and preorders past their expected date are observable."
+        "Aging backorders and preorders past their expected date are observable.",
+        "When CAP-ORDER-MERGE is also selected, orders eligible for merge but still pending are observable.",
+        "When CAP-FULFILLMENT-ROUTING is also selected, orders that fail to resolve to any available fulfillment source are observable and alertable.",
+        "When CAP-ORDER-EXCEPTION is also selected, open exception record count and age are observable and alertable."
       ],
       "recovery": [
-        "Order orchestration state (split/backorder/preorder/dropship routing) is included in backup scope."
+        "Order orchestration state (split/backorder/preorder/dropship routing) is included in backup scope.",
+        "When CAP-ORDER-MERGE is also selected, order-merge linkage records are included in backup scope.",
+        "When CAP-FULFILLMENT-ROUTING is also selected, routing rule configuration and routing-decision history are included in backup scope.",
+        "When CAP-ORDER-EXCEPTION is also selected, exception records are included in backup scope."
       ]
     },
     "demand_planning": {
       "purpose": "Forecast future demand and recommend restocking, distinct from simply recording current inventory levels.",
       "invariants": [
-        "A restock recommendation is always traceable to the forecast and safety-stock parameters that produced it, never an opaque unexplained number."
+        "A restock recommendation is always traceable to the forecast and safety-stock parameters that produced it, never an opaque unexplained number.",
+        "When CAP-INVENTORY-OVERSTOCK is also selected, an overstock flag is always traceable to the specific forecast and threshold parameters that produced it, the same traceability this module's own restock-recommendation invariant already requires.",
+        "When CAP-INVENTORY-AGING is also selected, a stock unit/batch's age is computed from its actual recorded receipt movement (CAP-INVENTORY's own immutable movement ledger), never a separately-maintained or manually-entered receipt date."
       ],
       "security": [
-        "Historical demand data used for forecasting is scoped per tenant/brand in a multi-tenant deployment, never pooled across unrelated tenants without explicit consent."
+        "Historical demand data used for forecasting is scoped per tenant/brand in a multi-tenant deployment, never pooled across unrelated tenants without explicit consent.",
+        "When CAP-INVENTORY-OVERSTOCK is also selected, overstock signals and any suggested markdown/reallocation action are visible only to authorized inventory/merchandising staff, not customer-facing.",
+        "When CAP-INVENTORY-AGING is also selected, aging reports are visible only to authorized inventory/merchandising staff."
       ],
       "tests": [
-        "Reorder-point calculation is contract-tested against known forecast/lead-time/safety-stock inputs with a hand-verified expected output."
+        "Reorder-point calculation is contract-tested against known forecast/lead-time/safety-stock inputs with a hand-verified expected output.",
+        "When CAP-INVENTORY-OVERSTOCK is also selected, overstock threshold detection is contract-tested against known forecast/stock-level inputs with a hand-verified expected flag.",
+        "When CAP-INVENTORY-AGING is also selected, age-band classification is contract-tested against a known receipt-date fixture spanning multiple age bands."
       ],
       "operations": [
-        "Forecast accuracy (predicted vs. actual) is tracked over time so drift can be caught."
+        "Forecast accuracy (predicted vs. actual) is tracked over time so drift can be caught.",
+        "When CAP-INVENTORY-OVERSTOCK is also selected, flagged overstock volume/value is observable over time.",
+        "When CAP-INVENTORY-AGING is also selected, stock aging into the oldest band is observable and alertable."
       ],
       "recovery": [
-        "Forecast models and historical demand data used to produce them are included in backup scope."
+        "Forecast models and historical demand data used to produce them are included in backup scope.",
+        "When CAP-INVENTORY-OVERSTOCK is also selected, overstock detection history is included in backup scope.",
+        "When CAP-INVENTORY-AGING is also selected, aging history is derivable from CAP-INVENTORY's own backed-up movement ledger, requiring no separate backup scope of its own."
       ]
     },
     "affiliate": {
       "purpose": "Manage third-party promoters (influencers, affiliates) who drive sales in exchange for commission, distinct from the merchant's own marketing campaigns.",
       "invariants": [
         "A commission is only calculated and payable against an attributed, completed, non-refunded sale -- never against clicks/views alone.",
-        "Attribution follows a single documented rule (e.g. last-click within a window) applied consistently, not an ad hoc per-case decision."
+        "Attribution follows a single documented rule (e.g. last-click within a window) applied consistently, not an ad hoc per-case decision.",
+        "When CAP-CREATOR-SEEDING is also selected, a seeded (gifted) product unit is recorded against the creator's own record and never conflated with a commission-bearing affiliate sale in performance reporting.",
+        "When CAP-UGC-LICENSING is also selected, the merchant reusing a creator's content in its own marketing is only permitted within the scope, duration, and channels an actually-recorded usage-rights grant covers; reuse outside a recorded grant, or after it expires, is never silently allowed."
       ],
       "security": [
-        "Promo/referral codes are rate-limited against brute-force enumeration."
+        "Promo/referral codes are rate-limited against brute-force enumeration.",
+        "When CAP-CREATOR-SEEDING is also selected, authorizing a seeding shipment requires the same partner-management authority as other creator/affiliate record changes.",
+        "When CAP-UGC-LICENSING is also selected, recording or amending a usage-rights grant requires the same partner-management authority as other creator/affiliate record changes."
       ],
       "tests": [
-        "Commission calculation is contract-tested including a refunded-sale case that must reverse the commission."
+        "Commission calculation is contract-tested including a refunded-sale case that must reverse the commission.",
+        "When CAP-CREATOR-SEEDING is also selected, seeding records are contract-tested to confirm they never contribute to commission calculation.",
+        "When CAP-UGC-LICENSING is also selected, reuse-permission enforcement is contract-tested against an expired or out-of-scope grant, which must be rejected."
       ],
       "operations": [
-        "Pending commission payouts and top-performing partners are observable."
+        "Pending commission payouts and top-performing partners are observable.",
+        "When CAP-CREATOR-SEEDING is also selected, seeding spend (units/value gifted) per creator is observable.",
+        "When CAP-UGC-LICENSING is also selected, content whose usage-rights grant is expiring soon is observable before the merchant loses permission to keep using it."
       ],
       "recovery": [
-        "Partner records, attribution data, and commission history are included in backup scope."
+        "Partner records, attribution data, and commission history are included in backup scope.",
+        "When CAP-CREATOR-SEEDING is also selected, seeding records are included in backup scope.",
+        "When CAP-UGC-LICENSING is also selected, usage-rights grant records are included in backup scope."
       ]
     },
     "pos": {
@@ -961,19 +1086,24 @@
         "In-store inventory and online inventory are reconciled against a single canonical stock record; a sale in either channel decrements the same source of truth.",
         "A click-and-collect or ship-from-store order is not marked ready/fulfilled until the specific store location confirms the physical action.",
         "When CAP-MULTI-LOCATION-STOCK is also selected, a click-and-collect or ship-from-store order sources its stock from that specific store's own partitioned location balance -- this module's store-location fulfillment check composes with, and never duplicates, that module's per-location allocation; when CAP-MULTI-LOCATION-STOCK is not selected, 'the specific store location' is a fulfillment-routing distinction only, with no location-partitioned stock record behind it.",
-        "When CAP-SHIPPING is also selected, a ship-from-store order's shipment is a record in that module's own shipment/tracking system, not a second, parallel shipment concept local to this module; when CAP-SHIPPING is not selected, 'ship the order to them' is a fulfillment-routing description only, with no tracking-number/carrier record behind it."
+        "When CAP-SHIPPING is also selected, a ship-from-store order's shipment is a record in that module's own shipment/tracking system, not a second, parallel shipment concept local to this module; when CAP-SHIPPING is not selected, 'ship the order to them' is a fulfillment-routing description only, with no tracking-number/carrier record behind it.",
+        "When CAP-POS-RECEIPT is also selected, a receipt's itemized total always reconciles to the POS transaction record it was generated from; it is never independently recalculated as a separate, potentially-diverging figure."
       ],
       "security": [
-        "Store-level staff access to POS transaction history follows the same role-based access as other customer_service/commerce data; no separate unmanaged cash-handling data model is introduced by this module."
+        "Store-level staff access to POS transaction history follows the same role-based access as other customer_service/commerce data; no separate unmanaged cash-handling data model is introduced by this module.",
+        "When CAP-POS-RECEIPT is also selected, an emailed receipt is sent only to the customer identity linked to that transaction, never an address supplied without verification at the register."
       ],
       "tests": [
-        "Cross-channel inventory decrement (online sale reducing in-store availability and vice versa) is contract-tested."
+        "Cross-channel inventory decrement (online sale reducing in-store availability and vice versa) is contract-tested.",
+        "When CAP-POS-RECEIPT is also selected, receipt generation is contract-tested for a transaction including tax and a partial/split payment method."
       ],
       "operations": [
-        "Per-store daily reconciliation discrepancies are observable."
+        "Per-store daily reconciliation discrepancies are observable.",
+        "When CAP-POS-RECEIPT is also selected, receipt print/send failures at the register are observable."
       ],
       "recovery": [
-        "POS transaction records are included in backup scope."
+        "POS transaction records are included in backup scope.",
+        "When CAP-POS-RECEIPT is also selected, issued receipts are included in backup scope and can be reprinted/resent from the original transaction record."
       ]
     },
     "returns": {
@@ -1152,7 +1282,7 @@
         "When CAP-CHANNEL-PRICING is also selected, the feed publishes the price that capability resolved for the target channel; when it is not selected, the feed publishes the product's own catalog price. A channel-reported price mismatch is always resolved by correcting the source price record (CAP-PRODUCTS or CAP-CHANNEL-PRICING), never by writing a different, feed-local price that the source record disagrees with.",
         "When CAP-INVENTORY-COSTING or CAP-FINANCIAL-ANALYSIS is also selected, a merchandising rule may weight ranking by product margin as one additional signal; when neither is selected, ranking rules use only catalog, inventory, and merchant-authored signals -- margin-aware ranking is never assumed available.",
         "AI-suggested merchandising rules or feed-issue diagnoses (when an AI capability is also selected) are advisory only: a suggested rule takes effect only after a human holding `merchandising.manage` approves it, and this module's AI tooling never calls an external channel's API directly -- it only informs a rule or diagnosis that the module's own publish path executes.",
-        "Autocomplete/typeahead query suggestions and synonym/alias mapping (e.g. treating \"sunscreen\" and a brand-specific term as equivalent for ranking and retrieval) are explicitly out of scope for this module in this release -- they are retrieval-time engineering behavior, not a merchant-authored ranking decision, and are not owned by any capability in this catalog yet."
+        "Autocomplete/typeahead query suggestions are now owned by CAP-AUTOCOMPLETE (the search module, not this one) -- retrieval-time engineering behavior, never a merchant-authored ranking decision this module's own rules could override. Synonym/alias mapping (e.g. treating \"sunscreen\" and a brand-specific term as equivalent for ranking and retrieval) remains explicitly out of scope for this module and is not owned by any capability in this catalog yet."
       ],
       "security": [
         "Merchandising rule authoring (`merchandising.manage`) and shopping/ad channel feed configuration (`feed.manage`) require their own permissions, separate from read-only discovery/feed analytics (`discovery.analytics.read`); viewing performance data never implies authority to change ranking rules or feed configuration.",

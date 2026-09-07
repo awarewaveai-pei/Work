@@ -152,6 +152,16 @@
       ]
     },
     {
+      "id": "RULE-Q-ID-007",
+      "when": {
+        "question": "Q-ID-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-2FA"
+      ]
+    },
+    {
       "id": "RULE-Q-ORG-001",
       "when": {
         "question": "Q-ORG-001",
@@ -462,6 +472,46 @@
       ]
     },
     {
+      "id": "RULE-Q-WF-010",
+      "when": {
+        "question": "Q-WF-010",
+        "equals": true
+      },
+      "require": [
+        "CAP-WORKFLOW-RETRY"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-011",
+      "when": {
+        "question": "Q-WF-011",
+        "equals": true
+      },
+      "require": [
+        "CAP-POLICY-ENGINE"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-012",
+      "when": {
+        "question": "Q-WF-012",
+        "equals": true
+      },
+      "require": [
+        "CAP-CHECKLIST"
+      ]
+    },
+    {
+      "id": "RULE-Q-WF-013",
+      "when": {
+        "question": "Q-WF-013",
+        "equals": true
+      },
+      "require": [
+        "CAP-EXPERIMENT-METRICS"
+      ]
+    },
+    {
       "id": "RULE-Q-FILE-001",
       "when": {
         "question": "Q-FILE-001",
@@ -582,6 +632,26 @@
       ]
     },
     {
+      "id": "RULE-Q-SR-008",
+      "when": {
+        "question": "Q-SR-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-AUTOCOMPLETE"
+      ]
+    },
+    {
+      "id": "RULE-Q-SR-009",
+      "when": {
+        "question": "Q-SR-009",
+        "equals": true
+      },
+      "require": [
+        "CAP-METRIC-GOVERNANCE"
+      ]
+    },
+    {
       "id": "RULE-Q-COM-001",
       "when": {
         "question": "Q-COM-001",
@@ -639,6 +709,16 @@
       },
       "require": [
         "CAP-LICENSE"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-007",
+      "when": {
+        "question": "Q-COM-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-CONNECTOR-QUOTA"
       ]
     },
     {
@@ -1059,6 +1139,36 @@
       },
       "require": [
         "CAP-AGENTIC-COMMERCE"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-012",
+      "when": {
+        "question": "Q-AI-012",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-PROMPT-REGISTRY"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-013",
+      "when": {
+        "question": "Q-AI-013",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-OUTPUT-EVAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-AI-014",
+      "when": {
+        "question": "Q-AI-014",
+        "equals": true
+      },
+      "require": [
+        "CAP-AI-CITATION"
       ]
     },
     {
@@ -1524,6 +1634,26 @@
       ]
     },
     {
+      "id": "RULE-Q-CS-010",
+      "when": {
+        "question": "Q-CS-010",
+        "equals": true
+      },
+      "require": [
+        "CAP-CANNED-REPLY"
+      ]
+    },
+    {
+      "id": "RULE-Q-CS-011",
+      "when": {
+        "question": "Q-CS-011",
+        "equals": true
+      },
+      "require": [
+        "CAP-DOC-TEMPLATES"
+      ]
+    },
+    {
       "id": "RULE-Q-CRM-001",
       "when": {
         "question": "Q-CRM-001",
@@ -1601,6 +1731,16 @@
       },
       "require": [
         "CAP-CONTENT-APPROVAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-CONTENT-005",
+      "when": {
+        "question": "Q-CONTENT-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-CAPTIONING"
       ]
     },
     {
@@ -1814,6 +1954,36 @@
       ]
     },
     {
+      "id": "RULE-Q-MKTOPS-006",
+      "when": {
+        "question": "Q-MKTOPS-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-CHANNEL-MAPPING"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-007",
+      "when": {
+        "question": "Q-MKTOPS-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-LISTING-ISSUES"
+      ]
+    },
+    {
+      "id": "RULE-Q-MKTOPS-008",
+      "when": {
+        "question": "Q-MKTOPS-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-MARKETPLACE-MESSAGING"
+      ]
+    },
+    {
       "id": "RULE-Q-B2B-001",
       "when": {
         "question": "Q-B2B-001",
@@ -1911,6 +2081,16 @@
       },
       "require": [
         "CAP-SUBC-DUNNING"
+      ]
+    },
+    {
+      "id": "RULE-Q-SUBC-005",
+      "when": {
+        "question": "Q-SUBC-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-SUBC-CHURN"
       ]
     },
     {
@@ -2074,6 +2254,36 @@
       ]
     },
     {
+      "id": "RULE-Q-OMS-005",
+      "when": {
+        "question": "Q-OMS-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORDER-MERGE"
+      ]
+    },
+    {
+      "id": "RULE-Q-OMS-006",
+      "when": {
+        "question": "Q-OMS-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-FULFILLMENT-ROUTING"
+      ]
+    },
+    {
+      "id": "RULE-Q-OMS-007",
+      "when": {
+        "question": "Q-OMS-007",
+        "equals": true
+      },
+      "require": [
+        "CAP-ORDER-EXCEPTION"
+      ]
+    },
+    {
       "id": "RULE-Q-DEM-001",
       "when": {
         "question": "Q-DEM-001",
@@ -2091,6 +2301,26 @@
       },
       "require": [
         "CAP-REORDER-POINT"
+      ]
+    },
+    {
+      "id": "RULE-Q-DEM-003",
+      "when": {
+        "question": "Q-DEM-003",
+        "equals": true
+      },
+      "require": [
+        "CAP-INVENTORY-OVERSTOCK"
+      ]
+    },
+    {
+      "id": "RULE-Q-DEM-004",
+      "when": {
+        "question": "Q-DEM-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-INVENTORY-AGING"
       ]
     },
     {
@@ -2124,6 +2354,26 @@
       ]
     },
     {
+      "id": "RULE-Q-AFF-004",
+      "when": {
+        "question": "Q-AFF-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-CREATOR-SEEDING"
+      ]
+    },
+    {
+      "id": "RULE-Q-AFF-005",
+      "when": {
+        "question": "Q-AFF-005",
+        "equals": true
+      },
+      "require": [
+        "CAP-UGC-LICENSING"
+      ]
+    },
+    {
       "id": "RULE-Q-POS-001",
       "when": {
         "question": "Q-POS-001",
@@ -2151,6 +2401,16 @@
       },
       "require": [
         "CAP-CLICK-COLLECT"
+      ]
+    },
+    {
+      "id": "RULE-Q-POS-004",
+      "when": {
+        "question": "Q-POS-004",
+        "equals": true
+      },
+      "require": [
+        "CAP-POS-RECEIPT"
       ]
     },
     {

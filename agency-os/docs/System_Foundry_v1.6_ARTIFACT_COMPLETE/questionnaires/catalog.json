@@ -437,6 +437,18 @@
       }
     },
     {
+      "id": "Q-ID-007",
+      "category": "identity",
+      "label": "雙重驗證 (2FA/MFA)",
+      "description": "使用者可以在密碼之外再啟用第二個驗證因子（例如驗證器 App、簡訊/Email 一次性驗證碼），系統也可以強制登入時要求輸入。只在你有勾選「使用者帳號」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-ID-001",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-ORG-001",
       "category": "scope",
       "label": "多家公司使用",
@@ -725,6 +737,54 @@
       "required_when_active": true
     },
     {
+      "id": "Q-WF-010",
+      "category": "workflow",
+      "label": "工作流程步驟失敗需要自動重試",
+      "description": "自動化流程裡任何一個步驟執行失敗時，系統要能依設定的重試次數與間隔自動重試，或讓人從失敗的那一步手動恢復，且不會重複執行已完成的步驟或造成重複副作用。只在你有勾選「多步驟狀態流程」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-WF-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-WF-011",
+      "category": "workflow",
+      "label": "商業規則需要用可設定的政策引擎評估",
+      "description": "審核門檻、資格條件、審核路由這類商業規則要用可設定的政策定義來評估，而不是寫死在流程程式碼裡，這樣改規則不需要改流程本身的程式。只在你有勾選「多步驟狀態流程」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-WF-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-WF-012",
+      "category": "workflow",
+      "label": "任務需要拆成 checklist 子項目",
+      "description": "一個任務底下可以有一份有順序的子項目清單，每個子項目可以各自勾選完成，並可以設定父任務要等所有子項目都勾完才算完成，跟單純的任務指派/狀態追蹤不同。只在你有勾選「任務指派」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-WF-004",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-WF-013",
+      "category": "workflow",
+      "label": "功能實驗需要統計顯著性結果分析",
+      "description": "功能旗標／漸進式功能發布切出來的對照組跟實驗組，要能依設定的成功指標計算統計顯著性（樣本數、信賴區間），產生一個可以據此做決策的結果，跟功能旗標本身只負責控制曝光範圍不同。只在你有勾選「功能旗標／漸進式功能發布」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-WF-009",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-FILE-001",
       "category": "files",
       "label": "上傳一般文件",
@@ -857,6 +917,30 @@
       }
     },
     {
+      "id": "Q-SR-008",
+      "category": "search_reporting",
+      "label": "搜尋自動完成／輸入建議",
+      "description": "使用者輸入搜尋關鍵字時，系統即時提示可能的完成詞或相符字詞，不用等使用者送出查詢才顯示結果，用的是跟全文搜尋同一份索引資料。只在你有勾選「全文搜尋」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SR-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-SR-009",
+      "category": "search_reporting",
+      "label": "業務指標需要集中定義與版本控管",
+      "description": "「活躍客戶」「每週出貨件數」這類業務指標要有一個集中註冊、版本化的定義，每個報表/Dashboard/資料倉儲的使用者都從同一個定義取值，而不是各自重新計算出可能互相對不上的版本。只在你有勾選「使用分析 / Analytics」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SR-006",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-COM-001",
       "category": "commercial",
       "label": "向客戶收費",
@@ -928,6 +1012,18 @@
         "equals": true
       },
       "group": "enterprise"
+    },
+    {
+      "id": "Q-COM-007",
+      "category": "commercial",
+      "label": "個別串接/連接器需要各自的用量上限",
+      "description": "每一個外部串接/連接器（例如連接的電商平台數量）都有自己獨立的用量額度，不同方案給的額度不同，這個額度要獨立於其他依用量計費的維度單獨檢查與限制。只在你有勾選「依使用量計費」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-005",
+        "equals": true
+      }
     },
     {
       "id": "Q-PAY-001",
@@ -1010,8 +1106,14 @@
       "required_when_active": true,
       "active_when": {
         "all": [
-          { "question": "Q-DATA-009", "equals": true },
-          { "question": "Q-COM-001", "equals": true }
+          {
+            "question": "Q-DATA-009",
+            "equals": true
+          },
+          {
+            "question": "Q-COM-001",
+            "equals": true
+          }
         ]
       }
     },
@@ -1346,6 +1448,30 @@
         "question": "Q-PAY-001",
         "equals": true
       }
+    },
+    {
+      "id": "Q-AI-012",
+      "category": "ai",
+      "label": "AI 提示詞集中管理與版本控制",
+      "description": "驅動各項 AI 功能的提示詞（prompt）要集中存放、版本化並重複使用，不是每個呼叫點各自寫死一份，這樣提示詞改版才能被追蹤、歸屬到特定版本，而不是散落各處難以追蹤的行內修改。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-013",
+      "category": "ai",
+      "label": "AI 輸出品質自動評分",
+      "description": "AI 產生的內容要能依預先定義的品質/正確性標準（例如標準測試集、評分規則）自動打分，在模型、提示詞或供應商更換造成品質變差時能主動抓到，而不是等使用者發現才知道。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AI-014",
+      "category": "ai",
+      "label": "AI 回答需附上來源引用",
+      "description": "AI 生成的回答要附上它引用的具體來源文件/段落，讓使用者可以自己查證答案的出處，而不是只在系統內部記錄可還原的證據卻不呈現給使用者看。",
+      "answer_type": "boolean",
+      "required_when_active": true
     },
     {
       "id": "Q-PAY-009",
@@ -1936,6 +2062,18 @@
       }
     },
     {
+      "id": "Q-CONTENT-005",
+      "category": "content_production",
+      "label": "AI 字幕／隱藏式字幕生成",
+      "description": "影片可以自動產生多語言字幕／隱藏式字幕並對齊時間軸，不需人工逐句聽打與翻譯。只在你有勾選「影片製作與剪輯」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CONTENT-002",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-SOC-001",
       "category": "social_media",
       "label": "社群貼文排程與發佈",
@@ -2136,6 +2274,26 @@
       "required_when_active": true
     },
     {
+      "id": "Q-CS-010",
+      "category": "customer_service",
+      "label": "罐頭訊息／快速回覆範本",
+      "description": "客服人員可以在客服對話或工單裡直接套用預先寫好的固定回覆範本，不用每次重新輸入常見問題的答案。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-CS-011",
+      "category": "customer_service",
+      "label": "文件範本自動產生",
+      "description": "可以用預先定義好的文件範本，帶入變數自動產生標準化文件（例如常見問題頁面、政策公告、說明手冊），不需每次手動重新排版撰寫。只在你有勾選「知識庫／常見問題自助查詢」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-CS-003",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-MKTOPS-001",
       "category": "marketplace_ops",
       "label": "同時在多個電商平台/市集上架同一批商品",
@@ -2168,8 +2326,14 @@
       "required_when_active": true,
       "active_when": {
         "all": [
-          { "question": "Q-MKTOPS-001", "equals": true },
-          { "question": "Q-COM-001", "equals": true }
+          {
+            "question": "Q-MKTOPS-001",
+            "equals": true
+          },
+          {
+            "question": "Q-COM-001",
+            "equals": true
+          }
         ]
       }
     },
@@ -2198,6 +2362,50 @@
       }
     },
     {
+      "id": "Q-MKTOPS-006",
+      "category": "marketplace_ops",
+      "label": "上架平台分類/屬性自動對應",
+      "description": "把商品自己的分類與屬性結構，自動對應到每個第三方電商平台各自不同的分類/屬性規則，才能符合該平台的上架格式要求，不需要每個平台各自手動填寫。只在你同時有勾選「同時在多個電商平台/市集上架同一批商品」與「商品屬性與分類治理」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "all": [
+          {
+            "question": "Q-MKTOPS-001",
+            "equals": true
+          },
+          {
+            "question": "Q-DATA-016",
+            "equals": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q-MKTOPS-007",
+      "category": "marketplace_ops",
+      "label": "上架錯誤與刊登問題追蹤",
+      "description": "平台回報的商品刊登被拒絕、審核不通過或刊登異常訊息會被收集並依原因分類，讓你知道要修正哪個欄位或問題才能重新上架，不用自己一筆一筆去平台後台查。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-MKTOPS-008",
+      "category": "marketplace_ops",
+      "label": "電商平台內建買家訊息整合",
+      "description": "買家透過電商平台自己內建的訊息系統（例如 Amazon Seller Messaging、蝦皮聊聊）傳來的訊息，可以在系統裡直接收到並回覆，並遵守該平台自己的回覆時效規則，跟自家網站的線上客服對話或內部工單是不同的管道。只在你有勾選「同時在多個電商平台/市集上架同一批商品」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-MKTOPS-001",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-B2B-001",
       "category": "b2b",
       "label": "客戶包含企業採購，流程跟一般消費者不同",
@@ -2214,8 +2422,14 @@
       "required_when_active": true,
       "active_when": {
         "all": [
-          { "question": "Q-B2B-001", "equals": true },
-          { "question": "Q-COM-001", "equals": true }
+          {
+            "question": "Q-B2B-001",
+            "equals": true
+          },
+          {
+            "question": "Q-COM-001",
+            "equals": true
+          }
         ]
       }
     },
@@ -2240,8 +2454,14 @@
       "required_when_active": true,
       "active_when": {
         "all": [
-          { "question": "Q-B2B-001", "equals": true },
-          { "question": "Q-COM-001", "equals": true }
+          {
+            "question": "Q-B2B-001",
+            "equals": true
+          },
+          {
+            "question": "Q-COM-001",
+            "equals": true
+          }
         ]
       }
     },
@@ -2323,6 +2543,18 @@
             "equals": true
           }
         ]
+      }
+    },
+    {
+      "id": "Q-SUBC-005",
+      "category": "subscription_commerce",
+      "label": "訂閱流失率分析與提前預警",
+      "description": "客戶取消或不續訂訂閱的狀況要被追蹤分析，算出流失率，並在客戶還沒取消前就找出可能要流失的訂戶（例如使用量下降、扣款一直失敗），而不是等取消發生了才記錄下來。只在你有勾選「賣訂閱制商品或服務給終端客戶」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-SUBC-001",
+        "equals": true
       }
     },
     {
@@ -2446,8 +2678,14 @@
       "required_when_active": true,
       "active_when": {
         "all": [
-          { "question": "Q-XB-001", "equals": true },
-          { "question": "Q-COM-001", "equals": true }
+          {
+            "question": "Q-XB-001",
+            "equals": true
+          },
+          {
+            "question": "Q-COM-001",
+            "equals": true
+          }
         ]
       }
     },
@@ -2496,6 +2734,42 @@
       "required_when_active": true
     },
     {
+      "id": "Q-OMS-005",
+      "category": "oms",
+      "label": "多筆訂單合併出貨",
+      "description": "同一個客戶或要出到同一個地點的多筆分開的訂單，可以在出貨前合併成同一個出貨包裹，是「訂單可能需要拆成多筆分開出貨」的反向操作。只在你有勾選「訂單可能需要拆成多筆分開出貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-OMS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-OMS-006",
+      "category": "oms",
+      "label": "自動判斷由哪個倉庫/門市/供應商出貨",
+      "description": "系統依照設定好的規則（例如就近出貨、庫存成本最低、有無庫存）自動決定一筆訂單該由哪個倉庫、門市或供應商出貨，原本指定的來源出狀況時也能手動改派。只在你有勾選「訂單可能需要拆成多筆分開出貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-OMS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-OMS-007",
+      "category": "oms",
+      "label": "訂單異常需要建立可追蹤的處理紀錄",
+      "description": "訂單處理過程中出問題（例如配貨失敗、出貨來源拒絕、地址或庫存對不上）時，系統要建立一筆明確、可追蹤、需要處理的異常紀錄，而不是訂單默默卡住不明狀態，或只留下一筆看不出原因的錯誤紀錄。只在你有勾選「訂單可能需要拆成多筆分開出貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-OMS-001",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-DEM-001",
       "category": "demand_planning",
       "label": "需要系統預測未來銷量以規劃備貨",
@@ -2508,6 +2782,30 @@
       "category": "demand_planning",
       "label": "需要系統自動建議何時該補貨、補多少",
       "description": "系統根據預測需求、進貨前置時間與安全庫存，自動算出建議補貨時間點與數量，而不是人工憑經驗判斷。只在你有勾選「需要系統預測未來銷量以規劃備貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DEM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DEM-003",
+      "category": "demand_planning",
+      "label": "系統自動偵測庫存過剩",
+      "description": "庫存量明顯超過預測需求的持有成本/保存期限考量時，系統要用同一份需求預測自動標示為過剩庫存，讓你能在資金被過多庫存卡住之前先採取行動（清倉、調撥、暫停補貨）。只在你有勾選「需要系統預測未來銷量以規劃備貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-DEM-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-DEM-004",
+      "category": "demand_planning",
+      "label": "庫存週齡分析（庫齡）",
+      "description": "每一批庫存從進貨算起放了多久要被追蹤，並依天數區間（例如 0-30/31-60/60 天以上）分類呈現，跟應收帳款帳齡分析追蹤的是完全不同的東西（那個追蹤的是還沒收到的錢，這個追蹤的是實體庫存放多久）。只在你有勾選「需要系統預測未來銷量以規劃備貨」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {
@@ -2552,6 +2850,30 @@
       }
     },
     {
+      "id": "Q-AFF-004",
+      "category": "affiliate",
+      "label": "免費寄送商品給網紅/創作者（Seeding）",
+      "description": "可以把商品免費寄送給網紅或創作者作為合作的一部分，並記錄在該創作者自己的紀錄底下，跟真正產生分潤的聯盟行銷交易是分開追蹤的兩件事。只在你有勾選「透過網紅／創作者合作帶貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-AFF-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-AFF-005",
+      "category": "affiliate",
+      "label": "創作者內容使用授權範圍記錄",
+      "description": "創作者提交的內容（照片、影片、貼文）要能明確記錄使用授權範圍——可以用多久、用在哪些通路——你才能在自己的行銷素材裡重複使用，不是假設有合作關係就代表對方默許授權。只在你有勾選「透過網紅／創作者合作帶貨」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-AFF-001",
+        "equals": true
+      }
+    },
+    {
       "id": "Q-POS-001",
       "category": "pos",
       "label": "有實體門市或快閃店銷售",
@@ -2576,6 +2898,18 @@
       "category": "pos",
       "label": "支援線上下單門市取貨或門市出貨",
       "description": "客戶可以線上下單、選門市取貨，或由門市直接出貨寄給客戶。只在你有勾選「有實體門市或快閃店銷售」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-POS-001",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-POS-004",
+      "category": "pos",
+      "label": "門市交易需要產生收據",
+      "description": "門市結帳完成後，系統要能列印或用電子郵件寄出一張收據，列出購買品項、稅金與付款方式。只在你有勾選「有實體門市或快閃店銷售」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {

@@ -94,6 +94,7 @@
         "tests/contract/identity"
       ],
       "activated_by": [
+        "CAP-2FA",
         "CAP-IDENTITY",
         "CAP-INTERNAL-USERS",
         "CAP-INVITES",
@@ -153,14 +154,18 @@
       ],
       "activated_by": [
         "CAP-APPROVAL",
+        "CAP-CHECKLIST",
         "CAP-COMMENTS",
         "CAP-ESIGN",
+        "CAP-EXPERIMENT-METRICS",
         "CAP-FEATURE-FLAGS",
         "CAP-MULTI-APPROVAL",
+        "CAP-POLICY-ENGINE",
         "CAP-REALTIME-COLLAB",
         "CAP-SCHEDULING",
         "CAP-STATE-WORKFLOW",
-        "CAP-TASKS"
+        "CAP-TASKS",
+        "CAP-WORKFLOW-RETRY"
       ]
     },
     {
@@ -185,6 +190,7 @@
         "packages/search"
       ],
       "activated_by": [
+        "CAP-AUTOCOMPLETE",
         "CAP-FILTERS",
         "CAP-SEARCH"
       ]
@@ -201,6 +207,7 @@
         "CAP-EXPORT",
         "CAP-FINANCIAL-ANALYSIS",
         "CAP-FINANCIAL-STATEMENTS",
+        "CAP-METRIC-GOVERNANCE",
         "CAP-REPORTS"
       ]
     },
@@ -212,6 +219,7 @@
       ],
       "activated_by": [
         "CAP-COMMERCIAL",
+        "CAP-CONNECTOR-QUOTA",
         "CAP-EDITIONS",
         "CAP-LICENSE",
         "CAP-SUBSCRIPTION",
@@ -306,9 +314,12 @@
       "activated_by": [
         "CAP-AGENTIC-COMMERCE",
         "CAP-AI",
+        "CAP-AI-CITATION",
         "CAP-AI-CLASSIFY",
         "CAP-AI-EXTERNAL",
         "CAP-AI-GENERATE",
+        "CAP-AI-OUTPUT-EVAL",
+        "CAP-AI-PROMPT-REGISTRY",
         "CAP-AI-RECOMMEND",
         "CAP-AI-SEARCH",
         "CAP-AI-SUMMARY",
@@ -399,6 +410,7 @@
         "tests/contract/content"
       ],
       "activated_by": [
+        "CAP-CAPTIONING",
         "CAP-CONTENT-APPROVAL",
         "CAP-DAM",
         "CAP-GRAPHIC-DESIGN",
@@ -415,7 +427,9 @@
         "CAP-AI-FIRST-CHAT",
         "CAP-AI-VOICE-SUPPORT",
         "CAP-CALL-CENTER",
+        "CAP-CANNED-REPLY",
         "CAP-CSAT",
+        "CAP-DOC-TEMPLATES",
         "CAP-KNOWLEDGE-BASE",
         "CAP-LIVE-CHAT",
         "CAP-OMNICHANNEL-MESSAGING",
@@ -508,6 +522,9 @@
         "tests/contract/marketplace-ops"
       ],
       "activated_by": [
+        "CAP-CHANNEL-MAPPING",
+        "CAP-LISTING-ISSUES",
+        "CAP-MARKETPLACE-MESSAGING",
         "CAP-MARKETPLACE-SETTLEMENT",
         "CAP-MARKETPLACE-SYNC",
         "CAP-MULTI-MARKETPLACE",
@@ -538,6 +555,7 @@
       ],
       "activated_by": [
         "CAP-SUBC-CHANGE-PLAN",
+        "CAP-SUBC-CHURN",
         "CAP-SUBC-DUNNING",
         "CAP-SUBC-PAUSE",
         "CAP-SUBSCRIPTION-COMMERCE"
@@ -591,6 +609,9 @@
       "activated_by": [
         "CAP-BACKORDER",
         "CAP-DROPSHIP",
+        "CAP-FULFILLMENT-ROUTING",
+        "CAP-ORDER-EXCEPTION",
+        "CAP-ORDER-MERGE",
         "CAP-ORDER-SPLIT",
         "CAP-PREORDER"
       ]
@@ -603,6 +624,8 @@
       ],
       "activated_by": [
         "CAP-DEMAND-FORECAST",
+        "CAP-INVENTORY-AGING",
+        "CAP-INVENTORY-OVERSTOCK",
         "CAP-REORDER-POINT"
       ]
     },
@@ -615,7 +638,9 @@
       "activated_by": [
         "CAP-AFFILIATE",
         "CAP-AFFILIATE-ATTRIBUTION",
-        "CAP-INFLUENCER"
+        "CAP-CREATOR-SEEDING",
+        "CAP-INFLUENCER",
+        "CAP-UGC-LICENSING"
       ]
     },
     {
@@ -627,7 +652,8 @@
       "activated_by": [
         "CAP-CLICK-COLLECT",
         "CAP-POS",
-        "CAP-POS-INVENTORY-SYNC"
+        "CAP-POS-INVENTORY-SYNC",
+        "CAP-POS-RECEIPT"
       ]
     },
     {
