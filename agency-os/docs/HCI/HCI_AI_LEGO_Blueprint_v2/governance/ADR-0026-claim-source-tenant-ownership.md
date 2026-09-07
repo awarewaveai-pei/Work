@@ -62,14 +62,7 @@ the historical decision record.
   A). Real-Docker-verified as part of the full Wave 1 suite (102/102
   assertions, 37/37 mutations, 2026-09-05 — see
   `wave1/HCI_WAVE1_NEGATIVE_TEST_SPEC.md`).
-- **Gate 3 (`DSR-CLAIM-DELETE-01`) is genuinely blocked, not skipped.** It
-  requires an actual deletion/erasure mechanism for `subject_records`-and-
-  friends, and none exists yet: `subject_records` is unconditionally
-  append-only (H1003 on any UPDATE/DELETE, no exception path), and the only
-  decided erasure mechanism (crypto-shredding) is `ADR-0018`, still
-  `SPECIFIED — RUNTIME OPEN`. Writing this test now would either be vacuous
-  or require inventing `ADR-0018`'s mechanism inline — left `OPEN`, tracked
-  as blocked on `ADR-0018` landing first.
+- **Gate 3 (`DSR-CLAIM-DELETE-01`) is still genuinely blocked, re-verified 2026-09-07 for a different, now-precise reason** (this note's original premise below was stale, caught while writing P0-08's threat models the same day — see `TASKS.md`). `ADR-0018` is no longer `SPECIFIED — RUNTIME OPEN`: `hci.tombstone_evidence(uuid)` (`migrations/0007_wave1_crypto_shredding_up.sql:143-162`) exists, is real-Docker-verified, and is kind-agnostic — it operates on `hci.subject_records` by `id` alone with no `kind` filter, so it mechanically CAN tombstone a `kind='CLAIM'` row exactly like an `EVIDENCE` row. That does not unblock this gate, for two independent reasons checked directly: (1) `Source`/`SourceSnapshot` (`hci.sources`/`hci.source_snapshots`) are separate tables `tombstone_evidence()` never touches — zero erasure mechanism exists for them at all, dump-only or otherwise; (2) grepping every call site of `tombstone_evidence` (`database/`, 2026-09-07) found exactly one: `wave1-negative-tests.sql:1307-1309`, which calls it directly as schema owner to prove the function itself works and that app roles are correctly refused (`ADR-0018` gate 3's own scope) — there is no trigger, no application code, and no wiring from a `data_subject_request_events` row (`event_type='ERASURE_RECORDED'`) to an actual call. Writing `DSR-CLAIM-DELETE-01` today would still be vacuous: the DSR-to-erasure call path P0-03 already named as the deferred piece (`security/evidence-integrity/HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`) is the real blocker, not `ADR-0018`'s own gate 3, and no Source/SourceSnapshot erasure mechanism has ever been designed. Left `OPEN`, now tracked as blocked on that wiring + a Source/SourceSnapshot erasure design, not on `ADR-0018` landing (it already has, for Claim).
 - **A real limitation surfaced during implementation, not anticipated by
   this ADR's original text**: making `source_relationships` append-only (the
   correct call for an evidentiary corroboration graph) means a `CITES` edge

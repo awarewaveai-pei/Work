@@ -95,6 +95,35 @@ rollback：單一 commit，`git revert`；純防禦強化+測試補強，行為�
 
 **[rollback]**：單一 commit，`git revert`；純防禦性強化+文件補充，無 schema 變更，無行為改變（原本合法輸入路徑不變，僅原本會繞過檢查的畸形輸入路徑改變）。
 
+## 2026-09-07（P0-10 cross-box restore drill——真跑 GitHub Actions 兩台獨立 runner，第一次跑就抓到自己 drill 設計的真 bug；順手解決 P0-08 遺留的 ADR-0026/ADR-0018 追蹤項）
+
+**產出**：`.github/workflows/hci30-restore-drill.yml` + `Projects/internal/hci30/security/DR_RESTORE_DRILL_RECORD.md`。
+
+**為什麼是 GitHub Actions**：`13_TESTING_REPLAY_ROLLBACK_AND_SRE.md:60` 明文要求「cross-box，不是 same-box verify」。現有基礎設施筆電之外只剩 prod `ks-aw-01`，合成 HCI 資料不該碰它（README.md 自訂的 test/prod 隔離）。兩個 GitHub Actions job（`produce-dump`→artifact→`restore-and-verify`）跑在各自獨立佈建的 runner VM 上，彼此沒有共用檔案系統，零成本滿足「第二台機器」的字面要求，不是自我安慰的 same-box 偽裝。
+
+**機制**：job 1 套 11 個 migration+fixtures，記 6 張表的 row-count marker，`pg_dump -Fc`，`pg_dumpall --roles-only`（先錄起來給未來的通用 role-replay 用，這次沒吃它），上傳 artifact。job 2 下載 artifact，重建 `hci_app_test_a`/`hci_app_test_b` 兩個 role，`pg_restore`，比對 row-count marker，再跑既有 `wave1-negative-tests.sql`（不是新寫一套，重用既有真測試）對還原後的 schema。
+
+**第一次真跑（run [34137801181](https://github.com/awarewaveai-pei/Work/actions/runs/34137801181)）FAILED，而且失敗得正確**：`pg_restore`、negative-test suite 全部綠燈，只有我自己加的 row-count 比對步驟紅燈——`cases` source=4 target=12、`subject_records` source=3 target=22 等等，全部是「target 比 source 多」。根因：我把 marker 比對放在 negative-test suite**之後**，但那個 suite 自己會真的 INSERT 資料（DSR lifecycle、Case lifecycle 等測試本來就要建資料才能測轉換），等於拿「跑測試前的 source」比「跑完測試後的 target」，不管還原對不對本來就不會match。這是 drill 自己的檢查點順序 bug，不是還原機制的問題——但也正因為真的跑了才抓得到，寫文件不會發現。
+
+**修正（commit `7c9584123`）**：把 row-count 比對移到 `pg_restore` 之後、negative-test suite**之前**，兩邊都在「資料剛落地、還沒被任何測試碰過」的同一個檢查點。重跑（run [34138260481](https://github.com/awarewaveai-pei/Work/actions/runs/34138260481)）：source job 40s、target job 31s，6 張表 row count 完全一致（`tenants=2, cases=4, subject_records=3, principals=2, data_subject_requests=0`, 第 6 張 `data_subject_request_events` 一併 match），既有測試套件在還原後的 schema 上真跑 **232 PASS / 0 FAIL**。
+
+**額外真發現（設計時未預期，寫 workflow 過程中查出）**：`hci_app_test_a`/`hci_app_test_b` 是 **cluster-scoped** role（`CREATE ROLE`），`pg_dump <db>` 只 dump **database-scoped** 物件——naive 還原到一個從沒建過這兩個 role 的全新 cluster，GRANT 陳述式會失敗或被 `pg_restore` 靜默跳過（依它的逐句錯誤處理而定）。修法：還原前先用 migration 0001 同一段 DDL 重建這兩個 role，而非通用 `pg_dumpall` 全量重放（那會撞上 `hci_owner` 已存在的衝突，另記在檔案裡當作未來通用化的路）。
+
+**順手解決 P0-08 遺留追蹤項（ADR-0026/ADR-0018）**：P0-08 那輪抓到 ADR-0026 自己的 Implementation note 宣稱 ADR-0018「still SPECIFIED — RUNTIME OPEN」已過期，但沒深入查會不會解除 `DSR-CLAIM-DELETE-01` 的阻塞。這輪查證：`hci.tombstone_evidence()`（`0007_wave1_crypto_shredding_up.sql:143-162`）確實已存在且真跑驗證過，函式本身對 `kind` 不挑，技術上能 tombstone 一筆 `kind='CLAIM'` 的 `subject_records` row，跟 tombstone 一筆 EVIDENCE row 沒有差別。**但這不解除 gate 3**，原因是兩個新查到、更精確的真缺口：① `hci.sources`／`hci.source_snapshots` 是完全獨立的表，`tombstone_evidence()` 從來不碰，零抹除機制存在；② grep 全庫 `tombstone_evidence` 的每個呼叫點，只有一處——`database/tests/wave1-negative-tests.sql:1307-1309`，以 schema owner 身分直接呼叫，用來證明函式本身能動、且 app role 被正確拒絕呼叫（ADR-0018 gate 3 自己的驗證範圍）——**沒有任何 trigger 或應用層程式碼把一筆 `data_subject_request_events`（`event_type='ERASURE_RECORDED'`）接到這個函式的實際呼叫**。結論：ADR-0026 原文的過期前提（「ADR-0018 還是 SPECIFIED」）確實錯了，但它的結論（gate 3 卡住）換了個更精確的理由後仍然成立——P0-03 早就點名的「DSR-lifecycle-to-erasure 接線」才是真正的缺口，不是 ADR-0018 本身。已就地修正 ADR-0026 §Implementation note（保留原文承認過期，不砍掉重寫，補上正確結論）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`gh workflow run hci30-restore-drill.yml` + `gh run watch <id> --exit-status` 兩輪（第一輪失敗、修正後第二輪成功）| exit=0（第二輪）| result=真實 GitHub Actions 執行，非本機模擬，log 全數截取存證於本條目
+- REALTEST_EVIDENCE: tool=Bash | cmd=`gh run view <id> --job <id> --log` 逐行核對 row-count marker 數字與 232 個 PASS 斷言 | exit=0 | result=數字皆來自真實 log，非估計
+- REVIEW_DONE: critic=自審（Low/Medium risk，新 CI workflow 不碰 prod/secrets/deploy；YAML 用 `python3 yaml.safe_load` 驗證語法，`on:` 被剖成 `True` 是 PyYAML 已知的 YAML 1.1 bool-coercion 假警報，非真錯誤，已核對既有 `next-admin-typecheck.yml` 同款寫法）| verdict=pass | findings=0c/0m（1 個自己抓到的邏輯 bug 已在真跑中發現並修正，非漏網）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,.github | grep=`hci30-restore-drill\|DR_RESTORE_DRILL_RECORD\|tombstone_evidence` | hits=僅本輪新檔+README/gap-analysis/ADR-0026 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 `.github/workflows/hci30-restore-drill.yml`（2 個 commit：`0b3b70c79` 初版、`7c9584123` 修正 marker 順序）；新 `Projects/internal/hci30/security/DR_RESTORE_DRILL_RECORD.md`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-10 補 closure 段；`README.md` 補一行連結；`governance/ADR-0026-claim-source-tenant-ownership.md` §Implementation note 就地修正 gate 3 現況。
+
+**[剩餘風險]**：只驗證 Wave 1 合成 fixture 規模，未驗證真實資料量下的還原時間/RPO/RTO（Wave 4+ 才有意義，另外把關）；`pg_dumpall --roles-only` 的通用 role-replay 路徑錄了資料但沒真的用上，app role 集合若擴大超過現在的兩個，需要補上這條路；`DSR-CLAIM-DELETE-01` 仍是 OPEN——這次只是把阻塞理由從過期的講法換成精確的講法，沒有真的解除它，需要的是 Source/SourceSnapshot 抹除機制設計 + 一條真的 DSR→tombstone 呼叫路徑，兩者都不存在。
+
+**[rollback]**：`git revert`；純新增 workflow+文件+既有文件補段落，未改動任何 schema、程式碼、或正式環境。
+
 ## 2026-09-07（P0-06 API + Event contracts——跨端點合約慣例，非端點清單；找到 RLS 真實機制非假設；event 命名留誠實 OPEN）
 
 **產出**：`Projects/internal/hci30/api/{API_CONTRACT_STANDARD.md, openapi/hci-v1.yaml, asyncapi/hci-events-v1.yaml, errors/ERROR_MAPPING.md}`。刻意不寫端點清單——全庫零 API 端點決策，列出即發明產品範圍；改寫跨端點都要遵守的合約慣例，每條自帶 CLOSED／CONVENTION／OPEN 三態標記。
