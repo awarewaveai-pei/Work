@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-07（Docker watchdog 第三輪：event trigger 從未真正開過火（RecordId 證據）+ Docker 非單一實例應用（真跑洩漏一個 process）→ 拿掉整個背景排程，回到純 guard-on-launch）
+
+**觸發**：critic 覆審抓到「Kernel-Power 107 在這台機器是睡眠時寫入，不是喚醒」，RecordId 序列證據確鑿；且該事件觸發從註冊以來一次都沒真的開過火。
+
+**兩個真發現，都是真跑驗證出來，不是推論**：
+1. 107 事件：4 天內 12 次進入睡眠都配一個 1-10 秒後的 107；11 次真實喚醒（`Power-Troubleshooter/1`）零次配 107。註冊時間晚於最後一次 107 → 這個 trigger 至今一次都沒開過火，smoke 卻回報 `ok:guarded`——正是這次要根治的「死了沒人知道」同一類問題重現在自己身上。
+2. critic 建議「Docker 已在跑時仍嘗試啟動，單一實例應用會自己 focus 既有視窗」——真跑驗證：**錯**。Docker Desktop 4.89 不會 focus，而是留下一個真的常駐第二個 process（~130MB，會耗 CPU，需要手動 kill）。已清除，10 個 container 全程未受影響。
+
+**決定**：不再嘗試「偵測崩潰並自動重啟」，改回操作者原本選的 B 方案徹底做到底——只在啟動路徑做守衛（登入排程 + 捷徑），background 排程整個拿掉。刪除 `scripts/watch-docker-desktop-runtime.ps1`（唯一呼叫者已不存在，確認過零殘留引用才刪）。
+
+**同時修 critic 這輪抓到的、跟方案無關的真 bug**：
+- M1：`register-...ps1` 用 `-File`（runbook 教的排錯指令）必炸——`$PSScriptRoot` 當 param 預設值在 `-File` 呼叫下是空字串，改成 body 內判斷（同 `test-...ps1` 既有寫法）。
+- M3：`%ProgramData%\...\Docker Desktop.lnk`（all-users Start Menu）直接啟動、繞過守衛，`-Show`/smoke 從未看過它——已列入回報＋runbook 補手動 retarget 指令（需 admin，腳本本身維持 unelevated 不動它）。
+- M5：`.vbs` launcher 對第 2 個之後的參數不重新加引號，帶空白字串的參數會被靜默截斷——改成逐一加引號。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=PowerShell/TaskScheduler | cmd=`Unregister-ScheduledTask 'Docker Desktop Runtime Watchdog'` | exit=0 | result=排程移除確認
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`register-...ps1 -File -Show`（M1 修復後直接用 -File 呼叫）| exit=0 | result=正常輸出，含 all-users 捷徑 UNGUARDED 正確回報
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=守衛捷徑端到端（Docker 已跑）| exit=0 | result=**第一次真跑發現洩漏第二個 Docker Desktop process（PID 存活、131MB、佔 CPU）**，已 kill 確認清除、10 container 全程健康
+- REALTEST_EVIDENCE: tool=PowerShell 5.1 | cmd=harness（7 情境，watchdog 相關 14 個情境隨檔案刪除一併移除）| exit=0 | result=7/7 PASS
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`check-smoke-tests.ps1` | exit=0 | result=`docker_wd=ok:guarded`
+- REVIEW_DONE: critic=Quick（第二次，針對 register/vbs/smoke/捷徑）| verdict=1 Critical（107 事件從未真正觸發）+5 Major（M1/M2/M3/M4-冗餘排程/M5）→ Critical 靠拿掉整個機制解決；M1/M3/M5 直接修；M2 真跑後發現建議本身是錯的，撤銷不採納；M4（排程冗餘設定）隨排程刪除自然消失 | findings=1c/5m
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=`Docker Desktop Runtime Watchdog\|watch-docker-desktop-runtime\|resume from sleep\|Kernel-Power.*107\|PollingMinutes` | hits=僅存在於歷史 WORKLOG（不改寫）與現行程式碼／runbook 的「為什麼不這樣做」說明性註解，無殘留的「現在會這樣跑」宣稱
+- WORKLOG: 本條目
+
+**教訓**：critic 的建議（「單一實例應用會 focus」）看起來合理，沒有真的在這支 app 上跑過就採納，上線後才發現錯——跟這整個任務一直在犯的錯是同一類：沒有真跑驗證就相信一個聽起來合理的假設。
+
+**[rollback]**：`git revert`；若要恢復某版 watchdog，本檔案與 register 腳本開頭的「History」註解記錄了兩個被否決的設計版本，及否決理由。
+
 ## 2026-09-07（5 個 opus-pinned subagent 拔除 model 欄位，改吃呼叫當下 session 的模型 —— 額度根因排查：critic 高頻 mandatory review 是週限制早鯨盡的主因，非工作量問題）
 
 **觸發**：操作者提出「加 local model 分擔工作，額度太緊」，查 session transcript（08-24 至今，63 個 session/jsonl，約 4.2 億 tokens）發現 opus 佔 18.6%（8,376 次 assistant turn），`WORKLOG.md` 逐字記錄多筆「critic subagent...撞到帳號級 rate limit，model=claude-opus-5」429（08-31/09-03~09-07 幾乎每天），操作者當場回報「週限制已用 74%，剩 4 天重置」。根因鎖定：`critic.md`/`db-expert.md`/`debugger.md`/`planner.md`/`vuln-verifier.md` 五個 agent frontmatter 寫死 `model: opus`，AGENTS.md §4 R2 又強制「每 commit 一個 critic」（過去兩週 commit 日均 ~35 個，區間 15-92，`WORKLOG.md` 內「critic 覆審/critic subagent」字樣文字提及 442 次）——GPT 原提的「local model 分擔 implementation」方案打錯瓶頸，implementation 對應的是 Sonnet（60.7% token占比），不是撞到 429 的 Opus。
