@@ -2,7 +2,7 @@
 
 Canonical product root: `D:\Work\Projects\internal\hci30\`. HCI runtime code belongs here; architecture, ADR, and research records remain under `D:\Work\agency-os\docs\HCI\`.
 
-Start with `docs\HCI30_DELIVERY_PLAN.md` for architecture and gates, then `docs\HCI30_EXECUTION_PLAN.md` for the ordered implementation backlog. For the schema as actually shipped — every table, every cross-cutting rule, every lifecycle — see `docs\domain\{HCI_DOMAIN_ERD,HCI_ENTITY_DICTIONARY,HCI_INVARIANTS,HCI_STATE_MACHINES}.md` (P0-01).
+Start with `docs\HCI30_DELIVERY_PLAN.md` for architecture and gates, then `docs\HCI30_EXECUTION_PLAN.md` for the ordered implementation backlog. For the schema as actually shipped — every table, every cross-cutting rule, every lifecycle — see `docs\domain\{HCI_DOMAIN_ERD,HCI_ENTITY_DICTIONARY,HCI_INVARIANTS,HCI_STATE_MACHINES}.md` (P0-01). Evidence tamper-evidence mapping (P0-03): `security\evidence-integrity\HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`.
 
 This is an **isolated, synthetic-only PostgreSQL 15.8 test skeleton**. It has no host-port mapping, production configuration, portal integration, real-person fixture, or deployment path.
 

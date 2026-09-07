@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-09-07（P0-03 Evidence tamper-evidence 部分關閉——5 個必要元素逐一對照已出貨 schema，2 全關+1 半關+2 誠實留 OPEN，同一根因）
+
+**產出**：`Projects/internal/hci30/security/evidence-integrity/HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`。5 個必要元素：immutable audit refs（append-only 雙層，已關）、correction lineage（ADR-0017 bitemporal supersession，已關）、crypto-shredding（ADR-0018 key table/reference/tombstoning function 已建，只差 DSR lifecycle→`record_erasure()` 接線是 Wave 4）、content hash（Source 層級 `source_snapshots.content_hash` 已關，Evidence 內容層級卡在「還沒有真實 payload 欄位」）、hash-chain/Merkle（gap analysis 原文「where justified」本身是條件式，今天誠實答案是「還不到需要的時候」）。後兩者同一根因：Evidence/Claim 的真實 payload 欄位形狀是懸而未決的產品決策，非本輪該發明。
+
+**驗證**：同 P0-01，純文件轉寫，逐項核對 0004/0007 migration 原文（`content_hash`/`data_encryption_keys`/`tombstone_evidence`）確認引用正確；risk 判 Low 免全套 critic。
+
+- REALTEST_EVIDENCE: tool=Grep | cmd=核對 `source_snapshots.content_hash` NOT NULL CHECK、`hci.data_encryption_keys` 零 GRANT、`hci.tombstone_evidence()` 簽章 | exit=0 | result=與本檔宣稱逐字相符
+- REVIEW_DONE: critic=自審（Low risk，轉寫已知事實）| verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`security/evidence-integrity` | hits=僅本輪新檔+README/gap-analysis 同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：新 `security/evidence-integrity/HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`；`21_HCI_TOP_TIER_GAP_ANALYSIS.md` P0-03 補 partial-closure 段；`README.md` 補一行連結。
+
+**[rollback]**：`git revert`；純新增文件。
+
 ## 2026-09-07（P0-01 Formal Domain ERD + invariants 部分關閉——4 份文件，逐檔讀完 11 個 migration 後轉寫既有已測 schema，非新設計）
 
 **觸發**：操作者「用最快速度又安全和最具效益方式完成HCI...做超過2個星期了」——選 P0-01 作下一項，因為它可從已出貨、已真跑驗證的 schema 直接轉寫，非發明新設計，風險最低、速度最快。

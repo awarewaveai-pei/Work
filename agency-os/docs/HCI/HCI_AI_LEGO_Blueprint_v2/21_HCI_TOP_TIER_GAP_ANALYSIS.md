@@ -53,6 +53,8 @@ Path: `D:\Work\Projects\internal\hci30\security\evidence-integrity\`. Specify: c
 
 Expected result: critical evidence cannot be silently rewritten without detection, **and can still be lawfully erased when required (new in V2)**.
 
+**Partial closure (2026-09-07)**: `HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md` maps all 5 required elements to the shipped schema. 2 of 5 fully closed (immutable audit refs — the append-only grant+trigger dual layer; correction lineage — ADR-0017 bitemporal supersession), 1 closed with a tracked Wave-4 gap (crypto-shredding — ADR-0018's key table/reference columns/tombstoning function are built; only the DSR-lifecycle-to-`record_erasure()` wiring is deferred), 2 genuinely blocked on one shared root cause: no real Evidence/Claim payload column exists in this schema yet, so there is no content to hash or chain (content/source/attachment hashes — Source-level hashing is closed via `source_snapshots.content_hash`, Evidence-content-level is not; hash-chain/Merkle — the gap analysis's own "where justified" wording makes this conditional, and today's real answer is "not yet justified"). Not a design gap to fill speculatively — the payload-column shape (free text, structured, external object reference) is an undischarged product decision.
+
 ## P0-04 Mathematical specifications
 
 Path: `D:\Work\Projects\internal\hci30\docs\intelligence\{HCI_EVIDENCE_QUALITY_SPEC.md, HCI_CONFIDENCE_SPEC.md, HCI_TRUST_DOMAIN_SPEC.md, HCI_RISK_SPEC.md, HCI_PERMISSION_SPEC.md, HCI_CONTRADICTION_SPEC.md, HCI_TIME_DECAY_SPEC.md}`.
