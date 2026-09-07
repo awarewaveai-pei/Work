@@ -1,6 +1,6 @@
 # Media Video isolated-branch handoff bundles
 
-**Status:** local handoff artifact only; not merged or deployed.
+**Status:** historical, verified handoff artifacts. Their contents were integrated into `main` by `2fb93f9dc`; no production deployment occurred.
 **Created:** 2026-09-07
 **Shared prerequisite base:** 8570b74f07e3c7cd119d747c285f5055f3184742
 

@@ -15,8 +15,8 @@
 - `PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`：短劇 Bible 與實拍 Edit Decision Plan 如何安全匯入 Timeline、QA 與 Release；尚未接入 UI 或 renderer。
 - `PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md`：WordPress、Postiz、成效回饋、自用／SaaS／企業 BYO API 的交付與治理契約；尚未發布或啟用商業模式。
 - `LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`：正式環境盤點與 staging 建置條件。
-- `PHASE_1A_IMPLEMENTATION_RECEIPT.md`、`PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md`、`PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`：已完成但尚未部署的隔離交付。
-- `PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md`：Timeline→dynamic-slideshow 的 fail-closed 編譯器與 renderer 語意保留；已在隔離分支提交，尚未接到出片路徑。
+- `PHASE_1A_IMPLEMENTATION_RECEIPT.md`、`PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md`、`PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`：已整合至 `main`、尚未部署的程式交付。
+- `PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md`：Timeline→dynamic-slideshow 的 fail-closed 編譯器與 renderer 語意保留；已整合至 `main`，尚未接到出片路徑。
 - PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md：把既有 video_jobs 演進為可恢復執行紀錄的 additive schema、驗收與 rollback 包；尚未建立 migration。
 - PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md：renderer idempotency、private R2 receipt、restart reconciliation 與 no-double-render 驗收；尚未實作。
 - `PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md`：正式 renderer 的 staging canary、驗收與 rollback gate；尚未執行。

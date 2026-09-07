@@ -1,9 +1,10 @@
 # Phase 3B — Timeline v1 到 Remotion 編譯器收據
 
-**狀態：隔離分支已提交並驗證；未合併、未部署、未改變任何 renderer route、資料庫、R2、UI 或外部服務。**
+**狀態：已整合至 `main` 並驗證；未部署、未改變任何正式 renderer route、資料庫、R2、UI 或外部服務。**
 **日期：2026-09-07**
-**工作樹：** `D:\Worktrees\media-video-phase0`
+**正式 source checkout：** `D:\Work\lobster-factory\infra\hetzner-phase1-core`
 **提交：** `166e0372b318dc59fcd4b11360990f0b9e1ecb1b` (`feat(video): compile Timeline v1 for Remotion`)、`d1fac1e57d49b864ec891756554049baa4b54e88` (`fix(video): omit blank dynamic slide overlays`)
+**Main integration：** `2fb93f9dc` (`feat(video): establish modular renderer foundations`)
 
 ## 已交付的編譯邊界
 

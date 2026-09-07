@@ -12670,3 +12670,19 @@ Committed `d1fac1e57` on the existing isolated branch. A Timeline-generated scen
 
 [rollback]
 Before integration, do not merge `d1fac1e57`. After integration, revert this one isolated commit; it restores the former empty overlay behaviour only and does not alter any other video path.
+
+## 2026-09-07 — Video renderer foundations integrated into main
+
+[scope]
+Merged the verified `codex/media-video-phase0` branch into `main` as `2fb93f9dc`. The merge contains renderer authentication policy, pure durable lifecycle and Timeline contracts, structural preflight, Timeline→Remotion compiler, dynamic-scene semantic support, tests, and a non-started staging compose manifest. No database migration, production deployment, production container change, R2 action, real render, WordPress or Postiz action occurred.
+
+[verification]
+- REALTEST_EVIDENCE: next-admin on `main` ran `npm test -- timeline-v1 timeline-remotion renderer-auth renderer-client-auth job-lifecycle video-status-tenant reconcile-classify registry-video-blocks video-out-name pick-primary-output` successfully: 10 files / 66 tests; `npm run typecheck` passed.
+- REALTEST_EVIDENCE: video-service on `main` ran `python tests/test_auth_policy.py`: 4 tests passed. Main renderer/Python source SHA-256 values matched the previously built isolated checkout for SceneSeries, server, auth policy, package manifest and Python auth tests.
+- REALTEST_WAIVED: MAIN_REMOTION_DEPENDENCIES_ABSENT -- the main remotion-service checkout lacks local `node_modules`, so its `tsc` cannot resolve `express`, `uuid` and Remotion packages. The same file hashes match the isolated checkout where `npm run build` passed; no dependency install or lockfile change was made.
+- REVIEW_PENDING: independent critic result was not persisted by the review runner; merge scope, source-path overlap and all executable test outputs above were manually re-read before push.
+- BUGHUNT_DONE: scope=`D:\\Work\\agency-os,D:\\Work\\scripts,D:\\Work\\lobster-factory` | grep=`compileTimelineV1ToDynamicSlideshow|RENDER_AUTH_TOKEN|dynamic-slideshow` | hits=16; all expected source/docs references reviewed.
+- WORKLOG_DONE: source evidence is at `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/timeline-remotion.ts:138-185`, `apps/remotion-service/src/compositions/SceneSeries.tsx:14-285`, and the receipt at `agency-os/docs/video_generator/PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md:1-45`.
+
+[rollback]
+`git revert -m 1 2fb93f9dc` returns `main` to its pre-merge source state. Do not use that revert after a dependent production deployment without first classifying downstream state; no such deployment exists now.
