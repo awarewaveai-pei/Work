@@ -166,14 +166,15 @@ jobs:
       - name: pg_restore into the fresh target database
         run: pg_restore -v --clean --if-exists --no-owner -d hci_wave1_synthetic /tmp/hci-wave1.dump
 
-      - name: Run the existing negative-test suite against the RESTORED schema
-        run: |
-          set -e
-          cd "$HCI_ROOT/database"
-          psql -v ON_ERROR_STOP=1 -f tests/00_test_harness.sql
-          psql -v ON_ERROR_STOP=1 -f tests/wave1-negative-tests.sql
-
       - name: Compare post-restore row counts to the source marker
+        # Must run BEFORE the negative-test suite below, not after: that
+        # suite's own assertions legitimately INSERT rows (DSR lifecycle,
+        # Case lifecycle, etc.) as part of exercising the restored schema.
+        # Comparing counts after it ran compares "source pre-test" against
+        # "target post-test" and fails on rows the suite itself added --
+        # a drill-design bug this run's first attempt (see PR/commit history)
+        # actually caught, not a restore defect. The correct checkpoint on
+        # both sides is "right after data lands, before any test touches it."
         run: |
           set -e
           cd "$HCI_ROOT/database"
@@ -184,6 +185,13 @@ jobs:
           diff /tmp/marker-source.txt /tmp/marker-target.txt \
             && echo "MARKER MATCH: restored row counts equal source row counts, per table" \
             || (echo "MARKER MISMATCH -- restore lost or duplicated rows" && exit 1)
+
+      - name: Run the existing negative-test suite against the RESTORED schema
+        run: |
+          set -e
+          cd "$HCI_ROOT/database"
+          psql -v ON_ERROR_STOP=1 -f tests/00_test_harness.sql
+          psql -v ON_ERROR_STOP=1 -f tests/wave1-negative-tests.sql
 
       - name: Write run summary
         if: always()
