@@ -3,7 +3,7 @@
 **狀態：隔離分支已提交並驗證；未合併、未部署、未改變任何 renderer route、資料庫、R2、UI 或外部服務。**
 **日期：2026-09-07**
 **工作樹：** `D:\Worktrees\media-video-phase0`
-**提交：** `166e0372b318dc59fcd4b11360990f0b9e1ecb1b` (`feat(video): compile Timeline v1 for Remotion`)
+**提交：** `166e0372b318dc59fcd4b11360990f0b9e1ecb1b` (`feat(video): compile Timeline v1 for Remotion`)、`d1fac1e57d49b864ec891756554049baa4b54e88` (`fix(video): omit blank dynamic slide overlays`)
 
 ## 已交付的編譯邊界
 
@@ -15,7 +15,7 @@
 - 編譯器只接受一條無時間空洞的 generated-image video track；實拍素材、多條 video track、字幕 track 都拒絕，避免靜默遺失語意，規則在同檔 `:93-115`。
 - 音訊只接受一條從 0 起、完整覆蓋影片時長的 audio item；其他剪輯形狀回 `unsupported_audio_shape`，規則在同檔 `:117-135`。
 
-為使這些資料不在 renderer 端被忽略，`SceneSeries.tsx` 已擴充為讀取 `crop` 和 `transitionOut`：`D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\src\compositions\SceneSeries.tsx:14-20`、`:191-205`、`:255-281`。沒有這個 renderer 支援，將 Timeline props 傳入只會造成畫面語意遺失，因此兩側包含在同一提交。
+為使這些資料不在 renderer 端被忽略，`SceneSeries.tsx` 已擴充為讀取 `crop` 和 `transitionOut`：`D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\src\compositions\SceneSeries.tsx:14-20`、`:195-209`、`:259-285`。沒有這個 renderer 支援，將 Timeline props 傳入只會造成畫面語意遺失，因此兩側包含在同一提交。後續修正亦確保 `text: ""` 的 Timeline 場景不會產生空白黑色文字框，避免遮蔽圖片。
 
 ## 驗證
 
@@ -38,7 +38,7 @@ npm run build
 
 結果：`tsc -p tsconfig.server.json` 通過。工作樹 `git diff --check` 在提交前通過。
 
-可重現交接包為 `_handoff_2026-09-07/media-video-phase0-plus-timeline-remotion-166e0372b.bundle`；`git bundle verify` 已通過，SHA-256 為 `7f5bef1030605823a8c81c3a475a86bc052353fb315a5fdf9f7a65c0cdc0b91a`，前置基線為 `8570b74f07e3c7cd119d747c285f5055f3184742`。
+可重現交接包為 `_handoff_2026-09-07/media-video-phase0-plus-timeline-remotion-2026-09-07.bundle`；`git bundle verify` 已通過，head 為 `d1fac1e57d49b864ec891756554049baa4b54e88`，SHA-256 為 `0db059621a813fbf1a97ca2f4840c859f37493a78429a0dd183bb11a58537559`，前置基線為 `8570b74f07e3c7cd119d747c285f5055f3184742`。前一份 compiler bundle 保留作中間收據。
 
 ## 刻意未做的事與下一個閘
 
@@ -48,4 +48,4 @@ npm run build
 
 ## rollback
 
-未合併前，只需不交付 `166e0372b`。整合後若 adapter 發生問題，revert 此單一提交並關閉尚未建立的 Director capability；既有 Timeline validator、Quick Engine、手動 Remotion 路徑和產物均不受影響。
+未合併前，只需不交付這兩個隔離提交。整合後若 adapter 發生問題，依序 revert `d1fac1e57`、`166e0372b` 並關閉尚未建立的 Director capability；既有 Timeline validator、Quick Engine、手動 Remotion 路徑和產物均不受影響。

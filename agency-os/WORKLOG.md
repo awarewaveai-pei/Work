@@ -12598,3 +12598,17 @@ Committed `166e0372b` to the existing isolated `codex/media-video-phase0` branch
 
 [rollback]
 Before integration, do not merge `166e0372b`. After integration, revert that one commit and keep the Director capability disabled; current Quick Engine and manual Remotion workflows remain available.
+
+## 2026-09-07 — DynamicSlideshow empty-overlay correction
+
+[scope]
+Committed `d1fac1e57` on the existing isolated branch. A Timeline-generated scene has no title text by design; the prior component still drew an empty dark overlay. The component now renders the text overlay only when `text.trim()` is non-empty. No merge, deployment, renderer request, database, R2, UI route or production host changed.
+
+[verification]
+- REALTEST_EVIDENCE: remotion-service `npm run build` passed after the edit (`tsc -p tsconfig.server.json`).
+- REALTEST_EVIDENCE: `git diff --check` passed before commit.
+- REALTEST_EVIDENCE: latest full isolated-branch handoff bundle verified with head=`d1fac1e57d49b864ec891756554049baa4b54e88`, SHA-256=`0db059621a813fbf1a97ca2f4840c859f37493a78429a0dd183bb11a58537559`, required base=`8570b74f07e3c7cd119d747c285f5055f3184742`.
+- WORKLOG_DONE: source proof and integration boundary are in `agency-os/docs/video_generator/PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md:1-45`.
+
+[rollback]
+Before integration, do not merge `d1fac1e57`. After integration, revert this one isolated commit; it restores the former empty overlay behaviour only and does not alter any other video path.

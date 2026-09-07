@@ -20,7 +20,7 @@
 - PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md：把既有 video_jobs 演進為可恢復執行紀錄的 additive schema、驗收與 rollback 包；尚未建立 migration。
 - PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md：renderer idempotency、private R2 receipt、restart reconciliation 與 no-double-render 驗收；尚未實作。
 - `PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md`：正式 renderer 的 staging canary、驗收與 rollback gate；尚未執行。
-- `_handoff_2026-09-07/README.md`：Phase 0 隔離分支的已驗證 Git bundle、雜湊、提交範圍與整合前置條件；另有 `media-video-phase0-plus-timeline-remotion-166e0372b.bundle` 作為包含編譯器的不可變交接包；兩者均尚未合併或部署。
+- `_handoff_2026-09-07/README.md`：Phase 0 隔離分支的已驗證 Git bundle、雜湊、提交範圍與整合前置條件；最新版 `media-video-phase0-plus-timeline-remotion-2026-09-07.bundle` 含編譯器與空白覆蓋框修正；均尚未合併或部署。
 - `LEGACY_REFERENCE_ADOPTION_MATRIX.md`：舊 P7 參考碼的採用與禁止清單。
 
 ## 封存文件
