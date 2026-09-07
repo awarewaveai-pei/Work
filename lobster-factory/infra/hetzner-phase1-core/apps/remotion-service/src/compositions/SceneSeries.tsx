@@ -105,41 +105,43 @@ const Slide: React.FC<{
           />
         )}
 
-        {/* Headline overlay */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: slideIndex % 3 === 1 ? "auto" : "0",
-            top: slideIndex % 3 === 1 ? "0" : "55%",
-            left: slideIndex % 2 === 0 ? "2%" : "auto",
-            right: slideIndex % 2 !== 0 ? "2%" : "auto",
-            width: "60%",
-            transform: `translateX(${textTranslateX}%)`,
-            opacity: textOpacity,
-          }}
-        >
+        {/* Timeline scenes can deliberately have no title. Do not cover their image with an empty box. */}
+        {text.trim() && (
           <div
             style={{
-              backgroundColor: "rgba(0,0,0,0.3)",
-              borderRadius: "8px",
-              padding: "12px 20px",
+              position: "absolute",
+              bottom: slideIndex % 3 === 1 ? "auto" : "0",
+              top: slideIndex % 3 === 1 ? "0" : "55%",
+              left: slideIndex % 2 === 0 ? "2%" : "auto",
+              right: slideIndex % 2 !== 0 ? "2%" : "auto",
+              width: "60%",
+              transform: `translateX(${textTranslateX}%)`,
+              opacity: textOpacity,
             }}
           >
-            <p
+            <div
               style={{
-                color: "#ffffff",
-                fontSize: 48,
-                fontFamily: "Noto Sans CJK SC, sans-serif",
-                fontWeight: 700,
-                lineHeight: 1.3,
-                margin: 0,
-                textShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                backgroundColor: "rgba(0,0,0,0.3)",
+                borderRadius: "8px",
+                padding: "12px 20px",
               }}
             >
-              {text}
-            </p>
+              <p
+                style={{
+                  color: "#ffffff",
+                  fontSize: 48,
+                  fontFamily: "Noto Sans CJK SC, sans-serif",
+                  fontWeight: 700,
+                  lineHeight: 1.3,
+                  margin: 0,
+                  textShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                }}
+              >
+                {text}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {logoUrl && (
