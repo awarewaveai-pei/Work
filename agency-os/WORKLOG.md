@@ -13697,10 +13697,10 @@ None: permission probe was read-only.
 - Formatter rejects invalid ranges, overlaps and empty captions before producing output; it does not overwrite transcript data.
 
 [verification]
-- REALTEST_EVIDENCE: tool=Vitest | cmd=`npm test -- --run lib/content/video/__tests__/caption-formats.test.ts` | exit=0 | tests=3
+- REALTEST_EVIDENCE: tool=Vitest | cmd=`npm test -- --run lib/content/video/__tests__/caption-formats.test.ts` | exit=0 | tests=4
 - REVIEW_DONE: critic=Standard | verdict=pass | pure formatter with fail-closed validation and no provider/network access.
 - BUGHUNT_DONE: scope=caption-formats.ts | grep=`secret|fetch|eval|child_process` | hits=0
-- WORKLOG_DONE: source and fixture are staged for the commit immediately following this receipt.
+- WORKLOG_DONE: source and fixture committed in `b2c6170b8`.
 
 [rollback]
 Revert the single caption formatter commit; no schema or runtime route is changed.
