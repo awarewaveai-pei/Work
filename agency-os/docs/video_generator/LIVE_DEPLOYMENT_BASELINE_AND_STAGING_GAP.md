@@ -85,3 +85,23 @@ Evidence command: `ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145
 - Stored staging bucket/account references in the local vault.
 - Remaining Gate 2 blockers: bucket-scoped R2 write token, staging Anthropic key and staging Pexels key. Existing production references remain unused.
 - Cloudflare token-management probe returned HTTP `403`; the available R2 token cannot issue a bucket-scoped token. Anthropic/Pexels staging key issuance also has no available machine credential or API path in this environment.
+
+## Staging deployment receipt — 2026-09-08
+
+Gate 2/3 staging-only deployment completed on `ns31414856` without touching production:
+
+- Installed `/root/lobster-phase1/docker-compose.renderer-staging.yml` and root-only `0600` `/root/lobster-phase1/.env.renderer-staging`.
+- Built `lobster-video-service:staging` and `lobster-remotion-service:staging`; both builds exited `0`.
+- Started `lobster-renderer-staging-net` with loopback-only host ports `9732/9733`; both staging containers report `healthy`.
+- Internal `/health` checks returned `{"ok":true}`; unauthenticated POST `/render` returned `401` for both services.
+- Production container IDs remained unchanged (`lobster-video-service` `77a3f864bdc3`, `lobster-remotion-service` `be2d7ff7106b`), both remained healthy.
+- Authenticated Remotion canary accepted the request and created job `ab2144f6-856e-48b5-a474-5e16f0ec2593`; rendering reached 100%, then staging-only R2 upload failed because the Docker network could not resolve `api.cloudflare.com` (`EAI_AGAIN`). No production bucket or service was used.
+
+Follow-up blocker: keep `internal: true`; provide a separately controlled, allowlisted proxy/egress path for the required R2 endpoints, then rerun the canary. Do not make the renderer network generally routable. The Remotion image now passes the system Chromium executable explicitly at `apps/remotion-service/src/server.ts` so it does not attempt an unapproved browser download.
+
+Reproducibility and rollback evidence:
+
+- Build: `sudo docker compose -p lobster-renderer-staging --env-file /root/lobster-phase1/.env.renderer-staging -f /root/lobster-phase1/docker-compose.renderer-staging.yml build` (exit `0`).
+- Start: `sudo docker compose -p lobster-renderer-staging --env-file /root/lobster-phase1/.env.renderer-staging -f /root/lobster-phase1/docker-compose.renderer-staging.yml up -d` (exit `0`).
+- Image digests: video `sha256:81487269bfc2bbc2b55fc3a38ce52e3ae59f296ca57bf5d7d3fe8b08a2850fdc`; Remotion `sha256:af26867df4887582e7e05fc5a09a4f9d9a7db4bb6960db47c7d580fa66f5c881`.
+- Current rollback state: staging stack intentionally remains running for inspection; rollback command is `sudo docker compose -p lobster-renderer-staging --env-file /root/lobster-phase1/.env.renderer-staging -f /root/lobster-phase1/docker-compose.renderer-staging.yml down`. Production remains running.

@@ -13670,3 +13670,22 @@ Revoke the generated staging token and delete the newly created staging bucket o
 
 [rollback]
 None: permission probe was read-only.
+
+## 2026-09-08 — Staging renderer deployment and canary
+
+[result]
+- Installed root-only staging manifest/env on `ns31414856`; production env files were not changed.
+- Built and started isolated `lobster-renderer-staging-net`; both staging renderers healthy on internal ports 8732/8733.
+- Health checks passed; unauthenticated render requests returned HTTP 401 for both services.
+- Production renderer container IDs and health stayed unchanged.
+- Authenticated Remotion canary reached render completion but R2 upload failed at staging-only egress with `EAI_AGAIN api.cloudflare.com`; no production artifact was created.
+- Added explicit system Chromium executable to Remotion select/render calls; staging rebuild TypeScript check passed.
+
+[verification]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`compose build; compose up -d; docker inspect; internal health; unauthenticated POST; production ID comparison` | exit=0 | ms=completed
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after correction | findings=0c/0m/0n; controlled allowlisted egress requirement and reproducibility evidence recorded.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`staging deployment receipt|browserExecutable|EAI_AGAIN` | hits=3
+- WORKLOG_DONE: receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+`ssh -p 58122 ubuntu@145.239.195.47 'sudo docker compose -p lobster-renderer-staging --env-file /root/lobster-phase1/.env.renderer-staging -f /root/lobster-phase1/docker-compose.renderer-staging.yml down'` removes only staging containers/network.

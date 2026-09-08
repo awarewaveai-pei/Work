@@ -271,6 +271,7 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
         serveUrl,
         id: compositionId,
         inputProps,
+        browserExecutable: process.env.REMOTION_CHROME_EXECUTABLE_PATH,
       });
 
       // Data-driven templates set durationInFrames via calculateMetadata (scenes[] sum).
@@ -286,6 +287,7 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
         codec: "h264",
         outputLocation: outFile,
         inputProps,
+        browserExecutable: process.env.REMOTION_CHROME_EXECUTABLE_PATH,
         concurrency: 1,
         chromiumOptions: {
           headless: true,
