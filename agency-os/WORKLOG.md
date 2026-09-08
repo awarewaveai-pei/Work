@@ -13387,6 +13387,20 @@ No local rollback needed: `origin/main` retains integrated source and the histor
 [rollback]
 Revert this commit; it only restores the former preflight authorization behaviour and changes no persisted state.
 
+## 2026-09-08 — Timeline draft validation UI
+
+[scope]
+Added an isolated VideoStudio tab that validates pasted Timeline JSON only. The client keeps `organizationId` unchanged and has no renderer, database, storage or delivery action.
+
+[verification]
+- REALTEST_EVIDENCE: `npm test -- timeline-draft-validation app/api/video/timeline/validate/route.test.ts` passed 2 files / 11 tests; `npm run typecheck` passed.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; raw JSON is byte-preserved inside the envelope and non-structural replies fail closed.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=timeline/validate | expected helper, UI, route, test and receipt hits.
+- WORKLOG_DONE: contract state is in `agency-os/docs/video_generator/PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`.
+
+[rollback]
+Revert this UI commit. The preflight API remains separately available; Quick Engine and Remotion templates are unchanged.
+
 ## 2026-09-07 — System Foundry v1.6：真實 blueprint 內容抽取管線（不再只吐通用治理樣板）
 
 [scope]
