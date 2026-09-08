@@ -13724,11 +13724,11 @@ Revert the VTT-only change; existing SRT/JSON downloads remain unchanged.
 
 [result]
 - Added `POST /api/video/timeline/compile` as a compile-only Director boundary.
-- It enforces operator role and organization access, resolves artifact URLs only from tenant-owned `media_assets`, validates Timeline v1, and returns Remotion dynamic-slideshow specs without renderer or storage side effects.
+- It enforces operator role and organization access, resolves artifact URLs only from tenant-owned `media_assets`, validates Timeline v1, and returns Remotion specs without renderer or storage side effects.
 
 [verification]
-- REALTEST_EVIDENCE: tool=Vitest | cmd=`npm test -- --run app/api/video/timeline/compile/route.test.ts` | exit=0 | tests=5
-- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after DB-before-guard and hostname-deny regression coverage.
+- REALTEST_EVIDENCE: tool=Vitest + TypeScript | cmd=`npm test -- --run app/api/video/timeline/compile/route.test.ts`; `npm run typecheck -- --pretty false` | exit=0 | tests=5
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass | compile-only boundary retained; unsafe submit path rejected before commit.
 - BUGHUNT_DONE: scope=timeline compile route | grep=`fetch|supabase|write|child_process` | hits=0
 - WORKLOG_DONE: route and tests staged for commit.
 
