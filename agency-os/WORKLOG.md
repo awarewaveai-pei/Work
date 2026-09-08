@@ -56,8 +56,15 @@
 
 learning.prediction_tracking(138t，F17 CLOSED 9/9)/decision.impact_effort(99t)/decision.ice(108t)/decision.rice(90t)/decision.moscow(116t)。551 tests 零衝突。查重：impact_effort/ice/rice 皆比對 mcda 確認真不同（絕對評分 vs 相對正規化、除法公式 vs 加權和），moscow 比對 F01 Non-goals（未建，不同粒度），prediction_tracking 比對 decision_journal（單一 hash 非兩層，因 error 可重算不需 free-text hash）。順手關閉 decision_journal 的 OQ-DECISIONJOURNAL-2（calibration 屬另一個未建的 F10 方法）與 rice 的 OQ-RICE-2（Effort vs ICE 的 Ease 確認不同概念）。ice_effort agent 發現 mcda.py 的 gate 缺 isinstance guard（真 bug，非本批次範圍，已 spawn_task 追蹤，未在本 commit 修）。
 
-REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_prediction_tracking tests.unit.test_impact_effort tests.unit.test_ice tests.unit.test_rice tests.unit.test_moscow -v` | exit=0 | result=551 tests OK
-WORKLOG_DONE: 本條目（全 regression/golden/critic 結果見下一條目）
+critic scope=normal tier，真跑全 regression（自己單獨一輪 4230 tests，203s）。verdict SHIP WITH MINOR FIXES，0C/1Major/1Minor：`decision.ice` 的 `evaluate_genuine_compute_gate` 缺 isinstance guard，非dict輸入真的crash（critic 實跑重現，非猜測）——這是本 session 第三次同一個根因（`evaluate_statistical_gate` 呼叫端各自忘記防呆，`mcda.py`已修過一次、`ice.py`是第二次現場撞見）。**根治**：改在 `research/gates.py` 的 `evaluate_statistical_gate` 本體加防呆，一次保護全部 5 個既有呼叫端（pareto/ahp/mcda/impact_effort/ice）+未來所有呼叫端，而非逐一補洞；`ice.py`/`rice.py` 呼叫端仍各自保留自己的 guard 做 defense-in-depth（比照 impact_effort.py 先例）。`test_ice.py` 原本測試 non-dict 輸入的用例只測了 provenance/integrity 兩個 gate，沒測到 genuine_compute（正是這個 bug 沒被抓到的原因）——已補齊三個 gate + bundler 全覆蓋。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_prediction_tracking tests.unit.test_impact_effort tests.unit.test_ice tests.unit.test_rice tests.unit.test_moscow -v` | exit=0 | result=551 tests OK（含 critic 修正後的 +1 補強測試）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "evaluate_genuine_compute_gate(None,...)/evaluate_ice_gates(None,...)"` | exit=0 | result=修正前 critic 實測 AttributeError crash；修正後直接重現同一路徑，乾淨 FAIL 無 crash
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -p "test_*.py"`（product-root 全 regression）| exit=0 | result=4230+ tests OK（含本批 551 新增+critic 修正）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3062
+REVIEW_DONE: critic=Standard（真跑全 4230-test regression、5 CLI、22 核心檔全讀、10 項指定查核點逐一驗真）| verdict=SHIP WITH MINOR FIXES → 1 Major+1 Minor+根治建議全部落地 | findings=0c/1m/1minor
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`learning\.prediction_tracking\|decision\.impact_effort\|decision\.ice\b\|decision\.rice\|decision\.moscow` | hits=僅歸屬檔+registry+decision_journal合法交叉引用
+WORKLOG_DONE: 本條目
 
 ## 2026-09-08（System Foundry v1.6 — 收尾 Commerce OS blueprint 剩餘 26 個缺口，`326cb5a45` top-10 之後的全部）
 
@@ -13387,3 +13394,27 @@ No local rollback needed: `origin/main` retains integrated source and the histor
 
 [rollback]
 `git revert` 本次 commit：移除 `generation/blueprint-doc-mapping.json`、`generation/blueprint-architecture-content.json`、`scripts/extract_blueprint_content.py`，並還原 `foundry_generate.py`/`manifest.json`/`CHANGELOG_v1.6.md`。既有 10-artifact 生成路徑完全不受影響（新增檔案為條件式附加，非取代）。
+
+## 2026-09-08 — cognitive-engineering-os：8 個 evaluate_statistical_gate/authority-check reuse-site 非 dict 輸入崩潰修復
+
+[scope]
+`ai_lego/modules/research/gates.py` 的 `evaluate_statistical_gate` 對非 dict 輸入（`None`/`str`/`list`/`int`）崩潰（`AttributeError`，非乾淨 FAIL），因 `.get()` 無 isinstance 前置檢查。既有修法慣例（`root_cause.fault_tree.py`／`decision.impact_effort.py` 已示範）是在每個 reuse 該函式的 module 自己的 wrapper gate 內加 `isinstance(x, dict)` guard 並回傳乾淨 `_result(gate_id, False, ...)`，而非改 `gates.py` 本身（該 shared primitive 是刻意留給各 module 自行守門的既有架構決策，非疏漏，本次未動）。
+
+稽核來源指定的 12 個 `evaluate_statistical_gate` reuse site + `assert_no_*_authority_claim`-shaped 檢查（明確點名 `decision.mcda`／`challenge.red_team`）：
+- `database_data/normalization.py`／`data_quality_dimensions.py`、`devops_sre/soak_test.py`／`stress_test.py`／`load_test.py`：5 個較晚寫的 slice，逐檔讀過確認每個 `evaluate_*_gate` 已全部 guard，無需改動。
+- `decision/mcda.py`／`ahp.py`、`root_cause/pareto.py`、`challenge/red_team.py`、`database_data/reconciliation.py`／`data_lineage.py`、`devops_sre/capacity_model.py`／`error_budget.py`：8 個較早的 slice 缺 guard，逐一補上——範圍不只使用者點名的兩種函式形狀，同一檔內其餘 sibling gate（如 `evaluate_provenance_required_gate`、`evaluate_sensitivity_disclosed_gate`、`evaluate_consistency_gate` 等）有相同風險者一併修，比對 `fault_tree.py`/`impact_effort.py` 兩份已修好的參考檔逐一核對每個 gate 都補齊。
+- `error_budget.py` 的 `evaluate_exhausted_forbids_unrestricted_gate` 一度誤判「已靠既有 `except (KeyError, InvariantViolation, TypeError)` 安全」——真實測試證明其 evidence 建構區塊在 try/except 之外仍對非 dict record 呼叫 `.get()` 崩潰（`AttributeError` 不在被捕捉的例外型別內）；補上同款 isinstance guard，並修正先前寫錯的 docstring 宣稱。
+- 每個觸動的 module 在對應 `tests/unit/test_*.py` 新增/擴充 `test_non_dict_*_fails_all_gates_not_a_crash`（命名比照 `test_fault_tree.py` 既有慣例，實際 assert 逐一 gate `status == "FAIL"`，非僅「不丟例外」）。
+
+Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓到 `decision/ice.py`／`decision/rice.py` 兩個相同 bug class 的 reuse site（未在原始 12+2 清單內）。逐一即時複驗：兩者現況皆已乾淨（`ice.py` 的 `evaluate_genuine_compute_gate` 已有 guard，docstring 自帶 `"critic finding, 2026-09-08"` 註記；`rice.py` 的 `assert_no_automatic_authority_claim` 對四種非 dict 值皆乾淨拋 `InvariantViolation`）——兩檔為同一 `D:\Work` 共用目錄下另一併行 session 的未提交 in-flight 工作（F17 learning family／ice/moscow/rice/impact_effort/prediction_tracking 新增模組，git status 顯示皆為 `??` untracked），該 session 自己的 critic 迴圈已獨立修好，屬 critic 報告產出後、我複驗前的時間差造成的過時發現，非本次遺漏；未觸碰這兩檔（不屬本次授權範圍，且為他人 in-flight 未提交檔案）。
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_mcda tests.unit.test_ahp tests.unit.test_pareto tests.unit.test_red_team tests.unit.test_reconciliation tests.unit.test_data_lineage tests.unit.test_capacity_model tests.unit.test_error_budget tests.unit.test_blue_team` | exit=0 | ms=97286（276 tests，含新增 `test_non_dict_*_fails_all_gates_not_a_crash` 系列；`test_blue_team` 為間接 import `red_team.evaluate_evidence_labeling_required_gate` 的旁系 consumer）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_{mcda,ahp,pareto,red_team,reconciliation,data_lineage,capacity_model,error_budget}_slice`（8 個真實 CLI demo 全跑，非僅 unit test）| exit=0（全部 gates PASS，證明 guard 對既有合法 dict 輸入零行為改變）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "from ai_lego.modules.decision.ice import evaluate_ice_gates; evaluate_ice_gates(None,'test','t')"` 與 `rice.assert_no_automatic_authority_claim(None/'x'/[]/42)` | exit=0（複驗 critic 的 ice/rice 發現已被他人 session 獨立修好，非本次需處理）
+- REVIEW_DONE: critic=Standard | verdict=pass（8 檔範圍內零缺失）| findings=0c/0m/0n（額外 2 個 out-of-scope finding 已複驗過時，見上）
+- BUGHUNT_SCOPE_NARROW: 本次改動僅在 `Projects/internal/cognitive-engineering-os/`，與 agency-os/scripts 治理內容無關，scope 改用該子專案根目錄
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os | grep=`from ai_lego\.modules\.(decision\.mcda|decision\.ahp|root_cause\.pareto|challenge\.red_team|database_data\.reconciliation|database_data\.data_lineage|devops_sre\.capacity_model|devops_sre\.error_budget) import` | hits=17（8 test 檔 + 8 CLI demo + `test_blue_team.py`，全數已跑過驗證，無遺漏 caller；`evaluate_genuine_compute_gate`/`evaluate_provenance_required_gate` 等函式名雖在 ~70 個 module 重複出現，但逐檔皆為各自 local 定義，非真實 caller，已用 import-based grep 排除誤報）
+
+[rollback]
+`git revert` 本次 commit：8 個 source module + 8 個 test 檔還原至無 isinstance guard 狀態（回到已知的非 dict 崩潰風險，非功能性退化——所有既有合法呼叫路徑行為不變，8 個 CLI demo 與 276 個測試已證明）。
