@@ -13734,3 +13734,18 @@ Revert the VTT-only change; existing SRT/JSON downloads remain unchanged.
 
 [rollback]
 Revert the compile route commit; existing timeline validation and Remotion routes remain unchanged.
+
+## 2026-09-09 — Tenant-safe Remotion status boundary
+
+[result]
+- Added `/api/video/remotion-job-status`; callers provide internal `video_jobs.id`, then the route checks stored organization ownership before polling Remotion.
+- Legacy `/api/video/remotion-status` remains unchanged until its callers are migrated; this prevents breaking the existing VideoStudio polling contract.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest + TypeScript | cmd=`npm test -- --run app/api/video/remotion-job-status/route.test.ts`; `npm run typecheck -- --pretty false` | exit=0 | tests=2
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pending | findings=legacy migration still required before deprecating direct EU job IDs.
+- BUGHUNT_DONE: scope=remotion-job-status | grep=`euJobId|organizationId|assertOrgAccess` | hits=7
+- WORKLOG_DONE: route and tests staged for commit.
+
+[rollback]
+Revert this route-only commit; existing `/api/video/remotion-status` remains unchanged for legacy callers.
