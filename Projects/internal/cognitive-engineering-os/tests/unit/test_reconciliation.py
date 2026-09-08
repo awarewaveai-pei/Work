@@ -379,6 +379,18 @@ class GateMutationTests(unittest.TestCase):
         gate = evaluate_genuine_compute_gate(record, "test", "2026-09-05T00:00:00Z")
         self.assertEqual(gate["status"], "FAIL")
 
+    def test_non_dict_record_fails_all_gates_not_a_crash(self):
+        """Every gate in this module's own aggregate must fail closed, not crash, on a non-dict top-level
+        argument -- the same regression class ``root_cause.fault_tree``'s own
+        ``test_non_dict_record_fails_all_gates_not_a_crash`` proves for its family. The prior
+        ``test_non_dict_check_fails_the_integrity_gate_not_a_crash`` above covers a malformed ENTRY inside
+        ``checks``; this covers ``record`` itself not being a dict at all."""
+        for bad_record in (None, "not-a-dict", [], 42):
+            with self.subTest(bad_record=bad_record):
+                results = evaluate_reconciliation_gates(bad_record, "test", "2026-09-05T00:00:00Z")  # must not raise
+                self.assertFalse(all_gates_pass(results))
+                self.assertTrue(all(r["status"] == "FAIL" for r in results))
+
 
 if __name__ == "__main__":
     unittest.main()

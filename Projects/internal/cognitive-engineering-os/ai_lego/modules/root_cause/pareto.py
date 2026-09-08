@@ -96,7 +96,12 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_genuine_compute_gate(analysis: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
-    provenance/computation_provenance_ref/engine, all of which ParetoAnalysis also carries at the top level."""
+    provenance/computation_provenance_ref/engine, all of which ParetoAnalysis also carries at the top level.
+    Guards ``isinstance(analysis, dict)`` itself before delegating -- a non-dict analysis must fail closed, not
+    crash with AttributeError (``dict.get`` called on a non-dict), the same fix every sibling reuse of this
+    gate now also applies."""
+    if not isinstance(analysis, dict):
+        return _result("genuine_compute", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(analysis)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -104,6 +109,8 @@ def evaluate_genuine_compute_gate(analysis: dict[str, Any], validator: str, time
 def evaluate_explicit_threshold_gate(analysis: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Atlas L1320: '80/20 不是自然法則；真正比例由資料決定' -- a non-empty vital_few_hypothesis_ids MUST be paired
     with threshold_status: OPERATOR_SET (an explicit, disclosed choice), never silently assumed."""
+    if not isinstance(analysis, dict):
+        return _result("explicit_threshold_required", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     threshold_status = analysis.get("threshold_status")
     vital_few_ids = analysis.get("vital_few_hypothesis_ids") or []
     checks = {

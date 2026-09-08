@@ -47,7 +47,11 @@ FORBIDDEN_AUTHORITY_KEYS = frozenset({"approved", "decision", "final_decision", 
 def assert_no_automatic_authority_claim(record: dict[str, Any]) -> None:
     """Atlas §22.3 L4154's own rule ('MCDA | 禁止直接輸出: Automatic Authority'), checked structurally BEFORE the
     record is returned/persisted -- same 'raise before construction' discipline every forbidden-transition guard
-    this session built already applies."""
+    this session built already applies. Guards ``isinstance(record, dict)`` itself -- a non-dict record must
+    fail closed via InvariantViolation, not crash with AttributeError from ``record.keys()`` (the same guard
+    ``decision.impact_effort``'s own independently-derived equivalent already applies)."""
+    if not isinstance(record, dict):
+        raise InvariantViolation(f"MCDA_AUTOMATIC_AUTHORITY_CLAIM_FORBIDDEN: record must be a dict, got {type(record).__name__}")
     violations = FORBIDDEN_AUTHORITY_KEYS & record.keys()
     if violations:
         raise InvariantViolation(f"MCDA_AUTOMATIC_AUTHORITY_CLAIM_FORBIDDEN: top-level key(s) {sorted(violations)} assert automatic/final authority (Atlas §22.3 L4154: MCDA may not directly output Automatic Authority)")
@@ -112,6 +116,8 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_provenance_required_gate(analysis: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.provenance_required: true`` -- the record carries a schema-valid provenance_record."""
+    if not isinstance(analysis, dict):
+        return _result("provenance_required", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     passed = provenance_is_valid(analysis.get("provenance"))
     return _result("provenance_required", passed, [{"provenance": analysis.get("provenance")}], validator, timestamp)
 
@@ -119,7 +125,11 @@ def evaluate_provenance_required_gate(analysis: dict[str, Any], validator: str, 
 def evaluate_genuine_compute_gate(analysis: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- the same reuse
     ``modules.root_cause.pareto`` and ``modules.decision.ahp`` already proved, now exercised by a fourth,
-    unrelated method family."""
+    unrelated method family. Guards ``isinstance(analysis, dict)`` itself before delegating -- ``decision
+    .impact_effort``'s own identically-shaped gate already documented this gate as lacking it and crashing with
+    AttributeError (``dict.get`` called on a non-dict) instead of failing closed; fixed here to match."""
+    if not isinstance(analysis, dict):
+        return _result("genuine_compute", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(analysis)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -128,6 +138,8 @@ def evaluate_sensitivity_disclosed_gate(analysis: dict[str, Any], validator: str
     """Atlas §22.3 L4154's own required-verification column: 'Human Judgment + Sensitivity'. Checks PRESENCE of a
     non-empty sensitivity disclosure only -- not any particular methodology or correctness (see method contract's
     own compilation_decisions/OQ-MCDA-2 for why disclosure, not a computed formula)."""
+    if not isinstance(analysis, dict):
+        return _result("sensitivity_disclosed", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     notes = analysis.get("sensitivity_notes")
     passed = isinstance(notes, str) and bool(notes.strip())
     return _result("sensitivity_disclosed", passed, [{"sensitivity_notes_present": passed}], validator, timestamp)

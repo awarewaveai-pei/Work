@@ -152,7 +152,11 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_provenance_required_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.provenance_required: true`` -- every node and the overall record carry a
-    schema-valid provenance_record. FAILS CLOSED on a malformed node rather than crashing."""
+    schema-valid provenance_record. FAILS CLOSED on a malformed node rather than crashing. Also guards
+    ``isinstance(record, dict)`` itself -- the per-node check below only protects a malformed ENTRY inside
+    ``nodes``, not a ``record`` argument that is not a dict at all."""
+    if not isinstance(record, dict):
+        return _result("provenance_required", False, [{"reason": "record is not a dict"}], validator, timestamp)
     nodes = record.get("nodes") or []
     invalid: list[Any] = []
     for item in nodes:
@@ -170,7 +174,11 @@ def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timest
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
     provenance/computation_provenance_ref/engine, all of which DataLineageRecord also carries at the top
     level. Fifth reuse of this gate this session (after root_cause.pareto/decision.ahp/decision.mcda/
-    devops_sre.error_budget)."""
+    devops_sre.error_budget). Guards ``isinstance(record, dict)`` itself before delegating -- a non-dict
+    record must fail closed, not crash with AttributeError (``dict.get`` called on a non-dict), the same fix
+    every sibling reuse of this gate now also applies."""
+    if not isinstance(record, dict):
+        return _result("genuine_compute", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(record)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -188,6 +196,8 @@ def evaluate_structural_integrity_gate(record: dict[str, Any], validator: str, t
     duplicate-id check added here after that review is a second, previously entirely absent, structural
     precondition, not a re-statement of the traversal fix.
     """
+    if not isinstance(record, dict):
+        return _result("structural_integrity", False, [{"reason": "record is not a dict"}], validator, timestamp)
     nodes = record.get("nodes")
     if not isinstance(nodes, list) or not nodes:
         return _result("structural_integrity", False, [{"reason": "nodes missing, not a list, or empty"}], validator, timestamp)

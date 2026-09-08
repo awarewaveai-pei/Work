@@ -211,6 +211,8 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_provenance_required_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.provenance_required: true`` -- the record's own provenance is schema-valid."""
+    if not isinstance(record, dict):
+        return _result("provenance_required", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed = provenance_is_valid(record.get("provenance"))
     return _result("provenance_required", passed, [{"provenance_valid": passed}], validator, timestamp)
 
@@ -219,7 +221,11 @@ def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timest
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
     provenance/computation_provenance_ref/engine, all of which ReconciliationRecord also carries at the top
     level. Sixth reuse of this gate this session (after root_cause.pareto/decision.ahp/decision.mcda/
-    devops_sre.error_budget/database_data.data_lineage)."""
+    devops_sre.error_budget/database_data.data_lineage). Guards ``isinstance(record, dict)`` itself before
+    delegating -- a non-dict record must fail closed, not crash with AttributeError (``dict.get`` called on a
+    non-dict), the same fix every sibling reuse of this gate now also applies."""
+    if not isinstance(record, dict):
+        return _result("genuine_compute", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(record)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -230,6 +236,8 @@ def evaluate_reconciliation_integrity_gate(record: dict[str, Any], validator: st
     ``source_value``/``target_value``, comparing against the stored ``matches``/``diff``, AND re-derives
     whether ``overall_status: reconciled`` is actually justified. Does not trust any stored value. FAILS
     CLOSED at every step on malformed input."""
+    if not isinstance(record, dict):
+        return _result("reconciliation_integrity", False, [{"reason": "record is not a dict"}], validator, timestamp)
     checks = record.get("checks")
     if not isinstance(checks, list) or not checks:
         return _result("reconciliation_integrity", False, [{"reason": "checks missing, not a list, or empty"}], validator, timestamp)

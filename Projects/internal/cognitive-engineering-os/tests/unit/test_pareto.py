@@ -159,6 +159,16 @@ class GateReuseTests(unittest.TestCase):
         gate = evaluate_explicit_threshold_gate(analysis, "test", "2026-09-04T00:00:00Z")
         self.assertEqual(gate["status"], "FAIL")
 
+    def test_non_dict_analysis_fails_all_gates_not_a_crash(self):
+        """Every gate in this module's own aggregate must fail closed, not crash, on a non-dict top-level
+        argument -- the same regression class ``root_cause.fault_tree``'s own
+        ``test_non_dict_record_fails_all_gates_not_a_crash`` proves for its family."""
+        for bad_analysis in (None, "not-a-dict", [], 42):
+            with self.subTest(bad_analysis=bad_analysis):
+                results = evaluate_pareto_gates(bad_analysis, "test", "2026-09-04T00:00:00Z")  # must not raise
+                self.assertFalse(all_gates_pass(results))
+                self.assertTrue(all(r["status"] == "FAIL" for r in results))
+
 
 if __name__ == "__main__":
     unittest.main()

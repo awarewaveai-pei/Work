@@ -149,6 +149,8 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_provenance_required_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.provenance_required: true`` -- the record's own provenance is schema-valid."""
+    if not isinstance(record, dict):
+        return _result("provenance_required", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed = provenance_is_valid(record.get("provenance"))
     return _result("provenance_required", passed, [{"provenance_valid": passed}], validator, timestamp)
 
@@ -159,7 +161,12 @@ def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timest
     level. Seventh reuse of this gate this session (CORRECTED from "Eighth" by devops_sre.load_test's own
     critic round -- the six predecessors listed here plus this module make seven; after root_cause.pareto/decision.ahp/decision.mcda/
     devops_sre.error_budget/database_data.data_lineage/database_data.reconciliation, and -- via the
-    reconciliation-slice's own null-provenance fail-closed fix -- benefiting every prior reuser too)."""
+    reconciliation-slice's own null-provenance fail-closed fix -- benefiting every prior reuser too). Guards
+    ``isinstance(record, dict)`` itself before delegating -- a non-dict record must fail closed, not crash
+    with AttributeError (``dict.get`` called on a non-dict), the same fix every sibling reuse of this gate now
+    also applies."""
+    if not isinstance(record, dict):
+        return _result("genuine_compute", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(record)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -175,6 +182,8 @@ def evaluate_capacity_integrity_gate(record: dict[str, Any], validator: str, tim
     never re-validated the two THRESHOLD fields the builder itself requires -- so a record hand-tampered to
     reverse or infinitize its own thresholds passed unchallenged. The threshold check now runs FIRST and
     independently of the computed-field recomputation below."""
+    if not isinstance(record, dict):
+        return _result("capacity_integrity", False, [{"reason": "record is not a dict"}], validator, timestamp)
     if not _thresholds_are_valid(record.get("low_threshold_ratio"), record.get("high_threshold_ratio")):
         return _result(
             "capacity_integrity", False,

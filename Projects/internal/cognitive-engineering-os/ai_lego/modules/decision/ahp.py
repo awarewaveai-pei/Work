@@ -97,13 +97,20 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_provenance_required_gate(analysis: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.provenance_required: true`` -- the record carries a schema-valid provenance_record."""
+    if not isinstance(analysis, dict):
+        return _result("provenance_required", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     passed = provenance_is_valid(analysis.get("provenance"))
     return _result("provenance_required", passed, [{"provenance": analysis.get("provenance")}], validator, timestamp)
 
 
 def evaluate_genuine_compute_gate(analysis: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- the same reuse
-    ``modules.root_cause.pareto`` already proved, now exercised by a second, unrelated method family."""
+    ``modules.root_cause.pareto`` already proved, now exercised by a second, unrelated method family. Guards
+    ``isinstance(analysis, dict)`` itself before delegating -- a non-dict analysis must fail closed, not crash
+    with AttributeError (``dict.get`` called on a non-dict), the same fix ``decision.mcda``'s own identically-
+    shaped gate now also applies."""
+    if not isinstance(analysis, dict):
+        return _result("genuine_compute", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(analysis)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -112,6 +119,8 @@ def evaluate_consistency_gate(analysis: dict[str, Any], validator: str, timestam
     """Atlas L1938: '權重仍然是 judgment，不是客觀真理' (weights are still judgment, not objective truth) -- Saaty's
     own Consistency Ratio pipeline stage exists precisely to catch judgments too self-contradictory to trust.
     FAILs when consistency_ratio exceeds Saaty's published 0.10 threshold, with the real CR value as evidence."""
+    if not isinstance(analysis, dict):
+        return _result("consistency_required", False, [{"reason": "analysis is not a dict"}], validator, timestamp)
     cr = analysis.get("consistency_ratio")
     consistent = analysis.get("consistent")
     checks = {

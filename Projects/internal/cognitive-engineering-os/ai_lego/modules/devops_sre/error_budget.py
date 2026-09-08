@@ -101,7 +101,14 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 
 def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
-    provenance/computation_provenance_ref/engine, all of which ErrorBudgetRecord also carries at the top level."""
+    provenance/computation_provenance_ref/engine, all of which ErrorBudgetRecord also carries at the top level.
+    Guards ``isinstance(record, dict)`` itself before delegating -- a non-dict record must fail closed, not
+    crash with AttributeError (``dict.get`` called on a non-dict). This file's own
+    ``evaluate_exhausted_forbids_unrestricted_gate`` had the identical gap -- its own
+    ``except (KeyError, InvariantViolation, TypeError)`` only shields the recomputation block, not the
+    unconditional ``record.get(...)`` calls building its own evidence afterward -- fixed there too."""
+    if not isinstance(record, dict):
+        return _result("genuine_compute", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(record)
     return _result("genuine_compute", passed, evidence, validator, timestamp)
 
@@ -113,7 +120,13 @@ def evaluate_exhausted_forbids_unrestricted_gate(record: dict[str, Any], validat
     healthy->exhausted (the direction re-reading the stored field alone already caught), AND exhausted->healthy
     (the direction that actually unlocks release_policy:unrestricted, which re-reading the stored field alone
     would miss). Any field present on the record but present differently from what the raw inputs recompute is
-    itself a FAIL -- this is a consistency check, not merely a policy check."""
+    itself a FAIL -- this is a consistency check, not merely a policy check. Guards ``isinstance(record, dict)``
+    itself -- the ``except (KeyError, InvariantViolation, TypeError)`` below only protects the RECOMPUTATION
+    block; the ``evidence``/``passed`` construction after it calls ``record.get(...)`` unconditionally, which
+    raises ``AttributeError`` (not caught there) on a non-dict record. A real test run, not just reasoning
+    about the except clause, is what caught this -- the exception-type argument alone looked sufficient."""
+    if not isinstance(record, dict):
+        return _result("exhausted_forbids_unrestricted", False, [{"reason": "record is not a dict"}], validator, timestamp)
     try:
         recomputed_budget_ratio = calculate_error_budget_ratio(record["slo_target_ratio"])
         recomputed_burn_rate = calculate_burn_rate(record["observed_failure_rate"], recomputed_budget_ratio)

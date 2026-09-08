@@ -102,6 +102,15 @@ class NoFinalAuthorityTests(unittest.TestCase):
     def test_clean_record_passes_the_authority_check(self):
         assert_no_authority_claim(_valid_challenge())  # must not raise
 
+    def test_non_dict_record_is_refused_not_crashed_by_the_authority_assert(self):
+        """This gate's own precedent had no isinstance guard and would crash with AttributeError (``dict.keys``
+        called on a non-dict) instead of failing closed -- the same fix ``decision.mcda``'s own equivalent now
+        also applies."""
+        for bad_record in (None, "not-a-dict", [], 42):
+            with self.subTest(bad_record=bad_record):
+                with self.assertRaisesRegex(InvariantViolation, "REDTEAM_AUTHORITY_CLAIM_FORBIDDEN"):
+                    assert_no_authority_claim(bad_record)
+
     def test_schema_layer_independently_refuses_a_hand_crafted_bypass(self):
         """Second, independent enforcement: even if a caller bypasses assert_no_authority_claim entirely and
         hand-crafts the dict, additionalProperties:false still refuses it."""
@@ -147,6 +156,18 @@ class GateMutationTests(unittest.TestCase):
         challenge = generate_red_team_challenge("RTC-T-007", "PROP-T-007", ["SECURITY"], [fabricated], make_provenance("AI_INFERENCE", "AI_GENERATED"))
         gate = evaluate_evidence_labeling_required_gate(challenge, "test", "2026-09-04T00:00:00Z")
         self.assertEqual(gate["status"], "FAIL")
+
+    def test_non_dict_challenge_fails_all_gates_not_a_crash(self):
+        """Every gate in this module's own aggregate must fail closed, not crash, on a non-dict top-level
+        argument -- the same regression class ``root_cause.fault_tree``'s own
+        ``test_non_dict_record_fails_all_gates_not_a_crash`` proves for its family. The prior
+        ``test_non_dict_finding_fails_the_evidence_gate_not_a_crash`` above covers a malformed ENTRY inside
+        ``findings``; this covers ``challenge`` itself not being a dict at all."""
+        for bad_challenge in (None, "not-a-dict", [], 42):
+            with self.subTest(bad_challenge=bad_challenge):
+                results = evaluate_red_team_gates(bad_challenge, "test", "2026-09-04T00:00:00Z")  # must not raise
+                self.assertFalse(all_gates_pass(results))
+                self.assertTrue(all(r["status"] == "FAIL" for r in results))
 
 
 if __name__ == "__main__":

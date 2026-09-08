@@ -51,7 +51,11 @@ def assert_no_authority_claim(record: dict[str, Any]) -> None:
     """Atlas L1735's own rule, checked structurally. Raises if ``record`` (or any of its ``findings[]`` items)
     carries a key shaped like a final-authority claim -- checked BEFORE the record is returned/persisted, the same
     "raise before construction, don't rely only on the schema" discipline every prior slice's own forbidden-
-    transition/failure-mode guards already established."""
+    transition/failure-mode guards already established. Guards ``isinstance(record, dict)`` itself -- a non-dict
+    record must fail closed via InvariantViolation, not crash with AttributeError from ``record.keys()`` (the
+    same guard ``decision.mcda``'s own equivalent now also applies)."""
+    if not isinstance(record, dict):
+        raise InvariantViolation(f"REDTEAM_AUTHORITY_CLAIM_FORBIDDEN: record must be a dict, got {type(record).__name__}")
     top_level_violations = FORBIDDEN_AUTHORITY_KEYS & record.keys()
     if top_level_violations:
         raise InvariantViolation(f"REDTEAM_AUTHORITY_CLAIM_FORBIDDEN: top-level key(s) {sorted(top_level_violations)} assert final authority (Atlas §11.23 L1735: Red Team has no final authority)")
@@ -109,6 +113,8 @@ def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, tim
 def evaluate_provenance_required_gate(challenge: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Contract ``quality.provenance_required: true`` -- every finding and the overall record carry a
     schema-valid provenance_record."""
+    if not isinstance(challenge, dict):
+        return _result("provenance_required", False, [{"reason": "challenge is not a dict"}], validator, timestamp)
     findings = challenge.get("findings", [])
     invalid = [f["id"] for f in findings if not provenance_is_valid(f.get("provenance"))]
     overall_valid = provenance_is_valid(challenge.get("provenance"))
@@ -122,7 +128,11 @@ def evaluate_evidence_labeling_required_gate(challenge: dict[str, Any], validato
     EVIDENCE label must actually cite evidence. FAILS CLOSED on a malformed finding (not a dict) rather than
     crashing -- a critic review of this family's own third slice (challenge.independent_judge, WORKLOG
     continuation 40) found this exact crash-instead-of-FAIL shape in this gate's own port and fixed it there;
-    applied back here since the underlying bug is identical."""
+    applied back here since the underlying bug is identical. Also guards ``isinstance(challenge, dict)`` itself
+    -- the per-finding check above only protects a malformed ENTRY inside ``findings``, not a ``challenge``
+    argument that is not a dict at all."""
+    if not isinstance(challenge, dict):
+        return _result("evidence_labeling_required", False, [{"reason": "challenge is not a dict"}], validator, timestamp)
     findings = challenge.get("findings", [])
     problems: list[dict[str, Any]] = []
     for f in findings:
