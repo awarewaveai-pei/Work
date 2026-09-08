@@ -13649,7 +13649,7 @@ None: preflight was read-only.
 - REALTEST_EVIDENCE: tool=Bash | cmd=`Cloudflare R2 bucket create via API (response status only)` | exit=0 | ms=13100
 - REALTEST_EVIDENCE: tool=Bash | cmd=`RandomNumberGenerator + secrets-vault.ps1 set (output suppressed)` | exit=0 | ms=1400
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; staging/prod credential separation preserved.
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_STAGING_|lobster-video-staging-20260908` | hits=8
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_STAGING_|lobster-video-staging-20260908` | hits=3
 - WORKLOG_DONE: credential receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
 [rollback]
