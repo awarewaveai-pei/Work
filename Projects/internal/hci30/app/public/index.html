@@ -88,6 +88,31 @@
     <button id="btn-b" onclick="loadList('b')">Tenant B</button>
   </div>
   <div class="case-grid" id="cases"></div>
+
+  <details class="add-panel" style="margin-top:1rem">
+    <summary>+ Open a new case</summary>
+    <form class="inline-form" onsubmit="return submitCase(event)">
+      <label for="c-purpose">Purpose</label>
+      <select id="c-purpose">
+        <option value="vendor_risk_assessment">Vendor risk assessment</option>
+        <option value="fraud_investigation">Fraud investigation</option>
+        <option value="personal_safety">Personal safety</option>
+        <option value="journalism_research">Journalism research</option>
+        <option value="general_due_diligence">General due diligence</option>
+      </select>
+      <label for="c-risk">Risk tier</label>
+      <select id="c-risk">
+        <option value="R0">R0</option><option value="R1">R1</option><option value="R2">R2</option>
+        <option value="R3">R3</option><option value="R4">R4</option>
+      </select>
+      <label for="c-requester">Requester context</label>
+      <textarea id="c-requester" rows="2" placeholder="Who is asking, and why"></textarea>
+      <label for="c-relationship">Relationship context (optional)</label>
+      <input id="c-relationship">
+      <button type="submit">Open case</button>
+      <div id="c-err" class="err"></div>
+    </form>
+  </details>
 </div>
 
 <div id="detail" style="display:none">
@@ -117,7 +142,10 @@
     <summary>+ Add a research finding</summary>
     <form class="inline-form" onsubmit="return submitRecord(event)">
       <label for="f-person">Person</label>
-      <select id="f-person"></select>
+      <select id="f-person" onchange="togglePersonNew()"></select>
+      <div id="f-person-new-wrap" style="display:none">
+        <input id="f-person-new" placeholder="New person's display label">
+      </div>
       <label for="f-kind">Kind</label>
       <select id="f-kind" onchange="renderKindFields()">
         <option value="EVIDENCE">EVIDENCE</option>
@@ -136,6 +164,13 @@
 <script>
 let currentTenant = 'a';
 let currentCaseId = null;
+let currentRecords = [];
+// critic review (2026-09-08): refreshDetail() had no request-sequencing
+// guard -- two overlapping calls (e.g. open case1, navigate to case2 before
+// case1's fetch resolves) could let an out-of-order response overwrite
+// currentRecords with a different case's data than the one on screen, which
+// citableOptions() would then offer as citable evidence for the wrong case.
+let detailRequestSeq = 0;
 
 const DIMENSIONS = ['INTEGRITY_CONSISTENCY','RELIABILITY_FULFILLMENT','COMPETENCE','COMMUNICATION_QUALITY',
   'BOUNDARY_RESPECT','RECIPROCITY_FAIRNESS','CONFLICT_REPAIR','POWER_BEHAVIOR','INCENTIVE_ALIGNMENT',
@@ -173,9 +208,13 @@ function bandBadge(value) {
 }
 
 async function refreshDetail() {
-  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}?tenant=${currentTenant}`);
+  const seq = ++detailRequestSeq;
+  const caseId = currentCaseId;
+  const res = await fetch(`/api/hci/v1/cases/${caseId}?tenant=${currentTenant}`);
   const body = await res.json();
+  if (seq !== detailRequestSeq) return; // a newer refreshDetail() call started since this one -- discard this stale response
   if (!res.ok) { alert('Error: ' + (body.detail || body.title)); return; }
+  currentRecords = body.records;
 
   document.getElementById('d-title').textContent = body.case.purpose;
   document.getElementById('d-meta').textContent = `${body.case.id} · status ${body.case.status} · risk ${body.case.risk_tier} · opened ${new Date(body.case.opened_at).toLocaleDateString()}`;
@@ -234,14 +273,34 @@ async function refreshDetail() {
     const text = r.payload.content || `${r.payload.dimension || ''} = ${r.payload.value || ''}`.trim();
     const quality = qualityByDim[r.payload.dimension];
     return `<div class="record-card">
-      <span class="kind-tag">${r.kind} · ${esc(personById[r.person_id] || r.person_id)}</span>
+      <span class="kind-tag">${r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace;text-transform:none">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
       ${quality ? `<span class="quality-tag">${quality.replace('_',' ').toLowerCase()}</span>` : ''}
     </div>`;
   }).join('') : '<p class="empty">No evidence, claims, or assessments recorded yet.</p>';
 
-  document.getElementById('f-person').innerHTML = body.persons.map(p => `<option value="${p.id}">${esc(p.display_label)}</option>`).join('');
+  document.getElementById('f-person').innerHTML = body.persons.map(p => `<option value="${p.id}">${esc(p.display_label)}</option>`).join('')
+    + '<option value="__new__">+ Create a new person…</option>';
+  togglePersonNew();
   renderKindFields();
+}
+
+function togglePersonNew() {
+  const sel = document.getElementById('f-person');
+  document.getElementById('f-person-new-wrap').style.display = sel.value === '__new__' ? 'block' : 'none';
+}
+
+function citableOptions() {
+  // EVIDENCE/CLAIM only -- an ASSESSMENT cannot itself be cited (mirrors the
+  // TRUST_DOMAIN-not-directly-creatable rule: a citation must bottom out in
+  // something evidentiary, not another judgment).
+  const citable = currentRecords.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
+  if (!citable.length) return '<option value="" disabled selected>-- add Evidence first --</option>';
+  return citable.map(r => {
+    const text = (r.payload.content || `${r.payload.dimension || ''} ${r.payload.value || ''}`).trim();
+    const short = text.length > 40 ? text.slice(0, 40) + '…' : text;
+    return `<option value="${r.id}">${esc(r.kind)} · ${esc(short)} (#${r.id.slice(0,8)})</option>`;
+  }).join('');
 }
 
 function renderKindFields() {
@@ -251,18 +310,29 @@ function renderKindFields() {
     el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>`;
   } else if (kind === 'CLAIM') {
     el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>
-      <label for="f-evref">Evidence ref (an Evidence/Claim record id this cites)</label><input id="f-evref">`;
+      <label for="f-evref">Cites (evidence/claim this is based on)</label><select id="f-evref">${citableOptions()}</select>`;
   } else if (kind === 'ASSESSMENT') {
     el.innerHTML = `<label for="f-dimension">Dimension</label><select id="f-dimension">${DIMENSIONS.map(d => `<option>${d}</option>`).join('')}</select>
       <label for="f-value">Band</label><select id="f-value">${BANDS.map(b => `<option>${b}</option>`).join('')}</select>
-      <label for="f-evref">Evidence ref (an Evidence/Claim record id backing this)</label><input id="f-evref">`;
+      <label for="f-evref">Cites (evidence/claim backing this)</label><select id="f-evref">${citableOptions()}</select>`;
   }
 }
 
 async function submitRecord(evt) {
   evt.preventDefault();
   const kind = document.getElementById('f-kind').value;
-  const person_id = document.getElementById('f-person').value;
+  let person_id = document.getElementById('f-person').value;
+  const errEl = document.getElementById('f-err');
+  if (person_id === '__new__') {
+    const display_label = document.getElementById('f-person-new').value;
+    const pRes = await fetch('/api/hci/v1/persons', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant: currentTenant, display_label }),
+    });
+    const pBody = await pRes.json();
+    if (!pRes.ok) { errEl.textContent = pBody.detail || pBody.title; return false; }
+    person_id = pBody.id;
+  }
   let payload = {};
   if (kind === 'EVIDENCE') payload = { content: document.getElementById('f-content').value };
   else if (kind === 'CLAIM') payload = { content: document.getElementById('f-content').value, evidence_refs: [document.getElementById('f-evref').value] };
@@ -273,10 +343,27 @@ async function submitRecord(evt) {
     body: JSON.stringify({ tenant: currentTenant, kind, person_id, payload }),
   });
   const body = await res.json();
-  const errEl = document.getElementById('f-err');
   if (!res.ok) { errEl.textContent = body.detail || body.title; return false; }
   errEl.textContent = '';
   await refreshDetail();
+  return false;
+}
+
+async function submitCase(evt) {
+  evt.preventDefault();
+  const purpose = document.getElementById('c-purpose').value;
+  const risk_tier = document.getElementById('c-risk').value;
+  const requester_context = document.getElementById('c-requester').value;
+  const relationship_context = document.getElementById('c-relationship').value;
+  const res = await fetch('/api/hci/v1/cases', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, purpose, risk_tier, requester_context, relationship_context }),
+  });
+  const body = await res.json();
+  const errEl = document.getElementById('c-err');
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return false; }
+  errEl.textContent = '';
+  await openCase(body.id);
   return false;
 }
 

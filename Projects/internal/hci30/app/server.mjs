@@ -38,6 +38,14 @@ const TENANT_IDS = { a: '11111111-1111-1111-1111-111111111111', b: '22222222-222
 // TRUST_DOMAIN excluded from this list deliberately -- see the POST handler
 // below for why it is not a directly-creatable kind in this app.
 const SUBJECT_RECORD_KINDS = ['EVIDENCE', 'CLAIM', 'ASSESSMENT'];
+// migrations/0002:71 -- the five real, already-decided values, not invented
+// for this demo.
+const CASE_RISK_TIERS = ['R0', 'R1', 'R2', 'R3', 'R4'];
+// hci.cases's cases_purpose_allowlist CHECK (migrations/0003, ADR-0012) --
+// purpose is a regulated classification, not free text. Found by a real 409
+// from the schema itself while wiring this endpoint (an earlier version of
+// this form sent free text), not looked up in the migration first.
+const CASE_PURPOSES = ['vendor_risk_assessment', 'fraud_investigation', 'personal_safety', 'journalism_research', 'general_due_diligence'];
 // ADR-0019 (hci.enforce_field_author_class(), migrations/0008) requires this
 // exact value per kind, discovered by a real 409 from the schema itself
 // while wiring this endpoint, not looked up in the trigger source first.
@@ -83,6 +91,16 @@ function problem(res, status, title, detail) {
 
 const app = express();
 app.use(express.json());
+// critic review (2026-09-08): without this, express.json()'s own parse
+// failure (malformed JSON body) never reaches any route handler -- Express's
+// default error response is a correct 400 but an HTML page, breaking this
+// API's own application/problem+json contract for every route. Pre-existing
+// gap (not introduced with today's two new endpoints); fixed once, here,
+// rather than per-route.
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') return problem(res, 400, 'Bad Request', 'malformed JSON body');
+  next(err);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 function resolveTenant(req, res) {
@@ -103,6 +121,71 @@ app.get('/api/hci/v1/cases', async (req, res) => {
     res.json({ data: rows, next_cursor: null });
   } catch (err) {
     problem(res, 500, 'Internal Server Error', err.message);
+  }
+});
+
+app.post('/api/hci/v1/cases', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { purpose, risk_tier, requester_context, relationship_context } = req.body || {};
+  if (!CASE_PURPOSES.includes(purpose)) return problem(res, 400, 'Bad Request', `purpose must be one of: ${CASE_PURPOSES.join(', ')}`);
+  if (!CASE_RISK_TIERS.includes(risk_tier)) return problem(res, 400, 'Bad Request', `risk_tier must be one of: ${CASE_RISK_TIERS.join(', ')}`);
+  if (typeof requester_context !== 'string' || requester_context.trim() === '') return problem(res, 400, 'Bad Request', 'requester_context is required');
+  // critic review (2026-09-08): a non-string, non-nullish relationship_context
+  // (number/boolean/array/object) survived `?.trim()` as far as the try block
+  // and only failed there with a raw "...trim is not a function" 409 -- the
+  // wrong status and a message that leaks a JS expression, not a domain
+  // reason. Guarded explicitly like every other field in this handler.
+  if (relationship_context !== undefined && relationship_context !== null && typeof relationship_context !== 'string') {
+    return problem(res, 400, 'Bad Request', 'relationship_context must be a string');
+  }
+  try {
+    // hci.cases.tenant_authorization_id (migrations/0002) is only FK-checked
+    // -- any row satisfies it, ACTIVE or not. Unlike hci.research_workflows,
+    // hci.cases carries no hci.require_active_authorization() trigger
+    // (migrations/0001:110-123 defines it, :123 attaches it to
+    // research_workflows only). Opening a case under a revoked/expired
+    // authorization would be silently, semantically wrong even though the
+    // schema itself permits it, so this endpoint enforces the same
+    // ACTIVE+non-expired rule the DB enforces one table over -- the correct
+    // place for a rule the schema's own design leaves to its caller, not a
+    // workaround for a missing constraint.
+    const { rows: authRows } = await queryAsTenant(
+      t.role,
+      "SELECT id FROM hci.tenant_authorizations WHERE status = 'ACTIVE' AND (expires_at IS NULL OR expires_at > now()) ORDER BY id LIMIT 1"
+    );
+    if (authRows.length === 0) return problem(res, 409, 'Conflict', 'no active tenant authorization exists for this tenant; cannot open a new case');
+    const id = crypto.randomUUID();
+    await queryAsTenant(
+      t.role,
+      'INSERT INTO hci.cases (id, tenant_id, tenant_authorization_id, purpose, risk_tier, relationship_context, requester_context) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, t.tenantId, authRows[0].id, purpose, risk_tier, relationship_context?.trim() || null, requester_context.trim()]
+    );
+    // Re-SELECT rather than construct client-side: status/opened_at are
+    // server/trigger-assigned (migrations/0002:151-155), not something this
+    // endpoint's INSERT ever sets.
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases WHERE id = $1', [id]);
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
+app.post('/api/hci/v1/persons', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { display_label } = req.body || {};
+  if (typeof display_label !== 'string' || display_label.trim() === '') return problem(res, 400, 'Bad Request', 'display_label is required');
+  try {
+    const id = crypto.randomUUID();
+    // hci.persons (migrations/0001:81-84) has no gate beyond a non-empty
+    // label -- identity_candidates/identity_verifications are a separate,
+    // still-unwired confirmation workflow (ADR-0015), not a precondition on
+    // this table's own INSERT grant.
+    await queryAsTenant(t.role, 'INSERT INTO hci.persons (id, tenant_id, display_label) VALUES ($1, $2, $3)', [id, t.tenantId, display_label.trim()]);
+    res.status(201).json({ id, display_label: display_label.trim() });
+  } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
   }
 });
 

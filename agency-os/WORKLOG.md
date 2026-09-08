@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-08 HCI30 Person 軌加開案/新人物能力 + 修好完全不能用的證據引用 UI，critic 覆審 1 Major+2 Minor+2 Suggestion，已修 3 項、1 項追蹤、1 項維持現狀
+
+操作者持續要求「去完成它」。在已驗證的 Evidence→Assessment→Trust Domain→Decision 垂直切片（前一條目）基礎上，找下一個「真人能不能真的從頭用到尾」的缺口，找到並修了 4 個：
+
+1. **CLAIM/ASSESSMENT 的 evidence_refs 欄位形同不可用**——純文字輸入框要求手貼一個 UI 上完全看不到的 UUID。改成下拉選單，列出本案已有的 EVIDENCE/CLAIM 紀錄（內容預覽+短 id），citableOptions()（app/public/index.html）。
+2. **案件只能是預塞的 synthetic fixture，無法真的開新案**——新增 POST /api/hci/v1/cases + 前端「+ Open a new case」表單。真跑時被 schema 自己的 cases_purpose_allowlist（database/migrations/0003, ADR-0012）擋下一次 409：purpose 是 5 值管制分類（vendor_risk_assessment/fraud_investigation/personal_safety/journalism_research/general_due_diligence）不是自由文字，修正前端改用下拉，非事後才知道。
+3. **hci.cases.tenant_authorization_id 只有 FK 存在性檢查**——不像 hci.research_workflows 有 hci.require_active_authorization() trigger（migrations/0001:110-123），schema 本身允許新案綁到已撤銷的授權。應用層補上同款規則（找 ACTIVE+未過期授權，找不到回 409），真跑驗證：Tenant A（有 ACTIVE 授權）開案成功，Tenant B（只有一筆 REVOKED）被乾淨拒絕，不是當機或悄悄成功。
+4. **人物只能是預塞的 fixture**——新增 POST /api/hci/v1/persons + Person 下拉「+ Create a new person…」inline 選項，研究途中遇到系統裡不存在的人可以直接建檔。
+
+全部透過真瀏覽器互動驗證，非假設：Tenant A 開新案 201→對新案新增 Evidence 201→用新下拉引用它建立 Assessment 201→Trust Domain 即時從全部「No evidence yet」變成 CONFIDENTIALITY=LOW partial coverage（packages/intelligence/rollup-trust-domains.mjs 真的重算，非前端假狀態）→Material Risks 正確列出→inline 建立新人物「Jordan Reyes (Vendor CFO)」並正確歸戶在新 Evidence 上→Tenant B 開案收到乾淨 409。
+
+**Critic 獨立覆審**（讀完整兩檔案+對照 migrations/0001-0003,0012+API_CONTRACT_STANDARD.md+validate-subject-record-payload.mjs）：0 Critical。**1 Major**：relationship_context?.trim() 是這個 handler 裡唯一沒有明確 typeof 檢查的欄位——非字串非空值（如數字）會讓 .trim 解析成 undefined 而丟未捕捉 TypeError，被 try/catch 接住後回傳誤導性 409+洩漏 JS 運算式的訊息，而非乾淨 400（critic 用真實 Node 呼叫重現）。**已修**：比照同一 handler 其他三個欄位補上明確型別檢查。**2 Minor**：① POST /cases 的 active-authorization 檢查是兩個獨立連線的 check-then-act（queryAsTenant 每次開新 client），非同一 transaction，併發 REVOKE 可在 SELECT 之後、INSERT 之前發生，讓新案綁到剛失效的授權——正是這條規則本來要防的情況。單一操作者本機 demo 機率極低，**列 TASKS.md 追蹤，非本次修**（治本方向是比照 require_active_authorization() 在 hci.cases 也加對應 trigger，讓檢查與 INSERT 原子化）。② refreshDetail() 無 request-sequencing guard，快速切換案件時較晚送出但較早返回的請求可能讓 currentRecords 停在錯誤的案件上，讓 citableOptions() 提供跨案的引用選項。**已修**：加 detailRequestSeq generation token，捨棄過期回應。**2 Suggestion**：① express.json() 解析失敗的回應是 Express 預設 HTML 頁面，違反本 API 自己的 application/problem+json 契約（六條路由共同的既有缺口，非本次新增）——**已修**：加一個全域 error-handling middleware，一次修好全部路由。② ORDER BY id LIMIT 1 在多筆 ACTIVE 授權時選擇是任意的——critic 自評「今天無害」（tenant_authorizations 無優先權欄位），**維持現狀**。
+
+修正後重新真跑驗證（瀏覽器 javascript_tool 直接呼叫兩個端點）：relationship_context:42 現在回 400 {"detail":"relationship_context must be a string"}；壞掉的 JSON body 現在回 400 application/problem+json {"detail":"malformed JSON body"}；重啟伺服器後原本測試流程的案件/證據/人物資料原樣保留（證明真的寫進 Postgres，非記憶體假狀態），refreshDetail() 加 guard 後原本流程零回歸。
+
+REALTEST_EVIDENCE: tool=Browser（preview_start+find/computer/form_input，c-purpose 等下拉用 form_input 直接設值） | 場景=開新案(Tenant A 成功/Tenant B 409)→新案新增 Evidence→新下拉引用建 Assessment→觀察 Trust Domain 即時 roll-up→inline 建新人物並歸戶 | 結果=全部符合預期，read_network_requests 逐筆核對 201/201/201/409/201/201，console 除本次刻意觸發的 2 個預期 409 外零錯誤
+REALTEST_EVIDENCE: tool=Browser（javascript_tool 直接 fetch 兩個新端點，繞過前端驗證單獨測 API 契約） | 場景=relationship_context:42（非字串）、壞掉的 JSON body（{not valid json） | 結果=各自回傳乾淨 400+正確 content-type，修正前分別是誤導性 409 與 HTML 錯誤頁
+REVIEW_DONE: critic=Deep（獨立 agent，讀完整 2 檔案 314+380 行、對照 4 個 migration 找 grant/CHECK 逐一核對、SQL injection/RLS bypass/XSS 逐路徑追蹤、1 個發現用真實 Node 呼叫重現） | verdict=warn→修正後 pass | findings=0c/1m/2minor(1 修 1 追蹤)/2suggestion(1 修 1 維持)
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=CASE_PURPOSES|togglePersonNew|citableOptions | hits=8(全部在本次修改的 server.mjs/index.html 兩檔內，無外部殘留引用或衝突定義)
+WORKLOG_DONE: 本條目
+
+[已知誠實留白，非本次範圍]
+api/openapi/hci-v1.yaml 自稱是刻意的 skeleton-only(檔頭明寫「not a complete surface」)，本次新增的 POST /cases／POST /persons 未回填進去，與既有的 /records／/decisions 端點同一款既存缺口，未擴大也未修。
+
+[rollback]
+git revert 本次 commit：app/server.mjs 的 POST /cases／POST /persons 兩個端點、CASE_PURPOSES/CASE_RISK_TIERS 常數、JSON-parse-error middleware；app/public/index.html 的開案表單、inline 建人物、citableOptions()/detailRequestSeq guard 全部移除，回到只能對既有 fixture 案件/人物加證據的前一版。純新增+修正，未改動任何既有 schema/migration。
+
+
 ## 2026-09-08（73–77 號切片：F16 decision 家族 6/13→11/13，5 個平行 agent）
 
 decision.weighted_decision_matrix(107t)/decision.topsis(83t)/decision.decision_tree(127t)/decision.expected_value(112t)/decision.pareto_frontier(107t)。536 tests 零衝突（含 critic 補的 1 個）。查重：weighted_decision_matrix 比對 mcda 確認真不同（Atlas 公式無 Normalize 階段，vs MCDA 自己 Sec11.32 有）；topsis 比對 mcda 確認真不同（歐氏距離排序 vs 加權和，重用 mcda 的 normalize_scores 做自己的 Normalize 階段）；decision_tree 比對 fault_tree/event_tree 確認真不同（巢狀 decision/chance/terminal vs 兩者皆扁平），與同批平行建置的 expected_value 互相查證方向不衝突；expected_value 比對 monte_carlo（SIMULATED_RESULT 非 CALCULATED_RESULT）與 mcda（[0,1] 有界排序）確認真不同；pareto_frontier 比對既有 root_cause.pareto 確認真不同概念（單維度 80/20 排名 vs 多目標非支配集合，SET 分類無分數），刻意選用不同 machine_id 避免混淆。F16 現況 11/13，剩 WSJF/Kano。
