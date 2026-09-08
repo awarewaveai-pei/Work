@@ -3,6 +3,7 @@
 **現況（2026-09-08）：** 原交付已由 `2fb93f9dc` 整合至 `main`；原隔離 branch/worktree 已退休。預檢 API 未部署、未接 renderer、未寫入資料庫或外部服務。
 **安全補強：** 結構有效後仍以 `tenant-guard` 驗證 Timeline 的 `organizationId`；client 跨租戶預檢回 403。
 **Middleware gate：** `/api/video/timeline/validate` 在 `middleware.ts` matcher 內，且不在 `PUBLIC_API_PATHS`；middleware 會剝除來自 client 的 identity headers，再注入受驗證身分。
+**草稿 UI（2026-09-08）：** VideoStudio 的「Timeline 驗證」tab 只提交原始 JSON 至預檢 API，顯示 `structural_only` 收據或錯誤；沒有 render、DB、storage 或發布控制。
 **原始交付日期：** 2026-09-06；原始 commits：`4f6b574a7`、`a53021d85`、`6fa054f20`、`0cf46d201`。
 
 ## 交付內容
