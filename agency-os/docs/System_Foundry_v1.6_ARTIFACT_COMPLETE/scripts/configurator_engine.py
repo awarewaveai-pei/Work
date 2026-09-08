@@ -17,6 +17,18 @@ EXPECTED_BLUEPRINT_COUNT=73
 def load(rel):
     return json.loads((ROOT/rel).read_text(encoding='utf-8'))
 
+# Industry-pack selection layer (2026-09-08). industries/REGISTRY.json maps an industry key to the
+# relative paths its catalogs/rules/generation maps live at. 'commerce' (the default, used whenever
+# industry is None) points at the exact same top-level paths this module has always hardcoded --
+# same strings, same load() cache keys -- so every existing caller that never passes `industry`
+# gets byte-identical behavior. See industries/construction-mep/ for the second pack.
+def industry_paths(industry=None):
+    reg=load('industries/REGISTRY.json')
+    key=industry or reg['default_industry']
+    industries=reg['industries']
+    if key not in industries: raise ValueError('unknown industry: '+key)
+    return industries[key]
+
 def canonical(obj): return json.dumps(obj,ensure_ascii=False,sort_keys=True,separators=(',',':'))
 def digest(obj): return hashlib.sha256(canonical(obj).encode('utf-8')).hexdigest()
 def safe_name(s):
@@ -31,12 +43,13 @@ def eval_condition(cond, answers):
     if 'any' in cond: return any(eval_condition(x,answers) for x in cond['any'])
     raise ValueError('unknown condition')
 
-def active_questions(answers):
-    catalog=load('questionnaires/catalog.json')
+def active_questions(answers,industry=None):
+    catalog=load(industry_paths(industry)['questionnaire'])
     return [q for q in catalog['questions'] if eval_condition(q.get('active_when'),answers)]
 
-def validate_answers(answers):
-    catalog=load('questionnaires/catalog.json'); qmap={q['id']:q for q in catalog['questions']}; errors=[]
+def validate_answers(answers,industry=None):
+    paths=industry_paths(industry)
+    catalog=load(paths['questionnaire']); qmap={q['id']:q for q in catalog['questions']}; errors=[]
     unknown=set(answers)-set(qmap)
     if unknown: errors.append('unknown question ids: '+','.join(sorted(unknown)))
     for k,v in answers.items():
@@ -45,12 +58,12 @@ def validate_answers(answers):
         active=eval_condition(q.get('active_when'),answers)
         if active and q.get('required_when_active') and q['id'] not in answers: errors.append(q['id']+': active question unanswered')
         if not active and answers.get(q['id']) is True: errors.append(q['id']+': inactive question cannot be YES')
-    for r in load('rules/conflict-rules.json')['rules']:
+    for r in load(paths['conflict_rules'])['rules']:
         if all(eval_condition(c,answers) for c in r['if_all']): errors.append(r['code']+': '+r['message'])
     return errors
 
-def capability_closure(seed):
-    catalog={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}; out=set(seed); changed=True
+def capability_closure(seed,industry=None):
+    catalog={c['id']:c for c in load(industry_paths(industry)['capabilities'])['capabilities']}; out=set(seed); changed=True
     while changed:
         changed=False
         for cid in list(out):
@@ -66,20 +79,21 @@ def derive_archetypes(caps):
     if not out: out=['service_or_internal_system']
     return sorted(out)
 
-def resolve(project,answers,custom_requirements=None):
+def resolve(project,answers,custom_requirements=None,industry=None):
+    paths=industry_paths(industry)
     custom_requirements=custom_requirements or []
-    errors=validate_answers(answers)
+    errors=validate_answers(answers,industry)
     if errors: raise ValueError('\n'.join(errors))
-    baseline=load('baselines/production-baseline.json'); foundation={x['id'] for x in baseline['capabilities']}
+    baseline=load(paths['baseline']); foundation={x['id'] for x in baseline['capabilities']}
     selected=set(); deferred=set(); trace={}
-    for rule in load('rules/question-rules.json')['rules']:
+    for rule in load(paths['question_rules'])['rules']:
         if eval_condition(rule['when'],answers):
             for cid in rule.get('require',[]): selected.add(cid); trace.setdefault(cid,[]).append(rule['id'])
             for cid in rule.get('defer',[]): deferred.add(cid); trace.setdefault(cid,[]).append(rule['id'])
     deferred-=selected
-    current=capability_closure(foundation|selected)
+    current=capability_closure(foundation|selected,industry)
     derived=set(); changed=True
-    drules=load('rules/derivation-rules.json')['rules']
+    drules=load(paths['derivation_rules'])['rules']
     while changed:
         changed=False
         allcaps=current|derived
@@ -88,15 +102,27 @@ def resolve(project,answers,custom_requirements=None):
                 for cid in r['derive']:
                     if cid not in allcaps:
                         derived.add(cid); trace.setdefault(cid,[]).append(r['id']); changed=True
-        if changed: derived=capability_closure(derived|current)-current
-    all_current=capability_closure(current|derived)
+        if changed: derived=capability_closure(derived|current,industry)-current
+    all_current=capability_closure(current|derived,industry)
     derived |= all_current-foundation-selected
     # A capability cannot be both current and deferred. Current dependency/derivation wins.
     deferred -= all_current
-    ccat={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
+    ccat={c['id']:c for c in load(paths['capabilities'])['capabilities']}
     modules={'core'} | {ccat[c]['module'] for c in all_current if ccat[c].get('module')}
     module_reasons={m:sorted(c for c in all_current if ccat[c].get('module')==m) for m in modules}
     module_reasons['core']=sorted(set(module_reasons.get('core',[]))|foundation)
+    # Optional industry extension: a capability can additionally pull in generation modules beyond
+    # its own `module` tag (industries/construction-mep/rules/module-rules.json's own
+    # when_capability -> require_modules shape, consumed unchanged). Commerce's registry entry has
+    # module_rules=null, so this is a no-op for the default industry -- zero regression.
+    if paths.get('module_rules'):
+        extra_triggers={}
+        for r in load(paths['module_rules'])['rules']:
+            if r['when_capability'] in all_current:
+                for m in r['require_modules']:
+                    modules.add(m); extra_triggers.setdefault(m,set()).add(r['when_capability'])
+        for m,trig in extra_triggers.items():
+            module_reasons[m]=sorted(set(module_reasons.get(m,[]))|trig)
     commercial=answers.get('Q-COM-001',False)
     regulated=any(answers.get(x,False) for x in ['Q-REG-001','Q-REG-002','Q-REG-003','Q-REG-004','Q-REG-005','Q-REG-007','Q-GLO-005'])
     high_impact=any(answers.get(x,False) for x in ['Q-IMP-004','Q-IMP-005','Q-IMP-006'])
@@ -131,4 +157,4 @@ def resolve(project,answers,custom_requirements=None):
     }
     return plan
 
-def questionnaire_digest(): return digest(load('questionnaires/catalog.json'))
+def questionnaire_digest(industry=None): return digest(load(industry_paths(industry)['questionnaire']))

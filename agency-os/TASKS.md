@@ -1055,6 +1055,12 @@
   - **完成定義（已達成）**：操作者實測過生成流程、對本批四項改動與收尾驗證無異議，明確表示精靈式流程不用做（範圍終局），12 步 verify chain 全綠。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-04/05 多筆 System Foundry 條目（搜尋「System Foundry v1.6」）；相關 commit `d069a0080`(55份內容)、`f837dd90e`(3個缺口)、`717b57742`(7部門)、`046758978`(卡片UI)；操作者原話「你的UI/UX 很差, 而且27大項的順序沒有邏輯」。
 
+- [x] **System Foundry v1.6：多產業 industry-pack 選層（Commerce OS + Construction/MEP 第二產業）** ✅ 2026-09-08 結案
+  - `🟢 已結案` · `2026-09-08 開，同日完成` · `操作者`
+  - **一句話**：引擎原本硬編死單一產業；新增 `industries/REGISTRY.json` + `industries/construction-mep/`（機械轉換自 `Water_Electrical_MEP_ALL_LATEST_2026-09-03`），`configurator_engine.py`/`foundry_generate.py` 全部改動點只加尾端可選 `industry=None` 參數，Commerce OS 15 個既有 gate script + 38 個既有 unittest 逐字零回歸（golden fixture 未變），新增 8 個測試涵蓋 MEP 全 66 capability closure + `MEP-CAP-DISPATCH` 真實生成 `BLUEPRINT_ARCHITECTURE.md`（state machine/invariants/JSON Schema，非佔位文字）。
+  - **完成定義（已達成）**：15 gate + 46 unittest 全綠、`manifest.json` 已 `regenerate_integrity.py --write` 重算。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-08「System Foundry v1.6 — 多產業 industry-pack 選層」條目。
+
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。

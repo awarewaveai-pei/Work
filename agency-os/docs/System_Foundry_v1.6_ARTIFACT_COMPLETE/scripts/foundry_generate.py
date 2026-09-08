@@ -2,7 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 import argparse, json, tempfile, shutil, os, datetime, hashlib
-from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name, EXPECTED_BLUEPRINT_COUNT
+from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name, EXPECTED_BLUEPRINT_COUNT, industry_paths
 from extract_blueprint_content import doc_id as bp_doc_id
 
 MODULE_DOCS=[
@@ -10,18 +10,24 @@ MODULE_DOCS=[
  '05_TEST_STRATEGY.md','06_OBSERVABILITY_AND_SRE.md','07_ROLLBACK_AND_RECOVERY.md','08_IMPLEMENTATION_BACKLOG.md'
 ]
 
-# canonical extraction key (extract_blueprint_content.SECTION_ALIASES) -> display title
+# canonical extraction key -> display title. domain_objects..definition_of_done come from Commerce's
+# extract_blueprint_content.SECTION_ALIASES; state_machine/contract_schema were added for the
+# construction-mep-contractor pack's own real content shape (state-machine.json + JSON Schema
+# contracts have no equivalent in Commerce's LEGO doc vocabulary). Additive only: Commerce docs
+# never populate these two keys, so this list growing is a no-op for existing output.
 BP_SECTION_TITLES={
  'domain_objects':'Domain Objects','service_contract':'Public Service Contract',
  'events_published':'Events Published','events_consumed':'Events Consumed',
  'permissions':'Permissions','data_rules':'Data Rules','lego_test':'LEGO Test',
  'definition_of_done':'Definition of Done',
+ 'state_machine':'State Machine','contract_schema':'Contract Schema',
 }
 
-def blueprint_content_maps():
-    mapping=load('generation/blueprint-doc-mapping.json')['mapping']
-    content=load('generation/blueprint-architecture-content.json')['docs']
-    return mapping,content
+def blueprint_content_maps(industry=None):
+    paths=industry_paths(industry)
+    mapping=load(paths['blueprint_doc_mapping'])['mapping']
+    raw=load(paths['blueprint_architecture_content'])
+    return mapping,raw['docs'],raw.get('source_pack','')
 
 MODULE_COMMON='_module_common'
 
@@ -29,10 +35,15 @@ MODULE_COMMON='_module_common'
 # that have a hand-curated generation/blueprint-capability-item-map.json entry. Docs without one
 # are untouched (module_architecture_text's covered_docs check skips filtering entirely) -- the
 # module-level fallback from dc9e5d2b6/9a7afef80 is preserved byte-for-byte for every module this
-# pass didn't map.
-def blueprint_item_maps():
-    items=load('generation/blueprint-architecture-items.json')['docs']
-    capmap=load('generation/blueprint-capability-item-map.json')
+# pass didn't map. Industries without an item map (registry entry is null, e.g.
+# construction-mep-contractor) get empty structures here -- every doc stays module-level/unfiltered,
+# which is this pass's explicitly correct scope (see task step 6's out-of-scope note).
+def blueprint_item_maps(industry=None):
+    paths=industry_paths(industry)
+    if not paths.get('blueprint_architecture_items') or not paths.get('blueprint_capability_item_map'):
+        return {},{},set()
+    items=load(paths['blueprint_architecture_items'])['docs']
+    capmap=load(paths['blueprint_capability_item_map'])
     rev={}
     for cid,entries in capmap['map'].items():
         for e in entries: rev[(e['doc_id'],e['section'],e['item_index'])]=cid
@@ -66,7 +77,7 @@ def filter_section_content(did,skey,raw_content,items_for_doc,rev,selected):
 # mcaps = the module's actually-selected capability IDs from plan['module_reasons'][mid] (the
 # resolved plan, not "module selected/not selected"). item_maps is blueprint_item_maps()'s
 # (items, rev, covered_docs) tuple; docs not in covered_docs keep full content unfiltered.
-def module_architecture_text(mid,bp_mapping,bp_content,mcaps=(),item_maps=None):
+def module_architecture_text(mid,bp_mapping,bp_content,mcaps=(),item_maps=None,source_pack=''):
     items_by_doc,rev,covered_docs=item_maps if item_maps else ({},{},set())
     selected=set(mcaps)|{MODULE_COMMON}
     blocks=[]
@@ -90,7 +101,7 @@ def module_architecture_text(mid,bp_mapping,bp_content,mcaps=(),item_maps=None):
 Status: **EXTRACTED_FROM_BLUEPRINT**
 Foundry: `{VERSION}`
 Module: `{mid}`
-Source pack: `agency-os/docs/Composable AI Commerce OS/Composable_AI_Commerce_OS_LEGO_Documentation_Pack`
+Source pack: `{source_pack}`
 
 Content below is mechanically extracted (verbatim, unedited) from the matched blueprint doc(s) via `scripts/extract_blueprint_content.py`. It is real architecture content, not generic governance boilerplate. Regenerate from source if the blueprint docs change; do not hand-edit."""
     return header+'\n\n'+'\n\n'.join(blocks)
@@ -109,9 +120,10 @@ def sha256_file(p):
         for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
     return h.hexdigest()
 
-def cap_maps():
-    caps={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
-    qs={q['id']:q for q in load('questionnaires/catalog.json')['questions']}
+def cap_maps(industry=None):
+    paths=industry_paths(industry)
+    caps={c['id']:c for c in load(paths['capabilities'])['capabilities']}
+    qs={q['id']:q for q in load(paths['questionnaire'])['questions']}
     return caps,qs
 
 def cap_source(plan,cid):
@@ -190,13 +202,13 @@ Module: `{mid}`
 """
     return common+'\n'+body
 
-def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content,item_maps=None):
+def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content,item_maps=None,source_pack=''):
     d=stage/'docs/modules'/mid
     d.mkdir(parents=True,exist_ok=True)
     for role in MODULE_DOCS:
         write(d/role,module_doc_text(mid,role,plan,obl,caps))
     mcaps=[x for x in plan['module_reasons'].get(mid,[]) if x in caps]
-    arch_text=module_architecture_text(mid,bp_mapping,bp_content,mcaps,item_maps)
+    arch_text=module_architecture_text(mid,bp_mapping,bp_content,mcaps,item_maps,source_pack)
     if arch_text is not None: write(d/'BLUEPRINT_ARCHITECTURE.md',arch_text)
     manifest={
       'schema_version':'1.0.0','module_id':mid,'status':'SELECTED','purpose':obl['purpose'],
@@ -212,8 +224,8 @@ def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_c
         link='docs/modules/'+mid+'/MODULE_MANIFEST.json'
         write(p/'README.md',f"# Generated Foundry Module Path\n\nModule: `{mid}`  \nStatus: `SCAFFOLDED`\n\nThis path is intentionally technology-neutral until architecture selects a stack. The executable requirements are in `{link}` and `docs/modules/{mid}/`.\n\nDo not add implementation that violates the generated module contract.\n")
 
-def write_requirements(stage,plan,answers):
-    caps,qs=cap_maps(); qr={r['when']['question']:r for r in load('rules/question-rules.json')['rules'] if 'question' in r.get('when',{})}
+def write_requirements(stage,plan,answers,industry=None):
+    caps,qs=cap_maps(industry); qr={r['when']['question']:r for r in load(industry_paths(industry)['question_rules'])['rules'] if 'question' in r.get('when',{})}
     decisions=['# User Requirement Decisions','', '| Question | Decision | Direct effect |','|---|---|---|']
     for qid,val in sorted(answers.items()):
         q=qs[qid]; r=qr.get(qid,{}); eff=(r.get('require') or r.get('defer') or [])
@@ -324,23 +336,24 @@ def artifact_manifest(stage):
         rows.append({'path':p.relative_to(stage).as_posix(),'sha256':sha256_file(p),'bytes':p.stat().st_size})
     return {'schema_version':'1.0.0','file_count':len(rows),'files':rows}
 
-def generate(plan,answers,custom,out_root):
+def generate(plan,answers,custom,out_root,industry=None):
     name=safe_name(plan['project']['name']); out_root=Path(out_root).resolve(); target=out_root/name
     if target.exists(): raise FileExistsError('target already exists: '+str(target))
     out_root.mkdir(parents=True,exist_ok=True)
     stage=Path(tempfile.mkdtemp(prefix='.foundry-stage-',dir=out_root))
     try:
-        module_data={m['id']:m for m in load('generation/module-manifests.json')['modules']}
-        obligations=load('generation/module-obligations.json')['modules']; caps,_=cap_maps()
-        bp_mapping,bp_content=blueprint_content_maps(); item_maps=blueprint_item_maps()
+        paths=industry_paths(industry)
+        module_data={m['id']:m for m in load(paths['module_manifests'])['modules']}
+        obligations=load(paths['module_obligations'])['modules']; caps,_=cap_maps(industry)
+        bp_mapping,bp_content,bp_source_pack=blueprint_content_maps(industry); item_maps=blueprint_item_maps(industry)
         for mid in plan['modules']:
             if mid not in module_data: raise ValueError('unknown generation module '+mid)
             if mid not in obligations: raise ValueError('missing module obligations '+mid)
-            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps,bp_mapping,bp_content,item_maps)
+            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps,bp_mapping,bp_content,item_maps,bp_source_pack)
         for rel in ['.foundry/intake','.foundry/resolution','.foundry/handoffs','.foundry/verification','.foundry/migration-history','docs/requirements','docs/blueprint']:
             (stage/rel).mkdir(parents=True,exist_ok=True)
         now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
-        snapshot={'schema_version':'1.0.0','questionnaire_version':load('questionnaires/catalog.json')['questionnaire_version'],'questionnaire_digest':questionnaire_digest(),'submitted_at':now,'project':plan['project'],'answers':dict(sorted(answers.items())),'custom_requirements':plan['custom_requirements']}
+        snapshot={'schema_version':'1.0.0','questionnaire_version':load(paths['questionnaire'])['questionnaire_version'],'questionnaire_digest':questionnaire_digest(industry),'submitted_at':now,'project':plan['project'],'answers':dict(sorted(answers.items())),'custom_requirements':plan['custom_requirements']}
         dump(stage/'.foundry/intake/answers.json',snapshot); dump(stage/'.foundry/resolution/foundry-plan.json',plan)
         dump(stage/'.foundry/foundry-lock.json',{'foundry_version':VERSION,'compiler_version':VERSION,'input_digest':plan['input_digest'],'questionnaire_digest':snapshot['questionnaire_digest']})
         profile={'project_id':name,'profile':plan['profile'],'system_type':'+'.join(plan['archetypes']),'criticality':plan['criticality'],'commercial':'CAP-COMMERCIAL' in plan['current_capabilities'],'multi_tenant':'CAP-MULTI-TENANT' in plan['current_capabilities'],'regulated':'compliance' in plan['modules']}
@@ -348,7 +361,7 @@ def generate(plan,answers,custom,out_root):
         custom_lines=['# Custom Requirements','']
         for r in plan['custom_requirements']: custom_lines += [f"## {r['id']}",f"Category: `{r['category']}`",'',r['statement'],'',f"Mapping: `{r['mapping_status']}`",'']
         if not plan['custom_requirements']: custom_lines.append('- None.')
-        write(stage/'docs/requirements/custom.md','\n'.join(custom_lines)); write_requirements(stage,plan,answers)
+        write(stage/'docs/requirements/custom.md','\n'.join(custom_lines)); write_requirements(stage,plan,answers,industry)
         cap_lines=['# Foundry Capability Plan','',f"Generated by System Foundry {VERSION}.",'','## Foundation (locked)']+[f'- {x}' for x in plan['foundation']]+['','## User selected']+[f'- {x}' for x in plan['user_selected']]+['','## Derived']+[f'- {x}' for x in plan['derived']]+['','## Deferred / option preserved']+[f'- {x}' for x in plan['deferred']]
         write(stage/'docs/FOUNDRY_CAPABILITY_PLAN.md','\n'.join(cap_lines))
         active_bp,total_bp=write_blueprints(stage,plan)
@@ -371,6 +384,6 @@ def generate(plan,answers,custom,out_root):
         shutil.rmtree(stage,ignore_errors=True); raise
 
 def main(argv=None):
-    ap=argparse.ArgumentParser(); ap.add_argument('--input',required=True,help='JSON containing project, answers, custom_requirements'); ap.add_argument('--out',required=True); a=ap.parse_args(argv)
-    data=json.loads(Path(a.input).read_text(encoding='utf-8')); plan=resolve(data['project'],data['answers'],data.get('custom_requirements',[])); print(generate(plan,data['answers'],data.get('custom_requirements',[]),a.out)); return 0
+    ap=argparse.ArgumentParser(); ap.add_argument('--input',required=True,help='JSON containing project, answers, custom_requirements'); ap.add_argument('--out',required=True); ap.add_argument('--industry',default=None,help='industries/REGISTRY.json key; defaults to the registry default_industry (commerce)'); a=ap.parse_args(argv)
+    data=json.loads(Path(a.input).read_text(encoding='utf-8')); industry=data.get('industry',a.industry); plan=resolve(data['project'],data['answers'],data.get('custom_requirements',[]),industry); print(generate(plan,data['answers'],data.get('custom_requirements',[]),a.out,industry)); return 0
 if __name__=='__main__': raise SystemExit(main())
