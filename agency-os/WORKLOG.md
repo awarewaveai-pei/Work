@@ -13712,10 +13712,10 @@ Revert the single caption formatter commit; no schema or runtime route is change
 - Added `/api/download/{job_id}/transcript_vtt`; source transcript remains immutable and the meeting service remains local-only.
 
 [verification]
-- REALTEST_EVIDENCE: tool=Python unittest | cmd=`python -m unittest discover -s tests -p 'test_vtt.py' -v` plus py_compile | exit=0 | tests=4
-- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after regression tests and CR sanitization.
+- REALTEST_EVIDENCE: tool=Python unittest | cmd=`python -m unittest discover -s tests -p 'test_vtt.py' -v` plus py_compile | exit=0 | tests=5
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after pipeline regression coverage and CR sanitization.
 - BUGHUNT_DONE: scope=meeting-service VTT path | grep=`subprocess|eval|secret` | hits=0
-- WORKLOG_DONE: source, tests and receipt are ready for commit.
+- WORKLOG_DONE: source, tests and receipt are committed in the follow-up VTT integration commit.
 
 [rollback]
 Revert the VTT-only change; existing SRT/JSON downloads remain unchanged.
