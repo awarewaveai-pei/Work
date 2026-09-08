@@ -13636,3 +13636,21 @@ None: config parse made no change.
 
 [rollback]
 None: preflight was read-only.
+
+## 2026-09-08 — Provisioned isolated staging bucket and render token
+
+[result]
+- R2 bucket `lobster-video-staging-20260908` created successfully; response status `200`.
+- Unique render token generated and stored in local vault under a staging-only name; value never printed or committed.
+- Bucket and account references stored in local vault.
+- Gate 2 remains blocked until a bucket-scoped R2 token plus staging Anthropic/Pexels keys exist; production references were not substituted.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Cloudflare R2 bucket create via API (response status only)` | exit=0 | ms=13100
+- REALTEST_EVIDENCE: tool=Bash | cmd=`RandomNumberGenerator + secrets-vault.ps1 set (output suppressed)` | exit=0 | ms=1400
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; staging/prod credential separation preserved.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_STAGING_|lobster-video-staging-20260908` | hits=8
+- WORKLOG_DONE: credential receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+Revoke the generated staging token and delete the newly created staging bucket only after confirming it contains no evidence; no production bucket was touched.

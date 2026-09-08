@@ -77,3 +77,10 @@ Evidence command: `ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145
 ## Gate 2 preflight — blocked
 
 主機 `/root/lobster-phase1/.env.renderer-staging` 不存在；本機 secrets vault 只有既有 production credential references，沒有 staging-only R2、Claude 或 Pexels identity。依 runbook 不得複製 production 值、使用 placeholder 或在無獨立 bucket／token 下 build/up。Gate 2–4、`video_jobs` migration 與 renderer 接線維持封鎖。
+
+## Credential provisioning receipt — 2026-09-08
+
+- Created Cloudflare R2 bucket `lobster-video-staging-20260908` (API response `200`).
+- Generated and stored a unique staging render token in the local vault; value is never written to Git or chat.
+- Stored staging bucket/account references in the local vault.
+- Remaining Gate 2 blockers: bucket-scoped R2 write token, staging Anthropic key and staging Pexels key. Existing production references remain unused.
