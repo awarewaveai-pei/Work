@@ -13689,3 +13689,18 @@ None: permission probe was read-only.
 
 [rollback]
 `ssh -p 58122 ubuntu@145.239.195.47 'sudo docker compose -p lobster-renderer-staging --env-file /root/lobster-phase1/.env.renderer-staging -f /root/lobster-phase1/docker-compose.renderer-staging.yml down'` removes only staging containers/network.
+
+## 2026-09-08 — Caption rendition foundation
+
+[result]
+- Added deterministic SRT and WebVTT rendering from immutable timed transcript segments.
+- Formatter rejects invalid ranges, overlaps and empty captions before producing output; it does not overwrite transcript data.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest | cmd=`npm test -- --run lib/content/video/__tests__/caption-formats.test.ts` | exit=0 | tests=3
+- REVIEW_DONE: critic=Standard | verdict=pass | pure formatter with fail-closed validation and no provider/network access.
+- BUGHUNT_DONE: scope=caption-formats.ts | grep=`secret|fetch|eval|child_process` | hits=0
+- WORKLOG_DONE: source and fixture are staged for the commit immediately following this receipt.
+
+[rollback]
+Revert the single caption formatter commit; no schema or runtime route is changed.
