@@ -84,3 +84,4 @@ Evidence command: `ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145
 - Generated and stored a unique staging render token in the local vault; value is never written to Git or chat.
 - Stored staging bucket/account references in the local vault.
 - Remaining Gate 2 blockers: bucket-scoped R2 write token, staging Anthropic key and staging Pexels key. Existing production references remain unused.
+- Cloudflare token-management probe returned HTTP `403`; the available R2 token cannot issue a bucket-scoped token. Anthropic/Pexels staging key issuance also has no available machine credential or API path in this environment.

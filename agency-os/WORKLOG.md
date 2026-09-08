@@ -13654,3 +13654,19 @@ None: preflight was read-only.
 
 [rollback]
 Revoke the generated staging token and delete the newly created staging bucket only after confirming it contains no evidence; no production bucket was touched.
+
+## 2026-09-08 — Staging credential issuance probe
+
+[result]
+- Cloudflare `/user/tokens/permission_groups` returned HTTP `403`; current token cannot mint a bucket-scoped R2 token.
+- No Anthropic or Pexels administrative credential/API path is available in the local inventory.
+- No production key was copied; staging build/up remains blocked.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Cloudflare GET /user/tokens/permission_groups (status only)` | exit=0 | ms=12000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; confirmed no secret output or production substitution.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`bucket-scoped|permission_groups|Anthropic|Pexels` | hits=27
+- WORKLOG_DONE: blocker recorded in `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+None: permission probe was read-only.
