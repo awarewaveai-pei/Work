@@ -1,23 +1,22 @@
 # Phase 3A — Timeline v1 契約收據
 
-**狀態：隔離 worktree 已完成並測試；提供結構預檢 API，但未合併、未部署、未接到既有 renderer route，且未變更 UI、資料庫或外部服務。**
-**日期：2026-09-06**
-**工作樹：** `D:\Worktrees\media-video-phase0`
-**分支：** `codex/media-video-phase0`
-**Commits：** `4f6b574a7`、`a53021d85`、`6fa054f20`、`0cf46d201`
+**現況（2026-09-08）：** 原交付已由 `2fb93f9dc` 整合至 `main`；原隔離 branch/worktree 已退休。預檢 API 未部署、未接 renderer、未寫入資料庫或外部服務。
+**安全補強：** 結構有效後仍以 `tenant-guard` 驗證 Timeline 的 `organizationId`；client 跨租戶預檢回 403。
+**Middleware gate：** `/api/video/timeline/validate` 在 `middleware.ts` matcher 內，且不在 `PUBLIC_API_PATHS`；middleware 會剝除來自 client 的 identity headers，再注入受驗證身分。
+**原始交付日期：** 2026-09-06；原始 commits：`4f6b574a7`、`a53021d85`、`6fa054f20`、`0cf46d201`。
 
 ## 交付內容
 
 新增 renderer-neutral 的 Timeline v1 純函式契約與測試：
 
-- `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\content\video\timeline-v1.ts`
-- `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\content\video\__tests__\timeline-v1.test.ts`
-- `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\video\timeline\validate\route.ts`
-- `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\video\timeline\validate\route.test.ts`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/timeline-v1.ts`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/__tests__/timeline-v1.test.ts`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/timeline/validate/route.ts`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/timeline/validate/route.test.ts`
 
 程式證據：契約型別與限制見 `timeline-v1.ts:1-39`；完整的 deterministic validator 見 `timeline-v1.ts:73-142`；接受、負向與 frame-limit 測試見 `timeline-v1.test.ts:4-75`。
 
-正式 schema 版本為 `1.0.0`。它遵循平台設計基線：`timelineId`、`organizationId`、製作 purpose、frame rate、多輸出 profile、video/audio/caption tracks、`styleRef` 及 provenance。所有媒體均為既有 `media_assets.id` 的 UUID reference，沒有 public URL 或 Remotion composition props；`media_assets` 的 canonical UUID 主鍵、組織歸屬與版本欄位見 `D:\Worktrees\media-video-phase0\lobster-factory\packages\db\migrations\0011_ops_console_control_plane.sql:35-54`。
+正式 schema 版本為 `1.0.0`。它遵循平台設計基線：`timelineId`、`organizationId`、製作 purpose、frame rate、多輸出 profile、video/audio/caption tracks、`styleRef` 及 provenance。所有媒體均為既有 `media_assets.id` 的 UUID reference，沒有 public URL 或 Remotion composition props；`media_assets` 的 canonical UUID 主鍵、組織歸屬與版本欄位見 `lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql:35-54`。
 
 驗證器拒絕未知欄位、錯誤 artifact reference、重複 ID、無效 purpose/profile/frame rate、非整數時間、非 frame-aligned 時間、同 track overlap、錯誤 caption 時序或閱讀速度，以及換算後超過 Remotion 既有 `18,000` frame 上限的請求。錯誤包含 JSON path、機械代碼與訊息；不做隱性型別轉換。
 
@@ -39,7 +38,7 @@ Timeline provenance 的 capability ID 現依既有 LEGO grammar `^[a-z_]+(\.[a-z
 
 ## 驗證
 
-在 `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\next-admin` 實際執行：
+在 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin` 實際執行：
 
 ```powershell
 npm test -- timeline-v1 renderer-client-auth job-lifecycle
@@ -67,4 +66,4 @@ git diff --check
 
 ## rollback
 
-此交付沒有 runtime import 或部署面；回滾只需不合併此隔離分支。若未來接線失敗，保留 Timeline 文件與測試，關閉新的 capability route，既有 Quick Engine 與手動 Remotion template 不受影響。
+此交付未部署且未接 renderer。若未來接線失敗，停用新 capability 或以審核過的 `main` revert 回退程式；既有 Quick Engine 與手動 Remotion template 不受影響。
