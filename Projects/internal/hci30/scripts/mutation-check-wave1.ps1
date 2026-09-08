@@ -834,7 +834,13 @@ $mutations = @(
   # RLS-COMPLETENESS-02 itself. Real-Docker verified, not estimated.
   @{ id = 'drop-cases-rls-policy'
      sql = 'DROP POLICY tenant_isolation ON hci.cases;'
-     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-03','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02') }
+     # RECORD-DECISION-HAPPY-01/-CROSSTENANT-PRINCIPAL-01 joined this
+     # mutation's blast radius 2026-09-08 (hci.record_decision(), migration
+     # 0014): both read hci.cases under RLS as part of the function's own
+     # case_id ownership check, so losing that policy cascades into them too
+     # -- found by this exact mutation run flagging them as unexpected
+     # rather than assumed in advance.
+     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-03','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01') }
   # RLS-OWN-02 (db-expert M2): hci.tenants is scoped by `id`, not `tenant_id`,
   # so it is invisible to every mutation above. Dropping its own policy fails
   # CLOSED - RLS-LEAK-02 (tenant B invisible) stays green - which is exactly
@@ -842,6 +848,26 @@ $mutations = @(
   @{ id = 'drop-tenants-rls-policy'
      sql = 'DROP POLICY tenant_registry_isolation ON hci.tenants;'
      expect = @('RLS-OWN-02') }
+
+  # hci.record_decision() (migration 0014, db-expert review 2026-09-08):
+  # each mutation drops ONE of the function's two EXISTS checks. Either way
+  # the composite FK on hci.decisions (case_id/principal_id, 0005/0008)
+  # still independently rejects the cross-tenant id -- just with 23503
+  # instead of the function's own H1020/H1021 -- so expect_sqlstate's exact
+  # SQLSTATE match still correctly flips to FAIL, proving the assertion
+  # depends on the function's own check, not merely on "something rejects
+  # this eventually." No `repin` key (unlike line 129's sibling): that
+  # function's search_path pin was bolted on LATER via a separate ALTER
+  # FUNCTION (0009), so CREATE OR REPLACE there wipes it. record_decision()'s
+  # `SET search_path = hci, pg_temp` was authored inline in its original
+  # CREATE FUNCTION (0014) and is restated identically in both mutations
+  # below, so nothing is lost - confirmed by critic review, 2026-09-08.
+  @{ id = 'drop-record-decision-case-check'
+     sql = 'CREATE OR REPLACE FUNCTION hci.record_decision(p_case_id uuid, p_principal_id uuid, p_outcome text, p_rationale text) RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = hci, pg_temp AS $fn$ DECLARE v_tenant_id uuid; v_id uuid; BEGIN v_tenant_id := hci.current_tenant_id(); IF v_tenant_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1001'', MESSAGE = ''x''; END IF; IF NOT EXISTS (SELECT 1 FROM hci.principals WHERE tenant_id = v_tenant_id AND id = p_principal_id) THEN RAISE EXCEPTION USING ERRCODE = ''H1021'', MESSAGE = ''x''; END IF; v_id := gen_random_uuid(); INSERT INTO hci.decisions (id, tenant_id, case_id, outcome, rationale, author_class, principal_id) VALUES (v_id, v_tenant_id, p_case_id, p_outcome, p_rationale, ''HUMAN_ONLY'', p_principal_id); RETURN v_id; END $fn$;'
+     expect = @('RECORD-DECISION-CROSSTENANT-CASE-01') }
+  @{ id = 'drop-record-decision-principal-check'
+     sql = 'CREATE OR REPLACE FUNCTION hci.record_decision(p_case_id uuid, p_principal_id uuid, p_outcome text, p_rationale text) RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = hci, pg_temp AS $fn$ DECLARE v_tenant_id uuid; v_id uuid; BEGIN v_tenant_id := hci.current_tenant_id(); IF v_tenant_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1001'', MESSAGE = ''x''; END IF; IF NOT EXISTS (SELECT 1 FROM hci.cases WHERE tenant_id = v_tenant_id AND id = p_case_id) THEN RAISE EXCEPTION USING ERRCODE = ''H1020'', MESSAGE = ''x''; END IF; v_id := gen_random_uuid(); INSERT INTO hci.decisions (id, tenant_id, case_id, outcome, rationale, author_class, principal_id) VALUES (v_id, v_tenant_id, p_case_id, p_outcome, p_rationale, ''HUMAN_ONLY'', p_principal_id); RETURN v_id; END $fn$;'
+     expect = @('RECORD-DECISION-CROSSTENANT-PRINCIPAL-01') }
 )
 
 $project = "hcimut$PID"

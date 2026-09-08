@@ -825,6 +825,25 @@ SELECT hci_test.expect_sqlstate('DECISION-PRINCIPAL-CROSSTENANT-01',
   $q$INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale,author_class,principal_id)
      VALUES ('aaaaaaaa-0000-0000-0000-000000000605','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','PAUSE','cross-tenant principal probe','HUMAN_ONLY','bbbbbbbb-0000-0000-0000-000000000850')$q$,
   '23503');
+
+-- hci.record_decision() (migration 0014) - a SEPARATE, narrower write path
+-- next to the raw INSERT grant the tests above already exercise (see that
+-- migration's header for why both coexist). Tests here prove ITS OWN
+-- tenant-isolation logic specifically, not the composite FK above - a
+-- db-expert review (2026-09-08) found this coverage did not exist at all,
+-- verified only by a throwaway, non-committed probe. RECORD-DECISION-
+-- CROSSTENANT-CASE-01/-PRINCIPAL-01 must each go red if the corresponding
+-- EXISTS check in that function's body is ever deleted (see
+-- mutation-check-wave1.ps1's matching entries).
+SELECT hci_test.expect_success('RECORD-DECISION-HAPPY-01',
+  $q$SELECT hci.record_decision('aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000850','REVIEW_REQUIRED','record_decision() happy-path probe')$q$);
+SELECT hci_test.expect_sqlstate('RECORD-DECISION-CROSSTENANT-CASE-01',
+  $q$SELECT hci.record_decision('bbbbbbbb-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000850','REVIEW_REQUIRED','cross-tenant case_id probe')$q$,
+  'H1020');
+SELECT hci_test.expect_sqlstate('RECORD-DECISION-CROSSTENANT-PRINCIPAL-01',
+  $q$SELECT hci.record_decision('aaaaaaaa-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000850','REVIEW_REQUIRED','cross-tenant principal_id probe')$q$,
+  'H1021');
+
 -- Real-Docker correction (2026-09-05): the first version of the two
 -- claim-side tests below expected 23503 and got H1016. A BEFORE ROW trigger
 -- runs before the row exists, RI checks run after - so for a cross-tenant
@@ -1709,4 +1728,4 @@ RESET ROLE;
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(232);
+SELECT hci_test.finish(235);

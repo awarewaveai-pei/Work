@@ -38,6 +38,8 @@ column. Do not compute "next free" from any other file.**
 | `H1017` | A case's `risk_tier` elevation retroactively flags a Claim that is already linked to a `PROCEED`/`PROCEED_WITH_CONTROLS`/`EXIT` Decision | RAISED — db-expert review (2026-09-05) found the link->elevate ordering was unguarded (only elevate->link was); this closes it by rejecting the elevation itself, forcing human review before the tier change is recorded | `hci.flag_claims_on_risk_elevation()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
 | `H1018` | Unrecognized `risk_tier` value reached the elevation-rank comparison | **RESERVED, NOT RAISED** — `hci.cases.risk_tier`'s own `CHECK (risk_tier IN ('R0'..'R4'))` (`migrations/0002_wave1_case_aggregate_up.sql:66`) makes this branch currently unreachable via any legal input; same "reserved but unraisable today" disposition as `H1012`. Defense-in-depth against a future tier being added to that CHECK without updating `hci.flag_claims_on_risk_elevation()`'s hardcoded rank array (db-expert review, 2026-09-05) | `hci.flag_claims_on_risk_elevation()` | `migrations/0008_wave1_field_author_class_policy_up.sql` |
 | `H1019` | Epistemic promotion `UNKNOWN`/`HYPOTHESIS` -> `SOURCE_FACT` on a superseding Claim without a human verifier (`epistemic_verifier_principal_id`) - the `epistemic-label.schema.yaml` `forbidden_transition`, ADR-0019 gate 5 / `NEG-HD08-04` | RAISED | `hci.enforce_claim_state_admission()` | `migrations/0010_wave1_epistemic_label_up.sql` |
+| `H1020` | `record_decision()`'s `case_id` argument does not belong to the caller's own tenant | RAISED — db-expert review (2026-09-08) found the first draft reused `H1001` here, a distinct referential/tenant-mismatch condition from `H1001`'s registered session/authorization-state meaning; split out to avoid the exact collision class this file's own header names as a repeat past incident | `hci.record_decision()` | `migrations/0014_wave1_decision_recording_up.sql` |
+| `H1021` | `record_decision()`'s `principal_id` argument does not belong to the caller's own tenant | RAISED — same review, same reasoning as `H1020`, split into its own code rather than reusing `H1020` since the two conditions test different columns and a caller may need to distinguish which argument was wrong | `hci.record_decision()` | `migrations/0014_wave1_decision_recording_up.sql` |
 
 `'H1TST'` is reserved separately for the test-harness sentinel
 (`database/tests/00_test_harness.sql`) and must never be raised by schema
@@ -46,7 +48,7 @@ succeeded" from every real domain code.
 
 ## Next free code
 
-**`H1020`.**
+**`H1022`.**
 
 ## Maintenance rule
 

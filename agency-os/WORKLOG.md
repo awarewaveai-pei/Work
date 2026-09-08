@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-08（hci30 record_decision() db-expert 覆審抓到 1 Critical+2 Major，全修＋補測試，235/235 斷言+122/122 mutation 全綠）
+
+**背景**：操作者對 HCI 進度不耐（多次「動工把系統寫好」），本輪把「人→證據→評估→Trust Domain→決定」核心迴圈接通：migration 0012（`subject_records.payload` jsonb，ADR-0034）、0013（`hci.mint_encryption_key()`，補 EVIDENCE/CLAIM 建立缺的金鑰路徑）、0014（`hci.record_decision()`，決定紀錄）+ 前端改版成 Trust Report 卡片式 UI（`09d722232`，非本條目做的，本條目只覆審+修 0014）。
+
+**db-expert 獨立覆審 migration 0014，抓到 1 Critical+2 Major**：
+- **Critical**：migration 自己的說明文字宣稱「`hci.decisions` 從來沒有 INSERT grant」——**假**，`0005:247-248` 早就有 column-level INSERT grant（`0008:418-421` 加寬），既有測試 `BITEMP-DECISION-01/02` 早就是用 app role 身分在跑。`record_decision()` 不是補一個不存在的能力，是刻意保留的第二條、更窄的寫入路徑（correction/supersession 仍需要原本的寬 grant）。header 就地改寫講清楚。
+- **Major**：函式原本 `SECURITY DEFINER`，db-expert 用 A/B clone 真證明改 `SECURITY INVOKER` 行為完全一樣且更安全——`DEFINER` 在這個 schema 記載的正式生產型態（`hci_owner` 非 superuser）下,遇到 `FORCE RLS` 會 100% 失敗關閉（`docs/domain/HCI_INVARIANTS.md:224-239` 早就警告過,這次是拿真探針證實）。已修 0014；其餘 5 個既有 DEFINER function 的同款風險另開 TASKS 追蹤，不在本次動。
+- **Major**：`H1001` 被拿來重複表示兩個新的、語意不同的條件（case_id/principal_id 跨租戶），撞上 `ERROR_CODE_REGISTRY.md` 自己點名要防的重複分配問題。新開 `H1020`／`H1021`，registry 同步更新。
+- **Minor（已提前修好）**：`app/server.mjs` 的 `hci.principals.display_label`／`display_name` 混用——查現況已經是對的（`display_name`），推測是本輪較早已修過。
+
+**補測試**（db-expert 抓到「零測試覆蓋」）：`wave1-negative-tests.sql` 新增 `RECORD-DECISION-HAPPY-01`／`-CROSSTENANT-CASE-01`／`-CROSSTENANT-PRINCIPAL-01`；`mutation-check-wave1.ps1` 新增 2 個 mutation（各拔掉函式的一個 EXISTS check），真跑下去都正確變紅；順手發現既有 `drop-cases-rls-policy` mutation 的爆炸半徑意外波及 2 個新測試，補進它的 expect 清單。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1`（14 個 migration 全套+reversibility）| exit=0 | result=235/235 assertion 全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=122/122 mutation 全殺，含新增 2 個
+- REVIEW_DONE: critic=Standard（真跑 PS AST parser 驗語法+獨立字串求值驗跳脫字元+逐行比對 migration 原文+查證 Postgres DDL transactional 語意）| verdict=pass | findings=0c/0m/1 suggestion（已採納補註解）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`H1020\|H1021\|RECORD-DECISION-` | hits=僅本輪新增+同步引用
+- WORKLOG: 本條目
+
+**[已修改]**：`Projects/internal/hci30/database/{ERROR_CODE_REGISTRY.md, migrations/0014_wave1_decision_recording_up.sql, tests/wave1-negative-tests.sql}`、`scripts/mutation-check-wave1.ps1`。
+
+**[剩餘風險]**：另外 5 個既有 `SECURITY DEFINER` function 在真實非-superuser owner 下的 FORCE-RLS 失效風險未修（本次只解 0014 這一個新函式）；瀏覽器端到端驗證（開 case→加 evidence→加 assessment→看 Trust Domain→record decision）因 preview 工具暫時性 unhealthy 中斷，尚未在本條目內完成，另行驗證。
+
+**[rollback]**：`git revert`；純函式定義+測試+文件變更，未動任何表結構或既有資料。
+
 ## 2026-09-08（TASKS.md tarot batch 條的「操作者待辦①②」查證後判定作廢——secret 走 payload 不走 Trigger.dev env，且 SG/EU 已不存在）
 
 **觸發**：操作者問「把這條的 host 路徑更新成 ks-aw-01、順便把 BATCH_INTERNAL_SECRET 設好」。先查現況（VBC）才發現兩項待辦皆已不成立，故未做任何 prod 寫入。
