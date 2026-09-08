@@ -73,3 +73,7 @@ Evidence command: `ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145
 ## Gate 1 receipt — 2026-09-08
 
 本機版本庫 manifest 解析通過：`docker compose --env-file D:\Work\lobster-factory\infra\hetzner-phase1-core\.env.renderer-staging.example -f D:\Work\lobster-factory\infra\hetzner-phase1-core\docker-compose.renderer-staging.yml config --quiet`，exit `0`。這只驗證 YAML／變數結構；未 build、未 up、未連主機，不能取代 Gate 2 secrets 或 Gate 3 staging canary。
+
+## Gate 2 preflight — blocked
+
+主機 `/root/lobster-phase1/.env.renderer-staging` 不存在；本機 secrets vault 只有既有 production credential references，沒有 staging-only R2、Claude 或 Pexels identity。依 runbook 不得複製 production 值、使用 placeholder 或在無獨立 bucket／token 下 build/up。Gate 2–4、`video_jobs` migration 與 renderer 接線維持封鎖。

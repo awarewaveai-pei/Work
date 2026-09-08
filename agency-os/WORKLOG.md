@@ -13616,3 +13616,23 @@ None: Gate 0 made no change.
 
 [rollback]
 None: config parse made no change.
+
+## 2026-09-08 — Video Phase 1B Gate 2 preflight blocked
+
+[scope]
+唯讀確認主機 staging env 與本機 vault reference；未輸出 secret value、未複製 production credential、未 build/up。
+
+[result]
+- C1: `/root/lobster-phase1/.env.renderer-staging` absent；staging manifest 亦 absent。
+- C2: vault 僅有既有 production references，沒有 staging-only R2／Claude／Pexels identity。
+- Decision: 不以正式 credential 或 placeholder 代替；Gate 2–4、`video_jobs` migration 與 renderer 接線封鎖。
+
+[verification]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 -o BatchMode=yes ubuntu@145.239.195.47 'sudo test -f /root/lobster-phase1/.env.renderer-staging ...'` | exit=0 | ms=4600
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/secrets-vault.ps1 -Action list` | exit=0 | ms=1200
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; production-to-staging credential substitution remains prohibited.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`.env.renderer-staging|staging-only|production credential` | hits=75
+- WORKLOG_DONE: blocker receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+None: preflight was read-only.
