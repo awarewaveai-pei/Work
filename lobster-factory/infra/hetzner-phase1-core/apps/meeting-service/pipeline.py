@@ -21,7 +21,7 @@ import time
 import traceback
 
 from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, speaker_notes, summarize, word
-from lib.transcribe import transcribe, write_srt
+from lib.transcribe import transcribe, write_srt, write_vtt
 
 
 class JobLogger:
@@ -122,6 +122,7 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         json.dump(result, open(os.path.join(job_dir, "transcript.json"), "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
         write_srt(result["segments"], os.path.join(job_dir, "transcript.srt"))
+        write_vtt(result["segments"], os.path.join(job_dir, "transcript.vtt"))
         write_status(job_dir, transcribe_stats={
             "audio_duration_sec": result["audio_duration_sec"],
             "realtime_factor": result["realtime_factor"],

@@ -168,6 +168,7 @@ DOWNLOADS = {
     "excel": ("meeting_record.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     "coach": ("coach.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "transcript_srt": ("transcript.srt", "application/x-subrip"),
+    "transcript_vtt": ("transcript.vtt", "text/vtt; charset=utf-8"),
     "transcript_json": ("transcript.json", "application/json"),
     "diarized_txt": ("diarized.txt", "text/plain; charset=utf-8"),
     "merged_txt": ("merged.txt", "text/plain; charset=utf-8"),

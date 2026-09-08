@@ -13704,3 +13704,18 @@ None: permission probe was read-only.
 
 [rollback]
 Revert the single caption formatter commit; no schema or runtime route is changed.
+
+## 2026-09-08 — Whisper VTT output path
+
+[result]
+- Extended the existing local faster-whisper pipeline to emit a deterministic `transcript.vtt` beside the existing SRT/JSON outputs.
+- Added `/api/download/{job_id}/transcript_vtt`; source transcript remains immutable and the meeting service remains local-only.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Python unittest | cmd=`python -m unittest discover -s tests -p 'test_vtt.py' -v` plus py_compile | exit=0 | tests=4
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after regression tests and CR sanitization.
+- BUGHUNT_DONE: scope=meeting-service VTT path | grep=`subprocess|eval|secret` | hits=0
+- WORKLOG_DONE: source, tests and receipt are ready for commit.
+
+[rollback]
+Revert the VTT-only change; existing SRT/JSON downloads remain unchanged.
