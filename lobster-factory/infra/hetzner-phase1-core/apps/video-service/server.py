@@ -59,6 +59,7 @@ R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
 # 影片輸出專用 bucket（隔離於圖片 bucket；後續可設 7 天 lifecycle）
 R2_VIDEO_BUCKET = os.getenv("R2_VIDEO_BUCKET", "lobster-videos")
 R2_VIDEO_PUBLIC_BASE = os.getenv("R2_VIDEO_PUBLIC_BASE", "").rstrip("/")
+R2_API_BASE_URL = os.getenv("R2_API_BASE_URL", "https://api.cloudflare.com").rstrip("/")
 _render_lock = threading.Lock()
 
 # /generate-job 全自動管道憑證
@@ -73,7 +74,7 @@ def _r2_video_configured() -> bool:
 def _r2_put(object_key: str, data: bytes, content_type: str, bucket: str, public_base: str) -> str:
     """上傳一個物件到指定 R2 bucket（CF R2 API），回 public URL；失敗丟例外。"""
     key_path = quote(object_key, safe="/")
-    url = (f"https://api.cloudflare.com/client/v4/accounts/{R2_ACCOUNT_ID}"
+    url = (f"{R2_API_BASE_URL}/client/v4/accounts/{R2_ACCOUNT_ID}"
            f"/r2/buckets/{bucket}/objects/{key_path}")
     r = requests.put(url, headers={"Authorization": f"Bearer {R2_API_TOKEN}",
                                    "Content-Type": content_type}, data=data, timeout=120)

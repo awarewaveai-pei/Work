@@ -24,6 +24,7 @@ services:
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}
       R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:?R2_VIDEO_BUCKET is required}
       R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:?R2_VIDEO_PUBLIC_BASE is required}
+      R2_API_BASE_URL: ${R2_API_BASE_URL:-https://api.cloudflare.com}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY:?CLAUDE_API_KEY is required}
       PEXELS_API_KEY: ${PEXELS_API_KEY:?PEXELS_API_KEY is required}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -59,6 +60,7 @@ services:
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}
       R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:?R2_VIDEO_BUCKET is required}
       R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:?R2_VIDEO_PUBLIC_BASE is required}
+      R2_API_BASE_URL: ${R2_API_BASE_URL:-https://api.cloudflare.com}
       CHROMIUM_FLAGS: "--no-sandbox --disable-dev-shm-usage"
     ports:
       - "127.0.0.1:9733:8733"
