@@ -1,0 +1,149 @@
+$id: "ai-lego://methods/contracts/decision.topsis.contract.yaml"
+title: "TOPSIS Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry, mandated by the actively-running Cognitive OS
+  runtime slice. Atlas F16 tool table, TOPSIS row (L769): "TOPSIS | 距理想/
+  最差解排序 | normalize→ideal points→distance | 量化方案比較". No dedicated
+  Atlas section beyond the table row (grep-confirmed across the whole spec
+  root). Genuinely distinct from `decision.mcda` (same criteria+weights+
+  options input shape, but ranks by EUCLIDEAN DISTANCE to computed ideal/
+  anti-ideal reference points, never a weighted-sum score -- see
+  `ai_lego/modules/decision/topsis.py`'s own due-diligence). Core invariant:
+  ideal/anti-ideal points and the closeness coefficient are GENUINE_COMPUTE,
+  re-derived independently by the gate from the record's own stored
+  normalized_scores/weights, never trusted as caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, TOPSIS row (L769)"
+  - "methods/contracts/decision.mcda.contract.yaml (due-diligence comparison -- confirms distinct compute shape, see decided_by)"
+  - "ai_lego/compute/mcda/scoring.py::normalize_scores (REUSED unchanged for this method's own Normalize stage)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in methods/registry/contract-backlog.yaml
+  tier_1, same class of justification as every F16 sibling entry. id:
+  decision.topsis mints a new machine_id, 7th member of the decision family
+  (F16), after ahp/mcda/impact_effort/ice/rice/moscow. Due-diligence against
+  decision.mcda (read in full, plus ai_lego/compute/mcda/scoring.py):
+  confirmed no existing ideal-point or Euclidean-distance compute anywhere
+  in this package before this contract (grepped exhaustively) -- MCDA ranks
+  by weighted SUM (ai_lego/compute/ahp/weights.py::rank_options, reused
+  unchanged by MCDA, has no distance/sqrt operator anywhere in its body);
+  TOPSIS ranks by DISTANCE to two computed reference points. Distinct
+  GENUINE_COMPUTE method, not a duplicate.
+
+id: decision.topsis
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, CALCULATE, PRIORITIZE]
+# INFERRED, not cited -- same status decision.mcda's own primitive set
+# carries. Excludes WEIGHT (present in decision.mcda's own inferred set):
+# TOPSIS's weights are a direct caller-supplied input, not derived or
+# adjusted by this method itself, the same reasoning decision.rice's own
+# inferred set already applies to its own caller-supplied inputs.
+
+purpose:
+  - rank_options_by_euclidean_distance_to_computed_ideal_and_anti_ideal_points
+
+inputs:
+  required:
+    - Options
+    - Criteria
+    - RawScores
+    - Weights
+  optional: []
+  # Same shape decision.mcda.contract.yaml's own inputs already establish --
+  # Atlas's own "normalize→ideal points→distance" pipeline implies the same
+  # Options/Criteria/RawScores/Weights inputs MCDA's own pipeline names,
+  # just aggregated by distance instead of weighted sum.
+
+outputs:
+  - TopsisAnalysis
+# NEW output type (see typed-objects/topsis-analysis.schema.yaml). Atlas
+# names no PascalCase output type for this method, same disclosed gap every
+# sibling F16 contract already carries.
+
+preconditions:
+  - "every criterion carries a direction (maximize or minimize)"
+  - "weights are non-negative and sum to 1.0 (tolerance 1e-6)"
+  - "every raw_scores entry references a known option_id and criterion_id"
+  - "at least 2 options are supplied (a relative ideal/anti-ideal point is meaningless with fewer than 2)"
+  # First three are the SAME structurally-necessary preconditions
+  # decision.mcda.contract.yaml already establishes for the shared Normalize
+  # stage (reused unchanged, see decided_by). The fourth is TOPSIS-specific
+  # phrasing of decision.mcda's own MCDA_TOO_FEW_OPTIONS reasoning, adapted
+  # (TOPSIS_TOO_FEW_OPTIONS) -- both methods need >=2 options for the same
+  # underlying reason (a relative comparison is meaningless with 1).
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning decision.mcda.contract.yaml's own quality block already
+  # documents -- provenance_required for the CALCULATED_RESULT ideal
+  # points/ranking; evidence_labeling_required false (this method's risk
+  # profile is about the ranking's own trustworthiness, not about omitted
+  # evidence citations for individual raw scores).
+
+forbidden_transition: []
+# Atlas gives no Method-specific Gate table row for TOPSIS (grep-confirmed:
+# L769 is the only whole-document hit) -- UNLIKE decision.mcda (L4154,
+# directly cited "Automatic Authority" ban) and decision.rice (its own
+# dedicated Sec.12.32 limit). Left genuinely empty rather than inventing an
+# uncited rule, same disclosed-absence precedent root_cause.fault_tree.contract.yaml
+# already sets for a different single-table-row method. See open_questions.
+
+recommended_next: []
+# Same reasoning decision.mcda.contract.yaml's own recommended_next leaves
+# empty: the real next step (a human embedding this TopsisAnalysis into a
+# Decision.analyses[]) is a Decision object FIELD, not a callable method
+# with its own machine_id.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Classic TOPSIS (Hwang & Yoon 1981) normalizes via vector normalization (r_ij = x_ij / sqrt(sum x_ij^2)); should this implementation match that exactly?"
+    decision: "No -- reuse ai_lego.compute.mcda.scoring.normalize_scores's own direction-aware min-max normalization instead."
+    reasoning: "Atlas L769 cites the pipeline stage name ('normalize'), not a specific formula. Reusing MCDA's existing, hand-verified, direction-aware normalization avoids a second independent maximize/minimize implementation in this package -- one clear owner per concern. See ai_lego/compute/topsis/distance.py's own module docstring for the full mathematical-equivalence argument."
+  - question: "Should weights be applied before or after computing ideal/anti-ideal points and distances?"
+    decision: "Before -- ideal/anti-ideal points and distances are computed over the WEIGHTED normalized matrix (v_ij = w_j * r_ij), matching classic TOPSIS's own methodology."
+    reasoning: "Textbook TOPSIS (Hwang & Yoon 1981): the positive/negative ideal solutions are defined as the per-criterion best/worst value of the weighted normalized matrix, not the unweighted one -- real, well-documented methodology, not a compilation guess."
+  - question: "Schema file name: topsis-analysis-record.schema.yaml or topsis-analysis.schema.yaml (matching mcda-analysis/ahp-analysis sibling convention)?"
+    decision: "topsis-analysis.schema.yaml -- matching the closer sibling convention."
+    reasoning: "decision.mcda and decision.ahp (this method's own closest structural siblings -- same options+criteria+weights input shape, same 'candidate ranking, not a Decision' output role) both use '-analysis.schema.yaml', not '-record.schema.yaml' (that suffix marks a different shape elsewhere in this suite -- two-stage/tamper-evident records or a structural DAG -- this method does not share)."
+  - question: "Should a no-automatic-authority forbidden_transition be inferred for TOPSIS, matching decision.mcda's own cited rule, given the same 'ranking could be mistaken for a decision' risk?"
+    decision: "No -- left empty, disclosed as an open question rather than inferred."
+    reasoning: "decision.mcda's own rule is directly table-cited (Atlas §22.3 L4154); TOPSIS carries no equivalent citation anywhere in the corpus (grep-confirmed). Inferring a restriction with no textual anchor would be presenting a guess as a compiled fact, the same failure mode this suite's own decided_by sections repeatedly flag as out of bounds. root_cause.fault_tree.contract.yaml already sets this exact precedent for a different single-citation method."
+
+open_questions:
+  - id: "OQ-TOPSIS-1"
+    question: "Should a future revision add an inferred no-automatic-authority gate matching decision.mcda's own cited one, given TOPSIS shares the identical 'ranking mistaken for decision authority' risk despite carrying no Atlas citation for it?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity -- disclosed absence, not a silent gap"
+  - id: "OQ-TOPSIS-2"
+    question: "evaluate_genuine_compute_gate re-derives ideal_points/ranking from the record's own stored normalized_scores, not from raw_scores -- same scope decision.mcda's own gate already keeps (it does not re-verify normalized_scores against raw_scores either). Should a future hardening pass extend both siblings' gates to re-verify that link too, same open question decision.rice's own OQ-RICE-3 already raised for its two siblings?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-TOPSIS-3"
+    question: "id: decision.topsis mints a machine_id method-inventory.yaml's own TOPSIS entry (L1013) never carried -- same open question every prior Tier 1 F16 contract (OQ-MCDA-3, OQ-AHP-3, ...) already raised and left unresolved for its own sibling entry."
+    owner: "operator, or a future session with explicit write scope over method-inventory.yaml"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F16 tool table TOPSIS row (L769) directly; grep-confirmed no
+    dedicated section exists beyond it (only whole-document hit for
+    "topsis"/"TOPSIS", case-insensitive, across the whole spec root). Read
+    ai_lego/modules/decision/mcda.py and ai_lego/compute/mcda/scoring.py in
+    full for due-diligence (confirmed no existing ideal-point/Euclidean-
+    distance compute before this contract). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `forbidden_transition`'s empty value is
+    a disclosed absence (no citation exists), not an oversight -- see
+    compilation_decisions/OQ-TOPSIS-1. The vector-vs-min-max normalization
+    substitution and the weights-before-distance ordering are disclosed,
+    methodology-grounded compilation decisions, not silent guesses.

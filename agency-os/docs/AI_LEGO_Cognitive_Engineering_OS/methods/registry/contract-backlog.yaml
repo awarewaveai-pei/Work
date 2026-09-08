@@ -2054,6 +2054,46 @@ tier_1:
     source: "methods/contracts/decision.moscow.contract.yaml + specs/cognitive/typed-objects/moscow-prioritization-record.schema.yaml"
     note: "72nd slice. 116 tests pass. F16 decision family: 6 of 13 built (ahp/mcda/impact_effort/ice/rice/moscow); remaining: Weighted Decision Matrix, TOPSIS, Decision Tree, Expected Value, Pareto Frontier, WSJF, Kano."
 
+  seventysecond_concrete_entry:
+    method_id: "decision.weighted_decision_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: "7th `decision` (F16) member, row L766 + Sec12.33 (L2969-2986). Distinct from mcda.py: pipeline omits Normalize stage (Atlas cites Options x Criteria x Weights -> Scores -> Sensitivity -> Decision, no normalize step, vs MCDA's own Sec11.32 Weights->Normalize node) -- scored on one common declared scale, not rescaled per-criterion. Invariants: scores within common scale_min/scale_max; ranking GENUINE_COMPUTE re-derived by gate."
+    source: "methods/contracts/decision.weighted_decision_matrix.contract.yaml + specs/cognitive/typed-objects/weighted-decision-matrix-record.schema.yaml + ai_lego/compute/weighted_decision_matrix/scoring.py"
+    note: "73rd slice. 106 tests pass."
+
+  seventythird_concrete_entry:
+    method_id: "decision.topsis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "8th `decision` (F16) member, row L769. Distinct from mcda.py: ranks by Euclidean distance to computed ideal/anti-ideal points, not weighted-sum; reuses mcda's normalize_scores (direction-aware min-max, not classic TOPSIS vector normalization -- disclosed). Invariants: ideal/anti-ideal + closeness_coefficient GENUINE_COMPUTE re-derived by gate; TOPSIS_TOO_FEW_OPTIONS adapted from MCDA_TOO_FEW_OPTIONS."
+    source: "methods/contracts/decision.topsis.contract.yaml + specs/cognitive/typed-objects/topsis-analysis.schema.yaml + ai_lego/compute/topsis/distance.py"
+    note: "74th slice. 83 tests pass."
+
+  seventyfourth_concrete_entry:
+    method_id: "decision.decision_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: "9th `decision` (F16) member, row L770. Distinct from root_cause.fault_tree (flat AND/OR gates, backward, no payoff) and root_cause.event_tree (flat barrier sequence, forward, no payoff); distinct from flat decision.expected_value (cross-checked directly, no contradiction) -- nested decision/chance/terminal shape, backward-induction rollup. Invariants: chance-node branch probabilities sum to 1.0; expected_value/optimal_branch_label GENUINE_COMPUTE recomputed bottom-up."
+    source: "methods/contracts/decision.decision_tree.contract.yaml + specs/cognitive/typed-objects/decision-tree-record.schema.yaml + ai_lego/compute/decision_tree/rollup.py"
+    note: "75th slice. 127 tests pass."
+
+  seventyfifth_concrete_entry:
+    method_id: "decision.expected_value"
+    contract_status: complete
+    tier: 1
+    mandated_by: "10th `decision` (F16) member, row L771. Flat single-stage Sum(p_i x outcome_i) over exhaustive states -- distinct from computation.monte_carlo's sampled outcome_distribution.mean (SIMULATED_RESULT not CALCULATED_RESULT) and mcda's cross-option ranker (bounded [0,1]); complementary to decision.decision_tree (flat baseline vs branching superset, cross-checked both directions). Invariants: state probabilities sum to 1.0; expected_value GENUINE_COMPUTE re-derived by gate."
+    source: "methods/contracts/decision.expected_value.contract.yaml + specs/cognitive/typed-objects/expected-value-record.schema.yaml + ai_lego/compute/expected_value/calculation.py"
+    note: "76th slice. 112 tests pass."
+
+  seventysixth_concrete_entry:
+    method_id: "decision.pareto_frontier"
+    contract_status: complete
+    tier: 1
+    mandated_by: "11th `decision` (F16) member, row L772. Distinct from root_cause.pareto (single-dimension 80/20 cumulative-% ranking, no 'objectives' or domination concept) and decision.mcda (always collapses to one weighted_score) -- outputs a SET partition (on_frontier/dominated), no score field. Invariants: >=2 objectives enforced inside compute_frontier itself (construction and gate re-derive through the same code path); frontier classification GENUINE_COMPUTE via real pairwise domination."
+    source: "methods/contracts/decision.pareto_frontier.contract.yaml + specs/cognitive/typed-objects/pareto-frontier-record.schema.yaml + ai_lego/compute/pareto_frontier/dominance.py"
+    note: "77th slice. 107 tests pass. F16 decision family: 11 of 13 built (ahp/mcda/impact_effort/ice/rice/moscow/weighted_decision_matrix/topsis/decision_tree/expected_value/pareto_frontier); remaining: WSJF, Kano."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

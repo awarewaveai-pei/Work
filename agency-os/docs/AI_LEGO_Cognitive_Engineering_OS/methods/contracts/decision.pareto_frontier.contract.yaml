@@ -1,0 +1,159 @@
+$id: "ai-lego://methods/contracts/decision.pareto_frontier.contract.yaml"
+title: "Pareto Frontier Method Contract"
+status: ACTIVE
+
+description: >
+  decision.pareto_frontier, F16, 7th concrete member (after ahp/mcda/impact_effort/ice/rice/moscow). Atlas F16
+  table row (L772, grep-verified: method-inventory.yaml's own cached L769 is stale by the same systematic +3
+  offset decision.impact_effort's contract already disclosed for its own row) -- no dedicated Atlas section, no
+  §22.3 gate-table row (grep-confirmed absent). NOT a duplicate of root_cause.pareto (F05, single-dimension
+  80/20 cumulative-ranking, read in full) -- this method is multi-objective Pareto dominance: option A
+  dominates B iff A is at least as good as B on EVERY objective AND strictly better on at least one; the
+  non-dominated remainder is the frontier. Also NOT a duplicate of decision.mcda (read in full) -- MCDA
+  collapses N criteria into ONE weighted_score per option; this method outputs a SET partition
+  (on_frontier/dominated) with no score field anywhere, matching the F16 row's own benefit column ("不過早壓成
+  單一總分"). Invariants: every option's status/dominated_by is GENUINE_COMPUTE, re-derived by the gate via the
+  real domination algorithm; >=2 objectives required (a single-objective "frontier" is meaningless -- that is
+  sorting, root_cause.pareto's own operation).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Pareto Frontier row (L772): '找非支配方案｜objective vectors→remove dominated｜不過早壓成單一總分' -- grep-verified fresh, NOT method-inventory.yaml's cached L769"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.12 Decision Under Deep Uncertainty Recipe (L3491-3506): '... → Robust Options → Pareto Frontier → Red Team → MCDA by Scenario → ...' -- this contract's recommended_next"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155): grep-confirmed NO Pareto Frontier row -- forbidden_transition below is inferred from the F16 row's own benefit-column text, not table-cited (weaker grounding than decision.mcda's L4154 citation AND weaker than decision.impact_effort's own L1905-1906 prose-caution citation, since Pareto Frontier has no dedicated caution sentence anywhere)"
+  - "methods/contracts/root_cause.pareto.contract.yaml + ai_lego/modules/root_cause/pareto.py + ai_lego/compute/pareto/ranking.py (all read in full) -- mandatory naming-collision due-diligence, confirmed non-duplicate (single-dimension cumulative-% ranking vs multi-objective dominance)"
+  - "methods/contracts/decision.mcda.contract.yaml + ai_lego/modules/decision/mcda.py (both read in full) -- due-diligence comparison target for the 'no single score' distinction"
+  - "ai_lego/modules/decision/impact_effort.py (read in full) -- the closest structural analog in this family (categorical, non-scalar genuine-compute result with its own re-derive integrity gate), not MCDA/RICE's own scalar-recompute gates"
+  - "ai_lego/modules/root_cause/fault_tree.py (read in full) -- the two-layer construction+gate, raise-before-write, re-derive-don't-trust pattern this contract's own invariants follow"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas F16 L772 gives a complete, if terse, formula (objective vectors -> remove
+  dominated) plus a benefit-column caution against premature score-collapse. `id: decision.pareto_frontier`
+  (NOT `decision.pareto`) mints a new machine_id, 7th concrete F16 entry, deliberately disjoint from the
+  existing `root_cause.pareto` machine_id to avoid naming ambiguity (see naming-collision due-diligence above).
+
+id: decision.pareto_frontier
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, CLASSIFY, OPTIMIZE, CALCULATE]
+# INFERRED, not cited -- Atlas §4 gives no primitive formula for this method (same absence decision.mcda/
+# decision.rice/decision.impact_effort's own inferred sets already document). COMPARE=pairwise dominance
+# comparison across objectives; CLASSIFY (OBSERVED_EXTENSION tier)=binary on_frontier/dominated assignment,
+# same tier decision.impact_effort's own 4-quadrant CLASSIFY use already establishes for a comparably-shaped
+# operation; OPTIMIZE=CANONICAL_KERNEL's own standard operations-research term for multi-objective
+# optimization, the textbook name for what this method does; CALCULATE=genuine deterministic compute (not LLM
+# math), same class every genuine-compute sibling's inferred set already uses. PRIORITIZE and DECIDE are
+# deliberately EXCLUDED: the F16 row's own benefit column ("不過早壓成單一總分") is explicitly a caution against
+# collapsing to a priority order or a decision too early -- including either primitive would contradict this
+# contract's own forbidden_transition two sections below.
+
+purpose:
+  - identify_non_dominated_options_across_multiple_objectives_without_collapsing_to_a_single_score
+# Atlas L772 verbatim sense: "找非支配方案" (find non-dominated options) + benefit column "不過早壓成單一總分"
+# (don't collapse to a single score too early).
+
+inputs:
+  required: [Objectives, Options, OptionValues]
+  optional: []
+  # Atlas's own terse formula ("objective vectors→remove dominated") names the input class ("objective
+  # vectors") without a field-level shape -- Objectives/Options/OptionValues are the structurally-necessary
+  # decomposition (a vector is meaningless without knowing which option and which objective each component
+  # belongs to), same class of necessary-but-not-literally-cited input decision.mcda's own Options/Criteria/
+  # RawScores/Weights split already establishes for an analogous terse citation.
+
+outputs: [ParetoFrontierRecord]
+# NEW output type (see typed-objects/pareto-frontier-record.schema.yaml). Deliberately NOT reusing
+# pareto-analysis.schema.yaml (root_cause.pareto's own output) -- zero field overlap, see naming-collision
+# due-diligence above.
+
+preconditions:
+  - "objectives has >=2 entries, each {id,label,direction}, direction in {maximize,minimize}, ids unique -- a single-objective 'frontier' is meaningless (PARETOFRONTIER_TOO_FEW_OBJECTIVES)"
+  - "options has >=2 entries, each {id,label}, ids unique -- a 1-option 'frontier' is trivially non-dominated, no information (PARETOFRONTIER_TOO_FEW_OPTIONS)"
+  - "option_values completely and exactly covers every (option_id, objective_id) pair once, each value a finite real number (PARETOFRONTIER_INCOMPLETE_VALUES / PARETOFRONTIER_INVALID_VALUE)"
+  - "frontier_classification (status + dominated_by per option) is COMPUTED only -- never a caller-supplied constructor input, same discipline every genuine-compute sibling in this family establishes for its own computed field"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning every decision-family sibling already establishes: this method's real risk is premature
+  # score-collapse / unauthorized authority, not omitted evidence citations for individual option values.
+
+forbidden_transition:
+  - "Automatic Authority"
+# INFERRED (weakest-grounded citation in the decision family so far -- see source_of_truth_for's own disclosed
+# ranking against decision.mcda's table citation and decision.impact_effort's prose-caution citation). Grounded
+# in the F16 row's own benefit-column text ("不過早壓成單一總分") read as a structural implication: an output
+# whose entire purpose is to NOT collapse to one score must not itself assert a single decided/approved winner.
+# Enforced the same two-layer way every sibling rule is: construction-time assert_no_automatic_authority_claim
+# + evaluate_no_automatic_authority_gate + this schema's own additionalProperties:false, using an
+# INDEPENDENTLY RE-DERIVED (not imported) FORBIDDEN_AUTHORITY_KEYS set (widened by 2 entries --
+# recommended_option/winner -- beyond the family's usual set, since a frontier's own natural vocabulary
+# invites exactly those two smuggled claims).
+
+recommended_next: [challenge.red_team]
+# CITED, Atlas §13.12 L3491-3506's own Decision Under Deep Uncertainty Recipe: "... → Pareto Frontier → Red
+# Team → MCDA by Scenario → ...". Pareto Frontier is immediately followed by the unqualified "Red Team" step,
+# mapping unambiguously to the existing challenge.red_team machine_id (only one Red Team method exists in this
+# codebase). "MCDA by Scenario" (2 hops later, in the same recipe) is deliberately NOT cited here -- it carries
+# a "by Scenario" qualifier this contract does not attempt to silently resolve to a bare decision.mcda
+# invocation; see open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Distinct method from root_cause.pareto, or the same '80/20' concept under a new machine_id?"
+    decision: "Genuinely distinct -- single-dimension cumulative-% ranking (root_cause.pareto) vs multi-objective pairwise dominance (this method); zero shared code, own compute/pareto_frontier/ package, disjoint schema (PARETOFRONTIER- vs PA- id prefix). Full due-diligence in ai_lego/modules/decision/pareto_frontier.py's own module docstring."
+  - question: "Distinct method from decision.mcda, or MCDA with an unusual output shape?"
+    decision: "Distinct -- MCDA always collapses to ONE weighted_score per option (mcda.py:87-92, rank_options is an accumulate-and-sum loop); this method's own schema has no score field anywhere, only a categorical status + dominated_by, matching the F16 row's own benefit column."
+  - question: "option_values shape: flat list (mcda's raw_scores[] style) or per-option embedded values?"
+    decision: "Flat list [{option_id, objective_id, value}], mirrors mcda-analysis.schema.yaml's raw_scores[] -- arbitrary-many objectives per option, unlike decision.impact_effort's fixed 2 named axes."
+  - question: "Where does the >=2-objectives floor live -- the module's own constructor pre-checks, or the compute layer?"
+    decision: "Compute layer (inside compute_frontier itself), not the module's own shape pre-checks."
+    reasoning: >
+      So BOTH construction and evaluate_frontier_integrity_gate re-derive it through the exact SAME code path
+      (both call compute_frontier), rather than duplicating the same numeric floor check in two places that
+      could drift -- a stronger two-layer guarantee than decision.mcda's own MCDA_TOO_FEW_OPTIONS, which is
+      checked only once at construction (MCDA carries no structural integrity gate to re-derive it).
+  - question: "Should dominated_by[] be included, or a bare status enum only?"
+    decision: "Include dominated_by[] for explainability/hand-verification -- Atlas gives no field shape, disclosed Phase 3 addition, same class as root_cause.pareto's own share_of_total_percent/cumulative_share_percent enrichment beyond a bare rank."
+  - question: "Gate granularity: one bundled structural gate (fault_tree/impact_effort style), or one gate per invariant?"
+    decision: "One bundled gate (frontier_integrity) for both headline invariants -- they are DEPENDENT (recomputing a frontier is only meaningful once its own objective/option/value data is structurally sane), same bundling rationale fault_tree/impact_effort's own integrity gates already use."
+
+open_questions:
+  - "OQ-PARETOFRONTIER-1: forbidden_transition is inferred from the F16 benefit column's own literal text, not a dedicated caution sentence or a §22.3 table row (both grep-confirmed absent) -- the weakest-grounded such citation in the decision family so far. Should Atlas §22.3 gain an explicit Pareto Frontier row in a future revision?（owner: operator, or whoever next revises Atlas §22.3）"
+  - "OQ-PARETOFRONTIER-2: cognitive_primitives is inferred, not cited (Atlas §4 gives no formula for this method).（owner: operator）"
+  - "OQ-PARETOFRONTIER-3: §13.12's own Decision Under Deep Uncertainty Recipe names 'MCDA by Scenario' as the step two hops after this method -- not mapped to a recommended_next entry here since the 'by Scenario' qualifier is unresolved (does it mean N independent decision.mcda invocations, one per scenario, with no new schema needed -- the same composability decision.mcda's own contract already establishes for AHP-derived weights -- or something structurally new?). Left open rather than silently guessed.（owner: operator）"
+  - "OQ-PARETOFRONTIER-4: F16 status at build time: 7 of 13 built after this contract (ahp, mcda, impact_effort, ice, rice, moscow, pareto_frontier). Remaining 6: Weighted Decision Matrix, TOPSIS, Decision Tree, Expected Value, WSJF, Kano.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Grepped the Atlas for "Pareto Frontier"/"pareto_frontier"/"non-dominated"/"domination" across the whole
+    mother document -- found and read the F16 table row (L772) directly, plus 2 secondary mentions (§13.12
+    L3501 recipe step, confirmed not a protocol section) and confirmed via grep that "Pareto" near §22.3's
+    L4142-4155 gate-table region matches nothing (no dedicated gate row). Read root_cause.pareto.contract.yaml,
+    ai_lego/modules/root_cause/pareto.py, and ai_lego/compute/pareto/ranking.py in full for the mandatory
+    naming-collision due-diligence (confirmed: single-dimension, no "objectives"/"domination" concept
+    anywhere). Read decision.mcda.contract.yaml and ai_lego/modules/decision/mcda.py in full for the
+    "no single score" due-diligence (confirmed: rank_options always produces exactly one weighted_score per
+    option). Read ai_lego/modules/decision/impact_effort.py in full as the closest structural analog
+    (categorical genuine-compute result with its own re-derive integrity gate). Read
+    ai_lego/modules/root_cause/fault_tree.py in full for the two-layer gate pattern. Read
+    specs/cognitive/primitive.schema.yaml in full to ground cognitive_primitives against the real 29-value
+    vocabulary. Grepped ai_lego/ and agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/ exhaustively for
+    "pareto_frontier"/"ParetoFrontier" before writing -- zero prior hits, confirmed no duplicate exists, and
+    re-confirmed immediately before writing any file (repo had concurrent uncommitted activity from another
+    session this same session; re-checked HEAD and searched for pareto_frontier artifacts fresh before the
+    first write). Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator
+    (via the project's own SchemaContracts loader, exercised through tests/unit/test_pareto_frontier.py).
+  note: >
+    No mother document was modified. Doc format follows methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md
+    (2026-09-06 operator ruling) and decision.impact_effort.contract.yaml as the current lean exemplar --
+    description/compilation_decisions/open_questions kept terse, no separate slice markdown file written, no
+    per-edit method-inventory.yaml/contract-backlog.yaml/decision/__init__.py update (all out of scope for
+    this task by explicit instruction -- see this task's own suggested entries for a future integration pass).
+    forbidden_transition is the WEAKEST-grounded field in this file, explicitly flagged as such rather than
+    silently presented at the same strength as decision.mcda's own table-cited rule. recommended_next is
+    real-recipe-cited (§13.12), stronger grounding than most sibling recommended_next fields (usually inferred
+    or left empty).

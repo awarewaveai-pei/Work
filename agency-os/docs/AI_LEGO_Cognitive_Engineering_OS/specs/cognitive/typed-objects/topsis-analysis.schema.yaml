@@ -1,0 +1,248 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/topsis-analysis.schema.yaml"
+title: TOPSIS Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical definition of `TopsisAnalysis`, decision.topsis's declared
+  outputs (methods/contracts/decision.topsis.contract.yaml, outputs:
+  [TopsisAnalysis]). Atlas F16 table row (L769): "TOPSIS | 距理想/最差解排序
+  | normalize→ideal points→distance | 量化方案比較". Same
+  options/criteria/raw_scores/weights/normalized_scores input shape as
+  mcda-analysis.schema.yaml (this method's closest sibling), but adds
+  `weighted_normalized_scores`/`ideal_points` and a richer `ranking[]`
+  (distance_to_ideal/distance_to_anti_ideal/closeness_coefficient, not a
+  bare weighted_score) -- the real, structural difference between the two
+  methods. See ai_lego/modules/decision/topsis.py's own module docstring for
+  the full due-diligence trail.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, TOPSIS row (L769)"
+  - "methods/contracts/decision.topsis.contract.yaml (outputs, preconditions, quality)"
+  - "ai_lego/compute/mcda/scoring.py::normalize_scores (reused unchanged for normalized_scores)"
+  - "ai_lego/compute/topsis/distance.py (weighted_normalized_scores/ideal_points/ranking's own real compute)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+type: object
+required: [id, version, options, criteria, raw_scores, weights, normalized_scores, weighted_normalized_scores, ideal_points, ranking, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^TOPSIS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as mcda-analysis.schema.yaml's own MCDA- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.topsis"
+
+  options:
+    type: array
+    minItems: 2
+    description: "Atlas's own pipeline first input, same shape mcda-analysis.schema.yaml's own options[] establishes."
+    items:
+      type: object
+      required: [id, label]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        label: {type: string}
+
+  criteria:
+    type: array
+    minItems: 1
+    description: "Same shape mcda-analysis.schema.yaml's own criteria[] establishes -- direction is structurally necessary for the Normalize stage (reused unchanged from ai_lego/compute/mcda/scoring.py)."
+    items:
+      type: object
+      required: [id, label, direction]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        label: {type: string}
+        direction:
+          enum: [maximize, minimize]
+
+  raw_scores:
+    type: array
+    minItems: 1
+    description: "Input side of the Normalize stage -- caller-supplied, arbitrary-scale per-option, per-criterion values. Same shape mcda-analysis.schema.yaml's own raw_scores[] establishes."
+    items:
+      type: object
+      required: [option_id, criterion_id, raw_value]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        raw_value: {type: number}
+
+  weights:
+    type: array
+    minItems: 1
+    description: "Caller-supplied directly, not derived. Must be non-negative and sum to 1.0 (tolerance 1e-6), enforced by ai_lego/compute/mcda/scoring.py::validate_weights_sum_to_one (reused unchanged)."
+    items:
+      type: object
+      required: [criterion_id, weight]
+      additionalProperties: false
+      properties:
+        criterion_id: {type: string}
+        weight: {type: number, minimum: 0, maximum: 1}
+
+  normalized_scores:
+    type: array
+    minItems: 1
+    description: "COMPUTED -- Atlas's own 'normalize' pipeline stage. Reuses ai_lego.compute.mcda.scoring.normalize_scores UNCHANGED (direction-aware min-max, not classic TOPSIS vector normalization -- disclosed compilation decision, see method contract). Same shape mcda-analysis.schema.yaml's own normalized_scores[] establishes."
+    items:
+      type: object
+      required: [option_id, criterion_id, normalized_value]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        normalized_value: {type: number, minimum: 0, maximum: 1}
+
+  weighted_normalized_scores:
+    type: array
+    minItems: 1
+    description: "COMPUTED, TOPSIS-specific (no MCDA equivalent) -- the weighted normalized matrix (v_ij = weight * normalized_value) ideal points and distances are computed against, classic TOPSIS's own real methodology (Hwang & Yoon 1981), not the unweighted normalized_scores."
+    items:
+      type: object
+      required: [option_id, criterion_id, weighted_value]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        weighted_value: {type: number, minimum: 0, maximum: 1}
+
+  ideal_points:
+    type: array
+    minItems: 1
+    description: "COMPUTED, TOPSIS-specific (no MCDA equivalent) -- Atlas's own 'ideal points' pipeline stage. One entry per criterion: positive_ideal is the per-criterion MAX of weighted_value across all options, negative_ideal the per-criterion MIN. GENUINE_COMPUTE, re-derived independently by evaluate_genuine_compute_gate on every call."
+    items:
+      type: object
+      required: [criterion_id, positive_ideal, negative_ideal]
+      additionalProperties: false
+      properties:
+        criterion_id: {type: string}
+        positive_ideal: {type: number, minimum: 0, maximum: 1}
+        negative_ideal: {type: number, minimum: 0, maximum: 1}
+
+  ranking:
+    type: array
+    minItems: 2
+    description: "COMPUTED -- Atlas's own 'distance' pipeline stage. Sorted DESCENDING by closeness_coefficient (higher = closer to the positive ideal = better), mirroring mcda-analysis.schema.yaml's own ranking[] descending-by-score convention. GENUINE_COMPUTE, re-derived independently by evaluate_genuine_compute_gate on every call."
+    items:
+      type: object
+      required: [option_id, distance_to_ideal, distance_to_anti_ideal, closeness_coefficient]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        distance_to_ideal: {type: number, minimum: 0}
+        distance_to_anti_ideal: {type: number, minimum: 0}
+        closeness_coefficient: {type: number, minimum: 0, maximum: 1}
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed weighted_normalized_scores/ideal_points/ranking. Points at compute_topsis_ranking (this method's own distinctive new compute), not normalize_scores (reused unchanged from MCDA for the earlier Normalize stage)."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine TOPSIS run -- same design choice mcda-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3-vendor cloud-hosting selection, cost (minimize) vs quality (maximize), weights 0.6/0.4. Every field below is a REAL output of generate_topsis_analysis (live Python run, not hand-typed) -- hand-verified independently: V1 wins (0.6), V2 is exactly the equidistant midpoint (0.5, its weighted vector (0.3,0.2) = 0.5 * the ideal point (0.6,0.4)), V3 last (0.4). See ai_lego/compute/topsis/distance.py's own module docstring for the full worked derivation."
+    value:
+      id: "TOPSIS-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.topsis"
+      options:
+        - {id: "V1", label: "Vendor A"}
+        - {id: "V2", label: "Vendor B"}
+        - {id: "V3", label: "Vendor C"}
+      criteria:
+        - {id: "COST", label: "Monthly cost (USD)", direction: minimize}
+        - {id: "QUALITY", label: "Support quality (1-10)", direction: maximize}
+      raw_scores:
+        - {option_id: "V1", criterion_id: "COST", raw_value: 1000}
+        - {option_id: "V1", criterion_id: "QUALITY", raw_value: 1}
+        - {option_id: "V2", criterion_id: "COST", raw_value: 2000}
+        - {option_id: "V2", criterion_id: "QUALITY", raw_value: 5}
+        - {option_id: "V3", criterion_id: "COST", raw_value: 3000}
+        - {option_id: "V3", criterion_id: "QUALITY", raw_value: 9}
+      weights:
+        - {criterion_id: "COST", weight: 0.6}
+        - {criterion_id: "QUALITY", weight: 0.4}
+      normalized_scores:
+        - {option_id: "V1", criterion_id: "COST", normalized_value: 1.0}
+        - {option_id: "V2", criterion_id: "COST", normalized_value: 0.5}
+        - {option_id: "V3", criterion_id: "COST", normalized_value: 0.0}
+        - {option_id: "V1", criterion_id: "QUALITY", normalized_value: 0.0}
+        - {option_id: "V2", criterion_id: "QUALITY", normalized_value: 0.5}
+        - {option_id: "V3", criterion_id: "QUALITY", normalized_value: 1.0}
+      weighted_normalized_scores:
+        - {option_id: "V1", criterion_id: "COST", weighted_value: 0.6}
+        - {option_id: "V2", criterion_id: "COST", weighted_value: 0.3}
+        - {option_id: "V3", criterion_id: "COST", weighted_value: 0.0}
+        - {option_id: "V1", criterion_id: "QUALITY", weighted_value: 0.0}
+        - {option_id: "V2", criterion_id: "QUALITY", weighted_value: 0.2}
+        - {option_id: "V3", criterion_id: "QUALITY", weighted_value: 0.4}
+      ideal_points:
+        - {criterion_id: "COST", positive_ideal: 0.6, negative_ideal: 0.0}
+        - {criterion_id: "QUALITY", positive_ideal: 0.4, negative_ideal: 0.0}
+      ranking:
+        - {option_id: "V1", distance_to_ideal: 0.4, distance_to_anti_ideal: 0.6, closeness_coefficient: 0.6}
+        - {option_id: "V2", distance_to_ideal: 0.36055513, distance_to_anti_ideal: 0.36055513, closeness_coefficient: 0.5}
+        - {option_id: "V3", distance_to_ideal: 0.6, distance_to_anti_ideal: 0.4, closeness_coefficient: 0.4}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.topsis.distance.compute_topsis_ranking"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+compilation_decisions:
+  - question: "Model ideal_points as an array of {criterion_id, positive_ideal, negative_ideal} objects, or as two separate dict-like objects keyed by criterion_id?"
+    decision: "Array of objects, one per criterion."
+    reasoning: "Matches the array-of-objects convention every other per-criterion/per-option field in this schema (and its mcda-analysis.schema.yaml sibling) already uses -- a dynamically-keyed JSON object would not be validatable with additionalProperties: false the same way."
+  - question: "File name: topsis-analysis-record.schema.yaml or topsis-analysis.schema.yaml?"
+    decision: "topsis-analysis.schema.yaml -- matching mcda-analysis.schema.yaml/ahp-analysis.schema.yaml, this method's closer structural siblings."
+    reasoning: "The '-record' suffix elsewhere in this directory (fault-tree-record, prediction-tracking-record, rice-score-record) marks a different shape (two-stage/tamper-evident, or a structural DAG) this method does not share; TOPSIS is, like MCDA/AHP, a single-stage options+criteria->ranking analysis."
+  - question: "Does ranking[] need a schema-level constraint tying it to options[] (every option appears exactly once)?"
+    decision: "No -- left as a runtime invariant, same disclosed gap mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 / ahp-analysis.schema.yaml's own OQ-AHPANALYSIS-1 already document for their structurally identical field."
+    reasoning: "ai_lego/modules/decision/topsis.py's own builder computes ranking directly from options/weighted_normalized_scores, so it cannot legally diverge in practice; evaluate_genuine_compute_gate re-derives and compares the whole ranking[] on every call regardless."
+
+open_questions:
+  - id: "OQ-TOPSISANALYSIS-1"
+    question: "Same disclosed gap as OQ-MCDAANALYSIS-1/OQ-AHPANALYSIS-1 (see compilation_decisions) -- no schema-level cross-field constraint ties ranking[]/ideal_points[] to options[]/criteria[]."
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F16 tool table TOPSIS row (L769) directly. Cross-checked
+    against methods/contracts/decision.topsis.contract.yaml's own
+    outputs/preconditions/quality and ai_lego/compute/topsis/distance.py's
+    real ideal-point/Euclidean-distance/closeness-coefficient compute
+    (hand-verified against a worked-by-hand 3-option case before this schema
+    was written -- see that module's own docstring). The worked example
+    above is that SAME hand-verified case, its stored values a real output
+    of generate_topsis_analysis (computed via a live Python run, not
+    hand-typed) -- the test suite loads an equivalent fixture and re-derives
+    the same values via evaluate_genuine_compute_gate as a live regression
+    guard, so this file cannot silently drift out of sync with the algorithm
+    it documents. Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. weighted_normalized_scores/ideal_points
+    and ranking's own richer shape (distance_to_ideal/distance_to_anti_ideal/
+    closeness_coefficient, not a bare weighted_score) are the real,
+    structural fields distinguishing this schema from mcda-analysis.schema.yaml
+    -- not a relabeled duplicate.

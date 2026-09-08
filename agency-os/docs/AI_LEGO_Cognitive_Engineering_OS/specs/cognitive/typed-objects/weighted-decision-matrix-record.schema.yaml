@@ -1,0 +1,198 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/weighted-decision-matrix-record.schema.yaml"
+title: Weighted Decision Matrix Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `WeightedDecisionMatrixAnalysis`
+  -- the declared `outputs` of `decision.weighted_decision_matrix`'s Method
+  Contract (methods/contracts/decision.weighted_decision_matrix.contract.yaml,
+  `outputs: [WeightedDecisionMatrixAnalysis]`). Field provenance -- Atlas
+  §12.33 (L2969-2986) + F16 L766's own 6-node pipeline ("Options x Criteria
+  x Weights -> Scores -> Sensitivity -> Decision") maps onto this schema:
+  `options[]`/`criteria[]`/`weights[]` the Options/Criteria/Weights stages;
+  `scores[]` the Scores stage (caller-supplied directly on one common
+  `scale_min`/`scale_max`, NEVER normalized -- contrast `mcda-analysis
+  .schema.yaml`'s own `raw_scores[]`+`normalized_scores[]` two-stage
+  shape); `ranking[]` COMPUTED (reuses `ai_lego.compute.ahp.weights
+  .rank_options` unchanged, third family to do so); `sensitivity_notes`
+  the Sensitivity stage, disclosure-only (see method contract
+  compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.33 (L2969-2986) + F16 table row (L766) -- the 6-node pipeline this schema's fields are transcribed from"
+  - "methods/contracts/decision.weighted_decision_matrix.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/compute/weighted_decision_matrix/scoring.py (validate_scores_within_common_scale -- the one new compute primitive backing this schema's scale_min/scale_max/scores fields)"
+  - "ai_lego/compute/ahp/weights.py::rank_options (reused unchanged for ranking)"
+  - "ai_lego/compute/mcda/scoring.py::validate_weights_sum_to_one (reused unchanged for weights)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should criteria[] carry a direction field, the way mcda-analysis.schema.yaml's own criteria[] does?"
+    decision: "No -- neither WDM Atlas citation names a Normalize stage that would need one; direction is baked into the caller's own scoring discipline on the common scale, not a schema field."
+  - question: "Should raw scores be split into raw_scores[]/normalized_scores[] the way MCDA's own schema is, or a single scores[] field?"
+    decision: "Single scores[] -- there is no Normalize stage to produce a second, derived array; scores[] IS the final per-criterion value, already on the common scale."
+  - question: "Should this schema use additionalProperties:false at the top level, the same structural enforcement mcda-analysis.schema.yaml's own compilation_decisions already justify for an identical inferred-not-cited authority risk?"
+    decision: "Yes -- same reasoning: a permissive schema would silently allow a caller to smuggle an authority-claiming key onto a record whose contract explicitly forbids that claim."
+
+type: object
+required: [id, version, options, criteria, scale_min, scale_max, scores, weights, ranking, sensitivity_notes, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^WDM-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as mcda-analysis.schema.yaml's MCDA- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.weighted_decision_matrix"
+
+  options:
+    type: array
+    minItems: 2
+    description: "Atlas L2976 pipeline stage 1: 'Options'."
+    items:
+      type: object
+      required: [id, label]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        label: {type: string}
+
+  criteria:
+    type: array
+    minItems: 1
+    description: "Atlas L2977 'Criteria'. NO direction field -- see compilation_decisions (the real, disclosed difference from mcda-analysis.schema.yaml's own criteria[])."
+    items:
+      type: object
+      required: [id, label]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        label: {type: string}
+
+  scale_min:
+    type: number
+    description: "Structurally-necessary addition (see method contract preconditions) -- the lower bound of the ONE common scale every criterion's scores[] value is rated on. Not Atlas-cited; it is what makes omitting a Normalize stage valid."
+
+  scale_max:
+    type: number
+    description: "Upper bound of the common scale. Must be strictly greater than scale_min (enforced by ai_lego/compute/weighted_decision_matrix/scoring.py::validate_scores_within_common_scale, not merely by this schema's own type declaration)."
+
+  scores:
+    type: array
+    minItems: 1
+    description: "Atlas L2979 'Scores' -- caller-supplied directly on [scale_min, scale_max], never normalized. Exactly one entry per (option_id, criterion_id) pair (completeness enforced at the runtime layer, not expressible in JSON Schema alone)."
+    items:
+      type: object
+      required: [option_id, criterion_id, value]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        criterion_id: {type: string}
+        value: {type: number}
+
+  weights:
+    type: array
+    minItems: 1
+    description: "Atlas L2978 'Weights' -- caller-supplied. Must be non-negative and sum to 1.0 (tolerance 1e-6), enforced by ai_lego/compute/mcda/scoring.py::validate_weights_sum_to_one (reused unchanged)."
+    items:
+      type: object
+      required: [criterion_id, weight]
+      additionalProperties: false
+      properties:
+        criterion_id: {type: string}
+        weight: {type: number, minimum: 0, maximum: 1}
+
+  ranking:
+    type: array
+    minItems: 2
+    description: "Atlas L2979 'Scores' stage's own ranked output -- COMPUTED, sorted descending by weighted_score. Reuses ai_lego.compute.ahp.weights.rank_options unchanged (third family to do so, after decision.ahp and decision.mcda)."
+    items:
+      type: object
+      required: [option_id, weighted_score]
+      additionalProperties: false
+      properties:
+        option_id: {type: string}
+        weighted_score: {type: number}
+
+  sensitivity_notes:
+    type: string
+    minLength: 1
+    description: "Atlas L2980 'Sensitivity' stage -- DISCLOSURE-ONLY: presence is enforced (non-empty), the sensitivity methodology/correctness is not. See method contract compilation_decisions/OQ-WDM-1 for why no formula is computed."
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed/validated this record's own distinctive new compute. Points at validate_scores_within_common_scale (this method's own one new primitive), not rank_options (reused unchanged from ahp) or validate_weights_sum_to_one (reused unchanged from mcda)."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine run -- same design choice mcda-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two options, three criteria, common 1-5 scale, clear winner"
+    value:
+      id: "WDM-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.weighted_decision_matrix"
+      options:
+        - {id: "O1", label: "供應商 A"}
+        - {id: "O2", label: "供應商 B"}
+      criteria:
+        - {id: "C1", label: "價格競爭力（1-5，5=最便宜）"}
+        - {id: "C2", label: "交期可靠度（1-5，5=最可靠）"}
+        - {id: "C3", label: "品質紀錄（1-5，5=最佳）"}
+      scale_min: 1
+      scale_max: 5
+      scores:
+        - {option_id: "O1", criterion_id: "C1", value: 4}
+        - {option_id: "O1", criterion_id: "C2", value: 3}
+        - {option_id: "O1", criterion_id: "C3", value: 5}
+        - {option_id: "O2", criterion_id: "C1", value: 2}
+        - {option_id: "O2", criterion_id: "C2", value: 5}
+        - {option_id: "O2", criterion_id: "C3", value: 4}
+      weights:
+        - {criterion_id: "C1", weight: 0.3}
+        - {criterion_id: "C2", weight: 0.4}
+        - {criterion_id: "C3", weight: 0.3}
+      ranking:
+        - {option_id: "O1", weighted_score: 3.9}
+        - {option_id: "O2", weighted_score: 3.8}
+      sensitivity_notes: "O1/O2 差距僅 0.1 分（滿分區間 1-5），屬高敏感度：任一標準權重調整 0.05 以上就可能反轉排名。人工檢查，非機械計算。"
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.weighted_decision_matrix.scoring.validate_scores_within_common_scale"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-WDMANALYSIS-1"
+    question: "scores[] completeness (exactly one entry per option x criterion) is a runtime-only invariant, not schema-expressible -- same class of disclosed gap ahp-analysis.schema.yaml's own OQ-AHPANALYSIS-1 documents for ranking[] vs. options[]. (owner: operator, or whoever next hardens this schema's cross-field guarantees)"
+
+verification:
+  method: >
+    Read Atlas §12.33 (L2969-2986) and F16 L766 directly. Cross-checked
+    against methods/contracts/decision.weighted_decision_matrix.contract.yaml's
+    own outputs/preconditions/quality/forbidden_transition and
+    ai_lego/compute/weighted_decision_matrix/scoring.py's real scale-bounds
+    compute (hand-verified: in-range accepted, out-of-range and
+    scale_max<=scale_min both refused, before this schema was written).
+    Validated against jsonschema Draft202012Validator.
+  note: >
+    `options`/`criteria`/`scores`/`weights`/`ranking`/`sensitivity_notes`
+    field names and stage ordering are transcribed from Atlas's own 6-node
+    pipeline (L2973-2982). `additionalProperties: false` mirrors
+    mcda-analysis.schema.yaml's own citation-grounded rule. No mother
+    document was modified to produce this file.

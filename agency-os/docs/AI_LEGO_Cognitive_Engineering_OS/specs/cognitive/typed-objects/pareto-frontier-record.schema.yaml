@@ -1,0 +1,197 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/pareto-frontier-record.schema.yaml"
+title: Pareto Frontier Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ParetoFrontierRecord` -- `decision.pareto_frontier`'s declared output. Atlas F16 tool table, Pareto Frontier
+  row (L772): "找非支配方案｜objective vectors→remove dominated｜不過早壓成單一總分". Every option is classified
+  as `on_frontier` (non-dominated) or `dominated`, COMPUTED, never a constructor input -- see
+  `methods/contracts/decision.pareto_frontier.contract.yaml`'s own compilation_decisions. NOT the same type as
+  `pareto-analysis.schema.yaml` (`root_cause.pareto`'s own output, a single-dimension cumulative-percentage
+  ranking) -- zero shared fields, disjoint id prefixes (`PA-` vs `PARETOFRONTIER-`), see that method's own
+  contract for the full naming-collision due-diligence.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Pareto Frontier row (L772)"
+  - "methods/contracts/decision.pareto_frontier.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/compute/pareto_frontier/dominance.py::compute_frontier (the real pairwise domination-check compute this schema's `frontier_classification` records the result of)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "option_values as a flat list (mcda-analysis.schema.yaml's raw_scores[] shape) or embedded per-option?"
+    decision: "Flat list [{option_id, objective_id, value}], mirrors mcda-analysis.schema.yaml's raw_scores[] -- arbitrary-many objectives per option, unlike decision.impact_effort's fixed 2 named axes."
+  - question: "Include dominated_by[] per option, or a bare status enum only?"
+    decision: "Include dominated_by[] -- explainability/hand-verification, Atlas gives no field shape so this is a disclosed Phase 3 addition, same class as pareto-analysis.schema.yaml's own share_of_total_percent/cumulative_share_percent enrichment beyond a bare rank."
+  - question: "Should this schema structurally enforce status/dominated_by consistency (on_frontier implies empty, dominated implies non-empty)?"
+    decision: "Yes -- if/then at the item level, same discipline moscow-prioritization-record.schema.yaml's own if/then (WONT requires a non-empty reason) already establishes. The full genuine-compute recompute (does dominated_by actually name real dominators) is left as a runtime invariant -- JSON Schema cannot express that arithmetic, same disclosed gap mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 and impact-effort-classification.schema.yaml's own OQ-IMPACTEFFORTSCHEMA-1 already document."
+
+$defs:
+  objective:
+    type: object
+    required: [id, label, direction]
+    additionalProperties: false
+    properties:
+      id: {type: string}
+      label: {type: string}
+      direction:
+        enum: [maximize, minimize]
+        description: "Direction-aware comparison, same convention mcda-analysis.schema.yaml's own criteria[].direction establishes -- independently re-derived, not shared code (see ai_lego/compute/pareto_frontier/dominance.py's own module docstring)."
+
+  option:
+    type: object
+    required: [id, label]
+    additionalProperties: false
+    properties:
+      id: {type: string}
+      label: {type: string}
+
+  option_value:
+    type: object
+    required: [option_id, objective_id, value]
+    additionalProperties: false
+    properties:
+      option_id: {type: string}
+      objective_id: {type: string}
+      value: {type: number}
+
+  classification_entry:
+    type: object
+    required: [option_id, status, dominated_by]
+    additionalProperties: false
+    properties:
+      option_id: {type: string}
+      status:
+        enum: [on_frontier, dominated]
+        description: "COMPUTED -- never a constructor input; re-derived and cross-checked at the gate layer (evaluate_frontier_integrity_gate), never trusted as stored."
+      dominated_by:
+        type: array
+        items: {type: string}
+        description: "option_id(s) that Pareto-dominate this option. Empty for on_frontier (enforced by this schema's own if/then below); non-empty for dominated."
+    if:
+      properties: {status: {const: on_frontier}}
+    then:
+      properties: {dominated_by: {maxItems: 0}}
+    else:
+      properties: {dominated_by: {minItems: 1}}
+
+type: object
+required: [id, version, subject, objectives, options, option_values, frontier_classification, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PARETOFRONTIER-"
+    description: "NEW DESIGN. Deliberately disjoint from pareto-analysis.schema.yaml's PA- prefix (root_cause.pareto's own output type) -- see naming-collision due-diligence in the method contract and modules/decision/pareto_frontier.py's own module docstring."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.pareto_frontier"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What is being analyzed, e.g. 'vendor shortlist -- cost vs quality'."
+
+  objectives:
+    type: array
+    minItems: 2
+    description: "Atlas F16 L772's own 'objective vectors' (plural). >=2 required -- a single-objective 'frontier' is meaningless (that is sorting, root_cause.pareto's own single-dimension operation). See method contract's own PARETOFRONTIER_TOO_FEW_OBJECTIVES invariant."
+    items:
+      $ref: "#/$defs/objective"
+
+  options:
+    type: array
+    minItems: 2
+    description: "The candidate set being partitioned into on_frontier/dominated. >=2 required -- a 1-option 'frontier' is trivially non-dominated, no information (same floor-reasoning class as mcda-analysis.schema.yaml's own options[] minItems:2)."
+    items:
+      $ref: "#/$defs/option"
+
+  option_values:
+    type: array
+    description: "Every (option_id, objective_id) pair exactly once -- completeness enforced at the runtime layer (PARETOFRONTIER_INCOMPLETE_VALUES), not by this schema (JSON Schema cannot express that cross-array completeness constraint)."
+    items:
+      $ref: "#/$defs/option_value"
+
+  frontier_classification:
+    type: array
+    minItems: 2
+    description: "Atlas F16 L772's own 'remove dominated' -- COMPUTED, one entry per option, never caller-supplied. Reuses ai_lego.compute.pareto_frontier.dominance.compute_frontier, re-derived and compared by evaluate_frontier_integrity_gate, never trusted as a stored value."
+    items:
+      $ref: "#/$defs/classification_entry"
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses (mcda-analysis.schema.yaml, rice-score-record.schema.yaml, impact-effort-classification.schema.yaml, pareto-analysis.schema.yaml, ...) -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed frontier_classification -- same convention every genuine-compute typed object in this directory establishes, and the exact prefix evaluate_statistical_gate's own resolvability check requires (ai_lego/modules/research/gates.py)."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine Pareto Frontier run -- same design choice mcda-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "4 options, 2 objectives (cost minimize, quality maximize) -- hand-verifiable: B and C form a genuine cost/quality tradeoff (both on_frontier, neither dominates the other); A is dominated by B alone (same quality, higher cost); D is dominated by all three others (worse on both axes than everyone)"
+    value:
+      id: "PARETOFRONTIER-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.pareto_frontier"
+      subject: "vendor shortlist -- cost vs quality"
+      objectives:
+        - {id: "OBJ-COST", label: "成本 (USD, 千)", direction: minimize}
+        - {id: "OBJ-QUALITY", label: "品質評分 (1-10)", direction: maximize}
+      options:
+        - {id: "OPT-A", label: "廠商 A"}
+        - {id: "OPT-B", label: "廠商 B"}
+        - {id: "OPT-C", label: "廠商 C"}
+        - {id: "OPT-D", label: "廠商 D"}
+      option_values:
+        - {option_id: "OPT-A", objective_id: "OBJ-COST", value: 10}
+        - {option_id: "OPT-A", objective_id: "OBJ-QUALITY", value: 8}
+        - {option_id: "OPT-B", objective_id: "OBJ-COST", value: 8}
+        - {option_id: "OPT-B", objective_id: "OBJ-QUALITY", value: 8}
+        - {option_id: "OPT-C", objective_id: "OBJ-COST", value: 12}
+        - {option_id: "OPT-C", objective_id: "OBJ-QUALITY", value: 9}
+        - {option_id: "OPT-D", objective_id: "OBJ-COST", value: 15}
+        - {option_id: "OPT-D", objective_id: "OBJ-QUALITY", value: 5}
+      frontier_classification:
+        - {option_id: "OPT-A", status: dominated, dominated_by: ["OPT-B"]}
+        - {option_id: "OPT-B", status: on_frontier, dominated_by: []}
+        - {option_id: "OPT-C", status: on_frontier, dominated_by: []}
+        - {option_id: "OPT-D", status: dominated, dominated_by: ["OPT-A", "OPT-B", "OPT-C"]}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.pareto_frontier.dominance.compute_frontier"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-PARETOFRONTIERRECORD-1"
+    question: "No schema-level constraint ties dominated_by's actual CONTENTS (which option ids) to a real recomputation -- only the empty/non-empty shape is enforced by this schema's if/then. Left as a runtime invariant (evaluate_frontier_integrity_gate re-derives and compares), same disclosed gap ahp-analysis.schema.yaml's own OQ-AHPANALYSIS-1 and mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 already document for their structurally identical fields."
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F16 tool table Pareto Frontier row (L772) directly at the cited line. Cross-checked against
+    methods/contracts/decision.pareto_frontier.contract.yaml's own outputs/preconditions/quality and
+    ai_lego/compute/pareto_frontier/dominance.py's real compute_frontier algorithm (hand-verified against the
+    4-option/2-objective worked example above before this schema was written: B/C mutually non-dominated,
+    A dominated only by B, D dominated by all three). Read pareto-analysis.schema.yaml (root_cause.pareto's own
+    output type) in full to confirm zero field overlap and a disjoint id prefix. Grepped specs/ and methods/
+    exhaustively for "pareto_frontier"/"ParetoFrontier"/"non-dominated"/"domination" before writing -- zero
+    prior hits, confirmed no duplicate exists. Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. `objectives`/`options`/`option_values`/`frontier_classification` field
+    names are Phase 3 compilation (Atlas gives the F16 row's own terse formula only, no field-level shape or
+    worked example) -- disclosed above in compilation_decisions/open_questions, not a silent invention. The
+    if/then status/dominated_by consistency check and the disjoint-from-pareto-analysis id prefix are the two
+    strongest structural safeguards this file adds beyond the family's usual pattern.

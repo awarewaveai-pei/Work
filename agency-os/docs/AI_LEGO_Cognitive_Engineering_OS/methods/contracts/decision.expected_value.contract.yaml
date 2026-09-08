@@ -1,0 +1,129 @@
+$id: "ai-lego://methods/contracts/decision.expected_value.contract.yaml"
+title: "Expected Value Method Contract"
+status: ACTIVE
+
+description: >
+  decision.expected_value, family decision (F16), 7th member. Atlas F16
+  table row (L771) only, no dedicated section (grepped "Expected Value"/
+  "期望值" whole-document, L771 sole hit). Formula: Sigma(probability_i *
+  outcome_value_i) over an exhaustive, mutually-exclusive, enumerated state
+  list -- the simple flat baseline a method like Decision Tree could call
+  per chance node, not a competitor to it. Core invariants: states sum to
+  1.0, expected_value is GENUINE_COMPUTE re-derived by the gate, never
+  trusted as stored (full due-diligence vs computation.monte_carlo and
+  decision.mcda in ai_lego/modules/decision/expected_value.py's own module
+  docstring).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Expected Value row (L771)"
+  - "methods/registry/contract-backlog.yaml -- checked, no existing decision.expected_value entry found"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas's own cited
+  formula plus disclosed compilation choices for field shapes Atlas leaves
+  unspecified (see compilation_decisions).
+
+  `id: decision.expected_value` is a NEW machine_id, `<family>.<name>`
+  bare-form grammar per ADR-005b. Grepped exhaustively (runtime tree +
+  spec root) -- no competing machine_id or duplicate typed object found.
+  Record-id prefix deliberately NOT "EV-" (collides in mnemonic with
+  decision-journal-entry.schema.yaml's own Evidence id prefix) --
+  "EXPECTEDVALUE-" instead, matching FAULTTREE-/EVENTTREE-'s own
+  multi-word convention.
+
+id: decision.expected_value
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [ESTIMATE, CALCULATE]
+# INFERRED, not cited (Atlas's own L771 row gives no primitive list).
+# Excludes COMPARE/PRIORITIZE -- one record scores ONE decision_subject,
+# it does not itself rank/compare alternatives (same absolute-per-record
+# reasoning decision.rice/decision.ice already apply). Excludes WEIGHT --
+# probability is a likelihood estimate of an uncertain future state, not
+# a caller-chosen importance/preference allocation across criteria the
+# AHP/MCDA sense of WEIGHT implies (see module docstring due-diligence
+# point 3 against decision.mcda). Excludes DECIDE -- this computes a
+# baseline number a human then uses, same reasoning decision.rice/
+# decision.mcda's own contracts already document, even without a
+# structural forbidden_transition gate here (see below).
+
+purpose:
+  - compute_a_probability_weighted_baseline_value_for_one_decision_across_its_mutually_exclusive_future_states
+
+inputs:
+  required:
+    - DecisionSubject
+    - States
+  optional: []
+
+outputs:
+  - ExpectedValueRecord
+
+preconditions:
+  - "states has at least 2 entries, each with a unique id"
+  - "each state's probability is a finite number in [0,1]"
+  - "each state's outcome_value is a finite number (unbounded -- negative/loss is valid)"
+  - "states[].probability sums to 1.0 across the record (tolerance 1e-6) -- mutually exclusive and exhaustive"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning decision.rice/decision.mcda already established: real risk
+  # here is a caller-tampered stored expected_value, not omitted evidence
+  # citations for individual state probabilities.
+
+forbidden_transition: []
+# Atlas §22.3 Method-specific Gate table has no Expected Value row
+# (grep-confirmed, L4142-4155), and no prose caution exists elsewhere
+# either (whole-document grep for "Expected Value"/"期望值" returns only
+# L771 itself) -- left empty rather than inventing one, same disclosed-
+# absence class decision.ice/decision.moscow already establish.
+
+recommended_next: []
+# Same reasoning decision.rice's contract already gives for its own
+# identical field.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "outcome_value: bare number or structured {value,unit} like RICE's reach?"
+    decision: "Bare number, unbounded. No Atlas citation grounds a unit label here the way RICE's 'affected people count' benefit column does."
+  - question: "Minimum state count?"
+    decision: "2 -- a single state forces probability=1.0 (zero probabilistic content), contradicting Atlas's own plural pipeline wording."
+  - question: "Reuse ai_lego.compute.ahp.weights.rank_options (MCDA/AHP's weighted-sum ranker) instead of a new compute module?"
+    decision: "No -- rank_options ranks multiple options relative to each other and bounds scores to [0,1]; this method returns one scalar per record and requires unbounded (negative-capable) outcome_value. Real type/range incompatibility, not a style preference."
+  - question: "Give the sum-to-1.0 check its own gate_id, or fold it into genuine_compute?"
+    decision: "Own gate_id (states_mutually_exclusive_exhaustive) -- same 'failure names the specific bug class' discipline root_cause.fault_tree's own 3-way gate split already establishes, even though genuine_compute's own recompute would transitively catch the same defect."
+
+open_questions:
+  - "OQ-EXPECTEDVALUE-1: outcome_value carries no unit label -- should a future revision require one once a worked cross-decision-comparison example exists?（owner: operator）"
+  - "OQ-EXPECTEDVALUE-2: RESOLVED (conceptually). decision.decision_tree landed later in this same batch; its own module docstring independently reaches the identical 'flat baseline vs. branching superset' conclusion (its own OQ-DECISIONTREE-2, now closed by this method's existence). NOT reconciled at the code level -- decision_tree's own ai_lego.compute.decision_tree.rollup.roll_up_node (recursive, nested-child-pointer shape) does not call this method's compute_expected_value (flat, caller-enumerated list shape); a real reshape would be needed on one side, not a trivial import swap.（owner: operator, or whoever next considers unifying the two compute paths）"
+  - "OQ-EXPECTEDVALUE-3: MIN_STATES=2 floor is a disclosed compilation judgment call (see compilation_decisions), not an Atlas citation -- revisit if a real worked example ever needs a degenerate single-state record.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F16 tool table Expected Value row (L771) directly, plus a
+    whole-document grep for "Expected Value"/"期望值" (L771 sole hit).
+    Read ai_lego/modules/computation/monte_carlo.py and
+    ai_lego/compute/montecarlo/simulation.py in full (confirmed: Monte
+    Carlo's outcome_distribution.mean is a sampled statistical estimate,
+    not this method's closed-form enumeration -- see module docstring).
+    Read ai_lego/compute/ahp/weights.py and ai_lego/compute/mcda/scoring.py
+    in full (confirmed rank_options is a bounded-score cross-option ranker,
+    incompatible with this method's unbounded single-scalar shape). Read
+    ai_lego/modules/root_cause/event_tree.py in full (confirmed no overlap
+    -- it computes a path-probability product, no outcome-value field
+    exists in its schema). Grepped specs/ and methods/ exhaustively for
+    "expected_value"/"expected-value"/"EXPECTEDVALUE" -- no duplicate
+    typed object found. decision.decision_tree not yet built at time of
+    writing (ai_lego/modules/decision/ held no decision_tree.py) -- see
+    OQ-EXPECTEDVALUE-2. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. forbidden_transition is genuinely
+    empty (disclosed, not invented -- see above). Field shapes beyond the
+    formula itself are disclosed Phase 3 compilation -- see
+    compilation_decisions/open_questions.

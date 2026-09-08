@@ -1,0 +1,126 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/expected-value-record.schema.yaml"
+title: Expected Value Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ExpectedValueRecord` -- the
+  declared `outputs` of `decision.expected_value`'s Method Contract
+  (methods/contracts/decision.expected_value.contract.yaml,
+  `outputs: [ExpectedValueRecord]`). Simple flat single-stage baseline:
+  Sigma(probability_i * outcome_value_i) over an exhaustive, mutually
+  exclusive `states` list. 7th `decision`-family typed object.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Expected Value row (L771): '機率×結果｜states→probabilities→outcomes｜概率決策基線'"
+  - "methods/contracts/decision.expected_value.contract.yaml (outputs, preconditions, quality)"
+  - "ai_lego/compute/expected_value/calculation.py::compute_expected_value (the real arithmetic this schema's expected_value records the result of)"
+
+decided_by: >
+  No ADR governs this file. Same class of Phase 3 compilation decision every
+  sibling typed-object schema in this directory documents -- Atlas gives the
+  formula and pipeline only, no field-level shape.
+
+compilation_decisions:
+  - question: "Bare number or {value,unit} for outcome_value, matching decision.rice's own structured reach?"
+    decision: "Bare number, unbounded (negative allowed) -- Atlas gives no reach-equivalent citation for a unit label here; a generic payoff has no single natural unit the way RICE's cited 'affected people count' does."
+  - question: "Should states require >= 2 entries?"
+    decision: "Yes -- a single state forces probability=1.0, zero probabilistic content, contradicting Atlas's own plural pipeline wording ('states->probabilities->outcomes')."
+  - question: "Should expected_value be caller-suppliable?"
+    decision: "No -- always computed, never accepted as input, same convention every genuine-compute sibling (RiceScoreRecord, MCDAAnalysis) already uses."
+
+type: object
+required: [id, version, decision_subject, states, expected_value, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^EXPECTEDVALUE-"
+    description: "NOT 'EV-' -- collides in mnemonic (not schema) with decision-journal-entry.schema.yaml's own Evidence id prefix. Same multi-word-concatenation convention FAULTTREE-/EVENTTREE- already use."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.expected_value"
+
+  decision_subject:
+    type: string
+    minLength: 1
+    description: "What decision/bet/venture this calculation evaluates -- same role fault-tree-record.schema.yaml's own system_under_analysis plays for its family."
+
+  states:
+    type: array
+    minItems: 2
+    description: "Mutually exclusive, exhaustive set of possible states. probability across all entries must sum to 1.0 (tolerance 1e-6) -- enforced by compute_expected_value, re-derived independently by evaluate_states_mutually_exclusive_exhaustive_gate, never trusted as caller-asserted."
+    items:
+      type: object
+      required: [id, label, probability, outcome_value]
+      additionalProperties: false
+      properties:
+        id: {type: string, minLength: 1}
+        label: {type: string, minLength: 1}
+        probability:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "Likelihood of this state, not a subjective importance weight (contrast MCDA's caller-chosen criterion weights)."
+        outcome_value:
+          type: number
+          description: "Payoff if this state occurs. UNBOUNDED -- a loss (negative value) is a valid, common outcome; no >=0 floor (contrast RICE's reach/impact, which Atlas's own benefit-column citation grounds as a non-negative count)."
+
+  expected_value:
+    type: number
+    description: "COMPUTED, never caller-supplied -- Sigma(probability_i * outcome_value_i) across states, rounded to 8 decimal places. Re-derived and compared by evaluate_expected_value_genuine_compute_gate, never trusted as a stored value."
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'. NOT SIMULATED_RESULT-flavored (contrast computation.monte_carlo) -- this is exact closed-form enumeration, not sampling."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed expected_value -- same convention every genuine-compute typed object in this directory establishes."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine run (never SIMULATED_RESULT -- see engine's own description for the monte_carlo distinction)."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A risky venture: 30% chance of a $50,000 gain, 70% chance of a $10,000 loss"
+    value:
+      id: "EXPECTEDVALUE-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.expected_value"
+      decision_subject: "投資新產品線 Q1 launch"
+      states:
+        - {id: "STATE-SUCCESS", label: "產品成功", probability: 0.3, outcome_value: 50000}
+        - {id: "STATE-FAILURE", label: "產品失敗", probability: 0.7, outcome_value: -10000}
+      expected_value: 8000.0
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.expected_value.calculation.compute_expected_value"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-EXPECTEDVALUERECORD-1"
+    question: "outcome_value carries no unit label (contrast RICE's reach.unit) -- should a future revision require one for cross-decision comparability?"
+    owner: "operator, or whoever next compares two ExpectedValueRecord decision_subjects side by side"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F16 tool table Expected Value row (L771) directly at the
+    cited line, plus a whole-document grep for "Expected Value"/"期望值"
+    (L771 only hit, either casing/language -- no dedicated section exists).
+    Grepped specs/ and methods/ exhaustively for "expected_value"/"expected-value"/"EXPECTEDVALUE"
+    before writing -- no duplicate typed object found (only unrelated hits: EV-1/EV-2
+    Evidence ids in decision-journal-entry.schema.yaml, and a local variable
+    named expected_value in run_event_tree_slice.py). Validated against
+    jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. All field shapes beyond the formula
+    itself are disclosed Phase 3 compilation -- see compilation_decisions/
+    open_questions, not silent invention.

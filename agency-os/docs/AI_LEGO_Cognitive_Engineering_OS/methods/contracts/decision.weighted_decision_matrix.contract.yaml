@@ -1,0 +1,171 @@
+$id: "ai-lego://methods/contracts/decision.weighted_decision_matrix.contract.yaml"
+title: "Weighted Decision Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 entry, `decision` family (F16), 7th of 13. Atlas §12.33 (L2969-2986)
+  + F16 row (L766): Options x Criteria x Weights -> Scores -> Sensitivity ->
+  Decision. NOT a decision.mcda duplicate (verified field-for-field, see
+  `verification`): both citations omit MCDA's own cited Normalize stage, so
+  criteria carry no `direction` and scores are rated directly on one common
+  declared scale -- Weighted Sum Model, not MCDA's raw-unit normalization.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.33 加權決策矩陣／加權評分矩陣 (L2969-2986) -- dedicated section, 6-node pipeline, benefit/limitation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Weighted Decision Matrix row (L766): 'criteria→weights→scores→sensitivity｜透明化 trade-off' -- second, independent citation, agrees with §12.33"
+  - "methods/contracts/decision.mcda.contract.yaml -- the sibling this contract was verified against and determined NOT to duplicate (inputs L112-118, pipeline L14-21 of mcda.py)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155): grep-confirmed no dedicated Weighted Decision Matrix row (only MCDA, L4154 -- not inherited, see forbidden_transition)"
+  - "methods/registry/method-inventory.yaml Weighted Decision Matrix entry (L998-1002, line:763) -- carried no machine_id when this file was written"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas §12.33 + F16
+  L766 (two independent, agreeing citations), plus disclosed
+  structurally-necessary preconditions -- same standard every Tier 1
+  contract in this directory applies. `id: decision.weighted_decision_matrix`
+  mints a NEW machine_id (method-inventory.yaml's own entry, L998, carried
+  none). `family: decision` reused as the 7th F16 member.
+
+id: decision.weighted_decision_matrix
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, WEIGHT, CALCULATE, PRIORITIZE]
+# INFERRED (Atlas §4 L192 cites a primitive formula for only 5 methods;
+# WDM is not among them, same absence class decision.mcda's own inference
+# already establishes). Identical set to decision.mcda's own inferred
+# primitives -- same real cognitive operations (compare options, weight
+# criteria, calculate a score, prioritize/rank), not evidence of
+# duplication (decision.ice/decision.rice overlap on COMPARE/PRIORITIZE
+# too). DECIDE deliberately excluded -- would contradict forbidden_transition below.
+
+purpose:
+  - score_and_rank_options_against_weighted_criteria_on_a_common_scale
+# Atlas L2971 verbatim sense: "多個方案、criteria 有不同重要度時比較" (compare
+# multiple options when criteria carry different importance).
+
+inputs:
+  required: [Options, Criteria, Scores, Weights]
+  optional: []
+  # Atlas's own pipeline (L2976-2979) names all four as the real required
+  # inputs to reach Scores. No RawScores/Normalize input stage, unlike
+  # decision.mcda -- Scores here ARE the final per-criterion values.
+
+outputs:
+  - WeightedDecisionMatrixAnalysis
+# NEW output type (see typed-objects/weighted-decision-matrix-record.schema.yaml).
+# Atlas names no PascalCase output type for this method, same honesty gap
+# every Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "scale_max is a finite number strictly greater than finite scale_min (the single common scale every criterion's scores are rated on)"
+  - "every scores entry's value falls within [scale_min, scale_max]"
+  - "scores contains exactly one entry per (option_id, criterion_id) pair -- complete, no duplicates"
+  - "weights are non-negative and sum to 1.0 (tolerance 1e-6)"
+  - "every scores/weights entry references a known option_id and/or criterion_id"
+  # NEW, structurally necessary -- Atlas's own pipeline names the Scores
+  # and Weights stages but gives no field-level precondition text (same
+  # class decision.mcda.contract.yaml's own preconditions already
+  # establish for its sibling stages). The scale-bounds precondition is
+  # this method's own distinguishing structural requirement -- it is
+  # what makes skipping Normalize valid (see compilation_decisions).
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision.mcda.contract.yaml's own quality block already
+  # establishes: real risk here is a malformed/incomplete score matrix or
+  # an unauthorized authority claim, not missing per-score evidence
+  # citations -- enforced by forbidden_transition and this method's own
+  # score_matrix_integrity quality gate instead.
+
+forbidden_transition:
+  - "Automatic Authority"
+# INFERRED (not table-cited -- §22.3 L4142-4155 grep-confirmed has no WDM
+# row), from Atlas §12.33's own L2985 limitation: "高風險決策要補 hard
+# constraints、scenario 與 stakeholder weights" (high-risk decisions need
+# to add hard constraints/scenario/stakeholder weights before this
+# analysis is sufficient) -- same inference class
+# decision.impact_effort.contract.yaml's own L1906-grounded rule already
+# applies for an analogous "insufficient alone for high-risk use" caution
+# (contrast decision.rice.contract.yaml's own VERBATIM "decision aid, not
+# authority" citation, and decision.ice.contract.yaml's genuinely-empty
+# field -- WDM's own text is closer to Impact-Effort's than to either of
+# those). Enforced the same two-layer way every sibling with this field
+# populated already does:
+# ai_lego/modules/decision/weighted_decision_matrix.py::assert_no_automatic_authority_claim
+# (runtime) plus weighted-decision-matrix-record.schema.yaml's own
+# additionalProperties:false (schema).
+
+recommended_next: []
+# No specific next machine_id cited at L2969-2986 or L766. Same
+# empty-and-disclosed choice decision.mcda.contract.yaml's own field applies.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Reuse decision.mcda's pipeline/schema (contract-only entry, architecture.trade_off_matrix-style), or build a genuinely distinct method?"
+    decision: "Build distinct -- both WDM citations (§12.33, F16 L766) omit the Normalize stage MCDA's own two citations both name; criteria carry no direction field; scores are rated directly on one common declared scale. Verified field-for-field, not assumed (see verification)."
+  - question: "Should Scores be derived via per-criterion min-max normalization the way decision.mcda's own Normalize stage does?"
+    decision: "No -- scores are caller-supplied directly on one common scale (scale_min/scale_max), enforced structurally, never rescaled."
+  - question: "Do criteria carry a direction (maximize/minimize) field, as decision.mcda's own criteria[] does?"
+    decision: "No -- direction is the caller's own scoring discipline (rate every criterion so a higher value-on-the-common-scale always means better-for-that-option), not a schema field. This is the real, disclosed scope difference from MCDA, not an oversight."
+  - question: "Should the Score stage reuse ai_lego.compute.ahp.weights.rank_options, the same function decision.mcda and decision.ahp already reuse unchanged?"
+    decision: "Yes -- its own implementation has nothing AHP-specific (plain weight dict + per-option-per-criterion score list), a third family now reusing it verbatim."
+  - question: "Should weight validation reuse ai_lego.compute.mcda.scoring.validate_weights_sum_to_one?"
+    decision: "Yes -- its own logic has nothing MCDA-specific (generic criterion-id/non-negative/sum checks), same reuse-not-duplicate class as rank_options above."
+  - question: "Should scores[] additionally require exactly one entry per (option_id, criterion_id) pair (completeness), beyond what decision.mcda's own raw_scores[] requires?"
+    decision: "Yes -- a missing cell would silently under-weight that option for that criterion in the direct weighted sum (no Normalize stage to make the gap visible), a real catchable defect this method's own simpler shape makes worth gating."
+  - question: "Does sensitivity_notes compute an actual sensitivity formula?"
+    decision: "No -- disclosure-only (non-empty string), same scope limit decision.mcda.contract.yaml's own OQ-MCDA-2 and decision.ahp.contract.yaml's own OQ-AHP-2 already apply to their identically-named, identically-ungrounded stage."
+
+open_questions:
+  - id: "OQ-WDM-1"
+    question: "sensitivity_notes only enforces presence, not methodology or correctness -- should a future pass define a real sensitivity computation (e.g. weight-perturbation-until-rank-change), same open question OQ-MCDA-2/OQ-AHP-2 already raise for their own stage? (owner: operator)"
+  - id: "OQ-WDM-2"
+    question: "forbidden_transition is INFERRED from L2985's own 'add hard constraints/scenario/stakeholder weights for high-risk decisions' limitation, not a verbatim 'not authority' citation like RICE's -- should a future Atlas revision make this explicit, should the inference be revisited? (owner: operator)"
+  - id: "OQ-WDM-3"
+    question: "method-inventory.yaml's own Weighted Decision Matrix entry (L998, line:763) has not been updated with this machine_id -- same disclosed-not-synced state every prior Tier 1 contract in this directory leaves for its own row (out of this task's write scope). (owner: operator, or a future session with write scope over method-inventory.yaml)"
+
+verification:
+  method: >
+    Read Atlas §12.33 (L2969-2986) and the F16 tool-table row (L766)
+    directly at the cited lines. Read decision.mcda.contract.yaml and
+    ai_lego/modules/decision/mcda.py in full before writing this contract
+    (the task's own central due-diligence question). Compared field-for-
+    field, the same methodology architecture.trade_off_matrix.contract.yaml's
+    own verification section applied when it found the OPPOSITE result
+    (true duplicate) for a different F18 row: Options/Criteria/Weights/
+    Sensitivity all present under matching names in both WDM citations,
+    but a Normalize stage present in BOTH of decision.mcda's own citations
+    (§11.32 L1956 mermaid node, F16 row L768 'normalize') is ABSENT from
+    BOTH of WDM's own citations (§12.33 L2973-2982 plain-text flow, F16 row
+    L766) -- confirmed by direct re-read of both, not inferred from one.
+    Also checked: §11 (Atlas L1118, "核心工具詳細解說與圖解") vs. §12 (Atlas
+    L2542, "其他高頻工具詳細解說") are different top-level chapters -- MCDA
+    lives in the former (mermaid diagram), WDM in the latter (plain-text
+    flow), consistent with but not solely relied upon for the distinctness
+    finding. Grepped the whole Atlas exhaustively for "Weighted Decision
+    Matrix"/"加權決策矩陣"/"加權評分矩陣"/"WDM" -- exactly 3 hits total (L766
+    table row, L2969 section, L4295 a Phase-1 build-sequencing list with no
+    new spec content, read and confirmed non-substantive). Read
+    ai_lego/modules/decision/ice.py and decision/__init__.py: both already
+    treat Weighted Decision Matrix as a distinct, not-yet-built F16 sibling
+    (ice.py's own due-diligence flagged its citation density without
+    flagging a duplicate; __init__.py lists it among 7 distinct remaining
+    methods alongside TOPSIS/Decision Tree/Expected Value/Pareto
+    Frontier/WSJF/Kano) -- corroborating, not sole, evidence. Grepped
+    specs/cognitive/typed-objects/ for "weighted decision"/"weighted
+    scoring" -- no existing or competing typed object found. Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. This is a genuine-compute Tier 1
+    entry, not a reuse/contract-only entry -- the opposite determination
+    from architecture.trade_off_matrix's own, reached by the same
+    field-for-field comparison methodology applied to a different pair of
+    citations that did NOT turn out identical. `criteria` (no direction
+    field) and the scale_min/scale_max preconditions are this contract's
+    own disclosed, structurally-necessary departures from decision.mcda's
+    shape, not silent omissions.

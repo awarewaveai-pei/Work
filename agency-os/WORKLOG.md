@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-09-08（73–77 號切片：F16 decision 家族 6/13→11/13，5 個平行 agent）
+
+decision.weighted_decision_matrix(107t)/decision.topsis(83t)/decision.decision_tree(127t)/decision.expected_value(112t)/decision.pareto_frontier(107t)。536 tests 零衝突（含 critic 補的 1 個）。查重：weighted_decision_matrix 比對 mcda 確認真不同（Atlas 公式無 Normalize 階段，vs MCDA 自己 Sec11.32 有）；topsis 比對 mcda 確認真不同（歐氏距離排序 vs 加權和，重用 mcda 的 normalize_scores 做自己的 Normalize 階段）；decision_tree 比對 fault_tree/event_tree 確認真不同（巢狀 decision/chance/terminal vs 兩者皆扁平），與同批平行建置的 expected_value 互相查證方向不衝突；expected_value 比對 monte_carlo（SIMULATED_RESULT 非 CALCULATED_RESULT）與 mcda（[0,1] 有界排序）確認真不同；pareto_frontier 比對既有 root_cause.pareto 確認真不同概念（單維度 80/20 排名 vs 多目標非支配集合，SET 分類無分數），刻意選用不同 machine_id 避免混淆。F16 現況 11/13，剩 WSJF/Kano。
+
+critic scope=normal tier，真跑獨立全 regression（4698 tests，164s，非沿用本 session 自己的跑法）+5 個 CLI 全部真跑+核對 worked example。verdict 0C/1Major/2Minor：**Major**（真 bug，即時重現）——`weighted_decision_matrix.py` 建構時對 options/criteria/scores/weights 只淺拷貝外層 list，內層 dict 仍與呼叫端共用同一物件，呼叫端事後修改會悄悄污染已驗證的 record；比對同批次 topsis.py 自己抓到並修好的同款 bug（改用 `[dict(x) for x in ...]`）。已修 4 個欄位+補 1 個對應 mutation-safety 迴歸測試（107 tests）。**Minor #1**：mcda.py 存在完全相同、未修的舊 bug（本次未觸碰 mcda.py，開 follow-up task 追蹤，非本批次範圍）。**Minor #2**：`run_decision_tree_slice.py` 是本批唯一沒有 CLI tamper-demo 步驟的手足（其餘 4 個都有）——已補 `evaluate_expected_value_integrity_gate` 的 tamper-demo 區塊，真跑確認 `tampered_gate=FAIL`（127 tests 不變）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_weighted_decision_matrix tests.unit.test_topsis tests.unit.test_decision_tree tests.unit.test_expected_value tests.unit.test_pareto_frontier` | exit=0 | result=536 tests OK（含 critic 修正後 +1）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_decision_tree_slice`（critic 修正後真跑）| exit=0 | result=`genuine_compute_guard_verified(tampered_gate=FAIL)`
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression，critic 修正後最終跑）| exit=0 | result=4699 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，5 個新 contract/schema 觸發 spec index 過期，已跑 `gen_spec_index.py` 重生後確認）| exit=0 | result=PASSED 3087，ALL GOLDEN TESTS PASSED
+REVIEW_DONE: critic=Standard（真跑獨立 4698-test regression、5 CLI 全跑、TOPSIS 修法/Pareto 非重複兩項強制查證項獨立覆核、20 個 gate function × 6 種非法輸入=120 組合零 crash）| verdict=0C/1Major/2Minor → 全修 | findings=0c/1m/2minor
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`decision\.weighted_decision_matrix\|decision\.topsis\|decision\.decision_tree\|decision\.expected_value\|decision\.pareto_frontier` | hits=14（agency-os）+22（cognitive-engineering-os），逐一核對：僅本批次新建檔案+registry+`__init__.py`合法引用+2 份自動產生 dispatch log；`run_event_tree_slice.py` 命中的 `expected_value` 是無關的區域變數名，非本方法引用
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/compute/module/CLI/test（30 個新檔）+ `decision/__init__.py` 與 `contract-backlog.yaml` 的追加內容全部移除；純新增與 docstring 追加，未修改任何既有方法的既有行為。
+
 ## 2026-09-08（hci30 record_decision() db-expert 覆審抓到 1 Critical+2 Major，全修＋補測試，235/235 斷言+122/122 mutation 全綠）
 
 **背景**：操作者對 HCI 進度不耐（多次「動工把系統寫好」），本輪把「人→證據→評估→Trust Domain→決定」核心迴圈接通：migration 0012（`subject_records.payload` jsonb，ADR-0034）、0013（`hci.mint_encryption_key()`，補 EVIDENCE/CLAIM 建立缺的金鑰路徑）、0014（`hci.record_decision()`，決定紀錄）+ 前端改版成 Trust Report 卡片式 UI（`09d722232`，非本條目做的，本條目只覆審+修 0014）。

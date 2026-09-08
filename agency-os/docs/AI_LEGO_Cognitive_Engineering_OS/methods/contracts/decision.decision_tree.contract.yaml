@@ -1,0 +1,127 @@
+$id: "ai-lego://methods/contracts/decision.decision_tree.contract.yaml"
+title: "Decision Tree Method Contract"
+status: ACTIVE
+
+description: >
+  decision.decision_tree, family decision, Atlas F16 L770 ("Decision Tree |
+  決策/機率/payoff 分支 | decision nodes→chance→probability→payoff | 呈現
+  uncertainty"). No dedicated section, no §22.3 gate row (grep-confirmed).
+  Distinct from root_cause.fault_tree/event_tree (no decision/chance node
+  types, no payoff, no probability rollup there) and from the adjacent
+  F16 row Expected Value (L771 -- flat, non-branching; this method is the
+  branching, multi-stage structure). Invariants: (1) every chance node's
+  branches[] probabilities sum to 1.0; (2) expected_value (decision/chance
+  nodes) and optimal_branch_label (decision nodes) are GENUINE_COMPUTE,
+  recomputed bottom-up, never caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 table row (L770): '決策/機率/payoff 分支｜decision nodes→chance→probability→payoff｜呈現 uncertainty'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 table row (L771, Expected Value) -- due-diligence distinction, see compilation_decisions"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4144-4155) -- grep-confirmed no Decision Tree row exists"
+  - "methods/contracts/root_cause.fault_tree.contract.yaml + ai_lego/modules/root_cause/fault_tree.py (both read in full) -- due-diligence comparison target"
+  - "methods/contracts/root_cause.event_tree.contract.yaml + ai_lego/modules/root_cause/event_tree.py (both read in full) -- due-diligence comparison target"
+  - "ai_lego/modules/security/attack_tree.py + ai_lego/compute/attack_tree/aggregate.py (both read in full) -- representation-choice precedent (nested/embedded tree, bottom-up rollup)"
+  - "ai_lego/modules/decision/expected_value.py (read in full as a follow-up -- landed later in this same batch, from a concurrent agent, per this task's own brief) -- independently reaches the identical flat-vs-branching/superset conclusion this file reached first; that module's own docstring cross-checked THIS file back and confirmed no contradiction (see compilation_decisions)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs this. decision.decision_tree mints new machine_id, F16
+  7th member after ahp/mcda/impact_effort/ice/rice/moscow. Registered in
+  contract-backlog.yaml tier_1 by orchestrating session, not this file.
+
+id: decision.decision_tree
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [DECOMPOSE, MAP, CALCULATE, DECIDE]
+# INFERRED, not cited -- Atlas gives no composition formula. DECOMPOSE = breaking a decision situation into
+# decision/chance/terminal nodes; MAP = attaching probability/payoff; CALCULATE = the bottom-up expected-
+# value rollup; DECIDE = selecting optimal_branch_label at every decision node (backward induction IS
+# decide-shaped -- unlike decision.mcda, which deliberately EXCLUDES DECIDE because its own table-cited
+# forbidden_transition bars automatic authority, this contract has no such citation to contradict, and the
+# rollup genuinely does select a recommended branch).
+
+purpose:
+  - roll_up_expected_value_bottom_up_through_a_branching_decision_chance_terminal_tree_to_recommend_a_branch_at_every_choice_point
+
+inputs:
+  required: [ProblemStatement]
+  optional: [EvidenceSet]
+# Reuse ProblemStatement -- a decision situation is conceptually "a problem needing resolution", same class
+# root_cause.fault_tree's own top_event / root_cause.event_tree's own initiating_event already are.
+
+outputs: [DecisionTreeRecord]
+
+preconditions:
+  - "every chance node's branches[].probability sums to 1.0 across its own siblings (tolerance 1e-6), anywhere in the tree"
+  - "every decision/chance node has >= 2 branches; every branch's child is a well-shaped decision_tree_node (decision/chance/terminal), recursively, up to MAX_TREE_DEPTH=100; a decision branch never carries probability"
+  - "expected_value at every decision/chance node, and optimal_branch_label at every decision node, are GENUINE_COMPUTE -- recomputed bottom-up from raw payoffs/probabilities, never caller-supplied"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition: []
+# Atlas gives no §22.3 row for this method (grep-confirmed: that table's 10 rows do not include Decision
+# Tree) and no prose caution exists to infer one from either (unlike decision.impact_effort's own L1905-1906
+# prose-grounded inference) -- left genuinely empty, not invented. See OQ-DECISIONTREE-3.
+
+recommended_next: [architecture.adr]
+# Same forward link root_cause.fault_tree/event_tree's own contracts already establish: once expected values
+# are computed and a branch recommended, the next real step is a decision record (ratify the recommendation,
+# or override it with human judgment the payoffs/probabilities didn't capture) -- not another decision-tree
+# invocation.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Same concept as the adjacent F16 row 'Expected Value' (L771)?"
+    decision: "No -- Expected Value is flat/non-branching (states→probabilities→outcomes, one set, no choices); Decision Tree is branching/multi-stage, computing expected value recursively at each chance node with real decision nodes interspersed. Superset relationship (conceptual/analytical), not a duplicate -- CONFIRMED MUTUALLY: decision.expected_value did not exist when this file was first drafted (grepped, zero hits at that time); it landed later in the same batch (a concurrent agent) and was read in full as a follow-up, and its own module docstring independently reached this identical conclusion AND cross-checked this file back, unprompted. One real, disclosed gap remains (not yet reconciled): neither module's compute function calls the other's today -- ai_lego.compute.decision_tree.rollup.roll_up_node's own chance-node case is a bespoke weighted sum, not a call into ai_lego.compute.expected_value.calculation.compute_expected_value, because roll_up_node's input is nested child pointers and compute_expected_value's is a flat state list (a real reshape, not a trivial import swap) -- see OQ-DECISIONTREE-2."
+  - question: "Nested/embedded tree (security.attack_tree's own shape) or flat id-cross-referenced graph (root_cause.fault_tree/event_tree's own shape)?"
+    decision: "Nested embedded -- a decision-tree node is path-dependent (unlike fault_tree's basic events, which legitimately recur under multiple gates); also makes dangling-reference/cycle bug classes structurally impossible, not merely unchecked."
+  - question: "Maximize or minimize payoff at decision nodes?"
+    decision: "Maximize -- payoff models a value to be maximized (profit/utility), textbook convention; minimization is achievable by negating payoffs, not a separate mode."
+  - question: "Annotate expected_value at every decision/chance node, or only at the root (security.attack_tree's own root_aggregate-only precedent)?"
+    decision: "Every node -- backward induction is this method's own defining step at EVERY choice point, not just the top; attack_tree's root-only scope does not fit."
+  - question: "Minimum branch count for decision/chance nodes?"
+    decision: ">= 2 -- matches decision.mcda's own MCDA_TOO_FEW_OPTIONS precedent (a choice/chance needs >= 2 real alternatives to be meaningful)."
+  - question: "Tie-breaking when two branches share the same maximal expected value?"
+    decision: "First branch in declared order wins (deterministic) -- Atlas gives no tie-breaking rule."
+  - question: "Follow the family's own Pattern A (engine/computation_provenance_ref fields + evaluate_statistical_gate, per ahp/mcda/impact_effort/ice) or the structurally-closer Pattern B (bespoke gate only, per fault_tree/event_tree/attack_tree)?"
+    decision: "Pattern A -- family consistency (every existing decision-family sibling uses it) outweighs the structural resemblance to the tree-shaped root_cause/security methods."
+  - question: "Reuse ProblemStatement as required input, or invent a bespoke type?"
+    decision: "Reuse ProblemStatement -- same class fault_tree/event_tree's own required input already is."
+
+open_questions:
+  - "OQ-DECISIONTREE-1: cognitive_primitives [DECOMPOSE, MAP, CALCULATE, DECIDE] is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+  - "OQ-DECISIONTREE-2: decision.expected_value now exists (landed later in this same batch, cross-checked -- see compilation_decisions) but roll_up_node's own chance-node arithmetic does not call compute_expected_value today (different input shapes: nested pointers vs flat state list) -- should a future revision reshape one side so the chance-node case genuinely delegates, removing the current duplicate-formula risk?（owner: operator）"
+  - "OQ-DECISIONTREE-3: no forbidden_transition -- Atlas gives no §22.3 row or prose caution for this method, unlike decision.impact_effort's own inferred one; should a future revision add one if grounding is found?（owner: operator）"
+  - "OQ-DECISIONTREE-4: no sensitivity_notes field -- unlike decision.mcda/decision.ahp (both §22.3-adjacent-grounded), Atlas gives no citation requiring a Sensitivity disclosure here; how much a probability/payoff would need to shift before optimal_branch_label changes is not computed.（owner: operator）"
+
+verification:
+  method: >
+    Grepped Atlas case-insensitively for "Decision Tree"/"決策樹" -- one hit,
+    the F16 table row (L770); confirmed no dedicated section exists.
+    Grepped §22.3's own Method-specific Gate table (L4144-4155) directly --
+    10 rows, Decision Tree absent. Read root_cause.fault_tree.py,
+    root_cause.event_tree.py, and security.attack_tree.py
+    (+ai_lego/compute/attack_tree/aggregate.py) in full for the
+    due-diligence structural-distinctness comparison and the
+    nested-tree/rollup representation precedent (see compilation_decisions).
+    Grepped this whole ai_lego runtime tree and the spec root for
+    "decision.expected_value"/"ExpectedValue" at drafting time -- zero hits.
+    Re-checked after decision.expected_value landed later in this same batch
+    (concurrent agent): read that module in full, confirmed it independently
+    reached the same flat-vs-branching/superset conclusion and had already
+    cross-checked this file back (see compilation_decisions) -- updated this
+    contract's own citations/open_questions rather than leaving the
+    now-stale "not yet built" claim standing (R4 claim-before-verify).
+    Validated against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. L770's formula is transcribed
+    verbatim. The nested representation, per-node annotation scope,
+    maximize convention, >=2-branches minimum, tie-breaking rule, and the
+    Pattern-A family-consistency choice are Phase 3 compilation decisions,
+    disclosed above, not textually cited.

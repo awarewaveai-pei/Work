@@ -1,0 +1,213 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/decision-tree-record.schema.yaml"
+title: Decision Tree Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `DecisionTreeRecord`, outputs of `decision.decision_tree`. Atlas F16 L770
+  ("Decision Tree | 決策/機率/payoff 分支 | decision nodes→chance→
+  probability→payoff | 呈現 uncertainty"). `root` is a recursive, NESTED
+  tree (not id-cross-referenced -- see method contract compilation_decisions)
+  of `decision_node` / `chance_node` / `terminal_node`. `expected_value`
+  (decision/chance nodes) and `optimal_branch_label` (decision nodes) are
+  GENUINE, RE-DERIVED -- never caller-supplied, recomputed bottom-up by
+  `ai_lego/compute/decision_tree/rollup.py`. Chance-node branch
+  probabilities summing to 1.0 is not schema-expressible -- runtime gate,
+  `DECISIONTREE_PROBABILITY_SUM_MISMATCH`
+  (`ai_lego/modules/decision/decision_tree.py`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 table row (L770)"
+  - "methods/contracts/decision.decision_tree.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  terminal_node:
+    type: object
+    required: [node_type, label, payoff]
+    additionalProperties: false
+    description: "A leaf outcome -- no further branching. payoff IS this node's own value; no separate expected_value field (would be a redundant, potentially-drifting duplicate)."
+    properties:
+      node_type: {const: terminal}
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      payoff:
+        type: number
+        description: "Any finite real number -- profit, cost (negative), or utility. Caller's own unit, undisclosed (see method contract open_questions). NaN/Infinity excluded at the runtime layer, not by JSON Schema's bare `type: number` alone."
+
+  decision_branch:
+    type: object
+    required: [label, child]
+    additionalProperties: false
+    description: "One alternative under a decision node. NEVER carries probability -- a decision is a choice, not a chance (structurally distinct from chance_branch, not merely unchecked)."
+    properties:
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      child: {$ref: "#/$defs/decision_tree_node"}
+
+  chance_branch:
+    type: object
+    required: [label, probability, child]
+    additionalProperties: false
+    description: "One branch under a chance node. probability is required. Every chance node's OWN branches[].probability must sum to 1.0 (tolerance 1e-6) -- not schema-expressible, see file description."
+    properties:
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      probability: {type: number, minimum: 0, maximum: 1}
+      child: {$ref: "#/$defs/decision_tree_node"}
+
+  decision_node:
+    type: object
+    required: [node_type, label, branches, expected_value, optimal_branch_label]
+    additionalProperties: false
+    description: "A human choice among >=2 alternatives. No probability anywhere on this node itself."
+    properties:
+      node_type: {const: decision}
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      branches:
+        type: array
+        minItems: 2
+        items: {$ref: "#/$defs/decision_branch"}
+        description: ">=2 -- a 'choice' needs at least 2 real alternatives to be meaningful (decision.mcda's own MCDA_TOO_FEW_OPTIONS precedent)."
+      expected_value:
+        type: number
+        description: "GENUINE, RE-DERIVED -- max over branches[].child's own resolved value (payoff for a terminal child, expected_value for a decision/chance child). Never caller-supplied; no constructor parameter for it."
+      optimal_branch_label:
+        type: string
+        description: "GENUINE, RE-DERIVED -- the branches[].label achieving expected_value (first branch wins an exact tie, deterministic). Never caller-supplied."
+
+  chance_node:
+    type: object
+    required: [node_type, label, branches, expected_value]
+    additionalProperties: false
+    description: "A probabilistic branch point. Siblings' probabilities must exhaust the probability space (sum to 1.0)."
+    properties:
+      node_type: {const: chance}
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      branches:
+        type: array
+        minItems: 2
+        items: {$ref: "#/$defs/chance_branch"}
+        description: ">=2 -- a 'chance' needs at least 2 real branches to constitute uncertainty."
+      expected_value:
+        type: number
+        description: "GENUINE, RE-DERIVED -- sum(branch.probability * that branch's own child resolved value). Never caller-supplied."
+
+  decision_tree_node:
+    description: "A tree node -- exactly ONE of decision_node / chance_node / terminal_node. Recursive, NESTED (embedded children, not id-referenced -- see method contract compilation_decisions: a decision-tree node is inherently path-dependent, unlike root_cause.fault_tree's own basic events which legitimately recur under multiple gates)."
+    oneOf:
+      - $ref: "#/$defs/decision_node"
+      - $ref: "#/$defs/chance_node"
+      - $ref: "#/$defs/terminal_node"
+
+type: object
+required: [id, version, decision_context, root, root_expected_value, provenance]
+additionalProperties: false
+properties:
+  id:
+    type: string
+    pattern: "^DECISIONTREE-"
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "decision.decision_tree"
+  decision_context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The decision situation under analysis. Atlas gives no field name for this -- compilation decision, same class every sibling schema's own non-cited top-level field already is (e.g. decision.impact_effort's own subject)."
+  root:
+    $ref: "#/$defs/decision_tree_node"
+    description: "Atlas's own 'decision nodes→chance→probability→payoff' formula -- the tree root, recursive down to terminal payoffs."
+  root_expected_value:
+    type: number
+    description: "GENUINE, RE-DERIVED -- root's own resolved value (root.expected_value if decision/chance, root.payoff if terminal). Convenience top-level mirror, same pattern security.attack_tree's own root_aggregate establishes for its own family."
+  engine:
+    type: string
+    description: "Family-consistency field (decision.ahp/mcda/impact_effort/ice all carry it) -- not structurally required by this method's own tree shape the way root_cause/security's tree methods are (see method contract compilation_decisions)."
+  computation_provenance_ref:
+    type: string
+  provenance:
+    description: "epistemic_type expected CALCULATED_RESULT -- expected_value/optimal_branch_label are a genuine deterministic calculation, same class decision.mcda/decision.ahp/decision.impact_effort already establish. The tree's own STRUCTURE (which nodes/branches/payoffs/probabilities exist) is still human/AI judgment -- only the rollup arithmetic is calculated."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: >
+      Invented-but-realistic (disclosed), same convention learning.pdca-cycle-record.schema.yaml's own
+      example already uses. A product-launch decision: launch immediately (chance: high/low demand),
+      invest in R&D first (chance: R&D succeeds -> a SECOND decision, launch-after-success vs abandon;
+      R&D fails -> sunk cost), or do not launch. Hand-verified arithmetic (see method contract
+      verification / tests/unit/test_decision_tree.py ComputeRollupHandVerifiedTests):
+      EV(launch immediately) = 0.6*500000 + 0.4*(-100000) = 260000.
+      EV(post-R&D launch) = 0.8*800000 + 0.2*(-50000) = 630000; max(630000, -80000) = 630000, optimal="Launch after success".
+      EV(R&D outcome) = 0.7*630000 + 0.3*(-150000) = 396000.
+      EV(root) = max(260000, 396000, 0) = 396000, optimal="Invest in R&D first".
+    value:
+      id: "DECISIONTREE-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.decision_tree"
+      decision_context: "Should the team launch the new product now, invest in R&D first, or not launch at all?"
+      root:
+        node_type: decision
+        label: "Product launch strategy"
+        expected_value: 396000
+        optimal_branch_label: "Invest in R&D first"
+        branches:
+          - label: "Launch immediately"
+            child:
+              node_type: chance
+              label: "Immediate market response"
+              expected_value: 260000
+              branches:
+                - {label: "High demand", probability: 0.6, child: {node_type: terminal, label: "High demand outcome", payoff: 500000}}
+                - {label: "Low demand", probability: 0.4, child: {node_type: terminal, label: "Low demand outcome", payoff: -100000}}
+          - label: "Invest in R&D first"
+            child:
+              node_type: chance
+              label: "R&D outcome"
+              expected_value: 396000
+              branches:
+                - label: "R&D succeeds"
+                  probability: 0.7
+                  child:
+                    node_type: decision
+                    label: "Post-R&D launch decision"
+                    expected_value: 630000
+                    optimal_branch_label: "Launch after success"
+                    branches:
+                      - label: "Launch after success"
+                        child:
+                          node_type: chance
+                          label: "Post-R&D market response"
+                          expected_value: 630000
+                          branches:
+                            - {label: "High demand", probability: 0.8, child: {node_type: terminal, label: "High demand outcome", payoff: 800000}}
+                            - {label: "Low demand", probability: 0.2, child: {node_type: terminal, label: "Low demand outcome", payoff: -50000}}
+                      - label: "Abandon after success"
+                        child: {node_type: terminal, label: "Abandon after successful R&D", payoff: -80000}
+                - {label: "R&D fails", probability: 0.3, child: {node_type: terminal, label: "R&D failure outcome", payoff: -150000}}
+          - label: "Do not launch"
+            child: {node_type: terminal, label: "No launch", payoff: 0}
+      root_expected_value: 396000
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.decision_tree.rollup.roll_up_node"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+  - description: "A minimal single-terminal-node record -- no branching at all, root_expected_value is simply the one payoff."
+    value:
+      id: "DECISIONTREE-2026-09-08-002"
+      version: "1.0.0"
+      generated_by_method: "decision.decision_tree"
+      decision_context: "A guaranteed, single-outcome placeholder (no real choice or uncertainty modeled yet)."
+      root: {node_type: terminal, label: "Guaranteed outcome", payoff: 1000}
+      root_expected_value: 1000
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.decision_tree.rollup.roll_up_node"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+verification:
+  method: "Read Atlas F16 table row (L770) directly, and the F16 table's own §22.3 Method-specific Gate table (no Decision Tree row). Validated against jsonschema Draft202012Validator, including the recursive oneOf union across 3 node types."
+  note: >
+    No mother document was modified. The decision/chance/terminal formula is directly transcribed from
+    Atlas. The nested (not id-referenced) representation, the per-node expected_value/optimal_branch_label
+    annotation (not root-only), the >=2-branches minimum, and the maximize-payoff convention are compilation
+    decisions (see method contract), not textually cited.
