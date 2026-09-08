@@ -1,0 +1,1662 @@
+{
+  "schema_version": "1.0.0",
+  "generated_from": "scripts/build_capability_item_map.py (hand-curated semantic mapping over generation/blueprint-architecture-items.json)",
+  "covered_modules": {
+    "cross_border": "23_Cross_Border_Compliance",
+    "b2b": "18_B2B_Wholesale",
+    "customer_service": "04_Customer_Service",
+    "marketing": "06_Marketing_Growth",
+    "subscription_commerce": "43_Subscription_Commerce",
+    "pos": "19_POS_Retail",
+    "oms": "12_OMS_Order_Orchestration",
+    "sales": "05_CRM_Sales"
+  },
+  "map": {
+    "CAP-CROSS-BORDER": [
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "domain_objects",
+        "item_index": 4
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "permissions",
+        "item_index": 3
+      }
+    ],
+    "CAP-PRODUCT-PASSPORT": [
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_published",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "data_rules",
+        "item_index": 2
+      }
+    ],
+    "CAP-HS-CODE": [
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "data_rules",
+        "item_index": 0
+      }
+    ],
+    "_module_common": [
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "data_rules",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "23_Cross_Border_Compliance",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 6
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_consumed",
+        "item_index": 3
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 7
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 8
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 9
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "data_rules",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_consumed",
+        "item_index": 4
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_consumed",
+        "item_index": 5
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "data_rules",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "data_rules",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "data_rules",
+        "item_index": 1
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "data_rules",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "data_rules",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "data_rules",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "data_rules",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "definition_of_done",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_consumed",
+        "item_index": 4
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "permissions",
+        "item_index": 5
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "data_rules",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "data_rules",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "data_rules",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 3
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 4
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 5
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 6
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "lego_test",
+        "item_index": 7
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "definition_of_done",
+        "item_index": 0
+      }
+    ],
+    "CAP-B2B": [
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "data_rules",
+        "item_index": 0
+      }
+    ],
+    "CAP-B2B-PRICING": [
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "data_rules",
+        "item_index": 2
+      }
+    ],
+    "CAP-RFQ": [
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_published",
+        "item_index": 1
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "permissions",
+        "item_index": 2
+      }
+    ],
+    "CAP-B2B-BUYER-ROLES": [
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "service_contract",
+        "item_index": 1
+      }
+    ],
+    "CAP-CREDIT-TERMS": [
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "domain_objects",
+        "item_index": 4
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "service_contract",
+        "item_index": 5
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "permissions",
+        "item_index": 3
+      },
+      {
+        "doc_id": "18_B2B_Wholesale",
+        "section": "data_rules",
+        "item_index": 1
+      }
+    ],
+    "CAP-LIVE-CHAT": [
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "data_rules",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "data_rules",
+        "item_index": 3
+      }
+    ],
+    "CAP-TICKETING": [
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "domain_objects",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "service_contract",
+        "item_index": 5
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 5
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_published",
+        "item_index": 6
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 3
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 5
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 6
+      }
+    ],
+    "CAP-OMNICHANNEL-MESSAGING": [
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "events_consumed",
+        "item_index": 4
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "data_rules",
+        "item_index": 1
+      },
+      {
+        "doc_id": "04_Customer_Service",
+        "section": "data_rules",
+        "item_index": 2
+      }
+    ],
+    "CAP-SEGMENTATION": [
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "domain_objects",
+        "item_index": 4
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 1
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "permissions",
+        "item_index": 5
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "data_rules",
+        "item_index": 1
+      }
+    ],
+    "CAP-CAMPAIGNS": [
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 4
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "permissions",
+        "item_index": 3
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "data_rules",
+        "item_index": 3
+      }
+    ],
+    "CAP-MARKETING-AUTOMATION": [
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 5
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_published",
+        "item_index": 6
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "events_consumed",
+        "item_index": 3
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "permissions",
+        "item_index": 4
+      }
+    ],
+    "CAP-CAMPAIGN-ATTRIBUTION": [
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "domain_objects",
+        "item_index": 5
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "06_Marketing_Growth",
+        "section": "service_contract",
+        "item_index": 5
+      }
+    ],
+    "CAP-SUBSCRIPTION-COMMERCE": [
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "service_contract",
+        "item_index": 5
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_published",
+        "item_index": 1
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_consumed",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "data_rules",
+        "item_index": 0
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "data_rules",
+        "item_index": 2
+      }
+    ],
+    "CAP-SUBC-CHANGE-PLAN": [
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "service_contract",
+        "item_index": 4
+      }
+    ],
+    "CAP-SUBC-PAUSE": [
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_published",
+        "item_index": 3
+      }
+    ],
+    "CAP-SUBC-DUNNING": [
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_consumed",
+        "item_index": 1
+      }
+    ],
+    "CAP-SUBC-CHURN": [
+      {
+        "doc_id": "43_Subscription_Commerce",
+        "section": "events_published",
+        "item_index": 4
+      }
+    ],
+    "CAP-POS": [
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "permissions",
+        "item_index": 0
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "permissions",
+        "item_index": 3
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "data_rules",
+        "item_index": 1
+      }
+    ],
+    "CAP-POS-RECEIPT": [
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_published",
+        "item_index": 1
+      }
+    ],
+    "CAP-POS-INVENTORY-SYNC": [
+      {
+        "doc_id": "19_POS_Retail",
+        "section": "events_consumed",
+        "item_index": 0
+      }
+    ],
+    "CAP-FULFILLMENT-ROUTING": [
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "permissions",
+        "item_index": 3
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "data_rules",
+        "item_index": 1
+      }
+    ],
+    "CAP-ORDER-EXCEPTION": [
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_consumed",
+        "item_index": 3
+      }
+    ],
+    "CAP-ORDER-SPLIT": [
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "12_OMS_Order_Orchestration",
+        "section": "events_published",
+        "item_index": 1
+      }
+    ],
+    "CAP-SALES-PIPELINE": [
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "domain_objects",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "domain_objects",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "domain_objects",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "domain_objects",
+        "item_index": 3
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "domain_objects",
+        "item_index": 5
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "service_contract",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "service_contract",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "service_contract",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "service_contract",
+        "item_index": 3
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "service_contract",
+        "item_index": 5
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 0
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 3
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 4
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 5
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_consumed",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_consumed",
+        "item_index": 3
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "permissions",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "permissions",
+        "item_index": 2
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "permissions",
+        "item_index": 3
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "data_rules",
+        "item_index": 3
+      }
+    ],
+    "CAP-INTERACTION-HISTORY": [
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "domain_objects",
+        "item_index": 4
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "service_contract",
+        "item_index": 4
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_published",
+        "item_index": 6
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "events_consumed",
+        "item_index": 1
+      },
+      {
+        "doc_id": "05_CRM_Sales",
+        "section": "permissions",
+        "item_index": 4
+      }
+    ]
+  },
+  "coverage": {
+    "modules_fine_grained": [
+      "b2b",
+      "cross_border",
+      "customer_service",
+      "marketing",
+      "oms",
+      "pos",
+      "sales",
+      "subscription_commerce"
+    ],
+    "modules_fine_grained_count": 8,
+    "modules_fallback_full_content": [
+      "affiliate",
+      "ai",
+      "analytics",
+      "api",
+      "cdp",
+      "cli",
+      "commercial",
+      "compliance",
+      "content",
+      "core",
+      "demand_planning",
+      "desktop",
+      "domain",
+      "files",
+      "globalization",
+      "hr",
+      "identity",
+      "integrations",
+      "inventory_ops",
+      "loyalty",
+      "marketplace_ops",
+      "merchandising",
+      "migration",
+      "mobile",
+      "notifications",
+      "offline",
+      "payments",
+      "plm_quality",
+      "portals",
+      "procurement",
+      "promotions",
+      "reliability",
+      "returns",
+      "reviews",
+      "risk",
+      "search",
+      "shipping",
+      "social",
+      "tenant",
+      "warranty",
+      "web",
+      "workflow"
+    ],
+    "modules_fallback_count": 42,
+    "modules_total": 50,
+    "docs_itemized_total": 42,
+    "docs_capability_mapped": [
+      "04_Customer_Service",
+      "05_CRM_Sales",
+      "06_Marketing_Growth",
+      "12_OMS_Order_Orchestration",
+      "18_B2B_Wholesale",
+      "19_POS_Retail",
+      "23_Cross_Border_Compliance",
+      "43_Subscription_Commerce"
+    ],
+    "capabilities_in_fine_grained_modules_with_zero_items": [
+      "CAP-AB-TESTING",
+      "CAP-AI-FIRST-CHAT",
+      "CAP-AI-VOICE-SUPPORT",
+      "CAP-BACKORDER",
+      "CAP-CALL-CENTER",
+      "CAP-CANNED-REPLY",
+      "CAP-CLICK-COLLECT",
+      "CAP-CSAT",
+      "CAP-DOC-TEMPLATES",
+      "CAP-DROPSHIP",
+      "CAP-EMAIL-MARKETING",
+      "CAP-KNOWLEDGE-BASE",
+      "CAP-LANDED-COST",
+      "CAP-LEAD-GEN",
+      "CAP-MOQ",
+      "CAP-ORDER-MERGE",
+      "CAP-PREORDER",
+      "CAP-SALES-FORECAST",
+      "CAP-SALES-PERFORMANCE",
+      "CAP-SLA-TRACKING"
+    ],
+    "note": "Modules not in modules_fine_grained keep full-module BLUEPRINT_ARCHITECTURE.md content (unchanged fallback behavior). capabilities_in_fine_grained_modules_with_zero_items are real, honestly-reported gaps: the mechanically-extracted 8 sections of that module's blueprint doc never named that capability's specifics (often covered by non-extracted doc sections like Primary Workflows/AI Tool Surface); selecting only such a capability yields _module_common items only, never fabricated content."
+  }
+}

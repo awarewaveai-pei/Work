@@ -13432,3 +13432,27 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 
 [rollback]
 `git revert` 本次 commit：8 個 source module + 8 個 test 檔還原至無 isinstance guard 狀態（回到已知的非 dict 崩潰風險，非功能性退化——所有既有合法呼叫路徑行為不變，8 個 CLI demo 與 276 個測試已證明）。
+
+## 2026-09-08（System Foundry v1.6 — 「單位性」capability-item 級別 BLUEPRINT_ARCHITECTURE.md 過濾，操作者明確要求推翻前一輪「不可機械/語意derivable」的拒絕結論）
+
+**背景**：前一輪（`dc9e5d2b6`/`9a7afef80`）只做到 module-level 全量輸出；操作者要求若客戶只選模組內單一 capability（如 cross_border 模組只選 `CAP-HS-CODE`），`BLUEPRINT_ARCHITECTURE.md` 不該吐出整模組全部內容。
+
+**做法**（3 支新/改腳本，1 份新資料）：
+1. `scripts/extract_blueprint_items.py`：機械化（非語意）把 `blueprint-architecture-content.json` 每個 section 拆成有序 item list（fenced code block 一行一 item；`- `/`N. ` bullet 一條一 item），寫 `generation/blueprint-architecture-items.json`（42 docs）。
+2. `scripts/build_capability_item_map.py`：手工語意判讀（非字串比對，逐 doc 逐 item 讀內容對照 `capabilities/catalog.json` 的 name/description 判斷歸屬），寫 `generation/blueprint-capability-item-map.json`。無法歸給單一 capability 的（LEGO Test、DoD、跨 capability 通用不變量）進 `_module_common` bucket，永遠隨選任何 capability 一起輸出。
+3. `scripts/foundry_generate.py`：`module_architecture_text`/`write_module_package` 新增 `mcaps`（該模組實際選中的 capability，取自 `plan['module_reasons'][mid]`）+ `item_maps` 參數；有 fine-grained map 的 doc 用 `filter_section_content` 過濾 section 內容至「已選 capability ∪ _module_common」；沒有 map 的 doc 完全不動（維持既有 module-level 全量輸出，`filter_section_content` 未過濾任何東西時回傳同一個 raw_content 物件，保證全選 capability = byte-identical 舊行為）。
+
+**覆蓋範圍（誠實回報，非全 40 模組）**：本輪完成 fine-grained 的 8 個模組（`cross_border`／`b2b`／`customer_service`／`marketing`／`subscription_commerce`／`pos`／`oms`／`sales`），對應 8 份單一模組專用 blueprint doc（排除了 `Loyalty_Reviews_UGC.md` 這類單一 doc 服務多模組的情況，留在 fallback）。其餘 32 個已對映模組維持 module-level fallback，不受影響、不會因為缺 map 而丟內容。29 個 capability bucket（含 `_module_common`）；這 8 模組內有 20 個 capability 在機械抽取的 8 個 section 裡本來就沒被指名（如 `CAP-MOQ`／`CAP-LANDED-COST`／`CAP-SLA-TRACKING`），這些是誠實的覆蓋率缺口（`blueprint-capability-item-map.json` 的 `coverage.capabilities_in_fine_grained_modules_with_zero_items` 欄位列出），單獨選這些 capability 只會拿到 `_module_common`，不會捏造內容。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python <scratch>/verify_unit_level.py`（用真實 `resolve()`+`generate()` 跑兩組真設定：(a) 只選 `Q-XB-001`+`Q-XB-002`=True 即只啟用 `CAP-CROSS-BORDER`+`CAP-HS-CODE`；(b) 全選 `Q-XB-001~004`+`Q-COM-001`=True 即啟用全部 4 個 cross_border capability）| exit=0 | 結果：(a) 的 `BLUEPRINT_ARCHITECTURE.md` 不含任何 landed-cost/product-passport 專屬字串（`buildCustomsData()`／`Landed cost`／`DPP` 等 0 命中），只留 `classifyProduct()`（HS-CODE 專屬）+ `_module_common` 內容；(b) 與「未套用 unit-level 過濾前」的 `module_architecture_text(...,item_maps=None)` 輸出逐字（`.strip()` 後）相同 = 全選回歸測試通過，byte-for-byte 等價舊行為
+- 15 個 gate script + `python -m unittest discover -s tests`（38 tests）於 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 全數 PASS（`questions=261 capabilities=301 modules=51`、`SELECTION MATRIX: PASS`、`MUTATION COVERAGE: PASS`、`PAYMENT/COMMERCIAL GATING: PASS`、`Ran 38 tests ... OK`、`MANIFEST VALIDATION: PASS`、`DOC NUMBERS VALIDATION: PASS`）；`manifest.json` 已用 `regenerate_integrity.py --write` 重算 hash
+- REVIEW_DONE: critic=Quick 自審（風險 Low：新增過濾邏輯不觸碰 auth/payment/crypto，且有全選=舊行為的 byte-identical 回歸測試自我證明未破壞既有輸出）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`blueprint_item_maps\|filter_section_content\|blueprint-architecture-items\|blueprint-capability-item-map\|module_architecture_text` | hits=命中皆為本次改動自己的檔案（`foundry_generate.py`／`CHANGELOG_v1.6.md`／`manifest.json`）+ 舊 WORKLOG 對 `module_architecture_text` 的歷史記錄，無遺漏 call site
+- WORKLOG_DONE: 本條目
+
+**已知限制**：`git status` 顯示這 6 個新/改檔案在本次任務開始前已由前一次（疑似遭 429 中斷但實際留下工作的）session 建好；本輪工作 = 讀懂並驗證該 session 的產出（程式碼、資料、CHANGELOG 皆已存在且正確）+ 補上 step 5 要求的真實跑測 + 15-gate 驗證鏈 + 本 WORKLOG 條目（該 session 未來得及寫 WORKLOG）。共用 worktree 期間 `git add` 後索引被另一 session 重置過一次，commit 前重新 `git add` 解決。
+
+**[剩餘風險]**：其餘 32 個已對映模組尚未做 fine-grained 拆解，維持 module-level 全量輸出（非缺陷，是明確設計：`build_capability_item_map.py` 的 `covered_modules` 只列 8 個，未列到的模組 `foundry_generate.py` 的 `fine_grained` 判斷會直接跳過過濾）。
+
+**[rollback]**：`git revert` 本次 commit 即回到純 module-level 輸出；`foundry_generate.py` 的過濾邏輯全部行為受 `covered_docs`（來自 `blueprint-capability-item-map.json['covered_modules']`）門控，刪除該檔案等同停用全部 unit-level 過濾且不影響其他函式。

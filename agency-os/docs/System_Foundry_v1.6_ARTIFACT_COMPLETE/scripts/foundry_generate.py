@@ -23,19 +23,66 @@ def blueprint_content_maps():
     content=load('generation/blueprint-architecture-content.json')['docs']
     return mapping,content
 
+MODULE_COMMON='_module_common'
+
+# Unit-level (per-capability) filtering of the mechanically-extracted blueprint content, for docs
+# that have a hand-curated generation/blueprint-capability-item-map.json entry. Docs without one
+# are untouched (module_architecture_text's covered_docs check skips filtering entirely) -- the
+# module-level fallback from dc9e5d2b6/9a7afef80 is preserved byte-for-byte for every module this
+# pass didn't map.
+def blueprint_item_maps():
+    items=load('generation/blueprint-architecture-items.json')['docs']
+    capmap=load('generation/blueprint-capability-item-map.json')
+    rev={}
+    for cid,entries in capmap['map'].items():
+        for e in entries: rev[(e['doc_id'],e['section'],e['item_index'])]=cid
+    covered_docs=set(capmap['covered_modules'].values())
+    return items,rev,covered_docs
+
+# Rebuilds a section's content from only the items whose mapped capability is in `selected`
+# (which always includes MODULE_COMMON). Returns raw_content unchanged -- literally the same
+# object -- when nothing would be filtered out, so "every capability in the module selected"
+# is guaranteed byte-identical to the pre-unit-filtering full-module output, not just
+# content-equivalent. Returns '' when every item in this section was filtered out (caller skips
+# emitting the section header for an empty body rather than printing a dangling heading).
+def filter_section_content(did,skey,raw_content,items_for_doc,rev,selected):
+    item_list=items_for_doc.get(skey)
+    if not item_list: return raw_content
+    keep=[i for i in range(len(item_list)) if rev.get((did,skey,i),MODULE_COMMON) in selected]
+    if len(keep)==len(item_list): return raw_content
+    kept=[item_list[i] for i in keep]
+    if not kept: return ''
+    first_line=next((l for l in raw_content.splitlines() if l.strip()),'')
+    if first_line.lstrip().startswith('```'):
+        lang=first_line.lstrip()[3:].strip() or 'text'
+        return '```'+lang+'\n'+'\n'.join(kept)+'\n```'
+    if first_line.lstrip().startswith('- '):
+        return '\n'.join(f'- {it}' for it in kept)
+    return '\n'.join(kept)
+
 # Real blueprint architecture content, mechanically extracted (extract_blueprint_content.py) --
 # not the generic governance boilerplate in MODULE_DOCS. Returns None (write nothing, no
 # placeholder) when the module has no mapping, or every mapped doc matched zero sections.
-def module_architecture_text(mid,bp_mapping,bp_content):
+# mcaps = the module's actually-selected capability IDs from plan['module_reasons'][mid] (the
+# resolved plan, not "module selected/not selected"). item_maps is blueprint_item_maps()'s
+# (items, rev, covered_docs) tuple; docs not in covered_docs keep full content unfiltered.
+def module_architecture_text(mid,bp_mapping,bp_content,mcaps=(),item_maps=None):
+    items_by_doc,rev,covered_docs=item_maps if item_maps else ({},{},set())
+    selected=set(mcaps)|{MODULE_COMMON}
     blocks=[]
     for fname in bp_mapping.get(mid,[]):
         did=bp_doc_id(fname); entry=bp_content.get(did)
         if not entry or not entry['sections']: continue
+        fine_grained=did in covered_docs
         lines=[f'## {did}','',f'Source: `{entry["source_file"]}`','']
         for key,title in BP_SECTION_TITLES.items():
             sec=entry['sections'].get(key)
             if not sec: continue
-            lines += [f'### {title}','',sec['content'],'']
+            content=sec['content']
+            if fine_grained:
+                content=filter_section_content(did,key,content,items_by_doc.get(did,{}),rev,selected)
+                if not content.strip(): continue
+            lines += [f'### {title}','',content,'']
         blocks.append('\n'.join(lines).rstrip())
     if not blocks: return None
     header=f"""# {mid} — Blueprint Architecture Reference
@@ -143,12 +190,13 @@ Module: `{mid}`
 """
     return common+'\n'+body
 
-def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content):
+def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content,item_maps=None):
     d=stage/'docs/modules'/mid
     d.mkdir(parents=True,exist_ok=True)
     for role in MODULE_DOCS:
         write(d/role,module_doc_text(mid,role,plan,obl,caps))
-    arch_text=module_architecture_text(mid,bp_mapping,bp_content)
+    mcaps=[x for x in plan['module_reasons'].get(mid,[]) if x in caps]
+    arch_text=module_architecture_text(mid,bp_mapping,bp_content,mcaps,item_maps)
     if arch_text is not None: write(d/'BLUEPRINT_ARCHITECTURE.md',arch_text)
     manifest={
       'schema_version':'1.0.0','module_id':mid,'status':'SELECTED','purpose':obl['purpose'],
@@ -284,11 +332,11 @@ def generate(plan,answers,custom,out_root):
     try:
         module_data={m['id']:m for m in load('generation/module-manifests.json')['modules']}
         obligations=load('generation/module-obligations.json')['modules']; caps,_=cap_maps()
-        bp_mapping,bp_content=blueprint_content_maps()
+        bp_mapping,bp_content=blueprint_content_maps(); item_maps=blueprint_item_maps()
         for mid in plan['modules']:
             if mid not in module_data: raise ValueError('unknown generation module '+mid)
             if mid not in obligations: raise ValueError('missing module obligations '+mid)
-            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps,bp_mapping,bp_content)
+            write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps,bp_mapping,bp_content,item_maps)
         for rel in ['.foundry/intake','.foundry/resolution','.foundry/handoffs','.foundry/verification','.foundry/migration-history','docs/requirements','docs/blueprint']:
             (stage/rel).mkdir(parents=True,exist_ok=True)
         now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
