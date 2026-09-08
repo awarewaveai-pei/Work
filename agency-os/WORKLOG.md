@@ -13665,7 +13665,7 @@ Revoke the generated staging token and delete the newly created staging bucket o
 [verification]
 - REALTEST_EVIDENCE: tool=Bash | cmd=`Cloudflare GET /user/tokens/permission_groups (status only)` | exit=0 | ms=12000
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; confirmed no secret output or production substitution.
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`bucket-scoped|permission_groups|Anthropic|Pexels` | hits=27
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`bucket-scoped|permission_groups|Anthropic|Pexels` | hits=410
 - WORKLOG_DONE: blocker recorded in `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
 [rollback]
