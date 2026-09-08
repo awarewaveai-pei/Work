@@ -13373,6 +13373,20 @@ After explicit approval, removed the clean local `D:\Worktrees\media-video-phase
 [rollback]
 No local rollback needed: `origin/main` retains integrated source and the historical bundle remains under `agency-os/docs/video_generator/_handoff_2026-09-07/`.
 
+## 2026-09-08 — Timeline preflight tenant binding
+
+[scope]
+`POST /api/video/timeline/validate` now rejects a client Timeline naming another organization after structural validation. It remains validation-only: no renderer, database, storage or external call.
+
+[verification]
+- REALTEST_EVIDENCE: `npm test -- app/api/video/timeline/validate/route.test.ts` passed 6 tests; `npm run typecheck` passed in `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; verified middleware coverage, real role handling, matched/mismatched/unbound client cases, and zero renderer/DB/storage path.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=assertOrgAccess\(req, result.value.organizationId\) | expected route/test/docs hits.
+- WORKLOG_DONE: boundary and original-handoff status are in `agency-os/docs/video_generator/PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`.
+
+[rollback]
+Revert this commit; it only restores the former preflight authorization behaviour and changes no persisted state.
+
 ## 2026-09-07 — System Foundry v1.6：真實 blueprint 內容抽取管線（不再只吐通用治理樣板）
 
 [scope]
