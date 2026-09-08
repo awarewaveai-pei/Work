@@ -92,6 +92,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, status: "running", step: job.step ?? "準備中…" });
   }
 
+  if (job.recordParams?.rendererKind === "remotion") {
+    return NextResponse.json({ ok: false, error: "Remotion job 使用 /api/video/remotion-job-status" }, { status: 409 });
+  }
+
   // 查 EU 一次
   const { pollRenderJob } = await import("@/lib/content/video/render-client");
   const poll = await pollRenderJob(job.euJobId);

@@ -46,6 +46,7 @@ export interface VideoJob {
     visualBreakdown?: { custom: number; broll: number };
     imageModel?: string;
     source?: "generate" | "draft";
+    rendererKind?: "ffmpeg" | "remotion";
     serviceCapability?: VideoServiceCapability;
   };
   recorded?: boolean;           // media_assets 已記錄（只記一次）
