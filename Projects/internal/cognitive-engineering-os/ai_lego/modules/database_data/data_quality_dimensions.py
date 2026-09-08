@@ -218,7 +218,7 @@ def evaluate_provenance_required_gate(record: dict[str, Any], validator: str, ti
 def evaluate_genuine_compute_gate(record: dict[str, Any], validator: str, timestamp: str) -> dict[str, Any]:
     """Reuses ``modules.research.gates.evaluate_statistical_gate`` UNCHANGED -- it only ever inspected
     provenance/computation_provenance_ref/engine, all of which DataQualityAssessmentRecord also carries at
-    the top level. Eighth reuse of this gate this session."""
+    the top level. Twelfth reuse of this gate this session (CORRECTED post-critic-review, see module docstring)."""
     if not isinstance(record, dict):
         return _result("genuine_compute", False, [{"reason": "record is not a dict"}], validator, timestamp)
     passed, evidence = evaluate_statistical_gate(record)

@@ -13512,3 +13512,19 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 **[剩餘風險]**：其餘 32 個已對映模組尚未做 fine-grained 拆解，維持 module-level 全量輸出（非缺陷，是明確設計：`build_capability_item_map.py` 的 `covered_modules` 只列 8 個，未列到的模組 `foundry_generate.py` 的 `fine_grained` 判斷會直接跳過過濾）。
 
 **[rollback]**：`git revert` 本次 commit 即回到純 module-level 輸出；`foundry_generate.py` 的過濾邏輯全部行為受 `covered_docs`（來自 `blueprint-capability-item-map.json['covered_modules']`）門控，刪除該檔案等同停用全部 unit-level 過濾且不影響其他函式。
+
+## 2026-09-08 — cognitive-engineering-os：data_quality_dimensions「第八次重用」function docstring 歷史誤植修正（應為第十二次）
+
+[scope]
+`ai_lego/modules/database_data/data_quality_dimensions.py:221`（`evaluate_genuine_compute_gate` function docstring）殘留「Eighth reuse of this gate this session」。同檔案 module docstring（L24-30）、`contract-backlog.yaml` `fortieth_concrete_entry`（L1518）、`tests/unit/test_data_quality_dimensions.py:401-403` 三處早於本 session 42nd slice（2026-09-06，`TASKS.md` L867 記錄）修正為「twelfth」；`docs/FORTYSECOND_SLICE_DATABASE_DATA_DATA_QUALITY_DIMENSIONS.md:26` 自己明講當時「in four places」都要修——實際只改了 3 處，L221 這處 function docstring 漏改，殘留至今。根因（module docstring L26-28 自陳）：初版把「`database_data` 家族第八成員」（L1：`EIGHTH member of the database_data family`，屬實）與「`evaluate_statistical_gate` 第八次重用」（兩個不同計數軸）搞混。
+
+獨立驗證方法（不假設 TASKS.md／YAML 已對，重新從程式碼本身重建鏈，同今日 `capacity_model` 案用的方法）：grep 全樹 `ai_lego/modules/` 真實 import+call `evaluate_statistical_gate`（非僅提及）站點，逐檔讀出各自 docstring 內嵌「after X/Y/Z...」前輩清單，重建一條前後自洽鏈：`root_cause.pareto`(1)→`decision.ahp`(2)→`decision.mcda`(3)→`devops_sre.error_budget`(4，自身明講「fourth reuse (after pareto/ahp/mcda)」)→`database_data.data_lineage`(5)→`database_data.reconciliation`(6)→`devops_sre.capacity_model`(7)→`devops_sre.load_test`(8，自身列出前 7 名自稱 EIGHTH)→`devops_sre.stress_test`(9)→`devops_sre.soak_test`(10)→`database_data.normalization`(11)→`database_data.data_quality_dimensions`(12)。`decision` 家族其餘成員（`decision_tree`／`weighted_decision_matrix`／`pareto_frontier`／`impact_effort`／`ice`）雖也真的 import+call 該函式，但各自明講「same family-wide reuse ... already established」不個別累加序數（跟 `computation.monte_carlo` 提及函式名卻明講「does NOT reuse」被排除同一種「提及≠計數」邏輯）。四方交叉核對一致，皆指向十二：module docstring／`contract-backlog.yaml`／test docstring／`TASKS.md` L867。
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_data_quality_dimensions -v`（cwd=Projects/internal/cognitive-engineering-os）| exit=0 | result=76/76 tests pass（修正前後跑兩次數字相同；純 docstring 字串取代，模組成功 import 本身已證語法未破壞）
+- REVIEW_DONE: critic=Quick 自審（風險 Low：三重獨立來源——module docstring／YAML/test 既有正確值——與本次改動目標值一致，純 prose 單字取代零邏輯改動）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`eighth reuse\|第八次重用`（case-insensitive，全樹）| hits=11（修正前）→10（修正後，本次目標 1 處已修正）；其餘 10 處三類均不動：(a) `WORKLOG.md`×2／`TASKS.md`×2／`docs/THIRTYFIRST_SLICE_...md`／`docs/THIRTYFIFTH_SLICE_...md`／`docs/FORTYSECOND_SLICE_DATABASE_DATA_DATA_QUALITY_DIMENSIONS.md`——歷史 WORKLOG／切片報告既有記錄，舊記錄不回改（AGENTS.md §8 precedent）；(b) `ai_lego/modules/devops_sre/load_test.py:217`——該模組自己目前正確的「EIGHTH reuse」宣稱（它自己就是第 8 個，非本次範圍非錯誤）；(c) `tests/unit/test_capacity_model.py:372`、`contract-backlog.yaml:1040`——`devops_sre.capacity_model` 自己一組獨立、不同模組的殘留「eighth」錯誤（應為第七次），與本次 data_quality_dimensions 錯誤不相關。**順手發現但非本次範圍**：commit `0f5d64eff`（訊息宣稱已修正 capacity_model 這組，含改 `test_capacity_model.py`/`TASKS.md`/`contract-backlog.yaml`）不在本機目前 `main` HEAD（`0f4714fe5`）祖先鏈內（`git merge-base --is-ancestor 0f5d64eff HEAD` = NO），疑似另一並行 session 的未合併或遺失變更，已口頭告知操作者，未動手處理。
+- WORKLOG: 本條目
+
+[rollback]
+`git revert` 本次 commit：`data_quality_dimensions.py:221` 還原「Eighth reuse of this gate this session.」。純 docstring 文字變更，無資料/邏輯風險，76 個既有測試不受影響。
