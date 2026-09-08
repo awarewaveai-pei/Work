@@ -21,15 +21,15 @@
 
 相對地，版本庫的 renderer compose 位於：
 
-- D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\video-service\docker-compose.video.yml:1
-- D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\docker-compose.remotion.yml:1
+- D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\video-service\docker-compose.video.yml:1
+- D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\remotion-service\docker-compose.remotion.yml:1
 
 因此部署前不能假定「Git 內 compose = 線上 compose」。必須先建立受版本控制的 renderer deployment manifest 與同步驗證，並比對 image digest、容器 ports、network、healthcheck、restart policy 與非機密環境變數名稱。
 
 ## staging 缺口
 
 主機的 /root/lobster-phase1/docker-compose.staging.yml 不存在，與
-D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\SAME_VPS_STAGING_RUNBOOK.md:1-14
+D:\Work\lobster-factory\infra\hetzner-phase1-core\SAME_VPS_STAGING_RUNBOOK.md:1-14
 所述路徑不一致。故目前沒有可供 Phase 1A 使用的受控 staging stack。
 
 在 staging 存在前，禁止：
@@ -43,10 +43,11 @@ D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\SAME_V
 
 已在隔離分支提交 9667d0075：
 
-- D:\\Worktrees\\media-video-phase0\\lobster-factory\\infra\\hetzner-phase1-core\\docker-compose.renderer-staging.yml:1
-- D:\\Worktrees\\media-video-phase0\\lobster-factory\\infra\\hetzner-phase1-core\\.env.renderer-staging.example:1
+- D:\\Work\\lobster-factory\\infra\\hetzner-phase1-core\\docker-compose.renderer-staging.yml:1
+- D:\\Work\\lobster-factory\\infra\\hetzner-phase1-core\\.env.renderer-staging.example:1
 
 它使用 staging image、127.0.0.1:9732/9733、lobster-renderer-staging-net、healthcheck、CPU/RAM 限制，且不加入 lobster-net。Docker Compose config validation 已通過。
+該 commit 已在 `main`；這是版本庫交付證據，不代表檔案已部署到主機。
 
 ## 部署前剩餘條件
 
@@ -54,3 +55,17 @@ D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\SAME_V
 2. 以 staging compose build/up，確認兩個 healthcheck、未帶 token 的拒絕、正確 token 的接受與 production containers 未重啟。
 3. 記錄 staging image digest、測試 job ID 和 rollback down 結果。
 4. 經此驗收後，才可建立 Phase 1A 的 production rollout package。
+
+## Gate 0 receipt — 2026-09-08
+
+唯讀 SSH 預檢完成；未讀 secrets、未寫主機、未啟動或停止容器。
+
+| Check | Actual result | Next action |
+|---|---|---|
+| Host | `ns31414856` | PASS: correct `ks-aw-01`. |
+| Production renderers | `lobster-video-service` and `lobster-remotion-service` are healthy; loopback `127.0.0.1:8732/8733`. | Preserve; no restart or direct change. |
+| Production compose | `/root/render-services/docker-compose.yml` present. | Drift boundary remains. |
+| Controlled staging manifest | `/root/lobster-phase1/docker-compose.renderer-staging.yml` absent. | BLOCK Gate 1–4; do not build/start staging or migrate `video_jobs`. |
+| Durable executor baseline | Trigger services are healthy. | Availability alone is not a video-task deployment proof. |
+
+Evidence command: `ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145.239.195.47 'hostname; sudo docker ps ...; sudo test -f ...'`; exit `0`. Full non-secret result is recorded in `agency-os/WORKLOG.md` dated 2026-09-08.

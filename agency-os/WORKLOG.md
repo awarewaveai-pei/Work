@@ -13582,3 +13582,23 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 
 [rollback]
 `git revert` 本次 commit：`industries/` 整目錄消失，`configurator_engine.py`/`foundry_generate.py`/`serve_configurator.py` 三個既有函式簽章還原（新參數皆有預設值，revert 對現有 caller 零影響）；`manifest.json`/`registries/kernel.yaml` 同步還原（本次未觸碰 kernel_digest，因未改 `kernel/*.md`）。
+## 2026-09-08 — Video Phase 1B Gate 0 renderer/staging preflight
+
+[scope]
+Read-only preflight for the durable-video gates. No source, DB, renderer, container, secret, deployment, media, WordPress or Postiz change.
+
+[result]
+- C1: `ns31414856`; correct host.
+- C2: `lobster-video-service` and `lobster-remotion-service` healthy on `127.0.0.1:8732/8733`.
+- C3: `/root/render-services/docker-compose.yml` present; `/root/lobster-phase1/docker-compose.renderer-staging.yml` absent.
+- C4: Trigger containers healthy, but this does not prove a deployed media worker.
+- Decision: staging manifest absence blocks Gate 1–4, `video_jobs` migration and any Timeline/renderer submission integration.
+
+[verification]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145.239.195.47 '<hostname/docker ps/test -f preflight>'` | exit=0 | ms=6700
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; stale deleted worktree references corrected to canonical D:\Work paths.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`docker-compose.renderer-staging.yml|render-draft|video_jobs` | hits=162; no staging activation added.
+- WORKLOG_DONE: deployment baseline receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+None: Gate 0 made no change.
