@@ -1,0 +1,259 @@
+{
+  "version": "1.0.0",
+  "modules": [
+    {
+      "id": "accounting_integration",
+      "paths": [
+        "integrations/accounting"
+      ],
+      "activated_by": [
+        "MEP-CAP-ACCOUNTING-RECONCILIATION"
+      ]
+    },
+    {
+      "id": "ai",
+      "paths": [
+        "modules/ai"
+      ],
+      "activated_by": [
+        "MEP-CAP-AI-ANOMALY",
+        "MEP-CAP-AI-QUERY",
+        "MEP-CAP-AI-REPORT-SUMMARY",
+        "MEP-CAP-AI-WRITE"
+      ]
+    },
+    {
+      "id": "audit_observability",
+      "paths": [
+        "modules/audit",
+        "observability"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "calendar_integration",
+      "paths": [
+        "integrations/calendar"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "commercial",
+      "paths": [
+        "modules/commercial"
+      ],
+      "activated_by": [
+        "MEP-CAP-BUDGET",
+        "MEP-CAP-CHANGE-ORDER",
+        "MEP-CAP-CONTRACT",
+        "MEP-CAP-PROGRESS-BILLING",
+        "MEP-CAP-PROGRESS-ESTIMATE",
+        "MEP-CAP-RETENTION"
+      ]
+    },
+    {
+      "id": "core",
+      "paths": [
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/interfaces",
+        "tests/unit",
+        "tests/integration",
+        "tests/contract",
+        "tests/e2e",
+        "infra",
+        "docs/architecture"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "cost",
+      "paths": [
+        "modules/cost"
+      ],
+      "activated_by": [
+        "MEP-CAP-LABOR-COST",
+        "MEP-CAP-MATERIAL-COST",
+        "MEP-CAP-OTHER-COST",
+        "MEP-CAP-PROJECT-MARGIN",
+        "MEP-CAP-PROJECT-PNL",
+        "MEP-CAP-SUBCONTRACT-COST"
+      ]
+    },
+    {
+      "id": "dispatch",
+      "paths": [
+        "modules/dispatch"
+      ],
+      "activated_by": [
+        "MEP-CAP-COMPANY-CALENDAR",
+        "MEP-CAP-DISPATCH",
+        "MEP-CAP-DISPATCH-ACK",
+        "MEP-CAP-DISPATCH-DND",
+        "MEP-CAP-DISPATCH-REACK",
+        "MEP-CAP-MULTI-PERSON-DISPATCH",
+        "MEP-CAP-MY-DISPATCH",
+        "MEP-CAP-UNASSIGNED-WORKFORCE"
+      ]
+    },
+    {
+      "id": "documents",
+      "paths": [
+        "modules/documents"
+      ],
+      "activated_by": [
+        "MEP-CAP-DRAWING",
+        "MEP-CAP-DRAWING-VERSION",
+        "MEP-CAP-SITE-PHOTO"
+      ]
+    },
+    {
+      "id": "experience",
+      "paths": [
+        "modules/experience"
+      ],
+      "activated_by": [
+        "MEP-CAP-NATIVE-MOBILE",
+        "MEP-CAP-OFFLINE",
+        "MEP-CAP-OFFLINE-ACTION-QUEUE",
+        "MEP-CAP-OFFLINE-CONFLICT",
+        "MEP-CAP-OFFLINE-READ-CACHE",
+        "MEP-CAP-OFFLINE-SYNC",
+        "MEP-CAP-PWA",
+        "MEP-CAP-RWD-WEB"
+      ]
+    },
+    {
+      "id": "field",
+      "paths": [
+        "modules/field"
+      ],
+      "activated_by": [
+        "MEP-CAP-DAILY-REPORT",
+        "MEP-CAP-WORK-PROGRESS"
+      ]
+    },
+    {
+      "id": "future",
+      "paths": [
+        "modules/future"
+      ],
+      "activated_by": [
+        "MEP-CAP-ACCOUNTING-INTEGRATION",
+        "MEP-CAP-ATTENDANCE",
+        "MEP-CAP-MULTI-TENANT",
+        "MEP-CAP-ONLINE-PAYMENT"
+      ]
+    },
+    {
+      "id": "identity_authorization",
+      "paths": [
+        "modules/identity",
+        "modules/authorization"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "integrations",
+      "paths": [
+        "modules/integrations"
+      ],
+      "activated_by": [
+        "MEP-CAP-GCAL-INTEGRATION",
+        "MEP-CAP-LINE-INTEGRATION",
+        "MEP-CAP-MAP-LINK"
+      ]
+    },
+    {
+      "id": "labor_time",
+      "paths": [
+        "modules/labor-time"
+      ],
+      "activated_by": [
+        "MEP-CAP-APPROVED-LABOR-TIME"
+      ]
+    },
+    {
+      "id": "notification",
+      "paths": [
+        "modules/notification"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "offline_sync",
+      "paths": [
+        "apps/rwd-web/offline"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "procurement",
+      "paths": [
+        "modules/procurement"
+      ],
+      "activated_by": [
+        "MEP-CAP-DELIVERY",
+        "MEP-CAP-MATERIAL",
+        "MEP-CAP-MATERIAL-ISSUE",
+        "MEP-CAP-MATERIAL-REQUEST",
+        "MEP-CAP-MATERIAL-RETURN",
+        "MEP-CAP-PURCHASE-ORDER",
+        "MEP-CAP-RFQ",
+        "MEP-CAP-VENDOR"
+      ]
+    },
+    {
+      "id": "project",
+      "paths": [
+        "modules/project"
+      ],
+      "activated_by": [
+        "MEP-CAP-PROJECT",
+        "MEP-CAP-PROJECT-LIFECYCLE",
+        "MEP-CAP-PROJECT-OWNERSHIP",
+        "MEP-CAP-SITE",
+        "MEP-CAP-WARRANTY"
+      ]
+    },
+    {
+      "id": "quality",
+      "paths": [
+        "modules/quality"
+      ],
+      "activated_by": [
+        "MEP-CAP-DEFECT",
+        "MEP-CAP-INSPECTION"
+      ]
+    },
+    {
+      "id": "rwd_web",
+      "paths": [
+        "apps/rwd-web"
+      ],
+      "activated_by": []
+    },
+    {
+      "id": "subcontract",
+      "paths": [
+        "modules/subcontract"
+      ],
+      "activated_by": [
+        "MEP-CAP-SUBCONTRACT-BILLING",
+        "MEP-CAP-SUBCONTRACTOR"
+      ]
+    },
+    {
+      "id": "workforce",
+      "paths": [
+        "modules/workforce"
+      ],
+      "activated_by": [
+        "MEP-CAP-CREW",
+        "MEP-CAP-EMPLOYEE",
+        "MEP-CAP-FOREMAN"
+      ]
+    }
+  ]
+}

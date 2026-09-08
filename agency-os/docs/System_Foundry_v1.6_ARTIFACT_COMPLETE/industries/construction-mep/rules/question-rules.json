@@ -1,0 +1,616 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "RULE-MEP-Q-PROJ-001",
+      "when": {
+        "question": "MEP-Q-PROJ-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROJECT"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-PROJ-002",
+      "when": {
+        "question": "MEP-Q-PROJ-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-SITE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-PROJ-003",
+      "when": {
+        "question": "MEP-Q-PROJ-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROJECT-OWNERSHIP"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-PROJ-004",
+      "when": {
+        "question": "MEP-Q-PROJ-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROJECT-LIFECYCLE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-PROJ-005",
+      "when": {
+        "question": "MEP-Q-PROJ-005",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-WARRANTY"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-001",
+      "when": {
+        "question": "MEP-Q-DSP-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-EMPLOYEE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-002",
+      "when": {
+        "question": "MEP-Q-DSP-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-CREW"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-003",
+      "when": {
+        "question": "MEP-Q-DSP-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-FOREMAN"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-004",
+      "when": {
+        "question": "MEP-Q-DSP-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DISPATCH"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-005",
+      "when": {
+        "question": "MEP-Q-DSP-005",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MULTI-PERSON-DISPATCH"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-006",
+      "when": {
+        "question": "MEP-Q-DSP-006",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-UNASSIGNED-WORKFORCE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-007",
+      "when": {
+        "question": "MEP-Q-DSP-007",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DISPATCH-ACK"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-008",
+      "when": {
+        "question": "MEP-Q-DSP-008",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DISPATCH-REACK"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-009",
+      "when": {
+        "question": "MEP-Q-DSP-009",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DISPATCH-DND"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-010",
+      "when": {
+        "question": "MEP-Q-DSP-010",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-COMPANY-CALENDAR"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DSP-011",
+      "when": {
+        "question": "MEP-Q-DSP-011",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MY-DISPATCH"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-FLD-001",
+      "when": {
+        "question": "MEP-Q-FLD-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-WORK-PROGRESS"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-FLD-002",
+      "when": {
+        "question": "MEP-Q-FLD-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DAILY-REPORT"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DOC-001",
+      "when": {
+        "question": "MEP-Q-DOC-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DRAWING"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DOC-002",
+      "when": {
+        "question": "MEP-Q-DOC-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DRAWING-VERSION"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-DOC-003",
+      "when": {
+        "question": "MEP-Q-DOC-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-SITE-PHOTO"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-QA-001",
+      "when": {
+        "question": "MEP-Q-QA-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DEFECT"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-QA-002",
+      "when": {
+        "question": "MEP-Q-QA-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-INSPECTION"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-001",
+      "when": {
+        "question": "MEP-Q-MAT-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MATERIAL"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-002",
+      "when": {
+        "question": "MEP-Q-MAT-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MATERIAL-REQUEST"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-003",
+      "when": {
+        "question": "MEP-Q-MAT-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-RFQ"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-004",
+      "when": {
+        "question": "MEP-Q-MAT-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PURCHASE-ORDER"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-005",
+      "when": {
+        "question": "MEP-Q-MAT-005",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-DELIVERY"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-006",
+      "when": {
+        "question": "MEP-Q-MAT-006",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MATERIAL-ISSUE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-007",
+      "when": {
+        "question": "MEP-Q-MAT-007",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MATERIAL-RETURN"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-MAT-008",
+      "when": {
+        "question": "MEP-Q-MAT-008",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MATERIAL-COST"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-VEN-001",
+      "when": {
+        "question": "MEP-Q-VEN-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-VENDOR"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-VEN-002",
+      "when": {
+        "question": "MEP-Q-VEN-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-SUBCONTRACTOR"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-VEN-003",
+      "when": {
+        "question": "MEP-Q-VEN-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-SUBCONTRACT-BILLING"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-BIL-001",
+      "when": {
+        "question": "MEP-Q-BIL-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-CONTRACT"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-BIL-002",
+      "when": {
+        "question": "MEP-Q-BIL-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-BUDGET"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-BIL-003",
+      "when": {
+        "question": "MEP-Q-BIL-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-CHANGE-ORDER"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-BIL-004",
+      "when": {
+        "question": "MEP-Q-BIL-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROGRESS-ESTIMATE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-BIL-005",
+      "when": {
+        "question": "MEP-Q-BIL-005",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROGRESS-BILLING"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-BIL-006",
+      "when": {
+        "question": "MEP-Q-BIL-006",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-RETENTION"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-COST-001",
+      "when": {
+        "question": "MEP-Q-COST-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-LABOR-COST"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-COST-002",
+      "when": {
+        "question": "MEP-Q-COST-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MATERIAL-COST"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-COST-003",
+      "when": {
+        "question": "MEP-Q-COST-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-SUBCONTRACT-COST"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-COST-004",
+      "when": {
+        "question": "MEP-Q-COST-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-OTHER-COST"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-COST-005",
+      "when": {
+        "question": "MEP-Q-COST-005",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROJECT-PNL"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-COST-006",
+      "when": {
+        "question": "MEP-Q-COST-006",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PROJECT-MARGIN"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-INT-001",
+      "when": {
+        "question": "MEP-Q-INT-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-LINE-INTEGRATION"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-INT-002",
+      "when": {
+        "question": "MEP-Q-INT-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-GCAL-INTEGRATION"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-INT-003",
+      "when": {
+        "question": "MEP-Q-INT-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MAP-LINK"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-UX-001",
+      "when": {
+        "question": "MEP-Q-UX-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-RWD-WEB"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-UX-002",
+      "when": {
+        "question": "MEP-Q-UX-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-NATIVE-MOBILE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-UX-003",
+      "when": {
+        "question": "MEP-Q-UX-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-PWA"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-UX-004",
+      "when": {
+        "question": "MEP-Q-UX-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-OFFLINE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-AI-001",
+      "when": {
+        "question": "MEP-Q-AI-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-AI-REPORT-SUMMARY"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-AI-002",
+      "when": {
+        "question": "MEP-Q-AI-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-AI-QUERY"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-AI-003",
+      "when": {
+        "question": "MEP-Q-AI-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-AI-ANOMALY"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-AI-004",
+      "when": {
+        "question": "MEP-Q-AI-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-AI-WRITE"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-FUT-001",
+      "when": {
+        "question": "MEP-Q-FUT-001",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-MULTI-TENANT"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-FUT-002",
+      "when": {
+        "question": "MEP-Q-FUT-002",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-ACCOUNTING-INTEGRATION"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-FUT-003",
+      "when": {
+        "question": "MEP-Q-FUT-003",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-ATTENDANCE",
+        "MEP-CAP-APPROVED-LABOR-TIME"
+      ]
+    },
+    {
+      "id": "RULE-MEP-Q-FUT-004",
+      "when": {
+        "question": "MEP-Q-FUT-004",
+        "equals": true
+      },
+      "require": [
+        "MEP-CAP-ONLINE-PAYMENT"
+      ]
+    }
+  ]
+}

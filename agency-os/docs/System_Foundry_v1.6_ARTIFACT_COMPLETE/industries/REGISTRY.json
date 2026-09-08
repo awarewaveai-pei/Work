@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "default_industry": "commerce",
+  "industries": {
+    "commerce": {
+      "name": "Composable AI Commerce OS",
+      "capabilities": "capabilities/catalog.json",
+      "questionnaire": "questionnaires/catalog.json",
+      "question_rules": "rules/question-rules.json",
+      "derivation_rules": "rules/derivation-rules.json",
+      "conflict_rules": "rules/conflict-rules.json",
+      "module_rules": null,
+      "baseline": "baselines/production-baseline.json",
+      "module_manifests": "generation/module-manifests.json",
+      "module_obligations": "generation/module-obligations.json",
+      "blueprint_doc_mapping": "generation/blueprint-doc-mapping.json",
+      "blueprint_architecture_content": "generation/blueprint-architecture-content.json",
+      "blueprint_architecture_items": "generation/blueprint-architecture-items.json",
+      "blueprint_capability_item_map": "generation/blueprint-capability-item-map.json"
+    },
+    "construction-mep-contractor": {
+      "name": "Construction / MEP Contractor Operations",
+      "capabilities": "industries/construction-mep/capabilities/catalog.json",
+      "questionnaire": "industries/construction-mep/questionnaires/catalog.json",
+      "question_rules": "industries/construction-mep/rules/question-rules.json",
+      "derivation_rules": "industries/construction-mep/rules/derivation-rules.json",
+      "conflict_rules": "industries/construction-mep/rules/conflict-rules.json",
+      "module_rules": "industries/construction-mep/rules/module-rules.json",
+      "baseline": "industries/construction-mep/baselines/production-baseline.json",
+      "module_manifests": "industries/construction-mep/generation/module-manifests.json",
+      "module_obligations": "industries/construction-mep/generation/module-obligations.json",
+      "blueprint_doc_mapping": "industries/construction-mep/generation/blueprint-doc-mapping.json",
+      "blueprint_architecture_content": "industries/construction-mep/generation/blueprint-architecture-content.json",
+      "blueprint_architecture_items": null,
+      "blueprint_capability_item_map": null
+    }
+  }
+}

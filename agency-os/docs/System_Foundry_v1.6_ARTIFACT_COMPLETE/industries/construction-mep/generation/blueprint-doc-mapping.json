@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "source_pack": "Water_Electrical_MEP_Foundry_Delivery_v1.1/project-instance",
+  "source_manifest": "foundry-overlay\\industry-packs\\construction-mep-contractor\\INDUSTRY_MANIFEST.json",
+  "built_from": "scripts/adapt_mep_industry_pack.py",
+  "mapping": {
+    "dispatch": [
+      "dispatch-README.md",
+      "dispatch-state-machine.json",
+      "06_DISPATCH_STATE_MACHINE.md",
+      "dispatch-contract-schema.json"
+    ],
+    "project": [
+      "project-README.md"
+    ],
+    "workforce": [
+      "workforce-README.md"
+    ],
+    "identity_authorization": [
+      "identity-README.md",
+      "authorization-README.md"
+    ],
+    "notification": [
+      "notification-README.md"
+    ],
+    "audit_observability": [
+      "audit-README.md"
+    ]
+  },
+  "unmapped_platform_shape": [],
+  "unmapped_no_blueprint_doc": []
+}

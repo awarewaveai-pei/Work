@@ -1,0 +1,661 @@
+{
+  "version": "1.0.0",
+  "modules": {
+    "accounting_integration": {
+      "purpose": "Owns the following MEP capabilities: Accounting Reconciliation.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "ai": {
+      "purpose": "Owns the following MEP capabilities: AI Daily Report Summary, AI Authorized Query, AI Anomaly Analysis, AI Write Actions.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "AI can only access data the requesting user is already authorized to view."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "audit_observability": {
+      "purpose": "Immutable important-change evidence.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Important changes preserve actor, time, function, before/after values, and related identifiers."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "calendar_integration": {
+      "purpose": "Google Calendar integration boundary for published/amended/cancelled dispatch events (MEP-CAP-GCAL-INTEGRATION); see MEP-INV-GCAL-IDEMPOTENT.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Modifying a dispatch updates the same Google event and must not create duplicate events."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "commercial": {
+      "purpose": "Owns the following MEP capabilities: Project Contract, Project Budget, Change Order, Progress Estimate, Progress Billing, Retention.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "core": {
+      "purpose": "Establish the system-wide engineering foundation and clean architecture boundaries.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "The company system is the authoritative source for dispatch, project, procurement, cost, and audit records; LINE/Google Calendar cannot overwrite it."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "cost": {
+      "purpose": "Owns the following MEP capabilities: Material Cost, Labor Cost, Subcontract Cost, Other Cost, Project P&L, Project Margin.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "dispatch": {
+      "purpose": "Owns planned company work assignment, multi-person/crew membership, revisions and acknowledgement lifecycle.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "One work assignment may contain one person, many people, or a whole crew; do not duplicate one assignment into separate dispatch records per person.",
+        "A material dispatch amendment invalidates prior acknowledgements and requires re-acknowledgement."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "documents": {
+      "purpose": "Owns the following MEP capabilities: Drawing, Drawing Version, Site Photo.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "experience": {
+      "purpose": "Owns the following MEP capabilities: Responsive Web UI, Native Mobile App, Installable PWA, Bounded Offline RWD Operation, Offline Field Read Cache, Offline Safe Action Queue, Reconnect Synchronization, Offline Conflict Detection and Resolution.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Offline browser state is bounded local cache/queued intent; the company system remains authoritative, queued writes are idempotent and conflict-checked before commit."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "field": {
+      "purpose": "Owns the following MEP capabilities: Work Progress, Daily Site Report.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "future": {
+      "purpose": "Owns the following MEP capabilities: Multi-tenant SaaS, Accounting Integration, Actual Attendance / Work Log, Online Payment.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Accounting synchronization uses a replaceable adapter, idempotent export/import semantics and reconciliation; accounting-provider records cannot silently overwrite operational source-of-truth records."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "identity_authorization": {
+      "purpose": "Identity/session boundary. Role + Scope + Permission decisions.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Authorization is Role + Scope + Permission from Phase 1."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "integrations": {
+      "purpose": "Owns the following MEP capabilities: LINE Messaging Integration, Google Calendar Integration, Map Navigation Link.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "labor_time": {
+      "purpose": "Owns the following MEP capabilities: Approved Labor Time.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Dispatch is planned work assignment; actual attendance and approved labor time are separate records, and Phase 4 labor cost uses approved labor time rather than planned dispatch duration."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "notification": {
+      "purpose": "Notification intent/delivery status independent from provider.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "offline_sync": {
+      "purpose": "Bounded offline browser cache/queued-intent sync (MEP-CAP-OFFLINE); company system remains authoritative; see MEP-INV-OFFLINE-AUTHORITY.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "procurement": {
+      "purpose": "Owns the following MEP capabilities: Material Master, Material Request, RFQ, Purchase Order, Delivery, Material Issue, Material Return, Vendor.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "project": {
+      "purpose": "Project/Site ownership and lifecycle.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "quality": {
+      "purpose": "Owns the following MEP capabilities: Defect, Inspection.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "rwd_web": {
+      "purpose": "Responsive web UI delivery boundary (MEP-CAP-RWD-WEB); see MEP-INV-RWD.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "The implementation uses one RWD web application; no native mobile app, separate mobile codebase, or installable PWA is part of the current project."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "subcontract": {
+      "purpose": "Owns the following MEP capabilities: Subcontractor, Subcontract Billing.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    },
+    "workforce": {
+      "purpose": "Employee/Crew/Foreman lifecycle.",
+      "invariants": [
+        "This module owns its domain semantics and communicates through explicit contracts. Provider/framework details must not become domain fields unless they are genuine business semantics.",
+        "Former employees are not hard-deleted when historical dispatch/cost records depend on them."
+      ],
+      "security": [
+        "Deny by default at trust boundaries.",
+        "Secrets never enter source control or logs.",
+        "Dependency and supply-chain checks are mandatory."
+      ],
+      "tests": [
+        "Unit tests for domain invariants.",
+        "Integration tests for infrastructure adapters.",
+        "Contract tests for public/internal boundaries.",
+        "E2E tests for critical journeys.",
+        "Backup/restore and rollback verification."
+      ],
+      "operations": [
+        "SLIs/SLOs appropriate to criticality.",
+        "Structured logging, metrics, tracing where useful.",
+        "Runbooks for failure, rollback, restore, and incident response."
+      ],
+      "recovery": [
+        "Authoritative data is backed up and restore-tested.",
+        "Changes define rollback or forward-recovery before release.",
+        "Recovery minimizes blast radius."
+      ]
+    }
+  }
+}

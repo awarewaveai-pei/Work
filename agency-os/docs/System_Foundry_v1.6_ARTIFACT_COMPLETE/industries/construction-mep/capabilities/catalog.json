@@ -1,0 +1,656 @@
+{
+  "version": "1.1.0",
+  "capabilities": [
+    {
+      "id": "MEP-CAP-PROJECT",
+      "name": "Project",
+      "module": "project",
+      "requires": [],
+      "description": "Project (project module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-SITE",
+      "name": "Project Site",
+      "module": "project",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Project Site (project module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-PROJECT-OWNERSHIP",
+      "name": "Project Ownership",
+      "module": "project",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Project Ownership (project module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-PROJECT-LIFECYCLE",
+      "name": "Project Lifecycle",
+      "module": "project",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Project Lifecycle (project module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-WARRANTY",
+      "name": "Warranty Lifecycle",
+      "module": "project",
+      "requires": [
+        "MEP-CAP-PROJECT-LIFECYCLE"
+      ],
+      "description": "Warranty Lifecycle (project module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-EMPLOYEE",
+      "name": "Employee",
+      "module": "workforce",
+      "requires": [],
+      "description": "Employee (workforce module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-CREW",
+      "name": "Crew / Team",
+      "module": "workforce",
+      "requires": [
+        "MEP-CAP-EMPLOYEE"
+      ],
+      "description": "Crew / Team (workforce module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-FOREMAN",
+      "name": "Foreman",
+      "module": "workforce",
+      "requires": [
+        "MEP-CAP-CREW"
+      ],
+      "description": "Foreman (workforce module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-DISPATCH",
+      "name": "Dispatch",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-EMPLOYEE",
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Dispatch (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-MULTI-PERSON-DISPATCH",
+      "name": "Multi-person Dispatch",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "Multi-person Dispatch (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-UNASSIGNED-WORKFORCE",
+      "name": "Unassigned Workforce",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "Unassigned Workforce (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-DISPATCH-ACK",
+      "name": "Dispatch Acknowledgement",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "Dispatch Acknowledgement (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-DISPATCH-REACK",
+      "name": "Re-ack on Dispatch Amendment",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH-ACK"
+      ],
+      "description": "Re-ack on Dispatch Amendment (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-DISPATCH-DND",
+      "name": "Desktop Drag and Drop Dispatch",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "Desktop Drag and Drop Dispatch (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-COMPANY-CALENDAR",
+      "name": "Company Calendar",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "Company Calendar (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-MY-DISPATCH",
+      "name": "My Dispatch",
+      "module": "dispatch",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "My Dispatch (dispatch module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-WORK-PROGRESS",
+      "name": "Work Progress",
+      "module": "field",
+      "requires": [],
+      "description": "Work Progress (field module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-DAILY-REPORT",
+      "name": "Daily Site Report",
+      "module": "field",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Daily Site Report (field module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-DRAWING",
+      "name": "Drawing",
+      "module": "documents",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Drawing (documents module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-DRAWING-VERSION",
+      "name": "Drawing Version",
+      "module": "documents",
+      "requires": [
+        "MEP-CAP-DRAWING"
+      ],
+      "description": "Drawing Version (documents module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-SITE-PHOTO",
+      "name": "Site Photo",
+      "module": "documents",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Site Photo (documents module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-DEFECT",
+      "name": "Defect",
+      "module": "quality",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Defect (quality module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-INSPECTION",
+      "name": "Inspection",
+      "module": "quality",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Inspection (quality module).",
+      "phase": "P2"
+    },
+    {
+      "id": "MEP-CAP-MATERIAL",
+      "name": "Material Master",
+      "module": "procurement",
+      "requires": [],
+      "description": "Material Master (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-MATERIAL-REQUEST",
+      "name": "Material Request",
+      "module": "procurement",
+      "requires": [
+        "MEP-CAP-MATERIAL",
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Material Request (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-RFQ",
+      "name": "RFQ",
+      "module": "procurement",
+      "requires": [
+        "MEP-CAP-MATERIAL-REQUEST"
+      ],
+      "description": "RFQ (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-PURCHASE-ORDER",
+      "name": "Purchase Order",
+      "module": "procurement",
+      "requires": [
+        "MEP-CAP-RFQ"
+      ],
+      "description": "Purchase Order (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-DELIVERY",
+      "name": "Delivery",
+      "module": "procurement",
+      "requires": [
+        "MEP-CAP-PURCHASE-ORDER"
+      ],
+      "description": "Delivery (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-MATERIAL-ISSUE",
+      "name": "Material Issue",
+      "module": "procurement",
+      "requires": [
+        "MEP-CAP-DELIVERY"
+      ],
+      "description": "Material Issue (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-MATERIAL-RETURN",
+      "name": "Material Return",
+      "module": "procurement",
+      "requires": [
+        "MEP-CAP-MATERIAL-ISSUE"
+      ],
+      "description": "Material Return (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-MATERIAL-COST",
+      "name": "Material Cost",
+      "module": "cost",
+      "requires": [
+        "MEP-CAP-PURCHASE-ORDER",
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Material Cost (cost module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-VENDOR",
+      "name": "Vendor",
+      "module": "procurement",
+      "requires": [],
+      "description": "Vendor (procurement module).",
+      "phase": "P3"
+    },
+    {
+      "id": "MEP-CAP-SUBCONTRACTOR",
+      "name": "Subcontractor",
+      "module": "subcontract",
+      "requires": [],
+      "description": "Subcontractor (subcontract module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-SUBCONTRACT-BILLING",
+      "name": "Subcontract Billing",
+      "module": "subcontract",
+      "requires": [
+        "MEP-CAP-SUBCONTRACTOR",
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Subcontract Billing (subcontract module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-CONTRACT",
+      "name": "Project Contract",
+      "module": "commercial",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Project Contract (commercial module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-BUDGET",
+      "name": "Project Budget",
+      "module": "commercial",
+      "requires": [
+        "MEP-CAP-CONTRACT"
+      ],
+      "description": "Project Budget (commercial module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-CHANGE-ORDER",
+      "name": "Change Order",
+      "module": "commercial",
+      "requires": [
+        "MEP-CAP-CONTRACT"
+      ],
+      "description": "Change Order (commercial module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-PROGRESS-ESTIMATE",
+      "name": "Progress Estimate",
+      "module": "commercial",
+      "requires": [
+        "MEP-CAP-CONTRACT"
+      ],
+      "description": "Progress Estimate (commercial module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-PROGRESS-BILLING",
+      "name": "Progress Billing",
+      "module": "commercial",
+      "requires": [
+        "MEP-CAP-PROGRESS-ESTIMATE"
+      ],
+      "description": "Progress Billing (commercial module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-RETENTION",
+      "name": "Retention",
+      "module": "commercial",
+      "requires": [
+        "MEP-CAP-PROGRESS-BILLING"
+      ],
+      "description": "Retention (commercial module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-LABOR-COST",
+      "name": "Labor Cost",
+      "module": "cost",
+      "requires": [
+        "MEP-CAP-APPROVED-LABOR-TIME",
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Labor Cost (cost module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-SUBCONTRACT-COST",
+      "name": "Subcontract Cost",
+      "module": "cost",
+      "requires": [
+        "MEP-CAP-SUBCONTRACT-BILLING"
+      ],
+      "description": "Subcontract Cost (cost module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-OTHER-COST",
+      "name": "Other Cost",
+      "module": "cost",
+      "requires": [
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Other Cost (cost module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-PROJECT-PNL",
+      "name": "Project P&L",
+      "module": "cost",
+      "requires": [
+        "MEP-CAP-LABOR-COST",
+        "MEP-CAP-MATERIAL-COST",
+        "MEP-CAP-SUBCONTRACT-COST",
+        "MEP-CAP-OTHER-COST",
+        "MEP-CAP-PROGRESS-BILLING"
+      ],
+      "description": "Project P&L (cost module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-PROJECT-MARGIN",
+      "name": "Project Margin",
+      "module": "cost",
+      "requires": [
+        "MEP-CAP-PROJECT-PNL"
+      ],
+      "description": "Project Margin (cost module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-LINE-INTEGRATION",
+      "name": "LINE Messaging Integration",
+      "module": "integrations",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "LINE Messaging Integration (integrations module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-GCAL-INTEGRATION",
+      "name": "Google Calendar Integration",
+      "module": "integrations",
+      "requires": [
+        "MEP-CAP-DISPATCH"
+      ],
+      "description": "Google Calendar Integration (integrations module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-MAP-LINK",
+      "name": "Map Navigation Link",
+      "module": "integrations",
+      "requires": [
+        "MEP-CAP-SITE"
+      ],
+      "description": "Map Navigation Link (integrations module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-RWD-WEB",
+      "name": "Responsive Web UI",
+      "module": "experience",
+      "requires": [],
+      "description": "Responsive Web UI (experience module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-NATIVE-MOBILE",
+      "name": "Native Mobile App",
+      "module": "experience",
+      "requires": [],
+      "description": "Native Mobile App (experience module).",
+      "phase": "FUTURE"
+    },
+    {
+      "id": "MEP-CAP-PWA",
+      "name": "Installable PWA",
+      "module": "experience",
+      "requires": [],
+      "description": "Installable PWA (experience module).",
+      "phase": "FUTURE"
+    },
+    {
+      "id": "MEP-CAP-OFFLINE",
+      "name": "Bounded Offline RWD Operation",
+      "module": "experience",
+      "requires": [
+        "MEP-CAP-RWD-WEB",
+        "MEP-CAP-OFFLINE-READ-CACHE",
+        "MEP-CAP-OFFLINE-ACTION-QUEUE",
+        "MEP-CAP-OFFLINE-SYNC",
+        "MEP-CAP-OFFLINE-CONFLICT"
+      ],
+      "description": "Bounded Offline RWD Operation (experience module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-AI-REPORT-SUMMARY",
+      "name": "AI Daily Report Summary",
+      "module": "ai",
+      "requires": [
+        "MEP-CAP-DAILY-REPORT"
+      ],
+      "description": "AI Daily Report Summary (ai module).",
+      "phase": "P5"
+    },
+    {
+      "id": "MEP-CAP-AI-QUERY",
+      "name": "AI Authorized Query",
+      "module": "ai",
+      "requires": [],
+      "description": "AI Authorized Query (ai module).",
+      "phase": "P5"
+    },
+    {
+      "id": "MEP-CAP-AI-ANOMALY",
+      "name": "AI Anomaly Analysis",
+      "module": "ai",
+      "requires": [
+        "MEP-CAP-AI-QUERY"
+      ],
+      "description": "AI Anomaly Analysis (ai module).",
+      "phase": "P5"
+    },
+    {
+      "id": "MEP-CAP-AI-WRITE",
+      "name": "AI Write Actions",
+      "module": "ai",
+      "requires": [
+        "MEP-CAP-AI-QUERY"
+      ],
+      "description": "AI Write Actions (ai module).",
+      "phase": "FUTURE"
+    },
+    {
+      "id": "MEP-CAP-MULTI-TENANT",
+      "name": "Multi-tenant SaaS",
+      "module": "future",
+      "requires": [],
+      "description": "Multi-tenant SaaS (future module).",
+      "phase": "FUTURE"
+    },
+    {
+      "id": "MEP-CAP-ACCOUNTING-INTEGRATION",
+      "name": "Accounting Integration",
+      "module": "future",
+      "requires": [
+        "MEP-CAP-ACCOUNTING-RECONCILIATION",
+        "MEP-CAP-PROGRESS-BILLING",
+        "MEP-CAP-PURCHASE-ORDER",
+        "MEP-CAP-VENDOR"
+      ],
+      "description": "Accounting Integration (future module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-ATTENDANCE",
+      "name": "Actual Attendance / Work Log",
+      "module": "future",
+      "requires": [
+        "MEP-CAP-EMPLOYEE",
+        "MEP-CAP-PROJECT"
+      ],
+      "description": "Actual Attendance / Work Log (future module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-ONLINE-PAYMENT",
+      "name": "Online Payment",
+      "module": "future",
+      "requires": [],
+      "description": "Online Payment (future module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-OFFLINE-READ-CACHE",
+      "name": "Offline Field Read Cache",
+      "module": "experience",
+      "requires": [
+        "MEP-CAP-RWD-WEB"
+      ],
+      "description": "Offline Field Read Cache (experience module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-OFFLINE-ACTION-QUEUE",
+      "name": "Offline Safe Action Queue",
+      "module": "experience",
+      "requires": [
+        "MEP-CAP-RWD-WEB"
+      ],
+      "description": "Offline Safe Action Queue (experience module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-OFFLINE-SYNC",
+      "name": "Reconnect Synchronization",
+      "module": "experience",
+      "requires": [
+        "MEP-CAP-OFFLINE-ACTION-QUEUE"
+      ],
+      "description": "Reconnect Synchronization (experience module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-OFFLINE-CONFLICT",
+      "name": "Offline Conflict Detection and Resolution",
+      "module": "experience",
+      "requires": [
+        "MEP-CAP-OFFLINE-SYNC"
+      ],
+      "description": "Offline Conflict Detection and Resolution (experience module).",
+      "phase": "P1"
+    },
+    {
+      "id": "MEP-CAP-ACCOUNTING-RECONCILIATION",
+      "name": "Accounting Reconciliation",
+      "module": "accounting_integration",
+      "requires": [],
+      "description": "Accounting Reconciliation (accounting_integration module).",
+      "phase": "P4"
+    },
+    {
+      "id": "MEP-CAP-APPROVED-LABOR-TIME",
+      "name": "Approved Labor Time",
+      "module": "labor_time",
+      "requires": [
+        "MEP-CAP-ATTENDANCE"
+      ],
+      "description": "Approved Labor Time (labor_time module).",
+      "phase": "P4"
+    }
+  ]
+}

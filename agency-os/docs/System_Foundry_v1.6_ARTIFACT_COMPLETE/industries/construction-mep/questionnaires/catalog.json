@@ -1,0 +1,582 @@
+{
+  "version": "1.6.0",
+  "questionnaire_version": "1.1.0",
+  "answer_contract": "YES_NO_ONLY",
+  "principles": [
+    "industry semantics extend but never weaken Foundry kernel",
+    "questions are business choices only",
+    "engineering baselines are derived/mandatory",
+    "phase boundaries are explicit",
+    "vendor/framework choices remain replaceable"
+  ],
+  "categories": [
+    {
+      "id": "project_site",
+      "order": 1,
+      "title": "工程與工地",
+      "description": ""
+    },
+    {
+      "id": "workforce_dispatch",
+      "order": 2,
+      "title": "人員與派工",
+      "description": ""
+    },
+    {
+      "id": "field_execution",
+      "order": 3,
+      "title": "現場施工",
+      "description": ""
+    },
+    {
+      "id": "drawings_evidence",
+      "order": 4,
+      "title": "圖面與現場證據",
+      "description": ""
+    },
+    {
+      "id": "quality",
+      "order": 5,
+      "title": "缺失與查驗",
+      "description": ""
+    },
+    {
+      "id": "materials_procurement",
+      "order": 6,
+      "title": "材料與採購",
+      "description": ""
+    },
+    {
+      "id": "vendors_subcontractors",
+      "order": 7,
+      "title": "廠商與下包",
+      "description": ""
+    },
+    {
+      "id": "contracts_billing",
+      "order": 8,
+      "title": "合約與請款",
+      "description": ""
+    },
+    {
+      "id": "cost_profit",
+      "order": 9,
+      "title": "成本與毛利",
+      "description": ""
+    },
+    {
+      "id": "integrations",
+      "order": 10,
+      "title": "外部整合",
+      "description": ""
+    },
+    {
+      "id": "experience",
+      "order": 11,
+      "title": "操作介面",
+      "description": ""
+    },
+    {
+      "id": "ai",
+      "order": 12,
+      "title": "AI",
+      "description": ""
+    },
+    {
+      "id": "future",
+      "order": 13,
+      "title": "未來邊界",
+      "description": ""
+    }
+  ],
+  "questions": [
+    {
+      "id": "MEP-Q-PROJ-001",
+      "category": "project_site",
+      "label": "工程案件管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-PROJ-002",
+      "category": "project_site",
+      "label": "一個工程可包含多個工地 / 區域",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-PROJ-003",
+      "category": "project_site",
+      "label": "工程負責人 / 工務負責人",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-PROJ-004",
+      "category": "project_site",
+      "label": "工程狀態生命週期",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-PROJ-005",
+      "category": "project_site",
+      "label": "保固期管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-001",
+      "category": "workforce_dispatch",
+      "label": "員工資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-002",
+      "category": "workforce_dispatch",
+      "label": "班組管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-003",
+      "category": "workforce_dispatch",
+      "label": "領班管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-004",
+      "category": "workforce_dispatch",
+      "label": "每日派工",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-005",
+      "category": "workforce_dispatch",
+      "label": "單筆派工指派多人 / 整班",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-006",
+      "category": "workforce_dispatch",
+      "label": "未派工人員清單",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-007",
+      "category": "workforce_dispatch",
+      "label": "派工確認收到",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-008",
+      "category": "workforce_dispatch",
+      "label": "派工異動後重新確認",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-009",
+      "category": "workforce_dispatch",
+      "label": "桌面拖曳式派工",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-010",
+      "category": "workforce_dispatch",
+      "label": "公司日 / 週 / 月行事曆",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DSP-011",
+      "category": "workforce_dispatch",
+      "label": "個人今日 / 明日 / 本週派工",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-FLD-001",
+      "category": "field_execution",
+      "label": "工作項目與進度",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-FLD-002",
+      "category": "field_execution",
+      "label": "工地日報",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DOC-001",
+      "category": "drawings_evidence",
+      "label": "工程圖面管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DOC-002",
+      "category": "drawings_evidence",
+      "label": "圖面版本管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-DOC-003",
+      "category": "drawings_evidence",
+      "label": "工地照片",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-QA-001",
+      "category": "quality",
+      "label": "缺失管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-QA-002",
+      "category": "quality",
+      "label": "查驗管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-001",
+      "category": "materials_procurement",
+      "label": "材料主檔",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-002",
+      "category": "materials_procurement",
+      "label": "材料需求",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-003",
+      "category": "materials_procurement",
+      "label": "詢價",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-004",
+      "category": "materials_procurement",
+      "label": "採購單",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-005",
+      "category": "materials_procurement",
+      "label": "到貨驗收",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-006",
+      "category": "materials_procurement",
+      "label": "領料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-007",
+      "category": "materials_procurement",
+      "label": "退料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-MAT-008",
+      "category": "materials_procurement",
+      "label": "材料歸屬工程成本",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-VEN-001",
+      "category": "vendors_subcontractors",
+      "label": "材料供應商管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-VEN-002",
+      "category": "vendors_subcontractors",
+      "label": "下包商管理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-VEN-003",
+      "category": "vendors_subcontractors",
+      "label": "下包估驗 / 請款",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-BIL-001",
+      "category": "contracts_billing",
+      "label": "工程合約",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-BIL-002",
+      "category": "contracts_billing",
+      "label": "原始報價 / 預算",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-BIL-003",
+      "category": "contracts_billing",
+      "label": "追加減",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-BIL-004",
+      "category": "contracts_billing",
+      "label": "業主估驗",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-BIL-005",
+      "category": "contracts_billing",
+      "label": "工程請款",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-BIL-006",
+      "category": "contracts_billing",
+      "label": "保留款",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-COST-001",
+      "category": "cost_profit",
+      "label": "人工成本",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-COST-002",
+      "category": "cost_profit",
+      "label": "材料成本",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-COST-003",
+      "category": "cost_profit",
+      "label": "外包成本",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-COST-004",
+      "category": "cost_profit",
+      "label": "其他成本",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-COST-005",
+      "category": "cost_profit",
+      "label": "工程損益",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-COST-006",
+      "category": "cost_profit",
+      "label": "工程毛利",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-INT-001",
+      "category": "integrations",
+      "label": "LINE 派工通知與異動提醒",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-INT-002",
+      "category": "integrations",
+      "label": "Google Calendar 個人派工同步",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-INT-003",
+      "category": "integrations",
+      "label": "工地地址導航連結",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-UX-001",
+      "category": "experience",
+      "label": "單一 RWD Web 介面",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-UX-002",
+      "category": "experience",
+      "label": "原生手機 App",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-UX-003",
+      "category": "experience",
+      "label": "可安裝 PWA",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-UX-004",
+      "category": "experience",
+      "label": "無網路仍可操作",
+      "description": "Field users can continue a bounded set of work when network connectivity is unavailable. YES derives offline cache/sync/security obligations; it does not imply a native app or installable PWA.",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-AI-001",
+      "category": "ai",
+      "label": "AI 工地日報整理",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-AI-002",
+      "category": "ai",
+      "label": "AI 權限內資料查詢",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-AI-003",
+      "category": "ai",
+      "label": "AI 異常分析",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-AI-004",
+      "category": "ai",
+      "label": "AI 直接修改正式資料",
+      "description": "",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-FUT-001",
+      "category": "future",
+      "label": "多家公司 / 多租戶 SaaS",
+      "description": "Product will be offered as a multi-company/multi-tenant SaaS product rather than a single-company internal system.",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-FUT-002",
+      "category": "future",
+      "label": "與會計系統自動同步",
+      "description": "Project procurement/billing/cost data automatically synchronizes with an external accounting system through a replaceable adapter and reconciliation process.",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-FUT-003",
+      "category": "future",
+      "label": "現場實際出勤 / 工時核定",
+      "description": "Actual attendance/work time and supervisor-approved labor time are managed separately from planned Dispatch time.",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "MEP-Q-FUT-004",
+      "category": "future",
+      "label": "線上金流收款",
+      "description": "The system itself initiates/collects online payment through a payment provider. NO still allows progress billing, receivables and receipt recording.",
+      "answer_type": "boolean",
+      "required_when_active": true
+    }
+  ]
+}

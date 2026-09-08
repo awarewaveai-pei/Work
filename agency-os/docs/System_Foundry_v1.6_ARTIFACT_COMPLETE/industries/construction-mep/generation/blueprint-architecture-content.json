@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0.0",
+  "source_pack": "Water_Electrical_MEP_Foundry_Delivery_v1.1/project-instance",
+  "docs": {
+    "dispatch-README": {
+      "source_file": "modules/dispatch/README.md",
+      "section_count": 2,
+      "sections": {
+        "domain_objects": {
+          "heading": "Dispatch Module",
+          "content": "Owns planned company work assignment, multi-person/crew membership, revisions and acknowledgement lifecycle."
+        },
+        "data_rules": {
+          "heading": "Invariants",
+          "content": "- one work assignment is one Dispatch regardless of member count;\n- acknowledgement binds to a Dispatch revision;\n- material amendment invalidates old acknowledgement;\n- Dispatch time is planned assignment time, **not actual attendance or approved labor time**;\n- offline acknowledgement is a queued intent and must be re-authorized/version-checked by server before commit."
+        }
+      }
+    },
+    "dispatch-state-machine": {
+      "source_file": "modules/dispatch/state-machine.json",
+      "section_count": 1,
+      "sections": {
+        "state_machine": {
+          "heading": "States",
+          "content": "```json\n{\n  \"states\": [\n    \"DRAFT\",\n    \"PUBLISHED\",\n    \"ACK_REQUIRED\",\n    \"ACKNOWLEDGED\",\n    \"AMENDED\",\n    \"CANCELLED\"\n  ],\n  \"invariants\": [\n    \"acknowledgement is dispatch-version-bound\",\n    \"material amendment invalidates old acknowledgement\",\n    \"cancellation stops future reminders/provider projections\"\n  ]\n}\n```"
+        }
+      }
+    },
+    "06_DISPATCH_STATE_MACHINE": {
+      "source_file": "project-instance/phase1-blueprint/06_DISPATCH_STATE_MACHINE.md",
+      "section_count": 2,
+      "sections": {
+        "state_machine": {
+          "heading": "States",
+          "content": "`DRAFT -> PUBLISHED -> ACK_REQUIRED -> ACKNOWLEDGED`\n\nMaterial amendment:\n`PUBLISHED|ACK_REQUIRED|ACKNOWLEDGED -> AMENDED -> ACK_REQUIRED`\n\nCancellation:\n`DRAFT|PUBLISHED|ACK_REQUIRED|ACKNOWLEDGED|AMENDED -> CANCELLED`"
+        },
+        "data_rules": {
+          "heading": "Invariants",
+          "content": "- Acknowledgement is version-bound.\n- A stale version cannot be acknowledged.\n- Publication/amendment/cancellation creates integration work through a durable side-effect mechanism.\n- Failed LINE/Google delivery never rolls back authoritative dispatch truth after the transaction is committed; it becomes a visible retry/reconciliation state."
+        }
+      }
+    },
+    "dispatch-contract-schema": {
+      "source_file": "packages/contracts/dispatch.schema.json + dispatch-acknowledgement.schema.json",
+      "section_count": 1,
+      "sections": {
+        "contract_schema": {
+          "heading": "Contract Schema",
+          "content": "```json\n{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"Dispatch\",\n  \"type\": \"object\",\n  \"required\": [\n    \"id\",\n    \"version\",\n    \"date\",\n    \"start_time\",\n    \"end_time\",\n    \"project_id\",\n    \"site_id\",\n    \"work_description\",\n    \"member_ids\",\n    \"status\"\n  ],\n  \"properties\": {\n    \"id\": {\n      \"type\": \"string\"\n    },\n    \"version\": {\n      \"type\": \"integer\",\n      \"minimum\": 1\n    },\n    \"date\": {\n      \"type\": \"string\",\n      \"format\": \"date\"\n    },\n    \"start_time\": {\n      \"type\": \"string\"\n    },\n    \"end_time\": {\n      \"type\": \"string\"\n    },\n    \"project_id\": {\n      \"type\": \"string\"\n    },\n    \"site_id\": {\n      \"type\": \"string\"\n    },\n    \"work_description\": {\n      \"type\": \"string\",\n      \"minLength\": 1\n    },\n    \"foreman_employee_id\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"member_ids\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"minItems\": 1,\n      \"uniqueItems\": true\n    },\n    \"status\": {\n      \"enum\": [\n        \"DRAFT\",\n        \"PUBLISHED\",\n        \"ACK_REQUIRED\",\n        \"ACKNOWLEDGED\",\n        \"AMENDED\",\n        \"CANCELLED\"\n      ]\n    }\n  },\n  \"additionalProperties\": false\n}\n```\n\n```json\n{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"DispatchAcknowledgement\",\n  \"type\": \"object\",\n  \"required\": [\n    \"dispatch_id\",\n    \"dispatch_version\",\n    \"employee_id\",\n    \"acknowledged_at\"\n  ],\n  \"properties\": {\n    \"dispatch_id\": {\n      \"type\": \"string\"\n    },\n    \"dispatch_version\": {\n      \"type\": \"integer\",\n      \"minimum\": 1\n    },\n    \"employee_id\": {\n      \"type\": \"string\"\n    },\n    \"acknowledged_at\": {\n      \"type\": \"string\",\n      \"format\": \"date-time\"\n    }\n  },\n  \"additionalProperties\": false\n}\n```"
+        }
+      }
+    },
+    "project-README": {
+      "source_file": "modules/project/README.md",
+      "section_count": 1,
+      "sections": {
+        "domain_objects": {
+          "heading": "project",
+          "content": "Project/Site ownership and lifecycle."
+        }
+      }
+    },
+    "workforce-README": {
+      "source_file": "modules/workforce/README.md",
+      "section_count": 1,
+      "sections": {
+        "domain_objects": {
+          "heading": "workforce",
+          "content": "Employee/Crew/Foreman lifecycle."
+        }
+      }
+    },
+    "identity-README": {
+      "source_file": "modules/identity/README.md",
+      "section_count": 1,
+      "sections": {
+        "domain_objects": {
+          "heading": "identity",
+          "content": "Identity/session boundary."
+        }
+      }
+    },
+    "authorization-README": {
+      "source_file": "modules/authorization/README.md",
+      "section_count": 1,
+      "sections": {
+        "domain_objects": {
+          "heading": "authorization",
+          "content": "Role + Scope + Permission decisions."
+        }
+      }
+    },
+    "notification-README": {
+      "source_file": "modules/notification/README.md",
+      "section_count": 1,
+      "sections": {
+        "domain_objects": {
+          "heading": "notification",
+          "content": "Notification intent/delivery status independent from provider."
+        }
+      }
+    },
+    "audit-README": {
+      "source_file": "modules/audit/README.md",
+      "section_count": 1,
+      "sections": {
+        "domain_objects": {
+          "heading": "audit",
+          "content": "Immutable important-change evidence."
+        }
+      }
+    }
+  }
+}
