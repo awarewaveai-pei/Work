@@ -65,7 +65,11 @@ D:\Work\lobster-factory\infra\hetzner-phase1-core\SAME_VPS_STAGING_RUNBOOK.md:1-
 | Host | `ns31414856` | PASS: correct `ks-aw-01`. |
 | Production renderers | `lobster-video-service` and `lobster-remotion-service` are healthy; loopback `127.0.0.1:8732/8733`. | Preserve; no restart or direct change. |
 | Production compose | `/root/render-services/docker-compose.yml` present. | Drift boundary remains. |
-| Controlled staging manifest | `/root/lobster-phase1/docker-compose.renderer-staging.yml` absent. | BLOCK Gate 1–4; do not build/start staging or migrate `video_jobs`. |
+| Controlled staging manifest on host | `/root/lobster-phase1/docker-compose.renderer-staging.yml` absent. | BLOCK host-side Gates 2–4 and all staging build/start actions; do not migrate `video_jobs`. Local Gate 1 parse is separate. |
 | Durable executor baseline | Trigger services are healthy. | Availability alone is not a video-task deployment proof. |
 
 Evidence command: `ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145.239.195.47 'hostname; sudo docker ps ...; sudo test -f ...'`; exit `0`. Full non-secret result is recorded in `agency-os/WORKLOG.md` dated 2026-09-08.
+
+## Gate 1 receipt — 2026-09-08
+
+本機版本庫 manifest 解析通過：`docker compose --env-file D:\Work\lobster-factory\infra\hetzner-phase1-core\.env.renderer-staging.example -f D:\Work\lobster-factory\infra\hetzner-phase1-core\docker-compose.renderer-staging.yml config --quiet`，exit `0`。這只驗證 YAML／變數結構；未 build、未 up、未連主機，不能取代 Gate 2 secrets 或 Gate 3 staging canary。

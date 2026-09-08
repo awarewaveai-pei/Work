@@ -13592,7 +13592,7 @@ Read-only preflight for the durable-video gates. No source, DB, renderer, contai
 - C2: `lobster-video-service` and `lobster-remotion-service` healthy on `127.0.0.1:8732/8733`.
 - C3: `/root/render-services/docker-compose.yml` present; `/root/lobster-phase1/docker-compose.renderer-staging.yml` absent.
 - C4: Trigger containers healthy, but this does not prove a deployed media worker.
-- Decision: staging manifest absence blocks Gate 1–4, `video_jobs` migration and any Timeline/renderer submission integration.
+- Decision: host staging manifest absence blocks host-side Gates 2–4, `video_jobs` migration and any Timeline/renderer submission integration; local Gate 1 parsing remains allowed and passed below.
 
 [verification]
 - REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145.239.195.47 '<hostname/docker ps/test -f preflight>'` | exit=0 | ms=6700
@@ -13602,3 +13602,17 @@ Read-only preflight for the durable-video gates. No source, DB, renderer, contai
 
 [rollback]
 None: Gate 0 made no change.
+
+## 2026-09-08 — Video Phase 1B Gate 1 manifest parse
+
+[scope]
+本機只讀解析版本庫 renderer staging compose；未 build、未啟動容器、未連主機、未讀取或建立 secrets。
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose --env-file D:\Work\lobster-factory\infra\hetzner-phase1-core\.env.renderer-staging.example -f D:\Work\lobster-factory\infra\hetzner-phase1-core\docker-compose.renderer-staging.yml config --quiet` | exit=0 | ms=1500
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; Gate0 host block narrowed to Gates 2–4 so local Gate1 pass is consistent.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`docker-compose.renderer-staging.yml|\.env.renderer-staging.example` | hits=19
+- WORKLOG_DONE: Gate 1 receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+None: config parse made no change.
