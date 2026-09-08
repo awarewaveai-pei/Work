@@ -2014,6 +2014,46 @@ tier_1:
     source: "methods/contracts/learning.post_mortem.contract.yaml + specs/cognitive/typed-objects/post-mortem-record.schema.yaml"
     note: "67th slice. 88 tests pass. F17 learning family: 8 of 9 built; remaining: Prediction Tracking."
 
+  sixtyseventh_concrete_entry:
+    method_id: "learning.prediction_tracking"
+    contract_status: complete
+    tier: 1
+    mandated_by: "9th and LAST `learning` (F17) member, row L809 -- F17 CLOSED 9/9. Bare single prediction, no options, distinct from decision_journal (single hash not two -- error is self-recomputable, no free-text outcome to separately hash). Invariants: stage1_integrity_hash (prediction+horizon commit); error is GENUINE_COMPUTE, re-derived by gate, never caller-supplied."
+    source: "methods/contracts/learning.prediction_tracking.contract.yaml + specs/cognitive/typed-objects/prediction-tracking-record.schema.yaml + ai_lego/compute/prediction_tracking/error.py"
+    note: "68th slice. 138 tests pass. F17 learning family: 9 of 9 COMPLETE."
+
+  sixtyeighth_concrete_entry:
+    method_id: "decision.impact_effort"
+    contract_status: complete
+    tier: 1
+    mandated_by: "3rd `decision` (F16) member, row L760 + dedicated Sec11.30 (L1889-1906, worked quadrantChart) + Sec28 routing row (L4485, sequenced before MCDA/AHP as a distinct first-pass tool) -- stronger grounding than architecture.trade_off_matrix had, so built distinct not reused. 2 fixed named axes -> categorical quadrant, not N-criterion weighted score. Invariants: quadrant is GENUINE_COMPUTE (no constructor param, gate re-derives from impact/effort/thresholds); per-axis scale consistency."
+    source: "methods/contracts/decision.impact_effort.contract.yaml + specs/cognitive/typed-objects/impact-effort-classification.schema.yaml + ai_lego/compute/impact_effort/classification.py"
+    note: "69th slice. 99 tests pass."
+
+  sixtyninth_concrete_entry:
+    method_id: "decision.ice"
+    contract_status: complete
+    tier: 1
+    mandated_by: "4th `decision` (F16) member, row L761. Distinct from mcda.py: absolute per-item score (minItems:1, no caller weights) vs MCDA's relative per-run normalization (minItems:2, weights[] sum to 1.0). 1-10 scale + arithmetic mean is external (Sean Ellis), disclosed not Atlas-cited. Invariants: dimension range [1,10]; ice_score+ranking[] GENUINE_COMPUTE re-derived by gate."
+    source: "methods/contracts/decision.ice.contract.yaml + specs/cognitive/typed-objects/ice-score-record.schema.yaml + ai_lego/compute/ice/scoring.py"
+    note: "70th slice. 108 tests pass."
+
+  seventieth_concrete_entry:
+    method_id: "decision.rice"
+    contract_status: complete
+    tier: 1
+    mandated_by: "5th `decision` (F16) member, row L762 + Sec12.32 (L2955-2966). Distinct from mcda.py: Effort is a divisor (MCDA's weighted-sum shape cannot express division); reach requires an explicit unit (Atlas '納入受影響人數'). Confirmed distinct from decision.ice's Ease (bounded 1-10 additive rating, never a divisor) once ice.py landed concurrently. Invariants: effort>0 (rejected not floored); rice_score GENUINE_COMPUTE, stricter than ahp/mcda's resolvability-only gates; reach.unit required."
+    source: "methods/contracts/decision.rice.contract.yaml + specs/cognitive/typed-objects/rice-score-record.schema.yaml + ai_lego/compute/rice/scoring.py"
+    note: "71st slice. 90 tests pass."
+
+  seventyfirst_concrete_entry:
+    method_id: "decision.moscow"
+    contract_status: complete
+    tier: 1
+    mandated_by: "6th `decision` (F16) member, row L763. Categorical 4-bucket classifier, low overlap risk with the family's numeric-scoring siblings (ahp/mcda/ice/rice/impact_effort). F01 'Non-goals' (row L339) remains unbuilt -- disclosed as different granularity even once it exists (project-level flat exclusion list vs per-item classification). Invariants: items[] id uniqueness; every WONT item needs a non-empty reason (schema if/then + runtime, both real)."
+    source: "methods/contracts/decision.moscow.contract.yaml + specs/cognitive/typed-objects/moscow-prioritization-record.schema.yaml"
+    note: "72nd slice. 116 tests pass. F16 decision family: 6 of 13 built (ahp/mcda/impact_effort/ice/rice/moscow); remaining: Weighted Decision Matrix, TOPSIS, Decision Tree, Expected Value, Pareto Frontier, WSJF, Kano."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

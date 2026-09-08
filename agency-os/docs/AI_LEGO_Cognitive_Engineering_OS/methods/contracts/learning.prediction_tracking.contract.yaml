@@ -1,0 +1,112 @@
+$id: "ai-lego://methods/contracts/learning.prediction_tracking.contract.yaml"
+title: "Prediction Tracking Method Contract"
+status: ACTIVE
+
+description: >
+  learning.prediction_tracking, F17, 9th and LAST member -- CLOSES F17 9/9.
+  Atlas L809: prediction→horizon→actual→error, "改善 calibration". Distinct
+  from learning.decision_journal (bare single prediction, no options/choice
+  structure). Cross-record calibration-curve aggregation is Atlas's own
+  SEPARATE F10 row (L578 "Confidence Calibration", not yet built) -- out of
+  THIS method's one-record-at-a-time scope, see OQ-PREDICTIONTRACKING-2.
+  Two invariants: prediction-commitment integrity (single-hash, lighter than
+  decision_journal's two-hash mechanism) and genuinely-computed error (never
+  caller-supplied, gate re-derives from prediction vs actual).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 tool table, Prediction Tracking row (L809): 'prediction→horizon→actual→error', benefit '改善 calibration'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 tool table, Confidence Calibration row (L578): 'predictions→actuals→calibration curve', benefit '降低 overconfidence' -- the cross-record aggregate this method's own OQ-PREDICTIONTRACKING-2 explicitly defers to, not a gap in this method"
+  - "ai_lego/modules/learning/decision_journal.py (read in full): due-diligence comparison target and the stage1_integrity_hash pattern this contract's own commitment-hash mechanism reuses"
+  - "specs/cognitive/typed-objects/decision-journal-entry.schema.yaml OQ-DECISIONJOURNAL-2 (L225-228) and compilation_decisions (L45-52): both already flag this Atlas row as decision_journal's forecast/confidence 'lighter-weight instance' sibling"
+  - "ai_lego/modules/decision/mcda.py and ai_lego/modules/computation/monte_carlo.py (both read in full): the computation_provenance_ref/engine GENUINE_COMPUTE trail pattern this contract's error field follows, extended here with a gate-side recompute-and-compare (see compilation_decisions)"
+  - "ai_lego/modules/root_cause/fault_tree.py (read in full): the re-derive-don't-trust independent-gate pattern"
+  - "methods/registry/method-inventory.yaml Prediction Tracking entry (L1080-1084): category F17 learning, line field reads 806 -- CORRECTED here to the real L809 position, the same systematic drift disclosed by 9+ prior contracts (most recently learning.post_mortem)"
+  - "specs/cognitive/primitive.schema.yaml L66-90 -- the 24-value canonical kernel this contract's own cognitive_primitives draws from"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives this method one table row,
+  transcribed directly below. `id: learning.prediction_tracking` mints a new
+  machine_id, 9th and final concrete F17 entry alongside reversal_criteria/
+  kill_criteria/decision_journal/pdca/ooda/build_measure_learn/
+  after_action_review/post_mortem.
+
+id: learning.prediction_tracking
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [FORECAST, CALCULATE, LEARN]
+# INFERRED, not cited -- Atlas gives no composition formula. FORECAST=the
+# prediction stage, CALCULATE=the error stage (genuinely computed, never
+# asserted -- see invariant #2), LEARN=Atlas's own benefit "改善
+# calibration". Verified against the real 24-value kernel
+# (specs/cognitive/primitive.schema.yaml L66-90) -- MEASURE is NOT a real
+# kernel value, CALCULATE was chosen instead once that was checked.
+
+purpose:
+  - track_a_single_forecast_against_its_own_stated_future_check_in_horizon_and_the_later_observed_actual_to_produce_a_genuinely_computed_error_for_future_calibration_analysis
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw human/AI-supplied content), same class as decision_journal/pdca.
+outputs: [PredictionTrackingRecord]
+preconditions:
+  - "record_id (PREDICT- prefix), statement, horizon are non-empty strings; version is a string; prediction_type in {PROBABILITY, POINT_ESTIMATE}"
+  - "exactly one of predicted_probability (finite, [0,1]) / predicted_value (finite number) is set, matching prediction_type; the other is structurally None"
+  - "stage1_integrity_hash computed over exactly {statement, prediction_type, predicted_probability, predicted_value, horizon} at construction, independently re-derived and compared by evaluate_prediction_commitment_integrity_gate on every call -- catches any hand-edit after commitment, same discipline learning.decision_journal's own stage1_integrity_hash establishes"
+  - "actual (observed_outcome or observed_value, matching prediction_type) is attached only via record_actual(), which has no parameter for statement/prediction_type/predicted_probability/predicted_value/horizon -- structurally cannot pass a different stage-1 value through the sanctioned API"
+  - "actual accepted exactly once per record (write-once, PREDICTIONTRACKING_ACTUAL_ALREADY_RECORDED)"
+  - "error is NEVER a record_actual() parameter -- always computed internally by ai_lego.compute.prediction_tracking.error.compute_prediction_error from prediction vs actual (Brier score for PROBABILITY, absolute/relative error for POINT_ESTIMATE), and independently re-derived by evaluate_genuine_compute_gate from the record's own raw fields on every call"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+forbidden_transition: []
+# Atlas §22.3's own Method-specific Gate table (grep-confirmed across the whole spec root) has no
+# Prediction Tracking row -- unlike decision.mcda (L4154) / computation.monte_carlo (L4153).
+recommended_next: []
+# Leaf/terminal method per this session's own scope. Cross-record calibration-curve aggregation is
+# Atlas's own separate F10 "Confidence Calibration" row (L578, not yet built) -- see OQ-PREDICTIONTRACKING-2.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of learning.decision_journal (both have forecast/confidence-like fields, both two-stage)?"
+    decision: "No -- decision_journal is a >=2-OPTION choice record (invariant: options plural, exactly one chosen); this method has no options structure at all, just a bare prediction. decision-journal-entry.schema.yaml's own compilation_decisions (L49-52) already names this row as forecast/confidence's 'lighter-weight instance' sibling."
+  - question: "Duplicate of Atlas's own F10 'Confidence Calibration' row (L578, predictions→actuals→calibration curve)?"
+    decision: "No -- that row is explicitly PLURAL (predictions/actuals), a cross-record aggregate over many records' worth of calibration data. This method produces exactly ONE such record; a future evidence.confidence_calibration method would CONSUME many PredictionTrackingRecords, not overlap with producing them."
+  - question: "One hash (stage1 only) or two hashes (decision_journal's stage1 + outcome), given the identical hindsight-tamper risk applies to this method's own actual/error stage?"
+    decision: "One hash. Stage 1 keeps decision_journal's exact stage1_integrity_hash mechanism -- no lighter substitute catches a hand-tampered dict. Stage 2 skips decision_journal's second outcome_integrity_hash: decision_journal's actual_result is free-text prose with no independent recomputability (a hash is the ONLY way to detect tampering); this method's error is a NUMBER independently re-derived by evaluate_genuine_compute_gate from actual+prediction on every call, which already catches actual being edited without a matching, consistent error edit -- a second hash adds no coverage a determined tamperer's own consistent edit would not also defeat (sha256_json is unkeyed; neither mechanism is cryptographic security, both are tamper-evidence for naive/incomplete edits)."
+  - question: "GENUINE_COMPUTE gate style: provenance-ref-resolves check (mcda/monte_carlo's own style) or recompute-and-compare (fault_tree/decision_journal's own style)?"
+    decision: "Both. Keeps engine/computation_provenance_ref fields (mcda/monte_carlo naming, auditable trail) AND has evaluate_genuine_compute_gate literally recompute error via the same pure function and compare to the stored value -- stronger, and matches this method's own 'never trusted as a caller-supplied value' requirement more directly than a ref-resolves-only check alone would."
+  - question: "Does evaluate_genuine_compute_gate also check provenance.epistemic_type == CALCULATED_RESULT, matching mcda/monte_carlo's own gate?"
+    decision: "No -- this record's top-level provenance describes the STATEMENT (stage 1, a HYPOTHESIS-typed forecast), not the computed error, unlike mcda/monte_carlo where the whole record IS the computed result. Checking CALCULATED_RESULT against stage-1 provenance would be a category error; the recompute-and-compare check carries the genuine-compute burden instead."
+  - question: "Brier score for PROBABILITY, absolute/relative error for POINT_ESTIMATE -- one shared error field or type-discriminated?"
+    decision: "Type-discriminated: error.metric names which formula ran (BRIER_SCORE | ABSOLUTE_ERROR), error.value carries the primary number, error.relative_value is POINT_ESTIMATE-only (null when observed_value == 0 -- undefined, disclosed, never computed as inf/nan)."
+
+open_questions:
+  - "OQ-PREDICTIONTRACKING-1: actual.recorded_at is stored but, unlike decision_journal's outcome_integrity_hash, not independently hash-verified against backdating (claiming the actual was recorded sooner after the horizon than it really was). Disclosed gap -- error's own recompute does not cover this metadata field, see compilation_decisions.（owner: operator）"
+  - "OQ-PREDICTIONTRACKING-2: cross-record calibration (stated confidence/probability vs actual hit rate over MANY records) is Atlas's own separate F10 'Confidence Calibration' row (L578, method-inventory.yaml L687, not yet built) -- a future evidence.confidence_calibration (or similar) method would consume many PredictionTrackingRecords. Not this method's own scope.（owner: operator, whoever builds F10 next）"
+  - "OQ-PREDICTIONTRACKING-3: F17 learning family status at build time: 8 of 9 built before this contract (reversal_criteria/kill_criteria/decision_journal/pdca/ooda/build_measure_learn/after_action_review/post_mortem). This contract adds the 9th and LAST -- F17 CLOSED 9/9.（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole spec root for "Prediction Tracking"/prediction_tracking (case-insensitive) --
+    L809 table row (only citation, no dedicated section beyond it). Separately grepped for
+    "calibration" (case-insensitive) across all .md files and found Atlas's own SEPARATE F10
+    "Confidence Calibration" row (L578) -- read directly at that line, confirmed distinct family/
+    machine_id/scope, not yet built (method-inventory.yaml L687 has_contract: false). Read
+    decision_journal.py and its schema in full for the due-diligence comparison and the
+    stage1_integrity_hash pattern. Read fault_tree.py in full for the re-derive-don't-trust gate
+    pattern. Read mcda.py and monte_carlo.py in full for the GENUINE_COMPUTE
+    computation_provenance_ref/engine pattern. Read kill_criteria.py/reversal_criteria.py (grepped for
+    record_outcome/record_actual/actual_result) and confirmed neither has a two-stage actual-recording
+    mechanism -- this method is the second (after decision_journal), not a third copy of an existing
+    one. Confirmed Atlas §22.3's own Method-specific Gate table has no Prediction Tracking row.
+    Verified cognitive_primitives against the real 24-value kernel (primitive.schema.yaml L66-90) --
+    MEASURE is not a real value, corrected to CALCULATE before writing this file. Validated against
+    specs/cognitive/method.schema.yaml.
+  note: >
+    No mother document was modified. Atlas's own 4-element formula (prediction/horizon/actual/error)
+    is transcribed directly into preconditions above. The single-hash-vs-two-hash divergence from
+    decision_journal, the type-discriminated error shape, and the dual GENUINE_COMPUTE gate style are
+    disclosed compilation decisions, not further mother-document citations.

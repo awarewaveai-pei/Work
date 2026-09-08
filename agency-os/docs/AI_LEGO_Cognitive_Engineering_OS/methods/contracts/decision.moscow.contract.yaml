@@ -1,0 +1,123 @@
+$id: "ai-lego://methods/contracts/decision.moscow.contract.yaml"
+title: "MoSCoW Method Contract"
+status: ACTIVE
+
+description: >
+  decision.moscow, family decision (F16), Atlas F16 table row L763:
+  "MoSCoW | Must/Should/Could/Won't | release scope | 建立明確不做清單".
+  Single-citation, table-row-only (grep-confirmed sole Atlas hit; ADR-007
+  L105/117/186 already borrows the Must/Won't vocabulary in prose, not a
+  competing implementation). 3rd `decision` family (F16) member, after
+  ahp/mcda. Distinct from both: categorical 4-bucket classifier over MANY
+  items, not a numeric scoring method -- structurally closer to
+  strategy.swot's fixed-category shape. Invariants: (1) every items[] id
+  unique (the real, catchable form of "exactly one bucket per item");
+  (2) every WONT item carries a non-empty reason (Atlas's own "建立明確
+  不做清單" -- an unstated-reason exclusion is silence, not a decision).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, MoSCoW row (L763): 'Must/Should/Could/Won't | release scope | 建立明確不做清單'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Non-goals row (L339: 'excluded scope→理由→重審條件') -- due-diligence check, see compilation_decisions; UNBUILT (method-inventory.yaml:231-235 has_contract:false), no conflict"
+  - "docs/adr/ADR-007-pii-redaction-vs-pseudonymization-timing.md L105/117/186 -- prior prose use of MoSCoW's Must/Won't vocabulary in this repo's own governance, not a competing implementation"
+  - "methods/contracts/decision.mcda.contract.yaml and decision.ahp.contract.yaml -- same family (F16), read for the family's own input/primitive conventions"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. decision.moscow mints a new machine_id, F16
+  3rd `decision` family member (method-inventory.yaml's own MoSCoW entry,
+  L983/751, carries none). Registered in contract-backlog.yaml tier_1 by
+  orchestrating session, not this file.
+
+id: decision.moscow
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [CLASSIFY, PRIORITIZE, VALIDATE]
+# INFERRED, not cited -- MoSCoW is not among Atlas §4's 5 cited-formula
+# methods (Fishbone/SCAMPER/SWOT/Scenario Planning/AHP). CLASSIFY = bucket
+# assignment (same primitive strategy.swot.contract.yaml's own cited
+# formula uses for its analogous fixed-4-way split); PRIORITIZE = F16's
+# own family header ("Prioritization & Decision"); VALIDATE = the
+# id-uniqueness/WONT-reason invariant re-derivation (fault_tree.py
+# precedent: structural-consistency re-derivation counts as VALIDATE).
+
+purpose:
+  - classify_release_scope_items_into_must_should_could_wont_buckets_with_explicit_exclusion_reasons
+
+inputs:
+  required:
+    - ReleaseScope
+    - CandidateItems
+  optional: []
+# NEW, disclosed compilation inventions -- Atlas names no PascalCase input
+# type for this method (single table row only). F16 family convention is
+# structural inputs matching the method's own real pipeline shape (AHP:
+# Goal/Criteria/PairwiseComparisons; MCDA: Options/Criteria/RawScores/
+# Weights), not root_cause's ProblemStatement convention -- followed here,
+# not copied from the wrong sibling family.
+
+outputs: [MoscowPrioritizationRecord]
+
+preconditions:
+  - "every items[] entry has a unique id within the record (the real, catchable form of 'exactly one bucket per item' -- bucket is a single required enum field, so two buckets for one logical item is only representable as a duplicate id)"
+  - "every items[] entry whose bucket is WONT carries a non-empty reason"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F16 table has no misuse/evidence column for any row (a plain
+  # 4-column table: 工具/用途/使用方式/效益) -- re-derived independently for
+  # this method's own real risk (the WONT-reason requirement, already
+  # enforced above), not blanket-copied from strategy.swot/change_analysis.
+
+forbidden_transition: []
+# Atlas gives no worked example for this method, and MoSCoW is absent from
+# the §22.3 Method-specific Gate table (grep-confirmed, unlike decision.mcda's
+# L4154 row) -- left empty rather than inventing one.
+
+recommended_next: []
+# Atlas gives no chain/pipeline for this method (single table row only, no
+# §14.1-style legal-chain mention found) -- left empty rather than
+# inferring one without textual basis. See OQ-MOSCOW-3.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of decision.mcda/decision.ahp (same family)?"
+    decision: "No -- fixed 4-bucket categorical classifier over many items, not a numeric/weighted scoring method; structurally matches strategy.swot, not mcda/ahp."
+  - question: "Does F01 Non-goals (L339, excluded scope->理由->重審條件) already cover the WONT bucket?"
+    decision: "No -- Non-goals is unbuilt (method-inventory.yaml:231-235 has_contract:false); even once built it is a different granularity (project-level flat exclusion list with a re-review-trigger field vs. MoSCoW's per-item classification across 4 buckets for one release scope, no review-trigger field). See OQ-MOSCOW-1."
+  - question: "Should a Must<=X% guardrail (a common real-world MoSCoW convention) be an enforced gate?"
+    decision: "No -- Atlas cites no threshold; inventing one would be fabricated scope. Exposed as an informational-only must_ratio() compute helper, not a gate. See OQ-MOSCOW-2."
+  - question: "Enforce WONT-requires-reason via JSON Schema if/then, runtime-only, or both?"
+    decision: "Both -- unlike change-analysis-record.schema.yaml's before/after-equality case, conditional requiredness IS native JSON Schema Draft 2020-12 vocabulary (if/then), so the schema layer here is a REAL second structural layer, not merely disclosed-absent; the runtime module independently re-derives it (construction + gate), same two-layer discipline as every sibling."
+  - question: "Enum spelling: WONT or WON'T (Atlas's literal apostrophe)?"
+    decision: "WONT -- no enum value anywhere in this schema family carries punctuation (AFTER_FAULT, IMMEDIATELY_BEFORE, ...); disclosed transcription choice, not a silent respelling."
+
+open_questions:
+  - "OQ-MOSCOW-1: F01 Non-goals is unbuilt. Once built, should its excluded_scope entries be able to soft-reference a decision.moscow WONT item id?（owner: operator）"
+  - "OQ-MOSCOW-2: must_ratio() is informational-only, no enforced threshold (Atlas gives none). Add a caller-configurable advisory threshold if a real convention is ever sourced?（owner: operator）"
+  - "OQ-MOSCOW-3: recommended_next left empty -- Atlas gives no chain for this method. Link e.g. architecture.adr once a real usage pattern is observed?（owner: operator）"
+  - "OQ-MOSCOW-4: id: decision.moscow mints a machine_id method-inventory.yaml's own MoSCoW entry (L983/751) never carried. Update that registry entry?（owner: operator, or a future session with write scope）"
+
+verification:
+  method: >
+    Grepped the Atlas for "MoSCoW" -- sole hit F16 table row L763 (confirmed
+    no dedicated section exists). Grepped all of
+    agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/ for "MoSCoW"/"non.?goal" --
+    found ADR-007's prose borrowing (not a competing implementation) and F01
+    Non-goals' own unbuilt registry entry (method-inventory.yaml:231-235,
+    has_contract:false). Grepped ai_lego/ for moscow/MoSCoW/MOSCOW -- zero
+    hits before this contract. Read strategy/swot.py (full, closest
+    structural sibling -- 4 fixed named buckets), decision/mcda.py and
+    root_cause/fault_tree.py (gate pattern), root_cause/change_analysis.py
+    (denylist/misuse-guard style reference), decision.mcda.contract.yaml and
+    decision.ahp.contract.yaml (F16 family input/primitive convention)
+    before writing this contract. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document modified. F16 L763's four bucket names and the
+    "release scope"/"建立明確不做清單" phrasing are transcribed verbatim.
+    items[] shape, both invariants' concrete mechanics, and the WONT enum
+    spelling are compilation decisions, disclosed above, not textually cited.

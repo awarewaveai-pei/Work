@@ -1,0 +1,196 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/ice-score-record.schema.yaml"
+title: ICE Score Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `IceScoreRecord` -- the
+  declared `outputs` of `decision.ice`'s Method Contract
+  (methods/contracts/decision.ice.contract.yaml, `outputs: [IceScoreRecord]`).
+  Third `decision`-family (F16) typed object, after `AhpAnalysis` and
+  `MCDAAnalysis` -- deliberately named `*-record`, not `*-analysis`: an
+  `ice_score` is an ABSOLUTE, per-item function of only that item's own
+  impact/confidence/ease (no cross-item normalization or caller-supplied
+  weighting), not a relative multi-option ANALYSIS the way
+  `AhpAnalysis`/`MCDAAnalysis` are -- see
+  `methods/contracts/decision.ice.contract.yaml`'s own due-diligence
+  finding against `decision.mcda`.
+
+  Field provenance -- Atlas's F16 tool table ICE row (L761) is a single
+  line ("Impact×Confidence×Ease｜統一尺度評分｜快速粗排"), no dedicated
+  section (grep-confirmed): `items[].impact/confidence/ease` are the 3
+  named factors; `context`/`items[].ice_score`/`ranking[]` are this
+  schema's own structurally-necessary additions (disclosed in the method
+  contract's `compilation_decisions`), the latter two COMPUTED, never
+  caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, ICE row (L761): 'Impact×Confidence×Ease｜統一尺度評分｜快速粗排' -- this method's ONLY citation, no dedicated section (grep-confirmed absent)"
+  - "methods/contracts/decision.ice.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "ai_lego/compute/ice/scoring.py (the real arithmetic-mean compute this schema's items[].ice_score records the result of)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should this schema score exactly one item, or a backlog of many independently-scored items?"
+    decision: "A backlog: items[] (minItems: 1) plus a computed ranking[] sorted descending by ice_score."
+    reasoning: >
+      Atlas's own benefit text for this row is '快速粗排' (quick, rough
+      RANKING/sort) -- real ICE usage is near-always applied to a backlog
+      of candidate ideas that then get sorted by score, not one isolated
+      rating. minItems:1 (not 2, unlike MCDAAnalysis.options) because,
+      unlike MCDA's relative normalization, no ICE item's score depends
+      on any other item being present -- a single-item run is already a
+      complete, valid result.
+  - question: "Should ice_score be a caller-suppliable field on the INPUT item shape, matching how MCDA accepts raw_scores directly?"
+    decision: "No -- ice_score never appears in the method's own input item shape; it is computed and appended by the builder, present only in this OUTPUT record."
+    reasoning: >
+      The real invariant this contract enforces (see method contract's
+      own preconditions) is that ice_score can never be trusted as
+      caller-asserted -- keeping it entirely absent from the input shape
+      (ai_lego/modules/decision/ice.py's own generate_ice_score_record
+      rejects an input item carrying an unexpected ice_score key) makes
+      "the score is always genuine compute" true by construction, not
+      just by a runtime check a caller could route around.
+
+type: object
+required: [id, version, context, items, ranking, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ICE-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as ahp-analysis.schema.yaml's AHP- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.ice"
+
+  context:
+    type: string
+    minLength: 1
+    description: "Structurally-necessary addition, not Atlas-cited (the F16 row names no fields at all) -- same class of addition as fault-tree-record.schema.yaml's own system_under_analysis and ahp-analysis.schema.yaml's own goal. Free text: what backlog/decision session these items were scored for."
+
+  items:
+    type: array
+    minItems: 1
+    description: "Atlas L761's own 3 named factors, per item, plus the COMPUTED ice_score. See compilation_decisions for why minItems:1 (not 2) and why ice_score cannot be caller-supplied."
+    items:
+      type: object
+      required: [id, label, impact, confidence, ease, ice_score]
+      additionalProperties: false
+      properties:
+        id: {type: string, minLength: 1}
+        label: {type: string, minLength: 1}
+        impact:
+          type: number
+          minimum: 1
+          maximum: 10
+          description: "Atlas L761 factor 1 of 3. 1-10 scale is Sean Ellis's own published ICE convention, not Atlas-cited (see ai_lego/compute/ice/scoring.py module docstring)."
+        confidence:
+          type: number
+          minimum: 1
+          maximum: 10
+          description: "Atlas L761 factor 2 of 3. Same 1-10 scale as impact/ease."
+        ease:
+          type: number
+          minimum: 1
+          maximum: 10
+          description: "Atlas L761 factor 3 of 3. Same 1-10 scale as impact/confidence."
+        ice_score:
+          type: number
+          minimum: 1
+          maximum: 10
+          description: "COMPUTED -- arithmetic mean of this item's own impact/confidence/ease, never caller-supplied. Mathematically guaranteed within [1,10] given each input is itself within [1,10]."
+
+  ranking:
+    type: array
+    description: "COMPUTED -- items[] sorted descending by ice_score. Ties keep items[]'s own original relative order (stable sort). Every entry's item_id/ice_score must match its own items[] entry exactly (re-derived, not independently trusted -- see method contract preconditions)."
+    items:
+      type: object
+      required: [item_id, ice_score]
+      additionalProperties: false
+      properties:
+        item_id: {type: string, minLength: 1}
+        ice_score: {type: number, minimum: 1, maximum: 10}
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed items[].ice_score -- same convention every genuine-compute typed object in this directory establishes."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine ICE run -- same design choice ahp-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "4-item backlog, distinct scores, quick rough ranking (Atlas's own '快速粗排')"
+    value:
+      id: "ICE-2026-09-07-001"
+      version: "1.0.0"
+      generated_by_method: "decision.ice"
+      context: "Q4 成長實驗 backlog 初篩"
+      items:
+        - {id: "I1", label: "在結帳頁加入信任徽章", impact: 6, confidence: 8, ease: 9, ice_score: 7.66666667}
+        - {id: "I2", label: "重寫 onboarding email 系列", impact: 8, confidence: 6, ease: 4, ice_score: 6.0}
+        - {id: "I3", label: "推出 referral 計畫", impact: 9, confidence: 5, ease: 3, ice_score: 5.66666667}
+        - {id: "I4", label: "加大首頁 CTA 按鈕", impact: 3, confidence: 9, ease: 10, ice_score: 7.33333333}
+      ranking:
+        - {item_id: "I1", ice_score: 7.66666667}
+        - {item_id: "I4", ice_score: 7.33333333}
+        - {item_id: "I2", ice_score: 6.0}
+        - {item_id: "I3", ice_score: 5.66666667}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.ice.scoring.compute_ice_score"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-ICESCORERECORD-1"
+    question: >
+      Some secondary product-management sources describe the ICE score as
+      the PRODUCT of the three dimensions (Impact*Confidence*Ease, range
+      1-1000) rather than the arithmetic mean (range 1-10) implemented
+      here. This schema chose the mean because (a) it is the more
+      commonly cited formulation in primary/secondary literature and (b)
+      it is the only one consistent with Atlas's own '統一尺度評分'
+      (unified-scale) benefit text for this row -- a product would not
+      stay on the same 1-10 scale as its inputs. Should a future revision
+      add the product formulation as an alternative/named variant if a
+      concrete caller need or Atlas revision calls for it?
+    owner: "operator, or whoever next reads Atlas for additional ICE-specific content"
+    blocks: "nothing in this file's own validity -- the mean is a defensible, disclosed, externally-grounded choice, not an arbitrary guess"
+
+verification:
+  method: >
+    Read Atlas F16 tool table ICE row (L761) directly. Grep-confirmed no
+    dedicated §11.x/§12.x section exists (only RICE, L2955, and Weighted
+    Decision Matrix, L2969, have one among F16's own siblings) and no
+    §22.3 Method-specific Gate table row exists for ICE (L4142-4155,
+    checked directly). Read decision.mcda.contract.yaml and
+    mcda-analysis.schema.yaml in full before writing this schema (due
+    diligence against the most structurally similar sibling) -- confirmed
+    genuinely distinct shape (fixed 3 named dimensions, absolute
+    per-item scoring, no caller-supplied weights) rather than a
+    duplicate. Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. `items[].impact/confidence/ease`
+    are Atlas L761's own 3 named factors; `context`/`items[].ice_score`/
+    `ranking[]` are Phase 3 structurally-necessary additions, disclosed
+    in compilation_decisions and in the method contract's own
+    compilation_decisions, not textually cited. The 1-10 per-dimension
+    scale is Sean Ellis's own published ICE convention (see
+    ai_lego/compute/ice/scoring.py), not invented by this codebase and
+    not Atlas-cited -- disclosed distinctly, same class of external-
+    methodology citation ahp-analysis.schema.yaml's own Saaty 1980
+    threshold already uses.

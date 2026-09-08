@@ -1,0 +1,168 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/moscow-prioritization-record.schema.yaml"
+title: MoSCoW Prioritization Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `MoscowPrioritizationRecord`, outputs of `decision.moscow`. Atlas F16
+  table row L763: "MoSCoW | Must/Should/Could/Won't | release scope |
+  建立明確不做清單". `items[]` = the classified set; `bucket` a closed
+  4-value enum (MUST/SHOULD/COULD/WONT -- see compilation_decisions for the
+  WONT spelling). WONT-requires-reason enforced at BOTH layers: this
+  schema's own `if`/`then` (bucket==WONT -> reason required, non-empty) AND
+  an independent runtime gate (`MOSCOW_MISSING_WONT_REASON`,
+  `ai_lego/modules/decision/moscow.py`) -- genuinely real at both layers,
+  unlike a cross-field equality check (see that module's own docstring).
+  Item-id uniqueness (the real form of "exactly one bucket per item") is
+  runtime-only (`MOSCOW_DUPLICATE_ITEM_ID`) -- JSON Schema has no native
+  array-uniqueness-by-subfield constraint.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 table row (L763)"
+  - "methods/contracts/decision.moscow.contract.yaml"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "WONT spelling: WONT or WON'T?"
+    decision: "WONT -- no enum value anywhere in this schema family carries punctuation."
+  - question: "reason required unconditionally, or only for WONT?"
+    decision: "Conditional (if/then) -- MUST/SHOULD/COULD may carry an optional reason too (free annotation), but only WONT is schema-mandated, per Atlas's own benefit line naming the WONT list specifically as what must be explicit."
+  - question: "Local items[].id: strict prefix pattern, or free non-empty string?"
+    decision: "Free non-empty string (pattern \\S only), matching change-analysis-record.schema.yaml's changes[].id convention -- only the record-level id gets a strict MOSCOW- prefix."
+
+$defs:
+  item:
+    type: object
+    required: [id, description, bucket, provenance]
+    additionalProperties: false
+    if:
+      properties: { bucket: { const: WONT } }
+      required: [bucket]
+    then:
+      required: [reason]
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique within this record's items[] list (e.g. MOSCOW-001-I1)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The candidate item being scoped, in one sentence."
+      bucket:
+        enum: [MUST, SHOULD, COULD, WONT]
+        description: "Atlas L763's own four-way split, verbatim (spelling: see compilation_decisions)."
+      reason:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: >
+          Mandatory (schema if/then, AND runtime MOSCOW_MISSING_WONT_REASON)
+          when bucket==WONT -- Atlas's own "建立明確不做清單" benefit: an
+          unstated-reason exclusion is silence, not an explicit decision.
+          Optional free annotation for MUST/SHOULD/COULD.
+      provenance:
+        description: "Per-item, same per-entry granularity every sibling typed-object schema in this directory uses."
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+type: object
+required: [id, version, release_scope, items, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^MOSCOW-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.moscow"
+
+  release_scope:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L763's own literal 使用方式 column value: 'release scope' -- what this classification pass covers (e.g. a version/milestone label)."
+
+  items:
+    type: array
+    minItems: 1
+    description: "One or more classified candidate items. Every entry resolves to exactly one bucket (schema-structural, a single enum field) and must carry a unique id (MOSCOW_DUPLICATE_ITEM_ID, runtime-only -- see top-level description)."
+    items:
+      $ref: "#/$defs/item"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A release-scope classification with all 4 buckets, the WONT item carrying a reason"
+    value:
+      id: "MOSCOW-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.moscow"
+      release_scope: "Cognitive OS Method Atlas slice deliverable set, v1"
+      items:
+        - id: "MOSCOW-001-I1"
+          description: "Two-layer invariant enforcement (construction + independent gate)"
+          bucket: MUST
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "MOSCOW-001-I2"
+          description: "CLI demo proving both invariants at both layers"
+          bucket: MUST
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "MOSCOW-001-I3"
+          description: "Full 60-100+ test mutation suite"
+          bucket: SHOULD
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+        - id: "MOSCOW-001-I4"
+          description: "Auto-generated visual diagram of the gate flow"
+          bucket: COULD
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+        - id: "MOSCOW-001-I5"
+          description: "GraphQL API wrapper around the CLI"
+          bucket: WONT
+          reason: "No consumer or use case yet -- would add a dependency surface with zero present demand."
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+  - description: "A minimal single-item record, no WONT item present"
+    value:
+      id: "MOSCOW-2026-09-08-002"
+      version: "1.0.0"
+      generated_by_method: "decision.moscow"
+      release_scope: "internal reference lookup service, v1"
+      items:
+        - id: "MOSCOW-002-I1"
+          description: "read-through cache for the lookup table"
+          bucket: MUST
+          provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-MOSCOWPRIORITIZATIONRECORD-1"
+    question: "Should items[] support a free-text supporting_evidence_refs field, matching swot/change_analysis siblings, even though quality.evidence_labeling_required is false for this method?"
+    owner: "operator, or whoever next needs evidence citation on a MoSCoW item"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F16 table row (L763) directly. Read swot-analysis.schema.yaml
+    and change-analysis-record.schema.yaml in full before writing this file
+    (closest structural siblings -- fixed-enum categorical shape and
+    per-entry id/reason/provenance shape respectively). Validated against
+    jsonschema Draft202012Validator (required fields present, id pattern
+    satisfied, bucket enum closed, if/then WONT->reason conditional
+    verified against both a passing and a failing case).
+  note: >
+    No mother document modified. Bucket names and the "release scope"/
+    "建立明確不做清單" phrasing are transcribed verbatim. items[] shape,
+    the if/then WONT-reason mechanism, and the WONT spelling are
+    compilation decisions, disclosed above, not textually cited.

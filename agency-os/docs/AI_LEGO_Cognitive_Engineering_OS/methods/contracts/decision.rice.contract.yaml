@@ -1,0 +1,130 @@
+$id: "ai-lego://methods/contracts/decision.rice.contract.yaml"
+title: "RICE Prioritization Method Contract"
+status: ACTIVE
+
+description: >
+  decision.rice, family decision (F16). Atlas F16 table RICE row (L762)
+  and §12.32 (L2955-2966) both cite "Reach×Impact×Confidence÷Effort" --
+  no §22.3 gate-table row of its own (grepped, 3 total document hits for
+  "RICE"). Core invariant: Effort is a DIVISOR (must be > 0, rejected not
+  floored) and rice_score is GENUINE_COMPUTE, re-derived by the gate from
+  reach/impact/confidence/effort, never trusted as a stored value -- MCDA's
+  own weighted-sum shape (rank_options, ahp/weights.py:102-112, no division
+  operator) cannot express either property, confirming this is a distinct
+  method, not a relabeled MCDA (full due-diligence in
+  ai_lego/modules/decision/rice.py's own module docstring).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, RICE row (L762)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.32 RICE 優先級模型 (L2955-2966) -- formula, purpose, benefit, limit"
+  - "methods/registry/contract-backlog.yaml -- checked, no existing decision.rice entry found"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas's own cited
+  formula plus low-risk, disclosed compilation choices for the field
+  shapes Atlas leaves unspecified (see compilation_decisions).
+
+  `id: decision.rice` is a NEW machine_id, `<family>.<name>` bare-form
+  grammar per ADR-005b, `decision` family (third member, after
+  `decision.ahp`/`decision.mcda`). Grepped exhaustively for a competing
+  machine_id -- none found.
+
+id: decision.rice
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [ESTIMATE, CALCULATE, PRIORITIZE]
+# INFERRED, not cited (Atlas §4 L192's formula list does not include
+# RICE). Excludes COMPARE (unlike decision.mcda) -- a RiceScoreRecord
+# scores ONE idea, it does not itself compare options (see
+# compilation_decisions). Excludes WEIGHT -- Atlas's own primitive
+# evidence for WEIGHT (primitive.schema.yaml:123-124) is specifically
+# "AHP = COMPARE + WEIGHT + PRIORITIZE + DECIDE", RICE's 4 factors are
+# fixed roles in one formula, not caller-supplied weights the AHP way.
+# Excludes DECIDE for the same forbidden-authority reason decision.mcda's
+# own contract already documents.
+
+purpose:
+  - score_a_single_roadmap_idea_by_reach_impact_confidence_over_effort
+
+inputs:
+  required:
+    - Idea
+    - Reach
+    - Impact
+    - Confidence
+    - Effort
+  optional: []
+
+outputs:
+  - RiceScoreRecord
+
+preconditions:
+  - "effort is a finite number > 0 (division by zero/negative is undefined)"
+  - "confidence is a finite number in [0, 1]"
+  - "reach carries a non-empty unit label, not a bare number"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning decision.mcda/decision.ahp already established: real
+  # risk here is unauthorized automatic authority (Atlas §12.32 L2965),
+  # not omitted evidence citations for individual factor scores.
+
+forbidden_transition:
+  - "Automatic Authority"
+# CITED, Atlas §12.32 L2965: "限制：分數是 decision aid，不是 authority".
+# Same rule decision.mcda's own §22.3 L4154 citation enforces, cited here
+# from RICE's own dedicated section instead (RICE has no §22.3 row).
+
+recommended_next: []
+# Same reasoning decision.mcda's contract already gives for its own
+# identical field: "Human Judgment" is a Decision object FIELD, not a
+# machine-resolvable method id.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Atlas gives RICE zero field-level shape. What concrete shape do reach/impact/confidence/effort take?"
+    decision: "reach={value>=0, unit:non-empty string}; impact>=0; confidence in [0,1]; effort>0. No invented fixed scale/enum for impact or effort."
+  - question: "Should reach be a bare number like impact/effort, or a structured {value, unit}?"
+    decision: "Structured {value, unit}, unit required non-empty -- the one field Atlas's own benefit-column text (L762 納入受影響人數) gives a concrete citation to structure beyond a bare number."
+  - question: "Should RiceScoreRecord model multiple ideas/options per record, the way MCDAAnalysis does?"
+    decision: "No -- exactly one idea per record; cross-idea comparison happens by sorting many independently-generated records, not inside one record."
+    reasoning: >
+      Atlas's own §12.32 text never mentions options or a comparison
+      pipeline (contrast MCDA's 8-node §11.32 pipeline); RICE's own
+      formula has no cross-option dependency the way MCDA's per-record
+      min-max normalization does (mcda/scoring.py:53-64), so bundling many
+      ideas into one record would import MCDA's own relative-ranking shape
+      onto a method whose real behavior is absolute-per-idea.
+  - question: "Should the gate re-derive rice_score from stored raw fields and compare, or just check computation_provenance_ref resolvability like decision.mcda/decision.ahp's own genuine_compute gate does?"
+    decision: "Re-derive and compare (math.isclose) -- a strictly stronger, still-cheap check because RICE's formula is a single scalar, unlike MCDA/AHP's own list-shaped normalized_scores/ranking."
+
+open_questions:
+  - "OQ-RICE-1: impact/confidence/effort carry no fixed scale/enum -- should a future revision define one once a worked Atlas example exists?（owner: operator）"
+  - "OQ-RICE-2: RESOLVED. decision.ice is now built. Not the same concept: RICE's Effort is an unbounded resource-cost divisor (RICE_NONPOSITIVE_EFFORT guards >0, no upper bound); ICE's Ease is a bounded 1-10 rating on the same additive scale as Impact/Confidence, never a divisor (ice.py). No reconciliation needed -- both concepts stay distinct per their own real methodologies.（owner: operator）"
+  - "OQ-RICE-3: decision.mcda/decision.ahp's own genuine_compute gates only check computation_provenance_ref resolvability, not actual recomputed-value equality (mcda.py:119-124, ahp.py:104-108) -- should they be hardened to decision.rice's own stronger recompute-and-compare standard? (decision.ice, built later in this same batch, independently arrived at the same stronger recompute-and-compare design under a separate ice_integrity gate_id, ice.py:197-246 -- MCDA/AHP are the two siblings left with the shallower gate, not most of the family)（owner: operator, or whoever next revisits those two gates）"
+  - "OQ-RICE-4: decision.ice (sibling, same batch) models 1-to-N ideas per record via items[] with a derived ranking[] (ice.py:127-174), all absolutely scored (no cross-item normalization) -- proving a batch container is compatible with the same 'absolute, not relative' principle this contract's own compilation_decisions used to justify RICE's single-idea-per-record shape. Should RiceScoreRecord be widened to the same items[]+ranking[] batch shape for F16-family consistency, or is single-idea-per-record still preferred (e.g. because a RICE backlog is typically appended to over time, not scored in one batch the way an ICE triage session is)?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F16 tool table RICE row (L762) and §12.32 (L2955-2966)
+    directly at the cited lines. Read ai_lego/modules/decision/mcda.py and
+    ai_lego/compute/ahp/weights.py in full before deciding this is a
+    distinct method (rank_options has no division operator --
+    weights.py:102-112). Grepped specs/ and methods/ exhaustively for
+    "rice" -- no duplicate typed object found. decision.ice not yet built
+    at the initial check (ai_lego/modules/decision/ only held
+    ahp.py/mcda.py/__init__.py); ice.py landed later in the same batch and
+    was read in full as a follow-up (rice.py's own module docstring ICE
+    cross-check section; OQ-RICE-4 above is the one divergence that read
+    surfaced). Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. forbidden_transition is cited from
+    §12.32 L2965, not §22.3 (RICE has no §22.3 row of its own). Field
+    shapes beyond the formula itself are disclosed Phase 3 compilation,
+    not silent invention -- see compilation_decisions/open_questions.

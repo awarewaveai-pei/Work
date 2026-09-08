@@ -1,0 +1,132 @@
+$id: "ai-lego://methods/contracts/decision.impact_effort.contract.yaml"
+title: "Impact-Effort Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  decision.impact_effort, F16, 3rd concrete member (after ahp/mcda). Atlas §11.30 (L1889-1906) dedicated
+  section + F16 table row (L760, grep-confirmed -- method-inventory.yaml's own cached line 757 is stale by
+  3) + §28 routing row (L4485, First Tool before MCDA/AHP). Distinct from decision.mcda: 2 FIXED named
+  dimensions -> categorical quadrant label, not N arbitrary criteria -> continuous weighted score+ranking.
+  Invariants: quadrant recomputed fresh from impact/effort/declared thresholds (never trusts a stored
+  label), impact/effort each validated against their own declared scale (rejects mixed-scale input).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.30 影響－投入矩陣／效益－難度矩陣（Impact–Effort Matrix）(L1889-1906): purpose, quadrantChart (L1894-1903), caution note (L1905-1906)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Impact–Effort row (L760): 'ideas 初篩｜impact×effort 四象限｜快速找 quick wins' -- grep-verified fresh, NOT method-inventory.yaml's cached L757"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4485): '很多方案不知選哪個｜Impact–Effort｜MCDA / AHP｜Vote Only' -- this contract's recommended_next"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155): grep-confirmed NO Impact-Effort row -- forbidden_transition below is inferred from the L1905-1906 prose caution, not table-cited (weaker grounding than decision.mcda's own L4154 citation, disclosed)"
+  - "methods/contracts/decision.mcda.contract.yaml and ai_lego/modules/decision/mcda.py (both read in full) -- due-diligence comparison target; methods/contracts/architecture.trade_off_matrix.contract.yaml (read) -- the reuse-only precedent deliberately NOT followed here"
+  - "ai_lego/modules/root_cause/fault_tree.py (read in full) -- the two-layer construction+gate, raise-before-write, re-derive-don't-trust pattern this contract's own two invariants follow"
+  - "specs/cognitive/primitive.schema.yaml L66-90/107-112 -- the 24-value canonical kernel plus 5-value OBSERVED_EXTENSION tier this contract's cognitive_primitives draws from"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.30 gives a complete, dedicated section (purpose + worked quadrant
+  chart + caution). `id: decision.impact_effort` mints a new machine_id, 3rd concrete F16 entry alongside
+  ahp/mcda.
+
+id: decision.impact_effort
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, CLASSIFY, PRIORITIZE, CALCULATE]
+# INFERRED, not cited -- Atlas §4 gives no primitive formula for this method. COMPARE=impact/effort vs
+# thresholds, CLASSIFY (OBSERVED_EXTENSION tier)=assignment to Atlas's own 4 pre-defined quadrant boxes,
+# same operation SWOT's own CLASSIFY use already establishes for its own 4-box shape, PRIORITIZE=Atlas's
+# own "快速找 quick wins" purpose, CALCULATE=genuine deterministic compute (not LLM math), same class
+# decision.mcda's own inferred set already uses. DECIDE deliberately EXCLUDED -- same reasoning
+# decision.mcda's own exclusion applies: forbidden_transition below denies automatic authority, so claiming
+# DECIDE in the primitive composition would contradict it.
+
+purpose:
+  - triage_a_batch_of_ideas_into_4_fixed_quadrants_by_impact_and_effort_for_fast_first_pass_screening
+# Atlas L1892 verbatim sense: "大量 ideas 的第一輪快速篩選" (first-round quick screening of many ideas).
+
+inputs:
+  required: [Ideas, ImpactScale, EffortScale, ImpactThreshold, EffortThreshold]
+  optional: []
+  # Atlas's own quadrantChart (L1894-1903) names 2 axes (impact, effort) and their Low/High extremes; the
+  # scale/threshold fields are structurally-necessary additions (Atlas gives no numeric split point) -- same
+  # class of necessary-but-not-literally-cited precondition decision.mcda's own inputs already establish.
+
+outputs: [ImpactEffortClassification]
+# NEW output type (see typed-objects/impact-effort-classification.schema.yaml).
+
+preconditions:
+  - "record_id (IMPACTEFFORT- prefix), subject non-empty strings; version is a string"
+  - "impact_scale and effort_scale each {min, max}, both finite numbers, min < max -- validated independently per axis"
+  - "impact_threshold within impact_scale's own [min, max]; effort_threshold within effort_scale's own [min, max] -- both caller-supplied, no invented default"
+  - "ideas has >=1 entry; every entry has a unique id, non-empty label, and impact/effort each a finite number within their own declared scale -- rejects out-of-range/mixed-scale input, does not silently normalize"
+  - "quadrant is COMPUTED only -- never a caller-supplied constructor input, same discipline decision.mcda's own normalized_scores/ranking already establishes"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition:
+  - "Automatic Authority"
+# INFERRED from Atlas §11.30's own prose caution (L1905-1906: "它只適合初篩；高風險方案不能只靠這張圖決策"),
+# NOT a §22.3 table citation (grep-confirmed absent, unlike decision.mcda's directly-cited L4154 row) --
+# weaker grounding, disclosed. Enforced the same two-layer way decision.mcda's own rule is: construction-time
+# assert_no_automatic_authority_claim + evaluate_no_automatic_authority_gate + this schema's own
+# additionalProperties:false, using an INDEPENDENTLY RE-DERIVED (not imported) FORBIDDEN_AUTHORITY_KEYS set.
+
+recommended_next: [decision.mcda, decision.ahp]
+# TABLE-CITED, Atlas §28 L4485 verbatim: "很多方案不知選哪個｜Impact–Effort｜MCDA / AHP｜Vote Only" -- First
+# Tool = Impact-Effort, Then = MCDA/AHP. Stronger grounding than most sibling recommended_next fields
+# (usually inferred; this one is the literal next step in Atlas's own routing table).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Distinct method, or a contract-only reuse of decision.mcda (architecture.trade_off_matrix precedent)?"
+    decision: "Distinct. 2 fixed named dims -> categorical quadrant is a different operation from N arbitrary criteria -> continuous weighted score+ranking; §28 L4485 and Atlas's own Phase-1 method list (L4294) both list Impact-Effort as a DISTINCT sibling of MCDA/Weighted Decision Matrix, not an alias."
+  - question: "One shared threshold for both axes, or per-axis scale+threshold?"
+    decision: "Per-axis (impact_scale/impact_threshold, effort_scale/effort_threshold), each independently validated -- avoids the exact 'impact 1-10 vs effort 1-5 on the same boundary' incoherence without forcing both axes onto one identical numeric range Atlas never specifies."
+  - question: "Reject or normalize mismatched-scale idea input?"
+    decision: "Reject (construction-time InvariantViolation) -- consistent with decision.mcda's own validate_weights_sum_to_one (reject, not silently rescale)."
+  - question: "Invent a default numeric threshold (e.g. scale midpoint), or require caller-supplied?"
+    decision: "Caller-supplied, no invented default -- Atlas gives no numeric split point anywhere in §11.30; same class of caller-set threshold root_cause.pareto's own vital_few_threshold_percent already establishes."
+  - question: "Quadrant label vocabulary: invent new names, or transcribe Atlas's own mermaid labels?"
+    decision: "Transcribe verbatim (Major Projects/Quick Wins/Fill-ins/Avoid-Reconsider, L1899-1902), snake_cased for machine use."
+  - question: "Infer forbidden_transition from §11.30's prose caution despite no §22.3 table row for this method?"
+    decision: "Yes, inferred and disclosed as prose-grounded (not table-cited). L1905-1906 is a real, on-topic caution; reusing MCDA's own proven FORBIDDEN_AUTHORITY_KEYS structural pattern is cheap and directly grounded -- cheaper to disclose honestly than to silently drop found Atlas content."
+  - question: "Should ideas require >=2 entries, matching decision.mcda's own >=2 Options floor?"
+    decision: "No, >=1 -- MCDA's floor exists because it RANKS options relative to each other; this method classifies each idea independently against fixed external thresholds, so a single-idea run is complete and meaningful."
+  - question: "Compute-layer function location: ai_lego/compute/impact_effort/, or inline in the module (fault_tree.py precedent)?"
+    decision: "ai_lego/compute/impact_effort/classification.py -- required by evaluate_statistical_gate's own hard-coded computation_provenance_ref.startswith('ai_lego.compute.') check (ai_lego/modules/research/gates.py:76), which this contract's genuine_compute gate reuses unchanged."
+  - question: "Gate granularity: one bundled gate (fault_tree style), or one gate per invariant (learning.post_mortem/kill_criteria style)?"
+    decision: "One bundled gate (quadrant_integrity) for both headline invariants -- they are DEPENDENT (recomputing a quadrant is only meaningful once its own scale/threshold data is sane), matching fault_tree's own referential-integrity+cycle-detection bundling rationale, not post_mortem's 3 genuinely-independent invariants."
+
+open_questions:
+  - "OQ-IMPACTEFFORT-1: quadrant boundary uses >= (inclusive-high) for both thresholds -- Atlas gives no worked example pinning the exact boundary convention. Disclosed choice, not Atlas-cited.（owner: operator）"
+  - "OQ-IMPACTEFFORT-2: forbidden_transition is inferred from prose (L1905-1906), not a §22.3 table row (grep-confirmed absent) -- weaker grounding than MCDA's directly-cited L4154 row. Should Atlas §22.3 gain an explicit Impact-Effort row in a future revision?（owner: operator, or whoever next revises Atlas §22.3）"
+  - "OQ-IMPACTEFFORT-3: classify_quadrant (ai_lego/compute/impact_effort/classification.py) is impact-effort-specific in name only -- its logic (2 numeric values, 2 thresholds, 4-way split) is structurally similar to Atlas's own Power-Interest Grid (L488) and Assumption Mapping (L570) 四象限 methods. Not extracted into a shared/generic module now -- no second caller yet, same 'reuse discovered after the fact, not designed upfront' discipline decision.mcda's own rank_options reuse followed. Revisit if/when either method is built.（owner: operator, or whoever next builds a two-axis quadrant method）"
+  - "OQ-IMPACTEFFORT-4: F16 status at build time: 3 of 13 built after this contract (ahp, mcda, impact_effort). Remaining 10: ICE, RICE, MoSCoW, WSJF, Kano, Weighted Decision Matrix, TOPSIS, Decision Tree, Expected Value, Pareto Frontier.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Grepped the Atlas for Impact-Effort/impact_effort/四象限 across the whole mother document -- found and
+    read §11.30 (L1889-1906) directly, F16 table row (L760, fresh grep -- disagrees with
+    method-inventory.yaml's cached L757 by +3, same systematic drift class prior contracts already
+    disclosed), §28 routing row (L4485), Phase-1 method list (L4280-4295), and §22.3's gate table
+    (L4142-4155, confirmed no Impact-Effort row). Read decision.mcda.contract.yaml, decision.ahp.contract.yaml,
+    and their .py modules in full for the due-diligence distinctness comparison. Read
+    architecture.trade_off_matrix.contract.yaml in full as the reuse-only precedent this contract explicitly
+    does NOT follow. Read root_cause.fault_tree.py in full for the two-layer gate pattern. Read
+    specs/cognitive/primitive.schema.yaml in full to ground cognitive_primitives against the real 29-value
+    (24 kernel + 5 extension) vocabulary rather than guessing. Grepped ai_lego/ and specs/ exhaustively for
+    "impact_effort"/"ImpactEffort" before writing -- zero prior hits, confirmed no duplicate exists.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator (via the
+    project's own SchemaContracts loader, exercised through tests/unit/test_impact_effort.py).
+  note: >
+    No mother document was modified. Doc format follows
+    methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md (2026-09-06 operator ruling) and
+    learning.post_mortem.contract.yaml as the current lean exemplar -- description/compilation_decisions/
+    open_questions kept terse, no separate slice markdown file written, no per-edit
+    method-inventory.yaml/contract-backlog.yaml update (both out of scope for this task by explicit
+    instruction). recommended_next is the strongest-grounded field in this file (directly table-cited, §28
+    L4485) -- unusual for a Tier-1 contract in this suite, most of which infer it. forbidden_transition is
+    the most honestly-hedged field (prose-grounded, not table-cited, explicitly flagged weaker than MCDA's
+    own citation strength).

@@ -65,6 +65,17 @@ def evaluate_citation_gate(claims: list[dict[str, Any]], sentence_provenances: l
 
 def evaluate_statistical_gate(statistics: dict[str, Any]) -> tuple[bool, list[Any]]:
     """Contract fail_condition: no resolvable computation_provenance_ref, or epistemic_type/authorship_state inconsistent with genuine compute."""
+    # Root-caused here (critic review of the F16/F17 batch, 2026-09-08) after THREE separate call sites each
+    # independently forgot an isinstance guard before delegating to this function: mcda.py's own
+    # evaluate_genuine_compute_gate crashed on non-dict input (fixed by adding a caller-side guard,
+    # copied from impact_effort.py's own precedent); ice.py's identically-shaped gate had no such guard and
+    # crashed live (`AttributeError: 'NoneType'/'str' object has no attribute 'get'`) -- the exact bug class
+    # this repo's own two-layer discipline exists to prevent, confirmed by direct execution not just reading.
+    # Guarding it ONCE here protects every current reuse (root_cause.pareto/decision.ahp/decision.mcda/
+    # decision.impact_effort/decision.ice) and every future one, instead of relying on each new caller to
+    # remember a guard an older sibling already forgot twice.
+    if not isinstance(statistics, dict):
+        return False, [{"reason": "statistics is not a dict"}]
     # `.get("provenance", {})` only substitutes {} when the key is ABSENT -- a hand-tampered record with
     # `provenance: null` (key present, value None) sails through as None and crashes `.get("epistemic_type")`
     # below. Caught by a critic review of `database_data.reconciliation` (this gate's sixth reuse): fails

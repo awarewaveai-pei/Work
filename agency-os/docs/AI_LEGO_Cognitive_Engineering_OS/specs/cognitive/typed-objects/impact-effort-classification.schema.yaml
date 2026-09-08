@@ -1,0 +1,140 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/impact-effort-classification.schema.yaml"
+title: Impact-Effort Classification
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ImpactEffortClassification` -- `decision.impact_effort`'s declared output. Atlas §11.30 (L1889-1906):
+  2-axis quadrant chart (impact x effort), 4 canonical quadrants (L1899-1902, snake_cased here:
+  major_projects/quick_wins/fill_ins/avoid_reconsider). Each idea's `quadrant` is COMPUTED, never a
+  constructor input -- see `methods/contracts/decision.impact_effort.contract.yaml`'s own
+  compilation_decisions for the per-axis scale/threshold design.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.30 影響－投入矩陣（Impact–Effort Matrix）(L1889-1906), quadrantChart (L1894-1903)"
+  - "methods/contracts/decision.impact_effort.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/compute/impact_effort/classification.py (the real deterministic classify_quadrant this schema's `quadrant` field records the result of)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  scale:
+    type: object
+    required: [min, max]
+    additionalProperties: false
+    properties:
+      min: {type: number}
+      max: {type: number}
+    description: "min MUST be strictly less than max -- enforced at the runtime layer (IMPACTEFFORT_INVALID_SCALE), not by this schema (JSON Schema cannot express a cross-field min<max comparison)."
+  idea:
+    type: object
+    required: [id, label, impact, effort, quadrant]
+    additionalProperties: false
+    properties:
+      id: {type: string, minLength: 1, pattern: "\\S"}
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      impact: {type: number, description: "Raw value on the record's own declared impact_scale -- range checked at the runtime layer (IMPACTEFFORT_VALUE_OUT_OF_SCALE), not by this schema."}
+      effort: {type: number, description: "Raw value on the record's own declared effort_scale."}
+      quadrant:
+        enum: [major_projects, quick_wins, fill_ins, avoid_reconsider]
+        description: "COMPUTED -- Atlas L1899-1902's own 4 quadrant names, snake_cased. Never a constructor input; re-derived and cross-checked at the gate layer (evaluate_quadrant_integrity_gate), never trusted as stored."
+
+type: object
+required: [id, version, subject, impact_scale, effort_scale, impact_threshold, effort_threshold, ideas, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^IMPACTEFFORT-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as fault-tree-record.schema.yaml's FAULTTREE- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.impact_effort"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What is being screened, e.g. 'Q4 backlog triage' -- Atlas L1892's own '大量 ideas 的第一輪快速篩選' (first-round quick screening of many ideas)."
+
+  impact_scale:
+    $ref: "#/$defs/scale"
+    description: "Atlas's own y-axis 'Low Impact --> High Impact' (L1898), made a real, declared, finite range -- Phase 3 compilation, not Atlas-cited."
+
+  effort_scale:
+    $ref: "#/$defs/scale"
+    description: "Atlas's own x-axis 'Low Effort --> High Effort' (L1897). A SEPARATE declared range from impact_scale -- see method contract compilation_decisions for why the two axes are not forced onto one shared range."
+
+  impact_threshold:
+    type: number
+    description: "At or above this value on impact_scale = High Impact. Caller-supplied, no invented default -- Atlas gives no numeric split point anywhere in §11.30 (same class of caller-set threshold root_cause.pareto's own vital_few_threshold_percent already establishes, unlike AHP's externally-published Saaty constant). Range-checked against impact_scale at the runtime layer (IMPACTEFFORT_THRESHOLD_OUT_OF_SCALE)."
+
+  effort_threshold:
+    type: number
+    description: "At or above this value on effort_scale = High Effort. Same caller-supplied, no-invented-default reasoning as impact_threshold."
+
+  ideas:
+    type: array
+    minItems: 1
+    description: "Atlas L1892 pipeline subject: the ideas being screened. minItems 1, not 2 -- unlike decision.mcda's Options (which RANKS options relative to each other, meaningless below 2), each idea here is classified INDEPENDENTLY against fixed external thresholds, so a single-idea run is a complete, meaningful use case (see method contract compilation_decisions)."
+    items:
+      $ref: "#/$defs/idea"
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses (mcda-analysis.schema.yaml, ahp-analysis.schema.yaml, pareto-analysis.schema.yaml, ...) -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed each idea's quadrant -- same convention every genuine-compute typed object in this directory establishes, and the exact prefix evaluate_statistical_gate's own resolvability check requires (ai_lego/modules/research/gates.py)."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine classification run -- same design choice mcda-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Q4 backlog triage, 5 ideas on a shared 1-5 impact/effort scale split at 3, one idea landing in each of 3 quadrants plus a second major_projects entry"
+    value:
+      id: "IMPACTEFFORT-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.impact_effort"
+      subject: "Q4 backlog 初篩"
+      impact_scale: {min: 1, max: 5}
+      effort_scale: {min: 1, max: 5}
+      impact_threshold: 3
+      effort_threshold: 3
+      ideas:
+        - {id: "IDEA-1", label: "自助密碼重設", impact: 5, effort: 2, quadrant: quick_wins}
+        - {id: "IDEA-2", label: "SSO 整合", impact: 5, effort: 5, quadrant: major_projects}
+        - {id: "IDEA-3", label: "登入頁換色", impact: 1, effort: 1, quadrant: fill_ins}
+        - {id: "IDEA-4", label: "客製舊版報表匯出格式", impact: 2, effort: 5, quadrant: avoid_reconsider}
+        - {id: "IDEA-5", label: "行動裝置推播通知", impact: 4, effort: 3, quadrant: major_projects}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.impact_effort.classification.classify_quadrant"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-IMPACTEFFORTSCHEMA-1: no schema-level constraint ties quadrant to impact/effort/thresholds (JSON Schema cannot express that arithmetic) -- left as a runtime invariant (evaluate_quadrant_integrity_gate re-derives and compares), same disclosed gap ahp-analysis.schema.yaml's own OQ-AHPANALYSIS-1 and mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 already document for their structurally identical fields.（owner: operator, or whoever next hardens this schema's cross-field guarantees）"
+
+verification:
+  method: >
+    Read Atlas §11.30 (L1889-1906) directly at the cited lines, including the mermaid quadrantChart
+    (L1894-1903). Cross-checked against methods/contracts/decision.impact_effort.contract.yaml's own
+    outputs/preconditions/quality and ai_lego/compute/impact_effort/classification.py's real
+    classify_quadrant/validate_scale compute (hand-verified against the worked example above: all 4
+    quadrants exercised, boundary cases at exactly the threshold value confirmed High per the >=
+    convention). Grepped specs/cognitive/typed-objects/ for "impact"/"effort"/"quadrant" before writing --
+    no existing or competing typed object found. Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. `impact_scale`/`effort_scale`/`impact_threshold`/`effort_threshold`/
+    `ideas`/`quadrant` field names are transcribed from Atlas's own quadrantChart axes and quadrant labels
+    (L1894-1903). The per-axis (not shared) scale/threshold design and the additionalProperties:false
+    closed-key-set-per-idea shape are Phase 3 compilation decisions, disclosed in the method contract's own
+    compilation_decisions, not further mother-document citations.

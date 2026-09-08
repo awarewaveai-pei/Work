@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-09-08（TASKS.md tarot batch 條的「操作者待辦①②」查證後判定作廢——secret 走 payload 不走 Trigger.dev env，且 SG/EU 已不存在）
+
+**觸發**：操作者問「把這條的 host 路徑更新成 ks-aw-01、順便把 BATCH_INTERNAL_SECRET 設好」。先查現況（VBC）才發現兩項待辦皆已不成立，故未做任何 prod 寫入。
+
+**[已修改]**：
+- `agency-os/TASKS.md:794` —— 移除 `**⚠️ 操作者待辦**：① SG .env + EU Trigger.dev env 加 BATCH_INTERNAL_SECRET ② 重新 deploy packages/workflows`，改為實測就緒清單 + 兩層作廢理由 + 剩餘動作（跑 78 張 batch 觀察一致性）。byte-level replace，BOM (`efbbbf`) 保留。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv | grep -E "BATCH|TAROT|TRIGGER_|REPLICATE|POD_DESIGNS"` | exit=0 | result=`BATCH_INTERNAL_SECRET` 已設（值與 `.env.bak-rotate-20260828` 相同＝2026-08-28 rotation 未動此 var）、`TAROT_DAILY_LIMIT=300`、`TRIGGER_ACCESS_TOKEN=tr_prod_*`（符合 AGENTS.md §0 runtime 用 tr_prod 的規定）、`TRIGGER_API_URL`、`REPLICATE_API_TOKEN`、`POD_DESIGNS_ENABLED=true` 全在
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec trigger-postgres psql -U trigger -d trigger -c 'SELECT slug FROM "BackgroundWorkerTask" GROUP BY slug'` + `SELECT version,status FROM "WorkerDeployment" ORDER BY "createdAt" DESC LIMIT 3` | exit=0 | result=`tarot-batch-generate` 在列；最新 `20260815.1` DEPLOYED
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec trigger-postgres psql -U trigger -d trigger -c 'SELECT key FROM "EnvironmentVariable"'` | exit=0 | result=19 個 key，**無** `BATCH_INTERNAL_SECRET` —— 但讀 code 後判定無害，非缺陷（見下）
+- REALTEST_EVIDENCE: tool=curl+SSH | cmd=`curl -H "Host: app.aware-wave.com" http://127.0.0.1:3002/` on ks-aw-01 | exit=0 | result=`307 → /login?next=%2F`，與公開 `https://app.aware-wave.com/` 回應一致 → 確認 app 確實由 ks-aw-01 的 `lobster-next-admin` 服務（nginx vhost 檔名仍叫 `sg-stack.aware-wave.com`，屬搬機沿用舊檔名，非指向舊機）
+- REVIEW_DONE: critic=Quick（self-review，Low risk 文件單行修正，未派 subagent）| verdict=pass | findings=0c/0m/0n —— 改後 `sed -n '794p'` 讀回、BOM `xxd` 確認 `efbbbf` 未破壞
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=`BATCH_INTERNAL_SECRET` | hits=15（活躍宣告僅 `TASKS.md:794` 一處已修；`memory/daily/2026-06-13.md:186` 與 `WORKLOG-archive/2026-06.md` 屬歷史紀錄依 AGENTS.md §9「舊檔案不回改」保留；`.claude/worktrees/*` ×5 為獨立 checkout 不在本 repo 工作區；code 端 4 處為實作本身非宣告）
+- WORKLOG_DONE: 本條目
+
+**[根因：為何這條待辦從一開始就不會成立]**
+`BATCH_INTERNAL_SECRET` 從未透過 Trigger.dev 的 env var 傳遞，而是**隨 trigger payload 走**：
+`app/api/tools/tarot/batch/route.ts:72` 讀 `process.env.BATCH_INTERNAL_SECRET` 塞進 payload
+→ `packages/workflows/src/trigger/tarot-batch-generate.ts:41-47` 取 `payload.batchSecret` 組 `Authorization: Bearer`
+→ `app/api/tools/tarot/batch/[jobId]/card/route.ts:19-26` 比對自身 `process.env` 的同一值。
+`tarot-batch-generate.ts` 內 `process.env` 引用數 = 0（grep 確認）。故 Trigger.dev 端設不設 env var 對此流程無影響，`trigger.config.ts:131-132` 的 syncEnvVars 條目對這條路徑是冗餘的。原待辦②「重新 deploy workflows」同樣不需要。
+待辦①的另一層作廢理由是主機：SG/EU 已於 2026-08-31 整併至 `ks-aw-01`，該二機不存在。
+
+**[剩餘風險]**
+- `R2_DESIGNS_PUBLIC_BASE` 在容器內為空字串，但 `lib/storage/r2.ts:47` 有 `DEFAULT_PUBLIC_BASE` fallback（`https://pub-a88b06f569bd41a3b9e27e29644d520e.r2.dev`），且 `card/route.ts:79-83` 另有 `r2result.ok` 分支優先，判定非阻塞。未改。
+- 78 張 batch 一致性本身仍未實測（(a) 項維持 OPEN）——本輪只證明「前置就緒」，未證明「輸出夠好」。
+- 未做任何 prod 寫入：無 `.env` 修改、無容器重啟、無 deploy。
+
+**[rollback]**：單檔單行，`git revert`。
+
 ## 2026-09-08（learning.ooda 的 OQ-OODA-2 cycles[] 設計題由操作者拍板：維持單記錄不改，非投機加跨輪 invariant）
 
 **觸發**：操作者問清楚 OQ-OODA-2（`learning.ooda.contract.yaml:70`，非前一輪撞號的 docstring 那個）實際內容後，回覆「commit」——對應先前提的建議選項「維持現狀，不加 cycles[]」，視為拍板決定。

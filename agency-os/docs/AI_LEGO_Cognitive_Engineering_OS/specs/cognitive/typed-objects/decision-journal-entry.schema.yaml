@@ -224,7 +224,8 @@ open_questions:
     blocks: "nothing in this file's own validity -- free text remains schema-legal either way"
   - id: "OQ-DECISIONJOURNAL-2"
     question: "Atlas L809's sibling row 'Prediction Tracking' (prediction→horizon→actual→error→改善calibration) looks like a natural consumer of many DecisionJournalEntry.outcome values across entries (a calibration curve: stated confidence vs actual hit rate). Should that cross-entry aggregation live in a future learning.prediction_tracking method, or be added to this one?"
-    owner: "operator, or whoever next builds calibration analysis over a set of entries"
+    resolution: "RESOLVED. Built as a separate method (specs/cognitive/typed-objects/prediction-tracking-record.schema.yaml) -- a bare single prediction, no options structure, not added to this schema. Cross-entry calibration-curve aggregation is Atlas's own separate F10 'Confidence Calibration' row (L578), still not built."
+    owner: "operator, or whoever next builds F10 Confidence Calibration"
     blocks: "nothing in this file's own validity -- this method's own scope stays one entry at a time"
 
 verification:

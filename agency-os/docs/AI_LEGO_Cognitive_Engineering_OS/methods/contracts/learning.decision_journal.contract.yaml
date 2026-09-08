@@ -117,7 +117,7 @@ compilation_decisions:
 
 open_questions:
   - "OQ-DECISIONJOURNAL-1: Should DecisionRef be upgraded to a hard ^DEC- pattern or $ref once a real Decision record commonly exists at journal-entry time, matching OQ-REVERSALCRITERIA-1's own open question for a sibling method?（owner: operator）"
-  - "OQ-DECISIONJOURNAL-2: Atlas L809's sibling row 'Prediction Tracking' (prediction→horizon→actual→error→改善calibration) looks like a natural consumer of many entries' outcome values (a calibration curve across a whole journal). Should that cross-entry aggregation become a future learning.prediction_tracking method, or be added to this one?（owner: operator）"
+  - "OQ-DECISIONJOURNAL-2: RESOLVED. Built as a separate method (methods/contracts/learning.prediction_tracking.contract.yaml, F17 9th/LAST member) -- a bare single prediction with no options structure, distinct from this method's own >=2-option choice-record scope, not added here. Cross-entry calibration-curve aggregation itself is Atlas's own separate F10 'Confidence Calibration' row (L578), still not built.（owner: operator）"
   - "OQ-DECISIONJOURNAL-3: cognitive_primitives [DECIDE, FORECAST, REFLECT] is this file's own inference, not a cited Atlas composition formula.（owner: operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written）"
 
 verification:

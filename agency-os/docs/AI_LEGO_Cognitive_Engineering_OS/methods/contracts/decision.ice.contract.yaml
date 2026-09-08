@@ -1,0 +1,119 @@
+$id: "ai-lego://methods/contracts/decision.ice.contract.yaml"
+title: "ICE (Impact x Confidence x Ease) Scoring Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 entry, `decision` family (F16), third member after `decision.ahp`
+  and `decision.mcda`. Atlas F16 tool table ICE row (L761 --
+  "Impact×Confidence×Ease｜統一尺度評分｜快速粗排") is this method's ONLY
+  citation, no dedicated section (grep-confirmed) and no §22.3
+  Method-specific Gate row (grep-confirmed, L4142-4155) -- so, unlike
+  `decision.mcda`, `forbidden_transition` is genuinely empty here.
+
+  Due-diligence vs `decision.mcda` (read in full before writing): MCDA is
+  a general N-criteria, caller-weighted, per-run RELATIVE-normalization
+  engine (options minItems:2). ICE is structurally different, not "MCDA
+  with 3 fixed equal-weight criteria": exactly 3 fixed named dimensions,
+  no caller-supplied weights, and each item's score is an ABSOLUTE
+  function of only its own 3 dimensions (items minItems:1) -- reuse was
+  considered and rejected; see compilation_decisions.
+
+  Core invariants: (1) impact/confidence/ease each a finite, non-boolean
+  number in [1,10] -- Sean Ellis's published ICE convention, not
+  Atlas-cited; (2) every item's ice_score is GENUINE_COMPUTE, the
+  arithmetic mean of its own 3 dimensions, independently re-derived (not
+  trusted) at the gate, same for ranking[] against its own items[].
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, ICE row (L761): 'Impact×Confidence×Ease｜統一尺度評分｜快速粗排' -- this method's ONLY citation, no dedicated section (grep-confirmed absent)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155) -- grep-confirmed no ICE row exists (contrast decision.mcda's own L4154 row)"
+  - "methods/contracts/decision.mcda.contract.yaml + ai_lego/modules/decision/mcda.py -- read in full for due-diligence; grounds the reuse-vs-distinct decision below"
+  - "methods/registry/method-inventory.yaml 'ICE' entry (F16 decision) -- no machine_id recorded there; this contract mints one"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  methods/registry/contract-backlog.yaml tier_1, same class of
+  justification as every decision-family sibling entry (mandated by the
+  actively-running implementation slice). id: decision.ice mints a new
+  machine_id, third member of the decision family (F16), built alongside
+  decision.impact_effort and decision.rice in the same batch (each its
+  own distinct machine_id, own module -- no shared file touched).
+
+id: decision.ice
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [CALCULATE, PRIORITIZE]
+# INFERRED, not cited -- Atlas §4 (L192) names no primitive formula for
+# ICE. CALCULATE: the genuine arithmetic-mean compute. PRIORITIZE: Atlas's
+# own literal benefit text for this row, "快速粗排" (quick rough sort).
+# Deliberately EXCLUDES WEIGHT (no caller-supplied weighting stage, the
+# real structural difference from decision.mcda/decision.ahp) and COMPARE
+# (no cross-item normalization -- each item's score is absolute).
+
+purpose:
+  - score_and_rank_backlog_items_by_impact_confidence_ease
+
+inputs:
+  required: [Context, Items]
+  optional: []
+
+outputs: [IceScoreRecord]
+# NEW output type (see typed-objects/ice-score-record.schema.yaml).
+# Deliberately named *-record, not *-analysis (AhpAnalysis/MCDAAnalysis's
+# own suffix) -- see that schema's own compilation_decisions for why.
+
+preconditions:
+  - "every items[] entry supplies exactly id/label/impact/confidence/ease -- ice_score is never a caller-supplied input"
+  - "impact/confidence/ease are each a finite, non-boolean number in [1, 10]"
+  - "every items[] id is unique within the record"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class of departure decision.ahp/decision.mcda already document:
+  # this method's real risk is score-tampering/out-of-range dimensions
+  # (enforced by the ice_integrity gate below), not omitted evidence
+  # citations for individual ratings.
+
+forbidden_transition: []
+# Atlas §22.3's gate table has no ICE row (grep-confirmed, L4142-4155) --
+# genuinely empty, not an oversight. Contrast decision.mcda's own
+# table-cited "Automatic Authority" rule (L4154): that citation does not
+# exist for this method, so no automatic-authority gate is invented here.
+
+recommended_next: []
+# Atlas names no recommended_next method for ICE specifically. Left
+# genuinely empty rather than inventing one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Reuse decision.mcda (3 fixed equal-weight criteria) or build distinct?"
+    decision: "Distinct -- absolute per-item scoring (minItems:1, no cross-item normalization) vs MCDA's relative per-run normalization (minItems:2); no caller-supplied weights at all vs MCDA's required weights[] summing to 1.0."
+  - question: "1-10 per-dimension scale and arithmetic-mean formula -- Atlas-cited or external?"
+    decision: "External (Sean Ellis's published ICE convention) -- Atlas names only the 3 factors, no scale or formula. Mean chosen over the product (1-1000 range) some secondary sources also describe, because only the mean keeps the output on Atlas's own cited '統一尺度評分' (unified) scale."
+  - question: "Should ice_score be accepted as a caller-supplied input field, matching how MCDA accepts raw_scores?"
+    decision: "No -- computed and appended by the builder only; input items carry exactly id/label/impact/confidence/ease, an extra ice_score key is refused."
+
+open_questions:
+  - "OQ-ICE-1: Some secondary sources describe ICE as Impact*Confidence*Ease (product, range 1-1000) rather than the mean implemented here -- should a future revision add the product as a named alternative if a concrete need or Atlas revision calls for it?（owner: operator）"
+  - "OQ-ICE-2: id: decision.ice mints a machine_id method-inventory.yaml's own ICE entry (F16 decision) never carried -- should that entry be updated, the same open question every decision-family sibling entry already raised and left unresolved?（owner: operator, or a future session with explicit write scope over method-inventory.yaml）"
+
+verification:
+  method: >
+    Read Atlas F16 tool table ICE row (L761) directly. Grepped the whole
+    document for a dedicated ICE section (none found beyond the table
+    row) and for a §22.3 gate-table row (L4142-4155, none found). Read
+    decision.mcda.contract.yaml and ai_lego/modules/decision/mcda.py in
+    full before writing this contract (due diligence against the most
+    structurally similar sibling) -- confirmed genuinely distinct shape,
+    not a duplicate (see compilation_decisions). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 3 named dimensions are Atlas
+    L761's own literal factors; the 1-10 scale and mean formula are
+    Sean Ellis's own published external convention, disclosed as such,
+    not Atlas-cited and not invented by this codebase.

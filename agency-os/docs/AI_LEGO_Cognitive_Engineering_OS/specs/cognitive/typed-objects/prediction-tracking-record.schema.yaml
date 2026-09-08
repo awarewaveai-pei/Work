@@ -1,0 +1,257 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/prediction-tracking-record.schema.yaml"
+title: Prediction Tracking Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical definition of `PredictionTrackingRecord`, learning.prediction_tracking's declared outputs (F17
+  learning family, 9th and LAST concrete entry -- closes F17 9/9). Atlas F17 L809: "Prediction Tracking |
+  預測 vs 實際 | prediction→horizon→actual→error | 改善 calibration" -- this method's only citation. A
+  two-STAGE, tamper-evident record like `decision-journal-entry.schema.yaml`, but a bare single prediction
+  (no options/choice structure) with a type-discriminated shape (`PROBABILITY` -> Brier score,
+  `POINT_ESTIMATE` -> absolute/relative error). See `ai_lego/modules/learning/prediction_tracking.py`'s
+  module docstring for the full due-diligence trail and design rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F17 table row (L809): 'Prediction Tracking | 預測 vs 實際 | prediction→horizon→actual→error | 改善 calibration'"
+  - "methods/contracts/learning.prediction_tracking.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/decision-journal-entry.schema.yaml -- the stage1_integrity_hash tamper-evidence pattern this file's own single hash field reuses"
+  - "ai_lego/core/support.py (sha256_json/canonical_json -- the hash primitive this file's stage1_integrity_hash records the result of)"
+  - "ai_lego/compute/prediction_tracking/error.py (compute_prediction_error -- the pure function this file's error field records the result of)"
+
+decided_by: >
+  No ADR governs this file. Low-risk compilation choices, same bar every sibling typed-object schema in
+  this directory documents (see compilation_decisions below and the method contract's own).
+
+$defs:
+  actual_record:
+    type: object
+    required: [observed_value, observed_outcome, provenance, recorded_at]
+    additionalProperties: false
+    description: >
+      STAGE 2, attached later via record_actual(). Closed key set with BOTH observed_value/observed_outcome
+      always present -- exactly one is non-null, matching the record's own prediction_type (enforced at the
+      runtime layer, not here).
+    properties:
+      observed_value:
+        type: ["number", "null"]
+        description: "Non-null iff prediction_type == POINT_ESTIMATE; null when PROBABILITY."
+      observed_outcome:
+        type: ["boolean", "null"]
+        description: "Non-null iff prediction_type == PROBABILITY (did the predicted event occur); null when POINT_ESTIMATE."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      recorded_at:
+        type: string
+        minLength: 1
+        description: "When the actual was observed/recorded. Not independently tamper-hash-verified against backdating -- see contract OQ-PREDICTIONTRACKING-1."
+
+  error_record:
+    type: object
+    required: [metric, value, relative_value]
+    additionalProperties: false
+    description: >
+      GENUINE COMPUTE -- never caller-supplied, always the output of compute_prediction_error, independently
+      re-derived by evaluate_genuine_compute_gate on every call (see method module docstring DESIGN #2).
+    properties:
+      metric:
+        type: string
+        enum: [BRIER_SCORE, ABSOLUTE_ERROR]
+        description: "Which formula ran -- BRIER_SCORE for PROBABILITY predictions, ABSOLUTE_ERROR for POINT_ESTIMATE."
+      value:
+        type: number
+        minimum: 0
+        description: "The primary error number: the Brier score itself ([0,1]) or the absolute error (>=0, unbounded)."
+      relative_value:
+        type: ["number", "null"]
+        minimum: 0
+        description: "POINT_ESTIMATE only: value / abs(observed_value). Always null for BRIER_SCORE, and null (undefined, never inf/nan) when observed_value == 0."
+
+type: object
+required:
+  [
+    id,
+    version,
+    statement,
+    prediction_type,
+    predicted_probability,
+    predicted_value,
+    horizon,
+    provenance,
+    stage1_integrity_hash,
+    actual,
+    error,
+    engine,
+    computation_provenance_ref,
+  ]
+properties:
+  id:
+    type: string
+    pattern: "^PREDICT-"
+    description: "NEW DESIGN. Deliberately distinct from decision-journal-entry.schema.yaml's own ^DJ- prefix (a PredictionTrackingRecord is not a DecisionJournalEntry -- see due-diligence in the method module docstring)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "learning.prediction_tracking"
+
+  statement:
+    type: string
+    minLength: 1
+    description: "Atlas L809 element 1 (prediction), textual form: free-text description of what is being predicted. Same free-text, no-required-structure convention decision-journal-entry.schema.yaml's own `forecast` field establishes."
+
+  prediction_type:
+    type: string
+    enum: [PROBABILITY, POINT_ESTIMATE]
+    description: "Discriminates which of predicted_probability/predicted_value (and later observed_outcome/observed_value, and the error.metric formula) applies."
+
+  predicted_probability:
+    type: ["number", "null"]
+    minimum: 0
+    maximum: 1
+    description: "Atlas L809 element 1, numeric form. Non-null iff prediction_type == PROBABILITY; null when POINT_ESTIMATE (enforced at the runtime layer; the allOf conditional below is schema-level belt-and-suspenders for this one pairing, same selective-scoping decision-journal-entry.schema.yaml's own options contains/minContains/maxContains constraint demonstrates)."
+
+  predicted_value:
+    type: ["number", "null"]
+    description: "Atlas L809 element 1, numeric form. Non-null iff prediction_type == POINT_ESTIMATE; null when PROBABILITY."
+
+  horizon:
+    type: string
+    minLength: 1
+    description: "Atlas L809 element 2: the stated future check-in point, free text (e.g. a date, or a milestone description). Not format-validated -- same disclosed scope post-mortem-record.schema.yaml's own timestamp field documents for a different method."
+
+  provenance:
+    description: "The STATEMENT's own provenance (stage 1) -- e.g. HYPOTHESIS, a claim about the future not yet verified. NOT the error's provenance -- see method contract compilation_decisions for why evaluate_genuine_compute_gate does not check this against CALCULATED_RESULT."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  stage1_integrity_hash:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+    description: "sha256_json hex digest over exactly {statement, prediction_type, predicted_probability, predicted_value, horizon} as they existed at stage-1 construction. Re-derived and compared by evaluate_prediction_commitment_integrity_gate on every gate run -- see method module docstring DESIGN #1."
+
+  actual:
+    description: "STAGE 2, attached later via record_actual() -- null until (and unless) the actual is known. Write-once: never overwritten once set (enforced by the method module, not by this schema alone)."
+    oneOf:
+      - type: "null"
+      - $ref: "#/$defs/actual_record"
+
+  error:
+    description: "GENUINE COMPUTE, attached together with actual by record_actual() -- null until actual is known. See $defs/error_record."
+    oneOf:
+      - type: "null"
+      - $ref: "#/$defs/error_record"
+
+  engine:
+    type: ["string", "null"]
+    default: null
+    description: "'local_python_deterministic_compute' once actual/error are attached; null at stage 1 (nothing computed yet). Same literal decision.mcda/computation.monte_carlo use for their own single-stage records."
+
+  computation_provenance_ref:
+    type: ["string", "null"]
+    default: null
+    description: "'ai_lego.compute.prediction_tracking.error.compute_prediction_error' once attached; null at stage 1."
+
+allOf:
+  - if:
+      properties: { prediction_type: { const: PROBABILITY } }
+      required: [prediction_type]
+    then:
+      properties: { predicted_probability: { type: number }, predicted_value: { const: null } }
+  - if:
+      properties: { prediction_type: { const: POINT_ESTIMATE } }
+      required: [prediction_type]
+    then:
+      properties: { predicted_value: { type: number }, predicted_probability: { const: null } }
+
+examples:
+  - description: >
+      PROBABILITY prediction, stage 2 complete -- a real, invented-but-disclosed forecast about this
+      package's own architecture (same "grounded theme, disclosed invented specifics" convention every
+      prior CLI slice in this package uses). Brier score computed for real via
+      ai_lego.compute.prediction_tracking.error.compute_prediction_error, not hand-typed:
+      (0.65 - 1.0)**2 = 0.1225.
+    value:
+      id: "PREDICT-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "learning.prediction_tracking"
+      statement: "Cognitive OS Phase 5 runtime will handle real manifest-execution retry load without needing a managed queue service."
+      prediction_type: "PROBABILITY"
+      predicted_probability: 0.65
+      predicted_value: null
+      horizon: "2026-12-31 (end of Q4 2026)"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null }
+      stage1_integrity_hash: "5bb3a4980deabfb7e93cbadb777eccfa5721ae66bd94625e5da37d7ea20aa205"
+      actual:
+        observed_value: null
+        observed_outcome: true
+        provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null }
+        recorded_at: "2026-12-30T00:00:00Z"
+      error: { metric: "BRIER_SCORE", value: 0.1225, relative_value: null }
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.prediction_tracking.error.compute_prediction_error"
+  - description: >
+      POINT_ESTIMATE prediction, stage 2 complete -- absolute/relative error computed for real:
+      abs(3.0 - 3.4) = 0.4, relative 0.4 / abs(3.4) = 0.11764706 (rounded to 8dp, matching
+      compute_prediction_error's own rounding).
+    value:
+      id: "PREDICT-2026-09-08-002"
+      version: "1.0.0"
+      generated_by_method: "learning.prediction_tracking"
+      statement: "The F17 learning family batch (9 methods) will take under 3 hours of wall-clock session time to complete."
+      prediction_type: "POINT_ESTIMATE"
+      predicted_probability: null
+      predicted_value: 3.0
+      horizon: "when this build session ends"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null }
+      stage1_integrity_hash: "c70b9089a3c6e94e1c8d8a1d86d2623957df3f21cd10a297118a8d1468dc5e32"
+      actual:
+        observed_value: 3.4
+        observed_outcome: null
+        provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null }
+        recorded_at: "2026-09-08T12:00:00Z"
+      error: { metric: "ABSOLUTE_ERROR", value: 0.4, relative_value: 0.11764706 }
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.prediction_tracking.error.compute_prediction_error"
+
+compilation_decisions:
+  - question: "Should predicted_probability/predicted_value (and observed_outcome/observed_value) be a single polymorphic field, or two always-present, XOR-nulled fields?"
+    decision: "Two always-present, XOR-nulled fields (predicted_probability/predicted_value; observed_outcome/observed_value)."
+    reasoning: >
+      A single polymorphic-typed field (sometimes a probability, sometimes an arbitrary number) would blur
+      [0,1]-range validation with unbounded-range validation under one schema property. Two explicitly-typed,
+      always-keyed fields keep both JSON-Schema-level range checks meaningful and match the closed-key-set,
+      always-present-but-nullable convention decision-journal-entry.schema.yaml's own `outcome` object
+      already establishes for a different two-stage field.
+  - question: "One hash (stage1) or two (decision_journal's stage1 + outcome)?"
+    decision: "One -- see method contract compilation_decisions for the full reasoning (error's own genuine-compute recompute already covers the tamper risk decision_journal's second hash exists for)."
+  - question: "Round error.value/relative_value, or store raw float precision?"
+    decision: "Round to 8 decimal places (round(x, 8)), matching ai_lego.compute.mcda.scoring.normalize_scores's own rounding convention -- avoids float-repr noise across serialize/deserialize round-trips without meaningfully losing precision for a calibration metric."
+
+open_questions:
+  - id: "OQ-PREDICTIONTRACKING-1"
+    question: "actual.recorded_at is not independently hash-verified against backdating, unlike decision_journal's outcome_integrity_hash."
+    owner: "operator"
+    blocks: "nothing in this file's own validity -- disclosed gap, see method contract"
+  - id: "OQ-PREDICTIONTRACKING-2"
+    question: "Cross-record calibration-curve aggregation (Atlas's own separate F10 'Confidence Calibration' row, L578) would consume many PredictionTrackingRecords -- not yet built."
+    owner: "operator, whoever builds F10 next"
+    blocks: "nothing in this file's own validity -- this method's own scope stays one record at a time"
+
+verification:
+  method: >
+    Read Atlas L809 (F17 table row) directly, grep-confirmed as the only citation. Read
+    decision-journal-entry.schema.yaml in full for the stage1_integrity_hash pattern this file reuses.
+    Both worked examples' stage1_integrity_hash/error values are REAL outputs of
+    generate_prediction_tracking_record/record_actual/compute_prediction_error (computed via a live Python
+    run against this package's own code, not hand-typed) -- the test suite loads equivalent fixtures and
+    re-derives the same values via evaluate_prediction_commitment_integrity_gate/evaluate_genuine_compute_gate
+    as a live regression guard, so this file cannot silently drift out of sync with the algorithms it
+    documents. Validated against jsonschema Draft202012Validator, including the allOf/if/then
+    prediction_type-conditioned belt-and-suspenders constraint.
+  note: >
+    No mother document was modified to produce this file. The type-discriminated error shape and the
+    single-hash-vs-two-hash divergence from decision_journal are disclosed compilation decisions -- see
+    method contract compilation_decisions for the full reasoning.

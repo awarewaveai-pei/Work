@@ -1,0 +1,169 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/rice-score-record.schema.yaml"
+title: RICE Score Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RiceScoreRecord` -- the declared
+  `outputs` of `decision.rice`'s Method Contract
+  (methods/contracts/decision.rice.contract.yaml, `outputs: [RiceScoreRecord]`).
+  Third `decision`-family typed object (after `AhpAnalysis`, `MCDAAnalysis`).
+  Scores exactly ONE idea per record (contrast `MCDAAnalysis`'s >= 2
+  options) -- see `ai_lego/modules/decision/rice.py`'s own due-diligence
+  module docstring for why this is the Atlas-consistent shape, not an
+  oversight.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, RICE row (L762): 'Reach×Impact×Confidence÷Effort｜產品roadmap｜納入受影響人數'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.32 RICE 優先級模型 (L2955-2966) -- formula, purpose, benefit, limit"
+  - "methods/contracts/decision.rice.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/compute/rice/scoring.py::compute_rice_score (the real arithmetic this schema's rice_score records the result of)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Atlas gives RICE zero field-level shape (no pipeline, no worked example -- contrast decision.mcda's 8-node §11.32 pipeline). What concrete shape do reach/impact/confidence/effort take?"
+    decision: "reach = {value: number >= 0, unit: non-empty string}; impact = number >= 0; confidence = number in [0,1]; effort = number > 0. No invented fixed scale/enum for impact or effort."
+    reasoning: >
+      Atlas's own text gives no enum, no worked score band (e.g. no
+      "3=massive/2=high/1=medium" the way some real-world RICE writeups
+      invent) -- inventing one here would be presenting a guess as a
+      compiled fact, the same restraint decision.mcda's own OQ-MCDA-1/
+      OQ-MCDA-2 already applied to its identically ungrounded
+      "Sensitivity" stage. `confidence` as a [0,1] fraction mirrors this
+      package's own existing convention for probability-like fields
+      (mcda-analysis.schema.yaml's own `weights[].weight`, bounded [0,1])
+      rather than inventing a fresh 0-100 integer-percent convention with
+      no precedent in this codebase.
+  - question: "Should reach be a bare number (like impact/effort), or a structured {value, unit} object?"
+    decision: "Structured {value, unit}, unit required non-empty."
+    reasoning: >
+      Atlas's F16 table benefit column for RICE (L762) is specifically
+      "納入受影響人數" (incorporates the NUMBER OF PEOPLE AFFECTED) -- a
+      bare unlabeled number cannot satisfy this cited benefit: "500" is
+      not comparable across roadmap ideas without knowing whether it
+      means 500 users/quarter, 500 users/year, or 500 total signups ever.
+      This is the one field Atlas's own text gives a concrete, citable
+      reason to structure beyond a bare number; `impact`/`effort` have no
+      equivalent citation and are left as bare numbers accordingly (a
+      disclosed asymmetry, not a symmetric decision -- see
+      open_questions on whether `effort` should eventually get the same
+      treatment).
+  - question: "Atlas §12.32's own limit line (L2965, '限制：分數是 decision aid，不是 authority') is the RICE-family equivalent of §22.3's MCDA row, but RICE has no §22.3 gate-table row of its own (grepped exhaustively: 3 whole-document hits for 'RICE', none near L4154). Should this schema still carry the same additionalProperties:false + forbidden-authority-key structural enforcement decision.mcda/mcda-analysis.schema.yaml already use?"
+    decision: "Yes -- same structural enforcement, cited from §12.32 instead of §22.3."
+    reasoning: >
+      The governing concern (a computed priority score must never carry a
+      top-level key asserting it IS the decision) is identical; only the
+      citation LOCATION differs (the method's own dedicated section vs.
+      the cross-cutting gate table). Atlas's own §12.32 text is exactly as
+      explicit ("不是 authority") as §22.3's row wording ("禁止直接輸出:
+      Automatic Authority") -- a real citation, not an inferred absence,
+      just from a different location.
+
+type: object
+required: [id, version, idea, reach, impact, confidence, effort, rice_score, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^RICE-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as mcda-analysis.schema.yaml's MCDA- / fault-tree-record.schema.yaml's FAULTTREE- prefixes."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.rice"
+
+  idea:
+    type: object
+    required: [id, label]
+    additionalProperties: false
+    description: "The single roadmap idea this record scores -- RICE's natural unit is one idea, not a compared option set (contrast MCDAAnalysis.options[], minItems 2)."
+    properties:
+      id: {type: string}
+      label: {type: string}
+
+  reach:
+    type: object
+    required: [value, unit]
+    additionalProperties: false
+    description: "Atlas F16 table (L762) benefit column: '納入受影響人數'. `unit` is REQUIRED non-empty (e.g. 'users/quarter') -- an unlabeled value cannot satisfy this cited benefit. See compilation_decisions."
+    properties:
+      value: {type: number, minimum: 0}
+      unit: {type: string, minLength: 1}
+
+  impact:
+    type: number
+    minimum: 0
+    description: "Atlas §12.32 (L2960) 'Impact' factor. Unitless multiplier, no invented fixed scale -- see compilation_decisions."
+
+  confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Atlas §12.32 (L2960) 'Confidence' factor, modeled as a fraction in [0,1] -- see compilation_decisions."
+
+  effort:
+    type: number
+    exclusiveMinimum: 0
+    description: "Atlas §12.32 (L2960) 'Effort' factor -- the DIVISOR. Must be strictly > 0 (RICE_NONPOSITIVE_EFFORT, rejected explicitly, never silently floored -- see ai_lego/compute/rice/scoring.py::compute_rice_score)."
+
+  rice_score:
+    type: number
+    minimum: 0
+    description: "COMPUTED, never caller-supplied -- (reach.value * impact * confidence) / effort, rounded to 8 decimal places. Re-derived and compared by evaluate_rice_genuine_compute_gate, never trusted as a stored value."
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed rice_score -- same convention every genuine-compute typed object in this directory establishes."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine RICE run -- same design choice mcda-analysis.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "One roadmap idea: in-app onboarding checklist, reach in users/quarter, moderate confidence, effort in person-weeks"
+    value:
+      id: "RICE-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.rice"
+      idea: {id: "IDEA-1", label: "新用戶 onboarding checklist"}
+      reach: {value: 1200, unit: "users/quarter"}
+      impact: 2
+      confidence: 0.8
+      effort: 3
+      rice_score: 640.0
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.rice.scoring.compute_rice_score"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-RICESCORERECORD-1"
+    question: "impact/confidence/effort carry no fixed scale/enum (see compilation_decisions) -- should a future revision define one once Atlas or a worked example gives a citable band?"
+    owner: "operator, or whoever next finds a worked RICE scale example in Atlas or a future revision"
+    blocks: "nothing in this file's own validity -- the open, unconstrained-but-bounded numeric fields are the more conservative, less-invented choice"
+
+verification:
+  method: >
+    Read Atlas F16 tool table RICE row (L762) and §12.32 (L2955-2966)
+    directly at the cited lines. Grepped `specs/` and `methods/`
+    exhaustively for "rice"/"reach" before writing -- all hits were either
+    this file's own new content or bare table-row mentions with no defined
+    shape (no duplicate typed object found). Validated against jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. `idea`/`reach`/`impact`/`confidence`/
+    `effort`/`rice_score` field names are Phase 3 compilation (Atlas gives
+    the formula and the Reach benefit-column citation only, no field
+    shape) -- disclosed above in compilation_decisions/open_questions, not
+    a silent invention.
