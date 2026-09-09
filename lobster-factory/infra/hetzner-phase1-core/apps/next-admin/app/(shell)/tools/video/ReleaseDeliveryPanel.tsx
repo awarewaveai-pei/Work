@@ -43,13 +43,22 @@ export default function ReleaseDeliveryPanel() {
     setCandidateChecksum(asset?.checksum_sha256 ?? "");
     setQaItems([]); setReports("[]");
     if (!assetId || !organizationId.trim()) return;
+    const checksum = asset?.checksum_sha256 ?? "";
+    if (checksum.length >= 16 && checksum.length <= 128) {
+      // Selecting a candidate is the single explicit trigger for deterministic
+      // editorial/rights QA; the API derives evidence from tenant-owned metadata.
+      await fetch("/api/video/qa/editorial-rights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: organizationId.trim(), candidateAssetId: assetId, candidateChecksum: checksum }),
+      });
+    }
     const res = await fetch(`/api/video/qa/reports?organizationId=${encodeURIComponent(organizationId.trim())}&candidateAssetId=${encodeURIComponent(assetId)}`);
     const json = await res.json().catch(() => ({})) as { items?: typeof qaItems };
-    if (res.ok) {
-      const items = json.items ?? [];
-      setQaItems(items);
-      setReports(JSON.stringify(items.map((item) => ({ id: item.id, kind: item.kind, status: item.status, candidateAssetId: item.candidateAssetId, candidateChecksum: item.candidateChecksum, profileId: item.profileId, profileVersion: item.profileVersion })), null, 2));
-    }
+    if (!res.ok) return;
+    const items = json.items ?? [];
+    setQaItems(items);
+    setReports(JSON.stringify(items.map((item) => ({ id: item.id, kind: item.kind, status: item.status, candidateAssetId: item.candidateAssetId, candidateChecksum: item.candidateChecksum, profileId: item.profileId, profileVersion: item.profileVersion })), null, 2));
   }
 
   async function call(path: string, body: Record<string, unknown>) {
