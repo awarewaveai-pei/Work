@@ -13686,3 +13686,11 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REALTEST_EVIDENCE: Python unittest `8/8`；next-admin typecheck exit=0；Vitest `78 files / 764 tests`；Next build exit=0（既有 symlink traced-files EPERM 警告）。
 - PRODUCTION_DB: 先完成 public-schema custom-format backup `/tmp/supabase-public-20260909T071635Z.dump`（SHA-256 `23acb9c15d...`），再以 `ON_ERROR_STOP=1` 套用 migrations 0065/0066；`information_schema` 已確認七張表，`pg_proc` 已確認 `media_credit_reserve`，目前 row count 為 0。
 - LIMIT: production `MEDIA_PRODUCTION_PERSISTENCE_ENABLED`/outcome flags 仍未啟用；Whisper video worker、字幕自動 report、footage source asset registration/proxy、dedicated footage renderer 與 Release delivery UI 尚未完成；不宣稱平台已完整。
+
+## 2026-09-09 Video LEGO production persistence activation
+
+- Production DB safety: `pg_dump --format=custom --schema-only --schema=public --no-owner --no-acl` succeeded to `/tmp/supabase-public-20260909T071635Z.dump` (333625 bytes; SHA-256 `23acb9c15d...`). Full dump was rejected by Supabase `auth` schema permissions and was not retried with elevated credentials.
+- Applied migrations 0065/0066 to `supabase-db` with `ON_ERROR_STOP=1`; verified `media_qa_reports`, `media_releases`, `media_delivery_attempts`, `media_outcome_snapshots`, `media_billing_accounts`, `media_credit_ledger`, `media_provider_profiles` and function `media_credit_reserve`.
+- Added compose feature-flag wiring in code commit `9f904d090`; production config backup `/root/lobster-phase1/docker-compose.yml.bak-20260909T072812Z`; loaded `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true` into `lobster-next-admin`. `MEDIA_OUTCOME_WEBHOOK_ENABLED=false` remains disabled pending token/canary.
+- Restart verification: `lobster-next-admin` healthy; `/login` returned expected 307 auth redirect. Existing production services were not restarted.
+- Docs synced in `agency-os/docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md` and `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`; docs commit `f3225fd50` pushed to `video-docs-20260909`.

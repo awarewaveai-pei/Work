@@ -205,7 +205,7 @@ The immediate executable work is **Phase 0, then Phase 1**. Phase 2–4 contract
 
 ## 2026-09-09 implementation slice
 
-- `0b79deecc`: `packages/db/migrations/0065_media_production_persistence.sql` plus rollback script. Apply only after isolated Supabase rehearsal.
+- `0b79deecc`: `packages/db/migrations/0065_media_production_persistence.sql` plus rollback script. Applied on ks-aw-01 after public-schema backup and `ON_ERROR_STOP=1`; down script remains the rollback path.
 - `delivery-receipts.ts`: idempotent service-role adapter; disabled until `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`.
 - Postiz route and WordPress embed route: optional `releaseId`/`variant` receipt lifecycle with queued→drafted→published/failed transitions.
 - `FootageEditor.tsx`: VideoStudio tab for MP4 import through existing R2 route, cut points, output offsets, EDP JSON export and validated EDP→Timeline compilation.
@@ -217,4 +217,4 @@ The immediate executable work is **Phase 0, then Phase 1**. Phase 2–4 contract
 - `/api/webhooks/video-outcome` and `/api/video/outcomes`: bearer-authenticated event ingestion, deduplication and tenant dashboard read model.
 - `a93c413a0`: provider allowlist boundary; billing profile changes fail closed unless `MEDIA_PROVIDER_ALLOWLIST` explicitly permits the provider.
 
-Runtime activation requires migration 0065/0066 rehearsal, staging env flags and receipt/outcome secret provisioning. Existing Quick Engine, Remotion and publication paths remain unchanged when flags are off.
+Runtime activation status: migrations 0065/0066 are applied on ks-aw-01 and `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true` is loaded by `lobster-next-admin`; `MEDIA_OUTCOME_WEBHOOK_ENABLED=false` remains fail-closed until an ingest token and canary are recorded. Existing Quick Engine, Remotion and publication paths remain unchanged unless a Release ID is explicitly supplied.
