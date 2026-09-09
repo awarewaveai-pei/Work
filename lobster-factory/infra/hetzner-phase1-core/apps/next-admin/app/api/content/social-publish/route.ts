@@ -11,6 +11,12 @@ import {
   PLATFORM_VIDEO_FORMAT,
   type PostizMediaRef,
 } from "@/lib/content/postiz";
+import {
+  ensureDeliveryReceipt,
+  mediaPersistenceEnabled,
+  recordDeliveryReceipt,
+  type DeliveryReceipt,
+} from "@/lib/content/video/delivery-receipts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +31,9 @@ type RequestBody = {
    *  its preferred format via PLATFORM_VIDEO_FORMAT routing. */
   videoUrls?: Partial<Record<"16x9" | "9x16" | "4x5", string>>;
   confirmPublishNow?: boolean;
+  /** Optional release linkage. When supplied, Postiz receipts are persisted after migration 0065. */
+  releaseId?: string;
+  variant?: string;
 };
 
 export async function POST(req: Request): Promise<Response> {
@@ -40,10 +49,16 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const { clientId, mode, platforms, imageUrl, videoUrls, confirmPublishNow = false } = body;
+  const { clientId, mode, platforms, imageUrl, videoUrls, confirmPublishNow = false, releaseId, variant = "default" } = body;
 
   if (!clientId || typeof clientId !== "string") {
     return new NextResponse("clientId required", { status: 400 });
+  }
+  if (releaseId !== undefined && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(releaseId)) {
+    return new NextResponse("releaseId must be a UUID", { status: 400 });
+  }
+  if (typeof variant !== "string" || !variant.trim() || variant.length > 64) {
+    return new NextResponse("variant must be a non-empty string up to 64 characters", { status: 400 });
   }
   try { assertOrgAccess(req, clientId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
@@ -136,6 +151,28 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Reserve idempotent delivery rows before calling Postiz. This makes a
+  // retried request safe and guarantees every external call has a receipt.
+  const receipts = new Map<string, DeliveryReceipt>();
+  if (releaseId && mediaPersistenceEnabled()) {
+    try {
+      for (const post of requestedPosts) {
+        const receipt = await ensureDeliveryReceipt({
+          organizationId: clientId,
+          releaseId,
+          destination: "postiz",
+          variant: `${variant}:${post.platform}`,
+        });
+        if (receipt) receipts.set(post.platform, receipt);
+      }
+    } catch (err) {
+      return NextResponse.json(
+        { ok: false, error: err instanceof Error ? err.message : "failed to reserve delivery receipt" },
+        { status: 503 },
+      );
+    }
+  }
+
   let media: PostizMediaRef | undefined;
   if (imageUrl) {
     try {
@@ -192,5 +229,28 @@ export async function POST(req: Request): Promise<Response> {
 
   const results = await createSocialPost({ clientId, mode, posts: requestedPosts, media, mediaPerPlatform });
 
-  return NextResponse.json({ ok: true, results, skipped });
+  let receiptError: string | undefined;
+  if (receipts.size > 0) {
+    for (const result of results) {
+      const receipt = receipts.get(result.platform);
+      if (!receipt) continue;
+      try {
+        const event = result.status === "ok"
+          ? { type: mode === "draft" ? "drafted" : "published", externalId: result.postizPostId } as const
+          : { type: "failed" } as const;
+        const first = await recordDeliveryReceipt(
+          receipt,
+          mode === "now" && result.status === "ok" ? { type: "drafted", externalId: result.postizPostId } : event,
+          { mode, platform: result.platform, integrationId: result.integrationId, result },
+        );
+        if (mode === "now" && result.status === "ok" && first) {
+          await recordDeliveryReceipt(first, { type: "published", externalId: result.postizPostId }, { mode, platform: result.platform, result });
+        }
+      } catch (err) {
+        receiptError = err instanceof Error ? err.message : "failed to persist delivery receipt";
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, results, skipped, ...(receiptError ? { receiptError } : {}) });
 }

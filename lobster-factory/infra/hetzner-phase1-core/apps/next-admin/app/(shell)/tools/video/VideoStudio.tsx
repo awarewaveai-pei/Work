@@ -9,6 +9,8 @@ import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { tabStyle, chipStyle } from "@/components/tools/panel-primitives";
 import TimelineValidationPanel from "./TimelineValidationPanel";
+import FootageEditor from "./FootageEditor";
+import MediaOperationsPanel from "./MediaOperationsPanel";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
@@ -248,7 +250,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
-  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion" | "timeline">(remotionInitial ? "remotion" : "generate");
+  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion" | "timeline" | "footage" | "operations">(remotionInitial ? "remotion" : "generate");
 
   // Auto-switch to Remotion tab when a script prefill arrives from ScriptForge
   useEffect(() => { if (remotionInitial) setStudioTab("remotion"); }, [remotionInitial]);
@@ -594,6 +596,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
           { id: "generate" as const, label: "生成影片" },
           { id: "remotion" as const, label: "Remotion 模板" },
           { id: "timeline" as const, label: "Timeline 驗證" },
+          { id: "footage" as const, label: "實拍剪輯" },
+          { id: "operations" as const, label: "營運成效" },
           { id: "history"  as const, label: "生成記錄" },
           { id: "info"     as const, label: "說明 & 成本" },
         ]).map((t) => (
@@ -1154,6 +1158,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
       {/* ── Remotion 模板 tab ── */}
       {studioTab === "remotion" && <RemotionStudio scriptPrefill={remotionInitial} />}
       {studioTab === "timeline" && <TimelineValidationPanel />}
+      {studioTab === "footage" && <FootageEditor />}
+      {studioTab === "operations" && <MediaOperationsPanel />}
 
     </div>
   );
