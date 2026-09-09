@@ -7,6 +7,7 @@
 - Release QA gate, receipt state machine and outcome event contract exist.
 - `438efd9cc` adds real-footage audio replacement and caption burn-in, plus tenant-scoped deterministic editorial/rights QA persistence.
 - `2c64794b3` adds bounded outcome ranking and a Stripe-shaped payment adapter boundary; no card data is handled by next-admin.
+- `297ae36ef` wires `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` into the production next-admin compose environment with empty fail-closed defaults; it does not change existing meeting or renderer behavior.
 - Commit `035a32788` adds automatic render QA persistence, SHA-256 output identity, real-footage asset/QA pickers, and a dedicated `/api/video/footage/render` → video-service `/render-footage` path. It is deployed to production next-admin and video-service.
 
 ## Remaining runtime gaps (exact)
@@ -35,7 +36,7 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 
 ### 2026-09-09 implementation continuation
 
-- Code worktree commits: `438efd9cc` and `2c64794b3`; next-admin typecheck and full Vitest suites pass. Both commits are on `origin/main`; next-admin and video-service are deployed from `2c64794b3`.
+- Code worktree commits: `438efd9cc`, `2c64794b3` and `297ae36ef`; next-admin typecheck and full Vitest suites pass. All commits are on `origin/main`; next-admin and video-service are deployed from `2c64794b3`, with compose env wiring deployed in `297ae36ef`.
 - `/api/video/footage/render` now accepts one full-duration audio track and one bounded caption track; video-service materializes, replaces audio, burns captions, then runs the existing technical/signal QA. Production canary `df9e47be00a0467caa68798dd973a3ac` produced `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/canary_audio_caption_20260909/16x9.mp4`; ffprobe shows H.264 + AAC and the extracted frame contains the burned caption.
 - `/api/video/qa/editorial-rights` verifies tenant-owned assets and persists immutable editorial/rights evidence. Missing script, forbidden terms, missing license/source references, non-cleared or expired rights fail closed.
 - `/api/video/outcomes` returns `rankedReleases`; `/api/video/billing/checkout` and `/api/webhooks/video-billing` are provider-shaped and remain disabled until Stripe configuration is present.
@@ -45,6 +46,11 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 - `POST http://127.0.0.1:8732/render-footage` with one HTTPS clip, one full-duration audio track and one caption cue returned HTTP 202 (`jobId=df9e47be00a0467caa68798dd973a3ac`).
 - Job completed `status=done`; output `16x9` is 1920×1080, H.264 + AAC, 839238 bytes, checksum `850b94d31eaaf406aa1e33f6a68e19699a7735f728123b9ab2c87353c54b4076`; technical QA and signal QA both passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).
 - A frame extracted from the public output at 0.40s visibly contains `canary audio caption`; this proves the caption filter is applied in the deployed renderer.
+
+### Production environment wiring — 2026-09-09 10:01 UTC
+
+- `sg-deploy.sh next-admin` deployed `297ae36efaa5744b32da31e603dde1b0e85ccb65`; typecheck, 82-file/773-test suite, build, health and 4/4 smoke passed. Rollback snapshot: `lobster-phase1-next-admin:rollback-20260909-100102`.
+- The container now receives `MEDIA_TRANSCRIBE_WORKER_URL` and `MEDIA_TRANSCRIBE_WORKER_TOKEN` (both empty in production), so future tunnel configuration is a controlled environment change; current dispatch remains an intentional 503.
 
 ### Runtime correction — 2026-09-09 08:20 UTC
 

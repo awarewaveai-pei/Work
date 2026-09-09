@@ -13761,3 +13761,13 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=token storage, local restart, auth boundary.
 - BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=VIDEO_WORKER_TOKEN|MEDIA_TRANSCRIBE_WORKER_URL|hits=22.
 - LIMIT: this proves the laptop worker is protected and usable locally; it is still not reachable from ks-aw-01. The remaining solution is a durable authenticated HTTPS ingress (Cloudflare Tunnel or equivalent) plus production `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` configuration.
+
+## 2026-09-09 Video LEGO production environment wiring
+
+- `297ae36ef` wires `MEDIA_TRANSCRIBE_WORKER_URL` and `MEDIA_TRANSCRIBE_WORKER_TOKEN` into the canonical next-admin compose environment with empty fail-closed defaults; `.env.example` now documents the activation gate.
+- Production deployment via `/root/lobster-phase1/scripts/sg-deploy.sh next-admin` completed at 10:01 UTC; rollback snapshot `lobster-phase1-next-admin:rollback-20260909-100102`; existing Quick Engine, Remotion and video-service containers were not restarted.
+- REALTEST_EVIDENCE: tool=SSH|cmd=sg-deploy.sh next-admin|exit=0|ms=~21000|observed=tsc pass, Vitest 82/773 pass, build pass, health pass, smoke 4/4, deployed commit 297ae36ef.
+- REALTEST_EVIDENCE: tool=curl|cmd=POST https://app.aware-wave.com/api/video/transcription/dispatch and /api/video/billing/checkout without session|exit=0|ms=2900|observed=both 401; https://video-svc.aware-wave.com/health=200.
+- REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=compose env defaults, fail-closed behavior, existing service compatibility.
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=MEDIA_TRANSCRIBE_WORKER_URL|MEDIA_TRANSCRIBE_WORKER_TOKEN|hits=24.
+- LIMIT: no production worker URL/token was fabricated or injected; the container is wired and remains safely disabled until a durable authenticated HTTPS ingress exists.
