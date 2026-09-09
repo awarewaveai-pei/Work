@@ -5,6 +5,8 @@
 - Quick Engine, native 16:9/9:16/4:5 render, R2 storage, Remotion dynamic slideshow and Postiz/WordPress routes remain available.
 - Timeline v1 validation/compile/submit and caption cue rendering exist under `apps/next-admin/lib/content/video/` and `/api/video/timeline/*`.
 - Release QA gate, receipt state machine and outcome event contract exist.
+- `438efd9cc` adds real-footage audio replacement and caption burn-in, plus tenant-scoped deterministic editorial/rights QA persistence.
+- `2c64794b3` adds bounded outcome ranking and a Stripe-shaped payment adapter boundary; no card data is handled by next-admin.
 - Commit `035a32788` adds automatic render QA persistence, SHA-256 output identity, real-footage asset/QA pickers, and a dedicated `/api/video/footage/render` → video-service `/render-footage` path. It is deployed to production next-admin and video-service.
 
 ## Remaining runtime gaps (exact)
@@ -13,13 +15,13 @@
 |---|---|---|
 | Database activation | 0065/0066 applied to production `supabase-db` on 2026-09-09 after public-schema custom-format backup `/tmp/supabase-public-20260909T071635Z.dump` (SHA-256 `23acb9c15d...`) and `ON_ERROR_STOP=1`; all seven tables and `media_credit_reserve` verified | Keep migration ledger, run RLS/restore proof and retain down scripts |
 | Feature activation | Production `lobster-next-admin` now has `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`; outcome webhook remains false until an authenticated ingest token is provisioned | Keep outcome webhook disabled until token/canary; rollback by restoring `/root/lobster-phase1/docker-compose.yml.bak-20260909T072812Z` and restarting next-admin |
-| Whisper execution | `meeting-service` exposes authenticated local-only `/api/video/transcribe` (job/status + JSON/SRT/VTT) and next-admin `/api/video/transcription/dispatch`; production has no GPU worker because ks-aw-01 has no NVIDIA device, so dispatch remains fail-closed 503 | Register the RTX workstation behind HTTPS + `VIDEO_WORKER_TOKEN`, then set `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` in next-admin; no production secret can be invented |
-| QA evidence | video-service computes bounded ffprobe + black/freeze/loudness evidence and SHA-256; `/api/video/status` now writes immutable `media_qa_reports` automatically when the asset has a worker checksum | Caption/editorial/rights reports remain separate human/provider evidence before Release |
-| Real-footage convergence | Footage upload registers `media_assets(asset_domain=real_footage)`, EDP stores source ranges, `/api/video/footage/render` resolves tenant-owned HTTPS assets and submits durable footage jobs; canary passed | Add caption burn-in track after Whisper worker registration; reject unsupported audio/caption tracks explicitly |
+| Whisper execution | `meeting-service` exposes authenticated local-only `/api/video/transcribe` (job/status + JSON/SRT/VTT) and next-admin `/api/video/transcription/dispatch`; production has no GPU worker because ks-aw-01 has no NVIDIA device, so dispatch remains fail-closed 503 | Register the RTX workstation behind a durable HTTPS tunnel + `VIDEO_WORKER_TOKEN`, then set `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` in next-admin; no production secret can be invented |
+| QA evidence | video-service computes bounded ffprobe + black/freeze/loudness evidence and SHA-256; `/api/video/status` writes immutable technical QA; `/api/video/qa/editorial-rights` writes deterministic editorial and rights reports | A candidate must carry title/script and explicit rights evidence (`cleared`, licenseRef, sourceRef); missing evidence fails closed |
+| Real-footage convergence | Footage upload registers `media_assets(asset_domain=real_footage)`, EDP stores source ranges, `/api/video/footage/render` resolves tenant-owned HTTPS assets and submits durable jobs; audio replacement and caption burn-in are implemented in `438efd9cc` | Run a production canary with an audio track and caption track; rollback by reverting video-service to `035a32788` |
 | Release linkage | ReleaseDeliveryPanel loads tenant assets and passed/warned QA reports from picker APIs; approved Release still gates Postiz/WordPress receipt adapters | Delivery status history can be added after a real external receipt; existing calls remain backward-compatible |
-| Billing lifecycle | Credit reserve RPC exists; no payment provider, monthly grant, refund or usage reconciliation webhook | Add operator-controlled grant first, then payment adapter behind a separate approval |
+| Billing lifecycle | Credit reserve RPC and `/api/video/billing/checkout` Stripe adapter exist; provider/webhook are fail-closed when env is absent | Choose a payment provider, create prices/webhook secret, set `MEDIA_PAYMENT_PROVIDER=stripe`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `MEDIA_CHECKOUT_ALLOWED_ORIGIN`, then run test-mode webhook canary; this is the only remaining external step |
 | Provider governance | `provider-policy.ts` now fail-closes billing profile changes unless `MEDIA_PROVIDER_ALLOWLIST` is explicit; generation routes still use their existing provider selection | Enforce allowlist, jurisdiction, model version, spend cap and kill switch before every provider call |
-| Outcome feedback | Webhook and aggregate read API exist; no scheduled platform metric adapters or script-ranking feedback loop | Add per-platform fetch adapters, scheduled maturity snapshots and recommendation jobs |
+| Outcome feedback | Authenticated outcome webhook and dashboard now include deterministic `rankedReleases` feedback scores (`2c64794b3`) | Supply per-platform metric fetch adapters (Postiz/platform credentials) and schedule 24h/7d/30d POSTs to `/api/webhooks/video-outcome`; the ranking core is ready |
 | Deployment | next-admin and video-service run commit `035a32788`; next-admin smoke 4/4, video-service health and real `/render-footage` canary passed. Production DB migrations 0065/0066/0067 are active; persistence flag is on, outcome webhook remains off | Keep rollback tags and run a real tenant-authenticated asset→QA→Release receipt before enabling outcome ingestion |
 
 ## Safety boundary
@@ -30,6 +32,13 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 
 - SSH `ubuntu@145.239.195.47:58122`: hostname `ns31414856`; `lobster-next-admin`, both production renderers, Postiz and WordPress containers are healthy.
 - The three staging containers (`lobster-staging-r2-egress-proxy`, `lobster-staging-remotion-service`, `lobster-staging-video-service`) are healthy.
+
+### 2026-09-09 implementation continuation
+
+- Code worktree commits: `438efd9cc` and `2c64794b3`; next-admin typecheck and focused Vitest suites pass. The commits are ready for `origin/main` review/deploy.
+- `/api/video/footage/render` now accepts one full-duration audio track and one bounded caption track; video-service materializes, replaces audio, burns captions, then runs the existing technical/signal QA.
+- `/api/video/qa/editorial-rights` verifies tenant-owned assets and persists immutable editorial/rights evidence. Missing script, forbidden terms, missing license/source references, non-cleared or expired rights fail closed.
+- `/api/video/outcomes` returns `rankedReleases`; `/api/video/billing/checkout` and `/api/webhooks/video-billing` are provider-shaped and remain disabled until Stripe configuration is present.
 
 ### Runtime correction — 2026-09-09 08:20 UTC
 

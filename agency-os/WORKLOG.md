@@ -13732,3 +13732,14 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts | grep=video/transcribe|run_video_transcription|VIDEO_WORKER_TOKEN|write_vtt | hits=11
 - LIMIT: production dispatch remains 503 until the laptop is exposed via authenticated HTTPS and `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` is configured; no secret was printed or invented.
+
+## 2026-09-09 Video LEGO renderer/QA/outcome/commercial boundaries
+
+- `438efd9cc`: `/api/video/footage/render` now accepts one full-duration audio track and one bounded caption track; `video-service/pipeline.py:754-886` replaces audio, burns caption cues and keeps technical/signal QA after the final encode. `server.py:173-242` validates the payload before a worker thread starts.
+- `438efd9cc`: `app/api/video/qa/editorial-rights/route.ts:16-111` verifies tenant ownership and persists immutable editorial/rights reports. `lib/content/video/editorial-rights-qa.ts:76-133` fails closed on missing script, forbidden terms, missing license/source references, non-cleared or expired rights.
+- `2c64794b3`: `app/api/video/outcomes/route.ts:40-45` exposes deterministic `rankedReleases`; `lib/content/video/outcome-feedback.ts` bounds quality ratios and raises confidence only after repeated maturity snapshots.
+- `2c64794b3`: `lib/content/video/payment-provider.ts:23-86` provides a provider-shaped Stripe checkout/signature adapter; `/api/video/billing/checkout` and `/api/webhooks/video-billing` fail closed until explicit provider/key/origin/webhook configuration exists. No card data is handled by next-admin.
+- REALTEST_EVIDENCE: next-admin `npm run typecheck` exit=0; Vitest `82 files / 773 tests` exit=0; video-service `python -m py_compile pipeline.py server.py quality.py` exit=0 and unittest `8/8` exit=0.
+- REVIEW_DONE: self-review covered tenant asset lookup, HTTPS source checks, bounded caption/audio ranges, timing-safe webhook signature and deterministic ranking | verdict=pass.
+- BUGHUNT_DONE: `git diff --check` exit=0; no secrets added; existing Quick Engine/Remotion call signatures remain backward-compatible.
+- LIMIT: local host has no ffmpeg binary, so the new caption/audio filter chain was validated by py_compile/unit contracts only; run the production/staging canary with a real audio+caption Timeline before promotion. Production cannot run Whisper until the RTX workstation is exposed through a durable HTTPS tunnel and `VIDEO_WORKER_TOKEN` is configured as `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN`; payment/outcome external adapters require provider credentials and platform scopes.
