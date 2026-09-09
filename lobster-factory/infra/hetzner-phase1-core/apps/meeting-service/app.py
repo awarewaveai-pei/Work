@@ -18,7 +18,7 @@ from fastapi import Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
 from lib import settings, summarize
-from pipeline import resume_after_summary, run_pipeline_phase1
+from pipeline import resume_after_summary, run_pipeline_phase1, run_video_transcription
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(BASE_DIR, "jobs")
@@ -91,6 +91,37 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     thread.start()
 
     return {"job_id": job_id}
+
+
+@app.post("/api/video/transcribe")
+async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3"):
+    """Local-only Whisper worker boundary for video captions.
+
+    The caller uploads the source bytes; the worker never fetches arbitrary URLs.
+    Poll ``/api/status/{job_id}`` and download transcript_json/srt/vtt when done.
+    """
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
+    if not model or len(model) > 64 or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for c in model):
+        raise HTTPException(400, "invalid model")
+    job_id = uuid.uuid4().hex[:12]
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=True)
+    media_path = os.path.join(job_dir, f"input{ext}")
+    size = 0
+    try:
+        with open(media_path, "wb") as out:
+            while chunk := await file.read(1 << 20):
+                size += len(chunk)
+                if size > MAX_UPLOAD_MB * 1024 * 1024:
+                    raise HTTPException(413, f"檔案超過 {MAX_UPLOAD_MB}MB 上限")
+                out.write(chunk)
+    except Exception:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+    threading.Thread(target=run_video_transcription, args=(job_dir, media_path), kwargs={"model_name": model}, daemon=True).start()
+    return {"job_id": job_id, "kind": "video_transcription"}
 
 
 @app.get("/api/settings")

@@ -214,6 +214,35 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         log.close()
 
 
+def run_video_transcription(job_dir: str, media_path: str, model_name: str = "large-v3") -> None:
+    """Run the media-only Whisper worker path used by Video LEGO.
+
+    It deliberately stops after immutable JSON/SRT/VTT outputs; meeting summary,
+    diarization and external providers are not part of a video caption job.
+    """
+    log = JobLogger(job_dir)
+    write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time(), kind="video_transcription")
+    keep_awake.prevent_sleep()
+    try:
+        write_status(job_dir, stage="transcribe")
+        result = transcribe(media_path, model_name=model_name, log=log)
+        with open(os.path.join(job_dir, "transcript.json"), "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        write_srt(result["segments"], os.path.join(job_dir, "transcript.srt"))
+        write_vtt(result["segments"], os.path.join(job_dir, "transcript.vtt"))
+        write_status(job_dir, stage="done", done=True, transcribe_stats={
+            "audio_duration_sec": result["audio_duration_sec"],
+            "realtime_factor": result["realtime_factor"],
+            "backend": result["backend"],
+        })
+    except Exception as e:
+        log(f"[FAIL] {type(e).__name__}: {e}")
+        write_status(job_dir, stage="error", done=True, error=f"{type(e).__name__}: {e}")
+    finally:
+        keep_awake.allow_sleep()
+        log.close()
+
+
 def _finalize_from_minutes(job_dir: str, minutes: dict, log) -> list:
     """從已驗證通過的 minutes JSON 做完 PPT/教練稿/會議記錄/Excel/Drive 同步到
     done。resume_after_summary()（人工回路）與 run_pipeline_phase1() 的 API
