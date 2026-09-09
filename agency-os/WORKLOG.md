@@ -13752,3 +13752,12 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=audio/caption validation, output QA, rollback tag, existing renderer compatibility.
 - BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=2c64794b3|render-footage|canary_audio_caption_20260909|MEDIA_TRANSCRIBE_WORKER_URL|STRIPE_SECRET_KEY|hits=19.
 - LIMIT: Whisper production still requires an authenticated durable HTTPS URL/token for the laptop worker; outcome metric adapters still require Postiz/platform scopes; billing remains fail-closed until a provider and secrets are intentionally configured. These are external configuration gates, not missing renderer code.
+
+## 2026-09-09 Video LEGO local Whisper authentication boundary
+
+- Generated a random 256-bit `VIDEO_WORKER_TOKEN`; stored it in the Windows user environment and the existing secrets vault. The value was never printed or committed.
+- Restarted the desktop shortcut target only to load the video worker token; the existing meeting `/api/upload` pipeline was not changed or used as an acceptance target. Local listener `127.0.0.1:8420` returned HTTP 200.
+- REALTEST_EVIDENCE: tool=curl|cmd=POST http://127.0.0.1:8420/api/video/transcribe without bearer and with matching bearer|exit=0|ms=1200|observed=video endpoint unauthenticated=401; matching bearer accepted=200 before the deliberately invalid media probe failed closed during decode.
+- REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=token storage, local restart, auth boundary.
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=VIDEO_WORKER_TOKEN|MEDIA_TRANSCRIBE_WORKER_URL|hits=22.
+- LIMIT: this proves the laptop worker is protected and usable locally; it is still not reachable from ks-aw-01. The remaining solution is a durable authenticated HTTPS ingress (Cloudflare Tunnel or equivalent) plus production `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` configuration.
