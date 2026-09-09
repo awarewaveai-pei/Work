@@ -119,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const primaryUrl = pickPrimaryOutput(poll.outputs);
       if (primaryUrl && primaryUrl.startsWith("https://")) {
         try {
-          await recordVideoAsset({
+          const asset = await recordVideoAsset({
             organizationId: job.recordParams.organizationId,
             primaryUrl,
             outputs: poll.outputs,
@@ -136,6 +136,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             // enriched rather than freezing `title: <dir>` / `sceneCount: 0`.
             authoritative: true,
           });
+          if (asset) {
+            const { persistAutomaticTechnicalQa } = await import("@/lib/content/video/qa-persistence");
+            await persistAutomaticTechnicalQa({
+              organizationId: job.recordParams.organizationId,
+              candidateAssetId: asset.id,
+              candidateChecksum: asset.checksumSha256,
+              outputs: poll.outputs,
+              outputMeta: poll.outputMeta,
+            });
+          }
         } catch (e) {
           console.warn("[video/status] recordVideoAsset threw (best-effort):", e);
         }

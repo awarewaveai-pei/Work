@@ -24,6 +24,7 @@ export default function FootageEditor() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [compiledTimeline, setCompiledTimeline] = useState<Record<string, unknown> | null>(null);
+  const [renderJobId, setRenderJobId] = useState("");
   const [frameRate, setFrameRate] = useState(30);
 
   const plan = useMemo(() => ({
@@ -72,6 +73,18 @@ export default function FootageEditor() {
     finally { setBusy(false); }
   }
 
+  async function renderTimeline() {
+    setBusy(true); setError(""); setRenderJobId("");
+    try {
+      if (!compiledTimeline) throw new Error("請先編譯 Timeline");
+      const res = await fetch("/api/video/footage/render", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeline: compiledTimeline }) });
+      const json = await res.json() as { ok: boolean; jobId?: string; error?: string };
+      if (!res.ok || !json.ok || !json.jobId) throw new Error(json.error ?? "實拍渲染提交失敗");
+      setRenderJobId(json.jobId);
+    } catch (e) { setError(e instanceof Error ? e.message : "實拍渲染提交失敗"); }
+    finally { setBusy(false); }
+  }
+
   return <div style={{ padding: "20px 28px", display: "grid", gap: 14 }}>
     <div>
       <b style={{ fontSize: 15 }}>實拍素材剪輯</b>
@@ -96,7 +109,7 @@ export default function FootageEditor() {
         <label style={{ fontSize: 11 }}>輸出起點 ms<input type="number" min={0} value={c.destinationStartMs} onChange={(e) => update(c.id, "destinationStartMs", e.target.value)} style={{ ...input, width: "100%", boxSizing: "border-box" }} /></label>
       </div>
     </div>)}
-    <div style={{ ...card, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><button type="button" onClick={() => void copyPlan()} disabled={!clips.length} style={{ padding: "8px 12px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, cursor: clips.length ? "pointer" : "not-allowed" }}>{copied ? "已複製" : "複製 EDP 草稿"}</button><button type="button" onClick={() => void compileTimeline()} disabled={!clips.length || busy || !organizationId.trim()} style={{ padding: "8px 12px", border: 0, borderRadius: 7, background: "var(--green)", color: "#fff", fontWeight: 700, cursor: clips.length && organizationId.trim() ? "pointer" : "not-allowed" }}>{busy ? "編譯中…" : "編譯成 Timeline"}</button><span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{clips.length ? `${clips.length} 個素材；編譯結果可交給後續剪輯／渲染積木` : "匯入後會產生剪輯計畫"}</span></div>
+    <div style={{ ...card, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><button type="button" onClick={() => void copyPlan()} disabled={!clips.length} style={{ padding: "8px 12px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, cursor: clips.length ? "pointer" : "not-allowed" }}>{copied ? "已複製" : "複製 EDP 草稿"}</button><button type="button" onClick={() => void compileTimeline()} disabled={!clips.length || busy || !organizationId.trim()} style={{ padding: "8px 12px", border: 0, borderRadius: 7, background: "var(--green)", color: "#fff", fontWeight: 700, cursor: clips.length && organizationId.trim() ? "pointer" : "not-allowed" }}>{busy ? "編譯中…" : "編譯成 Timeline"}</button><button type="button" onClick={() => void renderTimeline()} disabled={!compiledTimeline || busy} style={{ padding: "8px 12px", border: 0, borderRadius: 7, background: "var(--green)", color: "#fff", fontWeight: 700, cursor: compiledTimeline && !busy ? "pointer" : "not-allowed" }}>{busy ? "提交中…" : "送實拍渲染"}</button><span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{clips.length ? `${clips.length} 個素材；Timeline 可交給實拍 renderer` : "匯入後會產生剪輯計畫"}</span>{renderJobId && <span style={{ fontSize: 11, color: "var(--green)", wordBreak: "break-all" }}>Job：{renderJobId}</span>}</div>
     {compiledTimeline && <div style={{ ...card, display: "grid", gap: 8 }}><b style={{ fontSize: 12, color: "var(--green)" }}>Timeline v1 編譯完成</b><pre style={{ margin: 0, maxHeight: 260, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 11, color: "var(--text-secondary)" }}>{JSON.stringify(compiledTimeline, null, 2)}</pre></div>}
   </div>;
 }

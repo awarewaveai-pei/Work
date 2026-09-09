@@ -740,6 +740,72 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
     return outputs, out_dir
 
 
+def render_footage_timeline(clips: list, out_name: str, output_formats: list[str], fps: int = 30):
+    """Render a canonical footage Timeline using deterministic source ranges.
+
+    Each clip is normalised to the requested output profile (cover-fit, fixed
+    fps, H.264/AAC) and then concatenated without a second lossy encode.  The
+    service intentionally requires a video source and supplies a silent AAC
+    track when camera footage has no audio, keeping the output contract valid.
+    """
+    if not clips:
+        raise ValueError("clips 不可為空")
+    if not output_formats:
+        raise ValueError("output_formats 不可為空")
+    safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40] or "footage"
+    out_dir = config.OUTPUT_DIR / safe_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    outputs = {}
+
+    for fmt in output_formats:
+        if fmt not in config.FORMATS:
+            raise ValueError(f"未知格式 {fmt}")
+        w, h = config.FORMATS[fmt]
+        segment_paths = []
+        for i, clip in enumerate(clips):
+            source = str(clip["path"])
+            start = float(clip.get("source_start_ms", 0)) / 1000.0
+            duration = float(clip["duration_ms"]) / 1000.0
+            if start < 0 or duration <= 0:
+                raise ValueError(f"clip[{i}] 時間範圍無效")
+            seg = config.TEMP_DIR / f"footage_{fmt}_{i:04d}.mp4"
+            # Probe audio presence once; camera files without audio receive a
+            # deterministic silent stereo track instead of producing invalid
+            # video output that later fails technical QA.
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", source],
+                capture_output=True, text=True, timeout=15,
+            )
+            has_audio = bool(probe.stdout.strip())
+            cmd = ["ffmpeg", "-y", "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", source]
+            if not has_audio:
+                cmd += ["-f", "lavfi", "-t", f"{duration:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+            cmd += [
+                "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps={fps}",
+                "-map", "0:v:0", "-map", "0:a:0" if has_audio else "1:a:0",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "21", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-shortest", str(seg),
+            ]
+            res = subprocess.run(cmd, capture_output=True)
+            if res.returncode != 0:
+                raise RuntimeError(f"footage clip {i} render failed: {res.stderr.decode('utf-8', 'ignore')[-500:]}")
+            segment_paths.append(str(seg))
+
+        list_path = config.TEMP_DIR / f"footage_{fmt}_concat.txt"
+        with open(list_path, "w", encoding="utf-8") as fh:
+            for path in segment_paths:
+                fh.write("file '%s'\n" % path.replace("\\", "/").replace("'", "'\\''"))
+        out_path = out_dir / f"{fmt}.mp4"
+        res = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", str(out_path)],
+            capture_output=True,
+        )
+        if res.returncode != 0:
+            raise RuntimeError(f"footage concat failed: {res.stderr.decode('utf-8', 'ignore')[-500:]}")
+        outputs[fmt] = str(out_path)
+    return outputs, out_dir
+
+
 # ═══════════════════════════════════════════
 # 可程式化進入點（給 controller 呼叫）
 # ═══════════════════════════════════════════

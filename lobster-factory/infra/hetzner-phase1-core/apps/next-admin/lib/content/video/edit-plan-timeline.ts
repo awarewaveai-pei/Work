@@ -40,6 +40,7 @@ export function compileEditPlanToTimeline(
       startMs: Number(decision.destinationStartMs),
       durationMs: Number(decision.outMs) - Number(decision.inMs),
       sourceArtifactId: String(decision.sourceAssetId),
+      sourceStartMs: Number(decision.inMs),
       crop: "cover" as const,
       transitionOut: "cut" as const,
       provenance: "footage" as const,

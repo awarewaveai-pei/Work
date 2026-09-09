@@ -45,8 +45,8 @@ export interface VideoJob {
     formats?: string[];
     visualBreakdown?: { custom: number; broll: number };
     imageModel?: string;
-    source?: "generate" | "draft";
-    rendererKind?: "ffmpeg" | "remotion";
+    source?: "generate" | "draft" | "footage";
+    rendererKind?: "ffmpeg" | "remotion" | "footage";
     timelineId?: string;
     outputProfile?: string;
     serviceCapability?: VideoServiceCapability;

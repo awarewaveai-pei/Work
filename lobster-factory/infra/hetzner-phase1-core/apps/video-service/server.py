@@ -34,6 +34,7 @@ import socket
 import ipaddress
 import threading
 import subprocess
+import hashlib
 from urllib.parse import urlparse, quote, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -169,6 +170,41 @@ def _validate(payload: dict):
     return scenes, assets, out_name, False
 
 
+def _validate_footage(payload: dict):
+    """Validate renderer-ready footage clips and output format selection."""
+    clips = payload.get("clips")
+    if not isinstance(clips, list) or not clips:
+        raise ValueError("clips 必須是非空 list")
+    if len(clips) > MAX_SCENES:
+        raise ValueError(f"clips 過多（{len(clips)} > {MAX_SCENES}）")
+    parsed = []
+    for i, clip in enumerate(clips):
+        if not isinstance(clip, dict):
+            raise ValueError(f"clip[{i}] 必須是物件")
+        source = clip.get("source_url")
+        if not isinstance(source, str) or not source.startswith("https://"):
+            raise ValueError(f"clip[{i}].source_url 必須是 https URL")
+        try:
+            source_start_ms = int(clip.get("source_start_ms", 0))
+            duration_ms = int(clip["duration_ms"])
+        except (TypeError, ValueError, KeyError):
+            raise ValueError(f"clip[{i}] 時間欄位必須是整數")
+        if source_start_ms < 0 or duration_ms <= 0 or duration_ms > 10 * 60 * 1000:
+            raise ValueError(f"clip[{i}] 時間範圍無效")
+        parsed.append({"source_url": source, "source_start_ms": source_start_ms, "duration_ms": duration_ms})
+    formats = payload.get("formats")
+    if not isinstance(formats, list) or not formats:
+        formats = ["16x9"]
+    if len(formats) > 3 or any(fmt not in config.FORMATS for fmt in formats):
+        raise ValueError(f"formats 必須是 config.FORMATS 子集：{list(config.FORMATS)}")
+    if len(set(formats)) != len(formats):
+        raise ValueError("formats 不可重複")
+    out_name = payload.get("out_name", "footage")
+    if not isinstance(out_name, str) or not out_name.strip():
+        raise ValueError("out_name 必須是非空字串")
+    return parsed, formats, out_name.strip()
+
+
 def _probe_video(path: str) -> dict:
     """Return the reproducible ffprobe evidence used by technical QA."""
     res = subprocess.run(
@@ -227,6 +263,17 @@ def _build_output_meta(outputs: dict) -> dict:
         size = {"width": int(video["width"]), "height": int(video["height"])}
         expected = config.FORMATS.get(fmt)
         item = dict(size)
+        # The checksum is part of the immutable media identity.  Compute it
+        # after rendering and before upload so downstream media_assets and QA
+        # records can pin evidence to the exact bytes that were delivered.
+        digest = hashlib.sha256()
+        byte_size = 0
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                byte_size += len(chunk)
+                digest.update(chunk)
+        item["byteSize"] = byte_size
+        item["checksumSha256"] = digest.hexdigest()
         if expected:
             item["expected_width"] = expected[0]
             item["expected_height"] = expected[1]
@@ -296,6 +343,28 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
             pipeline.cleanup()
 
 
+def _do_footage_render(clips, formats, out_name):
+    """Materialize authorized HTTPS clips, render the footage timeline, and upload outputs."""
+    with _render_lock:
+        try:
+            materialized = []
+            for idx, clip in enumerate(clips):
+                path = _materialize_asset(clip["source_url"], idx)
+                materialized.append({**clip, "path": path})
+            outputs, out_dir = pipeline.render_footage_timeline(materialized, out_name, formats, fps=config.FPS)
+            output_meta = _build_output_meta(outputs)
+            if _r2_video_configured():
+                base_key = "video/" + os.path.basename(str(out_dir))
+                urls = {}
+                for fmt, path in outputs.items():
+                    with open(path, "rb") as fh:
+                        urls[fmt] = _r2_put(f"{base_key}/{fmt}.mp4", fh.read(), "video/mp4", R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE)
+                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta}
+            return {"outputs": outputs, "out_dir": str(out_dir), "storage": "local", "output_meta": output_meta}
+        finally:
+            pipeline.cleanup()
+
+
 # ── async job store：POST /render 即回 jobId，背景 thread 渲染，GET /job?jobId= 查狀態 ──
 # 解決「跨機長連線回應遺失 + 呼叫端 fire-and-forget 不存活」：改短連線提交+輪詢。
 _JOBS: dict = {}
@@ -349,6 +418,26 @@ def submit_render(payload: dict) -> str:
         args=(job_id, scenes, assets, out_name, tts_provider, tts_voice, intro_title, intro_duration, multiformat),
         daemon=True,
     ).start()
+    return job_id
+
+
+def _run_footage_job(job_id: str, clips, formats, out_name):
+    try:
+        result = _do_footage_render(clips, formats, out_name)
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
+    except Exception as e:  # noqa: BLE001
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+def submit_footage_render(payload: dict) -> str:
+    clips, formats, out_name = _validate_footage(payload)
+    job_id = uuid.uuid4().hex
+    with _jobs_lock:
+        _prune_jobs()
+        _JOBS[job_id] = {"status": "running", "ts": time.time()}
+    threading.Thread(target=_run_footage_job, args=(job_id, clips, formats, out_name), daemon=True).start()
     return job_id
 
 
@@ -472,6 +561,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "format_assets": True,
                     "native_multiformat": True,
                     "output_dimensions": True,
+                    "footage_timeline": True,
                     "openai_tts": bool(config.OPENAI_API_KEY),
                 },
                 "formats": list(config.FORMATS.keys()),
@@ -492,7 +582,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/render", "/generate-job"):
+        if path not in ("/render", "/render-footage", "/generate-job"):
             self._json(404, {"error": "not found"})
             return
         if not _authed(self):
@@ -535,6 +625,9 @@ class _Handler(BaseHTTPRequestHandler):
                     args=(job_id, topic, language, scene_count, tts_voice, intro_title, intro_duration),
                     daemon=True,
                 ).start()
+                self._json(202, {"jobId": job_id})
+            elif path == "/render-footage":
+                job_id = submit_footage_render(payload)
                 self._json(202, {"jobId": job_id})
             else:
                 # /render — existing behaviour
