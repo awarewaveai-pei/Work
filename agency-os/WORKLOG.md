@@ -13743,3 +13743,12 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REVIEW_DONE: self-review covered tenant asset lookup, HTTPS source checks, bounded caption/audio ranges, timing-safe webhook signature and deterministic ranking | verdict=pass.
 - BUGHUNT_DONE: `git diff --check` exit=0; no secrets added; existing Quick Engine/Remotion call signatures remain backward-compatible.
 - LIMIT: local host has no ffmpeg binary, so the new caption/audio filter chain was validated by py_compile/unit contracts only; run the production/staging canary with a real audio+caption Timeline before promotion. Production cannot run Whisper until the RTX workstation is exposed through a durable HTTPS tunnel and `VIDEO_WORKER_TOKEN` is configured as `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN`; payment/outcome external adapters require provider credentials and platform scopes.
+
+## 2026-09-09 Video LEGO production renderer canary
+
+- Production renderer was deployed from `2c64794b3` under `/root/render-services`; existing rollback image retained as `lobster-video-service:rollback-20260909-0936`. The existing Quick Engine and Remotion services were not changed.
+- REALTEST_EVIDENCE: tool=SSH|cmd=POST /render-footage with clip+audio+caption then poll /job?jobId=df9e47be00a0467caa68798dd973a3ac|exit=0|ms=~20000|observed=202 HTTP, status=done, 1920x1080 output, technical_qa=passed, signal_qa=passed, blackRatio=0, freezeEvents=0, integratedLufs=-26.1.
+- REALTEST_EVIDENCE: tool=SSH|cmd=ffprobe deployed R2 output canary_audio_caption_20260909/16x9.mp4|exit=0|ms=8000|observed=H.264 video + AAC audio; extracted frame visibly contains `canary audio caption`.
+- REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=audio/caption validation, output QA, rollback tag, existing renderer compatibility.
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=2c64794b3|render-footage|canary_audio_caption_20260909|MEDIA_TRANSCRIBE_WORKER_URL|STRIPE_SECRET_KEY|hits=19.
+- LIMIT: Whisper production still requires an authenticated durable HTTPS URL/token for the laptop worker; outcome metric adapters still require Postiz/platform scopes; billing remains fail-closed until a provider and secrets are intentionally configured. These are external configuration gates, not missing renderer code.

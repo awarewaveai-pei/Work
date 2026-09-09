@@ -17,16 +17,16 @@
 | Feature activation | Production `lobster-next-admin` now has `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`; outcome webhook remains false until an authenticated ingest token is provisioned | Keep outcome webhook disabled until token/canary; rollback by restoring `/root/lobster-phase1/docker-compose.yml.bak-20260909T072812Z` and restarting next-admin |
 | Whisper execution | `meeting-service` exposes authenticated local-only `/api/video/transcribe` (job/status + JSON/SRT/VTT) and next-admin `/api/video/transcription/dispatch`; production has no GPU worker because ks-aw-01 has no NVIDIA device, so dispatch remains fail-closed 503 | Register the RTX workstation behind a durable HTTPS tunnel + `VIDEO_WORKER_TOKEN`, then set `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` in next-admin; no production secret can be invented |
 | QA evidence | video-service computes bounded ffprobe + black/freeze/loudness evidence and SHA-256; `/api/video/status` writes immutable technical QA; `/api/video/qa/editorial-rights` writes deterministic editorial and rights reports | A candidate must carry title/script and explicit rights evidence (`cleared`, licenseRef, sourceRef); missing evidence fails closed |
-| Real-footage convergence | Footage upload registers `media_assets(asset_domain=real_footage)`, EDP stores source ranges, `/api/video/footage/render` resolves tenant-owned HTTPS assets and submits durable jobs; audio replacement and caption burn-in are implemented in `438efd9cc` | Run a production canary with an audio track and caption track; rollback by reverting video-service to `035a32788` |
+| Real-footage convergence | Footage upload registers `media_assets(asset_domain=real_footage)`, EDP stores source ranges, `/api/video/footage/render` resolves tenant-owned HTTPS assets and submits durable jobs; audio replacement and caption burn-in are implemented in `438efd9cc` and passed the 2026-09-09 production canary (`df9e47be00a0467caa68798dd973a3ac`) | Keep the canary receipt and run tenant-authenticated asset→QA→Release once; rollback video-service to `lobster-video-service:rollback-20260909-0936` |
 | Release linkage | ReleaseDeliveryPanel loads tenant assets and passed/warned QA reports from picker APIs; approved Release still gates Postiz/WordPress receipt adapters | Delivery status history can be added after a real external receipt; existing calls remain backward-compatible |
 | Billing lifecycle | Credit reserve RPC and `/api/video/billing/checkout` Stripe adapter exist; provider/webhook are fail-closed when env is absent | Choose a payment provider, create prices/webhook secret, set `MEDIA_PAYMENT_PROVIDER=stripe`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `MEDIA_CHECKOUT_ALLOWED_ORIGIN`, then run test-mode webhook canary; this is the only remaining external step |
 | Provider governance | `provider-policy.ts` now fail-closes billing profile changes unless `MEDIA_PROVIDER_ALLOWLIST` is explicit; generation routes still use their existing provider selection | Enforce allowlist, jurisdiction, model version, spend cap and kill switch before every provider call |
 | Outcome feedback | Authenticated outcome webhook and dashboard now include deterministic `rankedReleases` feedback scores (`2c64794b3`) | Supply per-platform metric fetch adapters (Postiz/platform credentials) and schedule 24h/7d/30d POSTs to `/api/webhooks/video-outcome`; the ranking core is ready |
-| Deployment | next-admin and video-service run commit `035a32788`; next-admin smoke 4/4, video-service health and real `/render-footage` canary passed. Production DB migrations 0065/0066/0067 are active; persistence flag is on, outcome webhook remains off | Keep rollback tags and run a real tenant-authenticated asset→QA→Release receipt before enabling outcome ingestion |
+| Deployment | next-admin runs deployed commit `2c64794b3` with smoke 4/4; video-service image built from `2c64794b3` is healthy; production `/render-footage` audio+caption canary `df9e47be00a0467caa68798dd973a3ac` passed and produced a 1920×1080 R2 output with technical/signal QA passed. Production DB migrations 0065/0066/0067 are active; persistence flag is on, outcome webhook remains off | Keep rollback snapshots (`lobster-phase1-next-admin:rollback-20260909-093214`, `lobster-video-service:rollback-20260909-0936`) and run a real tenant-authenticated asset→QA→Release receipt before enabling outcome ingestion |
 
 ## Safety boundary
 
-The existing Quick Engine and Remotion paths remain available. New footage/QA persistence is additive and tenant-gated; rollback tags are retained for next-admin (`lobster-phase1-next-admin:rollback-20260909-081606`) and video-service (`lobster-video-service:rollback-20260909-082100`).
+The existing Quick Engine and Remotion paths remain available. New footage/QA persistence is additive and tenant-gated; rollback tags are retained for next-admin (`lobster-phase1-next-admin:rollback-20260909-093214`) and video-service (`lobster-video-service:rollback-20260909-0936`).
 
 ## Live read-only check — 2026-09-09
 
@@ -35,10 +35,16 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 
 ### 2026-09-09 implementation continuation
 
-- Code worktree commits: `438efd9cc` and `2c64794b3`; next-admin typecheck and focused Vitest suites pass. The commits are ready for `origin/main` review/deploy.
-- `/api/video/footage/render` now accepts one full-duration audio track and one bounded caption track; video-service materializes, replaces audio, burns captions, then runs the existing technical/signal QA.
+- Code worktree commits: `438efd9cc` and `2c64794b3`; next-admin typecheck and full Vitest suites pass. Both commits are on `origin/main`; next-admin and video-service are deployed from `2c64794b3`.
+- `/api/video/footage/render` now accepts one full-duration audio track and one bounded caption track; video-service materializes, replaces audio, burns captions, then runs the existing technical/signal QA. Production canary `df9e47be00a0467caa68798dd973a3ac` produced `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/canary_audio_caption_20260909/16x9.mp4`; ffprobe shows H.264 + AAC and the extracted frame contains the burned caption.
 - `/api/video/qa/editorial-rights` verifies tenant-owned assets and persists immutable editorial/rights evidence. Missing script, forbidden terms, missing license/source references, non-cleared or expired rights fail closed.
 - `/api/video/outcomes` returns `rankedReleases`; `/api/video/billing/checkout` and `/api/webhooks/video-billing` are provider-shaped and remain disabled until Stripe configuration is present.
+
+### Production renderer canary — 2026-09-09 09:40 UTC
+
+- `POST http://127.0.0.1:8732/render-footage` with one HTTPS clip, one full-duration audio track and one caption cue returned HTTP 202 (`jobId=df9e47be00a0467caa68798dd973a3ac`).
+- Job completed `status=done`; output `16x9` is 1920×1080, H.264 + AAC, 839238 bytes, checksum `850b94d31eaaf406aa1e33f6a68e19699a7735f728123b9ab2c87353c54b4076`; technical QA and signal QA both passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).
+- A frame extracted from the public output at 0.40s visibly contains `canary audio caption`; this proves the caption filter is applied in the deployed renderer.
 
 ### Runtime correction — 2026-09-09 08:20 UTC
 
