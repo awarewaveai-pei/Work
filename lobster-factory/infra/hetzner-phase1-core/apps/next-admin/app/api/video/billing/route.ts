@@ -3,6 +3,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { putSecret } from "@/lib/secret-vault";
 import { resolveOpsRole, canCreateAiImageJob, canManageOutreach } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { assertMediaProviderAllowed } from "@/lib/content/video/provider-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export async function POST(req: Request): Promise<Response> {
     const provider = typeof body.provider === "string" ? body.provider : "";
     const mode = body.mode === "byo" ? "byo" : "agency";
     if (!PROVIDERS.has(provider)) return NextResponse.json({ ok: false, error: "unsupported provider" }, { status: 400 });
+    try { assertMediaProviderAllowed(provider); } catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "provider_not_allowlisted" }, { status: 403 }); }
     let secretRef: string | null = typeof body.secretRef === "string" && body.secretRef.trim() ? body.secretRef.trim() : null;
     if (body.providerSecret !== undefined) {
       if (typeof body.providerSecret !== "string" || body.providerSecret.length < 8 || body.providerSecret.length > 4096) return NextResponse.json({ ok: false, error: "providerSecret length invalid" }, { status: 400 });

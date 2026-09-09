@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { optionalRendererAuthHeaders } from "@/lib/content/video/renderer-auth";
+import { allowedMediaProviders } from "@/lib/content/video/provider-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function GET() {
         openaiTts: body.capabilities?.openai_tts === true,
       },
       formats: Array.isArray(body.formats) ? body.formats : [],
+      providers: allowedMediaProviders(),
     });
   } catch (e: unknown) {
     return NextResponse.json({
@@ -45,6 +47,7 @@ export async function GET() {
         openaiTts: false,
       },
       formats: [],
+      providers: allowedMediaProviders(),
       error: e instanceof Error ? e.message : "video-service capability check failed",
     }, { status: 503 });
   }
