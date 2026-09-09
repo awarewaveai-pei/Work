@@ -15,6 +15,7 @@ export interface DynamicSlideshowProps {
   fps?: number;
   width?: number;
   height?: number;
+  captions?: Array<{ startFrame: number; endFrame: number; text: string }>;
 }
 
 const DEFAULT_SCENES: SceneItem[] = [
@@ -31,6 +32,7 @@ export const DynamicSlideshowDefaultProps: DynamicSlideshowProps = {
   fps: 30,
   width: 1920,
   height: 1080,
+  captions: [],
 };
 
 export const DynamicSlideshow: React.FC<DynamicSlideshowProps> = ({
@@ -39,6 +41,7 @@ export const DynamicSlideshow: React.FC<DynamicSlideshowProps> = ({
   audioUrl,
   logoUrl,
   transitionDurationSeconds = 1.0,
+  captions = [],
 }) => {
   // Merge global logoUrl as fallback for scenes that don't specify one.
   const scenesWithLogo: SceneItem[] = logoUrl
@@ -51,6 +54,7 @@ export const DynamicSlideshow: React.FC<DynamicSlideshowProps> = ({
       backgroundColor={backgroundColor}
       audioUrl={audioUrl}
       transitionDurationSeconds={transitionDurationSeconds}
+      captions={captions}
     />
   );
 };
