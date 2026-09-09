@@ -13749,3 +13749,20 @@ Revert the compile route commit; existing timeline validation and Remotion route
 
 [rollback]
 Revert this route-only commit; existing `/api/video/remotion-status` remains unchanged for legacy callers.
+
+## 2026-09-09 — Dedicated Video Whisper durable boundary
+
+[result]
+- Added 0069 dedicated `media_transcription_jobs`; no meeting-service code or route is referenced.
+- Dispatch now accepts only tenant-owned, SHA-256-pinned media assets on `R2_VIDEO_PUBLIC_BASE`, persists its job before worker handoff, and fails closed when worker configuration is absent.
+- Added independent RTX worker, per-job callback secret verification, JSON/SRT/VTT import, caption-integrity QA, callback retry, and a deployment contract.
+- Callback is an `/api/internal` route and authenticates itself; it never accepts a callback asset id.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest+TypeScript+Python | cmd=`npm test` (89 files/786 tests); `npm run typecheck`; `python -m py_compile app.py` | exit=0 | ms=completed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; checked tenant binding, one-job secret, URL boundary, and no meeting-service references.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`MEDIA_TRANSCRIBE_CALLBACK_BASE_URL|media_transcription_jobs|persistAutomaticCaptionQa` | hits=9
+- WORKLOG_DONE: migration, worker contract, and deployment receipt documented under `agency-os/docs/video_generator/`.
+
+[rollback]
+Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; after confirming no jobs need retention, apply `0069_media_transcription_jobs.down.sql`. Existing Quick Engine, Remotion, footage renderer, and meeting-service are untouched.

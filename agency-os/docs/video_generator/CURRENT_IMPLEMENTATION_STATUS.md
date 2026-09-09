@@ -25,3 +25,10 @@
 - No retry after an uncertain external delivery; reconcile the receipt first.
 - No browser-supplied QA, no browser-supplied Vault reference, and no committed secret.
 
+
+## In implementation — not deployed
+
+- 0069 adds the isolated video transcription job ledger. Dispatch accepts only tenant-owned, checksummed `R2_VIDEO_PUBLIC_BASE` assets; callback authentication is one secret per job.
+- `apps/video-whisper-worker` is a separate RTX-only FastAPI process. It validates HTTPS/DNS, source checksum, and retries callback delivery. It does not touch meeting-service.
+- Callback imports JSON/SRT/VTT and persists source-caption integrity QA. A rendered candidate still needs its own caption QA evidence before Release.
+- Operator deployment contract: `VIDEO_WHISPER_WORKER_DEPLOYMENT.md`.
