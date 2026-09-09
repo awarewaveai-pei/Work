@@ -28,6 +28,10 @@ export async function POST(req: Request): Promise<Response> {
   const gate = evaluateReleaseGate({ organizationId, candidateAssetId, candidateChecksum, requiredKinds, reports } as never);
   if (!gate.ok) return NextResponse.json({ ok: false, code: gate.code, message: gate.message, reportIds: gate.reportIds }, { status: 409 });
   const db = getSupabaseWriteClient(); if (!db) return new NextResponse("db unavailable", { status: 503 });
+  const candidate = await db.from("media_assets").select("id, organization_id, checksum_sha256").eq("id", candidateAssetId).maybeSingle();
+  if (candidate.error) return NextResponse.json({ ok: false, error: "candidate_asset_lookup_failed" }, { status: 502 });
+  if (!candidate.data || candidate.data.organization_id !== organizationId) return NextResponse.json({ ok: false, error: "candidate_asset_not_found" }, { status: 404 });
+  if (candidate.data.checksum_sha256 && candidate.data.checksum_sha256 !== candidateChecksum) return NextResponse.json({ ok: false, error: "candidate_checksum_mismatch" }, { status: 409 });
   const qaRows = reports.filter((r) => gate.reportIds.includes(r.id)).map((r) => { const reportJson = { source: "release-api", reportId: r.id, kind: r.kind, status: r.status }; return { id: r.id, organization_id: organizationId, candidate_asset_id: candidateAssetId, candidate_checksum: candidateChecksum, qa_kind: r.kind, capability_id: "video.qa", capability_version: r.profileVersion, profile_id: r.profileId, profile_version: r.profileVersion, status: r.status, report_json: reportJson, report_sha256: createHash("sha256").update(JSON.stringify(reportJson)).digest("hex") }; });
   const qa = await db.from("media_qa_reports").upsert(qaRows, { onConflict: "id", ignoreDuplicates: true });
   if (qa.error) return NextResponse.json({ ok: false, error: qa.error.message }, { status: 500 });

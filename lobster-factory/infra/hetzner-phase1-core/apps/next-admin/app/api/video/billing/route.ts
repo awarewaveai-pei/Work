@@ -46,6 +46,11 @@ export async function POST(req: Request): Promise<Response> {
   const status = typeof body.status === "string" ? body.status : undefined;
   if (plan && !["free", "subscription", "enterprise"].includes(plan)) return NextResponse.json({ ok: false, error: "invalid plan" }, { status: 400 });
   if (status && !["active", "past_due", "canceled"].includes(status)) return NextResponse.json({ ok: false, error: "invalid status" }, { status: 400 });
+  for (const [field, value] of [["monthlyCreditLimit", body.monthlyCreditLimit], ["hardCreditLimit", body.hardCreditLimit]] as const) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || Number(value) < 0)) {
+      return NextResponse.json({ ok: false, error: `${field} must be a non-negative safe integer` }, { status: 400 });
+    }
+  }
   if (plan || status || body.monthlyCreditLimit !== undefined || body.hardCreditLimit !== undefined) {
     const patch = { organization_id: organizationId, ...(plan ? { plan } : {}), ...(status ? { status } : {}), ...(Number.isInteger(body.monthlyCreditLimit) ? { monthly_credit_limit: body.monthlyCreditLimit } : {}), ...(Number.isInteger(body.hardCreditLimit) ? { hard_credit_limit: body.hardCreditLimit } : {}), updated_at: new Date().toISOString() };
     const saved = await db.from("media_billing_accounts").upsert(patch, { onConflict: "organization_id" }).select().single();

@@ -30,6 +30,14 @@ export async function POST(req: Request): Promise<Response> {
   const reportJson = body.reportJson && typeof body.reportJson === "object" && !Array.isArray(body.reportJson) ? body.reportJson : {};
   const reportSha256 = createHash("sha256").update(JSON.stringify(reportJson)).digest("hex");
   const db = getSupabaseWriteClient(); if (!db) return new NextResponse("db unavailable", { status: 503 });
+  const candidate = await db.from("media_assets").select("id, organization_id, checksum_sha256").eq("id", candidateAssetId).maybeSingle();
+  if (candidate.error) return NextResponse.json({ ok: false, error: "candidate_asset_lookup_failed" }, { status: 502 });
+  if (!candidate.data || candidate.data.organization_id !== organizationId) {
+    return NextResponse.json({ ok: false, error: "candidate_asset_not_found" }, { status: 404 });
+  }
+  if (candidate.data.checksum_sha256 && candidate.data.checksum_sha256 !== candidateChecksum) {
+    return NextResponse.json({ ok: false, error: "candidate_checksum_mismatch" }, { status: 409 });
+  }
   const inserted = await db.from("media_qa_reports").insert({ organization_id: organizationId, candidate_asset_id: candidateAssetId, candidate_checksum: candidateChecksum, qa_kind: qaKind, capability_id: capabilityId, capability_version: capabilityVersion, profile_id: profileId, profile_version: profileVersion, status, report_json: reportJson, report_sha256: reportSha256, supersedes_report_id: UUID.test(String(body.supersedesReportId ?? "")) ? body.supersedesReportId : null }).select("id, organization_id, candidate_asset_id, qa_kind, status, report_sha256, created_at").single();
   if (inserted.error) return NextResponse.json({ ok: false, error: inserted.error.message }, { status: 500 });
   return NextResponse.json({ ok: true, report: inserted.data }, { status: 201 });

@@ -26,6 +26,29 @@ export type DeliveryReceiptContext = {
   variant: string;
 };
 
+/**
+ * A delivery receipt is only valid for an approved Release owned by the same
+ * tenant.  Keeping this check inside the adapter protects every caller
+ * (WordPress, Postiz, and future destinations) from cross-tenant or
+ * pre-approval delivery when the persistence flag is enabled.
+ */
+async function assertReleaseReady(organizationId: string, releaseId: string): Promise<void> {
+  const db = getSupabaseWriteClient();
+  if (!db) throw new Error("Supabase service role is required for delivery receipts");
+  const { data, error } = await db
+    .from("media_releases")
+    .select("id, organization_id, status")
+    .eq("id", releaseId)
+    .maybeSingle();
+  if (error) throw new Error(`media_releases lookup failed: ${error.message}`);
+  if (!data || data.organization_id !== organizationId) {
+    throw new Error("release_not_found");
+  }
+  if (data.status !== "release_approved") {
+    throw new Error("release_not_approved");
+  }
+}
+
 type DeliveryRow = {
   id: string;
   release_id: string;
@@ -55,6 +78,7 @@ export async function ensureDeliveryReceipt(
   if (!mediaPersistenceEnabled()) return null;
   const db = getSupabaseWriteClient();
   if (!db) throw new Error("Supabase service role is required for delivery receipts");
+  await assertReleaseReady(context.organizationId, context.releaseId);
 
   const idempotencyKey = deliveryIdempotencyKey(
     context.releaseId,
