@@ -58,6 +58,11 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 - ReleaseDeliveryPanel now invokes `/api/video/qa/editorial-rights` automatically when a tenant-owned candidate with a checksum is selected, then reloads immutable QA reports. It does not alter the meeting upload pipeline or bypass the Release gate.
 - `sg-deploy.sh next-admin` deployed `7203d6e4e0e73cae5c908828c2727d97606b7537`; typecheck, Vitest 82/773, build, health and 4/4 smoke passed. Rollback snapshot: `lobster-phase1-next-admin:rollback-20260909-100724`.
 
+### Whisper ingress resolution boundary — 2026-09-09
+
+- The laptop worker is now token-protected and local-only. No public tunnel or DNS was changed: the available Cloudflare API credential verification returned HTTP 401 and `cloudflared` is not installed on the workstation.
+- Resolution is one account-side step: renew a scoped Cloudflare Tunnel credential (or choose an equivalent durable HTTPS ingress), create a dedicated hostname such as `video-worker.aware-wave.com` forwarding only `/api/video/transcribe`, then set the matching `MEDIA_TRANSCRIBE_WORKER_URL` and `MEDIA_TRANSCRIBE_WORKER_TOKEN` through the existing vault/deploy path. Until that is done, production dispatch remains the intentional 503 gate.
+
 ### Runtime correction — 2026-09-09 08:20 UTC
 
 Current production is commit `035a327885443be29a596361465f5648a6c837b4`: next-admin `sg-deploy` snapshot `lobster-phase1-next-admin:rollback-20260909-081606` and rebuilt `lobster-video-service` (`lobster-video-service:rollback-20260909-082100`), both healthy. Real footage canary `28e2dbee3de24bfd971e6f4d6bde1d63` produced 1920×1080 output with checksum `b5e96572470f59b028210610e8d5bcc95efd18a83e9f59f27a17fb80f2bdf7c1`; technical/signal QA passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).

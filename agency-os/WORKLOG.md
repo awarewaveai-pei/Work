@@ -13780,3 +13780,11 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=tenant candidate trigger, checksum guard, failed QA preservation.
 - BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=/api/video/qa/editorial-rights|chooseAsset|hits=8.
 - LIMIT: automatic trigger can only evaluate metadata that exists on the candidate asset; missing script/title/license/source remains a deliberate failed QA result.
+
+## 2026-09-09 Video LEGO Whisper ingress boundary
+
+- Read-only checks found no `cloudflared` executable/service on the workstation; the existing Cloudflare API credential verification returned HTTP 401. No public tunnel, DNS record or nginx route was changed.
+- REALTEST_EVIDENCE: tool=PowerShell|cmd=Cloudflare token verify endpoint + Get-Command cloudflared + Get-Service cloudflared|exit=0|ms=1700|observed=HTTP 401; executable/service absent.
+- REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=external ingress blast radius and secret non-disclosure.
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=CLOUDFLARE_TUNNEL|cloudflared|MEDIA_TRANSCRIBE_WORKER_URL|hits=24.
+- LIMIT: production Whisper cannot be made reachable without a valid tunnel credential or an equivalent ingress account-side action; code and environment wiring are already deployed and fail closed until then.
