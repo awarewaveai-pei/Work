@@ -13677,3 +13677,12 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - 線上只讀確認：SSH `145.239.195.47:58122` 的 production 與 staging containers 均 healthy；`supabase-db` 查詢 0065/0066 七張表均為空結果（尚未套用）；`lobster-next-admin` 仍是 `lobster-phase1-next-admin:local`（2026-09-08 啟動），故新 main 尚未部署。
 - `sg-deploy.sh next-admin` 正式部署完成：typecheck、Vitest `78/763` 通過；建立 rollback snapshot `lobster-phase1-next-admin:rollback-20260909-060402`；新 container digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632` healthy；`/login`、`/api/ops/summary`、WordPress、node-api smoke 全部 200。Remotion、video-service、DB、0065/0066 migration 與 flags 未變更。
 - 新增 `docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`，列出 Whisper worker、EDP asset registration、Release linkage、billing lifecycle、provider allowlist、outcome feedback 與 deployment 的確切 evidence/剩餘工作。
+
+## 2026-09-09 Video LEGO runtime slice continuation
+
+- `723bee99d`：新增純函式 `edit-plan-timeline.ts` 與 `/api/video/footage/compile`；租戶邊界、EDP organizationId 一致性與 Timeline v1 驗證均在 API 層完成。
+- `64f7ad8e2`：VideoStudio `FootageEditor` 增加 organization UUID、EDP→Timeline 編譯按鈕與結果檢視；不會自動渲染或改寫既有 Quick Engine。
+- `video-service/quality.py` / `server.py`：加入 bounded ffmpeg `blackdetect`、`freezedetect`、`ebur128` 訊號分析；黑畫面/卡幀為警告，音量/true peak 越界為失敗，失敗阻擋 output metadata。
+- REALTEST_EVIDENCE: Python unittest `8/8`；next-admin typecheck exit=0；Vitest `78 files / 764 tests`；Next build exit=0（既有 symlink traced-files EPERM 警告）。
+- PRODUCTION_DB: 先完成 public-schema custom-format backup `/tmp/supabase-public-20260909T071635Z.dump`（SHA-256 `23acb9c15d...`），再以 `ON_ERROR_STOP=1` 套用 migrations 0065/0066；`information_schema` 已確認七張表，`pg_proc` 已確認 `media_credit_reserve`，目前 row count 為 0。
+- LIMIT: production `MEDIA_PRODUCTION_PERSISTENCE_ENABLED`/outcome flags 仍未啟用；Whisper video worker、字幕自動 report、footage source asset registration/proxy、dedicated footage renderer 與 Release delivery UI 尚未完成；不宣稱平台已完整。

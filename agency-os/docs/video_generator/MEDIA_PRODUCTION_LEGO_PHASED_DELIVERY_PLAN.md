@@ -159,7 +159,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** approved releases reach WordPress and Postiz safely, outcomes improve future work, and local/SaaS/enterprise use follows one controlled product model.
 
-**Progress as of 2026-09-09:** `0b79deecc` adds additive RLS persistence for QA, Release, delivery attempts and outcome snapshots; `646896954` adds the tenant-scoped QA report ingestion boundary; `acfe7e7f2` and `60500f780` provide the shared state/event contracts. Postiz and WordPress now accept optional `releaseId` receipt linkage behind `MEDIA_PRODUCTION_PERSISTENCE_ENABLED`; `/api/webhooks/video-outcome` and `/api/video/outcomes` provide authenticated ingestion/read aggregation behind explicit flags. Migration is committed but deliberately not applied to production.
+**Progress as of 2026-09-09:** migrations 0065/0066 are applied to production after a public-schema custom-format backup and `ON_ERROR_STOP=1` transaction checks; all seven tables and `media_credit_reserve` are present. `723bee99d` adds signal QA extraction; `64f7ad8e2` exposes the EDP→Timeline compiler in VideoStudio. Postiz and WordPress accept optional `releaseId` receipt linkage behind `MEDIA_PRODUCTION_PERSISTENCE_ENABLED`; `/api/webhooks/video-outcome` and `/api/video/outcomes` provide authenticated ingestion/read aggregation behind explicit flags. Automatic Whisper worker execution, production flag activation and Release delivery UI remain gated work.
 
 **Scope**
 
@@ -208,7 +208,9 @@ The immediate executable work is **Phase 0, then Phase 1**. Phase 2–4 contract
 - `0b79deecc`: `packages/db/migrations/0065_media_production_persistence.sql` plus rollback script. Apply only after isolated Supabase rehearsal.
 - `delivery-receipts.ts`: idempotent service-role adapter; disabled until `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`.
 - Postiz route and WordPress embed route: optional `releaseId`/`variant` receipt lifecycle with queued→drafted→published/failed transitions.
-- `FootageEditor.tsx`: VideoStudio tab for MP4 import through existing R2 route, cut points, output offsets and EDP JSON export.
+- `FootageEditor.tsx`: VideoStudio tab for MP4 import through existing R2 route, cut points, output offsets, EDP JSON export and validated EDP→Timeline compilation.
+- `edit-plan-timeline.ts` and `/api/video/footage/compile`: pure compiler plus tenant-bound API; no renderer or persistence side effects.
+- `video-service/server.py`: bounded ffmpeg signal analysis for black frames, freezes, loudness and true peak; failures block output metadata.
 - `MediaOperationsPanel.tsx`: VideoStudio 營運成效 tab，讀取租戶方案/點數/provider 與 outcome totals。
 - `0066_media_billing_and_provider_profiles.sql`: plan account, credit ledger, atomic reserve RPC and provider profile metadata; secrets remain Vault-only.
 - `/api/video/billing` and `/api/video/credits/reserve`: tenant-scoped account/provider read-write and atomic credit reservation.
