@@ -54,3 +54,19 @@ D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\SAME_V
 2. 以 staging compose build/up，確認兩個 healthcheck、未帶 token 的拒絕、正確 token 的接受與 production containers 未重啟。
 3. 記錄 staging image digest、測試 job ID 和 rollback down 結果。
 4. 經此驗收後，才可建立 Phase 1A 的 production rollout package。
+
+## 2026-09-09 staging S3 egress canary
+
+- staging R2 token 已改用新建立的 Object Read & Write S3 credentials；舊憑證可列舉但 PutObject 回 403。
+- `r2-egress-proxy` 改用 AWS SDK S3 `PutObject`，只允許 `PUT`、固定 account/bucket、`remotion/` 或 `video/` key，拒絕 query/path traversal；renderer network 仍為 internal，proxy 才有 egress。
+- staging compose 重新建立三個 container；production 未重啟。
+- REALTEST_EVIDENCE: SSH `docker inspect` 三個 staging container health=healthy；Remotion canary `submit_http=200`, `render_status=done`, `url_https=true`。
+- REVIEW_DONE: self-review + proxy unit tests 3/3 pass；BUGHUNT_DONE: `git diff --check` exit=0，未發現 secret 寫入版本庫。
+- Quick Engine 亦已加入 `media.qa_technical` 的 ffprobe 基本閘（stream、尺寸、正時長）；staging image 已重建，production 未重啟。
+- Timeline caption track 已接入 Remotion DynamicSlideshow，使用 frame-accurate cues；staging image build/canary 通過，production Next-admin 未部署。
+## 2026-09-09 Remotion tenant lifecycle slice
+
+- `eee9f3fea`：Remotion 提交先建立租戶綁定 `video_jobs`，對外只回傳內部 job id；VideoStudio 改輪詢 `/api/video/remotion-job-status`。
+- 舊 `/api/video/remotion-status` 固定回 `410 deprecated_use_remotion_job_status`，避免 EU job id 直通。
+- `video_jobs.record_params.rendererKind=remotion` 讓通用 FFmpeg status 回 `409`，避免跨 renderer 誤輪詢；Remotion 完成會寫入 `media_assets` 並標記 job done。
+- 驗證：Next-admin typecheck exit=0；Vitest `78 files / 763 tests` exit=0；`git diff --check` exit=0。

@@ -48,7 +48,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** the already-existing Quick Engine is a dependable first tool: native-format draft, human edit, render, status and retrieval.
 
-**Progress as of 2026-09-07:** Phase 1A renderer authentication, lifecycle contract and isolated staging manifest are integrated in `main` by merge commit `2fb93f9dc`; they are not deployed. Their source/change receipts are [PHASE_1A_IMPLEMENTATION_RECEIPT.md](PHASE_1A_IMPLEMENTATION_RECEIPT.md) and [PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md](PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md). Phase 1B durable-job design is complete in [PHASE_1B_DURABLE_QUICK_ENGINE_JOB_LIFECYCLE.md](PHASE_1B_DURABLE_QUICK_ENGINE_JOB_LIFECYCLE.md); its additive schema, migration rehearsal and retention rules are specified in [PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md](PHASE_1B_2_DURABLE_JOB_SCHEMA_PACKAGE.md), and its no-double-render receipt protocol is specified in [PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md](PHASE_1B_4_RENDERER_ATTEMPT_PROTOCOL.md), while renderer staging canary, acceptance and rollback gates are executable from [PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md](PHASE_1B_RENDERER_STAGING_REHEARSAL_RUNBOOK.md). Its remaining executor, renderer-protocol, route-adapter code, migration and rollout stay blocked until those gates pass.
+**Progress as of 2026-09-09:** commit `a913546a0` adds the isolated S3 egress proxy and staging-only credential installer. The staging Remotion canary passes (`submit_http=200`, `render_status=done`, HTTPS artifact); all three staging containers are healthy. Production renderers were not restarted and the durable production rollout/migration remains pending.
 
 **Scope**
 
@@ -94,7 +94,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** users can use a validated multi-scene Director Engine while Quick Engine remains unchanged.
 
-**Progress as of 2026-09-07:** `main` contains the fail-closed, artifact-reference Timeline v1 contract and structural-only preflight API ([Phase 3A](PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md)), plus a pure Timeline→`dynamic-slideshow` compiler that preserves crop, transition, profile and allowed audio semantics ([Phase 3B](PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md)); merge commit `2fb93f9dc` is not deployed. It deliberately has no render-submission API, UI, database write, artifact resolver, renderer call or deployment because the current Remotion route bypasses the durable job/artifact/release lifecycle. This does not satisfy this phase's acceptance gate and must not be described as a deployed Director Engine.
+**Progress as of 2026-09-09:** `main` contains the fail-closed Timeline v1 contract/compiler and a tenant-safe `timeline/submit` route that creates a durable internal job before calling Remotion. It also contains compile/submit route tests. The code is present across commits `ef1c2be2b`, `eee9f3fea` and `a913546a0`; it is not deployed to the production Next-admin. The Director acceptance gate still requires staging API deployment, interruption recovery and review UI.
 
 **Scope**
 
@@ -116,7 +116,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** a candidate video receives reviewable captions and cannot form a release with known technical failure.
 
-**Progress as of 2026-09-06:** the source-of-truth and caption revision boundary is defined in [PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md](PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md); the technical/editorial evidence and Release gate are defined in [PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md](PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md). This is design only: no Whisper worker has been attached to VideoStudio, no database schema exists, and no existing ffmpeg subtitle path has changed. Runtime implementation remains gated by Phase 2 asset/release safety and the durable job lifecycle.
+**Progress as of 2026-09-09:** the source-of-truth and caption revision boundary remains defined by the contracts. `a913546a0` adds a tenant-safe transcript import route that validates source ownership and writes immutable JSON/SRT/VTT renditions with lineage. `724044af7` carries validated caption cues into Remotion DynamicSlideshow with frame-accurate rendering. `adb92808c` adds deterministic Quick Engine technical QA for ffprobe streams, dimensions and positive duration; `646896954` adds the tenant-scoped persisted QA report boundary. Whisper execution, automatic transcription dispatch and media-analysis workers are still pending; no existing Quick Engine subtitle path was changed.
 
 **Scope**
 
@@ -138,7 +138,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** short-drama and real-footage workflows become independent production modes that converge only at Timeline, QA and Release.
 
-**Progress as of 2026-09-06:** versioned Story Bible、Edit Decision Plan、capability boundaries and their mandatory Timeline/QA/Release convergence are defined in [PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md](PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md). This is design only: no UI, asset write, provider call, render, migration or deployment exists.
+**Progress as of 2026-09-09:** versioned Story Bible and Edit Decision Plan structural validators are in `5476df680`, with UUID references, source ranges, frame alignment and overlap checks. Persistence/RLS, review UI, asset resolver integration and render convergence remain pending; no production-mode capability is enabled.
 
 **Scope**
 
@@ -159,7 +159,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** approved releases reach WordPress and Postiz safely, outcomes improve future work, and local/SaaS/enterprise use follows one controlled product model.
 
-**Progress as of 2026-09-06:** WordPress/Postiz attempt lifecycle, outcome snapshots and the self-use/SaaS/enterprise-BYO boundary are defined in [PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md](PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md). This is design only: the current Postiz route remains unchanged, no destination integration was provisioned, and no billing or provider-policy runtime exists.
+**Progress as of 2026-09-09:** `0b79deecc` adds additive RLS persistence for QA, Release, delivery attempts and outcome snapshots; `646896954` adds the tenant-scoped QA report ingestion boundary; `acfe7e7f2` and `60500f780` provide the shared state/event contracts. Postiz and WordPress now accept optional `releaseId` receipt linkage behind `MEDIA_PRODUCTION_PERSISTENCE_ENABLED`; `/api/webhooks/video-outcome` and `/api/video/outcomes` provide authenticated ingestion/read aggregation behind explicit flags. Migration is committed but deliberately not applied to production.
 
 **Scope**
 
@@ -202,3 +202,17 @@ Phase 0: prove baseline
 ```
 
 The immediate executable work is **Phase 0, then Phase 1**. Phase 2–4 contracts may be specified early to prevent incompatible implementations, but they do not authorize their runtime paths. This gives you a working, reviewable video tool before any new ledger, supplier, renderer or commercial surface is introduced.
+
+## 2026-09-09 implementation slice
+
+- `0b79deecc`: `packages/db/migrations/0065_media_production_persistence.sql` plus rollback script. Apply only after isolated Supabase rehearsal.
+- `delivery-receipts.ts`: idempotent service-role adapter; disabled until `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`.
+- Postiz route and WordPress embed route: optional `releaseId`/`variant` receipt lifecycle with queued→drafted→published/failed transitions.
+- `FootageEditor.tsx`: VideoStudio tab for MP4 import through existing R2 route, cut points, output offsets and EDP JSON export.
+- `MediaOperationsPanel.tsx`: VideoStudio 營運成效 tab，讀取租戶方案/點數/provider 與 outcome totals。
+- `0066_media_billing_and_provider_profiles.sql`: plan account, credit ledger, atomic reserve RPC and provider profile metadata; secrets remain Vault-only.
+- `/api/video/billing` and `/api/video/credits/reserve`: tenant-scoped account/provider read-write and atomic credit reservation.
+- `/api/webhooks/video-outcome` and `/api/video/outcomes`: bearer-authenticated event ingestion, deduplication and tenant dashboard read model.
+- `a93c413a0`: provider allowlist boundary; billing profile changes fail closed unless `MEDIA_PROVIDER_ALLOWLIST` explicitly permits the provider.
+
+Runtime activation requires migration 0065/0066 rehearsal, staging env flags and receipt/outcome secret provisioning. Existing Quick Engine, Remotion and publication paths remain unchanged when flags are off.

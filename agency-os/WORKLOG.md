@@ -13582,3 +13582,95 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 
 [rollback]
 `git revert` 本次 commit：`industries/` 整目錄消失，`configurator_engine.py`/`foundry_generate.py`/`serve_configurator.py` 三個既有函式簽章還原（新參數皆有預設值，revert 對現有 caller 零影響）；`manifest.json`/`registries/kernel.yaml` 同步還原（本次未觸碰 kernel_digest，因未改 `kernel/*.md`）。
+## 2026-09-09（Video LEGO — Remotion 租戶 job lifecycle）
+
+[完成] `eee9f3fea` 已送 `main`。Remotion UI 改用租戶綁定的 `video_jobs` 內部 id；舊 EU job 直通 endpoint 封存；renderer kind 防止 FFmpeg status 誤輪詢；完成寫入 `media_assets`。REALTEST：typecheck=0、Vitest=67 files/723 tests、diff-check=0。Staging/production 未重啟。
+
+## 2026-09-09 Remotion tenant lifecycle slice
+
+- `eee9f3fea`：Remotion 先建立租戶綁定 `video_jobs`，對外只回內部 job id；VideoStudio 改輪詢 `/api/video/remotion-job-status`。
+- 舊 `/api/video/remotion-status` 固定回 410；`rendererKind=remotion` 防止通用 FFmpeg status 誤輪詢；完成寫入 `media_assets`。
+- 驗證：typecheck exit=0；Vitest 67 files / 723 tests exit=0；diff-check exit=0。
+
+## 2026-09-09 Video LEGO staging S3 egress
+
+- 根因：原 staging token 可讀取但無 `PutObject` 權限；新 token 由 note 安裝至 root-only `.env.renderer-staging`，只記錄 SHA prefix，未輸出密鑰。
+- 程式：`apps/r2-egress-proxy` 改用 AWS SDK S3 簽名上傳；compose 將 renderer 保持 internal network，proxy 使用獨立 egress network；增加 key prefix/path/query allowlist。
+- REALTEST_EVIDENCE: SSH `docker inspect` 顯示 `lobster-staging-r2-egress-proxy`、`lobster-staging-remotion-service`、`lobster-staging-video-service` 均 `healthy`；canary `submit_http=200`, `render_status=done`, `url_https=true`；Next-admin `typecheck` exit=0；Vitest `72 files / 750 tests` exit=0；proxy tests `3/3` pass；`git diff --check` exit=0。
+- REVIEW_DONE: self-review（auth/tenant/network boundary；proxy only writes `remotion/`/`video/`）| verdict=pass。
+- BUGHUNT_DONE: scope=video renderer/proxy/staging compose/scripts | grep for credential literals and unsafe object paths | hits=0 in changed files。
+- ROLLBACK: restore `.env.renderer-staging.bak-r2-token`, then `docker compose ... up -d` staging only；code rollback via `git revert`。
+- COMMIT: `a913546a0` pushed to `main`; production renderer/Next-admin containers remained untouched.
+
+## 2026-09-09 Video LEGO technical QA slice
+
+- `adb92808c`：Quick Engine 成片加入 ffprobe 證據與純函式 `media.qa_technical`；缺 video/audio、無效時長或輸出比例錯誤會 fail-closed，成功輸出保存 detector/measurements/findings metadata。
+- REALTEST_EVIDENCE: `python -m unittest discover -s tests` = 7/7；`python -m py_compile server.py quality.py` exit=0；staging video-service rebuild/start 後 healthy。
+- REVIEW_DONE: self-review（只增加輸出驗證，未改既有輸入契約；失敗在 R2 上傳前停止）| verdict=pass。
+- BUGHUNT_DONE: changed scope `apps/video-service`；credential literal scan=0；`git diff --check`=0。
+- LIMIT: 目前是 report metadata + render gate；黑畫面、頻閃、字幕同步、QA report persistence 與 Release hard gate 仍屬後續 Phase 4。
+
+## 2026-09-09 Video LEGO frame-accurate captions
+
+- `724044af7`：Timeline v1 經驗證的 caption track 轉成 Remotion frame cues，DynamicSlideshow 以全域 frame clock 顯示目前字幕；舊手動場景未提供 captions 時行為不變。
+- REALTEST_EVIDENCE: next-admin typecheck exit=0；Vitest `72 files / 750 tests` exit=0；Remotion build exit=0、tests `3/3`；staging Remotion canary `submit_http=200`, `render_status=done`, `url_https=true`。
+- REVIEW_DONE: self-review（caption 時間先經 Timeline validator 對齊影格；renderer 不讀未授權來源）| verdict=pass。
+- BUGHUNT_DONE: changed scope=Timeline compiler + DynamicSlideshow/SceneSeries；`git diff --check` exit=0；credential literal scan=0。
+
+## 2026-09-09 Video LEGO short-drama and footage contracts
+
+- `5476df680`：新增 `story-bible.ts` 與 `edit-plan.ts` 純 validator；短劇角色/參考素材/分集狀態與實拍來源 range/輸出 track/frame alignment 先在邊界 fail-closed，兩者仍只能產生候選 Timeline。
+- REALTEST_EVIDENCE: production-document tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
+- REVIEW_DONE: self-review（純結構驗證，不寫資料庫、不呼叫 provider、不改既有 Quick Engine）| verdict=pass。
+- BUGHUNT_DONE: changed scope=video production documents；UUID、未知欄位、source range、track overlap negative fixtures 均覆蓋。
+- LIMIT: immutable document persistence、RLS、review UI、角色 continuity engine 與實拍 proxy media 尚未接入。
+
+## 2026-09-09 Video LEGO Release gate core
+
+- `bb284acce`：新增 `release-gate.ts`，要求每個 required QA kind 都有同 candidate asset/checksum 的 current evidence；missing、stale、failed、superseded、duplicate 會阻擋 Release。
+- REALTEST_EVIDENCE: release-gate tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
+- REVIEW_DONE: self-review（純 gate，不寫資料庫、不改發布 adapter；warned evidence 僅在明確 gate policy 下通過）| verdict=pass。
+- BUGHUNT_DONE: changed scope=video release gate；negative fixtures 覆蓋缺件、checksum 漂移、失敗與 duplicate kind。
+- LIMIT: persistence/RLS、immutable release records、WordPress/Postiz receipts and rollback adapters remain pending.
+
+## 2026-09-09 Video LEGO Release preflight API
+
+- `313cdc430`：接通 `POST /api/video/release/preflight`；驗證 tenant access、QA evidence schema、candidate checksum 與 required kinds，回傳 `releaseCreatable`，不產生資料庫或發布副作用。
+- REALTEST_EVIDENCE: route tests `3/3`；next-admin typecheck exit=0；`git diff --check` exit=0。
+- REVIEW_DONE: self-review（client foreign-org 403；invalid evidence 400；gate fail 不可升級）| verdict=pass。
+- BUGHUNT_DONE: negative fixtures 覆蓋 failed QA、foreign org、missing/unknown fields。
+- LIMIT: endpoint 是 preflight；immutable `media_releases` persistence and delivery adapters remain pending。
+
+## 2026-09-09 Video LEGO delivery contract
+
+- `acfe7e7f2`：新增 WordPress/Postiz 共用 delivery state machine；`releaseId + destination + variant` 產生穩定冪等 key，明確定義 retry、publish、withdrawn terminal transition。
+- REALTEST_EVIDENCE: delivery contract tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
+- REVIEW_DONE: self-review（純狀態轉移與 key derivation，不呼叫外部平台、不改既有 Postiz route）| verdict=pass。
+- BUGHUNT_DONE: negative fixture 覆蓋 withdrawn 後重發與 destination key collision。
+- LIMIT: durable delivery-attempt records、Postiz/WordPress adapter wiring and outcome ingestion remain pending。
+
+## 2026-09-09 Video LEGO outcome contract
+
+- `60500f780`：新增 append-only outcome snapshot validator；平台、外部貼文、觀測成熟度與固定 metrics 白名單分離，事件 ID 由 canonical fields SHA-256 決定以支援去重。
+- REALTEST_EVIDENCE: outcome tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
+- REVIEW_DONE: self-review（禁止負數/未知 metrics；不同平台不共用 event identity）| verdict=pass。
+- BUGHUNT_DONE: negative fixture 覆蓋未知 metric、負值與不支援平台/成熟度。
+- LIMIT: webhook ingestion、append-only DB table、dashboard and feedback loop remain pending。
+
+## 2026-09-09 Video LEGO persistence, adapters, footage UI, billing, outcomes
+
+- `0b79deecc`：新增 `packages/db/migrations/0065_media_production_persistence.sql` 與 down script；QA、Release、delivery attempt、outcome snapshot 四張表，FK/CHECK/index/RLS/service-role grant；尚未套用正式資料庫。
+- 新增 `apps/next-admin/lib/content/video/delivery-receipts.ts`；以 stable idempotency key 建立/更新 receipt，狀態機失敗即停止，旗標 `MEDIA_PRODUCTION_PERSISTENCE_ENABLED` 預設關閉。
+- `app/api/content/social-publish/route.ts`、`app/api/video/embed-to-wp/route.ts`：接受 optional `releaseId`/`variant`，Postiz/WordPress 外部結果寫入 receipt；既有呼叫不帶欄位時維持原行為。
+- 新增 `app/(shell)/tools/video/FootageEditor.tsx` 並掛入 `VideoStudio`：沿用既有 MP4 magic-byte/R2 上傳，支援片段入/出點、輸出起點與 EDP JSON 複製。
+- 新增 `packages/db/migrations/0066_media_billing_and_provider_profiles.sql` 與 down script：free/subscription/enterprise 帳戶、credit ledger、原子 reserve RPC、provider profile；BYO secret 只進 Vault。
+- 新增 `/api/video/billing`、`/api/video/credits/reserve`：tenant/role gate、方案/點數/Provider metadata 與原子扣點。
+- 新增 `/api/webhooks/video-outcome`、`/api/video/outcomes`：token 驗證、事件 canonical SHA-256 去重、已發布 delivery 關聯、租戶聚合 dashboard read model。
+- REALTEST_EVIDENCE: next-admin `npm run typecheck` exit=0；Vitest `77 files / 761 tests` exit=0；`git diff --check` exit=0。
+- LIMIT: 0065/0066 尚未套用 production；outcome/billing/receipt 需 staging flags 與 secrets 後才會啟用。未重啟正式容器。
+- CODE_COMMIT: `a93c413a0` 已推送 `main`；Next build exit=0（僅既有 symlink traced-files EPERM 警告，非編譯失敗）。
+- `646896954`：新增 `/api/video/qa/report`，對 tenant、candidate、checksum、QA kind/status 做 fail-closed 驗證並以 SHA-256 寫入 `media_qa_reports`；旗標關閉時維持 503，不觸碰舊流程。
+- `a93c413a0`：新增 provider allowlist policy；billing provider profile 與 capabilities API 只接受明確 `MEDIA_PROVIDER_ALLOWLIST`，未知/未列入供應商 fail-closed；既有生成器仍待全面接入 resolver。
+- 工作邊界補強：QA report 與 Release 寫入前查證 candidate `media_assets` 的租戶歸屬與 checksum；delivery receipt 建立前查證 Release 同租戶且 `release_approved`；billing limit 先拒絕負數或非安全整數。這些檢查不改變旗標關閉時的舊路徑。
+- `cde2f007c`：正式提交並推送上述邊界補強；`npm run typecheck`、Vitest `78 files / 763 tests` 與 `npm run build` 均通過。Build 僅保留既有 symlink traced-files EPERM 警告。
+- 新增 `docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`，列出 Whisper worker、EDP asset registration、Release linkage、billing lifecycle、provider allowlist、outcome feedback 與 deployment 的確切 evidence/剩餘工作。

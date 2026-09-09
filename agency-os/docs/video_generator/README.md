@@ -1,7 +1,7 @@
 # Media Production LEGO Platform
 
-**正式程式來源：** `origin/main`；影片基礎程式已於 `2fb93f9dc` 整合，尚未部署。
-**文件入口：** 本目錄；production VideoStudio 與 WordPress／Postiz 未因該整合變更。
+**正式程式來源：** `origin/main`；最新影片 LEGO 交付為 `cde2f007c`（tenant release/asset boundary）。
+**文件入口：** 本目錄；現有 Quick Engine 路徑保持相容，新功能以旗標與 additive migration 接入。
 
 ## 現行文件
 
@@ -9,12 +9,13 @@
 - `MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`：四個領域、Capability 契約與長期架構。
 - `MEDIA_CAPABILITY_ADOPTION_AND_PROMOTION_CATALOG.md`：正式 LEGO ID 映射、別名隔離與 ACTIVE promotion packet。
 - `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`：分期交付與驗收。
+- `VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`：逐項剩餘 runtime 缺口、file evidence 與啟用門檻。
 - `PHASE_0_ISOLATION_AND_CHANGE_CONTROL.md`：隔離、備份與變更管制。
 - `PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md`：既有素材、Timeline、Release 與安全刪除的資料契約及 migration gate。
-- `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`：本機 Whisper 轉錄、可校對字幕、審片與 Release 接線契約；尚未接入既有出片路徑。
+- `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`：本機 Whisper 轉錄、可校對字幕、審片與 Release 接線契約；目前仍需 worker 接線。
 - `PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md`：技術／字幕／編輯／權利 QA 的證據、waiver 與 Release gate 契約；尚未執行媒體分析或阻擋發布。
-- `PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`：短劇 Bible 與實拍 Edit Decision Plan 如何安全匯入 Timeline、QA 與 Release；尚未接入 UI 或 renderer。
-- `PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md`：WordPress、Postiz、成效回饋、自用／SaaS／企業 BYO API 的交付與治理契約；尚未發布或啟用商業模式。
+- `PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`：短劇 Bible 與實拍 Edit Decision Plan 契約；VideoStudio 已有實拍 EDP 草稿 UI，renderer convergence 仍待完成。
+- `PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md`：WordPress、Postiz、成效回饋、自用／SaaS／企業 BYO API 的交付與治理契約；receipt/billing/outcome API 已在 code，啟用仍需 migration rehearsal。
 - `LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`：正式環境盤點與 staging 建置條件。
 - `PHASE_1A_IMPLEMENTATION_RECEIPT.md`、`PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md`、`PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`：已整合至 `main`、尚未部署的程式交付。
 - `PHASE_3B_TIMELINE_TO_REMOTION_COMPILER_RECEIPT.md`：Timeline→dynamic-slideshow 的 fail-closed 編譯器與 renderer 語意保留；已整合至 `main`，尚未接到出片路徑。
