@@ -13694,3 +13694,10 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - Added compose feature-flag wiring in code commit `9f904d090`; production config backup `/root/lobster-phase1/docker-compose.yml.bak-20260909T072812Z`; loaded `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true` into `lobster-next-admin`. `MEDIA_OUTCOME_WEBHOOK_ENABLED=false` remains disabled pending token/canary.
 - Restart verification: `lobster-next-admin` healthy; `/login` returned expected 307 auth redirect. Existing production services were not restarted.
 - Docs synced in `agency-os/docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md` and `MEDIA_PRODUCTION_LEGO_PHASED_DELIVERY_PLAN.md`; docs commit `f3225fd50` pushed to `video-docs-20260909`.
+
+## 2026-09-09 Video LEGO Whisper worker boundary
+
+- `c66c64642`: meeting-service adds local-only authenticated `/api/video/transcribe`; upload is bounded to 500MB/allowlisted extensions, job is isolated, and outputs immutable transcript JSON/SRT/VTT through existing status/download endpoints.
+- `93cee8dc1`: next-admin adds tenant-bound `/api/video/transcription/dispatch`; it fails closed unless HTTPS worker URL and bearer token are explicitly configured, never fetches arbitrary source URLs, and forwards multipart bytes only to that worker.
+- REALTEST_EVIDENCE: meeting-service unittest `5/5` and `py_compile` pass; next-admin typecheck/Vitest `78/764`/build pass; sg-deploy next-admin smoke 4/4 pass, deployed commit `93cee8dc1`.
+- LIMIT: GPU workstation worker URL/token are not provisioned in production, so dispatch correctly returns `503 transcription_worker_not_configured`; this is an explicit safe gate, not a silent fallback.
