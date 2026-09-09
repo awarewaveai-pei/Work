@@ -9,16 +9,17 @@
 不部署到 SG/EU（無 GPU，見 README.md）。
 """
 import json
+import hmac
 import os
 import shutil
 import threading
 import uuid
 
-from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
 from lib import settings, summarize
-from pipeline import resume_after_summary, run_pipeline_phase1
+from pipeline import resume_after_summary, run_pipeline_phase1, run_video_transcription
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(BASE_DIR, "jobs")
@@ -91,6 +92,50 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     thread.start()
 
     return {"job_id": job_id}
+
+
+@app.post("/api/video/transcribe")
+async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3",
+                           authorization: str = Header(default="")):
+    """影片專用本機 Whisper worker 邊界；不抓取任意 URL，只接收上傳位元組。
+
+    本服務仍只綁定 127.0.0.1。若由受控 HTTPS 隧道轉發，必須設定
+    VIDEO_WORKER_TOKEN；未設定時端點會 fail-closed，避免隧道誤暴露無驗證服務。
+    """
+    expected_token = os.environ.get("VIDEO_WORKER_TOKEN", "").strip()
+    if not expected_token:
+        raise HTTPException(503, "video worker token not configured")
+    if not hmac.compare_digest(authorization, f"Bearer {expected_token}"):
+        raise HTTPException(401, "invalid worker token")
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
+    if not model or len(model) > 64 or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for c in model):
+        raise HTTPException(400, "invalid model")
+
+    job_id = uuid.uuid4().hex[:12]
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=True)
+    media_path = os.path.join(job_dir, f"input{ext}")
+    size = 0
+    try:
+        with open(media_path, "wb") as out:
+            while chunk := await file.read(1 << 20):
+                size += len(chunk)
+                if size > MAX_UPLOAD_MB * 1024 * 1024:
+                    raise HTTPException(413, f"檔案超過 {MAX_UPLOAD_MB}MB 上限")
+                out.write(chunk)
+    except Exception:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+
+    threading.Thread(
+        target=run_video_transcription,
+        args=(job_dir, media_path),
+        kwargs={"model_name": model},
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "kind": "video_transcription"}
 
 
 @app.get("/api/settings")
@@ -168,6 +213,7 @@ DOWNLOADS = {
     "excel": ("meeting_record.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     "coach": ("coach.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "transcript_srt": ("transcript.srt", "application/x-subrip"),
+    "transcript_vtt": ("transcript.vtt", "text/vtt; charset=utf-8"),
     "transcript_json": ("transcript.json", "application/json"),
     "diarized_txt": ("diarized.txt", "text/plain; charset=utf-8"),
     "merged_txt": ("merged.txt", "text/plain; charset=utf-8"),

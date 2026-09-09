@@ -37,6 +37,7 @@ function Test-ServerListening {
 function Start-OnWindows {
     $env:HF_TOKEN = [Environment]::GetEnvironmentVariable("HF_TOKEN", "User")
     $env:MEETING_DRIVE_BASE = [Environment]::GetEnvironmentVariable("MEETING_DRIVE_BASE", "User")
+    $env:VIDEO_WORKER_TOKEN = [Environment]::GetEnvironmentVariable("VIDEO_WORKER_TOKEN", "User")
     $env:PYTHONIOENCODING = "utf-8"
     $env:PYTHONUNBUFFERED = "1"
     Start-Process -FilePath "python" -ArgumentList "app.py" `
@@ -60,11 +61,12 @@ function Start-OnWsl2 {
     }
     $env:MEETING_HF_TOKEN = [Environment]::GetEnvironmentVariable("HF_TOKEN", "User")
     $env:MEETING_DRIVE_BASE = $driveBaseWsl
+    $env:VIDEO_WORKER_TOKEN = [Environment]::GetEnvironmentVariable("VIDEO_WORKER_TOKEN", "User")
     # 模型快取指向 Windows 既有的（large-v3 2.9GB / medium 1.5GB 已下載完成），
     # 避免在 WSL2 內重下一份。模型檔是資料不是可執行碼，SAC 不擋。
     $env:HF_HOME = "/mnt/c/Users/$env:USERNAME/.cache/huggingface"
     # WSLENV 控制哪些變數跨界；不加 /p 因為值已經是 WSL 路徑格式，不需再轉換
-    $env:WSLENV = "MEETING_HF_TOKEN:MEETING_DRIVE_BASE:HF_HOME"
+    $env:WSLENV = "MEETING_HF_TOKEN:MEETING_DRIVE_BASE:VIDEO_WORKER_TOKEN:HF_HOME"
 
     $sh = "$APPDIR/start_server.sh"
     # 先確認 WSL 那側看得到這個檔案。否則 -WindowStyle Hidden 會吞掉 bash 的

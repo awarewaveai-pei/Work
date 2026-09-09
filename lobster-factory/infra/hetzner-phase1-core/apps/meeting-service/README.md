@@ -98,6 +98,9 @@ python app.py
   客戶名稱、帳號路徑帶去別人的機器。別人拿到這份程式碼時這裡天生是空的，
   勾選同步選項只會安全回報「未設定」，**不會觸發任何登入畫面、不會用到操作者
   的任何帳號**——這功能全程只是檢查本機檔案路徑，從來不呼叫 Google 的登入 API。
+- `VIDEO_WORKER_TOKEN` — 影片字幕 worker 的 bearer token；未設定時 `/api/video/transcribe`
+  會回 503。只有在受控 HTTPS 隧道與 next-admin `MEDIA_TRANSCRIBE_WORKER_TOKEN`
+  同時設定後，才可讓遠端影片流程使用；本機會議 `/api/upload` 不受影響。
 
 **摘要階段預設不需要 API key**（人工回路模式）。想用 API 自動處理見下方「摘要階段二：API 自動處理」。
 
@@ -158,7 +161,8 @@ pip install --force-reinstall --index-url https://download.pytorch.org/whl/cu128
 ## 架構
 
 ```
-app.py            FastAPI，僅 bind 127.0.0.1，/upload /status /log /download
+app.py            FastAPI，僅 bind 127.0.0.1；會議 /api/upload + 影片 /api/video/transcribe
+                  （影片端點受 VIDEO_WORKER_TOKEN 保護）
 pipeline.py       串接全流程，寫 jobs/<job_id>/status.json 供輪詢
 lib/
   transcribe.py   faster-whisper + GPU 探針（建構成功 != 能推論，見下方坑 3）

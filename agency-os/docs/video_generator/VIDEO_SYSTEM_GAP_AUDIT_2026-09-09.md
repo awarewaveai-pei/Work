@@ -36,6 +36,14 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 Current production is commit `035a327885443be29a596361465f5648a6c837b4`: next-admin `sg-deploy` snapshot `lobster-phase1-next-admin:rollback-20260909-081606` and rebuilt `lobster-video-service` (`lobster-video-service:rollback-20260909-082100`), both healthy. Real footage canary `28e2dbee3de24bfd971e6f4d6bde1d63` produced 1920×1080 output with checksum `b5e96572470f59b028210610e8d5bcc95efd18a83e9f59f27a17fb80f2bdf7c1`; technical/signal QA passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).
 Historical baseline bullets (before the 08:20 UTC correction) are retained below for audit:
 
+### Laptop Whisper boundary correction — 2026-09-09
+
+- `C:\Users\user1115\Desktop\啟動會議處理服務.lnk` targets `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\start_server.ps1`; it starts the local meeting-service on `127.0.0.1:8420`.
+- The laptop has an NVIDIA RTX 5060 Laptop GPU (8,151 MiB reported by `nvidia-smi`); `ks-aw-01` remains CPU-only.
+- The canonical shortcut service now has `/api/video/transcribe` (`app.py:97`) and `run_video_transcription` (`pipeline.py:216`), emitting transcript JSON/SRT/VTT. `VIDEO_WORKER_TOKEN` is passed by `start_server.ps1:40,64` and the endpoint fails closed with 503 when absent.
+- The shortcut target was launched on 2026-09-09; it selected Windows native GPU mode and `GET http://127.0.0.1:8420/` returned HTTP 200. A real multipart POST to `/api/video/transcribe` returned the expected 503 because no token is configured.
+- This local capability is not a production worker URL: `127.0.0.1` is unreachable from `ks-aw-01`. Production dispatch therefore remains 503 until the laptop is exposed through an authenticated HTTPS tunnel and next-admin receives the matching URL/token.
+
 - Before migration, a read-only query in `supabase-db` returned empty values for all seven 0065/0066 tables. After the controlled apply, `information_schema` lists all seven tables and `pg_proc` lists `media_credit_reserve`; row counts remain zero as expected for a new additive ledger.
 - `lobster-next-admin` now runs image digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632`, healthy; `/root/lobster-phase1/.deployed-commit` is `31857c06b6aa415a8806e413c91f99473924c676`.
 - Deployment used `sg-deploy.sh next-admin`: snapshot `lobster-phase1-next-admin:rollback-20260909-060402`; `/login`, `/api/ops/summary`, WordPress and node-api smoke checks all returned 200. The saved host-local Remotion edit was restored after deployment. A follow-up compose restart loaded persistence flags; `/login` returned the expected 307 auth redirect and the container is healthy. Config backup: `/root/lobster-phase1/docker-compose.yml.bak-20260909T072812Z`.

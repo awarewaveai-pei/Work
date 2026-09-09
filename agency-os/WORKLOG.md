@@ -13719,3 +13719,16 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - Production: next-admin deployed via `sg-deploy.sh`, snapshot `lobster-phase1-next-admin:rollback-20260909-081606`, smoke 4/4; video-service rebuilt from `035a32788`, rollback tag `lobster-video-service:rollback-20260909-082100`, health OK.
 - Real canary `jobId=28e2dbee3de24bfd971e6f4d6bde1d63`: 16x9 1920×1080, 979753 bytes, SHA-256 `b5e96572470f59b028210610e8d5bcc95efd18a83e9f59f27a17fb80f2bdf7c1`; technical/signal QA passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).
 - Remaining external prerequisite is explicit: ks-aw-01 has no NVIDIA GPU, so production Whisper dispatch remains 503 until the RTX workstation is exposed through an authenticated HTTPS worker (`VIDEO_WORKER_TOKEN`) and configured as `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN`.
+
+## 2026-09-09 Video LEGO local RTX Whisper boundary
+
+- 根因：桌面捷徑啟動的是筆電 `meeting-service` (`127.0.0.1:8420`)；它原先只有會議 `/api/upload`，而 ks-aw-01 無 NVIDIA，不能把 localhost 當 production worker。
+- 修改：`meeting-service/app.py:16,21,97-143,215` 新增 token-protected `/api/video/transcribe`；`pipeline.py:24,216-243` 新增影片專用 Whisper JSON/SRT/VTT worker；`lib/transcribe.py:187-197` 新增 WebVTT；`start_server.ps1:40,64,69` 傳遞 `VIDEO_WORKER_TOKEN` 到 Windows/WSL。
+- `C:\Users\user1115\Desktop\啟動會議處理服務.lnk` 實測 Target 為上述 `start_server.ps1`；筆電 `nvidia-smi` 實測 RTX 5060 Laptop GPU / 8151 MiB；檢查時本機 8420 無 listener（服務未啟動）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m py_compile app.py pipeline.py lib/transcribe.py | exit=0 | ms=97
+- REALTEST_EVIDENCE: tool=Bash | cmd=FastAPI TestClient /api/video/transcribe with missing bearer and valid bearer | exit=0 | ms=998 | observed=503 without configured token after fail-closed check; 401 with configured token and missing bearer; 200 with matching bearer
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -ExecutionPolicy Bypass -File D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\start_server.ps1; Invoke-WebRequest http://127.0.0.1:8420/ | exit=0 | ms=12200 | observed=Windows 原生 GPU 模式啟動，HTTP 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -c "requests.post(http://127.0.0.1:8420/api/video/transcribe, files=...)" | exit=0 | ms=269 | observed=503 video worker token not configured
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts | grep=video/transcribe|run_video_transcription|VIDEO_WORKER_TOKEN|write_vtt | hits=11
+- LIMIT: production dispatch remains 503 until the laptop is exposed via authenticated HTTPS and `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` is configured; no secret was printed or invented.

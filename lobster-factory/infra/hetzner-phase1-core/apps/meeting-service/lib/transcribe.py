@@ -182,3 +182,13 @@ def write_srt(segs: list, path: str):
     with open(path, "w", encoding="utf-8") as f:
         for i, s in enumerate(segs, 1):
             f.write(f"{i}\n{fmt_srt_ts(s['start'])} --> {fmt_srt_ts(s['end'])}\n{s['text']}\n\n")
+
+
+def write_vtt(segs: list, path: str):
+    """Write WebVTT using the same segment boundaries as SRT."""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("WEBVTT\n\n")
+        for s in segs:
+            start = fmt_srt_ts(s["start"]).replace(",", ".")
+            end = fmt_srt_ts(s["end"]).replace(",", ".")
+            f.write(f"{start} --> {end}\n{s['text']}\n\n")
