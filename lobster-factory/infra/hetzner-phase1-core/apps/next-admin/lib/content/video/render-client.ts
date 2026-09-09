@@ -171,6 +171,10 @@ export async function submitFootageRender(
   formats: string[],
   outName: string,
   baseUrl?: string,
+  opts?: {
+    audio?: { source_url: string; source_start_ms: number; duration_ms: number };
+    captions?: Array<{ start_ms: number; end_ms: number; text: string }>;
+  },
 ): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
   const base = svcBase(baseUrl);
   const auth = resolveRendererAuth("quick");
@@ -179,7 +183,13 @@ export async function submitFootageRender(
     const res = await fetch(`${base}/render-footage`, {
       method: "POST",
       headers: { ...auth.headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ clips, formats, out_name: outName }),
+      body: JSON.stringify({
+        clips,
+        formats,
+        out_name: outName,
+        ...(opts?.audio ? { audio: opts.audio } : {}),
+        ...(opts?.captions ? { captions: opts.captions } : {}),
+      }),
       signal: AbortSignal.timeout(30_000),
     });
     const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };

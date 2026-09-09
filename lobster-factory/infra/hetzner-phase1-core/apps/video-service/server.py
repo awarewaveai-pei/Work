@@ -199,10 +199,47 @@ def _validate_footage(payload: dict):
         raise ValueError(f"formats 必須是 config.FORMATS 子集：{list(config.FORMATS)}")
     if len(set(formats)) != len(formats):
         raise ValueError("formats 不可重複")
+    audio = payload.get("audio")
+    parsed_audio = None
+    if audio is not None:
+        if not isinstance(audio, dict):
+            raise ValueError("audio 必須是物件")
+        source = audio.get("source_url")
+        if not isinstance(source, str) or not source.startswith("https://"):
+            raise ValueError("audio.source_url 必須是 https URL")
+        try:
+            source_start_ms = int(audio.get("source_start_ms", 0))
+            duration_ms = int(audio["duration_ms"])
+        except (TypeError, ValueError, KeyError):
+            raise ValueError("audio 時間欄位必須是整數")
+        if source_start_ms < 0 or duration_ms <= 0 or duration_ms > 10 * 60 * 1000:
+            raise ValueError("audio 時間範圍無效")
+        parsed_audio = {"source_url": source, "source_start_ms": source_start_ms, "duration_ms": duration_ms}
+    captions = payload.get("captions")
+    parsed_captions = []
+    if captions is not None:
+        if not isinstance(captions, list) or len(captions) > 120:
+            raise ValueError("captions 必須是最多 120 段的 list")
+        previous_end = 0
+        for i, cue in enumerate(captions):
+            if not isinstance(cue, dict):
+                raise ValueError(f"caption[{i}] 必須是物件")
+            try:
+                start_ms = int(cue["start_ms"])
+                end_ms = int(cue["end_ms"])
+            except (TypeError, ValueError, KeyError):
+                raise ValueError(f"caption[{i}] 時間欄位必須是整數")
+            text = cue.get("text")
+            if start_ms < previous_end or end_ms <= start_ms or end_ms > 10 * 60 * 1000:
+                raise ValueError(f"caption[{i}] 時間範圍無效或重疊")
+            if not isinstance(text, str) or not text.strip() or len(text) > 600:
+                raise ValueError(f"caption[{i}].text 必須是 1-600 字元")
+            previous_end = end_ms
+            parsed_captions.append({"start_ms": start_ms, "end_ms": end_ms, "text": text.strip()})
     out_name = payload.get("out_name", "footage")
     if not isinstance(out_name, str) or not out_name.strip():
         raise ValueError("out_name 必須是非空字串")
-    return parsed, formats, out_name.strip()
+    return parsed, formats, out_name.strip(), parsed_audio, parsed_captions
 
 
 def _probe_video(path: str) -> dict:
@@ -343,7 +380,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
             pipeline.cleanup()
 
 
-def _do_footage_render(clips, formats, out_name):
+def _do_footage_render(clips, formats, out_name, audio=None, captions=None):
     """Materialize authorized HTTPS clips, render the footage timeline, and upload outputs."""
     with _render_lock:
         try:
@@ -351,7 +388,14 @@ def _do_footage_render(clips, formats, out_name):
             for idx, clip in enumerate(clips):
                 path = _materialize_asset(clip["source_url"], idx)
                 materialized.append({**clip, "path": path})
-            outputs, out_dir = pipeline.render_footage_timeline(materialized, out_name, formats, fps=config.FPS)
+            materialized_audio = None
+            if audio:
+                audio_path = _materialize_asset(audio["source_url"], len(clips))
+                materialized_audio = {**audio, "path": audio_path}
+            outputs, out_dir = pipeline.render_footage_timeline(
+                materialized, out_name, formats, fps=config.FPS,
+                audio=materialized_audio, captions=captions or [],
+            )
             output_meta = _build_output_meta(outputs)
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
@@ -421,9 +465,9 @@ def submit_render(payload: dict) -> str:
     return job_id
 
 
-def _run_footage_job(job_id: str, clips, formats, out_name):
+def _run_footage_job(job_id: str, clips, formats, out_name, audio=None, captions=None):
     try:
-        result = _do_footage_render(clips, formats, out_name)
+        result = _do_footage_render(clips, formats, out_name, audio=audio, captions=captions)
         with _jobs_lock:
             _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
     except Exception as e:  # noqa: BLE001
@@ -432,12 +476,12 @@ def _run_footage_job(job_id: str, clips, formats, out_name):
 
 
 def submit_footage_render(payload: dict) -> str:
-    clips, formats, out_name = _validate_footage(payload)
+    clips, formats, out_name, audio, captions = _validate_footage(payload)
     job_id = uuid.uuid4().hex
     with _jobs_lock:
         _prune_jobs()
         _JOBS[job_id] = {"status": "running", "ts": time.time()}
-    threading.Thread(target=_run_footage_job, args=(job_id, clips, formats, out_name), daemon=True).start()
+    threading.Thread(target=_run_footage_job, args=(job_id, clips, formats, out_name, audio, captions), daemon=True).start()
     return job_id
 
 

@@ -740,18 +740,93 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
     return outputs, out_dir
 
 
-def render_footage_timeline(clips: list, out_name: str, output_formats: list[str], fps: int = 30):
+def _timeline_caption_font() -> str:
+    for path in (
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+    ):
+        if os.path.exists(path):
+            return path
+    return ""
+
+
+def _burn_footage_captions(input_path: str, output_path: str, captions: list, width: int, height: int) -> None:
+    """Burn validated Timeline caption cues into the final video stream."""
+    if not captions:
+        return
+    font_path = _timeline_caption_font()
+    font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
+    filters = []
+    for index, cue in enumerate(captions):
+        text_path = config.TEMP_DIR / f"footage_caption_{index:04d}.txt"
+        text_path.write_text(cue["text"], encoding="utf-8")
+        safe_path = str(text_path).replace("\\", "/").replace(":", "\\:")
+        in_tag = "[0:v]" if index == 0 else f"[caption{index - 1}]"
+        out_tag = f"[caption{index}]"
+        filters.append(
+            f"{in_tag}drawtext={font_arg}textfile={safe_path}:fontsize={max(48, height // 20)}:"
+            f"fontcolor=white:borderw=3:bordercolor=black:box=1:boxcolor=black@0.45:"
+            f"boxborderw={max(4, height // 270)}:x=(w-text_w)/2:y=h-text_h-{max(40, height // 30)}:"
+            f"enable='between(t,{cue['start_ms'] / 1000:.3f},{cue['end_ms'] / 1000:.3f})'{out_tag}"
+        )
+    cmd = [
+        "ffmpeg", "-y", "-i", input_path,
+        "-filter_complex", ";".join(filters),
+        "-map", f"[caption{len(captions) - 1}]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "21", "-pix_fmt", "yuv420p",
+        "-c:a", "copy", "-shortest", output_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"footage caption burn-in failed: {result.stderr.decode('utf-8', 'ignore')[-500:]}")
+
+
+def _replace_footage_audio(input_path: str, output_path: str, audio: dict, duration_ms: int) -> None:
+    """Replace camera audio with a bounded external track, padding short audio deterministically."""
+    start = float(audio.get("source_start_ms", 0)) / 1000.0
+    duration = float(audio["duration_ms"]) / 1000.0
+    total = float(duration_ms) / 1000.0
+    filter_complex = (
+        f"[1:a]atrim=start={start:.3f}:duration={duration:.3f},asetpts=PTS-STARTPTS,"
+        f"apad,atrim=duration={total:.3f},aresample=44100[a]"
+    )
+    cmd = [
+        "ffmpeg", "-y", "-i", input_path, "-i", audio["path"],
+        "-filter_complex", filter_complex,
+        "-map", "0:v:0", "-map", "[a]", "-t", f"{total:.3f}",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        output_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"footage audio replacement failed: {result.stderr.decode('utf-8', 'ignore')[-500:]}")
+
+
+def render_footage_timeline(clips: list, out_name: str, output_formats: list[str], fps: int = 30,
+                            audio: dict | None = None, captions: list | None = None):
     """Render a canonical footage Timeline using deterministic source ranges.
 
     Each clip is normalised to the requested output profile (cover-fit, fixed
-    fps, H.264/AAC) and then concatenated without a second lossy encode.  The
-    service intentionally requires a video source and supplies a silent AAC
-    track when camera footage has no audio, keeping the output contract valid.
+    fps, H.264/AAC) and then concatenated. Optional Timeline audio replaces
+    camera audio and validated caption cues are burned into the final video.
+    A silent AAC track is supplied when camera footage has no audio, keeping
+    the output contract valid.
     """
     if not clips:
         raise ValueError("clips 不可為空")
     if not output_formats:
         raise ValueError("output_formats 不可為空")
+    captions = captions or []
+    total_duration_ms = sum(int(clip["duration_ms"]) for clip in clips)
+    if audio and (int(audio.get("source_start_ms", 0)) != 0 or int(audio["duration_ms"]) != total_duration_ms):
+        raise ValueError("audio 必須從 0 開始並完整覆蓋 video 時長")
+    previous_caption_end = 0
+    for index, cue in enumerate(captions):
+        start_ms, end_ms = int(cue["start_ms"]), int(cue["end_ms"])
+        if start_ms < previous_caption_end or end_ms <= start_ms or end_ms > total_duration_ms:
+            raise ValueError(f"caption[{index}] 時間範圍無效或超出 video 時長")
+        previous_caption_end = end_ms
     safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40] or "footage"
     out_dir = config.OUTPUT_DIR / safe_name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -802,6 +877,14 @@ def render_footage_timeline(clips: list, out_name: str, output_formats: list[str
         )
         if res.returncode != 0:
             raise RuntimeError(f"footage concat failed: {res.stderr.decode('utf-8', 'ignore')[-500:]}")
+        if audio:
+            audio_path = config.TEMP_DIR / f"footage_{fmt}_audio.mp4"
+            _replace_footage_audio(str(out_path), str(audio_path), audio, total_duration_ms)
+            os.replace(audio_path, out_path)
+        if captions:
+            caption_path = config.TEMP_DIR / f"footage_{fmt}_captions.mp4"
+            _burn_footage_captions(str(out_path), str(caption_path), captions, w, h)
+            os.replace(caption_path, out_path)
         outputs[fmt] = str(out_path)
     return outputs, out_dir
 

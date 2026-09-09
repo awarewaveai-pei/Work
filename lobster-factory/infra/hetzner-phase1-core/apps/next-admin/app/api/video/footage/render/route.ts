@@ -34,13 +34,34 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const videoTracks = timeline.tracks.filter((track): track is Extract<MediaTimelineV1["tracks"][number], { kind: "video" }> => track.kind === "video");
   if (videoTracks.length !== 1 || videoTracks[0].items.length === 0) return NextResponse.json({ ok: false, error: "實拍 Timeline 必須有一條非空 video track" }, { status: 422 });
-  if (timeline.tracks.some((track) => track.kind !== "video" && track.items.length > 0)) return NextResponse.json({ ok: false, error: "實拍 renderer 尚未支援 audio/caption track；請先輸出純 video Timeline" }, { status: 422 });
-  const items = videoTracks[0].items;
+  const items = [...videoTracks[0].items].sort((a, b) => a.startMs - b.startMs || a.id.localeCompare(b.id));
   if (items.some((item) => item.provenance !== "footage")) return NextResponse.json({ ok: false, error: "實拍 renderer 只接受 provenance=footage" }, { status: 422 });
+  let videoDurationMs = 0;
+  for (const [index, item] of items.entries()) {
+    if (item.startMs !== videoDurationMs) return NextResponse.json({ ok: false, error: `實拍 video track 不可有時間空洞（item ${index}）` }, { status: 422 });
+    videoDurationMs += item.durationMs;
+  }
+
+  const audioTracks = timeline.tracks.filter((track): track is Extract<MediaTimelineV1["tracks"][number], { kind: "audio" }> => track.kind === "audio");
+  if (audioTracks.length > 1 || (audioTracks[0]?.items.length ?? 0) > 1) return NextResponse.json({ ok: false, error: "實拍 renderer 最多接受一條單一 audio track" }, { status: 422 });
+  const audioItem = audioTracks[0]?.items[0];
+  if (audioItem && (audioItem.startMs !== 0 || audioItem.durationMs !== videoDurationMs)) {
+    return NextResponse.json({ ok: false, error: "audio 必須從 0 開始並完整覆蓋實拍 video 時長" }, { status: 422 });
+  }
+
+  const captionTracks = timeline.tracks.filter((track): track is Extract<MediaTimelineV1["tracks"][number], { kind: "caption" }> => track.kind === "caption");
+  if (captionTracks.length > 1) return NextResponse.json({ ok: false, error: "實拍 renderer 最多接受一條 caption track" }, { status: 422 });
+  const captions = [...(captionTracks[0]?.items ?? [])]
+    .sort((a, b) => a.startMs - b.startMs || a.id.localeCompare(b.id))
+    .map(({ startMs, endMs, text }) => ({ start_ms: startMs, end_ms: endMs, text: text.trim() }));
+  if (captions.some((cue) => cue.end_ms > videoDurationMs)) return NextResponse.json({ ok: false, error: "caption 不可超出實拍 video 時長" }, { status: 422 });
 
   const db = getSupabaseWriteClient();
   if (!db) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const artifactIds = [...new Set(items.map((item) => item.sourceArtifactId))];
+  const artifactIds = [...new Set([
+    ...items.map((item) => item.sourceArtifactId),
+    ...(audioItem ? [audioItem.sourceArtifactId] : []),
+  ])];
   const { data: assets, error } = await db.from("media_assets")
     .select("id, object_url, organization_id, mime_type, asset_domain")
     .eq("organization_id", timeline.organizationId)
@@ -61,10 +82,24 @@ export async function POST(req: NextRequest): Promise<Response> {
     clips.push({ source_url: url.toString(), source_start_ms: item.sourceStartMs ?? 0, duration_ms: item.durationMs });
   }
 
+  let audio: { source_url: string; source_start_ms: number; duration_ms: number } | undefined;
+  if (audioItem) {
+    const asset = assetMap.get(audioItem.sourceArtifactId);
+    if (!asset || !String(asset.mime_type).startsWith("audio/")) return NextResponse.json({ ok: false, error: `音訊素材不存在或格式不支援：${audioItem.sourceArtifactId}` }, { status: 422 });
+    let url: URL;
+    try { url = new URL(String(asset.object_url)); }
+    catch { return NextResponse.json({ ok: false, error: "音訊素材 URL 無效" }, { status: 422 }); }
+    if (url.protocol !== "https:" || !allowedHosts.has(url.hostname)) return NextResponse.json({ ok: false, error: "音訊素材 URL 不在受控來源" }, { status: 422 });
+    audio = { source_url: url.toString(), source_start_ms: audioItem.startMs, duration_ms: audioItem.durationMs };
+  }
+
   let job: Awaited<ReturnType<typeof createJob>>;
   try { job = await createJob(timeline.organizationId); }
   catch { return NextResponse.json({ ok: false, error: "無法建立影片工作" }, { status: 500 }); }
-  const submission = await submitFootageRender(clips, [format], timeline.timelineId);
+  const submission = await submitFootageRender(clips, [format], timeline.timelineId, undefined, {
+    ...(audio ? { audio } : {}),
+    ...(captions.length > 0 ? { captions } : {}),
+  });
   if (submission.ok === false) {
     await finishJob(job.id, { status: "error", error: submission.error, statusCode: submission.status });
     return NextResponse.json({ ok: false, error: submission.error }, { status: submission.status });
