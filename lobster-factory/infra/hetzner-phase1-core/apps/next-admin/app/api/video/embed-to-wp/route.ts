@@ -4,6 +4,7 @@ import { resolveWpSite } from "@/lib/content/wp-sites";
 import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import {
   ensureDeliveryReceipt,
+  claimDeliveryReceipt,
   mediaPersistenceEnabled,
   recordDeliveryReceipt,
   type DeliveryReceipt,
@@ -62,6 +63,13 @@ export async function POST(req: Request): Promise<Response> {
         destination: "wordpress",
         variant: `${variant}:post-${postId}`,
       });
+      if (receipt) {
+        const claim = await claimDeliveryReceipt(receipt);
+        if (claim && !claim.claimed) {
+          return NextResponse.json({ ok: true, idempotent: true, postId, videoUrl, delivery: claim.receipt });
+        }
+        if (claim) receipt = claim.receipt;
+      }
     } catch (err) {
       return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "failed to reserve delivery receipt" }, { status: 503 });
     }

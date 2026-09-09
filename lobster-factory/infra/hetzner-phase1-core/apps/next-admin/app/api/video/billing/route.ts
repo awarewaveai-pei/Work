@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { putSecret } from "@/lib/secret-vault";
-import { resolveOpsRole, canCreateAiImageJob, canManageOutreach } from "@/lib/ops-role";
+import { resolveOpsRole, canCreateAiImageJob, canWriteTenantConfig } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { assertMediaProviderAllowed } from "@/lib/content/video/provider-policy";
 
@@ -27,7 +27,7 @@ export async function GET(req: Request): Promise<Response> {
   const [account, ledger, providers] = await Promise.all([
     db.from("media_billing_accounts").select("organization_id, plan, status, monthly_credit_limit, hard_credit_limit, current_period_end, metadata").eq("organization_id", organizationId).maybeSingle(),
     db.from("media_credit_ledger").select("units").eq("organization_id", organizationId),
-    db.from("media_provider_profiles").select("id, provider, mode, secret_ref, enabled, settings, updated_at").eq("organization_id", organizationId).order("provider"),
+    db.from("media_provider_profiles").select("id, provider, mode, enabled, settings, updated_at").eq("organization_id", organizationId).order("provider"),
   ]);
   if (account.error || ledger.error || providers.error) return NextResponse.json({ ok: false, error: account.error?.message ?? ledger.error?.message ?? providers.error?.message }, { status: 500 });
   const balance = (ledger.data ?? []).reduce((n, row) => n + Number(row.units ?? 0), 0);
@@ -36,7 +36,7 @@ export async function GET(req: Request): Promise<Response> {
 
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
-  if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
+  if (!canWriteTenantConfig(role)) return new NextResponse("forbidden", { status: 403 });
   let body: Record<string, unknown>; try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
   let organizationId: string;
   try { organizationId = orgFrom(req, body.organizationId); } catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "invalid organization" }, { status: 400 }); }
@@ -62,13 +62,23 @@ export async function POST(req: Request): Promise<Response> {
     const mode = body.mode === "byo" ? "byo" : "agency";
     if (!PROVIDERS.has(provider)) return NextResponse.json({ ok: false, error: "unsupported provider" }, { status: 400 });
     try { assertMediaProviderAllowed(provider); } catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "provider_not_allowlisted" }, { status: 403 }); }
-    let secretRef: string | null = typeof body.secretRef === "string" && body.secretRef.trim() ? body.secretRef.trim() : null;
+    // Vault references are server-owned. A request can replace its own BYO
+    // secret, but can never point a provider profile at another vault entry.
+    let secretRef: string | null = null;
     if (body.providerSecret !== undefined) {
       if (typeof body.providerSecret !== "string" || body.providerSecret.length < 8 || body.providerSecret.length > 4096) return NextResponse.json({ ok: false, error: "providerSecret length invalid" }, { status: 400 });
       secretRef = `media_provider:${organizationId}:${provider}`;
       await putSecret(secretRef, body.providerSecret);
+    } else {
+      const existing = await db.from("media_provider_profiles")
+        .select("secret_ref")
+        .eq("organization_id", organizationId)
+        .eq("provider", provider)
+        .maybeSingle();
+      if (existing.error) return NextResponse.json({ ok: false, error: existing.error.message }, { status: 500 });
+      secretRef = typeof existing.data?.secret_ref === "string" ? existing.data.secret_ref : null;
     }
-    const saved = await db.from("media_provider_profiles").upsert({ organization_id: organizationId, provider, mode, secret_ref: secretRef, enabled: body.enabled !== false, settings: (body.settings ?? {}) as object, updated_at: new Date().toISOString() }, { onConflict: "organization_id,provider" }).select("id, provider, mode, secret_ref, enabled, settings, updated_at").single();
+    const saved = await db.from("media_provider_profiles").upsert({ organization_id: organizationId, provider, mode, secret_ref: secretRef, enabled: body.enabled !== false, settings: (body.settings ?? {}) as object, updated_at: new Date().toISOString() }, { onConflict: "organization_id,provider" }).select("id, provider, mode, enabled, settings, updated_at").single();
     if (saved.error) return NextResponse.json({ ok: false, error: saved.error.message }, { status: 500 });
     return NextResponse.json({ ok: true, provider: saved.data });
   }

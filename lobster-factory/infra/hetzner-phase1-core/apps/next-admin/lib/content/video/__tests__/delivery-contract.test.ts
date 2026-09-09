@@ -8,10 +8,13 @@ describe("delivery contract", () => {
     expect(deliveryIdempotencyKey("r1", "postiz", "vertical")).toBe(deliveryIdempotencyKey("r1", "postiz", "vertical"));
     expect(deliveryIdempotencyKey("r1", "postiz", "vertical")).not.toBe(deliveryIdempotencyKey("r1", "wordpress", "vertical"));
   });
-  it("allows retry after failure and blocks republish after withdrawal", () => {
-    const failed = applyDeliveryEvent(receipt, { type: "failed" });
+  it("allows only a claimed dispatch to change external state", () => {
+    expect(() => applyDeliveryEvent(receipt, { type: "drafted", externalId: "p1" })).toThrow(/invalid delivery transition/);
+    const claimed: DeliveryReceipt = { ...receipt, status: "dispatching", attempt: 1, dispatchToken: "claim" };
+    const failed = applyDeliveryEvent(claimed, { type: "failed" });
     expect(failed.attempt).toBe(1);
-    const drafted = applyDeliveryEvent(failed, { type: "drafted", externalId: "p1" });
+    const retry: DeliveryReceipt = { ...failed, status: "dispatching", attempt: 2, dispatchToken: "claim-2" };
+    const drafted = applyDeliveryEvent(retry, { type: "drafted", externalId: "p1" });
     const published = applyDeliveryEvent(drafted, { type: "published" });
     const withdrawn = applyDeliveryEvent(published, { type: "withdrawn" });
     expect(withdrawn.status).toBe("withdrawn");

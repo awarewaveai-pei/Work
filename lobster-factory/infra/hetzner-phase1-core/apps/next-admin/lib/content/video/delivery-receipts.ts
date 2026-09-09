@@ -57,6 +57,7 @@ type DeliveryRow = {
   external_id: string | null;
   idempotency_key: string;
   attempt: number;
+  dispatch_token: string | null;
 };
 
 function toReceipt(row: DeliveryRow): DeliveryReceipt {
@@ -68,6 +69,7 @@ function toReceipt(row: DeliveryRow): DeliveryReceipt {
     ...(row.external_id ? { externalId: row.external_id } : {}),
     idempotencyKey: row.idempotency_key,
     attempt: row.attempt,
+    ...(row.dispatch_token ? { dispatchToken: row.dispatch_token } : {}),
   };
 }
 
@@ -98,20 +100,37 @@ export async function ensureDeliveryReceipt(
       },
       { onConflict: "idempotency_key", ignoreDuplicates: true },
     )
-    .select("id, release_id, destination, status, external_id, idempotency_key, attempt")
+    .select("id, release_id, destination, status, external_id, idempotency_key, attempt, dispatch_token")
     .maybeSingle();
   if (error) throw new Error(`media_delivery_attempts insert failed: ${error.message}`);
   if (data) return toReceipt(data as DeliveryRow);
 
   const existing = await db
     .from("media_delivery_attempts")
-    .select("id, release_id, destination, status, external_id, idempotency_key, attempt")
+    .select("id, release_id, destination, status, external_id, idempotency_key, attempt, dispatch_token")
     .eq("idempotency_key", idempotencyKey)
     .single();
   if (existing.error || !existing.data) {
     throw new Error(`media_delivery_attempts lookup failed: ${existing.error?.message ?? "row missing"}`);
   }
   return toReceipt(existing.data as DeliveryRow);
+}
+
+export type DeliveryClaim = { readonly receipt: DeliveryReceipt; readonly claimed: boolean };
+
+/**
+ * Atomically reserve the next external side effect.  A dispatching receipt is
+ * deliberately not auto-replayed: external providers cannot offer a common
+ * exactly-once guarantee, so a crash requires reconciliation before retry.
+ */
+export async function claimDeliveryReceipt(receipt: DeliveryReceipt): Promise<DeliveryClaim | null> {
+  if (!mediaPersistenceEnabled()) return null;
+  const db = getSupabaseWriteClient();
+  if (!db) throw new Error("Supabase service role is required for delivery receipts");
+  const { data, error } = await db.rpc("media_delivery_claim", { p_idempotency_key: receipt.idempotencyKey });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) throw new Error(`media_delivery_claim failed: ${error?.message ?? "row missing"}`);
+  return { receipt: toReceipt(row as DeliveryRow), claimed: row.claimed === true };
 }
 
 /** Apply one validated delivery event and retain the raw adapter response. */
@@ -124,7 +143,7 @@ export async function recordDeliveryReceipt(
   const db = getSupabaseWriteClient();
   if (!db) throw new Error("Supabase service role is required for delivery receipts");
   const next = applyDeliveryEvent(receipt, event);
-  const { data, error } = await db
+  let query = db
     .from("media_delivery_attempts")
     .update({
       status: next.status,
@@ -134,7 +153,10 @@ export async function recordDeliveryReceipt(
       updated_at: new Date().toISOString(),
     })
     .eq("id", receipt.id)
-    .select("id, release_id, destination, status, external_id, idempotency_key, attempt")
+    .eq("status", receipt.status);
+  if (receipt.dispatchToken) query = query.eq("dispatch_token", receipt.dispatchToken);
+  const { data, error } = await query
+    .select("id, release_id, destination, status, external_id, idempotency_key, attempt, dispatch_token")
     .single();
   if (error || !data) throw new Error(`media_delivery_attempts update failed: ${error?.message ?? "row missing"}`);
   return toReceipt(data as DeliveryRow);

@@ -12,8 +12,10 @@ export function evaluateReleaseGate(input: ReleaseGateInput): ReleaseGateResult 
     const report = matches[0];
     if (!report) return { ok: false, code: "missing_qa", reportIds: selected.map((r) => r.id), message: `missing required QA: ${kind}` };
     if (report.candidateChecksum !== input.candidateChecksum) return { ok: false, code: "stale_qa", reportIds: [report.id], message: `QA ${report.id} does not match candidate checksum` };
-    if (report.status === "failed" || report.status === "superseded") return { ok: false, code: "failed_qa", reportIds: [report.id], message: `QA ${report.id} is not releasable` };
+    // Warnings require a future, explicit immutable waiver model.  Until that
+    // exists, only a passed server-issued report may authorize a Release.
+    if (report.status !== "passed") return { ok: false, code: "failed_qa", reportIds: [report.id], message: `QA ${report.id} is not releasable` };
     selected.push(report);
   }
-  return { ok: true, code: "approved", reportIds: selected.map((r) => r.id), message: "all required QA passed or explicitly warned" };
+  return { ok: true, code: "approved", reportIds: selected.map((r) => r.id), message: "all required QA passed" };
 }

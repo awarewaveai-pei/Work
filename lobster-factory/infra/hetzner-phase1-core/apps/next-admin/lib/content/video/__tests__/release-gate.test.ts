@@ -12,6 +12,7 @@ describe("release gate", () => {
   it("blocks stale, failed, and duplicate evidence", () => {
     expect(evaluateReleaseGate({ ...base, reports: [report("technical", "passed", "old"), report("caption")] }).code).toBe("stale_qa");
     expect(evaluateReleaseGate({ ...base, reports: [report("technical", "failed"), report("caption")] }).code).toBe("failed_qa");
+    expect(evaluateReleaseGate({ ...base, reports: [report("technical", "warned"), report("caption")] }).code).toBe("failed_qa");
     expect(evaluateReleaseGate({ ...base, reports: [report("technical"), report("technical"), report("caption")] }).code).toBe("duplicate_kind");
   });
 });

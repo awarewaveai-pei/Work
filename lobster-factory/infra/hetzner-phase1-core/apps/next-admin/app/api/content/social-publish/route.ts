@@ -13,6 +13,7 @@ import {
 } from "@/lib/content/postiz";
 import {
   ensureDeliveryReceipt,
+  claimDeliveryReceipt,
   mediaPersistenceEnabled,
   recordDeliveryReceipt,
   type DeliveryReceipt,
@@ -173,11 +174,45 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // Claim each destination before uploading media or creating a Postiz post.
+  // A non-claimed receipt is a previous external operation (or one awaiting
+  // reconciliation), never a signal to replay it.
+  const dispatchPosts: typeof requestedPosts = [];
+  const receiptSkipped: Array<{ platform: string; status: string; externalId?: string }> = [];
+  if (receipts.size > 0) {
+    try {
+      for (const post of requestedPosts) {
+        const receipt = receipts.get(post.platform);
+        if (!receipt) continue;
+        const claim = await claimDeliveryReceipt(receipt);
+        if (!claim) continue;
+        receipts.set(post.platform, claim.receipt);
+        if (claim.claimed) dispatchPosts.push(post);
+        else receiptSkipped.push({ platform: post.platform, status: claim.receipt.status, ...(claim.receipt.externalId ? { externalId: claim.receipt.externalId } : {}) });
+      }
+    } catch (err) {
+      return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "failed to claim delivery receipt" }, { status: 503 });
+    }
+  } else {
+    dispatchPosts.push(...requestedPosts);
+  }
+  if (dispatchPosts.length === 0) {
+    return NextResponse.json({ ok: true, results: receiptSkipped, skipped, idempotent: true });
+  }
+  const markClaimedFailure = async (phase: string, error: string) => {
+    await Promise.all(dispatchPosts.map(async (post) => {
+      const receipt = receipts.get(post.platform);
+      if (!receipt) return;
+      try { await recordDeliveryReceipt(receipt, { type: "failed" }, { phase, error, platform: post.platform }); } catch { /* preserve primary failure */ }
+    }));
+  };
+
   let media: PostizMediaRef | undefined;
   if (imageUrl) {
     try {
       media = await uploadMedia({ imageUrl });
     } catch (err) {
+      await markClaimedFailure("image_upload", err instanceof Error ? err.message : String(err));
       return NextResponse.json(
         { ok: false, error: `media upload failed: ${err instanceof Error ? err.message : String(err)}` },
         { status: 500 }
@@ -192,7 +227,7 @@ export async function POST(req: Request): Promise<Response> {
     const urlToRef = new Map<string, PostizMediaRef>();
     const uploadErrors: string[] = [];
 
-    for (const post of requestedPosts) {
+    for (const post of dispatchPosts) {
       const preferredFormat = PLATFORM_VIDEO_FORMAT[post.platform] ?? "16x9";
       // Fall back through format priority if the preferred format wasn't generated
       const candidateFormats: Array<"9x16" | "4x5" | "16x9"> =
@@ -220,6 +255,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     if (uploadErrors.length > 0) {
+      await markClaimedFailure("video_upload", uploadErrors.join("; "));
       return NextResponse.json(
         { ok: false, error: `video upload failed: ${uploadErrors.join("; ")}` },
         { status: 500 }
@@ -227,7 +263,7 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const results = await createSocialPost({ clientId, mode, posts: requestedPosts, media, mediaPerPlatform });
+  const results = await createSocialPost({ clientId, mode, posts: dispatchPosts, media, mediaPerPlatform });
 
   let receiptError: string | undefined;
   if (receipts.size > 0) {
@@ -252,5 +288,5 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  return NextResponse.json({ ok: true, results, skipped, ...(receiptError ? { receiptError } : {}) });
+  return NextResponse.json({ ok: true, results: [...results, ...receiptSkipped], skipped, ...(receiptError ? { receiptError } : {}) });
 }

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { RenderOutputMeta, RenderOutputs } from "./render-client";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { automaticQaIssuance } from "./qa-issuance";
 
 type PersistedQaStatus = "passed" | "warned" | "failed";
 
@@ -45,6 +46,7 @@ export async function persistAutomaticTechnicalQa(params: {
   const reportJson = {
     source: "video-service",
     detector: { id: "media.qa.render", version: "1.0.0" },
+    issuance: automaticQaIssuance("video.qa.render"),
     outputs: params.outputs,
     formats: reports,
   };
@@ -80,4 +82,3 @@ export async function persistAutomaticTechnicalQa(params: {
   }
   return { id: String(inserted.data.id), status };
 }
-
