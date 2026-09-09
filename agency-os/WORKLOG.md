@@ -13709,3 +13709,13 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - LIMIT: UI currently accepts UUID/QA JSON manually; asset and QA pickers, automatic Whisper worker credentials, automatic QA report creation and dedicated footage renderer remain next slices.
 - LIVE_SMOKE: `https://app.aware-wave.com/api/video/footage/compile` and `/api/video/transcription/dispatch` return 401 without session (auth boundary), `/tools/video` returns 307 to login; no unauthenticated write path exposed.
 - Documentation index updated with the latest worker/dispatch (`c66c64642`,`93cee8dc1`) and Release UI (`3dd116baf`) commits; source-of-truth remains `D:\Work\agency-os\docs\video_generator`.
+
+## 2026-09-09 Video LEGO QA + footage renderer completion slice
+
+- Code commit `035a32788` (pushed `origin/main`): video-service computes per-output SHA-256/byte size; next-admin `/api/video/status` persists immutable automatic technical QA in `media_qa_reports` with content-hash idempotency.
+- Added tenant-scoped `/api/video/assets` and `/api/video/qa/reports` picker APIs; ReleaseDeliveryPanel now selects assets and loads passed/warned QA records instead of requiring manual IDs/JSON.
+- Added Timeline `sourceStartMs` and `/api/video/footage/render`; dedicated video-service `/render-footage` materializes HTTPS tenant assets, cuts ranges, normalizes profile/fps/audio, concatenates, runs existing ffprobe/signal QA and uploads to R2. FootageEditor now submits the durable job.
+- Verification: next-admin typecheck passed; Vitest `78 files / 764 tests` passed; video-service Python unittest `8/8` and py_compile passed; `git diff --check` passed.
+- Production: next-admin deployed via `sg-deploy.sh`, snapshot `lobster-phase1-next-admin:rollback-20260909-081606`, smoke 4/4; video-service rebuilt from `035a32788`, rollback tag `lobster-video-service:rollback-20260909-082100`, health OK.
+- Real canary `jobId=28e2dbee3de24bfd971e6f4d6bde1d63`: 16x9 1920×1080, 979753 bytes, SHA-256 `b5e96572470f59b028210610e8d5bcc95efd18a83e9f59f27a17fb80f2bdf7c1`; technical/signal QA passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).
+- Remaining external prerequisite is explicit: ks-aw-01 has no NVIDIA GPU, so production Whisper dispatch remains 503 until the RTX workstation is exposed through an authenticated HTTPS worker (`VIDEO_WORKER_TOKEN`) and configured as `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN`.

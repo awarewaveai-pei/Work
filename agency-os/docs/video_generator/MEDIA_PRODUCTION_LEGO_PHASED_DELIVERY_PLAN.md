@@ -218,3 +218,11 @@ The immediate executable work is **Phase 0, then Phase 1**. Phase 2–4 contract
 - `a93c413a0`: provider allowlist boundary; billing profile changes fail closed unless `MEDIA_PROVIDER_ALLOWLIST` explicitly permits the provider.
 
 Runtime activation status: migrations 0065/0066 are applied on ks-aw-01 and `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true` is loaded by `lobster-next-admin`; `MEDIA_OUTCOME_WEBHOOK_ENABLED=false` remains fail-closed until an ingest token and canary are recorded. Existing Quick Engine, Remotion and publication paths remain unchanged unless a Release ID is explicitly supplied.
+
+## Runtime correction — 2026-09-09 08:20 UTC
+
+- `035a32788` is deployed to next-admin and video-service. The next-admin snapshot is `lobster-phase1-next-admin:rollback-20260909-081606`; the renderer rollback tag is `lobster-video-service:rollback-20260909-082100`.
+- Render completion now computes output SHA-256/byte size and automatically writes immutable technical QA evidence when persistence is enabled.
+- Footage upload creates `media_assets(asset_domain=real_footage)`; EDP preserves `sourceStartMs`; `/api/video/footage/render` submits durable jobs to `/render-footage`.
+- ReleaseDeliveryPanel uses tenant-scoped asset and QA picker APIs. A real renderer canary completed with technical/signal QA passed: 1920×1080, 979753 bytes, SHA-256 `b5e96572470f59b028210610e8d5bcc95efd18a83e9f59f27a17fb80f2bdf7c1`, black ratio 0, freeze events 0, integrated loudness −26.1 LUFS.
+- Remaining external dependency: ks-aw-01 has no NVIDIA GPU, so the local RTX Whisper worker still needs an HTTPS endpoint and `VIDEO_WORKER_TOKEN` before `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` can be safely set. No token is fabricated.
