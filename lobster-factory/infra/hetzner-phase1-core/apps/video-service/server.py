@@ -42,7 +42,7 @@ import requests
 from auth_policy import authentication_required
 import config
 import pipeline
-from quality import evaluate_probe
+from quality import evaluate_probe, evaluate_signal_quality
 
 HOST = os.getenv("VIDEO_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.getenv("VIDEO_SERVICE_PORT", "8732"))
@@ -196,6 +196,29 @@ def _probe_video(path: str) -> dict:
     return parsed
 
 
+def _signal_probe(path: str, duration: float) -> dict:
+    """Collect black/freeze/loudness evidence with one bounded ffmpeg pass."""
+    res = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", path,
+         "-vf", "blackdetect=d=0.5:pix_th=0.98,freezedetect=n=-60dB:d=0.5",
+         "-af", "ebur128=framelog=verbose", "-f", "null", "-"],
+        capture_output=True, text=True, timeout=60,
+    )
+    output = f"{res.stdout}\n{res.stderr}"
+    import re as _re
+    black_seconds = sum(float(end) - float(start) for start, end in _re.findall(r"black_start:\s*([0-9.]+).*?black_end:\s*([0-9.]+)", output))
+    freeze_events = len(_re.findall(r"freeze_start:\s*[0-9.]+", output))
+    lufs = [float(value) for value in _re.findall(r"\bI:\s*(-?[0-9]+(?:\.[0-9]+)?)\s+LUFS", output)]
+    peaks = [float(value) for value in _re.findall(r"\b(?:Peak|Peak level):\s*(-?[0-9]+(?:\.[0-9]+)?)\s+dBFS", output)]
+    return {
+        "blackRatio": max(0.0, min(1.0, black_seconds / duration)) if duration > 0 else 0.0,
+        "freezeEvents": freeze_events,
+        "integratedLufs": lufs[-1] if lufs else None,
+        "truePeakDb": peaks[-1] if peaks else None,
+        "ffmpegExitCode": res.returncode,
+    }
+
+
 def _build_output_meta(outputs: dict) -> dict:
     meta = {}
     for fmt, path in outputs.items():
@@ -214,7 +237,9 @@ def _build_output_meta(outputs: dict) -> dict:
                 )
         qa = evaluate_probe(probe, expected)
         item["technical_qa"] = qa
-        if qa["status"] == "failed":
+        signal_qa = evaluate_signal_quality(probe, _signal_probe(str(path), float((probe.get("format") or {}).get("duration") or 0)))
+        item["signal_qa"] = signal_qa
+        if qa["status"] == "failed" or signal_qa["status"] == "failed":
             raise RuntimeError(f"technical QA failed for output {fmt}")
         meta[fmt] = item
     return meta

@@ -1,6 +1,6 @@
 import unittest
 
-from quality import evaluate_probe
+from quality import evaluate_probe, evaluate_signal_quality
 
 
 class TechnicalQualityTests(unittest.TestCase):
@@ -26,6 +26,15 @@ class TechnicalQualityTests(unittest.TestCase):
         self.assertEqual(report["status"], "failed")
         self.assertIn("container.video_stream", {f["ruleId"] for f in report["findings"]})
         self.assertIn("duration.positive", {f["ruleId"] for f in report["findings"]})
+
+    def test_signal_qa_reports_black_freeze_loudness_and_caption_evidence(self):
+        report = evaluate_signal_quality(
+            {"format": {"duration": "4"}},
+            {"blackRatio": 0.4, "freezeEvents": 1, "integratedLufs": -4, "truePeakDb": 0.2},
+            [{"startMs": 0, "endMs": 5000, "text": "too long"}],
+        )
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual({f["ruleId"] for f in report["findings"]}, {"picture.black_frames", "picture.freeze", "audio.loudness", "audio.true_peak", "caption.timing"})
 
 
 if __name__ == "__main__":

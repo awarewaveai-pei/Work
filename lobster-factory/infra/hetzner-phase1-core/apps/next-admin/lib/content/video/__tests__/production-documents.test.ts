@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateStoryBible } from "../story-bible";
+import { compileEditPlanToTimeline } from "../edit-plan-timeline";
 import { validateEditPlan } from "../edit-plan";
 
 const org = "123e4567-e89b-42d3-a456-426614174001";
@@ -18,5 +19,14 @@ describe("production document validators", () => {
     expect(result.ok).toBe(false);
     expect(result.findings.some((f) => f.code === "overlap")).toBe(true);
     expect(validateEditPlan({ ...base, decisions: [{ sourceAssetId: asset, inMs: 0, outMs: 2000, destinationStartMs: 0 }] }).ok).toBe(true);
+  });
+
+  it("compiles a valid EDP into footage Timeline v1", () => {
+    const org = "123e4567-e89b-42d3-a456-426614174100";
+    const asset = "123e4567-e89b-42d3-a456-426614174101";
+    const edp = { schemaVersion: "1.0.0", organizationId: org, frameRate: 30, sources: [{ assetId: asset, durationMs: 10_000 }], decisions: [{ sourceAssetId: asset, track: "video", inMs: 0, outMs: 3_000, destinationStartMs: 0 }] };
+    const result = compileEditPlanToTimeline(edp, { timelineId: "tl_123e4567-e89b-42d3-a456-426614174102", organizationId: org });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.timeline.tracks[0]).toMatchObject({ kind: "video", items: [{ provenance: "footage", durationMs: 3_000 }] });
   });
 });
