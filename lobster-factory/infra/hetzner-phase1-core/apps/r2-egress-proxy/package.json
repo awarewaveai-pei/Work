@@ -1,1 +1,1 @@
-{"private":true,"type":"commonjs","scripts":{"start":"node server.js"}}
+{"private":true,"type":"commonjs","scripts":{"start":"node server.js","test":"node --test test/*.test.cjs"},"dependencies":{"@aws-sdk/client-s3":"3.883.0"}}

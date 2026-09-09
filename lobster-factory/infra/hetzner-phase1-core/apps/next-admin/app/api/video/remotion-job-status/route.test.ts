@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 const getJob = vi.hoisted(() => vi.fn());
+const finishJob = vi.hoisted(() => vi.fn());
 const pollRemotion = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/content/video/job-store", () => ({ getJob }));
+vi.mock("@/lib/content/video/job-store", () => ({ getJob, finishJob }));
 vi.mock("@/lib/content/video/remotion-client", () => ({ pollRemotion }));
 
 import { GET } from "./route";

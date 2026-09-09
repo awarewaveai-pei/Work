@@ -17,7 +17,10 @@ function request(body: unknown, role = "owner", userKind = "staff", orgId?: stri
 
 describe("POST /api/video/timeline/compile", () => {
   const configureAssets = (objectUrl = "https://images.pexels.com/image.jpg") => {
-    supabaseFrom.mockReturnValue({ select: () => ({ eq: () => ({ in: async () => ({ data: [{ id: "123e4567-e89b-42d3-a456-426614174002", object_url: objectUrl }], error: null }) }) }) });
+    supabaseFrom.mockReturnValue({ select: () => ({ eq: () => ({ in: async () => ({ data: [
+      { id: "123e4567-e89b-42d3-a456-426614174002", object_url: objectUrl },
+      { id: "123e4567-e89b-42d3-a456-426614174003", object_url: "https://images.pexels.com/style.jpg" },
+    ], error: null }) }) }) });
   };
 
   it("compiles a tenant-scoped timeline without submitting a render", async () => {
@@ -31,6 +34,19 @@ describe("POST /api/video/timeline/compile", () => {
     configureAssets("https://untrusted.example/private.jpg");
     const response = await POST(request({ timeline }));
     expect(response.status).toBe(422);
+  });
+
+  it("fails closed when provenance names an asset outside the tenant query", async () => {
+    supabaseFrom.mockReturnValue({ select: () => ({ eq: () => ({ in: async () => ({
+      data: [{ id: "123e4567-e89b-42d3-a456-426614174002", object_url: "https://images.pexels.com/image.jpg" }],
+      error: null,
+    }) }) }) });
+    const response = await POST(request({ timeline }));
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      errors: [expect.objectContaining({ code: "unresolved_artifact" })],
+    });
   });
 
   it("rejects null timelines", async () => {

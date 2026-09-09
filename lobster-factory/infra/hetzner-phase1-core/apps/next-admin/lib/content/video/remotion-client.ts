@@ -6,10 +6,16 @@ import { resolveRendererAuth } from "./renderer-auth";
 
 const svcBase = () => process.env.REMOTION_SERVICE_URL ?? "http://127.0.0.1:8733";
 
+export interface RemotionRenderOptions {
+  readonly outputFormat?: "9x16" | "4x5" | "16x9" | "1x1";
+  readonly fps?: 24 | 25 | 30 | 60;
+}
+
 /** POST /render → remotion service job ID (not the job-store UUID). */
 export async function submitRemotion(
   templateId: string,
   props: Record<string, unknown>,
+  options: RemotionRenderOptions = {},
 ): Promise<{ ok: true; jobId: string } | { ok: false; error: string }> {
   const auth = resolveRendererAuth("remotion");
   if (auth.ok === false) return { ok: false, error: "renderer authentication is not configured" };
@@ -17,7 +23,7 @@ export async function submitRemotion(
     const r = await fetch(`${svcBase()}/render`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...auth.headers },
-      body: JSON.stringify({ templateId, props }),
+      body: JSON.stringify({ templateId, props, ...options }),
       signal: AbortSignal.timeout(30_000),
     });
     const body = (await r.json().catch(() => ({}))) as { jobId?: string; error?: string };
