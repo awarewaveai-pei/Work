@@ -13771,3 +13771,12 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=compose env defaults, fail-closed behavior, existing service compatibility.
 - BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=MEDIA_TRANSCRIBE_WORKER_URL|MEDIA_TRANSCRIBE_WORKER_TOKEN|hits=24.
 - LIMIT: no production worker URL/token was fabricated or injected; the container is wired and remains safely disabled until a durable authenticated HTTPS ingress exists.
+
+## 2026-09-09 Video LEGO automatic editorial/rights QA trigger
+
+- `7203d6e4e` updates `ReleaseDeliveryPanel.chooseAsset` so candidate selection triggers `/api/video/qa/editorial-rights` from tenant metadata before reloading QA reports; failed rights/editorial evidence still blocks Release.
+- Production deployment via `/root/lobster-phase1/scripts/sg-deploy.sh next-admin` completed at 10:11 UTC; rollback snapshot `lobster-phase1-next-admin:rollback-20260909-100724`; existing meeting upload and renderer services were not changed.
+- REALTEST_EVIDENCE: tool=SSH|cmd=sg-deploy.sh next-admin|exit=0|ms=~250000|observed=tsc pass, Vitest 82/773 pass, Next build pass, health pass, smoke 4/4, deployed commit 7203d6e4e.
+- REVIEW_DONE: critic=Quick|verdict=pass|findings=0c/0m/0n|scope=tenant candidate trigger, checksum guard, failed QA preservation.
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts|grep=/api/video/qa/editorial-rights|chooseAsset|hits=8.
+- LIMIT: automatic trigger can only evaluate metadata that exists on the candidate asset; missing script/title/license/source remains a deliberate failed QA result.

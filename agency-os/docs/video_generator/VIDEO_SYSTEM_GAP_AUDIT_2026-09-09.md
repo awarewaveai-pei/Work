@@ -8,6 +8,7 @@
 - `438efd9cc` adds real-footage audio replacement and caption burn-in, plus tenant-scoped deterministic editorial/rights QA persistence.
 - `2c64794b3` adds bounded outcome ranking and a Stripe-shaped payment adapter boundary; no card data is handled by next-admin.
 - `297ae36ef` wires `MEDIA_TRANSCRIBE_WORKER_URL/TOKEN` into the production next-admin compose environment with empty fail-closed defaults; it does not change existing meeting or renderer behavior.
+- `7203d6e4e` makes candidate selection in ReleaseDeliveryPanel trigger the deterministic editorial/rights QA endpoint before loading QA reports; failed evidence remains a hard Release gate.
 - Commit `035a32788` adds automatic render QA persistence, SHA-256 output identity, real-footage asset/QA pickers, and a dedicated `/api/video/footage/render` → video-service `/render-footage` path. It is deployed to production next-admin and video-service.
 
 ## Remaining runtime gaps (exact)
@@ -51,6 +52,11 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 
 - `sg-deploy.sh next-admin` deployed `297ae36efaa5744b32da31e603dde1b0e85ccb65`; typecheck, 82-file/773-test suite, build, health and 4/4 smoke passed. Rollback snapshot: `lobster-phase1-next-admin:rollback-20260909-100102`.
 - The container now receives `MEDIA_TRANSCRIBE_WORKER_URL` and `MEDIA_TRANSCRIBE_WORKER_TOKEN` (both empty in production), so future tunnel configuration is a controlled environment change; current dispatch remains an intentional 503.
+
+### Automatic editorial/rights QA trigger — 2026-09-09 10:11 UTC
+
+- ReleaseDeliveryPanel now invokes `/api/video/qa/editorial-rights` automatically when a tenant-owned candidate with a checksum is selected, then reloads immutable QA reports. It does not alter the meeting upload pipeline or bypass the Release gate.
+- `sg-deploy.sh next-admin` deployed `7203d6e4e0e73cae5c908828c2727d97606b7537`; typecheck, Vitest 82/773, build, health and 4/4 smoke passed. Rollback snapshot: `lobster-phase1-next-admin:rollback-20260909-100724`.
 
 ### Runtime correction — 2026-09-09 08:20 UTC
 
