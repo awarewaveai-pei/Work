@@ -5,11 +5,11 @@
 - Quick Engine / Remotion render, real-footage EDP, caption burn-in, technical render QA, tenant asset records, WordPress/Postiz adapters.
 - Release, QA, delivery, billing, provider-profile and outcome database tables (0065–0067).
 
-## Being deployed next
+## Deployed — 2026-09-09
 
-- Server-issued QA trust boundary and owner/admin Release approval.
-- Delivery atomic claim migration `0068_media_delivery_dispatch_guard.sql` and Postiz/WordPress claim enforcement.
-- Compose passthrough for Postiz and Stripe settings. Values remain absent until configured.
+- Server-issued QA trust boundary and owner/admin Release approval are live in next-admin `5417260f7`.
+- Delivery atomic claim migration `0068_media_delivery_dispatch_guard.sql` and Postiz/WordPress claim enforcement are live; table backup SHA-256: `7ddfa51b1d28f55ca8fcc8fa8a15d4d90713d7678578534e2b06a257f4acb06a`.
+- Compose passes Postiz and Stripe settings through; values remain disabled until configured.
 
 ## Blocked only by external account setup
 
@@ -24,3 +24,4 @@
 - No external publish without a Release and server-issued QA evidence.
 - No retry after an uncertain external delivery; reconcile the receipt first.
 - No browser-supplied QA, no browser-supplied Vault reference, and no committed secret.
+

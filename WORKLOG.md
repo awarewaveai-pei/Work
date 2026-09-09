@@ -30,3 +30,4 @@
 - Postiz/WordPress claim a durable receipt before first external write. A `dispatching` receipt is never blindly replayed after an uncertain provider result.
 - Billing/BYO writes are owner/admin only; Vault references remain server-owned.
 - Validation: targeted Vitest release/QA/delivery suites and `npm run typecheck` passed before production migration/deploy.
+- Production: `5417260f7` deployed through `sg-deploy.sh next-admin`; next-admin healthy and four HTTP smokes passed. Migration 0068 applied after a `media_delivery_attempts` custom-format backup (`7ddfa51b1d28f55ca8fcc8fa8a15d4d90713d7678578534e2b06a257f4acb06a`); columns, function and status constraint verified.
