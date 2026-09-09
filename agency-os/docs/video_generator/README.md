@@ -1,6 +1,6 @@
 # Media Production LEGO Platform
 
-**正式程式來源：** `origin/main`；最新影片 LEGO 交付為 `cde2f007c`（tenant release/asset boundary）。
+**正式程式來源：** `origin/main`；最新影片 LEGO 交付為 `31857c06b`（QA capability version fix）。
 **文件入口：** 本目錄；現有 Quick Engine 路徑保持相容，新功能以旗標與 additive migration 接入。
 
 ## 現行文件

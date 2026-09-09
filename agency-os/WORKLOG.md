@@ -13673,4 +13673,5 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - `a93c413a0`：新增 provider allowlist policy；billing provider profile 與 capabilities API 只接受明確 `MEDIA_PROVIDER_ALLOWLIST`，未知/未列入供應商 fail-closed；既有生成器仍待全面接入 resolver。
 - 工作邊界補強：QA report 與 Release 寫入前查證 candidate `media_assets` 的租戶歸屬與 checksum；delivery receipt 建立前查證 Release 同租戶且 `release_approved`；billing limit 先拒絕負數或非安全整數。這些檢查不改變旗標關閉時的舊路徑。
 - `cde2f007c`：正式提交並推送上述邊界補強；`npm run typecheck`、Vitest `78 files / 763 tests` 與 `npm run build` 均通過。Build 僅保留既有 symlink traced-files EPERM 警告。
+- `31857c06b`：修正 Release API 寫入 QA evidence 時的 `capability_version`，不再錯把 profile version 當 capability version；typecheck 與 Vitest `78 files / 763 tests` 通過，已推送 `origin/main`。
 - 新增 `docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`，列出 Whisper worker、EDP asset registration、Release linkage、billing lifecycle、provider allowlist、outcome feedback 與 deployment 的確切 evidence/剩餘工作。
