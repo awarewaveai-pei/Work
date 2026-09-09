@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { rankOutcomeSnapshots } from "@/lib/content/video/outcome-feedback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,5 +36,11 @@ export async function GET(req: Request): Promise<Response> {
       if (typeof value === "number" && Number.isFinite(value)) totals[key] = (totals[key] ?? 0) + value;
     }
   }
-  return NextResponse.json({ ok: true, organizationId, releaseId: releaseId || null, count: data?.length ?? 0, totals, snapshots: data ?? [] });
+  const snapshots = data ?? [];
+  const rankedReleases = rankOutcomeSnapshots(snapshots.map((row) => ({
+    releaseId: String(row.release_id),
+    maturity: row.maturity as "24h" | "7d" | "30d",
+    metrics: (row.metrics ?? {}) as Record<string, unknown>,
+  })));
+  return NextResponse.json({ ok: true, organizationId, releaseId: releaseId || null, count: snapshots.length, totals, rankedReleases, snapshots });
 }
