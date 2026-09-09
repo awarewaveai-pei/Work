@@ -38,11 +38,12 @@ export default function FootageEditor() {
   async function upload(file: File) {
     setBusy(true); setError("");
     try {
-      const fd = new FormData(); fd.append("file", file);
+      if (!organizationId.trim()) throw new Error("請先填入 organization UUID，素材才會登錄到正式資產庫");
+      const fd = new FormData(); fd.append("file", file); if (organizationId.trim()) fd.append("organizationId", organizationId.trim());
       const res = await fetch("/api/video/upload-asset", { method: "POST", body: fd });
-      const json = await res.json() as { ok: boolean; imageUrl?: string; r2Key?: string; error?: string };
+      const json = await res.json() as { ok: boolean; imageUrl?: string; r2Key?: string; assetId?: string; error?: string };
       if (!res.ok || !json.ok || !json.imageUrl || !json.r2Key) throw new Error(json.error ?? "素材上傳失敗");
-      const id = crypto.randomUUID();
+      const id = json.assetId ?? crypto.randomUUID();
       setClips((old) => [...old, { id, name: file.name, url: json.imageUrl!, r2Key: json.r2Key!, inMs: 0, outMs: 10_000, destinationStartMs: old.reduce((n, c) => Math.max(n, c.destinationStartMs + (c.outMs - c.inMs)), 0), durationMs: 10_000 }]);
     } catch (e) { setError(e instanceof Error ? e.message : "素材上傳失敗"); }
     finally { setBusy(false); }
