@@ -34,6 +34,8 @@ The existing Quick Engine and Remotion paths remain available. New footage/QA pe
 ### Runtime correction — 2026-09-09 08:20 UTC
 
 Current production is commit `035a327885443be29a596361465f5648a6c837b4`: next-admin `sg-deploy` snapshot `lobster-phase1-next-admin:rollback-20260909-081606` and rebuilt `lobster-video-service` (`lobster-video-service:rollback-20260909-082100`), both healthy. Real footage canary `28e2dbee3de24bfd971e6f4d6bde1d63` produced 1920×1080 output with checksum `b5e96572470f59b028210610e8d5bcc95efd18a83e9f59f27a17fb80f2bdf7c1`; technical/signal QA passed (`blackRatio=0`, `freezeEvents=0`, `integratedLufs=-26.1`).
+Historical baseline bullets (before the 08:20 UTC correction) are retained below for audit:
+
 - Before migration, a read-only query in `supabase-db` returned empty values for all seven 0065/0066 tables. After the controlled apply, `information_schema` lists all seven tables and `pg_proc` lists `media_credit_reserve`; row counts remain zero as expected for a new additive ledger.
 - `lobster-next-admin` now runs image digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632`, healthy; `/root/lobster-phase1/.deployed-commit` is `31857c06b6aa415a8806e413c91f99473924c676`.
 - Deployment used `sg-deploy.sh next-admin`: snapshot `lobster-phase1-next-admin:rollback-20260909-060402`; `/login`, `/api/ops/summary`, WordPress and node-api smoke checks all returned 200. The saved host-local Remotion edit was restored after deployment. A follow-up compose restart loaded persistence flags; `/login` returned the expected 307 auth redirect and the container is healthy. Config backup: `/root/lobster-phase1/docker-compose.yml.bak-20260909T072812Z`.
