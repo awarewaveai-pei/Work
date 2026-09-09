@@ -13675,4 +13675,5 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - `cde2f007c`：正式提交並推送上述邊界補強；`npm run typecheck`、Vitest `78 files / 763 tests` 與 `npm run build` 均通過。Build 僅保留既有 symlink traced-files EPERM 警告。
 - `31857c06b`：修正 Release API 寫入 QA evidence 時的 `capability_version`，不再錯把 profile version 當 capability version；typecheck 與 Vitest `78 files / 763 tests` 通過，已推送 `origin/main`。
 - 線上只讀確認：SSH `145.239.195.47:58122` 的 production 與 staging containers 均 healthy；`supabase-db` 查詢 0065/0066 七張表均為空結果（尚未套用）；`lobster-next-admin` 仍是 `lobster-phase1-next-admin:local`（2026-09-08 啟動），故新 main 尚未部署。
+- `sg-deploy.sh next-admin` 正式部署完成：typecheck、Vitest `78/763` 通過；建立 rollback snapshot `lobster-phase1-next-admin:rollback-20260909-060402`；新 container digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632` healthy；`/login`、`/api/ops/summary`、WordPress、node-api smoke 全部 200。Remotion、video-service、DB、0065/0066 migration 與 flags 未變更。
 - 新增 `docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`，列出 Whisper worker、EDP asset registration、Release linkage、billing lifecycle、provider allowlist、outcome feedback 與 deployment 的確切 evidence/剩餘工作。

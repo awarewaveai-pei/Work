@@ -20,7 +20,7 @@
 | Billing lifecycle | Credit reserve RPC exists; no payment provider, monthly grant, refund or usage reconciliation webhook | Add operator-controlled grant first, then payment adapter behind a separate approval |
 | Provider governance | `provider-policy.ts` now fail-closes billing profile changes unless `MEDIA_PROVIDER_ALLOWLIST` is explicit; generation routes still use their existing provider selection | Enforce allowlist, jurisdiction, model version, spend cap and kill switch before every provider call |
 | Outcome feedback | Webhook and aggregate read API exist; no scheduled platform metric adapters or script-ranking feedback loop | Add per-platform fetch adapters, scheduled maturity snapshots and recommendation jobs |
-| Deployment | `main` contains code; production containers were not restarted | Deploy via existing backup/health/rollback runbook after migration rehearsal |
+| Deployment | `next-admin` is now deployed at `31857c06b`; production renderer/database remain unchanged | Keep migration/flag rollout separate; run renderer and DB canaries only after rehearsal |
 
 ## Safety boundary
 
@@ -31,4 +31,5 @@ The current production VideoStudio path is preserved while the flags are off. Do
 - SSH `ubuntu@145.239.195.47:58122`: hostname `ns31414856`; `lobster-next-admin`, both production renderers, Postiz and WordPress containers are healthy.
 - The three staging containers (`lobster-staging-r2-egress-proxy`, `lobster-staging-remotion-service`, `lobster-staging-video-service`) are healthy.
 - A read-only query in `supabase-db` returned empty values for all seven 0065/0066 tables (`media_qa_reports`, `media_releases`, `media_delivery_attempts`, `media_outcome_snapshots`, `media_billing_accounts`, `media_credit_ledger`, `media_provider_profiles`). This is direct evidence that production persistence is not activated.
-- `lobster-next-admin` is still running image `lobster-phase1-next-admin:local` started `2026-09-08T07:04:03Z`; the new `origin/main` commits have not been deployed to production.
+- `lobster-next-admin` now runs image digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632`, healthy; `/root/lobster-phase1/.deployed-commit` is `31857c06b6aa415a8806e413c91f99473924c676`.
+- Deployment used `sg-deploy.sh next-admin`: snapshot `lobster-phase1-next-admin:rollback-20260909-060402`; `/login`, `/api/ops/summary`, WordPress and node-api smoke checks all returned 200. The saved host-local Remotion edit was restored after deployment.

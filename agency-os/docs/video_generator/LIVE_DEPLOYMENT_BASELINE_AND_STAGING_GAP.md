@@ -63,10 +63,17 @@ D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\SAME_V
 - REALTEST_EVIDENCE: SSH `docker inspect` 三個 staging container health=healthy；Remotion canary `submit_http=200`, `render_status=done`, `url_https=true`。
 - REVIEW_DONE: self-review + proxy unit tests 3/3 pass；BUGHUNT_DONE: `git diff --check` exit=0，未發現 secret 寫入版本庫。
 - Quick Engine 亦已加入 `media.qa_technical` 的 ffprobe 基本閘（stream、尺寸、正時長）；staging image 已重建，production 未重啟。
-- Timeline caption track 已接入 Remotion DynamicSlideshow，使用 frame-accurate cues；staging image build/canary 通過，production Next-admin 未部署。
+- Timeline caption track 已接入 Remotion DynamicSlideshow，使用 frame-accurate cues；staging image build/canary 通過。
 ## 2026-09-09 Remotion tenant lifecycle slice
 
 - `eee9f3fea`：Remotion 提交先建立租戶綁定 `video_jobs`，對外只回傳內部 job id；VideoStudio 改輪詢 `/api/video/remotion-job-status`。
 - 舊 `/api/video/remotion-status` 固定回 `410 deprecated_use_remotion_job_status`，避免 EU job id 直通。
 - `video_jobs.record_params.rendererKind=remotion` 讓通用 FFmpeg status 回 `409`，避免跨 renderer 誤輪詢；Remotion 完成會寫入 `media_assets` 並標記 job done。
 - 驗證：Next-admin typecheck exit=0；Vitest `78 files / 763 tests` exit=0；`git diff --check` exit=0。
+
+## 2026-09-09 Next-admin production deployment
+
+- `sg-deploy.sh next-admin` completed from `origin/main` commit `31857c06b`.
+- Pre-build gates: typecheck PASS; Vitest `78 files / 763 tests` PASS. Snapshot: `lobster-phase1-next-admin:rollback-20260909-060402`.
+- Post-deploy: container image digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632`, health=healthy; `/login`, `/api/ops/summary`, WordPress and node-api smoke checks HTTP 200.
+- Production Remotion, video-service, database, migrations 0065/0066 and feature flags were not changed.
