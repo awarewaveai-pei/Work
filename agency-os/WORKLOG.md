@@ -13766,3 +13766,12 @@ Revert this route-only commit; existing `/api/video/remotion-status` remains unc
 
 [rollback]
 Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; after confirming no jobs need retention, apply `0069_media_transcription_jobs.down.sql`. Existing Quick Engine, Remotion, footage renderer, and meeting-service are untouched.
+
+## 2026-09-09 — 0069 production receipt
+
+- Applied additive 0069 on `supabase-db`; verified all 11 columns.
+- Deployed `b4db0dd37` with `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`; snapshot `lobster-phase1-next-admin:rollback-20260909-150932`.
+- REALTEST_EVIDENCE: tool=SSH | cmd=`schema query; docker health; /api/ops/summary smoke` | exit=0 | ms=completed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`media_transcription_jobs` | hits=11
+- WORKLOG_DONE: status updated in `agency-os/docs/video_generator/CURRENT_IMPLEMENTATION_STATUS.md`.
