@@ -42,6 +42,7 @@ import requests
 from auth_policy import authentication_required
 import config
 import pipeline
+from quality import evaluate_probe
 
 HOST = os.getenv("VIDEO_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.getenv("VIDEO_SERVICE_PORT", "8732"))
@@ -168,13 +169,12 @@ def _validate(payload: dict):
     return scenes, assets, out_name, False
 
 
-def _probe_video_size(path: str) -> dict:
-    """Return actual mp4 width/height using ffprobe from the ffmpeg package."""
+def _probe_video(path: str) -> dict:
+    """Return the reproducible ffprobe evidence used by technical QA."""
     res = subprocess.run(
         [
             "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
+            "-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt:format=duration,size",
             "-of", "json",
             path,
         ],
@@ -184,20 +184,24 @@ def _probe_video_size(path: str) -> dict:
     )
     if res.returncode != 0:
         raise RuntimeError(f"ffprobe failed for {path}: {res.stderr[-300:]}")
-    streams = json.loads(res.stdout or "{}").get("streams", [])
+    parsed = json.loads(res.stdout or "{}")
+    streams = parsed.get("streams", [])
     if not streams:
         raise RuntimeError(f"ffprobe found no video stream: {path}")
-    width = int(streams[0].get("width") or 0)
-    height = int(streams[0].get("height") or 0)
+    video = next((s for s in streams if s.get("codec_type") == "video"), None)
+    width = int((video or {}).get("width") or 0)
+    height = int((video or {}).get("height") or 0)
     if width <= 0 or height <= 0:
         raise RuntimeError(f"ffprobe invalid dimensions for {path}: {width}x{height}")
-    return {"width": width, "height": height}
+    return parsed
 
 
 def _build_output_meta(outputs: dict) -> dict:
     meta = {}
     for fmt, path in outputs.items():
-        size = _probe_video_size(str(path))
+        probe = _probe_video(str(path))
+        video = next(s for s in probe["streams"] if s.get("codec_type") == "video")
+        size = {"width": int(video["width"]), "height": int(video["height"])}
         expected = config.FORMATS.get(fmt)
         item = dict(size)
         if expected:
@@ -208,6 +212,10 @@ def _build_output_meta(outputs: dict) -> dict:
                     f"output {fmt} dimensions {size['width']}x{size['height']} "
                     f"!= expected {expected[0]}x{expected[1]}"
                 )
+        qa = evaluate_probe(probe, expected)
+        item["technical_qa"] = qa
+        if qa["status"] == "failed":
+            raise RuntimeError(f"technical QA failed for output {fmt}")
         meta[fmt] = item
     return meta
 
