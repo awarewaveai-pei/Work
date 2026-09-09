@@ -13792,3 +13792,11 @@ Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; af
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_WHISPER|video-whisper.aware-wave.com` | hits=4
 - WORKLOG_DONE: this entry.
+
+## 2026-09-10 — Whisper on-demand operation
+
+- Removed login auto-start and stopped only the dedicated video worker/Tunnel; created Desktop launcher `啟動影片字幕服務.cmd`.
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`Startup absence; Desktop launcher presence; port 8421 listener absence` | exit=0
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`recovers at user login` | hits=0
+- WORKLOG_DONE: this entry.

@@ -15,4 +15,4 @@ Cloudflare Tunnel may expose only `/v1/jobs` and `/health` from this process.
 The worker accepts HTTPS source/callback URLs, verifies the source SHA-256, and
 returns results only to the per-job callback secret supplied by next-admin.
 
-Recovery: `start-worker.ps1` reads only `VIDEO_WHISPER_WORKER_TOKEN` and `VIDEO_WHISPER_TUNNEL_TOKEN` from the user-owned staging secret file. `runtime/` is local-only; the Startup entry `AwareWave-Video-Whisper-Worker.cmd` launches it on user login.
+Recovery: `start-worker.ps1` reads only `VIDEO_WHISPER_WORKER_TOKEN` and `VIDEO_WHISPER_TUNNEL_TOKEN` from the user-owned staging secret file. `runtime/` is local-only. Run `start-worker.ps1` or the Desktop launcher `啟動影片字幕服務.cmd` only when subtitles are needed; stop the two dedicated processes after use.

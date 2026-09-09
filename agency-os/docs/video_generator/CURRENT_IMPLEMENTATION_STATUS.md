@@ -36,5 +36,5 @@
 ## Enabled and verified — 2026-09-10
 
 - Dedicated Cloudflare Tunnel: `video-whisper.aware-wave.com`; only worker ingress and `/health` verification exposed.
-- RTX 5060 Video Whisper worker is independent from meeting-service and recovers at user login.
+- RTX 5060 Video Whisper worker is independent from meeting-service and is started on demand from the Desktop launcher.
 - Production canary completed: `media_transcription_jobs=completed`, JSON/SRT/VTT artifacts=3, source caption QA=`passed`.
