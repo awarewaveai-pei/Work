@@ -18,6 +18,10 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!organizationId) return NextResponse.json({ ok: false, error: "organizationId required" }, { status: 400 });
   try { assertOrgAccess(req, organizationId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (body.editPlan && typeof body.editPlan === "object" && !Array.isArray(body.editPlan)) {
+    const planOrg = (body.editPlan as Record<string, unknown>).organizationId;
+    if (planOrg !== organizationId) return NextResponse.json({ ok: false, error: "EDP organizationId 與請求租戶不一致" }, { status: 403 });
+  }
   const result = compileEditPlanToTimeline(body.editPlan, { timelineId: `tl_${randomUUID()}`, organizationId });
   if ("errors" in result) return NextResponse.json({ ok: false, error: "EDP 無法編譯成 Timeline", errors: result.errors }, { status: 422 });
   return NextResponse.json({ ok: true, timeline: result.timeline, next: "POST /api/video/timeline/submit" });
