@@ -5,7 +5,7 @@
 - Quick Engine, native 16:9/9:16/4:5 render, R2 storage, Remotion dynamic slideshow and Postiz/WordPress routes remain available.
 - Timeline v1 validation/compile/submit and caption cue rendering exist under `apps/next-admin/lib/content/video/` and `/api/video/timeline/*`.
 - Release QA gate, receipt state machine and outcome event contract exist.
-- Commits `a2ff1ec06`, `646896954`, `a93c413a0`, `cde2f007c`, `31857c06b`, `723bee99d` and `64f7ad8e2` add receipt adapter wiring, persisted QA report endpoint, footage editor, billing/credit APIs, provider profiles, outcome webhook/dashboard, migrations 0065/0066, provider allowlist, tenant release/asset boundaries, signal QA and the EDP→Timeline compiler/UI.
+- Commits `a2ff1ec06`, `646896954`, `a93c413a0`, `cde2f007c`, `31857c06b`, `723bee99d`, `64f7ad8e2`, `c66c64642`, `93cee8dc1` and `3dd116baf` add receipt adapter wiring, persisted QA report endpoint, footage editor, billing/credit APIs, provider profiles, outcome webhook/dashboard, migrations 0065/0066, provider allowlist, tenant release/asset boundaries, signal QA, EDP→Timeline compiler/UI, authenticated Whisper dispatch and Release delivery UI.
 
 ## Remaining runtime gaps (exact)
 

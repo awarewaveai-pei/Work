@@ -13708,3 +13708,4 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - REALTEST_EVIDENCE: next-admin typecheck exit=0; Vitest `78 files / 764 tests`; Next build pass; sg-deploy snapshot `lobster-phase1-next-admin:rollback-20260909-074039`; production smoke 4/4 and container healthy; deployed commit `3dd116baf`.
 - LIMIT: UI currently accepts UUID/QA JSON manually; asset and QA pickers, automatic Whisper worker credentials, automatic QA report creation and dedicated footage renderer remain next slices.
 - LIVE_SMOKE: `https://app.aware-wave.com/api/video/footage/compile` and `/api/video/transcription/dispatch` return 401 without session (auth boundary), `/tools/video` returns 307 to login; no unauthenticated write path exposed.
+- Documentation index updated with the latest worker/dispatch (`c66c64642`,`93cee8dc1`) and Release UI (`3dd116baf`) commits; source-of-truth remains `D:\Work\agency-os\docs\video_generator`.
