@@ -25,3 +25,10 @@
 ## Safety boundary
 
 The current production VideoStudio path is preserved while the flags are off. Do not apply 0065/0066 or restart the production stack until the isolated database rehearsal and authenticated staging canary have receipts in this folder.
+
+## Live read-only check — 2026-09-09
+
+- SSH `ubuntu@145.239.195.47:58122`: hostname `ns31414856`; `lobster-next-admin`, both production renderers, Postiz and WordPress containers are healthy.
+- The three staging containers (`lobster-staging-r2-egress-proxy`, `lobster-staging-remotion-service`, `lobster-staging-video-service`) are healthy.
+- A read-only query in `supabase-db` returned empty values for all seven 0065/0066 tables (`media_qa_reports`, `media_releases`, `media_delivery_attempts`, `media_outcome_snapshots`, `media_billing_accounts`, `media_credit_ledger`, `media_provider_profiles`). This is direct evidence that production persistence is not activated.
+- `lobster-next-admin` is still running image `lobster-phase1-next-admin:local` started `2026-09-08T07:04:03Z`; the new `origin/main` commits have not been deployed to production.
