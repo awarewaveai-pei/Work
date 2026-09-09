@@ -1,6 +1,6 @@
 # Media Production LEGO Platform
 
-**正式程式來源：** `origin/main`；本輪影片 LEGO 交付為 `2c64794b3`（footage audio/caption、editorial/rights QA、outcome ranking、payment adapter boundary）。
+**正式程式來源：** `origin/main`；本輪影片 LEGO 交付為 `297ae36ef`（`2c64794b3` 的 footage audio/caption、editorial/rights QA、outcome ranking、payment adapter boundary，加上 Whisper worker 環境接線）。
 **文件入口：** 本目錄；現有 Quick Engine 路徑保持相容，新功能以旗標與 additive migration 接入。
 
 ## 現行文件
