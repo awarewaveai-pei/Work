@@ -1,11 +1,11 @@
 # Phase 4 — Whisper 逐字稿、字幕與審片契約
 
-**狀態：設計基線；尚未建立 migration、未接入 VideoStudio、未部署、未轉錄任何影片。**
+**狀態：契約基線；本機影片 Whisper endpoint 已實作並受 token 保護，production compose 已接上 URL/token 變數（目前留空 fail-closed）。Transcript migration、VideoStudio 自動 dispatch 與 durable transcript ledger 尚未啟用。**
 **日期：2026-09-06**
 
 ## 已確認的現況
 
-本機既有的 Whisper worker 是會議服務，不是 VideoStudio 的字幕來源。它以 `faster-whisper` 轉錄，固定傳入 `word_timestamps=True`，並保留每段的 `id`、`start`、`end`、`text`、`avg_logprob` 與 `no_speech_prob`，見 `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\lib\transcribe.py:127-171`。同一 worker 已可輸出 SRT，見 `transcribe.py:174-181`。
+本機既有的 Whisper worker 位於 meeting-service，但影片端點是獨立的 `/api/video/transcribe` 邊界；它以 `faster-whisper` 轉錄，固定傳入 `word_timestamps=True`，並保留每段的 `id`、`start`、`end`、`text`、`avg_logprob` 與 `no_speech_prob`，見 `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\lib\transcribe.py:127-171`。影片端點輸出 JSON/SRT/VTT，見 `app.py:97-143` 與 `pipeline.py:216-243`；既有會議 `/api/upload` 流程不在本契約驗收範圍。
 
 會議 pipeline 將原始 transcript JSON、SRT、合併文字與 hallucination 統計各自寫到 job directory，見 `D:\Worktrees\media-video-phase0\lobster-factory\infra\hetzner-phase1-core\apps\meeting-service\pipeline.py:124-143`。這證明本機能力存在，卻沒有提供多租戶素材歸屬、不可變版本、人工字幕修訂或影片 Release linkage。
 
@@ -94,9 +94,9 @@ canonical document 的 segment 必含：
 5. approval 後才產生 SRT/VTT/ASS rendition，並讓 Timeline / Remotion / ffmpeg adapter 讀取 approved、pinned caption artifact；現有 `drawtext` 比例切分不得被假稱為 Whisper 字幕。
 6. 以 staging 的短片、長片、無音軌、低音量、混合語言、人工更正與中斷重試案例驗證，再提出 production 接線與 canary package。
 
-## 刻意未做的事
+## 尚未啟用的事
 
-本文件沒有改動 `apps/video-service/pipeline.py`、會議服務、VideoStudio UI、Timeline validator、資料庫、R2、Remotion、WordPress、Postiz 或生產環境。沒有宣稱目前影片可自動產生 Whisper 字幕，也沒有以 SRT 檔案輸出取代 Release / QA 審核。
+本契約沒有建立 transcript migration、durable worker dispatch、VideoStudio 自動字幕按鈕或 production HTTPS ingress。影片 renderer 已支援把外部字幕 cue 燒入成片，但只有 approved transcript/caption artifact 才能進 Release；不以本機 job directory 或 SRT 檔案取代 Release / QA 審核。
 
 
 ## rollback
