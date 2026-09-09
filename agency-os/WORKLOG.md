@@ -13783,3 +13783,12 @@ Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; af
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`captionCues|persistAutomaticCaptionQa` | hits=8
 - WORKLOG_DONE: this entry.
+
+## 2026-09-10 — Video Whisper enabled canary
+
+- Created dedicated Cloudflare Tunnel + DNS, installed official cloudflared, enabled independent RTX worker and startup recovery; meeting-service untouched.
+- Added 3 production env settings only after local/public health and invalid-token authorization checks.
+- REALTEST_EVIDENCE: tool=Cloudflare API+SSH+HTTPS | cmd=`Tunnel/DNS create; local/public health=200; worker canary` | exit=0 | result=`completed; artifacts=3; caption QA=passed`
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_WHISPER|video-whisper.aware-wave.com` | hits=4
+- WORKLOG_DONE: this entry.

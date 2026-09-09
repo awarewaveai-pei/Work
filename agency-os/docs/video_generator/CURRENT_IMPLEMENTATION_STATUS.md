@@ -32,3 +32,9 @@
 - `apps/video-whisper-worker` is a separate RTX-only FastAPI process, staged for the RTX laptop. It validates HTTPS/DNS, source checksum, and retries callback delivery. It does not touch meeting-service.
 - Callback imports JSON/SRT/VTT and persists source-caption integrity QA. A rendered candidate still needs its own caption QA evidence before Release.
 - next-admin deployment passed typecheck, 786 tests, health and `/api/ops/summary` smoke. Worker URL/token remain empty, so dispatch is deliberately 503 until the dedicated tunnel is configured.\n- Operator deployment contract: `VIDEO_WHISPER_WORKER_DEPLOYMENT.md`.
+
+## Enabled and verified — 2026-09-10
+
+- Dedicated Cloudflare Tunnel: `video-whisper.aware-wave.com`; only worker ingress and `/health` verification exposed.
+- RTX 5060 Video Whisper worker is independent from meeting-service and recovers at user login.
+- Production canary completed: `media_transcription_jobs=completed`, JSON/SRT/VTT artifacts=3, source caption QA=`passed`.
