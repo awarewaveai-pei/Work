@@ -117,6 +117,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       rendererKind: "footage",
       timelineId: timeline.timelineId,
       outputProfile: profile,
+      captionCues: captions.map((cue) => ({ startMs: cue.start_ms, endMs: cue.end_ms, text: cue.text })),
     },
   });
   return NextResponse.json({ ok: true, jobId: job.id, outputProfile: profile, format }, { status: 202 });

@@ -13775,3 +13775,11 @@ Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; af
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`media_transcription_jobs` | hits=11
 - WORKLOG_DONE: status updated in `agency-os/docs/video_generator/CURRENT_IMPLEMENTATION_STATUS.md`.
+
+## 2026-09-09 — Rendered-footage caption evidence
+
+- Footage jobs persist validated caption cues with the durable render job; `/api/video/status` emits caption QA against the final rendered asset checksum after asset registration.
+- REALTEST_EVIDENCE: tool=Vitest+TypeScript | cmd=`npm run typecheck`; `npm test -- --run lib/content/video/__tests__/caption-qa-persistence.test.ts` | exit=0 | tests=2
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`captionCues|persistAutomaticCaptionQa` | hits=8
+- WORKLOG_DONE: this entry.

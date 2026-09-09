@@ -49,6 +49,7 @@ export interface VideoJob {
     rendererKind?: "ffmpeg" | "remotion" | "footage";
     timelineId?: string;
     outputProfile?: string;
+    captionCues?: Array<{ startMs: number; endMs: number; text: string }>;
     serviceCapability?: VideoServiceCapability;
   };
   recorded?: boolean;           // media_assets 已記錄（只記一次）

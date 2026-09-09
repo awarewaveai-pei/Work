@@ -145,6 +145,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
               outputs: poll.outputs,
               outputMeta: poll.outputMeta,
             });
+            if (job.recordParams.captionCues) {
+              const { persistAutomaticCaptionQa } = await import("@/lib/content/video/caption-qa-persistence");
+              await persistAutomaticCaptionQa({
+                organizationId: job.recordParams.organizationId,
+                candidateAssetId: asset.id,
+                candidateChecksum: asset.checksumSha256,
+                captions: job.recordParams.captionCues,
+              });
+            }
           }
         } catch (e) {
           console.warn("[video/status] recordVideoAsset threw (best-effort):", e);
