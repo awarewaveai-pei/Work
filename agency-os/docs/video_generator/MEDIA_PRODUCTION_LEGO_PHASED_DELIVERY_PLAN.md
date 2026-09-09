@@ -207,7 +207,7 @@ The immediate executable work is **Phase 0, then Phase 1**. Phase 2–4 contract
 
 - `0b79deecc`: `packages/db/migrations/0065_media_production_persistence.sql` plus rollback script. Applied on ks-aw-01 after public-schema backup and `ON_ERROR_STOP=1`; down script remains the rollback path.
 - `delivery-receipts.ts`: idempotent service-role adapter; disabled until `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`.
-- Postiz route and WordPress embed route: optional `releaseId`/`variant` receipt lifecycle with queued→drafted→published/failed transitions.
+- Postiz route and WordPress embed route: optional `releaseId`/`variant` receipt lifecycle with queued→drafted→published/failed transitions; `ReleaseDeliveryPanel.tsx` now exposes explicit Release creation and both delivery actions.
 - `FootageEditor.tsx`: VideoStudio tab for MP4 import through existing R2 route, cut points, output offsets, EDP JSON export and validated EDP→Timeline compilation.
 - `edit-plan-timeline.ts` and `/api/video/footage/compile`: pure compiler plus tenant-bound API; no renderer or persistence side effects.
 - `video-service/server.py`: bounded ffmpeg signal analysis for black frames, freezes, loudness and true peak; failures block output metadata.

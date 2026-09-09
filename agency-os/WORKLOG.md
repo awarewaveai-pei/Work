@@ -13701,3 +13701,9 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - `93cee8dc1`: next-admin adds tenant-bound `/api/video/transcription/dispatch`; it fails closed unless HTTPS worker URL and bearer token are explicitly configured, never fetches arbitrary source URLs, and forwards multipart bytes only to that worker.
 - REALTEST_EVIDENCE: meeting-service unittest `5/5` and `py_compile` pass; next-admin typecheck/Vitest `78/764`/build pass; sg-deploy next-admin smoke 4/4 pass, deployed commit `93cee8dc1`.
 - LIMIT: GPU workstation worker URL/token are not provisioned in production, so dispatch correctly returns `503 transcription_worker_not_configured`; this is an explicit safe gate, not a silent fallback.
+
+## 2026-09-09 Video LEGO Release delivery UI
+
+- `3dd116baf`: VideoStudio adds `ReleaseDeliveryPanel.tsx` and a `Release 交付` tab. It requires organization/candidate/checksum and four QA report JSON before creating `release_approved`; Postiz draft and WordPress embed buttons are disabled until a Release ID exists and pass that ID to receipt adapters.
+- REALTEST_EVIDENCE: next-admin typecheck exit=0; Vitest `78 files / 764 tests`; Next build pass; sg-deploy snapshot `lobster-phase1-next-admin:rollback-20260909-074039`; production smoke 4/4 and container healthy; deployed commit `3dd116baf`.
+- LIMIT: UI currently accepts UUID/QA JSON manually; asset and QA pickers, automatic Whisper worker credentials, automatic QA report creation and dedicated footage renderer remain next slices.
