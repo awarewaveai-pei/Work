@@ -14,7 +14,7 @@ import shutil
 import threading
 import uuid
 
-from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
 from lib import settings, summarize
@@ -94,12 +94,15 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
 
 
 @app.post("/api/video/transcribe")
-async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3"):
+async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3", authorization: str = Header(default="")):
     """Local-only Whisper worker boundary for video captions.
 
     The caller uploads the source bytes; the worker never fetches arbitrary URLs.
     Poll ``/api/status/{job_id}`` and download transcript_json/srt/vtt when done.
     """
+    expected_token = os.environ.get("VIDEO_WORKER_TOKEN", "").strip()
+    if expected_token and authorization != f"Bearer {expected_token}":
+        raise HTTPException(401, "invalid worker token")
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
