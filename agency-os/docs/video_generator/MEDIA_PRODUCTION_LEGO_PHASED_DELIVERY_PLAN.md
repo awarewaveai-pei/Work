@@ -1,6 +1,6 @@
 # Media Production LEGO Platform — phased delivery plan
 
-**Status:** DRAFT — no production change authorised
+**Status:** ACTIVE — runtime slice deployed 2026-09-09; remaining external prerequisites stay gated
 **Primary goal:** make the existing video tool reliably runnable first, then add the missing LEGO capabilities without replacing working paths.
 **Companion plan:** [MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md](MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md)
 
@@ -48,7 +48,7 @@ The delivery plan uses the four domains defined in [the platform plan](MEDIA_PRO
 
 **User result:** the already-existing Quick Engine is a dependable first tool: native-format draft, human edit, render, status and retrieval.
 
-**Progress as of 2026-09-09:** commit `a913546a0` adds the isolated S3 egress proxy and staging-only credential installer. The staging Remotion canary passes (`submit_http=200`, `render_status=done`, HTTPS artifact); all three staging containers are healthy. Production renderers were not restarted and the durable production rollout/migration remains pending.
+**Progress as of 2026-09-09:** the existing Quick Engine remains unchanged; the additive runtime slice is deployed at `035a32788`. Production next-admin and video-service are healthy, and the dedicated footage canary passed. The isolated staging proxy remains available for renderer rehearsal.
 
 **Scope**
 
