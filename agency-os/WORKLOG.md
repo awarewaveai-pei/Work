@@ -1,5 +1,52 @@
 # Worklog
 
+## 2026-09-10 K0：知識庫從客服模組拆出成 `lib/kb`（純搬移；critic 抓到一個「五項驗證結構上不可能發現」的 Critical）
+
+ADR 011 §決策 3 的第一步。`lib/cs/` 原本混了通用知識庫（rag/db 的 knowledge 部分）與客服專屬邏輯（intent/autonomy/guardrail/eval）——混著就只能賣給客服，賣不了研究／內訓／業務。拆出 `lib/kb/`（7 檔），`lib/cs` 降為其消費者之一。搬移範圍：`rag.ts` 全檔、`db.ts` 知識段、3 個型別、`rrfFuse`（原在 `autonomy.ts`，是檢索數學無客服語意）、以及只被檢索路徑引用的 6 個常數（`CS_EMBEDDING`／`embedMs`／`vectorTopK`／`keywordTopK`／`contextTopK`／`rrfK` → `KB_*`）。依 §決策 12，`lib/kb/index.ts` 刻意沒有 `answer()`／guardrail／intent／autonomy。
+
+**在隔離 worktree（`D:/Worktrees/kb-k0-split`，detached HEAD）執行**：`git status` 顯示當下有 3 個平行 session 共用 `D:\Work`，其中一個標題就是「客服系統進度」＝正面對撞 K0 要動的 `lib/cs/`。worktree 的 `node_modules` 用 junction 共用主目錄那份（801MB，免重裝）。
+
+**基線本來就是紅的**（15 個 tsc 錯、7 個測試失敗，全在 video session 的在製品），故 DoD 從「tsc 全綠」改為**「錯誤集與基線完全相同 + `lib/cs`/`lib/kb` 零錯」**——這比宣稱全綠誠實，且 worktree 釘在固定 commit 使基線可重現。7 個測試失敗以 `git stash` 跑基線**實測證明**為既有（同 4 檔同 7 筆），非推論。
+
+**critic 抓到的 Critical（C1）**：`lib/kb/` 六個新檔**完全沒進 git index**（`git ls-files` = 0）。根因是先前 `git add -A ... && git commit ...` 寫在同一條 Bash 指令，被 `verify-gate-commit` 在 PreToolUse **整條**擋掉 → `add` 也沒跑到（memory 早有此記載，我仍踩到）。若照 shared-worktree 慣用的 `git commit --only -- <modified files>` 提交，會產出一個 **main 上每個 `@/lib/kb` import 都解析不到**的 commit：build 全炸、`sg-deploy.sh` test gate 紅、rollback。**我跑的五項驗證全在 working tree 上，結構上看不到 index，與這個風險完全正交。** 已修並以 `git ls-files lib/kb | wc -l` = 7 當機械閘。另修 critic 的 4 個 Major/Minor：KB 測試搬進 `lib/kb/__tests__`（否則抽成服務時測試跟不走）、barrel 不再為了遷就消費者測試而洩漏 `chunkText`/`rrfFuse`、型別改由 `@/lib/kb/types` 匯入（避免手滑刪 `type` 就把 Supabase client 拉進純模組 init）、兩份設計文件的 stale `file:line` 重指新位置。
+
+**記錄但不在 K0 修的跨模組不變量**：`minRetrievalScore`（cs 安全閘）吃的是 `retrieve()` 回傳的 cosine，而 `setEmbeddingProvider` 是 process 全域 singleton 且已對外公開——任一未來消費者換 provider 會改變 cs 安全閘語意。已寫成 `lib/kb/index.ts` 的 RETRIEVAL CONTRACT，並列入 K1 DoD（改 per-caller 注入）。治本不在純搬移的範圍內。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（worktree，專案層級）| exit=1 | result=15 errors，與基線**檔案集合完全相同**，`lib/cs`+`lib/kb` 零錯
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/cs/__tests__ lib/kb/__tests__` | exit=0 | result=42/42 綠（3 檔）
+REALTEST_EVIDENCE: tool=Bash | cmd=`git stash push -u` → `npx vitest run <4 個 video 測試檔>` → `git stash pop` | exit=0 | result=基線同樣 4 檔 7 筆失敗 → 證明既有，非 K0 造成；pop 後複驗 42/42 仍綠
+REALTEST_EVIDENCE: tool=Bash | cmd=`git show HEAD:lib/cs/rag.ts \| sed <常數改名> \| diff - lib/kb/rag.ts`（逐字比對）| exit=0 | result=全檔唯一差異為 import 路徑一行；`db.ts` 知識段 byte-identical；git 亦自行判定為 R084 rename
+REVIEW_DONE: critic=Deep（獨立 subagent，重跑 tsc/全套 vitest/baseline git grep/逐函式 byte diff）| verdict=Medium risk | findings=1c/4m/3n+1s，**Critical 與 4 個 Major 全數已修**
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory（worktree 內，K0 已套用）| grep=`lib/cs/rag\|CS_EMBEDDING\|CS_THRESHOLDS.(vectorTopK\|keywordTopK\|contextTopK\|rrfK)\|CS_TIMEOUTS.embedMs` | hits=1（`lib/cs/autonomy.ts` 的 `CS_THRESHOLDS.minRetrievalScore` 合法保留 + 一行指向已刪檔的註解，已改寫）。`WORKLOG.md`／`worklog-excerpt.md` 的命中為當日歷史記錄，依 AGENTS.md §9「舊檔案不回改」保留
+WORKLOG_DONE: 本條目
+
+[rollback]
+K0 的 code 在隔離 worktree（`D:/Worktrees/kb-k0-split`）的 detached commit，**尚未 land 到 main**。放棄只需 `git worktree remove`。已 land 後回滾 = `git revert` 該 commit（純搬移，無 schema／DB／設定變更）。
+
+## 2026-09-10（97–101 號切片：新開 F11 causal 家族 1/10→6/10，5 個平行 agent，critic 抓到 2 個真 schema 閘漏洞）
+
+counterfactual_reasoning(41t)/theory_of_change(60t)/logic_model(60t)/process_tracing(67t)/rct(44t)。272 tests 零衝突，全 regression 6017→6290，golden 3186→3211。`causal.dag`（本 session 更早建置）是家族第一員；本批次新增後 F11 現況 6/10，剩 Difference-in-Differences／Regression Discontinuity／Instrumental Variables／Synthetic Control（皆為未建的計量／準實驗方法）。
+
+**兩個查證判斷**：① `logic_model` vs `theory_of_change` 是否應分離建置或 contract-only 重用（`architecture.trade_off_matrix`/`decision.mcda` 先例）——建置 agent 自行判斷應分離，critic 獨立從 Atlas 原文重新推導確認正確：L618+§11.22（L1689-1711）是 6 階段終於 IMPACT、每條 transition 強制 assumption/evidence/indicator/risk 四欄位；L619 是 5 階段無 IMPACT 無 assumptions 概念——兩個 schema 非欄位對欄位相同形狀，分離建置正確。② `rct` 建置 agent 自己抓蟲時發現 `counterfactual_reasoning` 的 `assumptions` 不變量引用 Atlas L635（「每條 edge 都應綁 evidence/rationale/confidence」）為「F11 共用框架規則」的推廣——標記為疑點但未修，留給整合階段。critic 複驗 Atlas L635 原文：該句字面指名「DAG」，緊接在 causal.dag 自己的 mermaid 範例圖之下，F11 其餘 9 列從未引用——確認為引用過寬，非家族共用規則。**修正做法比照本 session稍早 `retention_deletion_model` 訂正慣例**：只訂正引用文字（`causal.counterfactual_reasoning.contract.yaml`/`counterfactual-reasoning-record.schema.yaml` 各 3-4 處，標記 CORRECTED 保留原文脈絡），不動不變量本身——`assumptions` minItems:1 改為單獨以 L617 本身（「intervention→actual→counterfactual→assumptions」4 階段公式字面已含 assumptions）為根據，本來就足以獨立成立，無需 L635 佐證。
+
+process_tracing 是本批次唯一真 GENUINE_COMPUTE：Van Evera hoop/smoking-gun 4 格查表（`ai_lego/compute/process_tracing/evidence_evaluation.py`）derive 每筆證據的 `implication`，再以 ELIMINATED 覆蓋 CONFIRMED 的優先序 derive 記錄層 `hypothesis_status`，兩者皆由獨立 gate 重新推導、never caller-asserted。critic 自建 3-4 個情境手算比對程式輸出全數吻合。5 個 agent 同時搶 `contract-backlog.yaml` 尾端序數，各自即時重讀後自行避開碰撞（`ninetyseventh`→`onehundredfirst_concrete_entry`），零重複 key。
+
+**critic 覆審（0 Critical，2 Major 全修，2 Minor 全修）**：
+- 🟠 Major×2：`logic-model-record.schema.yaml`／`process-tracing-record.schema.yaml` 頂層皆缺 `additionalProperties:false`（僅巢狀 `$defs` 有）。critic 實測 hand-tamper PoC：用真 builder 產生合法記錄後夾帶一個未審欄位，兩份 schema 皆放行——真漏洞，非理論風險（同批次另外 3 份 schema 早已在頂層加上此閘）。已補閘 + 補對應 regression test（`test_logic_model.py`/`test_process_tracing.py` 各 1 條），連帶更新兩份 schema 自己的 `verification.method` 描述使其誠實反映新增的檢查範圍。
+- 🟡 Minor×2：見上段①②（②已述修法）；`ai_lego/modules/causal/__init__.py` 誤植「`causal.dag` 每條**邊**有封閉 `VALID_ROLES` 詞彙」——實際 `VALID_ROLES` 是 `dag_node()` 檢查，`dag_edge()` 完全無 role 欄位，已訂正為「每條**節點**」。
+- 附帶觀察（非本批次範圍，flag-only）：Lean Standard 遵循度混合（5 份新 contract description 行數 11–21 行，皆未達 5–8 行目標，`theory_of_change` 建置 agent 自報「唯一遵循者」的說法經 critic 實測不成立，5 份程度相近）——後續若要統一收斂，建議 6 份（含 causal.dag）一次處理，非本批次阻塞項。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_counterfactual_reasoning tests.unit.test_theory_of_change tests.unit.test_logic_model tests.unit.test_process_tracing tests.unit.test_rct`（critic 修復後重跑）| exit=0 | result=274 tests OK（272+2 補測）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression，critic 修復後重跑）| exit=0 | result=6292 tests OK，311s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root，critic 修復後重跑）| exit=0 | result=PASSED 3211，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=5 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=5 個 CLI 全部 PASS，各自拒絕證明＋獨立 gate 抓包證明皆真跑非模擬
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 5 contract+5 schema+5 module+1 compute submodule+5 CLI+5 test+`causal/__init__.py`+`causal.dag.py`，重新自 Atlas 原文推導兩個查證判斷而非採信任一方結論，真跑 272 測試+5 CLI，hand-tamper PoC 找到 2 個真 schema 閘漏洞，手算驗證 process_tracing 的 GENUINE_COMPUTE 邏輯）| verdict=PASS-WITH-FIXES | findings=0c/2m 全修/2n 全修
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`causal\.counterfactual_reasoning\|causal\.theory_of_change\|causal\.logic_model\|causal\.process_tracing\|causal\.rct\|CounterfactualReasoningRecord\|TheoryOfChangeRecord\|LogicModel\|ProcessTracingRecord\|RCTRecord` | hits=28（僅本批次新建檔案 17 個+registry+`causal/__init__.py`+TASKS.md 本條目；額外確認 SPEC_QUICKREF.md 已依 schema 路徑收錄全部 5 筆，非以 method_id 字面索引故未落在此 pattern）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/module/CLI/test（+1 個 compute submodule，共 26 個新檔）+ `causal/__init__.py`／`contract-backlog.yaml`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md` 的追加內容全部移除；`causal.counterfactual_reasoning.contract.yaml`／`counterfactual-reasoning-record.schema.yaml` 的 L635 引用訂正若回退，該檔案回到「L635 為家族共用規則」的過寬引用（不影響任何 runtime 行為，僅文字倒退）——可與本次一併回退，不強制連動。純新增+訂正，無 schema breaking change（僅收緊 additionalProperties，對既有合法記錄無影響），可安全回滾。
+
 ## 2026-09-10（99–100 號切片：F04 收官 5/6→6/6 + F21 收官 9/10→10/10，2 個平行 agent，其中一個推翻既有 contract 的錯誤結論）
 
 analogy_mapping(60t，F04 收官)/schema_compatibility_analysis(41t，F21 收官)。101 tests 零衝突，全 regression 5916→6017，golden 3186。analogy_mapping 是 source_domain→抽象機制→target_mapping 三段式轉移管線，三個欄位需兩兩真正相異（語法層面判定，非語意「是否真的更抽象」——後者無 gate 能誠實判斷，刻意不做）；查重時意外多找到第 3 個易混淆手足 Cross-industry Transfer（F13 L675，任務簡報未點名，agent 自己查到並揭露為 OQ）。

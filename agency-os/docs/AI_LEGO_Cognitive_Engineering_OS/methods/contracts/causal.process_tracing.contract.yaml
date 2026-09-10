@@ -1,0 +1,136 @@
+$id: "ai-lego://methods/contracts/causal.process_tracing.contract.yaml"
+title: "Process Tracing Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 concrete entry. 2nd member of the `causal` family (F11, after `causal.dag`), built alongside 4
+  concurrent siblings (causal.counterfactual_reasoning/theory_of_change/logic_model/rct) in the same batch.
+
+  **Atlas gives this method exactly ONE citation** -- the F11 tool table's Process Tracing row (L620: purpose
+  "用機制證據檢查因果鏈"; usage "mechanism→hoop/smoking-gun evidence"; benefit "適合小樣本深度因果"). Broad
+  grep across the whole Atlas for "Process Tracing"/"hoop"/"smoking gun"/"smoking-gun" found NO dedicated
+  §11.x section (unlike causal.dag's own §11.21), NO worked example, NO §10 Causal recipe mention (L1108:
+  "DAG→Data Quality→Identification→Compute→Sensitivity"), and NO §22.3 Method-specific Gate row -- same
+  "thinnest grounding" class `security.pasta.contract.yaml`'s own due diligence already documented.
+
+  Because Atlas gives no structural detail beyond its own five-word formula, field-level detail beyond that
+  formula is grounded in REAL, EXTERNAL, NAMED methodology practice (Van Evera's own hoop-test/smoking-gun-test
+  typology), NOT an Atlas citation -- same disclosure class `security.pasta.contract.yaml` already establishes.
+  Van Evera's real typology has FOUR test types; `evidence[].test_type` is deliberately restricted to the TWO
+  Atlas's own row literally names (see `OQ-PROCESSTRACING-2`).
+
+  Core invariant: `evidence[].implication` and record-level `hypothesis_status` are GENUINE_COMPUTE -- HOOP and
+  SMOKING_GUN evidence carry asymmetric logical implications when PRESENT vs ABSENT (failing a HOOP test
+  eliminates the hypothesis; finding a SMOKING_GUN test confirms it), re-derived by both the builder and an
+  independent gate, never caller-asserted.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Process Tracing row (L620): 'mechanism→hoop/smoking-gun evidence'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §10 Method Selection Engine, Causal recipe row (L1108) -- checked, does NOT name Process Tracing"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155) -- checked, no Process Tracing row"
+  - "methods/contracts/causal.dag.contract.yaml -- sole existing family sibling, two-layer-invariant precedent"
+  - "methods/contracts/security.pasta.contract.yaml -- 'thin Atlas citation, real external methodology, disclosed' precedent reused here"
+  - "methods/registry/method-inventory.yaml Process Tracing entry (F11 causal, line: 617 -- stale by 3 against the real L620, same drift class every other F-family row in that file already carries)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in `methods/registry/contract-backlog.yaml` `tier_1`.
+  `id: causal.process_tracing` mints a new machine_id, 2nd member of `causal` (F11).
+
+id: causal.process_tracing
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [MAP, CAUSE_HYPOTHESIS, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4 composition formula for this method, same gap causal.dag's own
+# cognitive_primitives already discloses). Recording the mechanism + evidence set is MAP; the mechanism being
+# tested IS a CAUSE_HYPOTHESIS (Atlas §9's own literal example primitive); testing it against hoop/smoking-gun
+# evidence and deriving hypothesis_status is VALIDATE.
+
+purpose:
+  - test_a_hypothesized_causal_mechanism_against_hoop_and_smoking_gun_evidence_and_derive_the_hypothesis_survival_status
+
+inputs:
+  required: []
+  optional: [CauseHypothesisSet]
+  # No required upstream typed-object: unlike causal.dag (grounded in Atlas §14.1's own explicit legal chain
+  # naming "Causal DAG" by name), Atlas's own Process Tracing row cites no upstream typed-object -- inventing a
+  # required CauseHypothesisSet dependency here would be exactly the "fabricate structure Atlas never gives"
+  # class R0 forbids. `causal_mechanism` (see outputs) is a self-contained string, not a foreign-key reference.
+  # CauseHypothesisSet is kept OPTIONAL -- a real, low-risk soft link for a caller who does have one from an
+  # upstream causal.dag/fishbone run, same family-convention class `association.morphological_analysis`'s own
+  # `informs_mcda_ref` already establishes for an analogous soft, non-required cross-reference.
+
+outputs: [ProcessTracingRecord]
+# NEW output type (see typed-objects/process-tracing-record.schema.yaml). Atlas gives this method's output no
+# PascalCase name anywhere, same honesty gap causal.dag's own outputs field already discloses.
+
+preconditions:
+  - "causal_mechanism is a non-empty string -- Atlas's own literal 'mechanism' formula word"
+  - "cause_hypothesis_set_ref, when present, is a non-empty string (format-only checked, existence of the referenced record not verified)"
+  - "evidence has at least 1 entry -- a mechanism claim with zero evidence tests has not been process-traced at all, unlike security.stride's freshly-scoped-review-with-zero-threats state"
+  - "every evidence entry has a non-empty id (unique within the record), test_type in {HOOP, SMOKING_GUN}, non-empty description, result in {PRESENT, ABSENT}, and schema-valid provenance"
+  - "evidence[].implication is NOT caller-supplied -- the builder computes it internally via derive_implication(test_type, result), and the gate independently re-derives and compares against every stored entry"
+  - "hypothesis_status is NOT caller-supplied -- the builder computes it internally via derive_hypothesis_status(evidence[].implication), and the gate independently re-derives and compares; ELIMINATED takes precedence over CONFIRMED when both are present in the same evidence set (a failed HOOP test is dispositive -- a necessary-condition failure logically forecloses the hypothesis regardless of any other, merely-sufficient confirming evidence)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  genuine_compute: true
+  # Atlas's own citation IS evidence-driven end to end ("mechanism→hoop/smoking-gun evidence") -- the same
+  # re-derived-not-copied reasoning causal.dag's own quality block already applies to its own family.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Process Tracing row (grep-confirmed).
+
+recommended_next: []
+# Disclosed gap, not invented: Atlas's own F11 table lists Process Tracing as one of 10 flat, unordered
+# alternative causal-validation methods (Causal DAG/Counterfactual Reasoning/Theory of Change/Logic
+# Model/Process Tracing/RCT/DiD/Regression Discontinuity/IV/Synthetic Control), with no inter-method ordering
+# given anywhere in this spec root -- unlike causal.dag's own §14.1 chain citation. See OQ-PROCESSTRACING-1.
+
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- same class every prior structural/genuine_compute contract's own
+  # rollback field already draws.
+
+compilation_decisions:
+  - question: "Should evidence[].test_type cover Van Evera's full 4-type typology (straw-in-the-wind, hoop, smoking-gun, doubly-decisive) or only the 2 Atlas's own row literally names?"
+    decision: "Only 2 -- HOOP and SMOKING_GUN, a closed enum."
+    reasoning: "Atlas's own citation is the enforced field set (per this session's own PASTA/framing.boundary_critique precedent); importing the fuller external typology here would silently expand past what the mother document actually names. Disclosed as OQ-PROCESSTRACING-2, not silently done."
+  - question: "Should a caller-supplied implication be accepted and merely cross-checked, or never accepted at all?"
+    decision: "Never accepted -- evidence[].implication is not a builder parameter; it is always computed from test_type/result. Same 'no code path to a disagreeing stored value' discipline security.stride's own elements_with_no_recorded_threats and association.morphological_analysis's own legal_combinations already establish, applied here at the per-ITEM level (a new shape in this suite, not just record-level)."
+  - question: "When a HOOP-test elimination and a SMOKING_GUN-test confirmation both appear in the same evidence set, which wins?"
+    decision: "ELIMINATED wins."
+    reasoning: "A HOOP test is a NECESSARY-condition test -- failing it means the mechanism AS HYPOTHESIZED cannot be true, which logically must override any SUFFICIENT-but-not-necessary 'confirmation', since an eliminated hypothesis cannot simultaneously be confirmed. This is the one real logical asymmetry Van Evera's own typology asserts, not an invented tie-break rule."
+  - question: "Should evidence be allowed to be empty (a freshly-scoped review not yet tested), matching security.stride's own empty threats[]?"
+    decision: "No -- minItems 1. Process tracing's own defining act IS the mechanism-vs-evidence test; a record with zero evidence has not performed that act at all, unlike a STRIDE review's own legitimate 'scoped but not yet enumerated' state."
+
+open_questions:
+  - id: "OQ-PROCESSTRACING-1"
+    question: "recommended_next is left empty -- no Atlas citation orders Process Tracing relative to any sibling F11 method. Should a future pass add one once a real downstream consumer exists?"
+    owner: "operator, or whoever next builds a method that explicitly follows Process Tracing"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-PROCESSTRACING-2"
+    question: "test_type is restricted to Van Evera's HOOP/SMOKING_GUN pair only, not his full 4-type typology (straw-in-the-wind, doubly-decisive). Should a future revision, on explicit operator instruction to treat the external methodology as authoritative beyond Atlas's own literal citation, add the other two?"
+    owner: "operator, or whoever next revises this contract's own scope with explicit authorization to cite the external methodology as a source"
+    blocks: "nothing in this file's own validity -- disclosed limit, not a silent gap"
+  - id: "OQ-PROCESSTRACING-3"
+    question: "cognitive_primitives is this file's own inference, not a cited Atlas composition formula. Same open question class as OQ-CAUSALDAG-2."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F11 tool table row (L620) directly. Broad case-insensitive grep across the whole Atlas for
+    "Process Tracing"/"process tracing"/"hoop"/"smoking_gun"/"smoking gun" -- confirmed no dedicated section
+    beyond the table row (§11.x numbering runs causal.dag's own §11.21 straight to §11.22 Theory of Change with
+    no Process Tracing section between them), no §10 recipe mention, no §22.3 gate row. Grepped the whole
+    ai_lego tree case-insensitively for "process_tracing"/"hoop"/"smoking_gun" before writing -- zero
+    pre-existing implementation. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own five-word formula is directly transcribed as
+    `causal_mechanism` + `evidence[].test_type`'s enum. All per-evidence/record-level derivation logic beyond
+    that formula is explicitly disclosed as grounded in Van Evera's real, named process-tracing methodology,
+    not a mother-document citation.

@@ -1,0 +1,117 @@
+$id: "ai-lego://methods/contracts/causal.theory_of_change.contract.yaml"
+title: "Theory of Change Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 7th F11 causal-family member (causal.dag built earlier this batch;
+  counterfactual_reasoning/logic_model/process_tracing/rct landing concurrently
+  via 4 other agents in the same batch). Atlas F11 table row (L618) + dedicated
+  §11.22 (L1689-1711): a 6-stage linear chain (Inputs->Activities->Outputs->
+  Short-term Outcomes->Long-term Outcomes->Impact) whose own literal requirement
+  is that EVERY arrow (5 transitions) carries an Assumption, Evidence, Indicator,
+  and Risk -- not just the 6 stage labels. Not in EC §32. Core invariant: exactly
+  6 positionally-ordered stages and exactly 5 positionally-ordered transitions,
+  each unconditionally carrying all 4 named attributes non-empty -- the Atlas
+  citation made real, not a slogan.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Theory of Change row (L618)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.22 (L1689-1711) -- dedicated section, worked mermaid chain, '每條箭頭都應有：Assumption / Evidence / Indicator / Risk' requirement"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 table, Objective Tree row (L367, 最佳搭配 column names Theory of Change) -- corroborating, unbuilt F02 sibling, NOT depended on (see open_questions)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.8 Problem Tree 搭配 line (L2638, 'Problem Tree → Objective Tree → Theory of Change') -- corroborating recipe citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.1 Policy 起始推薦 row (L1110, 'Stakeholder→Jurisdiction→Evidence→Theory of Change→Scenario') -- corroborating recipe citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.7 Public Policy Recipe (L3378-3394, names Theory of Change as one pipeline step) -- corroborating recipe citation"
+  - "methods/contracts/framing.five_w_one_h.contract.yaml -- prefixItems positional-array fixed-sequence convention reused for `stages`"
+  - "methods/contracts/association.concept_map.contract.yaml -- explicit from/to edge-reference convention reused for `transitions`"
+  - "specs/cognitive/typed-objects/theory-of-change-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas §11.22 plus
+  low-risk, disclosed compilation choices, same class every Tier 1 F11
+  sibling contract (causal.dag) this session already established. Registered
+  in methods/registry/contract-backlog.yaml tier_1.
+
+id: causal.theory_of_change
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited. The 6-stage chain is a DECOMPOSE of "intervention ->
+# impact" into a causal pipeline; laying out stages+transitions is MAP; the
+# per-arrow Assumption/Evidence/Indicator/Risk requirement (L1703-1708)
+# demands each link be VALIDATE-able, same primitive class causal.dag's own
+# VALIDATE member already establishes for a different structural check.
+
+purpose:
+  - trace_how_an_intervention_produces_outcomes_and_impact_through_an_explicit_assumption_bearing_causal_chain
+inputs:
+  required: []
+  optional: []
+  # Atlas §11.22 gives no upstream typed-object dependency (unlike Atlas F02's
+  # own 最佳搭配 column naming Objective Tree as a feeder, L367) -- see
+  # open_questions on why that is not turned into a hard or soft dependency here.
+outputs: [TheoryOfChangeRecord]
+preconditions:
+  - "stages is EXACTLY the six entries {INPUTS, ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES, IMPACT}, one each, IN THAT ORDER -- Atlas's own literal mermaid chain order (L1695-1700)"
+  - "transitions is EXACTLY the five adjacent-stage-pairs, one each, IN THAT ORDER -- transitions[i] connects stages[i] to stages[i+1]"
+  - "every transition carries a non-empty assumption, evidence, indicator, AND risk -- unconditional, per Atlas's own '每條箭頭都應有' (L1703-1708), no exception"
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Every stage and transition is a claim about how the intervention actually
+  # works until independently validated -- same evidence-discipline shape
+  # causal.dag/framing.five_w_one_h/association.concept_map already use.
+forbidden_transition: []
+# Atlas §11.22 gives no explicit forbidden-transition worked example, and F11's
+# table (L614-624) has no §22.3 Method-specific Gate row for this method
+# (grep-confirmed) -- left genuinely empty rather than inventing one.
+recommended_next: []
+# F11's own tool table (L614-624) has only 4 columns (工具/用途/使用方式/效益) --
+# no 最佳搭配/推薦 column, unlike F04's 5-column table that grounded
+# association.concept_map's own recommended_next: [causal.dag]. Left empty,
+# same "no citation, no invention" restraint every other empty-recommended_next
+# sibling in this directory already applies.
+
+compilation_decisions:
+  - question: "Positional array (prefixItems, matching framing.five_w_one_h) or explicit from/to references (matching association.concept_map) to lock each transition to its correct adjacent stage pair?"
+    decision: "Both. prefixItems positionally locks the 5-entry array order AND each entry also carries its own const-locked from_stage/to_stage fields -- see typed-object schema's own compilation_decisions for the full reasoning."
+  - question: "Should assumption/evidence/indicator/risk be conditionally required (matching concept_map's conditional supporting_evidence_refs)?"
+    decision: "No -- all 4 are unconditionally required and non-empty on every transition. Atlas's own citation states this as an unqualified property of every arrow."
+  - question: "Add a GENUINE_COMPUTE derived field, matching framing.five_w_one_h's information_gaps / association.concept_map's orphan_node_ids?"
+    decision: "No. Atlas's own benefit column for this row (L618, '建可驗證政策邏輯') names no gap/orphan-style computed property. The real invariant here is the fixed 6-stage/5-transition shape plus the unconditional 4-attribute completeness per transition, same 'no invented third invariant' restraint causal.dag's own acyclic_verified-as-structural-const (not a derived comparison field) already applies."
+  - question: "Depend on Atlas's own named feeder (Objective Tree, F02 L367), unbuilt at this write time, via a hard or soft input reference?"
+    decision: "No dependency of any kind, not even an optional soft-link field. This task's own scope explicitly frames Objective Tree as 'note as open question, don't depend on it' -- a stronger restraint than framing.five_w_one_h's/association.concept_map's own optional forward soft-links to THEIR named-next unbuilt siblings, disclosed as a deliberate divergence driven by this task's own instruction rather than a citation-grounded reason."
+
+open_questions:
+  - "OQ-THEORYOFCHANGE-1: F02's Objective Tree (Atlas L367, unbuilt at this write time) is named as this method's own upstream feeder via the §12.8/§13.7 recipe chains cited above. No dependency (hard or soft) is added here per this task's own explicit scope instruction (owner: operator, or whoever next builds framing.objective_tree and reconciles the chain)."
+  - "OQ-THEORYOFCHANGE-2: `cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]` is this file's own inference, not a cited Atlas composition formula (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-THEORYOFCHANGE-3: Atlas's own Logic Model row (L619, 'inputs→activities→outputs→short/long outcomes') is structurally near-identical to this method minus Impact and minus the per-arrow Assumption/Evidence/Indicator/Risk requirement -- landing concurrently via a different agent in this same batch, not read or depended on here; a future integration pass should confirm the two methods stay genuinely distinct in their own typed-object shapes (owner: operator, integration pass)."
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses.
+
+verification:
+  method: >
+    Read Atlas §11.22 (L1689-1711) directly, plus F11 table row L618, F02 row
+    L367, §12.8 (L2633-2639), §13.1 policy row (L1110), and §13.7 (L3378-3394)
+    at the cited lines. Grepped the whole Atlas file case-insensitively for
+    "Theory of Change" (5 hits total: F02 row, F11 row, §11.22 header+body,
+    §12.8, §13.1, §13.7 -- all read, none add a citation beyond what is
+    transcribed above). Read causal.dag.contract.yaml, framing.five_w_one_h.contract.yaml,
+    and association.concept_map.contract.yaml in full to reuse the established
+    two-layer-invariant / positional-array / from-to-reference conventions.
+    Grepped the whole ai_lego tree case-insensitively for "theory_of_change"
+    and "theory of change" before writing -- zero pre-existing implementation.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 6-stage mermaid order and
+    the literal "每條箭頭都應有：Assumption / Evidence / Indicator / Risk"
+    requirement are transcribed verbatim into preconditions. The
+    stage/transition field shapes and the from_stage/to_stage-plus-prefixItems
+    hybrid are this suite's own compiled structure, not Atlas-cited
+    field-by-field -- disclosed as such, same honesty discipline every sibling
+    Tier 1 contract in this directory already applies.

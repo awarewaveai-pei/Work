@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/causal.counterfactual_reasoning.contract.yaml"
+title: "Counterfactual Reasoning Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 2nd F11 `causal` family member (`causal.dag` built earlier this session is the first). Atlas's only
+  citation for this method: F11 tool table row (L617: "Counterfactual Reasoning｜比較 actual vs
+  no-intervention｜intervention→actual→counterfactual→assumptions｜明確因果基準"). Grep-confirmed zero other
+  Atlas mentions of "counterfactual" anywhere in the document -- no dedicated section exists, unlike
+  causal.dag's own §11.21. Two real invariants: (1) `intervention`/`actual_outcome`/`counterfactual_outcome`
+  pairwise non-identical (case/whitespace-insensitive) -- an echoing pair means no real WHAT-IF comparison is
+  being made; (2) `assumptions` REQUIRED non-empty -- the table's own 4th pipeline stage (L617 itself names
+  "assumptions" as the literal 4th word of its formula). **CORRECTED (2026-09-10, batch critic review)**: an
+  earlier draft of this description additionally cited L635 ("每條 edge 都應綁 evidence/rationale/confidence")
+  as a "shared F11 framing rule" being generalized here. Re-verified against the Atlas source: L635 is
+  textually scoped to `causal.dag` specifically (its sentence names "DAG," sits directly beneath causal.dag's
+  own worked mermaid diagram, and is never referenced by or repeated near any other F11 table row) -- not a
+  family-wide rule. The `assumptions` invariant needs no L635 support: L617's own citation already names
+  assumptions as this method's required 4th pipeline stage, independent of causal.dag's separate per-edge
+  convention.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Counterfactual Reasoning row (L617) -- this method's ONLY citation (grep-confirmed no dedicated section, unlike causal.dag's own §11.21)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L635 (DAG edges must carry evidence/rationale/confidence) -- read for pattern only; CORRECTED (2026-09-10, batch critic review): L635 is textually scoped to causal.dag, not a family-wide F11 rule -- NOT cited as authority for this method's own assumptions-required invariant, which is grounded in L617 alone (see compilation_decisions)"
+  - "methods/contracts/causal.dag.contract.yaml + ai_lego/modules/causal/dag.py -- sibling F11 member, two-layer invariant discipline and family conventions (family:causal, no CauseHypothesisSet dependency invented for this method since none is cited)"
+  - "methods/contracts/framing.problem_statement.contract.yaml -- 'not an echo' distinctness-invariant class reused here as the 3-way pairwise check"
+  - "specs/cognitive/typed-objects/counterfactual-reasoning-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas's own single table-row citation is transcribed into purpose/preconditions;
+  the record shape (intervention/actual_outcome/counterfactual_outcome/assumptions, flat, no upstream
+  typed-object input) is this suite's own compiled structure, disclosed in compilation_decisions, same
+  restraint every Tier 1 sibling in this directory already applies to its own un-cited field-level shape.
+
+id: causal.counterfactual_reasoning
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [CAUSE, IMAGINE, COMPARE]
+# INFERRED, not cited (Atlas gives no composition formula for this method). Atlas L617's own purpose column
+# literally says "比較 actual vs no-intervention" -- a direct textual match to COMPARE. Constructing a
+# counterfactual_outcome that never actually happened is IMAGINE (same kernel token causal.dag's sibling
+# reasoning would draw on for a hypothetical state, though DAG itself did not need it). The underlying claim
+# being tested -- that the intervention caused the actual outcome, contrasted against what would have
+# happened without it -- is CAUSE, the same kernel token causal.dag's own [MAP, RELATE, VALIDATE] triple
+# deliberately did NOT need (DAG maps/relates variables; this method makes one specific causal claim and
+# compares it against its own negation).
+
+purpose:
+  - compare_an_actual_outcome_against_a_claimed_no_intervention_counterfactual_to_establish_an_explicit_causal_baseline
+inputs:
+  required: []
+  optional: []
+  # Atlas's own F11 table row describes this method operating directly on a real intervention/outcome pair,
+  # with no upstream typed-object named as a requirement (unlike causal.dag's own §14.1 CauseHypothesisSet
+  # dependency, which is a DIFFERENT F11 member's own citation, not shared by this row). Same "no hard
+  # dependency on an un-cited upstream type" restraint every sibling Tier 1 contract in this directory applies.
+outputs: [CounterfactualReasoningRecord]
+
+preconditions:
+  - "id is a non-empty string prefixed CFR-; version is a string"
+  - "intervention, actual_outcome, and counterfactual_outcome are each non-empty strings"
+  - "no two of intervention/actual_outcome/counterfactual_outcome are identical (case/whitespace-insensitive) -- an echoing pair means no real WHAT-IF comparison is being made, same 'echo' class framing.problem_statement's own expected_state!=current_state check already establishes, extended to 3-way"
+  - "assumptions has >=1 non-empty string entries -- Atlas L617's own 4th pipeline stage word ('assumptions'); an undisclosed-assumption counterfactual claim is exactly the correlation=causation risk this stage exists to prevent (CORRECTED 2026-09-10: not grounded in L635, which is causal.dag-scoped -- see description)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # One whole-record provenance, not per-field/per-item labels -- this record makes ONE causal claim (unlike
+  # causal.dag's own graph of independently-evidenced hypothesis edges, each needing its own EVIDENCE-label
+  # check), same structural reasoning framing.problem_statement's own quality block already establishes.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Counterfactual Reasoning row (grep-confirmed).
+
+recommended_next: []
+# Atlas's F11 table row names no downstream method for this row specifically (contrast causal.dag's own
+# §14.1 chain into validation.experiment) -- left empty rather than inventing one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Reuse causal.dag's own per-edge evidence/rationale/confidence object shape (Atlas L635) for each assumptions[] entry, or keep assumptions a flat list of strings?"
+    decision: "Flat list of non-empty strings, REQUIRED with minItems:1 (unlike framing.problem_statement's own optional evidence/constraints arrays)."
+    reasoning: "causal.dag's per-edge shape addresses a structurally different problem -- N independently-evidenced causal HYPOTHESES inside one graph, each needing its own provenance. This method emits ONE already-provenanced claim; inventing a nested evidence/rationale/confidence object per assumption would be unstated structure no citation names. CORRECTED (2026-09-10, batch critic review): the minItems:1 requirement itself is grounded directly in L617's own 4th pipeline-stage word ('assumptions'), not in a generalization of L635 -- L635 is causal.dag-scoped text (see description), not a family-wide disclosure rule this method inherits."
+  - question: "Nest intervention/actual_outcome/counterfactual_outcome under a content wrapper (framing.problem_statement's own shape) or keep them flat top-level fields?"
+    decision: "Flat top-level fields."
+    reasoning: "ProblemStatement's content wrapper exists because Atlas §12.2 cites an actual nested '建議格式' content block for THAT method. No equivalent nested-content citation exists here -- Atlas's own F11 row is a flat 4-stage pipeline, matching causal.dag's own flat top-level convention instead."
+  - question: "Add a status lifecycle field (framing.problem_statement's own draft/under_review/validated/rejected/superseded enum)?"
+    decision: "No."
+    reasoning: "ProblemStatement's status enum exists because a real downstream consumer (root_cause.fishbone's own precondition, Atlas L1013) names the literal value 'validated'. No citation or downstream consumer names any lifecycle concept for this method -- omitted rather than invented."
+  - question: "Enforce 3-way pairwise distinctness (intervention vs actual_outcome vs counterfactual_outcome) or only actual_outcome!=counterfactual_outcome (the literal WHAT-IF comparison)?"
+    decision: "3-way pairwise, one specific error code per pair."
+    reasoning: "actual_outcome==counterfactual_outcome is the core degenerate case (no comparative claim being made at all). intervention==actual_outcome or intervention==counterfactual_outcome are a different but equally real echo -- an action description pasted into an outcome field -- same failure class, not a separate risk category worth leaving unchecked."
+
+open_questions:
+  - "OQ-COUNTERFACTUALREASONING-1: no dedicated Atlas section exists for this method (only the F11 table row) -- unlike causal.dag's own §11.21 worked mermaid example, there is no concrete worked scenario to verify field names against beyond the table's own 4-word pipeline. Should a future pass re-derive field names from a real worked example if a dedicated section is ever written?（owner: operator）"
+  - "OQ-COUNTERFACTUALREASONING-2: assumptions[] entries are plain strings with no per-entry provenance/confidence, a deliberate departure from causal.dag's own per-edge shape (see compilation_decisions). Should a future revision add an optional per-assumption confidence field once a real downstream consumer needs to rank or filter assumptions by strength?（owner: operator, or whoever next needs a confidence-weighted assumptions consumer）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-insensitively for "counterfactual" -- exactly 1 hit, the F11 table row
+    (L617); confirmed no dedicated §11.x/§12.x section exists for this method (unlike causal.dag's own
+    §11.21). Read the F11 shared framing rule (L635) and causal.dag.contract.yaml + ai_lego/modules/causal/
+    dag.py in full to evaluate whether its per-edge evidence/rationale/confidence shape applies here (decision
+    disclosed in compilation_decisions: it does not, directly). Read framing.problem_statement.contract.yaml
+    in full for the echo-invariant class, extended here to 3-way. Grepped the whole ai_lego tree
+    case-insensitively for "counterfactual" before writing -- zero pre-existing implementation. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own single table-row citation is transcribed into
+    purpose/preconditions; the flat field shape, the 3-way distinctness invariant, and the required-non-empty
+    assumptions invariant are this suite's own compiled structure, explicitly disclosed as such above, not
+    presented as mother-document content.

@@ -1,0 +1,272 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/theory-of-change-record.schema.yaml"
+title: Theory of Change Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TheoryOfChangeRecord` -- the declared `outputs` of
+  `causal.theory_of_change`'s Method Contract (methods/contracts/causal.theory_of_change.contract.yaml).
+  Atlas §11.22 (L1689-1711) gives a 6-node mermaid chain (Inputs -> Activities -> Outputs -> Short-term
+  Outcomes -> Long-term Outcomes -> Impact) plus one literal, unconditional requirement: "每條箭頭都應有：
+  Assumption / Evidence / Indicator / Risk" -- EVERY ONE of the 5 transitions between adjacent stages, not
+  the 6 stage labels themselves. This schema makes that literal: `stages` is a fixed-length-six POSITIONALLY
+  ORDERED tuple (`prefixItems`, same convention `5w1h-record.schema.yaml`'s own `dimensions` already
+  establishes), and `transitions` is a fixed-length-five POSITIONALLY ORDERED tuple whose `from_stage`/
+  `to_stage` are BOTH `const`-locked to the correct adjacent stage pair (transitions[i] connects
+  stages[i]->stages[i+1]) AND named explicitly (same edge-reference convention
+  `concept-map-record.schema.yaml`'s own `from_node_id`/`to_node_id` already establishes) -- a hybrid of both
+  sibling conventions, see `compilation_decisions`. Every transition's `assumption`/`evidence`/`indicator`/
+  `risk` are all `required` and non-empty, UNCONDITIONALLY (no `if`/`then` gating, unlike
+  `concept-map-record.schema.yaml`'s own conditionally-required `supporting_evidence_refs`) -- Atlas's own
+  "每條箭頭都應有" carries no exception.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Theory of Change row (L618)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.22 (L1689-1711) -- dedicated section, worked mermaid chain, 4-attribute-per-arrow requirement"
+  - "methods/contracts/causal.theory_of_change.contract.yaml (id: causal.theory_of_change)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml (prefixItems positionally-ordered fixed-set convention reused for `stages`)"
+  - "specs/cognitive/typed-objects/concept-map-record.schema.yaml (from_node_id/to_node_id explicit edge-reference convention reused for `transitions[].from_stage`/`to_stage`; nodes-carry-no-provenance-only-edges-do asymmetry reused for stages-carry-no-evidence-refs-only-transitions-do)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml (per-edge provenance granularity reused for transitions)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Positional array (prefixItems, matching 5w1h-record's dimensions) or explicit from/to references (matching concept-map-record's edges) to lock each transition to its correct adjacent stage pair?"
+    decision: "Both -- prefixItems positionally locks the 5-entry array order, AND each entry additionally carries its own from_stage/to_stage fields, both const-locked by position."
+    reasoning: >
+      Referential integrity is doubly expressed (array index AND explicit named field), not a conflict
+      between the two sibling conventions -- a reader does not have to count array position to know which
+      transition they are looking at, strictly stronger than either convention alone, and both mechanisms
+      are independently verified by jsonschema (see verification).
+  - question: "Should assumption/evidence/indicator/risk be conditionally required, matching concept-map-record's conditional supporting_evidence_refs?"
+    decision: "No -- all 4 are unconditionally required and non-empty on every transition."
+    reasoning: "Atlas §11.22's own citation ('每條箭頭都應有') states this as an unqualified property of every arrow, not a conditional one -- unlike concept-map's own step-3/step-4 sourced-vs-inferred partition, Atlas gives Theory of Change no such conditional split."
+  - question: "Add a GENUINE_COMPUTE derived field, matching 5w1h-record's information_gaps / concept-map-record's orphan_node_ids?"
+    decision: "No."
+    reasoning: >
+      Atlas's own benefit column for this row (L618, "建可驗證政策邏輯") names no gap/orphan-style computed
+      property the way F01/F04's benefit columns did. The real, Atlas-explicit structural invariant here is
+      the fixed 6-stage/5-transition shape plus the unconditional 4-attribute completeness per transition --
+      expressed via prefixItems/const/required at the schema layer and a shared-predicate builder+gate at the
+      runtime layer, same "no invented third invariant" restraint causal-dag-analysis.schema.yaml already
+      applies (acyclic_verified is a structural const, not a derived comparison field either).
+  - question: "Should stages carry their own supporting_evidence_refs, matching transitions?"
+    decision: "No -- stages carry only a description + provenance."
+    reasoning: "Atlas's own §11.22 citation attaches Evidence (and Assumption/Indicator/Risk) to the ARROWS, not the stage nodes -- same asymmetric precedent concept-map-record.schema.yaml's own nodes (no provenance/evidence field, only edges carry it) already establishes."
+
+type: object
+required: [id, version, intervention, stages, transitions, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^TOC-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as concept-map-record.schema.yaml's CONCEPTMAP- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.theory_of_change"
+
+  intervention:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The program/policy intervention this chain describes. Grounded directly in Atlas's own §11.22 purpose line literal wording ('描述一個 intervention 如何經過機制產生 outcome 與 impact') -- stronger citation grounding than 5w1h-record's un-cited topic/concept-map-record's un-cited context anchor fields."
+
+  stages:
+    type: array
+    minItems: 6
+    maxItems: 6
+    description: >
+      Atlas §11.22's own literal 6-node mermaid chain (L1695-1700), AS AN ORDERED TUPLE -- stages[0] MUST be
+      INPUTS, stages[5] MUST be IMPACT.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: INPUTS}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: ACTIVITIES}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: OUTPUTS}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: SHORT_TERM_OUTCOMES}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: LONG_TERM_OUTCOMES}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: IMPACT}}}]
+    items: false
+
+  transitions:
+    type: array
+    minItems: 5
+    maxItems: 5
+    description: >
+      The 5 arrows between adjacent stages -- Atlas §11.22's own literal citation: "每條箭頭都應有：
+      Assumption / Evidence / Indicator / Risk". AS AN ORDERED TUPLE -- transitions[0] connects
+      INPUTS->ACTIVITIES, transitions[4] connects LONG_TERM_OUTCOMES->IMPACT.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/transition_entry"}, {properties: {from_stage: {const: INPUTS}, to_stage: {const: ACTIVITIES}}}]
+      - allOf: [{$ref: "#/$defs/transition_entry"}, {properties: {from_stage: {const: ACTIVITIES}, to_stage: {const: OUTPUTS}}}]
+      - allOf: [{$ref: "#/$defs/transition_entry"}, {properties: {from_stage: {const: OUTPUTS}, to_stage: {const: SHORT_TERM_OUTCOMES}}}]
+      - allOf: [{$ref: "#/$defs/transition_entry"}, {properties: {from_stage: {const: SHORT_TERM_OUTCOMES}, to_stage: {const: LONG_TERM_OUTCOMES}}}]
+      - allOf: [{$ref: "#/$defs/transition_entry"}, {properties: {from_stage: {const: LONG_TERM_OUTCOMES}, to_stage: {const: IMPACT}}}]
+    items: false
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  stage_entry:
+    type: object
+    required: [stage, description, provenance]
+    additionalProperties: false
+    properties:
+      stage:
+        type: string
+        enum: [INPUTS, ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES, IMPACT]
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What this stage concretely IS for this intervention, e.g. 'Inputs: NT$50M annual budget + 20 instructors + 3 training center venues'."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  transition_entry:
+    type: object
+    required: [from_stage, to_stage, assumption, evidence, indicator, risk, provenance]
+    additionalProperties: false
+    properties:
+      from_stage:
+        type: string
+        enum: [INPUTS, ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES]
+      to_stage:
+        type: string
+        enum: [ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES, IMPACT]
+      assumption:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas §11.22's own literal 'Assumption' attribute -- what must hold true for this arrow to actually produce its target stage."
+      evidence:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas §11.22's own literal 'Evidence' attribute -- the basis for believing this arrow holds."
+      indicator:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas §11.22's own literal 'Indicator' attribute -- what would be measured to confirm this arrow fired."
+      risk:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas §11.22's own literal 'Risk' attribute -- what could break this arrow."
+      provenance:
+        description: "Per-transition, same granularity causal-dag-analysis.schema.yaml's own edges already use -- each transition IS a distinct causal-mechanism claim."
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids. Required (non-empty) when provenance.epistemic_type == EVIDENCE, same convention every sibling schema in this directory already establishes -- see allOf below."
+    allOf:
+      - if:
+          properties: {provenance: {properties: {epistemic_type: {const: EVIDENCE}}, required: [epistemic_type]}}
+          required: [provenance]
+        then:
+          required: [supporting_evidence_refs]
+          properties: {supporting_evidence_refs: {minItems: 1}}
+
+examples:
+  - description: "A local-government vocational training subsidy program, matching Atlas's own named benefit domain (L1711, '非常適合政策、教育、社會方案') -- not itself an Atlas-cited worked instance (§11.22 gives only the abstract chain), constructed to exercise all 6 stages / 5 transitions with realistic content"
+    value:
+      id: "TOC-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.theory_of_change"
+      intervention: "地方政府職業訓練津貼計畫"
+      stages:
+        - stage: INPUTS
+          description: "年度預算 NT$5,000 萬、20 名訓練講師、3 個訓練中心場地"
+          provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: null}
+        - stage: ACTIVITIES
+          description: "為 800 名失業者開設 12 週職業技能課程（電腦、餐飲、長照三類）"
+          provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: null}
+        - stage: OUTPUTS
+          description: "800 名學員完成課程，其中 650 名取得技能證照"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - stage: SHORT_TERM_OUTCOMES
+          description: "結業後 3 個月內，450 名學員成功就業"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - stage: LONG_TERM_OUTCOMES
+          description: "結業後 12 個月，450 名就業者中 380 名仍在職，平均薪資較訓練前提升 18%"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - stage: IMPACT
+          description: "計畫涵蓋區域失業率由 6.2% 下降至 5.1%"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null}
+      transitions:
+        - from_stage: INPUTS
+          to_stage: ACTIVITIES
+          assumption: "講師與場地足以同時開課而不互相排擠"
+          evidence: "過去兩期同規模計畫的排課紀錄顯示可行"
+          indicator: "課程如期開班的班次比例"
+          risk: "講師流動或場地檔期衝突導致開課延遲"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-2001"]
+        - from_stage: ACTIVITIES
+          to_stage: OUTPUTS
+          assumption: "學員出席率足以完成課程並通過檢定"
+          evidence: "同類課程過去結業率約 80%"
+          indicator: "結業率、證照通過率"
+          risk: "學員因家庭或經濟壓力中途退訓"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-2002"]
+        - from_stage: OUTPUTS
+          to_stage: SHORT_TERM_OUTCOMES
+          assumption: "持有證照的學員具備雇主要求的最低技能門檻"
+          evidence: "訓練中心與 12 家在地企業的用人合作備忘錄"
+          indicator: "結業後 3 個月就業率"
+          risk: "當地就業市場需求萎縮，證照與職缺不匹配"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - from_stage: SHORT_TERM_OUTCOMES
+          to_stage: LONG_TERM_OUTCOMES
+          assumption: "初期就業具有可持續性，不會短期內流失"
+          evidence: "上一期學員 12 個月留職率追蹤資料"
+          indicator: "12 個月在職率、薪資變化"
+          risk: "試用期後遭資遣或自願離職"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-2003"]
+        - from_stage: LONG_TERM_OUTCOMES
+          to_stage: IMPACT
+          assumption: "計畫規模足以在區域統計層級產生可偵測的失業率變化"
+          evidence: "區域勞動力調查基準線與追蹤期比較"
+          indicator: "區域失業率"
+          risk: "總體經濟景氣同時影響失業率，難以歸因於本計畫"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-THEORYOFCHANGERECORD-1"
+    question: >
+      Should a future revision allow more than one intervention "arm" per record (e.g. a program with two
+      parallel activity tracks converging on the same outcome), rather than one strict linear 6-stage chain?
+      Left as a strict single chain -- Atlas §11.22's own mermaid diagram shows exactly one linear path, no
+      branching or converging arrows.
+    owner: "operator, or whoever next needs a branching Theory of Change variant"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.22 (L1689-1711) directly, including the exact mermaid node/arrow labels and the literal
+    "每條箭頭都應有" requirement. Read 5w1h-record.schema.yaml and concept-map-record.schema.yaml in full as
+    the prefixItems/$defs and from/to-reference convention templates respectively. Validated against
+    jsonschema Draft202012Validator (required fields present, id pattern satisfied, stages/transitions
+    prefixItems order AND const-locked from_stage/to_stage both enforced, additionalProperties:false on the
+    top level and both $defs verified to actually reject an unknown key, the EVIDENCE-requires-
+    supporting_evidence_refs allOf branch verified to actually reject an EVIDENCE-labeled transition with no
+    refs and to accept a non-EVIDENCE transition with none).
+  note: >
+    `stages`' six values/order and `transitions`' 4-attribute-per-arrow requirement are transcribed verbatim
+    from Atlas L1695-1708. The worked example's own program content, the from_stage/to_stage-plus-prefixItems
+    hybrid, and the omission of a GENUINE_COMPUTE derived field are this suite's own compiled structure,
+    explicitly flagged as such above, not presented as mother-document content. No mother document was
+    modified to produce this file.

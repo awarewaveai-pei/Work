@@ -1,0 +1,182 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/rct-record.schema.yaml"
+title: RCT Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RCTRecord` -- the declared
+  `outputs` of `causal.rct`'s Method Contract
+  (methods/contracts/causal.rct.contract.yaml, `outputs: [RCTRecord]`).
+  Atlas F11 table row L621 gives this method a single 4-step pipeline
+  ("randomize→power→treatment/control→analysis") and no field-level
+  sub-structure -- modeled as a FLAT record of 5 plain-string content
+  fields, same shape class `how-might-we-record.schema.yaml`'s own
+  flat-record convention uses for a similarly thin citation.
+
+  Field provenance -- Atlas F11 L621:
+    * `randomization` -- the "randomize" stage: HOW units were assigned,
+      a narrative description, NOT an actual RNG call this schema/record
+      runs.
+    * `power_analysis` -- the "power" stage: the study's own disclosed
+      power/sample-size justification. REQUIRED, not optional -- see
+      compilation_decisions.
+    * `treatment_group`/`control_group` -- the "treatment/control" stage,
+      split into 2 named arms (Atlas's own single word covers both). Must
+      be genuinely distinct (enforced at the runtime layer, see
+      `ai_lego/modules/causal/rct.py`) -- a record naming an identical arm
+      twice is not describing a randomized CONTROLLED trial.
+    * `analysis_summary` -- the "analysis" stage: REPORTED analytical
+      approach/findings, not computed by this record (see
+      compilation_decisions and the method contract's own scope-boundary
+      note). Provenance for this claim is the record's own top-level
+      `provenance` field, same record-level-only convention
+      `how-might-we-record.schema.yaml`/`weighted-decision-matrix-record
+      .schema.yaml` already use (contrast `causal-dag-analysis.schema
+      .yaml`'s own per-edge provenance, which fits a multi-edge GRAPH,
+      not a single flat study record).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, RCT row (L621) -- the ONLY Atlas citation for this method (grep-confirmed, see method contract's own verification section)"
+  - "methods/contracts/causal.rct.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/how-might-we-record.schema.yaml -- flat-record-from-thin-citation shape precedent reused here"
+  - "specs/cognitive/typed-objects/weighted-decision-matrix-record.schema.yaml -- disclosure-only field precedent (presence enforced, methodology not) reused for power_analysis/analysis_summary"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: direct transcription of a
+  cited Atlas worked pipeline plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Should power_analysis be an OPTIONAL field (present only when a real power justification exists)?"
+    decision: "No -- REQUIRED, minLength:1. A study with no formal power analysis must say so explicitly (e.g. 'no formal power analysis conducted; opportunistic sample of N=...'), not silently omit the field -- same 'declared gap needs an explicit justification' discipline boundary-critique-record.schema.yaml's own empty_justification field already establishes for a different kind of declared gap. See method contract's own compilation_decisions for the full reasoning."
+  - question: "Should treatment_group/control_group be one combined field (Atlas's own citation uses a single slash-joined phrase 'treatment/control') or 2 separate fields?"
+    decision: "2 separate required fields -- a single field could not express the distinctness invariant this method's own name (randomized CONTROLLED trial) demands; JSON Schema has no operator to assert 'a substring differs from another substring of the same field'."
+  - question: "Should treatment_group != control_group be expressed as a JSON Schema constraint?"
+    decision: "No -- cross-field, case/whitespace-insensitive text comparison has no native JSON Schema 'not equal to a sibling, normalized' operator, same limitation how-might-we-record.schema.yaml's own pain_point/hmw_question echo check accepted. Enforced at the runtime layer (ai_lego/modules/causal/rct.py), at construction AND independently re-derived by a gate."
+  - question: "Should analysis_summary/power_analysis carry their own genuine-compute fields (engine, computation_provenance_ref), the way causal-dag-analysis.schema.yaml's acyclic_verified does?"
+    decision: "No -- this record performs no genuine computation (no RNG, no statistical test). Omitting engine/computation_provenance_ref entirely (not present as false/null) is itself the honest disclosure that nothing here is GENUINE_COMPUTE, same omission-as-disclosure convention how-might-we-record.schema.yaml's own schema (no engine field either) already uses."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- same baseline hygiene every sibling record schema in this directory converges on (prevents a caller from smuggling an unreviewed field onto the record), not specifically risk-driven here the way weighted-decision-matrix-record.schema.yaml's own choice is tied to a named forbidden_transition."
+
+type: object
+required: [id, version, randomization, power_analysis, treatment_group, control_group, analysis_summary, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^RCT-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as how-might-we-record.schema.yaml's HMW- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.rct"
+
+  randomization:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L621's own "randomize" stage -- a narrative description of HOW
+      units were assigned to treatment/control (e.g. the unit of
+      randomization, simple/block/cluster method, allocation concealment).
+      NOT an actual RNG call or algorithm this record itself runs -- see
+      the method contract's own scope-boundary note.
+
+  power_analysis:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L621's own "power" stage -- the study's own disclosed power/
+      sample-size justification, made BEFORE data collection per real RCT
+      practice. REQUIRED (see compilation_decisions): a caller with no
+      formal power analysis must disclose that fact explicitly rather than
+      omit the field.
+
+  treatment_group:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L621's own "treatment" arm -- who/what received the
+      intervention. Must genuinely differ from control_group (runtime-
+      layer invariant, see top-level description) -- a record naming an
+      identical treatment and control arm is not describing a randomized
+      CONTROLLED trial.
+
+  control_group:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L621's own "control" arm -- the comparison condition (e.g.
+      placebo, standard-of-care, waitlist). Must genuinely differ from
+      treatment_group.
+
+  analysis_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L621's own "analysis" stage -- the stated analytical approach
+      and/or findings, as REPORTED content (see method contract's own
+      scope-boundary note: this record captures what the study's own
+      analysis claims, it does not itself compute a statistical test).
+      Provenance for this claim is the record's own top-level `provenance`
+      field.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern
+      every sibling typed-object schema in this directory uses. No
+      `const`: epistemic_type legitimately varies by whether this record
+      documents a planned design (e.g. ASSUMPTION/HYPOTHESIS, not yet run)
+      or a completed, reported study (e.g. EVIDENCE/SOURCE_FACT).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed onboarding-email RCT on new-signup 7-day retention"
+    value:
+      id: "RCT-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.rct"
+      randomization: "以個別新註冊帳號為隨機分派單位，系統於註冊完成當下以亂數產生器等機率指派至 treatment/control，分派後不可切換組別"
+      power_analysis: "資料蒐集前先驗設定 α=0.05、power=0.8，依歷史 7 日留存率 35% 估算，偵測至少 5 個百分點差異所需樣本數為每組 1,600 人"
+      treatment_group: "新註冊帳號於第 0/2/5 天收到 3 封 onboarding email"
+      control_group: "新註冊帳號不收到任何 onboarding email，僅維持既有產品內引導流程"
+      analysis_summary: "雙尾 t 檢定比較兩組 7 日留存率：treatment 組 41.2% vs control 組 35.6%，差異 5.6 個百分點（p=0.021）。分析方法與結果為研究團隊回報，本紀錄未重新執行統計檢定"
+      provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-RCTRECORD-1"
+    question: >
+      treatment_group/control_group != each other is a runtime-only
+      invariant, not schema-expressible -- same class of disclosed gap
+      how-might-we-record.schema.yaml's own pain_point!=hmw_question check
+      documents.
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F11 table row (L621) directly. Cross-checked against
+    methods/contracts/causal.rct.contract.yaml's own outputs/preconditions
+    /quality. Read how-might-we-record.schema.yaml and weighted-decision-
+    matrix-record.schema.yaml in full as shape precedent before writing
+    this file. Validated against jsonschema Draft202012Validator (required
+    fields present, id pattern satisfied, additionalProperties:false
+    present from the start).
+  note: >
+    randomization/power_analysis/treatment_group/control_group/
+    analysis_summary field names are this contract's own naming (Atlas
+    itself does not name these 4 pipeline stages with formal field
+    labels, only lists them as a slash-arrow chain); the flat-record
+    shape, the 2-arm split, and power_analysis's REQUIRED status are
+    compilation decisions, disclosed above. No mother document was
+    modified to produce this file.
