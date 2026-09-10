@@ -41,7 +41,6 @@ begin
   return new;
 end $$;
 
-drop trigger if exists media_story_bible_revisions_immutable on public.media_story_bible_revisions;
 create trigger media_story_bible_revisions_immutable
 before update or delete on public.media_story_bible_revisions
 for each row execute function public.prevent_story_bible_document_mutation();
