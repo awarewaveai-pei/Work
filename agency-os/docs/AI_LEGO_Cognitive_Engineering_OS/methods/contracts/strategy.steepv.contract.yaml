@@ -1,0 +1,120 @@
+$id: "ai-lego://methods/contracts/strategy.steepv.contract.yaml"
+title: "STEEPV Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 2nd F08 `strategy` family member (`strategy.swot` is the first). Atlas's only citation: F08 tool
+  table row (L516: "STEEPV｜加入 Values 的長期環境掃描｜S/T/E/E/P/V｜適合長期社會變遷｜Scenario"). Grep-confirmed
+  zero other Atlas mentions of "STEEPV" anywhere in the document -- no dedicated section, unlike its neighbor
+  PESTEL's own rich §11.9 (9 named per-factor sub-fields). STEEPV's row is even thinner than PESTEL's own row
+  (PESTEL's "使用方式" column adds "facts→trends→implications→uncertainty"; STEEPV's is the bare 6-letter
+  acronym, nothing else) -- neither PESTEL's 9 sub-fields nor its pipeline stages are transcribed here; that
+  would be borrowing structure THIS method's own citation does not name. Real invariant, grounded directly in
+  the citation's own purpose text ("加入 Values 的...掃描" -- ADDING Values IS the method's stated reason for
+  existing, the one thing that distinguishes it from PESTEL's 5 shared letters): a STEEPV analysis with zero
+  VALUES-dimension factors is not a STEEPV analysis, just PESTEL with an unused enum value -- enforced both at
+  construction and independently re-derived by a gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, STEEPV row (L516) -- this method's ONLY citation (grep-confirmed no dedicated section)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, PESTEL row (L515) -- read for contrast only, to confirm PESTEL's richer field list is NOT this method's own citation (see description)"
+  - "methods/contracts/strategy.swot.contract.yaml -- sibling F08 member, two-layer invariant discipline and family conventions (family:strategy, closed-enum classification-list shape)"
+  - "methods/contracts/causal.counterfactual_reasoning.contract.yaml -- thin-citation (single table row) precedent: flat compiled shape, no borrowed structure from a richer sibling, required-non-empty invariant traced directly to the citation's own words"
+  - "specs/cognitive/typed-objects/steepv-analysis.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas's own single table-row citation is transcribed into purpose/preconditions;
+  the record shape (factors[] of {id, dimension, statement, provenance}, no geography/time/source, no
+  per-factor pipeline stages) is this suite's own compiled structure, disclosed in compilation_decisions, same
+  restraint causal.counterfactual_reasoning.contract.yaml already applies to its own un-cited field-level shape.
+
+id: strategy.steepv
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [CLASSIFY, MAP, FORECAST]
+# INFERRED, not cited (Atlas's §4 composition-formula list, L185-192, has no STEEPV entry -- only SWOT/SCAMPER/
+# AHP/Fishbone are given formulas there). CLASSIFY: already-cataloged OBSERVED_EXTENSION token (primitive.schema.yaml,
+# evidenced via SWOT's own "SWOT = CLASSIFY + COMPARE + CONTEXTUALIZE", Atlas L189) -- reused here because STEEPV
+# performs the identical act, sorting real-world factors into one of a closed set of named categories (6, not
+# SWOT's 4). MAP: canonical kernel token, direct textual match to "環境掃描" (environmental scan) -- charting
+# the external landscape. FORECAST: canonical kernel token, direct textual match to L516's own "長期" (long-term)
+# framing and its benefit column "適合長期社會變遷" (suited for long-term social change).
+
+purpose:
+  - scan_the_long_term_external_environment_across_social_technological_economic_environmental_political_and_values_dimensions
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own F08 table row names no upstream typed-object requirement (unlike strategy.swot's own L1331
+  # "先取得證據" precondition, which is SWOT-specific text, not shared by this row). Same "no hard dependency on
+  # an un-cited upstream type" restraint causal.counterfactual_reasoning.contract.yaml already applies.
+
+outputs: [SteepvAnalysis]
+
+preconditions:
+  - "id is a non-empty string prefixed STEEPV-; version is a string"
+  - "factors has >=1 entry"
+  - "every factor's dimension is one of the 6 closed STEEPV values (SOCIAL, TECHNOLOGICAL, ECONOMIC, ENVIRONMENTAL, POLITICAL, VALUES) -- transcribed directly from L516's own S/T/E/E/P/V formula"
+  - "factors includes at least 1 entry with dimension == VALUES -- L516's own defining differentiator ('加入 Values 的...掃描'); see compilation_decisions"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # No misuse-warning citation exists for STEEPV specifically (contrast strategy.swot's own L1347 "沒有 Evidence
+  # 就寫『品牌強』『市場大』", which directly grounds SWOT's identical flag). Left false rather than borrowed.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no STEEPV row (grep-confirmed); unlike strategy.swot, no §14.1-style illegal
+# transition example names this method either. Left empty rather than inventing one by analogy to SWOT.
+
+recommended_next: []
+# L516's own "最佳搭配" column names "Scenario" -- but no machine-readable id or contract exists anywhere in
+# this corpus for a Scenario method (grep-confirmed against method-inventory.yaml and methods/contracts/). Left
+# empty rather than inventing an id that does not yet exist, per OQ-STEEPV-1 below (same honesty class
+# strategy.swot.contract.yaml's own OQ-SWOT-1 already applies to its "strategy.tows" gap).
+
+rollback:
+  side_effect_free: true
+  # Pure analysis/knowledge-object production, no external side effect named by the citation -- same low-risk
+  # inference class strategy.swot.contract.yaml's own rollback field already documents.
+
+compilation_decisions:
+  - question: "Reuse strategy.swot's own per-factor geography/time/source fields (Atlas L1332), or PESTEL's own richer 9-sub-field shape, for each STEEPV factor?"
+    decision: "Neither. Flat {id, dimension, statement, provenance(, supporting_evidence_refs)} -- no geography/time/source, no PESTEL sub-fields."
+    reasoning: "Both are real, but each belongs to a DIFFERENT method's own citation (SWOT's L1332, PESTEL's §11.9) -- STEEPV's own L516 citation is a bare 6-letter acronym with no per-factor field list of its own. Borrowing either neighbor's shape because the acronyms overlap would be exactly the fabrication this task was told to avoid."
+  - question: "Should the required VALUES-dimension coverage be a hard construction-time invariant (raise before the record exists) and a schema-level structural constraint, or only a softer runtime quality gate (the class strategy.swot's own evidence_labeling_required uses)?"
+    decision: "Both: builder-level raise (STEEPV_MISSING_VALUES_DIMENSION) AND a JSON Schema `contains`/`minContains:1` structural constraint on `factors`, PLUS an independent re-deriving runtime gate that trusts neither."
+    reasoning: >
+      Genuinely counter-intuitive vs. the closest sibling (strategy.swot does NOT require all 4 of its own
+      categories to be present -- STRENGTH/WEAKNESS/OPPORTUNITY/THREAT are symmetric, no single one is SWOT's
+      reason for existing). STEEPV is different: L516's own purpose column states the method's entire reason
+      for existing IS the addition of Values on top of the 5 letters it shares with PESTEL. A STEEPV analysis
+      with zero VALUES factors has not done the one thing that makes it STEEPV rather than PESTEL under a
+      different name -- this is not invented structure, it is the citation's own defining sentence taken
+      literally. Three-layer enforcement (builder + schema `contains` + gate) mirrors this suite's existing
+      "never trust a single layer" discipline (e.g. causal.counterfactual_reasoning's own assumptions-required
+      check), applied to the one invariant this method's citation states is definitional rather than incidental.
+  - question: "Keep supporting_evidence_refs (the repo-wide soft-reference-to-Evidence convention strategy.swot and causal.counterfactual_reasoning both use) as an optional field despite evidence_labeling_required: false?"
+    decision: "Yes, optional, not required."
+    reasoning: "Available as the established cross-method convention for callers who do have real evidence.schema.yaml records to cite, without requiring it structurally -- no citation names an evidence-misuse warning for STEEPV the way SWOT's L1347 does, so it stays optional rather than gated."
+
+open_questions:
+  - "OQ-STEEPV-1: recommended_next is intentionally empty -- L516 names 'Scenario' as STEEPV's best pairing but no machine-readable id/contract exists anywhere in this corpus for a Scenario method (same gap class strategy.swot.contract.yaml's own OQ-SWOT-1 already flags for 'strategy.tows'). Should a future Tier 1/2 pass add a real scenario.* contract and wire this field to it?（owner: operator, or whoever next backfills the Scenario family）"
+  - "OQ-STEEPV-2: no dedicated Atlas section exists for this method (only the F08 table row, thinner even than PESTEL's own row) -- there is no concrete worked example to verify field names against beyond the bare 6-letter acronym. Should a future pass re-derive field names from a real worked example if a dedicated section is ever written?（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-insensitively for "STEEPV" -- exactly 1 hit, the F08 table row (L516);
+    confirmed no dedicated §11.x/§12.x section exists (unlike PESTEL's own §11.9). Read strategy.swot.contract.yaml
+    and causal.counterfactual_reasoning.contract.yaml in full to evaluate which precedent applies (list-of-factors
+    shape from the former, thin-citation restraint from the latter). Grepped the whole ai_lego tree
+    case-insensitively for "steepv" before writing -- zero pre-existing implementation. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. L516's own citation is transcribed into purpose/preconditions/the dimension
+    enum; the flat field shape (deliberately NOT borrowing SWOT's geography/time/source or PESTEL's 9-field
+    richness) and the VALUES-required invariant (grounded directly in L516's own defining sentence, not by
+    analogy) are this suite's own compiled structure, explicitly disclosed as such above.

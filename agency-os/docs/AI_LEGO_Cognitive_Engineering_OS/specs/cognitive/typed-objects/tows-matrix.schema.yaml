@@ -1,0 +1,189 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/tows-matrix.schema.yaml"
+title: TOWS Matrix
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TowsMatrix` -- the declared `outputs` of `strategy.tows`'s Method
+  Contract (methods/contracts/strategy.tows.contract.yaml, `outputs: [TowsMatrix]`). Third node of the §14.1
+  legal chain (`SwotAnalysis -> TOWS -> StrategyOptions -> MCDA -> DecisionCandidate -> HumanDecision`, Atlas
+  L3536-3544). Atlas F08 L519 + §11.8 (L1351-1362) give the real SO/ST/WO/WT pairing structure and its own
+  defining benefit ("把「分析清單」真正轉成 Strategy Options", L1361) -- `strategy_option` below is REQUIRED
+  non-empty content per pairing, not an optional label.
+
+  Field provenance:
+    * `swot_analysis_ref` -- which upstream SwotAnalysis this matrix pairs against (Atlas L1335 step 5: "SWOT
+      完成後進 TOWS").
+    * `pairings[].internal_factor_id`/`external_factor_id` -- Atlas's own SO/ST/WO/WT structure (L519, §11.8) is
+      ALWAYS one internal (STRENGTH/WEAKNESS) + one external (OPPORTUNITY/THREAT) factor, never two of the same
+      side -- enforced at the runtime layer (`ai_lego/modules/strategy/tows.py`), a referential-integrity check
+      against the real `swot-analysis.schema.yaml#/properties/factors` this matrix was built from.
+    * `pairings[].pairing_type` -- GENUINE_COMPUTE (see `compilation_decisions`): derived from the two factors'
+      real categories, never caller-supplied. Same two-layer discipline `causal-dag-analysis.schema.yaml`'s own
+      `acyclic_verified` already establishes for a different structural property.
+    * `pairings[].strategy_option` -- Atlas §11.8's own defining benefit line (L1361), the real content a bare
+      SO/ST/WO/WT label without this would not satisfy (method contract's own `description`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, TOWS row (L519)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md SWOT→TOWS sub-table (L530-536)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.8 TOWS 矩陣／SWOT 策略矩陣 (L1351-1362)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 legal chain (L3536-3544)"
+  - "methods/contracts/strategy.tows.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/swot-analysis.schema.yaml#/properties/factors -- the real upstream collection pairings[] reference"
+  - "specs/cognitive/typed-objects/synthetic-control-record.schema.yaml -- cross-collection referential-integrity shape + additionalProperties:false-from-the-start precedent reused here"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml -- acyclic_verified/computation_provenance_ref two-layer genuine-compute precedent reused for referential_integrity_verified/computation_provenance_ref"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of a cited Atlas section plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should pairing_type be caller-settable (accept + validate + refuse on mismatch) or always computed?"
+    decision: "Always computed -- the pairing constructor (tows_pairing()) has no pairing_type parameter at all; generate_tows_matrix derives it, an independent gate re-derives it from raw fields. Structurally eliminates a caller-asserted wrong label rather than accepting then refusing it."
+  - question: "Should swot_analysis_ref be the only tie to the upstream record, or should the builder also require the real SwotAnalysis object?"
+    decision: "Both -- swot_analysis_ref is the stored soft-reference field on the record (this schema); the REAL SwotAnalysis object is a required runtime-layer parameter to generate_tows_matrix/evaluate_tows_integrity_gate (not stored on the schema instance), the same way causal/dag.py's nodes/edges are runtime inputs rather than schema-embedded elsewhere."
+  - question: "additionalProperties: false at the top level and inside pairings[] items?"
+    decision: "Yes, from the start -- same baseline hygiene synthetic-control-record.schema.yaml's own note documents was caught missing on 2 earlier sibling schemas by a critic hand-tamper PoC (2026-09-10 session); applied here from the first draft, not retrofitted."
+  - question: "Does TowsMatrix need its own forbidden_transition / genuine-compute marker, mirroring SWOTAnalysis / CausalDagAnalysis?"
+    decision: "Yes -- forbidden_transition (schema-level, below) generalizes SWOTAnalysis's identical guard one step down the same L3536-3552 chain; referential_integrity_verified: const true mirrors acyclic_verified's two-layer discipline (computed True only after every pairing's referential integrity + pairing_type derivation pass, re-verified independently by the gate from raw fields)."
+
+type: object
+required: [id, version, swot_analysis_ref, pairings, referential_integrity_verified, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^TOWS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as swot-analysis.schema.yaml's SWOT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.tows"
+
+  swot_analysis_ref:
+    type: string
+    description: >
+      Which SwotAnalysis this matrix pairs against (Atlas L1335 step 5). Soft-reference field on the SCHEMA
+      instance; the runtime layer (ai_lego/modules/strategy/tows.py) additionally requires and validates against
+      the REAL SwotAnalysis object at both construction and gate-evaluation time -- this field alone is not what
+      makes the dependency genuine, see compilation_decisions.
+
+  pairings:
+    type: array
+    minItems: 1
+    description: "One or more SO/ST/WO/WT pairings, per Atlas L519/§11.8 (L1351-1362)."
+    items:
+      type: object
+      required: [id, internal_factor_id, external_factor_id, pairing_type, strategy_option]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this matrix (e.g. TOWS-001-P1)."
+        internal_factor_id:
+          type: string
+          description: >
+            Must resolve (runtime-layer referential-integrity check) to a real factor in the referenced
+            SwotAnalysis whose category is STRENGTH or WEAKNESS (INTERNAL, per swot.py's own is_internal()).
+        external_factor_id:
+          type: string
+          description: >
+            Must resolve (same check) to a real factor whose category is OPPORTUNITY or THREAT (EXTERNAL).
+            Atlas's own SO/ST/WO/WT structure is ALWAYS one internal + one external factor -- never two of the
+            same side.
+        pairing_type:
+          type: string
+          enum: [SO, ST, WO, WT]
+          description: >
+            GENUINE_COMPUTE (see top-level compilation_decisions) -- derived from internal_factor_id/
+            external_factor_id's real categories by ai_lego.modules.strategy.tows.derive_pairing_type, never
+            accepted as caller input. STRENGTH+OPPORTUNITY=SO, STRENGTH+THREAT=ST, WEAKNESS+OPPORTUNITY=WO,
+            WEAKNESS+THREAT=WT (Atlas L519/§11.8's own table, transcribed verbatim).
+        strategy_option:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: >
+            REQUIRED, non-empty, disclosed content -- Atlas §11.8's own defining benefit line (L1361: 把「分析
+            清單」真正轉成 Strategy Options). A pairing with a type label but no real strategy content has not
+            done this method's job (see method contract's own `description`).
+
+  referential_integrity_verified:
+    const: true
+    description: >
+      Two-layer discipline mirroring causal-dag-analysis.schema.yaml's own acyclic_verified: set True only after
+      every pairing's factor-id referential integrity AND pairing_type genuine-compute derivation pass at
+      construction; independently re-derived (not trusted) by evaluate_tows_integrity_gate against the real
+      SwotAnalysis.
+
+  computation_provenance_ref:
+    type: string
+    description: >
+      Which function performed the pairing_type computation. Same pattern causal-dag-analysis.schema.yaml's own
+      computation_provenance_ref establishes.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in
+      this directory uses. No `const`: epistemic_type legitimately varies by whether this record documents an
+      AI-drafted or human-approved matrix.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+# ---------------------------------------------------------------------------
+# Schema-level static rule (describes the TYPE, not per-instance data -- same pattern as
+# swot-analysis.schema.yaml's own top-level forbidden_transition, sibling to `properties`, not nested inside it).
+# ---------------------------------------------------------------------------
+forbidden_transition:
+  description: >
+    Machine-checkable form of strategy.tows.contract.yaml's own forbidden_transition (TowsMatrix ->
+    AutomaticProductionDeployment) -- generalizes swot-analysis.schema.yaml's identical guard (Atlas L3550-3552)
+    one step down the same L3536-3544 legal chain: TowsMatrix is still short of StrategyOptions -> MCDA ->
+    DecisionCandidate -> HumanDecision.
+  from: "TowsMatrix"
+  to_forbidden_target: "AutomaticProductionDeployment"
+  rule: "TowsMatrix -> AutomaticProductionDeployment (direct) is FORBIDDEN. Legal path: TowsMatrix -> StrategyOptions -> MCDA -> DecisionCandidate -> HumanDecision (Atlas L3536-3544)."
+
+examples:
+  - description: "A TOWS matrix pairing 2 SWOT factors into 1 SO-type growth strategy"
+    value:
+      id: "TOWS-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.tows"
+      swot_analysis_ref: "SWOT-2026-09-04-001"
+      pairings:
+        - id: "TOWS-2026-09-11-001-P1"
+          internal_factor_id: "SWOT-2026-09-04-001-F1"
+          external_factor_id: "SWOT-2026-09-04-001-F3"
+          pairing_type: SO
+          strategy_option: "既有 92% 續約率證明客戶信任度高，可將此信任資產包裝為進入 SG 市場的背書，優先在法規鬆綁的鄰近市場複製既有訂閱方案"
+      referential_integrity_verified: true
+      computation_provenance_ref: "ai_lego.modules.strategy.tows.derive_pairing_type"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null}
+
+open_questions:
+  - id: "OQ-TOWSMATRIX-1"
+    question: "internal_factor_id/external_factor_id -> real SwotAnalysis factor + category resolution is a runtime-only invariant, not schema-expressible -- same class of disclosed gap causal-dag-analysis.schema.yaml's own edge-reference check already documents."
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+  - id: "OQ-TOWSMATRIX-2"
+    question: "StrategyOptions (§14.1's next chain node after TOWS) has no dedicated typed-object schema anywhere in this spec root yet -- same class of gap strategy.swot.contract.yaml's own OQ-SWOT-1 discloses one link earlier."
+    owner: "operator, or whoever next backfills the StrategyOptions/MCDA chain"
+
+verification:
+  method: >
+    Read Atlas F08 table (L500-536), §11.8 (L1351-1362), §14.1 (L3536-3552) directly at the cited lines. Read
+    swot-analysis.schema.yaml and synthetic-control-record.schema.yaml in full as shape precedent before writing
+    this file. Validated against jsonschema Draft202012Validator (required fields present, id pattern satisfied,
+    pairing_type enum closed per Atlas's own 4-way SO/ST/WO/WT split, additionalProperties:false present at both
+    the top level and the nested pairings[] item level from the start).
+  note: >
+    swot_analysis_ref/pairings[].id/internal_factor_id/external_factor_id/pairing_type/strategy_option field
+    names are this contract's own naming (Atlas does not give formal field labels, only the SO/ST/WO/WT table).
+    The overall record shape, referential_integrity_verified/computation_provenance_ref pairing, and the
+    always-computed (never caller-supplied) treatment of pairing_type are Phase-3-class compilation decisions,
+    disclosed above. No mother document was modified to produce this file.

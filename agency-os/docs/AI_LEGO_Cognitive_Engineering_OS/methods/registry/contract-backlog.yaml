@@ -2661,6 +2661,320 @@ tier_1:
     source: "methods/contracts/causal.synthetic_control.contract.yaml + specs/cognitive/typed-objects/synthetic-control-record.schema.yaml + ai_lego/modules/causal/synthetic_control.py"
     note: "61 tests pass. F11 causal family: 9 of 10 built before this entry (causal.dag + prior 6 + this batch's causal.instrumental_variables/causal.difference_in_differences/causal.regression_discontinuity) -- F11 IS 10/10 counting this entry, but has_contract/contract_status flip on any other registry (method-inventory.yaml) and ai_lego/modules/causal/__init__.py's own shared family docstring are deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites/reconciles both once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including a negative-control 1-donor-pool rejection check and a negative-control smuggled-top-level-key and smuggled-nested-weights-key rejection check. CLI demo (python -m ai_lego.apps.cli.run_synthetic_control_slice) prints PASS and exits 0, demonstrating 3 real refusals (undersized donor pool, treated_unit echoing a donor, a weight naming an unknown donor) plus 1 independent-gate hand-tamper catch."
 
+  onehundredsixth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 5 F08 strategy-family
+    # builds -- strategy.pestel/strategy.three_c/strategy.tows/strategy.
+    # porter_five_forces land concurrently via 4 sibling agents, not read here;
+    # re-read this file's own tail immediately before appending per this
+    # batch's own instruction -- onehundredfifth_concrete_entry was the last
+    # taken key at that time, no collision observed. Orchestrating session
+    # reconciles exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes).
+    method_id: "strategy.steepv"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot` already built, F08 was
+      1/14 before this batch; `strategy.pestel`/`strategy.three_c`/`strategy.
+      tows`/`strategy.porter_five_forces` land concurrently in this same
+      batch, not read here). F08 table row (L516: "STEEPV｜加入 Values 的長期
+      環境掃描｜S/T/E/E/P/V｜適合長期社會變遷｜Scenario") -- the ONLY Atlas
+      citation for this method (grep-confirmed: whole-file case-insensitive
+      grep for "STEEPV" found exactly 1 hit, this row; no dedicated §11.x/
+      §12.x section, unlike its neighbor PESTEL's own rich §11.9 9-sub-field
+      section; no §22.3 gate row). STEEPV's own row is thinner even than
+      PESTEL's (PESTEL's row adds "facts→trends→implications→uncertainty";
+      STEEPV's is the bare 6-letter acronym alone) -- PESTEL's richer
+      per-factor shape (9 named sub-fields) was deliberately NOT borrowed
+      here despite 5 of 6 dimension letters overlapping, since STEEPV's own
+      citation names none of that structure; same restraint `causal.
+      counterfactual_reasoning`'s own thin-citation build already applies
+      against a richer sibling (`causal.dag`). Same classification-list
+      shape as `strategy.swot` (`factors[]` of closed-enum-tagged items), but
+      the closed vocabulary is STEEPV's own 6-value S/T/E/E/P/V split
+      (SOCIAL/TECHNOLOGICAL/ECONOMIC/ENVIRONMENTAL/POLITICAL/VALUES), not
+      SWOT's 4. Real invariant, genuinely asymmetric vs. SWOT (which requires
+      no minimum coverage of its own 4 categories): `factors` must include
+      >=1 entry with `dimension == VALUES` -- L516's own purpose text names
+      adding Values on top of the 5 letters shared with PESTEL as this
+      method's entire reason for existing, so zero VALUES factors makes the
+      output indistinguishable from PESTEL with an unused enum value, not a
+      valid STEEPV analysis. Enforced at three layers: builder raise
+      (STEEPV_MISSING_VALUES_DIMENSION), the typed-object schema's own
+      `contains`/`minContains:1` structural constraint (verified by direct
+      Draft202012Validator execution to actually reject a zero-VALUES factors
+      array and accept one that has it), and an independent gate that
+      re-derives from raw fields without trusting the builder or the schema
+      validator, same never-trust-a-single-layer discipline every sibling
+      module in this suite already establishes. No forbidden_transition
+      guard (unlike `strategy.swot`'s own AutomaticProductionDeployment
+      guard) -- grep-confirmed no equivalent §14.1-style illegal-transition
+      example or §22.3 gate row names this method; disclosed as an absence,
+      not silently omitted. `recommended_next` left empty -- L516 names
+      "Scenario" as best pairing but no machine-readable scenario.* id or
+      contract exists anywhere in this corpus (OQ-STEEPV-1).
+    source: "methods/contracts/strategy.steepv.contract.yaml + specs/cognitive/typed-objects/steepv-analysis.schema.yaml + ai_lego/modules/strategy/steepv.py"
+    note: "28 tests pass. F08 strategy family: 1 of 14 built before this batch (strategy.swot) -- this entry (strategy.steepv) is F08's 2nd member; strategy.pestel/strategy.three_c/strategy.tows/strategy.porter_five_forces land concurrently in this same batch via 4 sibling agents, not read here -- F08 is 6/14 counting all 5 of this batch, NOT complete (9 more F08 rows remain). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 5 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the embedded example resolved through its real $ref to epistemic-label.schema.yaml, and negative-control checks for a smuggled top-level key, a smuggled per-factor key, a 7th dimension value, a zero-VALUES-factors array (contains/minContains), an empty factors array, and a missing id prefix -- all correctly rejected; the unmodified valid example correctly accepted. CLI demo (python -m ai_lego.apps.cli.run_steepv_slice) prints PASS and exits 0, demonstrating 1 real refusal (STEEPV_MISSING_VALUES_DIMENSION on a factor set with no Values dimension) plus 1 independent-gate hand-tamper catch (VALUES factor stripped from an already-valid analysis' raw dict). Grepped the whole ai_lego tree case-insensitively for 'steepv' both before writing (zero pre-existing implementation) and after (only this method's own 3 files, no collision with the 4 concurrent sibling builds)."
+
+  onehundredseventh_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 5 F08 strategy-family
+    # builds -- strategy.pestel/strategy.steepv/strategy.three_c/strategy.tows
+    # land concurrently via 4 sibling agents, not read here; re-read this
+    # file's own tail immediately before appending per this batch's own
+    # instruction -- onehundredsixth_concrete_entry (strategy.steepv) was the
+    # last taken key at that time, no collision observed. Orchestrating
+    # session reconciles exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes).
+    method_id: "strategy.porter_five_forces"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot` already built, F08 was
+      1/14 before this batch; `strategy.pestel`/`strategy.steepv`/`strategy.
+      three_c`/`strategy.tows` land concurrently in this same batch, not read
+      here). Atlas cites this method TWICE: F08 table row (L520: "分析產業結構｜
+      rivalry/new entrants/substitutes/supplier/buyer｜長期產業吸引力｜
+      Benchmark") and dedicated §12.11 (L2659-2675), naming the five forces
+      explicitly by name (Industry Rivalry/New Entrants/Substitutes/Supplier
+      Power/Buyer Power) plus the method's own stated benefit ("長期產業吸引力")
+      and limitation (digital platforms/network effects/ecosystem often need
+      supplementary Platform Strategy, disclosed as an open_question, not
+      mechanically enforced -- no citation gives a structural test for "is
+      this industry a digital platform"). Design-shape investigation
+      (task-mandated): read causal.dag's VALID_ROLES (closed enum, any
+      subset, no completeness requirement) and causal.logic_model's
+      STAGE_ORDER (closed, positionally-ordered 5-tuple) before choosing this
+      method's own shape -- Porter's five forces have no cited sequence
+      (unlike Logic Model's arrow-chain pipeline), so `FORCE_NAMES` is a
+      THIRD shape: a closed SET requiring completeness (all 5, Atlas's own
+      definition of the method IS the five-way split) WITHOUT position.
+      Real invariants, all enforced at construction AND independently
+      re-derived by a gate: (1) `forces` names EXACTLY the 5 closed-set
+      values, each exactly once, any order -- INCOMPLETE_FORCE_SET otherwise;
+      (2) every force entry carries non-empty `assessment` + `intensity` in
+      {HIGH, MEDIUM, LOW} (disclosed judgment call, never a computed score --
+      no citation supports a mechanical formula); (3) top-level
+      `overall_attractiveness` required non-empty, never auto-derived from
+      the 5 intensities -- Atlas's own stated benefit for this method IS this
+      conclusion, so a record labeling all 5 forces but never concluding has
+      not delivered the method's own defining benefit. `quality.
+      evidence_labeling_required: true` is a disclosed same-family
+      generalization from strategy.swot's identical flag, not a direct
+      Atlas citation for this method (§12.11 gives no explicit misuse
+      warning the way SWOT's own L1347 does). `recommended_next` left empty
+      -- L520's own "最佳搭配" column names "Benchmark" but no
+      strategy.benchmark machine_id/contract exists anywhere in this corpus
+      (grep-confirmed). No forbidden_transition -- no §14.1-style legal/
+      illegal chain or §22.3 gate row cites this method (grep-confirmed).
+    source: "methods/contracts/strategy.porter_five_forces.contract.yaml + specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml + ai_lego/modules/strategy/porter_five_forces.py"
+    note: "60 tests pass. F08 strategy family: 1 of 14 built before this batch (strategy.swot) -- this entry (strategy.porter_five_forces) is F08's 6th member counting all 5 of this batch (strategy.pestel/strategy.steepv/strategy.three_c/strategy.tows land concurrently via 4 sibling agents, not read here) -- F08 is 6/14, NOT complete (8 more F08 rows remain). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 5 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the embedded example resolved through its real $ref to epistemic-label.schema.yaml, and negative-control checks for a smuggled top-level key, a smuggled per-force key, and a 4-item forces array (minItems:5) -- all correctly rejected; the unmodified valid example correctly accepted. CLI demo (python -m ai_lego.apps.cli.run_porter_five_forces_slice) prints PASS and exits 0, demonstrating 3 real refusals (PORTER_INCOMPLETE_FORCE_SET on a 4-force set missing BUYER_POWER, PORTER_EMPTY_ASSESSMENT, PORTER_EMPTY_OVERALL_ATTRACTIVENESS) plus 1 independent-gate hand-tamper catch (a force stripped and duplicated on an already-valid analysis' raw dict). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'porter'/'five_forces' both before writing (zero pre-existing implementation -- only pre-existing doc references in architecture-inventory.yaml/ADR-008/MOTHER_DOC_SECTION_INDEX.md/method-inventory.yaml/Master Plan/problem-type.schema.yaml, none a real contract/schema/module) and after (only this method's own 3 files plus this registry entry and strategy.steepv's own note mentioning this method_id by name -- no collision with the 4 concurrent sibling builds)."
+
+  onehundredeighth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 5 F08 strategy-family
+    # builds -- strategy.steepv/strategy.three_c/strategy.tows/strategy.
+    # porter_five_forces land concurrently via 4 sibling agents, not read here;
+    # re-read this file's own tail immediately before appending per this
+    # batch's own instruction -- onehundredsixth_concrete_entry
+    # (strategy.steepv) and onehundredseventh_concrete_entry
+    # (strategy.porter_five_forces) were both already taken by the time this
+    # entry landed, no other collision observed. Orchestrating session
+    # reconciles exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes).
+    method_id: "strategy.pestel"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot` already built, F08 was
+      1/14 before this batch; `strategy.steepv`/`strategy.three_c`/`strategy.
+      tows`/`strategy.porter_five_forces` land concurrently in this same
+      batch, not read here). F08 table row (L515: "PESTEL｜掃描宏觀環境｜
+      P/E/S/T/E/L→facts→trends→implications→uncertainty｜建立外部基線｜
+      Scenario、SWOT") PLUS a dedicated §11.9 section (L1365-1404) giving a
+      "全球系統的必要欄位" yaml block (L1386-1395) with 9 literal per-factor
+      field names -- the richest F08 citation of this batch's 5 concurrent
+      builds (grep-confirmed 11 total "PESTEL" hits across the whole Atlas,
+      1 table row + 1 dedicated section + 9 unrelated pipeline-listing
+      mentions that add no new field/primitive/transition content), closer
+      to `strategy.swot`'s own §11.7 than to any single-row F08 sibling.
+      Real invariants, all grounded directly in L1368/L1386-1395/L1402 (not
+      borrowed from SWOT): (1) `dimension` closed 6-value enum
+      (POLITICAL/ECONOMIC/SOCIAL/TECHNOLOGICAL/ENVIRONMENTAL/LEGAL,
+      transcribed verbatim from L1368's own spelled-out list, resolving the
+      P/E/S/T/E/L acronym's Economic-vs-Environmental ambiguity -- not one of
+      Atlas's literal 9 factor fields, but structurally necessary, disclosed);
+      (2) `source_type` closed 4-value enum (official/research/market/other,
+      L1390's own literal enum -- the one enum Atlas names explicitly for
+      this method); (3) `effective_from`/`effective_to` both required
+      ISO-8601 dates (`effective_to` nullable for an open-ended window), with
+      `effective_from <= effective_to` enforced when `effective_to` is
+      non-null -- grounded in L1402's own benefit line naming this from/to
+      pair as the reason PESTEL becomes "真正可全球重用", tightened from
+      Atlas's unspecified format specifically to make that ordering property
+      real and checkable (disclosed compilation choice, not literally cited);
+      (4) `factors` non-empty. Structural divergence from `strategy.swot`,
+      deliberately disclosed: `inputs.required: []`, NOT `[KnowledgeSet]` --
+      unlike SWOT's explicit §14.1 KnowledgeSet chain, PESTEL does not appear
+      in §14.1 at all (grep-confirmed), and every factor is self-evidencing
+      via its own required `source`/`source_type`, so no shared external
+      KnowledgeSet input is claimed; `generate_pestel_analysis` therefore
+      takes no knowledge-set argument, unlike `generate_swot_analysis`.
+      `cognitive_primitives` [CLASSIFY, CONTEXTUALIZE, FORECAST, INFER,
+      ESTIMATE] is INFERRED (Atlas §4 gives no PESTEL formula), one primitive
+      per pipeline stage, reusing only already-catalogued kernel/extension
+      tokens (CLASSIFY/CONTEXTUALIZE from SWOT's own L189 citation, FORECAST/
+      INFER/ESTIMATE from the canonical kernel) -- no new primitive minted.
+      `forbidden_transition` left empty ([]) -- grep-confirmed PESTEL has no
+      §14.1-style illegal-chain example the way SWOT does. `recommended_next`
+      = [strategy.swot] only -- L515's pairing column also names "Scenario"
+      but no machine-readable scenario.* id or contract exists anywhere in
+      this corpus (OQ-PESTEL-1, same gap `strategy.steepv`'s own
+      OQ-STEEPV-1 already discloses for the identical missing Scenario
+      contract). All 4 real invariants enforced at construction (builder
+      raise) AND independently re-derived by a dedicated
+      `pestel_integrity` gate from raw fields (never trusting the builder),
+      same never-trust-a-single-layer discipline every sibling module in this
+      suite already establishes.
+    source: "methods/contracts/strategy.pestel.contract.yaml + specs/cognitive/typed-objects/pestel-analysis.schema.yaml + ai_lego/modules/strategy/pestel.py"
+    note: "52 tests pass. F08 strategy family: 1 of 14 built before this batch (strategy.swot); strategy.steepv and strategy.porter_five_forces already landed before this entry (grep-confirmed via this file's own onehundredsixth_concrete_entry/onehundredseventh_concrete_entry, read but not modified) -- this entry (strategy.pestel) is F08's 4th member; strategy.three_c/strategy.tows land concurrently in this same batch via 2 further sibling agents, not read here -- F08 is 6/14 counting all 5 of this batch, NOT complete (8 more F08 rows remain). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 5 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the embedded example resolved through its real $ref to epistemic-label.schema.yaml, and negative-control checks for a missing required top-level field, a missing required factor field, an invalid dimension enum value, an invalid source_type enum value, a malformed effective_from date, a smuggled top-level key, a smuggled per-factor key, and an invalid epistemic_type via the real $ref -- all correctly rejected (8 negative controls, 0 false negatives); a null-effective_to positive control and the unmodified valid example both correctly accepted. CLI demo (python -m ai_lego.apps.cli.run_pestel_slice) prints PASS and exits 0, demonstrating 4 real refusals (invalid dimension, invalid source_type, effective_to before effective_from, empty factor set) plus 1 independent-gate hand-tamper catch (dimension corrupted on an already-valid analysis' raw dict, never going back through the builder). Grepped the whole ai_lego tree case-insensitively for 'pestel' both before writing (zero pre-existing implementation) and after (only this method's own 5 files plus purely-descriptive comparison mentions inside strategy.steepv's/strategy.porter_five_forces's own files/registry entries, naming PESTEL by way of contrast -- no shared code, no collision with any of the 4 concurrent sibling builds)."
+
+  onehundredninth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 5 F08 strategy-family
+    # builds -- strategy.steepv/strategy.pestel/strategy.tows/strategy.
+    # porter_five_forces land concurrently via 4 sibling agents; re-read this
+    # file's own tail immediately before appending per this batch's own
+    # instruction -- onehundredsixth_concrete_entry (strategy.steepv),
+    # onehundredseventh_concrete_entry (strategy.porter_five_forces), and
+    # onehundredeighth_concrete_entry (strategy.pestel) were all already taken
+    # by the time this entry landed (grep-confirmed via this file's own keys,
+    # read but not modified -- their own contract/schema/module files were
+    # NOT read, per this batch's own "zero shared files" constraint), no
+    # other collision observed. Orchestrating session reconciles exact
+    # numbering on any later collision, same pattern ninetysixth_
+    # concrete_entry's own note already establishes). strategy.tows remains
+    # the one sibling of this batch not yet landed as of this entry.
+    method_id: "strategy.three_c"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot` already built, F08 was
+      1/14 before this batch; `strategy.steepv`/`strategy.pestel`/`strategy.
+      porter_five_forces` already landed, `strategy.tows` lands concurrently
+      in this same batch, none read here). Atlas cites this method TWICE:
+      F08 table row (L517: "3C｜Customer/Competitor/Company｜三面向分析→找
+      fit｜快速商業定位｜SWOT/TOWS") and §12.12 (L2679-2686, same content
+      restated) -- both grep-confirmed the ONLY real citations (7 total "3C"
+      hits whole-file; the other 3 are cross-references inside OTHER
+      methods' own pipelines/tables, no new structural content). Thinner
+      than SWOT's own §11.7 (no per-item geography/time/source, no
+      usage-step protocol). Real invariants, both enforced at construction
+      AND independently re-derived by a gate from raw fields: (1)
+      `findings` covers all 3 fixed dimensions (CUSTOMER/COMPETITOR/COMPANY,
+      closed enum) -- Atlas's own "三面向" (three dimensions) is the
+      method's defining split, a record missing a whole dimension has not
+      done a 3C analysis; also enforced at the schema layer via `allOf` of 3
+      `contains`/`minContains:1` constraints (one per dimension), same
+      Draft-2020-12 technique decision-journal-entry.schema.yaml's own
+      `options` constraint already establishes; (2) `fit_summary` is a
+      required non-empty, DISCLOSURE-ONLY string (never computed) -- Atlas's
+      own citation for 3C IS "→找 fit", finding fit across the three
+      dimensions is the method's entire stated purpose, same disclosure-only
+      restraint `causal.rct`'s own `analysis_summary` establishes.
+      `quality.evidence_labeling_required: false` -- neither Atlas citation
+      carries SWOT's own explicit unevidenced-claim misuse warning (L1356),
+      same class `causal.rct`'s own quality block already establishes for a
+      thin citation with no cited evidence-misuse risk. `inputs.required:
+      []` -- neither citation names an upstream typed-object dependency
+      (unlike SWOT's own explicit §14.1 KnowledgeSet chain).
+      `recommended_next: [strategy.swot]` -- both citations' own explicit
+      pairing ("3C → SWOT/TOWS"); TOWS omitted since `strategy.tows` has no
+      contract yet as of this entry (strategy.swot.contract.yaml's own
+      OQ-SWOT-1 already discloses this same gap). No forbidden_transition --
+      no §14.1-style illegal-transition example names 3C specifically
+      (SWOT's own `SWOTAnalysis -> AutomaticProductionDeployment` guard is
+      SWOT's own field, not generalized here by unverified analogy,
+      disclosed as OQ-THREEC-3).
+    source: "methods/contracts/strategy.three_c.contract.yaml + specs/cognitive/typed-objects/three-c-analysis.schema.yaml + ai_lego/modules/strategy/three_c.py"
+    note: "40 tests pass. F08 strategy family: 1 of 14 built before this batch (strategy.swot); strategy.steepv/strategy.porter_five_forces/strategy.pestel already landed before this entry (grep-confirmed via this file's own onehundredsixth/onehundredseventh/onehundredeighth_concrete_entry keys, read but not modified) -- this entry (strategy.three_c) is F08's 5th member counting all landed-so-far of this batch; strategy.tows remains outstanding -- F08 is 7/14, NOT complete (7 more F08 rows remain). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 5 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the embedded example resolved through its real $ref to epistemic-label.schema.yaml, and negative-control checks for a smuggled top-level key, a smuggled per-finding key, a <3-findings array (minItems:3), and a missing-COMPANY-dimension array (allOf contains/minContains) -- all correctly rejected; the unmodified valid example correctly accepted. CLI demo (python -m ai_lego.apps.cli.run_three_c_slice) prints PASS and exits 0, demonstrating 2 real refusals (THREEC_MISSING_DIMENSION_COVERAGE on a findings set missing COMPANY, THREEC_EMPTY_FIT_SUMMARY) plus 1 independent-gate hand-tamper catch (a finding's dimension mutated to duplicate another on an already-valid analysis' raw dict, leaving COMPANY uncovered). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'three_c'/'3C analysis' both before writing (zero pre-existing implementation -- 4 unrelated 'three_c*' substring false positives in test_pdca.py/test_fault_tree.py/test_attack_tree.py/test_causal_dag.py, 2 more 'three_criteria' false positives in mcda-analysis.fixtures.yaml/ahp-analysis.fixtures.yaml, all confirmed non-matching) and after (only this method's own 5 files plus this registry entry and strategy.steepv's/strategy.porter_five_forces's own notes mentioning this method_id by name -- no collision with any of the 4 concurrent sibling builds)."
+
+  onehundredtenth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 5 F08 strategy-family
+    # builds -- strategy.steepv/strategy.porter_five_forces/strategy.pestel/
+    # strategy.three_c land concurrently via 4 sibling agents, none read here
+    # beyond this file's own keys/notes; re-read this file's own tail
+    # immediately before appending per this batch's own instruction --
+    # onehundredsixth_concrete_entry (strategy.steepv),
+    # onehundredseventh_concrete_entry (strategy.porter_five_forces),
+    # onehundredeighth_concrete_entry (strategy.pestel), and
+    # onehundredninth_concrete_entry (strategy.three_c) were all already
+    # taken by the time this entry landed, no other collision observed.
+    # Orchestrating session reconciles exact numbering on any later
+    # collision, same pattern ninetysixth_concrete_entry's own note already
+    # establishes. This is the LAST of this batch's 5 concurrent builds --
+    # F08 is 6/14 after this batch lands (8 more F08 rows remain, NOT
+    # complete; the "7/14" figure onehundredninth_concrete_entry's own note
+    # cites double-counted strategy.swot as both pre-batch AND part of the
+    # 5-member count -- corrected here: 1 pre-batch + 5 this batch = 6/14).
+    method_id: "strategy.tows"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot` already built, F08 was
+      1/14 before this batch; `strategy.steepv`/`strategy.porter_five_forces`/
+      `strategy.pestel`/`strategy.three_c` already landed, none read here
+      beyond this file's own keys/notes). F08 table row (L519: "TOWS｜SWOT
+      轉策略｜SO/ST/WO/WT 配對｜避免 SWOT 停在清單｜MCDA") + SWOT→TOWS
+      sub-table (L530-536) + dedicated §11.8 (L1351-1362, identical SO/ST/
+      WO/WT table plus its own benefit line "把「分析清單」真正轉成
+      Strategy Options") + §11.7 usage step 5 (L1335: "SWOT 完成後進 TOWS")
+      + §14.1 legal chain (L3536-3544: `SwotAnalysis -> TOWS ->
+      StrategyOptions -> MCDA -> DecisionCandidate -> HumanDecision`).
+      Unlike this batch's other 4 members, TOWS has a REAL, MANDATORY
+      dependency on `strategy.swot`'s actual typed output, not a bare
+      ref-string convenience: `generate_tows_matrix` takes the ACTUAL
+      `SwotAnalysis` dict (built via `swot.py`'s own real
+      `generate_swot_analysis`/`swot_factor` functions, imported not
+      duplicated) and validates every pairing's two factor ids against that
+      record's real `factors[].category` -- same referential-integrity
+      discipline `causal.dag`'s edges->nodes check already establishes, one
+      level deeper (reaching INTO an upstream typed object's own field
+      values, not a same-record collection). `is_internal`/`VALID_CATEGORIES`
+      are imported (read-only) from `ai_lego.modules.strategy.swot` rather
+      than re-declared, since Atlas defines the STRENGTH/WEAKNESS/
+      OPPORTUNITY/THREAT split exactly once (L1327). Real invariants, all
+      grounded directly in L519/§11.8's own SO/ST/WO/WT table (not borrowed
+      from SWOT): (1) `pairings` non-empty; (2) every
+      `internal_factor_id`/`external_factor_id` resolves to a real upstream
+      factor with the correct INTERNAL (STRENGTH/WEAKNESS)/EXTERNAL
+      (OPPORTUNITY/THREAT) side -- Atlas's own structure is ALWAYS one of
+      each, never two of the same side; (3) `pairing_type` (SO/ST/WO/WT) is
+      GENUINE_COMPUTE -- the pairing constructor (`tows_pairing()`) has NO
+      `pairing_type` parameter at all, `generate_tows_matrix` derives it via
+      `derive_pairing_type` from the two factors' real categories, and an
+      independent gate (`evaluate_tows_integrity_gate`) re-derives it from
+      raw fields against the real SwotAnalysis -- a caller-supplied label
+      (even a CORRECT one) is refused outright
+      (`TOWS_PAIRING_TYPE_MUST_NOT_BE_CALLER_SUPPLIED`), eliminating the
+      "caller asserts SO on a WEAKNESS+THREAT pair" hazard structurally
+      rather than accepting-then-refusing; (4) `strategy_option` non-empty
+      per pairing -- Atlas §11.8's own defining benefit line (L1361), a
+      pairing with a type label but no real content has not done this
+      method's job. `forbidden_transition` (`TowsMatrix ->
+      AutomaticProductionDeployment`) generalizes `strategy.swot`'s identical
+      guard one step down the same L3536-3552 chain, using an
+      INDEPENDENTLY-defined hazard-id constant (same string value, no
+      runtime import from swot.py, disclosed in compilation_decisions).
+      `recommended_next: [decision.mcda]` per L519's own "最佳搭配" column
+      (verified decision.mcda.contract.yaml already exists before citing
+      it). `cognitive_primitives` [RELATE, COMPARE, EXPLAIN] is INFERRED
+      (Atlas §4 gives no TOWS formula), disclosed in open_questions. All
+      invariants enforced at construction (builder raise) AND independently
+      re-derived by `evaluate_tows_integrity_gate` from raw fields against
+      the real SwotAnalysis (never trusting the builder or a stale
+      reference) -- same never-trust-a-single-layer discipline every sibling
+      module in this suite already establishes.
+    source: "methods/contracts/strategy.tows.contract.yaml + specs/cognitive/typed-objects/tows-matrix.schema.yaml + ai_lego/modules/strategy/tows.py"
+    note: "59 tests pass. F08 strategy family: 1 of 14 built before this batch (strategy.swot); strategy.steepv/strategy.porter_five_forces/strategy.pestel/strategy.three_c already landed before this entry (grep-confirmed via this file's own onehundredsixth/onehundredseventh/onehundredeighth/onehundredninth_concrete_entry keys, read but not modified) -- this entry (strategy.tows) is F08's 6th member and the LAST of this batch's 5 concurrent builds -- F08 is 6/14 (1 pre-batch + 5 this batch), NOT complete (8 more F08 rows remain). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 5 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the schema's own embedded example resolved through its real $ref to epistemic-label.schema.yaml, and negative-control checks for a smuggled top-level key, a smuggled pairings[] item key, and an out-of-enum pairing_type -- all correctly rejected, 0 false negatives. CLI demo (python -m ai_lego.apps.cli.run_tows_slice) prints PASS and exits 0, building a REAL SwotAnalysis via swot.py's own real functions then a REAL TowsMatrix against it (genuine SWOT->TOWS chain, not a mock), demonstrating 3 real construction-time refusals (caller-supplied pairing_type, internal/external category swap, unknown factor id) plus 1 independent-gate hand-tamper catch (pairing_type corrupted on an already-valid matrix's raw dict, re-checked against the same real SwotAnalysis, never going back through the builder). Grepped the whole ai_lego tree case-insensitively for 'tows' both before writing (zero pre-existing implementation -- one unrelated forward-reference mention in docs/THIRD_SLICE_STRATEGY_SWOT.md's own §14.1 quote) and after (only this method's own 5 files plus a single purely-descriptive citation inside strategy.three_c.py's own docstring, naming TOWS by way of Atlas's F08 'SWOT/TOWS' pairing column -- no shared code, no collision with any of the 4 concurrent sibling builds)."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

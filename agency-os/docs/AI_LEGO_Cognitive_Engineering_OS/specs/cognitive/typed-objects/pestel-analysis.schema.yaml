@@ -1,0 +1,319 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/pestel-analysis.schema.yaml"
+title: PESTEL Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PESTELAnalysis` -- the declared
+  `outputs` of `strategy.pestel`'s Method Contract
+  (methods/contracts/strategy.pestel.contract.yaml, `outputs: [PESTELAnalysis]`).
+  Atlas §11.9 (L1365-1404) gives this method the richest per-factor field
+  citation of any F08 method: a literal "全球系統的必要欄位" (necessary fields
+  for the global system) yaml block (L1386-1395) naming 9 fields verbatim,
+  plus a mermaid diagram (L1370-1381) organizing every factor under exactly
+  one of 6 named dimension boxes feeding a shared Context Model.
+
+  Field provenance -- Atlas §11.9 (L1365-1404):
+    * Purpose (L1368): "從 Political、Economic、Social、Technological、
+      Environmental、Legal 掃描外部環境" -- names the 6 dimensions verbatim,
+      resolving the P/E/S/T/E/L acronym's Economic-vs-Environmental ambiguity.
+      `dimension` below is a closed 6-value enum transcribing these names.
+    * The 9-field yaml block (L1386-1395, verbatim field names): `statement`,
+      `geography`, `source`, `source_type` (closed enum
+      official|research|market|other), `effective_from`, `effective_to`,
+      `trend`, `implication`, `confidence` -- all transcribed as literal
+      per-factor fields below, not paraphrased.
+    * Benefits (L1402): "有 geography/time/source 後才真正可全球重用" (only
+      with geography/time/source does this become genuinely globally
+      reusable) -- the method's own stated reason `geography`/`source` are
+      required, not optional. Atlas's benefit line's shorthand "time" maps to
+      the structured block's two literal fields `effective_from`/
+      `effective_to` (a validity WINDOW, not one timestamp the way SWOT's own
+      `time` field is) -- see compilation_decisions for the disclosed gap
+      between the prose shorthand and the structured field list.
+    * Mermaid (L1370-1381): 6 dimension boxes -> Context Model -> Implications
+      -> Uncertainties -> Scenarios. This schema models only the FIRST node
+      (Context Model, i.e. `factors[]` classified by `dimension`) plus the
+      per-factor `trend`/`implication`/`confidence` fields Atlas's own 9-field
+      block already gives at the factor level. It does NOT model a top-level
+      aggregated "Implications"/"Uncertainties"/"Scenarios" object -- see
+      open_questions for why.
+
+  What this schema deliberately does NOT try to mechanically enforce: whether
+  a factor's free-text `statement` genuinely belongs to the `dimension` it
+  claims, or whether `trend`/`implication` are logically consistent with
+  `statement` -- both are semantic judgments no schema-level structural check
+  can make without NLP this codebase does not have, same honesty pattern
+  `swot-analysis.schema.yaml`'s own open_questions already applies to its
+  thinner-grounded fields (common misuse #2/#4).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.9 PESTEL Analysis, purpose/mermaid/necessary-fields block/benefits (L1365-1404)"
+  - "methods/contracts/strategy.pestel.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/swot-analysis.schema.yaml -- sibling F08 typed object, id-prefix/provenance/supporting_evidence_refs conventions reused; knowledge_set_ref convention explicitly NOT reused, see compilation_decisions"
+  - "specs/cognitive/typed-objects/synthetic-control-record.schema.yaml -- most recent precedent for additionalProperties:false at both the top level and a nested item level from the first draft, and for a disclosed non-cited structural field (treated_unit / this file's `dimension`)"
+  - "specs/decision/decision.schema.yaml -- precedent for leaving a Atlas-cited-but-unscaled `confidence` field fully untyped rather than inventing a scale"
+
+decided_by: >
+  No ADR governs this file (genuinely new type, same class as
+  `swot-analysis.schema.yaml`/`synthetic-control-record.schema.yaml`: direct
+  transcription of a cited Atlas section plus low-risk, disclosed compilation
+  choices, following the precedent those files' own `decided_by` fields set).
+
+compilation_decisions:
+  - question: "Should `dimension` (the P/E/S/T/E/L split) be a closed enum, and where is it grounded given Atlas's own 9-field block does not list it?"
+    decision: "Closed 6-value enum: POLITICAL, ECONOMIC, SOCIAL, TECHNOLOGICAL, ENVIRONMENTAL, LEGAL, transcribed verbatim from Atlas L1368's own spelled-out purpose line (not merely the P/E/S/T/E/L acronym, which is ambiguous between Economic and Environmental for the second E)."
+    reasoning: >
+      Not one of the 9 fields Atlas's own L1386-1395 yaml block names, but the
+      method's entire purpose and mermaid diagram (L1370-1381) organize every
+      factor under exactly one of 6 named boxes feeding one shared Context
+      Model -- a factor with no dimension could not be placed in any of those
+      boxes at all. Same class of disclosed, structurally-necessary addition
+      `synthetic-control-record.schema.yaml`'s own `treated_unit` field
+      already established (named nowhere in that method's own pipeline
+      string, but structurally required for the record to make sense).
+  - question: "Should `knowledge_set_ref` (swot-analysis.schema.yaml's own field) be reused here?"
+    decision: "No. This schema has no knowledge_set_ref field at all."
+    reasoning: >
+      swot-analysis.schema.yaml's knowledge_set_ref exists because Atlas's own
+      §14.1 chain names KnowledgeSet as SWOT's required upstream input
+      (strategy.swot.contract.yaml `inputs.required: [KnowledgeSet]`). PESTEL
+      has no comparable citation (strategy.pestel.contract.yaml
+      `inputs.required: []`, grep-confirmed PESTEL does not appear in §14.1)
+      -- each factor is self-evidencing via its own required
+      `source`/`source_type` fields instead of pointing at a shared external
+      evidence set. Adding an unused knowledge_set_ref field here would be
+      copying SWOT's shape without the citation that justifies it.
+  - question: "confidence field type?"
+    decision: "Untyped (no JSON Schema `type` key)."
+    reasoning: >
+      Atlas L1395 gives a bare `confidence: ...` ellipsis, no scale -- the
+      identical shape `decision.schema.yaml`'s own `confidence` field already
+      faced (Atlas §16.2 L3805, also `confidence: ...`), which that file
+      resolved by leaving the field fully untyped rather than inventing a 0-1
+      numeric scale or a qualitative enum neither mother document specifies.
+      Reusing that precedent here rather than picking a third, unprecedented
+      convention (e.g. `rice-score-record.schema.yaml`'s own 0-1 fraction,
+      which is NOT reused because RICE's own Atlas citation specifically
+      names it a fraction, unlike PESTEL's bare ellipsis).
+  - question: "effective_from/effective_to: required, format, and an ordering check?"
+    decision: "Both are REQUIRED keys (transcribing Atlas's own '必要欄位' framing literally). `effective_from` is a non-null ISO-8601 date string. `effective_to` may be null (open-ended / still in effect) or an ISO-8601 date string; when non-null, `effective_from <= effective_to` is enforced at the runtime layer (not schema-expressible as a cross-field JSON Schema rule without an `if`/`then` this file does not add)."
+    reasoning: >
+      Atlas gives no format for either field (contrast swot-analysis.schema.yaml's
+      own `time`, deliberately left free-text since SWOT's citation gives no
+      format either and has no stated ordering relationship to check). PESTEL
+      is different: `effective_from`/`effective_to` are a validity WINDOW
+      (Atlas's own benefit line, L1402, names them as the reason this method
+      becomes "真正可全球重用" -- genuinely globally reusable), and a window
+      has a real, checkable ordering property a single free-text timestamp
+      does not. Tightening to ISO dates is a disclosed compilation choice
+      made specifically to make that ordering property genuinely enforceable,
+      not left permanently unstructured.
+  - question: "additionalProperties: false at the top level and inside factors[] items?"
+    decision: "Yes -- both, from the first draft."
+    reasoning: >
+      Same baseline hygiene `synthetic-control-record.schema.yaml`'s own
+      compilation_decisions documents (2026-09-10 session note: two sibling
+      F11 schemas were initially missing this at the top level, caught by a
+      critic hand-tamper PoC and fixed) -- applied here from the start rather
+      than repeating that gap.
+
+type: object
+required: [id, version, factors]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PESTEL-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as swot-analysis.schema.yaml's SWOT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.pestel"
+    description: "Which method produced this analysis. Atlas names strategy.pestel (F08 table L515, §11.9) as the canonical producer."
+
+  factors:
+    type: array
+    minItems: 1
+    description: "One or more PESTEL factors, one per scanned macro-environment observation, per Atlas §11.9's own necessary-fields block (L1386-1395)."
+    items:
+      type: object
+      required: [id, dimension, statement, geography, source, source_type, effective_from, effective_to, trend, implication, confidence, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. PESTEL-001-F1)."
+        dimension:
+          type: string
+          enum: [POLITICAL, ECONOMIC, SOCIAL, TECHNOLOGICAL, ENVIRONMENTAL, LEGAL]
+          description: "Atlas L1368's own 6-way split. See compilation_decisions -- disclosed, structurally-necessary addition, not one of Atlas's literal 9 factor fields."
+        statement:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L1387 verbatim field name. The factor itself, in natural language."
+        geography:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L1388 verbatim field name. Required per Atlas's own benefit line (L1402): only with geography does this become genuinely globally reusable."
+        source:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L1389 verbatim field name."
+        source_type:
+          type: string
+          enum: [official, research, market, other]
+          description: "Atlas L1390's own closed enum, transcribed verbatim."
+        effective_from:
+          type: string
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          description: "Atlas L1391 verbatim field name. ISO-8601 date. See compilation_decisions for why this is tightened from Atlas's unspecified format."
+        effective_to:
+          type: ["string", "null"]
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          description: >
+            Atlas L1392 verbatim field name. ISO-8601 date, or null for an
+            open-ended / still-in-effect factor. When non-null, MUST be >=
+            effective_from -- runtime-layer invariant, see
+            compilation_decisions and open_questions.
+          # 2020-12 allows `pattern` to be present alongside a ["string","null"]
+          # type; `pattern` is only evaluated when the instance is a string, so
+          # a `null` value satisfies the type union without needing to match
+          # the date pattern.
+        trend:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L1393 verbatim field name. Free-text direction/magnitude of change (e.g. 'rising ~5%/yr'); Atlas gives no scale, same disclosure-only treatment as confidence."
+        implication:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L1394 verbatim field name. What this factor implies for the organization scanning the environment."
+        confidence:
+          description: >
+            Atlas L1395 verbatim field name (bare `confidence: ...` ellipsis).
+            Left untyped -- see compilation_decisions (same precedent
+            decision.schema.yaml's own confidence field already set).
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record ids.
+            Same convention `swot-analysis.schema.yaml#/properties/factors/items/properties/supporting_evidence_refs`
+            already uses -- required in practice by the
+            `evidence_labeling_required` gate whenever
+            `provenance.epistemic_type == EVIDENCE`, not by this schema
+            itself.
+        provenance:
+          description: >
+            Full provenance_record (not a narrow enum) -- same pattern
+            `swot-analysis.schema.yaml`'s own `factors[].provenance` already
+            uses.
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A PESTEL scan with 3 factors across 3 different dimensions, one still in effect (null effective_to)"
+    value:
+      id: "PESTEL-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.pestel"
+      factors:
+        - id: "PESTEL-2026-09-11-001-F1"
+          dimension: POLITICAL
+          statement: "地方政府宣布 2027 年起外資設立資料中心需通過新的能源使用審查"
+          geography: "SG"
+          source: "經濟發展局 2026-08 政策公告"
+          source_type: official
+          effective_from: "2026-08-01"
+          effective_to: null
+          trend: "審查門檻逐年收緊"
+          implication: "新設施的能源效率設計需提前納入合規評估"
+          confidence: "high"
+          supporting_evidence_refs: ["E-401"]
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - id: "PESTEL-2026-09-11-001-F2"
+          dimension: ECONOMIC
+          statement: "區域內平均雲端運算成本連續四季下降"
+          geography: "APAC"
+          source: "市場研究報告 2026-Q2"
+          source_type: research
+          effective_from: "2026-01-01"
+          effective_to: "2026-12-31"
+          trend: "年降幅約 6-8%"
+          implication: "新進入者的固定成本門檻降低"
+          confidence: 0.7
+          supporting_evidence_refs: ["E-402"]
+          provenance: {epistemic_type: EVIDENCE, authorship_state: AI_SUGGESTED, locked: null}
+        - id: "PESTEL-2026-09-11-001-F3"
+          dimension: ENVIRONMENTAL
+          statement: "鄰近港口城市預期收緊資料中心用水配額"
+          geography: "TW"
+          source: "現場訪談筆記"
+          source_type: other
+          effective_from: "2026-06-01"
+          effective_to: null
+          trend: "配額討論仍在進行，方向未定"
+          implication: "選址評估需納入用水風險，方案尚未定案"
+          confidence: "low -- single unconfirmed source"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+
+open_questions:
+  - id: "OQ-PESTELANALYSIS-1"
+    question: >
+      The mermaid diagram (L1370-1381) names 3 further downstream nodes this
+      schema does NOT model: aggregated "Implications", "Uncertainties", and
+      "Scenarios" objects (distinct from the per-factor `implication`/`trend`/
+      `confidence` fields this schema DOES carry). No mother document gives
+      any of the 3 its own field shape or a real aggregation formula (contrast
+      e.g. `rice-score-record.schema.yaml`'s own genuinely-computed score) --
+      modeling them here would be inventing structure Atlas does not give.
+      Should a future method (e.g. a dedicated Scenario Planning contract,
+      OQ-PESTEL-1 in the method contract) own that downstream shape instead?
+    owner: "operator, or whoever next builds strategy.scenario_planning"
+    blocks: "nothing in this file's own validity -- factors[].trend/implication/confidence already carry the per-factor content Atlas's own 9-field block gives"
+  - id: "OQ-PESTELANALYSIS-2"
+    question: >
+      Whether a factor's free-text `statement` genuinely belongs to the
+      `dimension` it claims, and whether `trend`/`implication` are logically
+      consistent with `statement`, are semantic judgments this schema cannot
+      mechanically check (same class of disclosed gap
+      `swot-analysis.schema.yaml`'s own OQ-SWOTANALYSIS-2 already documents
+      for its own common-misuse-#2 concern).
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.9 (L1365-1404) directly at the cited lines, including the
+    mermaid diagram and the '全球系統的必要欄位' yaml block. Cross-checked
+    every field against `methods/contracts/strategy.pestel.contract.yaml`'s
+    own `preconditions`/`quality` to confirm this type satisfies what the
+    method contract already promises. Read swot-analysis.schema.yaml and
+    synthetic-control-record.schema.yaml in full before writing this file.
+    Validated against jsonschema Draft202012Validator directly via a
+    standalone script (required fields present, id pattern satisfied,
+    dimension/source_type enums closed, additionalProperties:false enforced
+    at both the top level and the nested factors[] item level, the embedded
+    example resolved through its real $ref to epistemic-label.schema.yaml,
+    and a negative-control smuggled-key rejection check at both levels).
+  note: >
+    `factors[].statement/geography/source/source_type/effective_from/
+    effective_to/trend/implication/confidence` transcribed verbatim from
+    Atlas L1387-1395. `dimension`'s six values transcribed verbatim from
+    Atlas L1368. The overall object shape (id/version/factors[]), the
+    `dimension` field addition, the deliberate absence of a knowledge_set_ref
+    field, and the ISO-date tightening of effective_from/effective_to are
+    Phase 3-class compilation decisions, explicitly flagged above, same as
+    this file's sibling schemas. No mother document was modified to produce
+    this file.

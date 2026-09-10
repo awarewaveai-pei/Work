@@ -1,0 +1,178 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml"
+title: Porter Five Forces Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PorterFiveForcesAnalysis` -- the declared `outputs` of
+  `strategy.porter_five_forces`'s Method Contract (methods/contracts/strategy.porter_five_forces.contract.yaml,
+  `outputs: [PorterFiveForcesAnalysis]`). Atlas cites this method TWICE: the F08 tool table row (L520:
+  "分析產業結構｜rivalry/new entrants/substitutes/supplier/buyer｜長期產業吸引力｜Benchmark") and a dedicated
+  §12.11 section (L2659-2675) naming the five forces explicitly by name and giving the method's own stated
+  benefit ("長期產業吸引力" -- long-term industry attractiveness) and limitation ("數位平台、network effects、
+  ecosystem 常需補 Platform Strategy").
+
+  Field provenance:
+    * `forces[].force` (Atlas §12.11 L2665-2670 verbatim five-line list, SCREAMING_SNAKE_CASE) -- a CLOSED
+      set of exactly 5 names, each REQUIRED to appear EXACTLY ONCE (see `forces` field description below
+      and `ai_lego/modules/strategy/porter_five_forces.py` module docstring for the full design-shape
+      investigation against `causal/dag.py`'s VALID_ROLES and `causal/logic_model.py`'s STAGE_ORDER
+      precedents).
+    * `forces[].intensity`/`forces[].assessment` -- Atlas's own benefit line ("長期產業吸引力") implies the
+      method's point is to CONCLUDE something about each force, not just label it. `intensity` is a closed
+      3-value DISCLOSED judgment-call enum (never a computed score -- no citation supports a mechanical
+      formula); `assessment` is the free-text reasoning.
+    * `overall_attractiveness` (top-level, required) -- Atlas's own stated benefit for this method IS this
+      conclusion. DISCLOSED synthesis, never computed/aggregated from the 5 `intensity` values by this
+      schema or its runtime builder (same restraint as `intensity`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Porter Five Forces row (L520)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.11 波特五力分析 (L2659-2675) -- the five-force list, benefit, and limitation"
+  - "methods/contracts/strategy.porter_five_forces.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/swot-analysis.schema.yaml -- same F08 family, closed-category-enum precedent (see compilation_decisions for why Porter's own closed-set shape is stricter)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of Atlas §12.11's cited five-force list plus low-risk, disclosed
+  compilation choices.
+
+compilation_decisions:
+  - question: "Closed enum with any-subset (VALID_ROLES-style), positional tuple (STAGE_ORDER-style), or closed SET requiring completeness with no position?"
+    decision: "Closed set, completeness required, no position -- forces: minItems 5, maxItems 5, each force[].force a value from the 5-name enum, and a schema-level note (runtime-enforced, see below) that all 5 must be distinct."
+  - question: "Should intensity be a numeric score (e.g. 1-5) instead of a HIGH/MEDIUM/LOW enum?"
+    decision: "3-value enum (HIGH/MEDIUM/LOW), task-mandated -- no Atlas citation supports a numeric scoring formula; a closed enum keeps the judgment call disclosed and machine-comparable without implying arithmetic precision that was never computed."
+  - question: "Should overall_attractiveness be computed from the 5 intensity values (e.g. count of HIGH forces)?"
+    decision: "No -- REQUIRED but caller-supplied DISCLOSED content, never derived by this schema or by ai_lego/modules/strategy/porter_five_forces.py. No citation supports a mechanical aggregation formula (same restraint as intensity)."
+  - question: "additionalProperties: false at the top level, and on each forces[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on (2 sibling F11 schemas were caught missing this by a critic hand-tamper PoC earlier this session); set correctly from the start here, not retrofitted."
+  - question: "Does JSON Schema itself express 'all 5 distinct force names present, order-independent'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality operator. minItems:5/maxItems:5 plus the per-item enum bounds the SHAPE; genuine distinctness-and-completeness (the set of forces[].force values equals the full 5-name set) is a runtime-only invariant, enforced at construction AND independently re-derived by a gate in porter_five_forces.py -- same limitation-and-workaround class causal/logic_model.py's own STAGE_ORDER positional check and causal/regression_discontinuity.py's own checks[] distinctness check both already document for different field shapes."
+
+type: object
+required: [id, version, forces, overall_attractiveness, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PFF-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as swot-analysis.schema.yaml's SWOT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.porter_five_forces"
+
+  forces:
+    type: array
+    minItems: 5
+    maxItems: 5
+    description: >
+      Atlas §12.11 L2665-2670's own five-force list, transcribed verbatim. SHAPE-bounded here to exactly 5
+      items; genuine completeness (all 5 distinct names present, order-independent -- no duplicates, no
+      unrecognized name) is a runtime-only invariant this schema cannot express (see
+      compilation_decisions) -- enforced by ai_lego/modules/strategy/porter_five_forces.py at both the
+      builder and an independent gate.
+    items:
+      type: object
+      required: [force, intensity, assessment, provenance]
+      additionalProperties: false
+      properties:
+        force:
+          type: string
+          enum: [INDUSTRY_RIVALRY, NEW_ENTRANTS, SUBSTITUTES, SUPPLIER_POWER, BUYER_POWER]
+          description: "Atlas §12.11 L2665-2670's own five-line list (Industry Rivalry / New Entrants / Substitutes / Supplier Power / Buyer Power), SCREAMING_SNAKE_CASE."
+        intensity:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+          description: "DISCLOSED judgment-call enum, not a computed score. See compilation_decisions."
+        assessment:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual analysis content for this force, in natural language -- what makes this force HIGH/MEDIUM/LOW."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record ids. Same convention
+            swot-analysis.schema.yaml#/properties/factors/items/properties/supporting_evidence_refs already
+            uses -- required in practice by the `evidence_labeling_required` gate whenever
+            `provenance.epistemic_type == EVIDENCE`, not by this schema itself.
+        provenance:
+          description: "Per-force provenance. Full provenance_record, same pattern swot-analysis.schema.yaml's factors[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  overall_attractiveness:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED. Atlas §12.11's own stated benefit for this method IS this conclusion ("長期產業吸引力" --
+      long-term industry attractiveness). A record that labels all 5 forces but never states the resulting
+      attractiveness conclusion has not delivered the method's own defining benefit. DISCLOSED synthesis,
+      never computed/derived from `forces[].intensity` by this schema or its runtime builder -- see
+      compilation_decisions.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed Porter Five Forces analysis for a regional SaaS market entry decision"
+    value:
+      id: "PFF-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.porter_five_forces"
+      forces:
+        - force: INDUSTRY_RIVALRY
+          intensity: HIGH
+          assessment: "現有 5 家同類 SaaS 供應商，價格競爭激烈，客戶轉換成本低"
+          supporting_evidence_refs: ["E-401"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - force: NEW_ENTRANTS
+          intensity: MEDIUM
+          assessment: "技術門檻中等，但既有品牌與通路關係形成一定進入障礙"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - force: SUBSTITUTES
+          intensity: LOW
+          assessment: "尚無功能對等的替代方案，人工流程轉換成本高"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - force: SUPPLIER_POWER
+          intensity: LOW
+          assessment: "雲端基礎設施供應商眾多，可自由更換，議價力弱"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - force: BUYER_POWER
+          intensity: MEDIUM
+          assessment: "中大型客戶集中採購具議價力，但長尾客戶議價力低"
+          supporting_evidence_refs: ["E-402"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+      overall_attractiveness: "整體產業吸引力中等偏低：現有競爭與買方議價力壓縮利潤空間，但進入障礙與替代品威脅有限，仍具長期經營價值，建議搭配 Benchmark 分析既有領導者定位後再決策"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-PORTERFIVEFORCESANALYSIS-1"
+    question: "Atlas §12.11's own stated limitation (數位平台/network effects/ecosystem 常需補 Platform Strategy) is not mechanically enforced anywhere -- no citation gives a structural test for 'is this industry a digital platform'. Documented as a scope boundary only (owner: operator, or whoever builds a future `strategy.platform_strategy` method this record could recommended_next into)."
+  - id: "OQ-PORTERFIVEFORCESANALYSIS-2"
+    question: "forces[].force distinctness/completeness is a runtime-only invariant (see compilation_decisions) -- should a future pass add a JSON Schema `if`/`then` per-value-count constraint instead of relying solely on the runtime gate? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F08 table row (L520) and §12.11 (L2659-2675) directly. Cross-checked against
+    methods/contracts/strategy.porter_five_forces.contract.yaml's own outputs/preconditions/quality. Read
+    swot-analysis.schema.yaml and regression-discontinuity-record.schema.yaml in full as shape precedent
+    before writing this file. Validated against jsonschema Draft202012Validator via a standalone script
+    (required fields present, id pattern satisfied, forces enum closed per Atlas's own five-way split,
+    additionalProperties:false present at both the top level and the forces[] item level from the start,
+    embedded example resolved through its real $ref to epistemic-label.schema.yaml).
+  note: >
+    `force`'s five enum values and `overall_attractiveness`'s defining-benefit grounding are transcribed
+    directly from Atlas §12.11. The `intensity`/`assessment` field split, the flat-record-plus-array shape,
+    and the closed-set-without-position runtime invariant are compilation decisions, disclosed above. No
+    mother document was modified to produce this file.

@@ -1,0 +1,159 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/three-c-analysis.schema.yaml"
+title: 3C Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ThreeCAnalysis` -- outputs of
+  `strategy.three_c`'s Method Contract (outputs: [ThreeCAnalysis]). Atlas
+  F08 row (L517) + §12.12 (L2679-2686) give 3C's whole real content: 3 fixed
+  dimensions (Customer/Competitor/Company), analyzed to find "fit" --
+  thinner than SWOT's own §11.7 (no per-item geography/time/source cited).
+  `dimension` is a closed enum (both citations name these three, by name);
+  `fit_summary` is required and disclosed (not computed) -- 3C's own
+  defining purpose IS finding fit.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, 3C row (L517)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.12 3C 分析 (L2679-2686)"
+  - "methods/contracts/strategy.three_c.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/swot-analysis.schema.yaml -- same family, sibling shape (factors[] array + closed category enum) reused as this file's structural template"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- disclosure-only field precedent (fit_summary modeled on analysis_summary)"
+  - "specs/cognitive/typed-objects/decision-journal-entry.schema.yaml -- contains/minContains layering precedent reused for the dimension-coverage constraint below"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in
+  this directory documents: direct transcription of 2 cited Atlas sections
+  plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "additionalProperties: false at the top level and on each findings[] item?"
+    decision: "Yes on both -- baseline hygiene every sibling record schema in this directory converges on, applied from the first draft per this batch's own explicit instruction (2 sibling F11 schemas were caught missing it by a critic hand-tamper PoC earlier this session)."
+  - question: "Free-form dimension or closed 3-value enum?"
+    decision: "Closed enum {CUSTOMER, COMPETITOR, COMPANY} -- transcription of both Atlas citations' own defining split, same class swot-analysis.schema.yaml's own category enum."
+  - question: "Per-item geography/time/source fields, matching SWOT's own factors?"
+    decision: "No -- neither Atlas citation for 3C cites these fields (contrast SWOT's own explicit L1332 usage step); inventing them here would overstate this citation's own thinness."
+  - question: "How to enforce >=1 finding per dimension at the schema layer?"
+    decision: "allOf of 3 contains/minContains constraints (one per dimension value), same Draft-2020-12 technique decision-journal-entry.schema.yaml's own options constraint already establishes -- belt-and-suspenders alongside the Python builder + independent gate, not a replacement for either."
+  - question: "Should fit_summary carry a GENUINE_COMPUTE field (e.g. fit_score, engine)?"
+    decision: "No -- no algorithm here computes 'fit' from qualitative findings; omitting engine/computation_provenance_ref entirely is itself the honest disclosure, same convention rct-record.schema.yaml's own identical choice establishes."
+  - question: "A separate record-level provenance field, matching rct-record.schema.yaml's single top-level provenance?"
+    decision: "No -- each findings[] item already carries its own provenance (same per-item convention swot-analysis.schema.yaml uses); fit_summary is a synthesis OF those findings, not an independent new claim needing its own provenance slot."
+
+type: object
+required: [id, version, findings, fit_summary]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^3C-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as swot-analysis.schema.yaml's SWOT- prefix and rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.three_c"
+    description: "Which method produced this analysis."
+
+  findings:
+    type: array
+    minItems: 3
+    description: >
+      One or more findings per dimension; must cover all 3 (see the allOf
+      contains/minContains constraint below). Atlas gives no field-level
+      sub-structure for individual findings (thinner citation than SWOT's
+      own factors).
+    items:
+      type: object
+      required: [id, dimension, statement, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. 3C-001-F1)."
+        dimension:
+          type: string
+          enum: [CUSTOMER, COMPETITOR, COMPANY]
+          description: "Both Atlas citations' own 3-way split. See compilation_decisions -- closed enum, not free-form."
+        statement:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The finding itself, in natural language."
+        provenance:
+          description: "Full provenance_record, same pattern every sibling typed-object schema in this directory uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    allOf:
+      - contains: { properties: { dimension: { const: CUSTOMER } } }
+        minContains: 1
+      - contains: { properties: { dimension: { const: COMPETITOR } } }
+        minContains: 1
+      - contains: { properties: { dimension: { const: COMPANY } } }
+        minContains: 1
+
+  fit_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      DISCLOSURE-ONLY, REPORTED fit conclusion across the 3 dimensions
+      (Atlas's own "→找 fit", L517) -- not computed by this record (see
+      method contract's own compilation_decisions). Provenance for the
+      underlying claims is each finding's own `provenance` field; see
+      compilation_decisions for why there is no separate record-level
+      provenance field.
+
+examples:
+  - description: "A 3C analysis with one finding per dimension, evidence-backed, concluding a positioning fit"
+    value:
+      id: "3C-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.three_c"
+      findings:
+        - id: "3C-2026-09-11-001-F1"
+          dimension: CUSTOMER
+          statement: "目標客群為中小型電商，最在意結帳流程的轉換率"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "3C-2026-09-11-001-F2"
+          dimension: COMPETITOR
+          statement: "現有兩家主要競品皆未提供結帳流程 A/B 測試工具"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "3C-2026-09-11-001-F3"
+          dimension: COMPANY
+          statement: "團隊既有 A/B 測試框架可直接重用於結帳流程"
+          provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: null }
+      fit_summary: "客戶需求（結帳轉換率）、競品空白（無 A/B 工具）與公司既有能力（可重用框架）三者一致，指向「結帳流程 A/B 測試」為高優先切入點"
+
+open_questions:
+  - id: "OQ-THREECANALYSIS-1"
+    question: "dimension coverage is uncapped (no maxContains) -- should a future pass also bound findings-per-dimension?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-THREECANALYSIS-2"
+    question: "fit_summary is one flat string, not a structured per-pair fit score (Customer-Company fit, Customer-Competitor fit, etc.) -- Atlas gives no field-level structure for 'fit' itself."
+    owner: "operator, or whoever next needs a structured fit assessment"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F08 table (L511-528) and §12.12 (L2679-2688) directly. Read
+    swot-analysis.schema.yaml and rct-record.schema.yaml in full as shape
+    precedent before writing this file. Validated against jsonschema
+    Draft202012Validator via a standalone script (required fields present,
+    id pattern satisfied, dimension enum closed, additionalProperties:false
+    present from the start on both the top level and findings[] items, the
+    allOf contains/minContains dimension-coverage constraint, a negative
+    control confirming a 2-dimension-only findings array is rejected, a
+    negative control confirming a smuggled top-level and smuggled item-level
+    key are both rejected, and the embedded example resolved through its
+    real $ref to epistemic-label.schema.yaml).
+  note: >
+    findings[].dimension's 3 values transcribed verbatim from both Atlas
+    citations. The overall object shape (id/version/findings[]/fit_summary),
+    the omission of per-item geography/time/source, and the contains/
+    minContains coverage technique are Phase 3-class compilation decisions,
+    explicitly flagged above. No mother document was modified.

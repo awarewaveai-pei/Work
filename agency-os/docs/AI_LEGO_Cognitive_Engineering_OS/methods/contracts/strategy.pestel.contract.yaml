@@ -1,0 +1,185 @@
+$id: "ai-lego://methods/contracts/strategy.pestel.contract.yaml"
+title: "PESTEL Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  F08 context/strategy family, 2nd tenant after `strategy.swot` (1/14 -> 2/14).
+  Atlas F08 table row (L515: "PESTEL｜掃描宏觀環境｜P/E/S/T/E/L→facts→trends→
+  implications→uncertainty｜建立外部基線｜Scenario、SWOT") PLUS a dedicated §11.9
+  section (L1365-1404) that names the 6 real dimensions (L1368: Political/
+  Economic/Social/Technological/Environmental/Legal) and gives a "全球系統的必要
+  欄位" (necessary fields for the global system) yaml block (L1386-1395) with 9
+  literal per-factor field names -- a much richer citation than most F-family
+  rows, closer to SWOT's own §11.7 than to `causal.synthetic_control`'s single-
+  row citation. Core invariant: every factor is classified under exactly one of
+  the 6 named dimensions and carries its own source/source_type/geography/
+  effective_from/effective_to -- per-factor self-evidencing (see
+  `compilation_decisions`), not a shared external KnowledgeSet the way SWOT's
+  factors are.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, PESTEL row (L515)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.9 PESTEL 分析 (L1365-1404): purpose (L1368), mermaid pipeline (L1370-1381), '全球系統的必要欄位' yaml block (L1386-1395), benefits (L1400-1402)"
+  - "methods/contracts/strategy.swot.contract.yaml -- sibling F08 method, id-grammar/quality-flag/rollback conventions reused; KnowledgeSet-input convention explicitly NOT reused, see compilation_decisions"
+  - "methods/contracts/causal.synthetic_control.contract.yaml -- most recent precedent for an INFERRED (non-cited) cognitive_primitives composition and empty-and-disclosed forbidden_transition/recommended_next fields"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas §11.9's own 6
+  dimensions and 9-field yaml block, plus disclosed structurally-necessary
+  additions (`dimension` itself, effective_from<=effective_to ordering) --
+  same class of decision every Tier 1 contract in this directory applies.
+  `id: strategy.pestel` mints a NEW machine_id under ADR-005b's bare
+  `<family>.<name>` grammar; `family: strategy` reused as SWOT's sibling.
+
+id: strategy.pestel
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [CLASSIFY, CONTEXTUALIZE, FORECAST, INFER, ESTIMATE]
+# INFERRED, not cited -- Atlas §4 (L185-193) gives composition formulas for
+# SWOT/SCAMPER/Scenario Planning/AHP but none for PESTEL, same absence class
+# causal.synthetic_control.contract.yaml's own [GROUP, ESTIMATE, WEIGHT,
+# COMPARE, VALIDATE] inference already discloses. One primitive per pipeline
+# stage, literally: P/E/S/T/E/L split = CLASSIFY (SWOT's own L189-catalogued
+# extension token, reused for a different method's closed-taxonomy split, not
+# reinvented); geography/effective_from/effective_to bounding = CONTEXTUALIZE
+# (SWOT's own L189 token, reused for the identical geography/time-bounding
+# role its own compilation_decisions already establish); "trends" = FORECAST
+# (canonical kernel); "implications" = INFER (canonical kernel); "uncertainty"
+# / confidence = ESTIMATE (canonical kernel). No new primitive token minted.
+
+purpose:
+  - scan_external_macro_environment
+# Atlas L1368 verbatim sense: "從 Political、Economic、Social、Technological、
+# Environmental、Legal 掃描外部環境" (scan the external environment across the
+# 6 named dimensions).
+
+inputs:
+  required: []
+  optional: []
+  # Unlike strategy.swot's explicit §14.1 KnowledgeSet->SWOT->SWOTAnalysis
+  # chain (L3536-3544), Atlas gives PESTEL no comparable upstream typed-object
+  # citation (grep-confirmed: PESTEL does not appear in the §14.1 legal/
+  # illegal chain examples at all). See compilation_decisions -- each factor
+  # is self-evidencing via its own required source/source_type fields, so no
+  # shared external KnowledgeSet input is claimed. Same "no hard upstream
+  # dependency" position causal.synthetic_control.contract.yaml's own
+  # inputs.required: [] already takes for an analogous single-citation method.
+
+outputs:
+  - PESTELAnalysis
+# NEW output type (see typed-objects/pestel-analysis.schema.yaml). Atlas names
+# no PascalCase output type for this method, same honesty gap every other
+# Tier 0/1 contract in this directory discloses.
+
+preconditions:
+  - "factors is a non-empty list"
+  - "factors[].dimension in {POLITICAL, ECONOMIC, SOCIAL, TECHNOLOGICAL, ENVIRONMENTAL, LEGAL}"
+  - "factors[].source_type in {official, research, market, other}"
+  - "factors[].effective_to is null, or factors[].effective_from <= factors[].effective_to"
+  # Structurally necessary, disclosed as inferred (not literal Atlas
+  # precondition prose the way SWOT's L1331 "先取得證據" is) -- same "the
+  # method's own field list/name IS the claim" discipline
+  # causal.synthetic_control.contract.yaml's own donor-pool-size/treated-unit
+  # preconditions already establish. The 4th precondition tightens Atlas's
+  # unspecified effective_from/effective_to format into a real, checkable
+  # ordering invariant (see typed-object schema compilation_decisions).
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Atlas §11.9 gives PESTEL no separate "common misuse" list the way SWOT's
+  # §11.7 (L1345-1347) does, but the method's own '全球系統的必要欄位' block
+  # (L1386-1395) REQUIRES every factor to carry source + source_type -- the
+  # structural equivalent of SWOT's evidence_labeling_required gate, grounded
+  # in the field list itself rather than a separate misuse citation.
+
+forbidden_transition: []
+# Atlas gives PESTEL no comparable worked illegal-chain example (grep-
+# confirmed against the whole §14.1 section) -- unlike SWOT's explicit
+# L3550-3552 "SWOT -> AutomaticProductionDeployment". Inventing one here would
+# be fabrication (R0/R4). Same empty-and-disclosed choice
+# causal.synthetic_control.contract.yaml's own field applies.
+
+recommended_next:
+  - strategy.swot
+# Atlas L515 verbatim pairing column: "最佳搭配 Scenario、SWOT". Only the SWOT
+# half is listed here -- strategy.swot already has an ACTIVE contract;
+# "Scenario" (Scenario Planning, Atlas §11.27 L1804+) has real Atlas content
+# but no machine-readable id or contract anywhere in this spec root yet
+# (grep-confirmed). Flagged in open_questions, same class of disclosure
+# strategy.swot.contract.yaml's own OQ-SWOT-1 (recommended_next: strategy.tows)
+# already established.
+
+rollback:
+  side_effect_free: true
+  # No mother document states this explicitly for PESTEL. Grounded by analogy
+  # to strategy.swot's identical rollback field: a pure analysis/knowledge-
+  # object production method with no described external side effect anywhere
+  # in Atlas §11.9.
+
+compilation_decisions:
+  - question: "Does strategy.pestel require an upstream KnowledgeSet input type, like strategy.swot?"
+    decision: "No -- inputs.required: []. Each factor is self-evidencing via its own required source/source_type/geography/effective_from/effective_to fields (Atlas's own per-factor '必要欄位' block); no shared external KnowledgeSet concept appears anywhere in §11.9, unlike SWOT's explicit §14.1 chain."
+  - question: "What closed enum for the 6 PESTEL dimensions, and is 'dimension' itself an Atlas-cited field name?"
+    decision: "POLITICAL/ECONOMIC/SOCIAL/TECHNOLOGICAL/ENVIRONMENTAL/LEGAL, verbatim from Atlas L1368's own spelled-out list (resolves the P/E/S/T/E/L acronym's Economic-vs-Environmental ambiguity). 'dimension' itself is NOT one of the 9 fields in Atlas's own L1386-1395 yaml block, but the method's entire purpose line and mermaid diagram (L1370-1381) organize every factor under exactly one of these 6 named boxes -- omitting the field would make the method's own defining split unrepresentable. Added as a disclosed, structurally-necessary field, same class SyntheticControlRecord's own treated_unit addition (not individually named in Atlas's pipeline string, but structurally necessary) already established."
+  - question: "confidence field type?"
+    decision: "Untyped (no JSON Schema `type` key) -- same precedent decision.schema.yaml's own `confidence` field (Atlas §16.2 L3805) already set for an identically bare `confidence: ...` ellipsis with no scale given by any mother document. Not inventing a 0-1 scale or enum PESTEL's own citation does not specify either."
+  - question: "effective_from/effective_to: format and an ordering check?"
+    decision: "Both required keys; ISO-8601 date pattern (YYYY-MM-DD); effective_to may be null (open-ended / still in effect). When non-null, effective_from <= effective_to is enforced at construction AND independently re-derived by a gate. Atlas gives no format for either field -- tightening to ISO dates is a disclosed compilation choice made specifically to give this method one REAL, checkable structural invariant (task design guidance), not left as free text the way SWOT's analogous 'time' field was."
+  - question: "source_type enum?"
+    decision: "official|research|market|other, verbatim from Atlas L1390."
+
+open_questions:
+  - id: "OQ-PESTEL-1"
+    question: >
+      `recommended_next` names only `strategy.swot`; Atlas L515's pairing
+      column also names "Scenario" (Scenario Planning, §11.27 L1804+), which
+      has real Atlas content but no machine-readable id or contract anywhere
+      in this spec root yet (grep-confirmed). Should a future pass add a
+      `strategy.scenario_planning` (or similarly-named) contract and extend
+      this field?
+    owner: "whoever backfills Scenario Planning's own contract next"
+    blocks: "nothing in this file's own validity -- recommended_next is advisory metadata, not a hard $ref"
+  - id: "OQ-PESTEL-2"
+    question: >
+      `cognitive_primitives` [CLASSIFY, CONTEXTUALIZE, FORECAST, INFER,
+      ESTIMATE] is this file's own inference (one primitive per Atlas's own
+      pipeline stages), not a cited Atlas §4 composition formula the way
+      SWOT/SCAMPER/Scenario Planning/AHP each have.
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+  - id: "OQ-PESTEL-3"
+    question: >
+      inputs.required is deliberately empty ([]) -- diverges from strategy.swot's
+      own KnowledgeSet-input convention (see compilation_decisions). Is
+      per-factor self-evidencing (no shared external evidence-set input) the
+      right long-term shape once a real KnowledgeSet typed-object schema
+      exists (strategy.swot's own OQ-SWOTANALYSIS-1)?
+    owner: "operator, or a future review pass reconciling SWOT/PESTEL input shapes once KnowledgeSet gets its own schema"
+
+verification:
+  method: >
+    Read Atlas F08 table (L509-528) and §11.9 in full (L1365-1404) directly at
+    the cited lines, including the mermaid diagram and the '全球系統的必要欄位'
+    yaml block. Grepped the whole Atlas document case-insensitively for
+    "PESTEL" (11 hits total: the F08 table row, this dedicated section, and 9
+    further mentions in unrelated pipeline-listing sections -- none of which
+    add new PESTEL-specific field/primitive/transition content beyond L515 and
+    §11.9) and confirmed PESTEL does NOT appear in the §14.1 legal/illegal
+    transition chain examples (only SWOT does). Read strategy.swot.contract.yaml
+    and causal.synthetic_control.contract.yaml in full before writing this
+    file, reusing their established conventions (id grammar, two-layer
+    invariant discipline, empty-and-disclosed forbidden_transition) rather
+    than inventing new ones. Grepped the whole `ai_lego` tree case-insensitively
+    for "pestel" before writing any of this method's own files -- zero
+    pre-existing implementation. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L1368's 6 dimension names and
+    L1386-1395's 9-field yaml block are transcribed verbatim into `dimension`'s
+    enum and the typed-object schema's per-factor required fields. The
+    `dimension` field itself, the empty `inputs.required`, the ISO-date
+    tightening of effective_from/effective_to, and the untyped `confidence`
+    field are Phase 3 compilation choices, explicitly flagged above in
+    `compilation_decisions`, not presented as Atlas-cited.

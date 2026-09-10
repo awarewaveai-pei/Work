@@ -1,0 +1,170 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/steepv-analysis.schema.yaml"
+title: STEEPV Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SteepvAnalysis` -- the declared `outputs` of `strategy.steepv`'s
+  Method Contract. Atlas's ONLY citation is the F08 table row (L516: "STEEPV｜加入 Values 的長期環境掃描｜
+  S/T/E/E/P/V｜適合長期社會變遷｜Scenario") -- a bare 6-letter acronym, transcribed directly into this schema's
+  6-value `dimension` enum. No geography/time/source (strategy.swot's own L1332 fields) and no PESTEL-style
+  9-sub-field richness are reused -- neither is named by STEEPV's own citation; see `compilation_decisions`.
+
+  ONE real invariant JSON Schema alone cannot fully express at the construction layer but CAN express
+  structurally here (`contains`/`minContains`): at least 1 factor must carry `dimension: VALUES`. Grounded
+  directly in L516's own purpose text -- adding Values on top of the 5 letters STEEPV shares with PESTEL is the
+  method's stated reason for existing, not an incidental detail. Enforced at THREE layers (builder raise +
+  this schema's `contains` constraint + an independent gate that re-derives from raw fields), same
+  never-trust-a-single-layer discipline every sibling typed-object schema in this directory already documents;
+  see `ai_lego/modules/strategy/steepv.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, STEEPV row (L516)"
+  - "methods/contracts/strategy.steepv.contract.yaml (id: strategy.steepv)"
+  - "specs/cognitive/typed-objects/swot-analysis.schema.yaml (factors[] list-of-classified-items shape, reused; per-factor geography/time/source, NOT reused -- see compilation_decisions)"
+  - "specs/cognitive/typed-objects/counterfactual-reasoning-record.schema.yaml (thin-citation restraint precedent -- no structure borrowed beyond what this method's own citation names)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Reuse swot-analysis.schema.yaml's own per-factor geography/time/source fields, or pestel's richer per-factor shape, for each STEEPV factor?"
+    decision: "Neither. Flat {id, dimension, statement, provenance(, supporting_evidence_refs)}."
+    reasoning: "geography/time/source are transcribed verbatim from SWOT's OWN citation (Atlas L1332) for THAT method; STEEPV's own citation (L516) never names them. Borrowing structure across methods because their acronyms partly overlap would be fabrication, not transcription -- same restraint counterfactual-reasoning-record.schema.yaml already applies against causal.dag's richer per-edge shape."
+  - question: "Should 'at least 1 VALUES-dimension factor' be enforced structurally in this schema (JSON Schema 2020-12's `contains`/`minContains`), or left as a runtime-only gate (the class swot-analysis.schema.yaml's own evidence_labeling_required check uses)?"
+    decision: "Both -- schema-level `contains`/`minContains:1` on `factors`, AND an independent runtime gate (defense in depth, not a substitute)."
+    reasoning: >
+      Unlike SWOT's four categories (symmetric -- no single one is required by swot-analysis.schema.yaml),
+      STEEPV's Values dimension is the one thing L516's own purpose text names as this method's defining
+      addition over PESTEL. `contains`/`minContains:1` expresses "at least one array item matches {dimension:
+      VALUES}" natively in Draft 2020-12 (verified: `jsonschema.Draft202012Validator` correctly rejects a
+      factors array with no VALUES entry and accepts one that has it -- confirmed by direct execution, not
+      merely asserted). Making it a real schema constraint, not just a gate, means a hand-authored record that
+      never went through the Python builder still cannot validate without genuinely including a Values factor.
+  - question: "Nest dimension-specific fields under a content wrapper, or keep factors flat top-level objects?"
+    decision: "Flat top-level fields, matching swot-analysis.schema.yaml's own convention."
+    reasoning: "No nested-content citation exists for STEEPV (contrast problem-statement.schema.yaml's own §12.2-grounded wrapper) -- flat is the honest default absent contrary evidence."
+
+type: object
+required: [id, version, factors]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^STEEPV-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as swot-analysis.schema.yaml's SWOT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.steepv"
+    description: "Which method produced this analysis. Atlas names strategy.steepv (F08 table, L516) as the canonical producer."
+
+  factors:
+    type: array
+    minItems: 1
+    description: >
+      One or more STEEPV factors. `contains`/`minContains` below additionally requires at least one to carry
+      `dimension: VALUES` -- L516's own defining differentiator over PESTEL, not an incidental structural
+      choice. See top-level description and compilation_decisions.
+    items:
+      type: object
+      required: [id, dimension, statement, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. STEEPV-001-F1)."
+        dimension:
+          type: string
+          enum: [SOCIAL, TECHNOLOGICAL, ECONOMIC, ENVIRONMENTAL, POLITICAL, VALUES]
+          description: >
+            L516's own S/T/E/E/P/V formula, transcribed verbatim in acronym order: Social, Technological,
+            Economic, Environmental, Political, Values. Closed 6-value enum -- same "the method's own citation
+            names these exactly, by name, as the defining split" reasoning swot-analysis.schema.yaml's own
+            `category` enum already documents for SWOT's four.
+        statement:
+          type: string
+          description: "The factor itself, in natural language."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record ids. Same convention
+            swot-analysis.schema.yaml and counterfactual-reasoning-record.schema.yaml both use. OPTIONAL here
+            (not gated by an evidence_labeling_required check -- strategy.steepv.contract.yaml's `quality` block
+            sets that false; no misuse-warning citation exists for STEEPV the way SWOT's L1347 grounds its own).
+        provenance:
+          description: "Full provenance_record -- same pattern every sibling typed-object schema in this directory uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+    contains:
+      type: object
+      properties:
+        dimension: { const: VALUES }
+      required: [dimension]
+    minContains: 1
+
+examples:
+  - description: "A STEEPV analysis covering 4 dimensions including the required VALUES factor"
+    value:
+      id: "STEEPV-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.steepv"
+      factors:
+        - id: "STEEPV-2026-09-11-001-F1"
+          dimension: SOCIAL
+          statement: "區域高齡化人口比例預估未來 15 年持續上升"
+          supporting_evidence_refs: ["E-401"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "STEEPV-2026-09-11-001-F2"
+          dimension: TECHNOLOGICAL
+          statement: "生成式 AI 工具採用率在目標產業快速上升"
+          supporting_evidence_refs: ["E-402"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "STEEPV-2026-09-11-001-F3"
+          dimension: ENVIRONMENTAL
+          statement: "供應鏈上游法規對碳排放要求逐年收緊"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "STEEPV-2026-09-11-001-F4"
+          dimension: VALUES
+          statement: "年輕世代消費者對企業永續承諾的重視程度長期上升，非短期波動"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-STEEPVANALYSIS-1"
+    question: >
+      No mother document gives STEEPV a dedicated worked example (unlike PESTEL's own §11.9) -- field names
+      beyond the bare 6-letter acronym are this suite's own compiled structure. Should a future pass re-derive
+      or extend field names if a dedicated Atlas section for STEEPV is ever written?
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STEEPVANALYSIS-2"
+    question: >
+      Should a future gate rank or weight VALUES factors distinctly from the other 5 dimensions (e.g. a
+      confidence or timescale field specific to long-term social-change claims, per L516's own benefit column
+      '適合長期社會變遷')? No citation currently supports inventing that structure.
+    owner: "operator, or whoever next needs a timescale-weighted VALUES consumer"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F08 tool table STEEPV row (L516) and PESTEL row (L515) directly, for contrast only. Read
+    swot-analysis.schema.yaml and counterfactual-reasoning-record.schema.yaml in full to evaluate and then
+    explicitly decline to reuse their own respective richer/differently-grounded field shapes. Grepped
+    specs/cognitive/typed-objects/ for "steepv" before writing -- no pre-existing or competing typed object
+    found. Validated against jsonschema Draft202012Validator directly via a standalone script (schema itself
+    passes check_schema(); required fields present; additionalProperties:false verified to actually reject an
+    unknown top-level key AND an unknown per-factor key; dimension enum verified to actually reject a 7th
+    value; contains/minContains verified to actually reject a factors array with zero VALUES entries and
+    accept one that has exactly one).
+  note: >
+    `dimension`'s six values are transcribed directly from Atlas L516's own S/T/E/E/P/V formula, in that
+    literal order. The flat (non-nested) shape, the deliberate non-reuse of SWOT's geography/time/source and
+    PESTEL's richer per-factor fields, and the VALUES-required `contains`/`minContains` constraint are this
+    suite's own compiled structure, explicitly disclosed as such above, not presented as mother-document
+    content. No mother document was modified to produce this file.

@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-11（106–110 號切片：新開 F08 strategy 家族 1/14→6/14，5 個平行 agent，含本 session 第一個真跨方法依賴）
+
+pestel(52t)/steepv(28t)/three_c(40t)/tows(59t)/porter_five_forces(60t)。239 tests 零衝突，全 regression 6507→6746，golden 3231→3256。`strategy.swot`（既有唯一成員）是本批次唯一讀取基準；F08 現況 6/14，剩 VRIO／Value Chain／STP／Ansoff／BCG／Blue Ocean／Business Model Canvas／Value Proposition Canvas。
+
+**`strategy.tows` 是本 session 第一個真跨方法依賴**（非軟字串引用）：builder 直接吃真實 `SwotAnalysis` 物件（CLI demo 真的呼叫 `swot.py` 自己的 `generate_swot_analysis`/`swot_factor` 建出真記錄，非手造 mock），`pairing_type`（SO/ST/WO/WT）是 GENUINE_COMPUTE——`tows_pairing()` 建構子**根本沒有 `pairing_type` 參數**，呼叫端無法傳入（即使傳對的值也不行），永遠由 `derive_pairing_type()` 從兩個真實引用的 SWOT factor 類別重新推導；builder 與獨立 gate 各自獨立呼叫（非一份邏輯兩處共用），referential integrity 檢查 `internal_factor_id`/`external_factor_id` 真的分別解析回 SwotAnalysis 裡的 STRENGTH/WEAKNESS 與 OPPORTUNITY/THREAT factor。critic 親自手造 hand-tamper（直接改一個 pairing 的 `internal_factor_id` 指向真 THREAT factor，繞過 builder）證實獨立 gate 真的抓到。
+
+`strategy.porter_five_forces` 的不變量是本 session 第三種結構形狀（critic 逐一核對 `causal.dag`／`causal.logic_model` 原始碼後確認）：封閉 SET＋要求完整覆蓋但無順序性——不同於 `VALID_ROLES`（封閉集合，不要求覆蓋）也不同於 `STAGE_ORDER`（封閉且位置固定）；critic 自建 PoC 確認 4/5 力缺一被拒、5 力任意排序皆接受。`strategy.steepv` 面對「跟 PESTEL 高度重疊」的疑慮，agent 自主判斷刻意不借用 PESTEL citation 支持的 9 欄位豐富度（STEEPV 自己的引用只是表格列，無對應章節），只保留最小結構＋要求至少 1 個 VALUES 維度 factor 作為該方法自己存在的理由；critic 讀兩份 schema 並排比對確認判斷成立。
+
+critic 覆審（0 Critical/0 Major，2 Minor 全修）：`ai_lego/modules/strategy/__init__.py` 兩處行號引用誤差（L521-524→應為 L521-528；L1368-1390→應為 L1368, L1386-1395，Atlas 原文 9 欄位區塊實際落在 L1386-1395）——純文書訂正，不影響 runtime/schema/測試，已修。verdict=PASS-WITH-FIXES。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_pestel tests.unit.test_steepv tests.unit.test_three_c tests.unit.test_tows tests.unit.test_porter_five_forces` | exit=0 | result=239 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=6746 tests OK，282s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3256，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=5 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=5 個 CLI 全部 PASS，tows 真的示範完整 SWOT→TOWS 鏈（非模擬），其餘各自拒絕證明＋獨立 gate 抓包證明皆真跑
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 5 contract+5 schema+5 module+5 CLI+5 test+`strategy/__init__.py`+`swot.py`+`causal/dag.py`+`causal/logic_model.py`，真跑 239 測試+5 CLI+全 regression+golden，親自手造 3 個 hand-tamper PoC 驗證 tows 的跨方法依賴/additionalProperties/porter 不變量邊界，git log 確認 swot.py 零改動）| verdict=PASS-WITH-FIXES | findings=0c/0m/2 minor 全修（純行號引用訂正）
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`strategy\.pestel\|strategy\.steepv\|strategy\.three_c\|strategy\.tows\|strategy\.porter_five_forces\|PESTELAnalysis\|ThreeCAnalysis\|TowsMatrix\|PorterFiveForcesAnalysis` | hits=30（本批次新建檔案 25 個+registry+`strategy/__init__.py`+WORKLOG/TASKS 本條目，critic 獨立複驗零孤兒引用零命名碰撞，`swot.py`／`method_resolver.py`／`schema_contracts.py`／`event_ledger.py` 共用平台層零改動）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/module/CLI/test（共 25 個新檔）+ `strategy/__init__.py`／`contract-backlog.yaml` 的追加內容全部移除。純新增，無 schema breaking change，可安全回滾。
+
 ## 2026-09-11（KB K1：版本化接線 + 檢索六謂詞一次定型；migration 0072 尚未套用 prod）
 
 K0（`6e4947f9d`）之後接著做 K1。正本 [KNOWLEDGE_BASE_PLAN.md §1.2/§1.3/§1.5](docs/knowledge-base/KNOWLEDGE_BASE_PLAN.md)，決策 [ADR 011](docs/architecture/decisions/011-collection-ingestion-boundary.md)。

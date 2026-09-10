@@ -1,0 +1,123 @@
+$id: "ai-lego://methods/contracts/strategy.tows.contract.yaml"
+title: "TOWS Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 context/strategy family, 2nd member (after `strategy.swot`). Atlas F08 table row L519
+  ("TOWS｜SWOT 轉策略｜SO/ST/WO/WT 配對｜避免 SWOT 停在清單｜MCDA") + SWOT→TOWS sub-table L530-536 + dedicated
+  §11.8 (L1351-1362, identical SO/ST/WO/WT table plus its own benefit line: "把「分析清單」真正轉成 Strategy
+  Options") + L1335 usage step 5 ("SWOT 完成後進 TOWS") + §14.1 legal chain L3536-3544 (`SwotAnalysis -> TOWS ->
+  StrategyOptions -> MCDA -> DecisionCandidate -> HumanDecision`). Real cross-method dependency: the builder
+  takes an ACTUAL `SwotAnalysis` record and validates every pairing's two factor ids against its real
+  `factors[].category`, not a bare ref string. Core invariant: `pairing_type` (SO/ST/WO/WT) is GENUINE_COMPUTE,
+  derived from the two referenced factors' real categories, never caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, TOWS row (L519)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md SWOT→TOWS sub-table (L530-536)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.8 TOWS 矩陣／SWOT 策略矩陣 (L1351-1362)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.7 usage step 5 (L1335: 'SWOT 完成後進 TOWS')"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §14.1 legal chain (L3536-3544) + illegal example (L3550-3552)"
+  - "methods/contracts/strategy.swot.contract.yaml + ai_lego/modules/strategy/swot.py -- the literal upstream method/typed-object this method's builder genuinely depends on (read in full, not edited)"
+  - "methods/contracts/causal.dag.contract.yaml + ai_lego/modules/causal/dag.py -- cross-collection referential-integrity pattern (edges must reference real node ids) reused here one level deeper (pairings must reference real, correctly-categorized upstream factors)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L519/§11.8's own SO/ST/WO/WT structure into 2
+  required-category referential-integrity preconditions, plus disclosed structurally-necessary preconditions --
+  same standard every Tier 1 contract in this directory applies. `id: strategy.tows` mints a NEW machine_id,
+  resolving `strategy.swot.contract.yaml`'s own `OQ-SWOT-1` (TOWS had no contract/id anywhere in the corpus).
+
+id: strategy.tows
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [RELATE, COMPARE, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for TOWS (unlike SWOT's own L189 formula). One
+# primitive per this method's own structural shape: RELATE (pairing one internal + one external factor into a
+# single unit), COMPARE (each SO/ST/WO/WT cell poses a comparative "how do I use X against/for Y" question, same
+# sense SWOT's own COMPARE already carries forward), EXPLAIN (producing the disclosed strategy_option content
+# Atlas §11.8's own benefit line requires, not just a type label). Flagged in open_questions.
+
+purpose:
+  - convert_swot_factors_into_paired_strategy_options
+# Atlas §11.8 benefit line (L1361, verbatim): "把「分析清單」真正轉成 Strategy Options".
+
+inputs:
+  required:
+    - SwotAnalysis
+
+outputs:
+  - TowsMatrix
+
+preconditions:
+  - "swot_analysis is a real SwotAnalysis dict with a non-empty factors[] list of valid id+category entries (TOWS_INVALID_SWOT_ANALYSIS)"
+  - "pairings is non-empty (TOWS_EMPTY_PAIRINGS)"
+  - "every pairing carries a non-empty id, unique within the record (TOWS_PAIRING_MISSING_ID / TOWS_DUPLICATE_PAIRING_ID)"
+  - "every pairing's internal_factor_id resolves to a real SwotAnalysis factor whose category is STRENGTH or WEAKNESS (TOWS_UNKNOWN_FACTOR_ID / TOWS_INTERNAL_FACTOR_NOT_INTERNAL) -- Atlas's own SO/ST/WO/WT structure is ALWAYS one internal + one external factor, never two of the same side"
+  - "every pairing's external_factor_id resolves to a real SwotAnalysis factor whose category is OPPORTUNITY or THREAT (TOWS_UNKNOWN_FACTOR_ID / TOWS_EXTERNAL_FACTOR_NOT_EXTERNAL)"
+  - "pairing_type is never caller-supplied (TOWS_PAIRING_TYPE_MUST_NOT_BE_CALLER_SUPPLIED) -- always computed by derive_pairing_type from the two referenced factors' real categories"
+  - "strategy_option is a non-empty disclosed string per pairing (TOWS_EMPTY_STRATEGY_OPTION) -- Atlas §11.8's own benefit line (L1361)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision causal.synthetic_control.contract.yaml's own quality block already establishes: the real
+  # risk here is a referentially-broken or type-mislabeled matrix, not a missing per-claim evidence citation --
+  # SWOT's own evidence_labeling_required gate already covers the factors this method consumes; re-checking
+  # evidence a second time at the TOWS layer would duplicate, not add, a real check. Enforced instead by this
+  # method's own real invariants (preconditions above).
+
+forbidden_transition:
+  - "TowsMatrix -> AutomaticProductionDeployment"
+  # Generalizes strategy.swot.contract.yaml's identical guard (Atlas L3550-3552) one step down the SAME
+  # L3536-3544 legal chain: TowsMatrix is still short of StrategyOptions -> MCDA -> DecisionCandidate ->
+  # HumanDecision, so the same hazard (an AI-derived strategic artifact triggering an irreversible external
+  # action with no human decision in the loop) applies equally here.
+
+recommended_next:
+  - decision.mcda
+  # Atlas F08 table's own "最佳搭配" column for the TOWS row (L519, verbatim: "MCDA") -- NOT the §14.1 chain's
+  # literal next node (StrategyOptions, which has no dedicated contract/schema anywhere in this spec root yet,
+  # see open_questions); decision.mcda.contract.yaml already exists in this spec root (Tier 1, verified present
+  # before this field was written).
+
+rollback:
+  side_effect_free: true
+  # No mother document states this explicitly for TOWS specifically. Same low-risk inference class
+  # strategy.swot.contract.yaml's own identical field already applies: a pure analysis/knowledge-object
+  # production method with no described external side effect in any mother document.
+
+compilation_decisions:
+  - question: "Should pairing_type be caller-settable (accept + validate + refuse on mismatch), or always computed?"
+    decision: "Always computed -- the pairing constructor (tows_pairing()) has no pairing_type parameter at all; generate_tows_matrix derives it, an independent gate re-derives it from raw fields against the real SwotAnalysis. Structurally eliminates a caller-asserted wrong label rather than accepting the field and then refusing a mismatch."
+  - question: "Should the builder accept a bare swot_analysis_ref string, or the real SwotAnalysis object?"
+    decision: "The real SwotAnalysis object (dict with factors[]) -- required to genuinely validate factor ids/categories (task-mandated). Modeled on causal.dag.py's own cause_hypothesis_set object parameter, but going one level deeper: TOWS validates INTO the referenced object's own field values (category), not merely captures its id."
+  - question: "Reuse ai_lego.modules.strategy.swot's AUTOMATIC_DEPLOYMENT_HAZARD_ID constant, or define an independent one with the same value?"
+    decision: "Independent constant, identical string value -- avoids a runtime import dependency between two otherwise-unrelated Tier 1 method modules over a single shared string. (is_internal/VALID_CATEGORIES ARE imported from swot.py -- see next decision -- because those are the actual semantic split TOWS validates against, not an incidental shared constant.)"
+  - question: "Should is_internal()/VALID_CATEGORIES be re-declared in tows.py or imported from swot.py?"
+    decision: "Imported (read-only) from ai_lego.modules.strategy.swot -- Atlas defines the STRENGTH/WEAKNESS/OPPORTUNITY/THREAT split exactly once (L1327, inside SWOT's own citation) and TOWS's pairing_type derivation is a pure function of that SAME split; re-declaring it here would risk silent drift between two copies of the same four-value taxonomy."
+
+open_questions:
+  - id: "OQ-TOWS-1"
+    question: "cognitive_primitives [RELATE, COMPARE, EXPLAIN] is this file's own inference -- Atlas §4 gives no composition formula for TOWS."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+  - id: "OQ-TOWS-2"
+    question: "recommended_next names decision.mcda per Atlas's own F08 table column, but the §14.1 chain's literal next node (StrategyOptions) has no dedicated contract/schema anywhere in this spec root yet -- same class of gap strategy.swot.contract.yaml's own OQ-SWOT-1 discloses one link earlier in the chain."
+    owner: "operator, or whoever next backfills the StrategyOptions typed object"
+
+verification:
+  method: >
+    Read Atlas F08 table (L500-536), §11.7 (L1324-1357), §11.8 (L1351-1362), §14.1 (L3536-3552) directly at the
+    cited lines. Read strategy.swot.contract.yaml + ai_lego/modules/strategy/swot.py in full before writing this
+    contract (both the convention template AND the literal upstream dependency). Grepped the whole ai_lego tree
+    case-insensitively for "tows" before writing any of this method's own files -- zero pre-existing
+    implementation (one forward-reference mention in docs/THIRD_SLICE_STRATEGY_SWOT.md's own §14.1 quote, not an
+    implementation). Confirmed decision.mcda.contract.yaml already exists before citing it in recommended_next.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L519/§11.8's own SO/ST/WO/WT table is transcribed verbatim into the
+    referential-integrity preconditions. The 2-object-parameter builder signature (SwotAnalysis + pairings),
+    the always-computed (never caller-supplied) treatment of pairing_type, and the independent hazard-id
+    constant are Phase 3 compilation choices, disclosed above in `compilation_decisions`, not presented as
+    Atlas-cited.
