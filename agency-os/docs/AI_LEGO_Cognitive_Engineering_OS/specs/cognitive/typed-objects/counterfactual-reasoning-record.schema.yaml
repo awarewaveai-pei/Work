@@ -1,0 +1,141 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/counterfactual-reasoning-record.schema.yaml"
+title: Counterfactual Reasoning Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CounterfactualReasoningRecord` -- the declared `outputs` of
+  `causal.counterfactual_reasoning`'s Method Contract. Atlas's ONLY citation is the F11 table row (L617:
+  "Counterfactual Reasoning｜比較 actual vs no-intervention｜intervention→actual→counterfactual→assumptions
+  ｜明確因果基準") -- a flat 4-stage pipeline, transcribed directly into this schema's 4 real fields
+  (`intervention`/`actual_outcome`/`counterfactual_outcome`/`assumptions`), no nested wrapper.
+
+  TWO real invariants JSON Schema alone cannot express (pairwise cross-field distinctness;
+  non-fabricatable disclosure of >=1 assumption) -- both runtime-layer, enforced at construction AND
+  independently re-derived by a gate, same two-layer discipline every sibling typed-object schema in this
+  directory already documents; see `ai_lego/modules/causal/counterfactual_reasoning.py`.
+
+  `assumptions` is a flat list of non-empty strings, not a reuse of `causal-dag-analysis.schema.yaml`'s own
+  per-edge `{provenance, supporting_evidence_refs}` object shape -- see `compilation_decisions` for why that
+  shape does not transfer to this method's single-claim record.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Counterfactual Reasoning row (L617)"
+  - "methods/contracts/causal.counterfactual_reasoning.contract.yaml (id: causal.counterfactual_reasoning)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml (per-edge evidence/rationale/confidence shape considered and NOT reused here -- see compilation_decisions)"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml (expected_state!=current_state echo-invariant class, extended here to 3-way)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Reuse causal-dag-analysis.schema.yaml's own per-edge {provenance, supporting_evidence_refs} object shape for each assumptions[] entry?"
+    decision: "No -- flat list of non-empty strings, REQUIRED with minItems:1."
+    reasoning: "The DAG shape addresses N independently-evidenced causal hypotheses inside one graph. This record makes ONE already-provenanced claim (record-level provenance); assumptions are the disclosed premises that single claim rests on, not separate evidentiary sub-claims each needing their own provenance object. Forcing that structure here would invent shape no citation names."
+  - question: "Nest intervention/actual_outcome/counterfactual_outcome under a content wrapper (problem-statement.schema.yaml's own shape)?"
+    decision: "No -- flat top-level fields, matching causal-dag-analysis.schema.yaml's own flat convention."
+    reasoning: "ProblemStatement's wrapper transcribes an actual nested Atlas content block (§12.2) that has no equivalent here -- this method's only citation is an un-nested 4-stage table row."
+  - question: "Enforce distinctness across all 3 of intervention/actual_outcome/counterfactual_outcome, or only actual_outcome!=counterfactual_outcome?"
+    decision: "All 3 pairs, each independently checked."
+    reasoning: "actual_outcome==counterfactual_outcome is the core degenerate case (no real WHAT-IF comparison). intervention colliding with either outcome field is a different but equally real copy-paste echo, same failure class -- see method contract's own compilation_decisions."
+
+type: object
+required: [id, version, intervention, actual_outcome, counterfactual_outcome, assumptions, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CFR-"
+    description: "NEW DESIGN. Record id prefix, following the existing PROB-/CDA-/AFFINITY- convention this suite's other typed-object schemas already use."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.counterfactual_reasoning"
+
+  intervention:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L617 stage 1 -- what actually changed or was done (e.g. 'raised the price 10%')."
+
+  actual_outcome:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L617 stage 2 -- what really happened after the intervention, in the world that actually occurred."
+
+  counterfactual_outcome:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L617 stage 3 -- what the record CLAIMS would have happened had the intervention NOT occurred.
+      Unverifiable by construction (the intervention did happen; this is a claim about a world that never
+      existed) -- exactly why `assumptions` below is required, not optional.
+
+  assumptions:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: >
+      Atlas L617 stage 4. REQUIRED non-empty -- every counterfactual claim rests on unstated premises (e.g.
+      "no other confounding change occurred in the same window", "the pre-existing trend would have
+      continued"): never claim a counterfactual with zero disclosed assumptions. CORRECTED (2026-09-10,
+      batch critic review): an earlier draft additionally cited L635 ("每條 edge 都應綁 evidence/rationale/
+      confidence") as a "shared F11 framing rule" being generalized here. Re-verified against the Atlas
+      source: L635 is textually scoped to causal.dag specifically (sits directly beneath its own worked
+      mermaid diagram, never referenced by any other F11 row) -- not a family-wide rule. This field's
+      minItems:1 requirement needs no L635 support; it is grounded directly in L617's own 4th pipeline-stage
+      word alone. See top-level description and compilation_decisions for why this is a flat string list
+      rather than a reuse of causal-dag-analysis.schema.yaml's own per-edge object shape.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A price-increase intervention, its actual outcome, a claimed counterfactual, and disclosed assumptions"
+    value:
+      id: "CFR-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.counterfactual_reasoning"
+      intervention: "2026 Q2 將訂閱月費從 NT$299 調漲至 NT$349（+17%）"
+      actual_outcome: "調漲後 3 個月留存率從 92% 降至 87%，月營收淨增 4%"
+      counterfactual_outcome: "若未調漲，留存率預估維持 92% 基準線，月營收持平（無淨增）"
+      assumptions:
+        - "同期無其他重大產品變更或行銷活動足以單獨解釋留存率下降"
+        - "競品定價與可比性在此 3 個月內未發生足以轉移使用者的重大變化"
+        - "留存率的既有下滑趨勢（若有）在調漲前已扣除，非本次比較污染源"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-COUNTERFACTUALREASONINGRECORD-1"
+    question: >
+      assumptions[] entries carry no per-entry provenance/confidence (deliberate departure from
+      causal-dag-analysis.schema.yaml's own per-edge shape, see compilation_decisions). Should a future
+      revision add an optional per-assumption confidence field once a real downstream consumer needs to rank
+      or filter assumptions by strength?
+    owner: "operator, or whoever next needs a confidence-weighted assumptions consumer"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F11 tool table Counterfactual Reasoning row (L617) directly -- confirmed (grep,
+    case-insensitive, whole document) this is the method's ONLY citation, no dedicated section exists. Read
+    causal-dag-analysis.schema.yaml and problem-statement.schema.yaml in full to evaluate and then explicitly
+    decline/extend their own respective per-edge-provenance and echo-invariant conventions. Grepped
+    specs/cognitive/typed-objects/ for "counterfactual" before writing -- no pre-existing or competing typed
+    object found. Validated against jsonschema Draft202012Validator (schema itself passes check_schema();
+    required fields present; additionalProperties:false verified to actually reject an unknown top-level key;
+    assumptions minItems:1 verified to actually reject an empty array; id pattern verified to actually reject
+    an unprefixed id).
+  note: >
+    `intervention`/`actual_outcome`/`counterfactual_outcome`/`assumptions` field names are transcribed
+    directly from Atlas L617's own 4-word pipeline; the flat (non-nested) shape, the required-non-empty
+    assumptions constraint, and the decision not to reuse causal-dag-analysis.schema.yaml's per-edge object
+    shape are this suite's own compiled structure, explicitly disclosed as such above, not presented as
+    mother-document content. No mother document was modified to produce this file.

@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { ingestKnowledge, listKnowledgeSources, deleteKnowledgeSource } from "@/lib/cs";
+import { ingestKnowledge, listKnowledgeSources, deleteKnowledgeSource } from "@/lib/kb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

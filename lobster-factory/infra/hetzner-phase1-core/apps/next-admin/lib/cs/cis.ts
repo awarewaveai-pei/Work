@@ -4,7 +4,8 @@
 // (three-section isolation, plan §3 step 2) — it goes in the user turn via buildUserContext.
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { CisProfile, CsVoice, RetrievedChunk } from "@/lib/cs/types";
+import type { RetrievedChunk } from "@/lib/kb/types";
+import type { CisProfile, CsVoice } from "@/lib/cs/types";
 
 /** Load CIS for one tenant. Degrades to an empty profile (defaults applied downstream). */
 export async function loadCis(organizationId: string): Promise<CisProfile> {

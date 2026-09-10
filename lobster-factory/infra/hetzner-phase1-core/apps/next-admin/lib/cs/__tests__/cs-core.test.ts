@@ -5,7 +5,6 @@ import {
   hitsRedLine,
   hitsSensitive,
   passesCanary,
-  rrfFuse,
   topScore,
 } from "@/lib/cs/autonomy";
 import {
@@ -17,7 +16,6 @@ import {
 } from "@/lib/cs/guardrails";
 import { extractAmountCents, resolveToolDecision } from "@/lib/cs/tools";
 import { parseVerdict } from "@/lib/cs/generate";
-import { chunkText } from "@/lib/cs/rag";
 import { buildSystemPrompt, buildUserContext } from "@/lib/cs/cis";
 import type { Intent, ToolSpec } from "@/lib/cs/types";
 
@@ -42,16 +40,6 @@ const baseDecision = {
   messageText: "請問我的訂單到哪了",
   roll: 0,
 };
-
-describe("rrfFuse", () => {
-  it("ranks by fused reciprocal rank", () => {
-    const fused = rrfFuse([["a", "b", "c"], ["a", "c"]]);
-    expect(fused.map((f) => f.id)).toEqual(["a", "c", "b"]);
-  });
-  it("handles empty input", () => {
-    expect(rrfFuse([])).toEqual([]);
-  });
-});
 
 describe("canary", () => {
   it("is deterministic per key and within 0..99", () => {
@@ -173,19 +161,6 @@ describe("tool gate", () => {
     expect(extractAmountCents({ amount_cents: 500 })).toBe(500);
     expect(extractAmountCents({ amount: 9.99 })).toBe(999);
     expect(extractAmountCents({})).toBeNull();
-  });
-});
-
-describe("chunkText", () => {
-  it("splits into bounded chunks", () => {
-    const body = Array.from({ length: 6 }, (_, i) => `段落 ${i} `.repeat(40)).join("\n\n");
-    const chunks = chunkText(body, 500, 80);
-    expect(chunks.length).toBeGreaterThan(1);
-    for (const c of chunks) expect(c.length).toBeLessThanOrEqual(Math.floor(500 * 1.6));
-  });
-  it("hard-splits an oversize single paragraph", () => {
-    const chunks = chunkText("x".repeat(2000), 500, 80);
-    expect(chunks.length).toBeGreaterThanOrEqual(4);
   });
 });
 

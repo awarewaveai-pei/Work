@@ -1,0 +1,209 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/logic-model-record.schema.yaml"
+title: Logic Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LogicModel` -- the declared
+  `outputs` of `causal.logic_model`'s Method Contract
+  (methods/contracts/causal.logic_model.contract.yaml, `outputs:
+  [LogicModel]`). Atlas's F11 table row (L619: "Logic Model｜結構化
+  program｜inputs→activities→outputs→short/long outcomes｜便於 KPI 與評估")
+  is the ONLY citation -- a fixed, positionally-ordered 5-stage pipeline
+  (`stages` as a `prefixItems` tuple), same convention
+  `kepner-tregoe-problem-specification.schema.yaml`'s own `dimensions`
+  field already establishes for a different method's fixed-sequence chain.
+
+  Deliberately ONE STAGE SHORTER than
+  `theory-of-change-record.schema.yaml` (built concurrently by a different
+  agent in this same batch): no `IMPACT` stage, no per-stage/per-transition
+  `assumptions` field -- Logic Model's own citation stops at "short/long
+  outcomes" and names no assumptions concept anywhere. See
+  `methods/contracts/causal.logic_model.contract.yaml`'s own
+  `compilation_decisions` for the full disambiguation this suite's own
+  investigation reached.
+
+  ONE real invariant this schema CAN express structurally (unlike
+  `kepner-tregoe-problem-specification.schema.yaml`'s own IS != IS-NOT
+  cross-field check, which JSON Schema genuinely cannot express): each
+  `SHORT_TERM_OUTCOMES`/`LONG_TERM_OUTCOMES` stage entry's own
+  `indicators` array is required (minItems 1) via a position-specific
+  `prefixItems` override -- a per-item, position-local constraint, not a
+  cross-item reference, so it is schema-expressible directly. This is the
+  literal structural encoding of Atlas's own benefit column ("便於 KPI 與
+  評估"): an outcome stage that names no way to measure it fails this
+  method's own defining, cited purpose.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Logic Model row (L619) -- the ONLY citation for this method"
+  - "methods/contracts/causal.logic_model.contract.yaml"
+  - "specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml (prefixItems positionally-ordered pipeline convention reused here)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml (per-item provenance + supporting_evidence_refs convention reused here)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should `program_name` be a required top-level field, or should this type require an external $ref input?"
+    decision: "Required top-level `program_name` string; no external $ref input (matches the method contract's own `inputs.required: []`)."
+    reasoning: >
+      Atlas's own citation names no upstream typed-object dependency for
+      this method (contrast `causal-dag-analysis.schema.yaml`'s own
+      `cause_hypothesis_set_ref`). `program_name` is the minimal anchor
+      identifying WHICH program this record structures, without inventing
+      a whole new required upstream record type Atlas never cites.
+  - question: "Should every stage require `indicators`, or only the two outcome stages?"
+    decision: "Only `SHORT_TERM_OUTCOMES`/`LONG_TERM_OUTCOMES` require a non-empty `indicators[]` (minItems 1), via per-position `prefixItems` overrides. `INPUTS`/`ACTIVITIES`/`OUTPUTS` may optionally carry `indicators` too but are not required to."
+    reasoning: "See the method contract's own compilation_decisions for the full Atlas-citation-grounded reasoning (the benefit column is specifically about measuring results, not process)."
+  - question: "Should this schema carry an `impact` stage or `assumptions` field, matching `theory-of-change-record.schema.yaml`?"
+    decision: "No -- disclosed absence, not an oversight. See the method contract's own compilation_decisions disambiguation from `causal.theory_of_change`."
+
+type: object
+required: [id, version, program_name, stages, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^LGM-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as causal-dag-analysis.schema.yaml's CDA- prefix."
+
+  version:
+    type: string
+
+  program_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Which program this Logic Model structures. See compilation_decisions -- the self-contained anchor field replacing an external $ref input Atlas never cites."
+
+  generated_by_method:
+    type: string
+    default: "causal.logic_model"
+
+  stages:
+    type: array
+    minItems: 5
+    maxItems: 5
+    description: >
+      Atlas's own literal L619 citation ("inputs→activities→outputs→
+      short/long outcomes"), AS AN ORDERED TUPLE -- stages[0] MUST be
+      INPUTS, stages[4] MUST be LONG_TERM_OUTCOMES, and so on. Atlas's own
+      citation order is a fixed vocabulary, not a set, mirroring
+      kepner-tregoe-problem-specification.schema.yaml's own `dimensions`
+      discipline.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: INPUTS}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: ACTIVITIES}}}]
+      - allOf: [{$ref: "#/$defs/stage_entry"}, {properties: {stage: {const: OUTPUTS}}}]
+      - allOf:
+          - {$ref: "#/$defs/stage_entry"}
+          - properties:
+              stage: {const: SHORT_TERM_OUTCOMES}
+              indicators: {type: array, minItems: 1, items: {type: string, minLength: 1, pattern: "\\S"}}
+            required: [indicators]
+      - allOf:
+          - {$ref: "#/$defs/stage_entry"}
+          - properties:
+              stage: {const: LONG_TERM_OUTCOMES}
+              indicators: {type: array, minItems: 1, items: {type: string, minLength: 1, pattern: "\\S"}}
+            required: [indicators]
+    items: false
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  stage_entry:
+    type: object
+    required: [stage, description, provenance]
+    additionalProperties: false
+    properties:
+      stage:
+        type: string
+        enum: [INPUTS, ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES]
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What this stage actually is for this program (e.g. the specific inputs committed, or the specific outcome expected)."
+      indicators:
+        type: array
+        items: {type: string, minLength: 1, pattern: "\\S"}
+        description: >
+          KPI/measurement statements for this stage (Atlas's own '便於
+          KPI 與評估' benefit column). OPTIONAL on INPUTS/ACTIVITIES/
+          OUTPUTS; REQUIRED (minItems 1) on SHORT_TERM_OUTCOMES/
+          LONG_TERM_OUTCOMES via the position-specific prefixItems
+          override above.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+
+examples:
+  - description: >
+      Compilation illustration (Atlas L619 gives a table row, not a worked
+      example -- disclosed, same class every thin-citation sibling schema
+      in this directory already discloses): Cascadia's onboarding
+      activation program, 5 stages, both outcome stages carrying a real
+      indicator.
+    value:
+      id: "LGM-2026-09-10-001"
+      version: "1.0.0"
+      program_name: "Cascadia 新用戶啟用計畫"
+      generated_by_method: "causal.logic_model"
+      stages:
+        - stage: INPUTS
+          description: "產品團隊 2 FTE + 單季 $50K 預算"
+          provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: null }
+        - stage: ACTIVITIES
+          description: "建置互動式 onboarding tutorial + 7 日啟動 email 序列"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+        - stage: OUTPUTS
+          description: "完成 tutorial 的新用戶數、已送達 email 數"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-950"]
+        - stage: SHORT_TERM_OUTCOMES
+          description: "7 日內首次啟用率提升"
+          indicators: ["7-day activation rate"]
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - stage: LONG_TERM_OUTCOMES
+          description: "次月流失率下降"
+          indicators: ["Month-2 churn rate"]
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-LOGICMODELRECORD-1"
+    question: >
+      `indicators` values are free-text strings (e.g. "7-day activation
+      rate"), not a structured {metric, target, unit} object. Should a
+      future revision give indicators their own richer shape once a
+      concrete KPI-tracking consumer exists? Left as free text -- the same
+      restraint against inventing an unneeded structure this suite applies
+      elsewhere (Atlas's own citation names no indicator field shape at
+      all).
+    owner: "operator, or whoever next builds a KPI-tracking consumer of this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F11 table Logic Model row (L619) and its neighboring
+    Theory of Change row (L618) directly, side by side. Validated against
+    jsonschema Draft202012Validator (required fields present, id/
+    supporting_evidence_refs patterns satisfied, stages prefixItems order
+    AND per-position const enforced, SHORT_TERM_OUTCOMES/LONG_TERM_OUTCOMES
+    indicators-required override verified to actually reject a missing/
+    empty indicators array while leaving INPUTS/ACTIVITIES/OUTPUTS
+    optional, additionalProperties:false on stage_entry AND on the
+    top-level record verified to actually reject an unknown key).
+  note: >
+    `stages`' five values and citation order are transcribed verbatim from
+    Atlas L619. The indicators-required-on-outcome-stages override and the
+    `program_name` self-contained-anchor field are Phase 3 compilation
+    choices, explicitly flagged above. No mother document was modified to
+    produce this file.

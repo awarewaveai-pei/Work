@@ -1,0 +1,219 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/process-tracing-record.schema.yaml"
+title: Process Tracing Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ProcessTracingRecord` -- the declared `outputs` of
+  `causal.process_tracing`'s Method Contract. 2nd typed object in the `causal` family (F11, after
+  `causal-dag-analysis.schema.yaml`). Atlas's own F11 tool table row (L620: "mechanism→hoop/smoking-gun
+  evidence") is directly transcribed as `causal_mechanism` + `evidence[].test_type`'s closed 2-value enum.
+
+  `evidence[].implication` and record-level `hypothesis_status` are GENUINE_COMPUTE, re-derived from
+  `evidence[].test_type`/`result` by both the builder and an independent gate
+  (`ai_lego/compute/process_tracing/evidence_evaluation.py`), never caller-asserted -- same two-layer
+  discipline every genuine_compute sibling in this suite (e.g. `morphological-analysis-record.schema.yaml`)
+  already establishes. This is a cross-field, per-item derivation JSON Schema cannot express (no native
+  "compute this field from those two sibling fields" operator), so the CORRECTNESS of `implication`/
+  `hypothesis_status` is a runtime-layer invariant; this schema validates only their SHAPE (closed enums).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Process Tracing row (L620)"
+  - "methods/contracts/causal.process_tracing.contract.yaml (id: causal.process_tracing)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml (sole existing family sibling, id-prefix/provenance-shape convention reused here)"
+  - "specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml ($defs + additionalProperties:false-per-$def convention reused here)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should evidence[].test_type cover Van Evera's full 4-type typology, or only HOOP/SMOKING_GUN?"
+    decision: "Only 2 -- HOOP and SMOKING_GUN, matching the method contract's own enforced scope. See causal.process_tracing.contract.yaml's own OQ-PROCESSTRACING-2."
+  - question: "Should evidence be allowed to end up empty?"
+    decision: "No -- minItems: 1. A mechanism claim with zero evidence tests has not been process-traced at all, unlike security.stride's own legitimate empty-threats[] state. See method contract's own compilation_decisions."
+  - question: "Can implication/hypothesis_status's own correctness (the real Van Evera-derived value for a given test_type/result pair) be expressed in JSON Schema?"
+    decision: "No -- same limitation morphological-analysis-record.schema.yaml's own legal_combinations already documents: JSON Schema validates SHAPE (a value from the closed enum) but not that the VALUE is the correct derivation. Runtime-layer only, see top-level description."
+
+type: object
+required: [id, version, causal_mechanism, evidence, hypothesis_status, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PROCESSTRACING-"
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.process_tracing"
+
+  causal_mechanism:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The hypothesized causal chain under test -- Atlas L620's own literal 'mechanism' formula word."
+
+  cause_hypothesis_set_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL soft backward link to the CauseHypothesisSet this mechanism was drawn from, when the caller has
+      one (e.g. an upstream causal.dag/fishbone run). Format-only checked (non-empty string); existence of the
+      referenced record is NOT verified, same limitation morphological-analysis-record.schema.yaml's own
+      informs_mcda_ref already accepts. See method contract's own `inputs.optional`.
+
+  evidence:
+    type: array
+    minItems: 1
+    description: "Atlas's own 'hoop/smoking-gun evidence' formula step -- at least one test, see compilation_decisions."
+    items:
+      $ref: "#/$defs/evidence_test"
+
+  hypothesis_status:
+    type: string
+    enum: [ELIMINATED, SURVIVING, CONFIRMED]
+    description: >
+      GENUINE_COMPUTE -- re-derived from evidence[].implication: ELIMINATED if any entry is
+      HYPOTHESIS_ELIMINATED (takes precedence, see method contract's own compilation_decisions on why);
+      else CONFIRMED if any entry is HYPOTHESIS_CONFIRMED; else SURVIVING. Runtime-layer cross-field
+      derivation check: must equal the real recomputation -- see top-level description.
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real derivation function -- same convention causal-dag-analysis.schema.yaml's own computation_provenance_ref already establishes."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  evidence_test:
+    type: object
+    required: [id, test_type, description, result, implication, provenance]
+    additionalProperties: false
+    description: >
+      ONE hoop-test or smoking-gun-test finding. `implication` is GENUINE_COMPUTE, not caller-supplied -- see
+      top-level description.
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique within this record's own evidence[] array (uniqueness enforced at the runtime layer, not here)."
+      test_type:
+        enum: [HOOP, SMOKING_GUN]
+        description: >
+          Van Evera's own closed vocabulary, restricted to the two values Atlas L620's own 'hoop/smoking-gun'
+          formula literally names (see compilation_decisions). HOOP: necessary, not sufficient -- failing it
+          eliminates the hypothesis, passing it does not confirm. SMOKING_GUN: sufficient, not necessary --
+          finding it confirms the hypothesis, its absence does not rule the hypothesis out.
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What evidence was sought and/or observed for this specific test."
+      result:
+        enum: [PRESENT, ABSENT]
+        description: "Whether the evidence this test looks for was actually found."
+      implication:
+        enum: [HYPOTHESIS_ELIMINATED, HYPOTHESIS_NOT_ELIMINATED, HYPOTHESIS_CONFIRMED, HYPOTHESIS_NOT_CONFIRMED]
+        description: >
+          GENUINE_COMPUTE -- the Van Evera-correct implication of this (test_type, result) pair:
+          (HOOP, ABSENT)->HYPOTHESIS_ELIMINATED; (HOOP, PRESENT)->HYPOTHESIS_NOT_ELIMINATED;
+          (SMOKING_GUN, PRESENT)->HYPOTHESIS_CONFIRMED; (SMOKING_GUN, ABSENT)->HYPOTHESIS_NOT_CONFIRMED.
+          Schema validates only that the value is one of these four strings, not that it is the CORRECT one
+          for this entry's own test_type/result -- that cross-field check is runtime-layer only (see top-level
+          description).
+      provenance:
+        description: "Per-evidence provenance -- each test is a distinct, individually-evidenced finding, same per-item granularity causal-dag-analysis.schema.yaml's own per-edge provenance already establishes."
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A survived-but-unconfirmed mechanism: one HOOP test passed (mechanism not eliminated), no SMOKING_GUN test run yet."
+    value:
+      id: "PROCESSTRACING-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.process_tracing"
+      causal_mechanism: "Regulatory approval delay caused the product launch slip, mediated by a compliance re-filing requirement, not by engineering capacity."
+      evidence:
+        - id: "EV-1"
+          test_type: HOOP
+          description: "If the mechanism is real, the compliance re-filing date must precede the announced slip date."
+          result: PRESENT
+          implication: HYPOTHESIS_NOT_ELIMINATED
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+      hypothesis_status: SURVIVING
+      computation_provenance_ref: "ai_lego.compute.process_tracing.evidence_evaluation.derive_hypothesis_status"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "A confirmed mechanism: the HOOP test passed AND a SMOKING_GUN test found direct documentary evidence."
+    value:
+      id: "PROCESSTRACING-2026-09-10-002"
+      version: "1.0.0"
+      generated_by_method: "causal.process_tracing"
+      cause_hypothesis_set_ref: "CHS-2026-09-04-001"
+      causal_mechanism: "Regulatory approval delay caused the product launch slip, mediated by a compliance re-filing requirement, not by engineering capacity."
+      evidence:
+        - id: "EV-1"
+          test_type: HOOP
+          description: "If the mechanism is real, the compliance re-filing date must precede the announced slip date."
+          result: PRESENT
+          implication: HYPOTHESIS_NOT_ELIMINATED
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - id: "EV-2"
+          test_type: SMOKING_GUN
+          description: "An internal email from the compliance team explicitly requesting the re-filing, dated before the slip announcement, naming the launch as blocked."
+          result: PRESENT
+          implication: HYPOTHESIS_CONFIRMED
+          provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT}
+      hypothesis_status: CONFIRMED
+      computation_provenance_ref: "ai_lego.compute.process_tracing.evidence_evaluation.derive_hypothesis_status"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "An eliminated mechanism: the HOOP test failed (evidence that must be present if the mechanism is real was absent), overriding an unrelated SMOKING_GUN finding for a different candidate mechanism element."
+    value:
+      id: "PROCESSTRACING-2026-09-10-003"
+      version: "1.0.0"
+      generated_by_method: "causal.process_tracing"
+      causal_mechanism: "Regulatory approval delay caused the product launch slip, mediated by a compliance re-filing requirement, not by engineering capacity."
+      evidence:
+        - id: "EV-1"
+          test_type: HOOP
+          description: "If the mechanism is real, a compliance re-filing record must exist in the regulator's own public docket for this product."
+          result: ABSENT
+          implication: HYPOTHESIS_ELIMINATED
+          provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: LOCKED_FACT}
+        - id: "EV-2"
+          test_type: SMOKING_GUN
+          description: "An internal engineering standup note mentioning a capacity shortfall in the same week as the slip."
+          result: PRESENT
+          implication: HYPOTHESIS_CONFIRMED
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+      hypothesis_status: ELIMINATED
+      computation_provenance_ref: "ai_lego.compute.process_tracing.evidence_evaluation.derive_hypothesis_status"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - id: "OQ-PROCESSTRACINGRECORD-1"
+    question: "test_type's 2-value enum deliberately excludes Van Evera's straw-in-the-wind/doubly-decisive test types -- see method contract's own OQ-PROCESSTRACING-2."
+    owner: "operator, or whoever next revises this contract's own scope with explicit authorization to cite the external methodology as a source"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F11 tool table row (L620) directly. Read causal-dag-analysis.schema.yaml and
+    stride-threat-model-record.schema.yaml in full as the sibling-family and $defs-shape convention templates.
+    Grepped the whole ai_lego tree case-insensitively for "process_tracing"/"hoop"/"smoking_gun" before
+    writing -- zero pre-existing implementation. Validated against jsonschema Draft202012Validator (required
+    fields present, id pattern, evidence minItems enforced, test_type/result/implication/hypothesis_status
+    enums closed and verified to actually reject an illegal value, evidence_test additionalProperties:false
+    AND top-level record additionalProperties:false both verified to actually reject an unknown key).
+  note: >
+    causal_mechanism/evidence[].test_type field names and the 2-value HOOP/SMOKING_GUN enum are directly
+    transcribed from Atlas L620's own five-word formula. implication/hypothesis_status's own enum values and
+    derivation logic are Phase 3 compilation, explicitly disclosed as grounded in Van Evera's real, named
+    process-tracing methodology, not a mother-document citation. No mother document was modified to produce
+    this file.

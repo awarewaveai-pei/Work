@@ -8,14 +8,14 @@
 
 | 事實 | 位置 | 影響 |
 |---|---|---|
-| KB 唯一對外入口（已有模組邊界，抽取起點） | [cs/index.ts:1-23](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs/index.ts) | K0 純搬移可行 |
-| **`insertSource()` 無參數可寫 `doc_family_id`/`source_version`/`status`** | [cs/db.ts:231-251](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs/db.ts) | 版本化**未接線** |
-| **`insertChunks` 硬編 `doc_family_id: r.sourceId`、`source_version: 1`** | [cs/db.ts:273-274](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs/db.ts) | 兩表 family 語意**已分岔**，且無查詢會報錯 → 最易靜默留下的債 |
+| KB 唯一對外入口（已有模組邊界，抽取起點） | [kb/index.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb/index.ts)（K0 已建） | K0 純搬移可行 |
+| **`insertSource()` 無參數可寫 `doc_family_id`/`source_version`/`status`** | [kb/db.ts:48-68](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb/db.ts) | 版本化**未接線** |
+| **`insertChunks` 硬編 `doc_family_id: r.sourceId`、`source_version: 1`** | [kb/db.ts:90-91](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb/db.ts) | 兩表 family 語意**已分岔**，且無查詢會報錯 → 最易靜默留下的債 |
 | 版本化欄位存在但全 repo 無人讀寫（死欄位） | [0051:55-70](../../../lobster-factory/packages/db/migrations/0051_cs_core.sql) | 「重用既有機制」不成立，須實作 |
-| 唯一刪除路徑刪的是**整個 source 列**（chunk 靠 FK cascade） | `deleteKnowledgeSource()`，cs/db.ts:129-134 | 拿它換版 = 版本歷史當場被毀 |
-| **檢索端無 status/version/space 過濾**（向量與關鍵字**兩半都沒有**） | [0051:209-214](../../../lobster-factory/packages/db/migrations/0051_cs_core.sql)、cs/db.ts:323-340 | 換版需同時改檢索端；兩半謂詞不一致 = 跨租戶洩漏路徑 |
-| 三處邏輯專門消滅零 chunk 的 ghost source | [cs/rag.ts:130-136,150-154,156-159](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs/rag.ts) | 「不合格標 `dirty`」不能寫進這張表 |
-| `listKnowledgeSources()` 的 select **未取 `status`** | cs/db.ts:99-126 | UI 看不到 dirty/archived |
+| 唯一刪除路徑刪的是**整個 source 列**（chunk 靠 FK cascade） | `deleteKnowledgeSource()`，kb/db.ts:41-46 | 拿它換版 = 版本歷史當場被毀 |
+| **檢索端無 status/version/space 過濾**（向量與關鍵字**兩半都沒有**） | [0051:209-214](../../../lobster-factory/packages/db/migrations/0051_cs_core.sql)、kb/db.ts:140-157 | 換版需同時改檢索端；兩半謂詞不一致 = 跨租戶洩漏路徑 |
+| 三處邏輯專門消滅零 chunk 的 ghost source | [kb/rag.ts:134-140,154-158,160-163](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb/rag.ts) | 「不合格標 `dirty`」不能寫進這張表 |
+| `listKnowledgeSources()` 的 select **未取 `status`** | kb/db.ts:11-38 | UI 看不到 dirty/archived |
 | `cs_ai_replies.retrieved_chunk_ids` 是**無 FK 的 uuid 陣列** | 0051:172 | 實體刪 chunk 會讓稽核鏈懸空 → 只標 `archived`，不刪 |
 | RLS = service_role only（DB 層無跨租戶兜底） | 0051:217-234 | 任何漏寫租戶過濾的語句都無防護網 |
 | `organizations` **無 `parent_id`**，租戶是平的 | [0001_core.sql:3-14](../../../lobster-factory/packages/db/migrations/0001_core.sql) | 層級式租戶不存在 → 用 scope chain 預留 |
@@ -134,7 +134,7 @@ CREATE TABLE kb_document_relations (
 
 - `doc_family_id = uuidv5(NS, organizationId + "|" + canonicalUrl)`。**必須含 org**：兩個 organization 抓同一公開 URL 會得到相同 family uuid，未來任何「刪掉這個 family 的舊版本」漏寫 org 過濾就是跨租戶刪除，而 RLS 是 service_role only → **DB 層沒有兜底**。NS 常數寫死程式碼，不可從 env 取。
 - `insertChunks` 的 family **改為繼承 source 列**，不再用 `sourceId`。
-- **換版順序：先插新 → 確認 `chunks > 0` → 再標舊版 `archived`**。反過來若 embedding 中途失敗，`rag.ts:157` 會回滾新 source → **該文件的 KB 內容歸零**（supabase-js 無交易，順序是唯一保護）。
+- **換版順序：先插新 → 確認 `chunks > 0` → 再標舊版 `archived`**。反過來若 embedding 中途失敗，`kb/rag.ts:161` 會回滾新 source → **該文件的 KB 內容歸零**（supabase-js 無交易，順序是唯一保護）。
 
 ### 1.4 出處標記與不可信內容（ADR §決策 20/21/22）
 
@@ -263,8 +263,8 @@ CREATE INDEX IF NOT EXISTS idx_cs_chunks_hnsw_te3s  ON public.cs_knowledge_chunk
 
 | K | 交付的價值 | 內容 | DoD（缺一不算） | Rollback |
 |---|---|---|---|---|
-| **K0** | 產品化前提：知識庫不再與客服邏輯綁死 | `lib/cs/` 拆為 `lib/kb/`（rag/db 的 knowledge 部分）＋ `lib/cs/`（intent／autonomy／guardrail／eval）。**純搬移、零行為變更** | `npx tsc --noEmit` 綠；cs 既有測試全綠；`lib/kb/index.ts` 為唯一對外入口（grep 確認無人繞過）；ops 路由行為不變（真跑 ingest + retrieve 比對前後輸出） | `git revert`（純搬移） |
-| **K1** | **版本化真的會動 + 檢索契約一次定型** | 修 `insertSource`／`insertChunks` 簽名；chunk family 改繼承 source 列；§1.5 migration；`cs_match_chunks` 改**六謂詞**（§1.2）；`matchChunksKeyword` 套**同一組**謂詞；換版改「先插後標 archived」 | 同文件改內容 → 產生第二版且**舊 chunk 確實不再被檢索到**（用**查詢**驗證，非只看 insert）；先插後刪順序實測（模擬 embedding 失敗，確認舊版仍在）；**scope chain 傳兩節點時只回鏈上的**；**`is_sensitive` 不向下繼承**（實測）；**向量半邊與關鍵字半邊可見範圍一致**（同一 query 兩半 source 集合比對）；cs 既有 eval golden set（`cs_eval_cases`）未退步；migration down 實測可逆 | down migration + revert |
+| **K0** ✅**已完成** 2026-09-10 | 產品化前提：知識庫不再與客服邏輯綁死 | `lib/cs/` 拆為 `lib/kb/`（rag/db 的 knowledge 部分）＋ `lib/cs/`（intent／autonomy／guardrail／eval）。**純搬移、零行為變更** | `npx tsc --noEmit` 綠；cs 既有測試全綠；`lib/kb/index.ts` 為唯一對外入口（grep 確認無人繞過）；ops 路由行為不變（真跑 ingest + retrieve 比對前後輸出） | `git revert`（純搬移） |
+| **K1** | **版本化真的會動 + 檢索契約一次定型** | 修 `insertSource`／`insertChunks` 簽名；chunk family 改繼承 source 列；§1.5 migration；`cs_match_chunks` 改**六謂詞**（§1.2）；`matchChunksKeyword` 套**同一組**謂詞；換版改「先插後標 archived」；**embedding provider 改 per-caller 注入**（K0 critic 發現：`setEmbeddingProvider` 是 process 全域 singleton，任一消費者換 provider 會改變 cs `minRetrievalScore` 安全閘的語意） | 同文件改內容 → 產生第二版且**舊 chunk 確實不再被檢索到**（用**查詢**驗證，非只看 insert）；先插後刪順序實測（模擬 embedding 失敗，確認舊版仍在）；**scope chain 傳兩節點時只回鏈上的**；**`is_sensitive` 不向下繼承**（實測）；**向量半邊與關鍵字半邊可見範圍一致**（同一 query 兩半 source 集合比對）；cs 既有 eval golden set（`cs_eval_cases`）未退步；migration down 實測可逆 | down migration + revert |
 | **K2** | 多用途不互相汙染 + 學術級引用 | space 管理 API；引用錨點（`page`／`section`／`charOffset`）寫入 chunk metadata；`Passage.citation` 回傳；`listKnowledgeSources` 補 `status` 欄位 + UI 顯示 | 同一租戶下建兩個 space，交叉查詢**互不可見**（實測）；PDF 進來後 `search()` 回傳的 citation 含正確頁碼（開原文核對）；dirty/archived 在 UI 看得到 | 移除 space 過濾（退回單空間） |
 | **K2b** | **答得出「當時是怎樣」**；不再端出已廢止內容 | `valid_from`/`valid_to` 寫入 + as-of 檢索；`kb_document_relations`（§1.2c）；結構性矛盾偵測（§1.2d） | 同一文件兩個生效期版本，`p_as_of` 指到過去**回傳舊版**、指到現在回傳新版（實測）；`retracts` 指向的文件**查不到**；刻意造一組區間重疊 → 矛盾偵測**實際觸發並上報**（非只寫 log） | 移除 as-of 謂詞（退回 always-now） |
 | **K2c** | 一套引擎吃多產業 | Domain Pack 機制（§1.6）+ registry + 完整性機械閘；chunker/embedder 可插拔槽（§1.2b） | 建**兩個** pack（如 `general` + 一個真實產業），同一份文件在兩包下**切法不同、引用形狀不同**（實測）；故意造一個缺檔的 pack → 機械閘**擋下**；`domains/REGISTRY.json` 中的 `null` 不觸發靜默 fallback（實測） | 刪 pack 目錄，退回單一預設設定 |

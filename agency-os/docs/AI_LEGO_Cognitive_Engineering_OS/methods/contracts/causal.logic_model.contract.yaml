@@ -1,0 +1,197 @@
+$id: "ai-lego://methods/contracts/causal.logic_model.contract.yaml"
+title: "Logic Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F11 causal family (2nd member; `causal.dag` was the 1st). Atlas's
+  ONLY citation is the F11 table row (L619: "Logic Model｜結構化 program｜
+  inputs→activities→outputs→short/long outcomes｜便於 KPI 與評估") -- grep-
+  confirmed the single "Logic Model" hit anywhere in the Atlas file, no
+  dedicated section. Structurally a FOURTH shape for this family after
+  Causal DAG's graph: a fixed 5-stage positionally-ordered PIPELINE (same
+  class `root_cause.kepner_tregoe`'s 4-dimension grid already establishes).
+  Core invariant: the 5 stages in Atlas's own literal citation order, and
+  every outcome-stage entry carries at least one indicator -- the one thing
+  this method's own citation emphasizes ("便於 KPI 與評估") that its
+  concurrently-built near-twin `causal.theory_of_change` does not.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Logic Model row (L619): 'Logic Model｜結構化 program｜inputs→activities→outputs→short/long outcomes｜便於 KPI 與評估' -- the ONLY citation for this method anywhere in the spec root (grep-confirmed, whole-file, case-insensitive, zero other hits)"
+  - "methods/contracts/causal.dag.contract.yaml -- same family, first member, establishes the family's 'no upstream typed-object citation from Atlas §14.1's own causal chain applies to every F11 member' is FALSE for this method specifically (causal.dag's own chain is CauseHypothesisSet-specific, not a family-wide requirement -- see compilation_decisions)"
+  - "methods/contracts/root_cause.kepner_tregoe.contract.yaml -- cross-family precedent for a fixed, positionally-ordered stage/dimension pipeline with per-position schema-enforced constraints (prefixItems), reused here for Logic Model's own 5-stage chain"
+  - "methods/contracts/causal.theory_of_change.contract.yaml -- built concurrently in the same batch; see compilation_decisions for the disambiguation this file's own investigation reached"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives only a one-row citation; the
+  5-stage pipeline and the per-outcome-stage indicator requirement are
+  direct transcription of that row's own literal arrow-chain and benefit
+  column, not invented. `id: causal.logic_model` mints a new machine_id.
+  Registered in `methods/registry/contract-backlog.yaml` `tier_1`.
+
+id: causal.logic_model
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). Breaking one program into 5 fixed stages is DECOMPOSE; laying
+# them out in Atlas's own literal arrow-chain order is MAP (same class
+# causal.dag's own MAP usage for nodes); requiring every outcome stage to
+# carry a genuine indicator before the record is legal is VALIDATE (same
+# class root_cause.kepner_tregoe's own VALIDATE for dimension completeness).
+
+purpose:
+  - structure_a_program_as_a_fixed_five_stage_inputs_to_outcomes_pipeline
+# Atlas L619 verbatim sense: "結構化 program" (structure a program) via the
+# literal chain "inputs→activities→outputs→short/long outcomes".
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own citation names no upstream typed-object dependency (unlike
+  # causal.dag, which §14.1's chain places downstream of a
+  # CauseHypothesisSet, or root_cause.kepner_tregoe, which reuses
+  # fishbone's own ProblemStatement entry point). A Logic Model describes a
+  # PROGRAM directly -- it is a planning/evaluation tool, not a diagnostic
+  # one -- so it stands alone, same self-contained-method precedent
+  # association.mind_map/framing.five_w_one_h/framing.frame_storming
+  # already establish for their own `inputs.required: []`. See
+  # compilation_decisions.
+
+outputs:
+  - LogicModel
+# NEW output type (see typed-objects/logic-model-record.schema.yaml).
+# Atlas gives this method's output no PascalCase name anywhere, same
+# honesty gap every other thin-citation Tier 1 contract in this family
+# already discloses.
+
+preconditions:
+  - "stages is EXACTLY the five entries {INPUTS, ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES}, one each, IN THAT ORDER -- Atlas's own literal 'inputs→activities→outputs→short/long outcomes' citation order (L619)"
+  - "every stage's description field is a non-empty string"
+  - "every SHORT_TERM_OUTCOMES and LONG_TERM_OUTCOMES stage carries a non-empty indicators[] (at least one non-empty string) -- Atlas's own benefit column '便於 KPI 與評估' (L619) presumes an outcome stage is actually measurable; INPUTS/ACTIVITIES/OUTPUTS stages MAY carry indicators too but are not required to"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # Same evidence-discipline shape causal.dag/root_cause.kepner_tregoe
+  # already use for their own per-item claims -- a program's claimed
+  # inputs/activities/outputs/outcomes are assertions until independently
+  # evidenced, same risk class as any other causal/program claim in this
+  # suite.
+
+forbidden_transition: []
+# Atlas L619 gives no explicit forbidden-transition worked example. Same
+# open-question class as causal.dag's own OQ-CAUSALDAG-1.
+
+recommended_next: []
+# Atlas's own citation names no downstream method for Logic Model (unlike
+# causal.dag, whose position in §14.1's chain names validation.experiment
+# next). Left genuinely empty rather than inventing a plausible-sounding
+# successor -- see open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the 5 stages be a free-form array or a fixed, positionally-ordered set?"
+    decision: "Fixed: exactly INPUTS, ACTIVITIES, OUTPUTS, SHORT_TERM_OUTCOMES, LONG_TERM_OUTCOMES, one each, in Atlas's own literal citation order -- the same positionally-ordered pipeline class root_cause.kepner_tregoe's own DIMENSION_ORDER already establishes, reused for a 5-stage chain instead of a 4-dimension grid."
+  - question: "Should this method require an external upstream input type, matching causal.dag's own CauseHypothesisSet or root_cause.kepner_tregoe's own ProblemStatement?"
+    decision: "No -- inputs.required: []. Atlas's own citation ('結構化 program') names no upstream dependency; a Logic Model describes a program's own structure directly, the same self-contained-method precedent every `inputs.required: []` sibling in this suite already establishes. A required `program_name` field on the typed object itself (not an external $ref) anchors what program is being modeled."
+  - question: "Should indicators/KPI be required on every stage, or only on the two outcome stages?"
+    decision: "Only SHORT_TERM_OUTCOMES and LONG_TERM_OUTCOMES require a non-empty indicators[]; INPUTS/ACTIVITIES/OUTPUTS may optionally carry indicators too (e.g. a budget figure) but are not required to."
+    reasoning: >
+      Atlas's own benefit column ('便於 KPI 與評估') is specifically about
+      MEASURING RESULTS, not process -- a Logic Model whose own outcome
+      stages carry no way to measure them structurally fails to deliver on
+      its own defining, cited purpose. Unlike the cross-field checks
+      root_cause.kepner_tregoe's own IS != IS-NOT comparison needs (which
+      JSON Schema genuinely cannot express, per that schema's own
+      compilation_decisions), "this specific array position requires a
+      non-empty indicators[]" IS a per-item, position-local constraint --
+      schema-expressible via `prefixItems`, so this invariant is enforced
+      at BOTH the schema layer (independent of the runtime module) AND the
+      runtime module layer (construction + gate), a stronger guarantee than
+      most sibling contracts' own runtime-only cross-field checks can give.
+  - question: >
+      Is `causal.logic_model` a real, structurally distinct method from
+      `causal.theory_of_change` (built concurrently in the same batch), or
+      should it be a contract-only reuse of that method's own typed object
+      -- the precedent `architecture.trade_off_matrix` set for
+      `decision.mcda` when the two were found field-for-field identical?
+    decision: >
+      Built for real, NOT a contract-only reuse. Atlas's own two citations
+      differ in exactly two structural ways: (1) Logic Model's own chain
+      (L619) has NO impact stage and NO assumptions field -- it stops at
+      "short/long outcomes", one stage shorter than Theory of Change's own
+      explicit 6-stage chain ending in Impact (L618: "inputs→activities→
+      outputs→outcomes→impact＋assumptions"); (2) Logic Model's own benefit
+      column is "便於 KPI 與評估" (facilitates KPI-setting/evaluation) -- a
+      MEASUREMENT/tracking framing -- versus Theory of Change's "建可驗證
+      政策邏輯" (builds verifiable policy logic) -- a causal-reasoning/
+      assumption-testing framing.
+    reasoning: >
+      The `architecture.trade_off_matrix`/`decision.mcda` reuse precedent
+      (architecture.trade_off_matrix.contract.yaml:1906-1911) applied only
+      because that investigation found the two methods' own OUTPUT SHAPES
+      field-for-field identical (options/criteria/weights/normalized_scores/
+      ranking/sensitivity_notes, verbatim). Here, Theory of Change's own
+      citation carries a REAL EXTRA STAGE (Impact) AND a REAL EXTRA FIELD
+      (per-transition assumptions) that Logic Model's own citation simply
+      does not ask for -- reusing Theory of Change's schema would either
+      silently grow Logic Model an Impact stage/assumptions field Atlas
+      never cited for it, or force Theory of Change's own schema to drop
+      fields it legitimately needs. Building a distinct, shorter,
+      indicator-emphasizing schema for `causal.logic_model` is the more
+      accurate compilation; this module does NOT invent the per-transition
+      assumption/evidence/risk requirement `causal.theory_of_change` has,
+      since Logic Model's own citation carries no such per-arrow ask.
+
+open_questions:
+  - id: "OQ-LOGICMODEL-1"
+    question: >
+      `forbidden_transition`/`recommended_next` are left empty -- Atlas
+      gives this method's single table row no downstream/illegal-transition
+      citation. Same open question class as OQ-CAUSALDAG-1.
+    owner: "operator, or a future review pass specifically checking Tier 1/2 contracts with no forbidden_transition/recommended_next example in Atlas"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LOGICMODEL-2"
+    question: >
+      `cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]` is this file's own
+      inference, not a cited Atlas composition formula. Same open question
+      class as OQ-CAUSALDAG-2.
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-LOGICMODEL-3"
+    question: >
+      This contract's own `compilation_decisions` concludes `causal.logic_model`
+      and `causal.theory_of_change` are structurally distinct enough to both
+      warrant real builds. Should a future pass that reads BOTH finished
+      contracts side by side (this file was written without reading
+      `causal.theory_of_change.contract.yaml`'s own final field shape, per
+      this task's own "do not touch their files" constraint) re-confirm no
+      field-for-field overlap slipped through despite the citation-level
+      differences documented above?
+    owner: "operator, or the orchestrating session that integrates all 5 concurrent F11 builds in this batch"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for "Logic Model" -- one hit, the F11
+    table row (L619). Read the F11 table and its neighboring rows (Causal
+    DAG L617, Theory of Change L618, Process Tracing L620) directly to
+    confirm no dedicated section exists and to compare Logic Model's own
+    citation word-for-word against Theory of Change's. Read
+    causal.dag.contract.yaml and root_cause.kepner_tregoe.contract.yaml in
+    full to confirm the fixed-positional-pipeline convention and the
+    self-contained `inputs.required: []` convention this file reuses.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-stage chain and the KPI/
+    indicator emphasis are transcribed verbatim from Atlas L619.
+    `purpose`/`preconditions`/`program_name`'s literal shape are Phase 3
+    compilation, explicitly flagged as such above. The build-for-real vs
+    contract-only-reuse call against `causal.theory_of_change` is this
+    file's own investigation, documented in `compilation_decisions` rather
+    than silently assumed either way.

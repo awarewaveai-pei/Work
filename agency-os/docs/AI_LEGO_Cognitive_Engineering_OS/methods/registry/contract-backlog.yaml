@@ -2291,6 +2291,194 @@ tier_1:
       orchestrating session rewrites it once after this and the parallel
       association.analogy_mapping build both land.
 
+  ninetyseventh_concrete_entry:
+    # Provisional ordinal (concurrent batch of 5 F11 causal-family builds:
+    # this entry, causal.theory_of_change, causal.logic_model,
+    # causal.process_tracing, causal.rct -- orchestrating session
+    # reconciles exact numbering on any key collision, same pattern
+    # ninetysixth_concrete_entry's own note already discloses).
+    method_id: "causal.counterfactual_reasoning"
+    contract_status: complete
+    tier: 1
+    mandated_by: "2nd F11 `causal` family member (`causal.dag` is the first). F11 table row L617 only citation (grep-confirmed zero other Atlas mentions of \"counterfactual\", no dedicated section). Real invariants: intervention/actual_outcome/counterfactual_outcome pairwise non-identical (3-way echo check, extending framing.problem_statement's own 2-way class); assumptions REQUIRED non-empty (Atlas's own 4th pipeline stage, generalizing F11's shared per-edge evidence/rationale/confidence framing rule at L635 to this method's single-claim shape -- decided NOT to reuse causal.dag's own per-edge object shape verbatim, disclosed in compilation_decisions)."
+    source: "methods/contracts/causal.counterfactual_reasoning.contract.yaml + specs/cognitive/typed-objects/counterfactual-reasoning-record.schema.yaml + ai_lego/modules/causal/counterfactual_reasoning.py"
+    note: "41 tests pass. ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once after all 5 F11 builds land."
+
+  ninetyeighth_concrete_entry:
+    # Provisional ordinal (same concurrent batch of 5 F11 causal-family builds
+    # ninetyseventh_concrete_entry's own note already discloses -- key
+    # ninetyseventh_concrete_entry was already taken by
+    # causal.counterfactual_reasoning by the time this entry landed;
+    # orchestrating session reconciles exact numbering on collision, same
+    # pattern ninetysixth_concrete_entry's own note already establishes).
+    method_id: "causal.logic_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      3rd F11 `causal` family member (`causal.dag` is the first). F11 table
+      row L619 only citation (grep-confirmed zero other Atlas mentions of
+      "Logic Model", no dedicated section). Built for real, NOT a
+      contract-only reuse of `causal.theory_of_change` (built concurrently,
+      same batch, its own row L618 shares 4 of 5 pipeline-stage words) --
+      investigated and confirmed the two citations differ in two real
+      structural ways: Theory of Change's own citation has a real extra
+      stage (IMPACT) and a real extra field (per-transition ASSUMPTIONS)
+      Logic Model's own citation does not ask for; Logic Model's own
+      benefit column ("便於 KPI 與評估") is a measurement framing versus
+      Theory of Change's "建可驗證政策邏輯" causal-reasoning framing. Not a
+      field-for-field-identical case the `architecture.trade_off_matrix`/
+      `decision.mcda` reuse precedent would apply to. Real invariants:
+      fixed 5-stage positional order (INPUTS/ACTIVITIES/OUTPUTS/
+      SHORT_TERM_OUTCOMES/LONG_TERM_OUTCOMES, `prefixItems`, same class
+      `root_cause.kepner_tregoe`'s own DIMENSION_ORDER already
+      establishes); every outcome-stage entry (SHORT_TERM_OUTCOMES/
+      LONG_TERM_OUTCOMES) requires a non-empty `indicators[]` -- a
+      per-item, position-local constraint (unlike kepner_tregoe's own
+      cross-field IS != IS-NOT check), so enforced at BOTH the schema
+      layer (`prefixItems` position-specific `required: [indicators]`
+      override) AND the runtime module layer (construction + independent
+      gate), a stronger guarantee than most sibling contracts' own
+      runtime-only cross-field checks can give.
+    source: "methods/contracts/causal.logic_model.contract.yaml + specs/cognitive/typed-objects/logic-model-record.schema.yaml + ai_lego/modules/causal/logic_model.py"
+    note: "60 tests pass. Self-contained method (`inputs.required: []` -- Atlas's own citation names no upstream typed-object dependency, unlike causal.dag/root_cause.kepner_tregoe). ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once after all 5 F11 builds land."
+
+  ninetyninth_concrete_entry:
+    # Provisional ordinal (same concurrent batch of 5 F11 causal-family
+    # builds ninetyseventh_concrete_entry's own note already discloses --
+    # keys ninetyseventh_concrete_entry/ninetyeighth_concrete_entry were
+    # already taken by causal.counterfactual_reasoning/causal.logic_model
+    # by the time this entry landed; orchestrating session reconciles
+    # exact numbering on collision, same pattern ninetysixth_concrete_entry's
+    # own note already establishes). This is the LAST of 5 concurrent F11
+    # builds in this batch -- F11 is 6/10 after this batch lands
+    # (causal.dag + this batch's 5), NOT complete; causal.theory_of_change/
+    # causal.process_tracing land concurrently, has_contract/
+    # contract_status flip deferred to integration pass; Difference-in-
+    # Differences/Regression Discontinuity/Instrumental Variables/
+    # Synthetic Control (F11 table rows L622-625) remain pending.
+    method_id: "causal.rct"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member landed in this same batch (`causal.dag`
+      is the first F11 member, built earlier). F11 table row L621 is this
+      method's ONLY citation (grep-confirmed zero other Atlas "RCT"/
+      "randomiz"/"隨機分派" hits besides L621 itself and the unrelated A/B
+      Test row L746; no dedicated §11.x/§12.x section, no §22.3 gate-table
+      row). Task-mandated scope boundary: this method captures the
+      STRUCTURE/DESIGN of a study (randomize→power→treatment/control→
+      analysis, transcribed as 5 required disclosure fields), it does not
+      run an RNG or a statistical hypothesis test -- same restraint
+      `association.morphological_analysis`/`decision.weighted_decision_matrix`
+      already apply to combinatorics/scoring. Built for real, NOT reusing
+      causal.dag's own per-edge/graph shape (RCT's own citation gives no
+      graph structure, only a linear 4-stage pipeline). Real invariants:
+      all 5 content fields present and non-empty, `power_analysis`
+      REQUIRED (not optional -- a study disclosing no power justification
+      is a real methodological red flag worth structurally surfacing,
+      same 'declared gap needs explicit justification' discipline
+      `framing.boundary_critique`'s own `empty_justification` field
+      already establishes for a different kind of gap); `treatment_group`
+      must genuinely differ (NFKC/case/whitespace-insensitive) from
+      `control_group` -- a record naming an identical arm twice is not
+      describing a randomized CONTROLLED trial -- both enforced at
+      construction AND re-derived independently by a gate.
+    source: "methods/contracts/causal.rct.contract.yaml + specs/cognitive/typed-objects/rct-record.schema.yaml + ai_lego/modules/causal/rct.py"
+    note: "44 tests pass. F11 causal family: 6 of 10 built after this batch (causal.dag + this batch's causal.counterfactual_reasoning/causal.theory_of_change/causal.logic_model/causal.process_tracing/causal.rct) -- NOT complete; Difference-in-Differences/Regression Discontinuity/Instrumental Variables/Synthetic Control (F11 table rows L622-625) remain pending. ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once after all 5 F11 builds land."
+
+  onehundredth_concrete_entry:
+    # Provisional ordinal (same concurrent batch of 5 F11 causal-family
+    # builds ninetyseventh_concrete_entry's own note already discloses --
+    # keys ninetyseventh_concrete_entry/ninetyeighth_concrete_entry/
+    # ninetyninth_concrete_entry were already taken by
+    # causal.counterfactual_reasoning/causal.logic_model/causal.rct by the
+    # time this entry landed; orchestrating session reconciles exact
+    # numbering on collision, same pattern ninetysixth_concrete_entry's own
+    # note already establishes). causal.process_tracing lands concurrently
+    # in the same batch, not read here.
+    method_id: "causal.theory_of_change"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member (`causal.dag` is the first, built earlier
+      this same batch). F11 table row L618 + dedicated §11.22 (L1689-1711,
+      the only F11 method with its own worked mermaid section this batch)
+      -- a 6-stage linear chain (Inputs->Activities->Outputs->Short-term
+      Outcomes->Long-term Outcomes->Impact) plus one literal, unconditional
+      requirement: "每條箭頭都應有：Assumption / Evidence / Indicator /
+      Risk", attached to the 5 ARROWS between adjacent stages, not the 6
+      stage labels. Investigated and confirmed distinct from
+      causal.logic_model (landed concurrently, same batch, its own row
+      L619 shares 4 of 5 pipeline-stage words): Theory of Change has a
+      real extra stage (IMPACT) and a real extra per-transition
+      requirement (4 mandatory attributes: assumption/evidence/indicator/
+      risk) Logic Model's own citation does not ask for. Real invariants:
+      `stages` is a fixed 6-entry `prefixItems` positional sequence (same
+      class `framing.five_w_one_h`'s own `dimensions` already
+      establishes); `transitions` is a fixed 5-entry `prefixItems`
+      positional sequence whose `from_stage`/`to_stage` are BOTH
+      const-locked by position AND named explicitly (hybrid of
+      `framing.five_w_one_h`'s array-position convention and
+      `association.concept_map`'s explicit from/to-reference convention,
+      documented choice, see contract's own compilation_decisions); every
+      transition's 4 attributes are required non-empty UNCONDITIONALLY
+      (no if/then gating, unlike concept_map's own conditionally-required
+      supporting_evidence_refs) -- both enforced at construction AND
+      re-derived independently by a gate. No GENUINE_COMPUTE derived field
+      added (Atlas's own benefit column names none) -- same "no invented
+      third invariant" restraint causal.dag's own acyclic_verified-as-
+      structural-const already applies.
+    source: "methods/contracts/causal.theory_of_change.contract.yaml + specs/cognitive/typed-objects/theory-of-change-record.schema.yaml + ai_lego/modules/causal/theory_of_change.py"
+    note: "60 tests pass. F02's Objective Tree (Atlas L367, unbuilt) is named as this method's own upstream feeder via corroborating recipe citations (§12.8 L2638, §13.1 L1110, §13.7 L3378-3394) -- NOT turned into a dependency of any kind here per this task's own explicit scope instruction, recorded as OQ-THEORYOFCHANGE-1 in the method contract. F11 causal family: 6 of 10 built after this batch (causal.dag + this batch's causal.counterfactual_reasoning/causal.theory_of_change/causal.logic_model/causal.process_tracing/causal.rct) -- NOT complete; Difference-in-Differences/Regression Discontinuity/Instrumental Variables/Synthetic Control (F11 table rows L622-625) remain pending. ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once after all 5 F11 builds land."
+
+  onehundredfirst_concrete_entry:
+    # Provisional ordinal (same concurrent batch of 5 F11 causal-family
+    # builds ninetyseventh_concrete_entry's own note already discloses --
+    # keys ninetyseventh_concrete_entry/ninetyeighth_concrete_entry/
+    # ninetyninth_concrete_entry/onehundredth_concrete_entry were already
+    # taken by causal.counterfactual_reasoning/causal.logic_model/
+    # causal.rct/causal.theory_of_change by the time this entry landed;
+    # orchestrating session reconciles exact numbering on collision, same
+    # pattern ninetysixth_concrete_entry's own note already establishes).
+    method_id: "causal.process_tracing"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member (`causal.dag` is the first, built earlier
+      this same batch; counterfactual_reasoning/theory_of_change/
+      logic_model/rct landed concurrently in this same batch, not read
+      here). F11 table row (L620: "用機制證據檢查因果鏈｜mechanism→
+      hoop/smoking-gun evidence｜適合小樣本深度因果") -- the ONLY Atlas
+      citation for this method (grep-confirmed: no dedicated §11.x
+      section, unlike causal.dag's own §11.21; no §10 Causal recipe
+      mention; no §22.3 gate row), same "thinnest grounding" class
+      `security.pasta.contract.yaml`'s own due diligence already
+      documented for a different family. Field-level detail beyond
+      Atlas's own five-word formula is explicitly disclosed as grounded
+      in Van Evera's real, named hoop-test/smoking-gun-test typology
+      (political-science/case-study process-tracing methodology), not a
+      mother-document citation -- same disclosure class `security.pasta`
+      already establishes; the real typology's other two test types
+      (straw-in-the-wind, doubly-decisive) are deliberately NOT modeled,
+      since Atlas's own row literally names only the two kept. Real
+      invariants: `evidence[].implication` is GENUINE_COMPUTE, re-derived
+      per-ITEM from that same entry's own `test_type`/`result` (a NEW
+      per-item genuine_compute shape in this suite -- prior siblings like
+      `association.morphological_analysis` only re-derive at record
+      level); record-level `hypothesis_status` is likewise GENUINE_COMPUTE,
+      re-derived from `evidence[].implication`, with `ELIMINATED` taking
+      precedence over `CONFIRMED` when both appear in the same evidence
+      set (a failed HOOP test is dispositive -- a necessary-condition
+      failure logically forecloses the hypothesis regardless of any other,
+      merely-sufficient confirming evidence) -- both derivations enforced
+      at construction AND independently re-derived by a gate, never
+      caller-asserted; `evidence` has a structural floor of `minItems: 1`
+      (unlike `security.stride`'s own legitimate empty-threats[] state --
+      a mechanism with zero evidence tests has not been process-traced at
+      all).
+    source: "methods/contracts/causal.process_tracing.contract.yaml + specs/cognitive/typed-objects/process-tracing-record.schema.yaml + ai_lego/compute/process_tracing/evidence_evaluation.py + ai_lego/modules/causal/process_tracing.py"
+    note: "67 tests pass (incl. 8 direct compute-submodule unit tests for the 4-cell implication lookup table and the ELIMINATED-over-CONFIRMED precedence rule). F11 causal family: 6 of 10 built after this batch (causal.dag + this batch's causal.counterfactual_reasoning/causal.theory_of_change/causal.logic_model/causal.process_tracing/causal.rct) -- NOT complete; Difference-in-Differences/Regression Discontinuity/Instrumental Variables/Synthetic Control (F11 table rows L622-625) remain pending. method-inventory.yaml's own Process Tracing row (line: 617) is stale-by-3 against the real Atlas L620, same drift class every other F-family row in that file already carries; not corrected here per METHOD_ATLAS_SLICE_LEAN_STANDARD.md's own 'not a required step' ruling. ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once after all 5 F11 builds land."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

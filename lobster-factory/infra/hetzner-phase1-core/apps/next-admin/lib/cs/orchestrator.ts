@@ -8,7 +8,7 @@ import { canaryRoll, decideAnswerAction, topScore } from "@/lib/cs/autonomy";
 import { loadCis } from "@/lib/cs/cis";
 import { inputGuards, outputGuards } from "@/lib/cs/guardrails";
 import { classifyIntent } from "@/lib/cs/intent";
-import { retrieve } from "@/lib/cs/rag";
+import { retrieve } from "@/lib/kb";
 import { generateReply, runAgenticTurn, superviseReply } from "@/lib/cs/generate";
 import { loadEnabledTools, loadIntents, loadMemory, recordReply } from "@/lib/cs/db";
 import type {
