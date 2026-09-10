@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-10（99–100 號切片：F04 收官 5/6→6/6 + F21 收官 9/10→10/10，2 個平行 agent，其中一個推翻既有 contract 的錯誤結論）
+
+analogy_mapping(60t，F04 收官)/schema_compatibility_analysis(41t，F21 收官)。101 tests 零衝突，全 regression 5916→6017，golden 3186。analogy_mapping 是 source_domain→抽象機制→target_mapping 三段式轉移管線，三個欄位需兩兩真正相異（語法層面判定，非語意「是否真的更抽象」——後者無 gate 能誠實判斷，刻意不做）；查重時意外多找到第 3 個易混淆手足 Cross-industry Transfer（F13 L675，任務簡報未點名，agent 自己查到並揭露為 OQ）。
+
+**schema_compatibility_analysis 推翻既有結論，非例行新建**：本 session 稍早 `database_data.retention_deletion_model.contract.yaml` 已明文判定 F21 的 Schema Compatibility Analysis 列（L903）「已被 expand_contract_migration 的 compatibility_analysis 階段完整覆蓋，非獨立建置候選」，F21 當時宣告「10 列 9 建，非缺口」。本次重新查證的 agent 提出反證：① expand_contract_migration 的階段紀錄只有 `{stage_id, completed_at}`，從未儲存任何分析結果（相容性判定、破壞性變更清單）；② 原判定漏查 Atlas 快速選工具表 L4482「DB Migration｜Schema Compatibility｜Expand–Contract｜Breaking ALTER」，該列把 Schema Compatibility 列為 Expand-Contract**之前**使用的獨立工具，非其子階段。我（統籌 session）親自複驗 L4482 確實存在、逐字核對，且獨立派一個 critic 重新從零推導整條論證鏈（不採信任一方結論）：critic 自己讀 EC §28 原文確認只給階段名稱無內容規格、讀 expand_contract_migration schema 確認該階段確實無法儲存判定結果、核對本 session「何時該建/何時該重用」的真實先例（architecture.trade_off_matrix 跳過建置的理由是與 decision.mcda 欄位對欄位相同，非引用單薄；decision.ice 引用一樣單薄卻照建）——**獨立判定推翻正確**。已修正 `retention_deletion_model.contract.yaml` 4 處（description/decided_by/source_of_truth_for/verification.method），標記為「已訂正」保留原文而非刪除（同本 repo「不回改已出貨散文，但可訂正事實」慣例）。
+
+新方法核心不變量：13 值封閉 change_type 詞彙（7 相容/6 破壞性，各自有理由）→ overall_verdict 是 GENUINE_COMPUTE worst-of-all 聚合，獨立 gate 重新推導；critic 手算 3 個情境（全相容/單一破壞性/混合 2:3 破壞性）核對程式輸出無誤。critic 覆審：0 Critical/0 Major，1 Minor（`notes` 空字串已測但空白字串未測，_is_nonempty_str 讀碼確認非真 bug 只是測試覆蓋缺口——已補測試）+2 建議（皆非阻塞，未動）。verdict=PASS。
+
+`ai_lego/modules/association/__init__.py` 改寫為「F04 -- COMPLETE, 6 of 6」，`ai_lego/modules/database_data/__init__.py` 改寫為「F21 -- COMPLETE, 10 of 10」（含訂正敘事）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_analogy_mapping tests.unit.test_schema_compatibility_analysis` | exit=0 | result=102 tests OK（101+1 補測）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=6017 tests OK，244s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3186，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=2 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=2 個 CLI 全部 PASS，拒絕證明＋獨立 gate 抓包證明皆真跑
+REVIEW_DONE: critic=Standard（獨立 subagent，被明確要求從零重新推導 override 判斷而非採信統籌 session 結論；逐檔全讀+真跑 101 測試+golden+2 CLI+手算 overall_verdict 聚合邏輯）| verdict=PASS | findings=0c/0m→1m 全修（測試覆蓋缺口）/2 建議
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`association\.analogy_mapping\|database_data\.schema_compatibility_analysis\|已被.*覆蓋\|already covered\|9 built` | hits=僅本批次新建檔案+registry+2 個 __init__.py 合法引用；critic 額外確認無其他檔案殘留過期「F21 9 建」宣稱
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：2 個新方法的 contract/schema/module/CLI/test（+1 個 compute submodule，共 11 個新檔）+ `association/__init__.py`／`database_data/__init__.py`／`contract-backlog.yaml`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md` 的追加內容全部移除；`retention_deletion_model.contract.yaml` 的 4 處訂正若回退，該檔案回到「F21 9 建」的錯誤宣稱狀態——需連同本次 revert 一併處理，不可單獨回退。純新增+訂正，無 schema/DB 變動，可安全回滾。
+
 ## 2026-09-10 `/tools/video` IA 重組：插入既有流程，不取代（修正同日 workbench-as-entry 誤做法）
 
 **觸發**：操作者糾正同日稍早的 `dbe28f317`→`a44fa61e2`（revert）——把架構規格直接套成導航取代是錯的，正確做法是先盤點現有設定與流程，再把新能力插入正確節點。操作者其後全權 delegate 決策（「需要決定的事都你決定」），並要求審慎用 agent（不濫派）、文件走 AI 可讀極簡格式。
@@ -213,14 +234,24 @@ WORKLOG_DONE: 本條目
 
 **命名與重複副本盤點**（操作者問「hci30 和 HCI 是同一個東西嗎」）：是同一產品的刻意分工——`Projects/internal/hci30/` = runtime code，`agency-os/docs/HCI/` = 架構/ADR/研究，hci30 `README.md:3` 自己寫死此分工。HCI-30 = "Human Collaboration Intelligence"，**與業界標準 HCI（Human-Computer Interaction）同名不同義，對外溝通有誤解風險**（產品命名問題，已告知操作者）。另發現 `_video_release_guard/`（312MB）與 `_video_release_guard2/`（1.9GB）是**整個 D:\Work 的完整複本**（含 AGENTS.md／CLAUDE.md／WORKLOG.md／agency-os／lobster-factory），`git ls-files` 確認**0 檔被追蹤**（非 repo 汙染）但**未被 gitignore**（一次 `git add -A` 即全數入庫），且使同一份 HCI 文件全機有 6 份、治理檔 3 份，任何全庫 grep 都會撈到過期規則。未處理，待操作者決定。
 
+**第六輪：共用平台層（新增 [ADR 012](docs/architecture/decisions/012-shared-platform-layer.md)）**。操作者指出八個系統要各自自用／訂閱／點數／賣人，但共用的東西沒整合。實查證實：**光「訂閱與點數」就有 4 套互不相容實作**——`0062`（訂閱狀態機，`product_key` 只認 cognitive/hci、無點數）、`0066`（**唯一能跑的點數帳本**，冪等鍵+四分錄+`ON DELETE RESTRICT` 都做對了，但寫死 `media_` 只服務 video）、HCI `ADR-0031`（簽章 `entitlement_ref`，只設計給 cognitive）、`ziwei-doushu`（唯一多金流抽象，stub）。且 `lib/portal/products.ts:30-31` 產品清單**只有 2 個**，video、SEO、cold email、KB、System Foundry 全不在列，**但 0066 已在對 video 收費**——清單與計費表對不上。
+
+寫 ADR 012 前先讀 ADR-0013／ADR-0031 決策全文，**兩處推翻我原本的計畫**：①ADR-0013 明確排除 `authorship_state`/`locked`/`provenance_record` 進 kernel（只 re-export `epistemic_type` 一個 enum）、亦明確排除計費 substrate（歸 ADR-0009）→ 回頭修正 ADR 011 §決策 20 的取用界線，避免日後有人以為三軸都由 kernel 提供；②ADR-0031 **明確不授權**建立完整 entitlement engine，原文理由是「no real Enterprise prospect yet」——那是商業狀態假設，已被操作者本日明示推翻，故 ADR 012 **明寫前提變更**、只解除「最小共用 substrate」一段，維持其餘不授權事項（金流商選定仍 open）。另 ADR-0002 禁止跨產品直讀資料庫 → 共用帳本不得被產品直讀，用量以**簽章記錄**回報而非資料庫寫入（這是邊界的必然結果，非額外設計）。
+
+自我壓測後承認上一版提案**比既有決定還弱**並修正 4 個洞：①只說「指定 SSOT」但 ADR-0013 早已決定要真的抽成 vendored/pinned 套件 + 每產品 CI 契約測試——光命名不抽，漂移照舊；②沒排序，而 `media_credit_ledger` 正在對真實用量計費 → 明訂 expand-contract（System Foundry `kernel/11` 禁止 flag-day）；③「上架檢查清單」不是機械閘就是散文 → 改為 `verify-product-registry.ps1` 納入 `verify-build-gates`，且**上線當天會立刻變紅**（video 有計費列但不在登記表），刻意讓既有違反可見；④`QUOTA`/`SAFETY_GATE` 二分裝不下 cold email 的網域信譽 → 改三類（`QUOTA` 風險落在帳單可加購／`RATE_LIMIT` 落在外部共用資源／`SAFETY_GATE` 落在第三方權利），**紅線：`SAFETY_GATE` 永不得實作為可加購 quota**，否則 HCI Continuous Monitoring 的反跟監限制（`06:263`）會變成「加購點數即解鎖跟監」。意外收穫：`RATE_LIMIT` 正好把蒐集器的跨 run 禮貌預算統一進來，原本被我當成兩個概念設計。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File ./scripts/verify-adr-index.ps1`（ADR 012 入表後）| exit=0 | result=`verify-adr-index: OK (12 ADR file(s))`
+REALTEST_EVIDENCE: tool=Bash | cmd=`for f in <ADR 012 引用的 12 個路徑>; do [ -f "$f" ] ...` | exit=0 | result=12/12 全部存在（ADR-0009/0013/0031、SF kernel/06,07,11、risk-tier.schema.yaml、0066、products.ts、payments/gateway.ts、verify-build-gates.ps1、0043_ai_call_logs）——寫入前先驗，不寫指向不存在檔案的文件
 REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File ./scripts/verify-adr-index.ps1` | exit=0 | result=`verify-adr-index: OK (11 ADR file(s))`
 REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File ./scripts/audit-cross-machine-bom.ps1` | exit=0 | result=90 檔／84 有 BOM／6 缺；**6 個皆 `memory/` 既有檔，非本次新增**（本次 2 個新 .md 在 `agency-os/docs/`，不跨 Drive，依 AGENTS.md §8 免 BOM）。已開背景任務 task_b8106bb8 另案處理，未混入本次
 REVIEW_DONE: critic=Deep（1 個獨立 critic subagent，讀 `rag.ts`/`db.ts`/`registry.ts`/`trending-sources.ts`/`0051`/hci30 `0001`+`0004` 全文後攻擊設計）| verdict=High risk on v1 | findings=3c/4m/1n，**全數已修**，其中 C1 推翻我自己的事實宣告
 BUGHUNT_DONE: scope=D:/Work 全庫（含必填根 agency-os,scripts）| grep=`CAP-KNOWLEDGE-BASE` + `knowledge_base\|retrieval\|vector_store\|rag`(cognitive-os) + `knowledge\|corpus\|evidence_store`(hci30) + `BlockKind` + `COLLECTION_PLAN` | hits=`BlockKind` 全庫僅 `registry.ts:18` 一處定義（驗證「不動它」的可行性）；`CAP-KNOWLEDGE-BASE` 5 處皆規格側非實作；cognitive-os 30 筆命中經逐一開檔確認**全為 `rag`→`storage` 假陽性**（誠實計數，非宣告 0）；檔名 `COLLECTION_PLAN` 與 hci30 既有 `EVIDENCE_COLLECTION_PLAN.md`（ISO/NIST 合規證據蒐集）撞名 → commit 前改為 `DATA_COLLECTION_PLAN.md` 並同步 ADR 內 3 處連結
 WORKLOG_DONE: 本條目
 
+**平行 session 覆蓋事故 ×2（同一任務內）**：①本條目第一版被另一 session 的 WORKLOG 寫入整條覆蓋，已重寫且較原版完整；②`ADR_INDEX.md` 的 011 那列被蓋回 HEAD 版本（`git status` 顯示該檔乾淨 = 我的編輯完全消失），**是跑機械閘才發現**——若未跑，會留下「ADR 檔在、索引沒有」的半殘狀態，直到 AO-CLOSE 的 `verify-build-gates` 才爆。已補回並二次驗證。教訓：本 session 每次動 `agency-os/docs/` 後都應立即跑對應機械閘，不能假設寫入成功。
+
 [rollback]
-刪 `docs/architecture/decisions/011-collection-ingestion-boundary.md` + `docs/data-collection/` + 還原 `ADR_INDEX.md` 一行。純新增文件，無 code／schema／DB 變動，零執行期影響。
+刪 `docs/architecture/decisions/011-collection-ingestion-boundary.md`、`012-shared-platform-layer.md`、`docs/data-collection/`、`docs/knowledge-base/` + 還原 `ADR_INDEX.md` 兩行。純新增文件，無 code／schema／DB 變動，零執行期影響。
 
 ## 2026-09-10 HCI30 按鍵式選單、案件分區＋可復活歷史案件、信任構面雷達圖——操作者再一輪回饋，一個是真後端缺口
 

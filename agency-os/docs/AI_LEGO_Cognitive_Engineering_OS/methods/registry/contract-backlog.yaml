@@ -2238,6 +2238,59 @@ tier_1:
     source: "methods/contracts/association.morphological_analysis.contract.yaml + specs/cognitive/typed-objects/morphological-analysis-record.schema.yaml + ai_lego/compute/morphological_analysis/combination_generation.py + ai_lego/modules/association/morphological_analysis.py"
     note: "95th slice per this task's own assignment (provisional ordinal -- 5 agents landed concurrently in this same F04-opening batch; key ninetyfourth_concrete_entry used since ninetieth/ninetyfirst/ninetysecond/ninetythird were already taken by affinity_diagram/concept_map/attribute_listing/mind_map by the time this entry landed; orchestrating session reconciles exact numbering on collision). 64 tests pass. F04 association family: 5 of 6 built as of this write (affinity_diagram/concept_map/attribute_listing/mind_map/morphological_analysis); Analogy Mapping (F04 table row L416) was not selected into this batch and remains pending."
 
+  ninetyfifth_concrete_entry:
+    method_id: "association.analogy_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: "6th and LAST F04 `association` member built (5 siblings -- mind_map/concept_map/affinity_diagram/morphological_analysis/attribute_listing -- landed earlier in this same batch), row L416 (把外部機制映射到問題｜source domain→抽象機制→target mapping｜跨產業移植｜Historical Analogy) -- the ONLY Atlas citation (grep-confirmed no dedicated §11.x section, same gap attribute_listing's own citation falls into; no §22.3 gate row; no EC §32 security surface). Built in parallel with a separate agent's database_data.schema_compatibility_analysis (F21, unrelated family, not read here). Due-diligence grep for '類比'/'Analogy' across the whole Atlas found 2 related-but-different unbuilt methods this task's own instructions named for disambiguation (Synectics F03 L388, a divergent-creativity technique using analogy as a TOOL; Historical Analogy F13 L674, this row's own cited best-pairing, scoped to historical comparisons with an explicit 限制類比 discipline step) PLUS a 3rd discovered during due diligence, not named by the task (Cross-industry Transfer F13 L675, near-identical benefit-column wording to this row's own 跨產業移植) -- flagged as an open question, not depended on. Flat 3-step linear pipeline (target_problem anchor + source_domain_description/abstracted_mechanism/target_mapping), deliberately NOT a multi-candidate generate-then-select shape (unlike frame_storming) since Atlas's own citation names no such step. Real invariant: the 3 stage fields must be PAIRWISE genuinely distinct (NFKC/casefold-normalized) across all 3 unique pairs -- any two collapsing to the same text skipped the abstraction step -- both enforced at construction AND re-derived independently by a gate, deliberately syntactic-only (not a semantic abstraction-level check, documented restraint in compilation_decisions)."
+    source: "methods/contracts/association.analogy_mapping.contract.yaml + specs/cognitive/typed-objects/analogy-mapping-record.schema.yaml + ai_lego/modules/association/analogy_mapping.py"
+    note: "99th slice. 60 tests pass. F04 associative mapping family COMPLETE, 6 of 6 (mind_map/concept_map/affinity_diagram/morphological_analysis/attribute_listing/analogy_mapping). method-inventory.yaml's own 'Analogy Mapping' row is stale-by-1 against the real Atlas line number, same drift class every other F04 row in that file already carries; not corrected here per METHOD_ATLAS_SLICE_LEAN_STANDARD.md's own 'not a required step' ruling on that file."
+
+  ninetysixth_concrete_entry:
+    method_id: "database_data.schema_compatibility_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      10th and LAST `database_data` (F21) member, row L903 (檢查 schema
+      migration 相容性 -- redirects to EC §28, the thinnest F21 row,
+      genuinely no formula of its own) + §28 快速選工具表 L4482 ("DB
+      Migration | Schema Compatibility | Expand–Contract | Breaking
+      ALTER" -- names this a distinct tool from Expand–Contract). DIRECT
+      CONFLICT with database_data.retention_deletion_model.contract.yaml
+      (L107-147), which investigated the SAME row earlier this session
+      and concluded "already fully covered" by expand_contract_migration's
+      own compatibility_analysis stage, not a build candidate -- that
+      investigation's own citation list omits L4482 (checked, absent);
+      this session's own actual contract-only-reuse bar
+      (architecture.trade_off_matrix vs decision.mcda) is field-for-field-
+      identical output shape, not thin Atlas grounding (decision.ice/
+      decision.rice both built with equally thin/absent formulas).
+      expand_contract_migration's own stage is {stage_id, completed_at}
+      (WHEN, not WHAT); data_contract's own compatibility_policy is free
+      text (caller-asserted, not computed). Built for real: changes[]
+      (closed 13-value change_type vocabulary, disclosed external domain
+      knowledge) -> change_classifications[] (GENUINE_COMPUTE per-change
+      compatible/breaking lookup) -> overall_verdict (GENUINE_COMPUTE
+      worst-of-all reduction: safe_for_zero_downtime vs
+      requires_coordinated_deploy), both re-derived by an independent
+      gate, never caller-asserted.
+    source: "methods/contracts/database_data.schema_compatibility_analysis.contract.yaml + specs/cognitive/typed-objects/schema-compatibility-analysis-record.schema.yaml + ai_lego/compute/schema_compatibility/classification.py + ai_lego/modules/database_data/schema_compatibility_analysis.py"
+    note: >
+      Provisional ordinal (concurrent batch, same pattern as the F04
+      entries above -- key ninetyfifth_concrete_entry was already taken
+      by association.analogy_mapping by the time this entry landed;
+      orchestrating session reconciles exact numbering on collision). 41
+      tests pass. F21 database_data family: 10 of 10 CLOSED (this build
+      supersedes database_data.retention_deletion_model.contract.yaml's
+      own "9 built + 1 confirmed-already-covered" framing -- that
+      sibling contract's own description/source_of_truth_for is now
+      out-of-date and needs a reconciling pass, flagged in this
+      contract's own OQ-SCHEMACOMPAT-0, not edited here).
+      ai_lego/modules/database_data/__init__.py's own shared docstring
+      is NOT edited here per this batch's own instruction -- the
+      orchestrating session rewrites it once after this and the parallel
+      association.analogy_mapping build both land.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

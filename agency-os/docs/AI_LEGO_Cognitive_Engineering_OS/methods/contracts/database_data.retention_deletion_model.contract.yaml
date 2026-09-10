@@ -12,9 +12,19 @@ description: >
   `database_data.data_contract` (fortieth), `database_data
   .normalization` (forty-first), and `database_data
   .data_quality_dimensions` (forty-second). F21's own remaining table
-  row, `Schema Compatibility Analysis` (L903), was investigated and
-  found to be ALREADY FULLY COVERED, not a ninth build candidate -- see
-  the dedicated note below.
+  row, `Schema Compatibility Analysis` (L903), was investigated at this
+  slice's own write time and judged ALREADY FULLY COVERED -- see the
+  dedicated note below. **CORRECTED (2026-09-10, F21 closeout batch)**:
+  that judgment missed a real, separate Atlas citation -- the quick-
+  reference table at L4482 ("DB Migration | Schema Compatibility |
+  Expand–Contract | Breaking ALTER") -- which positions Schema
+  Compatibility as the FIRST tool used, BEFORE Expand-Contract, not a
+  sub-stage nested inside it. `database_data.schema_compatibility_analysis`
+  was built for real as F21's tenth member; see its own contract for the
+  corrected reasoning. The claim below is left in place as the
+  historical record of the original (incomplete) judgment, per this
+  repo's "don't retroactively rewrite shipped prose" convention --
+  treat it as superseded, not current.
 
   Atlas gives this method exactly ONE citation of its own: the F21
   tool table's Retention / Deletion Model row (L906: purpose "保存、
@@ -144,7 +154,16 @@ description: >
   therefore FULLY accounted for with NINE built machine_ids (this one
   being the ninth and last) plus ONE confirmed-already-covered row
   (Schema Compatibility Analysis) -- ten rows, nine builds, not a
-  discrepancy.
+  discrepancy. **CORRECTED (2026-09-10)**: this whole paragraph's premise
+  was wrong -- it never checked the Atlas quick-reference table at L4482
+  ("DB Migration | Schema Compatibility | Expand–Contract | Breaking
+  ALTER"), which shows Schema Compatibility is used BEFORE
+  Expand-Contract as its own distinct tool, not a stage inside it; and
+  `expand_contract_migration`'s own stage genuinely only records
+  completion, never the compatibility verdict/breaking-change findings
+  Atlas's own benefit column ("支援零停機 migration") implies should
+  exist somewhere. `database_data.schema_compatibility_analysis` was
+  built for real; F21 is ten builds, not nine.
 
   Atlas's own formula grounds real structural invariants that make
   this record a genuine MODEL: `holds[]` entries use MP §114's own
@@ -158,7 +177,7 @@ source_of_truth_for:
   - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Retention / Deletion Model row (L906): 'data class→purpose→retention→deletion→exception→proof'"
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §114 Records Retention / Legal Hold / eDiscovery (L4711-4735): five named hold/trigger types plus a Policy-Engine conflict-resolution requirement"
   - "specs/execution/data-deletion.schema.yaml -- confirmed a distinct, complementary execution-layer record (EC §31), reused by reference for the optional deletion_evidence_ref field"
-  - "specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml -- confirmed F21's own Schema Compatibility Analysis row (L903) is already fully covered by that record's own compatibility_analysis stage, not a separate build candidate"
+  - "specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml -- CORRECTED (2026-09-10): this file's own investigation had concluded F21's Schema Compatibility Analysis row (L903) was already fully covered by that record's own compatibility_analysis stage, not a separate build candidate -- that conclusion missed Atlas's quick-reference table (L4482) and is superseded; see methods/contracts/database_data.schema_compatibility_analysis.contract.yaml, which was built for real"
   - "methods/registry/method-inventory.yaml Retention / Deletion Model entry: category 'F21 database-data', no machine_id -- this contract mints one"
   - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
 
@@ -166,10 +185,12 @@ decided_by: >
   No ADR governs the content. Registered in
   `methods/registry/contract-backlog.yaml` `tier_1` as a
   forty-first concrete entry. `id: database_data.retention_deletion_model`
-  mints a new machine_id, NINTH and FINAL member of the `database_data`
-  family -- F21's own TEN-row table is now fully accounted for (nine
-  built machine_ids plus one, Schema Compatibility Analysis, confirmed
-  already covered by an existing sibling's own stage).
+  mints a new machine_id, NINTH member of the `database_data` family at
+  this slice's own write time. CORRECTED (2026-09-10): the "Schema
+  Compatibility Analysis already covered" judgment below was wrong --
+  see the description field's own correction note -- so this was not
+  actually F21's final member; `database_data.schema_compatibility_analysis`
+  later became the real tenth.
 
 id: database_data.retention_deletion_model
 version: "1.0.0"
@@ -334,9 +355,10 @@ verification:
     unrelated passing mentions, individually listed above). Read
     `specs/execution/data-deletion.schema.yaml` and `specs/cognitive
     /typed-objects/expand-contract-migration-record.schema.yaml` in
-    full to confirm this method is not a duplicate of either, and that
-    F21's own remaining Schema Compatibility Analysis row is already
-    fully covered (not a ninth build candidate). Validated against
+    full to confirm this method is not a duplicate of either; the
+    conclusion drawn at the time (Schema Compatibility Analysis already
+    fully covered, not a build candidate) was later corrected -- see the
+    description field's own correction note. Validated against
     specs/cognitive/method.schema.yaml with
     jsonschema.Draft202012Validator.
   note: >

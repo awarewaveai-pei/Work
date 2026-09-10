@@ -1,4 +1,4 @@
-"""F04 associative mapping & combination family -- 5 of 6 built. Tenants: ``association.mind_map`` (fixed
+"""F04 associative mapping & combination family -- COMPLETE, 6 of 6. Tenants: ``association.mind_map`` (fixed
 4-level nested tree -- central_topic -> main_branches[] -> sub_branches[] -> keywords[], untyped edges,
 whole-tree id uniqueness; distinct from concept_map's typed-edge graph), ``association.concept_map``
 (nodes + typed-relationship edges, referential integrity on every edge's from/to node id, GENUINE_COMPUTE
@@ -11,4 +11,7 @@ options x compatibility constraints, GENUINE_COMPUTE ``legal_combinations``/``le
 re-derived via cartesian-product-minus-constraints, defensive ``MAX_RAW_COMBINATION_SPACE`` cap before
 enumeration), ``association.attribute_listing`` (decompose-transform-recombine: attributes each carrying
 >=1 transformed_variant that must genuinely differ from the original, optional recombination stage with
-referential integrity back to real ``(attribute_name, variant_id)`` pairs). Remaining: Analogy Mapping."""
+referential integrity back to real ``(attribute_name, variant_id)`` pairs), ``association.analogy_mapping``
+(3-stage transfer pipeline -- source_domain_description -> abstracted_mechanism -> target_mapping, all
+pairwise genuinely distinct; syntactic-only distinctness check, deliberately not a semantic
+"is this genuinely more abstract" judgment no runtime gate can honestly perform)."""
