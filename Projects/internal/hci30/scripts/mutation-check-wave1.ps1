@@ -42,6 +42,7 @@ $upMig12  = Join-Path $root 'database/migrations/0012_wave1_subject_record_paylo
 $upMig13  = Join-Path $root 'database/migrations/0013_wave1_key_issuance_up.sql'
 $upMig14  = Join-Path $root 'database/migrations/0014_wave1_decision_recording_up.sql'
 $upMig15  = Join-Path $root 'database/migrations/0015_wave1_case_reopen_up.sql'
+$upMig16  = Join-Path $root 'database/migrations/0016_wave1_case_report_snapshots_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -567,6 +568,22 @@ $mutations = @(
      # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
      expect = @('RLS-LEAK-06','RLS-COMPLETENESS-01') }
 
+  # hci.case_report_snapshots (migrations/0016, operator-requested "產生信任
+  # 評估報告") -- structural posture copied byte-for-byte from decision_claims
+  # above, so this table gets the identical 4-mutation set, not a subset.
+  @{ id = 'regrant-report-snapshots-writes'
+     sql = 'GRANT UPDATE, DELETE ON hci.case_report_snapshots TO hci_app_test_a;'
+     expect = @('APPEND-ONLY-GRANT-13','APPEND-ONLY-GRANT-14') }
+  @{ id = 'drop-report-snapshots-append-only-trigger'
+     sql = 'DROP TRIGGER case_report_snapshots_append_only ON hci.case_report_snapshots;'
+     expect = @('APPEND-ONLY-TRIGGER-08','APPEND-ONLY-TRIGGER-09') }
+  @{ id = 'drop-report-snapshots-truncate-guard'
+     sql = 'DROP TRIGGER case_report_snapshots_no_truncate ON hci.case_report_snapshots;'
+     expect = @('TRUNCATE-07') }
+  @{ id = 'disable-rls-on-report-snapshots'
+     sql = 'ALTER TABLE hci.case_report_snapshots NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.case_report_snapshots DISABLE ROW LEVEL SECURITY;'
+     expect = @('RLS-LEAK-07','RLS-COMPLETENESS-01') }
+
   # db-expert review (2026-09-05) findings C1/C2/C3/M2 - each mutation below
   # is a surgical CREATE OR REPLACE reproducing the current real function
   # minus only the one behaviour it targets, matching this file's own
@@ -966,6 +983,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig13)  -ne 0) { throw 'mutation harness: 0013 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig14)  -ne 0) { throw 'mutation harness: 0014 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig15)  -ne 0) { throw 'mutation harness: 0015 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig16)  -ne 0) { throw 'mutation harness: 0016 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

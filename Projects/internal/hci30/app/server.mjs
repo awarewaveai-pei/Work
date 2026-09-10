@@ -232,56 +232,126 @@ app.post('/api/hci/v1/persons', async (req, res) => {
   }
 });
 
+// Shared by the live GET below and POST /reports (report generation): both
+// need the exact same computed shape, one live, one about to be frozen into
+// hci.case_report_snapshots.report. Extracted 2026-09-10 rather than
+// duplicated -- a report snapshot's whole value is being an honest copy of
+// what the live view actually showed, not a second, driftable
+// re-implementation of the same rollup.
+async function buildCaseReportPayload(role, caseId) {
+  const { rows: caseRows } = await queryAsTenant(role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases WHERE id = $1', [caseId]);
+  if (caseRows.length === 0) return null;
+
+  const { rows: persons } = await queryAsTenant(role, 'SELECT id, display_label FROM hci.persons ORDER BY display_label');
+  const { rows: records } = await queryAsTenant(
+    role,
+    "SELECT id, kind, person_id, payload, reaudit_required FROM hci.subject_records WHERE case_id = $1 ORDER BY kind, id",
+    [caseId]
+  );
+  const { rows: decisions } = await queryAsTenant(
+    role,
+    'SELECT id, outcome, rationale, valid_from FROM hci.decisions WHERE case_id = $1 AND valid_to IS NULL ORDER BY valid_from DESC',
+    [caseId]
+  );
+
+  // Reuses the already-shipped, already-tested roll-up formula
+  // (packages/intelligence/rollup-trust-domains.mjs, HCI_TRUST_DOMAIN_SPEC.md)
+  // rather than re-deriving it -- this endpoint's only new work is
+  // shaping ASSESSMENT rows' real payload (ADR-0034) into the
+  // {dimension, value, evidence_refs} shape that function has always
+  // expected, which nothing could supply until today.
+  const dimensionScores = records.filter(r => r.kind === 'ASSESSMENT').map(r => r.payload);
+  let rollup = { domains: [] };
+  let evidenceQuality = [];
+  try {
+    rollup = rollupTrustDomains(dimensionScores);
+    // packages/intelligence/classify-evidence-quality.mjs -- SINGLE_SOURCE
+    // vs MULTIPLE_SOURCES by distinct evidence-ref count, never a
+    // corroboration claim this layer cannot verify (HCI_EVIDENCE_QUALITY_SPEC.md).
+    evidenceQuality = classifyEvidenceQuality(dimensionScores);
+  } catch (err) { rollup = { domains: [], error: err.message }; }
+
+  // Derived directly from the real roll-up, not a separate invented
+  // signal: HCI_TRUST_DOMAIN_SPEC.md's own band scale (VERY_LOW..VERY_HIGH)
+  // read as strength (HIGH/VERY_HIGH) or risk (LOW/VERY_LOW), matching the
+  // Subject Dashboard's "Top Strengths"/"Material Risks" sections
+  // (19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md). "Unknowns" is the
+  // complement: which of the 7 domains have no Assessment evidence at all
+  // yet -- never silently treated as MODERATE, matching that spec's
+  // §Score semantics the roll-up formula itself already enforces.
+  const strengths = rollup.domains.filter(d => d.value === 'HIGH' || d.value === 'VERY_HIGH');
+  const risks = rollup.domains.filter(d => d.value === 'LOW' || d.value === 'VERY_LOW');
+  const coveredDomains = new Set(rollup.domains.map(d => d.domain));
+  const unknowns = TRUST_DOMAINS.filter(d => !coveredDomains.has(d));
+
+  return { case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns };
+}
+
 app.get('/api/hci/v1/cases/:caseId', async (req, res) => {
   const t = resolveTenant(req, res);
   if (!t) return;
   try {
-    const { rows: caseRows } = await queryAsTenant(t.role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases WHERE id = $1', [req.params.caseId]);
-    if (caseRows.length === 0) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
+    const payload = await buildCaseReportPayload(t.role, req.params.caseId);
+    if (!payload) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
+    res.json(payload);
+  } catch (err) {
+    problem(res, 500, 'Internal Server Error', err.message);
+  }
+});
 
-    const { rows: persons } = await queryAsTenant(t.role, 'SELECT id, display_label FROM hci.persons ORDER BY display_label');
-    const { rows: records } = await queryAsTenant(
+// Report generation (operator-requested "產生信任評估報告", 2026-09-10; closes
+// SEC-10, docs/HCI/HCI30_RESEARCH_REVIEW/07_SECURITY_PRIVACY_REVIEW.md:265-284
+// -- an exported report must permanently carry its claim-status labels and a
+// disclaimer/purpose-reassertion, since a live app view can be re-rendered
+// after the fact but a delivered document must not silently change under the
+// person who received it). generated_at/generated_by are never client-
+// supplied (migrations/0016 withholds generated_at from the INSERT grant
+// entirely; generated_by is resolved server-side the same way decisions
+// resolve their principal).
+app.post('/api/hci/v1/cases/:caseId/reports', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    const payload = await buildCaseReportPayload(t.role, req.params.caseId);
+    if (!payload) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
+    const principalId = await findOrCreateReviewerPrincipal(t.role);
+    const id = crypto.randomUUID();
+    await queryAsTenant(
       t.role,
-      "SELECT id, kind, person_id, payload, reaudit_required FROM hci.subject_records WHERE case_id = $1 ORDER BY kind, id",
+      'INSERT INTO hci.case_report_snapshots (id, tenant_id, case_id, generated_by_principal_id, report) VALUES ($1, $2, $3, $4, $5)',
+      [id, t.tenantId, req.params.caseId, principalId, JSON.stringify(payload)]
+    );
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, generated_at, report FROM hci.case_report_snapshots WHERE id = $1', [id]);
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
+app.get('/api/hci/v1/cases/:caseId/reports', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    // Lightweight: history list needs only enough to label each entry, not
+    // the full frozen payload (fetched separately per-report below).
+    const { rows } = await queryAsTenant(
+      t.role,
+      'SELECT id, generated_at FROM hci.case_report_snapshots WHERE case_id = $1 ORDER BY generated_at DESC',
       [req.params.caseId]
     );
-    const { rows: decisions } = await queryAsTenant(
-      t.role,
-      'SELECT id, outcome, rationale, valid_from FROM hci.decisions WHERE case_id = $1 AND valid_to IS NULL ORDER BY valid_from DESC',
-      [req.params.caseId]
-    );
+    res.json({ data: rows });
+  } catch (err) {
+    problem(res, 500, 'Internal Server Error', err.message);
+  }
+});
 
-    // Reuses the already-shipped, already-tested roll-up formula
-    // (packages/intelligence/rollup-trust-domains.mjs, HCI_TRUST_DOMAIN_SPEC.md)
-    // rather than re-deriving it -- this endpoint's only new work is
-    // shaping ASSESSMENT rows' real payload (ADR-0034) into the
-    // {dimension, value, evidence_refs} shape that function has always
-    // expected, which nothing could supply until today.
-    const dimensionScores = records.filter(r => r.kind === 'ASSESSMENT').map(r => r.payload);
-    let rollup = { domains: [] };
-    let evidenceQuality = [];
-    try {
-      rollup = rollupTrustDomains(dimensionScores);
-      // packages/intelligence/classify-evidence-quality.mjs -- SINGLE_SOURCE
-      // vs MULTIPLE_SOURCES by distinct evidence-ref count, never a
-      // corroboration claim this layer cannot verify (HCI_EVIDENCE_QUALITY_SPEC.md).
-      evidenceQuality = classifyEvidenceQuality(dimensionScores);
-    } catch (err) { rollup = { domains: [], error: err.message }; }
-
-    // Derived directly from the real roll-up, not a separate invented
-    // signal: HCI_TRUST_DOMAIN_SPEC.md's own band scale (VERY_LOW..VERY_HIGH)
-    // read as strength (HIGH/VERY_HIGH) or risk (LOW/VERY_LOW), matching the
-    // Subject Dashboard's "Top Strengths"/"Material Risks" sections
-    // (19_HCI_UI_REPORTING_AND_EXPLAINABILITY.md). "Unknowns" is the
-    // complement: which of the 7 domains have no Assessment evidence at all
-    // yet -- never silently treated as MODERATE, matching that spec's
-    // §Score semantics the roll-up formula itself already enforces.
-    const strengths = rollup.domains.filter(d => d.value === 'HIGH' || d.value === 'VERY_HIGH');
-    const risks = rollup.domains.filter(d => d.value === 'LOW' || d.value === 'VERY_LOW');
-    const coveredDomains = new Set(rollup.domains.map(d => d.domain));
-    const unknowns = TRUST_DOMAINS.filter(d => !coveredDomains.has(d));
-
-    res.json({ case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns });
+app.get('/api/hci/v1/reports/:reportId', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, case_id, generated_at, report FROM hci.case_report_snapshots WHERE id = $1', [req.params.reportId]);
+    if (rows.length === 0) return problem(res, 404, 'Not Found', 'no report with that id visible to this tenant');
+    res.json(rows[0]);
   } catch (err) {
     problem(res, 500, 'Internal Server Error', err.message);
   }

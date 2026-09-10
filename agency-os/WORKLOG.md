@@ -1,5 +1,41 @@
 # Worklog
 
+## 2026-09-10 HCI30 產生信任評估報告——操作者對「看不出價值在哪裡」的直接回應
+
+操作者：「這個系統...根本讓人看不出價值在哪裡...就是一個輸入資料寄載的廢物」。根因診斷：產品名為「信任評估**報告**」，但 grep 全 codebase 確認零 print/export/PDF 能力——只有輸入畫面，沒有可拿出去的成品。查證既有 V2 藍圖文件發現這正是已記載但從未關閉的缺口：`agency-os/docs/HCI/HCI30_RESEARCH_REVIEW/07_SECURITY_PRIVACY_REVIEW.md:265-284`（SEC-10）——匯出報告必須永久帶有免責聲明與用途重申，否則證據離開系統後會被當成已核實事實。
+
+實作（新增，非補丁）：
+- `migrations/0016_wave1_case_report_snapshots_{up,down}.sql`：新表 `hci.case_report_snapshots`，append-only（GRANT 層 REVOKE UPDATE/DELETE + TRIGGER 層 `reject_update_delete()` 雙重防護，結構完全比照 `hci.decision_claims`），RLS 租戶隔離，不新增 SECURITY DEFINER 函式（app role 既有權限已足夠，避免疊加既知的 FORCE-RLS-under-non-superuser-owner 風險）。
+- `server.mjs`：抽出 `buildCaseReportPayload()` 共用函式（GET /cases/:id 與 POST /reports 共用同一份運算，避免二次實作 drift）；新增 `POST /cases/:id/reports`（產生快照）、`GET /cases/:id/reports`（歷史列表）、`GET /reports/:id`（取單一凍結快照）。
+- `index.html`：案件詳情頁加「產生信任評估報告」按鈕＋歷史列表；新增獨立報告頁（`renderReportView()`，重用既有 `renderRadar`/`bandBadge`/label maps，不碰 `refreshDetail()` 既有渲染路徑，零回歸風險）；報告內容含 SEC-10 要求的免責聲明＋用途重申（重申案件開立時的 `purpose` 真實值，非杜撰文字）；`@media print` CSS + 「列印/另存PDF」按鈕。
+
+真跑驗證（非假設）：對既有案件產生報告 → 報告頁正確顯示雷達圖/構面/證據/決策 → 回到案件把風險等級從 R2 調到 R4 → 重新開啟同一份報告，**仍顯示凍結當下的 R2**（凍結快照證實有效，不是活資料重新渲染）→ 用租戶 B 直接 fetch 該報告 id 得到 404（RLS 跨租戶隔離在 app 層也生效）→ 報告歷史列表正確顯示 1 筆 → print CSS 的 `.no-print` 規則與元素比對確認生效。全程 console 零錯誤。
+
+Schema 層另外用真 Docker 驗證：`test-wave1-local.ps1` 249/249 assertions（新增 4 個 REPORT-*/RLS-LEAK-07 + 4 個 owner-context trigger-layer 測試），reversibility 通過；`mutation-check-wave1.ps1` 126/126 mutations killed（新增 4 個 mutation，全部一次命中預期 expect list，無需事後修正）。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=真 Docker 跑 test-wave1-local.ps1(249/249)+mutation-check-wave1.ps1(126/126 killed)；瀏覽器產生報告→調升風險等級→確認報告內容凍結不變→跨租戶 fetch 404→歷史列表計數正確 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 新表結構與 GRANT/TRIGGER/RLS 佈局逐行比照已測試過的 hci.decision_claims（同樣的 append-only 立場），server.mjs 新端點沿用既有 queryAsTenant/problem() 慣例；真正的運算邏輯（rollup/evidenceQuality）零改動，only 抽出共用函式；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=case_report_snapshots\|buildCaseReportPayload\|generateReport\|renderReportView\|loadReportHistory\|viewReport\(\|showReportPage | hits=9（全部為本次新增/修改的 9 個檔案本身，零外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/database/migrations/0016_wave1_case_report_snapshots_{up,down}.sql（新檔）
+- Projects/internal/hci30/database/fixtures/0001_synthetic.sql（+1 筆租戶B report snapshot fixture）
+- Projects/internal/hci30/database/tests/wave1-negative-tests.sql（+8 assertions，finish(241)->finish(249)）
+- Projects/internal/hci30/scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1（掛載 migration 0016）
+- Projects/internal/hci30/app/server.mjs（buildCaseReportPayload 抽出 + 3 個新端點）
+- Projects/internal/hci30/app/public/index.html（報告產生 UI + 獨立報告頁 + 免責聲明 + print CSS）
+- agency-os/docs/operations/RUNNABLE_DEMOS.md（新增一列）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險]
+- `api/openapi/hci-v1.yaml` 仍未回填本輪 3 個新端點（既存、重複揭露過的 skeleton-only 缺口）
+- 報告章節結構刻意不比照 V2 藍圖 06 文件的完整版型（Executive Overview/Career Timeline/身份信心分數等）——那些欄位在 Wave 1 schema 沒有對應資料，做出來就是編造價值，此次誠實限縮在 Wave 1 實際擁有的資料
+
+[rollback]
+`git revert` 本次 commit：migration 0016 down 移除新表；server.mjs/index.html 的報告相關程式碼隨 commit revert 一併移除；純新增未修改既有 migration/trigger 邏輯，可安全回滾。
+
 ## 2026-09-10（99–100 號切片：F04 收官 5/6→6/6 + F21 收官 9/10→10/10，2 個平行 agent，其中一個推翻既有 contract 的錯誤結論）
 
 analogy_mapping(60t，F04 收官)/schema_compatibility_analysis(41t，F21 收官)。101 tests 零衝突，全 regression 5916→6017，golden 3186。analogy_mapping 是 source_domain→抽象機制→target_mapping 三段式轉移管線，三個欄位需兩兩真正相異（語法層面判定，非語意「是否真的更抽象」——後者無 gate 能誠實判斷，刻意不做）；查重時意外多找到第 3 個易混淆手足 Cross-industry Transfer（F13 L675，任務簡報未點名，agent 自己查到並揭露為 OQ）。

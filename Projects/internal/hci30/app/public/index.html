@@ -104,6 +104,31 @@
   .risk-tier-submit:hover { background: var(--teal-ink); }
   .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
 
+  /* Report generation (operator-requested "產生信任評估報告", 2026-09-10) --
+     a frozen, printable deliverable, distinct from the live editable case
+     view above it. */
+  .report-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .report-generate-btn { padding: 0.55rem 1.3rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+  .report-generate-btn:hover { background: var(--teal-ink); }
+  .report-history { margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .report-history-item { padding: 0.35rem 0.9rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--teal-ink); font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+  .report-history-item:hover { border-color: var(--teal); }
+
+  .report-print-btn { padding: 0.5rem 1.2rem; border: 1.5px solid var(--teal); border-radius: 999px; background: #fff; color: var(--teal-ink); font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+  .report-print-btn:hover { background: var(--teal); color: #fff; }
+  .report-frozen-banner { background: var(--teal-tint); border-left: 3px solid var(--teal); padding: 0.9rem 1.2rem; margin: 1.2rem 0; font-size: 0.85rem; color: var(--teal-ink); line-height: 1.6; }
+  .report-legal { border-top: 1px solid var(--border); margin-top: 2.5rem; padding-top: 1.2rem; font-size: 0.78rem; color: var(--muted); line-height: 1.7; }
+  .report-legal p { margin: 0 0 0.6rem; }
+  .report-legal b { color: var(--text); }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; padding: 0; }
+    #report-body { max-width: none; }
+    .report-legal { break-inside: avoid; }
+    .record-card, .domain-card { break-inside: avoid; }
+  }
+
   .radar-wrap { padding: 0.5rem 0 1.5rem; }
   .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); }
   .domain-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0.85rem 0.4rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
@@ -245,6 +270,7 @@
     </div>
     <div id="d-decision-banner"></div>
     <div id="d-risk-tier-wrap"></div>
+    <div id="d-reports-wrap"></div>
   </div>
   <div id="d-empty-cta"></div>
 
@@ -290,6 +316,12 @@
       <div id="f-err" class="err"></div>
     </form>
   </details>
+</div>
+
+<div id="report" style="display:none">
+  <p class="no-print"><span class="back" onclick="showDetail()">&larr; 返回案件</span></p>
+  <div id="report-body"></div>
+  <p class="no-print" style="margin-top:1.5rem"><button type="button" class="report-print-btn" onclick="window.print()">🖨 列印 / 另存 PDF</button></p>
 </div>
 
 </div>
@@ -338,8 +370,9 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => { p.style.display = p.id === 'tab-panel-' + name ? 'block' : 'none'; });
 }
 
-function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
-function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
+function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('report').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
+function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('report').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
+function showReportPage() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'none'; document.getElementById('report').style.display = 'block'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
 // Shared handler for every button-based selector in the app (purpose, risk
@@ -567,6 +600,120 @@ async function refreshDetail() {
   if (!body.persons.length) document.querySelector('#f-person-chips .chip.dashed').classList.add('selected');
   togglePersonNew();
   renderKindFields();
+  await loadReportHistory();
+}
+
+// Report generation (operator-requested "產生信任評估報告", 2026-09-10): a
+// frozen, printable deliverable distinct from the live editable view above --
+// see [POST] /cases/:id/reports in server.mjs for why this must be a stored
+// snapshot rather than a live re-render.
+async function loadReportHistory() {
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/reports?tenant=${currentTenant}`);
+  const body = await res.json();
+  const wrap = document.getElementById('d-reports-wrap');
+  if (!res.ok) { wrap.innerHTML = ''; return; }
+  const history = body.data.length
+    ? body.data.map(r => `<button type="button" class="report-history-item" onclick="viewReport('${r.id}')">📄 ${new Date(r.generated_at).toLocaleString('zh-TW')}</button>`).join('')
+    : '<span class="field-hint">尚未產生過報告。</span>';
+  wrap.innerHTML = `
+    <div class="report-actions">
+      <button type="button" class="report-generate-btn" onclick="generateReport()">產生信任評估報告</button>
+    </div>
+    <div class="report-history">${history}</div>`;
+}
+
+async function generateReport() {
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/reports?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant }),
+  });
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  await loadReportHistory();
+  await viewReport(body.id);
+}
+
+async function viewReport(reportId) {
+  const res = await fetch(`/api/hci/v1/reports/${reportId}?tenant=${currentTenant}`);
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  document.getElementById('report-body').innerHTML = renderReportView(body);
+  showReportPage();
+}
+
+// Pure render: takes a frozen { id, generated_at, report:{case,persons,
+// records,decisions,rollup,strengths,risks,unknowns} } row (either just-
+// generated or fetched from history) and renders the same information the
+// live case view shows, reusing its existing pure helpers (renderRadar,
+// bandBadge, label maps) rather than a second scoring/formatting
+// implementation. Deliberately does NOT touch refreshDetail()'s own
+// rendering path -- this is a separate function so the already-verified live
+// view carries zero regression risk from this addition.
+function renderReportView(row) {
+  const d = row.report;
+  const c = d.case;
+  const personById = Object.fromEntries(d.persons.map(p => [p.id, p.display_label]));
+  const qualityByDim = Object.fromEntries((d.evidenceQuality || []).map(q => [q.dimension, q.quality]));
+  const byDomain = Object.fromEntries(d.rollup.domains.map(x => [x.domain, x]));
+
+  const decisionHtml = d.decisions.length
+    ? (() => { const dec = d.decisions[0]; return `<div class="decision-banner outcome-${dec.outcome}">
+        <div class="outcome-label">${OUTCOME_LABELS[dec.outcome] || dec.outcome}</div>
+        <div class="rationale">${esc(dec.rationale)}</div>
+        <div class="when">記錄於 ${new Date(dec.valid_from).toLocaleString('zh-TW')}</div>
+      </div>`; })()
+    : `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策。</span></div>`;
+
+  const domainGridHtml = ALL_DOMAINS.map(name => {
+    const dom = byDomain[name];
+    if (!dom) return `<div class="domain-card unknown"><div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">尚無證據</div></div></div>`;
+    return `<div class="domain-card">
+      <div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">${COVERAGE_LABELS[dom.coverage] || dom.coverage}${dom.dimension_disagreement ? '．評估分歧' : ''}</div></div>
+      ${bandBadge(dom.value)}
+    </div>`;
+  }).join('');
+
+  const recordsHtml = d.records.length ? d.records.map(r => {
+    const text = r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''}：${BAND_LABELS[r.payload.value] || r.payload.value || ''}`.trim();
+    const quality = qualityByDim[r.payload.dimension];
+    return `<div class="record-card">
+      <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
+      <div class="content">${esc(text)}</div>
+      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality] || quality}</span>` : ''}
+      ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
+    </div>`;
+  }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
+
+  return `
+    <div class="report-frozen-banner">📄 本報告為 ${new Date(row.generated_at).toLocaleString('zh-TW')} 產生之凍結快照——案件後續異動（新增證據、調整風險等級、變更決策）不會反映於此份報告；如需最新狀態請回到案件詳情頁。</div>
+
+    <div class="report-header" style="border-top:none;padding-top:0">
+      <h1 style="margin:0">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}</h1>
+      <p class="subtitle">${c.id} ．狀態 ${STATUS_LABELS[c.status] || c.status} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</p>
+      ${decisionHtml}
+    </div>
+
+    <h2>信任構面</h2>
+    <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
+    <div class="radar-wrap">
+      <div>${renderRadar(d.rollup.domains)}</div>
+      <div class="domain-grid">${domainGridHtml}</div>
+    </div>
+
+    <div class="insight-cols" style="margin-top:1.5rem">
+      <div class="insight-col strengths"><h3>主要優勢</h3><ul>${d.strengths.length ? d.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>
+      <div class="insight-col risks"><h3>重大風險</h3><ul>${d.risks.length ? d.risks.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>
+      <div class="insight-col unknowns"><h3>未知構面</h3><ul>${d.unknowns.length ? d.unknowns.map(u => `<li>${DOMAIN_LABELS[u] || u}</li>`).join('') : '<li class="empty">全部構面皆有證據</li>'}</ul></div>
+    </div>
+
+    <h2>證據與主張</h2>
+    <div>${recordsHtml}</div>
+
+    <div class="report-legal">
+      <p><b>免責聲明：</b>本報告可能包含尚未證實之指控、推論與主觀判讀，不構成事實認定。內容中標示為「主張」或「評估」者為判讀性質，唯有標示為「證據」者為直接查得之事實；使用本報告前應自行查證，不應逕自視為最終定論。</p>
+      <p><b>用途限制：</b>本報告僅限用於案件開立時聲明之委託目的——${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}。不得轉作其他用途，亦不得作為對外公開評價或人身攻擊之依據。</p>
+      <p>報告 ID：${row.id} ．產生於 ${new Date(row.generated_at).toLocaleString('zh-TW')}</p>
+    </div>`;
 }
 
 function goToAddRecord() {

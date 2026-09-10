@@ -1038,6 +1038,17 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-06',
   $q$UPDATE hci.decision_claims SET created_at = now() WHERE id = 'aaaaaaaa-0000-0000-0000-000000000921'$q$, 'H1003');
 SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-07',
   $q$DELETE FROM hci.decision_claims$q$, 'H1003');
+
+-- hci.case_report_snapshots' trigger layer (migrations/0016), same reasoning
+-- as decision_claims directly above: APPEND-ONLY-GRANT-13/14 near the end of
+-- this file only prove the grant layer, not a connection that bypasses it.
+SELECT hci_test.expect_success('REPORT-TRIGGER-SETUP-01',
+  $q$INSERT INTO hci.case_report_snapshots (id,tenant_id,case_id,generated_by_principal_id,report)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000702','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000850','{}'::jsonb)$q$);
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-08',
+  $q$UPDATE hci.case_report_snapshots SET report = '{"tampered":true}'::jsonb WHERE id = 'aaaaaaaa-0000-0000-0000-000000000702'$q$, 'H1003');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-09',
+  $q$DELETE FROM hci.case_report_snapshots$q$, 'H1003');
 SELECT hci_test.expect_sqlstate('TENANT-IMMUTABLE-02',
   $q$UPDATE hci.principals SET tenant_id = '22222222-2222-2222-2222-222222222222' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000850'$q$,
   'H1006');
@@ -1152,6 +1163,10 @@ SELECT hci_test.expect_sqlstate('TRUNCATE-05-FK',
 -- TRUNCATE-02/03/05's.
 SELECT hci_test.expect_sqlstate('TRUNCATE-06',
   $q$TRUNCATE hci.decision_claims$q$, 'H1003');
+-- hci.case_report_snapshots is not referenced by any FK of its own either
+-- (migrations/0016) -- TRUNCATE-01/04/06's shape.
+SELECT hci_test.expect_sqlstate('TRUNCATE-07',
+  $q$TRUNCATE hci.case_report_snapshots$q$, 'H1003');
 
 -- hci.cases' owner-bypass layer (2026-09-04 critic review): the original
 -- migration gave hci.cases a grant layer only, unlike every other protected
@@ -1742,6 +1757,25 @@ SELECT hci_test.expect_true('RLS-OWN-02',
   $q$SELECT EXISTS (SELECT 1 FROM hci.tenants WHERE id = '11111111-1111-1111-1111-111111111111')$q$,
   'own tenant registry row must remain readable');
 
+-- Case Report Snapshot (migrations/0016, operator-requested "產生信任評估報告").
+-- Structural posture copied from hci.decision_claims, so its test depth
+-- mirrors that table's own coverage exactly (RLS-LEAK-0x + APPEND-ONLY-
+-- GRANT-0x, no separate cross-tenant-insert test -- decision_claims never got
+-- one either, RLS's own WITH CHECK on tenant_id is already proven generically
+-- by every other RLS-LEAK-0x in this file).
+SELECT hci_test.expect_success('REPORT-SETUP-01',
+  $q$INSERT INTO hci.case_report_snapshots (id,tenant_id,case_id,generated_by_principal_id,report)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000701','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000850','{}'::jsonb)$q$);
+SELECT hci_test.expect_true('RLS-LEAK-07',
+  $q$SELECT NOT EXISTS (SELECT 1 FROM hci.case_report_snapshots WHERE id = 'bbbbbbbb-0000-0000-0000-000000000700')$q$,
+  'tenant B report snapshot must not be visible to tenant A');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-13',
+  $q$UPDATE hci.case_report_snapshots SET report = '{"tampered":true}'::jsonb WHERE id = 'aaaaaaaa-0000-0000-0000-000000000701'$q$,
+  '42501');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-14',
+  $q$DELETE FROM hci.case_report_snapshots WHERE id = 'aaaaaaaa-0000-0000-0000-000000000701'$q$,
+  '42501');
+
 -- Restores the owner context hci_test.finish() requires below (that
 -- function's own EXECUTE grant list does not include hci_app_test_a/b --
 -- 00_test_harness.sql's final GRANT block only covers expect_sqlstate/
@@ -1753,4 +1787,4 @@ RESET ROLE;
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(241);
+SELECT hci_test.finish(249);
