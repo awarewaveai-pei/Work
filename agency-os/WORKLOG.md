@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-10 method-inventory.yaml has_contract 補同步，43 列 false→true（OQ-BACKLOG-1 解決）
+
+根因：`methods/registry/method-inventory.yaml` 的 `has_contract`/`contract_status` 欄位自 2026-08-29 就沒跟 `methods/registry/contract-backlog.yaml` 的 tier_0/tier_1 建置進度同步過（見 WORKLOG 2026-08-29 該條目與 `OQ-BACKLOG-1`：當時明確留給「有該檔寫入權限的未來 session」）。多數方法（F16 decision 11/13、F19 devops_sre 13/13、F21 database_data 9/9、causal.dag、computation.monte_carlo、challenge 3 個、learning 2 個、tier_0 3 個 Master-Plan 引用列）contract 早已建好，登記於 contract-backlog.yaml，`method-inventory.yaml` 卻仍顯示 `has_contract: false`。純文件漂移，非功能性 bug——`ai_lego/platform/ai_execution/method_resolver.py` 的 `MethodCatalog` 直接掃 `methods/contracts/*.contract.yaml`（`status: ACTIVE`），從不讀 `method-inventory.yaml`，本次寫 script 前已 grep 全 `ai_lego/` 樹確認零 runtime consumer（3 個命中皆為 docstring 註解，非程式碼讀取）。
+
+寫 `tests/sync_method_inventory_has_contract.py`：解析 `contract-backlog.yaml` tier_0(4)+tier_1(76 個 `*_concrete_entry`)，收集 80 個 `contract_status: complete` 的 `method_id`，用 4 層比對策略（machine_id 精確比對 → name 逐字等於 method_id → 正規化短名精確比對 → 子字串+category 過濾）在 `method-inventory.yaml` 的 `by_document`+`phase_3_additions` 找對應列，逐列用行號定位+regex 只換兩個欄位值——**非** YAML parse+dump 整檔重寫（該檔有大量說明性註解，`yaml.dump` roundtrip 會整批砍掉）。80 個 method_id 全部比對成功，0 unmatched/0 ambiguous，僅 1 個手動白名單例外（`devops_sre.runbook_execution`↔`"Runbook / Playbook"`，兩者正規化後零重疊，人工核對 Atlas F19 表列確認為同一方法的動詞/名詞命名差異）。`strategy.swot` 依 contract-backlog.yaml 自己的註記刻意**不**動 Atlas F08「SWOT」列（該列仍是 ADR-005 前的 `machine_id: method.swot`）——4 層比對策略第一層（machine_id/逐字 name）已先比對到 Master-Plan 引用列並命中，短路，第三層正規化比對永遠不會跑到，不會誤觸 F08 列。
+
+43 列 `has_contract: false→true`／`contract_status: pending→complete`（86 行變更，含 `root_cause.fishbone` 的 2 個引用列都補上，因為它在 Atlas F05 與 Master Plan 各出現一次）；38 列已經是 true（no-op，含既有 F05/F18/F20 家族與 `research.qualitative_coding`）。同步更新檔頭 `verification.has_contract_true_count`（2→81）與 `has_contract_true_entries`（逐條列舉改為指向 contract-backlog.yaml 當權威來源，避免第二處來源，比照該檔自己描述的重複性顧慮）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/sync_method_inventory_has_contract.py`（dry-run）→`--apply`→再次 dry-run 驗證冪等 | exit=0/0/0 | result=首次 43 flip+38 already-correct+0 unmatched+0 ambiguous；apply 後 86 行變更；重跑回報 0 flip+81 already-correct（冪等確認）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（apply 前後各跑一次，含 verification 區塊文字修改後第三次） | exit=0/0/0 | result=PASSED 3087，ALL GOLDEN TESTS PASSED，三次皆同
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile sync_method_inventory_has_contract.py` 語法檢查 →critic 覆審全 2 項 Major 修正後重跑 `python tests/sync_method_inventory_has_contract.py`（dry-run）+ `python tests/run_golden_tests.py` | exit=0/0/0 | result=修正前後結果完全一致（0 flip/81 already-correct/0 unmatched/0 ambiguous；golden 3087 checks 全綠），確認 critic 修正純防禦性、零行為回歸
+REVIEW_DONE: critic=Standard（獨立 agent，讀完整 script+對照真實 method-inventory.yaml/contract-backlog.yaml 獨立重跑比對/行標記邏輯，非只讀程式碼）| verdict=0C/2Major/3Minor → 全修 | findings=0c/2m/3minor：**Major1** Tier C（正規化短名比對）沒有 Tier D 同款 family/category 護欄，若未來出現跨家族正規化撞名會誤 flip——已加 category 過濾，僅單一候選時才退回未過濾集合。**Major2** 最後一列的邊界估算（下一列起點或 end_mark+2）經其獨立重算實測「確實」溢出到下一個 by_document 區塊的開頭列，本次未出錯純屬「has_contract/contract_status 剛好排在溢出區之前被先找到」運氣——已改為用該列自身真實欄位數精確算出行區間（此檔案逐列每欄位固定佔一行，驗證過），不再依賴 end_mark 或下一列位置猜測。**Minor1** 讀檔用預設換行轉譯、寫檔用 `newline=""` 逐字保留，兩者不一致——已統一讀寫皆 `newline=""`。**Minor2** `method_id` 缺 `.` 會讓 `short_name()` 未捕捉當機——已改為驗證後跳過並在 WARNING 列出。**Minor3** dry-run 與 `--apply` 後仍有殘留問題共用同一 exit code 1，呼叫端無法單從 exit code 判斷檔案是否已寫入——已拆分（dry-run=1，apply 後殘留=4）。修正後重跑：43 flip→0 flip/81 already-correct 結果不變（冪等，行為零回歸），`run_golden_tests.py` 3087 checks 再次全綠。
+BUGHUNT_DONE: scope=agency-os,scripts | grep=`has_contract_true_count\|has_contract_true_entries\|OQ-BACKLOG-1` | hits=6（`method-inventory.yaml`自身2處已更新一致、`contract-backlog.yaml`原始定義2處未動如預期、`sync_method_inventory_has_contract.py`註解2處、`WORKLOG.md`舊條目3處為歷史記錄不需回改）；無外部程式碼消費這兩個 verification 欄位
+WORKLOG_DONE: 本條目
+
+[已知誠實留白，非本次範圍]
+`contract-backlog.yaml` 自己的 `OQ-BACKLOG-1` 條目文字本身未標記為 resolved（該檔案本次任務範圍內未寫入，只讀取當 SSOT）——`method-inventory.yaml` 這邊的 verification note 已敘明如何解決，但兩邊沒有互相引用關閉的機制；留 TASKS.md 追蹤，未來若有人改 `contract-backlog.yaml` 順手補上 `resolved_by` 欄位。
+
+[rollback]
+`git revert` 本次 commit：`method-inventory.yaml` 43 列 has_contract/contract_status 回退為 false/pending + verification 區塊回退舊文字；新增檔案 `tests/sync_method_inventory_has_contract.py` 隨 revert 一併移除（純新增，無其他檔案依賴它）。
+
 ## 2026-09-08 HCI30 Person 軌加開案/新人物能力 + 修好完全不能用的證據引用 UI，critic 覆審 1 Major+2 Minor+2 Suggestion，已修 3 項、1 項追蹤、1 項維持現狀
 
 操作者持續要求「去完成它」。在已驗證的 Evidence→Assessment→Trust Domain→Decision 垂直切片（前一條目）基礎上，找下一個「真人能不能真的從頭用到尾」的缺口，找到並修了 4 個：
