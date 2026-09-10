@@ -1,0 +1,143 @@
+$id: "ai-lego://methods/contracts/framing.smart.contract.yaml"
+title: "SMART Goal Method Contract"
+status: ACTIVE
+
+description: >
+  framing.smart, F01, first concrete member of the framing family (0/11 contracted at batch start; two
+  sibling agents concurrently build framing.goal_statement/framing.non_goals in the same batch, not read
+  or depended on here). Atlas F01 table row (L335, grep-verified fresh -- method-inventory.yaml's own
+  cached L334 is stale by the same systematic +1 offset decision.impact_effort/decision.pareto_frontier's
+  own contracts already disclosed for their own rows) PLUS a dedicated §12.4 section (L2584-2589) --
+  stronger grounding than a single-row-only citation. This method REFINES an already-stated goal via 5
+  fixed criteria; it does not itself frame one (that is framing.goal_statement's own F01 row, L334,
+  immediately above). Invariants: all 5 criteria present with non-empty justification; TIME_BOUND
+  additionally carries a syntactically AND calendrically valid target_date.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, SMART row (L335): 'S/M/A/R/T 逐項補齊' -- grep-verified fresh, NOT method-inventory.yaml's cached L334"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.4 SMART 目標法 (L2584-2589): full 用途/效益/限制 prose, the only dedicated section for this method"
+  - "specs/cognitive/typed-objects/smart-goal-record.schema.yaml"
+  - "methods/contracts/root_cause.kepner_tregoe.contract.yaml + ai_lego/modules/root_cause/kepner_tregoe.py (read in full) -- structural template: fixed-length positionally-ordered criteria tuple, two-layer construction+gate invariant enforcement"
+  - "methods/contracts/devops_sre.game_day.contract.yaml (read in full) -- format-only OPTIONAL soft-link precedent (runbook_execution_ref) this contract's own refines_goal_statement_ref follows"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives both a table row and a dedicated section (see
+  source_of_truth_for) -- fuller grounding than root_cause.kepner_tregoe's single-row-only citation.
+  `id: framing.smart` mints a new machine_id under the `framing` prefix, matching
+  method-inventory.yaml's own literal "F01 framing" category label (all 11 F01 rows, L204-261 in that
+  file). Due-diligence found a DIFFERENT, pre-existing but never-contracted string,
+  `problem_framing.problem_statement`, already used as illustrative `origin_method` example data in 5
+  CLI slices (run_fishbone_slice.py, run_five_whys_slice.py, run_pareto_slice.py,
+  run_causal_dag_slice.py, run_kepner_tregoe_slice.py) and in problem-statement.schema.yaml's own doc
+  comment -- grep-confirmed zero contract file backs it, so no real machine_id collision exists today;
+  flagged in open_questions for whoever eventually contracts Problem Statement itself (also an F01 row,
+  L340).
+
+id: framing.smart
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [DECOMPOSE, VALIDATE]
+# INFERRED, not cited. DECOMPOSE=the goal is split across 5 independent criteria (Atlas's own literal
+# "S/M/A/R/T 逐項補齊" -- fill in one by one); VALIDATE=each criterion is checked/justified as satisfied
+# (Atlas's own benefit line, "提高可驗收性" -- increase acceptance-testability, directly implies
+# validation). FRAME is deliberately EXCLUDED -- this method refines an ALREADY-STATED goal, it does not
+# itself frame one; FRAME belongs to framing.goal_statement (F01 row L334), not this method, matching
+# this contract's own compilation_decisions on the Goal Statement distinction.
+
+purpose:
+  - refine_an_already_stated_goal_into_five_justified_specific_measurable_achievable_relevant_time_bound_criteria
+# Atlas L335 verbatim sense ("S/M/A/R/T 逐項補齊") + §12.4 L2587 ("讓目標 Specific、Measurable、
+# Achievable、Relevant、Time-bound").
+
+inputs:
+  required: []
+  optional: [GoalStatement]
+  # No Atlas-cited required input type (unlike root_cause.kepner_tregoe's required ProblemStatement).
+  # GoalStatement (framing.goal_statement's own declared output, not read here -- concurrent sibling
+  # agent, same batch) is OPTIONAL: see compilation_decisions on why this method carries a self-contained
+  # goal_statement string plus a format-only soft link instead of a hard $ref dependency.
+
+outputs: [SmartGoalRecord]
+# NEW output type (see typed-objects/smart-goal-record.schema.yaml).
+
+preconditions:
+  - "goal_statement is a non-empty string -- the concrete goal these five criteria justify"
+  - "criteria is EXACTLY the five entries {SPECIFIC, MEASURABLE, ACHIEVABLE, RELEVANT, TIME_BOUND}, one each, IN THAT ORDER -- Atlas's own literal 'S/M/A/R/T' citation order"
+  - "every criterion's justification field is a non-empty string -- an unjustified criterion contradicts Atlas's own benefit line ('提高可驗收性'), which presumes each letter was actually addressed"
+  - "the TIME_BOUND criterion's target_date is a syntactically AND calendrically valid ISO-8601 date (e.g. rejects 2026-02-30) -- a Time-bound criterion with no real, checkable deadline is prose, not Time-bound"
+  - "when refines_goal_statement_ref is present, it is a non-empty string -- format-only soft link, this method cannot see the referenced record"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition: []
+# Atlas's §12.4 limits line ("不應用 SMART 把錯誤目標「量化得很漂亮」；Goal Framing 必須先完成") is a
+# real, on-topic usage caveat -- but it names an UPSTREAM PROCESS ORDERING, not a state-machine
+# transition or an automatic-authority claim (this method asserts no decision/approval of anything).
+# JSON/runtime cannot verify an upstream step happened without a hard required-input dependency, which
+# is deliberately not imposed (see compilation_decisions) -- so left genuinely empty, same "disclosed
+# rather than fabricated into an unenforceable rule" restraint root_cause.kepner_tregoe's own empty
+# forbidden_transition already documents for a different reason (no citation at all, vs. here: a real
+# citation that is not the right SHAPE for this field).
+
+recommended_next: []
+# Atlas's own "最佳搭配" column names OKR/KPI (L335) -- neither has a contract (out of this batch's
+# scope, per this task's explicit instruction not to build or invent their shape). Left empty rather
+# than guessing a machine_id for an uncontracted method, same restraint decision.pareto_frontier's own
+# OQ-PARETOFRONTIER-3 already applies to an unresolved recipe step.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Require an existing GoalStatement input (kepner_tregoe's own ProblemStatement precedent), or accept a self-contained goal text?"
+    decision: "Self-contained required goal_statement string + OPTIONAL refines_goal_statement_ref soft link. framing.goal_statement has no contract yet in this batch (concurrent, unread) -- a hard $ref dependency isn't buildable today; matches devops_sre.game_day's own runbook_execution_ref discipline for a genuinely-unknown-at-write-time upstream type."
+  - question: "Is SMART a second way to FRAME a goal, or a refinement of one already framed?"
+    decision: "Refinement. Atlas gives Goal Statement (L334) and SMART (L335) separate rows with separate 何時使用/標準使用方式 columns -- Goal Statement is initial structural framing (目標→受益者→時間→成功條件→限制); SMART is a measurability checklist (S/M/A/R/T) applied afterward. §12.4's own limits line ('Goal Framing 必須先完成') makes this ordering explicit, not just inferred from row adjacency."
+  - question: "Does the §12.4 'Goal Framing 必須先完成' ordering become a required precondition or forbidden_transition?"
+    decision: "Neither, enforceably -- see forbidden_transition's own inline note. Documented as a disclosed process caveat only, same schema-vs-runtime honesty restraint kepner-tregoe-problem-specification.schema.yaml's own compilation_decisions already applies to a different unenforceable cross-field case."
+  - question: "Fixed positionally-ordered 5-tuple, or a free-form criteria list?"
+    decision: "Fixed: exactly SPECIFIC/MEASURABLE/ACHIEVABLE/RELEVANT/TIME_BOUND, in Atlas's own literal citation order -- same prefixItems discipline kepner-tregoe-problem-specification.schema.yaml's own dimensions[] already establishes."
+  - question: "Should S/M/A/R also carry a structured field beyond free-text justification (mirroring TIME_BOUND's target_date)?"
+    decision: "No -- only TIME_BOUND gets target_date, per this task's own design (5 free-text justifications, one narrow structured anchor where Atlas's own word names a checkable fact). No Atlas grounding exists for structured M/A/R sub-fields."
+  - question: "framing prefix (method-inventory.yaml's own F01 category label) or problem_framing (existing illustrative-only example string)?"
+    decision: "framing, per explicit task mandate and method-inventory.yaml's own literal label. problem_framing.problem_statement is disclosed as pre-existing but uncontracted (see decided_by) -- not a real collision today, flagged in open_questions."
+
+open_questions:
+  - "OQ-SMART-1: refines_goal_statement_ref is a format-only non-empty-string soft link with NO prefix pattern enforced -- framing.goal_statement's own id convention was not visible at this contract's write time (concurrent sibling agent, same batch). Should a future revision add the real prefix once that schema exists?（owner: operator, or whoever next builds framing.goal_statement）"
+  - "OQ-SMART-2: problem_framing.problem_statement (illustrative-only, never contracted -- see decided_by) uses a DIFFERENT F01 prefix than this contract's framing. Should Problem Statement (F01 row L340) be minted as framing.problem_statement for consistency, or does the existing illustrative string win by precedent?（owner: operator, or whoever next builds Problem Statement）"
+  - "OQ-SMART-3: Atlas gives no worked example pinning whether target_date must be in the future relative to when the record is built -- left as format/calendar validity only, not a wall-clock comparison, to keep construction and gate results deterministic (see the schema's own compilation_decisions).（owner: operator）"
+  - "OQ-SMART-4: F01 status at build time: 1 of 11 built after this contract (framing.smart). Two sibling agents concurrently build framing.goal_statement/framing.non_goals in the same batch, not verified complete here. Remaining after all three land: OKR, North Star Metric, Success Criteria, 5W1H, Problem Statement, How Might We, Frame Storming, Boundary Critique.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Grepped the Atlas for "SMART" across the whole mother document -- found and read the F01 table row
+    (L335) directly plus the dedicated §12.4 section (L2584-2589, the only other hit). Grepped for
+    "SMART-" repo-wide before minting the id prefix -- zero prior hits. Grepped for
+    "smart_goal"/"specific_measurable"/"framing.smart"/"framing.goal_statement" across
+    Projects/internal/cognitive-engineering-os -- zero prior hits, confirmed no duplicate exists and
+    ai_lego/modules/framing/ did not yet exist at read time. Grepped for "problem_framing" repo-wide,
+    found it used only as illustrative origin_method example data (5 CLI files +
+    problem-statement.schema.yaml's own doc comment), never backed by a contract file -- confirmed no
+    real machine_id collision with this contract's own framing prefix. Read
+    root_cause.kepner_tregoe.contract.yaml + kepner_tregoe.py in full as the structural template (closest
+    sibling: free-text structural record, no arithmetic, fixed positionally-ordered tuple). Read
+    devops_sre.game_day.contract.yaml's own runbook_execution_ref handling in full for the OPTIONAL
+    format-only soft-link precedent. Read method.schema.yaml in full (id pattern
+    `^[a-z_]+\.[a-z_]+$`, top-level required fields) and primitive.schema.yaml's full 29-value vocabulary
+    before choosing cognitive_primitives. Confirmed via ai_lego/core/contracts/schema_contracts.py (read
+    in full) that this codebase's Draft202012Validator is constructed with no format_checker, so
+    `format: date` is annotation-only here -- the real target_date calendar-validity check lives in
+    ai_lego/modules/framing/smart.py, not the schema.
+  note: >
+    No mother document was modified. Doc format follows methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md
+    (2026-09-06 operator ruling) and decision.pareto_frontier.contract.yaml as the current lean exemplar
+    -- description/compilation_decisions/open_questions kept terse, no separate slice markdown file
+    written, no per-edit method-inventory.yaml/contract-backlog.yaml/framing/__init__.py family-summary
+    update (all out of scope for this task by explicit instruction -- see this task's own suggested
+    entries for a future integration pass). ai_lego/modules/framing/__init__.py was created minimally by
+    this task (the directory did not exist), deliberately NOT carrying a family-summary claim since two
+    sibling agents write to the same file concurrently in this batch.

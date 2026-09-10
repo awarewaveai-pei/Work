@@ -28,6 +28,24 @@ api/openapi/hci-v1.yaml 自稱是刻意的 skeleton-only(檔頭明寫「not a co
 git revert 本次 commit：app/server.mjs 的 POST /cases／POST /persons 兩個端點、CASE_PURPOSES/CASE_RISK_TIERS 常數、JSON-parse-error middleware；app/public/index.html 的開案表單、inline 建人物、citableOptions()/detailRequestSeq guard 全部移除，回到只能對既有 fixture 案件/人物加證據的前一版。純新增+修正，未改動任何既有 schema/migration。
 
 
+## 2026-09-08（78–82 號切片：F16 decision 家族收官 11/13→13/13 + 新開 F01 framing 家族 0/11→3/11，5 個平行 agent）
+
+decision.wsjf(91t)/decision.kano(89t)/framing.goal_statement(50t)/framing.smart(61t)/framing.non_goals(110t)。401 tests 零衝突（含 critic 補的 2 個）。查重：wsjf 比對 rice 確認真不同（Cost of Delay 為 SAFe 外部慣例 3 因子總和，加法分子 vs RICE 的乘法分子 Reach*Impact*Confidence/Effort）；kano 選 GENUINE_COMPUTE（5x5 functional x dysfunctional 對照表分類，比對 moscow/impact_effort 確認真不同），建置時抓到一個錯誤的網路來源表格（自稱「modified」版本、2 格違反基本 Kano 語意），改為自行從定義重推並對照 Wikipedia 5 格全對；goal_statement 比對 kill_criteria/reversal_criteria 確認真不同（初始靜態框定 vs 持續監控規則）；smart 找到 Atlas Sec12.4 專節（goal framing 須先完成才能套 SMART），比對 goal_statement 確認真不同；non_goals 比對 moscow 的 WONT bucket 確認真不同（WONT 只需 reason，Non-goals 額外要求 re_review_trigger），順手解答 moscow 自己的 OQ-MOSCOW-1（新增 `related_moscow_wont_ref` 軟連結）。F16 家族正式收官 13/13；F01 framing 新開 3/11，剩 OKR/North Star Metric/Success Criteria/5W1H/Problem Statement/How Might We/Frame Storming/Boundary Critique。
+
+critic scope=normal tier，真跑獨立全 regression（4698 tests，164s）+golden（3112，含 spec index 重生）+5 個 CLI 全跑+獨立核實 Kano 對照表（WebFetch Wikipedia 驗證）+獨立核實 SMART 的 target_date 真跑 `date.fromisoformat` 邊界（正確拒絕 2026-02-30）。verdict 0C/0Major/2Minor：**Minor #1**（真漏洞，即時利用驗證）——`goal-statement-record.schema.yaml`／`smart-goal-record.schema.yaml` 頂層缺 `additionalProperties: false`，跟同批 5 個手足中 3 個（wsjf/kano/non_goals）不一致；critic 真的手工塞入 `approved: true` 證明會通過 schema 驗證。已補兩個 schema 的 `additionalProperties: false`，各補 1 個對應迴歸測試（`test_schema_rejects_an_unknown_top_level_authority_style_key`）。**Minor #2**：`method-inventory.yaml` 對這 5 個新方法仍是 `has_contract: false`——查證後發現這不是本批次獨有問題，而是本 session 全部約 82 個已建切片（F05/F16/F17/F18/F19/F20/F21/F01）在該 registry 檔案裡全部未同步（純文件性落差，runtime 不讀這個檔案，已 critic 確認）；範圍太大不適合本批次順手改 5 列造成不一致，已 spawn_task 追蹤要求一次性批次同步全部 ~82 列。順手清掉一個已確認 byte-identical 的孤兒檔 `ai_lego/modules/security/pasta.py.bak`。
+
+**收工前意外發現**：AO-RESUME 自動化對齊腳本（`git-align-main-aoresume-feature-20260910-123615`）在切換回 `main` 時對 `WORKLOG.md`／`docs/video_generator/README.md` 兩檔 stash pop 衝突未完成即中斷（無 MERGE_HEAD，純 stash pop 殘留），本地 `main` 與 `origin/main` 分別領先 4／55 個 commit。已用相同的「兩邊都留、只拆 marker」安全手法解掉兩個衝突（zero data loss，逐一 grep 確認全庫無殘留 marker）；本地 4 個既有 video-doc commit（非本次範圍）與一堆非本批次的暫存變更（README.md／AGENTS.md／ops docs／reports/status 等）先備份到本地分支 `backup-local-main-20260910`（未推送）保留，不代為 commit/push 不熟悉的內容；stash@{0} 仍保留未 drop，雙重保險。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_wsjf tests.unit.test_kano tests.unit.test_goal_statement tests.unit.test_smart tests.unit.test_non_goals` | exit=0 | result=401 tests OK（含 critic 修正後 +2）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression，critic 修正後最終跑）| exit=0 | result=5100 tests OK，237.8s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，含 5 個新 contract/schema 觸發的 spec index 重生）| exit=0 | result=PASSED 3112，ALL GOLDEN TESTS PASSED
+REVIEW_DONE: critic=Standard（真跑獨立 4698-test regression、5 CLI 全跑、Kano 對照表/SMART 日期驗證兩項強制查證獨立覆核、method-inventory.yaml 落差範圍查證）| verdict=0C/0Major/2Minor → 全修（schema 補洞）+1 個追蹤（registry 批次同步，開 task）| findings=0c/0m/2minor
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`decision\.wsjf\|decision\.kano\|framing\.goal_statement\|framing\.smart\|framing\.non_goals` | hits=僅本批次新建檔案+registry+`__init__.py`合法引用+1 處無關的 `scope_non_goals` 子字串巧合（既有 problem-statement.schema.yaml 欄位，已確認非碰撞）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/compute-如適用/module/CLI/test（約 27 個新檔）+ `decision/__init__.py`／`framing/__init__.py`／`contract-backlog.yaml`／`decision.moscow.contract.yaml`（OQ-MOSCOW-1 一行）的追加內容全部移除；純新增與 docstring 追加，未修改任何既有方法的既有行為。
+
 ## 2026-09-08（73–77 號切片：F16 decision 家族 6/13→11/13，5 個平行 agent）
 
 decision.weighted_decision_matrix(107t)/decision.topsis(83t)/decision.decision_tree(127t)/decision.expected_value(112t)/decision.pareto_frontier(107t)。536 tests 零衝突（含 critic 補的 1 個）。查重：weighted_decision_matrix 比對 mcda 確認真不同（Atlas 公式無 Normalize 階段，vs MCDA 自己 Sec11.32 有）；topsis 比對 mcda 確認真不同（歐氏距離排序 vs 加權和，重用 mcda 的 normalize_scores 做自己的 Normalize 階段）；decision_tree 比對 fault_tree/event_tree 確認真不同（巢狀 decision/chance/terminal vs 兩者皆扁平），與同批平行建置的 expected_value 互相查證方向不衝突；expected_value 比對 monte_carlo（SIMULATED_RESULT 非 CALCULATED_RESULT）與 mcda（[0,1] 有界排序）確認真不同；pareto_frontier 比對既有 root_cause.pareto 確認真不同概念（單維度 80/20 排名 vs 多目標非支配集合，SET 分類無分數），刻意選用不同 machine_id 避免混淆。F16 現況 11/13，剩 WSJF/Kano。
@@ -13582,82 +13600,91 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 
 [rollback]
 `git revert` 本次 commit：`industries/` 整目錄消失，`configurator_engine.py`/`foundry_generate.py`/`serve_configurator.py` 三個既有函式簽章還原（新參數皆有預設值，revert 對現有 caller 零影響）；`manifest.json`/`registries/kernel.yaml` 同步還原（本次未觸碰 kernel_digest，因未改 `kernel/*.md`）。
-## 2026-09-09（Video LEGO — Remotion 租戶 job lifecycle）
+## 2026-09-08 — Video Phase 1B Gate 0 renderer/staging preflight
 
-[完成] `eee9f3fea` 已送 `main`。Remotion UI 改用租戶綁定的 `video_jobs` 內部 id；舊 EU job 直通 endpoint 封存；renderer kind 防止 FFmpeg status 誤輪詢；完成寫入 `media_assets`。REALTEST：typecheck=0、Vitest=67 files/723 tests、diff-check=0。Staging/production 未重啟。
+[scope]
+Read-only preflight for the durable-video gates. No source, DB, renderer, container, secret, deployment, media, WordPress or Postiz change.
 
-## 2026-09-09 Remotion tenant lifecycle slice
+[result]
+- C1: `ns31414856`; correct host.
+- C2: `lobster-video-service` and `lobster-remotion-service` healthy on `127.0.0.1:8732/8733`.
+- C3: `/root/render-services/docker-compose.yml` present; `/root/lobster-phase1/docker-compose.renderer-staging.yml` absent.
+- C4: Trigger containers healthy, but this does not prove a deployed media worker.
+- Decision: host staging manifest absence blocks host-side Gates 2–4, `video_jobs` migration and any Timeline/renderer submission integration; local Gate 1 parsing remains allowed and passed below.
 
-- `eee9f3fea`：Remotion 先建立租戶綁定 `video_jobs`，對外只回內部 job id；VideoStudio 改輪詢 `/api/video/remotion-job-status`。
-- 舊 `/api/video/remotion-status` 固定回 410；`rendererKind=remotion` 防止通用 FFmpeg status 誤輪詢；完成寫入 `media_assets`。
-- 驗證：typecheck exit=0；Vitest 67 files / 723 tests exit=0；diff-check exit=0。
+[verification]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 -o BatchMode=yes -o ConnectTimeout=12 ubuntu@145.239.195.47 '<hostname/docker ps/test -f preflight>'` | exit=0 | ms=6700
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; stale deleted worktree references corrected to canonical D:\Work paths.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`docker-compose.renderer-staging.yml|render-draft|video_jobs` | hits=162; no staging activation added.
+- WORKLOG_DONE: deployment baseline receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
-## 2026-09-09 Video LEGO staging S3 egress
+[rollback]
+None: Gate 0 made no change.
 
-- 根因：原 staging token 可讀取但無 `PutObject` 權限；新 token 由 note 安裝至 root-only `.env.renderer-staging`，只記錄 SHA prefix，未輸出密鑰。
-- 程式：`apps/r2-egress-proxy` 改用 AWS SDK S3 簽名上傳；compose 將 renderer 保持 internal network，proxy 使用獨立 egress network；增加 key prefix/path/query allowlist。
-- REALTEST_EVIDENCE: SSH `docker inspect` 顯示 `lobster-staging-r2-egress-proxy`、`lobster-staging-remotion-service`、`lobster-staging-video-service` 均 `healthy`；canary `submit_http=200`, `render_status=done`, `url_https=true`；Next-admin `typecheck` exit=0；Vitest `72 files / 750 tests` exit=0；proxy tests `3/3` pass；`git diff --check` exit=0。
-- REVIEW_DONE: self-review（auth/tenant/network boundary；proxy only writes `remotion/`/`video/`）| verdict=pass。
-- BUGHUNT_DONE: scope=video renderer/proxy/staging compose/scripts | grep for credential literals and unsafe object paths | hits=0 in changed files。
-- ROLLBACK: restore `.env.renderer-staging.bak-r2-token`, then `docker compose ... up -d` staging only；code rollback via `git revert`。
-- COMMIT: `a913546a0` pushed to `main`; production renderer/Next-admin containers remained untouched.
+## 2026-09-08 — Video Phase 1B Gate 1 manifest parse
 
-## 2026-09-09 Video LEGO technical QA slice
+[scope]
+本機只讀解析版本庫 renderer staging compose；未 build、未啟動容器、未連主機、未讀取或建立 secrets。
 
-- `adb92808c`：Quick Engine 成片加入 ffprobe 證據與純函式 `media.qa_technical`；缺 video/audio、無效時長或輸出比例錯誤會 fail-closed，成功輸出保存 detector/measurements/findings metadata。
-- REALTEST_EVIDENCE: `python -m unittest discover -s tests` = 7/7；`python -m py_compile server.py quality.py` exit=0；staging video-service rebuild/start 後 healthy。
-- REVIEW_DONE: self-review（只增加輸出驗證，未改既有輸入契約；失敗在 R2 上傳前停止）| verdict=pass。
-- BUGHUNT_DONE: changed scope `apps/video-service`；credential literal scan=0；`git diff --check`=0。
-- LIMIT: 目前是 report metadata + render gate；黑畫面、頻閃、字幕同步、QA report persistence 與 Release hard gate 仍屬後續 Phase 4。
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose --env-file D:\Work\lobster-factory\infra\hetzner-phase1-core\.env.renderer-staging.example -f D:\Work\lobster-factory\infra\hetzner-phase1-core\docker-compose.renderer-staging.yml config --quiet` | exit=0 | ms=1500
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; Gate0 host block narrowed to Gates 2–4 so local Gate1 pass is consistent.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`docker-compose.renderer-staging.yml|\.env.renderer-staging.example` | hits=19
+- WORKLOG_DONE: Gate 1 receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
-## 2026-09-09 Video LEGO frame-accurate captions
+[rollback]
+None: config parse made no change.
 
-- `724044af7`：Timeline v1 經驗證的 caption track 轉成 Remotion frame cues，DynamicSlideshow 以全域 frame clock 顯示目前字幕；舊手動場景未提供 captions 時行為不變。
-- REALTEST_EVIDENCE: next-admin typecheck exit=0；Vitest `72 files / 750 tests` exit=0；Remotion build exit=0、tests `3/3`；staging Remotion canary `submit_http=200`, `render_status=done`, `url_https=true`。
-- REVIEW_DONE: self-review（caption 時間先經 Timeline validator 對齊影格；renderer 不讀未授權來源）| verdict=pass。
-- BUGHUNT_DONE: changed scope=Timeline compiler + DynamicSlideshow/SceneSeries；`git diff --check` exit=0；credential literal scan=0。
+## 2026-09-08 — Video Phase 1B Gate 2 preflight blocked
 
-## 2026-09-09 Video LEGO short-drama and footage contracts
+[scope]
+唯讀確認主機 staging env 與本機 vault reference；未輸出 secret value、未複製 production credential、未 build/up。
 
-- `5476df680`：新增 `story-bible.ts` 與 `edit-plan.ts` 純 validator；短劇角色/參考素材/分集狀態與實拍來源 range/輸出 track/frame alignment 先在邊界 fail-closed，兩者仍只能產生候選 Timeline。
-- REALTEST_EVIDENCE: production-document tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
-- REVIEW_DONE: self-review（純結構驗證，不寫資料庫、不呼叫 provider、不改既有 Quick Engine）| verdict=pass。
-- BUGHUNT_DONE: changed scope=video production documents；UUID、未知欄位、source range、track overlap negative fixtures 均覆蓋。
-- LIMIT: immutable document persistence、RLS、review UI、角色 continuity engine 與實拍 proxy media 尚未接入。
+[result]
+- C1: `/root/lobster-phase1/.env.renderer-staging` absent；staging manifest 亦 absent。
+- C2: vault 僅有既有 production references，沒有 staging-only R2／Claude／Pexels identity。
+- Decision: 不以正式 credential 或 placeholder 代替；Gate 2–4、`video_jobs` migration 與 renderer 接線封鎖。
 
-## 2026-09-09 Video LEGO Release gate core
+[verification]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 -o BatchMode=yes ubuntu@145.239.195.47 'sudo test -f /root/lobster-phase1/.env.renderer-staging ...'` | exit=0 | ms=4600
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/secrets-vault.ps1 -Action list` | exit=0 | ms=1200
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; production-to-staging credential substitution remains prohibited.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`.env.renderer-staging|staging-only|production credential` | hits=75
+- WORKLOG_DONE: blocker receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
-- `bb284acce`：新增 `release-gate.ts`，要求每個 required QA kind 都有同 candidate asset/checksum 的 current evidence；missing、stale、failed、superseded、duplicate 會阻擋 Release。
-- REALTEST_EVIDENCE: release-gate tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
-- REVIEW_DONE: self-review（純 gate，不寫資料庫、不改發布 adapter；warned evidence 僅在明確 gate policy 下通過）| verdict=pass。
-- BUGHUNT_DONE: changed scope=video release gate；negative fixtures 覆蓋缺件、checksum 漂移、失敗與 duplicate kind。
-- LIMIT: persistence/RLS、immutable release records、WordPress/Postiz receipts and rollback adapters remain pending.
+[rollback]
+None: preflight was read-only.
 
-## 2026-09-09 Video LEGO Release preflight API
+## 2026-09-08 — Provisioned isolated staging bucket and render token
 
-- `313cdc430`：接通 `POST /api/video/release/preflight`；驗證 tenant access、QA evidence schema、candidate checksum 與 required kinds，回傳 `releaseCreatable`，不產生資料庫或發布副作用。
-- REALTEST_EVIDENCE: route tests `3/3`；next-admin typecheck exit=0；`git diff --check` exit=0。
-- REVIEW_DONE: self-review（client foreign-org 403；invalid evidence 400；gate fail 不可升級）| verdict=pass。
-- BUGHUNT_DONE: negative fixtures 覆蓋 failed QA、foreign org、missing/unknown fields。
-- LIMIT: endpoint 是 preflight；immutable `media_releases` persistence and delivery adapters remain pending。
+[result]
+- R2 bucket `lobster-video-staging-20260908` created successfully; response status `200`.
+- Unique render token generated and stored in local vault under a staging-only name; value never printed or committed.
+- Bucket and account references stored in local vault.
+- Gate 2 remains blocked until a bucket-scoped R2 token plus staging Anthropic/Pexels keys exist; production references were not substituted.
 
-## 2026-09-09 Video LEGO delivery contract
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Cloudflare R2 bucket create via API (response status only)` | exit=0 | ms=13100
+- REALTEST_EVIDENCE: tool=Bash | cmd=`RandomNumberGenerator + secrets-vault.ps1 set (output suppressed)` | exit=0 | ms=1400
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; staging/prod credential separation preserved.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_STAGING_|lobster-video-staging-20260908` | hits=3
+- WORKLOG_DONE: credential receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
-- `acfe7e7f2`：新增 WordPress/Postiz 共用 delivery state machine；`releaseId + destination + variant` 產生穩定冪等 key，明確定義 retry、publish、withdrawn terminal transition。
-- REALTEST_EVIDENCE: delivery contract tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
-- REVIEW_DONE: self-review（純狀態轉移與 key derivation，不呼叫外部平台、不改既有 Postiz route）| verdict=pass。
-- BUGHUNT_DONE: negative fixture 覆蓋 withdrawn 後重發與 destination key collision。
-- LIMIT: durable delivery-attempt records、Postiz/WordPress adapter wiring and outcome ingestion remain pending。
+[rollback]
+Revoke the generated staging token and delete the newly created staging bucket only after confirming it contains no evidence; no production bucket was touched.
 
-## 2026-09-09 Video LEGO outcome contract
+## 2026-09-08 — Staging credential issuance probe
 
-- `60500f780`：新增 append-only outcome snapshot validator；平台、外部貼文、觀測成熟度與固定 metrics 白名單分離，事件 ID 由 canonical fields SHA-256 決定以支援去重。
-- REALTEST_EVIDENCE: outcome tests `2/2`；next-admin typecheck exit=0；`git diff --check` exit=0。
-- REVIEW_DONE: self-review（禁止負數/未知 metrics；不同平台不共用 event identity）| verdict=pass。
-- BUGHUNT_DONE: negative fixture 覆蓋未知 metric、負值與不支援平台/成熟度。
-- LIMIT: webhook ingestion、append-only DB table、dashboard and feedback loop remain pending。
+[result]
+- Cloudflare `/user/tokens/permission_groups` returned HTTP `403`; current token cannot mint a bucket-scoped R2 token.
+- No Anthropic or Pexels administrative credential/API path is available in the local inventory.
+- No production key was copied; staging build/up remains blocked.
 
-## 2026-09-09 Video LEGO persistence, adapters, footage UI, billing, outcomes
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Cloudflare GET /user/tokens/permission_groups (status only)` | exit=0 | ms=12000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; confirmed no secret output or production substitution.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`bucket-scoped|permission_groups|Anthropic|Pexels` | hits=410
+- WORKLOG_DONE: blocker recorded in `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
 
 - `0b79deecc`：新增 `packages/db/migrations/0065_media_production_persistence.sql` 與 down script；QA、Release、delivery attempt、outcome snapshot 四張表，FK/CHECK/index/RLS/service-role grant；尚未套用正式資料庫。
 - 新增 `apps/next-admin/lib/content/video/delivery-receipts.ts`；以 stable idempotency key 建立/更新 receipt，狀態機失敗即停止，旗標 `MEDIA_PRODUCTION_PERSISTENCE_ENABLED` 預設關閉。
@@ -13677,3 +13704,128 @@ Critic（Standard tier）覆審回報 8 個檔案本身零缺失，但額外抓�
 - 線上只讀確認：SSH `145.239.195.47:58122` 的 production 與 staging containers 均 healthy；`supabase-db` 查詢 0065/0066 七張表均為空結果（尚未套用）；`lobster-next-admin` 仍是 `lobster-phase1-next-admin:local`（2026-09-08 啟動），故新 main 尚未部署。
 - `sg-deploy.sh next-admin` 正式部署完成：typecheck、Vitest `78/763` 通過；建立 rollback snapshot `lobster-phase1-next-admin:rollback-20260909-060402`；新 container digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632` healthy；`/login`、`/api/ops/summary`、WordPress、node-api smoke 全部 200。Remotion、video-service、DB、0065/0066 migration 與 flags 未變更。
 - 新增 `docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`，列出 Whisper worker、EDP asset registration、Release linkage、billing lifecycle、provider allowlist、outcome feedback 與 deployment 的確切 evidence/剩餘工作。
+
+[rollback]
+None: permission probe was read-only.
+
+## 2026-09-08 — Staging renderer deployment and canary
+
+[result]
+- Installed root-only staging manifest/env on `ns31414856`; production env files were not changed.
+- Built and started isolated `lobster-renderer-staging-net`; both staging renderers healthy on internal ports 8732/8733.
+- Health checks passed; unauthenticated render requests returned HTTP 401 for both services.
+- Production renderer container IDs and health stayed unchanged.
+- Authenticated Remotion canary reached render completion but R2 upload failed at staging-only egress with `EAI_AGAIN api.cloudflare.com`; no production artifact was created.
+- Added explicit system Chromium executable to Remotion select/render calls; staging rebuild TypeScript check passed.
+
+[verification]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`compose build; compose up -d; docker inspect; internal health; unauthenticated POST; production ID comparison` | exit=0 | ms=completed
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after correction | findings=0c/0m/0n; controlled allowlisted egress requirement and reproducibility evidence recorded.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`staging deployment receipt|browserExecutable|EAI_AGAIN` | hits=3
+- WORKLOG_DONE: receipt at `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+[rollback]
+`ssh -p 58122 ubuntu@145.239.195.47 'sudo docker compose -p lobster-renderer-staging --env-file /root/lobster-phase1/.env.renderer-staging -f /root/lobster-phase1/docker-compose.renderer-staging.yml down'` removes only staging containers/network.
+
+## 2026-09-08 — Caption rendition foundation
+
+[result]
+- Added deterministic SRT and WebVTT rendering from immutable timed transcript segments.
+- Formatter rejects invalid ranges, overlaps and empty captions before producing output; it does not overwrite transcript data.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest | cmd=`npm test -- --run lib/content/video/__tests__/caption-formats.test.ts` | exit=0 | tests=4
+- REVIEW_DONE: critic=Standard | verdict=pass | pure formatter with fail-closed validation and no provider/network access.
+- BUGHUNT_DONE: scope=caption-formats.ts | grep=`secret|fetch|eval|child_process` | hits=0
+- WORKLOG_DONE: source and fixture committed in `b2c6170b8`.
+
+[rollback]
+Revert the single caption formatter commit; no schema or runtime route is changed.
+
+## 2026-09-08 — Whisper VTT output path
+
+[result]
+- Extended the existing local faster-whisper pipeline to emit a deterministic `transcript.vtt` beside the existing SRT/JSON outputs.
+- Added `/api/download/{job_id}/transcript_vtt`; source transcript remains immutable and the meeting service remains local-only.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Python unittest | cmd=`python -m unittest discover -s tests -p 'test_vtt.py' -v` plus py_compile | exit=0 | tests=5
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass after pipeline regression coverage and CR sanitization.
+- BUGHUNT_DONE: scope=meeting-service VTT path | grep=`subprocess|eval|secret` | hits=0
+- WORKLOG_DONE: source, tests and receipt are committed in the follow-up VTT integration commit.
+
+[rollback]
+Revert the VTT-only change; existing SRT/JSON downloads remain unchanged.
+
+## 2026-09-09 — Timeline compile boundary
+
+[result]
+- Added `POST /api/video/timeline/compile` as a compile-only Director boundary.
+- It enforces operator role and organization access, resolves artifact URLs only from tenant-owned `media_assets`, validates Timeline v1, and returns Remotion specs without renderer or storage side effects.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest + TypeScript | cmd=`npm test -- --run app/api/video/timeline/compile/route.test.ts`; `npm run typecheck -- --pretty false` | exit=0 | tests=5
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pass | compile-only boundary retained; unsafe submit path rejected before commit.
+- BUGHUNT_DONE: scope=timeline compile route | grep=`fetch|supabase|write|child_process` | hits=0
+- WORKLOG_DONE: route and tests staged for commit.
+
+[rollback]
+Revert the compile route commit; existing timeline validation and Remotion routes remain unchanged.
+
+## 2026-09-09 — Tenant-safe Remotion status boundary
+
+[result]
+- Added `/api/video/remotion-job-status`; callers provide internal `video_jobs.id`, then the route checks stored organization ownership before polling Remotion.
+- Legacy `/api/video/remotion-status` remains unchanged until its callers are migrated; this prevents breaking the existing VideoStudio polling contract.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest + TypeScript | cmd=`npm test -- --run app/api/video/remotion-job-status/route.test.ts`; `npm run typecheck -- --pretty false` | exit=0 | tests=2
+- REVIEW_DONE: critic=timeline_tenant_critic | verdict=pending | findings=legacy migration still required before deprecating direct EU job IDs.
+- BUGHUNT_DONE: scope=remotion-job-status | grep=`euJobId|organizationId|assertOrgAccess` | hits=7
+- WORKLOG_DONE: route and tests staged for commit.
+
+[rollback]
+Revert this route-only commit; existing `/api/video/remotion-status` remains unchanged for legacy callers.
+
+## 2026-09-09 — Dedicated Video Whisper durable boundary
+
+[result]
+- Added 0069 dedicated `media_transcription_jobs`; no meeting-service code or route is referenced.
+- Dispatch now accepts only tenant-owned, SHA-256-pinned media assets on `R2_VIDEO_PUBLIC_BASE`, persists its job before worker handoff, and fails closed when worker configuration is absent.
+- Added independent RTX worker, per-job callback secret verification, JSON/SRT/VTT import, caption-integrity QA, callback retry, and a deployment contract.
+- Callback is an `/api/internal` route and authenticates itself; it never accepts a callback asset id.
+
+[verification]
+- REALTEST_EVIDENCE: tool=Vitest+TypeScript+Python | cmd=`npm test` (89 files/786 tests); `npm run typecheck`; `python -m py_compile app.py` | exit=0 | ms=completed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; checked tenant binding, one-job secret, URL boundary, and no meeting-service references.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`MEDIA_TRANSCRIBE_CALLBACK_BASE_URL|media_transcription_jobs|persistAutomaticCaptionQa` | hits=9
+- WORKLOG_DONE: migration, worker contract, and deployment receipt documented under `agency-os/docs/video_generator/`.
+
+[rollback]
+Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; after confirming no jobs need retention, apply `0069_media_transcription_jobs.down.sql`. Existing Quick Engine, Remotion, footage renderer, and meeting-service are untouched.
+
+## 2026-09-09 — 0069 production receipt
+
+- Applied additive 0069 on `supabase-db`; verified all 11 columns.
+- Deployed `b4db0dd37` with `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`; snapshot `lobster-phase1-next-admin:rollback-20260909-150932`.
+- REALTEST_EVIDENCE: tool=SSH | cmd=`schema query; docker health; /api/ops/summary smoke` | exit=0 | ms=completed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`media_transcription_jobs` | hits=11
+- WORKLOG_DONE: status updated in `agency-os/docs/video_generator/CURRENT_IMPLEMENTATION_STATUS.md`.
+
+## 2026-09-09 — Rendered-footage caption evidence
+
+- Footage jobs persist validated caption cues with the durable render job; `/api/video/status` emits caption QA against the final rendered asset checksum after asset registration.
+- REALTEST_EVIDENCE: tool=Vitest+TypeScript | cmd=`npm run typecheck`; `npm test -- --run lib/content/video/__tests__/caption-qa-persistence.test.ts` | exit=0 | tests=2
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`captionCues|persistAutomaticCaptionQa` | hits=8
+- WORKLOG_DONE: this entry.
+
+## 2026-09-10 — Video Whisper enabled canary
+
+- Created dedicated Cloudflare Tunnel + DNS, installed official cloudflared, enabled independent RTX worker and startup recovery; meeting-service untouched.
+- Added 3 production env settings only after local/public health and invalid-token authorization checks.
+- REALTEST_EVIDENCE: tool=Cloudflare API+SSH+HTTPS | cmd=`Tunnel/DNS create; local/public health=200; worker canary` | exit=0 | result=`completed; artifacts=3; caption QA=passed`
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_WHISPER|video-whisper.aware-wave.com` | hits=4
+- WORKLOG_DONE: this entry.

@@ -1,0 +1,122 @@
+$id: "ai-lego://methods/contracts/framing.goal_statement.contract.yaml"
+title: "Goal Statement Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F01 framing family (first member built -- all 11 F01 rows carried
+  has_contract:false in method-inventory.yaml:206-261 before this slice).
+  Atlas's ONLY citation is the F01 table row (L334: "把模糊願望轉明確目標｜
+  任務起始｜目標→受益者→時間→成功條件→限制｜降低 scope 漂移｜Success
+  Criteria、Decision Question"). Modeled as a FLAT record of 5
+  heterogeneously-shaped fields (string/list/string/string/list), the same
+  shape class problem-statement.schema.yaml's own content object uses -- NOT
+  root_cause.kepner_tregoe's positionally-ordered array-of-same-shaped
+  entries (see compilation_decisions). Core invariants: every field
+  non-empty, and success_condition must genuinely differ from goal.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Goal Statement row (L334) -- the ONLY citation for this method anywhere in the spec root"
+  - "specs/cognitive/typed-objects/goal-statement-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "specs/cognitive/primitive.schema.yaml -- FRAME/DECOMPOSE/VALIDATE kernel primitives"
+  - "ai_lego/modules/learning/kill_criteria.py, ai_lego/modules/learning/reversal_criteria.py -- read in full to confirm success_condition is a distinct concept from their ongoing monitoring-threshold shape, see compilation_decisions"
+  - "methods/contracts/root_cause.kepner_tregoe.contract.yaml -- same 'identical pair is a no-op' invariant class reused for success_condition != goal"
+  - "methods/contracts/decision.moscow.contract.yaml:86-102 -- OQ-MOSCOW-1 pattern for citing an unbuilt sibling honestly, reused for OQ-GOALSTATEMENT-1/2"
+
+decided_by: >
+  No ADR governs the content. Atlas gives one table row plus a flowchart
+  label; the flat-record shape, the two runtime invariants, and the optional
+  forward-looking success_criteria_ref are Phase 3 compilation decisions
+  recorded below. `id: framing.goal_statement` mints a new machine_id and
+  establishes the `framing` family/machine_id prefix itself, per this task's
+  own explicit instruction (matches method-inventory.yaml's own "F01
+  framing" category label). method-inventory.yaml/contract-backlog.yaml
+  registration left to the orchestrating integration pass, per this task's
+  own hard constraint against editing shared registries while sibling agents
+  (framing.smart, framing.non_goals) touch the same new family folder
+  concurrently.
+
+id: framing.goal_statement
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, DECOMPOSE, VALIDATE]
+# INFERRED, not cited. FRAME = Atlas's own literal benefit line for this row
+# ("把模糊願望轉明確目標" -- turn a vague wish into an explicit frame), a
+# direct kernel-vocabulary match (primitive.schema.yaml's own FRAME token,
+# dimension A); DECOMPOSE = splitting one vague goal into 5 named fields;
+# VALIDATE = the two-layer invariant re-derivation every sibling module uses.
+
+purpose:
+  - frame_a_vague_goal_into_explicit_goal_beneficiaries_timeframe_success_condition_and_constraints
+inputs:
+  required: []
+  optional: []
+# Atlas's own "任務起始" (task-start) framing names this as an ENTRY-POINT
+# method with no cited upstream typed-object input -- disclosed as a
+# reasoned absence, not an oversight. See OQ-GOALSTATEMENT-3.
+outputs: [GoalStatementRecord]
+preconditions:
+  - "goal, timeframe, and success_condition are each a non-empty string"
+  - "beneficiaries and constraints are each a non-empty list of non-empty strings -- an unfilled field is exactly the vague-wish shape this method exists to eliminate (Atlas's own benefit line, '降低 scope 漂移')"
+  - "success_condition must NOT be identical (case/whitespace-insensitive) to goal -- an identical pair is an echo, not a checkable condition"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row (plain
+  # 6-column table), and this record carries one whole-record provenance,
+  # not per-field epistemic labels the way kepner_tregoe's dimensions or
+  # kill_criteria's thresholds each independently carry their own --
+  # re-derived independently for this method's own real shape, not
+  # blanket-copied from a sibling with per-item provenance.
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (single table row
+# only) -- left genuinely empty rather than inventing one.
+recommended_next: []
+# See compilation_decisions: Atlas's own best-paired column (Success
+# Criteria, Decision Question) cannot be transcribed here without inventing
+# an id for either. OQ-GOALSTATEMENT-1/2.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat record (ProblemStatement-shape) or positionally-ordered array (Kepner-Tregoe-shape)?"
+    decision: "Flat record -- Atlas's 5 fields are heterogeneously-shaped (string/list/string/string/list), not same-shaped positional entries; the '→' in Atlas's citation is a reading sequence, not a re-orderable array invariant."
+  - question: "受益者 (beneficiary, Atlas's singular wording) modeled as one string or a list?"
+    decision: "List of non-empty strings -- matches problem-statement.schema.yaml's own affected_stakeholders convention; a goal commonly benefits more than one party."
+  - question: "時間 (timeframe): free string or a structured start/end date object?"
+    decision: "Free string -- Atlas gives no worked example or date format; inventing a structured date type would be fabricated scope (same restraint learning.reversal_criteria's own indicator field already applies)."
+  - question: "Is success_condition the same concept as learning.kill_criteria/learning.reversal_criteria's threshold fields?"
+    decision: "No -- read both in full. Those are ongoing MONITORING rules (indicator/dimension+threshold+owner+action) re-evaluated over time against an already-in-flight decision, to block sunk-cost bias mid-course. success_condition here is a static description fixed once at INITIAL goal framing, before any decision or execution begins -- Atlas's own benefit line ('降低 scope 漂移') is about preventing drift from an ambiguous start, not monitoring a commitment. Corroborated by Atlas's own best-paired column naming a SEPARATE unbuilt F01 sibling ('Success Criteria', Must/Should/Guardrail/Stop) as this field's fuller elaboration, not kill_criteria/reversal_criteria. See OQ-GOALSTATEMENT-1."
+  - question: "Enforce a real invariant beyond per-field non-emptiness?"
+    decision: "Yes -- success_condition must genuinely differ from goal (case/whitespace-insensitive), same 'identical pair is a no-op' class root_cause.kepner_tregoe's own IS/IS-NOT invariant already establishes; an identical pair provides no separate, checkable success signal."
+  - question: "Cite Atlas's 最佳搭配 (Success Criteria, Decision Question) as recommended_next?"
+    decision: "No. Success Criteria is a real F01 sibling but unbuilt (has_contract:false, no machine_id minted yet). Decision Question is not even a catalogued method anywhere in the Atlas -- grep-confirmed zero tool-table row and zero method-inventory.yaml entry; its only 4 hits in the whole document are this family's own flowchart box (L354) plus 3 unrelated recipe-chain starting labels (L3294, L3494, L3670). Left recommended_next empty rather than inventing an id for either; added an OPTIONAL forward-looking success_criteria_ref field on the schema for the real (if unbuilt) sibling only. See OQ-GOALSTATEMENT-1/2."
+
+open_questions:
+  - "OQ-GOALSTATEMENT-1: F01 Success Criteria is unbuilt (has_contract:false). Once built, should it consume this record's own optional success_criteria_ref the way it anticipates?（owner: operator）"
+  - "OQ-GOALSTATEMENT-2: 'Decision Question' (Atlas's own best-paired citation, L334) has no tool-table row or method-inventory.yaml entry anywhere -- it is only a recipe-chain starting label (L354, L3294, L3494, L3670). Should it ever be formally catalogued as its own method with a real machine_id, or does it stay an informal recipe label permanently?（owner: operator）"
+  - "OQ-GOALSTATEMENT-3: inputs.required left empty on the strength of Atlas's own '任務起始' (task-start) framing, but no built F01 sibling yet confirms that entry-point convention (Problem Statement, this family's own closest analog, is itself still has_contract:false). Revisit once a second F01 entry-point method is built.（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for the F01 table (L330-345) and for every
+    "Decision Question" hit (4 total: L354 flowchart, L3294/L3494/L3670
+    recipe labels) to confirm it is not a catalogued method anywhere. Read
+    ai_lego/modules/learning/kill_criteria.py and reversal_criteria.py in
+    full to confirm success_condition is a distinct, static framing-time
+    concept, not their ongoing monitoring-rule shape. Read
+    root_cause.kepner_tregoe.contract.yaml/.py/.schema.yaml plus its CLI and
+    test in full as the structural template. Read
+    decision.moscow.contract.yaml:86-102 for the OQ-MOSCOW-1 unbuilt-sibling
+    citation pattern. Grepped ai_lego/ and agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/
+    for goal_statement/beneficiary/GOAL- -- zero pre-existing hits before
+    this slice. Confirmed ai_lego/modules/framing/ did not exist before this
+    slice created it. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 5-field citation order is
+    transcribed verbatim into the field list. The flat-record shape (vs.
+    Kepner-Tregoe's positional array), the beneficiaries/constraints-as-list
+    decision, the free-text timeframe, and both runtime invariants are
+    compilation decisions, disclosed above, not textually cited.

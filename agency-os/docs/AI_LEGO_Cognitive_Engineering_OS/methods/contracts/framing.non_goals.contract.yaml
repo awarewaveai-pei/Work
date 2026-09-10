@@ -1,0 +1,146 @@
+$id: "ai-lego://methods/contracts/framing.non_goals.contract.yaml"
+title: "Non-goals Method Contract"
+status: ACTIVE
+
+description: >
+  framing.non_goals, family framing (F01), Atlas F01 tool table row (L339):
+  "Non-goals | 明確說不做什麼 | 大型專案 | excluded scope→理由→重審條件 |
+  控制範圍與成本 | WBS、ADR". Single-citation, table-row-only (grep-confirmed
+  sole "Non-goals"/"non.?goal" hit besides problem-statement.schema.yaml's
+  unrelated free-text scope_non_goals field -- see compilation_decisions).
+  1st `framing` family (F01) member, a brand-new family (3 siblings landing
+  this same batch: framing.goal_statement/framing.smart built concurrently,
+  no shared code, zero overlap). Distinct from decision.moscow's WONT bucket
+  -- VERIFIED by reading moscow.py/moscow-prioritization-record.schema.yaml
+  directly, not merely repeating that sibling's own prior forward-reference:
+  MoSCoW classifies MANY items across 4 buckets within ONE release scope,
+  WONT needs only a reason, no re-review field exists anywhere in that
+  family. Non-goals is a project-level flat exclusion list where EVERY entry
+  needs BOTH a reason AND a re-review-trigger condition -- Atlas's own
+  3-stage citation, not a relabeling. Invariants: (1) every excluded_scope[]
+  entry carries non-empty scope_item + reason + re_review_trigger; (2) every
+  excluded_scope[] id is unique in the record.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Non-goals row (L339): 'excluded scope→理由→重審條件 | 控制範圍與成本 | WBS、ADR'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155) -- grep-confirmed Non-goals/framing absent, same as decision.moscow/root_cause.kepner_tregoe; see compilation_decisions on why no automatic-authority guard was added"
+  - "methods/contracts/decision.moscow.contract.yaml OQ-MOSCOW-1 -- this file's own related_moscow_wont_ref field resolves that open question; decision.moscow.contract.yaml's open_questions section was edited to RESOLVED by this same task (the one explicitly-permitted cross-file edit)"
+  - "ai_lego/modules/decision/moscow.py + moscow-prioritization-record.schema.yaml -- read in full to independently verify (not just repeat) the MoSCoW WONT-bucket distinction claimed above"
+  - "ai_lego/modules/architecture/adr.py -- structural framing-record sibling (no compute layer), read as this method's own closest template"
+  - "ai_lego/modules/devops_sre/game_day.py's runbook_execution_ref (game-day-record.schema.yaml) -- the optional, format-checked cross-family soft-reference convention this file's related_moscow_wont_ref field reuses"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml's scope_non_goals field -- checked and confirmed UNRELATED (a single free-text prose field inside a different method's record, Atlas L2586 'Scope / Non-goals' combined line, not a structured list, not a competing implementation)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. framing.non_goals mints a new machine_id, 1st
+  `framing` family (F01) member -- family/machine_id prefix "framing" per
+  method-inventory.yaml's own "F01 framing" category label
+  (method-inventory.yaml:231-235's Non-goals row). Registered in
+  contract-backlog.yaml tier_1 by orchestrating session, not this file. This
+  file ALSO resolves methods/contracts/decision.moscow.contract.yaml's own
+  OQ-MOSCOW-1 (see that file's open_questions, edited by this same task to
+  RESOLVED) -- the one explicitly-permitted cross-file edit for this task.
+
+id: framing.non_goals
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, DECOMPOSE, VALIDATE]
+# INFERRED, not cited -- Atlas gives no composition formula for this row.
+# FRAME = the family's own defining act (F01 "Goal & Problem Framing"; this
+# method frames a boundary by exclusion rather than inclusion); DECOMPOSE =
+# breaking one project scope into discrete excluded items; VALIDATE = the
+# re-review-trigger condition is itself a scheduled re-validation act. All 3
+# independently confirmed real values in specs/cognitive/primitive.schema.yaml's
+# CANONICAL_KERNEL enum by two different sibling contracts' own verification
+# work (root_cause.kepner_tregoe.contract.yaml for DECOMPOSE/VALIDATE,
+# learning.ooda.contract.yaml for FRAME).
+
+purpose:
+  - declare_project_scope_exclusions_with_reason_and_re_review_trigger_per_item
+
+inputs:
+  required: []
+  optional: []
+# Leaf method, same class as decision.moscow/learning.ooda -- Atlas's F01 row
+# names no PascalCase input type (table-row-only citation); excluded_scope[]
+# content is raw human/AI-supplied text, no upstream typed-object required.
+
+outputs: [NonGoalsRecord]
+
+preconditions:
+  - "excluded_scope has at least 1 entry (a Non-goals record declaring zero exclusions is vacuous)"
+  - "every excluded_scope[] entry carries a non-empty scope_item, a non-empty reason, AND a non-empty re_review_trigger -- Atlas's own 3-stage citation ('excluded scope→理由→重審條件'), all three mandatory per item, not merely the reason MoSCoW's WONT bucket alone requires"
+  - "every excluded_scope[] id is unique within the record"
+  - "when related_moscow_wont_ref is present, it is a non-empty string (same shape decision.moscow's own items[].id requires -- see compilation_decisions)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row (6-column
+  # table: 工具/主要用途/何時使用/標準使用方式/主要效益/最佳搭配) -- same
+  # reasoning decision.moscow's own contract already applies to its F16
+  # table, re-derived independently here rather than blanket-copied.
+
+forbidden_transition: []
+# Grep-confirmed Non-goals/framing is ABSENT from Atlas §22.3's
+# Method-specific Gate table (L4142-4155, 10 named rows: Fishbone, Persona,
+# Scenario Planning, SWOT, AI Expert Lens, LLM Arithmetic, Red Team, Monte
+# Carlo, MCDA, Jurisdiction Inference) -- left genuinely empty rather than
+# inventing a "no automatic authority" guard this method was never cited
+# for (same precedent decision.moscow/root_cause.kepner_tregoe's own
+# contracts already establish for their own §22.3 absence).
+
+recommended_next: [architecture.adr]
+# Atlas's own 最佳搭配 column names "WBS、ADR" -- WBS is a different,
+# UNBUILT F02 sibling with no minted machine_id (explicitly out of scope
+# for this task), so only the already-built architecture.adr is listed;
+# inventing a machine_id for an unbuilt method would be fabricated scope.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Duplicate of decision.moscow's WONT bucket (same excluded-scope concept)?"
+    decision: "No -- verified by reading moscow.py/moscow-prioritization-record.schema.yaml directly: WONT requires only a non-empty reason (conditionally, only for bucket==WONT), no re-review field exists anywhere in that schema/module. Non-goals requires BOTH reason AND re_review_trigger, unconditionally, on every entry -- project-level flat list vs. MoSCoW's per-item classification across 4 buckets for one release scope."
+  - question: "Should re_review_trigger be optional (like MoSCoW's conditional reason) or mandatory on every entry?"
+    decision: "Mandatory, unconditionally -- Atlas's own citation is a 3-stage pipeline, not 2; making the review-trigger optional would erase the exact field that distinguishes this method from MoSCoW's WONT bucket."
+  - question: "OQ-MOSCOW-1: should excluded_scope entries soft-reference a decision.moscow WONT item id?"
+    decision: "Yes -- added related_moscow_wont_ref, OPTIONAL, format-checked as a non-empty string. NOT a strict MOSCOW- prefix check: moscow's own items[].id carries no fixed prefix (only the record-level id does, per that schema's own compilation_decisions), so the honest format check here mirrors the SAME shape moscow's own schema imposes on that value, not a fabricated stricter one. Existence of the referenced record/item is NOT verified -- same limitation runbook_execution_ref already accepts."
+  - question: "Does this method need a compute/ package (derived numeric values) or an automatic-authority guard (MCDA-style)?"
+    decision: "Neither -- no compute/: same as architecture.adr, a structural framing record with no arithmetic. No automatic-authority guard: Atlas §22.3's gate table (grep-confirmed) does not cite this method, unlike MCDA (L4154); inventing one anyway would be fabricated scope, not genuine two-layer discipline. Both disclosed rather than silently added for their own sake."
+  - question: "Record id prefix?"
+    decision: "NONGOALS- -- matches the method's own short name, same convention decision.moscow's MOSCOW- prefix already establishes (vs. kepner_tregoe's KTPS- initialism, used there because that method's own output type name is itself an initialism)."
+
+open_questions:
+  - "OQ-NONGOALS-1: cognitive_primitives [FRAME, DECOMPOSE, VALIDATE] is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+  - "OQ-NONGOALS-2: related_moscow_wont_ref is format-checked only (non-empty string) -- it does NOT verify the referenced moscow record/item actually exists or is genuinely bucket==WONT (no cross-record existence check anywhere in this suite's existing soft-reference convention). Add real cross-record resolution if a consuming workflow ever needs it?（owner: operator）"
+  - "OQ-NONGOALS-3: WBS (Atlas's other F01 Non-goals 最佳搭配 pairing) is unbuilt -- recommended_next lists only architecture.adr. Add WBS once that F02 sibling mints a machine_id?（owner: operator, or whoever next builds F02 WBS）"
+
+verification:
+  method: >
+    Grepped the Atlas for "Non-goals"/"non.?goal" -- sole hit F01 table row
+    L339 (no dedicated section, confirmed no misuse/evidence column exists
+    for any F01 row). Grepped the Atlas §22.3 Method-specific Gate table
+    (L4142-4155) directly -- confirmed Non-goals/framing absent (10 rows,
+    none this method). Grepped ai_lego/ and agency-os/docs/AI_LEGO_.../ for
+    "non_goals"/"excluded_scope" -- zero hits beyond decision.moscow's own
+    forward-reference (already known) and problem-statement.schema.yaml's
+    unrelated free-text scope_non_goals field (confirmed by direct read: a
+    single string field, Atlas L2586 'Scope / Non-goals' combined line, not
+    a structured list). Read moscow.py and
+    moscow-prioritization-record.schema.yaml in full to independently
+    verify (not merely repeat) decision.moscow's own OQ-MOSCOW-1
+    characterization -- confirmed true. Read architecture/adr.py in full
+    (closest structural sibling: a document-template framing record, no
+    compute layer) and devops_sre/game_day.py's runbook_execution_ref (the
+    cross-family optional soft-reference convention this file's own
+    related_moscow_wont_ref reuses). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document modified except the one explicitly-permitted edit to
+    decision.moscow.contract.yaml's OQ-MOSCOW-1 line (open_questions
+    section only). F01 L339's 3-stage citation ("excluded scope→理由→重審
+    條件") is transcribed verbatim into preconditions. excluded_scope[]
+    field shape, the id-uniqueness invariant, and related_moscow_wont_ref
+    are compilation decisions, disclosed above, not textually cited.

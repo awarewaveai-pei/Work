@@ -1,0 +1,139 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/kano-classification-record.schema.yaml"
+title: Kano Classification Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `KanoClassificationRecord` -- `decision.kano`'s declared output. Atlas F16
+  table row (L765): "Kano | Basic/Performance/Delighter | 功能需求分類 | 不只
+  看票數". Each feature's `category` is COMPUTED via the classical Kano
+  evaluation table (functional_response x dysfunctional_response), never a
+  constructor input -- see `methods/contracts/decision.kano.contract.yaml`'s
+  own compilation_decisions for the option-(a)-vs-(b) design call and
+  `ai_lego/compute/kano/classification.py` for the real lookup table.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Kano row (L765)"
+  - "methods/contracts/decision.kano.contract.yaml (outputs, preconditions, quality)"
+  - "ai_lego/compute/kano/classification.py (the real deterministic classify_kano_category this schema's `category` field records the result of)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Per-feature response pair, or a top-level array of multi-respondent raw responses?"
+    decision: "Per-feature -- each features[] entry is self-contained (id/label/functional_response/dysfunctional_response/category), same shape impact-effort-classification.schema.yaml's own per-idea (impact/effort/quadrant) entries already establish. See method contract OQ-KANO-1 for the disclosed single-pair-per-feature scope boundary."
+  - question: "Category enum: Atlas's 3 named values only, or the full classical 6?"
+    decision: "Full 6 (basic/performance/delighter/indifferent/reverse/questionable) -- see method contract compilation_decisions for why 3 alone cannot cover all 25 functional x dysfunctional combinations."
+
+$defs:
+  feature:
+    type: object
+    required: [id, label, functional_response, dysfunctional_response, category]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique within this record's features[] list (e.g. KANO-001-F1)."
+      label:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The feature being classified, in one sentence."
+      functional_response:
+        enum: [LIKE, MUST_BE, NEUTRAL, LIVE_WITH, DISLIKE]
+        description: "Answer to 'how would you feel if the product HAD this feature' -- the classical 5-point Kano scale (external convention, disclosed in the method contract -- Atlas gives no wording for this axis)."
+      dysfunctional_response:
+        enum: [LIKE, MUST_BE, NEUTRAL, LIVE_WITH, DISLIKE]
+        description: "Answer to 'how would you feel if the product did NOT have this feature' -- same 5-point scale, paired per feature."
+      category:
+        enum: [basic, performance, delighter, indifferent, reverse, questionable]
+        description: "COMPUTED -- Atlas L765's own 3 named categories (basic/performance/delighter, snake_cased) plus 3 classical-model categories (indifferent/reverse/questionable) needed for lookup-table totality (see method contract compilation_decisions). Never a constructor input; re-derived and cross-checked at the gate layer (evaluate_kano_integrity_gate), never trusted as stored."
+
+type: object
+required: [id, version, subject, features, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^KANO-"
+    description: "NEW DESIGN. Same id-prefix convention as impact-effort-classification.schema.yaml's IMPACTEFFORT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.kano"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What is being classified, e.g. 'Q4 feature backlog Kano pass'."
+
+  features:
+    type: array
+    minItems: 1
+    description: "The features being classified. minItems 1 -- each feature is classified INDEPENDENTLY from its own functional/dysfunctional response pair, same reasoning impact-effort-classification.schema.yaml's own `ideas` field already documents for its analogous field."
+    items:
+      $ref: "#/$defs/feature"
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed each feature's category -- same convention every genuine-compute typed object in this directory establishes, and the exact prefix evaluate_statistical_gate's own resolvability check requires (ai_lego/modules/research/gates.py)."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine classification run -- same design choice impact-effort-classification.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Q4 feature backlog, 6 features, one landing in each of the 6 canonical categories"
+    value:
+      id: "KANO-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.kano"
+      subject: "Q4 feature backlog Kano pass"
+      features:
+        - {id: "KANO-001-F1", label: "行動裝置生物辨識登入", functional_response: LIKE, dysfunctional_response: NEUTRAL, category: delighter}
+        - {id: "KANO-001-F2", label: "頁面載入時間 < 2 秒", functional_response: LIKE, dysfunctional_response: DISLIKE, category: performance}
+        - {id: "KANO-001-F3", label: "HTTPS 加密傳輸", functional_response: MUST_BE, dysfunctional_response: DISLIKE, category: basic}
+        - {id: "KANO-001-F4", label: "介面提供 17 種語言切換", functional_response: NEUTRAL, dysfunctional_response: NEUTRAL, category: indifferent}
+        - {id: "KANO-001-F5", label: "強制每小時重新登入一次", functional_response: DISLIKE, dysfunctional_response: LIKE, category: reverse}
+        - {id: "KANO-001-F6", label: "矛盾回覆測試項", functional_response: LIKE, dysfunctional_response: LIKE, category: questionable}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.kano.classification.classify_kano_category"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-KANOCLASSIFICATIONRECORD-1: no schema-level constraint ties category to functional_response/dysfunctional_response (JSON Schema cannot express that table lookup) -- left as a runtime invariant (evaluate_kano_integrity_gate re-derives and compares), same disclosed gap impact-effort-classification.schema.yaml's own OQ-IMPACTEFFORTSCHEMA-1 already documents for its structurally identical field.（owner: operator, or whoever next hardens this schema's cross-field guarantees）"
+
+verification:
+  method: >
+    Read Atlas F16 table row (L765) directly -- grep-confirmed sole Atlas hit,
+    no dedicated section, no worked example. Cross-checked against
+    methods/contracts/decision.kano.contract.yaml's own outputs/preconditions/
+    quality and ai_lego/compute/kano/classification.py's real
+    classify_kano_category/classify_features compute (hand-verified against
+    the worked example above: all 6 categories exercised, cross-checked
+    against the compute module before this schema was written). Grepped
+    specs/cognitive/typed-objects/ for "kano"/"delighter"/"must_be"/
+    "dysfunctional" before writing -- no existing or competing typed object
+    found. Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. `category` enum's basic/performance/
+    delighter values are transcribed from Atlas L765's own
+    "Basic/Performance/Delighter", snake_cased. `functional_response`/
+    `dysfunctional_response` field names/enum values, the indifferent/
+    reverse/questionable category additions, and the per-feature (not
+    survey-aggregated) granularity are Phase 3 compilation decisions,
+    disclosed in the method contract's own compilation_decisions, not
+    further mother-document citations.

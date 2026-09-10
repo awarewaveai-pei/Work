@@ -1,0 +1,135 @@
+$id: "ai-lego://methods/contracts/decision.kano.contract.yaml"
+title: "Kano Model Method Contract"
+status: ACTIVE
+
+description: >
+  decision.kano, family decision (F16), Atlas F16 table row L765 (grep-confirmed
+  sole Atlas hit, bare 4-column row, no dedicated section/§22.3 gate row/§28
+  routing mention): "Kano | Basic/Performance/Delighter | 功能需求分類 | 不只看
+  票數". 12th concrete F16 member (of 13; WSJF built concurrently, same batch,
+  not verified by this session). Distinct from decision.moscow (release-scope
+  bucket, caller-asserted) and decision.impact_effort (2 continuous axes ->
+  threshold-compared quadrant): classifies FEATURES by satisfaction-curve shape
+  via a discrete 5x5 table lookup, GENUINE_COMPUTE like impact_effort, not
+  caller-asserted like moscow (see compilation_decisions). Invariant: every
+  feature's category is COMPUTED from its functional/dysfunctional response
+  pair, never a constructor input; re-derived and cross-checked at the gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, Kano row (L765): 'Basic/Performance/Delighter | 功能需求分類 | 不只看票數'"
+  - "methods/contracts/decision.moscow.contract.yaml and decision.impact_effort.contract.yaml and their .py modules (all read in full) -- due-diligence comparison targets"
+  - "ai_lego/compute/kano/classification.py -- the real deterministic classify_kano_category this contract's genuine_compute gate depends on; its own docstring records the multi-source cross-verification of the classical evaluation table"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. decision.kano mints a new machine_id.
+  methods/registry/method-inventory.yaml:993-997's own Kano entry never carried
+  one (has_contract:false, cached line:762 -- stale by the same +3 systematic
+  drift class decision.impact_effort's contract already disclosed; current
+  Atlas line is 765, grep-verified fresh). Registered in contract-backlog.yaml
+  tier_1 by orchestrating session, not this file.
+
+id: decision.kano
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [CLASSIFY, PRIORITIZE, VALIDATE, CALCULATE]
+# INFERRED, not cited -- Atlas §4 gives no primitive formula for Kano (not among
+# the 5 cited-formula methods). CLASSIFY = table-lookup bucket assignment, same
+# use decision.moscow/decision.impact_effort already establish for their own
+# fixed-category shapes. PRIORITIZE = F16's own family header, same
+# justification decision.moscow's contract already uses (this method's raw
+# output is a satisfaction-curve label, not itself a ranking, but the family
+# header applies uniformly). VALIDATE = the category-mismatch gate's structural
+# re-derivation (fault_tree.py precedent). CALCULATE = genuine deterministic
+# table-lookup compute, not LLM math, same class decision.impact_effort's own
+# inferred CALCULATE already uses. COMPARE deliberately EXCLUDED (unlike
+# impact_effort) -- there is no continuous value-vs-threshold comparison here,
+# only a discrete key lookup.
+
+purpose:
+  - classify_features_into_basic_performance_delighter_or_related_categories_by_customer_satisfaction_curve_shape
+
+inputs:
+  required:
+    - Features
+  optional: []
+# Each Features[] entry is self-contained (id/label/functional_response/
+# dysfunctional_response), same per-entry-self-contained shape
+# decision.impact_effort's own Ideas[] (impact+effort per entry) already
+# establishes -- no separate top-level response-array input needed.
+
+outputs: [KanoClassificationRecord]
+
+preconditions:
+  - "record_id (KANO- prefix), subject non-empty strings; version is a string"
+  - "features has >=1 entry; every entry has a unique id, non-empty label, and functional_response/dysfunctional_response each one of the 5 canonical Kano scale values (LIKE/MUST_BE/NEUTRAL/LIVE_WITH/DISLIKE)"
+  - "category is COMPUTED only -- never a caller-supplied constructor input, same discipline decision.impact_effort's own quadrant already establishes"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F16 table has no misuse/evidence column for any row (plain
+  # 4-column table) -- same disclosed absence decision.moscow's contract
+  # already establishes for this field.
+
+forbidden_transition: []
+# Atlas gives Kano no dedicated section, no prose caution, and no §22.3
+# Method-specific Gate table row (grep-confirmed, 10 rows, no Kano) --
+# inventing one would be fabricated scope. Same precedent decision.moscow's
+# own empty forbidden_transition already establishes for a bare-table-row-only
+# method; UNLIKE decision.impact_effort, which had a real §11.30 prose caution
+# to infer from (this method has none).
+
+recommended_next: []
+# Atlas gives no chain/pipeline for Kano (bare table row only, grep-confirmed
+# sole hit -- no §28 routing mention). Left empty rather than inventing one
+# without textual basis, same precedent decision.moscow's own OQ-MOSCOW-3
+# already establishes.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Caller-asserts category directly (decision.moscow precedent), or GENUINE_COMPUTE derives it from paired responses (decision.impact_effort precedent)?"
+    decision: "GENUINE_COMPUTE. Atlas's own benefit column '不只看票數' (not just vote counts) directly implies real classification logic beats naive tallying -- a caller-asserted category would BE the naive tallying Atlas's own text contrasts against. The classical Kano functional/dysfunctional evaluation table (external convention, not Atlas content) is the real derivation."
+  - question: "Model only Atlas's 3 named categories (Basic/Performance/Delighter), or the full classical 6 (add Indifferent/Reverse/Questionable)?"
+    decision: "Full 6 -- the lookup table must be TOTAL over all 25 functional x dysfunctional combinations; 3 categories cannot cover all 25 cells without leaving most unclassifiable, violating this codebase's fail-closed discipline. Atlas's 3 are the primary/headline names; the other 3 are disclosed external-convention additions, not fabricated Atlas content."
+  - question: "One functional/dysfunctional response pair per feature, or full multi-respondent survey aggregation (frequency tables + Better/Worse satisfaction coefficient)?"
+    decision: "One pair per feature (a single respondent, or a caller-pre-aggregated consensus judgment). Atlas cites no aggregation mechanic; full survey statistics is a much larger invented surface with no textual grounding. See OQ-KANO-1."
+  - question: "Response scale vocabulary and casing?"
+    decision: "LIKE/MUST_BE/NEUTRAL/LIVE_WITH/DISLIKE, transcribed from the classical 5-point Kano scale (external convention -- Atlas gives no wording for this axis, bare table row only). UPPER_SNAKE, same casing decision.moscow's own caller-asserted bucket enum uses (this is human/survey-supplied raw input); the COMPUTED category output is instead lowercase snake_case, matching decision.impact_effort's own computed quadrant precedent -- disclosed split by provenance class within one method."
+  - question: "Evaluation-table correctness -- single source, or cross-verified?"
+    decision: "Cross-verified against multiple independent sources after an initial single web source (a self-described 'modified' revision) contradicted first-principles category semantics on the Dislike-functional-row cells. The table implemented here matches Wikipedia's Kano-model spot-check examples (5/5 cells) and independent re-derivation from each category's own definition. See ai_lego/compute/kano/classification.py's own docstring."
+  - question: "Automatic-authority guard, matching decision.impact_effort's own inferred §11.30 rule?"
+    decision: "None. Atlas gives Kano no dedicated section and no prose caution (unlike impact_effort's §11.30 L1905-1906); grep-confirmed sole Atlas hit is the bare F16 table row. Inventing a caution here would be fabricated scope."
+
+open_questions:
+  - "OQ-KANO-1: single functional/dysfunctional pair per feature models one respondent or a pre-aggregated consensus judgment; full multi-respondent frequency-table + Better/Worse satisfaction-coefficient aggregation is out of scope (Atlas cites none). Build if a real multi-respondent survey use case appears.（owner: operator）"
+  - "OQ-KANO-2: category vocabulary extends Atlas's 3 named categories (basic/performance/delighter) with 3 classical-model categories (indifferent/reverse/questionable) needed for lookup-table totality -- disclosed external-convention addition, not Atlas-cited. Confirm acceptable if Atlas is ever revised to name them explicitly.（owner: operator）"
+  - "OQ-KANO-3: recommended_next left empty -- Atlas gives no chain for this method (bare table row only). Link e.g. decision.moscow (feature -> release-scope bucket) once a real usage pattern is observed?（owner: operator）"
+  - "OQ-KANO-4: F16 status at build time: 12 of 13 built after this contract (all except WSJF, reported concurrently in progress by a separate agent in this same batch, not verified by this session). method-inventory.yaml:993-997's own Kano entry never carried a machine_id -- update that registry entry?（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Grepped the Atlas for "Kano" -- sole hit F16 table row L765 (confirmed no
+    dedicated section, confirmed absent from the §22.3 Method-specific Gate
+    table [10 rows, L4142-4155] and the Phase-1 method list [L4280-4295]).
+    Grepped ai_lego/ and specs/ for kano/delighter/must_be/basic_need/
+    performance_need/dysfunctional before writing -- zero hits (no
+    pre-existing overlap). Read decision.moscow.py/.contract.yaml and
+    decision.impact_effort.py/.contract.yaml in full (both siblings, due
+    diligence) plus ai_lego/modules/research/gates.py (evaluate_statistical_gate,
+    reused unchanged) before writing. Evaluation-table values cross-verified
+    via WebSearch/WebFetch against Wikipedia's Kano-model article (5 spot-check
+    cells, 5/5 match) after a first web source's self-described "modified"
+    variant disagreed on the Dislike-functional-row cells -- rejected in favor
+    of the version corroborated by independent first-principles re-derivation.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document modified. F16 L765's three named categories and the
+    "功能需求分類"/"不只看票數" phrasing are transcribed verbatim. features[]
+    shape, the GENUINE_COMPUTE design call, the 3 extension categories, the
+    response-scale vocabulary, and the single-pair-per-feature scope boundary
+    are compilation decisions, disclosed above, not textually cited.

@@ -1,0 +1,173 @@
+$id: "ai-lego://methods/contracts/decision.wsjf.contract.yaml"
+title: "WSJF (Weighted Shortest Job First) Method Contract"
+status: ACTIVE
+
+description: >
+  decision.wsjf, family decision (F16), 12th of 13 members. Atlas's ONLY
+  citation is the F16 table row (L764: "Cost of Delay÷Job Size｜portfolio｜
+  突出延遲成本") -- no dedicated section, no §22.3 gate-table row (grepped
+  exhaustively: single whole-document hit for "WSJF"/"Cost of Delay",
+  L764 itself; §22.3 L4142-4155 grep-confirmed absent). Core invariant:
+  Job Size is a DIVISOR (must be > 0, rejected not floored) and BOTH
+  cost_of_delay_total and wsjf_score are GENUINE_COMPUTE, re-derived by the
+  gate from the record's own raw cost_of_delay sub-factors and job_size,
+  never trusted as stored values. Cost of Delay is modeled as the 3-factor
+  SAFe-convention sum (business_value + time_criticality +
+  risk_reduction_opportunity_enablement) -- external convention, disclosed
+  not Atlas-cited -- a SUM numerator, distinguishing this method from
+  decision.rice's own PRODUCT numerator (reach*impact*confidence); MCDA's
+  weighted-sum shape cannot express either method's division stage (full
+  due-diligence in ai_lego/modules/decision/wsjf.py's own module docstring).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, WSJF row (L764)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155) -- grep-confirmed no WSJF row"
+  - "methods/registry/contract-backlog.yaml -- checked, no existing decision.wsjf entry found (method-inventory.yaml carries only a pending/has_contract:false placeholder)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas's own cited
+  formula plus low-risk, disclosed compilation choices for the field
+  shapes Atlas leaves unspecified (see compilation_decisions).
+
+  `id: decision.wsjf` is a NEW machine_id, `<family>.<name>` bare-form
+  grammar per ADR-005b, `decision` family (12th member). Grepped
+  exhaustively for a competing machine_id -- none found.
+
+id: decision.wsjf
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [ESTIMATE, CALCULATE, PRIORITIZE]
+# INFERRED, not cited (Atlas §4 L192's formula list does not include WSJF).
+# Identical set to decision.rice's own inferred primitives, for the same
+# structural reasons: ESTIMATE (caller estimates the 4 raw factors),
+# CALCULATE (genuine deterministic compute, not LLM math), PRIORITIZE (the
+# whole point of a portfolio WSJF score is backlog sequencing). Excludes
+# COMPARE (a WsjfScoreRecord scores ONE job, it does not itself compare
+# jobs -- see compilation_decisions). Excludes WEIGHT (the 3 Cost-of-Delay
+# sub-factors are fixed named roles in one formula, not caller-supplied
+# weights the AHP way -- same reasoning decision.rice's own contract
+# already gives for excluding WEIGHT). Excludes DECIDE for the same
+# forbidden-authority reason every sibling contract already documents.
+
+purpose:
+  - score_a_single_portfolio_job_by_cost_of_delay_over_job_size
+
+inputs:
+  required:
+    - Job
+    - CostOfDelay
+    - JobSize
+  optional: []
+  # "CostOfDelay" is listed as ONE input concept (Atlas L764's own literal
+  # formula term), same convention decision.rice's own inputs list already
+  # uses for "Reach" despite Reach also being a structured {value,unit}
+  # object at the schema level -- the 3-factor sub-structure inside
+  # CostOfDelay is a compilation-level detail, not a separate Atlas-cited
+  # input.
+
+outputs:
+  - WsjfScoreRecord
+
+preconditions:
+  - "job_size is a finite number > 0 (division by zero/negative is undefined)"
+  - "cost_of_delay is a 3-factor sum (business_value + time_criticality + risk_reduction_opportunity_enablement), each a finite number >= 0 -- external SAFe convention, disclosed not Atlas-cited (see compilation_decisions)"
+  - "cost_of_delay_total and wsjf_score are COMPUTED only, never caller-supplied constructor inputs"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same reasoning decision.rice/decision.mcda/decision.ahp already
+  # established: real risk here is unauthorized automatic authority, not
+  # omitted evidence citations for individual Cost-of-Delay sub-factors.
+
+forbidden_transition:
+  - "Automatic Authority"
+# INFERRED -- the WEAKEST-grounded citation in the decision family so far.
+# WSJF has neither a §22.3 row (grep-confirmed absent, L4142-4155) NOR a
+# dedicated-section caution sentence (no §11.x/§12.x section exists at
+# all) NOR even benefit-column language that itself reads as a
+# decision-caution (contrast decision.pareto_frontier's own benefit-column
+# inference from "不過早壓成單一總分", which at least implies a caution;
+# WSJF's own benefit column "突出延遲成本" is purely informational). Grounded
+# purely in family-wide consistency -- every decision-family sibling built
+# so far enforces this same rule regardless of its own citation strength --
+# not in any WSJF-specific Atlas text. Disclosed explicitly, not silently
+# assumed; see OQ-WSJF-3. Enforced the same two-layer way every sibling
+# rule is: construction-time assert_no_automatic_authority_claim +
+# evaluate_no_automatic_authority_gate + this schema's own
+# additionalProperties:false, using an INDEPENDENTLY RE-DERIVED (not
+# imported) FORBIDDEN_AUTHORITY_KEYS set.
+
+recommended_next: []
+# Same reasoning decision.rice's contract already gives for its own
+# identical field: "Human Judgment" is a Decision object FIELD, not a
+# machine-resolvable method id; no Atlas-cited next-step text exists for
+# WSJF (no recipe/section mentions it at all).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Atlas gives WSJF zero field-level shape beyond 'Cost of Delay ÷ Job Size' -- model Cost of Delay as one caller-supplied opaque number, or decompose it into the real-world SAFe 3-factor sum (business value + time criticality + risk reduction/opportunity enablement)?"
+    decision: "Decompose into the 3-factor sum -- external SAFe convention, disclosed as such, not Atlas-invented."
+    reasoning: >
+      A single opaque number would make WSJF indistinguishable from a
+      generic value/cost ratio and would defeat Atlas's own cited benefit
+      for this exact row ("突出延遲成本" -- spotlight cost of delay), which
+      an inspectable breakdown operationalizes directly (the
+      cost_of_delay_breakdown_disclosed gate) and an opaque number cannot.
+  - question: "Should job_size be a bare number (like decision.rice's effort) or a structured {value, unit} (like decision.rice's reach)?"
+    decision: "Bare positive number -- WSJF's F16 row has no benefit-column citation specific to job_size the way RICE's reach had one ('納入受影響人數'); structuring it would be unsupported invention, not disclosed compilation."
+  - question: "Persist cost_of_delay_total as its own computed+re-derived field, or only expose the final wsjf_score?"
+    decision: "Persist and independently re-derive both -- the intermediate sum being genuinely computed and gate-verified is the concrete mechanism that satisfies Atlas's own 'spotlight cost of delay' benefit citation; exposing only the final ratio would leave cost of delay just as opaque as any other ratio method."
+  - question: "Reuse modules.research.gates.evaluate_statistical_gate (decision.mcda/decision.ahp's own pattern) for the genuine_compute gate, or write a local recompute-and-compare gate (decision.rice's own pattern)?"
+    decision: "Follow decision.rice's own pattern: local, stronger, recompute-and-compare via math.isclose (extended here to TWO independently re-derived quantities, cost_of_delay_total and wsjf_score, since decision.rice only ever had one)."
+    reasoning: >
+      decision.rice already does not reuse the shared statistical gate,
+      for a reason that applies here too: the formula is a single-record
+      scalar shape, not MCDA/AHP's own variable-length normalized_scores/
+      ranking lists, so a full recompute-and-compare is cheap and strictly
+      stronger. decision.rice's own OQ-RICE-3 already flags this as the
+      preferred design for the rest of the family.
+  - question: "One job per record (decision.rice's own single-idea shape) or N jobs per record (decision.ice's own items[] batch shape)?"
+    decision: "One job per record, same reasoning decision.rice's own contract already gives for its own identical choice."
+    reasoning: >
+      A portfolio backlog compares many independently-generated records by
+      sorting scores, not by bundling them into one comparison object --
+      decision.rice's own OQ-RICE-4 already leaves the family-wide version
+      of this question open, not re-litigated here.
+
+open_questions:
+  - "OQ-WSJF-1: cost_of_delay sub-factors carry no fixed scale/enum -- real SAFe practice commonly uses relative Fibonacci-like sizing, not cited here since Atlas gives no scale and no worked example exists. Should a future revision define one?（owner: operator）"
+  - "OQ-WSJF-2: chose the 3-factor SAFe-convention sum over a single opaque Cost-of-Delay number for a citation that is literally one table cell -- disclosed as external convention per compilation_decisions, not Atlas-invented. Is this the right amount of borrowed real-world structure for this codebase's usual 'no Atlas-invention' restraint, or too much for a 4-column table row?（owner: operator）"
+  - "OQ-WSJF-3: forbidden_transition is the WEAKEST-grounded citation in the decision family so far (see forbidden_transition's own comment) -- grounded purely in family-wide consistency, not in WSJF's own row text.（owner: operator）"
+  - "OQ-WSJF-4: one job per record (mirrors decision.rice) vs N jobs per record batch (mirrors decision.ice's items[]) -- decision.rice's own OQ-RICE-4 already leaves this open family-wide, not re-litigated here.（owner: operator）"
+  - "OQ-WSJF-5: decision.kano (F16 row L765, the last remaining F16 member) is being built concurrently in this same batch by a different agent -- not cross-checked here (this module's own due-diligence was written before kano.py necessarily existed). A future integration pass should confirm zero field-shape overlap, mirroring the ICE cross-check decision.rice's own module docstring already performed as a follow-up once ice.py existed.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Read Atlas F16 tool table WSJF row (L764) directly, and grepped the
+    entire document (case-insensitive) for "WSJF"/"Weighted Shortest Job
+    First"/"Cost of Delay": single whole-document hit, L764 itself.
+    Grepped §22.3 Method-specific Gate table (L4142-4155) directly --
+    confirmed no WSJF row exists. Read ai_lego/modules/decision/rice.py
+    and ai_lego/compute/rice/scoring.py in full before deciding this is a
+    distinct method (product numerator vs this method's sum numerator).
+    Read ai_lego/modules/decision/mcda.py and
+    ai_lego/compute/ahp/weights.py in full -- rank_options has no division
+    operator (weights.py:102-112), confirming MCDA cannot express either
+    method. Grepped ai_lego/ exhaustively for "cost_of_delay"/"job_size"
+    (case-insensitive) -- zero pre-existing hits, including
+    ai_lego/modules/devops_sre/error_budget.py (read via grep, no match).
+    Grepped specs/ and methods/ exhaustively for "wsjf" -- no duplicate
+    typed object found, only backlog bookkeeping mentions ("remaining:
+    WSJF, Kano"). Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. forbidden_transition is INFERRED, not
+    cited (see its own comment -- the weakest-grounded such rule in the
+    family so far). Field shapes beyond the formula itself are disclosed
+    Phase 3 compilation, not silent invention -- see
+    compilation_decisions/open_questions.

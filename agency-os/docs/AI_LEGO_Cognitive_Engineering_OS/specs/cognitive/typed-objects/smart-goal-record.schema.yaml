@@ -1,0 +1,167 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/smart-goal-record.schema.yaml"
+title: SMART Goal Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SmartGoalRecord` -- framing.smart's declared `outputs`.
+  Atlas F01 table row (L335: "S/M/A/R/T 逐項補齊") + dedicated §12.4 section (L2584-2589). `criteria` is
+  a fixed-length-five, POSITIONALLY ORDERED tuple (SPECIFIC/MEASURABLE/ACHIEVABLE/RELEVANT/TIME_BOUND,
+  Atlas's own literal citation order), same `prefixItems` discipline
+  kepner-tregoe-problem-specification.schema.yaml's own `dimensions` already establishes.
+
+  TWO real invariants this schema partially expresses structurally: every criterion entry requires a
+  non-empty `justification`; the TIME_BOUND entry additionally requires `target_date`. `target_date`
+  carries `format: date`, but this codebase's SchemaContracts loader builds `Draft202012Validator` with
+  no `format_checker` (grep-confirmed, ai_lego/core/contracts/schema_contracts.py) -- so `format` is
+  annotation-only here, same as method-resolution.schema.yaml's own pre-existing `format: date` usage
+  (L602-603). The full syntactic-AND-calendrical check (e.g. rejecting 2026-02-30) is runtime-layer --
+  see ai_lego/modules/framing/smart.py -- same schema-vs-runtime honesty split
+  kepner-tregoe-problem-specification.schema.yaml's own IS!=IS-NOT check already documents.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, SMART row (L335) + §12.4 (L2584-2589) -- the two citations for this method"
+  - "methods/contracts/framing.smart.contract.yaml"
+  - "specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml (prefixItems positionally-ordered pipeline convention reused here)"
+  - "specs/cognitive/typed-objects/game-day-record.schema.yaml (runbook_execution_ref -- the format-only OPTIONAL soft-link convention refines_goal_statement_ref follows)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should target_date require the actual date to be in the future relative to wall-clock now?"
+    decision: "No -- format/calendar validity only, not a wall-clock comparison. A 'now'-relative check would make construction and gate results depend on when they run, breaking the deterministic replay every sibling module in this suite relies on for tests (see the method contract's own OQ-SMART-3)."
+  - question: "Should S/M/A/R also carry a structured field beyond free-text justification, mirroring TIME_BOUND's target_date?"
+    decision: "No -- see the method contract's own compilation_decisions. Only TIME_BOUND, the one criterion whose Atlas-cited name names a checkable fact."
+  - question: "Fixed positional tuple or a free-form array?"
+    decision: "Fixed, same positionally-ordered convention kepner-tregoe-problem-specification.schema.yaml's own dimensions[] already establishes for its own Atlas-cited order."
+  - question: "refines_goal_statement_ref: enforce a prefix pattern (e.g. runbook_execution_ref's RBEXEC- precedent)?"
+    decision: "No -- framing.goal_statement's own id convention was not visible at this schema's write time (concurrent sibling agent, same batch, not read). Non-empty string only; see the method contract's own OQ-SMART-1."
+
+type: object
+required: [id, version, goal_statement, criteria, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SMART-"
+    description: "NEW DESIGN. Grepped clear of any existing SMART- prefix use in the repo before minting."
+
+  version:
+    type: string
+
+  goal_statement:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The concrete goal these five criteria justify. Self-contained free text -- see the method contract's own compilation_decisions on why this method does not require an upstream typed GoalStatement object."
+
+  refines_goal_statement_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "OPTIONAL soft link to a framing.goal_statement record (Atlas F01 row L334, immediately above this method's own L335 row), when one exists upstream. Format-only: no prefix pattern enforced (see compilation_decisions) and this method cannot see the referenced record, same discipline devops_sre.game_day's own runbook_execution_ref already establishes for a genuinely unknown-at-write-time upstream type."
+
+  generated_by_method:
+    type: string
+    default: "framing.smart"
+
+  criteria:
+    type: array
+    minItems: 5
+    maxItems: 5
+    description: "Atlas's own five-letter F01-row citation ('S/M/A/R/T 逐項補齊'), AS AN ORDERED TUPLE -- criteria[0] MUST be SPECIFIC, criteria[4] MUST be TIME_BOUND."
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/criterion_entry"}, {properties: {criterion: {const: SPECIFIC}}}]
+      - allOf: [{$ref: "#/$defs/criterion_entry"}, {properties: {criterion: {const: MEASURABLE}}}]
+      - allOf: [{$ref: "#/$defs/criterion_entry"}, {properties: {criterion: {const: ACHIEVABLE}}}]
+      - allOf: [{$ref: "#/$defs/criterion_entry"}, {properties: {criterion: {const: RELEVANT}}}]
+      - allOf:
+          - $ref: "#/$defs/criterion_entry"
+          - properties: {criterion: {const: TIME_BOUND}}
+          - required: [target_date]
+    items: false
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  criterion_entry:
+    type: object
+    required: [criterion, justification, provenance]
+    additionalProperties: false
+    properties:
+      criterion:
+        type: string
+        enum: [SPECIFIC, MEASURABLE, ACHIEVABLE, RELEVANT, TIME_BOUND]
+      justification:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Free-text justification of how the goal satisfies this criterion."
+      target_date:
+        type: string
+        format: date
+        description: "TIME_BOUND only -- required there via this schema's own per-index prefixItems `required` (see criteria above); a non-TIME_BOUND entry carrying target_date is rejected at the runtime layer (schema alone cannot cross-reference a sibling array index's own criterion value, see compilation_decisions). ISO-8601 calendar date; format:date is annotation-only in this codebase (see top-level description) -- full calendar validity is runtime-layer."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+
+examples:
+  - description: "A complete SMART goal: all 5 criteria filled, TIME_BOUND carries a real target_date"
+    value:
+      id: "SMART-2026-09-08-001"
+      version: "1.0.0"
+      goal_statement: "在 2026 Q4 結束前，為 F01 框定家族的 SMART 方法建立完整合約/schema/gate/CLI/test 五件套"
+      generated_by_method: "framing.smart"
+      criteria:
+        - criterion: SPECIFIC
+          justification: "明確產出 framing.smart 的 contract/schema/module/CLI/test 五個檔案"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - criterion: MEASURABLE
+          justification: "5 個檔案全部存在、測試全綠、CLI 兩個 PASS 案例皆驗證通過"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - criterion: ACHIEVABLE
+          justification: "已有 76 個既有切片可直接複製結構樣板，非從零設計"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - criterion: RELEVANT
+          justification: "F01 框定家族目前 0/11 有合約，是本批次唯一新開的認知方法家族"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - criterion: TIME_BOUND
+          justification: "在指定截止日前完成並通過驗證"
+          target_date: "2026-12-31"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-SMARTGOAL-1"
+    question: >
+      refines_goal_statement_ref carries no prefix pattern since framing.goal_statement's own id
+      convention was not visible at this schema's write time (concurrent sibling agent, same batch).
+      Should a future revision add the real prefix once that schema exists?
+    owner: "operator, or whoever next builds framing.goal_statement"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table SMART row (L335) and §12.4 (L2584-2589) directly. Read
+    kepner-tregoe-problem-specification.schema.yaml in full as the prefixItems/$defs convention
+    template. Read game-day-record.schema.yaml's own runbook_execution_ref field in full for the
+    format-only OPTIONAL soft-link convention. Confirmed via ai_lego/core/contracts/schema_contracts.py
+    (read in full) that format_checker is never passed to Draft202012Validator in this codebase.
+    Validated against jsonschema Draft202012Validator via the project's own SchemaContracts loader,
+    exercised through tests/unit/test_smart.py (required fields present, id/criterion enum/target_date
+    shape satisfied, criteria prefixItems order enforced, additionalProperties:false on
+    $defs/criterion_entry verified to actually reject an unknown key).
+  note: >
+    `criteria`'s five values and citation order are transcribed verbatim from Atlas L335. No mother
+    document was modified to produce this file.
+
+    CORRECTED (critic review, 2026-09-08): top-level `additionalProperties: false` was silently omitted
+    in the original build, inconsistent with 3 of this schema's own 5 batch siblings
+    (wsjf/kano/non-goals) and undisclosed. Added to close the gap.

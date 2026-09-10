@@ -96,7 +96,7 @@ compilation_decisions:
     decision: "WONT -- no enum value anywhere in this schema family carries punctuation (AFTER_FAULT, IMMEDIATELY_BEFORE, ...); disclosed transcription choice, not a silent respelling."
 
 open_questions:
-  - "OQ-MOSCOW-1: F01 Non-goals is unbuilt. Once built, should its excluded_scope entries be able to soft-reference a decision.moscow WONT item id?（owner: operator）"
+  - "OQ-MOSCOW-1: RESOLVED (2026-09-08). F01 Non-goals is now built (framing.non_goals) -- added an OPTIONAL related_moscow_wont_ref field on its own excluded_scope[] entries, format-checked as a non-empty string (mirrors moscow's own items[].id shape, which carries no fixed prefix either; existence of the referenced record/item is NOT verified, format-only). See methods/contracts/framing.non_goals.contract.yaml's own compilation_decisions and ai_lego/modules/framing/non_goals.py.（owner: operator）"
   - "OQ-MOSCOW-2: must_ratio() is informational-only, no enforced threshold (Atlas gives none). Add a caller-configurable advisory threshold if a real convention is ever sourced?（owner: operator）"
   - "OQ-MOSCOW-3: recommended_next left empty -- Atlas gives no chain for this method. Link e.g. architecture.adr once a real usage pattern is observed?（owner: operator）"
   - "OQ-MOSCOW-4: id: decision.moscow mints a machine_id method-inventory.yaml's own MoSCoW entry (L983/751) never carried. Update that registry entry?（owner: operator, or a future session with write scope）"

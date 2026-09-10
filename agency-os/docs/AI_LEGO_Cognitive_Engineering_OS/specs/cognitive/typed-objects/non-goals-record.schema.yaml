@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/non-goals-record.schema.yaml"
+title: Non-goals Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `NonGoalsRecord` -- the declared
+  `outputs` of `framing.non_goals`'s Method Contract. Atlas's F01 table row
+  (L339) names the 3-stage pipeline ("excluded scope→理由→重審條件") but
+  gives no worked example and no field-level shape -- the `excluded_scope[]`
+  structure below is compiled directly from that citation (not external
+  methodology, unlike e.g. kepner-tregoe-problem-specification.schema.yaml's
+  own disclosed non-Atlas grounding).
+
+  ALL THREE of `scope_item`/`reason`/`re_review_trigger` are unconditionally
+  REQUIRED per entry (native JSON Schema `required`, a REAL structural layer
+  here -- contrast moscow-prioritization-record.schema.yaml's own
+  CONDITIONAL `if`/`then`, needed there only because MoSCoW's `reason` is
+  optional for MUST/SHOULD/COULD and mandatory only for WONT). Per-entry
+  `id` UNIQUENESS is runtime-only (JSON Schema has no native
+  array-uniqueness-by-subfield operator, same disclosed limitation
+  moscow-prioritization-record.schema.yaml's own `id` field already
+  accepts) -- see `ai_lego/modules/framing/non_goals.py`'s
+  `NONGOALS_DUPLICATE_ITEM_ID`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Non-goals row (L339) -- the ONLY citation for this method"
+  - "methods/contracts/framing.non_goals.contract.yaml"
+  - "moscow-prioritization-record.schema.yaml#/$defs/item/properties/id -- the shape related_moscow_wont_ref's format check reuses (non-empty \\S string, no fixed prefix)"
+  - "game-day-record.schema.yaml's runbook_execution_ref -- the cross-family optional soft-reference convention related_moscow_wont_ref follows"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should related_moscow_wont_ref be a hard $ref into moscow-prioritization-record.schema.yaml?"
+    decision: "No -- a soft string reference only (format-checked, existence NOT verified), same class every cross-family _ref field in this suite already uses (e.g. game-day-record.schema.yaml's own runbook_execution_ref), disclosed in the method contract's own compilation_decisions."
+  - question: "excluded_scope minItems?"
+    decision: "1 -- a Non-goals record declaring zero exclusions is vacuous, same reasoning moscow-prioritization-record.schema.yaml's own items minItems:1 and architecture-decision-record.schema.yaml's alternatives_considered minItems:1 already apply."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- same closed-key-set convention moscow-prioritization-record.schema.yaml uses at both its top level and its $defs.item (structurally forecloses any hand-crafted key, including one that might assert an unearned finality/authority claim, even though Atlas §22.3 does not cite this method for that specific rule -- see the method contract's own compilation_decisions)."
+
+type: object
+required: [id, version, project_scope, excluded_scope, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^NONGOALS-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.non_goals"
+
+  project_scope:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L339's own 何時使用 column value: '大型專案' -- the project/initiative this exclusion list applies to. Same role moscow-prioritization-record.schema.yaml's release_scope plays for that method."
+
+  excluded_scope:
+    type: array
+    minItems: 1
+    description: "One or more excluded-scope entries. See compilation_decisions."
+    items: {$ref: "#/$defs/excluded_scope_entry"}
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  excluded_scope_entry:
+    type: object
+    required: [id, scope_item, reason, re_review_trigger, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique within this record's excluded_scope[] list (runtime-only uniqueness check, NONGOALS_DUPLICATE_ITEM_ID -- see top-level description)."
+      scope_item:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas L339 stage 1: what is explicitly excluded."
+      reason:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas L339 stage 2 (理由): why this is excluded. Unconditionally required (contrast decision.moscow's WONT-only-conditional reason)."
+      re_review_trigger:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas L339 stage 3 (重審條件): the condition under which this exclusion should be re-examined. The field decision.moscow's own WONT bucket has none of (see methods/contracts/decision.moscow.contract.yaml's own compilation_decisions and OQ-MOSCOW-1)."
+      related_moscow_wont_ref:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: >
+          OPTIONAL soft reference to a decision.moscow record's items[].id
+          (a WONT-bucket item, by convention -- NOT schema-checked here).
+          Format-checked only as non-empty \S, the SAME shape
+          moscow-prioritization-record.schema.yaml's own items[].id
+          requires (that field carries no fixed prefix either -- only the
+          MOSCOW- record-level id does). Existence of the referenced
+          record/item is NOT verified -- resolves OQ-MOSCOW-1.
+      provenance:
+        description: "Per-entry, same per-entry granularity every sibling typed-object schema in this directory uses."
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A project-level Non-goals record: 2 exclusions, one soft-linked to a decision.moscow WONT item"
+    value:
+      id: "NONGOALS-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "framing.non_goals"
+      project_scope: "Cognitive OS Method Atlas F01 framing family build batch, 2026-09-08"
+      excluded_scope:
+        - id: "NG-001"
+          scope_item: "即時多人協作編輯（多人同時編輯同一份 record）"
+          reason: "本批次目標是單人 R0/R4 驗證管線，非即時協作系統"
+          re_review_trigger: "第二個真實使用者需要同時寫入同一份 record 時，重新評估"
+          related_moscow_wont_ref: "MOSCOW-001-I6"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "NG-002"
+          scope_item: "WBS（F02 Work Breakdown Structure，尚未建置）"
+          reason: "Atlas 最佳搭配欄位所指的另一個 F02 method，本任務範疇明確排除"
+          re_review_trigger: "F02 WBS mint 出 machine_id 且有真實整合需求時"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+      provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-NONGOALSRECORD-1"
+    question: "related_moscow_wont_ref's format check mirrors moscow's own item-id shape (non-empty \\S) rather than a fixed prefix, because moscow item ids carry none. Should moscow's own item-id convention gain an optional strict sub-prefix in a future revision, making this reference tighter?"
+    owner: "operator, or whoever next revisits decision.moscow's item-id convention"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F01 table Non-goals row (L339) directly. Read
+    moscow-prioritization-record.schema.yaml and
+    architecture-decision-record.schema.yaml in full as the closest
+    structural siblings (conditional-field convention and
+    plain-document-template convention respectively) before writing this
+    file. Validated against jsonschema Draft202012Validator (required
+    fields present, id/excluded_scope[].id patterns satisfied,
+    additionalProperties:false on both objects verified to actually reject
+    an unknown key, minItems:1 verified to reject an empty excluded_scope).
+  note: >
+    No mother document modified. L339's 3-stage citation is transcribed
+    verbatim into the three required per-entry fields. project_scope, the
+    id-uniqueness runtime invariant, and related_moscow_wont_ref are
+    compilation decisions, disclosed above, not textually cited.
