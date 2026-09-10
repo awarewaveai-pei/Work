@@ -369,7 +369,7 @@ class GateMutationTests(unittest.TestCase):
         self.assertEqual(gate["status"], "FAIL")
 
     def test_genuine_compute_gate_is_the_real_evaluate_statistical_gate_function_reused_unchanged(self):
-        """Proves the reuse is real function identity -- eighth reuse this session, after root_cause.pareto/
+        """Proves the reuse is real function identity -- seventh reuse this session, after root_cause.pareto/
         decision.ahp/decision.mcda/devops_sre.error_budget/database_data.data_lineage/database_data
         .reconciliation."""
         from ai_lego.modules.devops_sre import capacity_model as capacity_model_module

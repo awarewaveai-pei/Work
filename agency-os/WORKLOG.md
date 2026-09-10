@@ -13903,3 +13903,20 @@ Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; af
 - Deployed `/tools/video` → `短劇 Bible`: versioned character/continuity UI, tenant-owned asset references, server-owned revision/approval state.
 - Evidence: next-admin `cf6f04a37`; snapshot `lobster-phase1-next-admin:rollback-20260910-045531`; controlled deploy health/smokes passed.
 - Regression: `npm run typecheck`; `npm test` = 90 files/790 tests passed. Whisper `https://video-whisper.aware-wave.com/health` = 200.
+
+## 2026-09-10 — cognitive-engineering-os：capacity_model「第八次重用」test docstring 二度修正（merge 衝突解決過程意外 revert 回舊值後重新套用）
+
+[scope]
+`tests/unit/test_capacity_model.py:372` 的「eighth reuse」→「seventh reuse」修正（`contract-backlog.yaml` 同一批修正已於稍早正確落地，未受影響）。本機 `main`（`D:\Work`，非 worktree）今日稍早發生一場大規模分支分歧收斂（本地 4 vs 遠端 55 個 commit，含 `agency-os/WORKLOG.md`／`agency-os/docs/video_generator/README.md` 兩檔真實 conflict marker，由另一 process/session 即時處理，本 session 全程只觀察未介入，事後確認已乾淨解決）過程中，`test_capacity_model.py:372` 的既有正確修正被意外 revert 回舊值「eighth」——非本次新引入的錯誤，是既有正確修正在無關的 merge 收斂中被撤銷，事後重新 grep 確認才發現此 regression。
+
+[並行寫入處理]
+Commit 當下 real index 已有另一 session 正在準備的大量 staged 內容（101 檔／4923 行新增，`lobster-factory` video 功能相關遷移/API/元件，與本次改動完全無關）。為避免污染，全程不使用會動到 real index 其他路徑的指令（`git add -A`／`git commit -a`／不帶 pathspec 的 `git commit` 皆會誤把該 101 個檔案一起 commit 掉；`git commit --only -- <path>` 對列出的路徑會從 working tree 重新 add，對 `WORKLOG.md` 這種同時被另一 session 污染 working tree 的檔案不安全）。改用 `GIT_INDEX_FILE` 指向暫存 index：`git read-tree HEAD` 建立乾淨基底 → 只對本次 2 個目標路徑 `git update-index --cacheinfo` 指向新 blob → `git write-tree`／`git commit-tree` 產生新 commit → 移動 `main` ref（不動 working tree／real index）→ 額外對 real index 的這 2 個路徑同步 `update-index --cacheinfo` 成新 blob，讓 `git status` 對這 2 檔顯示乾淨，同時 101 個他人 staged 檔案全程原封不動。`WORKLOG.md` 本身額外有另一 session 正在寫入的 33 行未 staged 新增（Docker Desktop 相關條目，與本次無關），採同樣手法：從 `HEAD` 版本（非污染的 working tree 版本）接上本條目，hash-object 後 splice 進新 commit，不動 working tree 上那 33 行（留給對方自己日後 commit）。
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_capacity_model -v`（cwd=Projects/internal/cognitive-engineering-os）| exit=0 | result=58/58 tests pass
+- REVIEW_DONE: critic=Quick 自審（風險 Low：單字 docstring 字串復原至先前已驗證過的正確值，零邏輯改動；git plumbing 操作逐步驗證真實 blob SHA 與 tree 內容，non-target 路徑零觸碰）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`eighth reuse` | 確認 `test_capacity_model.py` 為本次唯一目標，`contract-backlog.yaml`／`TASKS.md` 未受影響維持正確
+- WORKLOG: 本條目
+
+[rollback]
+`git revert` 本次 commit：`test_capacity_model.py:372` 還原「eighth」（回到 regression 狀態，非目標）；`WORKLOG.md` 本條目移除。純 docstring 字串復原，無資料/邏輯風險，58 個既有測試不受影響；101 個他人 staged 檔案不受本次 commit 或其 revert 影響（全程未進入本次 commit 範圍）。
