@@ -98,6 +98,12 @@
   .decision-banner .rationale { margin-top: 0.5rem; font-size: 0.92rem; line-height: 1.6; }
   .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
 
+  .risk-tier-editor { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .risk-tier-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .risk-tier-submit { padding: 0.4rem 1rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
+  .risk-tier-submit:hover { background: var(--teal-ink); }
+  .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
+
   .radar-wrap { padding: 0.5rem 0 1.5rem; }
   .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); }
   .domain-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0.85rem 0.4rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
@@ -238,6 +244,7 @@
       <div id="d-reopen-wrap"></div>
     </div>
     <div id="d-decision-banner"></div>
+    <div id="d-risk-tier-wrap"></div>
   </div>
   <div id="d-empty-cta"></div>
 
@@ -320,6 +327,8 @@ const DOMAIN_LABELS = { OPERATIONAL:'營運', COMPETENCE:'專業能力', CONFIDE
 const KIND_LABELS = { EVIDENCE:'證據', CLAIM:'主張', ASSESSMENT:'評估' };
 const STATUS_LABELS = { OPEN:'開啟中', ACTIVE:'進行中', CLOSED:'已結案' };
 const PURPOSE_LABELS = { vendor_risk_assessment:'供應商風險評估', fraud_investigation:'詐欺調查', personal_safety:'人身安全', journalism_research:'新聞調查研究', general_due_diligence:'一般盡職調查' };
+const CASE_RISK_TIERS = ['R0','R1','R2','R3','R4'];
+const RISK_TIER_LABELS = { R0:'R0（風險最低）', R1:'R1', R2:'R2（中等）', R3:'R3', R4:'R4（風險最高）' };
 const COVERAGE_LABELS = { FULL:'完整覆蓋', PARTIAL:'部分覆蓋' };
 const QUALITY_LABELS = { SINGLE_SOURCE:'單一來源', MULTIPLE_SOURCES:'多重來源' };
 const ALL_DOMAINS = ['OPERATIONAL','COMPETENCE','CONFIDENTIALITY','FINANCIAL','STRATEGIC','REPUTATIONAL','GOVERNANCE_POWER'];
@@ -379,6 +388,19 @@ async function reopenCase(caseId) {
   const body = await res.json();
   if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
   await loadList(currentTenant);
+}
+
+async function submitRiskTier() {
+  const risk_tier = document.getElementById('d-risk-tier').value;
+  const errEl = document.getElementById('risk-tier-err');
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/risk-tier?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, risk_tier }),
+  });
+  const body = await res.json();
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return; }
+  errEl.textContent = '';
+  await refreshDetail();
 }
 
 async function openCase(caseId) {
@@ -453,6 +475,22 @@ async function refreshDetail() {
     ? `<button type="button" class="reopen-btn" onclick="reopenCase('${body.case.id}').then(() => openCase('${body.case.id}'))">↺ 重新開啟此案件</button>`
     : '';
 
+  // Risk tier is the one field with a real, tested downstream effect
+  // (hci.flag_claims_on_risk_elevation(), migrations/0008): raising it
+  // retroactively flags every eligible linked CLAIM for reaudit, and is
+  // rejected outright if a flagged Claim is already tied to a finalized
+  // decision. Editable here (not just at case creation) so that mechanism
+  // is actually reachable through the product, not dormant in the schema.
+  document.getElementById('d-risk-tier-wrap').innerHTML = `
+    <div class="risk-tier-editor">
+      <span class="risk-tier-label">風險等級</span>
+      <div class="chip-group" id="d-risk-chips">${CASE_RISK_TIERS.map(t => `<button type="button" class="chip${t === body.case.risk_tier ? ' selected' : ''}" data-value="${t}" onclick="pickChip(this,'d-risk-tier')">${RISK_TIER_LABELS[t]}</button>`).join('')}</div>
+      <input type="hidden" id="d-risk-tier" value="${body.case.risk_tier}">
+      <button type="button" class="risk-tier-submit" onclick="submitRiskTier()">更新風險等級</button>
+    </div>
+    <p class="field-hint">調高風險等級會把此案件下所有已核准的主張標記為需要重新審查；若某個主張已連結到一個定案的決策（繼續進行/附條件繼續/終止往來），調升會被擋下，須先線下處理。</p>
+    <div id="risk-tier-err" class="err"></div>`;
+
   const bannerEl = document.getElementById('d-decision-banner');
   if (body.decisions.length) {
     const d = body.decisions[0];
@@ -519,6 +557,7 @@ async function refreshDetail() {
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
       ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality] || quality}</span>` : ''}
+      ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
     </div>`;
   }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
 

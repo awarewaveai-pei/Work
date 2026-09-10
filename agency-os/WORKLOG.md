@@ -59,6 +59,29 @@ WORKLOG_DONE: 本條目
 [剩餘風險] ① `scripts/system-health-check.ps1` 的 cf-security 整合點仍因既有 path bug 永遠 skip（跟上一條目同一個殘留風險，未擴大範圍修復）；② CAA 記錄設對是否真的不影響下次憑證更新，要等 `/etc/letsencrypt` 下次續期（WORKLOG 曾記 2026-11-26 到期）才算完整驗證，目前只驗證了「記錄內容符合預期＋Cloudflare 官方文件描述的自動追加行為」，未驗證「續期當下真的不出事」；③ SPF 對齊完整度只到「Resend 補齊」，DMARC 仍 `p=none` 監控期，何時升 `p=quarantine` 是獨立、故意留給操作者的決策，不在本次範圍內。
 [rollback] SPF：`PATCH` 回 `v=spf1 include:_spf.mx.cloudflare.net ~all`（record id 同上）。CAA：`DELETE` 6 個 record id（`5b3b4e93.../ebb58c54.../87a75d25.../ed051e5f.../f8807e86.../f446db7f...`，皆記在本條目 API 回應裡）。`check-cloudflare-security.ps1`：`git revert` 本次 commit，純邏輯新增與端點遷移，無刪除既有行為，無 schema/DB 影響。
 
+## 2026-09-10 HCI30 接上風險等級調升的真實效果——操作者直接問「這些欄位對系統有真正產生作用嗎」
+
+操作者對「風險等級」欄位的意義追問到底：「調查目的只是一個tag嗎? 風險等級要定義，但這些對系統有真正產生作用嗎？」查證程式碼而非猜測：
+
+- **調查目的（purpose）**：確認目前純粹是驗證過的分類標籤。它被限制在 ADR-0012 的 5 值管制清單（不是自由文字），是因為未來的司法管轄權/合法性基礎邏輯設計上要靠它分流，但**現在沒有任何程式碼真的讀這個值來改變行為**。誠實講清楚，沒有誇大。
+- **風險等級（risk_tier）**：查出**不只是標籤**——`hci.flag_claims_on_risk_elevation()`（migrations/0008）是一個真實、早就測試過的觸發器：案件風險等級調高時，會自動把該案件下所有符合條件的「主張」標記為需要重新審查，而且如果某個即將被標記的主張已經連結到一個定案的「繼續進行/附條件繼續/終止往來」決策，調升動作會直接被擋下（H1017）。但應用程式從來沒有提供「開案後修改風險等級」的地方——這個真實機制完全無法透過產品觸發，開案當下選的值本身什麼都不會做。
+
+操作者選擇接上這個能力，而非隱藏或預設欄位。新增：
+- `POST /api/hci/v1/cases/:id/risk-tier`——驗證同一組 5 值列舉，更新欄位，讓既有 trigger 自己的邏輯（調升標記／H1017 拒絕）去做真正的事，不特別處理方向（trigger 本身只對調升動作反應）。
+- 案件詳情頁的紀錄查詢加入 `reaudit_required` 欄位（這個欄位過去在整個應用程式裡從未被抓取過，就算端點做出來，效果也是看不見的）。
+- 案件報告頁頭加一個風險等級編輯器（按鈕式選擇＋明確送出按鈕，符合本應用既有的按鍵式選單風格），提示文字直接寫出真實後果，不是含糊的「請小心」。
+- 被標記 `reaudit_required` 的主張紀錄卡片上會顯示明顯的警示標籤，讓調升風險等級的效果真的看得見，不是一次無聲的資料庫寫入。
+
+真跑驗證（非假設）：在一個既有案件（R0）上建立一筆主張，確認 `reaudit_required=false`；透過新端點把案件調到 R2（200 OK）；重新查詢案件，確認該主張的 `reaudit_required` 真的變成 `true`；載入真實介面確認警示標籤正確渲染在該筆紀錄卡片上。H1017 拒絕路徑（調升被已定案決策的主張擋下）在這個應用程式裡誠實地維持不可觸發：`server.mjs` 目前沒有任何地方寫入 `hci.decision_claims`（「把這筆主張連結到這個決策」的功能不存在），所以這個 schema 層級真實存在、早已測試過的防護機制，應用程式從未把它逼到會真的觸發的情境。本次不修——那是另一個沒人要求的功能（決定「哪些主張支持了這個決策」）。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=在既有案件上建立主張確認 reaudit_required=false→呼叫新端點把風險等級從 R0 調到 R2（200 OK）→重新查詢確認該主張 reaudit_required 變 true→載入真實介面確認警示標籤正確渲染 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 新端點沿用既有 /reopen 端點一模一樣的 queryAsTenant/problem() 慣例，真正有意義的邏輯（調升標記、H1017 拒絕）本來就活在 migration 0008 一個已經有完整負向測試與 mutation-kill 覆蓋的 trigger 裡，本次只是讓這個既有、已驗證過的機制變得可觸達，沒有新增 trigger 邏輯。Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=risk-tier\|submitRiskTier\|reaudit_required\|d-risk-tier\|d-risk-chips | hits=0（本次修改的 server.mjs/index.html 外皆無殘留引用，皆為本次新增符號）；另檢查 docs/domain 與 ADR-0020 是否有「risk_tier 開案後不可變」的過期宣稱——沒有，既有文件本就只描述 trigger 自身行為，未曾對應用層 UI 做過任何宣稱，本輪無需修正文件
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：`server.mjs` 的 `POST /cases/:id/risk-tier` 端點與 records 查詢新增的 `reaudit_required` 欄位、`index.html` 的風險等級編輯器與警示標籤全部移除，回到風險等級只能開案當下選一次、之後無法修改的上一版。純新增，未修改 migration 0008 既有 trigger 邏輯，可安全回滾。
+
 ## 2026-09-10（System Foundry v1.6 — 新增 2 個 capability：個人自用帳號 + 預付點數包，補「無組織帳號」與「預付制計費」兩個真實缺口，全 verify chain 綠燈）
 
 **根因**：操作者本 session 指出 catalog 現有 account-type capability 全部預設有 owning org（`CAP-MULTI-TENANT` 也是單租戶 org，非無 org）；billing capability 只有 `CAP-USAGE-METERING`（純量測，不含預付）/`CAP-CREDIT-TERMS`（B2B 帳期，先貨後款）/`CAP-LOYALTY-POINTS`（賺取制非購買制），無「先儲值後扣點」模型。

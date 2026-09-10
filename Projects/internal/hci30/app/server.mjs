@@ -191,6 +191,29 @@ app.post('/api/hci/v1/cases/:caseId/reopen', async (req, res) => {
   }
 });
 
+app.post('/api/hci/v1/cases/:caseId/risk-tier', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { risk_tier } = req.body || {};
+  if (!CASE_RISK_TIERS.includes(risk_tier)) return problem(res, 400, 'Bad Request', `risk_tier must be one of: ${CASE_RISK_TIERS.join(', ')}`);
+  try {
+    // hci.flag_claims_on_risk_elevation() (migrations/0008) fires on ANY
+    // change to this column, not something this endpoint drives itself --
+    // raising the tier retroactively flags every eligible linked CLAIM
+    // (reaudit_required=true), and is rejected outright (H1017) if any of
+    // those Claims is already tied to a finalized PROCEED/PROCEED_WITH_
+    // CONTROLS/EXIT decision. Lowering or re-selecting the same tier is a
+    // plain no-op column write with no side effect -- this endpoint does
+    // not special-case either direction, the trigger already does.
+    const { rowCount } = await queryAsTenant(t.role, 'UPDATE hci.cases SET risk_tier = $1 WHERE id = $2', [risk_tier, req.params.caseId]);
+    if (rowCount === 0) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases WHERE id = $1', [req.params.caseId]);
+    res.json(rows[0]);
+  } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
 app.post('/api/hci/v1/persons', async (req, res) => {
   const t = resolveTenant(req, res);
   if (!t) return;
@@ -219,7 +242,7 @@ app.get('/api/hci/v1/cases/:caseId', async (req, res) => {
     const { rows: persons } = await queryAsTenant(t.role, 'SELECT id, display_label FROM hci.persons ORDER BY display_label');
     const { rows: records } = await queryAsTenant(
       t.role,
-      "SELECT id, kind, person_id, payload FROM hci.subject_records WHERE case_id = $1 ORDER BY kind, id",
+      "SELECT id, kind, person_id, payload, reaudit_required FROM hci.subject_records WHERE case_id = $1 ORDER BY kind, id",
       [req.params.caseId]
     );
     const { rows: decisions } = await queryAsTenant(
