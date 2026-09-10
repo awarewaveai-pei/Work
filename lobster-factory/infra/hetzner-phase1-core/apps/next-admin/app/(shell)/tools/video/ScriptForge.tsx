@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { chipStyle } from "@/components/tools/panel-primitives";
+import StoryBibleWorkbench from "./StoryBibleWorkbench";
 
 // Palette mapped onto the GLOBAL theme CSS vars so ScriptForge matches the rest of the
 // app (was a bespoke coral/violet/jade palette) AND follows /tools/theme automatically.
@@ -110,6 +111,7 @@ const CTAS=["留言互動","追蹤頻道","購買產品","預約服務","下載�
 const LANGUAGES=[{id:"en",label:"英文",flag:"🇺🇸"},{id:"ja",label:"日文",flag:"🇯🇵"},{id:"yue",label:"粵語",flag:"🇭🇰"},{id:"ko",label:"韓文",flag:"🇰🇷"},{id:"th",label:"泰文",flag:"🇹🇭"},{id:"ms",label:"馬來文",flag:"🇲🇾"}];
 
 const NAVS=[
+  {id:"story_bible",label:"短劇 Story Bible",icon:"📖",group:"生成"},
   {id:"manual",label:"手動生成",icon:"✏️",group:"生成"},
   {id:"article",label:"文章轉腳本",icon:"📄",group:"生成"},
   {id:"industry",label:"產業模板",icon:"🏭",group:"生成"},
@@ -934,6 +936,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
       </div>
       {/* 場景總數與 AI/圖庫分配已回到前製腳本；影片生產只負責素材模式、模型、配音、輸出比例與渲染。 */}
       <div style={{maxWidth:960,margin:"0 auto",padding:"22px 14px 80px",animation:"fadeUp .3s ease"}}>
+        {nav==="story_bible"&&<StoryBibleWorkbench/>}
         {nav==="manual"&&<ManualModule brand={brand}/>}
         {nav==="article"&&<ArticleModule brand={brand}/>}
         {nav==="industry"&&<IndustryModule setBrand={setBrand} brand={brand}/>}

@@ -20,6 +20,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "Projects/internal/hci30/app", "start"],
       "port": 4030
+    },
+    {
+      "name": "next-admin-verify",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx next dev -p 3901"],
+      "port": 3901
     }
   ]
 }

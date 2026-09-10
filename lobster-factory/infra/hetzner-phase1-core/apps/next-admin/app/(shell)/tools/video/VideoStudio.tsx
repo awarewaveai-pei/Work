@@ -9,6 +9,9 @@ import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { tabStyle, chipStyle } from "@/components/tools/panel-primitives";
 import TimelineValidationPanel from "./TimelineValidationPanel";
+import FootageEditor from "./FootageEditor";
+import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
+import MediaOperationsPanel from "./MediaOperationsPanel";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
@@ -144,6 +147,26 @@ function getCurrentStepIndex(step: string): number {
   return idx >= 0 ? idx : 0;
 }
 
+// ─── Studio tab groups（2026-09-10 IA 修正：既有 5 個平級 tab 重分組成三段，
+//     不砍任何既有 tab；新增 footage/release/operations 接線既有孤兒面板；
+//     「說明 & 成本」從 tab 移出 → 常駐彈窗，見 infoOpen）───────────────────
+type StudioTabId = "generate" | "remotion" | "footage" | "release" | "timeline" | "history" | "operations";
+const STUDIO_TAB_GROUPS: { group: string; items: { id: StudioTabId; label: string }[] }[] = [
+  { group: "製作", items: [
+    { id: "generate", label: "生成影片" },
+    { id: "remotion", label: "Remotion 模板" },
+    { id: "footage",  label: "實拍剪輯" },
+  ]},
+  { group: "審片與交付", items: [
+    { id: "release",  label: "Release 交付" },
+    { id: "timeline", label: "Timeline 驗證（進階）" },
+  ]},
+  { group: "營運", items: [
+    { id: "history",    label: "生成記錄" },
+    { id: "operations", label: "營運與成效" },
+  ]},
+];
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface VideoStudioInitial {
@@ -248,7 +271,9 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
-  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion" | "timeline">(remotionInitial ? "remotion" : "generate");
+  const [studioTab, setStudioTab] = useState<"generate" | "remotion" | "footage" | "release" | "timeline" | "history" | "operations">(remotionInitial ? "remotion" : "generate");
+  // 說明&成本已從步驟移出（2026-09-10 IA 修正：獨立可及，不佔生產流程），改用彈窗，跟 studioTab 分開追蹤。
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Auto-switch to Remotion tab when a script prefill arrives from ScriptForge
   useEffect(() => { if (remotionInitial) setStudioTab("remotion"); }, [remotionInitial]);
@@ -585,33 +610,39 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh" }}>
 
-      {/* ── Inner tab bar ── */}
+      {/* ── Inner tab bar：三段式（製作／審片與交付／營運）+ 常駐成本說明入口 ── */}
       <div style={{
-        display: "flex", gap: 4, padding: "10px 28px 0",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+        padding: "10px 28px 0",
         background: "var(--bg-canvas)", borderBottom: "1px solid var(--border-subtle)",
       }}>
-        {([
-          { id: "generate" as const, label: "生成影片" },
-          { id: "remotion" as const, label: "Remotion 模板" },
-          { id: "timeline" as const, label: "Timeline 驗證" },
-          { id: "history"  as const, label: "生成記錄" },
-          { id: "info"     as const, label: "說明 & 成本" },
-        ]).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setStudioTab(t.id)}
-            style={{
-              padding: "10px 18px", border: "none",
-              borderBottom: `3px solid ${studioTab === t.id ? "var(--accent)" : "transparent"}`,
-              background: "transparent", cursor: "pointer", fontSize: 14,
-              fontWeight: studioTab === t.id ? 700 : 500,
-              color: studioTab === t.id ? "var(--accent)" : "var(--text-secondary)",
-              transition: "color 0.15s, border-color 0.15s",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+        <div style={{ display: "flex", flexWrap: "wrap" }}>
+          {STUDIO_TAB_GROUPS.map(({ group, items }) => (
+            <div key={group} style={{ display: "flex", alignItems: "center", paddingRight: 10, marginRight: 10, borderRight: "1px solid var(--border-subtle)" }}>
+              <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: 0.5, marginRight: 4, textTransform: "uppercase", whiteSpace: "nowrap" }}>{group}</span>
+              {items.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setStudioTab(t.id)}
+                  style={{
+                    padding: "10px 14px", border: "none",
+                    borderBottom: `3px solid ${studioTab === t.id ? "var(--accent)" : "transparent"}`,
+                    background: "transparent", cursor: "pointer", fontSize: 13.5, whiteSpace: "nowrap",
+                    fontWeight: studioTab === t.id ? 700 : 500,
+                    color: studioTab === t.id ? "var(--accent)" : "var(--text-secondary)",
+                    transition: "color 0.15s, border-color 0.15s",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => setInfoOpen(true)}
+          style={{ marginBottom: 8, padding: "6px 12px", borderRadius: 999, border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+          💰 說明 & 成本
+        </button>
       </div>
 
       {/* ── Generate tab ── */}
@@ -963,7 +994,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
               <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>③ 費用預覽</span>
-                  <button type="button" onClick={() => setStudioTab("info")}
+                  <button type="button" onClick={() => setInfoOpen(true)}
                     style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                     完整明細 →
                   </button>
@@ -1098,62 +1129,74 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
         </div>
       )}
 
-      {/* ── Info tab ── */}
-      {studioTab === "info" && (
-        <div style={{ padding: "24px 28px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(340px, 480px) 1fr", gap: 24, alignItems: "start" }}>
-            <Card title="生成流程" subtitle="lib/content/video/video-cost.ts VIDEO_PIPELINE_STEPS 驅動">
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {VIDEO_PIPELINE_STEPS.map((step, idx) => (
-                  <FlowCard
-                    key={step.id}
-                    step={step}
-                    index={idx}
-                    costLine={costBreakdown.lines.find((l) => l.id === step.id)}
-                    activeStep={isLoading ? genStep : undefined}
-                  />
-                ))}
-              </div>
-            </Card>
-            <Card title="成本明細">
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                <thead>
-                  <tr style={{ color: "var(--text-muted)", textAlign: "left" }}>
-                    <th style={{ padding: "6px 0", fontWeight: 600 }}>步驟</th>
-                    <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>USD</th>
-                    <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>×</th>
-                    <th style={{ padding: "6px 0", fontWeight: 600, textAlign: "right" }}>NT$</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {costBreakdown.lines.map((line) => (
-                    <tr key={line.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                      <td style={{ padding: "7px 0", color: "var(--text-primary)" }}>
-                        <span style={{ marginRight: 6 }}>{line.icon}</span>{line.label}
-                        {line.free && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "1px 5px", borderRadius: 4 }}>免費</span>}
-                      </td>
-                      <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: 11.5 }}>{line.free ? "—" : USD(line.unitUsd)}</td>
-                      <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)" }}>{line.count}</td>
-                      <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 600, color: line.free ? "var(--text-muted)" : "var(--text-primary)" }}>{line.free ? "—" : NT(line.totalUsd)}</td>
-                    </tr>
+      {/* ── 說明 & 成本：2026-09-10 從 tab 移出改彈窗，獨立可及、不佔生產步驟 ── */}
+      {infoOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", overflowY: "auto" }}
+          onClick={() => setInfoOpen(false)}>
+          <div style={{ background: "var(--bg-canvas)", borderRadius: 14, maxWidth: 980, width: "100%", padding: "20px 24px 24px" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>說明 & 成本</span>
+              <button type="button" onClick={() => setInfoOpen(false)}
+                style={{ border: "none", background: "var(--bg-subtle)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 14, color: "var(--text-secondary)" }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(340px, 480px) 1fr", gap: 24, alignItems: "start" }}>
+              <Card title="生成流程" subtitle="lib/content/video/video-cost.ts VIDEO_PIPELINE_STEPS 驅動">
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {VIDEO_PIPELINE_STEPS.map((step, idx) => (
+                    <FlowCard
+                      key={step.id}
+                      step={step}
+                      index={idx}
+                      costLine={costBreakdown.lines.find((l) => l.id === step.id)}
+                      activeStep={isLoading ? genStep : undefined}
+                    />
                   ))}
-                </tbody>
-              </table>
-              <div style={{ marginTop: 12, borderTop: "2px solid var(--border-subtle)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>每支合計</span>
-                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)", marginLeft: 8 }}>({USD(costBreakdown.totalUsd)})</span>
                 </div>
-                <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
-              </div>
-            </Card>
+              </Card>
+              <Card title="成本明細">
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ color: "var(--text-muted)", textAlign: "left" }}>
+                      <th style={{ padding: "6px 0", fontWeight: 600 }}>步驟</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>USD</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, textAlign: "right" }}>×</th>
+                      <th style={{ padding: "6px 0", fontWeight: 600, textAlign: "right" }}>NT$</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costBreakdown.lines.map((line) => (
+                      <tr key={line.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                        <td style={{ padding: "7px 0", color: "var(--text-primary)" }}>
+                          <span style={{ marginRight: 6 }}>{line.icon}</span>{line.label}
+                          {line.free && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "var(--badge-green-text)", background: "var(--badge-green-bg)", padding: "1px 5px", borderRadius: 4 }}>免費</span>}
+                        </td>
+                        <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: 11.5 }}>{line.free ? "—" : USD(line.unitUsd)}</td>
+                        <td style={{ padding: "7px 8px", textAlign: "right", color: "var(--text-secondary)" }}>{line.count}</td>
+                        <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 600, color: line.free ? "var(--text-muted)" : "var(--text-primary)" }}>{line.free ? "—" : NT(line.totalUsd)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 12, borderTop: "2px solid var(--border-subtle)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>每支合計</span>
+                    <span style={{ fontSize: 11.5, color: "var(--text-secondary)", marginLeft: 8 }}>({USD(costBreakdown.totalUsd)})</span>
+                  </div>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Remotion 模板 tab ── */}
+      {/* ── Remotion 模板／實拍剪輯／Release 交付／營運 tab（孤兒面板接線，零 props，掛載點變動不影響其內部邏輯）── */}
       {studioTab === "remotion" && <RemotionStudio scriptPrefill={remotionInitial} />}
+      {studioTab === "footage" && <FootageEditor />}
+      {studioTab === "release" && <ReleaseDeliveryPanel />}
       {studioTab === "timeline" && <TimelineValidationPanel />}
+      {studioTab === "operations" && <MediaOperationsPanel />}
 
     </div>
   );

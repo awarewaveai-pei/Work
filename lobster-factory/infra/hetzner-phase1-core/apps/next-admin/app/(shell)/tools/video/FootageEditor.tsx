@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import OrganizationPicker from "./OrganizationPicker";
 
 type Clip = {
   id: string;
@@ -91,7 +92,7 @@ export default function FootageEditor() {
       <p style={{ margin: "4px 0", fontSize: 12, color: "var(--text-secondary)" }}>上傳短片、調整切點與輸出時間，產生可版本化的 Edit Decision Plan 草稿。</p>
     </div>
     <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <label style={{ fontSize: 12, color: "var(--text-secondary)", flex: "1 1 280px" }}>Organization UUID <input value={organizationId} onChange={(e) => { setOrganizationId(e.target.value); setCompiledTimeline(null); }} placeholder="目前租戶的 organization UUID" style={{ ...input, width: "100%", boxSizing: "border-box", marginTop: 5, fontFamily: "ui-monospace, monospace" }} /></label>
+      <label style={{ fontSize: 12, color: "var(--text-secondary)", flex: "1 1 280px" }}>租戶<div style={{ marginTop: 5 }}><OrganizationPicker value={organizationId} onChange={(id) => { setOrganizationId(id); setCompiledTimeline(null); }} /></div></label>
       <label style={{ padding: "8px 12px", borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>
         {busy ? "上傳中…" : "＋ 匯入 MP4"}
         <input type="file" accept="video/mp4" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.currentTarget.value = ""; }} />

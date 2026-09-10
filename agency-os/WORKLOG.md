@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-10 `/tools/video` IA 重組：插入既有流程，不取代（修正同日 workbench-as-entry 誤做法）
+
+**觸發**：操作者糾正同日稍早的 `dbe28f317`→`a44fa61e2`（revert）——把架構規格直接套成導航取代是錯的，正確做法是先盤點現有設定與流程，再把新能力插入正確節點。操作者其後全權 delegate 決策（「需要決定的事都你決定」），並要求審慎用 agent（不濫派）、文件走 AI 可讀極簡格式。
+
+**決策記錄**（含理由）：`agency-os/docs/video_generator/VIDEO_TOOL_IA_REORG_2026-09-10.md`（D1–D6，取代逐條散文，不在此重複）。
+
+**盤點**（先讀後動）：`VideoTabs.tsx` 二段式接力機制、`ScriptForge.tsx` 23 個既有 NAVS 模組、`VideoStudio.tsx` 5 個平級 tab 與既有③費用預覽卡片、4 個孤兒面板（`StoryBibleWorkbench`/`FootageEditor`/`ReleaseDeliveryPanel`/`MediaOperationsPanel`，grep 全 next-admin 零 import 確認）、DB migration 0071（SSH 上 ks-aw-01 `supabase-db` 實查：已 apply，欄位與 CHECK 約束與 route.ts 假設一致，4 rows 疑似先前 smoke test 殘留）。
+
+**改動**（全部「插入」，零刪除既有功能，file:line 詳見決策文件）：新增共用 `OrganizationPicker.tsx`（接 `/api/video/workbench/bootstrap`，取代 4 處裸 UUID 輸入）；`ScriptForge.tsx` 生成組新增 Story Bible 入口（腳本前可及）；`StoryBibleWorkbench.tsx` 補 asset picker + role/rightsNote 欄位（型別本來就有，UI 沒渲染）；`VideoStudio.tsx` 5 tab 重分組為製作／審片與交付／營運三段，接線 3 個孤兒面板，Timeline 驗證降級，說明&成本移出 tab 改彈窗（`infoOpen`，內容零改動只換容器）。
+
+**意外發現（非本次造成，已獨立開票追蹤，不算本次完成範圍）**：`npx tsc --noEmit` 全專案跑，14 個既有錯誤（`git stash` 驗證改動前後一致）——`api/video/footage/render/route.ts`、`api/video/release/route.ts`、`api/video/story-bibles/[id]/approve/route.ts` 引用不存在的 export（`submitFootageRender`/`canApproveMediaRelease`），`npx next build` 完整跑確認這會讓**整個 next-admin 生產編譯失敗**（非本次改動獨有，main HEAD 現狀如此）。今天把 `FootageEditor`/`ReleaseDeliveryPanel` 從孤兒接進主導覽，等於讓這兩個原本沒人碰得到的壞掉按鈕變成使用者看得到、按了會噴 500。已用 `spawn_task` 建 task_618a39ed 追蹤，未在本次範圍內修（誰能核准 media release 是權限語意決策，不可自行猜）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（改動前後各跑一次，`git stash`/`stash pop` 對照） | exit=0（型別檢查本身跑完，非「零錯誤」——見上，14 個既有錯誤改動前後一致，本次 7 個改動檔案 0 error）
+REALTEST_EVIDENCE: tool=SSH | cmd=`ssh ks-aw-01 docker exec supabase-db psql -c "\d media_production_projects"` + `select count(*)` | exit=0 | result=migration 0071 已 apply，欄位/CHECK 約束與 route.ts 假設一致，4 rows
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx next build`（完整生產編譯，非 dev-server） | exit=1 | result=在既有（非本次）`footage/render/route.ts` 型別錯誤處失敗，webpack 編譯階段本身對本次新增/修改的 7 個檔案零警告——證實本次改動的 bundling 正確，失敗點在別處
+REALTEST_WAIVED: NA -- next-admin 是需登入的正式後台（Supabase session），agent 不可代填密碼；已改用 `npx tsc --noEmit` 全專案 + `npx next build` webpack 階段驗證取代瀏覽器 E2E 點擊，dev server 留在 port 3901（`.claude/launch.json` 新增 `next-admin-verify` 條目）供操作者用自己的帳號親自點過
+REVIEW_DONE: critic=Standard（獨立 subagent，7 個改動檔案全讀，另讀 2 個後端 route 做 contract 核對）| verdict=pass-with-fixes | findings=0 Critical/0 Major/2 Minor（`OrganizationPicker` 空清單無手動輸入逃生口、single-org auto-select 用 mount-time 閉包讀 value 有未來風險）+ 2 Suggestion，2 個 Minor 已當場修（改用 ref 讀最新 value；空清單併入手動輸入分支），修後重跑 tsc 確認 0 新錯誤
+BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`studioTab\|"info"\|StoryBibleWorkbench\|FootageEditor\|ReleaseDeliveryPanel\|MediaOperationsPanel\|OrganizationPicker` | hits=僅本次改動的 7 檔 + 本次新建文件；`VideoTabs.tsx`/`page.tsx`（僅有的兩個 VideoStudio/ScriptForge 呼叫端）未引用被移除的 "info" tab id；無測試檔引用任何被改動的 tab 標籤或元件（零 snapshot 風險）
+WORKLOG_DONE: 本條目
+
+[剩餘風險] ① `api/video/footage/render`/`api/video/release`/`api/video/story-bibles/[id]/approve` 三條路徑編譯失敗，`FootageEditor`「送實拍渲染」與 `ReleaseDeliveryPanel`「建立 Release」按鈕會 500——已開 task_618a39ed，未修；② `ReleaseDeliveryPanel` 的 siteId/postId/clientId/videoUrl/platforms JSON 欄位維持裸輸入（無現成站點/客戶清單 API，建新 API 超出本輪範圍，決策文件 D6 記錄）；③ Bible 內容不進 `claude()` prompt（決策文件 D5，故意不做，避免猜規格）；④ `media_production_projects` 表本輪不接前端（決策文件 D4，故意不做，避免重蹈 workbench-as-entry 覆轍）。
+[rollback] 7 個改動檔案 + `OrganizationPicker.tsx`（新檔）+ `.claude/launch.json` 新增段落，`git revert` 本次 commit 即可完整回到重組前的既有二段式導覽；純前端重排+接線，無 DB/migration/後端 route 變動，可安全回滾。
+
 ## 2026-09-10（94–98 號切片：新開 F04 associative-mapping 家族 0/6→5/6，5 個平行 agent）
 
 mind_map(110t)/concept_map(57t)/affinity_diagram(75t)/morphological_analysis(64t)/attribute_listing(76t)。382 tests 零衝突，全 regression 5534→5916，golden 3176。查重：mind_map 是無型別、嚴格樹狀（中心→主枝→次枝→關鍵詞，跨層 id 唯一性），對比 concept_map 是有型別邊的一般圖（節點+typed relationship edges，邊的 from/to 皆需可解析回真實節點，孤兒節點 orphan_node_ids 是 GENUINE_COMPUTE 獨立 gate 重推導）；查證後確認與已建成的 causal.dag 真不同（後者強制 acyclic_verified+固定 role 詞彙，concept_map 無此二者）；affinity_diagram 是「一卡一 idea→靜默分群→命名」，核心不變量是每張卡恰好屬於一個群組（非零個非兩個以上），ungrouped_card_refs 同為 GENUINE_COMPUTE；morphological_analysis 是本批次唯一真組合數學（dimensions×options×compatibility constraints→legal_combinations 笛卡兒積扣除違反約束者，GENUINE_COMPUTE 獨立 gate 重算，`MAX_RAW_COMBINATION_SPACE` 防禦性上限防組合爆炸），查證後確認與 decision.mcda/weighted_decision_matrix 真不同（後兩者對「已給定」選項評分排序，本方法反而是「生成」選項空間本身）；attribute_listing 是 decompose-transform-recombine（每個屬性至少一個轉換後 variant 且不得與原值相同，選擇性重組階段對 combined_from 做真實 referential integrity 檢查，非幽靈引用）。

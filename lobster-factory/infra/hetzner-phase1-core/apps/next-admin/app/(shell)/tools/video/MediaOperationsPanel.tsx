@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import OrganizationPicker from "./OrganizationPicker";
 
 export default function MediaOperationsPanel() {
   const [organizationId, setOrganizationId] = useState("");
@@ -24,7 +25,7 @@ export default function MediaOperationsPanel() {
   }
   return <div style={{ padding: "20px 28px", display: "grid", gap: 14 }}>
     <div><b style={{ fontSize: 15 }}>營運與成效</b><p style={{ margin: "4px 0", fontSize: 12, color: "var(--text-secondary)" }}>查詢方案、點數、BYO provider 與平台成效快照。只顯示目前租戶可讀資料。</p></div>
-    <div style={{ display: "flex", gap: 8 }}><input value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} placeholder="organization UUID" style={{ flex: 1, padding: 9, borderRadius: 7, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontFamily: "monospace", fontSize: 12 }} /><button type="button" onClick={() => void load()} disabled={busy || !organizationId.trim()} style={{ padding: "0 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700 }}>{busy ? "讀取中…" : "載入"}</button></div>
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}><div style={{ flex: 1 }}><OrganizationPicker value={organizationId} onChange={setOrganizationId} /></div><button type="button" onClick={() => void load()} disabled={busy || !organizationId.trim()} style={{ padding: "0 14px", height: 34, border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700 }}>{busy ? "讀取中…" : "載入"}</button></div>
     {error && <div style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}
     {billing && <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, fontSize: 12 }}><b>方案與點數</b><div style={{ marginTop: 8 }}>方案：{String((billing.account as Record<string, unknown> | undefined)?.plan ?? "free")}　狀態：{String((billing.account as Record<string, unknown> | undefined)?.status ?? "active")}　餘額：{String(billing.balance ?? 0)}</div><div style={{ marginTop: 6, color: "var(--text-secondary)" }}>Provider：{((billing.providers as unknown[]) ?? []).map((p) => { const x = p as Record<string, unknown>; return `${String(x.provider)} (${String(x.mode)})`; }).join("、") || "尚未設定"}</div></div>}
     {outcomes && <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, fontSize: 12 }}><b>平台成效快照</b><div style={{ marginTop: 8 }}>事件數：{String(outcomes.count ?? 0)}</div><pre style={{ whiteSpace: "pre-wrap", margin: "8px 0 0", color: "var(--text-secondary)" }}>{JSON.stringify(outcomes.totals ?? {}, null, 2)}</pre></div>}
