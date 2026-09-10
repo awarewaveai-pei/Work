@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-09-10 HCI30 前端全繁中化 + 新手引導重做，操作者兩輪真實回饋各揭露一個真缺口
+
+操作者連續兩輪直接開罵，各指出一個本輪之前沒發現的真缺口，非情緒化空炮：
+
+1. 「還是英文版」——上一輪（2026-09-08）做完 case/person 建立功能後，介面文字從未做在地化，操作者是繁中使用者，整頁 HCI-30 title/label/button/select option/decision outcome/trust domain 名稱全是英文。**修正**：全站繁體中文化，含 `lang="zh-Hant"`、CJK 字型堆疊（PingFang TC / Microsoft JhengHei）、7 個信任構面、14 個評估構面、5 個等級、6 種決策結果、狀態、購買目的 5 類，全部建立 `*_LABELS` 對照表（key 是真實 API/DB enum 值，value 才是顯示用中文，內部資料流完全不動）。同時視覺重做：深色頂部品牌列、卡片陰影＋左側色條、信任構面卡加彩色進度條。
+   - 過程抓到一個真遺漏：`loadList()`／`d-title` 顯示 `c.purpose`/`body.case.purpose` 原始值（如 `vendor_risk_assessment`）忘記套用 `PURPOSE_LABELS`，翻譯後仍會漏英文——已補上，逐一 grep 所有 `${...domain|kind|value|outcome|status}` 插值點確認無其他遺漏。
+2. 「一個剛接觸的人知道這是什麼嗎？！」——翻譯完+視覺變好看之後，操作者指出更根本的問題：一個陌生使用者看到「開立新案件」表單（調查目的下拉、風險等級 R0-R4、委託背景說明）**完全不知道這是什麼、為什麼要填、風險等級數字代表什麼**。這是 onboarding／IA 缺口，不是翻譯或視覺問題。**修正**：
+   - 案件列表頁最上方加白話說明卡（這工具做什麼）+ 3 步驟流程圖（開案件→新增證據→取得信任報告）
+   - 開案表單每個欄位下方加 `field-hint` 提示；風險等級選項加方向性提示「R0（風險最低）」...「R4（風險最高）」
+   - 查證後**刻意不做**的事：沒有替 R0-R4 編造具體業務含義（例如「R0=例行審查」）。查證 `AI_LEGO_Cognitive_Engineering_OS/specs/execution/risk-tier.schema.yaml` 發現這組列舉是**借用另一個系統（AI 任務執行風險分級：R0=唯讀操作…R4=不可逆破壞性操作）的殼**，HCI 這邊自己的風險語意從未被定義過（`ADR-0013` 明文列為該共用核心的一部分，未見任何 HCI 專屬的 gate 3 落地）。編造一個看似合理但未經拍板的中文說明，會是比留白更嚴重的錯誤（未來稽核會誤信「這是已決定的產品規則」）。介面只給了唯一站得住腳的方向性提示，並在回覆中明講這是需要操作者自己拍板的產品決策。
+   - 新增調查發現表單：證據／主張／評估三個類型各加一句白話定義（避免陌生使用者猜不出三者差異）
+   - 新案件（0 筆紀錄）進入詳情頁時，自動展開「開立新案件」與「新增調查發現」兩個表單並顯示藍色引導 banner「案件已建立，請先新增第一筆證據」+ 一鍵導引按鈕，不再讓使用者對著全空的信任構面網格不知道下一步
+
+真跑驗證（瀏覽器互動，非假設）：建立全新空白案件 → 確認引導 banner 正確顯示且表單自動展開 → 切換證據/主張/評估三種類型確認提示文字與下拉選項（14 個構面＋5 個等級，含正確底層值）全部正確渲染 → 送出一筆 ASSESSMENT → 確認信任構面即時從「尚無證據」變成有分數、正確歸類到「重大風險」欄 → 全程讀 console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=全新空白案件建立→引導 banner 顯示→自動展開表單→切換 EVIDENCE/CLAIM/ASSESSMENT 三種類型確認提示文字與下拉值→送出 ASSESSMENT→信任構面即時更新→歸類重大風險 | 結果=全部符合預期，`read_console_messages` 零非預期錯誤，`read_network_requests` 確認對應 POST 皆 201
+REVIEW_WAIVED: NA -- 純前端文案/CSS/HTML 結構調整，無新 API 端點、無 schema 變動、無新資安面（沿用既有 label-map 模式，`esc()` 既有 XSS 防護未變動），Low risk 直接做並在 PR/WORKLOG 說明假設，比照 AGENTS.md §3 風險分級
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=PURPOSE_LABELS\|goToAddRecord\|d-empty-cta\|intro-card\|case-add-panel\|record-add-panel | hits=0（僅本檔內部定義與使用，皆為本次新增符號，無外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：`app/public/index.html` 回到純英文、無 onboarding 引導的上一版（`cd775b011`）。純前端檔案，無 schema/API 變動，可安全回滾。
+
+
 ## 2026-09-08 HCI30 Person 軌加開案/新人物能力 + 修好完全不能用的證據引用 UI，critic 覆審 1 Major+2 Minor+2 Suggestion，已修 3 項、1 項追蹤、1 項維持現狀
 
 操作者持續要求「去完成它」。在已驗證的 Evidence→Assessment→Trust Domain→Decision 垂直切片（前一條目）基礎上，找下一個「真人能不能真的從頭用到尾」的缺口，找到並修了 4 個：
@@ -13829,3 +13853,10 @@ Clear `MEDIA_TRANSCRIBE_*` and redeploy next-admin to return dispatch to 503; af
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_WHISPER|video-whisper.aware-wave.com` | hits=4
 - WORKLOG_DONE: this entry.
+
+## 2026-09-10 — Video Story Bible workbench production receipt
+
+- Applied additive `0070_media_story_bible_revisions.sql` after public-schema backup. RLS=true, immutable trigger=1, atomic approval RPC=1.
+- Deployed `/tools/video` → `短劇 Bible`: versioned character/continuity UI, tenant-owned asset references, server-owned revision/approval state.
+- Evidence: next-admin `cf6f04a37`; snapshot `lobster-phase1-next-admin:rollback-20260910-045531`; controlled deploy health/smokes passed.
+- Regression: `npm run typecheck`; `npm test` = 90 files/790 tests passed. Whisper `https://video-whisper.aware-wave.com/health` = 200.

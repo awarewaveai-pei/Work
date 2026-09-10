@@ -1,160 +1,225 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<title>HCI-30 — Trust Report (dev)</title>
+<title>HCI-30 信任評估報告（開發版）</title>
 <style>
   :root {
-    --very-high: #0a7d34; --high: #4caf50; --moderate: #b8860b; --low: #d97706; --very-low: #c0392b;
-    --bg: #f4f5f7; --card: #fff; --border: #e2e4e9; --text: #1a1d23; --muted: #6b7280;
+    --very-high: #15803d; --high: #22c55e; --moderate: #b45309; --low: #ea580c; --very-low: #dc2626;
+    --bg: #eef1f6; --card: #fff; --border: #e3e7ee; --text: #161a22; --muted: #6b7280;
+    --ink: #0b1220; --accent: #3454d1; --accent-ink: #24399b;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.05), 0 1px 1px rgba(15,23,42,.04);
+    --shadow-md: 0 8px 24px rgba(15,23,42,.10);
   }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0 0 3rem; }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem; }
-  .note { background: #fff8e1; border: 1px solid #e0c26a; padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.82rem; margin-bottom: 1.25rem; color: #665200; }
-  .tenant-switch { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
-  .tenant-switch button { padding: 0.4rem 1rem; border: 1px solid var(--border); background: var(--card); border-radius: 20px; cursor: pointer; font-size: 0.85rem; }
-  .tenant-switch button.active { background: var(--text); color: #fff; border-color: var(--text); }
+  body {
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); margin: 0; padding: 0 0 4rem;
+  }
+  .topbar { background: var(--ink); color: #fff; padding: 1.1rem 0; border-bottom: 3px solid var(--accent); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; display: flex; align-items: baseline; gap: 0.65rem; }
+  .brand { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
+  .brand-sub { font-size: 0.82rem; font-weight: 400; color: #9aa5c0; }
 
-  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-  h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 2rem 0 0.75rem; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 1.75rem 1.25rem; }
+  .note { background: #fff8e1; border: 1px solid #e0c26a; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.82rem; margin-bottom: 1.35rem; color: #665200; }
+  .tenant-switch { display: flex; gap: 0.5rem; margin-bottom: 1.35rem; }
+  .tenant-switch button { padding: 0.45rem 1.15rem; border: 1px solid var(--border); background: var(--card); border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-family: inherit; transition: background .15s, color .15s, border-color .15s; }
+  .tenant-switch button:hover { border-color: var(--accent); }
+  .tenant-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  .intro-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.3rem 1.4rem; margin-bottom: 1.4rem; box-shadow: var(--shadow-sm); }
+  .intro-lede { margin: 0 0 1.1rem; font-size: 0.98rem; line-height: 1.6; }
+  .steps { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: wrap; }
+  .step { display: flex; align-items: flex-start; gap: 0.6rem; flex: 1 1 180px; min-width: 160px; }
+  .step-num { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
+  .step-text { font-size: 0.85rem; line-height: 1.5; }
+  .step-text b { display: block; margin-bottom: 0.1rem; }
+  .step-arrow { flex: none; color: var(--border); font-size: 1.2rem; padding-top: 0.15rem; }
+  .field-hint { font-size: 0.78rem; color: var(--muted); margin: -0.15rem 0 0; line-height: 1.5; }
+
+  .cta-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px; padding: 0.9rem 1.2rem; margin: 1rem 0; }
+  .cta-banner p { margin: 0; font-size: 0.9rem; color: var(--accent-ink); }
+  .cta-banner button { flex: none; padding: 0.5rem 1.15rem; border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; }
+  .cta-banner button:hover { background: var(--accent-ink); }
+
+  h1 { font-size: 1.55rem; margin: 0 0 0.3rem; letter-spacing: 0.01em; }
+  h2 { font-size: 0.92rem; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); margin: 2.1rem 0 0.8rem; }
   .case-grid { display: grid; gap: 0.75rem; }
-  .case-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; cursor: pointer; transition: box-shadow .15s; }
-  .case-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
-  .case-card .title { font-weight: 600; }
-  .case-card .meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.2rem; }
-  .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
-  .badge.status-OPEN { background: #e3f2ee; color: var(--very-high); }
-  .badge.status-ACTIVE { background: #e3f2ee; color: var(--very-high); }
+  .case-card { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 10px; padding: 1rem 1.15rem; cursor: pointer; box-shadow: var(--shadow-sm); transition: box-shadow .15s, border-left-color .15s, transform .15s; }
+  .case-card:hover { box-shadow: var(--shadow-md); border-left-color: var(--accent); transform: translateY(-1px); }
+  .case-card.status-OPEN, .case-card.status-ACTIVE { border-left-color: var(--very-high); }
+  .case-card.status-CLOSED { border-left-color: var(--border); }
+  .case-card .title { font-weight: 700; font-size: 1.02rem; }
+  .case-card .meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.25rem; }
+  .badge { display: inline-block; padding: 0.18rem 0.65rem; border-radius: 12px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
+  .badge.status-OPEN, .badge.status-ACTIVE { background: #e6f4ea; color: var(--very-high); }
   .badge.status-CLOSED { background: #eee; color: var(--muted); }
 
   .band-VERY_HIGH, .band-HIGH { background: #e6f4ea; color: var(--very-high); }
   .band-MODERATE { background: #fdf3d9; color: var(--moderate); }
   .band-LOW { background: #fdeee0; color: var(--low); }
   .band-VERY_LOW { background: #fbe2e0; color: var(--very-low); }
-  .band-badge { display: inline-block; padding: 0.2rem 0.7rem; border-radius: 12px; font-size: 0.78rem; font-weight: 700; }
+  .band-badge { display: inline-block; padding: 0.22rem 0.75rem; border-radius: 12px; font-size: 0.78rem; font-weight: 700; }
 
-  .back { cursor: pointer; color: #1a56db; font-size: 0.85rem; }
+  .back { cursor: pointer; color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+  .back:hover { color: var(--accent-ink); }
   .subtitle { color: var(--muted); font-size: 0.9rem; }
 
-  .decision-banner { border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0; border: 1px solid var(--border); }
+  .decision-banner { border-radius: 12px; padding: 1.1rem 1.3rem; margin: 1rem 0; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
   .decision-banner.outcome-PROCEED { background: #e6f4ea; border-color: #b7dfc3; }
   .decision-banner.outcome-PROCEED_WITH_CONTROLS { background: #fdf3d9; border-color: #ead9a0; }
   .decision-banner.outcome-LIMIT_ACCESS { background: #fdf3d9; border-color: #ead9a0; }
   .decision-banner.outcome-PAUSE { background: #fdeee0; border-color: #f0cba3; }
   .decision-banner.outcome-REVIEW_REQUIRED { background: #fdeee0; border-color: #f0cba3; }
   .decision-banner.outcome-EXIT { background: #fbe2e0; border-color: #eab5b0; }
-  .decision-banner .outcome-label { font-weight: 700; font-size: 1.05rem; }
-  .decision-banner .rationale { margin-top: 0.35rem; font-size: 0.9rem; }
-  .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.4rem; }
+  .decision-banner .outcome-label { font-weight: 700; font-size: 1.08rem; }
+  .decision-banner .rationale { margin-top: 0.4rem; font-size: 0.9rem; }
+  .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.45rem; }
 
-  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.75rem; }
-  .domain-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; }
-  .domain-card .domain-name { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .domain-card .domain-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.35rem; }
-  .domain-card.unknown { border-style: dashed; color: var(--muted); }
+  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+  .domain-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.95rem 1.05rem; box-shadow: var(--shadow-sm); }
+  .domain-card .domain-name { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+  .domain-card .domain-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }
+  .domain-card.unknown { border-style: dashed; color: var(--muted); box-shadow: none; }
+  .meter { height: 6px; background: #eef0f4; border-radius: 4px; overflow: hidden; margin: 0.55rem 0 0.5rem; }
+  .meter-fill { height: 100%; border-radius: 4px; }
+  .meter-fill.band-fill-VERY_HIGH { width: 100%; background: var(--very-high); }
+  .meter-fill.band-fill-HIGH { width: 80%; background: var(--high); }
+  .meter-fill.band-fill-MODERATE { width: 60%; background: var(--moderate); }
+  .meter-fill.band-fill-LOW { width: 40%; background: var(--low); }
+  .meter-fill.band-fill-VERY_LOW { width: 20%; background: var(--very-low); }
 
   .insight-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-  .insight-col h3 { font-size: 0.8rem; margin: 0 0 0.5rem; }
+  .insight-col { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1.05rem; box-shadow: var(--shadow-sm); }
+  .insight-col h3 { font-size: 0.82rem; margin: 0 0 0.55rem; }
   .insight-col ul { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; }
   .insight-col.strengths h3 { color: var(--very-high); }
   .insight-col.risks h3 { color: var(--very-low); }
   .insight-col.unknowns h3 { color: var(--muted); }
 
-  .record-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1.1rem; margin-bottom: 0.6rem; }
-  .record-card .kind-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
-  .record-card .content { margin-top: 0.3rem; font-size: 0.9rem; }
-  .record-card .quality-tag { display: inline-block; margin-top: 0.4rem; font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 8px; background: #eee; color: var(--muted); }
+  .record-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1.15rem; margin-bottom: 0.6rem; box-shadow: var(--shadow-sm); }
+  .record-card .kind-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; color: var(--accent-ink); }
+  .record-card .content { margin-top: 0.35rem; font-size: 0.92rem; }
+  .record-card .quality-tag { display: inline-block; margin-top: 0.45rem; font-size: 0.7rem; padding: 0.12rem 0.55rem; border-radius: 8px; background: #eef1f6; color: var(--muted); }
 
-  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1.1rem; margin-top: 1rem; }
-  details.add-panel summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-  form.inline-form { display: grid; gap: 0.55rem; max-width: 520px; margin-top: 0.85rem; }
-  form.inline-form label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
-  form.inline-form input, form.inline-form select, form.inline-form textarea { padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
-  form.inline-form button { justify-self: start; padding: 0.5rem 1.1rem; border: none; border-radius: 6px; background: var(--text); color: #fff; cursor: pointer; font-size: 0.85rem; }
+  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.95rem 1.15rem; margin-top: 1rem; box-shadow: var(--shadow-sm); }
+  details.add-panel summary { cursor: pointer; font-weight: 700; font-size: 0.92rem; color: var(--accent-ink); }
+  form.inline-form { display: grid; gap: 0.6rem; max-width: 540px; margin-top: 0.9rem; }
+  form.inline-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+  form.inline-form input, form.inline-form select, form.inline-form textarea {
+    padding: 0.5rem 0.65rem; font-size: 0.88rem; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; color: var(--text); background: #fff;
+  }
+  form.inline-form input:focus, form.inline-form select:focus, form.inline-form textarea:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(52,84,209,.15);
+  }
+  form.inline-form button { justify-self: start; padding: 0.55rem 1.25rem; border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; font-size: 0.88rem; font-weight: 700; font-family: inherit; transition: background .15s; }
+  form.inline-form button:hover { background: var(--accent-ink); }
   .err { color: var(--very-low); font-size: 0.82rem; }
   .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
 </style>
 </head>
 <body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">HCI-30</span>
+    <span class="brand-sub">信任評估報告</span>
+  </div>
+</header>
 <div class="wrap">
 
 <div id="list">
-  <h1>HCI-30 — Trust Reports</h1>
-  <p class="subtitle">Synthetic dev data. Real API + real RLS-enforced Postgres, not a mock.</p>
-  <div class="note">No auth layer exists yet, so the tenant is an explicit switch below rather than a disguised login.</div>
-  <div class="tenant-switch">
-    <button id="btn-a" onclick="loadList('a')">Tenant A</button>
-    <button id="btn-b" onclick="loadList('b')">Tenant B</button>
+  <h1>信任評估案件列表</h1>
+
+  <div class="intro-card">
+    <p class="intro-lede">HCI-30 幫你用真實證據，快速判斷「這個人或這家公司值不值得信任」——不用光憑直覺，你蒐集事實，系統自動算出信任分數，最後由你做決策。</p>
+    <div class="steps">
+      <div class="step"><span class="step-num">1</span><span class="step-text"><b>開一個案件</b>說明調查對象與原因</span></div>
+      <div class="step-arrow">→</div>
+      <div class="step"><span class="step-num">2</span><span class="step-text"><b>新增證據</b>寫下查到的事實、聽到的說法</span></div>
+      <div class="step-arrow">→</div>
+      <div class="step"><span class="step-num">3</span><span class="step-text"><b>取得信任報告</b>系統自動評分，你做最終決策</span></div>
+    </div>
   </div>
+
   <div class="case-grid" id="cases"></div>
 
-  <details class="add-panel" style="margin-top:1rem">
-    <summary>+ Open a new case</summary>
+  <details class="add-panel" id="case-add-panel" style="margin-top:1rem" open>
+    <summary>＋ 開立新案件</summary>
     <form class="inline-form" onsubmit="return submitCase(event)">
-      <label for="c-purpose">Purpose</label>
+      <label for="c-purpose">調查目的</label>
       <select id="c-purpose">
-        <option value="vendor_risk_assessment">Vendor risk assessment</option>
-        <option value="fraud_investigation">Fraud investigation</option>
-        <option value="personal_safety">Personal safety</option>
-        <option value="journalism_research">Journalism research</option>
-        <option value="general_due_diligence">General due diligence</option>
+        <option value="vendor_risk_assessment">供應商風險評估</option>
+        <option value="fraud_investigation">詐欺調查</option>
+        <option value="personal_safety">人身安全</option>
+        <option value="journalism_research">新聞調查研究</option>
+        <option value="general_due_diligence">一般盡職調查</option>
       </select>
-      <label for="c-risk">Risk tier</label>
+      <p class="field-hint">選一個最符合這次調查性質的分類，會影響適用的規範。</p>
+      <label for="c-risk">風險等級</label>
       <select id="c-risk">
-        <option value="R0">R0</option><option value="R1">R1</option><option value="R2">R2</option>
-        <option value="R3">R3</option><option value="R4">R4</option>
+        <option value="R0">R0（風險最低）</option><option value="R1">R1</option><option value="R2">R2（中等）</option>
+        <option value="R3">R3</option><option value="R4">R4（風險最高）</option>
       </select>
-      <label for="c-requester">Requester context</label>
-      <textarea id="c-requester" rows="2" placeholder="Who is asking, and why"></textarea>
-      <label for="c-relationship">Relationship context (optional)</label>
-      <input id="c-relationship">
-      <button type="submit">Open case</button>
+      <p class="field-hint">數字愈大代表這次調查愈敏感、應愈嚴謹看待；實際分級標準另由內部規範決定，不確定可先選最低再視情況調整。</p>
+      <label for="c-requester">委託背景說明</label>
+      <textarea id="c-requester" rows="2" placeholder="誰提出委託、為了什麼原因" required></textarea>
+      <label for="c-relationship">關係背景（選填）</label>
+      <input id="c-relationship" placeholder="例如：即將合作的供應商">
+      <button type="submit">建立案件</button>
       <div id="c-err" class="err"></div>
     </form>
   </details>
+
+  <p class="subtitle" style="margin-top:1.5rem">合成開發資料。真實 API ＋真實 RLS 保護的 Postgres，非模擬系統。</p>
+  <div class="note">目前尚未建立登入機制，租戶身分暫以下方按鈕手動切換（正式版會是真實登入）。</div>
+  <div class="tenant-switch">
+    <button id="btn-a" onclick="loadList('a')">租戶 A</button>
+    <button id="btn-b" onclick="loadList('b')">租戶 B</button>
+  </div>
 </div>
 
 <div id="detail" style="display:none">
-  <p><span class="back" onclick="showList()">&larr; back to cases</span></p>
+  <p><span class="back" onclick="showList()">&larr; 返回案件列表</span></p>
   <h1 id="d-title"></h1>
   <p class="subtitle" id="d-meta"></p>
 
   <div id="d-decision-banner"></div>
+  <div id="d-empty-cta"></div>
 
-  <h2>Trust Domains</h2>
+  <h2>信任構面</h2>
   <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
   <div class="domain-grid" id="d-domains"></div>
 
   <div class="insight-cols" style="margin-top:1.5rem">
-    <div class="insight-col strengths"><h3>Top Strengths</h3><ul id="d-strengths"></ul></div>
-    <div class="insight-col risks"><h3>Material Risks</h3><ul id="d-risks"></ul></div>
-    <div class="insight-col unknowns"><h3>Unknowns</h3><ul id="d-unknowns"></ul></div>
+    <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
+    <div class="insight-col risks"><h3>重大風險</h3><ul id="d-risks"></ul></div>
+    <div class="insight-col unknowns"><h3>未知構面</h3><ul id="d-unknowns"></ul></div>
   </div>
 
-  <h2>Record a Decision</h2>
+  <h2>記錄決策</h2>
   <div id="d-decision-form-wrap"></div>
 
-  <h2>Evidence &amp; Claims</h2>
+  <h2>證據與主張</h2>
   <div id="d-records"></div>
 
-  <details class="add-panel">
-    <summary>+ Add a research finding</summary>
+  <details class="add-panel" id="record-add-panel">
+    <summary>＋ 新增調查發現</summary>
     <form class="inline-form" onsubmit="return submitRecord(event)">
-      <label for="f-person">Person</label>
+      <label for="f-person">當事人</label>
       <select id="f-person" onchange="togglePersonNew()"></select>
       <div id="f-person-new-wrap" style="display:none">
-        <input id="f-person-new" placeholder="New person's display label">
+        <input id="f-person-new" placeholder="新當事人的姓名或顯示名稱">
       </div>
-      <label for="f-kind">Kind</label>
+      <label for="f-kind">類型</label>
       <select id="f-kind" onchange="renderKindFields()">
-        <option value="EVIDENCE">EVIDENCE</option>
-        <option value="CLAIM">CLAIM</option>
-        <option value="ASSESSMENT">ASSESSMENT</option>
+        <option value="EVIDENCE">證據</option>
+        <option value="CLAIM">主張</option>
+        <option value="ASSESSMENT">評估</option>
       </select>
-      <p style="font-size:0.78rem;color:#777;margin:0">TRUST_DOMAIN is intentionally not directly creatable — it is the computed roll-up above (ADR-0004: trust must be evidence-linked, never hand-asserted).</p>
+      <p class="field-hint">上方的信任構面分數無法手動輸入——它是根據你新增的證據、主張與評估，由系統自動算出來的，確保每個分數都查得到根據。</p>
       <div id="f-kind-fields"></div>
-      <button type="submit">Add finding</button>
+      <button type="submit">送出紀錄</button>
       <div id="f-err" class="err"></div>
     </form>
   </details>
@@ -178,6 +243,20 @@ const DIMENSIONS = ['INTEGRITY_CONSISTENCY','RELIABILITY_FULFILLMENT','COMPETENC
 const BANDS = ['VERY_LOW','LOW','MODERATE','HIGH','VERY_HIGH'];
 const OUTCOMES = ['PROCEED','PROCEED_WITH_CONTROLS','LIMIT_ACCESS','PAUSE','REVIEW_REQUIRED','EXIT'];
 
+// Display-only label maps -- every value on the left is the real value sent
+// to/received from the API (DB enum values, dimension/domain identifiers);
+// only the right-hand label is presentational. Never key API calls off these.
+const DIMENSION_LABELS = { INTEGRITY_CONSISTENCY:'誠信與一致性', RELIABILITY_FULFILLMENT:'可靠度與履約', COMPETENCE:'專業能力', COMMUNICATION_QUALITY:'溝通品質', BOUNDARY_RESPECT:'界線尊重', RECIPROCITY_FAIRNESS:'互惠與公平', CONFLICT_REPAIR:'衝突修復能力', POWER_BEHAVIOR:'權力行為', INCENTIVE_ALIGNMENT:'誘因一致性', RISK_EXTERNALIZATION:'風險外部化傾向', INFORMATION_GOVERNANCE:'資訊治理', LEARNING_ADAPTABILITY:'學習與應變能力', CONTEXT_STABILITY:'情境穩定度', PREDICTABILITY:'可預測性' };
+const BAND_LABELS = { VERY_LOW:'極低', LOW:'偏低', MODERATE:'中等', HIGH:'偏高', VERY_HIGH:'極高' };
+const OUTCOME_LABELS = { PROCEED:'繼續進行', PROCEED_WITH_CONTROLS:'附條件繼續', LIMIT_ACCESS:'限制存取', PAUSE:'暫停', REVIEW_REQUIRED:'需要複核', EXIT:'終止往來' };
+const DOMAIN_LABELS = { OPERATIONAL:'營運', COMPETENCE:'專業能力', CONFIDENTIALITY:'機密性', FINANCIAL:'財務', STRATEGIC:'策略', REPUTATIONAL:'聲譽', GOVERNANCE_POWER:'治理與權力' };
+const KIND_LABELS = { EVIDENCE:'證據', CLAIM:'主張', ASSESSMENT:'評估' };
+const STATUS_LABELS = { OPEN:'開啟中', ACTIVE:'進行中', CLOSED:'已結案' };
+const PURPOSE_LABELS = { vendor_risk_assessment:'供應商風險評估', fraud_investigation:'詐欺調查', personal_safety:'人身安全', journalism_research:'新聞調查研究', general_due_diligence:'一般盡職調查' };
+const COVERAGE_LABELS = { FULL:'完整覆蓋', PARTIAL:'部分覆蓋' };
+const QUALITY_LABELS = { SINGLE_SOURCE:'單一來源', MULTIPLE_SOURCES:'多重來源' };
+const ALL_DOMAINS = ['OPERATIONAL','COMPETENCE','CONFIDENTIALITY','FINANCIAL','STRATEGIC','REPUTATIONAL','GOVERNANCE_POWER'];
+
 function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
 function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
@@ -189,12 +268,12 @@ async function loadList(tenant) {
   const res = await fetch('/api/hci/v1/cases?tenant=' + tenant);
   const body = await res.json();
   const grid = document.getElementById('cases');
-  if (!res.ok) { grid.innerHTML = `<p class="err">Error: ${esc(body.detail || body.title)}</p>`; return; }
+  if (!res.ok) { grid.innerHTML = `<p class="err">錯誤：${esc(body.detail || body.title)}</p>`; return; }
   grid.innerHTML = body.data.length ? body.data.map(c => `
-    <div class="case-card" onclick="openCase('${c.id}')">
-      <div class="title">${esc(c.purpose)} <span class="badge status-${c.status}">${c.status}</span></div>
-      <div class="meta">${c.id} &middot; risk ${c.risk_tier} &middot; opened ${new Date(c.opened_at).toLocaleDateString()}</div>
-    </div>`).join('') : '<p class="empty">No cases visible to this tenant.</p>';
+    <div class="case-card status-${c.status}" onclick="openCase('${c.id}')">
+      <div class="title">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)} <span class="badge status-${c.status}">${STATUS_LABELS[c.status] || c.status}</span></div>
+      <div class="meta">${c.id} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</div>
+    </div>`).join('') : '<p class="empty">此租戶目前沒有可見的案件。</p>';
 }
 
 async function openCase(caseId) {
@@ -204,7 +283,7 @@ async function openCase(caseId) {
 }
 
 function bandBadge(value) {
-  return `<span class="band-badge band-${value}">${value.replace('_',' ')}</span>`;
+  return `<span class="band-badge band-${value}">${BAND_LABELS[value] || value}</span>`;
 }
 
 async function refreshDetail() {
@@ -213,76 +292,92 @@ async function refreshDetail() {
   const res = await fetch(`/api/hci/v1/cases/${caseId}?tenant=${currentTenant}`);
   const body = await res.json();
   if (seq !== detailRequestSeq) return; // a newer refreshDetail() call started since this one -- discard this stale response
-  if (!res.ok) { alert('Error: ' + (body.detail || body.title)); return; }
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
   currentRecords = body.records;
 
-  document.getElementById('d-title').textContent = body.case.purpose;
-  document.getElementById('d-meta').textContent = `${body.case.id} · status ${body.case.status} · risk ${body.case.risk_tier} · opened ${new Date(body.case.opened_at).toLocaleDateString()}`;
+  document.getElementById('d-title').textContent = PURPOSE_LABELS[body.case.purpose] || body.case.purpose;
+  document.getElementById('d-meta').textContent = `${body.case.id} ．狀態 ${STATUS_LABELS[body.case.status] || body.case.status} ．風險 ${body.case.risk_tier} ．開立於 ${new Date(body.case.opened_at).toLocaleDateString('zh-TW')}`;
 
   const bannerEl = document.getElementById('d-decision-banner');
   if (body.decisions.length) {
     const d = body.decisions[0];
     bannerEl.innerHTML = `<div class="decision-banner outcome-${d.outcome}">
-      <div class="outcome-label">${d.outcome.replace(/_/g,' ')}</div>
+      <div class="outcome-label">${OUTCOME_LABELS[d.outcome] || d.outcome}</div>
       <div class="rationale">${esc(d.rationale)}</div>
-      <div class="when">Recorded ${new Date(d.valid_from).toLocaleString()}</div>
+      <div class="when">記錄於 ${new Date(d.valid_from).toLocaleString('zh-TW')}</div>
     </div>`;
   } else {
-    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">No decision recorded yet — review the evidence below, then record one.</span></div>`;
+    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策 — 請先檢視下方證據，再送出決策。</span></div>`;
+  }
+
+  const ctaEl = document.getElementById('d-empty-cta');
+  const recordPanel = document.getElementById('record-add-panel');
+  if (body.records.length === 0) {
+    ctaEl.innerHTML = `<div class="cta-banner"><p>案件已建立，目前還沒有任何證據——請先新增第一筆，系統才能開始計算信任分數。</p><button type="button" onclick="goToAddRecord()">立即新增證據</button></div>`;
+    recordPanel.open = true;
+  } else {
+    ctaEl.innerHTML = '';
   }
 
   const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q.quality]));
   document.getElementById('d-domain-note').textContent = body.rollup.domains.length
-    ? 'Computed live from Assessment records below (packages/intelligence/rollup-trust-domains.mjs) — never a hand-typed score.'
+    ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。'
     : '';
-  const allDomains = ['OPERATIONAL','COMPETENCE','CONFIDENTIALITY','FINANCIAL','STRATEGIC','REPUTATIONAL','GOVERNANCE_POWER'];
+  const bandRank = { VERY_LOW: 1, LOW: 2, MODERATE: 3, HIGH: 4, VERY_HIGH: 5 };
   const byDomain = Object.fromEntries(body.rollup.domains.map(d => [d.domain, d]));
-  document.getElementById('d-domains').innerHTML = allDomains.map(name => {
+  document.getElementById('d-domains').innerHTML = ALL_DOMAINS.map(name => {
     const d = byDomain[name];
-    if (!d) return `<div class="domain-card unknown"><div class="domain-name">${name.replace('_',' ')}</div><div class="domain-meta">No evidence yet</div></div>`;
+    if (!d) return `<div class="domain-card unknown"><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">尚無證據</div></div>`;
     return `<div class="domain-card">
-      <div class="domain-name">${name.replace('_',' ')}</div>
+      <div class="domain-name">${DOMAIN_LABELS[name] || name}</div>
+      <div class="meter"><div class="meter-fill band-fill-${d.value}"></div></div>
       ${bandBadge(d.value)}
-      <div class="domain-meta">${d.coverage.toLowerCase()} coverage${d.dimension_disagreement ? ' · disagreement' : ''}</div>
+      <div class="domain-meta">${COVERAGE_LABELS[d.coverage] || d.coverage}${d.dimension_disagreement ? '．評估分歧' : ''}</div>
     </div>`;
   }).join('');
 
   document.getElementById('d-strengths').innerHTML = body.strengths.length
-    ? body.strengths.map(s => `<li>${s.domain.replace('_',' ')} (${s.value.replace('_',' ')})</li>`).join('')
-    : '<li class="empty">None yet</li>';
+    ? body.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('')
+    : '<li class="empty">尚無項目</li>';
   document.getElementById('d-risks').innerHTML = body.risks.length
-    ? body.risks.map(s => `<li>${s.domain.replace('_',' ')} (${s.value.replace('_',' ')})</li>`).join('')
-    : '<li class="empty">None yet</li>';
+    ? body.risks.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('')
+    : '<li class="empty">尚無項目</li>';
   document.getElementById('d-unknowns').innerHTML = body.unknowns.length
-    ? body.unknowns.map(u => `<li>${u.replace('_',' ')}</li>`).join('')
-    : '<li class="empty">All domains have evidence</li>';
+    ? body.unknowns.map(u => `<li>${DOMAIN_LABELS[u] || u}</li>`).join('')
+    : '<li class="empty">全部構面皆有證據</li>';
 
   document.getElementById('d-decision-form-wrap').innerHTML = `
     <form class="inline-form" onsubmit="return submitDecision(event)">
-      <label for="dec-outcome">Outcome</label>
-      <select id="dec-outcome">${OUTCOMES.map(o => `<option>${o}</option>`).join('')}</select>
-      <label for="dec-rationale">Rationale</label>
-      <textarea id="dec-rationale" rows="2"></textarea>
-      <button type="submit">Record decision</button>
+      <label for="dec-outcome">決策結果</label>
+      <select id="dec-outcome">${OUTCOMES.map(o => `<option value="${o}">${OUTCOME_LABELS[o]}</option>`).join('')}</select>
+      <label for="dec-rationale">決策理由</label>
+      <textarea id="dec-rationale" rows="2" required></textarea>
+      <button type="submit">送出決策</button>
       <div id="dec-err" class="err"></div>
     </form>`;
 
   const personById = Object.fromEntries(body.persons.map(p => [p.id, p.display_label]));
   const recordsEl = document.getElementById('d-records');
   recordsEl.innerHTML = body.records.length ? body.records.map(r => {
-    const text = r.payload.content || `${r.payload.dimension || ''} = ${r.payload.value || ''}`.trim();
+    const text = r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''}：${BAND_LABELS[r.payload.value] || r.payload.value || ''}`.trim();
     const quality = qualityByDim[r.payload.dimension];
     return `<div class="record-card">
-      <span class="kind-tag">${r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace;text-transform:none">#${r.id.slice(0,8)}</span></span>
+      <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
-      ${quality ? `<span class="quality-tag">${quality.replace('_',' ').toLowerCase()}</span>` : ''}
+      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality] || quality}</span>` : ''}
     </div>`;
-  }).join('') : '<p class="empty">No evidence, claims, or assessments recorded yet.</p>';
+  }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
 
   document.getElementById('f-person').innerHTML = body.persons.map(p => `<option value="${p.id}">${esc(p.display_label)}</option>`).join('')
-    + '<option value="__new__">+ Create a new person…</option>';
+    + '<option value="__new__">＋ 建立新當事人…</option>';
   togglePersonNew();
   renderKindFields();
+}
+
+function goToAddRecord() {
+  const panel = document.getElementById('record-add-panel');
+  panel.open = true;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function togglePersonNew() {
@@ -295,11 +390,11 @@ function citableOptions() {
   // TRUST_DOMAIN-not-directly-creatable rule: a citation must bottom out in
   // something evidentiary, not another judgment).
   const citable = currentRecords.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
-  if (!citable.length) return '<option value="" disabled selected>-- add Evidence first --</option>';
+  if (!citable.length) return '<option value="" disabled selected>－－請先新增證據－－</option>';
   return citable.map(r => {
     const text = (r.payload.content || `${r.payload.dimension || ''} ${r.payload.value || ''}`).trim();
     const short = text.length > 40 ? text.slice(0, 40) + '…' : text;
-    return `<option value="${r.id}">${esc(r.kind)} · ${esc(short)} (#${r.id.slice(0,8)})</option>`;
+    return `<option value="${r.id}">${esc(KIND_LABELS[r.kind] || r.kind)} · ${esc(short)}（#${r.id.slice(0,8)}）</option>`;
   }).join('');
 }
 
@@ -307,14 +402,17 @@ function renderKindFields() {
   const kind = document.getElementById('f-kind').value;
   const el = document.getElementById('f-kind-fields');
   if (kind === 'EVIDENCE') {
-    el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>`;
+    el.innerHTML = `<p class="field-hint">證據：你直接查到或觀察到的具體事實，例如一份文件、一則公開紀錄。</p>
+      <label for="f-content">內容</label><textarea id="f-content" rows="2" placeholder="寫下你查到的事實" required></textarea>`;
   } else if (kind === 'CLAIM') {
-    el.innerHTML = `<label for="f-content">Content</label><textarea id="f-content" rows="2"></textarea>
-      <label for="f-evref">Cites (evidence/claim this is based on)</label><select id="f-evref">${citableOptions()}</select>`;
+    el.innerHTML = `<p class="field-hint">主張：一句說法或推論，需要引用下方的證據佐證，不能憑空成立。</p>
+      <label for="f-content">內容</label><textarea id="f-content" rows="2" placeholder="寫下這個說法或推論" required></textarea>
+      <label for="f-evref">引用依據（這個主張根據哪筆證據或主張）</label><select id="f-evref">${citableOptions()}</select>`;
   } else if (kind === 'ASSESSMENT') {
-    el.innerHTML = `<label for="f-dimension">Dimension</label><select id="f-dimension">${DIMENSIONS.map(d => `<option>${d}</option>`).join('')}</select>
-      <label for="f-value">Band</label><select id="f-value">${BANDS.map(b => `<option>${b}</option>`).join('')}</select>
-      <label for="f-evref">Cites (evidence/claim backing this)</label><select id="f-evref">${citableOptions()}</select>`;
+    el.innerHTML = `<p class="field-hint">評估：根據下方引用的證據，針對某個信任面向打出的等級分數，會直接影響上方的信任構面計算。</p>
+      <label for="f-dimension">評估構面</label><select id="f-dimension">${DIMENSIONS.map(d => `<option value="${d}">${DIMENSION_LABELS[d]}</option>`).join('')}</select>
+      <label for="f-value">等級</label><select id="f-value">${BANDS.map(b => `<option value="${b}">${BAND_LABELS[b]}</option>`).join('')}</select>
+      <label for="f-evref">引用依據（這個評估根據哪筆證據或主張）</label><select id="f-evref">${citableOptions()}</select>`;
   }
 }
 
