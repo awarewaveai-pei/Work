@@ -28,11 +28,11 @@
   .brand-sub { font-size: 0.85rem; font-weight: 400; color: #a9beb6; }
 
   .wrap { max-width: 1040px; margin: 0 auto; padding: 2.5rem 1.5rem; }
-  .note { background: #fbf0d9; border: 1px solid #dcc17f; padding: 0.7rem 1.1rem; border-radius: 4px; font-size: 0.82rem; margin-bottom: 1.5rem; color: #6b4f14; }
-  .tenant-switch { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
-  .tenant-switch button { padding: 0.45rem 1.15rem; border: 1.5px solid var(--border); background: transparent; border-radius: 999px; cursor: pointer; font-size: 0.85rem; font-family: inherit; color: var(--text); transition: background .15s, color .15s, border-color .15s; }
-  .tenant-switch button:hover { border-color: var(--teal); }
-  .tenant-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .topbar-inner { justify-content: space-between; }
+  .tenant-switch { display: flex; gap: 0.5rem; }
+  .tenant-switch button { padding: 0.4rem 1.05rem; border: 1.5px solid #4a5c56; background: transparent; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-family: inherit; color: #d7e6e1; transition: background .15s, color .15s, border-color .15s; }
+  .tenant-switch button:hover { border-color: #a9beb6; }
+  .tenant-switch button.active { background: #f3efe4; color: var(--ink); border-color: #f3efe4; font-weight: 700; }
 
   .intro-card { border-bottom: 1px solid var(--border); padding-bottom: 1.8rem; margin-bottom: 2rem; }
   .intro-lede { margin: 0 0 1.5rem; font-size: 1.05rem; line-height: 1.75; max-width: 46em; }
@@ -51,10 +51,15 @@
 
   h1 { font-family: "Noto Serif TC", "PMingLiU", Georgia, "Times New Roman", serif; font-weight: 700; font-size: 2.05rem; margin: 0 0 0.4rem; letter-spacing: 0; line-height: 1.25; }
   h2 { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); margin: 2.6rem 0 1.1rem; text-transform: uppercase; }
-  h2.section-heading { font-family: "Noto Serif TC", "PMingLiU", Georgia, serif; font-size: 1.4rem; font-weight: 700; color: var(--text); text-transform: none; letter-spacing: 0; margin: 2.6rem 0 1rem; }
 
-  .new-case-btn { display: block; width: 100%; text-align: center; padding: 1.1rem 1rem; border: 1.5px solid var(--teal); border-radius: 4px; background: transparent; color: var(--teal-ink); font-weight: 700; font-size: 1rem; cursor: pointer; font-family: inherit; margin-bottom: 2rem; transition: background .15s, color .15s; }
-  .new-case-btn:hover { background: var(--teal); color: #fff; }
+  /* Horizontal tab bar for the mutually-exclusive case-list views (+ the
+     new-case action folded in as a third tab) -- underline indicator,
+     matching the operator's reference layout. */
+  .tabs { display: flex; gap: 1.75rem; border-bottom: 1px solid var(--border); margin: 1.5rem 0 1.5rem; }
+  .tab { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 0.7rem 0.05rem; font-size: 0.95rem; font-weight: 700; color: var(--muted); cursor: pointer; font-family: inherit; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--teal-ink); border-bottom-color: var(--teal); }
+  .tab-panel form.inline-form { margin-top: 0.5rem; }
 
   .case-grid { display: block; margin-bottom: 0.5rem; }
   .case-card { background: transparent; border: none; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; padding: 1.1rem 0.4rem 1.1rem 1rem; cursor: pointer; transition: background .12s, border-left-color .12s; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -145,8 +150,14 @@
 <body>
 <header class="topbar">
   <div class="topbar-inner">
-    <span class="brand">HCI-30</span>
-    <span class="brand-sub">信任評估報告</span>
+    <div>
+      <span class="brand">HCI-30</span>
+      <span class="brand-sub">信任評估報告</span>
+    </div>
+    <div class="tenant-switch">
+      <button id="btn-a" onclick="loadList('a')">租戶 A</button>
+      <button id="btn-b" onclick="loadList('b')">租戶 B</button>
+    </div>
   </div>
 </header>
 <div class="wrap">
@@ -165,16 +176,13 @@
     </div>
   </div>
 
-  <button type="button" class="new-case-btn" onclick="document.getElementById('case-add-panel').open = true; document.getElementById('case-add-panel').scrollIntoView({behavior:'smooth'})">＋ 開始新的信任調查</button>
+  <div class="tabs">
+    <button type="button" class="tab" data-tab="new" onclick="switchTab('new')">＋ 新案件</button>
+    <button type="button" class="tab active" data-tab="active" onclick="switchTab('active')">進行中案件</button>
+    <button type="button" class="tab" data-tab="closed" onclick="switchTab('closed')">歷史案件</button>
+  </div>
 
-  <h2 class="section-heading">進行中案件</h2>
-  <div class="case-grid" id="cases-active"></div>
-
-  <h2 class="section-heading">歷史案件</h2>
-  <div class="case-grid" id="cases-closed"></div>
-
-  <details class="add-panel" id="case-add-panel" style="margin-top:1.5rem">
-    <summary>＋ 開立新案件</summary>
+  <div class="tab-panel" id="tab-panel-new" style="display:none">
     <form class="inline-form" onsubmit="return submitCase(event)">
       <label>調查目的</label>
       <div class="chip-group" id="c-purpose-chips">
@@ -205,14 +213,17 @@
       <button type="submit">建立案件</button>
       <div id="c-err" class="err"></div>
     </form>
-  </details>
-
-  <p class="subtitle" style="margin-top:1.5rem">合成開發資料。真實 API ＋真實 RLS 保護的 Postgres，非模擬系統。</p>
-  <div class="note">目前尚未建立登入機制，租戶身分暫以下方按鈕手動切換（正式版會是真實登入）。</div>
-  <div class="tenant-switch">
-    <button id="btn-a" onclick="loadList('a')">租戶 A</button>
-    <button id="btn-b" onclick="loadList('b')">租戶 B</button>
   </div>
+
+  <div class="tab-panel" id="tab-panel-active">
+    <div class="case-grid" id="cases-active"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-panel-closed" style="display:none">
+    <div class="case-grid" id="cases-closed"></div>
+  </div>
+
+  <p class="subtitle" style="margin-top:2.5rem">合成開發資料，真實 API ＋真實 RLS 保護的 Postgres，非模擬系統；租戶身分暫用右上角按鈕手動切換（正式版會是真實登入）。</p>
 </div>
 
 <div id="detail" style="display:none">
@@ -312,6 +323,11 @@ const PURPOSE_LABELS = { vendor_risk_assessment:'供應商風險評估', fraud_i
 const COVERAGE_LABELS = { FULL:'完整覆蓋', PARTIAL:'部分覆蓋' };
 const QUALITY_LABELS = { SINGLE_SOURCE:'單一來源', MULTIPLE_SOURCES:'多重來源' };
 const ALL_DOMAINS = ['OPERATIONAL','COMPETENCE','CONFIDENTIALITY','FINANCIAL','STRATEGIC','REPUTATIONAL','GOVERNANCE_POWER'];
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => { p.style.display = p.id === 'tab-panel-' + name ? 'block' : 'none'; });
+}
 
 function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
 function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
