@@ -60,14 +60,14 @@ by_document:
       - name: "root_cause.fishbone"
         machine_id: "root_cause.fishbone"
         line: 742
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
         category: "example-only (Atlas-authoritative); typed example ProblemStatement+EvidenceSet?→CauseHypothesisSet"
       - name: "strategy.swot"
         machine_id: "strategy.swot"
         line: 746
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
         category: "example-only (Atlas-authoritative); typed example KnowledgeSet→SWOTAnalysis"
       - name: "research.thematic_analysis"
         machine_id: "research.thematic_analysis"
@@ -78,8 +78,8 @@ by_document:
       - name: "evidence.triangulation"
         machine_id: "evidence.triangulation"
         line: 833
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
         category: "example-only, used in Workflow IR sample research.qualitative.v4"
   "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
     methods:
@@ -697,8 +697,8 @@ by_document:
       - name: "Causal DAG"
         line: 613
         category: "F11 causal"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
         machine_id: "causal.dag"
       - name: "Counterfactual Reasoning"
         line: 614
@@ -753,18 +753,18 @@ by_document:
       - name: "Red Team"
         line: 641
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Blue Team"
         line: 642
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Independent Judge"
         line: 643
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Pre-mortem"
         line: 644
         category: "F12 challenge"
@@ -968,23 +968,23 @@ by_document:
       - name: "Impact–Effort"
         line: 757
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "ICE"
         line: 758
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "RICE"
         line: 759
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "MoSCoW"
         line: 760
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "WSJF"
         line: 761
         category: "F16 decision"
@@ -998,38 +998,38 @@ by_document:
       - name: "Weighted Decision Matrix"
         line: 763
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "AHP"
         line: 764
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "MCDA"
         line: 765
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "TOPSIS"
         line: 766
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Decision Tree"
         line: 767
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Expected Value"
         line: 768
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Pareto Frontier"
         line: 769
         category: "F16 decision"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "PDCA"
         line: 801
         category: "F17 learning"
@@ -1069,8 +1069,8 @@ by_document:
       - name: "Reversal Criteria"
         line: 804
         category: "F17 learning"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Kill Criteria"
         line: 808
         category: "F17 learning"
@@ -1080,8 +1080,8 @@ by_document:
       - name: "Prediction Tracking"
         line: 806
         category: "F17 learning"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "C4 Model"
         line: 817
         category: "F18 architecture"
@@ -1145,68 +1145,68 @@ by_document:
       - name: "SLI/SLO/SLA"
         line: 847
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Error Budget"
         line: 848
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Capacity Model"
         line: 849
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Load Test"
         line: 850
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Stress Test"
         line: 851
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Soak Test"
         line: 852
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Canary Deployment"
         line: 853
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Blue–Green Deployment"
         line: 854
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Game Day"
         line: 855
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Chaos Engineering"
         line: 856
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "RTO/RPO"
         line: 857
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Runbook / Playbook"
         line: 858
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Release Readiness Review"
         line: 859
         category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "STRIDE"
         line: 882
         category: "F20 security"
@@ -1270,23 +1270,23 @@ by_document:
       - name: "ERD"
         line: 896
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Normalization"
         line: 897
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Data Lineage"
         line: 898
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Data Contract"
         line: 899
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Schema Compatibility Analysis"
         line: 900
         category: "F21 database-data"
@@ -1295,28 +1295,28 @@ by_document:
       - name: "Data Quality Dimensions"
         line: 901
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Backup/Restore Drill"
         line: 902
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Retention / Deletion Model"
         line: 903
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Expand–Contract Migration"
         line: 904
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "Reconciliation"
         line: 905
         category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "RAID Log"
         line: 927
         category: "F22 pm-governance"
@@ -1470,8 +1470,8 @@ by_document:
       - name: "Monte Carlo Simulation"
         line: 1867
         category: "computation (uncataloged in F01–F24)"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
       - name: "stakeholder.regulator lens"
         line: 1036
         category: "lens"
@@ -1587,21 +1587,39 @@ verification:
     SEPARATE, additive block of 1 entry (`research.qualitative_coding`),
     bringing this file's true total to 290 -- deliberately not folded into
     the 289 figure, per that block's own header comment.
-  has_contract_true_count: 2
-  has_contract_true_entries:
-    - "Fishbone / Ishikawa (F05 root_cause, machine_id root_cause.fishbone, Atlas L433)"
-    - "stakeholder.regulator lens (Atlas L1036)"
+  has_contract_true_count: 81
+  has_contract_true_entries: >
+    Itemized per-name listing retired 2026-09-10 (81 entries would duplicate
+    methods/registry/contract-backlog.yaml's own tier_0/tier_1 tracking,
+    which already carries full source/note detail per method_id -- the
+    "second source of truth" duplication that file's own description warns
+    against). Authoritative per-method detail: contract-backlog.yaml tier_0
+    (4 entries) + tier_1 (76 concrete_entry keys, contract_status: complete).
+    80 unique method_ids at time of writing map to 81 has_contract:true ROWS:
+    79 method_ids each cite exactly 1 row, `root_cause.fishbone` cites 2
+    rows (its Atlas F05 row and its Master-Plan example-only row) -- 79+2=81.
   confirmation_command: "grep -c '^\\s*- name:' and grep -n 'has_contract: true' against .ai/research/phase-0/method-inventory.yaml"
   note: >
-    The has_contract_true_count of 2 was independently re-confirmed by grep in
-    this migration task rather than trusted from prior session claims (per
-    AGENTS.md R4 Verify Before Conclude) -- matches
-    MACHINE_READABLE_SPEC_PLAN.md §4's own stated figure. No mother document
-    and no Phase 0 file was modified to produce this file. **2026-08-30
-    addition (separate task)**: `phase_3_additions.research.qualitative_coding`
-    is the one entry in this file with `has_contract: true` that is NOT one
-    of the 2 Phase-0-migrated entries above -- 3 has_contract:true entries
-    now exist in this file in total, across two structurally distinct blocks
-    (`by_document`: 2, `phase_3_additions`: 1), a distinction preserved
-    rather than collapsed into a single stale count.
+    Original count of 2 (Fishbone/Ishikawa, stakeholder.regulator lens) was
+    the Phase 0 migration's own figure, re-confirmed by grep. **2026-09-10
+    reconciliation**: tests/sync_method_inventory_has_contract.py flipped 43
+    rows' has_contract/contract_status to match every contract-backlog.yaml
+    tier_0/tier_1 method_id with contract_status:complete that this file's
+    own has_contract field had never been updated to reflect (confirmed
+    documentation-only drift -- ai_lego/platform/ai_execution/method_resolver.py
+    resolves methods directly against methods/contracts/*.contract.yaml
+    files, never reads this file, so no runtime behavior was affected).
+    Resolves contract-backlog.yaml's own OQ-BACKLOG-1 toward FULL
+    reconciliation: every citation of a complete method is flipped, not only
+    one canonical row (root_cause.fishbone now reads true at both its Atlas
+    F05 row and its Master-Plan example-only citation). strategy.swot's
+    Atlas F08 "SWOT" row is deliberately NOT flipped -- still
+    machine_id: method.swot, the pre-ADR-005 form -- per
+    contract-backlog.yaml's own strategy.swot note, which states that row is
+    out of scope; only the Master-Plan-example row named literally
+    "strategy.swot" changed. tests/run_golden_tests.py PASSED after the
+    edit (3087 checks); its run_registry_invariants only checks internal
+    has_contract<->contract_status consistency within this file, so it never
+    caught this drift and would not have caught its absence either --
+    verified by direct read of that function before writing the sync script.
     (.ai/research/phase-0/method-inventory.yaml remains untouched, read-only source).

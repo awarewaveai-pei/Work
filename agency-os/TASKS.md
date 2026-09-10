@@ -523,6 +523,11 @@
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
+- [ ] **`contract-backlog.yaml` 的 `OQ-BACKLOG-1` 文字本身標記 resolved**
+  - `🟠 未開始` · `2026-09-10 開出` · `可直接做`
+  - **一句話**：`method-inventory.yaml` 這邊已於 2026-09-10 完成 has_contract 補同步（見同日 WORKLOG），但 `contract-backlog.yaml` 自己那條 `OQ-BACKLOG-1` 的文字沒有互相引用關閉，讀者只看 `contract-backlog.yaml` 仍會以為問題未解。
+  - **下一步**：`contract-backlog.yaml` 的 `open_questions.OQ-BACKLOG-1` 補一行 `resolved_by`，指向 2026-09-10 WORKLOG 條目與 `tests/sync_method_inventory_has_contract.py`。
+
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
   - `🟠 未開始` · `2026-08-28 開出` · `可直接做`
   - **一句話**：`check-claude-sync.ps1` 的 H4 只能回答「產生器有沒有吐出 Claude 展不開的語法」；「這 24 支 server 實際上啟不啟得起來」沒有任何人在看。
