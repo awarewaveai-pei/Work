@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-10 HCI30 桌面啟動捷徑——操作者要求「桌面做一個啟動捷徑」
+
+新增兩支腳本：
+- `scripts/start-hci30-dev.ps1`：確保開發資料庫容器已啟動（呼叫既有 `dev-db-init.ps1`，本身已冪等）→ 視需要跑 `npm install` → 在獨立視窗啟動 `npm start` → 輪詢 `http://localhost:4030` 直到真的回應（最多 15 秒）才開瀏覽器，避免「頁面空白，重新整理才看到」這種還沒啟動好就開瀏覽器的競態。
+- `scripts/install-hci30-desktop-shortcut.ps1`：在桌面建立/覆蓋 `HCI-30.lnk`，指向上面那支腳本。桌面捷徑本身是本機狀態、不進 git，這支腳本是唯一真相（同一模式已用在 Docker Desktop 開機守護腳本），換機或重灌都能重建。
+
+真跑驗證（非假設）：實際執行 `start-hci30-dev.ps1`（等同真的點兩下桌面捷徑）——資料庫容器確認 Healthy、schema 標記正確判斷「已套用過，跳過遷移」、伺服器在獨立視窗啟動、`curl http://localhost:4030` 回 200、瀏覽器也正常載入頁面、console 零錯誤。桌面捷徑檔案本身讀回 `TargetPath`/`Arguments`/`WorkingDirectory` 三個屬性逐一核對正確。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=執行 install-hci30-desktop-shortcut.ps1 建立 C:\Users\user1115\Desktop\HCI-30.lnk → 讀回捷徑屬性核對正確 → 實際執行 start-hci30-dev.ps1 → 確認資料庫容器 Healthy、伺服器在新視窗啟動、curl 回 200、瀏覽器載入頁面零 console 錯誤 | 結果=全部符合預期
+REVIEW_WAIVED: NA -- 純新增兩支本機開發便利腳本，複製既有 dev-db-init.ps1 的慣例，未觸及任何 schema/API/前端邏輯；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=start-hci30-dev\|install-hci30-desktop-shortcut | hits=1（僅 install 腳本內對 start 腳本的自我引用，無外部殘留）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/scripts/start-hci30-dev.ps1（新檔）
+- Projects/internal/hci30/scripts/install-hci30-desktop-shortcut.ps1（新檔）
+- 本機 C:\Users\user1115\Desktop\HCI-30.lnk（機械產出，非 git 追蹤）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無
+
+[rollback]
+刪除兩支腳本＋桌面 HCI-30.lnk 檔案即可完全還原，無 DB/schema 影響。
+
 ## 2026-09-10 HCI30 清空本機開發資料庫的展示案件——操作者要求「先把所有測試的舊資料刪掉」
 
 操作者要求刪掉案件列表裡累積的舊測試案件。第一次執行時誤把整個 `hci30dev` docker volume 直接砍掉重建（回到只剩 fixtures 種子資料），範圍超出操作者原意——操作者澄清：連 fixtures 裡寫死的 4 筆原始種子案件也要一起清空，變成完全空的案件列表（透過 AskUserQuestion 確認選「全部清空」）。
