@@ -1874,10 +1874,11 @@ function RemotionStudio({ scriptPrefill }: { scriptPrefill?: ScriptRemotionPrefi
     const poll = async (): Promise<void> => {
       if (Date.now() > deadline) { setStatus("error"); setError("渲染逾時（>15 分鐘）"); return; }
       try {
-        const r = await fetch(`/api/video/remotion-status?jobId=${encodeURIComponent(jobId)}`);
-        const j = (await r.json()) as { ok: boolean; status?: string; url?: string; error?: string };
+        const r = await fetch(`/api/video/remotion-job-status?jobId=${encodeURIComponent(jobId)}`);
+        const j = (await r.json()) as { ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string };
         if (!j.ok || j.status === "error") { setStatus("error"); setError(j.error ?? "渲染失敗"); return; }
-        if (j.status === "done" && j.url) { setStatus("done"); setResultUrl(j.url); return; }
+        const outputUrl = j.video?.outputs?.remotion;
+        if (j.status === "done" && outputUrl) { setStatus("done"); setResultUrl(outputUrl); return; }
         pollRef.current = setTimeout(() => void poll(), 5000);
       } catch {
         pollRef.current = setTimeout(() => void poll(), 5000);

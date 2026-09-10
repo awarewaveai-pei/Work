@@ -19,6 +19,10 @@ export type RenderOutputMeta = Record<string, {
   height: number;
   expected_width?: number;
   expected_height?: number;
+  byteSize?: number;
+  checksumSha256?: string;
+  technical_qa?: Record<string, unknown>;
+  signal_qa?: Record<string, unknown>;
 }>;
 
 export interface VideoServiceCapability {
@@ -26,6 +30,7 @@ export interface VideoServiceCapability {
   format_assets: boolean;
   output_dimensions: boolean;
   openai_tts?: boolean;
+  footage_timeline?: boolean;
   formats: string[];
 }
 
@@ -157,6 +162,41 @@ export async function submitRender(
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
+  }
+}
+
+/** Submit a renderer-neutral real-footage timeline after next-admin resolves tenant assets. */
+export async function submitFootageRender(
+  clips: Array<{ source_url: string; source_start_ms: number; duration_ms: number }>,
+  formats: string[],
+  outName: string,
+  baseUrl?: string,
+  opts?: {
+    audio?: { source_url: string; source_start_ms: number; duration_ms: number };
+    captions?: Array<{ start_ms: number; end_ms: number; text: string }>;
+  },
+): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
+  const base = svcBase(baseUrl);
+  const auth = resolveRendererAuth("quick");
+  if (auth.ok === false) return { ok: false, status: 503, error: "renderer authentication is not configured" };
+  try {
+    const res = await fetch(`${base}/render-footage`, {
+      method: "POST",
+      headers: { ...auth.headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clips,
+        formats,
+        out_name: outName,
+        ...(opts?.audio ? { audio: opts.audio } : {}),
+        ...(opts?.captions ? { captions: opts.captions } : {}),
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
+    if (!res.ok || !body.jobId) return { ok: false, status: res.status || 502, error: body.error ?? `提交實拍渲染失敗（HTTP ${res.status}）` };
+    return { ok: true, jobId: body.jobId };
+  } catch (e: unknown) {
+    return { ok: false, status: 503, error: `無法連線到 video-service：${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
