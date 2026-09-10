@@ -13,6 +13,7 @@ For each entry: open the linked file for the full report including debate transc
 | 2026-08-17 | Dedicated 主機規格上修（64GB → 128GB ECC）+ 供應商候選擴至 OVH | OVH KS-6（$59.80）；Hetzner auction ≤€65 則改選 Hetzner | 0.78 | [2026-08-17-dedicated-host-spec-upgrade.md](2026-08-17-dedicated-host-spec-upgrade.md) |
 | 2026-08-18 | Dedicated 主機採購時機與供應商（「為什麼不乾脆買 KS-6？」）| C6：立刻買 OVH KS-6（月租）+ 平行觀望 + 死線前範圍閘 | 0.79 | [2026-08-18-dedicated-host-purchase-timing.md](2026-08-18-dedicated-host-purchase-timing.md) |
 | 2026-09-01 | HCI Wave 1 的人類決策處理策略 | C2：先批准 HD-00～10；其餘依觸發條件延後 | 0.70 | [2026-09-01-hci-wave-1-decision-tranche.md](2026-09-01-hci-wave-1-decision-tranche.md) |
+| 2026-09-10 | aware-wave.com DMARC 何時從 p=none 升到 quarantine/reject | 維持 p=none 至 9/28，之後 pct=25→100→reject 機械分階段推進 | 直接決策 | [2026-09-10-dmarc-enforcement-timeline.md](2026-09-10-dmarc-enforcement-timeline.md) |
 
 ---
 

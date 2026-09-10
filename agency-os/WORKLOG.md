@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-09-10 決策：aware-wave.com DMARC 執行時程（操作者全權 delegate 後的直接決策）
+
+操作者本輪明確全權 delegate（「需要決定的事都你決定」），對應上一條目結尾留白的「DMARC 何時升級」問題，做出決定並記錄，不再是懸而未決項。
+
+**決定**：不今天升級。維持 `p=none` 到 2026-09-28（= 8/29 起算滿 30 天），之後機械分三階段推進（`quarantine;pct=25`→14天→`pct=100`→14天→`reject`），任一階段出現未解釋失敗即凍結。理由：① 今天才改的 SPF（見上一條目）完全沒有觀察窗，現在執行等於拿幾分鐘前的授權做正式測試 ② p=none 至今僅 12 天，業界慣例建議 ≥2–4 週覆蓋週期性寄件者才夠判斷 ③ 執行做錯是會被感知的生產事故（客戶信被擋），不執行是零新增風險，數據不夠時不做不可逆的執行面變更。這是單一維度、標準協定知識可直接判斷的決策，未叫用 `/decide` 多角色面板（無效益）。
+
+決策正本：[`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md)（已登記 `INDEX.md`）。觸發日期已寫進 `TASKS.md` §A（有外部時鐘區），2026-09-28 會在 AO-RESUME 自動浮現，不依賴人工記憶。
+
+- WORKLOG_DONE: 本條目（純決策文件，非 code change，不適用 REALTEST/REVIEW/BUGHUNT 四動作；DoD 對應「Technical decision」類型 = 決策記錄+使用者確認，皆已滿足）
+
+[rollback] 刪除 `reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`、還原 `INDEX.md`/`TASKS.md` 各一行。純文件，DNS 上什麼都沒動（`p=none` 維持原狀）。
+
 ## 2026-09-10 aware-wave.com SPF/CAA 補齊 + `/firewall/rules` API 遷移（CF token 401 監控盲點條目的收尾）
 
 **觸發**：操作者於 Cloudflare dashboard 重新產生 token，貼在個人筆記 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md:147-148`（`API Token`／`Auth Bearer Token` 兩把皆換新），指給我該行號。已同步兩把進 `mcp/user-env.ps1`（gitignored，不進 git）並 `. mcp/user-env.ps1` 持久化到 User 環境變數。

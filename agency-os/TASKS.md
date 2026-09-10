@@ -222,6 +222,8 @@
   - **訪客地區不確定**（操作者 2026-08-18：「混合/不確定」）——不預先投資 Cloudflare Argo；切換前後各量一次 TTFB（P6.8/P7.9），惡化 >400ms 才評估
   - **下一步**：搬遷量已量測（檔案 1.5 GB／DB ~103 MB，plugins 619M 皆為正常大型外掛、無備份垃圾）→ ~~建 CF zone~~ ✅ → ~~操作者改 nameserver~~ ✅ 2026-08-15 → ~~驗證（網站 200 + 寄收測試信 + DKIM/SPF）~~ ✅ 2026-08-16 **mail-tester 10/10，三項 pass** → ~~決定目標主機~~ ✅ 2026-08-16（二手 dedicated）→ ~~還原演練~~ ✅ 2026-08-16 PASS → ~~定案機器規格~~ ✅ 2026-08-17（128G ECC / ≥8C16T / ≥1TB RAID1；首選 KS-6）→ ~~定案採購時機~~ ✅ 2026-08-18（立刻買，月租）→ **⏭️ 下一步：買機器**（操作者刷卡，**今天，KS-6 月租**）→ 建置 → 搬站 → 切換（需 go-ahead）→ 完整還原演練 Drill #2 → **11/20 起 EU/SG 整併**（六服務，兩週一台）
 
+- [ ] **【2026-09-28 觸發】aware-wave.com DMARC 升級第一階段（p=none → p=quarantine;pct=25）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md)：機械分階段（pct=25→100→reject，各 14 天），前提是操作者查看 `peijingartstudio@gmail.com` 收到的 DMARC rua 聚合報表，確認 Cloudflare Email Routing／Amazon SES／Resend 三個已知寄件來源皆對齊、零未解釋失敗。任一階段出現未解釋失敗 → 凍結，不得跳過原因逕自往下推進。
+
 #### B. 🔒 卡在你（你動手才會動，我做不了）
 
 > 刷卡／登入第三方面板／瀏覽器點測／給截圖。多數每條只要幾分鐘，卻卡住下游。
