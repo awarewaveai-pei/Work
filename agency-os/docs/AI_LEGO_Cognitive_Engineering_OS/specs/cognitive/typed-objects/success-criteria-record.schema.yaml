@@ -1,0 +1,164 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/success-criteria-record.schema.yaml"
+title: Success Criteria Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SuccessCriteriaRecord` -- the declared `outputs` of
+  `framing.success_criteria`'s Method Contract. Atlas's F01 table row (L338) gives a bare 4-term formula
+  (Must/Should/Guardrail/Stop) and no worked example -- see the method contract's own compilation_decisions
+  for the full shape reasoning (distinct from learning.kill_criteria/reversal_criteria's ongoing-monitoring
+  shape, distinct from decision.moscow's own Must/Should/Could/Won't release-scope classifier).
+
+  Modeled as FOUR fixed named array fields (must/should/guardrail/stop), each holding zero-or-more
+  `{id, statement, provenance}` criterion items. ONE required non-emptiness floor: `must` (Atlas's own
+  benefit, "防止事後改標準", needs at least one non-negotiable criterion to exist for there to be anything to
+  protect from later revision) -- `should`/`guardrail`/`stop` stay legitimately per-decision-optional (the
+  keys are required, their contents are not).
+
+  Runtime-layer invariant this schema CANNOT express (no native cross-array uniqueness operator): every
+  criterion `id`, across all four categories combined, must be unique within the record -- enforced at
+  `ai_lego/modules/framing/success_criteria.py`'s own construction AND independently re-derived by
+  `evaluate_criterion_id_uniqueness_gate`, same two-layer discipline every sibling typed-object schema in
+  this directory documents.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Success Criteria row (L338) -- the ONLY citation for this method"
+  - "methods/contracts/framing.success_criteria.contract.yaml"
+  - "specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml -- the real, already-built 'RCS-' id prefix this file's optional reversal_criteria_ref format-checks against"
+  - "specs/governance/epistemic-label.schema.yaml -- provenance_record"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents -- see the method contract's own compilation_decisions for the category-shape/owner-field/id-prefix decisions themselves, not repeated here."
+
+type: object
+required: [id, version, decision_ref, must, should, guardrail, stop, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SC-"
+    description: "NEW DESIGN. Resolves framing.goal_statement's own OQ-GOALSTATEMENT-1 -- matches the 'SC-FUTURE-001' placeholder format that method's own test suite already anticipated."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.success_criteria"
+
+  decision_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Free-text reference to the high-risk decision or goal this criteria set defines success for (Atlas L338 '高風險決策'). Same free-text-not-hard-$ref scope limit as learning.kill_criteria/reversal_criteria's own decision_ref."
+
+  must:
+    type: array
+    minItems: 1
+    description: "Atlas L338 'Must' -- non-negotiable minimum. REQUIRED non-empty, see top-level description."
+    items: { $ref: "#/$defs/criterion" }
+
+  should:
+    type: array
+    description: "Atlas L338 'Should' -- desired but not blocking. May be empty."
+    items: { $ref: "#/$defs/criterion" }
+
+  guardrail:
+    type: array
+    description: "Atlas L338 'Guardrail' -- a boundary that must not be crossed. May be empty."
+    items: { $ref: "#/$defs/criterion" }
+
+  stop:
+    type: array
+    description: "Atlas L338 'Stop' -- an explicit condition that halts the effort. May be empty."
+    items: { $ref: "#/$defs/criterion" }
+
+  reversal_criteria_ref:
+    type: string
+    pattern: "^RCS-"
+    description: >
+      OPTIONAL soft reference to a `learning.reversal_criteria` output id (Atlas's own best-paired
+      citation, L338: 'Reversal Criteria'). Unlike goal_statement's own unconstrained success_criteria_ref
+      (its target was unbuilt at that method's build time), `learning.reversal_criteria` IS already built,
+      so this field format-checks against its real, confirmed 'RCS-' id prefix -- existence of the
+      referenced record is NOT verified, format-only, same scope limit as every other soft-link in this
+      family (e.g. framing.non_goals' own related_moscow_wont_ref).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  criterion:
+    type: object
+    required: [id, statement, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique across ALL FOUR categories within this record (e.g. SC-001-M1)."
+      statement:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The criterion text itself (e.g. 'system uptime >= 99.9%')."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A high-risk decision's success criteria, with a forward soft-link to a Reversal Criteria set for ongoing monitoring once committed"
+    value:
+      id: "SC-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.success_criteria"
+      decision_ref: "DEC-2026-09-10-001: 導入新主機商作為 Hetzner 之外的替代選項"
+      must:
+        - {id: "SC-2026-09-10-001-M1", statement: "遷移後所有客戶站台 uptime >= 99.9%（30 天觀察窗）", provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      should:
+        - {id: "SC-2026-09-10-001-S1", statement: "月費成本較現有方案降低至少 10%", provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      guardrail:
+        - {id: "SC-2026-09-10-001-G1", statement: "任何客戶資料不得離開歐盟資料主權範圍", provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      stop:
+        - {id: "SC-2026-09-10-001-T1", statement: "試點期間累積損失超過 kill_criteria 門檻即中止", provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      reversal_criteria_ref: "RCS-2026-09-10-001"
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+  - description: "A minimal record: only the required Must category populated, should/guardrail/stop left empty"
+    value:
+      id: "SC-2026-09-10-002"
+      version: "1.0.0"
+      generated_by_method: "framing.success_criteria"
+      decision_ref: "DEC-2026-09-10-002: 內部工具 beta 測試"
+      must:
+        - {id: "SC-2026-09-10-002-M1", statement: "至少 5 名內部使用者完成完整流程且無 P0 bug", provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}}
+      should: []
+      guardrail: []
+      stop: []
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-SUCCESSCRITERIARECORD-1"
+    question: >
+      Should guardrail/stop eventually get their own minItems:1 floor once a real high-risk-decision usage
+      pattern shows they are in practice never left empty, or does per-decision optionality hold up?
+    owner: "operator, or whoever next applies this method to a real high-risk decision"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table Success Criteria row (L338) and the F01 flowchart (L346-355) directly. Read
+    learning/kill_criteria.py, learning/reversal_criteria.py, and decision.moscow.contract.yaml in full as
+    near-neighbor due diligence (see method contract's own compilation_decisions). Read
+    goal-statement-record.schema.yaml and reversal-criteria-set.schema.yaml in full for the id-prefix and
+    $defs-local-ref conventions reused here (5w1h-record.schema.yaml confirmed as this directory's own
+    precedent for a local $defs block, not a novel pattern). Grepped ai_lego/ and specs/ for
+    success_criteria/guardrail/must_should_guardrail_stop (case-insensitive) -- zero pre-existing hits beyond
+    goal_statement's own forward-reference field. Validated against jsonschema Draft202012Validator.
+  note: >
+    `must`/`should`/`guardrail`/`stop` category names and their citation order are transcribed verbatim
+    from Atlas L338. The per-criterion {id,statement,provenance} shape, the must-only non-emptiness floor,
+    and reversal_criteria_ref are compilation decisions, disclosed above, not textually cited. No mother
+    document was modified.

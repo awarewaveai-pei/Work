@@ -2134,6 +2134,46 @@ tier_1:
     source: "methods/contracts/framing.non_goals.contract.yaml + specs/cognitive/typed-objects/non-goals-record.schema.yaml"
     note: "82nd slice. 110 tests pass. F01 framing family: 3 of 11 built (goal_statement/smart/non_goals); remaining: OKR, North Star Metric, Success Criteria, 5W1H, Problem Statement, How Might We, Frame Storming, Boundary Critique."
 
+  eightysecond_concrete_entry:
+    method_id: "framing.okr"
+    contract_status: complete
+    tier: 1
+    mandated_by: "4th `framing` (F01) member, row L336 (Objective->2-5 KR->owner->review). Verified distinct from framing.smart (fixed 5-criteria single-goal refinement, no KR-count bound/owner/review fields) and from decision.rice/decision.moscow (operate on already-defined items, not goal-setting). Invariants: key_results count in [2,5]; every entry non-empty description/target/owner; key_results ids unique; review_cadence non-empty."
+    source: "methods/contracts/framing.okr.contract.yaml + specs/cognitive/typed-objects/okr-record.schema.yaml"
+    note: "83rd slice. 56 tests pass."
+
+  eightythird_concrete_entry:
+    method_id: "framing.north_star_metric"
+    contract_status: complete
+    tier: 1
+    mandated_by: "5th `framing` (F01) member, row L337 (核心價值->代理指標->反 gaming 驗證). Distinct from framing.goal_statement's success_condition (static, project-level) -- ongoing product-strategy metric; verified no overlap with decision.wsjf (metric DEFINITION vs prioritization SCORING). Invariant: proxy_metric must genuinely differ from core_value_proposition (not an echo)."
+    source: "methods/contracts/framing.north_star_metric.contract.yaml + specs/cognitive/typed-objects/north-star-metric-record.schema.yaml"
+    note: "84th slice. 38 tests pass."
+
+  eightyfourth_concrete_entry:
+    method_id: "framing.success_criteria"
+    contract_status: complete
+    tier: 1
+    mandated_by: "6th `framing` (F01) member, row L338 (Must/Should/Guardrail/Stop). Distinct from learning.kill_criteria/reversal_criteria (ongoing monitoring) and decision.moscow (per-item release-scope triage) -- pre-commitment classification for one high-risk decision. Resolves framing.goal_statement's own OQ-GOALSTATEMENT-1 (mints SC- id prefix). Invariants: must non-empty; criterion id unique across all 4 categories."
+    source: "methods/contracts/framing.success_criteria.contract.yaml + specs/cognitive/typed-objects/success-criteria-record.schema.yaml"
+    note: "85th slice. 54 tests pass."
+
+  eightyfifth_concrete_entry:
+    method_id: "framing.five_w_one_h"
+    contract_status: complete
+    tier: 1
+    mandated_by: "7th `framing` (F01) member, row L340 + Sec12.1 (L2544-2550). Id spelled out (method.schema.yaml's id pattern rejects digits, same precedent root_cause.five_whys set) -- filename framing.five_w_one_h.contract.yaml matches. Profiles a still-fuzzy situation across 6 fixed Who/What/When/Where/Why/How dimensions, distinct from framing.goal_statement (commits to an already-chosen goal). information_gaps is GENUINE_COMPUTE, re-derived by an independent gate from which dimensions are UNKNOWN, never caller-supplied. Invariants: 6 dimensions positionally ordered; KNOWN requires non-empty answer and forbids gap_note; UNKNOWN forbids the answer key's presence entirely."
+    source: "methods/contracts/framing.five_w_one_h.contract.yaml + specs/cognitive/typed-objects/5w1h-record.schema.yaml + ai_lego/compute/five_w1h/gap_detection.py"
+    note: "86th slice. 63 tests pass."
+
+  eightysixth_concrete_entry:
+    method_id: "framing.problem_statement"
+    contract_status: complete
+    tier: 1
+    mandated_by: "8th `framing` (F01) member, row L341 (Current->Expected->Gap->Impact->Constraints). Reuses the pre-existing specs/cognitive/typed-objects/problem-statement.schema.yaml verbatim (confirmed by grep: zero prior ACTIVE contract had outputs:[ProblemStatement] despite 5 siblings -- root_cause.event_tree/fault_tree/kepner_tregoe/change_analysis + decision.decision_tree -- already declaring it as a required input; root_cause.fishbone's own build_problem_statement() is an ungated test-fixture helper, not a real producer). Also closed 2 real gaps in that shared schema found during due-diligence: missing additionalProperties:false and no minLength on its 3 required content strings -- fixed, zero regression across all 6 consumers (536 tests) plus the full 5361-test repo suite. Invariants: field completeness; expected_state must genuinely differ from current_state (not an echo)."
+    source: "methods/contracts/framing.problem_statement.contract.yaml + specs/cognitive/typed-objects/problem-statement.schema.yaml (edited, not new)"
+    note: "87th slice. 50 tests pass. F01 framing family: 8 of 11 built (goal_statement/smart/non_goals/okr/north_star_metric/success_criteria/five_w_one_h/problem_statement); remaining: How Might We, Frame Storming, Boundary Critique."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

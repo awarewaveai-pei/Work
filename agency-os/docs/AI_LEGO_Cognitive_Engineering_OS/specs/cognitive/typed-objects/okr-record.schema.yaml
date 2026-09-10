@@ -1,0 +1,164 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/okr-record.schema.yaml"
+title: OKR Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `OKRRecord` -- the declared
+  `outputs` of `framing.okr`'s Method Contract. Atlas's F01 table row (L336)
+  names the pipeline "Objective→2–5 KR→owner→review" but gives no worked
+  example and no field-level shape.
+
+  One qualitative `objective` plus 2-5 `key_results[]`, each carrying a
+  `description`, a `target` (external, well-known OKR convention -- a Key
+  Result must be checkable/measurable, not prose alone; see the method
+  contract's own compilation_decisions), and an `owner` (Atlas's own
+  "→owner" stage). `review_cadence` realizes Atlas's own "→review" stage at
+  the record level (one review mechanism per Objective, not per-KR).
+
+  TWO invariants this schema CAN express structurally: `key_results` item
+  count bounded [2,5] (`minItems`/`maxItems`), and every string field
+  non-empty (`minLength`/`pattern: "\S"`). The one it CANNOT express --
+  `key_results[].id` uniqueness within the record (no native JSON Schema
+  array-uniqueness-by-subfield operator) -- is a runtime-layer invariant,
+  see `ai_lego/modules/framing/okr.py`, same disclosed limitation
+  `non-goals-record.schema.yaml`'s own `excluded_scope[].id` already accepts.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, OKR row (L336) -- the ONLY citation for this method"
+  - "methods/contracts/framing.okr.contract.yaml"
+  - "specs/cognitive/typed-objects/non-goals-record.schema.yaml -- the id-uniqueness-is-runtime-only limitation reused for key_results[].id"
+  - "specs/governance/epistemic-label.schema.yaml -- provenance_record"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "key_results minItems/maxItems?"
+    decision: "2 / 5 -- Atlas's own literal '2–5 KR' (L336), a real structural bound the schema CAN express natively."
+  - question: "target: free string or a structured baseline/current/target-value+unit shape?"
+    decision: "Free string -- Atlas gives no worked example or numeric format; a structured shape would be fabricated scope beyond both the literal citation and the external convention this field already discloses (see the method contract's own compilation_decisions, OQ-OKR-1)."
+  - question: "review_cadence: fixed enum (e.g. QUARTERLY) or free string?"
+    decision: "Free string -- Atlas's own 何時使用 column ('團隊/季度') names typical usage context, not a closed vocabulary; a fixed enum would exclude legitimate real-world cadences (monthly, per-sprint) with no Atlas grounding for a closed set."
+
+type: object
+required: [id, version, objective, key_results, review_cadence, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^OKR-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.okr"
+
+  objective:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L336 'Objective'. The qualitative direction -- Atlas's own benefit line ('方向與可衡量成果分離') separates this from the measurable key_results below."
+
+  key_results:
+    type: array
+    minItems: 2
+    maxItems: 5
+    description: "Atlas L336 '2–5 KR'. See top-level description and compilation_decisions."
+    items: {$ref: "#/$defs/key_result_entry"}
+
+  review_cadence:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L336 '→review'. Free text -- see compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  key_result_entry:
+    type: object
+    required: [id, description, target, owner, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique within this record's key_results[] list (runtime-only uniqueness check, OKR_DUPLICATE_KEY_RESULT_ID -- see top-level description)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The Key Result statement itself. Atlas L336 'KR'."
+      target:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The concrete, checkable measurable target this Key Result is judged against. External OKR convention, not a literal Atlas field name -- see the method contract's own compilation_decisions."
+      owner:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas L336 '→owner'. Accountable for this specific Key Result."
+      provenance:
+        description: "Per-entry, same per-entry granularity every sibling typed-object schema in this directory uses."
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A team-quarterly OKR record: 3 key results, distinct owners"
+    value:
+      id: "OKR-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.okr"
+      objective: "讓 Cognitive OS F01 framing 家族成為團隊預設的目標框定工具"
+      key_results:
+        - id: "KR-1"
+          description: "F01 家族 11 個方法中至少 6 個有完整 contract/schema/gate/CLI/test"
+          target: "6/11 達標"
+          owner: "operator"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "KR-2"
+          description: "每個已建成方法的 CLI demo 皆真實執行過且全綠"
+          target: "100% CLI demo PASS"
+          owner: "operator"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "KR-3"
+          description: "critic review 對每個新方法至少跑一次且無 unresolved critical finding"
+          target: "0 個未解決 critical finding"
+          owner: "operator"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+      review_cadence: "每季一次，team review"
+      provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-OKRRECORD-1"
+    question: "target has no numeric/unit structure -- should a future revision add one once a real consumer needs computed progress-tracking (current vs. target value)?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F01 table OKR row (L336) directly. Read
+    non-goals-record.schema.yaml and smart-goal-record.schema.yaml in full
+    as shape precedent (bounded list-of-structured-entries vs. fixed
+    positional tuple, respectively -- confirmed OKR's own 2-5 variable-count
+    shape matches non-goals's convention, not smart's). Validated against
+    jsonschema Draft202012Validator (required fields present, id/key_results
+    item-shape/minItems/maxItems enforced, additionalProperties:false at
+    both the top level and $defs.key_result_entry verified to reject an
+    unknown key from the start, per this session's own critic-finding
+    convention).
+  note: >
+    No mother document was modified. `objective`/`key_results`/`owner`/
+    `review_cadence` field names and the 2-5 count bound are transcribed
+    verbatim from Atlas L336. The key_result_entry shape (description+
+    target+owner+provenance), target itself, and review_cadence's free-text
+    (non-enum) treatment are compilation decisions, disclosed above, not
+    textually cited.

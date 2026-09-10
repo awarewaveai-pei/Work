@@ -1,0 +1,114 @@
+$id: "ai-lego://methods/contracts/framing.north_star_metric.contract.yaml"
+title: "North Star Metric Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F01 framing family (4th member). Atlas's ONLY citation is the F01
+  table row (L337: "找核心價值指標｜產品策略｜核心價值→代理指標→反 gaming
+  驗證｜聚焦長期價值｜KPI Tree"). Flat record of 3 non-empty string fields in
+  Atlas's own citation order. Distinct from framing.goal_statement's
+  success_condition (static, one-time, project-level) -- this is an ongoing
+  product-strategy metric definition, no project end-date. Core invariant:
+  proxy_metric must genuinely differ from core_value_proposition (a proxy
+  identical to the value it stands in for is not actually a proxy).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, North Star Metric row (L337) -- the ONLY citation for this method anywhere in the spec root"
+  - "specs/cognitive/typed-objects/north-star-metric-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "ai_lego/modules/framing/goal_statement.py -- read in full to confirm success_condition is a distinct, static/one-time concept, not this method's ongoing product-strategy metric"
+  - "ai_lego/modules/decision/wsjf.py -- read in full to confirm no 'core metric' overlap; wsjf.py scores/prioritizes jobs, it does not define a standing product metric (different axis: DEFINITION vs SCORING)"
+
+decided_by: >
+  No ADR governs the content. Atlas gives one table row; the flat-record
+  shape and the single runtime invariant are Phase 3 compilation decisions
+  recorded below. `id: framing.north_star_metric` mints a new machine_id
+  under the existing `framing` family (established by framing.goal_statement).
+  method-inventory.yaml/contract-backlog.yaml registration left to the
+  orchestrating integration pass, per this task's own hard constraint
+  against editing shared registries while up to 5 sibling agents touch the
+  same family folder concurrently.
+
+id: framing.north_star_metric
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, VALIDATE]
+# INFERRED, not cited. FRAME = Atlas's own literal benefit line for this row
+# ("找核心價值指標" -- find the core-value indicator), a direct kernel FRAME
+# match; VALIDATE = the anti-gaming check and the two-layer invariant
+# re-derivation every sibling module in this family uses. No DECOMPOSE:
+# unlike goal_statement's 5 heterogeneous fields, this is a 3-stage linear
+# derivation (value -> proxy -> validation), not a decomposition of one
+# thing into independent parts.
+
+purpose:
+  - name_the_single_proxy_metric_that_stands_in_for_a_product_s_core_value_and_prove_it_resists_gaming
+inputs:
+  required: []
+  optional: []
+# Atlas's own "產品策略" (product strategy) usage column names this as a
+# standing, ongoing artifact with no cited upstream typed-object input --
+# disclosed as a reasoned absence, not an oversight, same class of decision
+# framing.goal_statement's own contract already made for its own "任務起始"
+# entry point. See OQ-NORTHSTARMETRIC-2.
+outputs: [NorthStarMetricRecord]
+preconditions:
+  - "core_value_proposition, proxy_metric, and anti_gaming_validation are each a non-empty string"
+  - "proxy_metric must NOT be identical (case/whitespace-insensitive) to core_value_proposition -- an identical pair means no actual measurable stand-in was chosen, defeating the entire premise of a PROXY metric (external North Star Metric convention: a proxy exists precisely because the core value itself typically cannot be measured directly/continuously)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row (plain
+  # 6-column table); this record carries one whole-record provenance, same
+  # convention framing.goal_statement's own contract already established
+  # for this family's flat-record shape.
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (single table row
+# only) -- left genuinely empty rather than inventing one.
+recommended_next: []
+# Atlas's own best-paired column (KPI Tree) is unbuilt -- has_contract:false,
+# no machine_id minted, and this task's own instruction explicitly scopes
+# KPI Tree's shape out of this slice. Left empty rather than inventing an id
+# or a forward-referencing field for an unbuilt sibling this task was told
+# not to shape. See OQ-NORTHSTARMETRIC-1.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat record (goal_statement-shape) or a structured metric object (name/formula/unit)?"
+    decision: "Flat record of 3 plain strings -- Atlas gives no worked example, formula grammar, or unit convention for any of the 3 cited stages; inventing a structured metric-definition schema would be fabricated scope beyond the literal citation."
+  - question: "Is core_value_proposition/proxy_metric the same concept as framing.goal_statement's goal/success_condition?"
+    decision: "No -- read goal_statement.py in full. success_condition is a STATIC description fixed once at INITIAL, project-level goal framing (Atlas's own F01 benefit line for that row: '降低 scope 漂移', preventing drift from an ambiguous start). This method's usage column is '產品策略' (product strategy) with no project end-date -- an ONGOING metric definition a product keeps re-consulting, not a one-time framing artifact. Genuinely different concept, not a naming accident."
+  - question: "Does decision.wsjf (or any decision-family scoring method) already own a 'core metric' concept?"
+    decision: "No -- read wsjf.py in full. It computes a numeric SCORE (Cost of Delay / Job Size) for PRIORITIZING a set of candidate jobs; it defines no standing product metric and has no core_value/proxy_metric-shaped field anywhere. Different axis: metric DEFINITION (this method) vs prioritization SCORING (decision family) -- confirmed by reading, not assumed from the two methods' surface-level 'metric'-adjacent naming."
+  - question: "Enforce a real invariant beyond per-field non-emptiness?"
+    decision: "Yes -- proxy_metric must genuinely differ from core_value_proposition (case/whitespace-insensitive), same 'identical pair is a no-op, not a comparison' invariant class framing.goal_statement's own success_condition!=goal check already establishes for this family. An echoing pair provides no separate, measurable stand-in."
+  - question: "Cite Atlas's 最佳搭配 (KPI Tree) as recommended_next or add a forward-looking soft-reference field the way goal_statement added success_criteria_ref?"
+    decision: "No soft-reference field added, unlike goal_statement's success_criteria_ref. This task's own instruction is explicit and stronger than goal_statement's own discretionary call: 'KPI Tree — unbuilt, not in scope, do not invent its shape.' Adding even an untyped forward-reference field would be inventing a piece of KPI Tree's future integration surface this task was told not to shape. Left as an open question instead. See OQ-NORTHSTARMETRIC-1."
+
+open_questions:
+  - "OQ-NORTHSTARMETRIC-1: F01 KPI Tree (Atlas's own best-paired column, L337) is unbuilt (no tool-table detail beyond the name, no method-inventory.yaml entry). Once built, should it consume this record via a soft reference the way goal_statement's success_criteria_ref anticipates its own unbuilt sibling? Deliberately not decided here — see compilation_decisions.（owner: operator）"
+  - "OQ-NORTHSTARMETRIC-2: inputs.required left empty on the strength of Atlas's own '產品策略' (standing, ongoing) framing, no upstream typed-object cited. Revisit once a consuming downstream method (e.g. a built KPI Tree) clarifies whether it expects a specific upstream input.（owner: operator）"
+  - "OQ-NORTHSTARMETRIC-3: proxy_metric is left as a plain string (no measurement_unit/formula/cadence sub-fields). Atlas gives no worked example: should a future revision add structure once a real consuming method needs to parse it programmatically rather than read it as prose?（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for the F01 table (L330-345) and for
+    "North Star Metric"/"北極星" -- single hit, L337, no dedicated section.
+    Grepped for "KPI Tree" -- same single hit (L337 itself), confirming it
+    is not catalogued elsewhere. Read ai_lego/modules/framing/goal_statement.py
+    in full to confirm success_condition is a distinct static/project-scoped
+    concept. Read ai_lego/modules/decision/wsjf.py in full to confirm no
+    "core metric" overlap (different axis: definition vs scoring). Grepped
+    the whole ai_lego/ and agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/
+    trees for "north_star"/"proxy_metric"/"anti_gaming" (case-insensitive)
+    -- zero pre-existing hits before this slice. Read
+    framing.goal_statement.contract.yaml/.py/.schema.yaml plus its CLI and
+    test as the structural template. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 3-field citation order is
+    transcribed verbatim into the field list. The flat-record shape and the
+    proxy_metric!=core_value_proposition invariant are compilation
+    decisions, disclosed above, not textually cited.

@@ -1,0 +1,116 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/north-star-metric-record.schema.yaml"
+title: North Star Metric Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `NorthStarMetricRecord` -- the
+  declared `outputs` of `framing.north_star_metric`'s Method Contract.
+  Atlas's F01 table row (L337) names the 3-field citation order (核心價值→
+  代理指標→反 gaming 驗證) and its purpose but gives no worked example and
+  no field-level shape.
+
+  Modeled as a FLAT record of 3 plain-string fields, same shape class
+  `goal-statement-record.schema.yaml`'s own flat-record convention uses for
+  this family. The ONE real invariant this schema CANNOT express --
+  `proxy_metric` must genuinely differ from `core_value_proposition` (no
+  native JSON Schema cross-field "not equal to a sibling" operator) -- is a
+  runtime-layer invariant, see `ai_lego/modules/framing/north_star_metric.py`,
+  which enforces it at construction AND independently via a gate that
+  re-derives from raw fields, same two-layer discipline every sibling
+  module in this family already uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, North Star Metric row (L337) -- the ONLY citation for this method"
+  - "methods/contracts/framing.north_star_metric.contract.yaml"
+  - "specs/cognitive/typed-objects/goal-statement-record.schema.yaml -- flat plain-string record shape convention reused here"
+  - "specs/governance/epistemic-label.schema.yaml -- provenance_record"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Plain string fields, or a structured metric object (name/formula/unit/cadence)?"
+    decision: "Plain non-empty strings for all 3 fields -- Atlas gives no worked example or field-level shape for any of the 3 cited stages; a structured metric-definition object would be fabricated scope."
+  - question: "Should proxy_metric != core_value_proposition be expressed in JSON Schema?"
+    decision: "No -- no native cross-field 'not equal to a sibling' operator; left as a runtime-layer invariant, same limitation goal-statement-record.schema.yaml's own success_condition!=goal check already accepted."
+
+type: object
+required: [id, version, core_value_proposition, proxy_metric, anti_gaming_validation, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^NSM-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as goal-statement-record.schema.yaml's GOAL- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.north_star_metric"
+
+  core_value_proposition:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L337 '核心價值'. The underlying value the product delivers, typically not directly/continuously measurable itself -- the reason a proxy_metric is needed below."
+
+  proxy_metric:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L337 '代理指標'. The single measurable stand-in for
+      core_value_proposition. Must genuinely differ from
+      core_value_proposition -- runtime-layer check, see top-level
+      description.
+
+  anti_gaming_validation:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L337 '反 gaming 驗證'. An explicit check/argument for why proxy_metric cannot be trivially gamed (increased) without genuinely delivering core_value_proposition."
+
+  provenance:
+    description: "Same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A complete North Star Metric definition, self-referentially describing this same family's own downstream-usefulness value"
+    value:
+      id: "NSM-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.north_star_metric"
+      core_value_proposition: "Cognitive OS 使用者能可靠地把模糊決策問題轉成有 gate 把關的結構化記錄"
+      proxy_metric: "每週有幾個 method record 通過全部 gate 且被下游至少一個其他方法引用"
+      anti_gaming_validation: "只衝 record 數量無法灌高此指標——未被下游引用的 record 不計入分子，杜絕『灌水造 record 交差』"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-NORTHSTARMETRICREC-1"
+    question: >
+      proxy_metric has no structural shape beyond a non-empty string (no
+      measurement_unit/formula/cadence). Add structure once a real
+      consuming method (e.g. a built KPI Tree) needs to parse it
+      programmatically rather than read it as prose?
+    owner: "operator, or whoever builds KPI Tree"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table North Star Metric row (L337) directly, plus its
+    own flowchart context (L346-355) and confirmed (grep) it has no
+    dedicated section elsewhere in the document. Read
+    goal-statement-record.schema.yaml in full as shape precedent. Validated
+    against jsonschema Draft202012Validator (required fields present, id
+    pattern satisfied, additionalProperties:false present from the start --
+    2026-09-08 critic finding against a sibling schema applied proactively
+    here, not retrofitted).
+  note: >
+    `core_value_proposition`/`proxy_metric`/`anti_gaming_validation` field
+    names and citation order are transcribed verbatim from Atlas L337. The
+    flat-record shape is a compilation decision, disclosed above, not
+    textually cited. No mother document was modified.

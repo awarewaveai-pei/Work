@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-09-10 System Foundry：39 個 capability-item-map fragment 合併，抓到 4 類跨 fragment 衝突（80 個 triple，非只有指示的 3 個）
+
+8 個平行 agent 完成的 capability-item 細粒度標註（32 新模組 + 7 個既有模組修復，共 39 個 fragment）合併進 `generation/blueprint-capability-item-map.json`。收工前寫程式做全 fragment 交叉掃描（非只查任務指出的 3 個），找到 80 個 `(doc_id,section,item_index)` 三元組被 2 個不同 capability 同時宣告（`_module_common` 全域單一 bucket + `rev` dict 單一 owner 的既有機制下，重複宣告 = 未定義行為，看合併順序決定哪個生效）。
+
+- **機械規則**（specific 永遠贏 `_module_common`）：收集全部 fragment + 既有 live map 的 specific claim，過濾每個 `_module_common` list 移除已被任何 specific capability 宣告的 triple。單一規則，無需逐檔手改。
+- **人工判斷**（4 類，讀 `blueprint-architecture-items.json` 實際 item 文字決定）：
+  1. `domain` 模組的廣義 catch-all capability 被專屬 sibling 模組 100% 重複宣告——`CAP-UGC`(8 items,重複 reviews)、`CAP-FINANCIAL-RECORDS`(24 items,重複 analytics)、`CAP-PROJECTS`(11 items,重複 workflow)全數從 domain 移除（任務只點名 CAP-UGC，另兩個是本次交叉掃描新找到的同款問題）。
+  2. `domain.CAP-INVENTORY` 被 `inventory_ops.CAP-MULTI-LOCATION-STOCK` 部分重複（27 之 21 items）——修剪為 6 item 殘餘。
+  3. 單一 item specific-vs-specific（讀文字判斷歸屬）：doc16 `events_consumed[0]`('order.delivered')判給 returns 不給 warranty；doc17 `events_consumed[0]`('order.paid')判給 loyalty 不給 reviews；doc22 `data_rules[2]`('Currency rate source versioned')判給 globalization 不給 analytics。
+  4. 任務點名的 3 個衝突之一（search/merchandising doc42）：兩個 agent 都回報「刻意排除對方、zero overlap」——**查證後為假**，實際有 4 個 item 重複（`events_consumed[0,1,2]`+`data_rules[2]`），判給 merchandising 更細的拆分，從 search 移除。files/content(doc08) 9 個重複 item 判給 content（doc 標題與模組名稱直接對應），`DER-FILE-INTEGRITY`/`DER-FILE-AUTHZ` 修剪後歸零，誠實記錄非硬留空陣列。
+
+Step 5 順便發現 `ai` 模組也是多doc（2 docs），任務只點名 domain/workflow/analytics/integrations，`covered_modules` 值 str-or-list 的 flatten 改法本身已通用支援，無需額外改動。`integrations` 4 個 doc 在 `blueprint-architecture-items.json`／`blueprint-architecture-content.json` 兩層都是零 section（非本次新增問題，抽查確認 pre-existing），刻意不列入 `modules_fine_grained`（列了也不會真的觸發過濾，避免 overclaim）。
+
+驗證：merge 前 stash 跑 baseline（15 gate + 46 unit tests 全 PASS），pop 後重跑全綠，僅 `validate_manifest.py` 因 3 檔 hash drift 預期性失敗，`regenerate_integrity.py --write` 後轉綠。真實生成 4 個 spot-check（呼叫 `module_architecture_text()` 真實production路徑，非假資料）：`cross_border`(未動)新舊 byte-identical；`commercial`(新細粒度單doc)單capability輸出是全capability輸出的內容子集，全選輸出與合併前的 module-level fallback 完整內容 byte-identical；`domain`(6-doc多doc模組)僅選 `CAP-PRODUCT-ATTRIBUTES` 時，09_PIM_PXM 區塊正確顯示該capability專屬item，其餘5個doc區塊正確收斂到只剩 `_module_common`（實際印出比對確認，非只查 header 存在）；`integrations` 呼叫回傳 `None`（無 BLUEPRINT_ARCHITECTURE.md），確認與合併前行為一致，非本次造成的空/壞輸出。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=15個 gate script（validate_versions/foundry/semantics/configurator/artifact_generation/contract_fixtures/adversarial/bootstrap_e2e/configurator_e2e/configurator_http_e2e/selection_matrix/mutation_coverage/payment_commercial_gating/manifest/doc_numbers）+ `python -m unittest discover -s tests` merge 前後各跑一次 + 4 個真實生成 spot-check | exit=0（全部，manifest 在 regenerate_integrity 後轉 0）| ms=多次，selection_matrix/mutation_coverage 單次約 120s+
+REVIEW_DONE: critic=Standard（自審，未派獨立 critic subagent——純資料合併+8 行程式碼改動，非 auth/crypto/PII/金流，依 AGENTS.md §4 風險分級抽查即可；改用程式化全量交叉掃描 80 triple 取代人工抽查，較抽查更嚴謹） | verdict=pass | findings=0c/0m/0n（80 個衝突已於合併過程逐一化解並在上方記錄，非合併後另外發現的殘留問題）
+BUGHUNT_DONE: scope=agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE,agency-os,scripts | grep=_capmap_fragments\|CAP-FINANCIAL-RECORDS\|CAP-UGC\|CAP-PROJECTS | hits=0 個外部殘留引用（`_capmap_fragments` 目錄已刪除且無殘留參照；3 個移除的 capability id 只出現在 `capabilities/catalog.json` 定義與 `coverage.capabilities_in_fine_grained_modules_with_zero_items` 誠實記錄中，符合預期）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：`generation/blueprint-capability-item-map.json`／`scripts/foundry_generate.py`／`manifest.json`／`CHANGELOG_v1.6.md` 回到 8 模組細粒度基線，39 個 fragment 已刪除不會復原（若需重跑需重新產生）。純資料檔+8行程式碼改動，無 schema/DB 變動，可安全回滾。
+
+
+## 2026-09-10（83–87 號切片：F01 framing 家族 3/11→8/11，5 個平行 agent）
+
+framing.okr(56t)/framing.north_star_metric(38t)/framing.success_criteria(54t)/framing.five_w_one_h(63t)/framing.problem_statement(50t)。261 tests 零衝突。查重：okr 比對 smart 確認真不同（KR 數量上限[2,5]/owner/review_cadence 三個 smart 沒有的欄位）；north_star_metric 比對 goal_statement 確認真不同（持續產品策略指標 vs 靜態一次性 success_condition），順手比對 wsjf 確認無重疊（指標定義 vs 優先排序評分）；success_criteria 比對 kill_criteria/reversal_criteria 確認真不同（事前定義 vs 持續監控），順手解答 goal_statement 自己的 OQ-GOALSTATEMENT-1（新增 SC- id 前綴）；five_w_one_h 因 method.schema.yaml 的 id pattern 禁止數字（`^[a-z_]+\.[a-z_]+$`），比照既有 root_cause.five_whys 先例把 id 拼成全字母，information_gaps 做成 GENUINE_COMPUTE（獨立 gate 從 UNKNOWN 維度重新推導，呼叫端無法注入）；problem_statement 真查證發現既有 problem-statement.schema.yaml 雖被 6 個既有方法（event_tree/fault_tree/kepner_tregoe/change_analysis/fishbone/decision_tree）列為必要輸入，卻從未有任何方法真的產出它——本切片是第一個真正的 producer，沿用既有 schema 不重造，順手補上該 schema 缺的 additionalProperties:false 與 3 個必填欄位的 minLength（6 個既有消費者 536 tests 零回歸）。F01 framing 家族現況 8/11，剩 How Might We/Frame Storming/Boundary Critique。
+
+整合階段發現並修正 1 個真問題：`framing.5w1h.contract.yaml` 檔名與內部 `id: framing.five_w_one_h` 不一致，被 golden suite 自己的 registry 一致性檢查當場抓到（"id field does not match filename slug"）。改名為 `framing.five_w_one_h.contract.yaml`，grep 全庫揪出並修正 3 處殘留舊檔名引用（module 自己的 docstring、schema 的 source_of_truth_for、contract 自己的 $id 欄位）。
+
+critic scope=normal tier，真跑獨立全 regression（5361 tests，750s，非沿用本 session 自己的跑法）+golden（3136）+5 個 CLI 全跑+problem-statement schema 的 6 個既有消費者獨立覆核+5w1h 改名全庫窮舉 grep 覆核+goal_statement 的 OQ 單行編輯 diff 覆核。verdict 0C/0Major/0Minor，僅 1 個既有（非本批次引入）的 cosmetic 建議：`contract-backlog.yaml` 的 entry key 序數與 note 文字序數存在既有 off-by-one（如 `eightyfirst_concrete_entry` 自己的 note 寫「82nd slice」），非本批次造成，本批次 5 個新條目照既有慣例一致延續，未修。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_okr tests.unit.test_north_star_metric tests.unit.test_success_criteria tests.unit.test_5w1h tests.unit.test_problem_statement` | exit=0 | result=261 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_event_tree tests.unit.test_fault_tree tests.unit.test_decision_tree tests.unit.test_change_analysis tests.unit.test_fishbone tests.unit.test_kepner_tregoe`（problem-statement.schema.yaml 既有消費者）| exit=0 | result=536 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=5361 tests OK，1003s（機器當下負載高，非卡住）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，含 5 個新 contract/schema+5w1h 改名觸發的 spec index 重生）| exit=0 | result=PASSED 3136，ALL GOLDEN TESTS PASSED
+REVIEW_DONE: critic=Standard（真跑獨立 5361-test regression、3136 golden、5 CLI 全跑、5w1h 改名全庫窮舉 grep、problem-statement schema 6 消費者獨立覆核、goal_statement OQ 單行 diff 覆核）| verdict=0C/0Major/0Minor | findings=0c/0m/0n（1 個既有 cosmetic 建議，非本批次引入，未修）
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`framing\.okr\|framing\.north_star_metric\|framing\.success_criteria\|framing\.five_w_one_h\|framing\.problem_statement\|5w1h\.contract` | hits=僅本批次新建檔案+registry+`__init__.py`合法引用；`5w1h.contract`全庫 0 命中（改名後殘留引用已清零，critic 覆核確認）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/compute-如適用/module/CLI/test（約 24 個新檔，problem_statement 無新 schema）+ `framing/__init__.py`／`contract-backlog.yaml`／`framing.goal_statement.contract.yaml`（OQ-GOALSTATEMENT-1 一行）／`problem-statement.schema.yaml`（additionalProperties+minLength 加固）的追加內容全部移除；problem-statement.schema.yaml 的加固若回退，6 個既有消費者的行為回到修改前（更寬鬆，非破壞）。
+
 ## 2026-09-10 HCI30 前端全繁中化 + 新手引導重做，操作者兩輪真實回饋各揭露一個真缺口
 
 操作者連續兩輪直接開罵，各指出一個本輪之前沒發現的真缺口，非情緒化空炮：

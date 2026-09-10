@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/framing.success_criteria.contract.yaml"
+title: "Success Criteria Method Contract"
+status: ACTIVE
+
+description: >
+  framing.success_criteria, family framing (F01), Atlas F01 table row (L338): "Success Criteria | 事前定義
+  成功 | 高風險決策 | Must/Should/Guardrail/Stop | 防止事後改標準 | Reversal Criteria" -- grep-confirmed no
+  dedicated section beyond the table row. 4th F01 member built this batch (after goal_statement/smart/
+  non_goals). Distinct from learning.kill_criteria/reversal_criteria (ongoing monitoring rules re-evaluated
+  over an in-flight decision) and from decision.moscow's Must/Should/Could/Won't (per-item release-scope
+  triage across MANY items) -- this is a PRE-COMMITMENT classification of criteria STATEMENTS for ONE
+  decision, fixed before it begins. Core invariants: `must` non-empty (a criteria set with zero
+  non-negotiable items protects nothing), every criterion id unique across all 4 categories.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Success Criteria row (L338) -- the ONLY citation for this method anywhere in the spec root"
+  - "specs/cognitive/typed-objects/success-criteria-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "ai_lego/modules/learning/kill_criteria.py, ai_lego/modules/learning/reversal_criteria.py -- read in full to confirm the ongoing-monitoring-vs-pre-commitment distinction, see compilation_decisions"
+  - "methods/contracts/decision.moscow.contract.yaml -- read in full for the Must/Should/Could/Won't near-neighbor comparison, see compilation_decisions"
+  - "methods/contracts/framing.goal_statement.contract.yaml OQ-GOALSTATEMENT-1 -- this file resolves that open question; framing.goal_statement.contract.yaml's own open_questions section was edited to RESOLVED by this same task (the one explicitly-permitted cross-file edit), same pattern framing.non_goals.contract.yaml already used for decision.moscow's OQ-MOSCOW-1"
+  - "specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml -- the real, already-built 'RCS-' id prefix this method's optional reversal_criteria_ref format-checks against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives one table row with a bare 4-term formula and no worked example;
+  the per-criterion shape, the must-only non-emptiness floor, and the reversal_criteria_ref soft-link are
+  Phase 3 compilation decisions recorded below. `id: framing.success_criteria` mints a new machine_id,
+  4th `framing` family member this batch. method-inventory.yaml/contract-backlog.yaml registration left to
+  the orchestrating integration pass, per this task's own hard constraint against editing shared registries
+  while sibling agents build 5 other F01/framing-adjacent members concurrently.
+
+id: framing.success_criteria
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, CLASSIFY, VALIDATE]
+# INFERRED, not cited. FRAME = pre-committing what success means before a decision begins (Atlas's own
+# "事前定義成功"); CLASSIFY = bucketing criteria statements into 4 fixed named categories, same primitive
+# decision.moscow's own cited-analogous fixed-bucket split already uses in this suite; VALIDATE = the
+# two-layer invariant re-derivation every sibling module in this family already establishes.
+
+purpose:
+  - classify_pre_committed_success_criteria_for_a_high_risk_decision_into_must_should_guardrail_and_stop_categories
+inputs:
+  required: []
+  optional: []
+# Atlas's own row cites no typed-object input (bare 4-term formula only). The F01 flowchart's (L346-353) own
+# upstream node for Success Criteria is Boundary Critique -- a DIFFERENT, still-unbuilt F01 sibling, not
+# Goal Statement (Goal Statement is absent from that flowchart entirely; its own best-paired citation of
+# Success Criteria is a separate, row-level pairing, not the diagram's own pipeline). Same
+# entry-point-ish-until-a-real-upstream-sibling-exists reasoning class as OQ-GOALSTATEMENT-3.
+outputs: [SuccessCriteriaRecord]
+preconditions:
+  - "must is a non-empty list of well-formed {id, statement, provenance} criteria -- a success-criteria record with zero non-negotiable Must items commits to nothing, defeating Atlas's own benefit ('防止事後改標準')"
+  - "should, guardrail, and stop are each a list of well-formed criteria, but MAY be empty -- not every decision needs an explicit guardrail or stop trigger; Atlas gives no universal minimum for either"
+  - "every criterion id, across ALL FOUR categories combined, is unique within the record"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row (plain 6-column table, same as
+  # framing.goal_statement/decision.moscow's own identical reasoning) -- re-derived independently for this
+  # method's own real shape.
+forbidden_transition: []
+# Atlas gives no worked example or misuse rule for this row beyond the table itself -- left genuinely empty.
+recommended_next: [learning.reversal_criteria]
+# Atlas's own best-paired column (L338) names "Reversal Criteria" -- UNLIKE framing.goal_statement's own
+# best-paired citations (both unbuilt at that method's build time), learning.reversal_criteria IS already
+# built. Cited directly, not left empty -- see compilation_decisions.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Distinct from learning.kill_criteria/learning.reversal_criteria (near-neighbor risk, same class this family's own goal_statement already had to resolve)?"
+    decision: "Yes -- read both in full. Those are ONGOING MONITORING rules re-evaluated over an already-in-flight decision, to block sunk-cost bias mid-course. Success Criteria is a PRE-COMMITMENT classification fixed BEFORE a decision begins (Atlas's own '事前定義成功', literally 'define success beforehand')."
+  - question: "Distinct from decision.moscow's own Must/Should/Could/Won't (near-neighbor risk)?"
+    decision: "Yes -- read decision.moscow.contract.yaml in full. MoSCoW classifies MANY release-scope items into 4 buckets for prioritization; Success Criteria classifies criteria STATEMENTS for ONE decision's own outcome definition -- different vocabulary (Guardrail/Stop, not Could/Won't) and different granularity."
+  - question: "4 fixed named array fields (must/should/guardrail/stop) or one flat list with a category enum?"
+    decision: "4 fixed named fields -- matches Atlas's own literal 4-term formula (closed, not open/extensible), same closed-enumerable-vocabulary class learning.kill_criteria's own 3-value dimension enum already establishes."
+  - question: "Which category(ies) must be non-empty?"
+    decision: "Only must -- Atlas's own benefit ('防止事後改標準') needs at least one non-negotiable floor to exist; should/guardrail/stop stay legitimately per-decision-optional (the schema requires the KEYS, not their non-emptiness)."
+  - question: "Per-criterion shape: bare string, or {id, statement, provenance}?"
+    decision: "{id, statement, provenance} object -- individually addressable and provenanced, matching this family's own per-item discipline (kill_criteria's thresholds[], reversal_criteria's criteria[]); a bare string could carry neither."
+  - question: "Add an owner field per criterion, like kill_criteria/reversal_criteria?"
+    decision: "No -- Atlas's own L338 formula names no owner column, and this method's purpose is defining WHAT success means, not WHO enforces a stop action. Adding one would be fabricated scope."
+  - question: "Cite Reversal Criteria (Atlas's own best-paired column, L338) as recommended_next and/or an optional soft-link field?"
+    decision: "Yes to both -- unlike goal_statement's own best-paired citations (both unbuilt at build time), learning.reversal_criteria is already built. Added recommended_next and an optional reversal_criteria_ref, format-checked against the real, confirmed 'RCS-' prefix since the target schema genuinely exists."
+  - question: "Resolve framing.goal_statement's own OQ-GOALSTATEMENT-1 (does Success Criteria consume goal_statement's success_criteria_ref)?"
+    decision: "Yes -- mints RECORD_ID_PREFIX='SC-', matching the exact 'SC-FUTURE-001' placeholder format goal_statement's own test suite already anticipated. goal_statement's schema file is outside this task's edit scope (not touched), so success_criteria_ref stays an untyped free string there, but a real SuccessCriteriaRecord id now round-trips through it by convention. See OQ-SUCCESSCRITERIA-1."
+  - question: "Structured numeric shape for Guardrail/Stop (like Kill Criteria's dimension/value/unit)?"
+    decision: "No -- Atlas gives no worked numeric formula for this row (bare 4-term list only). Inventing one would be fabricated scope, same restraint kill_criteria's own consecutive-periods decision already applied."
+  - question: "'Immutable once recorded' (Atlas's own benefit) -- enforce via a lock field or version-bump mechanism?"
+    decision: "No new mechanism invented. This module exposes only a fresh builder, no update/mutate function, so 'produced once, not mutated' is already the natural API-surface behavior; provenance.locked (existing epistemic-label.schema.yaml field) is the correct place for a caller to flag locked status."
+
+open_questions:
+  - "OQ-SUCCESSCRITERIA-1: should any already-built GoalStatementRecord be back-filled with a real success_criteria_ref now that a SuccessCriteriaRecord id format exists, or only newly-created records going forward?（owner: operator）"
+  - "OQ-SUCCESSCRITERIA-2: should/guardrail/stop currently allow empty -- revisit a minItems:1 floor for guardrail/stop once a real high-risk-decision usage pattern shows they are in practice never left empty?（owner: operator）"
+  - "OQ-SUCCESSCRITERIA-3: the F01 flowchart's own upstream node (Boundary Critique, L349-353) is still unbuilt -- once it exists, should it become a cited (not just disclosed-absent) input here?（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for the F01 table (L330-345), the flowchart (L346-355), and "Success
+    Criteria" (2 hits total: L338 table row, L353 flowchart node) to confirm no dedicated section exists
+    beyond those. Read ai_lego/modules/learning/kill_criteria.py and reversal_criteria.py in full to confirm
+    the pre-commitment-vs-ongoing-monitoring distinction. Read decision.moscow.contract.yaml in full for the
+    Must/Should/Could/Won't near-neighbor comparison. Read framing.goal_statement.contract.yaml,
+    goal_statement.py, its CLI, and its test in full as the structural template (mirrored one-for-one).
+    Grepped ai_lego/ and agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/ for
+    success_criteria/guardrail/must_should_guardrail_stop (case-insensitive) -- zero pre-existing hits beyond
+    goal_statement's own forward-reference field. Confirmed ai_lego/compute/ has no
+    success_criteria/kill_criteria/reversal_criteria submodule and this method needs none (no numeric formula
+    cited). Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 4-category citation (Must/Should/Guardrail/Stop) and its
+    benefit/best-paired columns are transcribed verbatim. The per-criterion {id,statement,provenance} shape,
+    the must-only non-emptiness floor, the id-uniqueness invariant, and reversal_criteria_ref are compilation
+    decisions, disclosed above, not textually cited.

@@ -1,0 +1,109 @@
+$id: "ai-lego://methods/contracts/framing.five_w_one_h.contract.yaml"
+title: "5W1H Problem-Profile Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 4th F01 framing family member. Atlas's ONLY citation is the F01 table row
+  (L340: "5W1H｜快速建立問題輪廓｜資訊不足時｜Who/What/When/Where/Why/How｜找資訊缺口｜Problem Statement"),
+  corroborated by dedicated §12.1 (L2544-2550: "低門檻、跨文化容易理解...只負責探索,不代表已完成根因分析")
+  and the F01 mermaid flowchart (L348-354: 模糊需求 -> 5W1H -> Problem Statement -> ...). Benefit column
+  "找資訊缺口" (find information gaps) is the STRUCTURAL POINT: the record must expose which of the 6
+  dimensions are still unanswered, not merely store 6 answers. Core invariant: every dimension is EITHER
+  answered (non-empty answer, no gap_note) OR explicitly unknown (no answer key at all, optional gap_note) --
+  never silently coerced to an empty string that reads as "answered: nothing". ``information_gaps`` is
+  GENUINE_COMPUTE, re-derived from ``dimensions[].status`` by both the builder and an independent gate,
+  never caller-asserted.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, 5W1H row (L340) -- the primary citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.1 (L2544-2550) -- dedicated section, corroborates the same 6-dimension composition and the 'exploration only, not root-cause-complete' limit"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 mermaid flowchart (L348-354) -- 5W1H feeds Problem Statement, both unbuilt-at-write-time siblings' own relationship"
+  - "methods/contracts/root_cause.kepner_tregoe.contract.yaml -- same positionally-ordered fixed-dimension-set invariant class reused here"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against, including the ``id`` pattern that forced the naming decision below"
+
+decided_by: >
+  No ADR governs the content. Naming: ``method.schema.yaml``'s own ``id`` field requires pattern
+  ``^[a-z_]+\.[a-z_]+$`` (letters/underscore only, grep-confirmed zero digit in any of the 90+ existing
+  contract ``id`` values in this directory) -- "framing.5w1h" would FAIL this pattern, so ``id`` spells the
+  method out as ``framing.five_w_one_h``, same digit-avoidance precedent ``root_cause.five_whys`` already
+  set for this exact class of naming collision. The human-facing "5W1H" name is preserved verbatim in
+  ``RECORD_ID_PREFIX`` (record ids are free strings, not constrained by this pattern) and throughout prose.
+  `id: framing.five_w_one_h` mints a new machine_id; method-inventory.yaml's own "5W1H" row (line 236, citing
+  Atlas line 339) is stale by one line (real citation is L340, same class of drift
+  root_cause.kepner_tregoe's own OQ-KEPNERTREGOE-1 already disclosed for its row) -- not corrected here per
+  this task's explicit instruction not to touch that file.
+
+id: framing.five_w_one_h
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [DECOMPOSE, VALIDATE]
+# INFERRED, not cited. Splitting one fuzzy topic into 6 fixed dimensions is DECOMPOSE; determining which
+# dimensions are genuinely answered vs. still gaps is VALIDATE (same primitive class root_cause.kepner_tregoe's
+# own IS/IS-NOT completeness check already uses).
+
+purpose:
+  - profile_a_problem_across_who_what_when_where_why_how_and_surface_unanswered_dimensions_as_gaps
+inputs:
+  required: []
+  optional: []
+  # Unlike root_cause.kepner_tregoe (requires ProblemStatement) or framing.smart (requires an already-stated
+  # goal), Atlas's own F01 flowchart places 5W1H FIRST, directly on "模糊需求" (a fuzzy need) -- no upstream
+  # typed-object dependency to require.
+outputs: [FiveW1HRecord]
+preconditions:
+  - "dimensions is EXACTLY the six entries {WHO, WHAT, WHEN, WHERE, WHY, HOW}, one each, IN THAT ORDER -- Atlas's own literal 'Who/What/When/Where/Why/How' citation order"
+  - "every dimension's status is either KNOWN or UNKNOWN"
+  - "a KNOWN dimension carries a non-empty answer and MUST NOT carry a gap_note"
+  - "an UNKNOWN dimension MUST NOT carry an answer key at all (not even an empty string) and MAY carry a non-empty gap_note"
+  - "information_gaps is always present (an empty list is meaningful: zero gaps) and MUST equal the set of dimension names whose status is UNKNOWN, in DIMENSION_ORDER -- re-derived, never caller-trusted"
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (only the table row + §12.1, no Sec22.3 Method-
+# specific Gate table hit -- grep-confirmed) -- left genuinely empty rather than inventing one.
+recommended_next: []
+# Atlas's own best-paired next step is "Problem Statement" (F01 table L340, mermaid L349-350) -- NOT built at
+# this write time (a different concurrent agent's own scope, per this task's own constraint not to depend on
+# it or invent its shape). Left empty rather than substituting an unrelated built sibling, same restraint
+# framing.smart.contract.yaml's own recommended_next: [] (OKR/KPI unbuilt) and
+# framing.goal_statement.contract.yaml's own recommended_next: [] already establish for this exact situation.
+# See informs_problem_statement_ref below for the real forward soft-link to the Atlas-named next step.
+
+compilation_decisions:
+  - question: "How to represent an unanswered dimension without silently coercing it to an empty-string answer?"
+    decision: "A first-class status enum (KNOWN/UNKNOWN) per dimension. UNKNOWN structurally FORBIDS the answer key's presence at all (schema 'not: {required: [answer]}' + runtime check) -- an empty-string answer under UNKNOWN would be exactly the 'answered: nothing' trap this design avoids."
+  - question: "Should information_gaps be caller-supplied or computed?"
+    decision: "GENUINE_COMPUTE. The builder computes it itself from dimensions[].status (ai_lego/compute/five_w1h/gap_detection.py); callers cannot pass it in. The integrity gate independently re-derives and compares, catching a hand-tampered stored value that no longer matches the dimensions it was derived from."
+  - question: "Does this method require a topic/subject anchor field, though Atlas's own citation names only the 6 dimensions?"
+    decision: "Yes -- topic (non-empty string) is required. Six dimension answers with no shared subject line would be unattributable to any one problem. Same class of un-cited-but-necessary anchor field framing.non_goals's own project_scope already establishes."
+  - question: "Fixed positional array (prefixItems) or free-form array for dimensions?"
+    decision: "Fixed: exactly WHO, WHAT, WHEN, WHERE, WHY, HOW, one each, in Atlas's own literal citation order -- same positionally-ordered pipeline class root_cause.kepner_tregoe's own DIMENSION_ORDER and framing.smart's own CRITERION_ORDER already establish."
+  - question: "Depend on the Atlas-named next step (Problem Statement), unbuilt at this write time?"
+    decision: "No hard dependency. An OPTIONAL informs_problem_statement_ref soft-link field is added, format-only-checked (non-empty string), existence NOT verified -- same forward-looking-to-a-concurrently-unbuilt-sibling pattern framing.smart's own refines_goal_statement_ref already establishes."
+
+open_questions:
+  - "OQ-FIVEW1H-1: method-inventory.yaml's '5W1H' row (line 236) cites Atlas line 339; the real F01 table row is line 340 (Non-goals is 339). Not corrected here per this task's explicit DO NOT TOUCH constraint on that file.（owner: operator, or whoever next does an integration pass over method-inventory.yaml)"
+  - "OQ-FIVEW1H-2: Problem Statement (Atlas's own named best-pairing, F01 table L340) was being built concurrently by a different agent in this same batch and is not read or depended on here. informs_problem_statement_ref is a format-only soft link; a future integration pass should verify the referenced record's own id prefix once that method's contract lands.（owner: operator, integration pass）"
+  - "OQ-FIVEW1H-3: should a dimension be allowed to flip from UNKNOWN back to KNOWN (or vice versa) via a NEW record version rather than in-place mutation, matching Atlas §24.1's 'Method 不可就地覆寫' discipline? Left unaddressed -- this contract defines one record's own internal shape, not a revision/versioning workflow.（owner: operator, or whoever next builds a 5W1H revision flow）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for "5W1H" -- 5 hits: the F01 table row (L340), the dedicated §12.1 section
+    (L2544-2550), the F01 mermaid flowchart node (L350), and two unrelated recipe-chain mentions (L3638,
+    L4274) read and confirmed out of scope for this contract. Read framing.goal_statement.contract.yaml,
+    framing.smart.contract.yaml, framing.non_goals.contract.yaml, and root_cause.kepner_tregoe.contract.yaml
+    in full to confirm no overlap and to reuse the established two-layer-invariant/positional-array
+    conventions. Grepped the whole ai_lego tree case-insensitively for "5w1h" and
+    "who_what_when_where_why_how" before writing -- zero pre-existing implementation (only the stale
+    method-inventory.yaml row and problem-statement.schema.yaml's own citation of 5W1H as an equivalent,
+    not-this-file, framing tool). Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own "Who/What/When/Where/Why/How" order and "找資訊缺口"
+    benefit line are transcribed verbatim into preconditions/purpose. The status/gap_note shape and
+    information_gaps GENUINE_COMPUTE derivation are this suite's own compiled structure, not Atlas-cited
+    field-by-field -- disclosed as such, same honesty discipline every sibling Tier 1 contract in this
+    directory already applies.

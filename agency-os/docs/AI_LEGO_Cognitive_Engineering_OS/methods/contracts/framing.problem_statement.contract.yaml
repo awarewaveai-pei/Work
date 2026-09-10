@@ -1,0 +1,128 @@
+$id: "ai-lego://methods/contracts/framing.problem_statement.contract.yaml"
+title: "Problem Statement Method Contract"
+status: ACTIVE
+
+description: >
+  F01 framing family, 4th member built. Atlas F01 table row (L341, only
+  citation): "描述現況、差距、影響｜跨人協作｜Current→Expected→Gap→Impact→
+  Constraints｜建立共同問題定義｜Issue Tree". Not an EC §32 method; §22.3 gate
+  table has no Problem Statement row (grep-confirmed).
+
+  DUE-DILIGENCE FINDING (fork determination): outputs reuse the EXISTING
+  `typed-objects/problem-statement.schema.yaml` verbatim -- no second schema
+  minted. That file is already `inputs.required: [ProblemStatement]` for 5
+  built sibling contracts (root_cause.event_tree/fault_tree/kepner_tregoe,
+  decision.decision_tree, root_cause.change_analysis) and a status-precondition
+  target for root_cause.fishbone, but grep-confirmed ZERO existing contract
+  had `outputs: [ProblemStatement]` -- this is F01's first real producer, not
+  a contract-only-reuse case (no existing builder/module produced this type;
+  see compilation_decisions for the closest pre-existing candidate).
+
+  Core invariant: `content.expected_state` must genuinely differ from
+  `content.current_state` -- an identical pair means no real gap, same "echo"
+  class `framing.goal_statement`'s own `success_condition != goal` check
+  already establishes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:341 (F01 table, Problem Statement row) -- this method's ONLY citation"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml -- the pre-existing typed object this contract's outputs reuse verbatim (fixed 2 gaps alongside this build: additionalProperties:false, minLength on 3 required content strings; see that file's own verification.note)"
+  - "methods/contracts/root_cause.fishbone.contract.yaml:51 -- 'problem_statement.status == validated' precondition, the chain's downstream consumer"
+  - "methods/contracts/root_cause.event_tree.contract.yaml:45, root_cause.fault_tree.contract.yaml:54, root_cause.kepner_tregoe.contract.yaml:51, decision.decision_tree.contract.yaml:48, root_cause.change_analysis.contract.yaml:56 -- all five declare `inputs.required: [ProblemStatement]`, grep-confirmed"
+  - "ai_lego/modules/root_cause/fishbone.py:48-62 -- pre-existing `build_problem_statement()`, a thinner, ungated dict constructor Fishbone's own tests use for fixtures; NOT this method's real implementation (enforces zero invariants); left untouched, out of this contract's file ownership"
+  - "methods/contracts/framing.goal_statement.contract.yaml -- sibling F01 template followed for structure and the echo-invariant class"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: framing.problem_statement` mints a new
+  machine_id. Reusing the existing schema instead of minting a second one is
+  this contract's own compilation decision, grounded in the direct grep/read
+  evidence above -- not an ADR-level ruling, same evidentiary standard every
+  sibling contract in this directory applies.
+
+id: framing.problem_statement
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, DECOMPOSE, VALIDATE]
+# INFERRED. FRAME = Atlas's own purpose column ("建立共同問題定義" -- establish
+# a shared problem definition), same kernel token framing.goal_statement's own
+# benefit line ("把模糊願望轉明確目標") already maps to. DECOMPOSE = splitting
+# into current/expected/gap/impact/constraints. VALIDATE = the two-layer
+# invariant re-derivation every sibling module in this family already uses.
+
+purpose:
+  - describe_a_shared_problem_as_current_state_expected_state_gap_impact_and_constraints_for_cross_functional_alignment
+inputs:
+  required: []
+  optional: []
+# Atlas's own §14.1 chain names ProblemStatement as the chain ORIGIN
+# ("ProblemStatement -> Fishbone -> ..."), same entry-point reasoning
+# framing.goal_statement's own empty `inputs.required` already establishes for
+# this family's "任務起始"-shaped methods.
+outputs: [ProblemStatement]
+# REUSES the existing typed object verbatim (specs/cognitive/typed-objects/
+# problem-statement.schema.yaml) -- see description/compilation_decisions.
+preconditions:
+  - "id is a non-empty string prefixed PROB-; version is a string; status is one of [draft, under_review, validated, rejected, superseded]"
+  - "content.current_state, content.expected_state, and content.gap are each non-empty strings"
+  - "content.expected_state must NOT be identical (case/whitespace-insensitive) to content.current_state -- an identical pair is an echo, not a checkable gap"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row, and this
+  # record carries one whole-record provenance, not per-field labels -- same
+  # reasoning framing.goal_statement's own quality block already establishes.
+forbidden_transition: []
+# Atlas §22.3's own gate table (grep-confirmed) has no Problem Statement row.
+recommended_next: [root_cause.fishbone]
+# Directly grounded in the schema's own description chain ("ProblemStatement
+# -> Fishbone -> CauseHypothesisSet -> ...") and root_cause.fishbone's own
+# precondition on problem_statement.status. Four other built methods
+# (root_cause.event_tree/fault_tree/kepner_tregoe, decision.decision_tree,
+# root_cause.change_analysis) also legally consume this output -- a real,
+# disclosed one-to-many fan-out unlike a strict linear chain -- but Fishbone
+# is the one both the SAME source-of-truth citation (Atlas §14.1) names as
+# origin and designates as the immediate next node.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Contract-only reuse (fork a, like architecture.trade_off_matrix -> decision.mcda) or a real build (fork b)?"
+    decision: "Real build, but reusing the EXISTING schema as outputs (no second schema) -- neither fork as literally templated. No existing method contract produces ProblemStatement (grep-confirmed), so there is no builder to point at the way trade_off_matrix pointed at decision.mcda's generate_mcda_analysis; fishbone.py's own build_problem_statement is real code but enforces zero invariants (a test-fixture helper, not a gated implementation) -- not a reuse target either."
+  - question: "Mint a second schema (e.g. problem-statement-record.schema.yaml) to avoid ambiguity with the existing file's name?"
+    decision: "No -- the existing problem-statement.schema.yaml IS already this method's real, canonical, heavily-cross-referenced output type (5 sibling contracts require it verbatim). Minting a second schema for the same concept would be the exact undisclosed-duplication failure class this whole corpus repeatedly self-corrects against, in the opposite direction from the risk the task brief anticipated."
+  - question: "Enforce a real invariant beyond per-field non-emptiness?"
+    decision: "Yes -- expected_state must genuinely differ from current_state (case/whitespace-insensitive), same 'identical pair is a no-op' class framing.goal_statement's own success_condition!=goal invariant already establishes for this family."
+  - question: "Should the optional content fields (affected_stakeholders/impact/evidence/constraints/scope_non_goals) be required non-empty when present?"
+    decision: "No -- type-checked only (list of strings / string), matching the schema's own permissive shape (no minItems/minLength on those fields). Inventing stricter rules the schema itself does not state would be an undisclosed over-constraint, the same failure class this corpus's own compilation_decisions elsewhere already self-corrects against."
+
+open_questions:
+  - "OQ-PROBLEMSTATEMENT-1: ai_lego/modules/root_cause/fishbone.py:48's own build_problem_statement is a thinner, ungated duplicate (enforces nothing) that Fishbone's own tests use for fixtures. Should Fishbone's test suite migrate to this module's real generate_problem_statement instead, or is the duplication acceptable since fishbone.py's copy is test-fixture-only, never a public API for this method?（owner: operator）"
+  - "OQ-PROBLEMSTATEMENT-2: method-inventory.yaml's own Problem Statement row (line: 340) is stale by 1 (real Atlas line is L341, same recurring stale-citation class disclosed elsewhere in this corpus) and still carries has_contract:false -- a follow-up integration pass should correct both and set machine_id:framing.problem_statement.（owner: operator, integration pass; not edited here per this task's explicit scope boundary）"
+  - "OQ-PROBLEMSTATEMENT-3: this task's own brief claimed root_cause.barrier_analysis.contract.yaml and security.secrets_threat_review.contract.yaml reference problem-statement.schema.yaml -- grep-verified FALSE, neither file contains the string 'problem' anywhere. The real 6 consumers are listed in source_of_truth_for above. Flagged for the task brief's own author, not a defect in this contract.（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole ai_lego runtime tree and agency-os/docs/AI_LEGO_Cognitive_Engineering_OS
+    for problem_statement/ProblemStatement/problem-statement before any design
+    work (16 Python hits, 51 doc/spec hits) to find every real consumer and
+    confirm zero existing producer. Read problem-statement.schema.yaml in
+    full (its own $id, description, field provenance). Read
+    root_cause.fishbone.contract.yaml, root_cause.kepner_tregoe.contract.yaml,
+    and root_cause/fishbone.py in full to confirm the ProblemStatement ->
+    Fishbone chain and find the pre-existing ungated build_problem_statement
+    helper. Grep-reconfirmed root_cause.event_tree/fault_tree.contract.yaml,
+    decision.decision_tree.contract.yaml, root_cause.change_analysis.contract.yaml
+    each declare `inputs.required: [ProblemStatement]`. Grep-confirmed zero
+    `outputs:.*ProblemStatement` hit anywhere in methods/contracts/ before
+    this file. Grep-reconfirmed Atlas §22.3 gate table (L4142-4155) has no
+    Problem Statement row. Read framing.goal_statement.contract.yaml/.py/
+    schema/CLI/test in full as the structural template. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 5-field citation order
+    (Current/Expected/Gap/Impact/Constraints) matches the pre-existing
+    schema's own field list verbatim -- this contract does not re-derive
+    field names, only mints the method registration and the real gated
+    implementation the schema never had. The echo invariant and the
+    reuse-not-rebuild decision are compilation decisions, disclosed above.

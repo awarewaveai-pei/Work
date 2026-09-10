@@ -1,0 +1,206 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/5w1h-record.schema.yaml"
+title: 5W1H Problem Profile
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FiveW1HRecord` -- the declared `outputs` of
+  `framing.five_w_one_h`'s Method Contract (id spelled out per that contract's own `decided_by`; this
+  schema's filename keeps the human-facing "5w1h" form since typed-object filenames carry no `^[a-z_]+\.
+  [a-z_]+$` constraint). Atlas's F01 table row (L340) and §12.1 (L2544-2550) name the 6 dimensions
+  (Who/What/When/Where/Why/How) and the benefit "找資訊缺口" (find information gaps) but give no
+  field-level shape -- the `status`/`answer`/`gap_note` split and the `information_gaps` computed field
+  below are compiled to make that benefit column a real structural property, not merely a slogan.
+
+  `dimensions` is a fixed-length-six, POSITIONALLY ORDERED tuple (WHO/WHAT/WHEN/WHERE/WHY/HOW, Atlas's own
+  literal citation order), enforced via `prefixItems` -- same convention
+  `kepner-tregoe-problem-specification.schema.yaml`'s own `dimensions` and `smart-goal-record.schema.yaml`'s
+  own `criteria` already establish for their own Atlas-cited fixed sets.
+
+  TWO real invariants this schema expresses structurally via `if`/`then`/`not` (no custom format-checker
+  needed, same restraint every sibling typed-object schema in this directory already applies):
+  a KNOWN dimension MUST carry `answer` and MUST NOT carry `gap_note`; an UNKNOWN dimension MUST NOT carry
+  `answer` at all (not even an empty string -- see top-level description). The THIRD real invariant --
+  `information_gaps` must equal the actual set of UNKNOWN dimension names -- is a cross-field, whole-array
+  derivation JSON Schema cannot express (no native "compute this array from that array" operator), so it is
+  a runtime-layer invariant -- see `ai_lego/compute/five_w1h/gap_detection.py` and
+  `ai_lego/modules/framing/five_w_one_h.py`, which enforce it at construction AND independently via a gate
+  that re-derives from raw fields, same two-layer discipline every sibling module in this family already
+  uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, 5W1H row (L340)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.1 (L2544-2550) -- dedicated section"
+  - "methods/contracts/framing.five_w_one_h.contract.yaml (id: framing.five_w_one_h)"
+  - "specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml (prefixItems positionally-ordered fixed-set convention reused here)"
+  - "specs/cognitive/typed-objects/smart-goal-record.schema.yaml (refines_goal_statement_ref soft-link convention reused here as informs_problem_statement_ref)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Express status/answer/gap_note coherence as JSON Schema if/then/not, or leave it entirely runtime-layer?"
+    decision: "Express it in schema too (if/then/not on the status const), since JSON Schema's conditional keywords are sufficient for this single-object cross-field check -- unlike information_gaps (a cross-ARRAY derivation), which genuinely cannot be expressed and stays runtime-only."
+  - question: "Should information_gaps be omitted when empty, matching kepner-tregoe's own optional distinctions/changes?"
+    decision: "No -- information_gaps is always present, even as an empty list. It is the whole structural point of this method (Atlas's own '找資訊缺口' benefit column); omitting it when empty would make 'zero gaps' indistinguishable from 'gaps were never computed'."
+
+type: object
+required: [id, version, topic, dimensions, information_gaps, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^5W1H-"
+    description: "NEW DESIGN. Human-facing '5W1H' form preserved here since record ids carry no method-id character-set constraint (see method contract's own decided_by)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.five_w_one_h"
+
+  topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The one shared subject line every one of the 6 dimension answers is about -- un-cited-by-Atlas anchor field, see method contract's own compilation_decisions."
+
+  dimensions:
+    type: array
+    minItems: 6
+    maxItems: 6
+    description: >
+      Atlas's own six-word F01-row citation ("Who/What/When/Where/Why/How"), AS AN ORDERED TUPLE --
+      dimensions[0] MUST be WHO, dimensions[5] MUST be HOW.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHO}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHAT}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHEN}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHERE}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: WHY}}}]
+      - allOf: [{$ref: "#/$defs/dimension_entry"}, {properties: {dimension: {const: HOW}}}]
+    items: false
+
+  information_gaps:
+    type: array
+    description: >
+      GENUINE_COMPUTE -- the dimension names, IN DIMENSION_ORDER, whose status is UNKNOWN. Always present
+      (an empty array means zero gaps, a real and meaningful state, not "not computed"). Runtime-layer
+      cross-array derivation check: must equal the actual UNKNOWN set -- see top-level description.
+    items: {type: string, enum: [WHO, WHAT, WHEN, WHERE, WHY, HOW]}
+    uniqueItems: true
+
+  informs_problem_statement_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL forward soft-link to Atlas's own named best-pairing (F01 table L340, "Problem Statement"),
+      unbuilt at this schema's write time -- same forward-looking-to-a-concurrently-unbuilt-sibling pattern
+      smart-goal-record.schema.yaml's own refines_goal_statement_ref already establishes. Format-only
+      checked (non-empty string); existence of the referenced record is NOT verified, same limitation
+      non-goals-record.schema.yaml's own related_moscow_wont_ref already accepts.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  dimension_entry:
+    type: object
+    required: [dimension, status, provenance]
+    additionalProperties: false
+    properties:
+      dimension:
+        type: string
+        enum: [WHO, WHAT, WHEN, WHERE, WHY, HOW]
+      status:
+        type: string
+        enum: [KNOWN, UNKNOWN]
+        description: "First-class explicit state -- see top-level description on why this is not a caller-asserted empty-string convention."
+      answer:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Required when status==KNOWN; MUST NOT be present at all when status==UNKNOWN (see allOf below)."
+      gap_note:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "OPTIONAL, only meaningful when status==UNKNOWN (why this dimension is still a gap / what would fill it). MUST NOT be present when status==KNOWN."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+    allOf:
+      - if: {properties: {status: {const: KNOWN}}, required: [status]}
+        then: {required: [answer], not: {required: [gap_note]}}
+      - if: {properties: {status: {const: UNKNOWN}}, required: [status]}
+        then: {not: {required: [answer]}}
+
+examples:
+  - description: "A profile with 4 known dimensions and 2 genuine gaps (WHY, HOW) -- information_gaps exposes exactly those 2"
+    value:
+      id: "5W1H-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.five_w_one_h"
+      topic: "mutation-check-wave1.ps1 遠端主機執行超時"
+      dimensions:
+        - dimension: WHO
+          status: KNOWN
+          answer: "HCI30 開發者；P0-04 mutation-coverage gate 的下游消費者"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - dimension: WHAT
+          status: KNOWN
+          answer: "完整 SQL mutation sweep 執行超時（>10 分鐘）"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-901"]
+        - dimension: WHEN
+          status: KNOWN
+          answer: "腳本從 19925 bytes 擴充到 81481 bytes 之後才開始超時"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-901"]
+        - dimension: WHERE
+          status: KNOWN
+          answer: "在 ks-aw-01 遠端 SSH session 執行；筆電本機執行正常"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - dimension: WHY
+          status: UNKNOWN
+          gap_note: "尚未確認超時根因是網路延遲放大還是遠端 Postgres 本身效能差異"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - dimension: HOW
+          status: UNKNOWN
+          gap_note: "尚未量測是否為每案例一次 SSH round-trip 的加總延遲"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      information_gaps: [WHY, HOW]
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-FIVEW1HRECORD-1"
+    question: >
+      Should a future revision allow a dimension to carry BOTH a historical answer and a current gap_note
+      (e.g. "previously answered X, now believed stale, re-opened as a gap")? Left as a strict binary
+      (KNOWN xor UNKNOWN, no transitional state) -- same restraint against inventing an unneeded richer
+      state machine this suite applies elsewhere.
+    owner: "operator, or whoever next needs a richer transition model"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table 5W1H row (L340) and §12.1 (L2544-2550) directly. Read
+    kepner-tregoe-problem-specification.schema.yaml and smart-goal-record.schema.yaml in full as the
+    prefixItems / $defs / if-then-not convention templates. Validated against jsonschema
+    Draft202012Validator (required fields present, id/information_gaps enum values satisfied, dimensions
+    prefixItems order enforced, additionalProperties:false on both the top level and $defs/dimension_entry
+    verified to actually reject an unknown key, KNOWN/UNKNOWN if/then/not branches verified to actually
+    reject a KNOWN-with-gap_note and an UNKNOWN-with-answer).
+  note: >
+    `dimensions`'s six values and citation order, and the "找資訊缺口" benefit line, are transcribed
+    verbatim from Atlas L340/§12.1. `status`/`answer`/`gap_note`/`information_gaps` field shapes are this
+    suite's own compiled structure engineered to make that benefit column a real, re-derivable property --
+    explicitly flagged as non-Atlas field-level grounding above, not presented as mother-document content.
+    No mother document was modified to produce this file.

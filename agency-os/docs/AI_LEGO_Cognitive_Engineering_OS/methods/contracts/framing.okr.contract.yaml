@@ -1,0 +1,130 @@
+$id: "ai-lego://methods/contracts/framing.okr.contract.yaml"
+title: "OKR Method Contract"
+status: ACTIVE
+
+description: >
+  framing.okr, F01 framing family, 4th member (3/11 built at batch start:
+  goal_statement/smart/non_goals, built by concurrent sibling agents this
+  same batch, not read here). Atlas F01 table row (L336): "OKR | 方向與可
+  衡量成果分離 | 團隊/季度 | Objective→2–5 KR→owner→review | 避免只追工作量
+  | Roadmap". Single-citation, table-row-only. Genuinely distinct from
+  framing.smart (a 5-fixed-criteria refinement checklist for ONE goal, no
+  KR-count bound, no owner/review fields) -- verified by reading smart.py in
+  full, see compilation_decisions. Invariants: exactly 2-5 key_results, each
+  with non-empty description/target/owner; review_cadence non-empty;
+  key_result ids unique in the record.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, OKR row (L336) -- the ONLY citation for this method"
+  - "specs/cognitive/typed-objects/okr-record.schema.yaml"
+  - "ai_lego/modules/framing/smart.py + smart-goal-record.schema.yaml -- read in full to confirm OKR is not a smart.py near-duplicate, see compilation_decisions"
+  - "ai_lego/modules/framing/non_goals.py -- structural template: record-level fields + a bounded list of structured entries, two-layer construction+gate invariant enforcement, no compute/ package"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives one table row only (no dedicated
+  section, unlike framing.smart's §12.4). `id: framing.okr` mints a new
+  machine_id under the existing `framing` (F01) prefix, per
+  method-inventory.yaml's own "F01 framing" category label
+  (method-inventory.yaml:216-220). method-inventory.yaml/contract-backlog.yaml
+  registration left to the orchestrating integration pass, per this task's
+  own hard constraint against editing shared registries while sibling agents
+  build other F01 members concurrently in this same batch.
+
+id: framing.okr
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, DECOMPOSE, VALIDATE]
+# INFERRED, not cited. FRAME = Atlas's own benefit line for this row ("方向
+# 與可衡量成果分離" -- separate direction from measurable outcome; the
+# Objective is a fresh direction-setting act, same class framing.goal_statement/
+# framing.non_goals already use FRAME for); DECOMPOSE = one Objective split
+# into 2-5 Key Results; VALIDATE = the two-layer invariant re-derivation
+# every sibling module in this family already establishes. All 3 confirmed
+# real values in specs/cognitive/primitive.schema.yaml's CANONICAL_KERNEL enum.
+
+purpose:
+  - separate_a_qualitative_objective_from_2_to_5_owned_measurable_key_results_with_a_review_cadence
+
+inputs:
+  required: []
+  optional: []
+# Leaf method: Atlas's own OKR row (L336) cites no PascalCase upstream input
+# type. framing.smart's row (L335) names OKR/KPI as ITS OWN downstream
+# 最佳搭配 (what comes AFTER SMART) -- that is a citation on smart's row, not
+# on OKR's own row, so no optional refines-link input is added here; see
+# compilation_decisions.
+
+outputs: [OKRRecord]
+
+preconditions:
+  - "objective is a non-empty string"
+  - "key_results has between 2 and 5 entries inclusive -- Atlas's own literal '2–5 KR'"
+  - "every key_results[] entry carries a non-empty description, target, AND owner -- description+target realize Atlas's own 'KR' (a Key Result must be a checkable, measurable statement, external OKR convention -- see compilation_decisions), owner realizes Atlas's own '→owner' pipeline stage"
+  - "every key_results[] id is unique within the record"
+  - "review_cadence is a non-empty string -- Atlas's own '→review' pipeline stage"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row -- same
+  # reasoning framing.goal_statement/framing.non_goals's own contracts
+  # already apply, re-derived independently here.
+
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (single table row
+# only) -- left genuinely empty rather than inventing one.
+
+recommended_next: []
+# Atlas's own 最佳搭配 column names only "Roadmap" (L336) -- a different,
+# UNBUILT F01(-adjacent) method with no minted machine_id, explicitly out of
+# scope for this task ("do not build it or invent its shape"). Left empty
+# rather than guessing a machine_id for an uncontracted method, same
+# restraint framing.smart's own contract already applies to its own
+# unbuilt OKR/KPI citation.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Is OKR a near-duplicate of framing.smart (both 'make a goal measurable')?"
+    decision: "No -- read smart.py in full. SMART is a fixed 5-criteria checklist REFINING one already-stated goal (no KR-count bound, no owner field, no review-cadence field). OKR separates ONE qualitative Objective from 2-5 independently-owned, independently-measurable Key Results plus a team/quarterly review cadence -- a portfolio-of-bounded-results shape with per-item ownership and an explicit review mechanism, none of which SMART's schema has anywhere. Different axis (goal-setting structure vs. single-goal refinement checklist), not a naming accident."
+  - question: "Does 'measurable Key Result' need an explicit target field beyond a free-text description?"
+    decision: "Yes -- target (external, well-known OKR convention: Google/Intel-originated, a Key Result must be a checkable numeric/threshold statement, not prose alone; disclosed here as added-beyond-the-literal-Atlas-row detail, same convention framing.smart/decision.wsjf already used this session for SAFe/Kano-model detail). Kept as a free string (no numeric type/unit structure) -- Atlas gives no worked example or format, same restraint framing.goal_statement's own timeframe field already applies."
+  - question: "Overlap with decision.rice/decision.moscow (scope/prioritization tools)?"
+    decision: "No -- those operate on an ALREADY-DEFINED set of items (features, backlog entries) to rank or bucket them. OKR is goal-SETTING: it mints the Objective/Key Results themselves, upstream of any such prioritization. Different axis, not competing implementations."
+  - question: "Add an optional soft-link field for Atlas's own 'Roadmap' best-paired citation?"
+    decision: "No -- Roadmap is unbuilt with no minted machine_id, and this task's own instruction is explicit: do not build it or invent its shape. Left recommended_next empty rather than inventing a forward reference to a method whose own field shape is unknown."
+  - question: "Record id prefix?"
+    decision: "OKR- -- matches the method's own short name, same convention framing.non_goals's NONGOALS- / decision.moscow's MOSCOW- prefixes already establish."
+
+open_questions:
+  - "OQ-OKR-1: target is a free string (external OKR convention adds this field beyond Atlas's literal row) -- should a future revision add a structured numeric baseline/target/unit shape once a real consumer needs computed progress?（owner: operator）"
+  - "OQ-OKR-2: Atlas's own 'Roadmap' best-paired citation (L336) is unbuilt, no machine_id minted, out of this task's scope -- left uncited in recommended_next.（owner: operator, or whoever next builds Roadmap）"
+  - "OQ-OKR-3: review_cadence is free text (Atlas's own 'Objective→2–5 KR→owner→review' names the pipeline stage but gives no worked cadence value; the row's own 何時使用 column, '團隊/季度', is disclosed as typical usage context only, not enforced as a fixed enum).（owner: operator）"
+
+verification:
+  method: >
+    Grepped the Atlas for "OKR" -- sole hit F01 table row L336 (no dedicated
+    section). Grepped ai_lego/ (case-insensitive) for "okr"/"key_result"/
+    "objective" -- zero pre-existing OKR implementation (the only "objective"
+    hits, in decision/pareto_frontier.py, decision/ahp.py, and
+    learning/kill_criteria.py, are unrelated multi-objective-optimization/
+    threshold vocabulary, confirmed by direct read). Grepped
+    contract-backlog.yaml/method-inventory.yaml for "OKR" -- confirmed
+    has_contract:false, no prior contract. Read smart.py +
+    smart-goal-record.schema.yaml in full to confirm OKR is not a
+    near-duplicate (see compilation_decisions). Read non_goals.py +
+    non-goals-record.schema.yaml in full as the closest structural template
+    (record-level fields + a bounded list of structured entries, no compute
+    layer). Read kill_criteria.py for the per-dimension distinct-error-code
+    convention applied to key_results[] entries here. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L336's "Objective→2–5 KR→owner→
+    review" is transcribed verbatim into preconditions/field names. The
+    key_results[] structure (description+target+owner+provenance), the
+    target field itself (external OKR convention, disclosed above), and the
+    review_cadence field are compilation decisions, disclosed above, not
+    textually cited.

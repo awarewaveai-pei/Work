@@ -99,6 +99,13 @@ decided_by: >
 
 type: object
 required: [id, version, status, content, provenance]
+additionalProperties: false
+# ADDED 2026-09-10 (framing.problem_statement build, this method's first real
+# producer/contract): this file had the same additionalProperties gap critic
+# review already found and fixed in 2 sibling schemas (e.g.
+# goal-statement-record.schema.yaml) -- a hand-crafted authority-style key
+# (e.g. `approved: true`) previously passed validation silently. Closed here,
+# both at this level and inside `content` below.
 properties:
 
   id:
@@ -142,15 +149,22 @@ properties:
       Atlas §12.2's 8-field suggested format (L2578-2587), transcribed verbatim
       as field names (snake_cased).
     required: [current_state, expected_state, gap]
+    additionalProperties: false
     properties:
       current_state:
         type: string
+        minLength: 1
+        pattern: "\\S"
         description: "Atlas L2579 'Current State'."
       expected_state:
         type: string
+        minLength: 1
+        pattern: "\\S"
         description: "Atlas L2580 'Expected State'."
       gap:
         type: string
+        minLength: 1
+        pattern: "\\S"
         description: "Atlas L2581 'Gap'."
       affected_stakeholders:
         type: array
@@ -232,3 +246,13 @@ verification:
     enum values beyond `validated` are new Phase 3 design, explicitly flagged
     as such above (not presented as mother-document content). No mother
     document was modified to produce this file.
+
+    CORRECTED (framing.problem_statement build, 2026-09-10, this method's
+    first real producer/contract): `additionalProperties: false` was missing
+    both at the top level and inside `content` (same gap class critic review
+    already found and fixed in 2 sibling schemas), and the 3 required
+    `content` string fields (`current_state`/`expected_state`/`gap`) had no
+    `minLength`/non-blank constraint -- an empty string was schema-legal for
+    all of them. Both closed; verified against the pre-existing
+    `tests/contracts/specs/cognitive/typed-objects/problem-statement.fixtures.yaml`
+    valid/invalid cases, none of which relied on either gap.
