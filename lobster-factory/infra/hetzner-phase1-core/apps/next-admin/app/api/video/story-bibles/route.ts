@@ -37,6 +37,12 @@ export async function POST(req: Request): Promise<Response> {
   const seriesId = candidate && typeof candidate === "object" && !Array.isArray(candidate) && typeof (candidate as Record<string, unknown>).seriesId === "string" ? (candidate as Record<string, unknown>).seriesId : "";
   if (!seriesId) return NextResponse.json({ ok: false, error: "seriesId required" }, { status: 400 });
   const db = getSupabaseWriteClient(); if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
+  const projectId = typeof body.projectId === "string" && UUID.test(body.projectId) ? body.projectId : null;
+  if (projectId) {
+    const project = await db.from("media_production_projects").select("organization_id, production_mode").eq("id", projectId).maybeSingle();
+    if (project.error) return NextResponse.json({ ok: false, error: project.error.message }, { status: 500 });
+    if (!project.data || project.data.organization_id !== organizationId || project.data.production_mode !== "short_drama") return NextResponse.json({ ok: false, error: "project must be a short-drama project in this organization" }, { status: 422 });
+  }
   const latest = await db.from("media_story_bible_revisions").select("revision").eq("organization_id", organizationId).eq("series_id", seriesId).order("revision", { ascending: false }).limit(1).maybeSingle();
   if (latest.error) return NextResponse.json({ ok: false, error: latest.error.message }, { status: 500 });
   let document: Record<string, unknown>;
@@ -48,7 +54,7 @@ export async function POST(req: Request): Promise<Response> {
     if (owned.error) return NextResponse.json({ ok: false, error: owned.error.message }, { status: 500 });
     if ((owned.data ?? []).length !== assetIds.length) return NextResponse.json({ ok: false, error: "reference asset is missing or belongs to another organization" }, { status: 422 });
   }
-  const inserted = await db.from("media_story_bible_revisions").insert({ organization_id: organizationId, series_id: seriesId, revision: document.revision, status: "draft", document_json: document, document_sha256: canonicalStoryBibleSha256(document) }).select("id, organization_id, series_id, revision, status, document_json, document_sha256, created_at, approved_at").single();
+  const inserted = await db.from("media_story_bible_revisions").insert({ organization_id: organizationId, project_id: projectId, series_id: seriesId, revision: document.revision, status: "draft", document_json: document, document_sha256: canonicalStoryBibleSha256(document) }).select("id, organization_id, project_id, series_id, revision, status, document_json, document_sha256, created_at, approved_at").single();
   if (inserted.error) return NextResponse.json({ ok: false, error: inserted.error.message }, { status: inserted.error.code === "23505" ? 409 : 500 });
   return NextResponse.json({ ok: true, item: inserted.data }, { status: 201 });
 }
