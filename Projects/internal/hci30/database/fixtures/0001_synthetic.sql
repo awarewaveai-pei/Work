@@ -121,3 +121,10 @@ INSERT INTO hci.decisions (id,tenant_id,case_id,outcome,rationale,author_class,p
 -- H1015 gate.
 INSERT INTO hci.decision_claims (id,tenant_id,decision_id,claim_id) VALUES
   ('bbbbbbbb-0000-0000-0000-000000000920','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000600','bbbbbbbb-0000-0000-0000-000000000501');
+
+-- Case Report Snapshot fixture (migrations/0016, RLS-LEAK-07): one real
+-- tenant-B row, mirroring every other RLS-LEAK fixture above. 'report' is
+-- '{}' -- this table's own CHECK only requires a JSON object, and no test
+-- reads this row's content, only its (in)visibility.
+INSERT INTO hci.case_report_snapshots (id,tenant_id,case_id,generated_by_principal_id,report) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000700','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000850','{}'::jsonb);

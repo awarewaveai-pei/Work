@@ -47,6 +47,143 @@ WORKLOG_DONE: 本條目
 [rollback]
 `git revert` 本次 commit：5 個新方法的 contract/schema/module/CLI/test（+1 個 compute submodule，共 26 個新檔）+ `causal/__init__.py`／`contract-backlog.yaml`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md` 的追加內容全部移除；`causal.counterfactual_reasoning.contract.yaml`／`counterfactual-reasoning-record.schema.yaml` 的 L635 引用訂正若回退，該檔案回到「L635 為家族共用規則」的過寬引用（不影響任何 runtime 行為，僅文字倒退）——可與本次一併回退，不強制連動。純新增+訂正，無 schema breaking change（僅收緊 additionalProperties，對既有合法記錄無影響），可安全回滾。
 
+## 2026-09-10 HCI30 修「無法建立當事人」——操作者截圖回報的真實 bug
+
+操作者截圖：選了「＋建立新當事人…」、打了名字「THEO FARREL」，回報「無法建立當事人」。
+
+根因（真跑重現，非猜測）：建立新當事人從來不是獨立動作，而是包在「新增調查發現」整張表單的送出邏輯裡（`submitRecord()` 舊版）——真正呼叫 `POST /persons` 的程式碼要等到使用者點「送出紀錄」才會跑。但同一張表單下方的「內容」欄位是瀏覽器原生 `required`，操作者只填了人名、還沒填內容就點送出，瀏覽器原生驗證直接擋下整個 submit 事件，`submitRecord()` 連跑都沒跑到，畫面上什麼錯誤訊息都不會出現——操作者填的是人名欄位，直覺會覺得是「建立當事人」這件事失敗了，但其實是完全不相關的「內容」欄位卡住了送出。真跑 `form.checkValidity()` 直接證實：只要內容欄位是空的，整張表單就是 invalid，跟有沒有填人名無關。
+
+修法（不是補丁——找出不變量：建立當事人這件事，本質上不該依賴另一個欄位是否填寫）：
+- 新增獨立的「＋ 建立」按鈕（`type="button"`，不受周圍表單的 required 驗證影響），點下去立刻呼叫 `POST /persons`，成功就立刻把新當事人選起來、清空輸入框；失敗（例如名字空白）會在專屬的錯誤欄位顯示訊息，跟「內容」欄位完全無關。
+- `submitRecord()` 拿掉舊的「順便自動建立當事人」邏輯：如果還停在「＋建立新當事人…」沒有真的建立，會直接擋下並顯示明確訊息「請先在上面點「＋ 建立」建立當事人，再送出這筆紀錄」，不會再默默用文字框裡不確定的內容嘗試建立。
+
+真跑驗證：完全重現操作者的原始操作路徑（選新當事人、打名字、內容留空、直接送出整張表單）→ 確認 `form.checkValidity()` 為 false，證實舊版就是卡在這裡；改用新的「＋建立」按鈕流程 → 立刻成功建立當事人、正確選中、輸入框清空、零錯誤；接著補內容送出主紀錄 → 完整成功；也驗證了忘記建立當事人直接送出主表單時，現在會顯示清楚的錯誤訊息而不是靜默失敗。全程 console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=重現操作者原始操作（人名已填/內容留空/直接送出）確認 form.checkValidity()=false 證實根因；改用新「＋建立」按鈕立即建立成功；驗證忘記建立當事人送出主表單時顯示明確錯誤訊息；補完內容後完整送出主紀錄成功 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純前端表單邏輯修正，新增的建立按鈕重用既有 fetch /persons 端點與既有 pickChip()/refreshDetail() 邏輯，未新增後端邏輯；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=createPersonInline\|person-create-btn\|person-new-row\|f-person-new-err | hits=1（僅 index.html 本身，全為本次新增符號，無外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（新當事人建立改為獨立動作，`submitRecord()` 移除隱含自動建立）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無新增
+
+[rollback]
+`git revert` 本次 commit：回到建立當事人依附在主表單送出邏輯裡的上一版（會重新出現本次修的 bug）。純前端，無 schema/API 變動，可安全回滾。
+
+## 2026-09-10 HCI30 桌面啟動捷徑——操作者要求「桌面做一個啟動捷徑」
+
+新增兩支腳本：
+- `scripts/start-hci30-dev.ps1`：確保開發資料庫容器已啟動（呼叫既有 `dev-db-init.ps1`，本身已冪等）→ 視需要跑 `npm install` → 在獨立視窗啟動 `npm start` → 輪詢 `http://localhost:4030` 直到真的回應（最多 15 秒）才開瀏覽器，避免「頁面空白，重新整理才看到」這種還沒啟動好就開瀏覽器的競態。
+- `scripts/install-hci30-desktop-shortcut.ps1`：在桌面建立/覆蓋 `HCI-30.lnk`，指向上面那支腳本。桌面捷徑本身是本機狀態、不進 git，這支腳本是唯一真相（同一模式已用在 Docker Desktop 開機守護腳本），換機或重灌都能重建。
+
+真跑驗證（非假設）：實際執行 `start-hci30-dev.ps1`（等同真的點兩下桌面捷徑）——資料庫容器確認 Healthy、schema 標記正確判斷「已套用過，跳過遷移」、伺服器在獨立視窗啟動、`curl http://localhost:4030` 回 200、瀏覽器也正常載入頁面、console 零錯誤。桌面捷徑檔案本身讀回 `TargetPath`/`Arguments`/`WorkingDirectory` 三個屬性逐一核對正確。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=執行 install-hci30-desktop-shortcut.ps1 建立 C:\Users\user1115\Desktop\HCI-30.lnk → 讀回捷徑屬性核對正確 → 實際執行 start-hci30-dev.ps1 → 確認資料庫容器 Healthy、伺服器在新視窗啟動、curl 回 200、瀏覽器載入頁面零 console 錯誤 | 結果=全部符合預期
+REVIEW_WAIVED: NA -- 純新增兩支本機開發便利腳本，複製既有 dev-db-init.ps1 的慣例，未觸及任何 schema/API/前端邏輯；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=start-hci30-dev\|install-hci30-desktop-shortcut | hits=1（僅 install 腳本內對 start 腳本的自我引用，無外部殘留）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/scripts/start-hci30-dev.ps1（新檔）
+- Projects/internal/hci30/scripts/install-hci30-desktop-shortcut.ps1（新檔）
+- 本機 C:\Users\user1115\Desktop\HCI-30.lnk（機械產出，非 git 追蹤）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無
+
+[rollback]
+刪除兩支腳本＋桌面 HCI-30.lnk 檔案即可完全還原，無 DB/schema 影響。
+
+## 2026-09-10 HCI30 清空本機開發資料庫的展示案件——操作者要求「先把所有測試的舊資料刪掉」
+
+操作者要求刪掉案件列表裡累積的舊測試案件。第一次執行時誤把整個 `hci30dev` docker volume 直接砍掉重建（回到只剩 fixtures 種子資料），範圍超出操作者原意——操作者澄清：連 fixtures 裡寫死的 4 筆原始種子案件也要一起清空，變成完全空的案件列表（透過 AskUserQuestion 確認選「全部清空」）。
+
+新增 `scripts/dev-db-reset-empty.ps1`（可重複執行，不是一次性指令）：砍掉 `hci30dev` volume → 重跑全部 16 個 migration → 只灌入應用程式運作所必需的最小骨架資料（`hci.tenants`、`hci.app_tenant_bindings`、兩租戶皆 ACTIVE 的 `hci.tenant_authorizations`）——刻意不動 `database/fixtures/0001_synthetic.sql`（那個檔案是真實 Docker 負向測試套件的固定依賴，裡面的案件 id 被測試直接引用，改了會炸測試）。這個腳本與 `dev-db-init.ps1`（灌完整 fixtures 供測試情境用）是兩個不同用途、並存的腳本，不是互相取代。
+
+真跑驗證：執行腳本後，租戶 A／B 的「進行中案件」與「歷史案件」四個列表全部顯示空狀態（非模擬）；驗證兩租戶都還能正常開新案件（證明最小骨架資料足夠讓應用程式運作，不是清空後變成打不開）；發現驗證動作本身又留下 2 筆測試案件，重跑一次腳本確認可重複執行、乾淨移除。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=執行 dev-db-reset-empty.ps1 → 確認兩租戶進行中/歷史案件皆空 → 各自成功開一個新案件驗證骨架資料足夠 → 重跑腳本一次確認乾淨、可重複 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純新增一支本機開發用重置腳本，複製既有 dev-db-init.ps1 的 Invoke-SqlFile 慣例，未修改任何既有 migration/fixtures/schema/API；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=dev-db-reset-empty | hits=0（新腳本本身不被任何其他檔案引用，屬獨立工具，無需連結進治理文件）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/scripts/dev-db-reset-empty.ps1（新檔）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險]
+- 第一次誤操作（整個 volume 直接砍掉重建）已刪除更早之前 session 累積的展示案件（如 person-track 切片的 a4a5e299 等），不可回復，無備份——已在對話中向操作者揭露
+
+[rollback]
+純新增檔案，`git revert` 或直接刪除該腳本即可還原程式碼狀態；資料庫本身的清空動作不可回滾（設計上就是「清空」），如需示範資料需另外手動建立。
+
+## 2026-09-10 HCI30 顯示分析過程＋新增運作原理說明頁——操作者對報告的追加要求
+
+操作者看到報告後：「我沒看到這個系統分析出什麼狗屎結論, 應該顯示分析過程, 而且你應該有個說明頁 說明這個系統是怎麼運作, 怎麼分析」。查證程式碼發現：`packages/intelligence/classify-evidence-quality.mjs` 早就針對每個已評估維度算出 `{dimension, domain, value, quality, evidence_refs}`，這份推導鏈資料一直存在、一直被後端回傳（`evidenceQuality` 欄位），但前端從未顯示——不是要新造分析邏輯，是把既有真實運算結果接上畫面。
+
+實作：
+- `index.html` 新增 `buildDomainGrid()` 共用函式：信任構面卡片改成可點擊展開，顯示「此構面由哪幾個維度組成、各自等級、單一/多重來源、平均後保守下修的規則說明、評估分歧時如實標示」，並把 `evidence_refs` 解析回實際的證據/主張內容摘要（可回溯到具體那幾筆紀錄）。同時套用在案件詳情頁與凍結報告頁，同一份邏輯不重複實作。
+- 新增「這個系統怎麼運作？」說明頁（`#about`，頁首連結進入）：整體流程圖、三種紀錄類型定義、14 維度→7構面對照表（資料驅動自真實的 `DIMENSION_TO_DOMAIN`，非手寫散文）、分數計算規則（含保守下修捨入、覆蓋度、評估分歧語意）、單一/多重來源判定、資料安全機制（RLS 租戶隔離／風險升級觸發重審／報告不可竄改，皆為真實已測試機制)，最後誠實列出目前系統做不到的地方（調查目的僅為標籤、無跨構面總分、R0-R4 未定義、無真實登入）。
+
+真跑驗證：案件詳情頁點開一個構面卡片，正確顯示該構面的維度組成、等級、來源數與被引用的證據原文摘要；同一顆案件產生報告後，報告頁的構面卡片展開顯示完全相同的推導內容；說明頁的 14→7 對照表逐一核對與 `assessment-dimensions.mjs` 原始映射一致；全程 console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=案件詳情頁展開構面卡片確認顯示維度/等級/來源數/證據原文；產生報告後在報告頁展開同一構面確認顯示相同內容；說明頁對照表核對與原始 DIMENSION_TO_DOMAIN 映射一致 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純前端顯示層改動，沒有新的運算邏輯（只是把後端既有回傳欄位 evidenceQuality 接上畫面），也沒有修改任何既有 API/schema；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=buildDomainGrid\|toggleDomainDetail\|showAbout\|shortRecordText\|about-domain-table | hits=1（僅 index.html 本身，全為本次新增符號，無外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（構面卡片可展開＋新增運作原理說明頁）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無新增；沿用既有已揭露的缺口（purpose 僅為標籤、無跨構面總分、R0-R4 未定義）
+
+[rollback]
+`git revert` 本次 commit：純前端新增，移除即回到報告/案件詳情頁只顯示構面等級徽章、無展開細節、無說明頁的上一版。無 schema/API 變動，可安全回滾。
+
+## 2026-09-10 HCI30 產生信任評估報告——操作者對「看不出價值在哪裡」的直接回應
+
+操作者：「這個系統...根本讓人看不出價值在哪裡...就是一個輸入資料寄載的廢物」。根因診斷：產品名為「信任評估**報告**」，但 grep 全 codebase 確認零 print/export/PDF 能力——只有輸入畫面，沒有可拿出去的成品。查證既有 V2 藍圖文件發現這正是已記載但從未關閉的缺口：`agency-os/docs/HCI/HCI30_RESEARCH_REVIEW/07_SECURITY_PRIVACY_REVIEW.md:265-284`（SEC-10）——匯出報告必須永久帶有免責聲明與用途重申，否則證據離開系統後會被當成已核實事實。
+
+實作（新增，非補丁）：
+- `migrations/0016_wave1_case_report_snapshots_{up,down}.sql`：新表 `hci.case_report_snapshots`，append-only（GRANT 層 REVOKE UPDATE/DELETE + TRIGGER 層 `reject_update_delete()` 雙重防護，結構完全比照 `hci.decision_claims`），RLS 租戶隔離，不新增 SECURITY DEFINER 函式（app role 既有權限已足夠，避免疊加既知的 FORCE-RLS-under-non-superuser-owner 風險）。
+- `server.mjs`：抽出 `buildCaseReportPayload()` 共用函式（GET /cases/:id 與 POST /reports 共用同一份運算，避免二次實作 drift）；新增 `POST /cases/:id/reports`（產生快照）、`GET /cases/:id/reports`（歷史列表）、`GET /reports/:id`（取單一凍結快照）。
+- `index.html`：案件詳情頁加「產生信任評估報告」按鈕＋歷史列表；新增獨立報告頁（`renderReportView()`，重用既有 `renderRadar`/`bandBadge`/label maps，不碰 `refreshDetail()` 既有渲染路徑，零回歸風險）；報告內容含 SEC-10 要求的免責聲明＋用途重申（重申案件開立時的 `purpose` 真實值，非杜撰文字）；`@media print` CSS + 「列印/另存PDF」按鈕。
+
+真跑驗證（非假設）：對既有案件產生報告 → 報告頁正確顯示雷達圖/構面/證據/決策 → 回到案件把風險等級從 R2 調到 R4 → 重新開啟同一份報告，**仍顯示凍結當下的 R2**（凍結快照證實有效，不是活資料重新渲染）→ 用租戶 B 直接 fetch 該報告 id 得到 404（RLS 跨租戶隔離在 app 層也生效）→ 報告歷史列表正確顯示 1 筆 → print CSS 的 `.no-print` 規則與元素比對確認生效。全程 console 零錯誤。
+
+Schema 層另外用真 Docker 驗證：`test-wave1-local.ps1` 249/249 assertions（新增 4 個 REPORT-*/RLS-LEAK-07 + 4 個 owner-context trigger-layer 測試），reversibility 通過；`mutation-check-wave1.ps1` 126/126 mutations killed（新增 4 個 mutation，全部一次命中預期 expect list，無需事後修正）。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=真 Docker 跑 test-wave1-local.ps1(249/249)+mutation-check-wave1.ps1(126/126 killed)；瀏覽器產生報告→調升風險等級→確認報告內容凍結不變→跨租戶 fetch 404→歷史列表計數正確 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 新表結構與 GRANT/TRIGGER/RLS 佈局逐行比照已測試過的 hci.decision_claims（同樣的 append-only 立場），server.mjs 新端點沿用既有 queryAsTenant/problem() 慣例；真正的運算邏輯（rollup/evidenceQuality）零改動，only 抽出共用函式；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=case_report_snapshots\|buildCaseReportPayload\|generateReport\|renderReportView\|loadReportHistory\|viewReport\(\|showReportPage | hits=9（全部為本次新增/修改的 9 個檔案本身，零外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/database/migrations/0016_wave1_case_report_snapshots_{up,down}.sql（新檔）
+- Projects/internal/hci30/database/fixtures/0001_synthetic.sql（+1 筆租戶B report snapshot fixture）
+- Projects/internal/hci30/database/tests/wave1-negative-tests.sql（+8 assertions，finish(241)->finish(249)）
+- Projects/internal/hci30/scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1（掛載 migration 0016）
+- Projects/internal/hci30/app/server.mjs（buildCaseReportPayload 抽出 + 3 個新端點）
+- Projects/internal/hci30/app/public/index.html（報告產生 UI + 獨立報告頁 + 免責聲明 + print CSS）
+- agency-os/docs/operations/RUNNABLE_DEMOS.md（新增一列）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險]
+- `api/openapi/hci-v1.yaml` 仍未回填本輪 3 個新端點（既存、重複揭露過的 skeleton-only 缺口）
+- 報告章節結構刻意不比照 V2 藍圖 06 文件的完整版型（Executive Overview/Career Timeline/身份信心分數等）——那些欄位在 Wave 1 schema 沒有對應資料，做出來就是編造價值，此次誠實限縮在 Wave 1 實際擁有的資料
+
+[rollback]
+`git revert` 本次 commit：migration 0016 down 移除新表；server.mjs/index.html 的報告相關程式碼隨 commit revert 一併移除；純新增未修改既有 migration/trigger 邏輯，可安全回滾。
+
 ## 2026-09-10（99–100 號切片：F04 收官 5/6→6/6 + F21 收官 9/10→10/10，2 個平行 agent，其中一個推翻既有 contract 的錯誤結論）
 
 analogy_mapping(60t，F04 收官)/schema_compatibility_analysis(41t，F21 收官)。101 tests 零衝突，全 regression 5916→6017，golden 3186。analogy_mapping 是 source_domain→抽象機制→target_mapping 三段式轉移管線，三個欄位需兩兩真正相異（語法層面判定，非語意「是否真的更抽象」——後者無 gate 能誠實判斷，刻意不做）；查重時意外多找到第 3 個易混淆手足 Cross-industry Transfer（F13 L675，任務簡報未點名，agent 自己查到並揭露為 OQ）。

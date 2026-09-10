@@ -104,12 +104,56 @@
   .risk-tier-submit:hover { background: var(--teal-ink); }
   .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
 
+  /* Report generation (operator-requested "產生信任評估報告", 2026-09-10) --
+     a frozen, printable deliverable, distinct from the live editable case
+     view above it. */
+  .report-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .report-generate-btn { padding: 0.55rem 1.3rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+  .report-generate-btn:hover { background: var(--teal-ink); }
+  .report-history { margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .report-history-item { padding: 0.35rem 0.9rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--teal-ink); font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+  .report-history-item:hover { border-color: var(--teal); }
+
+  .report-print-btn { padding: 0.5rem 1.2rem; border: 1.5px solid var(--teal); border-radius: 999px; background: #fff; color: var(--teal-ink); font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+  .report-print-btn:hover { background: var(--teal); color: #fff; }
+  .report-frozen-banner { background: var(--teal-tint); border-left: 3px solid var(--teal); padding: 0.9rem 1.2rem; margin: 1.2rem 0; font-size: 0.85rem; color: var(--teal-ink); line-height: 1.6; }
+  .report-legal { border-top: 1px solid var(--border); margin-top: 2.5rem; padding-top: 1.2rem; font-size: 0.78rem; color: var(--muted); line-height: 1.7; }
+  .report-legal p { margin: 0 0 0.6rem; }
+  .report-legal b { color: var(--text); }
+
+  /* Explainer page ("運作原理", operator-requested 2026-09-10 -- "你應該有個
+     說明頁 說明這個系統是怎麼運作，怎麼分析"). */
+  .about-nav-link { background: none; border: none; color: #d7e6e1; font-size: 0.82rem; cursor: pointer; font-family: inherit; text-decoration: underline; padding: 0; }
+  .about-nav-link:hover { color: #fff; }
+  .about-section { margin: 2.2rem 0; }
+  .about-section h2 { margin-top: 0; }
+  .about-flow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.9rem; font-weight: 700; margin: 1rem 0; }
+  .about-flow span.node { background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 0.5rem 1.1rem; }
+  .about-flow span.arrow { color: var(--muted); }
+  .about-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0; }
+  .about-table th, .about-table td { text-align: left; padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--border); }
+  .about-table th { color: var(--muted); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .about-note { background: var(--teal-tint); border-left: 3px solid var(--teal); padding: 0.9rem 1.2rem; font-size: 0.88rem; line-height: 1.7; color: var(--teal-ink); margin: 1rem 0; }
+  .about-gap { border-left: 3px solid var(--moderate); background: #f7ead0; padding: 0.9rem 1.2rem; font-size: 0.85rem; line-height: 1.7; margin: 0.6rem 0; }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; padding: 0; }
+    #report-body { max-width: none; }
+    .report-legal { break-inside: avoid; }
+    .record-card, .domain-card { break-inside: avoid; }
+  }
+
   .radar-wrap { padding: 0.5rem 0 1.5rem; }
   .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); }
   .domain-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0.85rem 0.4rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .domain-card .domain-name { font-size: 0.85rem; font-weight: 700; color: var(--text); }
   .domain-card .domain-meta { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
   .domain-card.unknown { color: var(--muted); }
+  .domain-detail { grid-column: 1 / -1; background: var(--teal-tint); padding: 1rem 1.2rem; margin-bottom: 0.6rem; border-radius: 4px; }
+  .domain-dim-row { margin-top: 0.6rem; font-size: 0.85rem; }
+  .domain-dim-row:first-of-type { margin-top: 0.3rem; }
+  .domain-dim-refs { margin: 0.3rem 0 0; padding-left: 1.3rem; font-size: 0.8rem; color: var(--text); line-height: 1.6; }
 
   .insight-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
   .insight-col { background: transparent; border: none; padding: 0; }
@@ -151,6 +195,14 @@
   .chip.block { width: 100%; border-radius: 4px; }
   .chip.dashed { border-style: dashed; color: var(--teal-ink); }
   .chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* New-person creation is its own immediate action, not bundled into the
+     surrounding record form's submit (2026-09-10 fix -- see
+     createPersonInline()'s own comment for why bundling it broke). */
+  .person-new-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+  .person-new-row input { flex: 1; }
+  .person-create-btn { flex: none; padding: 0.5rem 1rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
+  .person-create-btn:hover { background: var(--teal-ink); }
 </style>
 </head>
 <body>
@@ -159,6 +211,7 @@
     <div>
       <span class="brand">HCI-30</span>
       <span class="brand-sub">信任評估報告</span>
+      <span class="brand-sub"> · <button type="button" class="about-nav-link" onclick="showAbout()">這個系統怎麼運作？</button></span>
     </div>
     <div class="tenant-switch">
       <button id="btn-a" onclick="loadList('a')">租戶 A</button>
@@ -245,6 +298,7 @@
     </div>
     <div id="d-decision-banner"></div>
     <div id="d-risk-tier-wrap"></div>
+    <div id="d-reports-wrap"></div>
   </div>
   <div id="d-empty-cta"></div>
 
@@ -273,9 +327,11 @@
       <label>當事人</label>
       <div class="chip-group" id="f-person-chips"></div>
       <input type="hidden" id="f-person">
-      <div id="f-person-new-wrap" style="display:none">
+      <div id="f-person-new-wrap" class="person-new-row" style="display:none">
         <input id="f-person-new" placeholder="新當事人的姓名或顯示名稱">
+        <button type="button" class="person-create-btn" onclick="createPersonInline()">＋ 建立</button>
       </div>
+      <div id="f-person-new-err" class="err"></div>
 
       <label>類型</label>
       <div class="chip-group" id="f-kind-chips">
@@ -290,6 +346,76 @@
       <div id="f-err" class="err"></div>
     </form>
   </details>
+</div>
+
+<div id="report" style="display:none">
+  <p class="no-print"><span class="back" onclick="showDetail()">&larr; 返回案件</span></p>
+  <div id="report-body"></div>
+  <p class="no-print" style="margin-top:1.5rem"><button type="button" class="report-print-btn" onclick="window.print()">🖨 列印 / 另存 PDF</button></p>
+</div>
+
+<div id="about" style="display:none">
+  <p><span class="back" onclick="showList()">&larr; 返回案件列表</span></p>
+  <h1>這個系統怎麼運作？</h1>
+  <p class="subtitle">這頁如實說明目前程式碼實際在做什麼——不是行銷文案，做不到的地方也直接寫在最下面。</p>
+
+  <div class="about-section">
+    <h2>整體流程</h2>
+    <div class="about-flow">
+      <span class="node">開案件</span><span class="arrow">→</span>
+      <span class="node">記錄證據／主張／評估</span><span class="arrow">→</span>
+      <span class="node">系統自動算出 7 個信任構面</span><span class="arrow">→</span>
+      <span class="node">你做決策</span>
+    </div>
+    <p>只有「決策」是人做的判斷；信任構面的分數是系統從你輸入的證據、主張、評估裡即時算出來的，不能手動填寫或覆蓋。</p>
+  </div>
+
+  <div class="about-section">
+    <h2>三種紀錄，各自的角色</h2>
+    <table class="about-table">
+      <tr><th>類型</th><th>是什麼</th><th>能不能被引用</th></tr>
+      <tr><td><b>證據</b></td><td>你直接查到或觀察到的具體事實（文件、公開紀錄等）</td><td>可以被主張／評估引用</td></tr>
+      <tr><td><b>主張</b></td><td>一句說法或推論，必須引用至少一筆證據或主張，不能憑空成立</td><td>可以被評估引用</td></tr>
+      <tr><td><b>評估</b></td><td>針對 14 個維度之一打出等級（極低～極高），必須引用至少一筆證據或主張</td><td>不能被引用（評估是判讀的終點，不是起點）</td></tr>
+    </table>
+  </div>
+
+  <div class="about-section">
+    <h2>14 個維度如何組成 7 個信任構面</h2>
+    <p>每個構面固定由 2 個維度組成（來源：<code>packages/intelligence/assessment-dimensions.mjs</code>，有自動化測試鎖定這個對照表不能悄悄改動）：</p>
+    <table class="about-table" id="about-domain-table"></table>
+  </div>
+
+  <div class="about-section">
+    <h2>構面分數怎麼算出來的</h2>
+    <p>某個構面底下，只要有維度被評估過，該維度的等級（極低=1 分～極高=5 分）會被平均，四捨五入後對回等級名稱。<b>同分不確定時採「保守下修」</b>（例如平均剛好 3.5 分，不會取 4，而取 3）——高估信任的代價比低估更大，這是刻意的設計選擇，不是運算誤差。</p>
+    <ul>
+      <li><b>完整覆蓋 / 部分覆蓋</b>：2 個維度都有評估＝完整覆蓋；只有 1 個＝部分覆蓋。</li>
+      <li><b>尚無證據</b>：2 個維度都沒有評估的構面，直接不顯示分數，<b>絕不會預設成「中等」</b>——沒有證據就是沒有證據，不是安全值。</li>
+      <li><b>評估分歧</b>：同一構面的 2 個維度評分差距達 2 級以上時（例如一個「偏高」一個「極低」），會如實標示「評估分歧」，不會被平均數字悄悄蓋過去。</li>
+    </ul>
+    <p>案件詳情頁與報告頁的每個構面卡片現在都可以點開，看到究竟是哪幾筆證據／主張撐起這個分數——這是操作者要求「顯示分析過程」後加上的。</p>
+  </div>
+
+  <div class="about-section">
+    <h2>單一來源 vs 多重來源</h2>
+    <p>一個維度的評估只引用了 1 筆證據／主張＝<b>單一來源</b>；引用了 2 筆以上不同的＝<b>多重來源</b>。這只是誠實標示佐證厚度，不會影響分數本身怎麼算。</p>
+  </div>
+
+  <div class="about-section">
+    <h2>資料安全與不可竄改機制（真的接線，不是文案）</h2>
+    <p class="about-note">租戶之間完全隔離：每一筆資料庫查詢都被 Postgres 自己的 Row-Level Security 擋住，A 租戶的連線在資料庫層級就看不到 B 租戶的任何一行資料，不是應用程式判斷「要不要顯示」。</p>
+    <p class="about-note">風險等級調升會自動觸發重新審查：把案件風險等級調高，資料庫觸發器會自動把該案件下所有已核准的主張標記為「需要重新審查」；若某主張已連結到一個定案決策，調升會直接被擋下，這條規則已用真實資料庫測試驗證過。</p>
+    <p class="about-note">產生的信任評估報告一旦建立就無法被修改或刪除——即使是資料庫管理員的連線也一樣，靠的是資料庫層的權限收回加觸發器雙重防護，不是應用程式的「不提供編輯按鈕」。</p>
+  </div>
+
+  <div class="about-section">
+    <h2>目前誠實還沒做到的地方</h2>
+    <div class="about-gap">「調查目的」目前只是一個經過驗證的分類標籤——存在是為了未來的司法管轄權／合法性基礎邏輯，但今天沒有任何程式碼真的依據它改變行為。</div>
+    <div class="about-gap">7 個信任構面之間<b>沒有</b>單一的總分或排名——這是刻意的設計，跨構面該怎麼加總目前故意留白，沒有證據支持的公式就不會假裝有一個。</div>
+    <div class="about-gap">R0-R4 風險等級目前只有「數字愈大愈敏感」的方向性提示，實際對應到什麼具體業務規則尚未制定。</div>
+    <div class="about-gap">沒有真實的登入驗證——租戶身分是右上角按鈕手動模擬切換，正式版才會是真實帳號登入。</div>
+  </div>
 </div>
 
 </div>
@@ -332,14 +458,32 @@ const RISK_TIER_LABELS = { R0:'R0（風險最低）', R1:'R1', R2:'R2（中等�
 const COVERAGE_LABELS = { FULL:'完整覆蓋', PARTIAL:'部分覆蓋' };
 const QUALITY_LABELS = { SINGLE_SOURCE:'單一來源', MULTIPLE_SOURCES:'多重來源' };
 const ALL_DOMAINS = ['OPERATIONAL','COMPETENCE','CONFIDENTIALITY','FINANCIAL','STRATEGIC','REPUTATIONAL','GOVERNANCE_POWER'];
+// Display-only transcription of packages/intelligence/assessment-dimensions.mjs's
+// DIMENSION_TO_DOMAIN (that file enforces the partition invariant at import
+// time; this copy is presentation-only, same disclosed-duplication posture
+// as DIMENSIONS/BANDS above -- no bundler in this static page to import it
+// directly). Used by the explainer page's methodology table and the domain
+// drill-down, never to compute a score.
+const DIMENSION_TO_DOMAIN = { RELIABILITY_FULFILLMENT:'OPERATIONAL', PREDICTABILITY:'OPERATIONAL', COMPETENCE:'COMPETENCE', LEARNING_ADAPTABILITY:'COMPETENCE', INFORMATION_GOVERNANCE:'CONFIDENTIALITY', BOUNDARY_RESPECT:'CONFIDENTIALITY', INCENTIVE_ALIGNMENT:'FINANCIAL', RISK_EXTERNALIZATION:'FINANCIAL', RECIPROCITY_FAIRNESS:'STRATEGIC', CONTEXT_STABILITY:'STRATEGIC', INTEGRITY_CONSISTENCY:'REPUTATIONAL', COMMUNICATION_QUALITY:'REPUTATIONAL', POWER_BEHAVIOR:'GOVERNANCE_POWER', CONFLICT_REPAIR:'GOVERNANCE_POWER' };
 
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => { p.style.display = p.id === 'tab-panel-' + name ? 'block' : 'none'; });
 }
 
-function showList() { document.getElementById('detail').style.display = 'none'; document.getElementById('list').style.display = 'block'; }
-function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
+function hideAllViews() { ['list','detail','report','about'].forEach(id => document.getElementById(id).style.display = 'none'); }
+function showList() { hideAllViews(); document.getElementById('list').style.display = 'block'; }
+function showDetail() { hideAllViews(); document.getElementById('detail').style.display = 'block'; }
+function showReportPage() { hideAllViews(); document.getElementById('report').style.display = 'block'; }
+function showAbout() {
+  hideAllViews();
+  document.getElementById('about').style.display = 'block';
+  document.getElementById('about-domain-table').innerHTML = '<tr><th>信任構面</th><th>組成的 2 個維度</th></tr>' +
+    ALL_DOMAINS.map(domain => {
+      const dims = Object.keys(DIMENSION_TO_DOMAIN).filter(d => DIMENSION_TO_DOMAIN[d] === domain);
+      return `<tr><td><b>${DOMAIN_LABELS[domain] || domain}</b></td><td>${dims.map(d => DIMENSION_LABELS[d] || d).join('、')}</td></tr>`;
+    }).join('');
+}
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
 // Shared handler for every button-based selector in the app (purpose, risk
@@ -411,6 +555,53 @@ async function openCase(caseId) {
 
 function bandBadge(value) {
   return `<span class="band-badge band-${value}">${BAND_LABELS[value] || value}</span>`;
+}
+
+function shortRecordText(r) {
+  const text = (r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''} ${BAND_LABELS[r.payload.value] || r.payload.value || ''}`).trim();
+  return text.length > 70 ? text.slice(0, 70) + '…' : text;
+}
+
+function toggleDomainDetail(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// Domain grid + drill-down (operator-requested 2026-09-10, "應該顯示分析過
+// 程" -- the domain rollup's evidence_refs were always computed by
+// evidenceQuality (packages/intelligence/classify-evidence-quality.mjs) but
+// never surfaced anywhere in the UI). Shared by the live case view and the
+// frozen report view so both show the identical derivation trail; `prefix`
+// keeps element ids unique between the two (both can exist in the DOM at
+// once, only one visible).
+function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix) {
+  const byDomain = Object.fromEntries(rollupDomains.map(d => [d.domain, d]));
+  const dimsByDomain = {};
+  (evidenceQuality || []).forEach(q => { (dimsByDomain[q.domain] = dimsByDomain[q.domain] || []).push(q); });
+
+  return ALL_DOMAINS.map(name => {
+    const d = byDomain[name];
+    if (!d) return `<div class="domain-card unknown"><div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">尚無證據</div></div></div>`;
+
+    const detailId = `dd-${prefix}-${name}`;
+    const dimRows = (dimsByDomain[name] || []).map(q => {
+      const refs = (q.evidence_refs || []).map(id => {
+        const r = recordById[id];
+        return r ? `<li>${esc(KIND_LABELS[r.kind] || r.kind)}：${esc(shortRecordText(r))}（#${id.slice(0,8)}）</li>` : `<li>#${id.slice(0,8)}（此紀錄目前查不到，可能已被取代）</li>`;
+      }).join('');
+      return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}</div>
+        <ul class="domain-dim-refs">${refs}</ul></div>`;
+    }).join('');
+
+    return `<div class="domain-card" onclick="toggleDomainDetail('${detailId}')" title="點擊查看依據">
+        <div><div class="domain-name">${DOMAIN_LABELS[name] || name} <span class="field-hint">▾ 依據</span></div><div class="domain-meta">${COVERAGE_LABELS[d.coverage] || d.coverage}${d.dimension_disagreement ? '．評估分歧' : ''}</div></div>
+        ${bandBadge(d.value)}
+      </div>
+      <div class="domain-detail" id="${detailId}" style="display:none">
+        <p class="field-hint">此構面的等級 = 底下已評估維度的等級取平均，四捨五入採保守下修（同分不確定時寧可低估）。${d.dimension_disagreement ? '<b style="color:var(--very-low)">兩個維度評分落差達 2 級以上，如實標示「評估分歧」，未被平均掉。</b>' : ''}</p>
+        ${dimRows}
+      </div>`;
+  }).join('');
 }
 
 // Radar chart across all 7 Trust Domains -- a different VISUALIZATION of the
@@ -517,15 +708,8 @@ async function refreshDetail() {
     ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。'
     : '';
   document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
-  const byDomain = Object.fromEntries(body.rollup.domains.map(d => [d.domain, d]));
-  document.getElementById('d-domains').innerHTML = ALL_DOMAINS.map(name => {
-    const d = byDomain[name];
-    if (!d) return `<div class="domain-card unknown"><div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">尚無證據</div></div></div>`;
-    return `<div class="domain-card">
-      <div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">${COVERAGE_LABELS[d.coverage] || d.coverage}${d.dimension_disagreement ? '．評估分歧' : ''}</div></div>
-      ${bandBadge(d.value)}
-    </div>`;
-  }).join('');
+  const recordById = Object.fromEntries(body.records.map(r => [r.id, r]));
+  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live');
 
   document.getElementById('d-strengths').innerHTML = body.strengths.length
     ? body.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('')
@@ -567,6 +751,113 @@ async function refreshDetail() {
   if (!body.persons.length) document.querySelector('#f-person-chips .chip.dashed').classList.add('selected');
   togglePersonNew();
   renderKindFields();
+  await loadReportHistory();
+}
+
+// Report generation (operator-requested "產生信任評估報告", 2026-09-10): a
+// frozen, printable deliverable distinct from the live editable view above --
+// see [POST] /cases/:id/reports in server.mjs for why this must be a stored
+// snapshot rather than a live re-render.
+async function loadReportHistory() {
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/reports?tenant=${currentTenant}`);
+  const body = await res.json();
+  const wrap = document.getElementById('d-reports-wrap');
+  if (!res.ok) { wrap.innerHTML = ''; return; }
+  const history = body.data.length
+    ? body.data.map(r => `<button type="button" class="report-history-item" onclick="viewReport('${r.id}')">📄 ${new Date(r.generated_at).toLocaleString('zh-TW')}</button>`).join('')
+    : '<span class="field-hint">尚未產生過報告。</span>';
+  wrap.innerHTML = `
+    <div class="report-actions">
+      <button type="button" class="report-generate-btn" onclick="generateReport()">產生信任評估報告</button>
+    </div>
+    <div class="report-history">${history}</div>`;
+}
+
+async function generateReport() {
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/reports?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant }),
+  });
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  await loadReportHistory();
+  await viewReport(body.id);
+}
+
+async function viewReport(reportId) {
+  const res = await fetch(`/api/hci/v1/reports/${reportId}?tenant=${currentTenant}`);
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  document.getElementById('report-body').innerHTML = renderReportView(body);
+  showReportPage();
+}
+
+// Pure render: takes a frozen { id, generated_at, report:{case,persons,
+// records,decisions,rollup,strengths,risks,unknowns} } row (either just-
+// generated or fetched from history) and renders the same information the
+// live case view shows, reusing its existing pure helpers (renderRadar,
+// bandBadge, label maps) rather than a second scoring/formatting
+// implementation. Deliberately does NOT touch refreshDetail()'s own
+// rendering path -- this is a separate function so the already-verified live
+// view carries zero regression risk from this addition.
+function renderReportView(row) {
+  const d = row.report;
+  const c = d.case;
+  const personById = Object.fromEntries(d.persons.map(p => [p.id, p.display_label]));
+  const qualityByDim = Object.fromEntries((d.evidenceQuality || []).map(q => [q.dimension, q.quality]));
+  const recordById = Object.fromEntries(d.records.map(r => [r.id, r]));
+
+  const decisionHtml = d.decisions.length
+    ? (() => { const dec = d.decisions[0]; return `<div class="decision-banner outcome-${dec.outcome}">
+        <div class="outcome-label">${OUTCOME_LABELS[dec.outcome] || dec.outcome}</div>
+        <div class="rationale">${esc(dec.rationale)}</div>
+        <div class="when">記錄於 ${new Date(dec.valid_from).toLocaleString('zh-TW')}</div>
+      </div>`; })()
+    : `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策。</span></div>`;
+
+  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report');
+
+  const recordsHtml = d.records.length ? d.records.map(r => {
+    const text = r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''}：${BAND_LABELS[r.payload.value] || r.payload.value || ''}`.trim();
+    const quality = qualityByDim[r.payload.dimension];
+    return `<div class="record-card">
+      <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
+      <div class="content">${esc(text)}</div>
+      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality] || quality}</span>` : ''}
+      ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
+    </div>`;
+  }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
+
+  return `
+    <div class="report-frozen-banner">📄 本報告為 ${new Date(row.generated_at).toLocaleString('zh-TW')} 產生之凍結快照——案件後續異動（新增證據、調整風險等級、變更決策）不會反映於此份報告；如需最新狀態請回到案件詳情頁。</div>
+
+    <div class="report-header" style="border-top:none;padding-top:0">
+      <h1 style="margin:0">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}</h1>
+      <p class="subtitle">${c.id} ．狀態 ${STATUS_LABELS[c.status] || c.status} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</p>
+      ${decisionHtml}
+    </div>
+
+    <h2>信任構面</h2>
+    <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
+    <div class="radar-wrap">
+      <div>${renderRadar(d.rollup.domains)}</div>
+      <div class="domain-grid">${domainGridHtml}</div>
+    </div>
+
+    <div class="insight-cols" style="margin-top:1.5rem">
+      <div class="insight-col strengths"><h3>主要優勢</h3><ul>${d.strengths.length ? d.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>
+      <div class="insight-col risks"><h3>重大風險</h3><ul>${d.risks.length ? d.risks.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>
+      <div class="insight-col unknowns"><h3>未知構面</h3><ul>${d.unknowns.length ? d.unknowns.map(u => `<li>${DOMAIN_LABELS[u] || u}</li>`).join('') : '<li class="empty">全部構面皆有證據</li>'}</ul></div>
+    </div>
+
+    <h2>證據與主張</h2>
+    <div>${recordsHtml}</div>
+
+    <div class="report-legal">
+      <p><b>免責聲明：</b>本報告可能包含尚未證實之指控、推論與主觀判讀，不構成事實認定。內容中標示為「主張」或「評估」者為判讀性質，唯有標示為「證據」者為直接查得之事實；使用本報告前應自行查證，不應逕自視為最終定論。</p>
+      <p><b>用途限制：</b>本報告僅限用於案件開立時聲明之委託目的——${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}。不得轉作其他用途，亦不得作為對外公開評價或人身攻擊之依據。</p>
+      <p>報告 ID：${row.id} ．產生於 ${new Date(row.generated_at).toLocaleString('zh-TW')}</p>
+    </div>`;
 }
 
 function goToAddRecord() {
@@ -578,6 +869,30 @@ function goToAddRecord() {
 function togglePersonNew() {
   const val = document.getElementById('f-person').value;
   document.getElementById('f-person-new-wrap').style.display = val === '__new__' ? 'block' : 'none';
+}
+
+// Creating a person used to only happen as a side effect of submitting the
+// WHOLE record form (operator report, 2026-09-10: "無法建立當事人" --
+// typing a name here did nothing visible if the unrelated, required 內容
+// textarea below was still empty, since the browser's own required-field
+// validation silently blocked the entire submit before submitRecord() ever
+// ran, with no error text pointing at the actual cause). Creating a person
+// is now its own immediate, independent action with its own error slot --
+// submitRecord() below no longer auto-creates one at all.
+async function createPersonInline() {
+  const display_label = document.getElementById('f-person-new').value;
+  const errEl = document.getElementById('f-person-new-err');
+  const res = await fetch('/api/hci/v1/persons', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, display_label }),
+  });
+  const body = await res.json();
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return; }
+  errEl.textContent = '';
+  document.getElementById('f-person-new').value = '';
+  await refreshDetail();
+  const chip = document.querySelector(`#f-person-chips .chip[data-value="${body.id}"]`);
+  if (chip) pickChip(chip, 'f-person');
 }
 
 function citableChips() {
@@ -625,18 +940,14 @@ function renderKindFields() {
 async function submitRecord(evt) {
   evt.preventDefault();
   const kind = document.getElementById('f-kind').value;
-  let person_id = document.getElementById('f-person').value;
+  const person_id = document.getElementById('f-person').value;
   const errEl = document.getElementById('f-err');
-  if (person_id === '__new__') {
-    const display_label = document.getElementById('f-person-new').value;
-    const pRes = await fetch('/api/hci/v1/persons', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant: currentTenant, display_label }),
-    });
-    const pBody = await pRes.json();
-    if (!pRes.ok) { errEl.textContent = pBody.detail || pBody.title; return false; }
-    person_id = pBody.id;
-  }
+  // Person creation is now its own immediate action (createPersonInline()
+  // above) -- if this is still '__new__' the operator has not clicked ＋建立
+  // yet, so fail with a specific message pointing at that step, rather than
+  // silently trying to create one from whatever (possibly empty) text is
+  // sitting in the name field.
+  if (person_id === '__new__') { errEl.textContent = '請先在上面點「＋ 建立」建立當事人，再送出這筆紀錄。'; return false; }
   let payload = {};
   if (kind === 'EVIDENCE') payload = { content: document.getElementById('f-content').value };
   else if (kind === 'CLAIM') payload = { content: document.getElementById('f-content').value, evidence_refs: [document.getElementById('f-evref').value] };
