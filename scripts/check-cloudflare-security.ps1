@@ -116,16 +116,49 @@ if (-not $token) {
     }
 
     try {
-        # 2. WAF firewall rules
-        $wr = Invoke-RestMethod -Uri "https://api.cloudflare.com/client/v4/zones/$ZoneId/firewall/rules?per_page=100" `
+        # 2. WAF firewall rules -- migrated 2026-09-10 off the legacy /firewall/rules endpoint,
+        # which now permanently 400s for this zone (CF error 10021 "rulesets_only_rule": "This
+        # ruleset contains rules created directly with the Rulesets API. Please use the Rulesets
+        # API..."), found live while re-verifying after a token rotation -- this zone's custom
+        # ruleset picked up a Rulesets-API rule sometime after the 2026-09-04 PASS (which used
+        # the legacy endpoint successfully), and every run from then on would have permanently
+        # reported BLIND for this one check, exactly the "detector nobody reads because it always
+        # fires" failure check-smoke-tests.ps1's own comments warn against. Modern equivalent:
+        # the http_request_firewall_custom phase entrypoint (same data Cloudflare's own dashboard
+        # reads). Empirically confirmed working against this zone: rule_count=1, matching 9/4's PASS.
+        $wr = Invoke-RestMethod -Uri "https://api.cloudflare.com/client/v4/zones/$ZoneId/rulesets/phases/http_request_firewall_custom/entrypoint" `
                 -Headers $cfH -TimeoutSec 10 -ErrorAction Stop
-        $ruleCount = @($wr.result).Count
-        $xmlrpcOk  = [bool](@($wr.result) | Where-Object { $_.filter.expression -match "xmlrpc" -or $_.description -match "xmlrpc" })
+        # Null-guard before drilling into .result.rules: a 200 response with result:null (not
+        # observed on this zone, but not ruled out by Cloudflare's docs either) would otherwise
+        # throw under Set-StrictMode -Version Latest -- $ErrorActionPreference does not govern
+        # that class of error, so without this guard it would rely on the outer catch as its
+        # only safety net (still fails closed into BLIND, just for the wrong stated reason).
+        # @() must wrap the WHOLE if/else expression, not just each branch: PowerShell unwraps
+        # a single-element array returned through an if-expression assignment back to a bare
+        # scalar (verified live: a 1-rule zone produced $rules as a PSCustomObject, not an
+        # array, so $rules.Count threw "property 'Count' not found" under StrictMode -- an
+        # array-unrolling gotcha, not a Cloudflare shape issue).
+        $rules = @(if ($wr -and $wr.result -and $wr.result.rules) { $wr.result.rules } else { @() })
+        $ruleCount = $rules.Count
+        $xmlrpcOk  = [bool]($rules | Where-Object { $_.expression -match "xmlrpc" -or $_.description -match "xmlrpc" })
     } catch {
         $code = $null
         try { $code = [int]$_.Exception.Response.StatusCode } catch {}
-        $blindChecks += @{ name = "WAF firewall rules"; code = $code }
-        if (-not $errorMsg) { $errorMsg = "firewall/rules API: $($_.Exception.Message)" }
+        if ($code -eq 404) {
+            # Documented Cloudflare behavior: this endpoint 404s when the zone has never created
+            # a custom ruleset for the http_request_firewall_custom phase at all -- NOT the same
+            # as "the check failed to measure anything." The legacy /firewall/rules list endpoint
+            # this replaced never had this failure mode (a list endpoint returns 200+[] for zero
+            # items), so without this branch every zone with zero custom WAF rules -- exactly the
+            # architecture this script's own $WpLoginProtectedByServerSide=$true mode describes as
+            # intentional -- would report BLIND forever, the same "nobody reads a detector that
+            # always fires" anti-pattern this whole migration exists to eliminate, just relocated.
+            $ruleCount = 0
+            $xmlrpcOk  = $false
+        } else {
+            $blindChecks += @{ name = "WAF firewall rules"; code = $code }
+            if (-not $errorMsg) { $errorMsg = "firewall ruleset API: $($_.Exception.Message)" }
+        }
     }
 
     try {

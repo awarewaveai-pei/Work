@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-10 aware-wave.com SPF/CAA 補齊 + `/firewall/rules` API 遷移（CF token 401 監控盲點條目的收尾）
+
+**觸發**：操作者於 Cloudflare dashboard 重新產生 token，貼在個人筆記 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md:147-148`（`API Token`／`Auth Bearer Token` 兩把皆換新），指給我該行號。已同步兩把進 `mcp/user-env.ps1`（gitignored，不進 git）並 `. mcp/user-env.ps1` 持久化到 User 環境變數。
+
+**① Token 驗證**：`check-cloudflare-security.ps1` 重跑，`bot=ON`（Bot Fight Mode 讀到真實資料，401 消失），但仍報 `BLIND`——1/3 check（WAF firewall rules）新出現 `400 不正確的要求`，非我這次改的兩態邏輯的問題。
+
+**② 意外根因（獨立於 token 本身）**：直接呼叫 `GET /zones/{zone}/firewall/rules` 收到 CF error code 10021："This ruleset contains rules created directly with the Rulesets API. Please use the Rulesets API to read or manage these rules."——此 zone 的自訂 WAF ruleset 在 2026-09-04（上次 PASS）之後的某個時間點混入了一條用新版 Rulesets API 建立的規則，導致舊版 list 端點對這個 zone**永久性** 400，與 token 無關、以後每次跑都會 400。若放著不修，我剛修好的 BLIND 偵測機制會立刻變成新的「永遠在響、沒人看」噪音源（`check-smoke-tests.ps1` 自己註解講的同一句話：a warning that always fires is a detector nobody reads）。
+
+**修法**：`scripts/check-cloudflare-security.ps1` check #2 遷移到 `GET /zones/{zone}/rulesets/phases/http_request_firewall_custom/entrypoint`（Cloudflare 自己 dashboard 讀的同一份資料），response shape 從 `$wr.result`（陣列）改成 `$wr.result.rules`（巢狀一層）；`$_.filter.expression` 改成 `$_.expression`。實測 `rule_count=1`，與 2026-09-04 那次 PASS 報告的規則數吻合。
+
+**③ 修過程中自己踩到兩個坑（critic 覆審抓到＋自己跑出來抓到）**：
+- critic 覆審抓到：新端點在 zone 從未建立過自訂 ruleset 時回 **404**（非 200+空陣列），舊端點沒有這個失敗模式（list 端點對 0 筆永遠回 200+`[]`）；若不處理，任何一個走 `$WpLoginProtectedByServerSide=$true`（WAF rules 故意留空）架構的 zone 用這支腳本都會永久卡 `BLIND`——同一款「detector 永遠響」問題換個觸發點重演。修法：catch 內對 `code -eq 404` 特判為「量測到 0 筆」（`$ruleCount=0`），不算進 `$blindChecks`。
+- 自己加 null-guard 時親手做出一個新 bug（非 critic 抓到，是我自己重新真跑時看見的）：`$rules = if (cond) { @($wr.result.rules) } else { @() }`——PowerShell 對「if-expression 賦值」有陣列拆包行為：分支回傳的單元素陣列會被拆回純量，`$rules` 實測型別是 `PSCustomObject` 不是陣列，導致 `.Count` 在 StrictMode 下丟例外（"找不到屬性 'Count'"），整個 check 又變回 `BLIND`。修法：`@()` 要包住**整個** if/else 運算式（`$rules = @(if (...) {...} else {@()})`），不能包在各分支內部。這是 PowerShell 已知陷阱不是 Cloudflare 的問題，重新真跑後 `Overall: PASS` 恢復。
+
+**④ 原定 DNS 修改（GPT 建議 + 我獨立研究過的兩項），token 驗證通過後直接執行，全用外部 DNS 查詢驗證（不只信 CF API 自己回的內容）**：
+- **SPF**：`PATCH` 根網域 TXT 記錄（record id `c84277063f60e1f86040c116b52a75a2`）從 `v=spf1 include:_spf.mx.cloudflare.net ~all` 改成 `v=spf1 include:_spf.mx.cloudflare.net include:_spf.resend.com ~all`——`noreply@aware-wave.com` 是 Resend 在寄（[`mcp/SERVICE_CREDENTIALS_MAP.md`]、[`agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md:126`]），原本 SPF 沒把它列進去。
+- **CAA**：`dig`/API 查證原本 0 筆，`POST` 建立 6 筆（`letsencrypt.org`／`pki.goog`／`sectigo.com` 各一組 `issue`+`issuewild`）。
+- **驗證**：兩項都額外用 `dns.google` 的 DNS-over-HTTPS 查詢（不透過 Cloudflare API，走真正的公開解析路徑）確認：TXT 記錄內容與 PATCH 後完全一致；CAA 查回 **12 筆**（我建立的 6 筆 + Cloudflare 自動追加的 6 筆 `ssl.com`／`comodoca.com`／`digicert.com`）——這正是 Cloudflare 官方文件講的行為（zone 一旦有任何 CAA 記錄，Universal SSL 會自動補齊自己目前所有簽發 CA，不會出現在 dashboard 但會出現在 DNS 查詢），不是異常，是我先前研究時就預期到的機制在起作用，等於反向確認了套用前的風險評估是對的。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/check-cloudflare-security.ps1`（連跑 4 次，跨越 token 修好→400 發現→404 修法→array-unwrap bug→修好）| exit=0 全程 | 最終結果=`Overall: PASS (bot=ON, rules=1, xmlrpc=True, lockdown=active)`，`agency-os/reports/status/cf-security-LATEST.md`
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=`dns.google/resolve?name=aware-wave.com&type=TXT` + `type=CAA` | 結果=TXT 內容與 PATCH 值逐字相符；CAA 12 筆（6 筆本次建立+6 筆 CF 自動追加），與 CF API 自己回報的 6 筆一致，外部視角二次確認
+- REVIEW_DONE: critic=Standard（2 輪，各 1 個獨立 subagent，針對兩次 check-cloudflare-security.ps1 改動分別覆審）| verdict=兩輪皆 pass-with-fixes | findings=第一輪 2 Major+1 Minor（401-only 判斷漏掉 403/網路失敗、partial-failure 誇大成全部失敗、雙引號字串吃掉 backtick）全修；第二輪 2 Major（404 語意混淆、null-guard 潛在陷阱）全修，其中 null-guard 修法本身在真跑時炸出上述 array-unwrap bug，屬第三次修正（自己抓到非 critic）
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`firewall/rules\|http_request_firewall_custom\|result\.rules\|filter\.expression` | hits=`scripts/check-cloudflare-security.ps1` 自身 6 處皆本次改動範圍內；`scripts/system-health-check.ps1:630-651`（既存 path-resolution bug，未擴大修復）與 `.claude/commands/ao-resume.md:225` 皆只讀 stdout/markdown 文字，不碰 API response shape，未受影響；全庫無其他檔案引用舊版 `/firewall/rules` 端點或 `.filter.expression` 形狀
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] ① `scripts/system-health-check.ps1` 的 cf-security 整合點仍因既有 path bug 永遠 skip（跟上一條目同一個殘留風險，未擴大範圍修復）；② CAA 記錄設對是否真的不影響下次憑證更新，要等 `/etc/letsencrypt` 下次續期（WORKLOG 曾記 2026-11-26 到期）才算完整驗證，目前只驗證了「記錄內容符合預期＋Cloudflare 官方文件描述的自動追加行為」，未驗證「續期當下真的不出事」；③ SPF 對齊完整度只到「Resend 補齊」，DMARC 仍 `p=none` 監控期，何時升 `p=quarantine` 是獨立、故意留給操作者的決策，不在本次範圍內。
+[rollback] SPF：`PATCH` 回 `v=spf1 include:_spf.mx.cloudflare.net ~all`（record id 同上）。CAA：`DELETE` 6 個 record id（`5b3b4e93.../ebb58c54.../87a75d25.../ed051e5f.../f8807e86.../f446db7f...`，皆記在本條目 API 回應裡）。`check-cloudflare-security.ps1`：`git revert` 本次 commit，純邏輯新增與端點遷移，無刪除既有行為，無 schema/DB 影響。
+
 ## 2026-09-10（System Foundry v1.6 — 新增 2 個 capability：個人自用帳號 + 預付點數包，補「無組織帳號」與「預付制計費」兩個真實缺口，全 verify chain 綠燈）
 
 **根因**：操作者本 session 指出 catalog 現有 account-type capability 全部預設有 owning org（`CAP-MULTI-TENANT` 也是單租戶 org，非無 org）；billing capability 只有 `CAP-USAGE-METERING`（純量測，不含預付）/`CAP-CREDIT-TERMS`（B2B 帳期，先貨後款）/`CAP-LOYALTY-POINTS`（賺取制非購買制），無「先儲值後扣點」模型。
