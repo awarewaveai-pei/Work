@@ -1,0 +1,232 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/boundary-critique-record.schema.yaml"
+title: Boundary Critique Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BoundaryCritiqueRecord` -- the declared `outputs` of
+  `framing.boundary_critique`'s Method Contract. Atlas's F01 table row (L344) names the 5 categories
+  (decision maker/affected/excluded/resources/values) and the benefit "揭露權力與價值假設" (reveal power/value
+  assumptions) but gives no field-level shape -- the `status`/`items`/`empty_justification` split and the
+  `empty_categories` computed field below are compiled to make that benefit column a real structural
+  property, not merely a slogan (same discipline `5w1h-record.schema.yaml`'s own `information_gaps` already
+  establishes for its own sibling method).
+
+  `categories` is a fixed-length-five, POSITIONALLY ORDERED tuple (DECISION_MAKER/AFFECTED/EXCLUDED/
+  RESOURCES/VALUES, Atlas's own literal citation order), enforced via `prefixItems` -- same convention
+  `5w1h-record.schema.yaml`'s own `dimensions` already establishes.
+
+  TWO real invariants this schema expresses structurally via `if`/`then`/`not`: a POPULATED category MUST
+  carry at least 1 `items` entry and MUST NOT carry `empty_justification`; a DECLARED_EMPTY category MUST
+  carry zero `items` and MUST carry a non-empty `empty_justification`. The THIRD real invariant --
+  `empty_categories` must equal the actual set of DECLARED_EMPTY category names -- is a cross-field,
+  whole-array derivation JSON Schema cannot express, so it is a runtime-layer invariant -- see
+  `ai_lego/modules/framing/boundary_critique.py`, which enforces it at construction AND independently via a
+  gate that re-derives from raw fields, same two-layer discipline every sibling module in this family already
+  uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:344 (F01 table, Boundary Critique row)"
+  - "methods/contracts/framing.boundary_critique.contract.yaml (id: framing.boundary_critique)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml (prefixItems positionally-ordered fixed-set convention, and the status+if/then/not coherence pattern, both reused here)"
+  - "specs/cognitive/typed-objects/success-criteria-record.schema.yaml (reversal_criteria_ref-style soft-link-against-a-real-confirmed-prefix convention, reused here as problem_statement_ref)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Express status/items/empty_justification coherence as JSON Schema if/then/not, or leave it entirely runtime-layer?"
+    decision: "Express it in schema too (if/then/not on the status const), since JSON Schema's conditional keywords are sufficient for this single-object cross-field check -- unlike empty_categories (a cross-ARRAY derivation), which genuinely cannot be expressed and stays runtime-only."
+  - question: "Should empty_categories be omitted when empty (all 5 categories POPULATED), matching kepner-tregoe's own optional distinctions/changes?"
+    decision: "No -- empty_categories is always present, even as an empty list. It is the whole structural point of this method (Atlas's own '揭露權力與價值假設' benefit column); omitting it when empty would make 'every category populated' indistinguishable from 'never computed'."
+
+type: object
+required: [id, version, decision_context, categories, empty_categories, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BCRIT-"
+    description: "NEW DESIGN. Deliberately NOT 'BC-' -- that prefix is already used by ai_lego/modules/ddd's own BoundedContext record ids (DDD's own 'BC-KERNEL' etc.), a different record type; 'BCRIT-' avoids human-readable ambiguity with that unrelated existing prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.boundary_critique"
+
+  decision_context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The policy/decision/system this boundary analysis examines -- un-cited-by-Atlas anchor field, same class 5w1h-record.schema.yaml's own topic field already establishes."
+
+  categories:
+    type: array
+    minItems: 5
+    maxItems: 5
+    description: >
+      Atlas's own five-term F01-row citation ("decision maker/affected/excluded/resources/values"), AS AN
+      ORDERED TUPLE -- categories[0] MUST be DECISION_MAKER, categories[4] MUST be VALUES.
+    prefixItems:
+      - allOf: [{$ref: "#/$defs/category_entry"}, {properties: {category: {const: DECISION_MAKER}}}]
+      - allOf: [{$ref: "#/$defs/category_entry"}, {properties: {category: {const: AFFECTED}}}]
+      - allOf: [{$ref: "#/$defs/category_entry"}, {properties: {category: {const: EXCLUDED}}}]
+      - allOf: [{$ref: "#/$defs/category_entry"}, {properties: {category: {const: RESOURCES}}}]
+      - allOf: [{$ref: "#/$defs/category_entry"}, {properties: {category: {const: VALUES}}}]
+    items: false
+
+  empty_categories:
+    type: array
+    description: >
+      GENUINE_COMPUTE -- the category names, IN CATEGORY_ORDER, whose status is DECLARED_EMPTY. Always
+      present (an empty array means every category is populated, a real and meaningful state, not "not
+      computed"). Runtime-layer cross-array derivation check: must equal the actual DECLARED_EMPTY set --
+      see top-level description.
+    items: {type: string, enum: [DECISION_MAKER, AFFECTED, EXCLUDED, RESOURCES, VALUES]}
+    uniqueItems: true
+
+  problem_statement_ref:
+    type: string
+    pattern: "^PROB-"
+    description: >
+      OPTIONAL backward soft-link to the real, already-built `framing.problem_statement`'s own output
+      (Atlas's own F01 flowchart names it the immediate upstream node, L348-354). Format-checked against
+      that method's own real, confirmed 'PROB-' id prefix (see problem-statement.schema.yaml) -- existence
+      of the referenced record is NOT verified, same limitation success-criteria-record.schema.yaml's own
+      reversal_criteria_ref accepts.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  boundary_item:
+    type: object
+    required: [name, provenance]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The named actor/group/resource/value being cited under this category."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "OPTIONAL free-text elaboration of why this item belongs under this category."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: {type: string, pattern: "^E-[0-9]+$"}
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+
+  category_entry:
+    type: object
+    required: [category, status, items]
+    additionalProperties: false
+    properties:
+      category:
+        type: string
+        enum: [DECISION_MAKER, AFFECTED, EXCLUDED, RESOURCES, VALUES]
+      status:
+        type: string
+        enum: [POPULATED, DECLARED_EMPTY]
+        description: "First-class explicit state -- see top-level description on why an empty category must be a justified, auditable claim, not a silent gap."
+      items:
+        type: array
+        items: {$ref: "#/$defs/boundary_item"}
+        description: "Required when status==POPULATED (minItems 1); MUST be empty when status==DECLARED_EMPTY (see allOf below)."
+      empty_justification:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "REQUIRED when status==DECLARED_EMPTY (explains why this category is legitimately empty); MUST NOT be present when status==POPULATED."
+    allOf:
+      - if: {properties: {status: {const: POPULATED}}, required: [status]}
+        then: {properties: {items: {minItems: 1}}, not: {required: [empty_justification]}}
+      - if: {properties: {status: {const: DECLARED_EMPTY}}, required: [status]}
+        then: {properties: {items: {maxItems: 0}}, required: [empty_justification]}
+
+examples:
+  - description: "A public-policy boundary critique with 4 populated categories and 1 legitimately-declared-empty category (EXCLUDED) -- empty_categories exposes exactly that one"
+    value:
+      id: "BCRIT-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.boundary_critique"
+      decision_context: "都市老舊建物耐震補助政策（市府擬編列年度預算，補助民眾老屋耐震評估與補強）"
+      categories:
+        - category: DECISION_MAKER
+          status: POPULATED
+          items:
+            - name: "市政府都市發展局"
+              description: "政策核准與年度預算編列權責單位"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+            - name: "市議會"
+              description: "年度預算審議與通過權"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - category: AFFECTED
+          status: POPULATED
+          items:
+            - name: "老舊建物屋主"
+              description: "補助方案的直接受益對象"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+            - name: "承租戶"
+              description: "耐震補強施工期間居住權益受影響，但非補助申請人"
+              provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - category: EXCLUDED
+          status: DECLARED_EMPTY
+          items: []
+          empty_justification: "初步分析未發現制度性排除對象；方案草案未設籍住限制，已諮詢里長與民政局確認無已知排除群體，惟此結論待利害關係人訪談進一步驗證"
+        - category: RESOURCES
+          status: POPULATED
+          items:
+            - name: "年度耐震補助預算 5000 萬元"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+              supporting_evidence_refs: ["E-701"]
+            - name: "結構技師公會審查量能"
+              description: "補強計畫書審查需要的專業人力"
+              provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - category: VALUES
+          status: POPULATED
+          items:
+            - name: "居住安全優先"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+            - name: "資源分配公平性"
+              description: "避免補助集中於特定行政區或所得族群"
+              provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      empty_categories: [EXCLUDED]
+      problem_statement_ref: "PROB-2026-09-10-001"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-BOUNDARYCRITIQUERECORD-1"
+    question: >
+      Should a future revision allow a category to hold BOTH real items AND an empty_justification (e.g.
+      "found 1 possible excluded group but the analysis is still preliminary")? Left as a strict binary
+      (POPULATED xor DECLARED_EMPTY, no partial/uncertain state) -- same restraint against inventing an
+      unneeded richer state machine 5w1h-record.schema.yaml's own OQ-FIVEW1HRECORD-1 already applies.
+    owner: "operator, or whoever next needs a richer transition model"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table Boundary Critique row (L344) directly, plus the F01 mermaid flowchart
+    (L348-354) and §13.7 Public Policy Recipe (L3378-3389) for corroboration. Read 5w1h-record.schema.yaml
+    and success-criteria-record.schema.yaml in full as the prefixItems / $defs / if-then-not / soft-link
+    convention templates. Validated against jsonschema Draft202012Validator (required fields present,
+    id/category/status enum values satisfied, categories prefixItems order enforced, additionalProperties:
+    false on the top level and both $defs verified to actually reject an unknown key, POPULATED/
+    DECLARED_EMPTY if/then/not branches verified to actually reject a POPULATED-with-zero-items, a
+    POPULATED-with-empty_justification, a DECLARED_EMPTY-with-items, and a DECLARED_EMPTY-missing-
+    empty_justification).
+  note: >
+    `categories`'s five values and citation order, and the "揭露權力與價值假設" benefit line, are transcribed
+    verbatim from Atlas L344. `status`/`items`/`empty_justification`/`empty_categories` field shapes are this
+    suite's own compiled structure engineered to make that benefit column a real, re-derivable property --
+    explicitly flagged as non-Atlas field-level grounding above, not presented as mother-document content. No
+    mother document was modified to produce this file.

@@ -1,0 +1,119 @@
+$id: "ai-lego://methods/contracts/framing.boundary_critique.contract.yaml"
+title: "Boundary Critique Method Contract"
+status: ACTIVE
+
+description: >
+  framing.boundary_critique, F01 framing family. Atlas: F01 table row L344 (primary) + mermaid flowchart
+  L348-354 + §13.7 Public Policy Recipe L3378-3389. Not an EC §32 method -- no security surface. Core
+  invariant (Atlas's own benefit column "揭露權力與價值假設" -- reveal power/value assumptions): each of the 5
+  fixed categories (decision maker/affected/excluded/resources/values, Atlas's own literal order) must be
+  either POPULATED (>=1 real item) or DECLARED_EMPTY with a non-empty justification -- never a silent gap.
+  External-methodology grounding (Werner Ulrich's Critical Systems Heuristics differs from Atlas's own
+  5-term citation) is disclosed in compilation_decisions, not enforced field shape.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:344 (F01 table, Boundary Critique row) -- the primary citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:348-354 (F01 mermaid flowchart) -- positions this method between Problem Statement and Success Criteria, both already-built siblings"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:3378-3389 (§13.7 Public Policy Recipe) -- corroborating recipe-chain citation, Boundary Critique immediately after Policy Goal"
+  - "methods/contracts/framing.five_w_one_h.contract.yaml + ai_lego/modules/framing/five_w_one_h.py -- structural template: this method's per-category POPULATED/DECLARED_EMPTY+justification shape is a direct isomorph of 5W1H's own per-dimension KNOWN/UNKNOWN+gap_note shape"
+  - "methods/contracts/framing.success_criteria.contract.yaml -- reversal_criteria_ref precedent for format-checking an optional soft-link against a REAL, already-confirmed sibling id prefix; also see that file's own OQ-SUCCESSCRITERIA-3, answered by this contract's existence (not edited here, out of scope)"
+  - "specs/cognitive/typed-objects/boundary-critique-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: framing.boundary_critique` mints a new machine_id -- the 11th and LAST
+  F01 family member built, closing F01 to 11/11 (matches Atlas table row order L342<L343<L344 = how_might_we
+  9th, frame_storming 10th, boundary_critique 11th; corrects this contract's own earlier draft, which had
+  self-numbered "10th" before the F01 closeout batch's integration pass reconciled the 3 concurrently-built
+  siblings' ordinals against Atlas table order). method-inventory.yaml's own
+  "Boundary Critique" row (line 257 in that file) cited Atlas line 343 (Frame Storming's own row, an
+  off-by-one); corrected to 344 in this same commit, since this is the row this contract mints (same drift
+  class every sibling F01 contract this session already disclosed for its own row).
+
+id: framing.boundary_critique
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, DECOMPOSE, VALIDATE]
+# INFERRED, not cited. FRAME = Atlas's own benefit line "揭露權力與價值假設" (reveal power/value assumptions)
+# is itself a framing act -- naming what is in/out of scope of the analysis -- same primitive
+# framing.problem_statement's own "建立共同問題定義" already maps to. DECOMPOSE = splitting the analysis into
+# 5 fixed categories. VALIDATE = the two-layer invariant re-derivation every sibling module in this family
+# already establishes.
+
+purpose:
+  - critique_a_decision_or_policys_boundary_across_decision_maker_affected_excluded_resources_and_values_to_reveal_power_and_value_assumptions
+inputs:
+  required: []
+  optional: [ProblemStatement]
+  # Atlas's own row cites no typed-object input (bare 5-term formula only), same reasoning
+  # framing.success_criteria's own empty inputs.required already applies despite also sitting
+  # flowchart-adjacent to a real built sibling. ProblemStatement is OPTIONAL: framing.problem_statement is a
+  # real, already-built sibling (the flowchart's own immediate upstream node) but Atlas gives no hard
+  # dependency citation -- see problem_statement_ref below for the real soft-link.
+outputs: [BoundaryCritiqueRecord]
+preconditions:
+  - "decision_context is a non-empty string -- the policy/decision/system this boundary analysis examines"
+  - "categories is EXACTLY the five entries {DECISION_MAKER, AFFECTED, EXCLUDED, RESOURCES, VALUES}, one each, IN THAT ORDER -- Atlas's own literal 'decision maker/affected/excluded/resources/values' citation order"
+  - "every category's status is either POPULATED or DECLARED_EMPTY"
+  - "a POPULATED category carries at least 1 well-formed item {name, provenance, description?, supporting_evidence_refs?} and MUST NOT carry empty_justification"
+  - "a DECLARED_EMPTY category carries zero items and MUST carry a non-empty empty_justification explaining why -- a silently empty category would defeat Atlas's own benefit column (see description)"
+  - "empty_categories is always present (an empty list is meaningful: every category populated) and MUST equal the set of category names whose status is DECLARED_EMPTY, in CATEGORY_ORDER -- re-derived, never caller-trusted"
+  - "when problem_statement_ref is present, it is a non-empty string prefixed PROB- -- format-only soft link against the real, confirmed prefix; this method cannot see the referenced record"
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+forbidden_transition: []
+# Atlas gives this row no worked example or misuse rule beyond the table itself -- left genuinely empty.
+recommended_next: []
+# Atlas's own best-paired column (L344) names "Stakeholder Map" -- unbuilt at this write time (no sibling
+# agent in this batch builds it), out of scope per this task's own instruction. Left empty rather than
+# inventing an uncontracted machine_id, same restraint every F01 sibling this session already establishes.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed prefixItems positional array (five_w_one_h's convention) or 4 fixed named top-level fields (success_criteria's convention) for the 5 categories?"
+    decision: "prefixItems, matching five_w_one_h -- this method's per-category POPULATED/DECLARED_EMPTY+justification shape is a direct structural isomorph of five_w_one_h's own per-dimension KNOWN/UNKNOWN+gap_note shape, the closer analogy of the two established sibling conventions."
+  - question: "Should a category with zero items be schema-illegal, or legal with an explicit justification?"
+    decision: "Legal but gated: DECLARED_EMPTY status requires a non-empty empty_justification. Forcing an explicit justification makes the omission itself an auditable claim, not a silent gap -- the real invariant this method exists to enforce (see description)."
+  - question: "Real external methodology name (Werner Ulrich's Critical Systems Heuristics) in prose, or Atlas-terms-only?"
+    decision: "Disclosed by name for grounding, but the ENFORCED field set is Atlas's own literal 5-term citation verbatim -- NOT CSH's real 4-category/12-question framework, which genuinely differs. Same honesty pattern security.pasta already established for its own external-methodology citation."
+  - question: "Hard inputs.required:[ProblemStatement], matching the flowchart's C->D arrow?"
+    decision: "No -- optional only. Atlas's own row cites no typed-object input, same reasoning framing.success_criteria's own empty inputs.required already applies to its own flowchart-adjacent position."
+  - question: "Optional soft-link to the real, already-built framing.problem_statement?"
+    decision: "problem_statement_ref, format-checked against the real, confirmed PROB- prefix (problem_statement genuinely exists at this write time) -- same 'format-check against a real confirmed prefix' precedent framing.success_criteria's own reversal_criteria_ref already establishes, stronger grounding than five_w_one_h's own informs_problem_statement_ref (unenforced prefix, built before problem_statement existed)."
+  - question: "Per-item shape uniform across all 5 categories, though decision_maker/resources/values are conceptually different from affected/excluded?"
+    decision: "Yes -- one uniform {name, description?, provenance, supporting_evidence_refs?} shape for every category. Ulrich's own CSH methodology asks a uniform 'who/what is...' question pattern across all boundary categories; inventing category-specific shapes would be fabricated, un-cited scope."
+  - question: "GENUINE_COMPUTE empty_categories: separate ai_lego/compute/ submodule (five_w_one_h's own precedent) or inline in the method module?"
+    decision: "Inline (derive_empty_categories lives in ai_lego/modules/framing/boundary_critique.py itself) -- this task's own explicit 5-file deliverable scope does not include a 6th compute-module file; the derivation is simple enough (one list comprehension) that a separate module would be ceremony, not a real testability gain."
+
+open_questions:
+  - "OQ-BOUNDARYCRITIQUE-1: recommended_next is empty -- Atlas's own best-paired column (L344) names 'Stakeholder Map', unbuilt at this write time and out of this batch's scope.（owner: operator, whoever next builds Stakeholder Map）"
+  - "OQ-BOUNDARYCRITIQUE-2: framing.success_criteria.contract.yaml's own OQ-SUCCESSCRITERIA-3 asks whether its flowchart-upstream node (Boundary Critique) should become a cited input now that it exists. Not resolved here -- out of this task's edit scope, success_criteria.contract.yaml untouched.（owner: operator, integration pass）"
+  - "OQ-BOUNDARYCRITIQUE-3: RESOLVED (integration pass). F01 framing family confirmed COMPLETE, 11/11 -- framing.how_might_we (9th, eightyseventh_concrete_entry), framing.frame_storming (10th, eightyninth_concrete_entry), framing.boundary_critique (11th and LAST, this contract) all landed. Ordinal order matches Atlas table row order (L342<L343<L344).（owner: none, closed）"
+
+verification:
+  method: >
+    Grepped the whole ai_lego tree case-insensitively for "boundary_critique"/"boundary critique" -- zero
+    pre-existing implementation (only this session's own framing/__init__.py docstring mention and an
+    unrelated compiled .pyc binary match). Grepped the whole Atlas file for "Boundary Critique" -- 3 hits,
+    all 3 already cited above (L344 table row, L352 flowchart node, L3382 recipe chain); a 4th hit (L343,
+    Frame Storming's own recommended_next column naming Boundary Critique) read and confirmed out of this
+    contract's own scope (that is Frame Storming's field to declare, not this file's). Read
+    framing.five_w_one_h.contract.yaml/.py/schema/CLI/test and framing.problem_statement.contract.yaml/.py/
+    CLI in full as structural templates. Read framing.smart.contract.yaml and framing.success_criteria
+    .contract.yaml in full for the optional-soft-link-to-a-real-sibling precedent (refines_goal_statement_ref
+    / reversal_criteria_ref). Read method-inventory.yaml lines 244-265 and contract-backlog.yaml's tier_1
+    section in full (stops at framing.problem_statement, 87th slice / eightysixth_concrete_entry) before
+    appending this method's own backlog entry. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 5-term citation order and benefit/usage-context columns are
+    transcribed verbatim into preconditions/description. The POPULATED/DECLARED_EMPTY+justification shape,
+    the uniform per-item structure, empty_categories GENUINE_COMPUTE, and problem_statement_ref are this
+    suite's own compiled structure engineered to make the "揭露權力與價值假設" benefit column a real,
+    re-derivable property -- disclosed as such, same honesty discipline every sibling Tier 1 contract in
+    this directory already applies. method-inventory.yaml line 257 (Boundary Critique's own citation line)
+    was corrected 343→344 in this same commit, the one line this task's own scope permits touching in that
+    file.

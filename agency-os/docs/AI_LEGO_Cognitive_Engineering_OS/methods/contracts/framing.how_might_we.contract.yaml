@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/framing.how_might_we.contract.yaml"
+title: "How Might We Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F01 framing family (9th member). Atlas's ONLY 2 citations: F01
+  table row (L342: "把痛點轉開放問題｜進入創意階段｜「我們可以如何…」且不預設
+  方案｜擴大解法空間｜Crazy 8s、SCAMPER") and dedicated Sec12.3 (L2575-2580,
+  worked example + "JTBD → HMW → Crazy 8s / SCAMPER" chain). Reframes a
+  pain_point into an open-ended, solution-agnostic question. Core invariant:
+  hmw_question must genuinely be an open question, not a disguised solution
+  statement -- differs from pain_point, takes the cited "how might we"/
+  「我們可以如何」stem, and ends in a question mark.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:342 (F01 table row) -- one of 2 citations"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:2575-2580 (Sec12.3, dedicated section, worked example + JTBD->HMW->Crazy 8s/SCAMPER chain) -- the other citation; grep-confirmed these are the ONLY 2 'How Might We' hits anywhere in the Atlas"
+  - "specs/cognitive/typed-objects/how-might-we-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "methods/contracts/framing.north_star_metric.contract.yaml -- structural template (flat record, single 'must differ' invariant class)"
+  - "methods/contracts/framing.problem_statement.contract.yaml -- 'must not just restate' invariant precedent (expected_state != current_state)"
+
+decided_by: >
+  No ADR governs the content. Atlas gives one table row + one dedicated
+  section; the flat 2-field record and the 2-part structural-question
+  invariant are this contract's own compilation decisions, recorded below.
+  `id: framing.how_might_we` mints a new machine_id under the existing
+  `framing` family. method-inventory.yaml/contract-backlog.yaml registration
+  handled directly in this same batch per this task's own instruction (not
+  deferred, unlike framing.north_star_metric's own deferral note).
+
+id: framing.how_might_we
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, VALIDATE]
+# INFERRED. FRAME = Atlas's own purpose column ("把痛點轉開放問題" -- turn a
+# pain point into an open question), same kernel token every F01 sibling's
+# own literal benefit line already maps to. VALIDATE = the two-layer
+# structural-question invariant re-derivation. No DECOMPOSE: pain_point ->
+# hmw_question is a single reframing step, not a split into independent
+# parts (contrast framing.problem_statement's 5-way decomposition).
+
+purpose:
+  - reframe_a_pain_point_as_a_solution_agnostic_open_question_to_widen_the_solution_space
+inputs:
+  required: []
+  optional: []
+# pain_point is caller-supplied prose, not a cited upstream typed-object.
+# Atlas's own Sec12.3 chain names JTBD as the upstream ("JTBD -> HMW -> Crazy
+# 8s / SCAMPER") but JTBD is unbuilt (method-inventory.yaml grep-confirmed:
+# no has_contract entry) -- same "unbuilt upstream, left as an open
+# question, not invented" reasoning framing.north_star_metric's own
+# OQ-NORTHSTARMETRIC-2 already establishes for this family. See
+# OQ-HOWMIGHTWE-2.
+outputs: [HowMightWeRecord]
+preconditions:
+  - "pain_point and hmw_question are each non-empty strings"
+  - "hmw_question must NOT be identical (case/whitespace-insensitive) to pain_point -- an identical pair means the pain point was not actually reframed"
+  - "hmw_question must begin with one of the Atlas-cited question stems (\"how might we\" / 「我們可以如何」, case-insensitive) and end with a question mark (? or ？) -- a genuinely open question, not a declarative solution statement wearing HMW's name"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F01 table has no misuse/evidence column for any row; one
+  # whole-record provenance, same convention every F01 sibling's contract
+  # already establishes.
+forbidden_transition: []
+# Atlas Sec22.3's own gate table (grep-confirmed) has no How Might We row.
+recommended_next: []
+# Atlas's own best-paired column ("Crazy 8s、SCAMPER") and Sec12.3's own
+# chain tail ("Crazy 8s / SCAMPER") are both unbuilt (method-inventory.yaml
+# grep-confirmed: neither has a machine_id or has_contract entry) -- same
+# "cite the pairing, do not invent the unbuilt sibling's id" discipline
+# every F01 sibling with an unbuilt best-paired tool already applies. See
+# OQ-HOWMIGHTWE-1.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat 2-field record (pain_point/hmw_question), or structure hmw_question into stem+body sub-fields?"
+    decision: "Flat record of 2 plain strings -- Atlas gives one worked example (a single prose sentence), no field-level sub-structure for the question itself; splitting stem from body would be fabricated scope beyond the literal citation."
+  - question: "How to make 'must not presuppose a solution' (Atlas's own explicit constraint, both citations) checkable without being flimsy?"
+    decision: "Two structural checks, both grounded directly in Atlas's own 2 citations: (1) hmw_question != pain_point (same 'identical pair is an echo, not a reframing' class framing.problem_statement's expected_state!=current_state and framing.north_star_metric's proxy_metric!=core_value_proposition already establish); (2) hmw_question must start with the literal Atlas-cited stem (「我們可以如何」verbatim from L342/L2580, or its literal English method-name form 'how might we') and end with a question mark. A prose-quality check for 'does not presuppose a solution' would require semantic judgment no gate in this corpus performs -- the stem+question-mark check is the checkable proxy for 'this is structurally a question, not a declarative statement', same class of deliberate proxy framing.north_star_metric's own anti_gaming_validation field already accepts (a checkable structural proxy, not a semantic guarantee)."
+  - question: "Accept broader English stems (\"how can we\"/\"how could we\") as synonyms?"
+    decision: "No -- only the 2 literal forms Atlas itself uses (「我們可以如何」in both citations, \"How Might We\" as the method's own cited English name) are accepted. Broadening to synonym stems not in either citation would be inventing acceptance criteria beyond the literal textual basis, the same over-invention this corpus's own compilation_decisions elsewhere already self-corrects against."
+  - question: "Any GENUINE_COMPUTE (contrast framing.five_w_one_h's information_gaps)?"
+    decision: "No -- Atlas mandates no derived field for this method (no gap-detection, no scoring). A flat record enforcing only the 2 structural invariants above is the honest shape; inventing compute the citation does not call for would be fabricated scope."
+
+open_questions:
+  - "OQ-HOWMIGHTWE-1: Atlas's own best-paired tools (Crazy 8s, SCAMPER) are both unbuilt (no machine_id, no has_contract entry). Once built, should either declare framing.how_might_we's HowMightWeRecord as a required input the way root_cause.fishbone declares ProblemStatement? Deliberately not decided here.（owner: operator）"
+  - "OQ-HOWMIGHTWE-2: Sec12.3's own chain names JTBD as the upstream (\"JTBD → HMW → ...\") but JTBD is unbuilt. inputs.required left empty on that basis, same reasoning framing.north_star_metric's own OQ-NORTHSTARMETRIC-2 already establishes. Revisit once JTBD is built.（owner: operator）"
+  - "OQ-HOWMIGHTWE-3: the stem check accepts only the 2 literal Atlas-cited forms (「我們可以如何」/\"how might we\"). Should a future revision broaden this to a configurable stem list once real HMW authoring at scale surfaces other accepted phrasings in practice?（owner: operator）"
+  - "OQ-HOWMIGHTWE-4: method-inventory.yaml's How Might We row still carries has_contract:false/contract_status:pending after this build (only its stale line number was corrected, 341->342, per this task's own scope boundary) -- same deferred-to-integration-pass pattern framing.problem_statement's own OQ-PROBLEMSTATEMENT-2 already establishes.（owner: operator, integration pass）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for "How Might We"/"how might we" -- exactly
+    2 hits (L342 table row, L2575 section header), confirmed no other
+    mention exists. Read Sec12.3 in full (L2575-2580). Grepped the whole
+    ai_lego tree and agency-os/docs/AI_LEGO_Cognitive_Engineering_OS for
+    "how_might_we"/"how might we" (case-insensitive) before writing any
+    file -- zero pre-existing hits. Grepped method-inventory.yaml for JTBD,
+    Crazy 8s, SCAMPER -- none carry has_contract:true or a machine_id,
+    confirming all 3 are genuinely unbuilt. Read
+    framing.north_star_metric.contract.yaml/.py/.schema.yaml/CLI/test and
+    framing.problem_statement.contract.yaml/.py in full as structural
+    templates for the 'must differ' invariant class. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified except method-inventory.yaml's own
+    stale line-number correction (341->342, same 1-line drift class every
+    sibling this session already found for its own row) and
+    contract-backlog.yaml's new tier_1 entry, both explicitly in this
+    task's scope. The flat-record shape and the 2-part structural-question
+    invariant are compilation decisions, disclosed above, not textually
+    cited.

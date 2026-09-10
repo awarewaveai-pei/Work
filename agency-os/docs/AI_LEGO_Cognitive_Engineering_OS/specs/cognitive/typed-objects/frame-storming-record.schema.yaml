@@ -1,0 +1,174 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/frame-storming-record.schema.yaml"
+title: Frame Storming Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FrameStormingRecord` -- the declared `outputs` of
+  `framing.frame_storming`'s Method Contract. Atlas's ONLY 2 citations (F01 table row L343, §28 quick-tool
+  table L4468) give a 3-step process with no field-level shape: "對同一現象產生多種問法→分群→選框架" (generate
+  multiple question-forms of the same phenomenon -> cluster -> select a frame). This schema makes that
+  process a real, checkable structure: `candidate_framings` (>=2 entries, each carrying enough content to be
+  a real question/framing, not a stub) plus `selected_frame_ref`, which MUST resolve to one of the generated
+  candidates' own `id` -- a selection not grounded in a generated option is exactly the free-floating-
+  authority failure this record structurally forbids. `cluster` (optional, per-candidate, free-text label)
+  is the one field absorbing Atlas's own "分群" step -- see `compilation_decisions` for why it is NOT a
+  separate indexed structure.
+
+  TWO real invariants JSON Schema alone cannot express (cross-array distinctness of `frame_text`, cross-field
+  reference of `selected_frame_ref` into `candidate_framings[].id`) -- both are runtime-layer, enforced at
+  construction AND independently re-derived by a gate, same two-layer discipline every sibling typed-object
+  schema in this directory already documents; see `ai_lego/modules/framing/frame_storming.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Frame Storming row (L343)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4468) -- second, independent citation, agrees on trigger condition"
+  - "methods/contracts/framing.frame_storming.contract.yaml (id: framing.frame_storming)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml (topic-as-anchor-field and informs_*_ref forward-soft-link conventions reused here as phenomenon / informs_boundary_critique_ref; supporting_evidence_refs shape reused verbatim)"
+  - "ai_lego/modules/decision/ice.py (items[]-with-unique-id + cross-referencing-array precedent reused for candidate_framings/selected_frame_ref)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Model candidate framings as a flat array with a free-text per-entry `cluster` label, or a separate indexed `clusters[]` structure each candidate references by id?"
+    decision: "Flat array, optional free-text `cluster` per entry. Atlas's own citation gives zero field-level shape for '分群' (no named cluster taxonomy, no cluster-object fields) -- a second indexed structure would invent referential-integrity rules (cluster id existence, coverage) Atlas never asked for. Same disclosure-only restraint decision.weighted_decision_matrix's own sensitivity_notes field already establishes for an equally uncomputed Atlas-cited stage."
+  - question: "How to enforce 'each candidate framing carries enough content to be a real question/framing, not a stub' without inventing an arbitrary rule?"
+    decision: "frame_text minLength:6 (JSON Schema, Unicode codepoints). No sibling schema in this directory has ever set minLength above 1 (grep-confirmed) -- this is a genuinely NEW, disclosed threshold, deliberately picked low enough to accept a real short CJK question (e.g. '為什麼轉換率下降？' = 9 codepoints) while still rejecting bare placeholder stubs ('?', 'x', 'N/A', 'TODO')."
+  - question: "Should selected_frame_ref's existence (pointing at a real candidate id) be schema-expressible?"
+    decision: "No -- JSON Schema has no native cross-array-membership operator (same limitation 5w1h-record.schema.yaml's own information_gaps derivation already documents for a different cross-array check). Runtime-layer only: enforced at construction (generate_frame_storming_record) AND independently re-derived by evaluate_frame_storming_integrity_gate."
+  - question: "Should candidate_framings ids carry a fixed prefix/format?"
+    decision: "No -- caller-chosen, only required non-empty and unique across the array, same freedom ai_lego/modules/decision/ice.py's own item id already establishes for its own generated-options list."
+
+type: object
+required: [id, version, phenomenon, candidate_framings, selected_frame_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^FS-"
+    description: "NEW DESIGN. Record id prefix, following the existing PROB-/5W1H-/IDEA- convention this suite's other typed-object schemas already use."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.frame_storming"
+
+  phenomenon:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The one shared subject every candidate_framings entry is a question-form OF -- un-cited-by-Atlas anchor field, same class 5w1h-record.schema.yaml's own topic already establishes."
+
+  candidate_framings:
+    type: array
+    minItems: 2
+    description: >
+      Atlas's own "對同一現象產生多種問法" (generate MULTIPLE question-forms of the same phenomenon) -- a
+      single framing is not "storming". Distinctness (no two entries' frame_text effectively identical) is a
+      runtime-layer check, see top-level description.
+    items: { $ref: "#/$defs/candidate_framing" }
+
+  selected_frame_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "MUST equal exactly one candidate_framings[].id -- runtime-layer enforced, see top-level description."
+
+  informs_boundary_critique_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL forward soft-link to Atlas's own F01-table-cited best pairing ("最佳搭配", L343: "Boundary
+      Critique"), unconfirmed at this schema's write time (concurrent sibling agent, same batch) -- same
+      forward-looking-to-a-concurrently-unbuilt-sibling pattern 5w1h-record.schema.yaml's own
+      informs_problem_statement_ref already establishes. Format-only checked (non-empty string); existence of
+      the referenced record is NOT verified.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  candidate_framing:
+    type: object
+    required: [id, frame_text, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Caller-chosen, unique across candidate_framings -- no fixed prefix required, same freedom ai_lego/modules/decision/ice.py's own item id already establishes."
+      frame_text:
+        type: string
+        minLength: 6
+        pattern: "\\S"
+        description: "One alternative question-form/framing of the shared phenomenon -- see compilation_decisions for the minLength reasoning."
+      cluster:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "OPTIONAL free-text label absorbing Atlas's own '分群' step -- see compilation_decisions. Not cross-checked against any other candidate's cluster label."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: { type: string, pattern: "^E-[0-9]+$" }
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention 5w1h-record.schema.yaml's own dimension_entry already uses."
+
+examples:
+  - description: "A phenomenon reframed 3 ways, one selected -- grounded in this same session's own repeated finding (every F01 sibling's own method-inventory.yaml row was stale-by-1)"
+    value:
+      id: "FS-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.frame_storming"
+      phenomenon: "method-inventory.yaml 的 F01 每一列引用的 Atlas 行號都跟真實行號差 1（本方法自己這列也是：line 342 應為 343）"
+      candidate_framings:
+        - id: "F-COPY"
+          frame_text: "這只是單次抄寫錯誤，逐列各自修正就好嗎？"
+          cluster: "root-cause-framing"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "F-STRUCT"
+          frame_text: "是不是 method-inventory.yaml 建置當時的 Atlas 版本整段少了一列，導致往後全部列往前推一行？"
+          cluster: "root-cause-framing"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "F-PROCESS"
+          frame_text: "現有『每個切片各自順手修一行』的流程，會不會讓同一份表永遠零星修不完，該不該換成一次性掃描腳本？"
+          cluster: "process-framing"
+          provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+      selected_frame_ref: "F-PROCESS"
+      informs_boundary_critique_ref: "BC-2026-09-10-001"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-FRAMESTORMINGRECORD-1"
+    question: >
+      Should a future revision give candidate_framings a lifecycle/status (e.g. superseded when a later
+      re-storming session replaces this record)? Left out -- no downstream consumer requires a lifecycle gate
+      yet, same restraint every other F01 sibling besides framing.problem_statement's own chain-origin
+      status enum already applies.
+    owner: "operator, or whoever next needs a revision/versioning workflow for this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table Frame Storming row (L343) and §28 quick-tool table (L4468) directly. Read
+    5w1h-record.schema.yaml and problem-statement.schema.yaml in full as the anchor-field / soft-link / $defs
+    convention templates. Read ai_lego/modules/decision/ice.py in full for the items[]-with-unique-id +
+    cross-referencing-array precedent. Grepped specs/cognitive/typed-objects/ for "frame_storming"/"frame
+    storming"/"FrameStorming" before writing -- no pre-existing or competing typed object found. Validated
+    against jsonschema Draft202012Validator (required fields present, id/candidate_framings/selected_frame_ref
+    shapes enforced, additionalProperties:false on both the top level and $defs/candidate_framing verified to
+    actually reject an unknown key, minItems:2 verified to actually reject a single-candidate array,
+    frame_text minLength:6 verified to actually reject a 1-character stub).
+  note: >
+    `candidate_framings`/`selected_frame_ref`/`cluster`/`phenomenon` field shapes are this suite's own
+    compiled structure engineered to make Atlas's own "對同一現象產生多種問法→分群→選框架" process column a
+    real, re-derivable property -- explicitly flagged as non-Atlas field-level grounding above
+    (compilation_decisions), not presented as mother-document content. No mother document was modified to
+    produce this file.

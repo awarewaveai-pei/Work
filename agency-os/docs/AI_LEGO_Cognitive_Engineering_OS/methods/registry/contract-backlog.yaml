@@ -2174,6 +2174,30 @@ tier_1:
     source: "methods/contracts/framing.problem_statement.contract.yaml + specs/cognitive/typed-objects/problem-statement.schema.yaml (edited, not new)"
     note: "87th slice. 50 tests pass. F01 framing family: 8 of 11 built (goal_statement/smart/non_goals/okr/north_star_metric/success_criteria/five_w_one_h/problem_statement); remaining: How Might We, Frame Storming, Boundary Critique."
 
+  eightyseventh_concrete_entry:
+    method_id: "framing.how_might_we"
+    contract_status: complete
+    tier: 1
+    mandated_by: "9th `framing` (F01) member, row L342 + Sec12.3 (L2575-2580) -- grep-confirmed the only 2 'How Might We' hits in the Atlas. Flat pain_point/hmw_question record; JTBD (cited upstream) and Crazy 8s/SCAMPER (cited best-paired) both unbuilt, left as open questions rather than invented. Invariants: hmw_question must genuinely differ from pain_point (not an echo); hmw_question must begin with an Atlas-cited stem (\"how might we\"/「我們可以如何」) and end with a question mark -- checkable proxy for Atlas's own 'must not presuppose a solution' constraint."
+    source: "methods/contracts/framing.how_might_we.contract.yaml + specs/cognitive/typed-objects/how-might-we-record.schema.yaml"
+    note: "88th slice. 44 tests pass. method-inventory.yaml's own How Might We row line number corrected (341->342, same stale-citation drift class other F01 rows already found); has_contract/contract_status flip deferred to integration pass."
+
+  eightyeighth_concrete_entry:
+    method_id: "framing.boundary_critique"
+    contract_status: complete
+    tier: 1
+    mandated_by: "11th and LAST `framing` (F01) member, row L344 + F01 mermaid flowchart L348-354 + §13.7 Public Policy Recipe L3378-3389. Fixed 5-category prefixItems array (DECISION_MAKER/AFFECTED/EXCLUDED/RESOURCES/VALUES, Atlas's own literal citation order), a direct structural isomorph of five_w_one_h's own KNOWN/UNKNOWN+gap_note dimension shape. Real invariant: every category is either POPULATED (>=1 real item, no empty_justification) or DECLARED_EMPTY (zero items, a real non-empty empty_justification required) -- a silently-empty category would defeat Atlas's own benefit column, '揭露權力與價值假設' (reveal power/value assumptions). empty_categories is GENUINE_COMPUTE, re-derived by an independent gate, never caller-supplied. Optional problem_statement_ref soft-link, format-checked against the real, confirmed 'PROB-' prefix. External methodology (Werner Ulrich's Critical Systems Heuristics) disclosed by name for grounding only -- Atlas's own 5-term citation, not CSH's real 4-category framework, is the enforced field set."
+    source: "methods/contracts/framing.boundary_critique.contract.yaml + specs/cognitive/typed-objects/boundary-critique-record.schema.yaml"
+    note: "89th slice. 67 tests pass. method-inventory.yaml's own Boundary Critique row line number corrected (343->344, same stale-citation drift class other F01 rows already found); has_contract/contract_status flip deferred to integration pass. F01 framing family COMPLETE 11/11 (integration pass reconciled ordinals to Atlas table row order: how_might_we 9th, frame_storming 10th, boundary_critique 11th)."
+
+  eightyninth_concrete_entry:
+    method_id: "framing.frame_storming"
+    contract_status: complete
+    tier: 1
+    mandated_by: "10th `framing` (F01) member, row L343 (對同一現象產生多種問法→分群→選框架) + §28 快速選工具表 L4468 (second, independent citation -- agrees on trigger condition but names a different next step than L343's own 最佳搭配 column, disclosed in this contract's own open_questions). No dedicated §12.x section (numbering jumps §12.3 How Might We -> §12.4 SMART, grep-confirmed) and no §22.3/EC §32 row. Generate-then-select structure, not a flat record: candidate_framings needs >=2 genuinely distinct entries (each >=6 non-blank characters, not a stub), selected_frame_ref must equal exactly one candidate's own id -- both enforced at construction AND re-derived independently by a gate."
+    source: "methods/contracts/framing.frame_storming.contract.yaml + specs/cognitive/typed-objects/frame-storming-record.schema.yaml + ai_lego/modules/framing/frame_storming.py"
+    note: "90th slice. 60 tests pass. method-inventory.yaml's own Frame Storming row line number corrected (342->343, same stale-citation drift class every other F01 row in this batch already found and fixed); has_contract/contract_status flip deferred to integration pass. F01 framing family COMPLETE 11/11 (integration pass reconciled ordinals to Atlas table row order: how_might_we 9th, frame_storming 10th, boundary_critique 11th)."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

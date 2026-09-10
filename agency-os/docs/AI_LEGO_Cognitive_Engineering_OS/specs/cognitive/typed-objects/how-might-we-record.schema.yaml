@@ -1,0 +1,114 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/how-might-we-record.schema.yaml"
+title: How Might We Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `HowMightWeRecord` -- the declared
+  `outputs` of `framing.how_might_we`'s Method Contract. Atlas's 2 citations
+  (F01 table row L342 + dedicated Sec12.3, L2575-2580) give one worked
+  example (a single prose pain_point -> a single prose hmw_question) and no
+  field-level sub-structure.
+
+  Modeled as a FLAT record of 2 plain-string fields, same shape class
+  `north-star-metric-record.schema.yaml`'s own flat-record convention uses
+  for this family. The 3 real invariants this schema CANNOT express --
+  `hmw_question` must genuinely differ from `pain_point` (cross-field, no
+  native JSON Schema "not equal to a sibling" operator), must begin with an
+  Atlas-cited HMW stem, and must end with a question mark (both
+  case-insensitive structural checks JSON Schema `pattern` cannot safely
+  express without enumerating every case variant) -- are runtime-layer
+  invariants, see `ai_lego/modules/framing/how_might_we.py`, which enforces
+  them at construction AND independently via a gate that re-derives from raw
+  fields, same two-layer discipline every sibling module in this family
+  already uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:342 (F01 table row) -- one of 2 citations"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md:2575-2580 (Sec12.3, dedicated section, worked example) -- the other citation"
+  - "methods/contracts/framing.how_might_we.contract.yaml"
+  - "specs/cognitive/typed-objects/north-star-metric-record.schema.yaml -- flat plain-string record shape convention reused here"
+  - "specs/governance/epistemic-label.schema.yaml -- provenance_record"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Plain string fields, or a structured question object (stem/body/target_user)?"
+    decision: "Plain non-empty strings for both fields -- Atlas gives one worked prose example, no field-level shape; a structured question object would be fabricated scope."
+  - question: "Encode the must-differ/stem/question-mark invariants as JSON Schema `pattern`/cross-field constraints?"
+    decision: "No -- must-differ is cross-field (same limitation north-star-metric-record.schema.yaml's own proxy_metric!=core_value_proposition check already accepted); the stem/question-mark checks are single-field but require case-insensitive matching JSON Schema `pattern` cannot safely express without enumerating every case variant. All 3 left as runtime-layer invariants."
+
+type: object
+required: [id, version, pain_point, hmw_question, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^HMW-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as north-star-metric-record.schema.yaml's NSM- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.how_might_we"
+
+  pain_point:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L342/Sec12.3 -- the ORIGINAL pain point, kept separate from hmw_question so the reframing stays auditable, not silently overwritten."
+
+  hmw_question:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L342/Sec12.3 -- the reframed, solution-agnostic open question.
+      Must genuinely differ from pain_point, begin with an Atlas-cited stem
+      (「我們可以如何」or the method's own English name "how might we"), and
+      end with a question mark (? or ？) -- runtime-layer checks, see
+      top-level description.
+
+  provenance:
+    description: "Same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas's own Sec12.3 worked example (hmw_question transcribed verbatim); pain_point is this contract's own restatement of the underlying pain -- Atlas's cited sentence contrasts an anti-pattern solution statement ('做一個 chatbot') with the reframed question, it does not itself label a separate pain_point field."
+    value:
+      id: "HMW-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "framing.how_might_we"
+      pain_point: "新使用者常常找不到正確資訊，只能反覆摸索甚至放棄"
+      hmw_question: "我們可以如何讓第一次使用者在 3 分鐘內找到正確資訊？"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-HOWMIGHTWERECORD-1"
+    question: >
+      hmw_question has no structural shape beyond a checked stem/ending (no
+      target_user/timeframe/outcome sub-fields the worked example implies
+      but Atlas never formalizes). Add structure once a real consuming
+      method (e.g. a built Crazy 8s) needs to parse it programmatically
+      rather than read it as prose?
+    owner: "operator, or whoever builds Crazy 8s/SCAMPER"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table How Might We row (L342) and Sec12.3 (L2575-2580)
+    in full, grep-confirmed these are the only 2 "How Might We" mentions in
+    the whole document. Read north-star-metric-record.schema.yaml in full as
+    shape precedent. Validated against jsonschema Draft202012Validator
+    (required fields present, id pattern satisfied, additionalProperties:false
+    present from the start).
+  note: >
+    pain_point/hmw_question field names are this contract's own naming
+    (Atlas itself does not name these 2 stages with formal field labels,
+    only describes them in prose); the flat-record shape and both field
+    names are compilation decisions, disclosed above. No mother document was
+    modified.

@@ -46,6 +46,7 @@
 | `specs/cognitive/typed-objects/barrier-analysis-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_incident, hazard_description, target_description, barriers, failure_modes, provenance] properties[9] |
 | `specs/cognitive/typed-objects/blue-green-deployment-plan.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, blue_environment, green_environment, green_verified, cutover_status, provenance] properties[9] |
 | `specs/cognitive/typed-objects/blue-team-review.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, improvements, provenance] properties[6] |
+| `specs/cognitive/typed-objects/boundary-critique-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, decision_context, categories, empty_categories, provenance] properties[8] |
 | `specs/cognitive/typed-objects/bounded-context-map.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, domain_description, subdomains, provenance] properties[8] |
 | `specs/cognitive/typed-objects/bow-tie-analysis-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, top_event_description, threats, consequences, controls, provenance] properties[9] |
 | `specs/cognitive/typed-objects/build-measure-learn-cycle.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, product_under_exploration, build, measure, learn, provenance] properties[8] |
@@ -71,8 +72,10 @@
 | `specs/cognitive/typed-objects/fault-tree-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_analysis, top_event, basic_events, gates, provenance] properties[8] |
 | `specs/cognitive/typed-objects/fitness-function-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, architecture_under_governance, functions, provenance] properties[6] |
 | `specs/cognitive/typed-objects/five-whys-validation.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance] properties[9] |
+| `specs/cognitive/typed-objects/frame-storming-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, phenomenon, candidate_framings, selected_frame_ref, provenance] properties[8] |
 | `specs/cognitive/typed-objects/game-day-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, scenario, roles, injected_failure, recovery, aar, provenance] properties[9] |
 | `specs/cognitive/typed-objects/goal-statement-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, goal, beneficiaries, timeframe, success_condition, constraints, provenance] properties[10] |
+| `specs/cognitive/typed-objects/how-might-we-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, pain_point, hmw_question, provenance] properties[6] |
 | `specs/cognitive/typed-objects/ice-score-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, context, items, ranking, engine, computation_provenance_ref, provenance] properties[9] |
 | `specs/cognitive/typed-objects/impact-effort-classification.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, impact_scale, effort_scale, impact_threshold, effort_threshold, ideas, engine, computation_provenance_ref, provenance] properties[12] |
 | `specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, positions_considered, criteria_used, judgment, provenance] properties[11] |

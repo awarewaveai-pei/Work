@@ -1,0 +1,135 @@
+$id: "ai-lego://methods/contracts/framing.frame_storming.contract.yaml"
+title: "Frame Storming Method Contract"
+status: ACTIVE
+
+description: >
+  framing.frame_storming, F01 framing family. Atlas: F01 table row L343 + §28 quick-tool table L4468 (only
+  2 citations; no dedicated §12.x section, no §22.3 gate row). Not an EC §32 method -- no security surface.
+  Core invariant: generate-then-select, not a flat record -- candidate_framings needs >=2 genuinely distinct
+  entries and selected_frame_ref must resolve to exactly one generated candidate's own id, so a selection is
+  never free-floating (same class ai_lego/modules/decision/ice.py's own ranking[].item_id cross-reference
+  already establishes).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Frame Storming row (L343) -- primary citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4468) -- second, independent citation, agrees on trigger condition ('不確定真正問題' == '可能解錯問題時') but names a DIFFERENT next step (Problem Statement) than L343's own '最佳搭配' column (Boundary Critique) -- see open_questions"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155) -- grep-confirmed no Frame Storming row"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract (L1231-1260) -- grep-confirmed this method has no security surface, not an EC §32 method"
+  - "ai_lego/modules/decision/ice.py -- items[]-with-unique-id + cross-referencing-array precedent reused for candidate_framings/selected_frame_ref"
+  - "methods/contracts/decision.weighted_decision_matrix.contract.yaml -- 'every scores/weights entry references a known option_id' precondition, same reference-integrity invariant class"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml -- topic-as-anchor-field and informs_*_ref forward-soft-link conventions reused here"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: framing.frame_storming` mints a new machine_id, `<family>.<name>` bare
+  form per ADR-005b (already digit-free, no naming collision unlike framing.five_w_one_h). Grepped
+  exhaustively for a competing machine_id and for any pre-existing implementation (whole ai_lego tree,
+  case-insensitive "frame_storming"/"frame storming") -- none found.
+
+id: framing.frame_storming
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [FRAME, QUESTION, GROUP, PRIORITIZE, VALIDATE]
+# INFERRED, not cited (Atlas §4 L192's 5-method primitive-formula list does not include Frame Storming).
+# FRAME = the method's own name and core act (reframing a phenomenon). QUESTION = Atlas's own literal
+# "產生多種問法" (generate multiple QUESTION-forms). GROUP = Atlas's own literal "分群" (cluster) step.
+# PRIORITIZE = "選框架" (select one frame out of the generated set) -- same class decision.moscow's own
+# PRIORITIZE-for-bucket-selection already establishes for choosing among generated/classified options;
+# DECIDE deliberately EXCLUDED, same restraint decision.moscow/decision.impact_effort/framing.smart's own
+# contracts already apply for non-Atlas-cited primitive inference (DECIDE is reserved for Atlas-cited
+# formulas like AHP, not casually inferred for an in-exercise selection with no forbidden_transition
+# authority claim to reconcile against). VALIDATE = the two-layer invariant re-derivation every sibling
+# module in this family already uses.
+
+purpose:
+  - generate_multiple_distinct_framings_of_one_phenomenon_and_select_one_traceable_to_a_generated_candidate
+
+inputs:
+  required: []
+  optional: []
+# Atlas's own citation places this method at "可能解錯問題時" (whenever you might be solving the wrong
+# problem) -- no named upstream typed-object dependency. F01's own mermaid flowchart (L348-354: 模糊需求 ->
+# 5W1H -> Problem Statement -> Boundary Critique -> Success Criteria -> Decision Question) does not include
+# Frame Storming OR How Might We at all (grep-confirmed) -- same entry-point reasoning
+# framing.goal_statement/framing.five_w_one_h's own empty inputs.required already establishes.
+
+outputs: [FrameStormingRecord]
+# NEW output type (see typed-objects/frame-storming-record.schema.yaml). Atlas names no PascalCase output
+# type for this row, same disclosed honesty gap every Tier 1 contract in this directory carries.
+
+preconditions:
+  - "candidate_framings contains at least 2 entries -- Atlas's own '對同一現象產生多種問法' (generate MULTIPLE question-forms) requires more than one; a single framing is not 'storming'"
+  - "every candidate_framings entry carries a non-empty id, unique across the array"
+  - "every candidate_framings entry's frame_text is a non-empty string of substantive length (>=6 non-blank characters, not a placeholder/stub -- see compilation_decisions for the threshold reasoning)"
+  - "no two candidate_framings entries' frame_text may be effectively identical (case/whitespace-insensitive) -- genuinely distinct question-forms, not near-duplicate re-wordings of the same question"
+  - "selected_frame_ref must equal exactly one candidate_framings[].id -- the chosen frame must be traceable to a generated candidate, never a free-floating selection"
+  - "phenomenon is a non-empty string -- the one shared subject every candidate framing is a question-form of"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # candidate_framings carry optional supporting_evidence_refs (same shape framing.five_w_one_h's own
+  # dimension_entry uses) -- an EVIDENCE-labeled candidate with no cited evidence would be the same "claims
+  # evidence backing it lacks" gap five_w_one_h's own evidence_labeling gate already guards against.
+
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (no limitation-column text, no §22.3 row, no
+# dedicated §12.x section -- grep-confirmed) -- left genuinely empty rather than inventing one, same
+# restraint framing.five_w_one_h's own identical field already establishes.
+
+recommended_next: []
+# Two independent Atlas citations DISAGREE on the next step: F01 table's own "最佳搭配" column (L343) names
+# Boundary Critique; §28's own "Then" column (L4468) names Problem Statement. Neither is asserted here --
+# Boundary Critique is an unconfirmed concurrent sibling at this write time (same restraint
+# framing.five_w_one_h's own recommended_next: [] already establishes for Problem Statement at ITS write
+# time), and Problem Statement, though already built this session, is not the SAME-citation-type ("最佳搭配")
+# match the other 9 F01 siblings' own informs_*_ref fields consistently follow. See
+# informs_boundary_critique_ref below and open_questions for the full disclosure.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should Frame Storming require an upstream typed-object input (e.g. ProblemStatement)?"
+    decision: "No -- Atlas's own citation places it at a 'possibly solving the wrong problem' entry point, not chained from any named typed object; F01's own mermaid flowchart omits Frame Storming entirely (grep-confirmed), unlike How Might We/Boundary Critique's own downstream mermaid position."
+  - question: "Reuse the pre-existing ICE items[]+unique-id pattern for candidate_framings, or invent a new shape?"
+    decision: "Reuse the structural pattern (not the code) -- ice.py's own items[]/ranking[] cross-referencing-by-id already solves the identical 'multiple generated entries, one later referenced by id elsewhere in the same record' problem; selected_frame_ref is a single-reference simplification of that same class (one chosen id instead of a full ranking)."
+  - question: "Should evidence_labeling_required be true?"
+    decision: "Yes -- candidate_framings carry optional supporting_evidence_refs; an EVIDENCE-labeled candidate with no cited evidence is the same disclosed gap class framing.five_w_one_h's own evidence_labeling gate already guards against."
+  - question: "Model Atlas's own '分群' (clustering) step as a real, separately-indexed structure, or absorb it into how candidates are organized?"
+    decision: "Absorbed -- an OPTIONAL, disclosure-only free-text `cluster` label per candidate_framings entry, not a second indexed structure. Atlas's own citation gives zero field-level shape for clustering (no named taxonomy, no cluster-object fields); a second indexed structure would invent referential-integrity rules (cluster id existence, coverage) Atlas never asked for -- same disclosure-only restraint decision.weighted_decision_matrix's own sensitivity_notes field already establishes for an equally uncomputed Atlas-cited stage."
+  - question: "How to enforce 'each candidate framing carries enough content to be a real question/framing, not a stub' without inventing an unneeded rule?"
+    decision: "frame_text minLength 6 (non-blank characters). Grep-confirmed zero prior typed-object schema in this directory has ever set minLength above 1 -- this is a genuinely NEW, disclosed threshold, deliberately picked low enough to accept a real short CJK question (e.g. '為什麼轉換率下降？' = 9 characters) while still rejecting bare placeholder stubs ('?', 'x', 'N/A', 'TODO')."
+
+open_questions:
+  - "OQ-FRAMESTORMING-1: RESOLVED. method-inventory.yaml's 'How Might We' (line 246) and 'Boundary Critique' (line 256) rows carried the SAME stale-by-1 drift class this contract's own row (line 251, cited L342, real L343 -- fixed to 343 in this same commit) had; re-read directly after this file's own edit landed (concurrent-write conflict on the shared file, re-read per this repo's own edit-conflict discipline) -- both other rows were ALSO already fixed by the other 2 concurrent agents in this same batch (line 247: 341->342; line 257: 343->344) by the time this contract was finalized. No action needed here.（owner: n/a, already closed）"
+  - "OQ-FRAMESTORMING-2: F01 table's own '最佳搭配' column (L343) names Boundary Critique as Frame Storming's best pairing; §28's own 'Then' column (L4468) names Problem Statement instead -- two independent citations that agree on the trigger condition but disagree on the next step. informs_boundary_critique_ref follows the F01 table's own '最佳搭配' citation for consistency with how the other 9 built F01 siblings' own informs_*_ref/refines_*_ref fields are all grounded in that SAME column, not §28. Should a future Atlas revision reconcile the two columns, or is '最佳搭配' vs. a general quick-select 'Then' column genuinely answering two different questions (specific pairing vs. general workflow orientation)?（owner: operator）"
+  - "OQ-FRAMESTORMING-3: candidate_framings' minLength:6 threshold and the optional cluster field are genuinely new, disclosed compilation decisions with zero prior precedent in this directory (grep-confirmed) -- should a future revision replace the length heuristic with a real interrogative-structure check (e.g. requiring '?'/'？'), or formalize cluster into an indexed structure once a second real consumer of clustering exists?（owner: operator）"
+
+verification:
+  method: >
+    Grepped the whole ai_lego runtime tree case-insensitively for "frame_storming"/"frame storming" before
+    any design work -- zero pre-existing implementation (confirmed clean, corroborating the orchestrating
+    session's own spot-check). Grepped the whole Atlas file case-insensitively for "Frame Storming" -- exactly
+    2 hits (F01 table L343, §28 L4468), both read directly at the cited lines. Grep-reconfirmed §12.x heading
+    numbering jumps from §12.3 How Might We (L2575) straight to §12.4 SMART (L2584) -- no dedicated section.
+    Grep-reconfirmed Atlas §22.3 gate table (L4142-4155) has no Frame Storming row. Read
+    AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 (L1231-1260) in full -- confirmed
+    scope (authn/authz/secrets/crypto/network/egress/tenant-isolation/file-parsing/user-content/AI-tools),
+    none applicable here. Read methods/contracts/framing.problem_statement.contract.yaml,
+    framing.five_w_one_h.contract.yaml, decision.weighted_decision_matrix.contract.yaml, and
+    ai_lego/modules/decision/ice.py in full as the structural templates for the two-layer invariant
+    discipline and the generated-options-cross-referenced-by-id pattern. Read
+    methods/registry/method-inventory.yaml's own F01 block (lines 236-259) directly -- confirmed every one of
+    the 4 unbuilt-at-batch-start rows (5W1H/Problem Statement/How Might We/Frame Storming/Boundary Critique)
+    is stale-by-exactly-1 against the real Atlas line; fixed only this contract's own row (line 251,
+    342->343) per this task's explicit single-row scope. Validated the contract body against
+    specs/cognitive/method.schema.yaml and the typed-object schema against
+    specs/cognitive/typed-objects/frame-storming-record.schema.yaml, both with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. Field shapes beyond the 3-step "generate->cluster->select" process name
+    are this suite's own compiled structure, engineered to make that process column a real, re-derivable
+    property -- explicitly flagged as non-Atlas field-level grounding above (compilation_decisions), not
+    presented as mother-document content.
