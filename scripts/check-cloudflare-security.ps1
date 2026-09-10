@@ -22,6 +22,16 @@
            health signal. (See WORKLOG 2026-06-04 + memory feedback_global_traveler.)
     $false (legacy): CF WAF is the wp-login/xmlrpc defense — PASS requires bot=ON AND
            rules>=3 AND xmlrpc block present. Set this only if reverting to CF-WAF defense.
+
+  Overall can be PASS / WARN / SKIP / BLIND. BLIND (added 2026-09-10, found when
+  CLOUDFLARE_API_TOKEN had silently expired for an unknown number of days with this
+  script still reporting WARN) means at least one of the 3 CF API calls below produced
+  NO measurement this run -- auth rejection (401/403) or a network/connection failure
+  (DNS, timeout, refused) -- which is a different and more urgent condition than WARN
+  (call succeeded, a real posture value came back and it happens to be suboptimal).
+  The report names exactly which check(s) are blind vs which completed with real data;
+  it does not claim total blindness when only some of the 3 calls failed.
+  SKIP still means "token not configured", a known/expected state on some machines.
 #>
 param(
     [string]$WorkRoot = "",
@@ -74,6 +84,18 @@ $xmlrpcOk   = $false
 $rateLimitRuleStatus = "unknown"
 $rateLimitAdminCarveout = "unknown"
 $errorMsg   = ""
+# Any exception from the 3 API calls below means that specific check learned NOTHING this
+# run -- not just a 401. A connection failure (DNS/timeout/refused, $code stays $null) or a
+# 403 (token valid but missing that endpoint's scope) is exactly as blind as a 401; gating
+# on "-eq 401" alone would silently re-swallow every one of those into plain WARN, i.e. the
+# same "detector goes quiet" bug this feature exists to catch, just for a different trigger.
+# $code is still recorded per entry so the report can give cause-specific remediation text.
+# Tracked per-check (not one shared bool): a token missing ONE scope must not make the
+# report claim "every check learned nothing" when 2 of 3 genuinely returned fresh data
+# (same class as check-smoke-tests.ps1's $noEvidence/blind_spots: a detector that goes
+# quiet must be louder than one that reports nothing wrong, not folded into "WARN" --
+# but "louder" must still describe reality, not round every partial failure up to total).
+$blindChecks = @()
 
 if (-not $token) {
     $errorMsg = "CLOUDFLARE_API_TOKEN not found in vault/env — skipped"
@@ -86,6 +108,9 @@ if (-not $token) {
                 -Headers $cfH -TimeoutSec 10 -ErrorAction Stop
         $botMode = if ($bm.result.fight_mode) { "ON" } else { "OFF" }
     } catch {
+        $code = $null
+        try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+        $blindChecks += @{ name = "Bot Fight Mode"; code = $code }
         $botMode  = "error"
         $errorMsg = "bot_management API: $($_.Exception.Message)"
     }
@@ -97,6 +122,9 @@ if (-not $token) {
         $ruleCount = @($wr.result).Count
         $xmlrpcOk  = [bool](@($wr.result) | Where-Object { $_.filter.expression -match "xmlrpc" -or $_.description -match "xmlrpc" })
     } catch {
+        $code = $null
+        try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+        $blindChecks += @{ name = "WAF firewall rules"; code = $code }
         if (-not $errorMsg) { $errorMsg = "firewall/rules API: $($_.Exception.Message)" }
     }
 
@@ -119,6 +147,9 @@ if (-not $token) {
             $rateLimitAdminCarveout = "missing"
         }
     } catch {
+        $code = $null
+        try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+        $blindChecks += @{ name = "Rate-limit ruleset"; code = $code }
         if (-not $errorMsg) { $errorMsg = "rate-limit ruleset API: $($_.Exception.Message)" }
         $rateLimitRuleStatus = "error"
         $rateLimitAdminCarveout = "unknown"
@@ -144,6 +175,12 @@ if (-not $token) {
         }
     }
 }
+
+# Any blind check overrides PASS/WARN (never SKIP -- missing-token is a known, expected
+# state on machines without the secret, not an incident): the token WAS present and at
+# least one call failed, so at least part of the posture picture below is not a fresh
+# reading. The report text (below) says exactly which check(s), not "everything."
+if ($blindChecks.Count -gt 0 -and $overall -ne "SKIP") { $overall = "BLIND" }
 
 # 3. Origin lockdown (ks-aw-01, warn-only, never affects $overall PASS/FAIL)
 # 2026-08-28 consolidation retarget (round-2 review F5): SG's ipset/iptables lockdown
@@ -211,9 +248,30 @@ if ($lockdownStatus -ne 'active') {
     $lines += '- INACTIVE/UNKNOWN: re-check /etc/nginx/snippets/cf-only.conf includes per 443 server block; CF CIDR source is soulful-security.conf (refresh-cf-origin-ips.ps1).'
 }
 $lines += '- Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP'
+if ($blindChecks.Count -gt 0) {
+    $allCheckNames  = @('Bot Fight Mode', 'WAF firewall rules', 'Rate-limit ruleset')
+    $blindNames     = @($blindChecks | ForEach-Object { $_.name })
+    $healthyNames   = @($allCheckNames | Where-Object { $blindNames -notcontains $_ })
+    $authCodes      = @($blindChecks | Where-Object { $_.code -eq 401 -or $_.code -eq 403 } | ForEach-Object { $_.code } | Select-Object -Unique)
+    $hasNetworkBlind = [bool]($blindChecks | Where-Object { -not $_.code })
+
+    $lines += ""
+    $lines += "## BLIND (not the same as WARN)"
+    $lines += ('- {0} of 3 checks produced ZERO measurement this run: {1}. Their values in the table above are stale/error, not a fresh reading.' -f $blindChecks.Count, ($blindNames -join ', '))
+    if ($healthyNames.Count -gt 0) {
+        $lines += ('- The other {0} check(s) DID complete with real data this run: {1}.' -f $healthyNames.Count, ($healthyNames -join ', '))
+    }
+    if ($authCodes.Count -gt 0) {
+        $lines += ('- Cause includes an auth/permission rejection (HTTP {0}). If 401: token invalid/expired -- Cloudflare dashboard -> My Profile -> API Tokens -> regenerate (scope: Zone:DNS Edit + Zone:Firewall Services Edit, zone=aware-wave.com) -> update mcp/user-env.ps1 CLOUDFLARE_API_TOKEN. If 403: token valid but missing the scope for that specific endpoint -- check the token''s permissions in the dashboard.' -f (($authCodes | ForEach-Object { "$_" }) -join '/'))
+    }
+    if ($hasNetworkBlind) {
+        $lines += '- At least one failure had no HTTP status code (connection refused / timeout / DNS) -- check network connectivity to api.cloudflare.com and https://www.cloudflarestatus.com/ before assuming the token is the cause.'
+    }
+    $lines += '- Re-run this script after fixing and confirm Overall != BLIND.'
+}
 if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }
 Set-Content -Path (Join-Path $reportDir "cf-security-LATEST.md") -Value ($lines -join "`r`n") -Encoding UTF8
 
-$colour = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
+$colour = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } elseif ($overall -eq "BLIND") { "Red" } else { "Yellow" }
 Write-Host "== Cloudflare security: $overall (bot=$botMode, rules=$ruleCount, xmlrpc=$xmlrpcOk, lockdown=$lockdownStatus) ==" -ForegroundColor $colour
 exit 0

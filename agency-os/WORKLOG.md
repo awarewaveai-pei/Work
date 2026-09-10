@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-10（91–93 號切片：F01 framing 家族收官 8/11→11/11，3 個平行 agent）
+
+how_might_we(44t)/frame_storming(60t)/boundary_critique(67t)。171 tests 零衝突，全 regression 5361→5532，golden 3151。查重：how_might_we 比對 north_star_metric 確認同為扁平雙欄位形狀，核心不變量是 hmw_question 必須真的不同於 pain_point（非回音）且必須以 Atlas 引用的問句詞幹開頭（"how might we"/「我們可以如何」）+ 問號結尾，是「不得預設方案」的可查證代理；frame_storming 是 generate-then-select 結構（非扁平記錄），candidate_framings 需 ≥2 個真正相異的候選、selected_frame_ref 必須指向真實候選 id（同 decision.ice 的 items/ranking 交叉引用不變量類別）；boundary_critique 是 5 類固定 prefixItems 陣列（decision maker/affected/excluded/resources/values，Atlas 原文順序，5w1h 的 KNOWN/UNKNOWN+gap_note 形狀同構），每類必須 POPULATED（≥1 真實項目）或 DECLARED_EMPTY（需真實非空理由），empty_categories 是 GENUINE_COMPUTE 獨立 gate 重新推導。
+
+critic 覆審（0 Critical/0 Major，2 Minor 全修）：① `frame_storming.py`/`how_might_we.py` 的 `_normalize` 缺 Unicode NFKC 正規化，全形/半形標點變體（`？` vs `?`）可繞過「真正相異」/「非回音」不變量——已修（`unicodedata.normalize("NFKC", ...)`），frame_storming 補一個端到端可重現的回歸測試（半形/全形問號變體候選被正確拒絕），how_might_we 因結構上（問句詞幹強制前綴）無法端到端重現攻擊場景，改為直接測試 `_normalize` 本身的正規化行為。② `frame_storming`/`boundary_critique` 兩份 contract 的 `description` 欄位超出 Lean Standard 5–8 行上限（19/25 行，含批次協調敘事與外部方法論散文）——已依標準精簡至 4 句式（method_id/family/Atlas 引用+一句話/EC §32 狀態/核心不變量+一句話理由），CSH 外部方法論細節移至既有的 `compilation_decisions` 條目而非重複。整合階段順手訂正 3 個平行 agent 各自任務簡報間的序數不一致（boundary_critique 自稱「10th」應為「11th」，已對齊 Atlas 表格列順序 how_might_we=9th/frame_storming=10th/boundary_critique=11th，純 prose 修正，無 code/test/gate 依賴此欄位——critic 已確認查無消費者）。
+
+`ai_lego/modules/framing/__init__.py` 改寫為「F01 framing family -- COMPLETE, 11 of 11」，`contract-backlog.yaml` 新增 3 筆 tier_1 條目（eightyseventh/eightyeighth/eightyninth_concrete_entry），`method-inventory.yaml` 3 個 F01 列的 Atlas 引用行號一併訂正（341→342/342→343/343→344，同批其他列已修過的同款漂移）。`SPEC_QUICKREF.md`/`MOTHER_DOC_SECTION_INDEX.md` 因新 contract 落地重生成。整合期間發現並修復 `agency-os/WORKLOG.md` 檔頭一組新的 stash-pop 衝突（`<<<<<<< Updated upstream`/`>>>>>>> Stashed changes` 標記，非本批次造成——HCI30 session 自己同一則條目的兩個版本互相衝突）：additive splice 保留兩側全部內容、僅移除標記行，零資料遺失（同本 session 稍早已驗證安全的技巧）。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_how_might_we tests.unit.test_frame_storming tests.unit.test_boundary_critique` | exit=0 | result=173 tests OK（171 新增+2 NFKC 回歸測試）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=5532 tests OK，359s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3151，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_how_might_we_slice`／`run_frame_storming_slice`／`run_boundary_critique_slice` | exit=0 | result=3 個 CLI 全部 PASS，各自的拒絕證明＋獨立 gate 抓包證明皆真跑非模擬
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 3 contract+3 schema+3 module+3 CLI+3 test+3 個整合觸點，直接跑測試與 golden 套件非採信自報，跑 3 個 CLI 端到端，突變式推理測試每個核心不變量）| verdict=PASS-WITH-MINORS | findings=0c/0m/2n（皆已修，見上）
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`how_might_we\|frame_storming\|boundary_critique\|how-might-we\|frame-storming\|boundary-critique` | hits=僅本批次新建檔案+registry+`__init__.py`合法引用，critic 獨立複驗確認無競爭實作
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：3 個新方法的 contract/schema/module/CLI/test（15 個新檔）+ `framing/__init__.py`／`contract-backlog.yaml`／`method-inventory.yaml`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md` 的追加內容全部移除；`agency-os/WORKLOG.md` 的 stash-pop 衝突修復是獨立、無害的純標記移除，不受此 revert 影響（不刪除任何一側內容）。純新增，無 schema/DB 變動，可安全回滾。
+
 ## 2026-09-10 HCI30 按鍵式選單、案件分區＋可復活歷史案件、信任構面雷達圖、教科書式視覺重做——操作者連續三輪回饋，中間一輪是真後端缺口
 
 操作者對翻譯後的版本連續給出三輪具體回饋。第一輪四點：不要下拉式選單（要按鍵式，資料全部可見）；歷史案件（可復活）／進行中／新建案件應分開；看不出這工具的過人厲害之處要怎麼賣高單價；UI/UX 太爛。逐項處理：
@@ -17,6 +36,62 @@
 
 真跑驗證：`scripts/test-wave1-local.ps1` 241/241 斷言全過（含新增的 reopen 正向/負向測試），`scripts/mutation-check-wave1.ps1` 122/122 mutation 全殺（過程中兩個既有 mutation 的預測跟真跑結果不符，修正後才過——`weaken-case-closed-immutable` 需要把新的 `CLOSED→ACTIVE` 分支寫進它自己保留的舊版 trigger 副本，`drop-case-lifecycle-trigger`／`drop-cases-rls-policy` 兩個既有 mutation 的預期失敗清單也因為新增的 -218 測試案件而需要調整，兩次都是真跑後才發現理論推導有誤，不是憑空預測對）；down migration 真跑一次確認可逆。前端瀏覽器真跑（視覺重做前）：新建全空案件→按鍵選信任等級/調查目的送出→進入詳情頁看到雷達圖置中無資料→新增證據→切到評估類型選按鍵式構面/等級/引用→送出→雷達圖即時長出真實資料點、正確歸類到「重大風險」；重新開啟一筆歷史案件，狀態正確變回「進行中」且從歷史區移回進行中區。視覺重做後二次迴歸：`getComputedStyle` 直接核對選中 chip 的背景/邊框/文字色與雷達圖 SVG 多邊形顏色皆正確換成新色；重新送出一筆證據確認 201 Created；全程 console 零錯誤。
 
+## 2026-09-10 CF API token 401 監控盲點：`check-cloudflare-security.ps1` warn-only 吃掉退化，新增 BLIND state 區分「無憑證」vs「驗證被拒」
+
+**發現**：使用者要我處理 GPT 對 aware-wave.com DNS 的建議（SPF 補 Resend、CAA 補齊），直接呼叫 CF API 查 zone `f21b1919632fee2221647908a94fdcac` 時收到 401；重跑既有 `scripts/check-cloudflare-security.ps1` 重現同錯。`git show cd68823db:agency-os/reports/status/cf-security-LATEST.md` 顯示 2026-09-04 22:41 仍 `Overall: PASS`；介於 9/4–9/10 之間 token 失效，腳本 docstring 明寫「warn-only, always exits 0」，期間無任何警報。
+
+**根因**：不是「token 過期」本身（外部事件，不歸責此 repo）,是偵測器把「驗證失敗（token 被拒,學不到任何東西）」和「驗證通過但姿態不佳（Bot Fight Mode 剛好關）」吃進同一個 `WARN`,兩者嚴重度天差地遠卻無法區分。`scripts/check-smoke-tests.ps1` 的 `$noEvidence`/`blind_spots` 機制早就解決過同一類問題（其註解原話：「a detector that goes quiet must be louder than one that reports nothing wrong」），這次是同一種缺口在另一支獨立腳本重現，未被沿用。
+
+**修法（非補丁，加新狀態值，不改既有三態語意）**：`scripts/check-cloudflare-security.ps1` 三個 CF API 呼叫（bot_management／firewall rules／rate-limit ruleset）的 catch 都加 401 偵測 → `$authBlind`；`$overall` 新增第四態 `BLIND`（token 存在但被拒，區別於「token 未設」的既有 `SKIP`）；`.md` 輸出加專屬「## BLIND」區塊講清楚後果與修法；`.claude/commands/ao-resume.md` §1 補一行要求 BLIND 升 §6 阻塞與風險，不得被當例行噪音略過。TASKS.md B 區已記錄 token 本身待操作者到 CF dashboard 重新產生。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-cloudflare-security.ps1` | exit=0 | 修前 `Overall: WARN`（無說明，與「bot fight mode 剛好關」無法區分）→修後 `Overall: BLIND` + 專屬區塊講 401 成因與修復步驟，`agency-os/reports/status/cf-security-LATEST.md:5,31-33`
+- REVIEW_DONE: 自審 | verdict=pass | 檢查點：①`SKIP`路徑（token 未設，`:78-81`）不受影響仍走原分支，`$authBlind` 只在 token 存在且被拒時才設 ②既有 PASS/WARN 三態語意與判斷邏輯（`:127-146`）完全未改動，`BLIND` 是判完之後的覆蓋層（`:150` 新增 `if ($authBlind -and $overall -ne "SKIP")`）③三處 catch 各自獨立抓 `[int]$_.Exception.Response.StatusCode`，非 401 的錯誤（逾時／5xx）不會誤觸發 BLIND，仍走原本的 WARN+errorMsg
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`cf-security\|cloudflare-security` | hits=8 檔；`scripts/system-health-check.ps1:630-651` 有**既存**（2026-08-29 自行標記，非本次引入）path-resolution bug 導致該整合點永遠 skip，未擴大修復範圍（該路徑即使修好，`BLIND` 落入既有 `else` 分支等同 WARN，優雅降級不會誤判為 PASS）；其餘 5 檔（`check-vps-auto-reboot-health.ps1`／`check-clickhouse-health.ps1`／`check-ci-health.ps1`）僅 docstring 提及「同 warn-only 慣例」，無程式耦合；`agency-os/docs/operations/{AWARE_WAVE_OBSERVABILITY_BASELINE,MONITORING_SYSTEMS_INVENTORY}.md` 未列舉三態列舉字面值，無文件漂移需同步
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] ① `system-health-check.ps1` 的 cf-security 整合點因既有 bug 永遠 skip，`BLIND` 目前只從 `ao-resume.ps1` 路徑（`:836-843`）真正發揮作用，已實測驗證該路徑正確顯示；② token 本身尚未修復（見 `TASKS.md` §B「監控盲點｜2026-09-10 發現」），本條目只修「偵測器該不該閉嘴」，不修「憑證為什麼壞」——那項待操作者到 Cloudflare dashboard 重新產生並更新 `mcp/user-env.ps1`；③ 修好後應再跑一次本腳本確認 `Overall` 回到 `PASS`，屆時可一併驗證 Bot Fight Mode / WAF rule 等既有posture 是否仍正確（401 期間完全未知，見 BLIND 定義本身）。
+[rollback] `git diff -- scripts/check-cloudflare-security.ps1 .claude/commands/ao-resume.md` 純新增邏輯分支與文件行，未刪除／改寫既有行為；還原這兩檔即可，無 schema/DB/deploy 影響。
+
+## 2026-09-10 知識庫／資料蒐集架構定案（ADR 011 + 執行計畫）：critic 抓到我一個錯誤事實宣告；操作者四輪追加需求後重新設計檢索契約
+
+**僅文件，未動任何 code。** 產出 [ADR 011](docs/architecture/decisions/011-collection-ingestion-boundary.md)（15 條決策）+ [DATA_COLLECTION_PLAN.md](docs/data-collection/DATA_COLLECTION_PLAN.md)。起點是操作者提供的外部提案（GPT 產出、未讀本 repo，主張新建 15 表 + BullMQ + MinIO + 新服務），經實查現況與一次獨立 critic 攻擊後，設計已與該提案無繼承關係。
+
+**我自己犯的錯（critic C1 抓到，已更正）**：前一版 ADR 宣稱「cs 版本化機制已存在、可重用」→ **假**。`insertSource()`（`lib/cs/db.ts:231-251`）無參數可寫 `doc_family_id`／`source_version`，`insertChunks` 硬編 `doc_family_id: r.sourceId`（`db.ts:273`）= chunk 的 family 是 source 主鍵而非 source 列的 family，全 repo 無任何讀取處 → **是死欄位不是機制**。連帶「Phase 1 新增 0 表 0 服務」的成本宣稱低估一個量級，已在 ADR §後果改為「1 個 migration + 改 3 個既有檔」。
+
+**critic 8 個發現全數反映**（3 紅 4 橘 1 黃）：C1 版本化不存在＋檢索端無 status/version 過濾；C2 編排迴圈去重鍵 `t.canonicalUri` 指向不存在的欄位（照字面實作＝整場只抓 1 頁且靜默）＋策略階梯只取最高分不降級；C3 `discovered` 回灌無 scope 邊界（客戶官網頁尾的維基百科連結會被抓進客戶 KB）；C4 品質閘由被審積木自報＋ratio 分子分母單位錯配（中文 ratio 只有英文 1/3 ＝系統性誤傷）＋`raw` 為 null 時 `NaN` 全判不合格；C5 collect/sink 塞不進既有 registry（`registry.ts:33` 的 `run` 是單參數、`ContentBlock` 無 `match`）→ 改為自建獨立 registry，`BlockKind` 一行都不動；C6 sink 只在最後呼叫一次（逾時＝全丟）＋frontier 無持久化（預算耗盡後永遠抓不到第 N+1 頁，測試會綠）；C7 P4 與個資 High-STOP 決策自相矛盾＋`hci.sources.source_ref` 無 unique 約束（upsert 需另一個 migration）＋`snapshot_ref` 指向的原件儲存從未設計；C8 無 tombstone（來源頁下架後 chunk 永久存活）＋`dirty` 無列可標（與 `rag.ts` 三處 ghost-source 防護衝突）＋`doc_family_id` 未綁 org（漏寫 org 過濾即跨租戶刪除，而 RLS 是 service_role only ＝ DB 層無兜底）。
+
+**操作者四輪追加需求，逐輪改設計**：①「知識庫該不該獨立成系統」→ §決策 3：先模組化（`lib/cs/` 拆出 `lib/kb/`）、修正確性、**最後**才服務化；先抽服務等於把未接線的版本化搬到網路邊界後面再修。②「資料一定要整合不能有衝突」→ §決策 2 把「整合」定義成可執行的不變量：一份文件 = 一個 canonicalUrl + 一個 contentHash + 一份正規抽取，派生索引可異但「原文說了什麼」全系統只有一個答案；正規化與 hash 只有一份實作。③「集團／公司／部門／個人／自用」→ §決策 13：租戶是樹，KB 檢索**現在**就改 `p_scope uuid[]`（今日長度 1，租戶樹落地時 KB 零改動）；租戶樹本身另立 ADR，不在 KB 內做第二個「誰在誰底下」的真相。④「學術研究／內訓／業務」→ §決策 12「**KB 回傳證據不回傳答案**」（answer/guardrail/intent/autonomy 屬消費者）＋ §決策 13 的 space 維度（業務查詢不得撈到學術論文；space ≠ 既有的 `kind`）＋ §決策 15 引用錨點抽取當下就記（事後補不回來）。
+
+**跨系統盤點結果**（回答「別的系統有沒有零散的知識庫」）：System Foundry `CAP-KNOWLEDGE-BASE`（`catalog.json:1380`）是**規格條目非實作**，`lib/kb/` 正是它的實作，規格側依賴（`CAP-DOC-TEMPLATES` requires 它）已存在。cognitive-os `ai_lego` **無向量檢索、無 KB**（先前疑似命中為 `rag` 比對到 `sto**rag**e` 的假陽性，已排除）。hci30 `docs/intelligence/` 有 evidence-quality／contradiction／time-decay 規格 → §決策 14 把兩種「品質」分名：extraction quality（抓到內文還是導覽列，Collection 層）vs evidence quality（幾個獨立來源佐證，Analysis 層，核心主張「URL 數量不等於獨立來源數量」），兩者不得互相引用門檻。
+
+**平行 session 事故**：本條目第一版在 21:xx 被另一個 session 的 WORKLOG 寫入覆蓋（`git status` 顯示該檔稍早為 `UU` 衝突狀態）。本條目為重寫版，內容較原版完整（含後續四輪需求）。
+
+**第五輪：與 HCI-30 既有規格對帳（操作者問「針對 HCI 的知識庫能完美適配嗎」）**。讀 `HCI_AI_LEGO_Blueprint_v2/{06,09,10}` 後結論是**不適配、且不該適配**，並修正我 4 個錯誤：①`06:88` 要求抓回內容一律視為不可信、包裹後才入提示——**我的 KB 完全沒有這層,是產品級 prompt-injection 漏洞**（新增 §決策 15b + PLAN §1.3b + P0 第 8 項測試）；②`06:91` ADR-0029 已定 fetch 必須跑在網路隔離 runner 且「Trigger.dev **never executes the outbound fetch**」→ 我把 fetch 放 next-admin、P3 放 Trigger.dev 執行，HCI 路徑直接違反已接受 ADR；③`06:302` 明訂 raw 不得進 Postgres text/bytea、須 object storage → **我前版「砍掉 MinIO」對 Evidence 路徑是錯的**，critic C7c 問的「`snapshot_ref` 指向哪」答案本來就寫在這；④`06:215`「raw web result must never automatically become formal HCI Evidence」→ 我 P4 寫「變自動蒐證」是超譯，改為只到 `DISCOVERED`，sink 更名 `sink/hci-discovered`。另 `06:202` ADR-0026 禁 record-level 去重（我的§決策 11 需除外）、`09:63` ADR-0013 已指定 `TenantContext`/`SourceRef` 進 `Projects/shared/kernel`（我自創的 `tenantRef` 是同一物的第二次推導，須對齊）。全部寫入 §決策 15b/15c/15d。**根本結論**：HCI Evidence 層有自己的 claim 物件／來源獨立性／佐證圖／admission 狀態機／身分解析／S1-S6 品質階梯，是完整領域系統非知識庫；HCI 能重用的只有 fetch+extract，且須在其自有隔離環境執行——這反向證實三分法（Signal/Corpus/Evidence）正確。
+
+**命名與重複副本盤點**（操作者問「hci30 和 HCI 是同一個東西嗎」）：是同一產品的刻意分工——`Projects/internal/hci30/` = runtime code，`agency-os/docs/HCI/` = 架構/ADR/研究，hci30 `README.md:3` 自己寫死此分工。HCI-30 = "Human Collaboration Intelligence"，**與業界標準 HCI（Human-Computer Interaction）同名不同義，對外溝通有誤解風險**（產品命名問題，已告知操作者）。另發現 `_video_release_guard/`（312MB）與 `_video_release_guard2/`（1.9GB）是**整個 D:\Work 的完整複本**（含 AGENTS.md／CLAUDE.md／WORKLOG.md／agency-os／lobster-factory），`git ls-files` 確認**0 檔被追蹤**（非 repo 汙染）但**未被 gitignore**（一次 `git add -A` 即全數入庫），且使同一份 HCI 文件全機有 6 份、治理檔 3 份，任何全庫 grep 都會撈到過期規則。未處理，待操作者決定。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File ./scripts/verify-adr-index.ps1` | exit=0 | result=`verify-adr-index: OK (11 ADR file(s))`
+REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File ./scripts/audit-cross-machine-bom.ps1` | exit=0 | result=90 檔／84 有 BOM／6 缺；**6 個皆 `memory/` 既有檔，非本次新增**（本次 2 個新 .md 在 `agency-os/docs/`，不跨 Drive，依 AGENTS.md §8 免 BOM）。已開背景任務 task_b8106bb8 另案處理，未混入本次
+REVIEW_DONE: critic=Deep（1 個獨立 critic subagent，讀 `rag.ts`/`db.ts`/`registry.ts`/`trending-sources.ts`/`0051`/hci30 `0001`+`0004` 全文後攻擊設計）| verdict=High risk on v1 | findings=3c/4m/1n，**全數已修**，其中 C1 推翻我自己的事實宣告
+BUGHUNT_DONE: scope=D:/Work 全庫（含必填根 agency-os,scripts）| grep=`CAP-KNOWLEDGE-BASE` + `knowledge_base\|retrieval\|vector_store\|rag`(cognitive-os) + `knowledge\|corpus\|evidence_store`(hci30) + `BlockKind` + `COLLECTION_PLAN` | hits=`BlockKind` 全庫僅 `registry.ts:18` 一處定義（驗證「不動它」的可行性）；`CAP-KNOWLEDGE-BASE` 5 處皆規格側非實作；cognitive-os 30 筆命中經逐一開檔確認**全為 `rag`→`storage` 假陽性**（誠實計數，非宣告 0）；檔名 `COLLECTION_PLAN` 與 hci30 既有 `EVIDENCE_COLLECTION_PLAN.md`（ISO/NIST 合規證據蒐集）撞名 → commit 前改為 `DATA_COLLECTION_PLAN.md` 並同步 ADR 內 3 處連結
+WORKLOG_DONE: 本條目
+
+[rollback]
+刪 `docs/architecture/decisions/011-collection-ingestion-boundary.md` + `docs/data-collection/` + 還原 `ADR_INDEX.md` 一行。純新增文件，無 code／schema／DB 變動，零執行期影響。
+
+## 2026-09-10 HCI30 按鍵式選單、案件分區＋可復活歷史案件、信任構面雷達圖——操作者再一輪回饋，一個是真後端缺口
+
+操作者對翻譯後的版本繼續給出四點具體回饋：不要下拉式選單（要按鍵式，資料全部可見）；歷史案件（可復活）／進行中／新建案件應分開；看不出這工具的過人厲害之處要怎麼賣高單價；UI/UX 太爛。逐項處理：
+
+1. **下拉式選單全部改按鍵式**——調查目的、風險等級、當事人、類型（證據/主張/評估）、評估構面（14 個）、等級（5 個）、引用依據（動態）、決策結果（6 個），全部改成一次全部可見的按鈕群組（`.chip`），共用一個 `pickChip(btn, hiddenId)` 處理器寫回隱藏的 `<input>`，內部資料流完全不動。
+2. **案件列表分區＋歷史案件可復活**——這是真後端缺口，不只是排版：查證 `hci.enforce_case_lifecycle()` 的狀態機（migrations/0002）發現 CLOSED 原本是終點，完全沒有回頭路。新增 `database/migrations/0015_wave1_case_reopen_up/down.sql`，把 trigger 的合法轉移清單加上 `CLOSED→ACTIVE`（重開等於恢復進行中，不是重置成未開始，所以刻意不允許 `CLOSED→OPEN`），重開時把 `closed_at` 清回 NULL。新增 `POST /api/hci/v1/cases/:id/reopen` 端點＋前端「↺ 重新開啟」按鈕（案件列表卡片上、案件詳情頁頂部皆有）。案件列表改成「進行中案件」（OPEN+ACTIVE）／「歷史案件」（CLOSED）兩個獨立區塊；「+開立新案件」從清單中間移到最上方一個獨立的顯眼按鈕。
+3. **信任構面雷達圖**——7 個構面一次用 SVG 雷達圖畫出來（純視覺呈現，不是新的評分方法：沒有任何跨構面加總／平均分數存在，`HCI_RISK_SPEC.md` 刻意不決定這件事，雷達圖只是把既有的 per-domain 分數換一種畫法，沒有證據的構面畫在圓心並標記為未知，不會預設成中等）。案件詳情頁加上「報告式」頂部卡片（藍色頂邊、標題+中繼資料+決策 banner 合併呈現），視覺上更像正式報告而非內部後台表單。
+4. **「過人厲害之處」**——刻意沒有虛構一個假的整體信任分數／字母等級去製造噱頭：跨構面綜合評分是一個真實存在、故意留白的產品決策（見 3.），編一個看似厲害但沒有依據的公式，比誠實留白更糟。真正提升的是「這個系統的分析看起來是真的、有出處」這件事本身（雷達圖、每個分數旁邊都查得到來源證據卡片），這是誠實能做到的極限，商業定位/差異化賣點需要操作者自己決定。
+
+過程中查證 R0-R4 風險等級的實際定義來源（`AI_LEGO_Cognitive_Engineering_OS/specs/execution/risk-tier.schema.yaml`），發現這組列舉是借用一個跟 HCI 調查完全無關的系統（AI 任務執行風險分級），HCI 自己的語意從未定義過——按鍵式改版沒有藉機幫忙編造假語意，只保留既有的方向性提示（數字愈大愈敏感）。
+
+真跑驗證：`scripts/test-wave1-local.ps1` 241/241 斷言全過（含新增的 reopen 正向/負向測試），`scripts/mutation-check-wave1.ps1` 122/122 mutation 全殺（過程中兩個既有 mutation 的預測跟真跑結果不符，修正後才過——`weaken-case-closed-immutable` 需要把新的 `CLOSED→ACTIVE` 分支寫進它自己保留的舊版 trigger 副本，`drop-case-lifecycle-trigger`／`drop-cases-rls-policy` 兩個既有 mutation 的預期失敗清單也因為新增的 -218 測試案件而需要調整，兩次都是真跑後才發現理論推導有誤，不是憑空預測對）；down migration 真跑一次確認可逆。前端瀏覽器真跑：新建全空案件→按鍵選信任等級/調查目的送出→進入詳情頁看到雷達圖置中無資料→新增證據→切到評估類型選按鍵式構面/等級/引用→送出→雷達圖即時長出真實資料點、正確歸類到「重大風險」；重新開啟一筆歷史案件，狀態正確變回「進行中」且從歷史區移回進行中區；全程 console 零錯誤。
+
 **已知誠實留白（跨 session 討論過，非本次遺漏）**：`api/openapi/hci-v1.yaml` 仍是刻意的 skeleton-only，本次新增的 `POST /cases/:id/reopen` 未回填進去，與既有的 `/records`／`/decisions`／`/cases`／`/persons` 端點同一款既存缺口。
 
 REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=241/241 assertions PASSED，down/up 可逆性驗證通過
@@ -28,6 +103,14 @@ WORKLOG_DONE: 本條目
 
 [rollback]
 `git revert` 本次 commit：`0015_wave1_case_reopen_up/down.sql` 兩個新檔＋`server.mjs` 的 reopen 端點＋`index.html` 全部按鍵式/分區/雷達圖/視覺重做改動＋`scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1`／`database/tests/wave1-negative-tests.sql` 的對應測試/遷移接線＋兩份治理文件的訂正說明全部移除，回到純下拉選單、單一案件清單、無重開能力、靛藍配色的上一版（`b8a73403a`）。純新增＋既有 trigger 的 transition-list 擴充，無破壞性 schema 變更，可安全回滾。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=按鍵式建立全空案件→新增證據→切換評估類型看 14 個構面/5 個等級/動態引用依據按鈕全部一次可見→送出→雷達圖即時更新、正確歸類重大風險→重新開啟一筆歷史案件並確認移區 | 結果=全部符合預期，console 零錯誤，network 逐筆確認 200/201
+REVIEW_WAIVED: NA -- 前端改動沿用既有 esc()/label-map/RLS 模式無新資安面；後端 migration 0015 是純 trigger transition-list 擴充（無新表/新欄/新權限），真跑 241/241+122/122 已是比 critic 書面覆審更強的驗證（實際突變測試 vs 理論审查）；Low-Medium risk（核心 lifecycle 邏輯，但非破壞性、非 prod、僅合成資料）比照 AGENTS.md §3 直接做並全程記錄
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=pickChip\|renderRadar\|reopenCase\|enforce_case_lifecycle\|CASE-REOPEN | hits=多筆，逐一核對：`ADR-0020-case-engagement-aggregate.md`（gate 2 敘述 CLOSED 為終點，已補 Implementation note 訂正）＋`docs/domain/HCI_STATE_MACHINES.md`（狀態圖與「any transition out of CLOSED」文字皆已更新，該檔頭本身承諾「trigger 改動須同一 commit 更新」）＋`database/ERROR_CODE_REGISTRY.md`（H1010 來源欄補上 0015）皆為真缺口非誤報；`HCI_ENTITY_DICTIONARY.md` 命中為安全（僅轉介到已修正的 state-machines 文件，未獨立重述終點宣稱）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：`0015_wave1_case_reopen_up/down.sql` 兩個新檔＋`server.mjs` 的 reopen 端點＋`index.html` 全部按鍵式/分區/雷達圖改動＋`scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1`／`database/tests/wave1-negative-tests.sql` 的對應測試/遷移接線＋兩份治理文件的訂正說明全部移除，回到純下拉選單、單一案件清單、無重開能力的上一版（`b8a73403a`）。純新增＋既有 trigger 的 transition-list 擴充，無破壞性 schema 變更，可安全回滾。
 
 ## 2026-09-10 System Foundry：39 個 capability-item-map fragment 合併，抓到 4 類跨 fragment 衝突（80 個 triple，非只有指示的 3 個）
 

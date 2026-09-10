@@ -222,7 +222,7 @@ Then classify the digest before reporting any messages:
 ops_inbox_commands（使用者 Bot 指令）：區段訊息數 + 可操作項條列；**0 訊息 = 「操作者本輪無下指令」，正常；不代表無告警**
 deploy_events（VPS 部署事件，source=deploy from ops_inbox）：區段筆數 + FAILED/SUCCESS 條列；無則寫「本輪無部署事件」；`endpoint_pending` = 新端點尚未部署，屬正常
 Slack #ops-incidents / #infra-alerts: 區段訊息數（不過濾已讀）+ 最新一筆
-Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing.
+Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing. **If Overall: BLIND** (CF API token rejected with 401 — different from WARN, means the check learned nothing this run): surface this in 阻塞與風險 (§6), not buried as routine noise — it is the same severity class as a `blind_spots` entry in smoke-LATEST.json.
 Only include actionable items; skip routine noise.
 
 **3. 已完成**
