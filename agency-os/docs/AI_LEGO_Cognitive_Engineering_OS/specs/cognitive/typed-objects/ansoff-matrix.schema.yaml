@@ -1,0 +1,150 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/ansoff-matrix.schema.yaml"
+title: Ansoff Matrix
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AnsoffMatrix` -- the declared `outputs` of
+  `strategy.ansoff`'s Method Contract (methods/contracts/strategy.ansoff.contract.yaml,
+  `outputs: [AnsoffMatrix]`). Atlas cites this method ONCE: F08 tool table row (L524:
+  "Ansoff｜產品×市場成長策略｜penetration/development/product/diversification｜顯示不同風險｜Risk") -- the
+  thinnest F08 citation of any member built so far, no dedicated section.
+
+  Field provenance:
+    * `quadrants[].quadrant` -- Atlas's own 4 fragment-tokens, DISAMBIGUATED (not verbatim-transcribed) into
+      the 4 canonical Ansoff Growth Matrix quadrant names via real, independently-verified business-strategy
+      domain knowledge (see `ai_lego/modules/strategy/ansoff.py` module docstring and this method's own
+      contract `compilation_decisions` for the full disambiguation reasoning). A CLOSED set of exactly 4
+      names, each REQUIRED to appear EXACTLY ONCE.
+    * `quadrants[].risk_level`/`quadrants[].strategy_description` -- Atlas's own benefit line ("顯示不同風險")
+      is per-quadrant: each quadrant must disclose ITS OWN risk level, not just be named. `risk_level` is a
+      closed 3-value DISCLOSED judgment-call enum (never a computed score -- no citation supports a mechanical
+      formula, same restraint porter-five-forces-analysis.schema.yaml's `intensity` already establishes);
+      `strategy_description` is the free-text description of what this growth path concretely looks like.
+    * No top-level synthesis field (contrast `overall_attractiveness` on the Porter Five Forces sibling) --
+      Atlas's benefit for THIS method is distributed across the 4 quadrants, not a single conclusion. See
+      compilation_decisions.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Ansoff row (L524)"
+  - "methods/contracts/strategy.ansoff.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- same F08 family, closed-set-with-completeness precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/three-c-analysis.schema.yaml -- same family, no-evidence-labeling / no-top-level-synthesis-field precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  disambiguated transcription of Atlas L524's own cited fragment-list plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Closed enum with any-subset, positional tuple, or closed SET requiring completeness with no position?"
+    decision: "Closed set, completeness required, no position -- quadrants: minItems 4, maxItems 4, each quadrants[].quadrant a value from the 4-name enum; same shape porter-five-forces-analysis.schema.yaml's forces field already establishes for an analogous fixed-name-vocabulary structural method (see that file's own compilation_decisions for the precedent this reuses)."
+  - question: "Should risk_level be a numeric score instead of a LOW/MEDIUM/HIGH enum?"
+    decision: "3-value enum (LOW/MEDIUM/HIGH), task-mandated -- no Atlas citation supports a numeric scoring formula; mirrors porter-five-forces-analysis.schema.yaml's intensity field exactly."
+  - question: "Should a top-level field synthesize which quadrant is 'recommended' or state overall risk, matching porter-five-forces-analysis.schema.yaml's required overall_attractiveness?"
+    decision: "No -- Atlas's own stated benefit for Ansoff ('顯示不同風險') is distributed per-quadrant, not a single industry-level conclusion the way Porter's '長期產業吸引力' is. Adding one here would assert a synthesis step this citation does not support. See method contract's own compilation_decisions for the full comparison against both Porter (has a top-level field) and 3C (has one, fit_summary) siblings."
+  - question: "additionalProperties: false at the top level, and on the quadrants[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start here, not retrofitted (same discipline every sibling F08 schema in this batch already establishes)."
+  - question: "Does JSON Schema itself express 'all 4 distinct quadrant names present, order-independent'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality operator. minItems:4/maxItems:4 plus the per-item enum bounds the SHAPE; genuine distinctness-and-completeness is a runtime-only invariant, enforced at construction AND independently re-derived by a gate in ansoff.py -- same limitation-and-workaround class porter-five-forces-analysis.schema.yaml's own identical compilation_decision already documents."
+  - question: "A supporting_evidence_refs field per quadrant, matching porter-five-forces-analysis.schema.yaml?"
+    decision: "No -- this method's own quality.evidence_labeling_required is false (Atlas's L524 citation is a bare table row with no explicit unevidenced-claim misuse warning, thinner than strategy.three_c's citation which already set the same flag false for the identical reason). Adding the field with no gate to consume it would be a dead field; three-c-analysis.schema.yaml's own findings[] items establish the same no-field-when-no-gate precedent."
+
+type: object
+required: [id, version, quadrants]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ANSOFF-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as porter-five-forces-analysis.schema.yaml's PFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.ansoff"
+
+  quadrants:
+    type: array
+    minItems: 4
+    maxItems: 4
+    description: >
+      Atlas L524's own 4 fragment-tokens, disambiguated into the 4 canonical Ansoff Growth Matrix quadrant
+      names (see top-level description and compilation_decisions). SHAPE-bounded here to exactly 4 items;
+      genuine completeness (all 4 distinct names present, order-independent) is a runtime-only invariant this
+      schema cannot express -- enforced by ai_lego/modules/strategy/ansoff.py at both the builder and an
+      independent gate.
+    items:
+      type: object
+      required: [quadrant, strategy_description, risk_level, provenance]
+      additionalProperties: false
+      properties:
+        quadrant:
+          type: string
+          enum: [MARKET_PENETRATION, MARKET_DEVELOPMENT, PRODUCT_DEVELOPMENT, DIVERSIFICATION]
+          description: "The 4 canonical Ansoff Growth Matrix quadrants (existing/new product x existing/new market), disambiguated from Atlas L524's own 4 fragment-tokens -- see this file's top-level description."
+        strategy_description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What this growth path would concretely look like for the actual product/market in question -- REPORTED content, not computed."
+        risk_level:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          description: "DISCLOSED judgment-call enum, not a computed score. See compilation_decisions."
+        provenance:
+          description: "Per-quadrant provenance. Full provenance_record, same pattern porter-five-forces-analysis.schema.yaml's forces[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An Ansoff Matrix analysis for a regional SaaS product's growth-strategy options"
+    value:
+      id: "ANSOFF-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.ansoff"
+      quadrants:
+        - quadrant: MARKET_PENETRATION
+          strategy_description: "在既有市場加碼行銷與銷售資源，提高既有客群的滲透率與續約率"
+          risk_level: LOW
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - quadrant: MARKET_DEVELOPMENT
+          strategy_description: "既有產品原封不動，拓展至歐洲新市場，需在地化語言與合規調整"
+          risk_level: MEDIUM
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - quadrant: PRODUCT_DEVELOPMENT
+          strategy_description: "在既有客群基礎上推出進階分析模組，滿足既有客戶未被滿足的需求"
+          risk_level: MEDIUM
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - quadrant: DIVERSIFICATION
+          strategy_description: "跨入全新垂直領域（如醫療產業）推出全新產品線，產品與市場皆未驗證"
+          risk_level: HIGH
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-ANSOFFMATRIX-1"
+    question: "No top-level synthesis/recommendation field exists (see compilation_decisions) -- should a future pass add one once a dedicated Atlas section for Ansoff (if any) states a singular benefit the way Porter's own §12.11 does? (owner: operator)"
+  - id: "OQ-ANSOFFMATRIX-2"
+    question: "quadrants[].quadrant distinctness/completeness is a runtime-only invariant (see compilation_decisions) -- should a future pass add a JSON Schema if/then per-value-count constraint instead of relying solely on the runtime gate? Same open question porter-five-forces-analysis.schema.yaml's own OQ-PORTERFIVEFORCESANALYSIS-2 already discloses for an identical shape. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F08 table row (L524) directly. Grepped the whole Atlas file case-insensitively for
+    "ansoff"/"penetration"/"diversification" -- confirmed exactly 1 real hit, no dedicated section. Cross-
+    checked against methods/contracts/strategy.ansoff.contract.yaml's own outputs/preconditions/quality. Read
+    porter-five-forces-analysis.schema.yaml and three-c-analysis.schema.yaml in full as shape precedent before
+    writing this file. Validated against jsonschema Draft202012Validator via a standalone script (required
+    fields present, id pattern satisfied, quadrant enum closed per the disambiguated 4-name set,
+    additionalProperties:false present at both the top level and the quadrants[] item level from the start,
+    embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative controls for a
+    smuggled top-level key, a smuggled quadrants[] item key, and a <4/>4-item quadrants array).
+  note: >
+    `quadrant`'s four enum values are a DISAMBIGUATED reading of Atlas L524's own bare 4-token list (not a
+    verbatim transcription -- the citation itself is ambiguous, see this file's top-level description and the
+    method contract's own compilation_decisions for the full reasoning). `risk_level`/`strategy_description`'s
+    field split, the flat-record-plus-array shape, the closed-set-without-position runtime invariant, and the
+    deliberate absence of a top-level synthesis field are compilation decisions, disclosed above. No mother
+    document was modified to produce this file.

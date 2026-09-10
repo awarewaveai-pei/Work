@@ -1,0 +1,173 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stp-analysis.schema.yaml"
+title: STP Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StpAnalysis` -- the declared `outputs` of `strategy.stp`'s Method
+  Contract (methods/contracts/strategy.stp.contract.yaml, `outputs: [StpAnalysis]`). Atlas F08 L523 + §12.14
+  (L2705-2712) give the real Segmentation→Targeting→Positioning sequence -- 3 distinct, differently-shaped
+  required fields (`segments[]`, `targeting_decision`, `positioning_statement`), NOT a uniform prefixItems tuple
+  like `logic-model-record.schema.yaml`'s own 5 same-shaped stages, since STP's 3 stages are not uniform in
+  shape. The sequential Segmentation→Targeting dependency is enforced by REFERENTIAL INTEGRITY at the runtime
+  layer (`ai_lego/modules/strategy/stp.py`): `targeting_decision.targeted_segment_id` must resolve to a real
+  entry in `segments[]` -- same discipline `tows-matrix.schema.yaml`'s own pairings->SwotAnalysis.factors check
+  already establishes, scaled down to a single-record reference.
+
+  Field provenance:
+    * `segments[]` -- the Segmentation (stage 1) output, Atlas §12.14's own "先選 segment" half.
+    * `targeting_decision` -- the Targeting (stage 2) output; `targeted_segment_id` MUST resolve to a real
+      `segments[].id` (runtime-layer referential-integrity check, `referential_integrity_verified` below marks
+      that check having passed).
+    * `positioning_statement` -- the Positioning (stage 3) output, Atlas §12.14's own "再定位" half and its own
+      final, required deliverable.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, STP row (L523)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.14 市場區隔、目標市場與定位（STP）(L2705-2712)"
+  - "methods/contracts/strategy.stp.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/tows-matrix.schema.yaml -- referential-integrity + additionalProperties:false-from-the-start precedent reused here"
+  - "specs/cognitive/typed-objects/logic-model-record.schema.yaml -- named-sequential-stage precedent, disambiguated in compilation_decisions since STP's 3 stages are not uniform-shaped"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of a cited Atlas section plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should the 3 stages be a uniform prefixItems tuple (matching logic-model-record.schema.yaml's own 5 same-shaped stages) or 3 distinct top-level fields?"
+    decision: "3 distinct top-level fields (segments/targeting_decision/positioning_statement) -- STP's 3 stages are not uniform in shape (a list of segment objects, a single decision object, and a bare string), unlike logic_model's 5 identically-shaped {stage, description, provenance, indicators?} entries. Forcing STP into one uniform shape would either strip segments[] of its own criteria[] structure or add unused fields to targeting_decision/positioning_statement."
+  - question: "Should this schema carry a referential_integrity_verified marker, mirroring tows-matrix.schema.yaml's own field of the same name?"
+    decision: "Yes -- same class of check (a field resolving to a real id inside a real collection), scaled down to a single-record reference. Does NOT carry tows-matrix.schema.yaml's own computation_provenance_ref sibling field: TOWS's pairing_type is a GENUINE_COMPUTE derived value (a function of two factor categories); STP's targeted_segment_id is a caller CHOICE, not a computed value, so there is no computing function to cite a provenance_ref for."
+  - question: "Do segments[] items or targeting_decision carry their own provenance, matching logic-model-record.schema.yaml's per-stage provenance or swot-analysis.schema.yaml's per-factor provenance?"
+    decision: "No -- only the overall record's top-level `provenance` field. Matches tows-matrix.schema.yaml's own pairings[] shape (no per-pairing provenance) rather than logic_model/swot's per-item provenance, because this method's own quality.evidence_labeling_required is false (see method contract) -- there is no per-item epistemic-type check that would need a per-item provenance record to check against."
+  - question: "additionalProperties: false at the top level and inside segments[] items and targeting_decision?"
+    decision: "Yes, from the start -- same baseline hygiene synthetic-control-record.schema.yaml's own note documents was caught missing on 2 earlier sibling schemas by a critic hand-tamper PoC (2026-09-10 session); applied here from the first draft, not retrofitted."
+
+type: object
+required: [id, version, segments, targeting_decision, positioning_statement, referential_integrity_verified, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^STP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as tows-matrix.schema.yaml's TOWS- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.stp"
+
+  segments:
+    type: array
+    minItems: 1
+    description: >
+      Segmentation (stage 1) output -- one or more identified market segments, per Atlas §12.14's own "先選
+      segment" half. Non-empty is a real invariant (STP_EMPTY_SEGMENTS): Segmentation producing zero segments
+      has not done this method's job.
+    items:
+      type: object
+      required: [id, description, criteria]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. STP-001-S1). Referenced by targeting_decision.targeted_segment_id."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Human-readable label for this segment (e.g. 'price-sensitive solo freelancers')."
+        criteria:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Non-empty list of defining criteria that delineate this segment (e.g. firmographic/behavioral/geographic cut lines)."
+        supporting_evidence_refs:
+          type: array
+          items: {type: string, pattern: "^E-[0-9]+$"}
+          description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses. OPTIONAL -- this method's own evidence_labeling_required is false."
+
+  targeting_decision:
+    type: object
+    required: [targeted_segment_id, rationale]
+    additionalProperties: false
+    description: "Targeting (stage 2) output -- which ONE of the identified segments[] this analysis pursues, and why."
+    properties:
+      targeted_segment_id:
+        type: string
+        description: >
+          MUST resolve (runtime-layer referential-integrity check, ai_lego/modules/strategy/stp.py) to a real
+          segments[].id in THIS SAME record -- Targeting cannot choose a segment Segmentation never identified.
+      rationale:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "REQUIRED, non-empty, disclosed reason this segment (and not another identified one) was chosen."
+
+  positioning_statement:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Positioning (stage 3) output -- REQUIRED, non-empty, disclosed content. Atlas §12.14's own final,
+      required stage ("再定位"); an StpAnalysis with no positioning content has not completed the method its own
+      name promises (see method contract's own `description`).
+
+  referential_integrity_verified:
+    const: true
+    description: >
+      Two-layer discipline mirroring tows-matrix.schema.yaml's own field of the same name: set True only after
+      targeting_decision.targeted_segment_id's referential integrity against segments[] passes at construction;
+      independently re-derived (not trusted) by evaluate_stp_integrity_gate from raw fields.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in
+      this directory uses. No `const`: epistemic_type legitimately varies by whether this record documents an
+      AI-drafted or human-approved STP analysis.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An STP analysis identifying 2 segments, targeting 1 of them, with a disclosed positioning statement"
+    value:
+      id: "STP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.stp"
+      segments:
+        - id: "STP-2026-09-11-001-S1"
+          description: "價格敏感的獨立接案者"
+          criteria: ["個人工作室規模", "月預算低於 $50", "自助服務偏好高"]
+        - id: "STP-2026-09-11-001-S2"
+          description: "中型行銷代理商"
+          criteria: ["5-50 人團隊規模", "需要多客戶白牌功能", "願付年約"]
+      targeting_decision:
+        targeted_segment_id: "STP-2026-09-11-001-S2"
+        rationale: "中型代理商的年約續約率與客單價都顯著高於獨立接案者區段，且白牌需求與現有產品能力直接吻合"
+      positioning_statement: "For 中型行銷代理商 who need to run multiple client brands from one workspace, [Product] is the white-label campaign platform that lets a 5-person team deliver agency-grade reporting without hiring a dedicated ops person."
+      referential_integrity_verified: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null}
+
+open_questions:
+  - id: "OQ-STPANALYSIS-1"
+    question: "targeting_decision.targeted_segment_id -> real segments[].id resolution is a runtime-only invariant, not schema-expressible (JSON Schema cannot cross-reference a sibling array's item ids) -- same class of disclosed gap tows-matrix.schema.yaml's own OQ-TOWSMATRIX-1 already documents."
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+  - id: "OQ-STPANALYSIS-2"
+    question: "targeting_decision is single-segment only (targeted_segment_id, not targeted_segment_ids[]) -- see method contract's own OQ-STP-3 for the full disclosure."
+    owner: "operator, or whoever next needs multi-segment targeting support"
+
+verification:
+  method: >
+    Read Atlas F08 table (L500-536) and §12.14 (L2705-2712) directly at the cited lines. Read
+    tows-matrix.schema.yaml and logic-model-record.schema.yaml in full as shape precedent before writing this
+    file. Validated against jsonschema Draft202012Validator (required fields present, id pattern satisfied,
+    additionalProperties:false present at the top level AND inside both segments[] items AND targeting_decision
+    from the start, embedded example resolved through its real $ref to epistemic-label.schema.yaml).
+  note: >
+    segments[]/targeting_decision/positioning_statement field names are this contract's own naming (Atlas does
+    not give formal field labels, only the Segmentation→Targeting→Positioning sequence). The overall record
+    shape, the referential_integrity_verified two-layer marker, and the single-targeted-segment design are
+    Phase-3-class compilation decisions, disclosed above. No mother document was modified to produce this file.

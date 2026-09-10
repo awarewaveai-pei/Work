@@ -1,0 +1,173 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/value-chain-analysis.schema.yaml"
+title: Value Chain Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ValueChainAnalysis` -- outputs
+  of `strategy.value_chain`'s Method Contract (outputs: [ValueChainAnalysis]).
+  Atlas F08 row (L522) gives this method's whole real content: activities
+  split into 2 fixed categories (PRIMARY/SUPPORT), each analyzed for
+  cost/value drivers, to find high-leverage points. `category` is a closed
+  2-value enum (the only split Atlas's citation names); `activity_name`
+  stays free-text (Atlas names none of Porter's real 9 sub-activities by
+  name -- see compilation_decisions); `leverage_points` is required and
+  disclosed (not computed) -- this method's own defining benefit IS finding
+  leverage points.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Value Chain row (L522)"
+  - "methods/contracts/strategy.value_chain.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/three-c-analysis.schema.yaml -- same family, sibling shape (flat array + closed category enum + contains/minContains coverage) reused as this file's structural template, generalized from 3-way to 2-way"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- disclosure-only field precedent (leverage_points modeled on analysis_summary)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in
+  this directory documents: direct transcription of 1 cited Atlas section
+  plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "additionalProperties: false at the top level and on each activities[] item?"
+    decision: "Yes on both, from the first draft, per this batch's own explicit instruction and every sibling record schema's baseline hygiene."
+  - question: "Free-text activity_name, or a closed 9-value enum naming Porter's real sub-activities?"
+    decision: "Free-text -- Atlas's own citation names zero of Porter's real 9 sub-activities (inbound logistics/operations/outbound logistics/marketing & sales/service; firm infrastructure/HR/technology development/procurement) by name, only the 2-category primary/support split itself; see the method contract's own compilation_decisions for the full disclosure."
+  - question: "Should cost_driver and value_driver both be required keys per activity?"
+    decision: "No -- both are optional properties, but an item-level anyOf requires at least one to be present (and each, if present, is a non-empty string) -- Atlas's own citation writes 'cost/value drivers' as a slash-joined either/or, same notation style as 'primary/support' itself."
+  - question: "How to enforce >=1 activity per category at the schema layer?"
+    decision: "allOf of 2 contains/minContains constraints (one per category value), same Draft-2020-12 technique three-c-analysis.schema.yaml's own 3-way constraint already establishes, generalized here to 2 categories -- belt-and-suspenders alongside the Python builder + independent gate, not a replacement for either."
+  - question: "Should leverage_points carry a GENUINE_COMPUTE field (e.g. leverage_score, engine)?"
+    decision: "No -- no algorithm here computes 'leverage' from qualitative cost/value driver statements; omitting engine/computation_provenance_ref entirely is itself the honest disclosure, same convention three-c-analysis.schema.yaml's own fit_summary and rct-record.schema.yaml's own analysis_summary already establish."
+  - question: "A separate record-level provenance field, matching rct-record.schema.yaml's single top-level provenance?"
+    decision: "No -- each activities[] item already carries its own provenance (same per-item convention three-c-analysis.schema.yaml uses); leverage_points is a synthesis OF those activities, not an independent new claim needing its own provenance slot."
+
+type: object
+required: [id, version, activities, leverage_points]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^VALUECHAIN-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as three-c-analysis.schema.yaml's 3C- prefix and rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.value_chain"
+    description: "Which method produced this analysis."
+
+  activities:
+    type: array
+    minItems: 2
+    description: >
+      One or more activities per category; must cover both PRIMARY and
+      SUPPORT (see the allOf contains/minContains constraint below). Atlas
+      gives no field-level sub-structure for individual activities beyond
+      category + cost/value drivers (thinner citation than SWOT's own
+      factors).
+    items:
+      type: object
+      required: [id, category, activity_name, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. VALUECHAIN-001-A1)."
+        category:
+          type: string
+          enum: [PRIMARY, SUPPORT]
+          description: "Atlas's own 2-way split (F08 L522). See compilation_decisions -- closed enum, not free-form."
+        activity_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The value activity itself, in natural language. Free-text -- see compilation_decisions on why this is not a closed 9-value Porter sub-activity enum."
+        cost_driver:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What drives this activity's cost. Optional key, but see the item-level anyOf below -- at least one of cost_driver/value_driver is required."
+        value_driver:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What drives this activity's value/differentiation. Optional key, but see the item-level anyOf below -- at least one of cost_driver/value_driver is required."
+        provenance:
+          description: "Full provenance_record, same pattern every sibling typed-object schema in this directory uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      anyOf:
+        - required: [cost_driver]
+        - required: [value_driver]
+    allOf:
+      - contains: { properties: { category: { const: PRIMARY } } }
+        minContains: 1
+      - contains: { properties: { category: { const: SUPPORT } } }
+        minContains: 1
+
+  leverage_points:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      DISCLOSURE-ONLY, REPORTED conclusion naming the high-leverage
+      point(s) across the decomposed activities (Atlas's own "→找高槓桿點",
+      L522) -- not computed by this record (see method contract's own
+      compilation_decisions). Provenance for the underlying claims is each
+      activity's own `provenance` field; see compilation_decisions for why
+      there is no separate record-level provenance field.
+
+examples:
+  - description: "A value chain analysis with one PRIMARY and one SUPPORT activity, evidence-backed, concluding a high-leverage point"
+    value:
+      id: "VALUECHAIN-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.value_chain"
+      activities:
+        - id: "VALUECHAIN-2026-09-11-001-A1"
+          category: PRIMARY
+          activity_name: "結帳流程出貨作業（outbound logistics）"
+          cost_driver: "人工揀貨與包裝耗時，隨訂單量線性增加"
+          value_driver: "出貨時效直接影響客戶回購率"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "VALUECHAIN-2026-09-11-001-A2"
+          category: SUPPORT
+          activity_name: "結帳頁面前端開發（technology development）"
+          value_driver: "既有 A/B 測試框架可直接重用，縮短新功能上線時間"
+          provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_APPROVED, locked: null }
+      leverage_points: "結帳頁面前端開發（SUPPORT，既有框架可重用）對出貨作業（PRIMARY，時效驅動回購率）的支援槓桿最大，優先投資此處可同時降低開發成本並提升主活動價值"
+
+open_questions:
+  - id: "OQ-VALUECHAINANALYSIS-1"
+    question: "category coverage is uncapped (no maxContains) -- should a future pass also bound activities-per-category?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-VALUECHAINANALYSIS-2"
+    question: "leverage_points is one flat string, not a structured ranked list of leverage points -- Atlas gives no field-level structure for '高槓桿點' itself."
+    owner: "operator, or whoever next needs a structured leverage-point ranking"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F08 table (L511-528) directly. Read three-c-analysis.schema.yaml
+    and rct-record.schema.yaml in full as shape precedent before writing this
+    file. Validated against jsonschema Draft202012Validator via a standalone
+    script (required fields present, id pattern satisfied, category enum
+    closed, additionalProperties:false present from the start on both the
+    top level and activities[] items, the allOf contains/minContains
+    category-coverage constraint, the item-level anyOf driver constraint, a
+    negative control confirming a PRIMARY-only activities array is rejected,
+    a negative control confirming an activity with neither cost_driver nor
+    value_driver is rejected, a negative control confirming a smuggled
+    top-level and smuggled item-level key are both rejected, and the
+    embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml).
+  note: >
+    activities[].category's 2 values transcribed verbatim from Atlas's
+    citation. The overall object shape (id/version/activities[]/
+    leverage_points), the free-text activity_name, the anyOf driver
+    constraint, and the contains/minContains coverage technique are Phase
+    3-class compilation decisions, explicitly flagged above in
+    compilation_decisions. No mother document was modified.

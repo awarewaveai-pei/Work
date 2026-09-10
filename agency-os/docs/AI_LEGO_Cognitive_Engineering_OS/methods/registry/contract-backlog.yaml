@@ -2975,6 +2975,276 @@ tier_1:
     source: "methods/contracts/strategy.tows.contract.yaml + specs/cognitive/typed-objects/tows-matrix.schema.yaml + ai_lego/modules/strategy/tows.py"
     note: "59 tests pass. F08 strategy family: 1 of 14 built before this batch (strategy.swot); strategy.steepv/strategy.porter_five_forces/strategy.pestel/strategy.three_c already landed before this entry (grep-confirmed via this file's own onehundredsixth/onehundredseventh/onehundredeighth/onehundredninth_concrete_entry keys, read but not modified) -- this entry (strategy.tows) is F08's 6th member and the LAST of this batch's 5 concurrent builds -- F08 is 6/14 (1 pre-batch + 5 this batch), NOT complete (8 more F08 rows remain). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 5 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the schema's own embedded example resolved through its real $ref to epistemic-label.schema.yaml, and negative-control checks for a smuggled top-level key, a smuggled pairings[] item key, and an out-of-enum pairing_type -- all correctly rejected, 0 false negatives. CLI demo (python -m ai_lego.apps.cli.run_tows_slice) prints PASS and exits 0, building a REAL SwotAnalysis via swot.py's own real functions then a REAL TowsMatrix against it (genuine SWOT->TOWS chain, not a mock), demonstrating 3 real construction-time refusals (caller-supplied pairing_type, internal/external category swap, unknown factor id) plus 1 independent-gate hand-tamper catch (pairing_type corrupted on an already-valid matrix's raw dict, re-checked against the same real SwotAnalysis, never going back through the builder). Grepped the whole ai_lego tree case-insensitively for 'tows' both before writing (zero pre-existing implementation -- one unrelated forward-reference mention in docs/THIRD_SLICE_STRATEGY_SWOT.md's own §14.1 quote) and after (only this method's own 5 files plus a single purely-descriptive citation inside strategy.three_c.py's own docstring, naming TOWS by way of Atlas's F08 'SWOT/TOWS' pairing column -- no shared code, no collision with any of the 4 concurrent sibling builds)."
 
+  onehundredeleventh_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F08 strategy-family
+    # builds -- strategy.vrio/strategy.value_chain/strategy.stp land concurrently
+    # via 3 sibling agents, none read here beyond this file's own keys/notes;
+    # re-read this file's own tail immediately before appending per this batch's
+    # own instruction -- onehundredtenth_concrete_entry (strategy.tows) was the
+    # last entry present at the time this one landed, no other collision
+    # observed. Orchestrating session reconciles exact numbering on any later
+    # collision, same pattern ninetysixth_concrete_entry's own note already
+    # establishes.
+    method_id: "strategy.ansoff"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/`three_c`/
+      `tows`/`porter_five_forces` already built, F08 was 6/14 before this batch;
+      sibling `strategy.vrio`/`strategy.value_chain`/`strategy.stp` land
+      concurrently in this same batch, none read here). Atlas cites this method
+      ONCE: F08 table row (L524: "Ansoff｜產品×市場成長策略｜penetration/
+      development/product/diversification｜顯示不同風險｜Risk") --
+      grep-confirmed the ONLY real hit for "ansoff"/"penetration"/
+      "diversification" case-insensitively, no dedicated section (thinnest F08
+      citation of any member built so far, thinner than strategy.three_c's own
+      table-row+§12.12 pair). DISAMBIGUATION (task-mandated, disclosed): Atlas's
+      row gives 4 fragment-tokens, not the 4 full canonical Ansoff Growth Matrix
+      names -- "development" alone is ambiguous between market-development and
+      product-development. Resolved via the real, independently-verified,
+      standard Ansoff Matrix (product x market 2x2): token 1 "penetration" ->
+      MARKET_PENETRATION and token 4 "diversification" -> DIVERSIFICATION
+      (both unambiguous), then by elimination token 3 "product" ->
+      PRODUCT_DEVELOPMENT and token 2 "development" -> MARKET_DEVELOPMENT --
+      corroborated (not proven) by the token order matching the standard
+      low-to-high risk convention Atlas's own benefit column describes. Real
+      invariants, both enforced at construction AND independently re-derived by
+      a gate from raw fields: (1) `quadrants` names EXACTLY the 4 disambiguated
+      quadrants, each exactly once, in ANY order -- same closed-SET-with-
+      completeness-no-position shape `strategy.porter_five_forces`'s own
+      `FORCE_NAMES` already establishes for an analogous fixed-name-vocabulary
+      structural method (4-way instead of 5-way); (2) every quadrant entry
+      carries a non-empty `strategy_description` and a disclosed `risk_level`
+      in {LOW, MEDIUM, HIGH} -- Atlas's own benefit ("顯示不同風險") demands
+      each quadrant actually assess its own risk, never mechanically scored or
+      hardcoded per quadrant name (no citation supports a formula). UNLIKE
+      Porter, deliberately NO top-level synthesis field (no
+      `overall_attractiveness`-equivalent) -- Ansoff's own benefit is
+      distributed per-quadrant, not a single industry-level conclusion, so
+      adding one would assert a synthesis step this citation does not support
+      (disclosed comparison in both the contract and typed-object schema's own
+      compilation_decisions). `quality.evidence_labeling_required: false` --
+      same reasoning `strategy.three_c.contract.yaml` already establishes for a
+      thin table-row-only citation with no explicit unevidenced-claim misuse
+      warning, one level more conservative given Ansoff's even thinner single-
+      row citation. `inputs.required: []`/`forbidden_transition: []`/
+      `recommended_next: []` -- no citation names an upstream dependency, a
+      §14.1-style illegal chain, or an existing sibling machine_id for L524's
+      own "Risk" best-combo column (no strategy.risk contract exists yet,
+      disclosed in open_questions).
+    source: "methods/contracts/strategy.ansoff.contract.yaml + specs/cognitive/typed-objects/ansoff-matrix.schema.yaml + ai_lego/modules/strategy/ansoff.py"
+    note: "52 tests pass. F08 strategy family: 6 of 14 built before this entry (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces) -- this entry (strategy.ansoff) is F08's 7th member; strategy.vrio/strategy.value_chain/strategy.stp are this batch's 3 other concurrent builds, not read or verified here (each responsible for its own registry entry). F08 is 7/14 after this entry, NOT complete (7 more F08 rows remain: BCG, Blue Ocean, Business Model Canvas, Value Proposition Canvas, plus this batch's 3 siblings pending their own entries). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, quadrant/risk_level enums closed, additionalProperties:false present at both the top level and the quadrants[] item level, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 7 negative controls (smuggled top-level key, smuggled quadrants[] item key, 3-item and 5-item quadrants arrays, unknown quadrant enum value, unknown risk_level enum value, missing required id) all correctly rejected -- 0 false negatives, all positive checks 0 errors. CLI demo (python -m ai_lego.apps.cli.run_ansoff_slice) prints PASS and exits 0, demonstrating 2 real construction-time refusals (ANSOFF_INCOMPLETE_QUADRANT_SET on a quadrant set missing DIVERSIFICATION, ANSOFF_EMPTY_STRATEGY_DESCRIPTION) plus 1 independent-gate hand-tamper catch (a quadrant dropped and duplicated on an already-valid record's raw dict, bypassing the builder entirely). Grepped the whole ai_lego tree case-insensitively for 'ansoff' both before writing (zero pre-existing implementation -- one doc-only hit in ai_lego/modules/strategy/__init__.py's own 'Remaining 8' list) and after (only this method's own 5 files plus this registry entry and 3 sibling batch files' own docstrings mentioning 'ansoff' by name as a not-yet-landed sibling at the time they were written -- no shared code, no collision)."
+
+  onehundredtwelfth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F08 strategy-family
+    # builds -- strategy.vrio/strategy.ansoff/strategy.stp land concurrently via
+    # 3 sibling agents, none read here beyond this file's own keys/notes;
+    # re-read this file's own tail immediately before appending per this
+    # batch's own instruction -- onehundredeleventh_concrete_entry
+    # (strategy.ansoff) was the last entry present at the time this one
+    # landed, no other collision observed. Orchestrating session reconciles
+    # exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes.
+    method_id: "strategy.value_chain"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/
+      `three_c`/`tows`/`porter_five_forces` already built, F08 was 6/14
+      before this batch; sibling `strategy.vrio`/`strategy.ansoff`/
+      `strategy.stp` land concurrently in this same batch, none read here
+      beyond this file's own keys/notes). Atlas cites this method ONCE: F08
+      table row (L522: "Value Chain｜拆價值活動｜primary/support→cost/value
+      drivers｜找高槓桿點｜Benchmarking") -- grep-confirmed the ONLY real
+      citation (2 total "Value Chain" hits whole-file case-insensitive: this
+      row L522, and VRIO's own row L521 whose OWN "最佳搭配" column names
+      "Value Chain" as VRIO's next step -- VRIO's own field, not read or
+      reused here). No dedicated §12.x section, no worked example, no §14.1
+      transition example. DESIGN DECISION (task-mandated, disclosed): Atlas's
+      row names only the 2-category primary/support split, NOT Porter's real
+      9 named sub-activities (inbound logistics/operations/outbound
+      logistics/marketing & sales/service; firm infrastructure/HR/technology
+      development/procurement) -- resolved via the same restraint
+      `causal.process_tracing`'s own Van Evera citation establishes (name the
+      real external methodology for grounding, restrict typed fields to
+      exactly what Atlas's own row literally names; there Atlas named 2 of
+      Van Evera's real 4 test types, here Atlas names 0 of Porter's real 9
+      sub-activities). `category` stays a closed 2-value enum
+      {PRIMARY, SUPPORT}; `activity_name` stays free-text, not a closed
+      9-value Porter sub-activity enum. Real invariants, all enforced at
+      construction AND independently re-derived by a gate from raw fields:
+      (1) `activities` covers both PRIMARY and SUPPORT (>=1 entry each) --
+      Atlas's own "primary/support" is the method's defining split, same
+      "both categories must be covered" completeness pattern
+      `strategy.three_c`'s own dimension-coverage invariant establishes,
+      generalized from 3-way to 2-way; also enforced at the schema layer via
+      `allOf` of 2 `contains`/`minContains:1` constraints; (2) every activity
+      discloses a non-empty `cost_driver` and/or `value_driver` (item-level
+      schema `anyOf` + builder + gate) -- Atlas's own citation names
+      "cost/value drivers" as the method's whole analytical output, at least
+      one not both required since Atlas's own "cost/value" is a slash-joined
+      either/or, same notation style as "primary/support" itself; (3)
+      `leverage_points` is a required, DISCLOSURE-ONLY non-empty string --
+      Atlas's own citation IS "→找高槓桿點", same disclosure-only restraint
+      `strategy.three_c`'s own `fit_summary` establishes, no algorithm here
+      computes "leverage" from qualitative driver statements.
+      `quality.evidence_labeling_required: false` -- same class
+      `strategy.three_c`'s own quality block already establishes for a thin
+      citation with no cited evidence-misuse risk. `inputs.required: []` --
+      no upstream typed-object dependency cited. `recommended_next: []` --
+      Atlas L522's own "最佳搭配" names "Benchmarking", no
+      strategy.benchmark/strategy.benchmarking contract exists yet anywhere
+      in this corpus (same gap class strategy.porter_five_forces' own
+      OQ-PORTERFIVEFORCES-1 already discloses), disclosed in open_questions
+      alongside the unresolved VRIO reverse-pairing question (OQ-VALUECHAIN-4).
+    source: "methods/contracts/strategy.value_chain.contract.yaml + specs/cognitive/typed-objects/value-chain-analysis.schema.yaml + ai_lego/modules/strategy/value_chain.py"
+    note: "50 tests pass. F08 strategy family: 7 of 14 built before this entry (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/ansoff, per onehundredeleventh_concrete_entry's own count) -- this entry (strategy.value_chain) is F08's 8th member; strategy.vrio/strategy.stp are this batch's 2 other concurrent builds, not read or verified here (each responsible for its own registry entry). F08 is 8/14 after this entry, NOT complete (6 more F08 rows remain: BCG, Blue Ocean, Business Model Canvas, Value Proposition Canvas, plus this batch's 2 remaining siblings pending their own entries). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, category enum closed, additionalProperties:false present at both the top level and the activities[] item level, the allOf contains/minContains category-coverage constraint, the item-level anyOf driver constraint, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 10 negative controls (fewer than 2 activities, PRIMARY-only activities, SUPPORT-only activities, an activity with neither driver, smuggled top-level key, smuggled activity-item key, invalid category enum value, missing id prefix, empty leverage_points, plus the unmodified valid example as a positive control) all correctly rejected/accepted -- 0 false negatives, 0 false positives. CLI demo (python -m ai_lego.apps.cli.run_value_chain_slice) prints PASS and exits 0, demonstrating 3 real construction-time refusals (VALUECHAIN_MISSING_CATEGORY_COVERAGE on an activities set missing SUPPORT, VALUECHAIN_MISSING_DRIVER on a driverless activity, VALUECHAIN_EMPTY_LEVERAGE_POINTS) plus 1 independent-gate hand-tamper catch (an activity's category mutated on an already-valid record's raw dict, bypassing the builder entirely). Grepped the whole ai_lego tree case-insensitively for 'value_chain'/'ValueChain' both before writing (zero pre-existing implementation) and after (only this method's own 5 files plus this registry entry and strategy.vrio's own OQ-VRIO-1 mentioning 'strategy.value_chain' by name as a not-yet-landed sibling at the time it was written -- no shared code, no collision)."
+
+  onehundredthirteenth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F08 strategy-family
+    # builds -- strategy.vrio/strategy.ansoff/strategy.value_chain/strategy.stp
+    # land concurrently via 4 sibling agents, none read here beyond this file's
+    # own keys/notes; re-read this file's own tail immediately before appending
+    # per this batch's own instruction -- onehundredtwelfth_concrete_entry
+    # (strategy.value_chain) was the last entry present at the time this one
+    # landed (onehundredeleventh_concrete_entry was strategy.ansoff before it),
+    # no other collision observed. Orchestrating session reconciles exact
+    # numbering on any later collision, same pattern ninetysixth_concrete_entry's
+    # own note already establishes. strategy.vrio remains outstanding as this
+    # batch's 1 remaining concurrent build.
+    method_id: "strategy.stp"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/`three_c`/
+      `tows`/`porter_five_forces`/`ansoff`/`value_chain` already built, F08 was
+      8/14 before this entry; sibling `strategy.vrio` lands concurrently in
+      this same batch, not read here beyond this file's own keys/notes). Atlas
+      cites this method TWICE: F08 table row (L523: "STP｜市場分群/選擇/定位｜
+      Segmentation→Targeting→Positioning｜避免一體適用｜JTBD") + dedicated
+      §12.14 (L2705-2712: 用途「決定不是「賣給所有人」，而是先選 segment 再
+      定位」，搭配 "JTBD / Survey → STP → Value Proposition"). Genuinely
+      SEQUENTIAL 3-stage pipeline per the method's own name and arrow notation
+      -- unlike this batch's `strategy.value_chain`/`strategy.ansoff`
+      (independent-dimension/fixed-quadrant shapes) or `causal.logic_model`'s
+      own uniform 5-tuple prefixItems pipeline, STP's 3 stages
+      (`segments[]`/`targeting_decision`/`positioning_statement`) are NOT
+      uniform in shape, so the sequential Segmentation→Targeting dependency is
+      enforced via REFERENTIAL INTEGRITY instead of array position --
+      `targeting_decision.targeted_segment_id` must resolve to a real id
+      inside `segments[]`, same class of check `strategy.tows`'s pairings->
+      SwotAnalysis.factors check already establishes, scaled down to a
+      single-record (not cross-record) reference. Real invariants, all
+      enforced at construction (builder raise) AND independently re-derived by
+      `evaluate_stp_integrity_gate` from raw fields: (1) `segments` non-empty
+      (STP_EMPTY_SEGMENTS) -- Segmentation (stage 1) must produce at least one
+      real segment; (2) every segment carries a non-empty, unique id, a
+      non-empty description, and a non-empty criteria[]
+      (STP_SEGMENT_MISSING_ID / STP_DUPLICATE_SEGMENT_ID /
+      STP_SEGMENT_MISSING_DESCRIPTION / STP_SEGMENT_MISSING_CRITERIA); (3)
+      `targeting_decision.targeted_segment_id` resolves to a real segments[]
+      entry (STP_UNKNOWN_TARGET_SEGMENT_ID) -- Targeting (stage 2) cannot
+      choose a segment Segmentation never identified, the citation's own
+      sequential dependency made mechanically checkable; (4)
+      `targeting_decision.rationale` non-empty
+      (STP_EMPTY_TARGETING_RATIONALE); (5) `positioning_statement` non-empty
+      and disclosed (STP_EMPTY_POSITIONING_STATEMENT) -- Positioning (stage
+      3), Atlas's own final, required stage; an STP record with no
+      positioning content has not completed the method its own name
+      promises. `cognitive_primitives` [DECOMPOSE, SELECT, EXPLAIN] is
+      INFERRED (Atlas §4 gives no STP formula), disclosed in open_questions.
+      `inputs.required: []` -- Atlas §12.14's own "JTBD / Survey" upstream
+      companion has no contract/typed-object anywhere in this spec root
+      (grep-confirmed). `recommended_next: []` -- §12.14's genuine downstream
+      ("Value Proposition") also has no contract yet; the F08 table's own
+      column-5 value for STP ("JTBD", L523) is actually the UPSTREAM
+      companion per §12.14's own arrow, not a downstream next step, disclosed
+      as OQ-STP-2 rather than cited backwards.
+    source: "methods/contracts/strategy.stp.contract.yaml + specs/cognitive/typed-objects/stp-analysis.schema.yaml + ai_lego/modules/strategy/stp.py"
+    note: "49 tests pass. F08 strategy family: 8 of 14 built before this entry (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/ansoff/value_chain, per onehundredtwelfth_concrete_entry's own count) -- this entry (strategy.stp) is F08's 9th member; strategy.vrio is this batch's 1 other remaining concurrent build, not read or verified here (responsible for its own registry entry). F08 is 9/14 after this entry, NOT complete (5 more F08 rows remain: BCG, Blue Ocean, Business Model Canvas, Value Proposition Canvas, plus this batch's 1 remaining sibling pending its own entry). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, additionalProperties:false present at the top level AND inside both segments[] items AND targeting_decision, referential_integrity_verified const:true enforced, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 11 negative controls (missing required top-level field, missing required segment field, empty criteria[], empty segments[], smuggled top-level key, smuggled segments[] item key, smuggled targeting_decision key, wrong id pattern, referential_integrity_verified=false, invalid epistemic_type via the real $ref, missing targeted_segment_id) all correctly rejected, plus a null-locked positive control and the unmodified valid example both correctly accepted -- 0 false negatives, 0 false positives. CLI demo (python -m ai_lego.apps.cli.run_stp_slice) prints PASS and exits 0, demonstrating 3 real construction-time refusals (STP_EMPTY_SEGMENTS, STP_UNKNOWN_TARGET_SEGMENT_ID, STP_EMPTY_POSITIONING_STATEMENT) plus 1 independent-gate hand-tamper catch (targeted_segment_id corrupted to a nonexistent id on an already-valid analysis' raw dict, never going back through the builder). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'strategy.stp'/'StpAnalysis' both before writing (zero pre-existing implementation) and after (only this method's own 5 files plus this registry entry and strategy.value_chain's own docstring mentioning 'strategy.stp' by name as a not-yet-landed sibling at the time it was written -- no shared code, no collision with any of the other 3 concurrent sibling builds)."
+
+  onehundredfourteenth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F08 strategy-family
+    # builds -- strategy.ansoff/strategy.value_chain/strategy.stp/strategy.vrio
+    # land concurrently via 4 sibling agents, none read here beyond this file's
+    # own keys/notes; re-read this file's own tail immediately before appending
+    # per this batch's own instruction -- onehundredeleventh_concrete_entry
+    # (strategy.ansoff), onehundredtwelfth_concrete_entry (strategy.value_chain),
+    # and onehundredthirteenth_concrete_entry (strategy.stp) were all already
+    # taken by the time this entry landed, no other collision observed. This is
+    # the LAST of this batch's 4 concurrent builds -- F08 is 10/14 after this
+    # batch lands (4 more F08 rows remain: BCG, Blue Ocean, Business Model
+    # Canvas, Value Proposition Canvas, NOT complete). Orchestrating session
+    # reconciles exact numbering on any later collision and rewrites
+    # ai_lego/modules/strategy/__init__.py's own shared family docstring now
+    # that all 4 of this batch are confirmed landed, same pattern
+    # ninetysixth_concrete_entry's own note already establishes.
+    method_id: "strategy.vrio"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/
+      `three_c`/`tows`/`porter_five_forces`/`ansoff`/`value_chain`/`stp`
+      already built, F08 was 9/14 before this entry). Atlas cites this method
+      TWICE: F08 table row (L521: "VRIO｜判斷資源優勢｜Value/Rarity/
+      Imitability/Organization｜找可防禦優勢｜Value Chain") and dedicated
+      §12.13 (L2689-2701, the 4-dimension code block plus the method's own
+      stated benefit: prevents conflating "we have this capability" with "we
+      have a moat"). Real invariants, all grounded in L521/§12.13, enforced at
+      BOTH construction AND independently re-derived by a gate from raw
+      fields: (1) `questions` names EXACTLY the 4 dimensions (VALUE, RARITY,
+      IMITABILITY, ORGANIZATION), each exactly once, in ANY order -- same
+      closed-SET-with-completeness-no-position shape
+      `strategy.porter_five_forces`'s own `FORCE_NAMES` already establishes
+      (4-way instead of 5-way); (2) every question entry carries a non-empty
+      `reasoning` and a disclosed `answer` in {YES, NO} -- Atlas's own benefit
+      line demands each dimension actually be judged, not just named; (3)
+      `competitive_implication` is GENUINE_COMPUTE, mechanically derived from
+      the 4 answers via a closed, TOTAL 16-cell lookup table -- grounded in
+      REAL, EXTERNAL, NAMED methodology (Jay B. Barney, "Firm Resources and
+      Sustained Competitive Advantage," Journal of Management 17(1), 1991;
+      the standard VRIO decision-tree classification: not Valuable ->
+      Competitive Disadvantage; Valuable but not Rare -> Competitive Parity;
+      +Rare but not costly-to-imitate -> Temporary Advantage;
+      +costly-to-imitate but not Organized -> Unused Advantage; all 4 ->
+      Sustained Advantage), NOT an Atlas citation -- disclosed exactly like
+      `causal.process_tracing`'s own Van Evera hoop/smoking-gun disclosure
+      establishes for a different family; ``generate_vrio_analysis`` has NO
+      `competitive_implication` parameter at all (structural elimination,
+      same class `causal.process_tracing`'s per-item `implication` and
+      `strategy.tows`'s `pairing_type` already establish), so no code path
+      lets a caller construct a record whose stored implication disagrees
+      with its own 4 answers; (4) `resource_description` (top-level,
+      required, non-empty) -- Atlas's own definition is meaningless without
+      naming WHICH resource is judged. Task-mandated restraint: all 4
+      dimensions REQUIRED and answered regardless of the classic decision
+      tree's short-circuit convention (mathematically equivalent outcome,
+      full disclosure/audit trail instead), matching
+      `strategy.porter_five_forces`'s own closed-SET-with-completeness
+      precedent rather than a partial-answer shortcut. IMITABILITY polarity
+      disclosed: `answer: YES` means "costly/hard to imitate" (favorable),
+      NOT "is highly imitable" -- keeps all 4 dimensions uniformly
+      YES-favorable, avoiding an inverted-metric trap the bare dimension name
+      would otherwise invite. `quality.evidence_labeling_required: true` --
+      same-family generalization from `strategy.porter_five_forces`'s
+      identical flag (itself generalized from `strategy.swot`), disclosed as
+      inferred, not directly Atlas-cited for VRIO specifically.
+      `recommended_next: [strategy.value_chain]` per L521's own "最佳搭配"
+      column -- re-grepped mid-task and confirmed
+      `strategy.value_chain.contract.yaml` (a concurrent sibling in this same
+      batch) exists with `status: ACTIVE` before naming it, same
+      verified-before-citing discipline `strategy.tows.contract.yaml`'s own
+      `recommended_next: [decision.mcda]` already establishes; the linkage is
+      one-directional for now (`strategy.value_chain`'s own OQ-VALUECHAIN-4
+      discloses the identical reverse-pairing tension from its side, deferred
+      to an orchestrating session). The lookup table itself lives inline in
+      `vrio.py` (`_IMPLICATION_BY_ANSWERS`, all 16 cells listed explicitly,
+      not loop-generated), same local-closed-lookup precedent
+      `strategy.tows.py`'s own `_PAIRING_TYPE_BY_CATEGORIES` already
+      establishes, rather than a separate `ai_lego/compute/vrio/` package.
+    source: "methods/contracts/strategy.vrio.contract.yaml + specs/cognitive/typed-objects/vrio-analysis.schema.yaml + ai_lego/modules/strategy/vrio.py"
+    note: "71 tests pass. F08 strategy family: 9 of 14 built before this entry (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/ansoff/value_chain/stp, per onehundredthirteenth_concrete_entry's own count) -- this entry (strategy.vrio) is F08's 10th member and the LAST of this batch's 4 concurrent builds. F08 is 10/14 (NOT complete, 4 more F08 rows remain: BCG, Blue Ocean, Business Model Canvas, Value Proposition Canvas). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- now that all 4 of this batch (ansoff/value_chain/stp/vrio) are confirmed landed, the orchestrating session's turn to reconcile it. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, dimension/answer/competitive_implication enums closed, additionalProperties:false present at both the top level and the questions[] item level, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 11 negative controls (missing resource_description, missing a question's reasoning, invalid dimension enum, invalid answer enum, invalid competitive_implication enum, smuggled top-level key, smuggled questions[] item key, 3-item and 5-item questions arrays, invalid epistemic_type via the real $ref, missing id prefix) all correctly rejected, plus the unmodified valid example and a second independently-built record (different V/R/I/O combination, classifying as TEMPORARY_COMPETITIVE_ADVANTAGE) both correctly accepted -- 0 false negatives, 0 false positives. The classification table was independently re-derived from its own definition (not trusted from a single memorized source) and confirmed TOTAL over all 16 YES/NO combinations via a dedicated test class (`ClassificationTableTests`, itertools.product exhaustive check). CLI demo (python -m ai_lego.apps.cli.run_vrio_slice) prints PASS and exits 0, demonstrating 3 real construction-time refusals (VRIO_INCOMPLETE_QUESTION_SET on a question set missing ORGANIZATION, VRIO_EMPTY_REASONING, VRIO_EMPTY_RESOURCE_DESCRIPTION) plus 1 independent-gate hand-tamper catch (competitive_implication flipped to a different, still-schema-legal enum value on an already-valid record's raw dict, caught by recomputation from the 4 stored answers, not merely by enum membership). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'vrio' both before writing (zero pre-existing implementation -- one unrelated forward-reference mention in ai_lego/modules/strategy/__init__.py's own 'Remaining 8' family roadmap comment) and after (only this method's own 5 files plus strategy.value_chain's own docstring/contract and this registry's own onehundredeleventh/onehundredtwelfth/onehundredthirteenth_concrete_entry notes mentioning 'vrio' by name as a sibling citation -- no shared code, no collision with any of the other 3 concurrent sibling builds)."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

@@ -1,0 +1,117 @@
+$id: "ai-lego://methods/contracts/strategy.vrio.contract.yaml"
+title: "VRIO Resource Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 context/strategy family, 7th member (built concurrently with 3 siblings --
+  strategy.value_chain/stp/ansoff -- alongside the 6 already-landed F08 methods). Atlas cites this method
+  TWICE: F08 table row L521 and dedicated §12.13 (L2689-2701), naming the 4 V/R/I/O question dimensions and
+  the method's own stated benefit (prevents conflating "we have this capability" with "we have a moat"). Core
+  invariant: all 4 dimensions must be answered (closed SET, completeness required, same shape class
+  `strategy.porter_five_forces` already established) AND `competitive_implication` is GENUINE_COMPUTE, a
+  closed lookup table over the 4 answers -- grounded in real external Barney/VRIO methodology, NOT Atlas text
+  (see compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, VRIO row (L521)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.13 VRIO 資源分析 (L2689-2701) -- the 4 question dimensions, benefit"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas §12.13's 4-dimension code block into `questions`'s
+  closed set. `id: strategy.vrio` mints a NEW machine_id; `family: strategy` reused as the 7th F08 member.
+
+id: strategy.vrio
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, ESTIMATE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed, same absence
+# class every Tier 1 contract with no §4 formula already discloses). DECOMPOSE = splitting the resource
+# judgment into the 4 V/R/I/O dimensions; ESTIMATE = per-dimension YES/NO judgment call with disclosed
+# reasoning; CLASSIFY (same primitive `decision.kano.contract.yaml` already uses for its own GENUINE_COMPUTE
+# table-lookup classification) = the mechanically-derived competitive_implication.
+
+purpose:
+  - assess_whether_a_resource_is_a_defensible_competitive_advantage
+# Atlas L521 verbatim sense: "判斷資源優勢" (judge resource advantage) / benefit "找可防禦優勢" (find a
+# defensible advantage) / §12.13's own stated purpose "判斷某項資源是否真的能成為持久競爭優勢".
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own citations for this method (table row + §12.13) name no
+  # required input type, same "no hard upstream dependency" position strategy.porter_five_forces.contract.yaml's
+  # own inputs.required: [] takes for an analogous standalone F08 method.
+
+outputs:
+  - VrioAnalysis
+# NEW output type (see typed-objects/vrio-analysis.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "questions is present and names EXACTLY the 4 Atlas §12.13 dimensions (VALUE, RARITY, IMITABILITY, ORGANIZATION), each exactly once, in any order -- Atlas's own §12.13 code block IS this method's 4-question definition; a record answering only some of the 4 has not actually done a VRIO analysis"
+  - "every questions[] entry carries a non-empty reasoning and an answer in {YES, NO} -- a named dimension with no disclosed judgment/reasoning would let 'we have this capability' silently pass as 'we have a moat' with no audit trail, exactly the conflation Atlas's own §12.13 benefit line warns against"
+  - "resource_description is present and non-empty -- Atlas §12.13's own definition ('判斷某項資源是否真的能成為持久競爭優勢') requires naming WHICH resource is under judgment; a VRIO record with no named subject cannot be audited against reality"
+  - "competitive_implication is GENUINE_COMPUTE, mechanically derived from the 4 questions[].answer values via a closed lookup table (real external Barney/VRIO classification, NOT an Atlas citation -- see compilation_decisions) -- never caller-supplied, re-derived independently by the gate from raw fields"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # evidence_labeling_required is an INFERRED generalization (disclosed, not directly Atlas-cited for THIS
+  # method): §12.13 gives no explicit misuse warning the way SWOT's own L1347 does. Grounded by same-family
+  # analogy to strategy.porter_five_forces.contract.yaml's identical flag (itself a same-family generalization
+  # from strategy.swot) -- an unevidenced "this capability is rare" claim is the same hazard class. See
+  # open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same empty-and-disclosed
+# choice strategy.porter_five_forces.contract.yaml's own field applies.
+
+recommended_next: [strategy.value_chain]
+# Atlas L521's own "最佳搭配" (best combo) column names "Value Chain". strategy.value_chain was being built by
+# a CONCURRENT sibling agent in this same batch; re-grepped mid-task and confirmed
+# methods/contracts/strategy.value_chain.contract.yaml now exists with `status: ACTIVE` and `id:
+# strategy.value_chain` before naming it here -- same "verified before citing it" discipline
+# strategy.tows.contract.yaml's own `recommended_next: [decision.mcda]` already establishes (that file also
+# confirmed decision.mcda.contract.yaml existed before citing it, rather than assuming).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the classic VRIO decision-tree short-circuit (stop evaluating once Value=NO, since later dimensions become moot for the classification)?"
+    decision: "No -- all 4 dimensions required and answered regardless (task-mandated), matching strategy.porter_five_forces's own closed-SET-with-completeness precedent. The full-disclosure invariant does not change the deterministic classification outcome (the lookup table is mathematically equivalent to the short-circuit tree); it adds an audit trail for the later dimensions even when they are moot for this particular resource's outcome."
+  - question: "Is there a real, standard, citable VRIO -> competitive-implication classification, or would computing one be fabrication?"
+    decision: "Real and citable -- Barney's Resource-Based View (Barney 1991, 'Firm Resources and Sustained Competitive Advantage', Journal of Management 17(1); standard VRIO decision-tree presentation, e.g. Barney & Hesterly, 'Strategic Management and Competitive Advantage'). NOT an Atlas citation -- Atlas §12.13 gives only the 4 question names, no classification table. Disclosed as this suite's own addition grounded in real external methodology, same disclosure discipline causal.process_tracing's Van Evera hoop/smoking-gun typology already establishes for a different family."
+  - question: "Should the IMITABILITY dimension's boolean answer mean 'is it easy to imitate' or 'is it costly/hard to imitate'?"
+    decision: "Costly/hard to imitate = YES is favorable -- keeps all 4 dimensions uniformly YES-favorable toward sustained advantage, avoiding an inverted-metric trap the bare dimension name 'Imitability' would otherwise invite. Disclosed in the typed-object schema's per-question description, not left implicit."
+  - question: "Where does the lookup table itself live -- a separate ai_lego/compute/vrio/ package (process_tracing's pattern) or inline in vrio.py?"
+    decision: "Inline in vrio.py, same-family precedent strategy.tows.py's own `_PAIRING_TYPE_BY_CATEGORIES`/`derive_pairing_type` already establishes for an analogous small closed lookup local to one method -- a separate compute/ package is this suite's convention for compute shared across methods or non-trivial algorithms (e.g. Kano's 5x5 table, process_tracing's asymmetric per-item + aggregate derivation), not a mandatory shape for every GENUINE_COMPUTE method."
+  - question: "Should recommended_next name strategy.value_chain (Atlas L521's own 最佳搭配)?"
+    decision: "Yes -- re-grepped mid-task and confirmed strategy.value_chain.contract.yaml (a concurrent sibling build in this same batch) now exists with status ACTIVE before naming it, same verified-before-citing discipline strategy.tows.contract.yaml's own recommended_next already establishes for decision.mcda."
+
+open_questions:
+  - "OQ-VRIO-1: strategy.value_chain does not reciprocally name strategy.vrio in ITS OWN recommended_next (its own OQ-VALUECHAIN-4 discloses the identical race-condition tension from its side) -- one-directional linkage until an orchestrating session reconciles both (owner: operator)."
+  - "OQ-VRIO-2: quality.evidence_labeling_required is an inferred same-family generalization, not directly Atlas-cited for this method specifically (owner: operator)."
+  - "OQ-VRIO-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-VRIO-4: competitive_implication's classification table is grounded in real external Barney/VRIO methodology, not Atlas text -- disclosed as this suite's own addition, not fabricated, but also not a mother-document citation (owner: operator, informational)."
+
+verification:
+  method: >
+    Read Atlas F08 table row (L521) and §12.13 (L2689-2701) directly at the cited lines. Grepped the whole
+    Atlas file case-insensitively for "VRIO" -- confirmed exactly these 2 real hits, no §4 composition formula,
+    no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole `ai_lego` tree and this docs tree
+    case-insensitively for "vrio" before writing any of this method's own files -- zero pre-existing
+    implementation (one unrelated forward-reference mention in
+    ai_lego/modules/strategy/__init__.py's own "Remaining 8" family roadmap comment, not an implementation).
+    Read strategy.porter_five_forces.contract.yaml (closed-SET-with-completeness precedent) and
+    strategy.tows.contract.yaml (GENUINE_COMPUTE lookup-table precedent) in full before writing this contract,
+    reusing their established conventions. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas §12.13's 4-dimension list and stated benefit are transcribed
+    verbatim into `preconditions`/`open_questions`. `cognitive_primitives`, `evidence_labeling_required`'s
+    grounding, the closed-set-without-position shape, and the competitive_implication lookup table's real
+    external (non-Atlas) grounding are compilation decisions, disclosed above, not presented as directly
+    Atlas-cited.

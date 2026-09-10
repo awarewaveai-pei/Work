@@ -1,0 +1,205 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/vrio-analysis.schema.yaml"
+title: VRIO Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `VrioAnalysis` -- the declared `outputs` of `strategy.vrio`'s
+  Method Contract (methods/contracts/strategy.vrio.contract.yaml, `outputs: [VrioAnalysis]`). Atlas cites this
+  method TWICE: the F08 tool table row (L521: "判斷資源優勢｜Value/Rarity/Imitability/Organization｜找可防禦
+  優勢｜Value Chain") and a dedicated §12.13 section (L2689-2701) naming the 4 question dimensions and the
+  method's own stated benefit (prevents conflating "we have this capability" with "we have a moat").
+
+  Field provenance:
+    * `questions[].dimension` (Atlas §12.13 L2694-2697 verbatim 4-line code block, SCREAMING_SNAKE_CASE) -- a
+      CLOSED set of exactly 4 names, each REQUIRED to appear EXACTLY ONCE (same closed-SET-with-completeness
+      shape `porter-five-forces-analysis.schema.yaml#/properties/forces` already establishes for a different
+      5-name set -- see `ai_lego/modules/strategy/vrio.py` module docstring).
+    * `questions[].answer`/`reasoning` -- Atlas §12.13's own benefit line implies the method's point is to
+      CONCLUDE something about each dimension, not just name it. `answer` is a closed 2-value DISCLOSED
+      judgment-call enum; `reasoning` is the free-text justification.
+    * `competitive_implication` (top-level, required) -- GENUINE_COMPUTE, mechanically derived from the 4
+      `questions[].answer` values via a closed lookup table. NOT an Atlas citation -- grounded in real external
+      Barney/VRIO methodology (see `strategy.vrio.contract.yaml`'s own `compilation_decisions`), never
+      caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, VRIO row (L521)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.13 VRIO 資源分析 (L2689-2701) -- the 4 question dimensions and benefit"
+  - "methods/contracts/strategy.vrio.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- same F08 family, closed-SET-with-completeness precedent (see compilation_decisions)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of Atlas §12.13's cited 4-dimension list plus low-risk, disclosed
+  compilation choices.
+
+compilation_decisions:
+  - question: "Closed set with completeness (all 4 required, no position) or a positional tuple?"
+    decision: "Closed set, completeness required, no position -- questions: minItems 4, maxItems 4, each questions[].dimension a value from the 4-name enum, genuine distinctness-and-completeness enforced at runtime (see below), same shape class porter-five-forces-analysis.schema.yaml#/properties/forces already establishes."
+  - question: "Should `answer` be a richer scale (e.g. HIGH/MEDIUM/LOW like Porter's intensity) instead of a binary YES/NO?"
+    decision: "Binary YES/NO -- Atlas §12.13 and the real external VRIO methodology both frame each of the 4 dimensions as a yes/no gate (is it valuable? is it rare? etc.), not a graded intensity; a 3+ value scale would not compose into the classic lookup table (see compilation_decisions in strategy.vrio.contract.yaml)."
+  - question: "What polarity does IMITABILITY's YES/NO answer carry?"
+    decision: "YES means 'costly/hard to imitate' (favorable toward advantage), NOT 'is highly imitable' -- keeps all 4 dimensions uniformly YES-favorable. See the `questions[].answer` property description below and strategy.vrio.contract.yaml's own compilation_decisions."
+  - question: "Should `competitive_implication` be computed from the 4 answers (e.g. count of YES) or caller-supplied?"
+    decision: "GENUINE_COMPUTE -- REQUIRED, but mechanically derived by ai_lego/modules/strategy/vrio.py's `derive_vrio_competitive_implication` via a closed lookup table (real external Barney/VRIO classification), never a builder parameter and never caller-supplied. Re-derived independently by an integrity gate from the record's own raw `questions[]`."
+  - question: "additionalProperties: false at the top level, and on each questions[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on (see porter-five-forces-analysis.schema.yaml's own compilation_decisions for the critic hand-tamper PoC that established this); set correctly from the start here, not retrofitted."
+  - question: "Does JSON Schema itself express 'all 4 distinct dimension names present, order-independent' and 'competitive_implication matches the lookup table'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality operator and no cross-field computed-value constraint. minItems:4/maxItems:4 plus the per-item enum bounds the SHAPE of `questions`; genuine distinctness-and-completeness, and genuine agreement between `competitive_implication` and the 4 `questions[].answer` values, are runtime-only invariants -- enforced at construction AND independently re-derived by a gate in vrio.py, same limitation-and-workaround class porter-five-forces-analysis.schema.yaml's own equivalent note already documents."
+
+type: object
+required: [id, version, resource_description, questions, competitive_implication, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^VRIO-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as porter-five-forces-analysis.schema.yaml's PFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.vrio"
+
+  resource_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED. Names the specific resource, capability, or asset under VRIO judgment. Atlas §12.13's own
+      definition ("判斷某項資源是否真的能成為持久競爭優勢") is meaningless without naming WHICH resource is
+      being judged -- a record with no named subject cannot be audited against reality later.
+
+  questions:
+    type: array
+    minItems: 4
+    maxItems: 4
+    description: >
+      Atlas §12.13 L2694-2697's own 4-dimension code block (Value / Rarity / Imitability / Organization),
+      transcribed verbatim. SHAPE-bounded here to exactly 4 items; genuine completeness (all 4 distinct
+      dimensions present, order-independent -- no duplicates, no unrecognized name) is a runtime-only
+      invariant this schema cannot express (see compilation_decisions) -- enforced by
+      ai_lego/modules/strategy/vrio.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [dimension, answer, reasoning, provenance]
+      additionalProperties: false
+      properties:
+        dimension:
+          type: string
+          enum: [VALUE, RARITY, IMITABILITY, ORGANIZATION]
+          description: "Atlas §12.13 L2694-2697's own 4-line code block (Value / Rarity / Imitability / Organization), SCREAMING_SNAKE_CASE."
+        answer:
+          type: string
+          enum: ["YES", "NO"]
+          description: >
+            DISCLOSED judgment-call enum, not a computed score. Uniform polarity across all 4 dimensions:
+            YES is always the answer that moves toward sustained competitive advantage -- VALUE: is it
+            valuable? RARITY: is it rare? IMITABILITY: is it costly/hard to imitate (NOT "is it highly
+            imitable")? ORGANIZATION: is the firm organized to capture the value? See compilation_decisions.
+        reasoning:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual analysis content for this dimension, in natural language -- what makes this dimension YES/NO."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record ids. Same convention
+            porter-five-forces-analysis.schema.yaml#/properties/forces/items/properties/supporting_evidence_refs
+            already uses -- required in practice by the `evidence_labeling_required` gate whenever
+            `provenance.epistemic_type == EVIDENCE`, not by this schema itself.
+        provenance:
+          description: "Per-dimension provenance. Full provenance_record, same pattern porter-five-forces-analysis.schema.yaml's forces[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  competitive_implication:
+    type: string
+    enum: [COMPETITIVE_DISADVANTAGE, COMPETITIVE_PARITY, TEMPORARY_COMPETITIVE_ADVANTAGE, UNUSED_COMPETITIVE_ADVANTAGE, SUSTAINED_COMPETITIVE_ADVANTAGE]
+    description: >
+      REQUIRED. GENUINE_COMPUTE -- mechanically derived from the 4 `questions[].answer` values via a closed
+      lookup table (real external Barney/VRIO classification: not Valuable -> COMPETITIVE_DISADVANTAGE;
+      Valuable but not Rare -> COMPETITIVE_PARITY; Valuable+Rare but not costly to imitate ->
+      TEMPORARY_COMPETITIVE_ADVANTAGE; Valuable+Rare+costly-to-imitate but not Organized ->
+      UNUSED_COMPETITIVE_ADVANTAGE; all four YES -> SUSTAINED_COMPETITIVE_ADVANTAGE). NEVER
+      caller-supplied and NEVER computed/aggregated by anything other than
+      ai_lego/modules/strategy/vrio.py's `derive_vrio_competitive_implication` -- see compilation_decisions.
+
+  computation_provenance_ref:
+    type: string
+    description: >
+      Names the exact function that computed `competitive_implication`
+      (`ai_lego.modules.strategy.vrio.derive_vrio_competitive_implication`), same audit-trail convention
+      process-tracing-record.schema.yaml's own `computation_provenance_ref` and tows-matrix.schema.yaml's own
+      identically-named field already establish for a GENUINE_COMPUTE derived value.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed VRIO analysis for a proprietary supply-chain data pipeline"
+    value:
+      id: "VRIO-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.vrio"
+      resource_description: "5 年累積的區域供應鏈即時異常偵測資料管線與其專屬訓練資料集"
+      questions:
+        - dimension: VALUE
+          answer: "YES"
+          reasoning: "偵測異常的平均前置時間比業界標準快 3 倍，直接降低缺貨成本"
+          supporting_evidence_refs: ["E-501"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - dimension: RARITY
+          answer: "YES"
+          reasoning: "同業僅 1 家有類似規模的自建資料管線，其餘皆採第三方通用方案"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - dimension: IMITABILITY
+          answer: "YES"
+          reasoning: "5 年累積的專屬異常標註資料難以短期複製，屬於路徑依賴優勢"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - dimension: ORGANIZATION
+          answer: "NO"
+          reasoning: "資料管線目前僅供內部維運團隊使用，尚無產品化或跨部門流程去實際變現此優勢"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      competitive_implication: UNUSED_COMPETITIVE_ADVANTAGE
+      computation_provenance_ref: "ai_lego.modules.strategy.vrio.derive_vrio_competitive_implication"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-VRIOANALYSIS-1"
+    question: "questions[].dimension distinctness/completeness AND competitive_implication's agreement with the 4 answers are runtime-only invariants (see compilation_decisions) -- should a future pass add a JSON Schema `if`/`then` constraint instead of relying solely on the runtime gate? (owner: operator)"
+  - id: "OQ-VRIOANALYSIS-2"
+    question: "The classic VRIO decision tree short-circuits once an earlier dimension is NO (later dimensions become moot for classification) -- this schema still REQUIRES all 4 answered and disclosed regardless (task-mandated completeness, see strategy.vrio.contract.yaml). Left as-is; not a defect, but worth flagging for a future reader expecting the textbook short-circuit presentation. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F08 table row (L521) and §12.13 (L2689-2701) directly. Cross-checked against
+    methods/contracts/strategy.vrio.contract.yaml's own outputs/preconditions/quality. Read
+    porter-five-forces-analysis.schema.yaml (closed-SET-with-completeness precedent) and
+    tows-matrix.schema.yaml (GENUINE_COMPUTE lookup-table precedent) in full as shape precedent before writing
+    this file. Independently re-derived the Barney/VRIO classification table from its own definition (not
+    trusted from a single memorized source) -- cross-checked the 5-outcome labels (Competitive Disadvantage /
+    Parity / Temporary Advantage / Unused Advantage / Sustained Advantage) against the standard
+    Value-Rarity-Imitability-Organization decision-tree presentation; confirmed the table is TOTAL over all 16
+    boolean combinations (8 map to DISADVANTAGE via Value=NO, 4 more to PARITY via Value=YES+Rarity=NO, 2 more
+    to TEMPORARY via +Imitability=NO, 1 to UNUSED via +Organization=NO, 1 to SUSTAINED -- 8+4+2+1+1=16).
+    Validated against jsonschema Draft202012Validator via a standalone script (required fields present, id
+    pattern satisfied, questions/competitive_implication enums closed, additionalProperties:false present at
+    both the top level and the questions[] item level from the start, embedded example resolved through its
+    real $ref to epistemic-label.schema.yaml).
+  note: >
+    `dimension`'s 4 enum values are transcribed directly from Atlas §12.13. `competitive_implication`'s 5
+    enum values and the lookup table that derives them are grounded in real external Barney/VRIO methodology,
+    NOT Atlas text -- disclosed in compilation_decisions and strategy.vrio.contract.yaml's own
+    compilation_decisions, not presented as an Atlas citation. The `answer`/`reasoning` field split, the
+    flat-record-plus-array shape, and the closed-set-without-position runtime invariant are compilation
+    decisions. No mother document was modified to produce this file.

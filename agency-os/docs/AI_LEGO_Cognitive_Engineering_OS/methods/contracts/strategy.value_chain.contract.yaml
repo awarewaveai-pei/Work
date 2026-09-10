@@ -1,0 +1,145 @@
+$id: "ai-lego://methods/contracts/strategy.value_chain.contract.yaml"
+title: "Value Chain Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 `strategy` family (7th member, after swot/pestel/steepv/
+  three_c/tows/porter_five_forces). Atlas F08 table row (L522: "Value Chain
+  ｜拆價值活動｜primary/support→cost/value drivers｜找高槓桿點｜
+  Benchmarking") is this method's ONLY citation -- names only the 2-category
+  split (PRIMARY/SUPPORT) and the analytical output (cost/value drivers),
+  NOT Porter's real 9 named sub-activities (see compilation_decisions). Not
+  in EC §32. Core invariants: `activities` covers both categories (a value
+  chain missing PRIMARY or SUPPORT entirely has not decomposed the chain),
+  each activity discloses >=1 of cost_driver/value_driver (Atlas's own cited
+  analytical output), and `leverage_points` is a required disclosed
+  conclusion (Atlas's own defining benefit IS "找高槓桿點").
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Value Chain row (L522: 'Value Chain｜拆價值活動｜primary/support→cost/value drivers｜找高槓桿點｜Benchmarking')"
+  - "methods/contracts/strategy.three_c.contract.yaml -- same family, 2-vs-3-way closed-category-enum/quality/id-pattern conventions reused here"
+  - "methods/contracts/causal.process_tracing.contract.yaml -- 'name the real external methodology for grounding, restrict typed fields to exactly what Atlas's own row literally names' disclosure precedent reused here for the 9-sub-activity question"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas's own single
+  citation into a 2-category split + required driver/leverage disclosure;
+  `id: strategy.value_chain` mints a new machine_id. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1`.
+
+id: strategy.value_chain
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY, COMPARE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for Value
+# Chain). Grounded word-for-word in the citation's own 3 clauses: "拆價值
+# 活動" (decompose value activities) = DECOMPOSE; "primary/support" (assign
+# each activity to one of 2 fixed categories) = CLASSIFY; "→找高槓桿點"
+# (compare cost/value drivers across activities to find the highest-leverage
+# ones) = COMPARE, same class strategy.three_c's own COMPARE grounds its
+# "→找 fit" clause.
+
+purpose:
+  - decompose_value_activities_into_primary_and_support_to_find_high_leverage_points
+# Atlas L522 verbatim sense folded into one purpose label: "拆價值活動" +
+# "primary/support→cost/value drivers" + "找高槓桿點".
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own citation names no upstream typed-object dependency for
+  # Value Chain -- same self-contained-method precedent strategy.three_c/
+  # causal.rct already establish.
+
+outputs:
+  - ValueChainAnalysis
+# NEW output type (see typed-objects/value-chain-analysis.schema.yaml).
+# Atlas's citation gives this method's output no PascalCase name.
+
+preconditions:
+  - "activities includes at least one PRIMARY entry and at least one SUPPORT entry -- Atlas's own 'primary/support' (L522) is the method's defining split; a record missing a whole category has not actually decomposed the value chain"
+  - "each activity discloses a non-empty cost_driver and/or value_driver -- Atlas's own citation names 'cost/value drivers' (L522) as the method's whole analytical output; an activity with neither disclosed has not been analyzed"
+  - "leverage_points is a non-empty string -- Atlas's own '→找高槓桿點' (L522) is the method's whole stated benefit; a record that never states which points are high-leverage has not delivered on it"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class strategy.three_c's own quality block establishes: the real
+  # risk this method's citation names is missing category coverage /
+  # missing driver disclosure / missing leverage-points disclosure (the 3
+  # preconditions above), not a missing per-claim evidence citation --
+  # Atlas's own row carries no unevidenced-claim misuse warning.
+
+forbidden_transition: []
+# No §14.1-style illegal-transition example names Value Chain specifically.
+
+recommended_next: []
+# Atlas L522's own "最佳搭配" (best combo) column names "Benchmarking" -- no
+# strategy.benchmark/strategy.benchmarking machine_id exists anywhere in
+# this corpus yet (grep-confirmed), so left empty rather than naming a
+# non-existent id, same precedent strategy.porter_five_forces.contract.yaml's
+# own OQ-PORTERFIVEFORCES-1 already establishes for an identical gap. See
+# open_questions.
+
+rollback:
+  side_effect_free: true
+  # Pure analysis/knowledge-object production, no external side effect named
+  # by the citation -- same low-risk inference class every sibling F08
+  # contract already applies.
+
+compilation_decisions:
+  - question: "Real named 9 Porter sub-activities (inbound logistics/operations/outbound logistics/marketing & sales/service; firm infrastructure/HR/technology development/procurement), or free-text activity_name + closed 2-value category enum?"
+    decision: "Free-text activity_name + closed 2-value category enum {PRIMARY, SUPPORT} only -- Atlas's own citation (L522) literally names only the primary/support split, zero of Porter's real 9 sub-activities by name; same restraint causal.process_tracing's own Van Evera citation establishes (name the real external methodology for grounding, but restrict the actual typed fields to exactly what Atlas's own row literally names -- there Atlas named 2 of Van Evera's real 4 test types, here Atlas names 0 of Porter's real 9 sub-activities), so inventing a closed 9-value enum here would overstate this citation further than process_tracing's own precedent permits."
+  - question: "Should cost_driver and value_driver both be mandatory per activity, or at least one?"
+    decision: "At least one (schema-level anyOf + builder + gate) -- Atlas's own citation writes 'cost/value drivers' as a slash-joined either/or output, the same notation style the citation itself uses for 'primary/support'; requiring both would overstate the citation."
+  - question: "Should at least one PRIMARY and one SUPPORT activity be required?"
+    decision: "Yes (allOf contains/minContains x2, belt-and-suspenders with builder+gate) -- same 'both categories must be covered' completeness pattern strategy.three_c's dimension coverage already establishes; a value chain analysis covering only one category has not decomposed the primary/support split Atlas's own row names."
+  - question: "Should leverage_points be computed or disclosed?"
+    decision: "Disclosed only -- no algorithm here computes 'high-leverage' from qualitative cost/value driver statements, same restraint strategy.three_c's own fit_summary and causal.rct's own analysis_summary already establish."
+  - question: "inputs.required -- empty, or an upstream typed-object like SWOT's KnowledgeSet?"
+    decision: "Empty -- Atlas's own citation names no upstream typed-object dependency, same self-contained-method precedent strategy.three_c/causal.rct already establish."
+
+open_questions:
+  - id: "OQ-VALUECHAIN-1"
+    question: "recommended_next is empty; Atlas's own citation names 'Benchmarking' (L522) but no strategy.benchmark/strategy.benchmarking contract exists yet anywhere in this corpus."
+    owner: "operator, or whoever builds strategy.benchmark"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-VALUECHAIN-2"
+    question: "cognitive_primitives [DECOMPOSE, CLASSIFY, COMPARE] is inferred word-for-word from the citation, not a cited Atlas §4 composition formula (no §4 entry exists for Value Chain)."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-VALUECHAIN-3"
+    question: "forbidden_transition is left empty -- no §14.1-style illegal-transition example names Value Chain specifically."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-VALUECHAIN-4"
+    question: "VRIO's own F08 row (L521) names 'Value Chain' as ITS OWN best-pairing next step -- whether this method's own recommended_next should reciprocally name strategy.vrio is left undecided (that is VRIO's own field, not read or asserted here per this batch's zero-shared-files constraint)."
+    owner: "operator, or whoever reconciles strategy.vrio (landing concurrently in this same batch by a sibling agent)"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F08 table (L511-528, Value Chain row L522) directly at the
+    cited line. Grepped the whole Atlas file case-insensitively for "Value
+    Chain"/"價值鏈"/"primary activities"/"support activities" -- exactly 2
+    hits total: L521 (VRIO's own row, whose own "最佳搭配" column names
+    "Value Chain" as VRIO's next step -- VRIO's own field, not reused here)
+    and L522 (this method's own row, the only real citation). No dedicated
+    §12.x section, no worked example, no §14.1 transition example, no §22.3
+    Method-specific Gate row found for this method. Grepped the whole
+    `ai_lego` tree and this docs tree case-insensitively for
+    "value_chain"/"ValueChain" before writing any of this method's own
+    files -- zero pre-existing implementation. Read strategy.three_c.contract.yaml
+    and causal.process_tracing.contract.yaml in full before writing this
+    contract, reusing their conventions rather than inventing new ones.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator via a standalone script.
+  note: >
+    No mother document was modified. Atlas's own single citation is
+    transcribed verbatim into `purpose`/`preconditions`. The 2-category
+    flat-activities shape, the required (not optional) `leverage_points`
+    field, the free-text `activity_name` (vs. a closed 9-sub-activity enum),
+    and the contains/minContains schema-level coverage check are Phase 3
+    compilation choices, explicitly flagged above in `compilation_decisions`,
+    not presented as Atlas-cited.

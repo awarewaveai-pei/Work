@@ -1,0 +1,124 @@
+$id: "ai-lego://methods/contracts/strategy.stp.contract.yaml"
+title: "STP (Segmentation, Targeting, Positioning) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 context/strategy family, 7th member (after strategy.swot/pestel/steepv/three_c/tows/
+  porter_five_forces). Atlas F08 table row L523 ("STP｜市場分群/選擇/定位｜Segmentation→Targeting→Positioning｜
+  避免一體適用｜JTBD") + dedicated §12.14 (L2705-2712: 用途「決定不是「賣給所有人」，而是先選 segment 再定位」，
+  搭配 "JTBD / Survey → STP → Value Proposition"). Genuinely SEQUENTIAL 3-stage pipeline per the method's own
+  name and arrow notation (Segmentation→Targeting→Positioning) -- Targeting logically depends on Segmentation's
+  own output. Core invariant: `targeting_decision`'s targeted segment id must resolve to a real entry in
+  `segments[]` (you cannot target a segment you never identified); `segments` non-empty; `positioning_statement`
+  disclosed and non-empty (Atlas's own 3rd, final, required stage).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, STP row (L523)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.14 市場區隔、目標市場與定位（STP）(L2705-2712)"
+  - "methods/contracts/strategy.tows.contract.yaml + ai_lego/modules/strategy/tows.py -- referential-integrity pattern (a field must resolve to a real id inside a real collection) reused here for targeted_segment_id -> segments[].id, scaled down to a single-record (not cross-record) reference"
+  - "methods/contracts/causal.logic_model.contract.yaml + ai_lego/modules/causal/logic_model.py -- fixed-order multi-stage pipeline precedent (named, sequential stages as the method's own defining structure); disambiguated in compilation_decisions since STP's 3 stages are NOT uniform-shaped like logic_model's 5"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L523/§12.14's own Segmentation->Targeting->
+  Positioning sequence into 3 required stages plus disclosed, structurally-necessary referential-integrity and
+  completeness preconditions -- same standard every Tier 1 contract in this directory applies. `id: strategy.stp`
+  mints a new machine_id.
+
+id: strategy.stp
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, SELECT, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for STP. Segmentation is DECOMPOSE (breaking one
+# undifferentiated market into segments); Targeting is SELECT (choosing which identified segment to pursue);
+# Positioning is EXPLAIN (producing the disclosed positioning_statement content). Flagged in open_questions.
+
+purpose:
+  - avoid_selling_to_everyone_by_selecting_and_positioning_for_a_target_segment
+# Atlas §12.14 用途 line verbatim sense: "決定不是「賣給所有人」，而是先選 segment 再定位" (decide NOT to sell to
+# everyone -- first choose a segment, then position for it).
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own §12.14 搭配 line names JTBD/Survey as the upstream companion ("JTBD / Survey → STP → Value
+  # Proposition"), but neither a JTBD nor a Survey typed-object/contract exists anywhere in this spec root
+  # (grep-confirmed before writing this file -- zero hits). Same self-contained-method precedent
+  # causal.logic_model's own inputs.required: [] already establishes when Atlas names a companion with no
+  # buildable typed object yet. See open_questions.
+
+outputs:
+  - StpAnalysis
+# NEW output type (see typed-objects/stp-analysis.schema.yaml). Atlas gives this method's output no PascalCase
+# name anywhere, same honesty gap every other thin-citation Tier 1 contract in this family already discloses.
+
+preconditions:
+  - "segments is non-empty -- Segmentation (stage 1) must produce at least one real segment (STP_EMPTY_SEGMENTS)"
+  - "every segment carries a non-empty id (unique within the record), a non-empty description, and a non-empty criteria[] (at least one non-empty defining-criteria string) (STP_SEGMENT_MISSING_ID / STP_DUPLICATE_SEGMENT_ID / STP_SEGMENT_MISSING_DESCRIPTION / STP_SEGMENT_MISSING_CRITERIA)"
+  - "targeting_decision.targeted_segment_id resolves to a real segment id present in segments[] -- Targeting (stage 2) cannot choose a segment Segmentation (stage 1) never identified (STP_UNKNOWN_TARGET_SEGMENT_ID)"
+  - "targeting_decision.rationale is a non-empty disclosed string (STP_EMPTY_TARGETING_RATIONALE)"
+  - "positioning_statement is a non-empty disclosed string -- Positioning (stage 3), Atlas's own final, required stage; an STP record with no positioning content has not completed the method its own name promises (STP_EMPTY_POSITIONING_STATEMENT)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision strategy.tows.contract.yaml's own quality block already establishes: the real risk here
+  # is an unreferenced target segment or an undisclosed positioning, not a missing per-claim evidence citation.
+  # Enforced instead by this method's own real invariants (preconditions above).
+
+forbidden_transition: []
+# Atlas §12.14 gives no explicit forbidden-transition worked example (unlike strategy.swot/tows's own §14.1
+# AutomaticProductionDeployment chain). Same open-question class as causal.dag's own OQ-CAUSALDAG-1.
+
+recommended_next: []
+# Atlas §12.14's own 搭配 line names "Value Proposition" (Value Proposition Canvas, Atlas F08 table L528) as the
+# genuine downstream next step, but no contract/typed-object exists anywhere in this spec root yet for that
+# method (grep-confirmed before writing this file). The F08 table's own column-5 value for STP itself ("JTBD",
+# L523) is semantically the UPSTREAM companion, not a downstream next step (per §12.14's own arrow: "JTBD/Survey
+# → STP → Value Proposition") -- naming it here as recommended_next would be backwards. Left genuinely empty
+# rather than citing either a backwards-direction or a nonexistent method id. See open_questions.
+
+rollback:
+  side_effect_free: true
+  # No mother document states this explicitly for STP specifically. Same low-risk inference class every sibling
+  # F08 contract's own identical field already applies: a pure analysis/knowledge-object production method with
+  # no described external side effect in any mother document.
+
+compilation_decisions:
+  - question: "Should the 3 stages (segments/targeting_decision/positioning_statement) be a uniform array of same-shaped entries, matching causal.logic_model's own STAGE_ORDER/prefixItems 5-tuple?"
+    decision: "No -- 3 distinct, differently-shaped top-level required fields instead. logic_model's 5 stages share one identical {stage, description, provenance, indicators?} shape; STP's 3 stages do not (segments is a list of segment objects, targeting_decision is a single decision object, positioning_statement is a bare string) -- forcing them into one uniform stage_entry shape would either strip segments[] of its own list-of-criteria structure or bloat targeting_decision/positioning_statement with unused fields."
+  - question: "How is Atlas's own Segmentation→Targeting arrow (a sequential dependency) mechanically enforced, given the 3 stages are not a positional array?"
+    decision: "Referential integrity, not array position -- targeting_decision.targeted_segment_id must resolve to a real id inside segments[], the same referential-integrity discipline strategy.tows.contract.yaml's own pairings->SwotAnalysis.factors check already establishes, scaled down to a single-record (not cross-record) reference. This makes 'you cannot target a segment that was never identified' a real, checked invariant rather than a documentation-only ordering claim."
+  - question: "Should targeting_decision support multiple targeted segments (a caller might legitimately pursue 2+ segments at once)?"
+    decision: "Single targeted_segment_id for this build. Atlas §12.14's own citation frames Targeting as 'first choose A segment, then position' (先選 segment 再定位), singular. Multi-segment targeting is a real future extension, disclosed in open_questions, not invented here without citation support."
+  - question: "Do segments/targeting_decision carry their own per-item provenance, matching logic_model's per-stage provenance or swot's per-factor provenance?"
+    decision: "No -- only the overall record carries provenance (quality.provenance_required, enforced on the top-level StpAnalysis). Matches strategy.tows.contract.yaml's own pairings shape (no per-pairing provenance), not causal.logic_model's per-stage provenance -- STP sets evidence_labeling_required: false (see quality block above), so there is no per-item epistemic-type check that would need a per-item provenance record to check against."
+
+open_questions:
+  - id: "OQ-STP-1"
+    question: "cognitive_primitives [DECOMPOSE, SELECT, EXPLAIN] is this file's own inference -- Atlas §4 gives no composition formula for STP."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+  - id: "OQ-STP-2"
+    question: "recommended_next is left empty: Atlas §12.14's genuine downstream (Value Proposition / Value Proposition Canvas, F08 table L528) has no contract/typed-object anywhere in this spec root yet; F08 table's own column-5 value for STP ('JTBD', L523) is actually the UPSTREAM companion per §12.14's own arrow, not a downstream next step, and JTBD also has no contract/typed-object here yet either."
+    owner: "operator, or whoever next backfills the JTBD / Value Proposition Canvas methods"
+  - id: "OQ-STP-3"
+    question: "targeting_decision is single-segment only (targeted_segment_id, not targeted_segment_ids[]) -- a real future extension for multi-segment targeting strategies, not built here since Atlas's own citation frames Targeting as choosing 'a segment' (singular)."
+    owner: "operator, or whoever next needs multi-segment targeting support"
+
+verification:
+  method: >
+    Read Atlas F08 table (L500-536) and §12.14 (L2705-2712) directly at the cited lines. Read
+    strategy.tows.contract.yaml + ai_lego/modules/strategy/tows.py (referential-integrity pattern) and
+    causal.logic_model.contract.yaml + ai_lego/modules/causal/logic_model.py (ordered-pipeline pattern) in full
+    before writing this contract. Grepped the whole ai_lego tree and this docs tree case-insensitively for
+    "strategy.stp"/"StpAnalysis" before writing any of this method's own files -- zero pre-existing
+    implementation. Grepped for "jtbd"/"value_prop" before writing recommended_next/inputs -- confirmed neither
+    has a contract/typed-object anywhere in this spec root, so neither is cited as a real dependency. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L523/§12.14's own Segmentation->Targeting->Positioning sequence is
+    transcribed verbatim into the 3-stage structure. The single-targeted-segment builder signature, the
+    referential-integrity-not-array-position sequencing mechanism, and the empty recommended_next/inputs are
+    Phase 3 compilation choices, disclosed above in compilation_decisions/open_questions, not presented as
+    Atlas-cited.
