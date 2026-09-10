@@ -1,0 +1,122 @@
+$id: "ai-lego://methods/contracts/association.attribute_listing.contract.yaml"
+title: "Attribute Listing Method Contract"
+status: ACTIVE
+
+description: >
+  association.attribute_listing, 1st real F04 association-family member (F04 has 0 built before this batch,
+  grep-confirmed no ai_lego/modules/association/ directory existed). Atlas's ONLY citation is the F04 table
+  row (L415: "Attribute Listing｜拆屬性再逐項變換｜attributes→變換→重組｜產品改良｜SCAMPER") -- grep-confirmed no
+  dedicated §11.x section (numbering jumps §11.11 Morphological Analysis L1436 -> §11.12 JTBD L1463) and no
+  §22.3 gate row. Not an EC §32 method -- no security surface. Core invariant: a decompose-transform pipeline
+  anchored to ONE existing subject (distinct from concurrent sibling association.morphological_analysis's
+  from-scratch multi-dimensional space) -- every attribute needs >=1 transformed_variant genuinely distinct
+  from its own original_value, or the record is not actually doing "逐項變換". This batch is NOT F04-complete:
+  Analogy Mapping (F04 table row L416) is not in this batch; F04 will be 5/6 after this batch lands.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Attribute Listing row (L415) -- the primary, and ONLY, citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L188 ('SCAMPER = EXPAND + ASSOCIATE + TRANSFORM') -- cognitive_primitives grounding via the row's own '最佳搭配' (best-pairing) SCAMPER's own primitive composition; this row cites no primitives directly"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.11 Morphological Analysis (L1436-1462) -- read in full to confirm the structural distinction (dimensions x options x combinatorial generation from scratch vs. this method's single-subject attribute decomposition)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §22.3 Method-specific Gate table (L4142-4155) -- grep-confirmed no Attribute Listing row"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §32 Security Change Contract -- grep-confirmed zero 'Attribute Listing' hits anywhere in that document, no security surface"
+  - "methods/contracts/framing.frame_storming.contract.yaml -- generate-then-cross-reference-by-id invariant class reused for recombination.combined_from"
+  - "methods/contracts/framing.five_w_one_h.contract.yaml -- un-cited-but-necessary anchor field precedent (topic) reused here as subject; per-entry provenance + supporting_evidence_refs convention"
+  - "specs/cognitive/typed-objects/attribute-listing-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: association.attribute_listing` mints a new machine_id, bare `<family>.<name>`
+  form per ADR-005b, already digit-free (no naming collision). Grepped exhaustively for a competing machine_id
+  and for any pre-existing implementation (whole ai_lego tree, case-insensitive "attribute_listing"/"attribute
+  listing") before writing -- none found (only method-inventory.yaml's own stale catalog rows: registry copy
+  line 377 and .ai/research/phase-0 copy line 270, both cite Atlas line 414 -- the real F04 table row is line
+  415, same stale-by-1 drift class every F01 sibling in the prior batch already found; not corrected here per
+  METHOD_ATLAS_SLICE_LEAN_STANDARD.md's own "not a required step" ruling on that file, disclosed as an open
+  question instead).
+
+id: association.attribute_listing
+version: "1.0.0"
+family: association
+
+cognitive_primitives: [DECOMPOSE, TRANSFORM, ASSOCIATE]
+# DECOMPOSE: INFERRED from the row's own literal "拆屬性" (split subject into attributes) -- same inference
+# class every sibling contract's un-cited DECOMPOSE already applies. TRANSFORM and ASSOCIATE: grounded via
+# Atlas L188's own literal "SCAMPER = EXPAND + ASSOCIATE + TRANSFORM" -- this row's own best-pairing (最佳搭配
+# column, SCAMPER) and its own 3-step usage text (變換=TRANSFORM the individual attribute; 重組=ASSOCIATE,
+# recombining transformed pieces into a new whole) mirror 2 of SCAMPER's own 3 cited primitives. EXPAND
+# deliberately EXCLUDED -- this row's own 3-step process has no divergent-generation step (that is SCAMPER's
+# own broader 7-lens scope, not Attribute Listing's narrower one).
+
+purpose:
+  - decompose_an_existing_subject_into_attributes_and_individually_transform_each_one
+
+inputs:
+  required: []
+  optional: []
+# Atlas's own citation gives no upstream typed-object dependency -- the row places this at "產品改良" (product
+# improvement of something that already exists), no named prerequisite typed object.
+
+outputs: [AttributeListingRecord]
+
+preconditions:
+  - "subject is a non-empty string -- the ONE existing thing being improved, distinct from association.morphological_analysis's own from-scratch abstract dimensions (no single subject anchor there)"
+  - "attributes has at least 1 entry; every attribute_name is unique across the array"
+  - "every attribute carries a non-empty original_value and at least 1 transformed_variants entry"
+  - "every transformed_variants entry's variant_text is genuinely distinct (case/whitespace-insensitive) from that attribute's own original_value and from every sibling variant of the SAME attribute -- a near-duplicate echo is not '逐項變換' (transform)"
+  - "every transformed_variants entry's variant_id is unique within its own attribute (not required globally unique)"
+  - "IF recombination is present: combined_from has at least 2 entries, each (attribute_name, variant_id) pair MUST resolve to an actually-existing attribute+variant in THIS record's own attributes array, and no two combined_from entries reference the identical pair"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (no limitation-column text, no §22.3 row, no
+# dedicated §11.x section -- grep-confirmed) -- left genuinely empty rather than inventing one, same restraint
+# framing.five_w_one_h's and framing.frame_storming's own identical fields already establish.
+
+recommended_next: []
+# Atlas's own best-pairing (F04 table L415, "最佳搭配" column) is SCAMPER, unbuilt at this write time (not
+# selected into this batch) -- left empty rather than asserting a hard dependency on an unbuilt sibling. See
+# informs_scamper_ref below for the real forward soft-link.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Model 'subject' as a required anchor field, though Atlas's own citation names only 'attributes'?"
+    decision: "Yes -- required. Attribute Listing's own benefit column is 產品改良 (PRODUCT improvement), and the row's own use pattern starts from ONE existing thing, not abstract from-scratch dimensions (that is Morphological Analysis's own shape, a concurrent sibling) -- same un-cited-but-necessary anchor field class framing.five_w_one_h's own topic and framing.frame_storming's own phenomenon already establish."
+  - question: "Should 重組 (recombination) get its own real field, or is it out of this record's scope as a downstream step?"
+    decision: "In scope, but OPTIONAL and deliberately thin. Unlike 5W1H's soft-link to a genuinely SEPARATE Atlas-named method row (Problem Statement), 重組 is THIS row's own literal 3rd process step (attributes→變換→重組) -- omitting it entirely would mean the record structurally only ever captures 2 of the row's own 3 steps. But Atlas gives ZERO field-level shape for what a recombined proposal looks like (no named type, no dedicated section) -- OPTIONAL (a record legitimately stops at 'transformed but not yet recombined', same partial-completion legitimacy 5W1H's own UNKNOWN dimensions establish), with a minimal shape: combined_from (which transformed variants, cross-referenced by real id, same referential-integrity pattern framing.frame_storming's own selected_frame_ref already establishes, generalized from one reference to a list) plus one proposal_description string. No richer structure invented."
+  - question: "Enforce transformed_variant distinctness as a GENUINE_COMPUTE derived field (like 5W1H's information_gaps), or as a construction/gate-time check with no derived field?"
+    decision: "No derived field -- unlike 5W1H's own 'which subset is unknown' structural point (a real benefit-column requirement to SURFACE gaps as data), this method's own benefit column (產品改良) names no analogous summary Atlas asks the record to expose. Distinctness is enforced identically to framing.frame_storming's own candidate_framings distinctness check: a real invariant, re-derived from raw fields by both the builder and an independent gate, but not manufactured into an extra stored field Atlas never asked for."
+  - question: "Give transformed_variants[].variant_id a fixed-format id (like a record-level prefix), or leave it caller-chosen?"
+    decision: "Caller-chosen, format-checked only as non-empty and unique WITHIN its own attribute (not globally) -- recombination.combined_from's own (attribute_name, variant_id) pair is what makes a reference globally unambiguous, so global uniqueness is unnecessary. Same caller-chosen-id freedom framing.frame_storming's own candidate_framings[].id already establishes."
+
+open_questions:
+  - "OQ-ATTRIBUTELISTING-1: method-inventory.yaml's 'Attribute Listing' row (registry copy line 377, .ai/research/phase-0 copy line 270) both cite Atlas line 414; the real F04 table row is line 415 (same stale-by-1 drift class the whole F04 block in that file carries -- Affinity Diagram/Morphological Analysis/Attribute Listing/Analogy Mapping rows are ALL off by exactly 1). Not corrected here per METHOD_ATLAS_SLICE_LEAN_STANDARD.md's own 'not a required step' ruling on that file.（owner: operator, or whoever next does an integration pass over method-inventory.yaml)"
+  - "OQ-ATTRIBUTELISTING-2: Atlas's own best-pairing SCAMPER (F04 table L415) is unbuilt at this write time (not selected into this batch) -- informs_scamper_ref is a format-only soft link; existence of the referenced record is not verified. A future integration pass should verify once SCAMPER's own contract lands.（owner: operator, integration pass）"
+  - "OQ-ATTRIBUTELISTING-3: recombination.proposal_description is a single free-text string with no further structure -- should a future revision give the combined proposal its own richer typed shape once a real downstream consumer needs to parse it structurally rather than read it as prose?（owner: operator, or whoever next needs a structured recombination proposal）"
+  - "OQ-ATTRIBUTELISTING-4: F04 association family is 5/6 built after this batch (Mind Map/Concept Map/Affinity Diagram/Morphological Analysis/Attribute Listing) -- Analogy Mapping (F04 table row L416) was not selected into this batch and remains pending.（owner: operator, future batch selection）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-sensitively for "Attribute Listing" -- exactly 1 hit (F04 table row
+    L415); no dedicated §11.x section exists (grep-reconfirmed heading numbering jumps §11.11 Morphological
+    Analysis L1436 straight to §11.12 Jobs To Be Done L1463) and no §22.3 gate table row. Grepped
+    Global_Execution_Contract_v1.md for "Attribute Listing" -- zero hits, confirmed no EC §32 security
+    surface. Read Atlas L188 directly for the SCAMPER primitive-composition citation used to ground
+    cognitive_primitives. Read Atlas §11.11 Morphological Analysis (L1436-1462) in full to confirm the
+    structural distinction from this method (from-scratch multi-dimensional space vs. one-subject attribute
+    decomposition). Grepped the whole ai_lego tree case-insensitively for "attribute_listing"/"attribute
+    listing" before any design work -- zero pre-existing implementation (only method-inventory.yaml's own
+    stale rows, confirmed by direct read of both copies). Read framing.five_w_one_h.contract.yaml and
+    framing.frame_storming.contract.yaml in full to confirm no overlap and to reuse the established two-layer-
+    invariant / cross-referencing-by-id conventions. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own "拆屬性→變換→重組" 3-step citation and "產品改良" benefit line
+    are transcribed verbatim into preconditions/purpose/description. The attribute/transformed_variant/
+    recombination field shapes are this suite's own compiled structure, not Atlas-cited field-by-field --
+    disclosed as such, same honesty discipline every sibling Tier 1 contract in this directory already
+    applies.

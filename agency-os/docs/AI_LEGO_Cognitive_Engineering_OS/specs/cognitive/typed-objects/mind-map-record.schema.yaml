@@ -1,0 +1,164 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/mind-map-record.schema.yaml"
+title: Mind Map Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MindMapRecord` -- outputs of `association.mind_map`'s Method
+  Contract. Atlas F04 table row (L411: "中心→主枝→次枝→關鍵詞") + dedicated §11.1 (L1124-1172), whose own
+  標準使用方式 step 1-3 name a strict 4-level structure: central_topic (exactly one) -> main_branches[] ->
+  sub_branches[] -> keywords[] (flat strings, the citation's own terminus). NESTED, never id-cross-referenced
+  (contrast association.concept_map's own typed-edge graph, a different sibling method) -- a sub_branch lives
+  inside exactly one main_branch's own sub_branches[] array, so there is no field anywhere that could express
+  a cross-branch link. This structurally enforces §11.1's own 限制 ("邊沒有正式語意" / "不能因為兩個東西畫在一起就
+  宣稱存在因果"): a strict tree has no cross-edges to smuggle a causal claim onto.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Mind Map row (L411)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.1 (L1124-1172) -- dedicated section, primary structural citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 mermaid diagram (L418-426) -- Mind Map's own untyped edges, contrasted directly against Concept Map's typed edges in the same diagram"
+  - "methods/contracts/association.mind_map.contract.yaml"
+  - "specs/cognitive/typed-objects/non-goals-record.schema.yaml -- nested-entry / additionalProperties:false / runtime-only id-uniqueness convention reused here"
+  - "specs/cognitive/typed-objects/decision-tree-record.schema.yaml -- NESTED, not id-cross-referenced tree-shape precedent reused here"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Fixed 3-level nesting (main_branch->sub_branch->keyword) or an arbitrary-depth recursive tree like decision-tree-record.schema.yaml's own root?"
+    decision: "Fixed -- Atlas's own citation names exactly 4 levels (中心→主枝→次枝→關鍵詞); no 5th level invented, no MAX_TREE_DEPTH bound needed."
+  - question: "Nested (embedded) tree or id-cross-referenced graph?"
+    decision: "Nested -- same representation choice decision-tree-record.schema.yaml's own compilation_decisions already reasoned through for a path-dependent node ('a node can only ever belong to one parent'), and the only shape that structurally forecloses the cross-branch link Atlas's own §11.1 限制 forbids, not merely by convention."
+  - question: "Enforce sub_branches/keywords non-emptiness when the key is present?"
+    decision: "Yes -- minItems:1 on both, same 'omit the key when there is nothing to say, never an empty array pretending to be populated' convention excluded_scope[]/dimensions[] already use elsewhere in this suite."
+
+type: object
+required: [id, version, central_topic, main_branches, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^MINDMAP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "association.mind_map"
+
+  central_topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas §11.1 step 1 (L1131): '中心只放一個主題或問題' -- exactly one center, a single string field (not a list), structurally forecloses multiple centers."
+
+  main_branches:
+    type: array
+    minItems: 1
+    description: "Atlas §11.1 step 2 (L1132): '第一層放主要方向，不急著要求 MECE' -- first-level directions, deliberately NOT required to be mutually exclusive/exhaustive (only id uniqueness is checked, never content overlap)."
+    items: {$ref: "#/$defs/main_branch"}
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  main_branch:
+    type: object
+    required: [id, label, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique across the WHOLE tree (main_branches[] AND every nested sub_branches[] entry) -- MINDMAP_DUPLICATE_BRANCH_ID, runtime-only (JSON Schema has no native cross-array uniqueness operator, same disclosed limitation non-goals-record.schema.yaml's own excluded_scope[].id already accepts)."
+      label:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas §11.1 step 2 content: one main direction radiating from central_topic."
+      sub_branches:
+        type: array
+        minItems: 1
+        description: "OPTIONAL -- Atlas §11.1 step 3 (L1133), level 2. Omitted, not an empty array, when this main_branch has no further expansion yet."
+        items: {$ref: "#/$defs/sub_branch"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  sub_branch:
+    type: object
+    required: [id, label, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique across the WHOLE tree -- see main_branch.id above (same namespace)."
+      label:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas §11.1 step 3 content: a sub-direction under one main_branch."
+      keywords:
+        type: array
+        minItems: 1
+        description: "OPTIONAL -- Atlas §11.1 step 3, level 3 terminus ('關鍵詞、例子、疑問、素材' -- keywords, examples, open questions, or raw material; Atlas draws no field-level distinction among these four content types, so one flat string array covers all of them). Omitted, not an empty array, when this sub_branch has no keywords recorded yet."
+        items: {type: string, minLength: 1, pattern: "\\S"}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-main-branch mind map on this same F04 build batch: one branch expanded to sub_branches with keywords, one branch left as a bare direction with no expansion yet"
+    value:
+      id: "MINDMAP-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "association.mind_map"
+      central_topic: "F04 關聯映射與組合家族該怎麼開局？"
+      main_branches:
+        - id: "MB-1"
+          label: "Mind Map 自己的結構"
+          provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+          sub_branches:
+            - id: "SB-1-1"
+              label: "巢狀 vs 圖"
+              provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+              keywords: ["nested", "no cross-branch ref", "對比 Concept Map"]
+            - id: "SB-1-2"
+              label: "層級深度"
+              provenance: { epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null }
+              keywords: ["中心", "主枝", "次枝", "關鍵詞"]
+        - id: "MB-2"
+          label: "下一步分群"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-MINDMAPRECORD-1"
+    question: >
+      Should a future revision allow a branch node to carry a soft, format-only-checked cross-reference to an
+      association.affinity_diagram or association.concept_map record it was later regrouped/retyped into
+      (Atlas's own §11.1 推薦搭配 'Mind Map → Affinity Diagram → Concept Map / Issue Tree')? Both are unbuilt
+      concurrent siblings at this schema's write time -- left unaddressed rather than inventing a forward
+      field with no real consumer yet, same restraint every sibling typed-object schema in this batch applies
+      to an unbuilt Atlas-named next step.
+    owner: "operator, or whoever next builds association.affinity_diagram/association.concept_map"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F04 table Mind Map row (L411), §11.1 (L1124-1172) full section, and the F04 mermaid diagram
+    (L418-426) directly. Read non-goals-record.schema.yaml and decision-tree-record.schema.yaml in full as the
+    closest structural templates (closed-key-set nested-entry convention; NESTED-not-id-cross-referenced tree
+    shape). Validated against jsonschema Draft202012Validator (required fields present, id/main_branches[]
+    shape enforced, additionalProperties:false on the top level AND both $defs verified to actually reject an
+    unknown key, minItems:1 verified to reject an empty main_branches/sub_branches/keywords array).
+  note: >
+    No mother document was modified. central_topic/main_branches's own existence and the "中心→主枝→次枝→關鍵詞"
+    4-level citation are transcribed verbatim from Atlas L411/§11.1. The exact per-level field names
+    (id/label/sub_branches/keywords), the whole-tree id-uniqueness runtime invariant, and the MINDMAP- prefix
+    are this suite's own compiled structure, disclosed above, not textually cited.

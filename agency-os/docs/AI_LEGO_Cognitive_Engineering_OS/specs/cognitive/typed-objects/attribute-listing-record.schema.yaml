@@ -1,0 +1,263 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/attribute-listing-record.schema.yaml"
+title: Attribute Listing Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AttributeListingRecord` -- the declared `outputs` of
+  `association.attribute_listing`'s Method Contract. Atlas's ONLY citation (F04 table row L415:
+  "Attribute Listing｜拆屬性再逐項變換｜attributes→變換→重組｜產品改良｜SCAMPER") gives a 3-step process with no
+  field-level shape: decompose an existing SUBJECT into `attributes` -> TRANSFORM each individually -> RECOMBINE
+  into a new proposal. This schema makes all 3 steps real, checkable structure: `subject` (the one existing
+  thing being improved -- distinct from `association.morphological_analysis`'s own from-scratch, no-single-
+  subject `dimensions` array, a concurrent sibling), `attributes[]` (each carrying its own `original_value`
+  PLUS >=1 `transformed_variants[]` -- an attribute with zero transformed variants is not doing "逐項變換"),
+  and OPTIONAL `recombination` (cross-references transformed variants that must actually exist in THIS
+  record's own `attributes`, same referential-integrity pattern `frame-storming-record.schema.yaml`'s own
+  `selected_frame_ref` already establishes, generalized from a single reference to a list).
+
+  THREE real invariants JSON Schema alone cannot express (cross-field distinctness of each `transformed_variants[].variant_text`
+  against its own attribute's `original_value` and against its own siblings; uniqueness of `attribute_name`
+  across `attributes` and of `variant_id` within one attribute; `recombination.combined_from[]` reference
+  existence into `attributes[].transformed_variants[]`) -- all three are runtime-layer, enforced at
+  construction AND independently re-derived by a gate, same two-layer discipline every sibling typed-object
+  schema in this directory already documents; see `ai_lego/modules/association/attribute_listing.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Attribute Listing row (L415) -- the ONLY citation; grep-confirmed zero dedicated section (numbering jumps §11.11 Morphological Analysis (L1436) straight to §11.12 Jobs To Be Done (L1463)) and zero §22.3 Method-specific Gate row"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md L188 ('SCAMPER = EXPAND + ASSOCIATE + TRANSFORM') -- indirect grounding for the runtime distinctness discipline via the row's own '最佳搭配' (best-pairing) SCAMPER, not a field-shape citation"
+  - "methods/contracts/association.attribute_listing.contract.yaml (id: association.attribute_listing)"
+  - "specs/cognitive/typed-objects/frame-storming-record.schema.yaml (generated-array + cross-referencing-by-id pattern reused for recombination.combined_from; caller-chosen non-prefixed id convention reused for variant_id)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml (topic-as-anchor-field convention reused here as subject; supporting_evidence_refs shape reused verbatim)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Does 重組 (recombination) deserve its own real field, or is it a downstream step out of this record's scope?"
+    decision: >
+      In scope, but OPTIONAL and deliberately thin. Unlike a genuinely separate Atlas-named next method (e.g.
+      5W1H's own soft-link to Problem Statement), 重組 is THIS row's own literal 3rd process step
+      (attributes→變換→重組) -- omitting it entirely would mean the record structurally only ever captures 2
+      of the row's own 3 steps. Atlas gives ZERO field-level shape for what a recombined proposal looks like
+      (no named type, no dedicated section), so `recombination` is OPTIONAL (a record legitimately stops at
+      "transformed but not yet recombined", same partial-completion legitimacy `5w1h-record.schema.yaml`'s own
+      UNKNOWN dimensions establish) and deliberately minimal: `combined_from` (which transformed variants,
+      cross-referenced by real id) + one `proposal_description` string. No richer structure invented.
+  - question: "Should transformed_variants[].variant_text distinctness (vs. original_value and vs. sibling variants) be schema-expressible?"
+    decision: "No -- JSON Schema has no native cross-field/cross-array string-distinctness operator (same limitation frame-storming-record.schema.yaml's own candidate_framings distinctness already documents). Runtime-layer only: enforced at construction (generate_attribute_listing_record) AND independently re-derived by evaluate_attribute_listing_integrity_gate."
+  - question: "Give transformed_variants[].variant_id a fixed prefix/format, or a global uniqueness requirement?"
+    decision: "Caller-chosen, only required non-empty and unique WITHIN its own attribute (not globally) -- recombination.combined_from's own (attribute_name, variant_id) pair is what makes a reference globally unambiguous, so global uniqueness is unnecessary. Same caller-chosen-id freedom frame-storming-record.schema.yaml's own candidate_framings[].id already establishes."
+  - question: "Should attributes[] be a fixed-length/positionally-ordered set, like 5W1H's own 6-dimension prefixItems?"
+    decision: "No -- Atlas's own citation names no fixed attribute set (unlike 5W1H's literal 'Who/What/When/Where/Why/How'); attributes are whatever properties of the real SUBJECT the caller identifies. Free-length array (minItems 1), same freedom this method's own subject-anchored, product-specific nature requires."
+
+type: object
+required: [id, version, subject, attributes, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ATTRLIST-"
+    description: "NEW DESIGN. Record id prefix, following the existing PROB-/5W1H-/FS- convention this suite's other typed-object schemas already use. Grep-confirmed no collision with any existing prefix in this directory."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "association.attribute_listing"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The ONE existing thing being improved (Atlas's own benefit column, "產品改良" = product improvement) --
+      un-cited-by-Atlas anchor field, same class 5w1h-record.schema.yaml's own topic and
+      frame-storming-record.schema.yaml's own phenomenon already establish. Structurally distinct from
+      `association.morphological_analysis`'s own citation, which names no single subject -- that method
+      explores an abstract, from-scratch multi-dimensional solution space instead.
+
+  attributes:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "拆屬性" (decompose into attributes) step -- each entry decomposes one property of `subject`
+      and carries its own individually-transformed variants ("逐項變換", transform item-by-item).
+    items: { $ref: "#/$defs/attribute_entry" }
+
+  recombination:
+    $ref: "#/$defs/recombination"
+    description: >
+      OPTIONAL. Atlas's own "重組" (recombine into a new whole) step -- see top-level description and
+      compilation_decisions for why this is in-scope but deliberately thin, and why it is optional.
+
+  informs_scamper_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL forward soft-link to Atlas's own F04-table-cited best pairing ("最佳搭配", L415: "SCAMPER"),
+      unbuilt at this schema's write time -- same forward-looking-to-an-unbuilt-sibling pattern
+      5w1h-record.schema.yaml's own informs_problem_statement_ref already establishes. Format-only checked
+      (non-empty string); existence of the referenced record is NOT verified.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  transformed_variant:
+    type: object
+    required: [variant_id, variant_text, provenance]
+    additionalProperties: false
+    properties:
+      variant_id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Caller-chosen, unique WITHIN its own attribute_entry only (not globally) -- see compilation_decisions."
+      variant_text:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: >
+          One individually-transformed value of the parent attribute's original_value -- Atlas's own "逐項變換"
+          step. MUST be genuinely distinct (case/whitespace-insensitive) from original_value and from every
+          sibling transformed_variants entry of the SAME attribute -- runtime-layer check, see top-level
+          description; a near-duplicate echo is not a real transformation.
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: { type: string, pattern: "^E-[0-9]+$" }
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every sibling typed-object schema in this directory already uses."
+
+  attribute_entry:
+    type: object
+    required: [attribute_name, original_value, transformed_variants, provenance]
+    additionalProperties: false
+    properties:
+      attribute_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Unique across the parent attributes[] array -- runtime-layer check, see top-level description."
+      original_value:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The attribute's own current/original value or description, BEFORE transformation."
+      transformed_variants:
+        type: array
+        minItems: 1
+        description: >
+          MUST carry at least 1 entry -- an attribute with zero transformed variants is not doing this
+          method's own "逐項變換" job (see top-level description).
+        items: { $ref: "#/$defs/transformed_variant" }
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: { type: string, pattern: "^E-[0-9]+$" }
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, backing original_value's own claim."
+
+  combined_from_entry:
+    type: object
+    required: [attribute_name, variant_id]
+    additionalProperties: false
+    properties:
+      attribute_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "MUST resolve to an actually-existing attributes[].attribute_name in THIS record -- runtime-layer check, see top-level description."
+      variant_id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "MUST resolve to an actually-existing transformed_variants[].variant_id under the SAME attribute_name -- runtime-layer check, see top-level description."
+
+  recombination:
+    type: object
+    required: [combined_from, proposal_description, provenance]
+    additionalProperties: false
+    properties:
+      combined_from:
+        type: array
+        minItems: 2
+        description: >
+          Which transformed variants were combined into the final proposal. MUST carry at least 2 entries --
+          combining a single variant is not "重組" (recombination), it is merely selecting one transformation.
+          No two entries may reference the identical (attribute_name, variant_id) pair -- runtime-layer check.
+        items: { $ref: "#/$defs/combined_from_entry" }
+      proposal_description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Free-text description of the recombined new whole -- see compilation_decisions for why this stays a single string rather than a richer invented structure."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A subject with 2 attributes, each individually transformed, then recombined into one proposal referencing 2 of the 3 generated variants"
+    value:
+      id: "ATTRLIST-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "association.attribute_listing"
+      subject: "association.attribute_listing 方法切片本身的 recombination 欄位設計"
+      attributes:
+        - attribute_name: "recombination_field_scope"
+          original_value: "最初考慮的立場：重組完全跳過，record 只涵蓋 attributes/變換兩步"
+          transformed_variants:
+            - variant_id: "V1"
+              variant_text: "重組改為 record 內建、OPTIONAL 的 recombination 欄位，combined_from 交叉引用已存在的 transformed_variant，而非省略或發明未經 Atlas 佐證的新 typed object"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+              supporting_evidence_refs: ["E-961"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - attribute_name: "variant_distinctness_check"
+          original_value: "最初只檢查 variant_text 非空字串，不比對是否與 original_value 或其他 variant 重複"
+          transformed_variants:
+            - variant_id: "V1"
+              variant_text: "改為 NFKC normalize + casefold 大小寫/空白不敏感比對，禁止 variant 逐字複製 original_value 或彼此重複"
+              provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+              supporting_evidence_refs: ["E-962"]
+      recombination:
+        combined_from:
+          - attribute_name: "recombination_field_scope"
+            variant_id: "V1"
+          - attribute_name: "variant_distinctness_check"
+            variant_id: "V1"
+        proposal_description: "最終方案：OPTIONAL recombination 欄位 + NFKC/casefold 不敏感比對，兩個屬性的轉換共同構成本方法切片的核心不變量設計"
+        provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-ATTRIBUTELISTINGRECORD-1"
+    question: >
+      recombination.proposal_description is a single free-text string with no further structure. Should a
+      future revision give the combined proposal its own richer typed shape (e.g. a distinct net-new-attribute
+      list) once a real downstream consumer needs to parse it structurally rather than read it as prose?
+    owner: "operator, or whoever next needs a structured recombination proposal"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F04 table Attribute Listing row (L415) directly, and Atlas L188 (SCAMPER's own primitive
+    composition) for the ASSOCIATE/TRANSFORM grounding. Grep-reconfirmed §11.x heading numbering jumps from
+    §11.11 Morphological Analysis (L1436) straight to §11.12 Jobs To Be Done (L1463) -- no dedicated section.
+    Grep-reconfirmed zero "Attribute Listing" hits anywhere in the Atlas file outside L415 (whole-file
+    case-sensitive grep, 1 total hit). Read frame-storming-record.schema.yaml and 5w1h-record.schema.yaml in
+    full as the anchor-field / cross-referencing-array / $defs convention templates. Grepped the whole
+    ai_lego tree and this specs directory case-insensitively for "attribute_listing"/"attribute listing"
+    before writing -- zero pre-existing implementation (only method-inventory.yaml's own stale catalog row).
+    Validated against jsonschema Draft202012Validator (required fields present, id/attributes/recombination
+    shapes enforced, additionalProperties:false verified to actually reject an unknown key at every level
+    including $defs, minItems:1 on attributes and transformed_variants and minItems:2 on
+    recombination.combined_from all verified to actually reject a too-short array).
+  note: >
+    `attributes`/`transformed_variants`/`recombination`/`subject` field shapes are this suite's own compiled
+    structure engineered to make Atlas's own "attributes→變換→重組" process column a real, re-derivable
+    property -- explicitly flagged as non-Atlas field-level grounding above (compilation_decisions), not
+    presented as mother-document content. No mother document was modified to produce this file.

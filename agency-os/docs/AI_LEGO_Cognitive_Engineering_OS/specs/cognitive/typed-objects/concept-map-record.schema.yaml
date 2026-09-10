@@ -1,0 +1,230 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/concept-map-record.schema.yaml"
+title: Concept Map Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ConceptMapRecord` -- the declared `outputs` of
+  `association.concept_map`'s Method Contract (methods/contracts/association.concept_map.contract.yaml). A
+  GRAPH, same structural class `causal-dag-analysis.schema.yaml` already establishes for its own sibling
+  method (nodes + directed typed edges, not a flat list) -- but a GENERAL graph, not a DAG: Atlas draws no
+  acyclic constraint on Concept Map (F04 mermaid contrast, L420-426: Concept Map is opposed to Mind Map's
+  untyped free branches by having TYPED edges, not by being acyclic), so this schema carries no
+  `acyclic_verified`-style field.
+
+  Field provenance -- Atlas F04 table row (L412) + dedicated §11.2 (L1176-1203):
+    * `nodes[]`/`edges[]` transcribe the worked mermaid example's own shape (L1181-1187: AI 教育平台/學生/
+      教育規範/個人資料/隱私法/教師採用率/學校採用, typed edges 服務/需符合/處理/受規範於/影響).
+    * `edges[].relationship_type` is required and non-empty per §11.2 step 2 (L1193): "每條 Edge 必須指定
+      relationship type" -- unconditional, no exception.
+    * `edges[].supporting_evidence_refs` operationalizes step 3 (L1194): "有來源的關係要連 Evidence".
+    * Step 4 (L1195, "推論關係必須標 Inference") is satisfied by `edges[].provenance.epistemic_type` itself
+      (e.g. `AI_INFERENCE`/`HYPOTHESIS`) -- see `compilation_decisions` for why no separate `is_inference`
+      boolean was added.
+    * `orphan_node_ids` is GENUINE_COMPUTE, un-cited-by-literal-field-name but grounded in the benefit column
+      (L1200-1202: "可直接映射 Knowledge Graph...有利搜尋、重用、矛盾偵測與 provenance") -- see
+      `ai_lego/compute/concept_map/orphan_detection.py`.
+
+  TWO real invariants this schema expresses structurally: (1) `relationship_type` required + non-empty on
+  every edge (JSON Schema `required` + `minLength`); (2) `edges[].supporting_evidence_refs` conditionally
+  required when `provenance.epistemic_type == EVIDENCE`, via `if`/`then`. The referential-integrity invariant
+  (every `from_node_id`/`to_node_id` must resolve to a real `nodes[].id` in the SAME record) and the
+  `orphan_node_ids` cross-array derivation are BOTH cross-field/cross-array checks JSON Schema cannot express
+  (no native "one array's values must be a subset of another array's projected field" operator) -- runtime-
+  layer invariants, see `ai_lego/modules/association/concept_map.py`, which enforces both at construction AND
+  independently via a gate that re-derives from raw fields, same two-layer discipline every sibling module in
+  this suite already uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Concept Map row (L412)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.2 (L1176-1203) -- dedicated section, worked mermaid example, 5-step 使用方式"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 Mind-Map-vs-Concept-Map mermaid contrast (L420-426)"
+  - "methods/contracts/association.concept_map.contract.yaml (id: association.concept_map)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml (nodes/edges graph-shape convention reused here, minus the acyclic constraint)"
+  - "specs/governance/epistemic-label.schema.yaml (provenance_record -- reused as the sourced-vs-inferred axis, see compilation_decisions)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should edges carry a dedicated `is_inference` boolean, or reuse `provenance.epistemic_type`?"
+    decision: "Reuse `provenance.epistemic_type` (no new boolean field)."
+    reasoning: >
+      Two direct sibling precedents with an analogous edge/dimension shape -- `causal-dag-analysis.schema.yaml`'s
+      own `edges[].provenance` and `5w1h-record.schema.yaml`'s own `dimensions[].provenance` -- already treat
+      "is this claim a sourced fact vs. an inference" as a function of the shared `epistemic_type` axis, not a
+      second parallel boolean. Introducing `is_inference` would duplicate an axis the shared provenance
+      vocabulary already expresses. See `ai_lego/modules/association/concept_map.py`'s own module docstring for
+      the full reasoning.
+  - question: "Should `nodes[]` require its own per-node `provenance`, matching `edges[].provenance`?"
+    decision: "No -- nodes carry no provenance field."
+    reasoning: "Atlas's own step 1 (\"建立 Concept Nodes\") says nothing about node-level epistemic labeling; `causal-dag-analysis.schema.yaml`'s own closest-sibling `nodes[]` (id/label/role) already omits per-node provenance for the same reason -- only ITS OWN edges carry provenance."
+  - question: "Minimum `nodes`/`edges` counts?"
+    decision: "nodes: minItems 2, edges: minItems 1."
+    reasoning: "nodes: minItems 2 is the structural floor for any edge to connect two DISTINCT concepts, same reasoning `causal-dag-analysis.schema.yaml`'s own `nodes: minItems: 2` already applies. edges: minItems 1 because Atlas's own F04 contrast (L420-426) defines Concept Map BY its typed edges -- a record with zero edges would not exercise the structural point this method exists for, same reasoning as `framing.frame_storming`'s own `candidate_framings: minItems: 2` being tied directly to that method's own defining structural point."
+
+type: object
+required: [id, version, context, nodes, edges, orphan_node_ids, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CONCEPTMAP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as 5w1h-record.schema.yaml's 5W1H- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "association.concept_map"
+
+  context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The shared subject/purpose line this concept map is about -- un-cited-by-Atlas anchor field, same necessary-anchor precedent framing.five_w_one_h's own `topic` and decision.ice's own `context` already establish."
+
+  nodes:
+    type: array
+    minItems: 2
+    description: "Atlas §11.2's own worked mermaid example (L1181-1187) has 7 nodes. See compilation_decisions for the minItems:2 floor."
+    items:
+      type: object
+      required: [id, label]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this record (e.g. CONCEPTMAP-001-N1). Uniqueness is a runtime-layer invariant, see top-level description."
+        label:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The concept's name, e.g. Atlas's own 'AI 教育平台' (AI education platform)."
+
+  edges:
+    type: array
+    minItems: 1
+    description: "Directed, typed relationship edges. Atlas's worked example has 5 (L1181-1187)."
+    items:
+      type: object
+      required: [from_node_id, to_node_id, relationship_type, provenance]
+      additionalProperties: false
+      properties:
+        from_node_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        to_node_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        relationship_type:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas §11.2 step 2 (L1193): every edge MUST specify a relationship type, e.g. Atlas's own '服務'/'需符合'/'處理'/'受規範於'/'影響'."
+        provenance:
+          description: "Per-edge, same granularity causal-dag-analysis.schema.yaml's own edges already use -- each edge IS a distinct relationship claim. Also the sourced-vs-inferred axis, see compilation_decisions."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+        supporting_evidence_refs:
+          type: array
+          items: {type: string, pattern: "^E-[0-9]+$"}
+          description: "Soft reference to real evidence/evidence.schema.yaml record ids. Required (non-empty) when provenance.epistemic_type == EVIDENCE, per Atlas §11.2 step 3 (L1194) -- see allOf below."
+      allOf:
+        - if:
+            properties: {provenance: {properties: {epistemic_type: {const: EVIDENCE}}, required: [epistemic_type]}}
+            required: [provenance]
+          then:
+            required: [supporting_evidence_refs]
+            properties: {supporting_evidence_refs: {minItems: 1}}
+
+  orphan_node_ids:
+    type: array
+    description: >
+      GENUINE_COMPUTE -- node ids referenced by ZERO edges (neither as from_node_id nor to_node_id), in
+      `nodes` order. Always present (an empty array means every node participates in at least one relation, a
+      real and meaningful state, not "not computed"). Runtime-layer cross-array derivation check: must equal
+      the actual unreferenced-node set -- see top-level description.
+    items: {type: string}
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas §11.2's own worked mermaid example (L1181-1187), transcribed verbatim, plus one deliberately isolated 8th node (競品觀察, not part of the Atlas citation) added specifically to exercise orphan_node_ids with a real non-empty case -- disclosed here, not presented as Atlas-cited"
+    value:
+      id: "CONCEPTMAP-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "association.concept_map"
+      context: "AI 教育平台的概念關係圖 (Atlas §11.2 worked example)"
+      nodes:
+        - {id: "N1", label: "AI 教育平台"}
+        - {id: "N2", label: "學生"}
+        - {id: "N3", label: "教育規範"}
+        - {id: "N4", label: "個人資料"}
+        - {id: "N5", label: "隱私法"}
+        - {id: "N6", label: "教師採用率"}
+        - {id: "N7", label: "學校採用"}
+        - {id: "N8", label: "競品觀察"}
+      edges:
+        - from_node_id: "N1"
+          to_node_id: "N2"
+          relationship_type: "服務"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-1001"]
+        - from_node_id: "N1"
+          to_node_id: "N3"
+          relationship_type: "需符合"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-1002"]
+        - from_node_id: "N1"
+          to_node_id: "N4"
+          relationship_type: "處理"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-1003"]
+        - from_node_id: "N4"
+          to_node_id: "N5"
+          relationship_type: "受規範於"
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+          supporting_evidence_refs: ["E-1002"]
+        - from_node_id: "N6"
+          to_node_id: "N7"
+          relationship_type: "影響"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null}
+      orphan_node_ids: ["N8"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-CONCEPTMAPRECORD-1"
+    question: >
+      Atlas §11.2 step 5 ("因果關係若要進一步證明，轉 Causal DAG") implies a causal edge that needs further
+      proof should be promotable to a real `causal.dag` record (which IS already built, `id: causal.dag` --
+      this task's own brief assumed it was still unbuilt; corrected here per R4 claim-before-verify, confirmed
+      by direct grep before writing). Should an individual edge carry a forward soft-link field (e.g.
+      `promoted_to_causal_dag_ref`) once such a promotion happens? Left unaddressed -- out of this slice's own
+      5-file scope, no such field added.
+    owner: "operator, or whoever next builds a concept-map-to-causal-dag promotion flow"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F04 table row (L412), §11.2 (L1176-1203), and the F04 Mind-Map-vs-Concept-Map mermaid contrast
+    (L420-426) directly. Read causal-dag-analysis.schema.yaml and 5w1h-record.schema.yaml in full as the
+    closest graph-shaped and if/then/not convention templates respectively. Grepped the whole Atlas file for
+    "Concept Map" (8 hits, all read, none add a citation beyond what is transcribed above). Validated against
+    jsonschema Draft202012Validator (required fields present, id pattern satisfied, additionalProperties:false
+    on the top level and both nested item shapes verified to actually reject an unknown key, the
+    EVIDENCE-requires-supporting_evidence_refs allOf branch verified to actually reject an EVIDENCE-labeled
+    edge with no refs and to accept a non-EVIDENCE edge with none).
+  note: >
+    `nodes`/`edges` shape and the worked example's own node labels/edge types/structure are transcribed
+    verbatim from Atlas L1181-1187 (the 8th node, N8, is a disclosed CLI-demo-only addition, not part of the
+    citation). The `orphan_node_ids` field and the reuse of `provenance.epistemic_type` as the sourced-vs-
+    inferred axis are this suite's own compiled structure, explicitly flagged as such above, not presented as
+    mother-document content. No mother document was modified to produce this file.

@@ -1,0 +1,243 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/morphological-analysis-record.schema.yaml"
+title: Morphological Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MorphologicalAnalysisRecord` -- the declared `outputs` of
+  `association.morphological_analysis`'s Method Contract. FIRST typed object in the `association` family
+  (F04, Associative Mapping & Combination) and the FIRST `genuine_compute` record in that family. Atlas's
+  F04 table row (L414) and dedicated §11.11 (L1436-1460, worked 4-dimension x 3-option table + 5-step
+  "使用方式") name `dimensions -> options -> 合法組合 -> 評估` but give no field-level shape -- the
+  `dimensions`/`constraints`/`legal_combinations` split below is compiled to make step 4's own verb ("產生",
+  GENERATE) a real structural property, not merely a slogan.
+
+  `legal_combinations`/`legal_combination_count` are GENUINE_COMPUTE, re-derived from `dimensions`/
+  `constraints` by both the builder and an independent gate, never caller-asserted -- see
+  `ai_lego/compute/morphological_analysis/combination_generation.py` and
+  `ai_lego/modules/association/morphological_analysis.py`, same two-layer discipline every sibling module in
+  this suite already uses. This is a cross-array, whole-object derivation JSON Schema cannot express (no
+  native "compute this array from those two arrays" operator), so the CORRECTNESS of `legal_combinations`
+  is a runtime-layer invariant; this schema validates only its SHAPE.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Morphological Analysis row (L414)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.11 (L1436-1460) -- dedicated section, worked 4-dimension x 3-option table + 5-step 使用方式"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.5 New Product / Startup Recipe mermaid (L3341: SCAMPER -> Morphological Analysis -> Assumption Mapping)"
+  - "methods/contracts/association.morphological_analysis.contract.yaml (id: association.morphological_analysis)"
+  - "specs/cognitive/typed-objects/attack-tree-record.schema.yaml (genuine_compute two-layer + defensive-cap-before-compute convention reused here)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml (informs_problem_statement_ref soft-link convention reused here as informs_mcda_ref)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should a dimension be allowed fewer than 2 options?"
+    decision: "No -- minItems: 2. A 1-option 'dimension' contributes no branching to the combinatorial space; Atlas's own worked table gives every dimension 3 option columns."
+  - question: "Should legal_combinations be allowed to end up empty (every combination eliminated by constraints)?"
+    decision: "Yes -- always present, even as an empty array. Same 'zero is meaningful, not unset' precedent 5w1h-record.schema.yaml's own information_gaps and boundary-critique-record.schema.yaml's own empty_categories already establish; an infeasible constraint set is itself a real finding, not an unset field."
+  - question: "Can legal_combinations' own correctness (matches the real cartesian-product-minus-constraints enumeration) be expressed in JSON Schema?"
+    decision: "No -- same limitation root_aggregate (attack-tree-record.schema.yaml) already documents: JSON Schema can validate SHAPE (each entry a string-keyed object) but not that the VALUE is the correct derivation from dimensions/constraints. Runtime-layer only, see top-level description."
+  - question: "Represent constraints as arbitrary boolean rules, or one fixed checkable shape?"
+    decision: "One fixed pairwise shape only: (dimension_a, option_a) forbidden to co-occur with (dimension_b, option_b). Atlas's own 'compatibility constraints' wording is not specific enough to justify inventing a richer rule grammar."
+
+type: object
+required: [id, version, subject, dimensions, constraints, legal_combinations, legal_combination_count, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^MORPHANALYSIS-"
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "association.morphological_analysis"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The one system/product/decision every dimension's options are a design axis OF -- un-cited-by-Atlas anchor field, same convention framing.five_w_one_h's own topic and security.attack_tree's own system_or_component already establish for their own families."
+
+  dimensions:
+    type: array
+    minItems: 2
+    description: >
+      Atlas's own "多維" (MULTIDIMENSIONAL) wording -- a single dimension isn't morphological analysis, so
+      at least 2 are required. Order is caller-significant only insofar as it determines
+      `legal_combinations`' own enumeration order (see `ai_lego/compute/morphological_analysis
+      /combination_generation.py`); dimension NAMES, not array position, are the real identity referenced
+      by `constraints` and by each `legal_combinations` entry's own keys.
+    items:
+      $ref: "#/$defs/dimension"
+
+  constraints:
+    type: array
+    default: []
+    description: >
+      Atlas's own step 3 ("建 compatibility constraints") -- REQUIRED array, MAY be empty (not every design
+      space needs exclusion rules), same required-but-possibly-empty convention attack-tree-record.schema.yaml's
+      own trust_boundaries/entry_points already establish.
+    items:
+      $ref: "#/$defs/constraint"
+
+  legal_combinations:
+    type: array
+    uniqueItems: true
+    description: >
+      GENUINE_COMPUTE -- the full cartesian product over dimensions[].options, minus every combination that
+      violates at least one constraint. Always present (an empty array is a real, meaningful state: every
+      combination was eliminated). Each entry maps every dimension's own `name` to its chosen `option` for
+      that one legal combination. Runtime-layer cross-array derivation check: must equal the real
+      enumeration -- see top-level description.
+    items:
+      type: object
+      minProperties: 2
+      additionalProperties:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+
+  legal_combination_count:
+    type: integer
+    minimum: 0
+    description: "GENUINE_COMPUTE -- MUST equal len(legal_combinations). Kept as an explicit sibling field (not merely derivable client-side) matching this suite's convention of surfacing a derived scalar summary alongside its own source array."
+
+  informs_mcda_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL forward soft-link to Atlas's own named convergence step (F04 table L414, §11.11 step 5:
+      "feasibility / MCDA / prototype"), specifically to a built `decision.mcda` record. Format-only checked
+      (non-empty string); existence of the referenced record is NOT verified, same limitation
+      5w1h-record.schema.yaml's own informs_problem_statement_ref already accepts. "Prototype" (Atlas's
+      other named convergence option) has no catalogued method id in this suite to link to.
+
+  provenance:
+    description: >
+      Overall record provenance. epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION -- the
+      dimension/option/constraint SET is an analytical design judgment (same character
+      attack-tree-record.schema.yaml's own provenance note already establishes for its own tree structure);
+      only legal_combinations/legal_combination_count are a calculated result.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  dimension:
+    type: object
+    required: [name, options]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Unique across the whole dimensions array -- referenced by name, not position, from constraints and legal_combinations entries. Cross-array uniqueness is a runtime-layer check (see top-level description)."
+      options:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        description: "At least 2 unique non-empty options -- see compilation_decisions above."
+
+  constraint:
+    type: object
+    required: [dimension_a, option_a, dimension_b, option_b]
+    additionalProperties: false
+    description: >
+      One pairwise MUTUALLY_EXCLUSIVE compatibility rule: a legal combination MUST NOT simultaneously pick
+      option_a for dimension_a AND option_b for dimension_b. dimension_a/dimension_b naming two DIFFERENT
+      real dimensions, and option_a/option_b each genuinely belonging to their own named dimension's
+      options, are runtime-layer cross-object checks (see top-level description).
+    properties:
+      dimension_a: {type: string, minLength: 1, pattern: "\\S"}
+      option_a: {type: string, minLength: 1, pattern: "\\S"}
+      dimension_b: {type: string, minLength: 1, pattern: "\\S"}
+      option_b: {type: string, minLength: 1, pattern: "\\S"}
+
+examples:
+  - description: "A small 2-dimension x 2-option illustrative example (Atlas's own §11.11 worked table is 4 dimensions x 3 options = 81 raw combinations, too large to reproduce readably here) -- 1 constraint eliminates 1 of the 4 raw combinations, leaving 3 legal."
+    value:
+      id: "MORPHANALYSIS-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "association.morphological_analysis"
+      subject: "internal Method Atlas tooling deployment shape"
+      dimensions:
+        - name: Deployment
+          options: [Cloud, Local]
+        - name: AI
+          options: [Bundled, BYOAI]
+      constraints:
+        - dimension_a: Deployment
+          option_a: Local
+          dimension_b: AI
+          option_b: Bundled
+      legal_combinations:
+        - {Deployment: Cloud, AI: Bundled}
+        - {Deployment: Cloud, AI: BYOAI}
+        - {Deployment: Local, AI: BYOAI}
+      legal_combination_count: 3
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+  - description: "Zero legal combinations -- a real, meaningful record state, not an error: 2 constraints together eliminate every one of the 4 raw combinations."
+    value:
+      id: "MORPHANALYSIS-2026-09-10-002"
+      version: "1.0.0"
+      generated_by_method: "association.morphological_analysis"
+      subject: "deliberately over-constrained illustrative example"
+      dimensions:
+        - name: Deployment
+          options: [Cloud, Local]
+        - name: AI
+          options: [Bundled, BYOAI]
+      constraints:
+        - dimension_a: Deployment
+          option_a: Cloud
+          dimension_b: AI
+          option_b: Bundled
+        - dimension_a: Deployment
+          option_a: Cloud
+          dimension_b: AI
+          option_b: BYOAI
+        - dimension_a: Deployment
+          option_a: Local
+          dimension_b: AI
+          option_b: Bundled
+        - dimension_a: Deployment
+          option_a: Local
+          dimension_b: AI
+          option_b: BYOAI
+      legal_combinations: []
+      legal_combination_count: 0
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - id: "OQ-MORPHANALYSISRECORD-1"
+    question: >
+      Should a future revision add a REQUIRES/IMPLIES constraint relationship (dimension X's option a
+      mandates dimension Y's option b), not just MUTUALLY_EXCLUSIVE? Left out -- Atlas's own "compatibility
+      constraints" wording gives no evidence of a richer rule grammar, and inventing one here would be
+      exactly the "fabricate a rich schema with no textual basis" R0 forbids.
+    owner: "operator, or whoever next needs a richer constraint model"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F04 table row (L414), §11.11 (L1436-1460), and the §13.5 mermaid node (L3341) directly.
+    Read attack-tree-record.schema.yaml and 5w1h-record.schema.yaml in full as the genuine_compute-shape and
+    soft-link-field convention templates. Grepped the whole ai_lego tree case-insensitively for
+    "morphological_analysis"/"morphological analysis" before writing -- zero pre-existing implementation.
+    Validated against jsonschema Draft202012Validator (required fields present, id pattern, dimensions
+    minItems/uniqueItems enforced, additionalProperties:false on the top level and both $defs verified to
+    actually reject an unknown key, legal_combinations shape accepted/rejected as expected).
+  note: >
+    dimensions/options/constraints/legal_combinations field names and the 5-step process they implement are
+    this suite's own compiled structure engineered to make Atlas's own step 4 verb ("產生", GENERATE) a real,
+    re-derivable property -- explicitly flagged as non-Atlas field-level grounding above, not presented as
+    mother-document content. No mother document was modified to produce this file.

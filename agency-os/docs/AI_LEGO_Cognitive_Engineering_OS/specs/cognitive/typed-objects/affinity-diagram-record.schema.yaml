@@ -1,0 +1,250 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/affinity-diagram-record.schema.yaml"
+title: Affinity Diagram Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AffinityDiagramRecord` -- the declared `outputs` of
+  `association.affinity_diagram`'s Method Contract. Atlas's F04 table row (L413: "Affinity Diagram｜大量
+  idea 自然分群｜一卡一 idea→靜默分群→命名｜找 pattern、降低資訊量｜Thematic Analysis") and dedicated §11.3
+  (L1206-1224) give a 5-step PROCESS ("一卡一 idea" -> do NOT pre-define category names -> let similar cards
+  cluster silently, no forced framework -> name the groups AFTER they form -> find higher-level
+  cross-group themes) with no field-level shape. This schema makes the checkable PART of that process a real
+  structure: `cards` (one entry per raw idea) and `groups` (post-hoc-named clusters, each referencing >=1
+  real card). `ungrouped_card_refs` makes the coverage question -- which cards did NOT land in any group --
+  a first-class, re-derivable field rather than a silent gap, same discipline `5w1h-record.schema.yaml`'s own
+  `information_gaps` and `boundary-critique-record.schema.yaml`'s own `empty_categories` already establish.
+
+  Atlas step 2 ("不要預先定義分類名稱" -- do NOT pre-define category names) is explicitly NOT expressed as a
+  schema field: it is a claim about the ANALYST'S WORKING ORDER (did naming happen after clustering?), not a
+  property the finished record's own data shape can prove or disprove -- see the method contract's own
+  `compilation_decisions` for the full reasoning on why no field was invented for it.
+
+  TWO real invariants JSON Schema alone cannot express (cross-array referential integrity of `groups[].
+  item_refs` into `cards[].id` and of `higher_level_themes[].group_refs` into `groups[].id`; the mutual-
+  exclusivity rule that no card is referenced by more than one group; the GENUINE_COMPUTE derivation of
+  `ungrouped_card_refs`) -- all four are runtime-layer, enforced at construction AND independently re-derived
+  by a gate, same two-layer discipline every sibling typed-object schema in this directory already documents;
+  see `ai_lego/modules/association/affinity_diagram.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Affinity Diagram row (L413)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.3 親和圖／KJ 法 (L1206-1224) -- dedicated section, the 5-step 使用方式"
+  - "methods/contracts/association.affinity_diagram.contract.yaml (id: association.affinity_diagram)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml (topic-as-anchor-field convention; UNKNOWN-with-gap_note explicit-non-coverage precedent reused here as ungrouped_card_refs)"
+  - "specs/cognitive/typed-objects/boundary-critique-record.schema.yaml (DECLARED_EMPTY / empty_categories GENUINE_COMPUTE coverage-field precedent reused here)"
+  - "specs/cognitive/typed-objects/frame-storming-record.schema.yaml (caller-chosen unique item id, no fixed prefix, convention reused for cards[].id / groups[].id)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should cards[].text carry a substantive-content minLength threshold, the way frame-storming-record.schema.yaml's own frame_text does (minLength:6)?"
+    decision: "No -- minLength:1 only. A real affinity-diagram card is legitimately a 2-3 word sticky note ('價格', 'confused users'), unlike a frame_storming candidate_framing (a full alternative question-form of a phenomenon, where Atlas's own 'storming' framing implies content richness). Imposing the same threshold here would reject genuine short cards."
+  - question: "Must every card be referenced by some group (100% coverage), or is an explicit ungrouped bucket legitimate?"
+    decision: "Explicit ungrouped bucket -- ungrouped_card_refs, always present (even empty). Forcing 100% coverage would pressure a producer to invent a fake cluster just to pass validation, directly contradicting Atlas's own step-3 discipline ('讓相似的卡片自然聚集,不要用框架硬套' -- let similar cards cluster naturally, do not force a framework). See method contract's own compilation_decisions for the full reasoning."
+  - question: "Can one card belong to more than one group?"
+    decision: "No. Mutual exclusivity (runtime-layer, not schema-expressible) -- a card is in zero or exactly one group. Multi-membership would make ungrouped_card_refs's own derivation ambiguous and has no basis in Atlas's own physical sticky-note-pile metaphor."
+  - question: "Model higher_level_themes (Atlas step 5) as required or optional, and what shape?"
+    decision: "Optional array, each entry requiring group_refs with >=2 members (a 'theme' naming a single group is a rename, not a cross-group relationship). Omitted entirely rather than an empty array when there is nothing to report, same 'helper omits' convention this suite's optional list fields already use elsewhere."
+
+type: object
+required: [id, version, topic, cards, groups, ungrouped_card_refs, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^AFFINITY-"
+    description: "NEW DESIGN. Record id prefix, following the existing PROB-/5W1H-/FS-/BC- convention this suite's other typed-object schemas already use."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "association.affinity_diagram"
+
+  topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The one shared subject every card is an idea/observation ABOUT -- un-cited-by-Atlas anchor field, same class 5w1h-record.schema.yaml's own topic and frame-storming-record.schema.yaml's own phenomenon already establish."
+
+  cards:
+    type: array
+    minItems: 1
+    description: "Atlas step 1: '一卡一 idea' -- one card, one raw idea/observation, no upstream grouping assumed."
+    items: { $ref: "#/$defs/card_entry" }
+
+  groups:
+    type: array
+    minItems: 1
+    description: >
+      Atlas steps 3-4: silently-clustered cards, named AFTER clustering. A record with zero groups is not yet
+      a completed affinity-diagram output (still raw, unclustered cards) -- see top-level description on why
+      step 2's 'names not pre-defined' constraint itself is NOT expressed here (unenforceable on finished data).
+      Referential integrity into cards[].id and mutual exclusivity across groups are runtime-layer checks.
+    items: { $ref: "#/$defs/group_entry" }
+
+  ungrouped_card_refs:
+    type: array
+    uniqueItems: true
+    items: { type: string, minLength: 1 }
+    description: >
+      GENUINE_COMPUTE -- cards[].id whose id is NOT referenced by any group's item_refs, in cards[] array
+      order. Always present (an empty array means full coverage, a real and meaningful state, not "not
+      computed"). Runtime-layer cross-array derivation check: must equal the actual uncovered set -- see
+      top-level description.
+
+  higher_level_themes:
+    type: array
+    minItems: 1
+    description: >
+      OPTIONAL. Atlas step 5: '然後再找更高層次的主題／跨組關係' (find higher-level themes / cross-group
+      relationships), a follow-on step after grouping, not a hard requirement of every completed diagram.
+      Referential integrity of group_refs into groups[].id is a runtime-layer check.
+    items: { $ref: "#/$defs/higher_level_theme" }
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  card_entry:
+    type: object
+    required: [id, text, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Caller-chosen, unique across cards -- no fixed prefix required, same freedom frame-storming-record.schema.yaml's own candidate_framings[].id already establishes."
+      text:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "One idea/observation (Atlas step 1). See compilation_decisions on why no minLength:6-class substantive-content threshold is imposed."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      supporting_evidence_refs:
+        type: array
+        items: { type: string, pattern: "^E-[0-9]+$" }
+        description: "Soft reference to real evidence/evidence.schema.yaml record ids, same convention every other typed-object schema in this directory already uses."
+
+  group_entry:
+    type: object
+    required: [id, name, item_refs, provenance]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Caller-chosen, unique across groups -- no fixed prefix required, same freedom as cards[].id above."
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Assigned AFTER cards cluster (Atlas step 4). The ORDERING itself (named after, not before, clustering) is a process fact this schema cannot verify -- see top-level description."
+      item_refs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: { type: string, minLength: 1 }
+        description: "cards[].id this group contains. Referential integrity (every ref resolves to a real card) and mutual exclusivity (no card referenced by 2+ groups) are runtime-layer checks -- see top-level description."
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  higher_level_theme:
+    type: object
+    required: [theme, group_refs]
+    additionalProperties: false
+    properties:
+      theme:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas step 5's own higher-level pattern/relationship name, spanning multiple groups."
+      group_refs:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items: { type: string, minLength: 1 }
+        description: "groups[].id this theme spans -- >=2 required (a single-group 'theme' is a rename, not a cross-group pattern). Referential integrity is a runtime-layer check."
+
+examples:
+  - description: "6 cards clustered into 2 named groups, 1 card left explicitly ungrouped, 1 cross-group theme"
+    value:
+      id: "AFFINITY-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "association.affinity_diagram"
+      topic: "使用者訪談：為什麼結帳流程放棄率偏高"
+      cards:
+        - id: "C1"
+          text: "運費太貴才發現"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-1"]
+        - id: "C2"
+          text: "結帳前才被要求註冊帳號"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-2"]
+        - id: "C3"
+          text: "付款方式沒有信用卡分期"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-3"]
+        - id: "C4"
+          text: "表單欄位太多，手機上很難填"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-4"]
+        - id: "C5"
+          text: "運費門檻不清楚，快結帳才算出來"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+          supporting_evidence_refs: ["E-5"]
+        - id: "C6"
+          text: "客服電話沒人接，怕買了求助無門"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      groups:
+        - id: "G1"
+          name: "價格與費用不透明"
+          item_refs: ["C1", "C5"]
+          provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "G2"
+          name: "結帳流程摩擦"
+          item_refs: ["C2", "C3", "C4"]
+          provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+      ungrouped_card_refs: ["C6"]
+      higher_level_themes:
+        - theme: "使用者在最後一步才發現隱藏成本／障礙"
+          group_refs: ["G1", "G2"]
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-AFFINITYDIAGRAMRECORD-1"
+    question: >
+      Should a future revision let a card carry a confidence/strength-of-fit value for its group membership
+      (some clustering decisions are more confident than others)? Left out -- no downstream consumer requires
+      it yet, same restraint every other Tier 1 sibling schema in this directory applies to unneeded richer
+      state.
+    owner: "operator, or whoever next needs a confidence-weighted clustering consumer"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F04 table Affinity Diagram row (L413) and dedicated §11.3 (L1206-1224) directly. Read
+    5w1h-record.schema.yaml, frame-storming-record.schema.yaml, and boundary-critique-record.schema.yaml in
+    full as the anchor-field / caller-chosen-id / GENUINE_COMPUTE-coverage-field convention templates.
+    Grepped specs/cognitive/typed-objects/ for "affinity" before writing -- no pre-existing or competing typed
+    object found. Validated against jsonschema Draft202012Validator (schema itself passes check_schema();
+    required fields present; additionalProperties:false on the top level and all three $defs verified to
+    actually reject an unknown key; cards/groups minItems:1 verified to actually reject an empty array;
+    group_entry.item_refs minItems:1 and higher_level_theme.group_refs minItems:2 verified to actually reject
+    under-sized arrays).
+  note: >
+    `cards`/`groups`/`ungrouped_card_refs`/`higher_level_themes` field shapes are this suite's own compiled
+    structure engineered to make Atlas's own 5-step process partially checkable -- explicitly flagged as
+    non-Atlas field-level grounding above (compilation_decisions), not presented as mother-document content.
+    Atlas step 2 ("do not pre-define category names") is explicitly NOT represented as a field -- see
+    top-level description and the method contract's own compilation_decisions for why it is a process
+    constraint, not a data-shape property. No mother document was modified to produce this file.

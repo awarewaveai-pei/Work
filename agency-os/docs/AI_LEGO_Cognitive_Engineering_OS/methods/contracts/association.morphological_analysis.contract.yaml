@@ -1,0 +1,104 @@
+$id: "ai-lego://methods/contracts/association.morphological_analysis.contract.yaml"
+title: "Morphological Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 1st member of the `association` family (F04, Associative Mapping & Combination -- 0/many built
+  before this slice). Atlas's citations: F04 table row (L414: "Morphological Analysis｜多維 options 組合｜
+  dimensions→options→合法組合→評估｜系統探索巨大 solution space｜MCDA、Prototype"), dedicated §11.11
+  (L1436-1460: worked 4-dimension x 3-option table + 5-step 使用方式), and the §13.5 recipe mermaid node
+  (L3341: SCAMPER -> Morphological Analysis -> Assumption Mapping). Not in EC §32. Core invariant:
+  `legal_combinations` is GENUINE_COMPUTE -- the full cartesian product over dimensions[].options minus
+  every (dimension,option)x(dimension,option) constraint violation, re-derived by both the builder and an
+  independent gate, never caller-asserted (Atlas's own step 4, "產生合法 combinations", uses the literal verb
+  GENERATE, not "declare").
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Morphological Analysis row (L414) -- the primary citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.11 (L1436-1460) -- dedicated section, worked table + 5-step 使用方式"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.5 New Product / Startup Recipe mermaid (L3341)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4471) -- names this method as a suggested next step after SCAMPER, an unbuilt sibling; not depended on, see open_questions"
+  - "methods/contracts/security.attack_tree.contract.yaml -- genuine_compute two-layer + defensive-cap-before-compute (MAX_TREE_DEPTH) precedent reused here (MAX_RAW_COMBINATION_SPACE)"
+  - "methods/contracts/framing.five_w_one_h.contract.yaml -- informs_<X>_ref forward soft-link convention reused here as informs_mcda_ref"
+  - "methods/contracts/decision.mcda.contract.yaml -- Atlas's own named convergence step (§11.11 step 5), soft-linked only, not hard-required"
+  - "specs/cognitive/typed-objects/morphological-analysis-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: association.morphological_analysis` has no digit-collision naming issue
+  (unlike framing.five_w_one_h/root_cause.five_whys) -- the method's own name has no digits.
+
+id: association.morphological_analysis
+version: "1.0.0"
+family: association
+
+cognitive_primitives: [DECOMPOSE, EXPAND, ASSOCIATE]
+# INFERRED, not cited. Splitting one system into dimensions is DECOMPOSE; listing options per dimension is
+# EXPAND; generating cross-dimension combinations is ASSOCIATE -- the same primitive the `association`
+# family name itself names (F04, Associative Mapping & Combination).
+
+purpose:
+  - explore_a_large_solution_space_by_generating_and_filtering_legal_combinations_across_independent_design_dimensions
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own §28 citation places this AFTER SCAMPER (an unbuilt
+  # sibling), not on a typed-object precondition; same "no hard upstream dependency" position
+  # framing.five_w_one_h's own inputs.required: [] takes for an analogous first-in-chain placement.
+outputs: [MorphologicalAnalysisRecord]
+preconditions:
+  - "dimensions has at least 2 entries -- Atlas's own '多維' (MULTIDIMENSIONAL) wording; a single dimension isn't morphological analysis"
+  - "every dimension's name is a non-empty string, unique across dimensions"
+  - "every dimension's options is a list of at least 2 non-empty, unique strings"
+  - "every constraint names two DIFFERENT dimensions, each existing in dimensions, and each option existing among that dimension's own options"
+  - "the raw (unfiltered) cartesian product size -- product of every dimension's option count -- MUST NOT exceed MAX_RAW_COMBINATION_SPACE (100,000); refused before generation, not silently hung or truncated"
+  - "legal_combinations is always present (an empty list is meaningful: every combination was eliminated by constraints) and MUST equal the full cartesian product over dimensions[].options minus every combination that violates at least one constraint -- re-derived, never caller-trusted"
+  - "legal_combination_count MUST equal len(legal_combinations)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  genuine_compute: true
+  # Second F04-family-opening genuine_compute method in this batch's own class (same marker
+  # security.attack_tree's own quality block already uses) -- legal_combinations/legal_combination_count are
+  # real bottom-up enumeration, not a caller-declared list.
+forbidden_transition: []
+# No Atlas §22.3 Method-specific Gate table row for Morphological Analysis (grep-confirmed).
+recommended_next: [decision.mcda]
+# Atlas's own step 5 names "feasibility / MCDA / prototype" as the convergence step (F04 table L414's own
+# rightmost column, §11.11 step 5); decision.mcda is the one of those two already built at this write time.
+# "Prototype" is not a catalogued method id in this suite -- left out rather than invented.
+
+compilation_decisions:
+  - question: "Should a dimension be allowed fewer than 2 options?"
+    decision: "No -- MIN_OPTIONS_PER_DIMENSION=2. A 1-option 'dimension' contributes no branching to the combinatorial space; Atlas's own worked table gives every dimension 3 option columns."
+  - question: "Should legal_combinations be allowed to end up empty (every combination eliminated by constraints)?"
+    decision: "Yes, the builder does not refuse -- same 'zero is meaningful, not unset' precedent framing.five_w_one_h's own information_gaps: [] and framing.boundary_critique's own empty_categories: [] already establish; an infeasible constraint set is itself a real, actionable finding for the caller."
+  - question: "How to bound combinatorial explosion during generation?"
+    decision: "MAX_RAW_COMBINATION_SPACE=100,000 (the raw, UNFILTERED cartesian product size, checked BEFORE generation) -- same defensive-cap-before-compute precedent security.attack_tree's own MAX_TREE_DEPTH already establishes for a different unbounded-computation risk; Atlas's own worked example is 3^4=81, so this cap rejects only pathological input."
+  - question: "Represent constraints as arbitrary boolean rules or one fixed checkable shape?"
+    decision: "One fixed pairwise MUTUALLY_EXCLUSIVE shape: (dimension_a,option_a) forbidden to co-occur with (dimension_b,option_b) -- the only relationship Atlas's own 'compatibility constraints' wording is specific enough to make checkable without inventing a rule grammar Atlas never gives."
+  - question: "Hard-require decision.mcda as the convergence step?"
+    decision: "No -- OPTIONAL informs_mcda_ref soft-link, format-checked only, same convention framing.five_w_one_h's own informs_problem_statement_ref already establishes; Atlas's own citation lists 'MCDA、Prototype' as options, not a mandate."
+  - question: "Separate ai_lego/compute/morphological_analysis/ submodule, or inline in the module?"
+    decision: "Separate submodule (combination_generation.py) -- same GENUINE_COMPUTE-gets-its-own-file precedent ai_lego/compute/five_w1h/gap_detection.py and ai_lego/compute/attack_tree/aggregate.py already establish; cartesian-product-minus-constraints is real, non-trivial derivation logic."
+
+open_questions:
+  - "OQ-MORPHANALYSIS-1: Atlas's own step 5 also names 'Prototype' alongside MCDA as a convergence option; no catalogued method id exists for it in this suite, so no soft-link field was added for it. If a future 'engineering prototype' typed-object is ever catalogued, reconsider.（owner: operator)"
+  - "OQ-MORPHANALYSIS-2: Atlas's own §28 citation places this method AFTER SCAMPER for an '已有產品想改良' scenario; SCAMPER is unbuilt at this write time and no backward soft-link was added (this task's scope is this method only). A future SCAMPER build may want a forward-looking field of its own pointing here.（owner: operator, whoever next builds SCAMPER）"
+  - "OQ-MORPHANALYSIS-3: whether a REQUIRES/IMPLIES constraint relationship (beyond MUTUALLY_EXCLUSIVE) is ever needed is left open -- see the typed-object schema's own OQ-MORPHANALYSISRECORD-1.（owner: operator)"
+
+verification:
+  method: >
+    Read Atlas's F04 table row (L414), §11.11 (L1436-1460), the §13.5 mermaid node (L3341), and §28's own
+    row (L4471) directly. Grepped the whole Atlas file for "Morphological Analysis" -- exactly those 4 hits,
+    confirmed no others. Read framing.five_w_one_h.contract.yaml and security.attack_tree.contract.yaml in
+    full to reuse the established two-layer-invariant / defensive-cap / soft-link conventions. Grepped the
+    whole ai_lego tree case-insensitively for "morphological_analysis" and "morphological analysis" before
+    writing -- zero pre-existing implementation. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own "dimensions→options→合法組合→評估" formula and 5-step
+    使用方式 are transcribed verbatim into preconditions/purpose. The dimension/constraint/legal_combinations
+    field shapes and the MAX_RAW_COMBINATION_SPACE cap are this suite's own compiled structure, not
+    Atlas-cited field-by-field -- disclosed as such, same honesty discipline every sibling Tier 1 contract in
+    this directory already applies.

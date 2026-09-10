@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/association.concept_map.contract.yaml"
+title: "Concept Map Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 1st `association` (F04) family member -- family had 0 real methods built before this slice (grep-
+  confirmed: no ai_lego/modules/association/ directory existed). Atlas F04 table row (L412) + dedicated §11.2
+  (L1176-1203, worked mermaid example + 5-step 使用方式) + F04 Mind-Map-vs-Concept-Map mermaid contrast
+  (L420-426, the defining property: typed edges vs. Mind Map's untyped free branches). Core invariant: every
+  edge carries a non-empty relationship_type and resolves to real declared nodes (referential integrity);
+  orphan_node_ids is GENUINE_COMPUTE, re-derived by an independent gate, never caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Concept Map row (L412) -- the primary citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.2 (L1176-1203) -- dedicated section, worked mermaid example, 5-step 使用方式"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 Mind-Map-vs-Concept-Map mermaid contrast (L420-426) -- the structural point (typed edges, general graph not a tree)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.3 Research-grade Ideation Recipe (L3271, 'Divergence -> Concept Map -> Multi-Expert Lens') -- corroborating recipe-chain citation"
+  - "methods/contracts/causal.dag.contract.yaml -- closest sibling graph-shaped method, cited as recommended_next below (Atlas's own L412 最佳搭配 column names it; confirmed already built, correcting this task's own brief which assumed otherwise)"
+  - "specs/cognitive/typed-objects/concept-map-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in methods/registry/contract-backlog.yaml tier_1 as the 91st slice.
+  Grep-confirmed 8 total "Concept Map" hits in the whole Atlas file (table row, section header, F04 mermaid
+  node, §11.2 header, its own 推薦搭配 line, its own dedicated section, the §13.3 recipe entry, Phase-1
+  priority list L4276) -- none add a citation beyond what is transcribed above.
+
+id: association.concept_map
+version: "1.0.0"
+family: association
+
+cognitive_primitives: [ASSOCIATE, MAP, RELATE]
+# INFERRED, not cited. Family name itself is ASSOCIATE; Atlas's own row-name "Concept Map" is MAP; "節點＋
+# typed relations" is RELATE -- all three are members of primitive.schema.yaml's own 24-primitive kernel.
+
+purpose:
+  - connect_concepts_via_typed_semantic_relationships_for_knowledge_graph_mapping_and_reasoning
+inputs:
+  required: []
+  optional: []
+  # Atlas's own F04 row/section gives no upstream typed-object dependency for Concept Map, same "no required
+  # input" class framing.five_w_one_h's own contract already establishes for its own F01 sibling.
+outputs: [ConceptMapRecord]
+preconditions:
+  - "nodes is a list of at least 2 well-shaped {id, label} entries with unique ids"
+  - "edges is a non-empty list; every edge carries a non-empty relationship_type (Atlas §11.2 step 2, unconditional)"
+  - "every edge's from_node_id/to_node_id resolves to a real node id declared in the SAME record's own nodes -- a dangling reference is refused"
+  - "every edge with provenance.epistemic_type == EVIDENCE cites at least 1 supporting_evidence_refs entry (Atlas §11.2 step 3)"
+  - "orphan_node_ids always present (empty is meaningful) and MUST equal the set of node ids referenced by zero edges, in nodes order -- re-derived, never caller-trusted"
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (only the table row + §11.2, no §22.3 Method-
+# specific Gate table hit -- grep-confirmed, association.concept_map is not among that table's rows) -- left
+# genuinely empty rather than inventing one.
+recommended_next: [causal.dag]
+# Atlas's own L412 最佳搭配 column names "Causal DAG" -- ALREADY BUILT (id: causal.dag), confirmed by direct
+# grep before writing (this task's own brief assumed it was unbuilt; corrected here per R4 claim-before-
+# verify). Atlas §11.2 step 5 ("因果關係若要進一步證明，轉 Causal DAG") corroborates the same pairing.
+
+compilation_decisions:
+  - question: "Should edges carry a dedicated is_inference boolean, or reuse provenance.epistemic_type as the sourced-vs-inferred axis?"
+    decision: "Reuse provenance.epistemic_type (no new boolean). Two direct sibling precedents (causal.dag's own edges, framing.five_w_one_h's own dimension entries) already use this axis for the same sourced-vs-inferred distinction, checked gate-only via evidence_labeling_required, not construction-enforced -- matched here rather than inventing a redundant field."
+  - question: "Should nodes require their own per-node provenance?"
+    decision: "No. Atlas's step 1 names no node-level epistemic labeling; causal-dag-analysis.schema.yaml's own closest-sibling nodes already omit it for the same reason -- only edges carry provenance."
+  - question: "Should a record with zero edges be legal (a bare node list)?"
+    decision: "No -- edges: minItems 1. Atlas's own F04 contrast (L420-426) defines Concept Map BY its typed edges; a zero-edge record would not exercise this method's own structural point."
+  - question: "Is orphan_node_ids worth building as GENUINE_COMPUTE, given Atlas's own benefit column doesn't literally say 'find orphans'?"
+    decision: "Yes -- same un-cited-but-benefit-grounded class framing.boundary_critique's own empty_categories already establishes. An unreferenced node contributes zero relations to the graph, directly weakening the cited '可直接映射 Knowledge Graph' benefit (§11.2, L1200-1202)."
+
+open_questions:
+  - "OQ-CONCEPTMAP-1: this task's own brief assumed causal.dag (Atlas's own recommended-next pairing) was unbuilt; direct grep before writing confirmed it IS already built and ACTIVE. recommended_next above cites it for real rather than leaving it empty pending a future integration pass.（owner: operator, informational correction only)"
+  - "OQ-CONCEPTMAP-2: should an individual causal-flavored edge carry a forward soft-link to a promoted causal.dag record once Atlas §11.2 step 5's 'further proof' conversion happens? Left unaddressed -- out of this slice's own 5-file scope, no such field added.（owner: operator, or whoever next builds a concept-map-to-causal-dag promotion flow)"
+
+verification:
+  method: >
+    Grepped the whole Atlas file for "Concept Map" -- 8 hits, all read (F04 table row L412, F04 section header
+    L407, F04 mermaid node L424, §11.2 header L1176, §11.2's own 推薦搭配 line L1172, §11.2 dedicated section
+    L1176-1203, §13.3 recipe L3271, Phase-1 priority list L4276) -- none add a citation beyond what is
+    transcribed above. Read framing.five_w_one_h.contract.yaml and causal.dag.contract.yaml in full (plus
+    causal.dag's own module and typed-object schema) to reuse the established two-layer-invariant /
+    graph-shape / provenance-as-sourced-vs-inferred conventions. Grepped the whole ai_lego tree case-
+    insensitively for "concept_map"/"concept map" before writing -- zero pre-existing implementation.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own worked mermaid example and 5-step 使用方式 are transcribed
+    verbatim into the typed-object schema's examples/preconditions. The provenance.epistemic_type-reuse
+    decision, orphan_node_ids's derivation, and the nodes-minItems-2/edges-minItems-1 floors are this suite's
+    own compiled structure, not Atlas-cited field-by-field -- disclosed as such, same honesty discipline every
+    sibling Tier 1 contract in this directory already applies.

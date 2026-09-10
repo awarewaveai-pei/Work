@@ -1,0 +1,125 @@
+$id: "ai-lego://methods/contracts/association.mind_map.contract.yaml"
+title: "Mind Map Method Contract"
+status: ACTIVE
+
+description: >
+  association.mind_map, 1st `association` (F04 "關聯映射與組合", Associative Mapping & Combination) family
+  member -- family 0/6 built before this batch. Atlas's PRIMARY citation is dedicated §11.1 (L1124-1172),
+  corroborated by the F04 table row (L411: "中心→主枝→次枝→關鍵詞") and the F04 mermaid diagram (L418-426, Mind
+  Map's own untyped edges contrasted against Concept Map's typed edges in the SAME diagram). NOT the same
+  thing as contract-backlog.yaml's own tier_2 `worked_example` under this exact method_id -- that is a
+  naming-format illustration lifted from a planning doc, `contract_status: pending`, not edited here. Core
+  invariant: a strict, fixed-depth NESTED tree (central_topic -> main_branches[] -> sub_branches[] ->
+  keywords[]), never an id-cross-referenced graph -- structurally forecloses the cross-branch/causal claim
+  Atlas's own §11.1 限制 forbids ('邊沒有正式語意'／不能因為兩個東西畫在一起就宣稱存在因果), by construction.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Mind Map row (L411)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.1 (L1124-1172) -- dedicated section, primary structural citation, including 標準使用方式 5 steps and 限制 3 bullets"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 mermaid diagram (L418-426)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.1 Simple Brainstorm Recipe (L3216) and §28 quick-tool table (L4467) -- corroborating recipe-chain citations, same method, no conflicting shape"
+  - "methods/registry/contract-backlog.yaml tier_2 worked_example (L2270-2285) -- pre-existing naming-format illustration for this exact method_id, NOT a real built method, NOT edited by this contract"
+  - "methods/registry/method-inventory.yaml F04 association 'Mind Map' row (L356-361) -- confirms family/category; its own `line: 410` citation is stale by one (real F04 table row is L411, same drift class other rows in this suite already found), not corrected here per Lean Standard §6"
+  - "specs/cognitive/typed-objects/non-goals-record.schema.yaml -- closed-key-set nested-entry convention reused"
+  - "specs/cognitive/typed-objects/decision-tree-record.schema.yaml -- NESTED, not id-cross-referenced tree-shape precedent reused"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: association.mind_map` mints the real tier_1 entry for a machine_id that
+  already existed as a NAMING-FORMAT ILLUSTRATION only (contract-backlog.yaml's own tier_2 worked_example,
+  MACHINE_READABLE_SPEC_PLAN.md §4 L263-266) -- already the ADR-005b-correct bare form, no naming collision.
+  Grepped the whole ai_lego tree case-insensitively for "mind_map"/"mind map" before writing -- zero
+  pre-existing implementation.
+
+id: association.mind_map
+version: "1.0.0"
+family: association
+
+cognitive_primitives: [EXPAND, ASSOCIATE]
+# INFERRED, not cited -- Atlas's own §4 L188 composition formula for SCAMPER ("EXPAND + ASSOCIATE +
+# TRANSFORM") is the closest real precedent for this exact primitive pair; Mind Map's own table citation
+# "自由樹狀聯想" (free tree-shaped ASSOCIATE-ion) + "外化工作記憶" via divergent EXPANSION matches both without
+# TRANSFORM (Mind Map does not reshape/convert content, only radiates it outward). Both independently confirmed
+# real values in specs/cognitive/primitive.schema.yaml's own CANONICAL_KERNEL enum.
+
+purpose:
+  - externalize_free_tree_shaped_association_from_one_central_topic_across_main_and_sub_branches
+
+inputs:
+  required: []
+  optional: []
+# Leaf method -- Atlas's own §11.1 places it directly on "資訊尚未結構化" (information not yet structured), no
+# upstream typed-object dependency, same entry-point class framing.five_w_one_h's own empty inputs.required
+# already establishes.
+
+outputs: [MindMapRecord]
+
+preconditions:
+  - "central_topic is exactly one non-empty topic/question, never more than one (Atlas §11.1 step 1, L1131: '中心只放一個主題或問題')"
+  - "main_branches has at least 1 entry, each carrying a non-empty label (Atlas §11.1 step 2, L1132: '第一層放主要方向'); main_branches are NOT required to be MECE (Atlas's own explicit '不急著要求 MECE')"
+  - "a main_branches[] entry MAY optionally carry sub_branches[] (non-empty when present); a sub_branches[] entry MAY optionally carry keywords[] (non-empty when present) -- Atlas §11.1 step 3, L1133: '第二、三層放關鍵詞、例子、疑問、素材'"
+  - "every branch id (main_branches[] and nested sub_branches[]) is unique across the whole record"
+  - "no field anywhere expresses a cross-branch or cross-main-branch reference -- Atlas's own 限制 (L1167-1169: '邊沒有正式語意'／'不能因為兩個東西畫在一起就宣稱存在因果') is enforced structurally via nesting, not a runtime denylist"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Atlas's F04 table has no misuse/evidence column (5-column table: 工具/用途/使用方式/效益/最佳搭配) -- same
+  # reasoning framing.non_goals's own contract already applies to its own column-less F01 table, re-derived
+  # independently here.
+
+forbidden_transition: []
+# Grep-confirmed Mind Map is ABSENT from Atlas §22.3's Method-specific Gate table (L4142-4155) and §14.1's
+# worked legal/illegal transition examples (L3544-3584) -- left genuinely empty rather than inventing one,
+# same restraint framing.five_w_one_h/framing.non_goals's own identical field already establishes. Atlas's own
+# §11.1 限制 text is enforced structurally instead (see preconditions above and compilation_decisions).
+
+recommended_next: []
+# Atlas's own real pairing (§11.1 step 4/L1134 + 推薦搭配 L1172: "Mind Map → Affinity Diagram → Concept Map /
+# Issue Tree") names association.affinity_diagram and association.concept_map, BOTH unbuilt concurrent
+# siblings at this write time (this task's own explicit constraint: do not depend on or invent their shape) --
+# left empty rather than asserting a machine_id for an unconfirmed sibling, same restraint
+# framing.five_w_one_h's own recommended_next: [] already establishes.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed 3-level nesting (main_branch->sub_branch->keyword) or an arbitrary-depth recursive tree like decision.decision_tree's own root?"
+    decision: "Fixed -- Atlas's own citation names exactly 4 levels (中心→主枝→次枝→關鍵詞); no 5th level invented, no MAX_TREE_DEPTH bound needed."
+  - question: "Nested (embedded) tree or id-cross-referenced graph (contrast fault_tree/event_tree's own flat shape)?"
+    decision: "Nested, same representation choice decision.decision_tree already reasoned through for a path-dependent node ('a node can only ever belong to one parent') -- and the ONLY shape that structurally forecloses the exact cross-branch/causal link Atlas's own §11.1 限制 forbids, not merely by convention."
+  - question: "Should main_branches be required to be MECE?"
+    decision: "No -- Atlas's own literal '不急著要求 MECE' is transcribed as a NON-invariant: only id uniqueness is checked, never content/label overlap or exhaustiveness."
+  - question: "Depend on the Atlas-named next steps (Affinity Diagram, Concept Map), both unbuilt at this write time?"
+    decision: "No hard dependency -- both are concurrent siblings in this same batch, not read here; recommended_next left empty, both named in open_questions, same restraint framing.five_w_one_h's own recommended_next: [] already establishes for an unbuilt Atlas-named pairing."
+  - question: "Record id prefix?"
+    decision: "MINDMAP- -- matches the method's own short name, same convention decision.decision_tree's DECISIONTREE- / framing.non_goals's NONGOALS- prefixes already establish."
+
+open_questions:
+  - "OQ-MINDMAP-1: cognitive_primitives [EXPAND, ASSOCIATE] is this file's own inference (SCAMPER's own cited composition 'EXPAND + ASSOCIATE + TRANSFORM', Atlas L188, is the closest real precedent for this pair), not a cited Atlas composition formula for Mind Map itself.（owner: operator）"
+  - "OQ-MINDMAP-2: recommended_next names no method -- Atlas's own real pairing (Affinity Diagram, then Concept Map / Issue Tree, §11.1 L1134/L1172) is unbuilt at this write time (association.affinity_diagram/association.concept_map are concurrent siblings in this same batch, not read here; Issue Tree is a different, unbuilt F02 method). Add once those mint machine_ids.（owner: operator, or whoever next lands the F04 siblings）"
+  - "OQ-MINDMAP-3: method-inventory.yaml's own 'Mind Map' row (line 356-361) cites Atlas line 410; the real F04 table row is line 411 (same off-by-one drift class this batch already found in multiple F01 rows). Not corrected here per Lean Standard §6 (method-inventory.yaml maintenance no longer a mandatory step).（owner: operator, or whoever next does an integration pass over method-inventory.yaml）"
+
+verification:
+  method: >
+    Grepped the whole Atlas for "Mind Map"/"心智圖" -- 19 hits total, read every one. Structural: F04 table row
+    (L411), §11.1 dedicated section (L1124-1172, primary citation), F04 mermaid diagram (L418-426). Recipe
+    citations, all confirmed the same method with no conflicting shape: §13.1 Simple Brainstorm Recipe
+    (L3216), §15.2 視覺探索 preference chain (L3627), §28 quick-tool table (L4467), Phase 1 priority list
+    (L4275), §3 LEGO-dimension examples (L142/L148). Ruled OUT as unrelated: "Mind Map View" (F24
+    Representation table L966, Representation Contract L1046, §11.55 L2468-2482, §15.1 L3614, L4364) -- a
+    RENDERING VIEW of an arbitrary Knowledge Object ("View 只保存 layout/filters/visible_fields/presentation_
+    preferences,不得複製 Knowledge 本體", L1053), not this method's own typed-object shape; Atlas's own §Data
+    Contract naming-format illustration (L50-51), already the source of contract-backlog.yaml's own tier_2
+    worked_example, not edited here. Grepped the whole ai_lego tree case-insensitively for "mind_map"/"mind
+    map" before writing -- zero pre-existing implementation. Read framing.non_goals.contract.yaml/.py
+    (closed-key-set, nested-entry convention, no compute layer) and decision.decision_tree.contract.yaml/.py
+    (the only other tree-shaped sibling; NESTED-not-id-cross-referenced representation choice) in full.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. §11.1's 5-step 標準使用方式 and F04 table's "中心→主枝→次枝→關鍵詞" citation
+    are transcribed verbatim into preconditions. The exact 4-level field shape (central_topic/main_branches/
+    sub_branches/keywords), whole-tree id-uniqueness invariant, and MINDMAP- prefix are this suite's own
+    compiled structure, disclosed as such, same honesty discipline every sibling Tier 1 contract already
+    applies.

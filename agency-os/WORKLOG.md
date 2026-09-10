@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-10（94–98 號切片：新開 F04 associative-mapping 家族 0/6→5/6，5 個平行 agent）
+
+mind_map(110t)/concept_map(57t)/affinity_diagram(75t)/morphological_analysis(64t)/attribute_listing(76t)。382 tests 零衝突，全 regression 5534→5916，golden 3176。查重：mind_map 是無型別、嚴格樹狀（中心→主枝→次枝→關鍵詞，跨層 id 唯一性），對比 concept_map 是有型別邊的一般圖（節點+typed relationship edges，邊的 from/to 皆需可解析回真實節點，孤兒節點 orphan_node_ids 是 GENUINE_COMPUTE 獨立 gate 重推導）；查證後確認與已建成的 causal.dag 真不同（後者強制 acyclic_verified+固定 role 詞彙，concept_map 無此二者）；affinity_diagram 是「一卡一 idea→靜默分群→命名」，核心不變量是每張卡恰好屬於一個群組（非零個非兩個以上），ungrouped_card_refs 同為 GENUINE_COMPUTE；morphological_analysis 是本批次唯一真組合數學（dimensions×options×compatibility constraints→legal_combinations 笛卡兒積扣除違反約束者，GENUINE_COMPUTE 獨立 gate 重算，`MAX_RAW_COMBINATION_SPACE` 防禦性上限防組合爆炸），查證後確認與 decision.mcda/weighted_decision_matrix 真不同（後兩者對「已給定」選項評分排序，本方法反而是「生成」選項空間本身）；attribute_listing 是 decompose-transform-recombine（每個屬性至少一個轉換後 variant 且不得與原值相同，選擇性重組階段對 combined_from 做真實 referential integrity 檢查，非幽靈引用）。
+
+critic 覆審（真跑 5 個 CLI+382 測試+golden，手算驗證 morphological_analysis 的組合數學：3 維度×2 選項=8 原始組合，1 條互斥約束消去 2 個→6 合法組合，與程式實際輸出 `legal_combination_count=6` 吻合；逐一驗證 3 個指名的突變情境皆在兩層都被正確擋下：mind_map 跨層 id 碰撞、affinity_diagram 卡片屬於兩個群組、attribute_listing 的 combined_from 幽靈引用）：**0 Critical/0 Major/0 Minor**，僅 1 個非程式碼建議（提醒整合階段記得 commit，非發現）。mind_map CLI demo 主控台顯示亂碼字元經查證為 Windows 終端機 codepage 顯示層級的問題（來源 .py 檔案本身確認為合法 UTF-8，用 `PYTHONIOENCODING=utf-8` 重跑後主控台正確顯示中文），非真實資料損毀。
+
+`ai_lego/modules/association/__init__.py` 改寫為「F04 associative mapping & combination family -- 5 of 6 built」，`contract-backlog.yaml` 新增 5 筆 tier_1 條目（5 個 agent 同時搶同一份檔案，序數字面非緊鄰排列但零重複 key，逐一核對真實存在）。F04 現況 5/6，剩 Analogy Mapping。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_mind_map tests.unit.test_concept_map tests.unit.test_affinity_diagram tests.unit.test_morphological_analysis tests.unit.test_attribute_listing` | exit=0 | result=382 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=5916 tests OK，239s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3176，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=5 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=5 個 CLI 全部 PASS，各自的拒絕證明＋獨立 gate 抓包證明皆真跑非模擬
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 5 contract+5 schema+5 module+2 compute submodule+5 CLI+5 test+3 個整合觸點，直接跑測試與 golden 套件非採信自報，跑 5 個 CLI 端到端，手算驗證組合數學，突變式推理測試 3 個指名情境）| verdict=PASS | findings=0c/0m/0n
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`association\.mind_map\|association\.concept_map\|association\.affinity_diagram\|association\.morphological_analysis\|association\.attribute_listing` | hits=僅本批次新建檔案+registry+`__init__.py`合法引用，critic 獨立複驗確認無競爭實作、無與 causal.dag/decision.mcda 混淆
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/module/CLI/test（+2 個 compute submodule，共 27 個新檔）+ `association/__init__.py`／`contract-backlog.yaml`／`SPEC_QUICKREF.md`／`MOTHER_DOC_SECTION_INDEX.md` 的追加內容全部移除。純新增，無 schema/DB 變動，可安全回滾。
+
 ## 2026-09-10 決策：aware-wave.com DMARC 執行時程（操作者全權 delegate 後的直接決策）
 
 操作者本輪明確全權 delegate（「需要決定的事都你決定」），對應上一條目結尾留白的「DMARC 何時升級」問題，做出決定並記錄，不再是懸而未決項。

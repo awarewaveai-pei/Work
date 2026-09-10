@@ -1,0 +1,118 @@
+$id: "ai-lego://methods/contracts/association.affinity_diagram.contract.yaml"
+title: "Affinity Diagram / KJ Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, 1st F04 association family member (family had 0/many built before this batch -- grep-confirmed no
+  `ai_lego/modules/association/` directory existed). Atlas's citations: F04 table row (L413: "Affinity
+  Diagram｜大量 idea 自然分群｜一卡一 idea→靜默分群→命名｜找 pattern、降低資訊量｜Thematic Analysis") and
+  dedicated §11.3 (L1206-1224, 5-step 使用方式). Core invariant: `cards` (one per raw idea) and `groups`
+  (post-hoc-named clusters) with mutual-exclusive referential integrity between them; `ungrouped_card_refs` is
+  GENUINE_COMPUTE (cards not covered by any group), re-derived by an independent gate, never caller-asserted.
+  Atlas step 2 ("do not pre-define category names") is a PROCESS constraint on how the analyst worked, not a
+  property of the finished record -- deliberately NOT turned into an unenforceable field (see
+  compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Affinity Diagram row (L413) -- the primary citation"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.3 親和圖／KJ 法 (L1206-1224) -- dedicated section, the 5-step 使用方式 this contract's preconditions and compilation_decisions are grounded in"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.x Ideation recipe (L1172, 'Mind Map → Affinity Diagram → Concept Map / Issue Tree') -- names this method's upstream/downstream pairing; neither sibling is read or depended on here (concurrent, unread in this batch)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4467, '腦袋很亂、不知從哪開始 | Mind Map | Affinity Diagram | AHP') -- second, independent citation, agrees this method is the recommended step after Mind Map"
+  - "methods/contracts/framing.five_w_one_h.contract.yaml -- explicit-non-coverage-over-silent-omission invariant class (UNKNOWN+gap_note) reused here as ungrouped_card_refs"
+  - "methods/contracts/framing.boundary_critique.contract.yaml -- DECLARED_EMPTY / empty_categories GENUINE_COMPUTE coverage-field precedent reused here"
+  - "methods/contracts/framing.frame_storming.contract.yaml -- caller-chosen unique item id (no fixed prefix) and cross-array referential-integrity-as-runtime-layer-check precedent reused here"
+  - "specs/cognitive/typed-objects/affinity-diagram-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.3's own 5-step sequence is transcribed into preconditions/purpose;
+  the record shape (cards/groups/ungrouped_card_refs/higher_level_themes) is this suite's own compiled
+  structure, disclosed as such in compilation_decisions, same restraint every Tier 1 F01 sibling in this
+  directory already applies to its own un-cited field-level shape.
+
+id: association.affinity_diagram
+version: "1.0.0"
+family: association
+
+cognitive_primitives: [DECOMPOSE, GROUP, RELATE]
+# INFERRED, not cited. Splitting a fuzzy idea-dump into one-idea-per-card is DECOMPOSE; silent clustering
+# into named groups is GROUP (same primitive root_cause.fishbone/framing.frame_storming/
+# research.qualitative_coding already use for their own clustering steps); finding step-5's higher-level
+# cross-group themes is RELATE (same primitive research.qualitative_coding's own axial-coding step and
+# architecture.ddd already use for their own cross-entity relationship-finding).
+
+purpose:
+  - cluster_a_large_set_of_raw_ideas_into_named_groups_to_reveal_patterns_and_reduce_information_volume
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own recipe (§13.x L1172) places this method AFTER Mind Map, but that pairing is advisory, not a
+  # hard typed-object precondition -- Atlas's own F04 table row and §11.3 both describe this method operating
+  # directly on a raw idea-dump ("一卡一 idea"), with no upstream typed-object named as a requirement. Same
+  # "no hard dependency on a concurrently-built, unread sibling" restraint every F01 sibling in this batch
+  # already establishes for its own Atlas-named-but-unbuilt upstream/downstream pairing.
+
+outputs: [AffinityDiagramRecord]
+
+preconditions:
+  - "cards has >=1 entries, each with a non-empty id (unique across cards) and non-empty text -- Atlas step 1, '一卡一 idea'"
+  - "groups has >=1 entries, each with a non-empty id (unique across groups), a non-empty name, and item_refs referencing >=1 real cards[].id -- Atlas steps 3-4, silent clustering then post-hoc naming"
+  - "every cards[].id is referenced by AT MOST one group's item_refs -- a card belongs to zero or one groups, never two or more"
+  - "ungrouped_card_refs is always present (an empty list is meaningful: full coverage) and MUST equal exactly the cards[].id values not referenced by any group, in cards[] order -- re-derived, never caller-trusted"
+  - "if higher_level_themes is present, every entry's group_refs references >=2 real groups[].id -- Atlas step 5, a theme naming fewer than 2 groups is not a cross-group relationship"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition: []
+# Atlas gives this row no forbidden_transition citation (only the F04 table row + dedicated §11.3, no
+# Sec22.3 Method-specific Gate table hit -- grep-confirmed) -- left genuinely empty rather than inventing one.
+
+recommended_next: []
+# Atlas's own best-paired next steps are Concept Map / Issue Tree (§13.x L1172), both unbuilt at this write
+# time by concurrent sibling agents in this same batch -- left empty rather than depending on or inventing
+# their shape, same restraint every F01 sibling in this batch already establishes for its own unbuilt
+# best-pairing. See open_questions below for the real forward-looking note.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Is 'did NOT pre-define category names before clustering' (Atlas step 2) a structural, checkable property of a final record?"
+    decision: "No. It is a PROCESS constraint about how the analyst worked, not a property of the finished data shape -- a record cannot prove groups were named AFTER clustering rather than before. Not invented as an unenforceable field (e.g. a trivially-fakeable 'categories_were_predefined: false' boolean), same restraint framing.problem_statement's own declined-scope precedent already establishes."
+  - question: "Must every card end up in a group (100% coverage), or is an explicit ungrouped bucket legitimate?"
+    decision: "Explicit ungrouped bucket. Forcing 100% coverage would itself violate Atlas's own 'silent, natural clustering, no forced framework' discipline (step 3) -- a producer would be pressured to invent a fake cluster just to satisfy the schema. ungrouped_card_refs is GENUINE_COMPUTE (cards[].id minus every group's item_refs), always present even when empty, same explicit-non-coverage-over-silent-omission precedent framing.five_w_one_h's own UNKNOWN state and framing.boundary_critique's own DECLARED_EMPTY category already establish."
+  - question: "Can one card belong to more than one group?"
+    decision: "No -- mutual exclusivity enforced at construction and by the gate. Atlas's own physical sticky-note-pile metaphor has no multi-membership concept; allowing it would make ungrouped_card_refs's own GENUINE_COMPUTE derivation ambiguous (a card in 2 groups is not 'ungrouped', but is also not cleanly attributable to one group)."
+  - question: "Represent step 5 (higher-level themes / cross-group relationships) as a required or optional field?"
+    decision: "Optional. Atlas's own step 5 ('然後再找更高層次的主題／跨組關係') is presented as a follow-on step after grouping is done, not a hard requirement of every completed diagram -- same restraint frame-storming-record.schema.yaml's own optional 'cluster' field applies to an Atlas-cited-but-unshaped sub-step. group_refs requires >=2 references (a 'theme' naming one group is a rename, not a cross-group pattern)."
+  - question: "Should cards[].text carry a substantive-content minLength threshold, the way framing.frame_storming's own frame_text does (minLength:6)?"
+    decision: "No -- minLength:1 only. A real affinity-diagram card is legitimately a 2-3 word sticky note, unlike a frame_storming candidate_framing (a full alternative question-form, where Atlas's own 'storming' framing implies content richness)."
+
+open_questions:
+  - "OQ-AFFINITYDIAGRAM-1: Atlas's own best-paired next steps (Concept Map, Issue Tree, §13.x L1172) and the upstream producer (Mind Map, same recipe line) are being built concurrently by other agents in this same batch and are not read or depended on here. No soft-link ref field was added for either direction (unlike 5w1h's informs_problem_statement_ref) since neither direction has a single Atlas-cited record type name yet at this write time.（owner: operator, integration pass）"
+  - "OQ-AFFINITYDIAGRAM-2: should a card be allowed to move between groups via a NEW record version rather than in-place mutation, matching Atlas §24.1's '方法不可就地覆寫' discipline? Left unaddressed -- this contract defines one record's own internal shape, not a revision/versioning workflow, same scope boundary framing.five_w_one_h's own OQ-FIVEW1H-3 already leaves open for its class of question.（owner: operator, or whoever next builds a revision flow）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-insensitively for "Affinity Diagram" -- 6 hits: the F04 table row
+    (L413), the §11.3 dedicated section header + 5-step body (L1206-1224), Mind Map's own §11.x step 4 prose
+    ("發散完成後切到 Affinity Diagram 做分群", L1134 -- confirms the same generate-then-cluster sequencing),
+    the F04-family recipe chain "推薦搭配" line (L1172, "Mind Map → Affinity Diagram → Concept Map / Issue
+    Tree"), a Simple Brainstorm Recipe mermaid flowchart node (L3218, "Mind Map → Brainstorm → Affinity
+    Diagram → Impact-Effort"), a Phase 1 priority-implementation plain-text list entry (L4277, bare method
+    name, no additional shape), and the §28 quick-tool-selection table (L4467) -- all 6 read and confirmed
+    consistent, no field-level shape given beyond what is already cited above. Grepped the
+    whole ai_lego tree case-insensitively for "affinity" before writing -- zero pre-existing implementation
+    (confirmed no `ai_lego/modules/association/` directory existed at write time). Read
+    framing.five_w_one_h.contract.yaml, framing.boundary_critique.contract.yaml, and
+    framing.frame_storming.contract.yaml in full to reuse the established
+    two-layer-invariant/explicit-non-coverage/caller-chosen-id conventions. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own F04 row and §11.3's 5-step sequence are transcribed into
+    preconditions/purpose/compilation_decisions; the cards/groups/ungrouped_card_refs/higher_level_themes
+    field shapes are this suite's own compiled structure, disclosed as such (not presented as mother-document
+    content), same honesty discipline every sibling Tier 1 contract in this directory already applies.
