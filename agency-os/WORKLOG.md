@@ -28,6 +28,24 @@ api/openapi/hci-v1.yaml 自稱是刻意的 skeleton-only(檔頭明寫「not a co
 git revert 本次 commit：app/server.mjs 的 POST /cases／POST /persons 兩個端點、CASE_PURPOSES/CASE_RISK_TIERS 常數、JSON-parse-error middleware；app/public/index.html 的開案表單、inline 建人物、citableOptions()/detailRequestSeq guard 全部移除，回到只能對既有 fixture 案件/人物加證據的前一版。純新增+修正，未改動任何既有 schema/migration。
 
 
+## 2026-09-08（78–82 號切片：F16 decision 家族收官 11/13→13/13 + 新開 F01 framing 家族 0/11→3/11，5 個平行 agent）
+
+decision.wsjf(91t)/decision.kano(89t)/framing.goal_statement(50t)/framing.smart(61t)/framing.non_goals(110t)。401 tests 零衝突（含 critic 補的 2 個）。查重：wsjf 比對 rice 確認真不同（Cost of Delay 為 SAFe 外部慣例 3 因子總和，加法分子 vs RICE 的乘法分子 Reach*Impact*Confidence/Effort）；kano 選 GENUINE_COMPUTE（5x5 functional x dysfunctional 對照表分類，比對 moscow/impact_effort 確認真不同），建置時抓到一個錯誤的網路來源表格（自稱「modified」版本、2 格違反基本 Kano 語意），改為自行從定義重推並對照 Wikipedia 5 格全對；goal_statement 比對 kill_criteria/reversal_criteria 確認真不同（初始靜態框定 vs 持續監控規則）；smart 找到 Atlas Sec12.4 專節（goal framing 須先完成才能套 SMART），比對 goal_statement 確認真不同；non_goals 比對 moscow 的 WONT bucket 確認真不同（WONT 只需 reason，Non-goals 額外要求 re_review_trigger），順手解答 moscow 自己的 OQ-MOSCOW-1（新增 `related_moscow_wont_ref` 軟連結）。F16 家族正式收官 13/13；F01 framing 新開 3/11，剩 OKR/North Star Metric/Success Criteria/5W1H/Problem Statement/How Might We/Frame Storming/Boundary Critique。
+
+critic scope=normal tier，真跑獨立全 regression（4698 tests，164s）+golden（3112，含 spec index 重生）+5 個 CLI 全跑+獨立核實 Kano 對照表（WebFetch Wikipedia 驗證）+獨立核實 SMART 的 target_date 真跑 `date.fromisoformat` 邊界（正確拒絕 2026-02-30）。verdict 0C/0Major/2Minor：**Minor #1**（真漏洞，即時利用驗證）——`goal-statement-record.schema.yaml`／`smart-goal-record.schema.yaml` 頂層缺 `additionalProperties: false`，跟同批 5 個手足中 3 個（wsjf/kano/non_goals）不一致；critic 真的手工塞入 `approved: true` 證明會通過 schema 驗證。已補兩個 schema 的 `additionalProperties: false`，各補 1 個對應迴歸測試（`test_schema_rejects_an_unknown_top_level_authority_style_key`）。**Minor #2**：`method-inventory.yaml` 對這 5 個新方法仍是 `has_contract: false`——查證後發現這不是本批次獨有問題，而是本 session 全部約 82 個已建切片（F05/F16/F17/F18/F19/F20/F21/F01）在該 registry 檔案裡全部未同步（純文件性落差，runtime 不讀這個檔案，已 critic 確認）；範圍太大不適合本批次順手改 5 列造成不一致，已 spawn_task 追蹤要求一次性批次同步全部 ~82 列。順手清掉一個已確認 byte-identical 的孤兒檔 `ai_lego/modules/security/pasta.py.bak`。
+
+**收工前意外發現**：AO-RESUME 自動化對齊腳本（`git-align-main-aoresume-feature-20260910-123615`）在切換回 `main` 時對 `WORKLOG.md`／`docs/video_generator/README.md` 兩檔 stash pop 衝突未完成即中斷（無 MERGE_HEAD，純 stash pop 殘留），本地 `main` 與 `origin/main` 分別領先 4／55 個 commit。已用相同的「兩邊都留、只拆 marker」安全手法解掉兩個衝突（zero data loss，逐一 grep 確認全庫無殘留 marker）；本地 4 個既有 video-doc commit（非本次範圍）與一堆非本批次的暫存變更（README.md／AGENTS.md／ops docs／reports/status 等）先備份到本地分支 `backup-local-main-20260910`（未推送）保留，不代為 commit/push 不熟悉的內容；stash@{0} 仍保留未 drop，雙重保險。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_wsjf tests.unit.test_kano tests.unit.test_goal_statement tests.unit.test_smart tests.unit.test_non_goals` | exit=0 | result=401 tests OK（含 critic 修正後 +2）
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression，critic 修正後最終跑）| exit=0 | result=5100 tests OK，237.8s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec-root，含 5 個新 contract/schema 觸發的 spec index 重生）| exit=0 | result=PASSED 3112，ALL GOLDEN TESTS PASSED
+REVIEW_DONE: critic=Standard（真跑獨立 4698-test regression、5 CLI 全跑、Kano 對照表/SMART 日期驗證兩項強制查證獨立覆核、method-inventory.yaml 落差範圍查證）| verdict=0C/0Major/2Minor → 全修（schema 補洞）+1 個追蹤（registry 批次同步，開 task）| findings=0c/0m/2minor
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`decision\.wsjf\|decision\.kano\|framing\.goal_statement\|framing\.smart\|framing\.non_goals` | hits=僅本批次新建檔案+registry+`__init__.py`合法引用+1 處無關的 `scope_non_goals` 子字串巧合（既有 problem-statement.schema.yaml 欄位，已確認非碰撞）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：5 個新方法的 contract/schema/compute-如適用/module/CLI/test（約 27 個新檔）+ `decision/__init__.py`／`framing/__init__.py`／`contract-backlog.yaml`／`decision.moscow.contract.yaml`（OQ-MOSCOW-1 一行）的追加內容全部移除；純新增與 docstring 追加，未修改任何既有方法的既有行為。
+
 ## 2026-09-08（73–77 號切片：F16 decision 家族 6/13→11/13，5 個平行 agent）
 
 decision.weighted_decision_matrix(107t)/decision.topsis(83t)/decision.decision_tree(127t)/decision.expected_value(112t)/decision.pareto_frontier(107t)。536 tests 零衝突（含 critic 補的 1 個）。查重：weighted_decision_matrix 比對 mcda 確認真不同（Atlas 公式無 Normalize 階段，vs MCDA 自己 Sec11.32 有）；topsis 比對 mcda 確認真不同（歐氏距離排序 vs 加權和，重用 mcda 的 normalize_scores 做自己的 Normalize 階段）；decision_tree 比對 fault_tree/event_tree 確認真不同（巢狀 decision/chance/terminal vs 兩者皆扁平），與同批平行建置的 expected_value 互相查證方向不衝突；expected_value 比對 monte_carlo（SIMULATED_RESULT 非 CALCULATED_RESULT）與 mcda（[0,1] 有界排序）確認真不同；pareto_frontier 比對既有 root_cause.pareto 確認真不同概念（單維度 80/20 排名 vs 多目標非支配集合，SET 分類無分數），刻意選用不同 machine_id 避免混淆。F16 現況 11/13，剩 WSJF/Kano。
@@ -13667,6 +13685,25 @@ Revoke the generated staging token and delete the newly created staging bucket o
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n; confirmed no secret output or production substitution.
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`bucket-scoped|permission_groups|Anthropic|Pexels` | hits=410
 - WORKLOG_DONE: blocker recorded in `agency-os/docs/video_generator/LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`.
+
+- `0b79deecc`：新增 `packages/db/migrations/0065_media_production_persistence.sql` 與 down script；QA、Release、delivery attempt、outcome snapshot 四張表，FK/CHECK/index/RLS/service-role grant；尚未套用正式資料庫。
+- 新增 `apps/next-admin/lib/content/video/delivery-receipts.ts`；以 stable idempotency key 建立/更新 receipt，狀態機失敗即停止，旗標 `MEDIA_PRODUCTION_PERSISTENCE_ENABLED` 預設關閉。
+- `app/api/content/social-publish/route.ts`、`app/api/video/embed-to-wp/route.ts`：接受 optional `releaseId`/`variant`，Postiz/WordPress 外部結果寫入 receipt；既有呼叫不帶欄位時維持原行為。
+- 新增 `app/(shell)/tools/video/FootageEditor.tsx` 並掛入 `VideoStudio`：沿用既有 MP4 magic-byte/R2 上傳，支援片段入/出點、輸出起點與 EDP JSON 複製。
+- 新增 `packages/db/migrations/0066_media_billing_and_provider_profiles.sql` 與 down script：free/subscription/enterprise 帳戶、credit ledger、原子 reserve RPC、provider profile；BYO secret 只進 Vault。
+- 新增 `/api/video/billing`、`/api/video/credits/reserve`：tenant/role gate、方案/點數/Provider metadata 與原子扣點。
+- 新增 `/api/webhooks/video-outcome`、`/api/video/outcomes`：token 驗證、事件 canonical SHA-256 去重、已發布 delivery 關聯、租戶聚合 dashboard read model。
+- REALTEST_EVIDENCE: next-admin `npm run typecheck` exit=0；Vitest `77 files / 761 tests` exit=0；`git diff --check` exit=0。
+- LIMIT: 0065/0066 尚未套用 production；outcome/billing/receipt 需 staging flags 與 secrets 後才會啟用。未重啟正式容器。
+- CODE_COMMIT: `a93c413a0` 已推送 `main`；Next build exit=0（僅既有 symlink traced-files EPERM 警告，非編譯失敗）。
+- `646896954`：新增 `/api/video/qa/report`，對 tenant、candidate、checksum、QA kind/status 做 fail-closed 驗證並以 SHA-256 寫入 `media_qa_reports`；旗標關閉時維持 503，不觸碰舊流程。
+- `a93c413a0`：新增 provider allowlist policy；billing provider profile 與 capabilities API 只接受明確 `MEDIA_PROVIDER_ALLOWLIST`，未知/未列入供應商 fail-closed；既有生成器仍待全面接入 resolver。
+- 工作邊界補強：QA report 與 Release 寫入前查證 candidate `media_assets` 的租戶歸屬與 checksum；delivery receipt 建立前查證 Release 同租戶且 `release_approved`；billing limit 先拒絕負數或非安全整數。這些檢查不改變旗標關閉時的舊路徑。
+- `cde2f007c`：正式提交並推送上述邊界補強；`npm run typecheck`、Vitest `78 files / 763 tests` 與 `npm run build` 均通過。Build 僅保留既有 symlink traced-files EPERM 警告。
+- `31857c06b`：修正 Release API 寫入 QA evidence 時的 `capability_version`，不再錯把 profile version 當 capability version；typecheck 與 Vitest `78 files / 763 tests` 通過，已推送 `origin/main`。
+- 線上只讀確認：SSH `145.239.195.47:58122` 的 production 與 staging containers 均 healthy；`supabase-db` 查詢 0065/0066 七張表均為空結果（尚未套用）；`lobster-next-admin` 仍是 `lobster-phase1-next-admin:local`（2026-09-08 啟動），故新 main 尚未部署。
+- `sg-deploy.sh next-admin` 正式部署完成：typecheck、Vitest `78/763` 通過；建立 rollback snapshot `lobster-phase1-next-admin:rollback-20260909-060402`；新 container digest `sha256:919f10a80a3553aae80cbec8e67687d65ad597ffecef268a537d745221f36632` healthy；`/login`、`/api/ops/summary`、WordPress、node-api smoke 全部 200。Remotion、video-service、DB、0065/0066 migration 與 flags 未變更。
+- 新增 `docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md`，列出 Whisper worker、EDP asset registration、Release linkage、billing lifecycle、provider allowlist、outcome feedback 與 deployment 的確切 evidence/剩餘工作。
 
 [rollback]
 None: permission probe was read-only.

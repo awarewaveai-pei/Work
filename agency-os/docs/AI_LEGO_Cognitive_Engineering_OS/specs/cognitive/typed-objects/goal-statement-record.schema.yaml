@@ -1,0 +1,162 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/goal-statement-record.schema.yaml"
+title: Goal Statement Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `GoalStatementRecord` -- the
+  declared `outputs` of `framing.goal_statement`'s Method Contract. Atlas's
+  F01 table row (L334) names the 5-field citation order (目標→受益者→時間→
+  成功條件→限制) and its purpose but gives no worked example and no
+  field-level shape.
+
+  Modeled as a FLAT record of 5 heterogeneously-shaped named fields
+  (string/list/string/string/list) -- the same shape class
+  `problem-statement.schema.yaml`'s own 8-field `content` object already
+  uses, NOT `kepner-tregoe-problem-specification.schema.yaml`'s
+  positionally-ordered array of same-shaped entries (Atlas's own "→" here
+  separates DIFFERENTLY-shaped fields, not same-shaped items needing an
+  enforced sequence -- see the method contract's own compilation_decisions).
+
+  TWO real invariants this schema expresses structurally: every field is
+  non-empty (`minLength`/`pattern: "\S"` on strings, `minItems: 1` on the
+  two list fields, each item itself non-empty). The one it CANNOT express --
+  `success_condition` must genuinely differ from `goal` (no native JSON
+  Schema cross-field "not equal to a sibling" operator) -- is a
+  runtime-layer invariant, see `ai_lego/modules/framing/goal_statement.py`,
+  which enforces it at construction AND independently via a gate that
+  re-derives from raw fields, same two-layer discipline every sibling
+  module in this family already uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F01 tool table, Goal Statement row (L334) -- the ONLY citation for this method"
+  - "methods/contracts/framing.goal_statement.contract.yaml"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml -- flat heterogeneous-named-field record shape convention reused here"
+  - "specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml -- the is/is_not 'not equal to a sibling' runtime-layer-only limitation reused for success_condition != goal"
+  - "specs/governance/epistemic-label.schema.yaml -- provenance_record"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "受益者 (Atlas's singular wording) as one string or a list?"
+    decision: "List of non-empty strings, minItems 1 -- matches problem-statement.schema.yaml's own affected_stakeholders convention."
+  - question: "時間 (timeframe): free string or structured start/end dates?"
+    decision: "Free string -- Atlas gives no worked example or date format."
+  - question: "Should success_condition != goal be expressed in JSON Schema?"
+    decision: "No -- no native cross-field 'not equal to a sibling' operator; left as a runtime-layer invariant, same limitation kepner-tregoe-problem-specification.schema.yaml's own is/is_not check already accepted."
+
+type: object
+required: [id, version, goal, beneficiaries, timeframe, success_condition, constraints, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^GOAL-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as problem-statement.schema.yaml's PROB- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "framing.goal_statement"
+
+  goal:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L334 '目標'. The concrete, explicit goal a vague wish is being turned into."
+
+  beneficiaries:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1, pattern: "\\S" }
+    description: "Atlas L334 '受益者' (beneficiary). Modeled as a list -- see compilation_decisions."
+
+  timeframe:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L334 '時間'. Free text -- see compilation_decisions."
+
+  success_condition:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L334 '成功條件'. A static description fixed at initial framing --
+      NOT the same concept as learning.kill_criteria/learning.reversal_criteria's
+      ongoing monitoring-threshold shape (see the method contract's own
+      compilation_decisions). Must genuinely differ from `goal` --
+      runtime-layer check, see top-level description.
+
+  constraints:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1, pattern: "\\S" }
+    description: "Atlas L334 '限制'."
+
+  success_criteria_ref:
+    type: string
+    minLength: 1
+    description: >
+      OPTIONAL, forward-looking soft reference to a future F01 'Success
+      Criteria' method record id (Atlas's own best-paired citation, L334) --
+      that method is unbuilt (method-inventory.yaml has_contract:false, no
+      machine_id minted yet), so this is an untyped free string, not a
+      pattern-constrained $ref. See the method contract's own
+      OQ-GOALSTATEMENT-1.
+
+  provenance:
+    description: "Same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A complete goal statement, self-referentially describing this same slice's own task"
+    value:
+      id: "GOAL-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "framing.goal_statement"
+      goal: "把 framing.goal_statement 建成有 contract、schema、gate、CLI demo、測試的 ai_lego 模組"
+      beneficiaries: ["Cognitive OS 後續使用者", "同批平行建置 framing.smart / framing.non_goals 的其他 agent"]
+      timeframe: "本次 session 內完成"
+      success_condition: "CLI demo 兩個真發生的 InvariantViolation 拒絕都証實、unittest 全綠、contract 通過 method.schema.yaml 驗證"
+      constraints: ["不得修改 contract-backlog.yaml / method-inventory.yaml（留給整合階段）", "不得與另外 2 個並行 agent 的檔案重疊"]
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-GOALSTATEMENTREC-1"
+    question: >
+      success_criteria_ref has no pattern constraint since the target
+      schema doesn't exist yet. Add one (e.g. a real id prefix) once F01
+      Success Criteria is built?
+    owner: "operator, or whoever builds the Success Criteria method"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F01 table Goal Statement row (L334) directly, plus its own
+    flowchart (L346-355) and every "Decision Question" hit elsewhere in the
+    document. Read problem-statement.schema.yaml and
+    kepner-tregoe-problem-specification.schema.yaml in full as shape
+    precedent. Validated against jsonschema Draft202012Validator (required
+    fields present, id pattern satisfied, beneficiaries/constraints
+    minItems/item-shape enforced, additionalProperties left at schema
+    default per this directory's own convention).
+  note: >
+    `goal`/`beneficiaries`/`timeframe`/`success_condition`/`constraints`
+    field names and citation order are transcribed verbatim from Atlas
+    L334. The flat-record shape, the beneficiaries/constraints-as-list
+    decision, and success_criteria_ref are compilation decisions, disclosed
+    above, not textually cited. No mother document was modified.
+
+    CORRECTED (critic review, 2026-09-08): the original build claimed
+    "additionalProperties left at schema default per this directory's own
+    convention" -- false; 3 of this schema's own 5 batch siblings
+    (wsjf/kano/non-goals) set `additionalProperties: false`, and the critic
+    live-proved a hand-crafted authority-claim key (e.g. `approved: true`)
+    passed validation without it. Added `additionalProperties: false` at
+    the top level to close the gap and match the majority sibling
+    convention.

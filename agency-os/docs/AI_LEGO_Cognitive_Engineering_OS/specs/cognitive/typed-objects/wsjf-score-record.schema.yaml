@@ -1,0 +1,161 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/wsjf-score-record.schema.yaml"
+title: WSJF Score Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `WsjfScoreRecord` -- the declared
+  `outputs` of `decision.wsjf`'s Method Contract
+  (methods/contracts/decision.wsjf.contract.yaml, `outputs: [WsjfScoreRecord]`).
+  12th `decision`-family typed object (after `AhpAnalysis`, `MCDAAnalysis`,
+  ..., `RiceScoreRecord`). Scores exactly ONE job per record (mirrors
+  `RiceScoreRecord`'s own one-idea-per-record shape, contrast
+  `MCDAAnalysis`'s >= 2 options) -- see `ai_lego/modules/decision/wsjf.py`'s
+  own due-diligence module docstring for why this is the Atlas-consistent
+  shape, not an oversight.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F16 tool table, WSJF row (L764): 'Cost of Delay÷Job Size｜portfolio｜突出延遲成本'"
+  - "methods/contracts/decision.wsjf.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/compute/wsjf/scoring.py::compute_cost_of_delay / compute_wsjf_score (the real arithmetic this schema's cost_of_delay_total/wsjf_score record the result of)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Atlas gives WSJF zero field-level shape (just 'Cost of Delay ÷ Job Size', no pipeline, no worked example). Model Cost of Delay as one opaque caller-supplied number, or decompose it into the real-world SAFe 3-factor sum?"
+    decision: "Decompose: cost_of_delay = {business_value, time_criticality, risk_reduction_opportunity_enablement}, each number >= 0. External SAFe convention, disclosed as such -- not Atlas-invented."
+    reasoning: >
+      A single opaque number would make WSJF indistinguishable from a
+      generic value/cost ratio and would defeat Atlas's own cited benefit
+      for this exact row ("突出延遲成本" -- spotlight cost of delay): an
+      inspectable 3-factor breakdown operationalizes that citation directly
+      (see this schema's own `cost_of_delay` field description and the
+      sibling contract's `cost_of_delay_breakdown_disclosed` gate); an
+      opaque number cannot. Same restraint class `RiceScoreRecord`'s own
+      compilation_decisions already applied when it structured `reach` as
+      `{value, unit}` instead of leaving it bare -- both decisions structure
+      exactly the one field Atlas's own benefit-column text gives a
+      concrete, citable reason to structure, and leave every other field
+      (here: `job_size`) at the more conservative bare-number default.
+  - question: "Should job_size be a bare number (like RiceScoreRecord's effort), or a structured {value, unit} (like RiceScoreRecord's reach)?"
+    decision: "Bare positive number."
+    reasoning: >
+      WSJF's F16 row (L764) has no benefit-column citation specific to
+      job_size the way RICE's own row (L762, '納入受影響人數') gave a
+      concrete reason to structure `reach`. Structuring `job_size` here
+      would be unsupported invention, not disclosed compilation -- the
+      disclosed asymmetry is deliberate, not an oversight.
+  - question: "Persist cost_of_delay_total as its own field, independently re-derivable by the gate, or only expose the final wsjf_score?"
+    decision: "Persist both cost_of_delay_total and wsjf_score, both COMPUTED, both re-derived and compared by evaluate_wsjf_genuine_compute_gate."
+    reasoning: >
+      The intermediate sum being genuinely computed and gate-verified is
+      the concrete mechanism that satisfies Atlas's own "spotlight cost of
+      delay" benefit citation; exposing only the final ratio would leave
+      cost of delay just as opaque as any other ratio method's hidden
+      numerator.
+
+type: object
+required: [id, version, job, cost_of_delay, job_size, cost_of_delay_total, wsjf_score, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^WSJF-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as rice-score-record.schema.yaml's RICE- / mcda-analysis.schema.yaml's MCDA- prefixes."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.wsjf"
+
+  job:
+    type: object
+    required: [id, label]
+    additionalProperties: false
+    description: "The single backlog job/feature this record scores -- WSJF's natural unit is one job, not a compared batch (mirrors RiceScoreRecord.idea, contrast MCDAAnalysis.options[], minItems 2)."
+    properties:
+      id: {type: string}
+      label: {type: string}
+
+  cost_of_delay:
+    type: object
+    required: [business_value, time_criticality, risk_reduction_opportunity_enablement]
+    additionalProperties: false
+    description: "External SAFe-convention 3-factor Cost of Delay breakdown (disclosed, not Atlas-cited -- Atlas L764 names only the aggregate 'Cost of Delay'). All 3 sub-factors required non-negative numbers -- see compilation_decisions for why this is structured instead of one opaque number."
+    properties:
+      business_value: {type: number, minimum: 0, description: "Relative value delivered to the customer/business if this job ships now."}
+      time_criticality: {type: number, minimum: 0, description: "How much value decays the longer this job is delayed."}
+      risk_reduction_opportunity_enablement: {type: number, minimum: 0, description: "Risk this job reduces, or future opportunity it unlocks, independent of direct business_value."}
+
+  job_size:
+    type: number
+    exclusiveMinimum: 0
+    description: "Atlas L764's own 'Job Size' -- the DIVISOR. Must be strictly > 0 (WSJF_NONPOSITIVE_JOB_SIZE, rejected explicitly, never silently floored -- see ai_lego/compute/wsjf/scoring.py::compute_wsjf_score). Bare number, no unit -- see compilation_decisions."
+
+  cost_of_delay_total:
+    type: number
+    minimum: 0
+    description: "COMPUTED, never caller-supplied -- business_value + time_criticality + risk_reduction_opportunity_enablement, rounded to 8 decimal places. Re-derived and compared by evaluate_wsjf_genuine_compute_gate, never trusted as a stored value."
+
+  wsjf_score:
+    type: number
+    minimum: 0
+    description: "COMPUTED, never caller-supplied -- cost_of_delay_total / job_size, rounded to 8 decimal places. Re-derived and compared by evaluate_wsjf_genuine_compute_gate, never trusted as a stored value."
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed wsjf_score -- same convention every genuine-compute typed object in this directory establishes."
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT for a genuine WSJF run -- same design choice rice-score-record.schema.yaml's own provenance field documents."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "One backlog job: API rate-limiting fix, moderate business value, high time criticality, some risk reduction, 5 points of job size"
+    value:
+      id: "WSJF-2026-09-08-001"
+      version: "1.0.0"
+      generated_by_method: "decision.wsjf"
+      job: {id: "JOB-1", label: "API 速率限制修復"}
+      cost_of_delay: {business_value: 8, time_criticality: 13, risk_reduction_opportunity_enablement: 5}
+      job_size: 5
+      cost_of_delay_total: 26.0
+      wsjf_score: 5.2
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.wsjf.scoring.compute_wsjf_score"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-WSJFSCORERECORD-1"
+    question: "cost_of_delay sub-factors carry no fixed scale/enum (see compilation_decisions) -- real SAFe practice commonly uses relative Fibonacci-like sizing. Should a future revision constrain to such a scale once Atlas or a worked example gives a citable band?"
+    owner: "operator, or whoever next finds a worked WSJF scale example in Atlas or a future revision"
+    blocks: "nothing in this file's own validity -- the open, unconstrained-but-bounded numeric fields are the more conservative, less-invented choice"
+
+verification:
+  method: >
+    Read Atlas F16 tool table WSJF row (L764) directly, and grepped the
+    entire document for "WSJF"/"Cost of Delay" (case-insensitive): single
+    whole-document hit, L764 itself -- no dedicated section, no worked
+    example. Grepped `specs/` and `methods/` exhaustively for
+    "wsjf"/"job_size"/"cost_of_delay" before writing -- all hits were
+    either this file's own new content or bare "remaining: WSJF" backlog
+    bookkeeping mentions with no defined shape (no duplicate typed object
+    found). Read `rice-score-record.schema.yaml` in full as the closest
+    structural sibling (both ratio-shaped, both single-idea/job per
+    record). Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. `job`/`cost_of_delay`/`job_size`/
+    `cost_of_delay_total`/`wsjf_score` field names are Phase 3 compilation
+    (Atlas gives the formula and the benefit-column citation only, no field
+    shape) -- disclosed above in compilation_decisions/open_questions, not
+    a silent invention.
