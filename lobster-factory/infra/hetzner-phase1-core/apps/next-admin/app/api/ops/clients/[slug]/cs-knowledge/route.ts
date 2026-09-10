@@ -1,8 +1,11 @@
 // GET/POST/DELETE /api/ops/clients/[slug]/cs-knowledge — manage a client's RAG knowledge sources.
 // GET    — list sources (+ per-source chunk counts).
-// POST   — add one document: { title, kind?, body, isSensitive? } → ingestKnowledge (chunk + embed
-//          + store). Needs OPENAI_API_KEY for embeddings; on failure returns a clear message.
-// DELETE — { sourceId } → remove source (chunks cascade).
+// POST   — add one document: { title, kind?, body, isSensitive?, canonicalUrl? } → ingestKnowledge
+//          (chunk + embed + store) as a new VERSION of that document (K1): same title + new text
+//          supersedes the old version, same title + same text is a no-op. Needs OPENAI_API_KEY for
+//          embeddings; on failure returns a clear message.
+// DELETE — { sourceId } → remove source (chunks cascade). This deletes one VERSION row, so it is
+//          for removing a document, not for replacing one — reposting handles replacement.
 // Writes gated by canWriteTenantConfig (owner/admin). Reads open to the internal ops console.
 
 import { NextResponse } from "next/server";
@@ -15,6 +18,17 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const KINDS = ["doc", "faq", "sop", "conversation", "url"];
+
+/**
+ * canonical_url is indexed, and a btree entry over ~2.7KB fails the insert outright — which would
+ * surface as a bare ingest_failed with no clue why. Bound it, and accept only real web URLs.
+ */
+function canonicalUrlOf(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const url = raw.trim().slice(0, 2048);
+  if (!url) return null;
+  return /^https?:\/\//i.test(url) ? url : null;
+}
 
 async function orgIdOf(slug: string): Promise<string | null> {
   const sb = getSupabaseWriteClient();
@@ -61,10 +75,20 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   try {
-    const result = await ingestKnowledge({ organizationId: orgId, kind, title, body: docBody, isSensitive });
+    const result = await ingestKnowledge({
+      organizationId: orgId, kind, title, body: docBody, isSensitive,
+      canonicalUrl: canonicalUrlOf(body.canonicalUrl),
+    });
     if (!result.sourceId) return NextResponse.json({ ok: false, error: "ingest_failed" }, { status: 503 });
-    audit(orgId, resolved.role, resolved.source, "cs_knowledge_added", { title, kind, chunks: result.chunks });
-    return NextResponse.json({ ok: true, sourceId: result.sourceId, chunks: result.chunks });
+    // Re-posting the same title with new text supersedes the previous version (K1); re-posting
+    // identical text is a no-op, reported as unchanged rather than as a new version.
+    audit(orgId, resolved.role, resolved.source, result.unchanged ? "cs_knowledge_unchanged" : "cs_knowledge_added", {
+      title, kind, chunks: result.chunks, version: result.version, docFamilyId: result.docFamilyId,
+    });
+    return NextResponse.json({
+      ok: true, sourceId: result.sourceId, chunks: result.chunks,
+      version: result.version, unchanged: result.unchanged,
+    });
   } catch (e) {
     const msg = String(e);
     const hint = msg.includes("OPENAI_API_KEY") ? "缺 OPENAI_API_KEY — embeddings 無法產生" : msg.includes("openai_embeddings") ? "OpenAI embeddings 呼叫失敗" : "ingest 失敗";

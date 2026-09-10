@@ -28,3 +28,14 @@ export const KB_RETRIEVAL = {
 export const KB_TIMEOUTS = {
   embedMs: 10_000,
 } as const;
+
+/**
+ * The space every document lands in until K2 introduces space management. Rows written before K1
+ * have space_id NULL, which the retrieval predicate COALESCEs to this same value — so "no space"
+ * and "the default space" are one set, not two. Retrieval with no spaces requested searches ONLY
+ * this space: a business question must not silently pick up academic material, so the default is
+ * fail-closed rather than search-everything.
+ *
+ * Kept byte-identical to the constant embedded in migration 0072's predicate.
+ */
+export const KB_DEFAULT_SPACE_ID = "00000000-0000-0000-0000-000000000000";

@@ -22,6 +22,8 @@
 | 規格側已有 `CAP-KNOWLEDGE-BASE`，且 `CAP-DOC-TEMPLATES` `requires` 它 | `System_Foundry_v1.6_ARTIFACT_COMPLETE/capabilities/catalog.json:1380` | 本 KB 即該能力的實作，接得上 |
 | ADR-0013 已指定 `TenantContext`/`SourceRef` 抽入 `Projects/shared/kernel` | `HCI_AI_LEGO_Blueprint_v2/09:63` | KB 的租戶型別**須對齊該 kernel**，不得長期並存第二套 |
 
+> **K1（2026-09-11）已接線**：上表「版本化未接線」「檢索端無過濾」「兩表 family 分岔」「list 未取 status」四項均已修，正本 = migration `0072_kb_versioning_and_retrieval_predicates.sql` + `lib/kb/`；行為證據（真 Postgres）= `packages/db/scripts/kb-local-verify.sh`。細節見 [WORKLOG 2026-09-11](../../WORKLOG.md)。
+
 ## §1 產品契約
 
 ### 1.1 對外能力（僅四項）
@@ -75,14 +77,20 @@ CREATE OR REPLACE FUNCTION public.cs_match_chunks(
   p_limit     int DEFAULT 8
 ) ...
 WHERE c.organization_id = ANY(p_scope)
-  AND c.space_id        = ANY(p_spaces)
+  AND COALESCE(s.space_id, '00000000-0000-0000-0000-000000000000'::uuid)
+      = ANY(COALESCE(p_spaces, ARRAY['00000000-0000-0000-0000-000000000000'::uuid]))
   AND s.status          = 'active'
   AND (NOT s.is_sensitive OR c.organization_id = p_viewer)
-  AND s.valid_from     <= COALESCE(p_as_of, now())
+  AND COALESCE(s.valid_from, '-infinity'::timestamptz) <= COALESCE(p_as_of, now())
   AND (s.valid_to IS NULL OR s.valid_to > COALESCE(p_as_of, now()))
   AND c.embed_model     = p_model
   AND c.embedding IS NOT NULL
 ```
+
+> **以上為 K1 實作的逐字謂詞**（`0072`，兩半 byte-identical）。與本檔前版差三處，皆為 NULL 語意，**行為相反不可回退**：
+> ① `space` 讀 **`s.space_id`** 不是 `c.space_id`——空間屬於文件，chunk 複製一份會在 K2 搬移空間時變成「UI 顯示在 B、只有 A 查得到」；chunk 表因此**不加** `space_id` 欄（§1.5 前版列了，已撤）。
+> ② `space_id`／`p_spaces` 為 NULL 時 COALESCE 成預設空間 uuid——否則 `= ANY(NULL)` 恆 false，既有列全部檢索不到。
+> ③ `valid_from` NULL 視為自始有效（`-infinity`）；前版寫法會把它整列排除。
 
 | 維度 | 規則 |
 |---|---|
@@ -239,13 +247,12 @@ ALTER TABLE public.cs_knowledge_sources
   ADD COLUMN IF NOT EXISTS doc_type      text,          -- 餵 chunker 與引用形狀
   ADD COLUMN IF NOT EXISTS authority_tier text,         -- 來源權威（Domain Pack 定義）
   ADD COLUMN IF NOT EXISTS domain_pack   text;          -- 屬於哪個產業包
-ALTER TABLE public.cs_knowledge_chunks
-  ADD COLUMN IF NOT EXISTS space_id      uuid;
+-- （K1 實作已撤下這一段：space 由 source 擁有，chunk 不複製一份 —— 見 §1.2 的 ①）
 
 CREATE INDEX IF NOT EXISTS idx_cs_sources_canonical ON public.cs_knowledge_sources(organization_id, canonical_url);
 CREATE INDEX IF NOT EXISTS idx_cs_sources_hash      ON public.cs_knowledge_sources(organization_id, content_hash);
 CREATE INDEX IF NOT EXISTS idx_cs_sources_valid     ON public.cs_knowledge_sources(organization_id, valid_from, valid_to);
-CREATE INDEX IF NOT EXISTS idx_cs_chunks_scope      ON public.cs_knowledge_chunks(organization_id, space_id);
+CREATE INDEX IF NOT EXISTS idx_cs_sources_space     ON public.cs_knowledge_sources(organization_id, space_id);
 -- 每個 embedding 模型一個 partial HNSW（跨模型距離不可比，不得同索引）
 CREATE INDEX IF NOT EXISTS idx_cs_chunks_hnsw_te3s  ON public.cs_knowledge_chunks
   USING hnsw (embedding vector_cosine_ops) WHERE embed_model = 'text-embedding-3-small';
@@ -256,7 +263,8 @@ CREATE INDEX IF NOT EXISTS idx_cs_chunks_hnsw_te3s  ON public.cs_knowledge_chunk
 - 全部可為 null → 既有列不受影響、**不需 backfill**（null space = 預設空間；null `valid_from` 視為「自始有效」）。
 - **刻意不加 unique index**：版本化下同一 `canonical_url` 會有多列（不同 `source_version`），加 unique 會在寫第二版時炸。
 - **`embedding` 仍固定 `vector(1536)`**：換維度的模型需另開表或改欄型，屬 K4 範圍，此處只先讓**同維度多模型**不互相汙染。
-- Down：`DROP INDEX` ×5 + `DROP COLUMN` ×9 + `DROP TABLE kb_document_relations` + 還原 `cs_match_chunks` 舊簽名。
+- Down：`DROP INDEX` ×6 + `DROP CONSTRAINT` ×1 + `DROP COLUMN` ×9 + `DROP TABLE kb_document_relations` + 還原 `cs_match_chunks` 舊簽名（且還原時要重跑 revoke，見下）。
+- **K1 實作比本節多三個約束**（critic 覆審後加，理由見 WORKLOG 2026-09-11）：`UNIQUE(organization_id, doc_family_id, source_version)`（並行 ingest 會各自 archive 對方 → 該文件零筆 active）；`UNIQUE(id, organization_id)` + chunk 的複合 FK（chunk 必須與 source 同租戶，DB 層兜底）；兩個 RPC 的 `REVOKE … FROM PUBLIC, anon, authenticated`（0064 已立案：Supabase `ALTER DEFAULT PRIVILEGES` 對每個新函式顯式授 anon／authenticated，`REVOKE FROM PUBLIC` 不會動到它，而 DROP+CREATE 會重新觸發）。
 - **六個維度現在加是一次 migration；事後加是重建 HNSW ＋ 回填 ＋ 改全部呼叫端，而 `valid_from` 根本回填不了。**
 
 ## §2 階段
@@ -264,8 +272,9 @@ CREATE INDEX IF NOT EXISTS idx_cs_chunks_hnsw_te3s  ON public.cs_knowledge_chunk
 | K | 交付的價值 | 內容 | DoD（缺一不算） | Rollback |
 |---|---|---|---|---|
 | **K0** ✅**已完成** 2026-09-10 | 產品化前提：知識庫不再與客服邏輯綁死 | `lib/cs/` 拆為 `lib/kb/`（rag/db 的 knowledge 部分）＋ `lib/cs/`（intent／autonomy／guardrail／eval）。**純搬移、零行為變更** | `npx tsc --noEmit` 綠；cs 既有測試全綠；`lib/kb/index.ts` 為唯一對外入口（grep 確認無人繞過）；ops 路由行為不變（真跑 ingest + retrieve 比對前後輸出） | `git revert`（純搬移） |
-| **K1** | **版本化真的會動 + 檢索契約一次定型** | 修 `insertSource`／`insertChunks` 簽名；chunk family 改繼承 source 列；§1.5 migration；`cs_match_chunks` 改**六謂詞**（§1.2）；`matchChunksKeyword` 套**同一組**謂詞；換版改「先插後標 archived」；**embedding provider 改 per-caller 注入**（K0 critic 發現：`setEmbeddingProvider` 是 process 全域 singleton，任一消費者換 provider 會改變 cs `minRetrievalScore` 安全閘的語意） | 同文件改內容 → 產生第二版且**舊 chunk 確實不再被檢索到**（用**查詢**驗證，非只看 insert）；先插後刪順序實測（模擬 embedding 失敗，確認舊版仍在）；**scope chain 傳兩節點時只回鏈上的**；**`is_sensitive` 不向下繼承**（實測）；**向量半邊與關鍵字半邊可見範圍一致**（同一 query 兩半 source 集合比對）；cs 既有 eval golden set（`cs_eval_cases`）未退步；migration down 實測可逆 | down migration + revert |
-| **K2** | 多用途不互相汙染 + 學術級引用 | space 管理 API；引用錨點（`page`／`section`／`charOffset`）寫入 chunk metadata；`Passage.citation` 回傳；`listKnowledgeSources` 補 `status` 欄位 + UI 顯示 | 同一租戶下建兩個 space，交叉查詢**互不可見**（實測）；PDF 進來後 `search()` 回傳的 citation 含正確頁碼（開原文核對）；dirty/archived 在 UI 看得到 | 移除 space 過濾（退回單空間） |
+| **K1** ✅**已完成** 2026-09-11 | **版本化真的會動 + 檢索契約一次定型** | 修 `insertSource`／`insertChunks` 簽名；chunk family 改繼承 source 列；§1.5 migration；`cs_match_chunks` 改**六謂詞**（§1.2）；`matchChunksKeyword` 套**同一組**謂詞；換版改「先插後標 archived」；**embedding provider 改 per-caller 注入**（K0 critic 發現：`setEmbeddingProvider` 是 process 全域 singleton，任一消費者換 provider 會改變 cs `minRetrievalScore` 安全閘的語意） | 同文件改內容 → 產生第二版且**舊 chunk 確實不再被檢索到**（用**查詢**驗證，非只看 insert）；先插後刪順序實測（模擬 embedding 失敗，確認舊版仍在）；**scope chain 傳兩節點時只回鏈上的**；**`is_sensitive` 不向下繼承**（實測）；**向量半邊與關鍵字半邊可見範圍一致**（同一 query 兩半 source 集合比對）；cs 既有 eval golden set（`cs_eval_cases`）未退步；migration down 實測可逆 | down migration + revert |
+| ↳ K1 實際交付 | | 六謂詞在 DB 內、兩半共用同一段以 `KB_VISIBILITY_PREDICATE` 標記的謂詞文字（`kb-predicate-parity.test.ts` 機械比對逐字相同）；關鍵字半邊改為 RPC（原本是 client 端 `.ilike()`，無任何 source 側過濾）；0051 舊三參數簽名 **DROP** 不留 overload；`content_hash` 相同即不重建版本 | 全部 DoD 已用真 Postgres 實測（`kb-local-verify.sh`）＋突變測試證明斷言非空跑。**唯一未達成**：`cs_eval_cases` 生產表為 0 列（實查），golden set 無可退步之物 → 記為 N/A 非 PASS | |
+| **K2** | 多用途不互相汙染 + 學術級引用 | space 管理 API；引用錨點（`page`／`section`／`charOffset`）寫入 chunk metadata；`Passage.citation` 回傳；~~`listKnowledgeSources` 補 `status`~~（K1 已做，UI 版本檢視仍待） | 同一租戶下建兩個 space，交叉查詢**互不可見**（實測）；PDF 進來後 `search()` 回傳的 citation 含正確頁碼（開原文核對）；dirty/archived 在 UI 看得到 | 移除 space 過濾（退回單空間） |
 | **K2b** | **答得出「當時是怎樣」**；不再端出已廢止內容 | `valid_from`/`valid_to` 寫入 + as-of 檢索；`kb_document_relations`（§1.2c）；結構性矛盾偵測（§1.2d） | 同一文件兩個生效期版本，`p_as_of` 指到過去**回傳舊版**、指到現在回傳新版（實測）；`retracts` 指向的文件**查不到**；刻意造一組區間重疊 → 矛盾偵測**實際觸發並上報**（非只寫 log） | 移除 as-of 謂詞（退回 always-now） |
 | **K2c** | 一套引擎吃多產業 | Domain Pack 機制（§1.6）+ registry + 完整性機械閘；chunker/embedder 可插拔槽（§1.2b） | 建**兩個** pack（如 `general` + 一個真實產業），同一份文件在兩包下**切法不同、引用形狀不同**（實測）；故意造一個缺檔的 pack → 機械閘**擋下**；`domains/REGISTRY.json` 中的 `null` 不觸發靜默 fallback（實測） | 刪 pack 目錄，退回單一預設設定 |
 | **K2d** | 知識變動能驅動流程，不用輪詢 | KB 事件輸出：`kb.document.ingested` / `.superseded` / `.archived` / `.conflict_detected` | 一次真實 ingest 觸發事件且**至少一個訂閱者收到**（實測，非只發不收） | 停發事件 |

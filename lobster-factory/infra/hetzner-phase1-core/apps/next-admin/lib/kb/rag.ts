@@ -1,20 +1,25 @@
 // Knowledge-base retrieval + ingestion — pluggable embeddings (OpenAI now, bge-m3 later — D3),
-// hybrid retrieval (vector ⊕ keyword via RRF), and document ingestion. Embeddings go over fetch
-// (no `openai` dep).
+// hybrid retrieval (vector ⊕ keyword via RRF), and versioned document ingestion. Embeddings go over
+// fetch (no `openai` dep).
 //
-// K0 (ADR 011 §決策 3): moved verbatim from lib/cs/rag.ts. Behaviour unchanged — only the module
-// it lives in, and where its config/RRF dependencies are imported from.
+// K0 (ADR 011 §決策 3): moved from lib/cs/rag.ts.
+// K1: the embedding provider is chosen PER CALL instead of by a module-level singleton, and ingest
+// actually versions documents (KNOWLEDGE_BASE_PLAN.md §1.3).
 
-import { KB_EMBEDDING, KB_RETRIEVAL, KB_TIMEOUTS } from "@/lib/kb/config";
+import { KB_DEFAULT_SPACE_ID, KB_EMBEDDING, KB_RETRIEVAL, KB_TIMEOUTS } from "@/lib/kb/config";
 import { rrfFuse } from "@/lib/kb/rrf";
+import { canonicalKeyFor, contentHash, docFamilyId } from "@/lib/kb/family";
 import {
+  archiveOtherVersions,
   deleteKnowledgeSource,
+  getFamilyState,
   insertChunks,
   insertSource,
   matchChunksKeyword,
   matchChunksVector,
+  type RetrievalScope,
 } from "@/lib/kb/db";
-import type { EmbeddingProvider, KnowledgeInput, RetrievedChunk } from "@/lib/kb/types";
+import type { EmbeddingProvider, IngestResult, KbContext, KnowledgeInput, RetrievedChunk } from "@/lib/kb/types";
 
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
   id = KB_EMBEDDING.model;
@@ -32,55 +37,77 @@ class OpenAIEmbeddingProvider implements EmbeddingProvider {
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`openai_embeddings_${res.status}`);
-      const json = (await res.json()) as { data?: Array<{ embedding: number[] }> };
-      return (json.data ?? []).map((d) => d.embedding);
+      const json = (await res.json()) as { data?: Array<{ index?: number; embedding: number[] }> };
+      // Order by the response's own `index`: the API documents an index per item and does not
+      // promise array order. A shuffled response would pair each chunk with another chunk's vector
+      // — retrieval then returns confidently irrelevant passages, with no error anywhere.
+      const rows = [...(json.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+      return rows.map((d) => d.embedding);
     } finally {
       clearTimeout(timer);
     }
   }
 }
 
-let provider: EmbeddingProvider | null = null;
+let defaultProvider: EmbeddingProvider | null = null;
 
-/** The active embedding provider (lazy). Swap with setEmbeddingProvider for bge-m3 / tests. */
-export function getEmbeddingProvider(): EmbeddingProvider {
-  if (!provider) provider = new OpenAIEmbeddingProvider();
-  return provider;
+/**
+ * The provider used when a caller does not bring its own. It is a lazy instance, NOT a swappable
+ * global: K0's critic found that a settable module-level provider let any consumer change which
+ * model produced `RetrievedChunk.score`, and cs thresholds that score in its knowledge-gap safety
+ * gate. Callers that need a different model pass `ctx.embedder` and change nothing for anyone else.
+ */
+export function defaultEmbedder(): EmbeddingProvider {
+  if (!defaultProvider) defaultProvider = new OpenAIEmbeddingProvider();
+  return defaultProvider;
 }
-export function setEmbeddingProvider(p: EmbeddingProvider): void {
-  provider = p;
+
+function scopeOf(ctx: KbContext, model: string): RetrievalScope {
+  return {
+    scope: ctx.scope,
+    // An empty array would mean "no space matches anything" further down; treat it as "unspecified"
+    // so the caller gets the documented default-space behaviour rather than a silent empty result.
+    spaces: ctx.spaces && ctx.spaces.length ? ctx.spaces : null,
+    viewer: ctx.viewer,
+    asOf: ctx.asOf ?? null,
+    model,
+  };
 }
 
 /**
  * Hybrid retrieval: embed the query, fetch vector + keyword candidates, fuse their orderings with
  * RRF, return the top-K. Each chunk's `score` is its VECTOR cosine similarity (the knowledge-gap
  * signal) — keyword-only hits carry score 0 so they contribute context but never raise the gate.
+ *
+ * Both halves receive the SAME RetrievalScope object, and both apply it inside the database via the
+ * same predicate text (migration 0072). Neither this function nor lib/kb/db.ts can filter one half
+ * differently from the other.
  */
-export async function retrieve(organizationId: string, query: string): Promise<RetrievedChunk[]> {
-  const embedding = (await getEmbeddingProvider().embed([query]))[0];
+export async function retrieve(ctx: KbContext, query: string): Promise<RetrievedChunk[]> {
+  // Fail closed. `viewer` outside `scope` is rejected rather than ignored: when this module becomes
+  // a network service (K4), scope and viewer arrive from the caller, and an unchecked pair is a
+  // cross-tenant read dressed up as a normal query.
+  if (!ctx.scope.length || !ctx.viewer || !ctx.scope.includes(ctx.viewer)) return [];
+  const embedder = ctx.embedder ?? defaultEmbedder();
+  const embedding = (await embedder.embed([query]))[0];
   if (!embedding) return [];
 
+  const s = scopeOf(ctx, embedder.id);
   const [vec, kw] = await Promise.all([
-    matchChunksVector(organizationId, embedding, KB_RETRIEVAL.vectorTopK),
-    matchChunksKeyword(organizationId, query, KB_RETRIEVAL.keywordTopK),
+    matchChunksVector(s, embedding, KB_RETRIEVAL.vectorTopK),
+    matchChunksKeyword(s, query, KB_RETRIEVAL.keywordTopK),
   ]);
 
-  const cos = new Map<string, { sourceId: string; content: string; similarity: number }>();
-  for (const m of vec) cos.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: m.similarity });
-  const kwContent = new Map<string, string>();
-  for (const m of kw) kwContent.set(m.id, m.content);
+  const byId = new Map<string, { sourceId: string; content: string; similarity: number }>();
+  for (const m of kw) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: 0 });
+  for (const m of vec) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: m.similarity });
 
   const fused = rrfFuse([vec.map((m) => m.id), kw.map((m) => m.id)]);
   return fused
     .slice(0, KB_RETRIEVAL.contextTopK)
     .map((f): RetrievedChunk => {
-      const c = cos.get(f.id);
-      return {
-        id: f.id,
-        sourceId: c?.sourceId ?? "",
-        content: c?.content ?? kwContent.get(f.id) ?? "",
-        score: c?.similarity ?? 0,
-      };
+      const c = byId.get(f.id);
+      return { id: f.id, sourceId: c?.sourceId ?? "", content: c?.content ?? "", score: c?.similarity ?? 0 };
     })
     .filter((c) => c.content.length > 0);
 }
@@ -119,44 +146,99 @@ export function chunkText(body: string, target = 500, overlap = 80): string[] {
   return out;
 }
 
+const EMPTY_INGEST: IngestResult = { sourceId: null, docFamilyId: null, version: 0, chunks: 0, unchanged: false };
+
 /**
- * Ingest one knowledge document: create a source row, chunk the body, embed, store. Contextual
- * Retrieval (Claude-generated per-chunk prefix, plan §4.2) is a P2 enhancement — seam left at
- * cs_knowledge_chunks.contextual_prefix (currently null).
+ * Ingest one knowledge document as a new VERSION of its document family.
+ *
+ * Order is load-bearing (KNOWLEDGE_BASE_PLAN.md §1.3): chunk → insert the new version → store its
+ * chunks → only then archive the previous version. supabase-js has no transactions, so if embedding
+ * fails halfway the new version is deleted and the previous version is still active and still
+ * retrievable. Archiving first would leave the document with nothing at all.
+ *
+ * Re-ingesting byte-identical content returns `unchanged` instead of creating version N+1 — without
+ * it, a crawler re-fetching an unchanged page would grow the family forever and re-embed every time.
+ *
+ * Contextual Retrieval (Claude-generated per-chunk prefix, plan §4.2) is a P2 enhancement — seam
+ * left at cs_knowledge_chunks.contextual_prefix (currently null).
  */
-export async function ingestKnowledge(input: KnowledgeInput): Promise<{ sourceId: string | null; chunks: number }> {
+export async function ingestKnowledge(input: KnowledgeInput, embedder?: EmbeddingProvider): Promise<IngestResult> {
+  const canonicalKey = canonicalKeyFor(input);
+  const familyId = docFamilyId(input.organizationId, canonicalKey);
+  const hash = contentHash(input.body);
+
+  const pieces = chunkText(input.body);
+  if (!pieces.length) return { ...EMPTY_INGEST, docFamilyId: familyId };
+
+  const spaceId = input.spaceId ?? KB_DEFAULT_SPACE_ID;
+  const { live, maxVersion } = await getFamilyState(input.organizationId, familyId);
+  // "Unchanged" has to mean the whole document, not just its text. Re-uploading the same body with
+  // the sensitive flag newly ticked is a real change; treating it as a no-op would silently discard
+  // a change the operator believes they made.
+  const sameMetadata =
+    !!live &&
+    live.isSensitive === !!input.isSensitive &&
+    (live.spaceId ?? KB_DEFAULT_SPACE_ID) === spaceId &&
+    (live.canonicalUrl ?? null) === (input.canonicalUrl ?? null) &&
+    (live.validFrom ?? null) === (input.validFrom ?? null) &&
+    (live.validTo ?? null) === (input.validTo ?? null);
+  if (live && live.contentHash === hash && sameMetadata) {
+    return { sourceId: live.id, docFamilyId: familyId, version: live.version, chunks: 0, unchanged: true };
+  }
+
+  const version = maxVersion + 1;
   const sourceId = await insertSource({
     organizationId: input.organizationId,
     kind: input.kind,
     title: input.title,
     isSensitive: !!input.isSensitive,
+    docFamilyId: familyId,
+    sourceVersion: version,
+    contentHash: hash,
+    canonicalUrl: input.canonicalUrl ?? null,
+    spaceId,
+    validFrom: input.validFrom ?? null,
+    validTo: input.validTo ?? null,
+    language: input.language ?? null,
+    docType: input.docType ?? null,
+    authorityTier: input.authorityTier ?? null,
+    domainPack: input.domainPack ?? null,
   });
-  if (!sourceId) return { sourceId: null, chunks: 0 };
+  if (!sourceId) return { ...EMPTY_INGEST, docFamilyId: familyId };
 
-  const pieces = chunkText(input.body);
-  if (!pieces.length) {
-    await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
-    return { sourceId: null, chunks: 0 };
-  }
-
-  // The source row is already committed; if embedding/chunk-insert fails, roll it back so a failed
-  // ingest never leaves a permanent zero-chunk ghost source (critic finding).
+  const provider = embedder ?? defaultEmbedder();
   try {
-    const embeddings = await getEmbeddingProvider().embed(pieces);
-    const model = getEmbeddingProvider().id;
+    const embeddings = await provider.embed(pieces);
+    // All or nothing. Storing the subset that came back would drop paragraphs from the document
+    // while reporting success — and because content_hash records the FULL body, re-uploading the
+    // same text would then be treated as unchanged, making the loss permanent and invisible.
+    if (embeddings.length !== pieces.length || embeddings.some((e) => !e?.length)) {
+      throw new Error(`embedding_count_mismatch_${embeddings.length}_of_${pieces.length}`);
+    }
     const rows = pieces.map((content, i) => ({
       organizationId: input.organizationId,
       sourceId,
+      docFamilyId: familyId,
+      sourceVersion: version,
       content,
-      embedding: embeddings[i] ?? [],
-      embedModel: model,
+      embedding: embeddings[i]!,
+      embedModel: provider.id,
     }));
-    const chunks = await insertChunks(rows.filter((r) => r.embedding.length > 0));
-    if (chunks === 0) {
+    const chunks = await insertChunks(rows);
+    if (chunks !== pieces.length) {
+      // Partially stored is not a version. Remove it and leave the previous one active.
       await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
-      return { sourceId: null, chunks: 0 };
+      return { ...EMPTY_INGEST, docFamilyId: familyId };
     }
-    return { sourceId, chunks };
+    const archive = await archiveOtherVersions(input.organizationId, familyId, sourceId);
+    return {
+      sourceId,
+      docFamilyId: familyId,
+      version,
+      chunks,
+      unchanged: false,
+      supersedeFailed: archive.failed,
+    };
   } catch (e) {
     await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
     throw e;

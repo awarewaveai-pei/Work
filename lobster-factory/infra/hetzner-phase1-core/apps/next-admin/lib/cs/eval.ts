@@ -73,7 +73,9 @@ export async function runEvalCase(cis: CisProfile, intents: Intent[], c: EvalCas
     const intent = resolveIntent(intents, cls.intentKey);
 
     // 3. Retrieve + score.
-    const chunks = await retrieve(orgId, c.question);
+    // One tenant node, viewing itself: the KB's scope chain is a list because tenants will become
+    // a tree, but today customer service is flat (organizations has no parent_id).
+    const chunks = await retrieve({ scope: [orgId], viewer: orgId }, c.question);
     const retrievalScore = topScore(chunks);
 
     // 4. Generate + supervise (only when there's knowledge to ground on).

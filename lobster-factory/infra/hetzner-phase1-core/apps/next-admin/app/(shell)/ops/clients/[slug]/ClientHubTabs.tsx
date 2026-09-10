@@ -1207,9 +1207,14 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify({ title: kTitle, body: kBody, kind: kKind, isSensitive: kSensitive }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; chunks?: number };
+      const data = (await res.json()) as { ok?: boolean; error?: string; chunks?: number; version?: number; unchanged?: boolean };
       if (!res.ok || !data.ok) throw new Error(data.error ?? `failed_${res.status}`);
-      setKMsg(`✓ 已建索引（${data.chunks ?? 0} 塊）`); setKTitle(""); setKBody(""); setKSensitive(false);
+      // Same title + changed text = a new version; same title + same text = nothing happened, and
+      // saying "已建索引（0 塊）" would read as a failure.
+      setKMsg(data.unchanged
+        ? `✓ 內容與第 ${data.version ?? 1} 版相同，未重建索引`
+        : `✓ 已建索引（第 ${data.version ?? 1} 版，${data.chunks ?? 0} 塊）`);
+      setKTitle(""); setKBody(""); setKSensitive(false);
       await reloadSources();
     } catch (e) { setKMsg(`⚠ ${String(e)}`); } finally { setKSaving(false); }
   }

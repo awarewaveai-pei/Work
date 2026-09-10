@@ -90,7 +90,9 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
     const intent = resolveIntent(intents, cls.intentKey);
 
     // 4. Retrieve knowledge.
-    const chunks = await retrieve(message.organizationId, message.text);
+    // Flat tenant today: scope = the org itself, viewer = the org (so its own sensitive docs are
+    // visible to it). A tenant tree would pass the whole chain here and change nothing in the KB.
+    const chunks = await retrieve({ scope: [message.organizationId], viewer: message.organizationId }, message.text);
     const retrievalScore = topScore(chunks);
     const chunkIds = chunks.map((c) => c.id);
 

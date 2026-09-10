@@ -1,5 +1,36 @@
 # Worklog
 
+## 2026-09-11（KB K1：版本化接線 + 檢索六謂詞一次定型；migration 0072 尚未套用 prod）
+
+K0（`6e4947f9d`）之後接著做 K1。正本 [KNOWLEDGE_BASE_PLAN.md §1.2/§1.3/§1.5](docs/knowledge-base/KNOWLEDGE_BASE_PLAN.md)，決策 [ADR 011](docs/architecture/decisions/011-collection-ingestion-boundary.md)。
+
+交付：`0072_kb_versioning_and_retrieval_predicates.sql`（+ down + `kb-local-verify.{sh,sql}` 驗證器）、`lib/kb/{family,db,rag,types,config,index}.ts`、3 個呼叫端、5 個測試檔（39 test）。
+
+做了什麼：
+- C1 **兩半共用一段以 `KB_VISIBILITY_PREDICATE` 標記的謂詞文字**，逐字相同由 `kb-predicate-parity.test.ts` 機械比對；關鍵字半邊從 client 端 `.ilike()`（**完全沒有 source 側過濾**）改成 RPC。兩半不一致 = 「向量查不到但關鍵字查得到」的洩漏路徑。
+- C2 0051 的三參數 `cs_match_chunks` **DROP** 不留 overload——留著就是一條仍然可用的無過濾檢索路徑。
+- C3 換版順序「插新版 → 存 chunk → 才 archive 舊版」，supabase-js 無交易，順序是唯一保護；失敗路徑一律刪新版、舊版仍 active。
+- C4 `doc_family_id = uuidv5(NS, org + "|" + canonicalKey)`，org 進 hash（否則兩租戶抓同一 URL 得到同一 family，未來任何漏寫 org 的 family 級刪除就是跨租戶刪除，而 RLS 是 service_role only 無兜底）。
+- C5 `content_hash` 相同且 metadata 相同才算 unchanged——爬蟲重抓不會長出第 2、3、4 版。
+- C6 embedding provider 改 per-call 注入，移除 K0 critic 指出的 process 全域 singleton（它讓任一消費者換 provider 就改變 cs `minRetrievalScore` 安全閘的語意）。
+
+critic 覆審（1 個 subagent，Deep）：1 Critical、6 Major、10 Minor。全部逐條查證後處理，其中三條是**我原設計真的會出事**：
+- **C1（Critical）已修**：0072 對兩個新函式只寫了 `REVOKE … FROM PUBLIC`。`0064_lockdown_security_definer_anon_grants.sql:6-8` 已立案並在 ks-aw-01 實查過：Supabase 的 `ALTER DEFAULT PRIVILEGES` **顯式**授 anon／authenticated EXECUTE，`REVOKE FROM PUBLIC` 不會動到它，且 DROP+CREATE 會重新觸發。這兩個函式**以參數決定租戶、函式內無任何身分檢查**，今天只靠 service_role-only RLS 擋著，而 0051 檔頭自己寫著 Phase 5 要放寬 RLS。修法 = `REVOKE … FROM PUBLIC, anon, authenticated`，並在驗證器裡先重現 Supabase 的 default privileges 再斷言 anon 無 EXECUTE（否則該斷言恆真）。
+- **M2（Major）已修**：並行 ingest 同一文件 → 兩者都讀到 maxVersion=N、都插 N+1、再各自 archive 對方 → 該 family **零筆 active** = 文件從 KB 消失且 UI 也看不到。加 `UNIQUE(organization_id, doc_family_id, source_version)` 讓後到者 insert 直接失敗（與「先插後 archive」不衝突，那條刻意不加的是 active 的 partial unique）。
+- **M5（Major）已修**：0072 原本沒有回填 pre-K1 的 chunk `doc_family_id`（舊碼寫成 `source_id`）。留著 = 版本化對既有文件全部無效。migration 內加 UPDATE；既有 source 的 random family 無法在 SQL 重算成 uuidv5，改在檔頭寫成套用後的一次性步驟（prod 只有 1 筆）。
+- 另修：M1 embedding 數量不符時硬失敗（原本 `.filter()` 靜默丟段落，且 `content_hash` 會把錯誤鎖死到永遠改不回來）、M3 archive 失敗回報 `supersedeFailed` 不再吞掉、M6 RPC error 改 `console.error`（原本與「這個租戶沒有知識」長得一模一樣）、m1 metadata-only 變更不再被當 unchanged、m2 space 改由 source 單一擁有（chunk 不存 `space_id`，撤下 plan §1.5 該欄）、m3 chunk↔source 同租戶複合 FK、m4 OpenAI embedding 依回應 `index` 排序（API 不保證陣列順序 = chunk 與向量錯配且無錯誤）、m5 驗證器釘 `plpgsql.check_asserts` + 自我煙霧測試、m6 掃描 >0072 的 migration 是否重定義 RPC、m7 RPC 參數名機械對照、m8 chunk 計數補 org 過濾、canonical_url 長度/scheme 驗證、`viewer ∈ scope` fail-closed。
+
+**未做、留給操作者決定**（M4／m10，兩者都是產品語意不是 bug）：① `is_sensitive` 謂詞對今天 100% 的呼叫端恆為真（viewer 必等於 chunk 的 org），它擋的是**租戶樹向下繼承**，而租戶樹還不存在；ops UI 的「敏感內容」勾選看起來像「不要進自動回覆」，那需要另一條受眾軸（`includeSensitive`），會改變線上客服行為。② ops 的刪除仍是硬刪，與 plan「只 archived 不實體刪」的稽核鏈不變量衝突。兩項都在 TASKS.md 開項。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh`（真 pgvector 容器：0051→0072→11 條行為斷言→down→重套→再驗）| exit=0 | result=KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + DOWN_OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=96 檔 827 test 全綠（lib/kb 39）
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（改 migration 後重跑驗證器）| exit=0 | result=拔 status／sensitive／embed_model 謂詞、只讓關鍵字半邊分岔、拔 anon revoke、拔 family unique、拔複合 FK → **6 個突變全部 KILLED 且錯誤訊息指名正確斷言**；純註解對照組 SURVIVED（證明不是全紅）
+REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 ks-aw-01 docker exec supabase-db psql -tAc "select count(*) ..."` | exit=0 | result=prod `cs_knowledge_sources=1 / chunks=1 / cs_eval_cases=0`
+REVIEW_DONE: critic=Deep（獨立 subagent，逐檔全讀 migration 上下/驗證器/6 個 lib/kb 檔/5 個測試/4 個呼叫端/0051/0064/plan 全文）| verdict=修前 High risk，17 項全數處理（12 修碼、3 修文件、2 升級為操作者決策）| findings=1c/6m/10 minor
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`setEmbeddingProvider|getEmbeddingProvider|cs_match_chunks|insertSource|insertChunks|matchChunks|space_id|archiveOtherVersions` | hits=舊 provider setter 全 repo 0 殘留；`cs_match_chunks` 10 檔全部核對；`space_id` 找到 plan §1.5 兩處與實作分岔（chunk 欄位＋索引）已同 commit 修正；ClientHubTabs 的 ingest 回應文案補上版本／unchanged 分流
+K1 DoD **未達成的一項（誠實記錄）**：「cs 既有 eval golden set 未退步」無法驗——`cs_eval_cases` 生產表 **0 列**（上面 SSH 實查），沒有可退步的東西，記 N/A 非 PASS。
+**尚未套用 prod**：migration 是 High-STOP，等操作者明示。套用時 migration 與 next-admin deploy **必須同一個維護窗口、migration 先**（0072 檔頭已寫）：只做一半 = 每次檢索靜默回 0 chunk，客服全部退 handoff 且無任何錯誤訊號。
+
 ## 2026-09-10（102–105 號切片：F11 causal 家族收官 6/10→10/10，4 個平行 agent，經歷一次 rate-limit 中斷後重派）
 
 instrumental_variables(47t)/difference_in_differences(51t)/regression_discontinuity(56t)/synthetic_control(61t)。215 tests 零衝突，全 regression 6292→6507，golden 3211→3231。第一次派出的 4 agent 全數死於帳號級 rate limit（HTTP 429），`git status` 確認零殘留檔案後，操作者確認額度重置，原 prompt 逐字重派成功。F11 causal 家族正式收官（10/10）：`causal.dag`（本 session 更早建置）+ 6+4 兩批共 10 個方法。
