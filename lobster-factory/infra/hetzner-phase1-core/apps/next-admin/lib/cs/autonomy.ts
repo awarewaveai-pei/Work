@@ -3,11 +3,11 @@
 // the LLM. See plan §1 (two-axis autonomy), §3.4 (action gate), §5 (guardrails).
 
 import { CS_RED_LINE_KEYWORDS, CS_SENSITIVE_KEYWORDS, CS_THRESHOLDS } from "@/lib/cs/config";
+import type { RetrievedChunk } from "@/lib/kb/types";
 import type {
   CsActionKind,
   HandoffReason,
   Intent,
-  RetrievedChunk,
 } from "@/lib/cs/types";
 
 function hitsAny(text: string, keywords: readonly string[]): boolean {
@@ -25,25 +25,8 @@ export function hitsSensitive(text: string): boolean {
   return hitsAny(text, CS_SENSITIVE_KEYWORDS);
 }
 
-/**
- * Reciprocal Rank Fusion of several ranked id lists (hybrid search: vector + keyword).
- * score(id) = Σ 1 / (k + rank_in_list). Returns ids sorted by fused score, descending.
- */
-export function rrfFuse(
-  rankings: string[][],
-  k: number = CS_THRESHOLDS.rrfK,
-): Array<{ id: string; score: number }> {
-  const scores = new Map<string, number>();
-  for (const list of rankings) {
-    list.forEach((id, idx) => {
-      const inc = 1 / (k + idx + 1);
-      scores.set(id, (scores.get(id) ?? 0) + inc);
-    });
-  }
-  return [...scores.entries()]
-    .map(([id, score]) => ({ id, score }))
-    .sort((a, b) => b.score - a.score);
-}
+// rrfFuse moved to lib/kb/rrf.ts in K0 (ADR 011 §決策 3): it is retrieval mathematics with no
+// customer-service semantics, and the retrieval path (now lib/kb/rag.ts) was its only caller.
 
 /** Deterministic 0..99 canary roll from a stable key (message id) — same input, same bucket. */
 export function canaryRoll(key: string): number {
@@ -114,7 +97,7 @@ export function decideAnswerAction(input: AnswerDecisionInput): AnswerDecision {
   return passesCanary(intent.canaryPct, roll) ? { action: "auto_sent" } : { action: "draft" };
 }
 
-/** Top fused retrieval score (0 when nothing retrieved). */
+/** Top vector cosine similarity across retrieved chunks (0 when nothing retrieved). */
 export function topScore(chunks: RetrievedChunk[]): number {
   return chunks.length ? Math.max(...chunks.map((c) => c.score)) : 0;
 }
