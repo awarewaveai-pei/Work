@@ -54,7 +54,7 @@ describe("Timeline v1 DynamicSlideshow compiler", () => {
     if (result.ok) expect(result.specs[0].props.audioUrl).toContain(artifact.audio);
   });
 
-  it("fails closed instead of discarding captions, footage, or timing gaps", () => {
+  it("renders validated caption timing while still rejecting footage and timing gaps", () => {
     const caption = { id: "captions", kind: "caption", items: [{ id: "caption", startMs: 0, endMs: 3000, text: "字幕", sourceTranscriptSegmentIds: ["seg_001"] }] } as const;
     const result = compileTimelineV1ToDynamicSlideshow({
       ...timeline,
@@ -64,9 +64,10 @@ describe("Timeline v1 DynamicSlideshow compiler", () => {
       ] }, caption],
     }, resolver);
     expect(result.ok).toBe(false);
-    if (result.ok === false) expect(result.errors.map((error) => error.code)).toEqual(expect.arrayContaining([
-      "unsupported_track", "unsupported_footage",
-    ]));
+    if (result.ok === false) expect(result.errors.map((error) => error.code)).toEqual(expect.arrayContaining(["unsupported_footage"]));
+    const valid = compileTimelineV1ToDynamicSlideshow({ ...timeline, tracks: [...timeline.tracks, caption] }, resolver);
+    expect(valid.ok).toBe(true);
+    if (valid.ok) expect(valid.specs[0].props.captions).toEqual([{ startFrame: 0, endFrame: 90, text: "字幕" }]);
   });
 
   it("refuses a missing or non-HTTPS resolved artifact URL", () => {

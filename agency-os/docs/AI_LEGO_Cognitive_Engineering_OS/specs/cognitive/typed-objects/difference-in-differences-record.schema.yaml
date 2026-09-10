@@ -1,0 +1,187 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/difference-in-differences-record.schema.yaml"
+title: Difference-in-Differences Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DifferenceInDifferencesRecord`
+  -- the declared `outputs` of `causal.difference_in_differences`'s Method
+  Contract (methods/contracts/causal.difference_in_differences.contract.yaml,
+  `outputs: [DifferenceInDifferencesRecord]`). Atlas F11 table row L622
+  gives this method a single 3-step pipeline ("treated/control→pre/post→
+  parallel trends") and no field-level sub-structure -- modeled as a FLAT
+  record of 6 plain-string content fields, same shape class
+  `rct-record.schema.yaml`'s own flat-record convention uses for a
+  similarly thin citation.
+
+  Field provenance -- Atlas F11 L622:
+    * `treated_group`/`control_group` -- the "treated/control" stage, split
+      into 2 named arms (Atlas's own single slash-joined phrase covers
+      both, same split rct-record.schema.yaml's own treatment_group/
+      control_group already applies). Must be genuinely distinct (enforced
+      at the runtime layer, see `ai_lego/modules/causal/
+      difference_in_differences.py`) -- a record naming an identical arm
+      twice has not identified 2 groups to compare.
+    * `pre_period`/`post_period` -- the "pre/post" stage, split into 2
+      named periods for the same reason. Must be genuinely distinct (same
+      runtime-layer enforcement) -- a record naming an identical period
+      twice cannot express a before/after difference at all.
+    * `parallel_trends_justification` -- the "parallel trends" stage:
+      DiD's own defining identifying assumption, disclosed as REQUIRED
+      justification text (see compilation_decisions), not a computed test
+      result this schema/record runs.
+    * `analysis_summary` -- REPORTED analytical approach/findings, not
+      computed by this record (see compilation_decisions and the method
+      contract's own scope-boundary note), same disclosure-only precedent
+      `rct-record.schema.yaml`'s own `analysis_summary` field already
+      establishes. Provenance for this claim is the record's own top-level
+      `provenance` field.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Difference-in-Differences row (L622) -- the ONLY Atlas citation for this method (grep-confirmed, see method contract's own verification section)"
+  - "methods/contracts/causal.difference_in_differences.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- flat-record-from-thin-citation shape precedent, and disclosure-only power_analysis/analysis_summary field precedent, both reused here"
+  - "specs/cognitive/typed-objects/how-might-we-record.schema.yaml -- original flat-record-from-thin-citation shape precedent rct-record.schema.yaml itself reused"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: direct transcription of a
+  cited Atlas worked pipeline plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Should parallel_trends_justification be OPTIONAL (present only when a real justification exists)?"
+    decision: "No -- REQUIRED, minLength:1, same required-not-optional treatment rct-record.schema.yaml's own power_analysis field already establishes for an analogous defining-assumption gap. A study with no stated basis for believing treated/control would move in parallel absent treatment must say so explicitly, not silently omit the field."
+  - question: "treated_group/control_group and pre_period/post_period as one combined field each (Atlas's own citation uses single slash-joined phrases) or 2 separate fields each?"
+    decision: "2 separate required fields per pair (4 fields total) -- a single field could not express either distinctness invariant this method's own name (DIFFERENCE-in-differences) demands; same reasoning rct-record.schema.yaml's own treatment_group/control_group split already establishes."
+  - question: "Should the 2 distinctness invariants (treated_group!=control_group, pre_period!=post_period) be expressed as JSON Schema constraints?"
+    decision: "No -- cross-field, case/whitespace-insensitive text comparison has no native JSON Schema 'not equal to a sibling, normalized' operator, same limitation rct-record.schema.yaml's own echo check accepted. Enforced at the runtime layer (ai_lego/modules/causal/difference_in_differences.py), at construction AND independently re-derived by a gate."
+  - question: "Should analysis_summary/parallel_trends_justification carry genuine-compute fields (engine, computation_provenance_ref)?"
+    decision: "No -- this record performs no genuine computation (no regression, no real parallel-trends test). Omitting engine/computation_provenance_ref entirely is itself the honest disclosure that nothing here is GENUINE_COMPUTE, same omission-as-disclosure convention rct-record.schema.yaml already uses."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes, present from the start at the top level (not retrofitted) -- 2 sibling F11 schemas this same batch (logic-model-record.schema.yaml/process-tracing-record.schema.yaml) needed a post-hoc fix for this exact gap after a critic hand-tamper PoC, so this file gets it right the first time."
+
+type: object
+required: [id, version, treated_group, control_group, pre_period, post_period, parallel_trends_justification, analysis_summary, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^DID-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.difference_in_differences"
+
+  treated_group:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L622's own "treated" arm -- who/what was exposed to the
+      treatment/policy/event. Must genuinely differ from control_group
+      (runtime-layer invariant, see top-level description) -- a record
+      naming an identical treated and control arm has not identified 2
+      groups to compare.
+
+  control_group:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L622's own "control" arm -- the comparison unit(s) not exposed
+      to the treatment/policy/event. Must genuinely differ from
+      treated_group.
+
+  pre_period:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L622's own "pre" stage -- the window observed before the
+      treatment/policy/event. Must genuinely differ from post_period
+      (runtime-layer invariant) -- a record naming an identical pre and
+      post period cannot express a before/after difference at all.
+
+  post_period:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L622's own "post" stage -- the window observed after the
+      treatment/policy/event. Must genuinely differ from pre_period.
+
+  parallel_trends_justification:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L622's own "parallel trends" stage -- the study's own disclosed
+      basis for believing treated and control would have followed parallel
+      trends absent the treatment (e.g. matched pre-period trend
+      comparison, institutional reasoning). REQUIRED (see
+      compilation_decisions): DiD's own defining identifying assumption, a
+      caller with no stated basis must disclose that fact explicitly
+      rather than omit the field. Disclosed/justified content, not a
+      computed statistical test this record itself runs.
+
+  analysis_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The stated analytical approach and/or findings, as REPORTED content
+      (see method contract's own scope-boundary note: this record captures
+      what the study's own analysis claims, it does not itself compute a
+      DiD estimator or regression). Provenance for this claim is the
+      record's own top-level `provenance` field.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern
+      every sibling typed-object schema in this directory uses. No
+      `const`: epistemic_type legitimately varies by whether this record
+      documents a planned design (e.g. ASSUMPTION/HYPOTHESIS, not yet run)
+      or a completed, reported study (e.g. EVIDENCE/SOURCE_FACT).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed natural-experiment DiD on a city-level minimum-wage change and teen employment"
+    value:
+      id: "DID-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.difference_in_differences"
+      treated_group: "A市：2025年第3季實施最低工資調升的速食業僱主"
+      control_group: "鄰近未調升最低工資的B市：同期速食業僱主"
+      pre_period: "2025年第1-2季（調升前2季）"
+      post_period: "2025年第4季-2026年第1季（調升後2季）"
+      parallel_trends_justification: "調升前4季A、B兩市速食業僱用人數走勢以平行趨勢圖比對，兩市季增率差異均在1個百分點內且無統計顯著差異，支持平行趨勢假設"
+      analysis_summary: "DiD 估計顯示處置組相對於對照組僱用人數變動 -2.1%（標準誤 0.9%），研究團隊回報之結果，本紀錄未重新執行迴歸分析"
+      provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - "OQ-DIDRECORD-1: treated_group!=control_group and pre_period!=post_period are runtime-only invariants, not schema-expressible -- same class of disclosed gap rct-record.schema.yaml's own treatment_group!=control_group check documents（owner: operator, or whoever next hardens this schema's cross-field guarantees）"
+
+verification:
+  method: >
+    Read Atlas F11 table row (L622) directly. Cross-checked against
+    methods/contracts/causal.difference_in_differences.contract.yaml's own
+    outputs/preconditions/quality. Read rct-record.schema.yaml in full as
+    shape precedent before writing this file. Validated against jsonschema
+    Draft202012Validator (required fields present, id pattern satisfied,
+    additionalProperties:false present at the top level from the start).
+  note: >
+    treated_group/control_group/pre_period/post_period/
+    parallel_trends_justification/analysis_summary field names are this
+    contract's own naming (Atlas itself does not name these 3 pipeline
+    stages with formal field labels, only lists them as a slash-arrow
+    chain); the flat-record shape, the 2-field-per-pair split, and
+    parallel_trends_justification's REQUIRED status are compilation
+    decisions, disclosed above. No mother document was modified to produce
+    this file.

@@ -1,0 +1,200 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/regression-discontinuity-record.schema.yaml"
+title: Regression Discontinuity Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RegressionDiscontinuityRecord` --
+  the declared `outputs` of `causal.regression_discontinuity`'s Method
+  Contract (methods/contracts/causal.regression_discontinuity.contract.yaml,
+  `outputs: [RegressionDiscontinuityRecord]`). Atlas F11 table row L623
+  gives this method a single 4-step pipeline ("running variable→cutoff→
+  bandwidth→checks") and no field-level sub-structure -- modeled as a FLAT
+  record: 3 disclosure strings (running_variable/bandwidth/checks[])
+  + 1 typed number (cutoff_value) + 1 optional disclosure string
+  (analysis_summary), same shape class `rct-record.schema.yaml`'s own
+  flat-record convention uses for a similarly thin citation.
+
+  Field provenance -- Atlas F11 L623:
+    * `running_variable` -- the "running variable" stage: a narrative
+      description of the continuous variable that determines treatment
+      assignment (e.g. test score, age, income, date), including its scale/
+      unit. NOT itself a computed statistic.
+    * `cutoff_value` -- the "cutoff" stage: the actual threshold point ON
+      that running variable's own numeric scale. A typed `number`, not a
+      narrative string -- see compilation_decisions.
+    * `bandwidth` -- the "bandwidth" stage: the study's own disclosed,
+      justified choice of how much data around the cutoff is used. A
+      narrative string, NOT a computed MSE-optimal bandwidth this record
+      itself runs -- see compilation_decisions.
+    * `checks` -- the "checks" stage: REQUIRED non-empty array of
+      genuinely distinct narrative entries (e.g. manipulation/density test,
+      placebo cutoff, covariate-balance check), REPORTED as disclosed
+      claims about what was checked, not actually computed by this record.
+    * `analysis_summary` -- OPTIONAL. Reported analytical
+      approach/findings, matching `rct-record.schema.yaml`'s own field for
+      a sibling method, but NOT required here -- Atlas's own citation for
+      THIS method names "checks", not "analysis", as its 4th word (see
+      compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Regression Discontinuity row (L623) -- the ONLY Atlas citation for this method (grep-confirmed, see method contract's own verification section)"
+  - "methods/contracts/causal.regression_discontinuity.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- flat-record-from-thin-citation shape precedent, and the disclosure-only field precedent (presence enforced, methodology not) reused here for bandwidth/checks/analysis_summary"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: direct transcription of a
+  cited Atlas worked pipeline plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Should cutoff_value be a typed number, or a narrative string like the other 3 content fields?"
+    decision: "Typed `number` (finite real, JSON Schema excludes NaN/Infinity by construction). A cutoff needs to be a real point on the running variable's own numeric scale -- a design that cannot state an actual threshold number has not identified a genuine discontinuity. `running_variable` itself (the scale/unit context) stays a narrative string, matching every other thin-citation field in this directory."
+  - question: "Should checks be a single combined narrative string (matching bandwidth/analysis_summary's own treatment) or a required array?"
+    decision: "Required array of strings, minItems: 1, each item minLength: 1 -- Atlas L623's own pipeline names this stage 'checks' (plural). A single string field could satisfy a naive non-empty check while describing only one (or zero, via a vague 'checks were performed' placeholder) real validation step; an array makes the count of genuinely disclosed checks directly inspectable, and lets the runtime layer (ai_lego/modules/causal/regression_discontinuity.py) enforce pairwise distinctness -- see that module's own invariant #2."
+  - question: "Should checks[] entry-to-entry distinctness be expressed as a JSON Schema constraint (e.g. uniqueItems: true)?"
+    decision: "No plain `uniqueItems: true` -- JSON Schema's own uniqueItems is exact-value equality, not the case/whitespace-insensitive NFKC-normalized comparison this record's own distinctness invariant needs (two checks differing only by trailing whitespace or full-width punctuation should still count as a duplicate). Enforced at the runtime layer instead (ai_lego/modules/causal/regression_discontinuity.py), at construction AND independently re-derived by a gate -- same limitation-and-workaround class rct-record.schema.yaml's own treatment_group/control_group distinctness question already documents for a different field shape (pair vs list)."
+  - question: "Should analysis_summary be REQUIRED, matching rct-record.schema.yaml's own required treatment?"
+    decision: "No -- OPTIONAL here. RCT's Atlas citation literally names 'analysis' as its own 4th pipeline word, grounding a REQUIRED field there. This method's own L623 citation names 'checks' as its 4th word instead; requiring analysis_summary here would force a still-in-design (not-yet-run) RDD record to fabricate a findings narrative it does not yet have. Included as an optional convenience field for a completed study, not as an Atlas-cited requirement."
+  - question: "Should this record carry its own genuine-compute fields (engine, computation_provenance_ref), the way causal-dag-analysis.schema.yaml's acyclic_verified does?"
+    decision: "No -- this record performs no genuine computation (no local-linear regression, no bandwidth optimizer, no manipulation-test statistic). Omitting engine/computation_provenance_ref entirely (not present as false/null) is itself the honest disclosure that nothing here is GENUINE_COMPUTE, same omission-as-disclosure convention rct-record.schema.yaml's own schema already uses."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- same baseline hygiene every sibling record schema in this directory converges on (prevents a caller from smuggling an unreviewed field onto the record). Set correctly from the start here (this exact top-level omission was a real bug caught by critic hand-tamper PoC in 2 sibling schemas earlier this same session, logic-model-record.schema.yaml and process-tracing-record.schema.yaml)."
+
+type: object
+required: [id, version, running_variable, cutoff_value, bandwidth, checks, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^RD-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.regression_discontinuity"
+
+  running_variable:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L623's own "running variable" stage -- a narrative description
+      of the continuous variable that determines treatment assignment
+      (e.g. "standardized exam score, 0-100 scale, administered at grade
+      6"), including its scale/unit. NOT itself a computed value -- see the
+      method contract's own scope-boundary note.
+
+  cutoff_value:
+    type: number
+    description: >
+      Atlas L623's own "cutoff" stage -- the actual threshold point on
+      `running_variable`'s own numeric scale (e.g. 60, if running_variable
+      is a 0-100 exam score and units scoring >=60 receive treatment).
+      REQUIRED and typed as a real number (see compilation_decisions): a
+      design that cannot state an actual numeric threshold has not
+      identified a genuine discontinuity.
+
+  bandwidth:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L623's own "bandwidth" stage -- the study's own disclosed,
+      justified choice of how much data around cutoff_value is used (e.g.
+      "±10 points around the cutoff, chosen via visual inspection of
+      density plus a standard rule-of-thumb bandwidth, not
+      cross-validated"). NOT a computed MSE-optimal bandwidth this record
+      itself runs -- see the method contract's own scope-boundary note.
+
+  checks:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      Atlas L623's own "checks" stage -- REQUIRED, non-empty list of
+      REPORTED validation claims (e.g. "McCrary density test found no
+      evidence of manipulation at the cutoff (p=0.41)", "placebo cutoffs
+      at the median of each side showed no discontinuity", "covariate
+      balance check: no significant jump in pre-treatment covariates at
+      the cutoff"). Each entry must genuinely differ from every other entry
+      (case/whitespace-insensitive, NFKC-normalized -- runtime-layer
+      invariant, see ai_lego/modules/causal/regression_discontinuity.py):
+      an RDD design with zero, or only duplicated, disclosed checks has
+      not actually validated its own identifying assumption.
+
+  analysis_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL (see compilation_decisions -- unlike rct-record.schema.yaml's
+      own required field, Atlas's own citation for THIS method does not
+      name "analysis" as a pipeline word). When present: the stated local-
+      effect estimate and/or findings, as REPORTED content (see method
+      contract's own scope-boundary note: this record captures what the
+      study's own analysis claims, it does not itself compute a local-
+      linear regression). Provenance for this claim is the record's own
+      top-level `provenance` field.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern
+      every sibling typed-object schema in this directory uses. No
+      `const`: epistemic_type legitimately varies by whether this record
+      documents a planned design (e.g. ASSUMPTION/HYPOTHESIS, not yet run)
+      or a completed, reported study (e.g. EVIDENCE/SOURCE_FACT).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed RDD study estimating the local effect of a scholarship on college enrollment at a test-score cutoff"
+    value:
+      id: "RD-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.regression_discontinuity"
+      running_variable: "入學考試標準化分數，0-100 分制，全體考生統一測驗"
+      cutoff_value: 60
+      bandwidth: "cutoff 上下各 8 分（±8），依歷史分數密度圖目視判斷加上 rule-of-thumb 頻寬估算，未做交叉驗證"
+      checks:
+        - "McCrary density test：cutoff 附近分數密度無明顯跳躍，未偵測到操縱證據（p=0.38）"
+        - "安慰劑 cutoff 檢定：於樣本中位數另設安慰劑 cutoff，未觀察到不連續（估計效果 ≈ 0，p=0.71）"
+        - "共變量平衡檢查：cutoff 附近的性別、家庭收入、先前成績等前決定共變量皆無顯著跳躍"
+      analysis_summary: "局部線性迴歸估計 cutoff 附近入學率跳躍約 12 個百分點（p=0.03）。分析方法與結果為研究團隊回報，本紀錄未重新執行迴歸估計"
+      provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-REGRESSIONDISCONTINUITYRECORD-1"
+    question: >
+      checks[] entry-to-entry distinctness is a runtime-only invariant, not
+      schema-expressible via plain JSON Schema uniqueItems -- same class of
+      disclosed gap rct-record.schema.yaml's own treatment_group!=
+      control_group check documents for a pair instead of a list.
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F11 table row (L623) directly. Cross-checked against
+    methods/contracts/causal.regression_discontinuity.contract.yaml's own
+    outputs/preconditions/quality. Read rct-record.schema.yaml in full as
+    shape precedent before writing this file. Validated against jsonschema
+    Draft202012Validator (required fields present, id pattern satisfied,
+    additionalProperties:false present from the start).
+  note: >
+    running_variable/cutoff_value/bandwidth/checks/analysis_summary field
+    names are this contract's own naming (Atlas itself does not name these
+    4 pipeline stages with formal field labels, only lists them as a
+    slash-arrow chain); the flat-record shape, the typed-number treatment
+    of cutoff_value, the required-array-with-distinctness treatment of
+    checks, and analysis_summary's OPTIONAL (not required) status are
+    compilation decisions, disclosed above. No mother document was
+    modified to produce this file.

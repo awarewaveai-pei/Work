@@ -195,7 +195,14 @@ interface ScriptRemotionPrefill {
   customScenes?: number;
 }
 
-export default function VideoStudio({ initial, remotionInitial }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill } = {}) {
+interface VideoStudioEmbedded {
+  /** 鎖定顯示單一內層 tab、隱藏自己的 tab bar chrome——供 VideoPipeline 當「④ 生成或選取素材」步驟內容嵌入。 */
+  lockTab: StudioTabId;
+  /** 該次生成完成（草稿渲染完成）時通知外層 wizard，讓它可以自動前進到下一步。 */
+  onRenderComplete?: () => void;
+}
+
+export default function VideoStudio({ initial, remotionInitial, embedded }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill; embedded?: VideoStudioEmbedded } = {}) {
   // ── Config knobs ──
   const [customScenes] = useState(initial?.customScenes ?? 3);
   const [imageModel, setImageModel] = useState(() => {
@@ -271,12 +278,17 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
-  const [studioTab, setStudioTab] = useState<"generate" | "remotion" | "footage" | "release" | "timeline" | "history" | "operations">(remotionInitial ? "remotion" : "generate");
+  const [studioTab, setStudioTab] = useState<StudioTabId>(embedded?.lockTab ?? (remotionInitial ? "remotion" : "generate"));
   // 說明&成本已從步驟移出（2026-09-10 IA 修正：獨立可及，不佔生產流程），改用彈窗，跟 studioTab 分開追蹤。
   const [infoOpen, setInfoOpen] = useState(false);
 
-  // Auto-switch to Remotion tab when a script prefill arrives from ScriptForge
-  useEffect(() => { if (remotionInitial) setStudioTab("remotion"); }, [remotionInitial]);
+  // Auto-switch to Remotion tab when a script prefill arrives from ScriptForge (standalone use only —
+  // embedded/wizard use pins the tab via embedded.lockTab, which owns tab selection instead).
+  useEffect(() => { if (remotionInitial && !embedded) setStudioTab("remotion"); }, [remotionInitial, embedded]);
+  // wizard 嵌入時，外層 step 切換到別的模式可能重掛載同一個 VideoStudio 實例；lockTab 改變時同步跟上。
+  useEffect(() => { if (embedded?.lockTab) setStudioTab(embedded.lockTab); }, [embedded?.lockTab]);
+  // 草稿渲染完成通知 wizard，讓它能自動前進到下一步（Timeline 背景驗證）。
+  useEffect(() => { if (embedded?.onRenderComplete && genStatus === "done") embedded.onRenderComplete(); }, [genStatus, embedded]);
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRenderingRef = useRef(false);
@@ -611,7 +623,8 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh" }}>
 
       {/* ── Inner tab bar：三段式（製作／審片與交付／營運）+ 常駐成本說明入口 ── */}
-      <div style={{
+      {/* embedded（VideoPipeline wizard 內嵌）= 外層 stepper 已經在扮演這個角色，這裡不重複顯示 tab bar。 */}
+      {!embedded && <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
         padding: "10px 28px 0",
         background: "var(--bg-canvas)", borderBottom: "1px solid var(--border-subtle)",
@@ -643,7 +656,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
           style={{ marginBottom: 8, padding: "6px 12px", borderRadius: 999, border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
           💰 說明 & 成本
         </button>
-      </div>
+      </div>}
 
       {/* ── Generate tab ── */}
       {studioTab === "generate" && (
@@ -1861,10 +1874,11 @@ function RemotionStudio({ scriptPrefill }: { scriptPrefill?: ScriptRemotionPrefi
     const poll = async (): Promise<void> => {
       if (Date.now() > deadline) { setStatus("error"); setError("渲染逾時（>15 分鐘）"); return; }
       try {
-        const r = await fetch(`/api/video/remotion-status?jobId=${encodeURIComponent(jobId)}`);
-        const j = (await r.json()) as { ok: boolean; status?: string; url?: string; error?: string };
+        const r = await fetch(`/api/video/remotion-job-status?jobId=${encodeURIComponent(jobId)}`);
+        const j = (await r.json()) as { ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string };
         if (!j.ok || j.status === "error") { setStatus("error"); setError(j.error ?? "渲染失敗"); return; }
-        if (j.status === "done" && j.url) { setStatus("done"); setResultUrl(j.url); return; }
+        const outputUrl = j.video?.outputs?.remotion;
+        if (j.status === "done" && outputUrl) { setStatus("done"); setResultUrl(outputUrl); return; }
         pollRef.current = setTimeout(() => void poll(), 5000);
       } catch {
         pollRef.current = setTimeout(() => void poll(), 5000);

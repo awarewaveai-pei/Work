@@ -13,6 +13,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { createHash } from "node:crypto";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 // 本 route 在 handler 內 Buffer.from(arrayBuffer) + 透過 r2.ts 用 node:crypto → 必須 nodejs runtime（與其餘 78 個 Buffer/上傳 route 一致；防 edge 預設翻轉的地雷）。
 export const runtime = "nodejs";
@@ -114,6 +117,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch {
       /* best-effort */
     }
+  }
+
+  // FootageEditor supplies an organization ID to make the uploaded source a
+  // durable tenant-owned media_assets row. Legacy callers omit it and retain
+  // the original temporary-upload response.
+  const organizationId = typeof form.get("organizationId") === "string" ? String(form.get("organizationId")).trim() : "";
+  if (organizationId) {
+    try { assertOrgAccess(req, organizationId); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
+    const db = getSupabaseWriteClient();
+    if (!db) return NextResponse.json({ ok: false, error: "asset persistence unavailable" }, { status: 503 });
+    const asset = await db.from("media_assets").insert({
+      organization_id: organizationId,
+      storage_backend: "r2",
+      asset_domain: "real_footage",
+      object_key: key,
+      object_url: put.publicUrl,
+      mime_type: mime,
+      byte_size: buf.byteLength,
+      checksum_sha256: createHash("sha256").update(buf).digest("hex"),
+      metadata: { source: "footage_editor", original_name: file.name },
+    }).select("id, checksum_sha256").single();
+    if (asset.error || !asset.data) {
+      try { const { deleteDesignObject } = await import("@/lib/storage/r2"); await deleteDesignObject(key); } catch { /* best effort cleanup */ }
+      return NextResponse.json({ ok: false, error: "asset registration failed" }, { status: 502 });
+    }
+    return NextResponse.json({ ok: true, imageUrl: put.publicUrl, r2Key: key, kind: isVideo ? "video" : "image", assetId: asset.data.id, checksumSha256: asset.data.checksum_sha256 });
   }
 
   return NextResponse.json({ ok: true, imageUrl: put.publicUrl, r2Key: key, kind: isVideo ? "video" : "image" });

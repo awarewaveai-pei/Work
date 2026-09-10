@@ -19,6 +19,10 @@ export type RenderOutputMeta = Record<string, {
   height: number;
   expected_width?: number;
   expected_height?: number;
+  byteSize?: number;
+  checksumSha256?: string;
+  technical_qa?: Record<string, unknown>;
+  signal_qa?: Record<string, unknown>;
 }>;
 
 export interface VideoServiceCapability {
@@ -26,6 +30,7 @@ export interface VideoServiceCapability {
   format_assets: boolean;
   output_dimensions: boolean;
   openai_tts?: boolean;
+  footage_timeline?: boolean;
   formats: string[];
 }
 

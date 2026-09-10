@@ -166,10 +166,13 @@ export async function recordVideoAsset(params: {
    * directory name as the title and 0 scenes forever.
    */
   authoritative?: boolean;
-}): Promise<void> {
+}): Promise<{ id: string; checksumSha256?: string } | null> {
   const supabase = getSupabaseWriteClient();
-  if (!supabase) return;
+  if (!supabase) return null;
   const objectKey = videoObjectKey(params.primaryUrl);
+  const primaryFormat = Object.entries(params.outputs).find(([, url]) => url === params.primaryUrl)?.[0];
+  const primaryMeta = primaryFormat ? params.outputMeta?.[primaryFormat] : undefined;
+  const checksumSha256 = primaryMeta?.checksumSha256;
   // Upsert arbiter = uq_media_assets_org_backend_key_version (migrations 0011/0038,
   // already live on EU prod). /status poll and reconcile cron can race on the same
   // finished job; conflicting on the full composite makes the second write a no-op.
@@ -199,7 +202,8 @@ export async function recordVideoAsset(params: {
       object_key: objectKey,
       object_url: params.primaryUrl,
       mime_type: "video/mp4",
-      byte_size: 0,
+      byte_size: primaryMeta?.byteSize ?? 0,
+      ...(checksumSha256 ? { checksum_sha256: checksumSha256 } : {}),
       is_current: true,
       metadata: {
         title: params.title,
@@ -222,7 +226,23 @@ export async function recordVideoAsset(params: {
       ignoreDuplicates: !params.authoritative,
     },
   );
-  if (error) console.warn("[video-pipeline] media_assets upsert failed (best-effort):", error.message);
+  if (error) {
+    console.warn("[video-pipeline] media_assets upsert failed (best-effort):", error.message);
+    return null;
+  }
+  const row = await supabase
+    .from("media_assets")
+    .select("id, checksum_sha256")
+    .eq("organization_id", params.organizationId)
+    .eq("storage_backend", "r2")
+    .eq("object_key", objectKey)
+    .eq("version", 1)
+    .maybeSingle();
+  if (row.error || !row.data) {
+    if (row.error) console.warn("[video-pipeline] media_assets lookup failed (best-effort):", row.error.message);
+    return null;
+  }
+  return { id: String(row.data.id), checksumSha256: row.data.checksum_sha256 ? String(row.data.checksum_sha256) : undefined };
 }
 
 /** 刪除本輪上傳的 Flux 暫存物件（render 消費完後清，防 R2 累積）。永不拋。 */

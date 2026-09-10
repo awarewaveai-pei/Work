@@ -18,9 +18,9 @@ const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px s
 const input: React.CSSProperties = { border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "7px 8px", background: "var(--bg-subtle)", color: "var(--text-primary)", fontSize: 12 };
 
 /** First-class real-footage editing surface. Uploads are isolated to the existing R2 asset route. */
-export default function FootageEditor() {
+export default function FootageEditor({ initialOrganizationId, onRenderComplete }: { initialOrganizationId?: string; onRenderComplete?: (jobId: string) => void } = {}) {
   const [clips, setClips] = useState<Clip[]>([]);
-  const [organizationId, setOrganizationId] = useState("");
+  const [organizationId, setOrganizationId] = useState(initialOrganizationId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -82,6 +82,7 @@ export default function FootageEditor() {
       const json = await res.json() as { ok: boolean; jobId?: string; error?: string };
       if (!res.ok || !json.ok || !json.jobId) throw new Error(json.error ?? "實拍渲染提交失敗");
       setRenderJobId(json.jobId);
+      onRenderComplete?.(json.jobId);
     } catch (e) { setError(e instanceof Error ? e.message : "實拍渲染提交失敗"); }
     finally { setBusy(false); }
   }

@@ -7,9 +7,9 @@ const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", pad
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, display: "grid", gap: 9 };
 
 /** Explicit Release gate and delivery receipts. No destination call happens before approval. */
-export default function ReleaseDeliveryPanel() {
-  const [organizationId, setOrganizationId] = useState("");
-  const [candidateAssetId, setCandidateAssetId] = useState("");
+export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCandidateAssetId, onReleaseCreated }: { initialOrganizationId?: string; initialCandidateAssetId?: string; onReleaseCreated?: (releaseId: string) => void } = {}) {
+  const [organizationId, setOrganizationId] = useState(initialOrganizationId ?? "");
+  const [candidateAssetId, setCandidateAssetId] = useState(initialCandidateAssetId ?? "");
   const [candidateChecksum, setCandidateChecksum] = useState("");
   const [releaseId, setReleaseId] = useState("");
   const [videoUrls, setVideoUrls] = useState('{"16x9":""}');
@@ -36,6 +36,14 @@ export default function ReleaseDeliveryPanel() {
       .finally(() => { if (!cancelled) setLoadingPickers(false); });
     return () => { cancelled = true; };
   }, [organizationId]);
+
+  // wizard 帶入的候選素材：等清單真的載入、確認該 id 存在後才觸發選取（跑 QA 抓取），避免對還不存在的 id 送請求。
+  useEffect(() => {
+    if (initialCandidateAssetId && assets.some((a) => a.id === initialCandidateAssetId) && candidateAssetId === initialCandidateAssetId && !candidateChecksum) {
+      void chooseAsset(initialCandidateAssetId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets]);
 
   async function chooseAsset(assetId: string) {
     setCandidateAssetId(assetId);
@@ -74,7 +82,7 @@ export default function ReleaseDeliveryPanel() {
   async function createRelease() {
     const result = await call("/api/video/release", { organizationId: organizationId.trim(), candidateAssetId: candidateAssetId.trim(), candidateChecksum: candidateChecksum.trim() });
     const release = result?.release as Record<string, unknown> | undefined;
-    if (typeof release?.id === "string") setReleaseId(release.id);
+    if (typeof release?.id === "string") { setReleaseId(release.id); onReleaseCreated?.(release.id); }
   }
   async function publishSocial() {
     let parsedPlatforms: unknown, parsedVideoUrls: unknown;

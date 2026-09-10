@@ -1,0 +1,143 @@
+$id: "ai-lego://methods/contracts/causal.difference_in_differences.contract.yaml"
+title: "Difference-in-Differences Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, `causal` family (F11), 7th member (after dag/
+  counterfactual_reasoning/theory_of_change/logic_model/process_tracing/
+  rct). Atlas F11 row L622 ONLY -- grep-confirmed, no dedicated §11.x/§12.x
+  section, no §22.3 gate row. Atlas's own 3-stage pipeline: "treated/
+  control→pre/post→parallel trends". Scope boundary (see
+  `ai_lego/modules/causal/difference_in_differences.py` docstring):
+  captures STUDY DESIGN only -- no regression or real parallel-trends test
+  runs, same restraint `causal.rct` establishes. Core invariants:
+  treated_group/control_group and pre_period/post_period are each present
+  AND genuinely distinct pairs; the parallel-trends assumption is a
+  required, non-empty disclosed justification.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Difference-in-Differences row (L622): '處置前後 × 對照組｜treated/control→pre/post→parallel trends｜自然實驗常用' -- the ONLY Atlas citation for this method"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md whole-file grep for 'Difference-in-Differences'/'parallel trends'/'DiD' (this session, 2026-09-10) -- confirmed exactly 1 hit (L622, this row), no dedicated §11.x/§12.x section, no §22.3 gate-table row"
+  - "methods/contracts/causal.rct.contract.yaml -- prior F11 member, same family conventions (id grammar, two-layer invariant discipline, disclosure-only field treatment) reused here"
+  - "methods/contracts/framing.how_might_we.contract.yaml -- flat-record-from-thin-citation precedent, reused via causal.rct as this file's own structural template"
+  - "methods/registry/method-inventory.yaml 'Difference-in-Differences' entry (F11) -- carried no machine_id/contract before this file"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L622's own
+  3-step pipeline into 6 required disclosure fields (treated/control and
+  pre/post each split into 2 named arms/periods), plus disclosed
+  structurally-necessary preconditions -- same standard every Tier 1
+  contract in this directory applies. `id: causal.difference_in_differences`
+  mints a NEW machine_id; `family: causal` reused as the 7th F11 member.
+
+id: causal.difference_in_differences
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [GROUP, COMPARE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method, same absence class causal.rct's own inference already
+# discloses). One primitive per Atlas L622's own 3 pipeline verbs,
+# literally: treated/control = GROUP (split units into treated/control
+# arms); pre/post = COMPARE (the before/after comparison this design's own
+# "difference" half performs, for each group); parallel trends = VALIDATE
+# (checking/asserting the identifying assumption the whole design rests
+# on). CAUSE deliberately NOT added on top of these 3 (contrast causal.rct,
+# whose own citation had a 4th separate "treatment/control" pipeline verb
+# distinct from "randomize" that warranted its own CAUSE primitive) --
+# Atlas L622's pipeline has only 3 verbs total, and forcing a 4th primitive
+# with no citation to anchor it would be exactly the kind of fabrication
+# this task was told to avoid.
+
+purpose:
+  - estimate_a_causal_effect_via_pre_post_comparison_between_treated_and_control_groups
+# Atlas L622 verbatim sense: "處置前後 × 對照組" (treatment pre/post crossed
+# with a control group).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own citation for this
+  # method is a single table row with no legal-chain placement (contrast
+  # causal.dag's own §14.1-cited position downstream of a
+  # CauseHypothesisSet); same "no hard upstream dependency" position
+  # causal.rct's own inputs.required: [] already takes for an analogous
+  # standalone method.
+
+outputs:
+  - DifferenceInDifferencesRecord
+# NEW output type (see typed-objects/difference-in-differences-record.schema.yaml).
+# Atlas names no PascalCase output type for this method, same honesty gap
+# every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "treated_group, control_group, pre_period, post_period, parallel_trends_justification, and analysis_summary are all present, non-empty strings -- Atlas L622's own 3-stage pipeline (treated/control, pre/post, parallel trends), transcribed as 6 required disclosure fields since 'treated/control' and 'pre/post' each name 2 distinct arms/periods"
+  - "treated_group and control_group are genuinely distinct (case/whitespace-insensitive, NFKC-normalized) -- a record naming an identical treated and control arm has not identified 2 groups to compare"
+  - "pre_period and post_period are genuinely distinct (same normalization) -- a record naming an identical pre and post period cannot express a before/after difference, the 'difference' half of difference-in-differences itself"
+  # NEW, structurally necessary -- Atlas's own table row names the 3
+  # pipeline stages but gives no field-level precondition text (same class
+  # causal.rct's own preconditions already establish for a sibling
+  # method). Both distinctness preconditions are this method's own name
+  # asserting a structural property, the same "the method's own name IS
+  # the claim" discipline causal.dag's/causal.rct's own preconditions
+  # already established for different structural guarantees.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class causal.rct.contract.yaml's own quality block already
+  # establishes: the real risk here is an incomplete/echoing study-design
+  # record, not a missing per-claim evidence citation -- enforced by this
+  # method's own 3 real invariants instead (both below and in
+  # preconditions).
+
+forbidden_transition: []
+# Atlas F11's Difference-in-Differences row is this method's ONLY citation
+# (grep-confirmed, no dedicated section, no §22.3 Method-specific Gate
+# table row). Same empty-and-disclosed choice causal.rct.contract.yaml's
+# own field applies.
+
+recommended_next: []
+# No specific next machine_id cited at L622 (contrast causal.dag's own
+# §14.1-cited chain into a Validation step). Same empty-and-disclosed
+# choice causal.rct.contract.yaml's own field applies.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should parallel_trends_justification be optional or required?"
+    decision: "Required, non-empty -- Atlas's own pipeline names parallel trends as an explicit, unconditional stage, and it is Difference-in-Differences' own defining identifying assumption. Same required-not-optional treatment causal.rct's own power_analysis field already establishes for an analogous defining-assumption gap."
+  - question: "treated_group/control_group and pre_period/post_period as combined fields (Atlas's own citation uses slash-joined phrases) or separate fields?"
+    decision: "4 separate required fields (2 per pair) -- a single field per pair could not express either distinctness invariant this method's own name demands; same thin-citation flat-record precedent causal.rct.contract.yaml's own treatment_group/control_group split already establishes."
+  - question: "Does this method perform genuine statistical computation (DiD regression, parallel-trends significance test, effect-size arithmetic)?"
+    decision: "No -- explicitly out of scope (task-mandated scope boundary, see module docstring). All 6 content fields are DISCLOSURE-ONLY (presence/distinctness enforced, methodology/correctness not), same class causal.rct.contract.yaml's own analysis_summary already establishes. `analysis_summary` captures REPORTED findings/approach, with provenance on the record's own top-level `provenance` field -- it is not itself computed by this record."
+  - question: "Should cognitive_primitives include CAUSE (family is `causal`)?"
+    decision: "No -- CAUSE was included in causal.rct because that method's own citation had a distinct 'treatment/control' pipeline verb beyond 'randomize'. This method's citation has exactly 3 verbs (treated/control, pre/post, parallel trends), each already mapped 1:1 to GROUP/COMPARE/VALIDATE; adding a 4th primitive with no citation to anchor it would be fabrication, not inference."
+
+open_questions:
+  - "OQ-DID-1: cognitive_primitives [GROUP, COMPARE, VALIDATE] is this file's own inference (one primitive per Atlas's own 3 pipeline verbs), not a cited Atlas composition formula（owner: operator, or whoever adds a dedicated Atlas §4 formula for this method）"
+  - "OQ-DID-2: forbidden_transition/recommended_next are both left empty -- Atlas's F11 row is this method's only citation, no legal-chain position given, unlike causal.dag's own §14.1-cited chain（owner: operator, or a future review pass）"
+  - "OQ-DID-3: treated_group/control_group/pre_period/post_period are flat strings, not structured objects (e.g. unit count, exact date ranges, panel-data identifiers) -- revisit if a future consumer needs to parse arm/period detail programmatically（owner: operator, or whoever next needs structured fields）"
+
+verification:
+  method: >
+    Read the whole Atlas F11 table (L612-625) directly, then grepped the
+    whole document case-insensitively for "Difference-in-Differences"/
+    "parallel trends"/"DiD" -- confirmed exactly 1 hit (L622, this row), no
+    dedicated §11.x/§12.x section, no §22.3 gate-table row. Grepped the
+    whole `ai_lego` tree and this docs tree case-insensitively for
+    "difference_in_differences"/"difference-in-differences" before writing
+    any of this method's own files -- zero pre-existing implementation.
+    Read causal.rct.contract.yaml, causal.rct.py, and rct-record.schema.yaml
+    in full before writing this contract, reusing their established
+    conventions rather than inventing new ones. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L622's own 3-step formula is
+    transcribed verbatim into `purpose`/`preconditions`. The 6-field flat
+    record shape, the required (not optional) `parallel_trends_justification`
+    field, and the disclosure-only (not genuine-compute) treatment of
+    `analysis_summary` are Phase 3 compilation choices, explicitly flagged
+    above in `compilation_decisions`, not presented as Atlas-cited.

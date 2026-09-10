@@ -1,0 +1,183 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/instrumental-variables-record.schema.yaml"
+title: Instrumental Variables Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `InstrumentalVariablesRecord` --
+  the declared `outputs` of `causal.instrumental_variables`'s Method
+  Contract (methods/contracts/causal.instrumental_variables.contract.yaml,
+  `outputs: [InstrumentalVariablesRecord]`). Atlas F11 table row L624 gives
+  this method a single 3-step pipeline ("instrument→relevance/exclusion→
+  2SLS") and no field-level sub-structure -- modeled as a FLAT record of 5
+  plain-string content fields, same shape class `rct-record.schema.yaml`
+  uses for a similarly thin citation.
+
+  Field provenance -- Atlas F11 L624:
+    * `instrument` -- the "instrument" stage: the variable identified as
+      the instrument, a narrative description, NOT a validated statistical
+      instrument this schema/record itself checks.
+    * `endogenous_variable` -- the endogenous regressor the instrument
+      targets. NOT named in Atlas's own single-word "instrument" citation;
+      added so the distinctness invariant (see compilation_decisions) is
+      expressible at all.
+    * `relevance_justification`/`exclusion_justification` -- the
+      "relevance/exclusion" stage, split into 2 named fields (Atlas's own
+      citation covers both with one slash-joined word). REQUIRED, not
+      optional -- see compilation_decisions.
+    * `analysis_summary` -- the "2SLS" stage: REPORTED analytical
+      approach/findings, not computed by this record (see
+      compilation_decisions and the method contract's own scope-boundary
+      note).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Instrumental Variables row (L624) -- the ONLY Atlas citation for this method (grep-confirmed, see method contract's own verification section)"
+  - "methods/contracts/causal.instrumental_variables.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- disclosure-only field precedent (presence/distinctness enforced, methodology not) and flat-record-from-thin-citation shape precedent, both reused here"
+  - "specs/cognitive/typed-objects/how-might-we-record.schema.yaml -- flat-record-from-thin-citation shape precedent reused here"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: direct transcription of a
+  cited Atlas worked pipeline plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Should relevance_justification/exclusion_justification be OPTIONAL fields (present only when a real validity argument exists)?"
+    decision: "No -- both REQUIRED, minLength:1. Atlas L624's own citation names relevance and exclusion as 2 distinct validity conditions; a design disclosing one but not the other has not actually established IV validity, same 'declared gap needs an explicit justification' discipline rct-record.schema.yaml's own power_analysis field already establishes for a different kind of required disclosure. See method contract's own compilation_decisions for the full reasoning."
+  - question: "Should instrument/endogenous_variable be one combined field (Atlas's own citation uses the single word 'instrument') or 2 separate fields?"
+    decision: "2 separate required fields -- a single field could not express the distinctness invariant this method's own definition demands (an instrument, by definition, is not the endogenous variable it instruments for); JSON Schema has no operator to assert 'a substring differs from another substring of the same field'."
+  - question: "Should instrument != endogenous_variable be expressed as a JSON Schema constraint?"
+    decision: "No -- cross-field, case/whitespace-insensitive text comparison has no native JSON Schema 'not equal to a sibling, normalized' operator, same limitation rct-record.schema.yaml's own treatment_group/control_group echo check accepted. Enforced at the runtime layer (ai_lego/modules/causal/instrumental_variables.py), at construction AND independently re-derived by a gate."
+  - question: "Should analysis_summary carry its own genuine-compute fields (first_stage_f_statistic, second_stage_coefficient, engine, computation_provenance_ref), the way causal-dag-analysis.schema.yaml's acyclic_verified does?"
+    decision: "No -- this record performs no genuine computation (no real 2SLS regression run). Omitting engine/computation_provenance_ref entirely (not present as false/null) is itself the honest disclosure that nothing here is GENUINE_COMPUTE, same omission-as-disclosure convention rct-record.schema.yaml's own schema (no engine field either) already uses."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- same baseline hygiene every sibling record schema in this directory converges on (prevents a caller from smuggling an unreviewed field onto the record). This exact omission bug was caught by critic hand-tamper PoC in 2 sibling schemas this same session (logic-model-record.schema.yaml/process-tracing-record.schema.yaml, both missing it at the top level) -- deliberately present here from the start."
+
+type: object
+required: [id, version, instrument, endogenous_variable, relevance_justification, exclusion_justification, analysis_summary, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^IV-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.instrumental_variables"
+
+  instrument:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L624's own "instrument" stage -- the variable identified as the
+      instrument (e.g. a source of exogenous variation in the endogenous
+      regressor). NOT a validated statistical instrument this record itself
+      checks -- see the method contract's own scope-boundary note. Must
+      genuinely differ from endogenous_variable (runtime-layer invariant,
+      see top-level description) -- an instrument identical to the
+      endogenous variable it targets is a degenerate, nonsensical design.
+
+  endogenous_variable:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The endogenous regressor `instrument` is meant to instrument for --
+      not itself a separately-named word in Atlas L624's own citation
+      (which covers both with "instrument"), added so the distinctness
+      invariant is expressible (see compilation_decisions). Must genuinely
+      differ from instrument.
+
+  relevance_justification:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L624's own "relevance" half of the "relevance/exclusion" stage
+      -- the disclosed argument that `instrument` correlates with
+      `endogenous_variable` (correlation strength). REQUIRED (see
+      compilation_decisions): a design with no disclosed relevance argument
+      has not established this validity condition.
+
+  exclusion_justification:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L624's own "exclusion" half of the "relevance/exclusion" stage
+      -- the disclosed argument that `instrument` affects the outcome ONLY
+      through `endogenous_variable` (no direct effect). REQUIRED (see
+      compilation_decisions): a design with no disclosed exclusion argument
+      has not established this validity condition, independently of
+      whether relevance_justification is present.
+
+  analysis_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L624's own "2SLS" stage -- the stated analytical approach
+      and/or findings, as REPORTED content (see method contract's own
+      scope-boundary note: this record captures what the study's own
+      2SLS analysis claims, it does not itself run a regression).
+      Provenance for this claim is the record's own top-level `provenance`
+      field.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern
+      every sibling typed-object schema in this directory uses. No
+      `const`: epistemic_type legitimately varies by whether this record
+      documents a planned design (e.g. ASSUMPTION/HYPOTHESIS, not yet run)
+      or a completed, reported study (e.g. EVIDENCE/SOURCE_FACT).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed IV study estimating the effect of education on earnings using compulsory-schooling-age instrument"
+    value:
+      id: "IV-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.instrumental_variables"
+      instrument: "個人出生季別所隱含的義務教育最低就學年限差異（quarter-of-birth compulsory schooling instrument）"
+      endogenous_variable: "個人完成之教育年數（years of completed schooling）"
+      relevance_justification: "第一階段迴歸中出生季別對教育年數的係數統計顯著（F 統計量 > 10），顯示出生季別確實與教育年數相關，滿足 relevance 條件"
+      exclusion_justification: "出生季別除透過義務教育年限影響教育年數外，無其他管道直接影響成年後薪資（已控制出生年度與地區固定效果），滿足 exclusion 條件"
+      analysis_summary: "2SLS 估計顯示教育年數每增加一年，薪資提高約 7.5%（標準誤 1.2%）。分析方法與結果為研究團隊回報，本紀錄未重新執行迴歸估計"
+      provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-IVRECORD-1"
+    question: >
+      instrument != endogenous_variable is a runtime-only invariant, not
+      schema-expressible -- same class of disclosed gap
+      rct-record.schema.yaml's own treatment_group!=control_group check
+      documents.
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F11 table row (L624) directly. Cross-checked against
+    methods/contracts/causal.instrumental_variables.contract.yaml's own
+    outputs/preconditions/quality. Read rct-record.schema.yaml and
+    how-might-we-record.schema.yaml in full as shape precedent before
+    writing this file. Validated against jsonschema Draft202012Validator
+    (required fields present, id pattern satisfied,
+    additionalProperties:false present from the start).
+  note: >
+    instrument/endogenous_variable/relevance_justification/
+    exclusion_justification/analysis_summary field names are this
+    contract's own naming (Atlas itself does not name these pipeline
+    stages with formal field labels, only lists them as a slash-arrow
+    chain); the flat-record shape, the endogenous_variable/instrument
+    split, and both justification fields' REQUIRED status are compilation
+    decisions, disclosed above. No mother document was modified to produce
+    this file.

@@ -1,0 +1,157 @@
+$id: "ai-lego://methods/contracts/causal.synthetic_control.contract.yaml"
+title: "Synthetic Control Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 entry, `causal` family (F11), 10th and FINAL member (after `causal.dag`,
+  `causal.counterfactual_reasoning`, `causal.theory_of_change`, `causal.logic_model`,
+  `causal.process_tracing`, `causal.rct`, plus 3 concurrent siblings
+  `causal.difference_in_differences`/`causal.regression_discontinuity`/
+  `causal.instrumental_variables` -- F11 is 10/10 once this batch of 4 lands). Atlas
+  F11 table row L625 ONLY -- grep-confirmed the whole Atlas document has exactly 1 hit
+  for "Synthetic Control"/"donor pool"/"placebo" combined (this row itself), no
+  dedicated §11.x/§12.x section, no §22.3 gate-table row. Atlas's own 5-step pipeline
+  (the LONGEST in F11): "donor pool→fit→weights→post gap→placebo". Scope boundary
+  (task-mandated, see `ai_lego/modules/causal/synthetic_control.py` module docstring):
+  this method captures the DESIGN of a synthetic-control study, it does not run donor
+  selection, weight optimization, or any real econometric fit. Core invariants: a
+  donor pool of at least 2 units (a single donor cannot produce a WEIGHTED
+  counterfactual, Atlas's own "建立加權反事實"); `treated_unit` must not itself appear
+  in `donor_pool`; every disclosed weight must reference a unit actually present in
+  `donor_pool`; at least one placebo test must be disclosed (Atlas's own explicit
+  final pipeline stage).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Synthetic Control row (L625): '建立加權反事實｜donor pool→fit→weights→post gap→placebo｜單一大型政策事件適用' -- the ONLY Atlas citation for this method"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md whole-file grep for 'Synthetic Control'/'donor pool'/'placebo' (this session, 2026-09-10) -- confirmed exactly 1 combined hit (L625, this row), no dedicated §11.x/§12.x section, no §22.3 gate-table row"
+  - "methods/contracts/causal.rct.contract.yaml -- 6th F11 member, same family conventions (id grammar, two-layer invariant discipline, disclosure-only content fields) reused here"
+  - "methods/contracts/causal.dag.contract.yaml + ai_lego/modules/causal/dag.py -- cross-collection referential-integrity pattern (edges must reference real node ids) reused, scaled down, for weights[].donor -> donor_pool membership"
+  - "specs/cognitive/primitive.schema.yaml -- WEIGHT extension token (L123, AHP formula 'COMPARE + WEIGHT + PRIORITIZE + DECIDE') reused verbatim for this method's own 'weights' pipeline stage, not a fabricated new token"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L625's own 5-step
+  pipeline into 6 required disclosure fields (treated_unit made explicit as the
+  implicit subject donor_pool/fit/weights/post-gap all presuppose), plus disclosed
+  structurally-necessary preconditions -- same standard every Tier 1 contract in this
+  directory applies. `id: causal.synthetic_control` mints a NEW machine_id; `family:
+  causal` reused as the 10th and final F11 member.
+
+id: causal.synthetic_control
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [GROUP, ESTIMATE, WEIGHT, COMPARE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this method, same
+# absence class causal.dag's/causal.rct's own inference already discloses). One
+# primitive per Atlas L625's own 5 pipeline verbs, literally: donor pool = GROUP
+# (assembling candidate untreated units, matching GROUP's own kernel definition as
+# bottom-up clustering); fit = ESTIMATE (assessing pre-treatment match quality);
+# weights = WEIGHT (specs/cognitive/primitive.schema.yaml's own extension token,
+# reused verbatim -- not invented here, already precedented by AHP's "COMPARE +
+# WEIGHT + PRIORITIZE + DECIDE", L123); post gap = COMPARE (the constructed
+# counterfactual against actual post-treatment outcome); placebo = VALIDATE
+# (checking the inference against placebo runs). DECIDE deliberately excluded --
+# this record documents a study design, it does not itself render a decision.
+
+purpose:
+  - construct_a_weighted_counterfactual_from_a_donor_pool_for_a_single_large_policy_event
+# Atlas L625 verbatim sense: "建立加權反事實" (construct a weighted counterfactual),
+# benefit column: "單一大型政策事件適用" (suited to a single large policy event).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own citation for this method is a
+  # single table row with no legal-chain placement (contrast causal.dag's own
+  # §11.21-cited position downstream of a CauseHypothesisSet); same "no hard
+  # upstream dependency" position causal.rct's/association.morphological_analysis's
+  # own inputs.required: [] already take for an analogous standalone method.
+
+outputs:
+  - SyntheticControlRecord
+# NEW output type (see typed-objects/synthetic-control-record.schema.yaml). Atlas
+# names no PascalCase output type for this method, same honesty gap every other
+# Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "treated_unit, fit_quality, and post_treatment_gap are all present, non-empty strings; donor_pool, weights, and placebo_tests are all present, non-empty lists -- Atlas L625's own 5-stage pipeline (donor pool/fit/weights/post gap/placebo), transcribed as 6 required disclosure fields since 'donor pool' is a list of candidate units, not a single value"
+  - "donor_pool contains at least 2 distinct units -- a synthetic control is BY DEFINITION a WEIGHTED COMBINATION (Atlas L625's own '建立加權反事實'); a pool of 0 or 1 unit cannot produce a weighted combination at all"
+  - "treated_unit is not itself a member of donor_pool (case/whitespace-insensitive, NFKC-normalized) -- the treated unit, by the method's own vocabulary, is not a donor"
+  - "every weights[].donor references a unit actually present in donor_pool (same normalization) -- weights are an allocation OVER the donor pool, Atlas's own pipeline places 'weights' directly after 'donor pool'/'fit'"
+  - "placebo_tests contains at least 1 disclosed check -- Atlas L625's own explicit FINAL pipeline stage; a design disclosing zero placebo checks has not validated its own inference"
+  # NEW, structurally necessary -- Atlas's own table row names the 5 pipeline
+  # stages but gives no field-level precondition text (same class causal.dag's/
+  # causal.rct's own preconditions already establish for sibling methods). The
+  # donor-pool-size and treated-unit/weights referential-integrity preconditions
+  # are this method's own name and pipeline ordering asserting structural
+  # properties, the same "the method's own name/ordering IS the claim" discipline
+  # causal.dag's acyclicity precondition and causal.rct's distinctness precondition
+  # both already established for different structural guarantees.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision.weighted_decision_matrix.contract.yaml's/causal.rct's own
+  # quality block already establishes: the real risk here is an incomplete or
+  # internally-contradictory (donor pool too small, treated unit doubling as its own
+  # donor, orphaned weights) study-design record, not a missing per-claim evidence
+  # citation -- enforced by this method's own 4 real invariants instead (below and
+  # in preconditions).
+
+forbidden_transition: []
+# Atlas F11's Synthetic Control row is this method's ONLY citation (grep-confirmed,
+# no dedicated section, no §22.3 Method-specific Gate table row). Same
+# empty-and-disclosed choice causal.rct.contract.yaml's own field applies.
+
+recommended_next: []
+# No specific next machine_id cited at L625 (contrast causal.dag's own §14.1-cited
+# chain into a Validation step). Same empty-and-disclosed choice causal.rct's/
+# decision.mcda's own field applies.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should donor_pool's minItems be 1 (any non-empty pool) or 2+?"
+    decision: "2 -- a synthetic control is BY DEFINITION a weighted COMBINATION of donor units (Atlas L625's own '建立加權反事實'). A pool of exactly 1 donor degenerates into a single comparison unit with a trivial 100% weight, which is not a constructed/blended counterfactual at all. Grounded directly in this method's own citation and name, not an arbitrary threshold."
+  - question: "Should weights be a flat disclosure string (matching causal.rct's analysis_summary pattern) or structured per-donor entries?"
+    decision: "Structured entries ({donor, weight}) -- Atlas's own pipeline names donor_pool and weights as 2 correlated stages where one is meaningless without the other (a weight for an undeclared unit is incoherent). Same cross-collection referential-integrity pattern causal.dag.contract.yaml's own edges[]->nodes[] reference already establishes, reused here at a smaller scale (membership check, not a graph)."
+  - question: "Should weight VALUES (magnitude, non-negativity, sum-to-1) be validated?"
+    decision: "No -- explicitly out of scope (task-mandated scope boundary). Weight values are DISCLOSURE-ONLY: presence and referential integrity (which donor a weight names) are enforced; the actual magnitude, non-negativity, or sum-to-1 convex-combination property is REPORTED content the caller supplies, never computed or range-checked here. Validating those would be re-implementing the real weight-optimization this method is scoped to exclude."
+  - question: "Does this method perform genuine statistical computation (RMSPE minimization, weight optimization, an actual donor-pool fitting algorithm)?"
+    decision: "No -- explicitly out of scope (task-mandated scope boundary, see module docstring). fit_quality and post_treatment_gap are DISCLOSURE-ONLY reported findings (e.g. 'pre-treatment fit was good based on visual match'), with provenance on the record's own top-level provenance field -- same restraint pattern causal.rct/association.morphological_analysis/decision.mcda already establish for their respective methods."
+
+open_questions:
+  - id: "OQ-SYNTHCONTROL-1"
+    question: "cognitive_primitives [GROUP, ESTIMATE, WEIGHT, COMPARE, VALIDATE] is this file's own inference (one primitive per Atlas's own 5 pipeline verbs), not a cited Atlas composition formula."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+  - id: "OQ-SYNTHCONTROL-2"
+    question: "forbidden_transition/recommended_next are both left empty -- Atlas's F11 table row is this method's only citation (grep-confirmed, no dedicated §11.x/§12.x section, no §22.3 gate row), unlike causal.dag's own §14.1-cited legal chain."
+    owner: "operator, or a future review pass specifically checking Tier 1 contracts with no forbidden_transition/recommended_next example in Atlas"
+  - id: "OQ-SYNTHCONTROL-3"
+    question: "weight value magnitude/sum-to-1/non-negativity is deliberately NOT validated (see compilation_decisions). Revisit only if a future consumer needs a genuine-compute weight-optimization method -- that would be a NEW method, not a change to this design-capture one."
+    owner: "operator, or whoever next needs an actual econometric synthetic-control engine"
+
+verification:
+  method: >
+    Read the whole Atlas F11 table (L612-625) directly, then grepped the whole
+    document case-insensitively for "Synthetic Control"/"donor pool"/"placebo" --
+    confirmed exactly 1 combined hit (L625, this row), no dedicated §11.x/§12.x
+    section, no §22.3 gate-table row. Grepped the whole `ai_lego` tree
+    case-insensitively for "synthetic_control"/"synthetic control" before writing
+    any of this method's own files -- zero pre-existing implementation (one
+    unrelated mention in `ai_lego/modules/causal/__init__.py`'s own family
+    docstring naming this method as a still-unbuilt F11 member, not an
+    implementation). Read causal.rct.contract.yaml and causal.dag.contract.yaml +
+    ai_lego/modules/causal/dag.py in full before writing this contract, reusing
+    their established conventions (disclosure-only content fields, cross-collection
+    referential integrity) rather than inventing new ones. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L625's own 5-step formula is
+    transcribed verbatim into `purpose`/`preconditions`. The 6-field record shape,
+    the donor_pool minItems:2 threshold, the structured {donor, weight} shape, and
+    the disclosure-only (not genuine-compute) treatment of fit_quality/
+    post_treatment_gap/weight-values are Phase 3 compilation choices, explicitly
+    flagged above in `compilation_decisions`, not presented as Atlas-cited.
