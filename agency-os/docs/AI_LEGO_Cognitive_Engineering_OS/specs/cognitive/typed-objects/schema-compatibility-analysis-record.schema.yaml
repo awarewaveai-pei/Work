@@ -1,0 +1,203 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/schema-compatibility-analysis-record.schema.yaml"
+title: Schema Compatibility Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SchemaCompatibilityAnalysisRecord` --
+  the declared `outputs` of `database_data.schema_compatibility_analysis`'s Method
+  Contract. TENTH and LAST `database_data`-family (F21) typed object, closing F21
+  10/10. `change_classifications`/`overall_verdict` are GENUINE_COMPUTE, re-derived
+  from `changes` by both the builder and an independent gate
+  (`ai_lego/modules/database_data/schema_compatibility_analysis.py`), never
+  caller-asserted -- same two-layer discipline `attack-tree-record.schema.yaml`'s
+  own `root_aggregate` and `morphological-analysis-record.schema.yaml`'s own
+  `legal_combinations` already establish. This is a cross-array, whole-object
+  derivation JSON Schema cannot express -- this schema validates SHAPE only; the
+  correctness of `change_classifications`/`overall_verdict` is a runtime-layer
+  invariant (see `ai_lego/compute/schema_compatibility/classification.py`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Schema Compatibility Analysis row (L903): redirects its own step sequence to EC §28"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4482): 'DB Migration | Schema Compatibility | Expand–Contract | Breaking ALTER' -- names this as a DISTINCT tool from Expand–Contract"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1077-1113): 'Compatibility Analysis' is stage 3 of the 15-stage sequence"
+  - "methods/contracts/database_data.schema_compatibility_analysis.contract.yaml"
+  - "specs/cognitive/typed-objects/attack-tree-record.schema.yaml (genuine_compute two-layer convention reused here)"
+  - "specs/cognitive/typed-objects/expand-contract-migration-record.schema.yaml (migration_ref soft-link convention reused here)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should change_type be an open string or a closed enum?"
+    decision: "Closed enum, 13 values -- see $defs/change_type_enum. Disclosed external domain knowledge (not Atlas-cited), grounded in standard expand-contract/schema-evolution practice; see method contract's own compilation_decisions."
+  - question: "Should target be required unique across changes[] (like erd's attribute names, data_contract's field names)?"
+    decision: "No -- one real migration can legitimately apply multiple DIFFERENT changes to the same target (e.g. narrow_type + tighten_nullable_to_not_null on the same column). Only a literal (change_type, target) duplicate is refused, at the runtime layer (see method contract)."
+  - question: "Can change_classifications/overall_verdict's own correctness (matches the real classify-then-reduce derivation) be expressed in JSON Schema?"
+    decision: "No -- same limitation root_aggregate (attack-tree-record.schema.yaml) and legal_combinations (morphological-analysis-record.schema.yaml) already document. Runtime-layer only, see top-level description."
+
+type: object
+required: [id, version, subject, changes, change_classifications, overall_verdict, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SCA-"
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "database_data.schema_compatibility_analysis"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The one migration/table/column change set every entry in changes[] is analyzing -- same anchor-field convention security.attack_tree's own system_or_component and association.morphological_analysis's own subject already establish for their own families."
+
+  changes:
+    type: array
+    minItems: 1
+    description: "The RAW, caller-supplied set of individual schema changes under analysis. change_classifications below is GENUINE_COMPUTE, derived from this array -- never a parameter."
+    items:
+      $ref: "#/$defs/change"
+
+  change_classifications:
+    type: array
+    minItems: 1
+    description: >
+      GENUINE_COMPUTE -- one entry per changes[] entry, in the SAME order, each carrying that change's
+      change_type/target plus its computed compatibility_class. MUST equal
+      ai_lego.compute.schema_compatibility.classification.classify_changes(changes) -- re-derived and
+      compared by the independent runtime gate, never trusted from a stored value.
+    items:
+      type: object
+      required: [change_type, target, compatibility_class]
+      additionalProperties: false
+      properties:
+        change_type:
+          $ref: "#/$defs/change_type_enum"
+        target:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        compatibility_class:
+          type: string
+          enum: [compatible, breaking]
+
+  overall_verdict:
+    type: string
+    enum: [safe_for_zero_downtime, requires_coordinated_deploy]
+    description: >
+      GENUINE_COMPUTE -- MUST equal the WORST-OF-ALL reduction over change_classifications
+      (ai_lego.compute.schema_compatibility.classification.aggregate_overall_verdict): a single `breaking`
+      classification anywhere forces `requires_coordinated_deploy`; `safe_for_zero_downtime` only when every
+      classification is `compatible`. Re-derived and compared by the independent runtime gate, never trusted
+      from a stored value.
+
+  migration_ref:
+    type: string
+    minLength: 1
+    pattern: "^ECMIG-"
+    description: "OPTIONAL, format-only soft link to a database_data.expand_contract_migration record's own id -- the migration this compatibility analysis was performed FOR (EC §28's own 'Compatibility Analysis precedes Expand' ordering). Not fetched or cross-validated at this layer, same declared limit every prior soft-link field in this package already carries."
+
+  provenance:
+    description: "epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION for the changes[] set itself (an analytical judgment of what is being changed) -- change_classifications/overall_verdict are the calculated result derived FROM it, not independently labeled."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  change_type_enum:
+    type: string
+    enum:
+      - add_nullable_column
+      - add_column_with_default
+      - widen_type
+      - relax_not_null_to_nullable
+      - drop_unique_constraint
+      - add_index
+      - drop_index
+      - drop_column
+      - narrow_type
+      - tighten_nullable_to_not_null
+      - add_not_null_column_without_default
+      - rename_column
+      - add_unique_constraint
+    description: "Closed vocabulary -- see ai_lego/compute/schema_compatibility/classification.py::CHANGE_TYPE_COMPATIBILITY for the disclosed per-entry compatibility rationale."
+
+  change:
+    type: object
+    required: [change_type, target]
+    additionalProperties: false
+    properties:
+      change_type:
+        $ref: "#/$defs/change_type_enum"
+      target:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The table/column this change applies to, e.g. 'orders.amount_cents'. NOT required unique across changes[] -- see compilation_decisions."
+      notes:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "OPTIONAL free-text context, e.g. why the change is needed. Never consulted by the classification compute -- classification is driven by change_type alone."
+
+examples:
+  - description: "A safe, zero-downtime-eligible change set -- every entry classifies compatible, so overall_verdict is safe_for_zero_downtime."
+    value:
+      id: "SCA-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "database_data.schema_compatibility_analysis"
+      subject: "orders table: add customer_tier column, 2026-Q3"
+      migration_ref: "ECMIG-2026-09-05-002"
+      changes:
+        - {change_type: add_nullable_column, target: "orders.customer_tier"}
+        - {change_type: add_index, target: "orders.customer_tier", notes: "supports the new tier-filter query path"}
+      change_classifications:
+        - {change_type: add_nullable_column, target: "orders.customer_tier", compatibility_class: compatible}
+        - {change_type: add_index, target: "orders.customer_tier", compatibility_class: compatible}
+      overall_verdict: safe_for_zero_downtime
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A risky change set with 3 breaking changes and 1 compatible one -- worst-of-all forces overall_verdict to requires_coordinated_deploy despite the majority being compatible."
+    value:
+      id: "SCA-2026-09-10-002"
+      version: "1.0.0"
+      generated_by_method: "database_data.schema_compatibility_analysis"
+      subject: "orders table: legacy_status rename + amount_cents narrowing, 2026-Q4"
+      changes:
+        - {change_type: rename_column, target: "orders.legacy_status", notes: "renaming to orders.status"}
+        - {change_type: narrow_type, target: "orders.amount_cents", notes: "BIGINT -> INT"}
+        - {change_type: drop_column, target: "orders.legacy_flag"}
+        - {change_type: add_index, target: "orders.status"}
+      change_classifications:
+        - {change_type: rename_column, target: "orders.legacy_status", compatibility_class: breaking}
+        - {change_type: narrow_type, target: "orders.amount_cents", compatibility_class: breaking}
+        - {change_type: drop_column, target: "orders.legacy_flag", compatibility_class: breaking}
+        - {change_type: add_index, target: "orders.status", compatibility_class: compatible}
+      overall_verdict: requires_coordinated_deploy
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-SCAREC-1"
+    question: "Should a future revision add a directional BACKWARD/FORWARD compatibility split (Confluent-style schema-registry practice), instead of the current single binary compatible/breaking class? Atlas's own row gives no directional vocabulary; left out (see method contract's own compilation_decisions).（owner: operator）"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F21 table row (L903), §28 快速選工具表 (L4482), and Execution Contract §28 (L1077-1113)
+    directly. Read attack-tree-record.schema.yaml and morphological-analysis-record.schema.yaml in full as
+    the genuine_compute-shape convention templates. Grepped the whole ai_lego tree and this spec root
+    case-insensitively for "schema_compatibility"/"compatibility_analysis"/"schema compatibility" before
+    writing -- zero pre-existing implementation (database_data.expand_contract_migration's own
+    compatibility_analysis STAGE, and database_data.data_contract's own compatibility_policy/
+    compatibility_ref FIELD, are both confirmed distinct -- neither classifies individual changes or derives
+    an aggregate verdict; see method contract). Validated against jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. change_type's 13-value closed vocabulary and the
+    change/change_classifications/overall_verdict field split are this suite's own compiled structure,
+    explicitly flagged as disclosed external domain knowledge, not mother-document field-level grounding --
+    see compilation_decisions above and the method contract's own.

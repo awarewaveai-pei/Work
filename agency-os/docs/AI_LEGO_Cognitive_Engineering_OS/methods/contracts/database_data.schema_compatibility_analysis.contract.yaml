@@ -1,0 +1,153 @@
+$id: "ai-lego://methods/contracts/database_data.schema_compatibility_analysis.contract.yaml"
+title: "Schema Compatibility Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  database_data.schema_compatibility_analysis, family database_data (F21),
+  TENTH and LAST member, closing F21 10/10. Atlas's F21 table row L903 is
+  a one-line redirect to EC §28 (no dedicated §11.x section, grep-
+  confirmed, genuinely the thinnest row in the F21 table -- both
+  Expand-Contract-Migration/L907 and Reconciliation/L908 carry their own
+  real formula in the same column, L903 does not) -- plus a second,
+  independent citation, §28 快速選工具表 L4482 ("DB Migration | Schema
+  Compatibility | Expand–Contract | Breaking ALTER"), naming this a
+  DISTINCT tool from Expand–Contract for the same scenario.
+
+  DIRECT CONFLICT, addressed, not silently overridden:
+  database_data.retention_deletion_model.contract.yaml (already-shipped,
+  already-critic-reviewed, L107-147) investigated this same row and
+  concluded the OPPOSITE -- "already fully covered" by
+  expand_contract_migration's own compatibility_analysis STAGE, not a
+  build candidate, on the grounds that L903 carries "no formula of its
+  own to model beyond the EC §28 redirect". That investigation's own
+  citation list does not include L4482 (checked directly, absent) -- a
+  real due-diligence gap this contract's own broader grep closed. This
+  session's own actual bar for "skip, contract-only reuse" is FIELD-FOR-
+  FIELD IDENTICAL output shape to an already-built sibling
+  (architecture.trade_off_matrix vs decision.mcda, both cited below), not
+  merely a thin/absent Atlas formula -- decision.ice/decision.rice were
+  both built this session with EQUALLY thin Atlas grounding, from
+  disclosed external domain knowledge. expand_contract_migration's own
+  stage is {stage_id, completed_at} (WHEN, not WHAT); data_contract's own
+  compatibility_policy is free text (caller-asserted, not computed) --
+  neither is field-for-field identical to a
+  changes->change_classifications->overall_verdict record. Built for
+  real; flagged for the orchestrating session to reconcile
+  retention_deletion_model.contract.yaml's own now-inaccurate claim (out
+  of this contract's own scope to edit that sibling file).
+
+  Core invariant: change_classifications/overall_verdict are
+  GENUINE_COMPUTE, re-derived by the gate from changes[] via a closed
+  change_type->compatible/breaking lookup + worst-of-all reduction, never
+  caller-asserted.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F21 tool table, Schema Compatibility Analysis row (L903): 'Schema Compatibility Analysis｜檢查 schema migration 相容性｜精確步驟序列見 Execution Contract §28（唯一正本）｜支援零停機 migration'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4482): 'DB Migration | Schema Compatibility | Expand–Contract | Breaking ALTER' -- second, independent citation naming this a distinct tool"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §28 Database Change Contract (L1077-1113): Compatibility Analysis is stage 3 of the 15-stage sequence"
+  - "methods/contracts/database_data.expand_contract_migration.contract.yaml + ai_lego/modules/database_data/expand_contract_migration.py -- read in full; that method's own compatibility_analysis is a presence+timestamp checkpoint, not a classification engine"
+  - "methods/contracts/database_data.data_contract.contract.yaml + ai_lego/modules/database_data/data_contract.py -- read in full; that method's own compatibility_policy/compatibility_ref is a free-text policy statement + soft link, not a classification engine"
+  - "methods/contracts/architecture.trade_off_matrix.contract.yaml -- this session's own precedent for the OPPOSITE finding (field-for-field-identical reuse), checked and confirmed not applicable here (no sibling shares this method's own change_type->classification->worst-of-verdict shape)"
+  - "methods/contracts/database_data.retention_deletion_model.contract.yaml (L107-147, L157-172): DIRECT CONFLICT -- that already-shipped contract concluded this row is already fully covered, not a build candidate; addressed above and in compilation_decisions/open_questions, not silently overridden"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1` as a
+  ninetyfifth concrete entry (provisional ordinal, see that entry's own
+  note). `id: database_data.schema_compatibility_analysis` mints a new
+  machine_id, TENTH and LAST member of the `database_data` family.
+
+id: database_data.schema_compatibility_analysis
+version: "1.0.0"
+family: database_data
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY, VALIDATE]
+# INFERRED, not cited (Atlas gives no §4-style composition formula for
+# this method). Splitting a migration into individual changes is
+# DECOMPOSE; mapping each into the closed compatible/breaking vocabulary
+# is CLASSIFY; the worst-of-all reduction plus structural checks is
+# VALIDATE -- same inferred-triple discipline every prior database_data
+# contract already uses (expand_contract_migration/data_contract both
+# used [DECOMPOSE, MAP, VALIDATE]; CLASSIFY replaces MAP here since the
+# per-change operation is a closed-vocabulary lookup, not a soft-link
+# assignment).
+
+purpose:
+  - classify_individual_schema_changes_and_derive_a_genuine_compute_zero_downtime_verdict
+inputs:
+  required: [ChangeSet]
+  optional: [MigrationReference]
+outputs: [SchemaCompatibilityAnalysisRecord]
+preconditions:
+  - "changes has at least 1 entry; every entry is a well-shaped {change_type, target, notes?} dict; change_type is one of the 13 closed vocabulary values; target is non-empty"
+  - "no two changes share the exact same (change_type, target) pair -- target alone is NOT required unique (one migration may apply multiple different changes to the same target)"
+  - "migration_ref, when present, is a non-empty string beginning with ECMIG- (the database_data.expand_contract_migration record id prefix) -- a format-only soft link"
+  - "change_classifications/overall_verdict are NEVER accepted parameters -- always computed fresh via ai_lego.compute.schema_compatibility.classification, re-derived independently by the gate"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same departure every prior database_data contract already reasons
+  # through: the real risk is classification/aggregation integrity (does
+  # the stored verdict match the real worst-of-all derivation), not an
+  # evidence-citation risk over a narrative claim.
+
+forbidden_transition: []
+# Atlas §22.3's own gate table has no Schema Compatibility Analysis row (grep-confirmed).
+
+recommended_next: [database_data.expand_contract_migration]
+# EC §28's own sequence: Compatibility Analysis (stage 3) directly
+# precedes Expand (stage 5) -- this record's own id is the natural
+# evidence_ref an expand_contract_migration stage("compatibility_analysis", ...)
+# entry can cite (that method's own compilation_decisions already
+# disclose evidence_ref as an unfetched, uninterpreted soft link).
+
+rollback:
+  side_effect_free: true
+  # The RECORD itself is side-effect-free -- it analyzes a proposed
+  # change set; it does not itself execute any schema change.
+
+compilation_decisions:
+  - question: "Is this genuinely distinct from expand_contract_migration's own compatibility_analysis stage or data_contract's own compatibility_policy/compatibility_ref, or already fully subsumed by one of them?"
+    decision: "Genuinely distinct -- built for real, not a contract-only reuse. expand_contract_migration's stage is presence+timestamp only (WHEN, not WHAT); data_contract's field is a free-text policy statement + soft link (caller-asserted, not computed). Neither performs per-change classification or aggregate-verdict derivation."
+  - question: "database_data.retention_deletion_model.contract.yaml already investigated this exact row and concluded 'already fully covered, not a build candidate' -- reached independently, in the same session, by a different agent. Which conclusion is right?"
+    decision: "This contract's own (build it) -- that investigation's own citation list omits Atlas §28 快速選工具表 L4482 (checked directly, absent), which independently names Schema Compatibility as a tool distinct from Expand–Contract. Its own reasoning ('no formula beyond the EC §28 redirect' = nothing to build) is also not this session's own actual bar: architecture.trade_off_matrix (the one real prior contract-only-reuse precedent) was skipped for FIELD-FOR-FIELD IDENTICAL output shape to decision.mcda, not for thin Atlas grounding -- decision.ice/decision.rice were both built this session with equally thin/absent Atlas formulas. Flagged for the orchestrating session to reconcile retention_deletion_model.contract.yaml's own now-inaccurate description/source_of_truth_for -- out of this contract's own scope to edit that sibling file directly."
+  - question: "Should change_type be an open string, or a closed, disclosed vocabulary?"
+    decision: "Closed 13-value vocabulary (ai_lego/compute/schema_compatibility/classification.py::CHANGE_TYPE_COMPATIBILITY), disclosed as external domain knowledge (not Atlas-cited) -- same class decision.ice's own 1-10 scale and decision.rice's own reach unit already establish for this package."
+  - question: "Should compatibility classification be a directional BACKWARD/FORWARD split (Confluent schema-registry style), or a single binary compatible/breaking class?"
+    decision: "Binary only. Atlas's own row gives no directional vocabulary, and every one of the task's own explicit worked examples is already binary."
+  - question: "Should target be required unique across changes[] the way erd's attribute names / data_contract's field names are?"
+    decision: "No. One real migration legitimately applies multiple different changes to the same target (e.g. narrow_type + tighten_nullable_to_not_null on one column) -- only a literal (change_type, target) duplicate is refused."
+
+open_questions:
+  - "OQ-SCHEMACOMPAT-0: database_data.retention_deletion_model.contract.yaml (L107-147, L157-172) and ai_lego/modules/database_data/__init__.py's own package docstring both assert F21 is '9 built + 1 confirmed-already-covered' and name this row as the covered one -- both now inaccurate given this contract's own build. __init__.py is rewritten by the orchestrating session per this batch's own instructions; retention_deletion_model.contract.yaml's own description/source_of_truth_for is NOT edited here (out of this contract's own scope) and needs a reconciling pass.（owner: operator, or the orchestrating session integrating this batch）"
+  - "OQ-SCHEMACOMPAT-1: id mints a machine_id method-inventory.yaml never carried -- should method-inventory.yaml be updated (has_contract:true, machine_id, line:903)?（owner: operator, or a future session with explicit write scope over method-inventory.yaml）"
+  - "OQ-SCHEMACOMPAT-2: recipes/validated/db-migration-expand-contract.recipe.yaml's own Compatibility Analysis step (ref: compatibility_analysis) carries no gate_ref, unlike Backup/Restore Validation/Reconciliation/Traffic Migration Switch -- should a future ADR-011-style pass wire this method's own schema_compatibility_integrity gate as that step's gate_ref?（owner: operator, or whoever next revises that recipe file）"
+  - "OQ-SCHEMACOMPAT-3: change_classifications carries no per-entry mitigation/rollout-strategy field (e.g. 'use expand-contract for this specific breaking change') -- Atlas gives no such structure; should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F21 table row (L903) and §28 快速選工具表 (L4482) directly.
+    Read database_data.expand_contract_migration.contract.yaml +
+    expand_contract_migration.py, and database_data.data_contract.contract.yaml
+    + data_contract.py, both in full, to confirm neither already performs
+    per-change classification or aggregate-verdict derivation. Read
+    architecture.trade_off_matrix.contract.yaml (this session's own
+    precedent for a contract-only reuse finding) to confirm the opposite
+    conclusion applies here. Read recipes/validated/db-migration-expand-
+    contract.recipe.yaml in full -- confirmed compatibility_analysis is
+    one of its 15 steps.ref values (transcribed nowhere new here; this
+    method does not reuse or restate that recipe's own step sequence).
+    Grepped the whole ai_lego tree and this spec root case-insensitively
+    for "schema_compatibility"/"compatibility_analysis"/"schema
+    compatibility" before writing -- zero pre-existing implementation.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 13-value change_type vocabulary
+    is disclosed external domain knowledge, not Atlas field-level
+    grounding -- see compilation_decisions above. recipes/validated/
+    db-migration-expand-contract.recipe.yaml's own compatibility_analysis
+    step was NOT edited to add a gate_ref pointing at this method -- filed
+    as OQ-SCHEMACOMPAT-2, out of this contract's own scope.

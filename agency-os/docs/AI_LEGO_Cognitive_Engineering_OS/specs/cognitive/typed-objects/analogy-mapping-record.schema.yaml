@@ -1,0 +1,185 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/analogy-mapping-record.schema.yaml"
+title: Analogy Mapping Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AnalogyMappingRecord` -- the declared `outputs` of
+  `association.analogy_mapping`'s Method Contract (6th and LAST F04 associative-mapping family member).
+  Atlas's ONLY citation (F04 table row L416: "Analogy Mapping｜把外部機制映射到問題｜source domain→抽象機制→
+  target mapping｜跨產業移植｜Historical Analogy") gives a 3-step process with no field-level shape: identify a
+  SOURCE DOMAIN with a known working mechanism -> ABSTRACT the underlying mechanism out of its original
+  context -> MAP that abstracted mechanism onto a TARGET problem. This schema makes all 3 steps real,
+  checkable structure: `target_problem` (un-cited-but-necessary anchor field, same class `subject`/`topic`/
+  `phenomenon` already establish), `source_domain_description`, `abstracted_mechanism`, `target_mapping`
+  (the row's own 3 named stages, verbatim).
+
+  ONE real invariant JSON Schema alone cannot express: `source_domain_description`, `abstracted_mechanism`,
+  and `target_mapping` must be PAIRWISE genuinely distinct (case/whitespace-insensitive, NFKC-normalized)
+  across all 3 unique pairs -- a record where any two stages collapse to the same text skipped the row's own
+  abstraction step. Runtime-layer only, enforced at construction AND independently re-derived by a gate, same
+  two-layer discipline every sibling typed-object schema in this directory already documents; see
+  `ai_lego/modules/association/analogy_mapping.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Analogy Mapping row (L416) -- the ONLY citation; grep-confirmed zero dedicated section (numbering jumps §11.11 Morphological Analysis (L1436) straight to §11.12 Jobs To Be Done (L1463)) and zero §22.3 Method-specific Gate row"
+  - "methods/contracts/association.analogy_mapping.contract.yaml (id: association.analogy_mapping)"
+  - "specs/cognitive/typed-objects/attribute-listing-record.schema.yaml (caller-chosen prefix convention, informs_<sibling>_ref forward-soft-link pattern reused here as informs_historical_analogy_ref, supporting_evidence_refs shape reused verbatim)"
+  - "specs/cognitive/typed-objects/problem-statement.schema.yaml (2-field echo-invariant class, expected_state != current_state, generalized here to 3-way pairwise distinctness)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Does target_problem deserve its own required field, though Atlas's own citation names only source domain/mechanism/mapping?"
+    decision: >
+      Yes -- required. A `target_mapping` with no named target problem is meaningless; same un-cited-but-
+      necessary anchor field class `attribute-listing-record.schema.yaml`'s own `subject` and
+      `5w1h-record.schema.yaml`'s own `topic` already establish.
+  - question: "Express pairwise distinctness of source_domain_description/abstracted_mechanism/target_mapping in JSON Schema?"
+    decision: >
+      No -- JSON Schema has no native cross-field string-distinctness operator (same limitation
+      `attribute-listing-record.schema.yaml`'s own `transformed_variants[].variant_text` distinctness already
+      documents). Runtime-layer only: enforced at construction (`generate_analogy_mapping_record`) AND
+      independently re-derived by `evaluate_analogy_mapping_integrity_gate`.
+  - question: "Full 3-way pairwise distinctness, or just a 2-field echo-check (source vs mapping, mirroring problem-statement.schema.yaml's current_state vs expected_state)?"
+    decision: >
+      Full pairwise, all 3 unique pairs. A source-vs-mapping-only check would let `abstracted_mechanism`
+      silently echo one of the two ends and still pass -- that record skipped the abstraction step just as
+      much as an end-to-end echo would. See the method contract's own `compilation_decisions` for the full
+      reasoning, including the deliberate restraint of keeping this check syntactic (near-duplicate text) and
+      NOT attempting to verify genuine abstraction LEVEL, which no runtime gate can honestly do.
+  - question: "Give this record a richer multi-candidate shape (e.g. several candidate source domains, generate-then-select), like frame-storming-record.schema.yaml's own candidate_framings -> selected_frame_ref?"
+    decision: >
+      No -- Atlas's own citation is a flat, literal 3-step linear pipeline ("source domain→抽象機制→target
+      mapping"), unlike frame_storming's own citation which explicitly names a generate-multiple-then-select
+      process ("對同一現象產生多種問法→分群→選框架"). Inventing a multi-candidate structure this row's own
+      citation does not ask for would be exactly the "fabricate a rich schema with no textual basis"
+      `method.schema.yaml`'s own `preconditions` field already warns against.
+  - question: "supporting_evidence_refs at record level (single field) or per-stage (3 separate fields)?"
+    decision: >
+      Record-level, single field, tied to `source_domain_description`'s own claim -- the one empirical/
+      citable fact among the 3 stages (`abstracted_mechanism`/`target_mapping` are this record's own
+      synthesis, not sourced claims). No array-of-entries shape exists here needing per-item refs the way
+      `attribute-listing-record.schema.yaml`'s per-attribute/per-variant convention does.
+
+type: object
+required: [id, version, target_problem, source_domain_description, abstracted_mechanism, target_mapping, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ANALOGY-"
+    description: "NEW DESIGN. Record id prefix, following the existing PROB-/5W1H-/FS-/ATTRLIST- convention this suite's other typed-object schemas already use. Grep-confirmed no collision with any existing prefix in this directory."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "association.analogy_mapping"
+
+  target_problem:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The ONE problem this analogy is being applied to -- un-cited-by-Atlas anchor field, same class
+      `attribute-listing-record.schema.yaml`'s own `subject` and `5w1h-record.schema.yaml`'s own `topic`
+      already establish.
+
+  source_domain_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas's own "source domain" step -- the external field/industry/system with a known working mechanism
+      this analogy transfers FROM. MUST be pairwise genuinely distinct (case/whitespace-insensitive,
+      NFKC-normalized) from `abstracted_mechanism` and `target_mapping` -- runtime-layer check, see top-level
+      description.
+
+  abstracted_mechanism:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas's own "抽象機制" (abstract the mechanism) step -- the causal/structural core of
+      `source_domain_description`, stripped of domain-specific surface detail. MUST be pairwise genuinely
+      distinct from both `source_domain_description` and `target_mapping` -- runtime-layer check; a value
+      that merely echoes either one skipped the abstraction work (see method contract's own
+      compilation_decisions for why this is a syntactic-only check, not a semantic abstraction-level one).
+
+  target_mapping:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas's own "target mapping" step -- how `abstracted_mechanism` is proposed to apply to
+      `target_problem`. MUST be pairwise genuinely distinct from both `source_domain_description` and
+      `abstracted_mechanism` -- runtime-layer check, see top-level description.
+
+  supporting_evidence_refs:
+    type: array
+    minItems: 1
+    items: { type: string, pattern: "^E-[0-9]+$" }
+    description: >
+      OPTIONAL. Soft reference to real `evidence/evidence.schema.yaml` record ids, backing
+      `source_domain_description`'s own empirical claim (the one citable fact among the 3 stages) -- same
+      convention every sibling typed-object schema in this directory already uses.
+
+  informs_historical_analogy_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      OPTIONAL forward soft-link to Atlas's own F04-table-cited best pairing ("最佳搭配", L416: "Historical
+      Analogy"), unbuilt at this schema's write time -- same forward-looking-to-an-unbuilt-sibling pattern
+      `attribute-listing-record.schema.yaml`'s own `informs_scamper_ref` already establishes. Format-only
+      checked (non-empty string); existence of the referenced record is NOT verified.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A source domain (ant colony foraging) abstracted into a stigmergic-coordination mechanism, mapped onto a target problem (warehouse pick-routing)"
+    value:
+      id: "ANALOGY-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "association.analogy_mapping"
+      target_problem: "倉儲揀貨路徑在尖峰時段壅塞，中央排程器算不過來"
+      source_domain_description: "螞蟻覓食：個別螞蟻沒有全局地圖，只靠地面費洛蒙濃度局部決策，族群整體卻收斂到近似最短路徑"
+      abstracted_mechanism: "stigmergic coordination -- 大量簡單代理人透過對共享環境留下的局部訊號做出反應，不需要中央協調者，系統整體行為從局部規則湧現"
+      target_mapping: "揀貨員改用動態地板訊號（如熱區看板）取代中央路徑指派，每完成一趟揀貨在通過的貨架留下'最近使用'標記，後續揀貨員優先避開高標記通道，讓路徑分佈自然收斂而不需中央重新排程"
+      supporting_evidence_refs: ["E-981"]
+      informs_historical_analogy_ref: "HISTANALOGY-2026-09-10-001"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-ANALOGYMAPPINGRECORD-1"
+    question: >
+      The pairwise distinctness check is syntactic-only (near-duplicate text detection) and does not verify
+      `abstracted_mechanism` is genuinely a HIGHER level of abstraction than either end. Should a future
+      revision attempt a stronger (likely LLM-judged, not schema-enforceable) semantic check?
+    owner: "operator, or whoever next needs a stronger semantic abstraction-level check"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas's F04 table Analogy Mapping row (L416) directly. Grep-reconfirmed §11.x heading numbering
+    jumps from §11.11 Morphological Analysis (L1436) straight to §11.12 Jobs To Be Done (L1463) -- no
+    dedicated section. Grep-reconfirmed zero "Analogy" hits anywhere in Global_Execution_Contract_v1.md.
+    Read attribute-listing-record.schema.yaml and problem-statement.schema.yaml in full as the anchor-field /
+    echo-invariant / forward-soft-link convention templates. Grepped the whole ai_lego tree and this specs
+    directory case-insensitively for "analogy_mapping"/"analogy mapping" before writing -- zero pre-existing
+    implementation. Validated against jsonschema Draft202012Validator (required fields present, id shape
+    enforced, additionalProperties:false verified to actually reject an unknown key, minLength on all 4
+    required string fields verified to actually reject an empty string, minItems:1 on
+    supporting_evidence_refs verified to actually reject an empty array).
+  note: >
+    `target_problem`/`source_domain_description`/`abstracted_mechanism`/`target_mapping` field shapes are
+    this suite's own compiled structure engineered to make Atlas's own "source domain→抽象機制→target mapping"
+    process column a real, re-derivable property -- explicitly flagged as non-Atlas field-level grounding
+    above (compilation_decisions), not presented as mother-document content. No mother document was modified
+    to produce this file.

@@ -1,0 +1,126 @@
+$id: "ai-lego://methods/contracts/association.analogy_mapping.contract.yaml"
+title: "Analogy Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  association.analogy_mapping, 6th and LAST F04 association-family member (mind_map/concept_map/
+  affinity_diagram/morphological_analysis/attribute_listing landed earlier in this same batch -- F04 is
+  0/6 -> 6/6 COMPLETE after this contract). Atlas's ONLY citation is the F04 table row (L416: "Analogy
+  Mapping｜把外部機制映射到問題｜source domain→抽象機制→target mapping｜跨產業移植｜Historical Analogy") --
+  grep-confirmed no dedicated §11.x section (numbering jumps §11.11 Morphological Analysis L1436 -> §11.12
+  JTBD L1463, the same gap class attribute_listing's own citation already falls into) and no §22.3 gate row
+  or EC §32 security surface. Not an EC §32 method. Core invariant: the row's own literal 3-step pipeline
+  (source domain -> abstracted mechanism -> target mapping) made real by pairwise syntactic distinctness
+  across all 3 stages -- a record where any two stages are near-duplicate text is not actually doing the
+  row's own "抽象機制" (abstraction) step, it is skipping it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F04 tool table, Analogy Mapping row (L416) -- the primary, and ONLY, citation for this method's own field shape"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 table, Synectics row (L388: '用類比/隱喻重構問題｜direct/personal/symbolic analogy｜深度創意突破') -- read and DISAMBIGUATED, not depended on: a divergent-creativity technique that uses analogy/metaphor as a TOOL to reframe a problem, structurally different from this method's own convergent 3-stage transfer pipeline"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Historical Analogy row (L674: '用歷史機制比較｜相似/差異→抽機制→限制類比｜借歷史又避免表面類比') -- this row's own cited best-pairing (最佳搭配). Read and DISAMBIGUATED, not depended on: scoped SPECIFICALLY to historical comparisons, with an explicit '限制類比' (limit-the-analogy) discipline step this row's own citation does not carry. Forward soft-link only (informs_historical_analogy_ref), Historical Analogy unbuilt at this write time"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Cross-industry Transfer row (L675: '移植其他產業機制｜找相同 job/constraint→adapt｜降低 reinvent-the-wheel') -- discovered during due-diligence grep, NOT named by this task's own instructions. Near-identical benefit-column wording to this row's own '跨產業移植' -- flagged as an open question (OQ-ANALOGYMAPPING-2), not depended on, not built"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §4 primitive kernel (L157-182, MAP/ASSOCIATE/INFER all kernel members; no ABSTRACT token exists in either the 24-member kernel or the 5-member OBSERVED_EXTENSION tier -- see cognitive_primitives note below)"
+  - "methods/contracts/association.attribute_listing.contract.yaml -- forward-soft-link-to-unbuilt-best-pairing-sibling pattern (informs_scamper_ref) reused here as informs_historical_analogy_ref"
+  - "methods/contracts/framing.problem_statement.contract.yaml -- 2-field echo-invariant class (expected_state != current_state) generalized here to 3-way pairwise distinctness"
+  - "specs/cognitive/typed-objects/analogy-mapping-record.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: association.analogy_mapping` mints a new machine_id, bare `<family>.<name>`
+  form per ADR-005b, already digit-free (no naming collision). Grepped exhaustively (whole ai_lego tree,
+  case-insensitive "analogy_mapping"/"analogy mapping") before writing -- zero pre-existing implementation
+  (only method-inventory.yaml's own stale catalog rows, disclosed in open_questions, same stale-by-1 drift
+  class every other F04 row in that file already carries).
+
+id: association.analogy_mapping
+version: "1.0.0"
+family: association
+
+cognitive_primitives: [ASSOCIATE, MAP, INFER]
+# INFERRED, not cited. ASSOCIATE: family-level primitive, same as every other F04 sibling this batch
+# (mind_map/concept_map/morphological_analysis/attribute_listing all include it). MAP: the row's own literal
+# verb, twice -- 用途 column "把外部機制映射到問題" (map an external mechanism onto the problem) and 使用方式
+# column's own "target mapping" -- same row-name-is-a-primitive precedent concept_map's own MAP already
+# establishes for its own row name. INFER: closest kernel member to the row's own "抽象機制" (abstract the
+# mechanism) step -- no ABSTRACT token exists anywhere in primitive.schema.yaml's 24-member kernel or its
+# 5-member OBSERVED_EXTENSION tier (grep-confirmed), so INFER (extracting an underlying pattern from surface
+# detail) is the nearest honest fit, not a literal citation.
+
+purpose:
+  - identify_a_source_domains_working_mechanism_and_transfer_its_abstracted_core_onto_a_target_problem
+
+inputs:
+  required: []
+  optional: []
+# Atlas's own citation gives no upstream typed-object dependency -- the row names no prerequisite typed
+# object, same as attribute_listing's identical citation-shape.
+
+outputs: [AnalogyMappingRecord]
+
+preconditions:
+  - "target_problem is a non-empty string -- the ONE problem this analogy is being applied to; un-cited-but-necessary anchor field, same class attribute_listing's own subject and framing.five_w_one_h's own topic already establish"
+  - "source_domain_description is a non-empty string -- the row's own 'source domain', an external field/industry/system with a known working mechanism"
+  - "abstracted_mechanism is a non-empty string -- the row's own '抽象機制', the causal/structural core stripped of source-domain-specific surface detail"
+  - "target_mapping is a non-empty string -- the row's own 'target mapping', how the abstracted mechanism is proposed to apply to target_problem"
+  - "source_domain_description, abstracted_mechanism, and target_mapping are pairwise genuinely distinct (case/whitespace-insensitive, NFKC-normalized) across all 3 unique pairs -- any two stages collapsing to the same text means the row's own 3-step pipeline was not actually walked (see compilation_decisions for why this is syntactic-only, not a semantic abstraction-level check)"
+  - "IF supporting_evidence_refs is present: at least 1 entry, backing source_domain_description's own empirical claim (the one factual/citable claim among the 3 stages -- abstracted_mechanism and target_mapping are synthesis, not sourced fact)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (no limitation-column text, no §22.3 row, no
+# dedicated §11.x section -- grep-confirmed) -- left genuinely empty rather than inventing one, same restraint
+# attribute_listing's own identical field already establishes.
+
+recommended_next: []
+# Atlas's own best-pairing (F04 table L416, "最佳搭配" column) is Historical Analogy, unbuilt at this write
+# time -- left empty rather than asserting a hard dependency on an unbuilt sibling. See
+# informs_historical_analogy_ref below for the real forward soft-link.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Model 'target_problem' as a required anchor field, though Atlas's own citation names only source domain/mechanism/mapping?"
+    decision: "Yes -- required. A 'target mapping' with no named target problem is meaningless; same un-cited-but-necessary anchor field class attribute_listing's own subject already establishes."
+  - question: "Enforce a full semantic 'is abstracted_mechanism genuinely a HIGHER level of abstraction than the other two' check, or a syntactic near-duplicate check only?"
+    decision: "Syntactic pairwise distinctness only (NFKC/casefold near-duplicate text check). Genuine abstraction-LEVEL verification would require semantic reasoning no runtime gate can honestly perform -- a fully rigorous 3-way abstraction check would be flimsy security theater, not a real invariant. The cheap, honest check that IS enforceable: none of the 3 stages may collapse to the same text, which catches the most degenerate failure (copy-pasting one stage into another and skipping the abstraction work entirely) without pretending to verify something it cannot."
+  - question: "Pairwise across all 3 unique stage-pairs, or just the 2 ends (source_domain_description vs target_mapping, mirroring problem_statement's 2-field echo-check)?"
+    decision: "All 3 unique pairs. A source-vs-mapping-only check would let abstracted_mechanism silently echo ONE of the two ends (e.g. mechanism == source_domain_description verbatim, while target_mapping is genuinely different from source) and still pass -- that record skipped the abstraction step just as much as an end-to-end echo would. Each pair gets its own error code (MECHANISM_ECHOES_SOURCE / MAPPING_ECHOES_MECHANISM / MAPPING_ECHOES_SOURCE) for precision, same per-failure-code granularity attribute_listing's own VARIANT_ECHOES_ORIGINAL/DUPLICATE_VARIANT_TEXT split already establishes."
+  - question: "Add informs_historical_analogy_ref, given Atlas's own best-pairing (F04 L416 最佳搭配) is Historical Analogy?"
+    decision: "Yes -- OPTIONAL forward soft-link, same class attribute_listing's own informs_scamper_ref already establishes. Format-only checked (non-empty string); existence of the referenced record is NOT verified (Historical Analogy is unbuilt)."
+  - question: "supporting_evidence_refs at record level (flat single field) or per-stage (3 separate fields)?"
+    decision: "Record-level, single field, tied to source_domain_description's own claim -- the one empirical/citable fact among the 3 stages (abstracted_mechanism and target_mapping are this record's own synthesis, not sourced claims). This record has no array-of-entries shape needing per-item refs the way attribute_listing's per-attribute/per-variant convention does."
+
+open_questions:
+  - "OQ-ANALOGYMAPPING-1: Atlas's own best-pairing Historical Analogy (F13 table L674) is unbuilt at this write time -- informs_historical_analogy_ref is a format-only soft link; existence of the referenced record is not verified. A future integration pass should verify once Historical Analogy's own contract lands.（owner: operator, integration pass）"
+  - "OQ-ANALOGYMAPPING-2: Due-diligence grep for this contract found a 3rd related-but-unbuilt method beyond the 2 this task's own instructions named for disambiguation (Synectics F03 L388, Historical Analogy F13 L674) -- Cross-industry Transfer (F13 table L675: '移植其他產業機制｜找相同 job/constraint→adapt｜降低 reinvent-the-wheel') carries near-identical benefit-column wording to this row's own '跨產業移植'. Not depended on, not built -- flagged for whoever next selects F13 methods into a batch to confirm the 3-way distinction holds.（owner: operator, future F13 batch selection）"
+  - "OQ-ANALOGYMAPPING-3: F04 associative-mapping family is COMPLETE 6/6 after this contract lands (mind_map/concept_map/affinity_diagram/morphological_analysis/attribute_listing/analogy_mapping).（owner: operator, informational -- no action needed）"
+  - "OQ-ANALOGYMAPPING-4: the pairwise distinctness check is syntactic-only (near-duplicate text detection) and does NOT verify abstracted_mechanism is genuinely a HIGHER level of abstraction than either end -- see compilation_decisions for why this restraint is deliberate, not an oversight.（owner: operator, or whoever next needs a stronger semantic check）"
+  - "OQ-ANALOGYMAPPING-5: method-inventory.yaml's 'Analogy Mapping' row is stale-by-1 against the real Atlas F04 table line number (same drift class every other F04 row in that file already carries, per attribute_listing's own OQ-ATTRIBUTELISTING-1). Not corrected here per METHOD_ATLAS_SLICE_LEAN_STANDARD.md's own 'not a required step' ruling on that file.（owner: operator, or whoever next does an integration pass over method-inventory.yaml）"
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-sensitively for "Analogy" and "類比" -- 3 hits total: F03 Synectics
+    (L388), F04 Analogy Mapping (L416, this method's own row), F13 Historical Analogy (L674); a 4th related
+    hit for "移植其他產業機制" led to F13 Cross-industry Transfer (L675), disclosed as OQ-ANALOGYMAPPING-2. No
+    dedicated §11.x section exists for Analogy Mapping (grep-reconfirmed heading numbering jumps §11.11
+    Morphological Analysis L1436 straight to §11.12 Jobs To Be Done L1463) and no §22.3 gate table row.
+    Grepped the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS tree case-insensitively for "Analogy"
+    -- zero hits in Global_Execution_Contract_v1.md, confirmed no EC §32 security surface. Read primitive.schema.yaml
+    in full -- confirmed no ABSTRACT token exists in either the 24-member kernel or the 5-member
+    OBSERVED_EXTENSION tier, grounding the cognitive_primitives INFER choice as an honest nearest-fit, not a
+    literal citation. Grepped the whole ai_lego tree case-insensitively for "analogy_mapping"/"analogy
+    mapping" before any design work -- zero pre-existing implementation. Read
+    association.attribute_listing.contract.yaml and framing.problem_statement.contract.yaml in full to reuse
+    the established two-layer-invariant / soft-link / echo-check conventions. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own "source domain→抽象機制→target mapping" 3-step citation and
+    "跨產業移植" benefit line are transcribed verbatim into preconditions/purpose/description. The
+    target_problem/source_domain_description/abstracted_mechanism/target_mapping field shapes and the pairwise
+    distinctness invariant are this suite's own compiled structure, not Atlas-cited field-by-field --
+    disclosed as such, same honesty discipline every sibling Tier 1 contract in this directory already
+    applies.
