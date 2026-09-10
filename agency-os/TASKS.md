@@ -1062,6 +1062,14 @@
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 
+- [ ] **F08 strategy 家族收官批次（10/14→14/14）4 個 agent 已派出未回報，操作者主動要求暫停記錄（5 小時額度將盡）**
+  - `🟡 潛伏` · `2026-09-10 開` · `操作者（Low：純接手既有 batch，非新設計）`
+  - **一句話**：bcg_matrix／blue_ocean／business_model_canvas／value_proposition_canvas 4 個平行 agent 剛派出即被要求暫停；F11(10/10)+F08 前兩批(10/14)皆已 commit+push 確認乾淨，只有這收官批次卡在「已派出未知結果」狀態
+  - **交接包**：`agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md`（完整 4 agent id、下一步指令、本 session 踩過的坑）
+  - **下一步**：接手 session 先讀交接包，`git status` 查 4 個方法檔案是否已存在（有=驗證不重派，無=重派），到齊後走標準整合流程（測試→CLI→regression→golden→critic→WORKLOG/TASKS→commit→push）
+  - **完成定義**：F08 14/14，`strategy/__init__.py` 宣告 COMPLETE，commit 已 push，`git fetch` 確認 0 ahead/0 behind
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「F08 strategy 家族推進 6/14→10/14」條目（前一批完成紀錄）；交接包本身
+
 - [ ] **compose `SG_SSH_HOST` 預設仍指退租 SG 5.223.93.113 — ks-aw-01 需 port 58122 + ubuntu，改預設不夠**
   - `🟡 潛伏` · `2026-09-04 開` · `操作者（Medium：動 next-admin 讀 env 程式碼＋伺服器 .env）`
   - **一句話**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `${SG_SSH_HOST:-5.223.93.113}` 是 hosting bridge 的 SSH 目標；整併後現役主機非 22 port／非 root，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數
