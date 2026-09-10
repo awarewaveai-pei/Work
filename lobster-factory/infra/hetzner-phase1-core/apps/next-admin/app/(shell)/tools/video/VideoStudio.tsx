@@ -12,6 +12,7 @@ import TimelineValidationPanel from "./TimelineValidationPanel";
 import FootageEditor from "./FootageEditor";
 import MediaOperationsPanel from "./MediaOperationsPanel";
 import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
+import StoryBibleWorkbench from "./StoryBibleWorkbench";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
@@ -251,7 +252,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [deletingVideos, setDeletingVideos] = useState(false);
-  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion" | "timeline" | "footage" | "operations" | "delivery">(remotionInitial ? "remotion" : "generate");
+  const [studioTab, setStudioTab] = useState<"generate" | "history" | "info" | "remotion" | "timeline" | "story" | "footage" | "operations" | "delivery">(remotionInitial ? "remotion" : "generate");
 
   // Auto-switch to Remotion tab when a script prefill arrives from ScriptForge
   useEffect(() => { if (remotionInitial) setStudioTab("remotion"); }, [remotionInitial]);
@@ -597,6 +598,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
           { id: "generate" as const, label: "生成影片" },
           { id: "remotion" as const, label: "Remotion 模板" },
           { id: "timeline" as const, label: "Timeline 驗證" },
+          { id: "story" as const, label: "短劇 Bible" },
           { id: "footage" as const, label: "實拍剪輯" },
           { id: "operations" as const, label: "營運成效" },
           { id: "delivery" as const, label: "Release 交付" },
@@ -1160,6 +1162,7 @@ export default function VideoStudio({ initial, remotionInitial }: { initial?: Vi
       {/* ── Remotion 模板 tab ── */}
       {studioTab === "remotion" && <RemotionStudio scriptPrefill={remotionInitial} />}
       {studioTab === "timeline" && <TimelineValidationPanel />}
+      {studioTab === "story" && <StoryBibleWorkbench />}
       {studioTab === "footage" && <FootageEditor />}
       {studioTab === "operations" && <MediaOperationsPanel />}
       {studioTab === "delivery" && <ReleaseDeliveryPanel />}
