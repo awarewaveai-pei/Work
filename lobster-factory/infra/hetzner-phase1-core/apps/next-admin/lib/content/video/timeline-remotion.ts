@@ -22,6 +22,11 @@ export interface DynamicSlideshowSceneV1 {
   readonly crop: DynamicSlideshowCrop;
   readonly transitionOut: DynamicSlideshowTransition;
 }
+export interface DynamicSlideshowCaptionV1 {
+  readonly startFrame: number;
+  readonly endFrame: number;
+  readonly text: string;
+}
 
 export interface DynamicSlideshowPropsV1 {
   readonly scenes: readonly DynamicSlideshowSceneV1[];
@@ -30,6 +35,7 @@ export interface DynamicSlideshowPropsV1 {
   readonly height: number;
   readonly transitionDurationSeconds: number;
   readonly audioUrl?: string;
+  readonly captions?: readonly DynamicSlideshowCaptionV1[];
 }
 
 export interface TimelineRemotionRenderSpec {
@@ -97,9 +103,6 @@ function singleVideoTrack(timeline: MediaTimelineV1, errors: TimelineRemotionCom
     errors.push({ code: "unsupported_track", path: "$.tracks", message: "DynamicSlideshow 必須剛好有一條 video track" });
     return undefined;
   }
-  if (nonVideoTracks.some((track) => track.kind === "caption")) {
-    errors.push({ code: "unsupported_track", path: "$.tracks", message: "DynamicSlideshow v1 尚不渲染字幕 track，不能忽略字幕後出片" });
-  }
   if (nonVideoTracks.filter((track) => track.kind === "audio").length > 1) {
     errors.push({ code: "unsupported_track", path: "$.tracks", message: "DynamicSlideshow v1 最多接受一條完整 audio track" });
   }
@@ -112,6 +115,18 @@ function singleVideoTrack(timeline: MediaTimelineV1, errors: TimelineRemotionCom
     cursor = item.startMs + item.durationMs;
   }
   return items;
+}
+
+function compileCaptions(timeline: MediaTimelineV1): readonly DynamicSlideshowCaptionV1[] {
+  const captionTrack = timeline.tracks.find((track): track is Extract<typeof track, { kind: "caption" }> => track.kind === "caption");
+  if (!captionTrack) return [];
+  return [...captionTrack.items]
+    .sort((a, b) => a.startMs - b.startMs || a.id.localeCompare(b.id))
+    .map((item) => ({
+      startFrame: Math.round((item.startMs * timeline.frameRate) / 1_000),
+      endFrame: Math.round((item.endMs * timeline.frameRate) / 1_000),
+      text: item.text,
+    }));
 }
 
 function resolveContinuousAudio(
@@ -163,6 +178,7 @@ export function compileTimelineV1ToDynamicSlideshow(
   });
   const totalDurationMs = video.reduce((duration, item) => duration + item.durationMs, 0);
   const audioUrl = resolveContinuousAudio(timeline, totalDurationMs, resolver, errors);
+  const captions = compileCaptions(timeline);
   if (errors.length) return { ok: false, errors };
 
   return {
@@ -181,6 +197,7 @@ export function compileTimelineV1ToDynamicSlideshow(
           height: dimension.height,
           transitionDurationSeconds: 1,
           ...(audioUrl ? { audioUrl } : {}),
+          ...(captions.length ? { captions } : {}),
         },
       };
     }),

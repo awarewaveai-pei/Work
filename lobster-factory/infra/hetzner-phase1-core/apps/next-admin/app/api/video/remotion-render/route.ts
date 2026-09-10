@@ -2,13 +2,15 @@
  * POST /api/video/remotion-render
  *
  * Forwards { templateId, props } to the EU remotion-service and returns
- * the remotion service's own jobId for polling via /api/video/remotion-status.
+ * a job-store UUID for polling via /api/video/remotion-job-status.
  *
  * Env: REMOTION_SERVICE_URL (default http://127.0.0.1:8733), REMOTION_AUTH_TOKEN
  */
 import { NextRequest, NextResponse } from "next/server";
 import { submitRemotion } from "@/lib/content/video/remotion-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { createJob, finishJob } from "@/lib/content/video/job-store";
 
 /** All templateIds the EU remotion-service accepts (mirrors TEMPLATE_MAP in server.ts). */
 const ALLOWED_TEMPLATE_IDS = new Set([
@@ -49,6 +51,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "templateId 為必填" }, { status: 400 });
   }
 
+  const { resolveOrgId: resolveDefaultOrgId } = await import("@/lib/content/blocks/video-pipeline");
+  let orgId: string | null;
+  try { orgId = effectiveOrgId(req, resolveDefaultOrgId()); }
+  catch (error) { if (error instanceof OrgAccessError) return toOrgAccessResponse(error) as NextResponse; throw error; }
+  if (!orgId) return NextResponse.json({ ok: false, error: "影片工作必須綁定組織" }, { status: 403 });
+
   // Fix 2a: templateId whitelist — prevent forwarding arbitrary composition IDs to the EU renderer.
   if (!ALLOWED_TEMPLATE_IDS.has(body.templateId)) {
     return NextResponse.json(
@@ -86,9 +94,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const result = await submitRemotion(body.templateId, body.props ?? {});
+  let job: Awaited<ReturnType<typeof createJob>>;
+  try { job = await createJob(orgId); }
+  catch (error) {
+    console.error("[video/remotion-render] createJob failed", error);
+    return NextResponse.json({ ok: false, error: "無法建立影片工作" }, { status: 500 });
+  }
+  let result: Awaited<ReturnType<typeof submitRemotion>>;
+  try { result = await submitRemotion(body.templateId, body.props ?? {}); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : "Remotion 提交失敗";
+    await finishJob(job.id, { status: "error", error: message, statusCode: 502 });
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+  }
   if (result.ok === false) {
+    await finishJob(job.id, { status: "error", error: result.error, statusCode: 502 });
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
   }
-  return NextResponse.json({ ok: true, jobId: result.jobId });
+  const scenes = Array.isArray((body.props as Record<string, unknown> | undefined)?.scenes)
+    ? ((body.props as Record<string, unknown>).scenes as unknown[]).length : 0;
+  await finishJob(job.id, {
+    status: "running", euJobId: result.jobId,
+    recordParams: { title: "Remotion template", sceneCount: scenes, organizationId: orgId, source: "draft", rendererKind: "remotion" },
+  });
+  return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
 }

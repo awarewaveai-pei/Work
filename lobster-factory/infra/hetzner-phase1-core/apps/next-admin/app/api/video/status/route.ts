@@ -92,6 +92,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, status: "running", step: job.step ?? "準備中…" });
   }
 
+  if (job.recordParams?.rendererKind === "remotion") {
+    return NextResponse.json({ ok: false, error: "Remotion job 使用 /api/video/remotion-job-status" }, { status: 409 });
+  }
+
   // 查 EU 一次
   const { pollRenderJob } = await import("@/lib/content/video/render-client");
   const poll = await pollRenderJob(job.euJobId);
@@ -115,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const primaryUrl = pickPrimaryOutput(poll.outputs);
       if (primaryUrl && primaryUrl.startsWith("https://")) {
         try {
-          await recordVideoAsset({
+          const asset = await recordVideoAsset({
             organizationId: job.recordParams.organizationId,
             primaryUrl,
             outputs: poll.outputs,
@@ -132,6 +136,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             // enriched rather than freezing `title: <dir>` / `sceneCount: 0`.
             authoritative: true,
           });
+          if (asset) {
+            const { persistAutomaticTechnicalQa } = await import("@/lib/content/video/qa-persistence");
+            await persistAutomaticTechnicalQa({
+              organizationId: job.recordParams.organizationId,
+              candidateAssetId: asset.id,
+              candidateChecksum: asset.checksumSha256,
+              outputs: poll.outputs,
+              outputMeta: poll.outputMeta,
+            });
+            if (job.recordParams.captionCues) {
+              const { persistAutomaticCaptionQa } = await import("@/lib/content/video/caption-qa-persistence");
+              await persistAutomaticCaptionQa({
+                organizationId: job.recordParams.organizationId,
+                candidateAssetId: asset.id,
+                candidateChecksum: asset.checksumSha256,
+                captions: job.recordParams.captionCues,
+              });
+            }
+          }
         } catch (e) {
           console.warn("[video/status] recordVideoAsset threw (best-effort):", e);
         }

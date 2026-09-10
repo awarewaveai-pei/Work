@@ -69,6 +69,11 @@ export function canCreateAiImageJob(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";
 }
 
+/** A Release is an approval to make a tenant artifact externally deliverable. */
+export function canApproveMediaRelease(role: OpsRole): boolean {
+  return role === "owner" || role === "admin";
+}
+
 // === 路線 B Ops Inbox 新增（docs/Ops_Observability_PathB_Plan.md §5.4） ===
 export function canTriggerAiDiagnose(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";

@@ -11,6 +11,13 @@ import {
   PLATFORM_VIDEO_FORMAT,
   type PostizMediaRef,
 } from "@/lib/content/postiz";
+import {
+  ensureDeliveryReceipt,
+  claimDeliveryReceipt,
+  mediaPersistenceEnabled,
+  recordDeliveryReceipt,
+  type DeliveryReceipt,
+} from "@/lib/content/video/delivery-receipts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +32,9 @@ type RequestBody = {
    *  its preferred format via PLATFORM_VIDEO_FORMAT routing. */
   videoUrls?: Partial<Record<"16x9" | "9x16" | "4x5", string>>;
   confirmPublishNow?: boolean;
+  /** Optional release linkage. When supplied, Postiz receipts are persisted after migration 0065. */
+  releaseId?: string;
+  variant?: string;
 };
 
 export async function POST(req: Request): Promise<Response> {
@@ -40,10 +50,16 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const { clientId, mode, platforms, imageUrl, videoUrls, confirmPublishNow = false } = body;
+  const { clientId, mode, platforms, imageUrl, videoUrls, confirmPublishNow = false, releaseId, variant = "default" } = body;
 
   if (!clientId || typeof clientId !== "string") {
     return new NextResponse("clientId required", { status: 400 });
+  }
+  if (releaseId !== undefined && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(releaseId)) {
+    return new NextResponse("releaseId must be a UUID", { status: 400 });
+  }
+  if (typeof variant !== "string" || !variant.trim() || variant.length > 64) {
+    return new NextResponse("variant must be a non-empty string up to 64 characters", { status: 400 });
   }
   try { assertOrgAccess(req, clientId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
@@ -136,11 +152,67 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Reserve idempotent delivery rows before calling Postiz. This makes a
+  // retried request safe and guarantees every external call has a receipt.
+  const receipts = new Map<string, DeliveryReceipt>();
+  if (releaseId && mediaPersistenceEnabled()) {
+    try {
+      for (const post of requestedPosts) {
+        const receipt = await ensureDeliveryReceipt({
+          organizationId: clientId,
+          releaseId,
+          destination: "postiz",
+          variant: `${variant}:${post.platform}`,
+        });
+        if (receipt) receipts.set(post.platform, receipt);
+      }
+    } catch (err) {
+      return NextResponse.json(
+        { ok: false, error: err instanceof Error ? err.message : "failed to reserve delivery receipt" },
+        { status: 503 },
+      );
+    }
+  }
+
+  // Claim each destination before uploading media or creating a Postiz post.
+  // A non-claimed receipt is a previous external operation (or one awaiting
+  // reconciliation), never a signal to replay it.
+  const dispatchPosts: typeof requestedPosts = [];
+  const receiptSkipped: Array<{ platform: string; status: string; externalId?: string }> = [];
+  if (receipts.size > 0) {
+    try {
+      for (const post of requestedPosts) {
+        const receipt = receipts.get(post.platform);
+        if (!receipt) continue;
+        const claim = await claimDeliveryReceipt(receipt);
+        if (!claim) continue;
+        receipts.set(post.platform, claim.receipt);
+        if (claim.claimed) dispatchPosts.push(post);
+        else receiptSkipped.push({ platform: post.platform, status: claim.receipt.status, ...(claim.receipt.externalId ? { externalId: claim.receipt.externalId } : {}) });
+      }
+    } catch (err) {
+      return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "failed to claim delivery receipt" }, { status: 503 });
+    }
+  } else {
+    dispatchPosts.push(...requestedPosts);
+  }
+  if (dispatchPosts.length === 0) {
+    return NextResponse.json({ ok: true, results: receiptSkipped, skipped, idempotent: true });
+  }
+  const markClaimedFailure = async (phase: string, error: string) => {
+    await Promise.all(dispatchPosts.map(async (post) => {
+      const receipt = receipts.get(post.platform);
+      if (!receipt) return;
+      try { await recordDeliveryReceipt(receipt, { type: "failed" }, { phase, error, platform: post.platform }); } catch { /* preserve primary failure */ }
+    }));
+  };
+
   let media: PostizMediaRef | undefined;
   if (imageUrl) {
     try {
       media = await uploadMedia({ imageUrl });
     } catch (err) {
+      await markClaimedFailure("image_upload", err instanceof Error ? err.message : String(err));
       return NextResponse.json(
         { ok: false, error: `media upload failed: ${err instanceof Error ? err.message : String(err)}` },
         { status: 500 }
@@ -155,7 +227,7 @@ export async function POST(req: Request): Promise<Response> {
     const urlToRef = new Map<string, PostizMediaRef>();
     const uploadErrors: string[] = [];
 
-    for (const post of requestedPosts) {
+    for (const post of dispatchPosts) {
       const preferredFormat = PLATFORM_VIDEO_FORMAT[post.platform] ?? "16x9";
       // Fall back through format priority if the preferred format wasn't generated
       const candidateFormats: Array<"9x16" | "4x5" | "16x9"> =
@@ -183,6 +255,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     if (uploadErrors.length > 0) {
+      await markClaimedFailure("video_upload", uploadErrors.join("; "));
       return NextResponse.json(
         { ok: false, error: `video upload failed: ${uploadErrors.join("; ")}` },
         { status: 500 }
@@ -190,7 +263,30 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const results = await createSocialPost({ clientId, mode, posts: requestedPosts, media, mediaPerPlatform });
+  const results = await createSocialPost({ clientId, mode, posts: dispatchPosts, media, mediaPerPlatform });
 
-  return NextResponse.json({ ok: true, results, skipped });
+  let receiptError: string | undefined;
+  if (receipts.size > 0) {
+    for (const result of results) {
+      const receipt = receipts.get(result.platform);
+      if (!receipt) continue;
+      try {
+        const event = result.status === "ok"
+          ? { type: mode === "draft" ? "drafted" : "published", externalId: result.postizPostId } as const
+          : { type: "failed" } as const;
+        const first = await recordDeliveryReceipt(
+          receipt,
+          mode === "now" && result.status === "ok" ? { type: "drafted", externalId: result.postizPostId } : event,
+          { mode, platform: result.platform, integrationId: result.integrationId, result },
+        );
+        if (mode === "now" && result.status === "ok" && first) {
+          await recordDeliveryReceipt(first, { type: "published", externalId: result.postizPostId }, { mode, platform: result.platform, result });
+        }
+      } catch (err) {
+        receiptError = err instanceof Error ? err.message : "failed to persist delivery receipt";
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, results: [...results, ...receiptSkipped], skipped, ...(receiptError ? { receiptError } : {}) });
 }
