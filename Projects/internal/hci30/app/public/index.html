@@ -4,119 +4,142 @@
 <meta charset="utf-8">
 <title>HCI-30 信任評估報告（開發版）</title>
 <style>
+  /* Design direction (2026-09-10, third pass -- operator rejected two
+     generic "blue accent + shadow card" SaaS reskins as looking cheap):
+     an authoritative analyst-report language, not an internal admin panel.
+     Deep teal (verification/soundness, not the generic indigo every AI-
+     generated site defaults to) + warm cream (not cold gray) + large serif
+     display headings for gravitas + hairline rules instead of boxed shadow-
+     cards, so content (scores, evidence, decisions) is the focus instead of
+     a grid of competing borders. */
   :root {
-    --very-high: #15803d; --high: #22c55e; --moderate: #b45309; --low: #ea580c; --very-low: #dc2626;
-    --bg: #eef1f6; --card: #fff; --border: #e3e7ee; --text: #161a22; --muted: #6b7280;
-    --ink: #0b1220; --accent: #3454d1; --accent-ink: #24399b;
-    --shadow-sm: 0 1px 2px rgba(15,23,42,.05), 0 1px 1px rgba(15,23,42,.04);
-    --shadow-md: 0 8px 24px rgba(15,23,42,.10);
+    --very-high: #1f6b47; --high: #3f8f5f; --moderate: #a3611c; --low: #b5501f; --very-low: #a13328;
+    --bg: #f6f2e9; --card: #fffdf8; --border: #e3dbc8; --text: #232019; --muted: #7a7261;
+    --ink: #1c2b27; --teal: #0e5b50; --teal-ink: #093f38; --teal-tint: #e2eeea;
   }
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
-    background: var(--bg); color: var(--text); margin: 0; padding: 0 0 4rem;
+    background: var(--bg); color: var(--text); margin: 0; padding: 0 0 5rem;
   }
-  .topbar { background: var(--ink); color: #fff; padding: 1.1rem 0; border-bottom: 3px solid var(--accent); }
-  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; display: flex; align-items: baseline; gap: 0.65rem; }
-  .brand { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
-  .brand-sub { font-size: 0.82rem; font-weight: 400; color: #9aa5c0; }
+  .topbar { background: var(--ink); color: #f3efe4; padding: 1.35rem 0; }
+  .topbar-inner { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; display: flex; align-items: baseline; gap: 0.75rem; }
+  .brand { font-family: "Noto Serif TC", "PMingLiU", Georgia, "Times New Roman", serif; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.01em; }
+  .brand-sub { font-size: 0.85rem; font-weight: 400; color: #a9beb6; }
 
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 1.75rem 1.25rem; }
-  .note { background: #fff8e1; border: 1px solid #e0c26a; padding: 0.65rem 1rem; border-radius: 10px; font-size: 0.82rem; margin-bottom: 1.35rem; color: #665200; }
-  .tenant-switch { display: flex; gap: 0.5rem; margin-bottom: 1.35rem; }
-  .tenant-switch button { padding: 0.45rem 1.15rem; border: 1px solid var(--border); background: var(--card); border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-family: inherit; transition: background .15s, color .15s, border-color .15s; }
-  .tenant-switch button:hover { border-color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+  .note { background: #fbf0d9; border: 1px solid #dcc17f; padding: 0.7rem 1.1rem; border-radius: 4px; font-size: 0.82rem; margin-bottom: 1.5rem; color: #6b4f14; }
+  .tenant-switch { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .tenant-switch button { padding: 0.45rem 1.15rem; border: 1.5px solid var(--border); background: transparent; border-radius: 999px; cursor: pointer; font-size: 0.85rem; font-family: inherit; color: var(--text); transition: background .15s, color .15s, border-color .15s; }
+  .tenant-switch button:hover { border-color: var(--teal); }
   .tenant-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-  .intro-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.3rem 1.4rem; margin-bottom: 1.4rem; box-shadow: var(--shadow-sm); }
-  .intro-lede { margin: 0 0 1.1rem; font-size: 0.98rem; line-height: 1.6; }
+  .intro-card { border-bottom: 1px solid var(--border); padding-bottom: 1.8rem; margin-bottom: 2rem; }
+  .intro-lede { margin: 0 0 1.5rem; font-size: 1.05rem; line-height: 1.75; max-width: 46em; }
   .steps { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: wrap; }
-  .step { display: flex; align-items: flex-start; gap: 0.6rem; flex: 1 1 180px; min-width: 160px; }
-  .step-num { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
+  .step { display: flex; align-items: flex-start; gap: 0.65rem; flex: 1 1 180px; min-width: 160px; }
+  .step-num { flex: none; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--teal-tint); color: var(--teal-ink); font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; border: 1px solid var(--teal); }
   .step-text { font-size: 0.85rem; line-height: 1.5; }
   .step-text b { display: block; margin-bottom: 0.1rem; }
-  .step-arrow { flex: none; color: var(--border); font-size: 1.2rem; padding-top: 0.15rem; }
-  .field-hint { font-size: 0.78rem; color: var(--muted); margin: -0.15rem 0 0; line-height: 1.5; }
+  .step-arrow { flex: none; color: var(--border); font-size: 1.2rem; padding-top: 0.2rem; }
+  .field-hint { font-size: 0.78rem; color: var(--muted); margin: -0.1rem 0 0; line-height: 1.5; }
 
-  .cta-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px; padding: 0.9rem 1.2rem; margin: 1rem 0; }
-  .cta-banner p { margin: 0; font-size: 0.9rem; color: var(--accent-ink); }
-  .cta-banner button { flex: none; padding: 0.5rem 1.15rem; border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; }
-  .cta-banner button:hover { background: var(--accent-ink); }
+  .cta-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: var(--teal-tint); border-left: 3px solid var(--teal); padding: 1rem 1.3rem; margin: 1.5rem 0; }
+  .cta-banner p { margin: 0; font-size: 0.9rem; color: var(--teal-ink); }
+  .cta-banner button { flex: none; padding: 0.55rem 1.2rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; }
+  .cta-banner button:hover { background: var(--teal-ink); }
 
-  h1 { font-size: 1.55rem; margin: 0 0 0.3rem; letter-spacing: 0.01em; }
-  h2 { font-size: 0.92rem; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); margin: 2.1rem 0 0.8rem; }
-  .case-grid { display: grid; gap: 0.75rem; }
-  .case-card { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 10px; padding: 1rem 1.15rem; cursor: pointer; box-shadow: var(--shadow-sm); transition: box-shadow .15s, border-left-color .15s, transform .15s; }
-  .case-card:hover { box-shadow: var(--shadow-md); border-left-color: var(--accent); transform: translateY(-1px); }
-  .case-card.status-OPEN, .case-card.status-ACTIVE { border-left-color: var(--very-high); }
+  h1 { font-family: "Noto Serif TC", "PMingLiU", Georgia, "Times New Roman", serif; font-weight: 700; font-size: 2.05rem; margin: 0 0 0.4rem; letter-spacing: 0; line-height: 1.25; }
+  h2 { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); margin: 2.6rem 0 1.1rem; text-transform: uppercase; }
+  h2.section-heading { font-family: "Noto Serif TC", "PMingLiU", Georgia, serif; font-size: 1.4rem; font-weight: 700; color: var(--text); text-transform: none; letter-spacing: 0; margin: 2.6rem 0 1rem; }
+
+  .new-case-btn { display: block; width: 100%; text-align: center; padding: 1.1rem 1rem; border: 1.5px solid var(--teal); border-radius: 4px; background: transparent; color: var(--teal-ink); font-weight: 700; font-size: 1rem; cursor: pointer; font-family: inherit; margin-bottom: 2rem; transition: background .15s, color .15s; }
+  .new-case-btn:hover { background: var(--teal); color: #fff; }
+
+  .case-grid { display: block; margin-bottom: 0.5rem; }
+  .case-card { background: transparent; border: none; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; padding: 1.1rem 0.4rem 1.1rem 1rem; cursor: pointer; transition: background .12s, border-left-color .12s; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .case-card:hover { background: var(--teal-tint); }
+  .case-card.status-OPEN, .case-card.status-ACTIVE { border-left-color: var(--teal); }
   .case-card.status-CLOSED { border-left-color: var(--border); }
-  .case-card .title { font-weight: 700; font-size: 1.02rem; }
-  .case-card .meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.25rem; }
-  .badge { display: inline-block; padding: 0.18rem 0.65rem; border-radius: 12px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
-  .badge.status-OPEN, .badge.status-ACTIVE { background: #e6f4ea; color: var(--very-high); }
-  .badge.status-CLOSED { background: #eee; color: var(--muted); }
+  .case-card .title { font-weight: 700; font-size: 1.08rem; }
+  .case-card .meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.3rem; }
+  .badge { display: inline-block; padding: 0.18rem 0.7rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; }
+  .badge.status-OPEN, .badge.status-ACTIVE { background: var(--teal-tint); color: var(--teal-ink); }
+  .badge.status-CLOSED { background: #ece6d6; color: var(--muted); }
+  .reopen-btn { flex: none; padding: 0.45rem 1rem; border: 1.5px solid var(--teal); border-radius: 999px; background: #fff; color: var(--teal-ink); font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
+  .reopen-btn:hover { background: var(--teal); color: #fff; }
 
-  .band-VERY_HIGH, .band-HIGH { background: #e6f4ea; color: var(--very-high); }
-  .band-MODERATE { background: #fdf3d9; color: var(--moderate); }
-  .band-LOW { background: #fdeee0; color: var(--low); }
-  .band-VERY_LOW { background: #fbe2e0; color: var(--very-low); }
-  .band-badge { display: inline-block; padding: 0.22rem 0.75rem; border-radius: 12px; font-size: 0.78rem; font-weight: 700; }
+  .band-VERY_HIGH, .band-HIGH { background: var(--teal-tint); color: var(--very-high); }
+  .band-MODERATE { background: #f7ead0; color: var(--moderate); }
+  .band-LOW { background: #f7e2d3; color: var(--low); }
+  .band-VERY_LOW { background: #f3ddd8; color: var(--very-low); }
+  .band-badge { display: inline-block; padding: 0.25rem 0.85rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
 
-  .back { cursor: pointer; color: var(--accent); font-size: 0.85rem; font-weight: 600; }
-  .back:hover { color: var(--accent-ink); }
-  .subtitle { color: var(--muted); font-size: 0.9rem; }
+  .back { cursor: pointer; color: var(--teal-ink); font-size: 0.85rem; font-weight: 600; }
+  .back:hover { color: var(--teal); }
+  .subtitle { color: var(--muted); font-size: 0.92rem; }
 
-  .decision-banner { border-radius: 12px; padding: 1.1rem 1.3rem; margin: 1rem 0; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-  .decision-banner.outcome-PROCEED { background: #e6f4ea; border-color: #b7dfc3; }
-  .decision-banner.outcome-PROCEED_WITH_CONTROLS { background: #fdf3d9; border-color: #ead9a0; }
-  .decision-banner.outcome-LIMIT_ACCESS { background: #fdf3d9; border-color: #ead9a0; }
-  .decision-banner.outcome-PAUSE { background: #fdeee0; border-color: #f0cba3; }
-  .decision-banner.outcome-REVIEW_REQUIRED { background: #fdeee0; border-color: #f0cba3; }
-  .decision-banner.outcome-EXIT { background: #fbe2e0; border-color: #eab5b0; }
-  .decision-banner .outcome-label { font-weight: 700; font-size: 1.08rem; }
-  .decision-banner .rationale { margin-top: 0.4rem; font-size: 0.9rem; }
-  .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.45rem; }
+  .report-header { border-top: 3px solid var(--teal); padding: 1.8rem 0 0.2rem; margin: 1.5rem 0; }
+  .report-header .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 
-  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
-  .domain-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.95rem 1.05rem; box-shadow: var(--shadow-sm); }
-  .domain-card .domain-name { font-size: 0.82rem; font-weight: 700; color: var(--text); }
-  .domain-card .domain-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }
-  .domain-card.unknown { border-style: dashed; color: var(--muted); box-shadow: none; }
-  .meter { height: 6px; background: #eef0f4; border-radius: 4px; overflow: hidden; margin: 0.55rem 0 0.5rem; }
-  .meter-fill { height: 100%; border-radius: 4px; }
-  .meter-fill.band-fill-VERY_HIGH { width: 100%; background: var(--very-high); }
-  .meter-fill.band-fill-HIGH { width: 80%; background: var(--high); }
-  .meter-fill.band-fill-MODERATE { width: 60%; background: var(--moderate); }
-  .meter-fill.band-fill-LOW { width: 40%; background: var(--low); }
-  .meter-fill.band-fill-VERY_LOW { width: 20%; background: var(--very-low); }
+  .decision-banner { border-radius: 4px; padding: 1.2rem 1.4rem; margin-top: 1.2rem; border: 1px solid var(--border); border-left: 4px solid var(--muted); }
+  .decision-banner.outcome-PROCEED { background: var(--teal-tint); border-left-color: var(--very-high); }
+  .decision-banner.outcome-PROCEED_WITH_CONTROLS { background: #f7ead0; border-left-color: var(--moderate); }
+  .decision-banner.outcome-LIMIT_ACCESS { background: #f7ead0; border-left-color: var(--moderate); }
+  .decision-banner.outcome-PAUSE { background: #f7e2d3; border-left-color: var(--low); }
+  .decision-banner.outcome-REVIEW_REQUIRED { background: #f7e2d3; border-left-color: var(--low); }
+  .decision-banner.outcome-EXIT { background: #f3ddd8; border-left-color: var(--very-low); }
+  .decision-banner .outcome-label { font-family: "Noto Serif TC", "PMingLiU", Georgia, serif; font-weight: 700; font-size: 1.25rem; }
+  .decision-banner .rationale { margin-top: 0.5rem; font-size: 0.92rem; line-height: 1.6; }
+  .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
 
-  .insight-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-  .insight-col { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1.05rem; box-shadow: var(--shadow-sm); }
-  .insight-col h3 { font-size: 0.82rem; margin: 0 0 0.55rem; }
-  .insight-col ul { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; }
+  .radar-wrap { padding: 0.5rem 0 1.5rem; }
+  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); }
+  .domain-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0.85rem 0.4rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .domain-card .domain-name { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+  .domain-card .domain-meta { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+  .domain-card.unknown { color: var(--muted); }
+
+  .insight-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  .insight-col { background: transparent; border: none; padding: 0; }
+  .insight-col h3 { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 0.7rem; }
+  .insight-col ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; line-height: 1.7; }
   .insight-col.strengths h3 { color: var(--very-high); }
   .insight-col.risks h3 { color: var(--very-low); }
   .insight-col.unknowns h3 { color: var(--muted); }
 
-  .record-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1.15rem; margin-bottom: 0.6rem; box-shadow: var(--shadow-sm); }
-  .record-card .kind-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; color: var(--accent-ink); }
-  .record-card .content { margin-top: 0.35rem; font-size: 0.92rem; }
-  .record-card .quality-tag { display: inline-block; margin-top: 0.45rem; font-size: 0.7rem; padding: 0.12rem 0.55rem; border-radius: 8px; background: #eef1f6; color: var(--muted); }
+  .record-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 1rem 0.2rem; margin-bottom: 0; }
+  .record-card .kind-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: var(--teal-ink); text-transform: uppercase; }
+  .record-card .content { margin-top: 0.4rem; font-size: 0.95rem; line-height: 1.6; }
+  .record-card .quality-tag { display: inline-block; margin-top: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: var(--teal-tint); color: var(--teal-ink); }
 
-  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.95rem 1.15rem; margin-top: 1rem; box-shadow: var(--shadow-sm); }
-  details.add-panel summary { cursor: pointer; font-weight: 700; font-size: 0.92rem; color: var(--accent-ink); }
-  form.inline-form { display: grid; gap: 0.6rem; max-width: 540px; margin-top: 0.9rem; }
-  form.inline-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
-  form.inline-form input, form.inline-form select, form.inline-form textarea {
-    padding: 0.5rem 0.65rem; font-size: 0.88rem; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; color: var(--text); background: #fff;
+  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.2rem 1.4rem; margin-top: 1.2rem; }
+  details.add-panel summary { cursor: pointer; font-weight: 700; font-size: 0.95rem; color: var(--teal-ink); }
+  form.inline-form { display: grid; gap: 0.5rem; max-width: 640px; margin-top: 1rem; }
+  form.inline-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-top: 0.4rem; }
+  form.inline-form input, form.inline-form textarea {
+    padding: 0.55rem 0.7rem; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; color: var(--text); background: #fff;
   }
-  form.inline-form input:focus, form.inline-form select:focus, form.inline-form textarea:focus {
-    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(52,84,209,.15);
+  form.inline-form input:focus, form.inline-form textarea:focus {
+    outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14,91,80,.14);
   }
-  form.inline-form button { justify-self: start; padding: 0.55rem 1.25rem; border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; font-size: 0.88rem; font-weight: 700; font-family: inherit; transition: background .15s; }
-  form.inline-form button:hover { background: var(--accent-ink); }
+  form.inline-form > button[type="submit"] { justify-self: start; padding: 0.65rem 1.5rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; cursor: pointer; font-size: 0.9rem; font-weight: 700; font-family: inherit; transition: background .15s; margin-top: 0.6rem; }
+  form.inline-form > button[type="submit"]:hover { background: var(--teal-ink); }
   .err { color: var(--very-low); font-size: 0.82rem; }
   .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+
+  /* Button-based selection: every choice visible at once, click to pick --
+     no dropdown ever hides an option the user has to guess exists. Pill
+     shape, thin outline when unselected, soft teal tint (not a stark solid
+     fill) when selected -- meant to feel tactile, not like a flat toggle. */
+  .chip-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip-group.block { flex-direction: column; }
+  .chip { padding: 0.5rem 1rem; border: 1.5px solid var(--border); border-radius: 999px; background: transparent; cursor: pointer; font-size: 0.85rem; font-family: inherit; color: var(--text); transition: border-color .12s, background .12s, color .12s; text-align: left; line-height: 1.4; }
+  .chip:hover { border-color: var(--teal); }
+  .chip.selected { background: var(--teal-tint); border-color: var(--teal); color: var(--teal-ink); font-weight: 700; }
+  .chip.block { width: 100%; border-radius: 4px; }
+  .chip.dashed { border-style: dashed; color: var(--teal-ink); }
+  .chip:disabled { opacity: 0.45; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -142,26 +165,39 @@
     </div>
   </div>
 
-  <div class="case-grid" id="cases"></div>
+  <button type="button" class="new-case-btn" onclick="document.getElementById('case-add-panel').open = true; document.getElementById('case-add-panel').scrollIntoView({behavior:'smooth'})">＋ 開始新的信任調查</button>
 
-  <details class="add-panel" id="case-add-panel" style="margin-top:1rem" open>
+  <h2 class="section-heading">進行中案件</h2>
+  <div class="case-grid" id="cases-active"></div>
+
+  <h2 class="section-heading">歷史案件</h2>
+  <div class="case-grid" id="cases-closed"></div>
+
+  <details class="add-panel" id="case-add-panel" style="margin-top:1.5rem">
     <summary>＋ 開立新案件</summary>
     <form class="inline-form" onsubmit="return submitCase(event)">
-      <label for="c-purpose">調查目的</label>
-      <select id="c-purpose">
-        <option value="vendor_risk_assessment">供應商風險評估</option>
-        <option value="fraud_investigation">詐欺調查</option>
-        <option value="personal_safety">人身安全</option>
-        <option value="journalism_research">新聞調查研究</option>
-        <option value="general_due_diligence">一般盡職調查</option>
-      </select>
+      <label>調查目的</label>
+      <div class="chip-group" id="c-purpose-chips">
+        <button type="button" class="chip selected" data-value="vendor_risk_assessment" onclick="pickChip(this,'c-purpose')">供應商風險評估</button>
+        <button type="button" class="chip" data-value="fraud_investigation" onclick="pickChip(this,'c-purpose')">詐欺調查</button>
+        <button type="button" class="chip" data-value="personal_safety" onclick="pickChip(this,'c-purpose')">人身安全</button>
+        <button type="button" class="chip" data-value="journalism_research" onclick="pickChip(this,'c-purpose')">新聞調查研究</button>
+        <button type="button" class="chip" data-value="general_due_diligence" onclick="pickChip(this,'c-purpose')">一般盡職調查</button>
+      </div>
+      <input type="hidden" id="c-purpose" value="vendor_risk_assessment">
       <p class="field-hint">選一個最符合這次調查性質的分類，會影響適用的規範。</p>
-      <label for="c-risk">風險等級</label>
-      <select id="c-risk">
-        <option value="R0">R0（風險最低）</option><option value="R1">R1</option><option value="R2">R2（中等）</option>
-        <option value="R3">R3</option><option value="R4">R4（風險最高）</option>
-      </select>
+
+      <label>風險等級</label>
+      <div class="chip-group" id="c-risk-chips">
+        <button type="button" class="chip selected" data-value="R0" onclick="pickChip(this,'c-risk')">R0（風險最低）</button>
+        <button type="button" class="chip" data-value="R1" onclick="pickChip(this,'c-risk')">R1</button>
+        <button type="button" class="chip" data-value="R2" onclick="pickChip(this,'c-risk')">R2（中等）</button>
+        <button type="button" class="chip" data-value="R3" onclick="pickChip(this,'c-risk')">R3</button>
+        <button type="button" class="chip" data-value="R4" onclick="pickChip(this,'c-risk')">R4（風險最高）</button>
+      </div>
+      <input type="hidden" id="c-risk" value="R0">
       <p class="field-hint">數字愈大代表這次調查愈敏感、應愈嚴謹看待；實際分級標準另由內部規範決定，不確定可先選最低再視情況調整。</p>
+
       <label for="c-requester">委託背景說明</label>
       <textarea id="c-requester" rows="2" placeholder="誰提出委託、為了什麼原因" required></textarea>
       <label for="c-relationship">關係背景（選填）</label>
@@ -181,15 +217,25 @@
 
 <div id="detail" style="display:none">
   <p><span class="back" onclick="showList()">&larr; 返回案件列表</span></p>
-  <h1 id="d-title"></h1>
-  <p class="subtitle" id="d-meta"></p>
 
-  <div id="d-decision-banner"></div>
+  <div class="report-header">
+    <div class="head-row">
+      <div>
+        <h1 id="d-title" style="margin:0"></h1>
+        <p class="subtitle" id="d-meta" style="margin-top:0.3rem"></p>
+      </div>
+      <div id="d-reopen-wrap"></div>
+    </div>
+    <div id="d-decision-banner"></div>
+  </div>
   <div id="d-empty-cta"></div>
 
   <h2>信任構面</h2>
   <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
-  <div class="domain-grid" id="d-domains"></div>
+  <div class="radar-wrap">
+    <div id="d-radar"></div>
+    <div class="domain-grid" id="d-domains"></div>
+  </div>
 
   <div class="insight-cols" style="margin-top:1.5rem">
     <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
@@ -206,17 +252,20 @@
   <details class="add-panel" id="record-add-panel">
     <summary>＋ 新增調查發現</summary>
     <form class="inline-form" onsubmit="return submitRecord(event)">
-      <label for="f-person">當事人</label>
-      <select id="f-person" onchange="togglePersonNew()"></select>
+      <label>當事人</label>
+      <div class="chip-group" id="f-person-chips"></div>
+      <input type="hidden" id="f-person">
       <div id="f-person-new-wrap" style="display:none">
         <input id="f-person-new" placeholder="新當事人的姓名或顯示名稱">
       </div>
-      <label for="f-kind">類型</label>
-      <select id="f-kind" onchange="renderKindFields()">
-        <option value="EVIDENCE">證據</option>
-        <option value="CLAIM">主張</option>
-        <option value="ASSESSMENT">評估</option>
-      </select>
+
+      <label>類型</label>
+      <div class="chip-group" id="f-kind-chips">
+        <button type="button" class="chip selected" data-value="EVIDENCE" onclick="pickChip(this,'f-kind')">證據</button>
+        <button type="button" class="chip" data-value="CLAIM" onclick="pickChip(this,'f-kind')">主張</button>
+        <button type="button" class="chip" data-value="ASSESSMENT" onclick="pickChip(this,'f-kind')">評估</button>
+      </div>
+      <input type="hidden" id="f-kind" value="EVIDENCE">
       <p class="field-hint">上方的信任構面分數無法手動輸入——它是根據你新增的證據、主張與評估，由系統自動算出來的，確保每個分數都查得到根據。</p>
       <div id="f-kind-fields"></div>
       <button type="submit">送出紀錄</button>
@@ -234,7 +283,7 @@ let currentRecords = [];
 // guard -- two overlapping calls (e.g. open case1, navigate to case2 before
 // case1's fetch resolves) could let an out-of-order response overwrite
 // currentRecords with a different case's data than the one on screen, which
-// citableOptions() would then offer as citable evidence for the wrong case.
+// citableChips() would then offer as citable evidence for the wrong case.
 let detailRequestSeq = 0;
 
 const DIMENSIONS = ['INTEGRITY_CONSISTENCY','RELIABILITY_FULFILLMENT','COMPETENCE','COMMUNICATION_QUALITY',
@@ -248,6 +297,13 @@ const OUTCOMES = ['PROCEED','PROCEED_WITH_CONTROLS','LIMIT_ACCESS','PAUSE','REVI
 // only the right-hand label is presentational. Never key API calls off these.
 const DIMENSION_LABELS = { INTEGRITY_CONSISTENCY:'誠信與一致性', RELIABILITY_FULFILLMENT:'可靠度與履約', COMPETENCE:'專業能力', COMMUNICATION_QUALITY:'溝通品質', BOUNDARY_RESPECT:'界線尊重', RECIPROCITY_FAIRNESS:'互惠與公平', CONFLICT_REPAIR:'衝突修復能力', POWER_BEHAVIOR:'權力行為', INCENTIVE_ALIGNMENT:'誘因一致性', RISK_EXTERNALIZATION:'風險外部化傾向', INFORMATION_GOVERNANCE:'資訊治理', LEARNING_ADAPTABILITY:'學習與應變能力', CONTEXT_STABILITY:'情境穩定度', PREDICTABILITY:'可預測性' };
 const BAND_LABELS = { VERY_LOW:'極低', LOW:'偏低', MODERATE:'中等', HIGH:'偏高', VERY_HIGH:'極高' };
+// Derived from BANDS above (packages/intelligence/band-scale.mjs's own
+// ordering), not a second independent hardcode -- this file has no module
+// loader/build step to import that package directly (plain static HTML, no
+// bundler), so BANDS itself is already a disclosed, pre-existing duplicate;
+// this at least avoids a THIRD independent copy of the same 5-value order.
+const BAND_RANK = Object.fromEntries(BANDS.map((b, i) => [b, i + 1]));
+const BAND_COLOR = { VERY_LOW: '#a13328', LOW: '#b5501f', MODERATE: '#a3611c', HIGH: '#3f8f5f', VERY_HIGH: '#1f6b47' };
 const OUTCOME_LABELS = { PROCEED:'繼續進行', PROCEED_WITH_CONTROLS:'附條件繼續', LIMIT_ACCESS:'限制存取', PAUSE:'暫停', REVIEW_REQUIRED:'需要複核', EXIT:'終止往來' };
 const DOMAIN_LABELS = { OPERATIONAL:'營運', COMPETENCE:'專業能力', CONFIDENTIALITY:'機密性', FINANCIAL:'財務', STRATEGIC:'策略', REPUTATIONAL:'聲譽', GOVERNANCE_POWER:'治理與權力' };
 const KIND_LABELS = { EVIDENCE:'證據', CLAIM:'主張', ASSESSMENT:'評估' };
@@ -261,19 +317,52 @@ function showList() { document.getElementById('detail').style.display = 'none'; 
 function showDetail() { document.getElementById('list').style.display = 'none'; document.getElementById('detail').style.display = 'block'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
+// Shared handler for every button-based selector in the app (purpose, risk
+// tier, kind, dimension, band, outcome, person, evidence-ref citation) --
+// operator-requested "不要下拉式選單, 要按鍵式" (no dropdowns, every option
+// visible at once as buttons, click to pick). hiddenId is the <input
+// type="hidden"> that actually carries the value the rest of the code reads.
+function pickChip(btn, hiddenId) {
+  btn.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById(hiddenId).value = btn.dataset.value;
+  if (hiddenId === 'f-kind') renderKindFields();
+  if (hiddenId === 'f-person') togglePersonNew();
+}
+
 async function loadList(tenant) {
   currentTenant = tenant;
   document.querySelectorAll('.tenant-switch button').forEach(b => b.classList.remove('active'));
   document.getElementById('btn-' + tenant).classList.add('active');
   const res = await fetch('/api/hci/v1/cases?tenant=' + tenant);
   const body = await res.json();
-  const grid = document.getElementById('cases');
-  if (!res.ok) { grid.innerHTML = `<p class="err">錯誤：${esc(body.detail || body.title)}</p>`; return; }
-  grid.innerHTML = body.data.length ? body.data.map(c => `
-    <div class="case-card status-${c.status}" onclick="openCase('${c.id}')">
-      <div class="title">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)} <span class="badge status-${c.status}">${STATUS_LABELS[c.status] || c.status}</span></div>
-      <div class="meta">${c.id} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</div>
-    </div>`).join('') : '<p class="empty">此租戶目前沒有可見的案件。</p>';
+  const activeEl = document.getElementById('cases-active');
+  const closedEl = document.getElementById('cases-closed');
+  if (!res.ok) { activeEl.innerHTML = `<p class="err">錯誤：${esc(body.detail || body.title)}</p>`; closedEl.innerHTML = ''; return; }
+  const active = body.data.filter(c => c.status === 'OPEN' || c.status === 'ACTIVE');
+  const closed = body.data.filter(c => c.status === 'CLOSED');
+  activeEl.innerHTML = active.length ? active.map(caseCardHtml).join('') : '<p class="empty">目前沒有進行中的案件。</p>';
+  closedEl.innerHTML = closed.length ? closed.map(caseCardHtml).join('') : '<p class="empty">尚無歷史案件。</p>';
+}
+
+function caseCardHtml(c) {
+  const reopenBtn = c.status === 'CLOSED'
+    ? `<button type="button" class="reopen-btn" onclick="event.stopPropagation(); reopenCase('${c.id}')">↺ 重新開啟</button>`
+    : '';
+  return `<div class="case-card status-${c.status}" onclick="openCase('${c.id}')">
+      <div>
+        <div class="title">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)} <span class="badge status-${c.status}">${STATUS_LABELS[c.status] || c.status}</span></div>
+        <div class="meta">${c.id} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</div>
+      </div>
+      ${reopenBtn}
+    </div>`;
+}
+
+async function reopenCase(caseId) {
+  const res = await fetch(`/api/hci/v1/cases/${caseId}/reopen?tenant=${currentTenant}`, { method: 'POST' });
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  await loadList(currentTenant);
 }
 
 async function openCase(caseId) {
@@ -284,6 +373,52 @@ async function openCase(caseId) {
 
 function bandBadge(value) {
   return `<span class="band-badge band-${value}">${BAND_LABELS[value] || value}</span>`;
+}
+
+// Radar chart across all 7 Trust Domains -- a different VISUALIZATION of the
+// exact same rollup values shown in the domain-grid below, not a new scoring
+// method: no cross-domain composite/aggregate score exists anywhere in the
+// intelligence layer (deliberately -- HCI_RISK_SPEC.md leaves that
+// undecided), so this chart never invents or averages one. A domain with no
+// evidence yet plots at the center (rank 0) in neutral grey, same "honestly
+// unknown, never defaulted to MODERATE" rule the text view already follows.
+function renderRadar(rollupDomains) {
+  const size = 320, cx = size / 2, cy = size / 2 + 4, maxR = 100;
+  const n = ALL_DOMAINS.length;
+  const byDomain = Object.fromEntries(rollupDomains.map(d => [d.domain, d]));
+  function angleFor(i) { return -Math.PI / 2 + i * (2 * Math.PI / n); }
+  function pt(i, r) { const a = angleFor(i); return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+
+  let grid = '';
+  for (let ring = 1; ring <= 5; ring++) {
+    const r = maxR * ring / 5;
+    const pts = Array.from({ length: n }, (_, i) => pt(i, r).join(',')).join(' ');
+    grid += `<polygon points="${pts}" fill="none" stroke="#e3dbc8" stroke-width="1"/>`;
+  }
+
+  let axes = '';
+  ALL_DOMAINS.forEach((name, i) => {
+    const [x1, y1] = pt(i, 0), [x2, y2] = pt(i, maxR);
+    axes += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e3dbc8" stroke-width="1"/>`;
+    const [lx, ly] = pt(i, maxR + 28);
+    const cos = Math.cos(angleFor(i));
+    const anchor = Math.abs(cos) < 0.3 ? 'middle' : (cos > 0 ? 'start' : 'end');
+    axes += `<text x="${lx}" y="${ly}" font-size="12" font-weight="700" text-anchor="${anchor}" fill="#232019">${esc(DOMAIN_LABELS[name])}</text>`;
+  });
+
+  const points = ALL_DOMAINS.map((name, i) => {
+    const d = byDomain[name];
+    const rank = d ? BAND_RANK[d.value] : 0;
+    return { xy: pt(i, maxR * rank / 5), color: d ? BAND_COLOR[d.value] : '#c7cdd8' };
+  });
+  const polyPts = points.map(p => p.xy.join(',')).join(' ');
+  const dots = points.map(p => `<circle cx="${p.xy[0]}" cy="${p.xy[1]}" r="4" fill="${p.color}" stroke="#fff" stroke-width="1.5"/>`).join('');
+
+  return `<svg viewBox="0 0 ${size} ${size + 14}" style="width:100%;max-width:380px;display:block;margin:0 auto">
+    ${grid}${axes}
+    <polygon points="${polyPts}" fill="rgba(14,91,80,.14)" stroke="#0e5b50" stroke-width="2.5"/>
+    ${dots}
+  </svg>`;
 }
 
 async function refreshDetail() {
@@ -297,6 +432,10 @@ async function refreshDetail() {
 
   document.getElementById('d-title').textContent = PURPOSE_LABELS[body.case.purpose] || body.case.purpose;
   document.getElementById('d-meta').textContent = `${body.case.id} ．狀態 ${STATUS_LABELS[body.case.status] || body.case.status} ．風險 ${body.case.risk_tier} ．開立於 ${new Date(body.case.opened_at).toLocaleDateString('zh-TW')}`;
+
+  document.getElementById('d-reopen-wrap').innerHTML = body.case.status === 'CLOSED'
+    ? `<button type="button" class="reopen-btn" onclick="reopenCase('${body.case.id}').then(() => openCase('${body.case.id}'))">↺ 重新開啟此案件</button>`
+    : '';
 
   const bannerEl = document.getElementById('d-decision-banner');
   if (body.decisions.length) {
@@ -323,16 +462,14 @@ async function refreshDetail() {
   document.getElementById('d-domain-note').textContent = body.rollup.domains.length
     ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。'
     : '';
-  const bandRank = { VERY_LOW: 1, LOW: 2, MODERATE: 3, HIGH: 4, VERY_HIGH: 5 };
+  document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
   const byDomain = Object.fromEntries(body.rollup.domains.map(d => [d.domain, d]));
   document.getElementById('d-domains').innerHTML = ALL_DOMAINS.map(name => {
     const d = byDomain[name];
-    if (!d) return `<div class="domain-card unknown"><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">尚無證據</div></div>`;
+    if (!d) return `<div class="domain-card unknown"><div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">尚無證據</div></div></div>`;
     return `<div class="domain-card">
-      <div class="domain-name">${DOMAIN_LABELS[name] || name}</div>
-      <div class="meter"><div class="meter-fill band-fill-${d.value}"></div></div>
+      <div><div class="domain-name">${DOMAIN_LABELS[name] || name}</div><div class="domain-meta">${COVERAGE_LABELS[d.coverage] || d.coverage}${d.dimension_disagreement ? '．評估分歧' : ''}</div></div>
       ${bandBadge(d.value)}
-      <div class="domain-meta">${COVERAGE_LABELS[d.coverage] || d.coverage}${d.dimension_disagreement ? '．評估分歧' : ''}</div>
     </div>`;
   }).join('');
 
@@ -348,8 +485,9 @@ async function refreshDetail() {
 
   document.getElementById('d-decision-form-wrap').innerHTML = `
     <form class="inline-form" onsubmit="return submitDecision(event)">
-      <label for="dec-outcome">決策結果</label>
-      <select id="dec-outcome">${OUTCOMES.map(o => `<option value="${o}">${OUTCOME_LABELS[o]}</option>`).join('')}</select>
+      <label>決策結果</label>
+      <div class="chip-group" id="dec-outcome-chips">${OUTCOMES.map((o, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}" data-value="${o}" onclick="pickChip(this,'dec-outcome')">${OUTCOME_LABELS[o]}</button>`).join('')}</div>
+      <input type="hidden" id="dec-outcome" value="${OUTCOMES[0]}">
       <label for="dec-rationale">決策理由</label>
       <textarea id="dec-rationale" rows="2" required></textarea>
       <button type="submit">送出決策</button>
@@ -368,8 +506,10 @@ async function refreshDetail() {
     </div>`;
   }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
 
-  document.getElementById('f-person').innerHTML = body.persons.map(p => `<option value="${p.id}">${esc(p.display_label)}</option>`).join('')
-    + '<option value="__new__">＋ 建立新當事人…</option>';
+  const personChips = body.persons.map((p, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}" data-value="${p.id}" onclick="pickChip(this,'f-person')">${esc(p.display_label)}</button>`).join('');
+  document.getElementById('f-person-chips').innerHTML = personChips + '<button type="button" class="chip dashed" data-value="__new__" onclick="pickChip(this,\'f-person\')">＋ 建立新當事人…</button>';
+  document.getElementById('f-person').value = body.persons.length ? body.persons[0].id : '__new__';
+  if (!body.persons.length) document.querySelector('#f-person-chips .chip.dashed').classList.add('selected');
   togglePersonNew();
   renderKindFields();
 }
@@ -381,21 +521,22 @@ function goToAddRecord() {
 }
 
 function togglePersonNew() {
-  const sel = document.getElementById('f-person');
-  document.getElementById('f-person-new-wrap').style.display = sel.value === '__new__' ? 'block' : 'none';
+  const val = document.getElementById('f-person').value;
+  document.getElementById('f-person-new-wrap').style.display = val === '__new__' ? 'block' : 'none';
 }
 
-function citableOptions() {
+function citableChips() {
   // EVIDENCE/CLAIM only -- an ASSESSMENT cannot itself be cited (mirrors the
   // TRUST_DOMAIN-not-directly-creatable rule: a citation must bottom out in
   // something evidentiary, not another judgment).
   const citable = currentRecords.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
-  if (!citable.length) return '<option value="" disabled selected>－－請先新增證據－－</option>';
-  return citable.map(r => {
+  if (!citable.length) return { html: '<p class="field-hint" style="color:var(--very-low)">－－請先新增證據－－</p>', first: '' };
+  const html = citable.map((r, i) => {
     const text = (r.payload.content || `${r.payload.dimension || ''} ${r.payload.value || ''}`).trim();
-    const short = text.length > 40 ? text.slice(0, 40) + '…' : text;
-    return `<option value="${r.id}">${esc(KIND_LABELS[r.kind] || r.kind)} · ${esc(short)}（#${r.id.slice(0,8)}）</option>`;
+    const short = text.length > 56 ? text.slice(0, 56) + '…' : text;
+    return `<button type="button" class="chip block${i === 0 ? ' selected' : ''}" data-value="${r.id}" onclick="pickChip(this,'f-evref')">${esc(KIND_LABELS[r.kind] || r.kind)} · ${esc(short)}（#${r.id.slice(0,8)}）</button>`;
   }).join('');
+  return { html, first: citable[0].id };
 }
 
 function renderKindFields() {
@@ -405,14 +546,24 @@ function renderKindFields() {
     el.innerHTML = `<p class="field-hint">證據：你直接查到或觀察到的具體事實，例如一份文件、一則公開紀錄。</p>
       <label for="f-content">內容</label><textarea id="f-content" rows="2" placeholder="寫下你查到的事實" required></textarea>`;
   } else if (kind === 'CLAIM') {
+    const c = citableChips();
     el.innerHTML = `<p class="field-hint">主張：一句說法或推論，需要引用下方的證據佐證，不能憑空成立。</p>
       <label for="f-content">內容</label><textarea id="f-content" rows="2" placeholder="寫下這個說法或推論" required></textarea>
-      <label for="f-evref">引用依據（這個主張根據哪筆證據或主張）</label><select id="f-evref">${citableOptions()}</select>`;
+      <label>引用依據（這個主張根據哪筆證據或主張）</label>
+      <div class="chip-group block" id="f-evref-chips">${c.html}</div>
+      <input type="hidden" id="f-evref" value="${c.first}">`;
   } else if (kind === 'ASSESSMENT') {
+    const c = citableChips();
     el.innerHTML = `<p class="field-hint">評估：根據下方引用的證據，針對某個信任面向打出的等級分數，會直接影響上方的信任構面計算。</p>
-      <label for="f-dimension">評估構面</label><select id="f-dimension">${DIMENSIONS.map(d => `<option value="${d}">${DIMENSION_LABELS[d]}</option>`).join('')}</select>
-      <label for="f-value">等級</label><select id="f-value">${BANDS.map(b => `<option value="${b}">${BAND_LABELS[b]}</option>`).join('')}</select>
-      <label for="f-evref">引用依據（這個評估根據哪筆證據或主張）</label><select id="f-evref">${citableOptions()}</select>`;
+      <label>評估構面</label>
+      <div class="chip-group" id="f-dimension-chips">${DIMENSIONS.map((d, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}" data-value="${d}" onclick="pickChip(this,'f-dimension')">${DIMENSION_LABELS[d]}</button>`).join('')}</div>
+      <input type="hidden" id="f-dimension" value="${DIMENSIONS[0]}">
+      <label>等級</label>
+      <div class="chip-group" id="f-value-chips">${BANDS.map((b, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}" data-value="${b}" onclick="pickChip(this,'f-value')">${BAND_LABELS[b]}</button>`).join('')}</div>
+      <input type="hidden" id="f-value" value="${BANDS[0]}">
+      <label>引用依據（這個評估根據哪筆證據或主張）</label>
+      <div class="chip-group block" id="f-evref-chips">${c.html}</div>
+      <input type="hidden" id="f-evref" value="${c.first}">`;
   }
 }
 

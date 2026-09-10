@@ -41,6 +41,7 @@ $upMig11  = Join-Path $root 'database/migrations/0011_wave1_trust_domain_scope_u
 $upMig12  = Join-Path $root 'database/migrations/0012_wave1_subject_record_payload_up.sql'
 $upMig13  = Join-Path $root 'database/migrations/0013_wave1_key_issuance_up.sql'
 $upMig14  = Join-Path $root 'database/migrations/0014_wave1_decision_recording_up.sql'
+$upMig15  = Join-Path $root 'database/migrations/0015_wave1_case_reopen_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -166,9 +167,21 @@ $mutations = @(
   # expected-failure list even though the trigger, not the CHECK, is what is
   # actually being removed. CASE-LIFECYCLE-01 is unaffected: OPEN->ACTIVE
   # never touches closed_at either way.
+  # 2026-09-10 (0015, case reopen): CASE-REOPEN-SETUP-03 sets -218 to CLOSED,
+  # same closed_at-never-auto-set mechanism as CASE-LIFECYCLE-02 above (the
+  # CHECK constraint backstops the missing trigger and rejects the row, which
+  # rolls that statement back) -- real-Docker run corrected two assumptions
+  # a purely theoretical trace got wrong: since SETUP-03 rolls back, -218
+  # stays ACTIVE (from SETUP-02), so the repurposed CASE-LIFECYCLE-03
+  # (UPDATE ... SET status='ACTIVE') is an ACTIVE->ACTIVE no-op that succeeds
+  # trivially with no trigger needed at all, and CASE-REOPEN-CLOSEDAT-CLEARED-01
+  # then reads a closed_at that was NULL all along (never actually closed) --
+  # neither one fails here. SETUP-04 (ACTIVE->CLOSED, the real transition)
+  # fails the same way SETUP-03 did, and CASE-REOPEN-SKIP-01 (expects H1010)
+  # instead succeeds trivially with no trigger present at all to reject it.
   @{ id = 'drop-case-lifecycle-trigger'
      sql = 'DROP TRIGGER cases_lifecycle ON hci.cases;'
-     expect = @('CASE-LIFECYCLE-02','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-03','CASE-LIFECYCLE-04','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-TRIGGER-01') }
+     expect = @('CASE-LIFECYCLE-02','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-04','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-TRIGGER-01','CASE-REOPEN-SETUP-03','CASE-REOPEN-SETUP-04','CASE-REOPEN-SKIP-01') }
 
   # Gate 2's "no direct UPDATE privilege on closed_at" is a grant-layer
   # control independent of the trigger above; this proves it is load-bearing
@@ -219,9 +232,13 @@ $mutations = @(
   # Only the CLOSED-immutability IF block is removed here (not the whole
   # trigger, which 'drop-case-lifecycle-trigger' above already covers) so this
   # mutation isolates that one invariant rather than reproducing a broader
-  # mutation's failure set.
+  # mutation's failure set. Transition list updated for 0015 (CLOSED->ACTIVE
+  # reopen) so this mutation stays isolated to the immutability guard alone --
+  # otherwise, applying the pre-0015 transition list here would also
+  # incidentally break CASE-LIFECYCLE-03/CASE-REOPEN-* (a second, unrelated
+  # invariant this mutation was never meant to test).
   @{ id = 'weaken-case-closed-immutable'
-     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_case_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF TG_OP = ''INSERT'' THEN IF NEW.status <> ''OPEN'' THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; RETURN NEW; END IF; IF NEW.status IS DISTINCT FROM OLD.status THEN IF NOT ((OLD.status = ''OPEN'' AND NEW.status = ''ACTIVE'') OR (OLD.status = ''ACTIVE'' AND NEW.status = ''CLOSED'')) THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; IF NEW.status = ''CLOSED'' THEN NEW.closed_at := now(); END IF; END IF; RETURN NEW; END $fn$;'
+     sql = 'CREATE OR REPLACE FUNCTION hci.enforce_case_lifecycle() RETURNS trigger LANGUAGE plpgsql SET search_path = hci, pg_temp AS $fn$ BEGIN IF TG_OP = ''INSERT'' THEN IF NEW.status <> ''OPEN'' THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; RETURN NEW; END IF; IF NEW.status IS DISTINCT FROM OLD.status THEN IF NOT ((OLD.status = ''OPEN'' AND NEW.status = ''ACTIVE'') OR (OLD.status = ''ACTIVE'' AND NEW.status = ''CLOSED'') OR (OLD.status = ''CLOSED'' AND NEW.status = ''ACTIVE'')) THEN RAISE EXCEPTION USING ERRCODE = ''H1010'', MESSAGE = ''x''; END IF; IF NEW.status = ''CLOSED'' THEN NEW.closed_at := now(); ELSIF OLD.status = ''CLOSED'' AND NEW.status = ''ACTIVE'' THEN NEW.closed_at := NULL; END IF; END IF; RETURN NEW; END $fn$;'
      expect = @('CASE-CLOSED-IMMUTABLE-01')
      repin = @('hci.enforce_case_lifecycle()') }
 
@@ -840,7 +857,16 @@ $mutations = @(
      # case_id ownership check, so losing that policy cascades into them too
      # -- found by this exact mutation run flagging them as unexpected
      # rather than assumed in advance.
-     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-03','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01') }
+     # 2026-09-10 (0015 case-reopen tests): CASE-LIFECYCLE-03 no longer
+     # belongs here -- it now targets -218, and with -218's own
+     # CASE-REOPEN-SETUP-01 INSERT rejected (FORCE RLS + no policy denies
+     # writes too, not only reads), CASE-LIFECYCLE-03's UPDATE against a
+     # never-created row matches zero rows and succeeds trivially instead of
+     # failing. CASE-REOPEN-SETUP-01 itself (the rejected INSERT) and
+     # CASE-REOPEN-CLOSEDAT-CLEARED-01/-SKIP-01 (both read/act on that same
+     # nonexistent row) join the blast radius instead -- real-Docker
+     # flagged all four, not assumed in advance.
+     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01') }
   # RLS-OWN-02 (db-expert M2): hci.tenants is scoped by `id`, not `tenant_id`,
   # so it is invisible to every mutation above. Dropping its own policy fails
   # CLOSED - RLS-LEAK-02 (tenant B invisible) stays green - which is exactly
@@ -939,6 +965,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig12)  -ne 0) { throw 'mutation harness: 0012 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig13)  -ne 0) { throw 'mutation harness: 0013 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig14)  -ne 0) { throw 'mutation harness: 0014 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig15)  -ne 0) { throw 'mutation harness: 0015 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

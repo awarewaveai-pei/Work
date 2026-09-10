@@ -279,10 +279,6 @@ SELECT hci_test.expect_true('CASE-LIFECYCLE-02b',
   $q$SELECT closed_at IS NOT NULL FROM hci.cases WHERE id = 'aaaaaaaa-0000-0000-0000-000000000210'$q$,
   'closed_at must be set exactly on the transition into CLOSED');
 
-SELECT hci_test.expect_sqlstate('CASE-LIFECYCLE-03',
-  $q$UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000210'$q$,
-  'H1010');
-
 -- -210 is CLOSED as of CASE-LIFECYCLE-02 above: prove every other column is
 -- frozen too, not just the status/closed_at pair (2026-09-04 critic review -
 -- the original trigger guarded only the moment of closing, leaving a closed
@@ -290,6 +286,35 @@ SELECT hci_test.expect_sqlstate('CASE-LIFECYCLE-03',
 SELECT hci_test.expect_sqlstate('CASE-CLOSED-IMMUTABLE-01',
   $q$UPDATE hci.cases SET purpose = 'rewritten after close' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000210'$q$,
   'H1007');
+
+-- Case reopen (migrations/0015, operator-requested "歷史案件(可復活)"):
+-- CLOSED->ACTIVE is now a valid transition, distinct from -210 above (which
+-- must stay CLOSED for CASE-CLOSED-IMMUTABLE-01) -- a dedicated case avoids
+-- disturbing that precondition.
+SELECT hci_test.expect_success('CASE-REOPEN-SETUP-01',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000218','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
+SELECT hci_test.expect_success('CASE-REOPEN-SETUP-02',
+  $q$UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000218'$q$);
+SELECT hci_test.expect_success('CASE-REOPEN-SETUP-03',
+  $q$UPDATE hci.cases SET status = 'CLOSED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000218'$q$);
+
+-- CASE-LIFECYCLE-03 repurposed (was: CLOSED->ACTIVE expected to fail, before
+-- 0015 -- that is now the wrong behavior by design, not a regression).
+SELECT hci_test.expect_success('CASE-LIFECYCLE-03',
+  $q$UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000218'$q$);
+SELECT hci_test.expect_true('CASE-REOPEN-CLOSEDAT-CLEARED-01',
+  $q$SELECT closed_at IS NULL FROM hci.cases WHERE id = 'aaaaaaaa-0000-0000-0000-000000000218'$q$,
+  'closed_at must be cleared when a CLOSED case is reopened to ACTIVE');
+
+-- Reopening only ever targets ACTIVE (resume in-progress review); CLOSED
+-- straight to OPEN (reset to never-started) stays rejected, same H1010 as
+-- the existing OPEN->CLOSED skip (CASE-LIFECYCLE-04 below).
+SELECT hci_test.expect_success('CASE-REOPEN-SETUP-04',
+  $q$UPDATE hci.cases SET status = 'CLOSED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000218'$q$);
+SELECT hci_test.expect_sqlstate('CASE-REOPEN-SKIP-01',
+  $q$UPDATE hci.cases SET status = 'OPEN' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000218'$q$,
+  'H1010');
 
 -- A fresh OPEN case: -210 is CLOSED as of CASE-LIFECYCLE-02 above, so testing
 -- the OPEN->CLOSED skip needs its own case rather than reusing that one.
@@ -1728,4 +1753,4 @@ RESET ROLE;
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(235);
+SELECT hci_test.finish(241);

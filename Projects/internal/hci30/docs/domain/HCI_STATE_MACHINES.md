@@ -13,14 +13,21 @@ stateDiagram-v2
     [*] --> OPEN: INSERT (only legal birth state, H1010)
     OPEN --> ACTIVE
     ACTIVE --> CLOSED: sets closed_at (trigger-assigned, not client-writable)
-    CLOSED --> [*]: terminal; every other column also frozen (H1007)
+    CLOSED --> ACTIVE: reopen (0015, 2026-09-10); clears closed_at back to NULL
 ```
 
-Illegal: `OPEN → CLOSED` (must pass through ACTIVE), any transition out of
-`CLOSED`, INSERT at any status but OPEN. A CLOSED case admits no new
-`research_workflows`/`subject_records` (H1011, checked at their own
-INSERT). Never deleted or truncated (`cases_no_delete`/`cases_no_truncate`,
-defends the table-owner bypass, not just the app-role grant).
+Illegal: `OPEN → CLOSED` (must pass through ACTIVE), `CLOSED → OPEN` (reopen
+resumes in-progress review, does not reset to never-started), INSERT at any
+status but OPEN. **CLOSED is no longer terminal** (superseded 2026-09-10,
+`migrations/0015_wave1_case_reopen_up.sql`, ADR-0020 §Implementation note —
+operator-requested "歷史案件(可復活)"): a CLOSED case may reopen to ACTIVE.
+While CLOSED, every other column is frozen (H1007) regardless — a
+status-only reopen is unaffected (no other column changes), but bundling a
+reopen with any other field edit in the same UPDATE stays rejected. A
+CLOSED case still admits no new `research_workflows`/`subject_records`
+(H1011, checked at their own INSERT) until reopened. Never deleted or
+truncated (`cases_no_delete`/`cases_no_truncate`, defends the table-owner
+bypass, not just the app-role grant).
 
 ## Data-subject-request lifecycle (`hci.data_subject_requests.status`)
 

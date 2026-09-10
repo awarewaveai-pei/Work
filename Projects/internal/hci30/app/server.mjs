@@ -171,6 +171,26 @@ app.post('/api/hci/v1/cases', async (req, res) => {
   }
 });
 
+app.post('/api/hci/v1/cases/:caseId/reopen', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    // migrations/0015 widened hci.cases's lifecycle trigger to allow
+    // CLOSED->ACTIVE (operator-requested "歷史案件(可復活)") -- this is a
+    // pure status-only UPDATE (no other column touched), so the trigger's
+    // own CLOSED-immutability guard (migrations/0002) never fires: OLD/NEW
+    // are IS NOT DISTINCT on every field except status. RLS's own
+    // tenant_id-scoped WITH CHECK still applies unchanged, so this cannot
+    // reopen another tenant's case even if the id were guessed.
+    const { rowCount } = await queryAsTenant(t.role, "UPDATE hci.cases SET status = 'ACTIVE' WHERE id = $1 AND status = 'CLOSED'", [req.params.caseId]);
+    if (rowCount === 0) return problem(res, 409, 'Conflict', 'no CLOSED case with that id is visible to this tenant');
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases WHERE id = $1', [req.params.caseId]);
+    res.json(rows[0]);
+  } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
 app.post('/api/hci/v1/persons', async (req, res) => {
   const t = resolveTenant(req, res);
   if (!t) return;

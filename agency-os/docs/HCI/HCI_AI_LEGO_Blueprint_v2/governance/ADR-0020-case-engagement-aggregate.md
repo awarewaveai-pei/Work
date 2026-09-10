@@ -28,7 +28,7 @@ This ADR does not authorize Organization as an assessable subject (ADR-0011 stil
 Runtime gates are **OPEN**. All land in `D:\Work\Projects\internal\hci30\database\` and must be green in `scripts/test-wave1-local.ps1` and killed in `scripts/mutation-check-wave1.ps1` before Wave 1 schema freeze.
 
 1. **Wave 1 — schema.** `hci.cases` per the Decision field list, `CHECK (risk_tier IN ('R0','R1','R2','R3','R4'))`, `CHECK (status IN ('OPEN','ACTIVE','CLOSED'))`, `CHECK (closed_at IS NULL OR status = 'CLOSED')`, `FOREIGN KEY (tenant_id, tenant_authorization_id) REFERENCES hci.tenant_authorizations`, `opened_at timestamptz NOT NULL DEFAULT now()` with `INSERT` privilege on that column withheld from the app role (same pattern as `data_subject_request_events.created_at`, `:340-344`); added to the RLS/`tenant_isolation` loop and the hand-maintained table-inventory list (`:296-337`) so the drift check in the same migration catches an unprotected table. Test `CASE-SCHEMA-01`: `information_schema.columns`/`table_constraints` introspection confirms the column set, checks, and FK (pattern of `BITEMP-SCOPE-01`, `ADR-0017:39`).
-2. **Wave 1 — lifecycle trigger.** `hci.enforce_case_lifecycle()` (`BEFORE UPDATE`) permits only `OPEN → ACTIVE` and `ACTIVE → CLOSED`; any other transition — including `CLOSED → *` and the `OPEN → CLOSED` skip — raises new registry code `H1010` (`case lifecycle transition rejected`; `H1009` is taken by ADR-0018 gate 3's `hci.tombstone_evidence()` "record already erased" — both this ADR and ADR-0018 independently computed "next free after `H1008`" and collided; `H1010` is the corrected next-free code, `H1011` below is renumbered accordingly). The same trigger sets `closed_at := now()` exactly on the transition into `CLOSED`; the app role has no direct `UPDATE` privilege on `closed_at`. Tests: `CASE-LIFECYCLE-01` (`OPEN→ACTIVE` succeeds), `CASE-LIFECYCLE-02` (`ACTIVE→CLOSED` succeeds, `closed_at` set), `CASE-LIFECYCLE-03` (`CLOSED→ACTIVE` → `H1010`), `CASE-LIFECYCLE-04` (`OPEN→CLOSED` skip → `H1010`). Mutation: dropping the trigger must turn `CASE-LIFECYCLE-03`/`-04` red.
+2. **Wave 1 — lifecycle trigger.** `hci.enforce_case_lifecycle()` (`BEFORE UPDATE`) originally permitted only `OPEN → ACTIVE` and `ACTIVE → CLOSED` (`CLOSED → *` and the `OPEN → CLOSED` skip both raised registry code `H1010`, "case lifecycle transition rejected"; `H1009` is taken by ADR-0018 gate 3's `hci.tombstone_evidence()` "record already erased" — both this ADR and ADR-0018 independently computed "next free after `H1008`" and collided; `H1010` is the corrected next-free code, `H1011` below is renumbered accordingly). **Superseded 2026-09-10 (migration 0015, see Implementation note below): `CLOSED → ACTIVE` is now also permitted** — `CLOSED → *` other than `ACTIVE`, and the `OPEN → CLOSED` skip, still raise `H1010` unchanged. The same trigger sets `closed_at := now()` exactly on the transition into `CLOSED` and clears it back to `NULL` on `CLOSED → ACTIVE`; the app role has no direct `UPDATE` privilege on `closed_at` either way. Tests: `CASE-LIFECYCLE-01` (`OPEN→ACTIVE` succeeds), `CASE-LIFECYCLE-02` (`ACTIVE→CLOSED` succeeds, `closed_at` set), `CASE-LIFECYCLE-03` (`CLOSED→ACTIVE` succeeds, `closed_at` cleared — repurposed 2026-09-10, previously asserted the pre-0015 `H1010` rejection), `CASE-LIFECYCLE-04` (`OPEN→CLOSED` skip → `H1010`, unchanged), `CASE-REOPEN-SKIP-01` (`CLOSED→OPEN` skip → `H1010`, new 2026-09-10). Mutation: dropping the trigger must turn `CASE-LIFECYCLE-04`/`CASE-REOPEN-SETUP-03`/`-SETUP-04`/`-SKIP-01` red.
 3. **Wave 1 — ownership binding.** `hci.research_workflows` and `hci.subject_records` each gain `case_id uuid NOT NULL` with composite `FOREIGN KEY (tenant_id, case_id) REFERENCES hci.cases`, replacing/augmenting the direct `tenant_authorization_id` reference (`:90-92`) as the workflow's bounding scope. Tests: `CASE-OWNS-01` (insert omitting `case_id` → `23502`), `CASE-OWNS-02` (a `case_id` from tenant B referenced by a tenant A row → `23503`), run as the non-owner tenant role per `ADR-0016-mandatory-tenant-rls.md:9`.
 4. **Wave 1 — terminal-state guard.** `hci.require_open_or_active_case()` (`BEFORE INSERT`) rejects a new `research_workflows` or `subject_records` row whose `case_id` resolves to a `CLOSED` case, raising `H1011`. Test `CASE-CLOSED-GUARD-01`; mutation: dropping the trigger must turn it red.
 5. **Wave 1 — `project_ref` non-FK proof (architecture test).** `CASE-PROJECTREF-01`: `information_schema.table_constraints` shows zero `FOREIGN KEY` constraints on `hci.cases.project_ref`; a synthetic fixture renames/drops a stand-in commercial `projects` row and asserts no `hci.cases` write fails — proving "never equal, references only" is enforced, not merely documented.
@@ -43,6 +43,23 @@ incidents that motivated
 SSOT for every `H1xxx` code in this schema. `H1010`/`H1011`'s allocation is
 recorded there, not only in this ADR and the migration header comment;
 future codes are claimed there first, not computed independently per-ADR.
+
+## Implementation note (2026-09-10, case reopen -- gate 2 superseded, not this ADR revised)
+
+Operator-requested product decision: closed (historical) cases must be
+revivable, not permanently terminal -- gate 2's original `CLOSED` terminal-
+state design was a reasonable default (this ADR never actually decided "can
+a closed case reopen," the question was simply never asked) but does not
+match the product's real intended lifecycle. `Projects/internal/hci30/database/migrations/0015_wave1_case_reopen_up.sql`
+widens `hci.enforce_case_lifecycle()` to also permit `CLOSED → ACTIVE`,
+reusing the existing `H1010` code (no new registry entry) and the existing
+`UPDATE (status)` grant (no new privilege). Gate 2's own CLOSED-immutability
+sub-guard (`OLD.status = 'CLOSED'` freezes every other column) is untouched
+by this change: reopening is a pure status-only `UPDATE`, so `NEW`/`OLD` are
+`IS NOT DISTINCT` on every other column and that guard never fires for it.
+Real-Docker verified: 241/241 assertions, 122/122 mutations killed
+(`agency-os/WORKLOG.md` 2026-09-10 entry). Gates 1/3/4/5/6 above are
+unaffected.
 
 ## Consequences
 

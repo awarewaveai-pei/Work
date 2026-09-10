@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-10 HCI30 按鍵式選單、案件分區＋可復活歷史案件、信任構面雷達圖、教科書式視覺重做——操作者連續三輪回饋，中間一輪是真後端缺口
+
+操作者對翻譯後的版本連續給出三輪具體回饋。第一輪四點：不要下拉式選單（要按鍵式，資料全部可見）；歷史案件（可復活）／進行中／新建案件應分開；看不出這工具的過人厲害之處要怎麼賣高單價；UI/UX 太爛。逐項處理：
+
+1. **下拉式選單全部改按鍵式**——調查目的、風險等級、當事人、類型（證據/主張/評估）、評估構面（14 個）、等級（5 個）、引用依據（動態）、決策結果（6 個），全部改成一次全部可見的按鈕群組（`.chip`），共用一個 `pickChip(btn, hiddenId)` 處理器寫回隱藏的 `<input>`，內部資料流完全不動。
+2. **案件列表分區＋歷史案件可復活**——這是真後端缺口，不只是排版：查證 `hci.enforce_case_lifecycle()` 的狀態機（migrations/0002）發現 CLOSED 原本是終點，完全沒有回頭路。新增 `database/migrations/0015_wave1_case_reopen_up/down.sql`，把 trigger 的合法轉移清單加上 `CLOSED→ACTIVE`（重開等於恢復進行中，不是重置成未開始，所以刻意不允許 `CLOSED→OPEN`），重開時把 `closed_at` 清回 NULL。新增 `POST /api/hci/v1/cases/:id/reopen` 端點＋前端「↺ 重新開啟」按鈕（案件列表卡片上、案件詳情頁頂部皆有）。案件列表改成「進行中案件」（OPEN+ACTIVE）／「歷史案件」（CLOSED）兩個獨立區塊；「+開立新案件」從清單中間移到最上方一個獨立的顯眼按鈕。
+3. **信任構面雷達圖**——7 個構面一次用 SVG 雷達圖畫出來（純視覺呈現，不是新的評分方法：沒有任何跨構面加總／平均分數存在，`HCI_RISK_SPEC.md` 刻意不決定這件事，雷達圖只是把既有的 per-domain 分數換一種畫法，沒有證據的構面畫在圓心並標記為未知，不會預設成中等）。
+4. **「過人厲害之處」**——刻意沒有虛構一個假的整體信任分數／字母等級去製造噱頭：跨構面綜合評分是一個真實存在、故意留白的產品決策（見 3.），編一個看似厲害但沒有依據的公式，比誠實留白更糟。真正提升的是「這個系統的分析看起來是真的、有出處」這件事本身，商業定位/差異化賣點需要操作者自己決定。
+
+過程中查證 R0-R4 風險等級的實際定義來源（`AI_LEGO_Cognitive_Engineering_OS/specs/execution/risk-tier.schema.yaml`），發現這組列舉是借用一個跟 HCI 調查完全無關的系統（AI 任務執行風險分級），HCI 自己的語意從未定義過——按鍵式改版沒有藉機幫忙編造假語意，只保留既有的方向性提示（數字愈大愈敏感）。
+
+**第二輪回饋**（看到第一輪成果截圖後）：「這是什麼狗屎東西？」——功能對了（按鈕、分區、雷達圖），但視覺語言仍是「內部後台工具」：選中狀態是死板黑色實心方塊、卡片薄灰框直角、字體單調、留白不夠。操作者明確要求「先清楚應該怎麼設計」，不要再用同一套「加陰影/加圓角/換色」補丁邏輯。
+
+5. **視覺語言整個換掉，非漸進修補**——捨棄原本的靛藍＋冷灰泛用 SaaS 配色（跟一堆 AI 產生網站同款），改採「權威分析報告」語言：深墨綠／teal（`#0e5b50`，象徵查核/信任/財務健全，盡職調查類產品少見的選擇）＋暖米白背景 `#f6f2e9`（非冷灰）＋深炭黑文字；大型 serif 展示字體（`Noto Serif TC`/`PMingLiU`/Georgia 疊字體序）用在頁面主標題、案件標題、決策結果標籤、品牌字「HCI-30」，一般 UI 文字維持無襯線；卡片系統整個換掉——盒狀陰影卡片改成 hairline 分隔線（案件列表、信任構面明細、insight 三欄、證據卡片皆同），減少邊框視覺噪音讓內容本身是焦點；按鈕/選單改藥丸形，選中狀態是淡 teal 底+深 teal 文字（非死黑實心塊），未選中用細邊框；雷達圖同步換色（格線/軸線改用新的暖邊框色、資料多邊形改 teal、座標軸文字加粗加深，原本是誤留的舊靛藍色未同步，已修正）。
+
+真跑驗證：`scripts/test-wave1-local.ps1` 241/241 斷言全過（含新增的 reopen 正向/負向測試），`scripts/mutation-check-wave1.ps1` 122/122 mutation 全殺（過程中兩個既有 mutation 的預測跟真跑結果不符，修正後才過——`weaken-case-closed-immutable` 需要把新的 `CLOSED→ACTIVE` 分支寫進它自己保留的舊版 trigger 副本，`drop-case-lifecycle-trigger`／`drop-cases-rls-policy` 兩個既有 mutation 的預期失敗清單也因為新增的 -218 測試案件而需要調整，兩次都是真跑後才發現理論推導有誤，不是憑空預測對）；down migration 真跑一次確認可逆。前端瀏覽器真跑（視覺重做前）：新建全空案件→按鍵選信任等級/調查目的送出→進入詳情頁看到雷達圖置中無資料→新增證據→切到評估類型選按鍵式構面/等級/引用→送出→雷達圖即時長出真實資料點、正確歸類到「重大風險」；重新開啟一筆歷史案件，狀態正確變回「進行中」且從歷史區移回進行中區。視覺重做後二次迴歸：`getComputedStyle` 直接核對選中 chip 的背景/邊框/文字色與雷達圖 SVG 多邊形顏色皆正確換成新色；重新送出一筆證據確認 201 Created；全程 console 零錯誤。
+
+**已知誠實留白（跨 session 討論過，非本次遺漏）**：`api/openapi/hci-v1.yaml` 仍是刻意的 skeleton-only，本次新增的 `POST /cases/:id/reopen` 未回填進去，與既有的 `/records`／`/decisions`／`/cases`／`/persons` 端點同一款既存缺口。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1` | exit=0 | result=241/241 assertions PASSED，down/up 可逆性驗證通過
+REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/mutation-check-wave1.ps1` | exit=0 | result=All 122 mutations killed（含 2 個既有 mutation 因本次新增測試案件而修正預期清單）
+REALTEST_EVIDENCE: tool=Browser | 場景=按鍵式建立全空案件→新增證據→切換評估類型看 14 個構面/5 個等級/動態引用依據按鈕全部一次可見→送出→雷達圖即時更新、正確歸類重大風險→重新開啟一筆歷史案件並確認移區→視覺重做後重新送出一筆證據確認 201＋`getComputedStyle` 核對新配色生效 | 結果=全部符合預期，console 零錯誤，network 逐筆確認 200/201
+REVIEW_WAIVED: NA -- 前端改動沿用既有 esc()/label-map/RLS 模式無新資安面，視覺重做為純 CSS/色彩變數替換無邏輯變更；後端 migration 0015 是純 trigger transition-list 擴充（無新表/新欄/新權限），真跑 241/241+122/122 已是比 critic 書面覆審更強的驗證（實際突變測試 vs 理論审查）；Low-Medium risk（核心 lifecycle 邏輯，但非破壞性、非 prod、僅合成資料）比照 AGENTS.md §3 直接做並全程記錄
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=pickChip\|renderRadar\|reopenCase\|enforce_case_lifecycle\|CASE-REOPEN\|var\(--accent | hits=多筆，逐一核對：`ADR-0020-case-engagement-aggregate.md`（gate 2 敘述 CLOSED 為終點，已補 Implementation note 訂正）＋`docs/domain/HCI_STATE_MACHINES.md`（狀態圖與「any transition out of CLOSED」文字皆已更新，該檔頭本身承諾「trigger 改動須同一 commit 更新」）＋`database/ERROR_CODE_REGISTRY.md`（H1010 來源欄補上 0015）皆為真缺口非誤報；`HCI_ENTITY_DICTIONARY.md` 命中為安全（僅轉介到已修正的 state-machines 文件）；`var(--accent` 舊配色變數 0 殘留（含 CSS 與雷達圖 SVG 內嵌色碼，逐一改完後才收斂到 0）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：`0015_wave1_case_reopen_up/down.sql` 兩個新檔＋`server.mjs` 的 reopen 端點＋`index.html` 全部按鍵式/分區/雷達圖/視覺重做改動＋`scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1`／`database/tests/wave1-negative-tests.sql` 的對應測試/遷移接線＋兩份治理文件的訂正說明全部移除，回到純下拉選單、單一案件清單、無重開能力、靛藍配色的上一版（`b8a73403a`）。純新增＋既有 trigger 的 transition-list 擴充，無破壞性 schema 變更，可安全回滾。
+
 ## 2026-09-10 System Foundry：39 個 capability-item-map fragment 合併，抓到 4 類跨 fragment 衝突（80 個 triple，非只有指示的 3 個）
 
 8 個平行 agent 完成的 capability-item 細粒度標註（32 新模組 + 7 個既有模組修復，共 39 個 fragment）合併進 `generation/blueprint-capability-item-map.json`。收工前寫程式做全 fragment 交叉掃描（非只查任務指出的 3 個），找到 80 個 `(doc_id,section,item_index)` 三元組被 2 個不同 capability 同時宣告（`_module_common` 全域單一 bucket + `rev` dict 單一 owner 的既有機制下，重複宣告 = 未定義行為，看合併順序決定哪個生效）。

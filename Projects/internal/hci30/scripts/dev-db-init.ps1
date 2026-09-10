@@ -28,22 +28,24 @@ function Invoke-SqlFile {
 & docker @composeArgs up -d --wait
 if ($LASTEXITCODE -ne 0) { throw 'Dev PostgreSQL did not become healthy.' }
 
-# Checks the LATEST migration's own marker (mint_encryption_key, 0013), not
-# an early one (critic review, 2026-09-08: checking hci.cases -- migration
-# 0002 -- would report "already applied" and silently skip 0012/0013 on any
-# volume from before they existed, since this check is all-or-nothing, not
-# per-migration). Update this alongside the loop bound below whenever a new
+# Checks the LATEST migration's own marker, not an early one (critic review,
+# 2026-09-08: checking hci.cases -- migration 0002 -- would report "already
+# applied" and silently skip later migrations on any volume from before they
+# existed, since this check is all-or-nothing, not per-migration). 0015 only
+# REPLACEs an existing function rather than creating a new one, so its
+# marker is a source-text check for the reopen branch it adds, not a mere
+# existence check. Update this alongside the loop bound below whenever a new
 # migration lands, same maintenance the project already accepts for the
 # equivalent $upMigN lists in test-wave1-local.ps1/mutation-check-wave1.ps1.
-$check = & docker @composeArgs exec -T db psql -tA -U hci_owner -d $db -c "SELECT to_regprocedure('hci.record_decision(uuid,uuid,text,text)')"
-if ($check -match 'record_decision') {
-  Write-Host 'Schema already applied (hci.record_decision exists, migration 0014) -- skipping migrations, DB left as-is.'
+$check = & docker @composeArgs exec -T db psql -tA -U hci_owner -d $db -c "SELECT pg_get_functiondef('hci.enforce_case_lifecycle()'::regprocedure) LIKE '%OLD.status = ''CLOSED'' AND NEW.status = ''ACTIVE''%'"
+if ($check -match 't') {
+  Write-Host 'Schema already applied (case-reopen branch exists, migration 0015) -- skipping migrations, DB left as-is.'
   exit 0
 }
 
-Write-Host 'Applying Wave 1 schema (14 migrations + synthetic fixtures)...'
+Write-Host 'Applying Wave 1 schema (15 migrations + synthetic fixtures)...'
 $db2 = Join-Path $root 'database'
-1..14 | ForEach-Object {
+1..15 | ForEach-Object {
   $n = '{0:D4}' -f $_
   $f = Get-ChildItem -LiteralPath (Join-Path $db2 'migrations') -Filter "${n}_*_up.sql" | Select-Object -First 1
   Invoke-SqlFile -Path $f.FullName -Label "migration $n up"
