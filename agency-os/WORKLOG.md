@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-10 HCI30 修「無法建立當事人」——操作者截圖回報的真實 bug
+
+操作者截圖：選了「＋建立新當事人…」、打了名字「THEO FARREL」，回報「無法建立當事人」。
+
+根因（真跑重現，非猜測）：建立新當事人從來不是獨立動作，而是包在「新增調查發現」整張表單的送出邏輯裡（`submitRecord()` 舊版）——真正呼叫 `POST /persons` 的程式碼要等到使用者點「送出紀錄」才會跑。但同一張表單下方的「內容」欄位是瀏覽器原生 `required`，操作者只填了人名、還沒填內容就點送出，瀏覽器原生驗證直接擋下整個 submit 事件，`submitRecord()` 連跑都沒跑到，畫面上什麼錯誤訊息都不會出現——操作者填的是人名欄位，直覺會覺得是「建立當事人」這件事失敗了，但其實是完全不相關的「內容」欄位卡住了送出。真跑 `form.checkValidity()` 直接證實：只要內容欄位是空的，整張表單就是 invalid，跟有沒有填人名無關。
+
+修法（不是補丁——找出不變量：建立當事人這件事，本質上不該依賴另一個欄位是否填寫）：
+- 新增獨立的「＋ 建立」按鈕（`type="button"`，不受周圍表單的 required 驗證影響），點下去立刻呼叫 `POST /persons`，成功就立刻把新當事人選起來、清空輸入框；失敗（例如名字空白）會在專屬的錯誤欄位顯示訊息，跟「內容」欄位完全無關。
+- `submitRecord()` 拿掉舊的「順便自動建立當事人」邏輯：如果還停在「＋建立新當事人…」沒有真的建立，會直接擋下並顯示明確訊息「請先在上面點「＋ 建立」建立當事人，再送出這筆紀錄」，不會再默默用文字框裡不確定的內容嘗試建立。
+
+真跑驗證：完全重現操作者的原始操作路徑（選新當事人、打名字、內容留空、直接送出整張表單）→ 確認 `form.checkValidity()` 為 false，證實舊版就是卡在這裡；改用新的「＋建立」按鈕流程 → 立刻成功建立當事人、正確選中、輸入框清空、零錯誤；接著補內容送出主紀錄 → 完整成功；也驗證了忘記建立當事人直接送出主表單時，現在會顯示清楚的錯誤訊息而不是靜默失敗。全程 console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=重現操作者原始操作（人名已填/內容留空/直接送出）確認 form.checkValidity()=false 證實根因；改用新「＋建立」按鈕立即建立成功；驗證忘記建立當事人送出主表單時顯示明確錯誤訊息；補完內容後完整送出主紀錄成功 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純前端表單邏輯修正，新增的建立按鈕重用既有 fetch /persons 端點與既有 pickChip()/refreshDetail() 邏輯，未新增後端邏輯；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=createPersonInline\|person-create-btn\|person-new-row\|f-person-new-err | hits=1（僅 index.html 本身，全為本次新增符號，無外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（新當事人建立改為獨立動作，`submitRecord()` 移除隱含自動建立）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無新增
+
+[rollback]
+`git revert` 本次 commit：回到建立當事人依附在主表單送出邏輯裡的上一版（會重新出現本次修的 bug）。純前端，無 schema/API 變動，可安全回滾。
+
 ## 2026-09-10 HCI30 桌面啟動捷徑——操作者要求「桌面做一個啟動捷徑」
 
 新增兩支腳本：

@@ -195,6 +195,14 @@
   .chip.block { width: 100%; border-radius: 4px; }
   .chip.dashed { border-style: dashed; color: var(--teal-ink); }
   .chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* New-person creation is its own immediate action, not bundled into the
+     surrounding record form's submit (2026-09-10 fix -- see
+     createPersonInline()'s own comment for why bundling it broke). */
+  .person-new-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+  .person-new-row input { flex: 1; }
+  .person-create-btn { flex: none; padding: 0.5rem 1rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
+  .person-create-btn:hover { background: var(--teal-ink); }
 </style>
 </head>
 <body>
@@ -319,9 +327,11 @@
       <label>當事人</label>
       <div class="chip-group" id="f-person-chips"></div>
       <input type="hidden" id="f-person">
-      <div id="f-person-new-wrap" style="display:none">
+      <div id="f-person-new-wrap" class="person-new-row" style="display:none">
         <input id="f-person-new" placeholder="新當事人的姓名或顯示名稱">
+        <button type="button" class="person-create-btn" onclick="createPersonInline()">＋ 建立</button>
       </div>
+      <div id="f-person-new-err" class="err"></div>
 
       <label>類型</label>
       <div class="chip-group" id="f-kind-chips">
@@ -861,6 +871,30 @@ function togglePersonNew() {
   document.getElementById('f-person-new-wrap').style.display = val === '__new__' ? 'block' : 'none';
 }
 
+// Creating a person used to only happen as a side effect of submitting the
+// WHOLE record form (operator report, 2026-09-10: "無法建立當事人" --
+// typing a name here did nothing visible if the unrelated, required 內容
+// textarea below was still empty, since the browser's own required-field
+// validation silently blocked the entire submit before submitRecord() ever
+// ran, with no error text pointing at the actual cause). Creating a person
+// is now its own immediate, independent action with its own error slot --
+// submitRecord() below no longer auto-creates one at all.
+async function createPersonInline() {
+  const display_label = document.getElementById('f-person-new').value;
+  const errEl = document.getElementById('f-person-new-err');
+  const res = await fetch('/api/hci/v1/persons', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, display_label }),
+  });
+  const body = await res.json();
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return; }
+  errEl.textContent = '';
+  document.getElementById('f-person-new').value = '';
+  await refreshDetail();
+  const chip = document.querySelector(`#f-person-chips .chip[data-value="${body.id}"]`);
+  if (chip) pickChip(chip, 'f-person');
+}
+
 function citableChips() {
   // EVIDENCE/CLAIM only -- an ASSESSMENT cannot itself be cited (mirrors the
   // TRUST_DOMAIN-not-directly-creatable rule: a citation must bottom out in
@@ -906,18 +940,14 @@ function renderKindFields() {
 async function submitRecord(evt) {
   evt.preventDefault();
   const kind = document.getElementById('f-kind').value;
-  let person_id = document.getElementById('f-person').value;
+  const person_id = document.getElementById('f-person').value;
   const errEl = document.getElementById('f-err');
-  if (person_id === '__new__') {
-    const display_label = document.getElementById('f-person-new').value;
-    const pRes = await fetch('/api/hci/v1/persons', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant: currentTenant, display_label }),
-    });
-    const pBody = await pRes.json();
-    if (!pRes.ok) { errEl.textContent = pBody.detail || pBody.title; return false; }
-    person_id = pBody.id;
-  }
+  // Person creation is now its own immediate action (createPersonInline()
+  // above) -- if this is still '__new__' the operator has not clicked ＋建立
+  // yet, so fail with a specific message pointing at that step, rather than
+  // silently trying to create one from whatever (possibly empty) text is
+  // sitting in the name field.
+  if (person_id === '__new__') { errEl.textContent = '請先在上面點「＋ 建立」建立當事人，再送出這筆紀錄。'; return false; }
   let payload = {};
   if (kind === 'EVIDENCE') payload = { content: document.getElementById('f-content').value };
   else if (kind === 'CLAIM') payload = { content: document.getElementById('f-content').value, evidence_refs: [document.getElementById('f-evref').value] };
