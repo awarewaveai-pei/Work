@@ -150,7 +150,7 @@ export async function recordVideoAsset(params: {
   formats?: string[];
   visualBreakdown?: { custom: number; broll: number };
   imageModel?: string;
-  source?: "generate" | "draft";
+  source?: "generate" | "draft" | "footage";
   serviceCapability?: VideoServiceCapability;
   outputMeta?: RenderOutputMeta;
   /**

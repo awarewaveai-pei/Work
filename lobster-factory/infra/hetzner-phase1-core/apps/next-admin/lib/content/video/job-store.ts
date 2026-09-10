@@ -45,8 +45,14 @@ export interface VideoJob {
     formats?: string[];
     visualBreakdown?: { custom: number; broll: number };
     imageModel?: string;
-    source?: "generate" | "draft";
+    source?: "generate" | "draft" | "footage";
     serviceCapability?: VideoServiceCapability;
+    /** 目前寫入端：footage/render(footage) 與 timeline/submit(remotion) 兩條路徑。目前無讀取端，
+     * 純供未來 UI/QA 消費的描述性 metadata（不影響 /status 收尾邏輯，故留 optional）。 */
+    rendererKind?: "quick" | "remotion" | "footage";
+    timelineId?: string;
+    outputProfile?: string;
+    captionCues?: { startMs: number; endMs: number; text: string }[];
   };
   recorded?: boolean;           // media_assets 已記錄（只記一次）
 }

@@ -499,20 +499,29 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
         print(f"   scene {scene.get('id', i)} ({duration:.1f}s)")
 
     # 所有場景同編碼參數 → concat demuxer -c copy（無重新編碼，秒級）
-    list_path = config.TEMP_DIR / "concat.txt"
+    base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
+    return _concat_uniform(scene_paths, "concat.txt", base_path)
+
+
+def _concat_uniform(segment_paths: list, list_name: str, out_path: str) -> str:
+    """concat demuxer -c copy。呼叫端保證所有 segment 已是同編碼參數（codec/尺寸/取樣率一致），
+    否則 -c copy 會產出壞檔或直接失敗。"""
+    list_path = config.TEMP_DIR / list_name
     with open(list_path, "w", encoding="utf-8") as f:
-        for sp in scene_paths:
+        for sp in segment_paths:
             # concat demuxer 單引號跳脫：path 內的 ' → '\'' （TEMP_DIR 為 env 可控，硬化防斷）
             safe = sp.replace("\\", "/").replace("'", "'\\''")
             f.write("file '%s'\n" % safe)
-    base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
-    res = subprocess.run(
-        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", base_path],
-        capture_output=True,
-    )
+    try:
+        res = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", out_path],
+            capture_output=True, timeout=_FFMPEG_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"concat failed: 逾時（>{_FFMPEG_TIMEOUT_S}s）")
     if res.returncode != 0:
         raise RuntimeError(f"concat failed: {res.stderr.decode('utf-8', 'ignore')[-400:]}")
-    return base_path
+    return out_path
 
 
 # ═══════════════════════════════════════════
@@ -737,6 +746,195 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
         shutil.move(base_video, out_path)
         outputs[fmt] = out_path
         print(f"   {fmt} ({w}x{h}) 原生輸出 ✓")
+    return outputs, out_dir
+
+
+# ═══════════════════════════════════════════
+# 實拍剪輯入口（給 next-admin footage/render 積木呼叫）
+# ═══════════════════════════════════════════
+def _probe_has_audio(path: str) -> bool:
+    """ffprobe 是否有音訊流（Pexels 等 B-roll 素材常無音軌，需補靜音才能 concat 對齊）。"""
+    res = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a",
+         "-show_entries", "stream=index", "-of", "json", path],
+        capture_output=True, text=True, timeout=15,
+    )
+    if res.returncode != 0:
+        return False
+    try:
+        return bool(json.loads(res.stdout or "{}").get("streams"))
+    except json.JSONDecodeError:
+        return False
+
+
+_FFMPEG_TIMEOUT_S = 300  # 單一 ffmpeg 呼叫上限；卡住會釋放 server._render_lock（見 subprocess.TimeoutExpired 處理）
+
+
+def _run_ffmpeg(cmd: list, on_fail_prefix: str) -> None:
+    """統一的 subprocess.run 包裝：bound timeout，逾時/失敗都丟 RuntimeError（讓呼叫端 job 標記
+    error 並釋放 _render_lock，而不是無限期卡住整個服務——這是唯一有 timeout 的路徑之一，
+    其餘既有 _render_scene_ffmpeg/_render_intro_scene/concat 呼叫沿用舊行為，不在本次改動範圍。"""
+    try:
+        res = subprocess.run(cmd, capture_output=True, timeout=_FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{on_fail_prefix}: 逾時（>{_FFMPEG_TIMEOUT_S}s）")
+    if res.returncode != 0:
+        raise RuntimeError(f"{on_fail_prefix}: {res.stderr.decode('utf-8', 'ignore')[-500:]}")
+
+
+def _trim_clip_video(src: str, start_ms: float, duration_ms: float, out_path: str, w: int, h: int, fps: int) -> None:
+    """單一 clip 依 [start_ms, start_ms+duration_ms) 剪出畫面（無音軌），cover-fit 填滿目標尺寸。"""
+    start_s, dur_s = start_ms / 1000.0, duration_ms / 1000.0
+    cmd = [
+        "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}",
+        "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps},setsar=1",
+        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
+        out_path,
+    ]
+    _run_ffmpeg(cmd, f"clip video trim failed ({os.path.basename(src)})")
+
+
+def _trim_clip_audio(src: str, start_ms: float, duration_ms: float, out_path: str) -> None:
+    """單一 clip（或獨立音訊檔）依 [start_ms, start_ms+duration_ms) 剪出音軌；無音軌來源補等長靜音，
+    確保所有片段統一編碼參數（aac/44100/stereo）以便後續 concat -c copy。"""
+    start_s, dur_s = start_ms / 1000.0, duration_ms / 1000.0
+    if _probe_has_audio(src):
+        cmd = [
+            "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}",
+            "-vn", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+            out_path,
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-t", f"{dur_s:.3f}", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+            out_path,
+        ]
+    _run_ffmpeg(cmd, f"clip audio trim failed ({os.path.basename(src)})")
+
+
+def _mux_audio_track(video_path: str, audio_path: str, out_path: str) -> None:
+    """把（已剪好、時長對齊的）音軌接上無聲畫面。-shortest 吸收秒級剪輯誤差，避免尾端卡幀。"""
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path, "-i", audio_path,
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        "-shortest",
+        out_path,
+    ]
+    _run_ffmpeg(cmd, "audio mux failed")
+
+
+def _burn_captions_ffmpeg(in_path: str, cues: list, out_path: str, h: int) -> None:
+    """依絕對時間（start_ms/end_ms）燒入字幕 cue，非依旁白字數比例切分（與 _render_scene_ffmpeg
+    的字幕邏輯不同源，因為 caption cue 時間已由呼叫端 Timeline v1 驗證過，不需重新切分）。
+    音訊直接 copy passthrough。"""
+    font_path = ""
+    for fp in [
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+    ]:
+        if os.path.exists(fp):
+            font_path = fp
+            break
+
+    font_size = max(48, h // 20)
+    margin_v = max(40, h // 30)
+    box_border = max(4, h // 270)
+    dt_filters = []
+    for i, cue in enumerate(cues):
+        seg_path = str(config.TEMP_DIR / f"fcaption_{i}.txt")
+        with open(seg_path, "w", encoding="utf-8") as f:
+            f.write(cue["text"])
+        safe_path = seg_path.replace("\\", "/").replace(":", "\\:")
+        font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
+        start_s = cue["start_ms"] / 1000.0
+        end_s = cue["end_ms"] / 1000.0
+        in_tag = "[0:v]" if i == 0 else f"[cap{i}]"
+        out_tag = f"[cap{i + 1}]" if i < len(cues) - 1 else "[capout]"
+        dt_filters.append(
+            f"{in_tag}drawtext={font_arg}"
+            f"textfile={safe_path}:"
+            f"fontsize={font_size}:"
+            f"fontcolor=white:"
+            f"borderw=3:"
+            f"bordercolor=black:"
+            f"box=1:"
+            f"boxcolor=black@0.45:"
+            f"boxborderw={box_border}:"
+            f"x=(w-text_w)/2:"
+            f"y=h-text_h-{margin_v}:"
+            f"enable='between(t,{start_s:.3f},{end_s:.3f})'"
+            f"{out_tag}"
+        )
+
+    cmd = [
+        "ffmpeg", "-y", "-i", in_path,
+        "-filter_complex", ";".join(dt_filters),
+        "-map", "[capout]", "-map", "0:a?",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
+        "-c:a", "copy",
+        out_path,
+    ]
+    _run_ffmpeg(cmd, "caption burn failed")
+
+
+def render_footage_multiformat(clips: list, formats: list, out_name: str,
+                               audio: "dict | None" = None, captions: "list | None" = None,
+                               fps: "int | None" = None):
+    """實拍素材剪輯合成：trim 各 clip 到 [source_start_ms, source_start_ms+duration_ms) → concat →
+    可選音軌覆蓋／可選字幕燒錄。刻意「不」呼叫 TTS/Claude/生圖 —— 實拍素材本身已是最終畫面
+    （可能自帶對白/環境音），本函式只做剪輯合成。
+
+    clips: [{"source_url": <已 materialize 的本機路徑>, "source_start_ms": ms, "duration_ms": ms}, ...]
+    audio: 選填 {"source_url","source_start_ms","duration_ms"} —— 提供時取代整段時間軸音軌
+           （各 clip 自帶音軌一律捨棄）；省略時保留各 clip 音軌剪接串接（無音軌處補靜音）。
+    captions: 選填 [{"start_ms","end_ms","text"}, ...] —— 絕對時間燒字幕，與比例無關但各格式
+              需各自重燒（字級/邊距依 h 換算）。
+    回傳 (outputs: {fmt: path}, out_dir)。呼叫端負責 cleanup()。
+    """
+    import shutil
+    if not clips:
+        raise ValueError("clips 不可為空")
+    if not formats:
+        raise ValueError("formats 不可為空")
+    fps = config.FPS if fps is None else fps
+    print(f"\n[實拍剪輯] {len(clips)} 個片段 × {len(formats)} 格式...")
+    safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40] or "footage"
+    out_dir = config.OUTPUT_DIR / safe_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # 音軌與畫面比例無關（trim 對象是聲音檔，不受 w/h 影響）→ 只需算一次，跨格式共用。
+    if audio:
+        audio_path = str(config.TEMP_DIR / "fclip_audio_ext.m4a")
+        _trim_clip_audio(audio["source_url"], audio["source_start_ms"], audio["duration_ms"], audio_path)
+    else:
+        audio_segs = []
+        for i, clip in enumerate(clips):
+            apath = str(config.TEMP_DIR / f"fclip_a_{i:03d}.m4a")
+            _trim_clip_audio(clip["source_url"], clip["source_start_ms"], clip["duration_ms"], apath)
+            audio_segs.append(apath)
+        audio_path = _concat_uniform(audio_segs, "fconcat_audio.txt", str(config.TEMP_DIR / "fclip_audio_native.m4a"))
+
+    outputs = {}
+    for fmt in formats:
+        w, h = config.FORMATS[fmt]
+        video_segs = []
+        for i, clip in enumerate(clips):
+            vpath = str(config.TEMP_DIR / f"fclip_v_{fmt}_{i:03d}.mp4")
+            _trim_clip_video(clip["source_url"], clip["source_start_ms"], clip["duration_ms"], vpath, w, h, fps)
+            video_segs.append(vpath)
+        base_video = _concat_uniform(video_segs, f"fconcat_video_{fmt}.txt", str(config.TEMP_DIR / f"{fmt}_base.mp4"))
+        muxed_path = str(config.TEMP_DIR / f"{fmt}_muxed.mp4")
+        _mux_audio_track(base_video, audio_path, muxed_path)
+        final_path = str(out_dir / f"{fmt}.mp4")
+        if captions:
+            _burn_captions_ffmpeg(muxed_path, captions, final_path, h)
+        else:
+            shutil.move(muxed_path, final_path)
+        outputs[fmt] = final_path
+        print(f"   {fmt} ({w}x{h}) 實拍剪輯輸出 ✓")
     return outputs, out_dir
 
 

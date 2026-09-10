@@ -14242,3 +14242,37 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 
 [rollback]
 `git revert` 本次 commit：`test_capacity_model.py:372` 還原「eighth」（回到 regression 狀態，非目標）；`WORKLOG.md` 本條目移除。純 docstring 字串復原，無資料/邏輯風險，58 個既有測試不受影響；101 個他人 staged 檔案不受本次 commit 或其 revert 影響（全程未進入本次 commit 範圍）。
+
+## 2026-09-10 — 實拍素材剪輯渲染能力（footage render adapter）：Python trim+concat+mux+caption 後端 + next-admin 接線 + 修復連帶浮現的 2 個既有 schema bug
+
+[根因] `apps/video-service/server.py` 的唯一 render 端點（`/render`）100% 由 TTS 配音驅動——每個場景時長來自生成的旁白音檔，影片素材只是背景循環（`-stream_loop -1`）。`FootageEditor.tsx` 上傳真實 MP4、設定 in/out 剪輯點與輸出位置、編成 Timeline v1、POST 到 `app/api/video/footage/render/route.ts`——該 route 已在前一 session（commit `035a32788`）改寫為呼叫 `submitFootageRender`，但 `render-client.ts` 根本沒這個 export（`agency-os/docs/video_generator/VIDEO_TOOL_IA_REORG_2026-09-10.md:22` 已記錄此既有 TS 編譯錯誤，`WORKLOG.md:80` 開了 `task_618a39ed` 未修）。根本缺口：無法把 [inMs,outMs] 精確剪出、無法混音已有音軌（非 TTS）、無法燒時間軸字幕——`agency-os/docs/video_generator/VIDEO_SYSTEM_GAP_AUDIT_2026-09-09.md:18` 早已點名「no EDP render adapter exists」。
+
+[方案] A（最小，採用）：在既有 video-service 上加 `POST /render-footage` 端點 + `pipeline.render_footage_multiformat`，完整複用既有 job store／`_render_lock`／SSRF-guard `_materialize_asset`／R2 上傳／`_build_output_meta`／`/job` 輪詢——零改動既有 `/render` 行為。next-admin 側新增 `submitFootageRender`（鏡射既有 `submitRender`/`assertNativeMultiformat` 樣式）。
+
+[已修改]
+- `apps/video-service/pipeline.py`：重構 `compose_base_video` 尾端共用出 `_concat_uniform`（去重複，非新行為）；新增 `_probe_has_audio`（ffprobe 偵測音軌，無音軌補靜音以利 concat -c copy 對齊）、`_trim_clip_video`/`_trim_clip_audio`（[source_start_ms, +duration_ms) 剪出畫面/音軌）、`_mux_audio_track`（換上外部音軌，`-shortest` 吸收秒級誤差）、`_burn_captions_ffmpeg`（絕對時間 cue 燒字幕，drawtext+textfile 沿用既有轉義手法）、`render_footage_multiformat`（每格式各自 trim+concat+mux+可選燒字幕）、`_run_ffmpeg`（統一 timeout wrapper，見下）。
+- `apps/video-service/server.py`：新增 `/render-footage`（`_validate_footage`／`_do_render_footage`／`submit_render_footage`／`_run_footage_job`），`/health` capabilities 加 `footage_render: true`。
+- `apps/video-service/tests/test_footage_render.py`（新檔）：17 個 `_validate_footage` 純邏輯單元測試。
+- `apps/next-admin/lib/content/video/render-client.ts`：新增 `submitFootageRender` + `assertFootageRenderCapability`（鏡射 `assertNativeMultiformat`）。
+- `apps/next-admin/lib/content/video/timeline-v1.ts`：video item 補 `sourceStartMs?: number`（來源素材剪入點，與 `startMs`=輸出時間軸位置是兩個概念）+ `allowed()` 鍵表 + 非負整數驗證——見下方「連帶浮現」。
+- `apps/next-admin/lib/content/video/job-store.ts` / `lib/content/blocks/video-pipeline.ts`：`recordParams.source` 聯合型別加 `"footage"`；`job-store.ts` 另補 `rendererKind`/`timelineId`/`outputProfile`/`captionCues`（純描述性 metadata，grep 全 repo 確認目前零讀取端，兩個既有呼叫端 `footage/render/route.ts` 與 `timeline/submit/route.ts` 早已在寫這些欄位）——見下方「連帶浮現」。
+
+[連帶浮現的 2 個既有 bug，非本次引入，隨手修正]
+1. `footage/render/route.ts:82` 讀 `item.sourceStartMs`，但 `MediaTimelineV1VideoItem` 型別與 `validateMediaTimelineV1` 的 `allowed()` 清單都沒這個欄位——`edit-plan-timeline.ts:42` 早就在寫這個欄位，代表 `compileEditPlanToTimeline` 對任何有 decisions 的實拍 Timeline 都會被 `unknown_field` 擋下。鐵證：既有（非本次新建）測試 `edit-plan-timeline.test.ts:8-19`「retains source in-point for the dedicated footage renderer」在本次修復前必然是紅的（`git status` 確認該測試檔本 session 零改動，純粹是 schema 缺欄位導致 runtime 一直失敗，不是型別系統獨有問題）。
+2. `footage/render/route.ts:116` 寫 `source: "footage"`，`job-store.ts`/`video-pipeline.ts` 的聯合型別只有 `"draft"|"generate"`；修完後連帶讓 `timeline/submit/route.ts:93` 的 `rendererKind` 也從「TS2322 蓋住其他錯誤」變成單獨浮現的 TS2353（該檔第二個既有欄位缺口，同一根因：`recordParams` 型別落後於兩個呼叫端的實際寫入形狀）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker build` 用 `apps/video-service/Dockerfile` 建本機映像（與 EU 部署同一 Dockerfile）+ 容器內直接呼叫 `pipeline.render_footage_multiformat`（真實 ffmpeg lavfi 測試片段：一段有音軌一段無音軌、native-audio 剪接+靜音補位、外部音軌覆蓋、絕對時間字幕燒錄）| exit=0 | result=輸出尺寸/總時長經 ffprobe 驗證正確（16x9→1920x1080、9x16→1080x1920、時長 4.00s=2+2 clips）
+- REALTEST_EVIDENCE: tool=Bash | cmd=容器內起 `server.py`，用 `requests` 打真實 HTTP：`/health` 回報 `footage_render:true`、未帶 token 打 `/render-footage` 回 401、完整 submit→poll→done 流程 | exit=0 | result=job 結構符合 `render-client.ts` 的 `pollRenderJob` 期待（`outputs`/`out_dir`/`storage`/`output_meta`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/test_footage_render.py -v`（容器內）| exit=0 | result=17/17 pass；`python tests/test_auth_policy.py -v` 4/4 pass 零回歸
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（next-admin，`npm ci` 後）| exit=2（既有 baseline 本就非 0）| result=錯誤數 14→11，`footage/render/route.ts` 兩個既有錯誤與 `timeline/submit/route.ts:93` 的 `rendererKind` 錯誤消失，剩 11 個全部確認為無關既有錯誤（`canApproveMediaRelease` 缺 export ×2、`submitRemotion` 參數數量 ×1、`qa-persistence.ts` 型別 ×7），零新增
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/video app/api/video` | exit=1（既有失敗） | result=130/135 pass，5 個失敗全部是上述同批無關既有錯誤所致（`release/route.test.ts` ×3、`remotion-render/route.test.ts` ×2），與本次改動的檔案無關
+- REVIEW_DONE: critic=Standard（獨立 subagent，讀完整 diff + route.ts/timeline-v1.ts 契約）| verdict=pass-with-fixes | findings=0 Critical/3 Major/3 Minor/2 Suggestion；3 個 Major 與 3 個 Minor 已修（詳見下）；2 個 Suggestion 記錄未修（ffprobe 剪後時長覆核——效能/複雜度取捨，留作已知限制；`video-pipeline.ts:198` `asset_domain` 硬編 `"ai_generated"` 誤標非 AI 內容——不在本次檔案清單內，已用 `spawn_task` 另開背景任務追蹤）
+- BUGHUNT_DONE: scope=agency-os,lobster-factory,scripts | grep=`submitFootageRender\|render-footage\|footage_render\|sourceStartMs\|MediaTimelineV1VideoItem\(\|MAX_FOOTAGE_CLIPS\|MAX_FOOTAGE_CAPTIONS\|MAX_CLIP_DURATION_MS\|_finite_number\|_run_ffmpeg\|AUDIO_DURATION_TOLERANCE_MS` | hits=全部落在本次改動檔案 + 既有唯一呼叫端 `footage/render/route.ts`（無孤兒引用、無重複定義）
+- WORKLOG_DONE: 本條目
+
+**Critic 修復明細（Major）**：① `/render-footage` 對 `clips[]`/`audio` 的 `source_url` 原本沿用 `/render` 既有的「非 http 前綴視為本機路徑直接讀」邏輯——任何持有共用 `RENDER_AUTH_TOKEN` 的呼叫者可送 `/etc/...` 等本機路徑餵給 ffmpeg；footage 這個新端點的產品前提就是「受控 https 來源」，不需要 `/render` 保留給本機開發用的逃生口，故在 `_validate_footage` 收斂為僅接受 `https://`（`server.py`）。② 4 個新 ffmpeg `subprocess.run` 呼叫（trim video/audio、mux、燒字幕，外加同批重構出的 `_concat_uniform`）原本零 timeout，單一卡住的 ffmpeg 會讓 `_render_lock` 永久卡死整個服務（含既有 `/render`）；新增 `_run_ffmpeg` 統一 wrapper（300s timeout，逾時轉 `RuntimeError` 釋放鎖並讓 job 標記 error）。③ `captions` 原本零筆數上限（`clips`/`scenes` 旁邊都有），且 stdlib `json.loads` 預設接受 `NaN`/`Infinity`，會繞過 `<0`/`<=0` 的比較式驗證，`duration_ms: NaN` 會一路傳進 ffmpeg 變成 `-t nan`；新增 `MAX_FOOTAGE_CAPTIONS`（120，對齊 `timeline-v1.ts` 的 `MEDIA_TIMELINE_V1_MAX_ITEMS_PER_TRACK`）與 `_finite_number()`（`math.isfinite` 守）。**連帶處理的 Minor**：`clips` 上限改用獨立的 `MAX_FOOTAGE_CLIPS=120` 而非借用 TTS 導向的 `MAX_SCENES=30`（避免合法 timeline 卡在服務端的困惑錯誤）；新增 `MAX_CLIP_DURATION_MS`（單 clip 20 分鐘上限）；`_mux_audio_track` 的 `-shortest` 原本會靜默截斷不對齊的音軌，新增 `audio.duration_ms` 對 `clips` 總長度的容許誤差驗證（100ms），不符直接拒絕而非靜默吃掉畫面。三輪 docker 重建 + 全套 real-exec/HTTP/unit test 逐一驗證（見上）。
+
+[剩餘風險] ① 剪出片段未做 ffprobe 覆核實際時長是否等於請求的 `duration_ms`——若 `source_start_ms+duration_ms` 超出來源實際長度，ffmpeg 會靜默產出較短片段，字幕時間軸可能跟著偏移（critic Suggestion，未修，留作已知限制）；② `video-pipeline.ts:198` 的 `asset_domain: "ai_generated"` 硬編會誤標實拍內容，已 spawn 背景任務追蹤，不在本次檔案清單；③ **EU 部署尚未執行**——`apps/video-service` 的容器映像需重建＋滾動更新才會讓 `/render-footage` 在 prod 生效，`render-client.ts` 的 `assertFootageRenderCapability` 會在部署前持續回報「video-service 尚未部署實拍剪輯能力」（fail-safe，不會打到不存在的端點）；next-admin 側改動本身可先部署（純新增，向後相容）。
+
+[rollback] 全部改動可用 `git revert` 本次 commit 整批回滾：`pipeline.py`/`server.py` 的新函式與 `/render-footage` 路由零觸碰既有 `/render`/`/generate-job` 邏輯（`_concat_uniform` 重構為行為不變的抽取，既有呼叫點 `compose_base_video` 邏輯逐字保留）；`timeline-v1.ts`/`job-store.ts`/`video-pipeline.ts` 的欄位皆為新增 optional 欄位或聯合型別擴增，無破壞性變更；`render-client.ts` 為純新增 export。EU 端因尚未部署，revert 不涉及任何 prod 狀態回滾。

@@ -10,6 +10,14 @@ next-admin `video/pipeline` 積木負責：生腳本(Claude) + 生圖(Flux) + �
       "out_name": "影片名" }
     → 202 { "jobId": "..." }
 
+  POST /render-footage   body JSON:
+    { "clips": [{"source_url":"https://.../clip.mp4","source_start_ms":0,"duration_ms":4000}, ...],
+      "formats": ["16x9"], "out_name": "...",
+      "audio": {"source_url":"https://.../voice.mp3","source_start_ms":0,"duration_ms":4000},  # 選填
+      "captions": [{"start_ms":0,"end_ms":2000,"text":"..."}] }                                 # 選填
+    → 202 { "jobId": "..." }
+    實拍素材剪輯（trim+concat），非 TTS 驅動；輪詢沿用 GET /job。
+
   POST /generate-job   body JSON:
     { "topic": "主題", "language": "繁體中文", "scene_count": 6,
       "tts_voice": "zh-TW-HsiaoChenNeural", "intro_title": "", "intro_duration": 3.0 }
@@ -28,6 +36,7 @@ import os
 import re
 import json
 import hmac
+import math
 import time
 import uuid
 import socket
@@ -323,6 +332,146 @@ def get_job(job_id: str):
         return _JOBS.get(job_id)
 
 
+# ── /render-footage：實拍素材剪輯（trim+concat，非 TTS 驅動）────────────────────
+
+MAX_FOOTAGE_CLIPS = int(os.getenv("RENDER_MAX_FOOTAGE_CLIPS", "120"))  # 與 timeline-v1.ts 的
+# MEDIA_TIMELINE_V1_MAX_ITEMS_PER_TRACK 同步（獨立於 TTS 導向的 MAX_SCENES，避免合法 timeline 卡在服務端）
+MAX_FOOTAGE_CAPTIONS = int(os.getenv("RENDER_MAX_FOOTAGE_CAPTIONS", "120"))
+MAX_CLIP_DURATION_MS = int(os.getenv("RENDER_MAX_CLIP_DURATION_MS", str(20 * 60 * 1000)))  # 單一 clip 20 分鐘上限
+AUDIO_DURATION_TOLERANCE_MS = 100  # 與 clips 總長度容許誤差（trim/mux 的秒級剪輯誤差）
+
+
+def _finite_number(value) -> bool:
+    """isinstance(value, (int,float)) 不擋 NaN/Infinity——stdlib json.loads 預設接受這兩者，
+    NaN 的所有比較（含 <0、<=0）都是 False，會繞過下面的正負值檢查。"""
+    return isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _validate_footage(payload: dict):
+    """回 (clips, formats, out_name, audio, captions)。"""
+    clips = payload.get("clips")
+    out_name = payload.get("out_name", "footage")
+    if not isinstance(clips, list) or not clips:
+        raise ValueError("clips 必須是非空 list")
+    if len(clips) > MAX_FOOTAGE_CLIPS:
+        raise ValueError(f"clips 過多（{len(clips)} > {MAX_FOOTAGE_CLIPS}）")
+    total_duration_ms = 0.0
+    for i, c in enumerate(clips):
+        if not isinstance(c, dict):
+            raise ValueError(f"clips[{i}] 必須是物件")
+        if not isinstance(c.get("source_url"), str) or not c["source_url"].startswith("https://"):
+            raise ValueError(f"clips[{i}].source_url 必須是 https:// URL")
+        if not _finite_number(c.get("source_start_ms")) or c["source_start_ms"] < 0:
+            raise ValueError(f"clips[{i}].source_start_ms 必須是非負數")
+        if not _finite_number(c.get("duration_ms")) or c["duration_ms"] <= 0:
+            raise ValueError(f"clips[{i}].duration_ms 必須是正數")
+        if c["duration_ms"] > MAX_CLIP_DURATION_MS:
+            raise ValueError(f"clips[{i}].duration_ms 過長（{c['duration_ms']} > {MAX_CLIP_DURATION_MS}）")
+        total_duration_ms += c["duration_ms"]
+
+    formats = payload.get("formats")
+    if not isinstance(formats, list) or not formats:
+        raise ValueError("formats 必須是非空 list")
+    for fmt in formats:
+        if fmt not in config.FORMATS:
+            raise ValueError(f"未知格式 {fmt}（合法：{list(config.FORMATS)}）")
+
+    audio = payload.get("audio")
+    if audio is not None:
+        if (not isinstance(audio, dict) or not isinstance(audio.get("source_url"), str)
+                or not audio["source_url"].startswith("https://")):
+            raise ValueError("audio.source_url 必須是 https:// URL")
+        if not _finite_number(audio.get("source_start_ms")) or audio["source_start_ms"] < 0:
+            raise ValueError("audio.source_start_ms 必須是非負數")
+        if not _finite_number(audio.get("duration_ms")) or audio["duration_ms"] <= 0:
+            raise ValueError("audio.duration_ms 必須是正數")
+        if abs(audio["duration_ms"] - total_duration_ms) > AUDIO_DURATION_TOLERANCE_MS:
+            raise ValueError(
+                f"audio.duration_ms（{audio['duration_ms']}）與 clips 總長度"
+                f"（{total_duration_ms}）不符（容許誤差 {AUDIO_DURATION_TOLERANCE_MS}ms）"
+            )
+
+    captions = payload.get("captions")
+    if captions is not None:
+        if not isinstance(captions, list):
+            raise ValueError("captions 必須是 list")
+        if len(captions) > MAX_FOOTAGE_CAPTIONS:
+            raise ValueError(f"captions 過多（{len(captions)} > {MAX_FOOTAGE_CAPTIONS}）")
+        for i, cue in enumerate(captions):
+            if not isinstance(cue, dict):
+                raise ValueError(f"captions[{i}] 必須是物件")
+            if (not _finite_number(cue.get("start_ms")) or not _finite_number(cue.get("end_ms"))
+                    or cue["end_ms"] <= cue["start_ms"]):
+                raise ValueError(f"captions[{i}] 必須有遞增的 start_ms/end_ms")
+            if not isinstance(cue.get("text"), str) or not cue["text"].strip():
+                raise ValueError(f"captions[{i}].text 必須是非空字串")
+
+    return clips, formats, out_name, audio, captions
+
+
+def _do_render_footage(clips, formats, out_name, audio=None, captions=None) -> dict:
+    """重活：序列化 materialize+trim+concat+mux+caption+R2 上傳。回 {outputs,out_dir,storage}。
+    與 _do_render 共用同一把 _render_lock（全域序列化，防並行撞 TEMP_DIR）。"""
+    with _render_lock:
+        try:
+            materialized_clips = []
+            for i, c in enumerate(clips):
+                path = _materialize_asset(c["source_url"], i)
+                materialized_clips.append({**c, "source_url": path})
+            materialized_audio = None
+            if audio:
+                apath = _materialize_asset(audio["source_url"], len(clips))
+                materialized_audio = {**audio, "source_url": apath}
+            outputs, out_dir = pipeline.render_footage_multiformat(
+                materialized_clips, formats, out_name,
+                audio=materialized_audio, captions=captions,
+            )
+            output_meta = _build_output_meta(outputs)
+            if _r2_video_configured():
+                base_key = "video/" + os.path.basename(str(out_dir))
+                urls = {}
+                for fmt, path in outputs.items():
+                    with open(path, "rb") as fh:
+                        urls[fmt] = _r2_put(
+                            f"{base_key}/{fmt}.mp4", fh.read(), "video/mp4",
+                            R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE,
+                        )
+                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta}
+            return {
+                "outputs": {k: str(v) for k, v in outputs.items()},
+                "out_dir": str(out_dir),
+                "storage": "local",
+                "output_meta": output_meta,
+            }
+        finally:
+            pipeline.cleanup()
+
+
+def _run_footage_job(job_id: str, clips, formats, out_name, audio=None, captions=None):
+    try:
+        result = _do_render_footage(clips, formats, out_name, audio=audio, captions=captions)
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
+    except Exception as e:  # noqa: BLE001
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+def submit_render_footage(payload: dict) -> str:
+    """驗證後建 job + 起背景 thread，立即回 jobId（不阻塞）。輪詢沿用既有 GET /job。"""
+    clips, formats, out_name, audio, captions = _validate_footage(payload)
+    job_id = uuid.uuid4().hex
+    with _jobs_lock:
+        _prune_jobs()
+        _JOBS[job_id] = {"status": "running", "ts": time.time()}
+    threading.Thread(
+        target=_run_footage_job,
+        args=(job_id, clips, formats, out_name, audio, captions),
+        daemon=True,
+    ).start()
+    return job_id
+
+
 # ── /generate-job：全自動管道（Claude 腳本 → Pexels B-roll → render）──────────────
 
 def _claude_generate_script(topic: str, language: str, scene_count: int) -> tuple:
@@ -439,6 +588,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "native_multiformat": True,
                     "output_dimensions": True,
                     "openai_tts": bool(config.OPENAI_API_KEY),
+                    "footage_render": True,
                 },
                 "formats": list(config.FORMATS.keys()),
             })  # healthcheck 免認證
@@ -458,7 +608,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/render", "/generate-job"):
+        if path not in ("/render", "/generate-job", "/render-footage"):
             self._json(404, {"error": "not found"})
             return
         if not _authed(self):
@@ -501,6 +651,9 @@ class _Handler(BaseHTTPRequestHandler):
                     args=(job_id, topic, language, scene_count, tts_voice, intro_title, intro_duration),
                     daemon=True,
                 ).start()
+                self._json(202, {"jobId": job_id})
+            elif path == "/render-footage":
+                job_id = submit_render_footage(payload)
                 self._json(202, {"jobId": job_id})
             else:
                 # /render — existing behaviour

@@ -160,6 +160,89 @@ export async function submitRender(
   }
 }
 
+/** /render-footage POST body 的素材片段（確切 in/out 時間，非 TTS 驅動）。 */
+export interface FootageClip {
+  source_url: string;
+  source_start_ms: number;
+  duration_ms: number;
+}
+/** 選填的整段時間軸音軌，提供時取代各 clip 自帶的音軌。 */
+export interface FootageAudio {
+  source_url: string;
+  source_start_ms: number;
+  duration_ms: number;
+}
+/** 選填的絕對時間字幕 cue。 */
+export interface FootageCaption {
+  start_ms: number;
+  end_ms: number;
+  text: string;
+}
+export interface FootageRenderOpts {
+  audio?: FootageAudio;
+  captions?: FootageCaption[];
+}
+
+async function assertFootageRenderCapability(base: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const r = await fetch(`${base}/health`, {
+      headers: svcHeaders(false),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const body = (await r.json().catch(() => ({}))) as {
+      ok?: boolean;
+      capabilities?: { footage_render?: boolean };
+    };
+    if (r.ok && body.ok && body.capabilities?.footage_render) return { ok: true };
+  } catch {
+    // Return the same actionable error below; render would fail or 404 on old services.
+  }
+  return {
+    ok: false,
+    error: "video-service 尚未部署實拍剪輯能力（需 /health 回報 footage_render）。請先更新 EU video-service 後再送實拍渲染。",
+  };
+}
+
+/**
+ * 提交實拍素材剪輯渲染給 EU video-service（trim+concat，非 TTS 驅動；一次短請求，不等渲染）。
+ * 回 EU 端 jobId，輪詢沿用 pollRenderJob（同一組 /job 端點與 job 結構）。
+ */
+export async function submitFootageRender(
+  clips: FootageClip[],
+  formats: string[],
+  outName: string,
+  baseUrl?: string,
+  opts?: FootageRenderOpts,
+): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
+  const base = svcBase(baseUrl);
+  const auth = resolveRendererAuth("quick");
+  if (auth.ok === false) {
+    return { ok: false, status: 503, error: "renderer authentication is not configured" };
+  }
+  const capability = await assertFootageRenderCapability(base);
+  if (capability.ok === false) return { ok: false, status: 503, error: capability.error };
+  try {
+    const res = await fetch(`${base}/render-footage`, {
+      method: "POST",
+      headers: { ...auth.headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clips, formats, out_name: outName,
+        ...(opts?.audio && { audio: opts.audio }),
+        ...(opts?.captions && opts.captions.length > 0 && { captions: opts.captions }),
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
+    if (!res.ok || !body.jobId) {
+      return { ok: false, status: res.status || 502, error: body.error ?? `提交實拍渲染失敗（HTTP ${res.status}）` };
+    }
+    return { ok: true, jobId: body.jobId };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
+  }
+}
+
 export type RenderPoll =
   | { status: "running" }
   | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string }
