@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-10 — remotion-render route 租戶 job 綁定被 91fdfe31a merge 撤銷，補回
+
+[根因] `app/api/video/remotion-render/route.ts` 直接把 EU remotion-service 自己的 jobId 回給 client（`{ ok:true, jobId: result.jobId }`），繞過 `createJob`/`finishJob` 的租戶持久化。這條 wiring 原本已在 `eee9f3fea`（2026-09-09）做好且有 `route.test.ts` 覆蓋，但 2026-09-10 14:05 的 `91fdfe31a`（reconcile main with origin/main, 9 vs 61 divergent）合併時，該 wiring 在 route.ts 被撤銷回舊版（`git diff 82cf5cf3f dbe28f317 -- route.ts` 顯示兩個 merge parent 內容不同，origin 側 `dbe28f317` 才有 wiring；HEAD 落地的卻是無 wiring 那份 —— 與同一 session 稍早修的 `51404a733`/`5a1a5f069` 是同一類「merge 過程中檔案內容被丟」事故）。`lib/content/video/job-store.ts` 的 `VideoJob.recordParams` type 同時掉了 `rendererKind`/`timelineId`/`outputProfile`/`captionCues` 欄位（同一次 merge、同一根因）。
+
+[修法] 四檔都用 `git show dbe28f317:<path>` 取回 origin 側正確內容重新套用（非猜測重寫）：
+- `route.ts`：補回 `effectiveOrgId` 解析 orgId → `createJob(orgId)` → `submitRemotion` → 成功/失敗都 `finishJob`（記 `euJobId`，不外洩）→ 回傳 `job.id`（內部 id，202）。
+- `job-store.ts`：`recordParams` type 補回上述 4 個欄位（僅型別，無邏輯改動）。
+- `remotion-status/route.ts`：改回 410 deprecated stub（`{ok:false, error:"deprecated_use_remotion_job_status"}`）——critic 覆審抓到：此路由原是無租戶檢查、直接把 client 提供的 jobId 轉給 EU 的 passthrough，同一批 merge 也把它連帶撤銷回舊版，留著就是一個活的、繞過租戶邊界的 endpoint，且與 route.ts 新回傳的是內部 UUID 而非 EU id 語意不合。
+- `app/(shell)/tools/video/VideoStudio.tsx:1859-1869`：`startPolling` 改打 `/api/video/remotion-job-status`（已存在且有測試覆蓋的租戶安全版本），並改讀新回應形狀 `video.outputs.remotion`（原本讀 `j.url` 是舊路由的欄位，新路由沒有）——不改此檔，第一版修法雖然測試綠燈，但 UI 端仍打已 deprecated 的路由，實際渲染永遠 5 秒後顯示「渲染失敗」，功能整條斷掉，此為第一版經 critic 覆審抓出的缺口。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/video/remotion-render app/api/video/remotion-status app/api/video/remotion-job-status app/api/video/timeline/submit`（worktree 缺 node_modules，junction 至 `D:\Work\node_modules` 與 `D:\Work\...\next-admin\node_modules`——兩處 package.json/lockfile 與 worktree HEAD 相同 commit 起點未變動，確認安全） | exit=0 | result=3 files / 10 tests pass（含原本 2 個 fail 的 test）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/video lib/content/video` | result=32 files/130 tests pass, 3 files/5 tests fail（`release/route.test.ts` x3 因 `canApproveMediaRelease` 缺失、`edit-plan-timeline.test.ts`/`production-documents.test.ts` 因 `sourceStartMs` 缺失——皆為同一次壞 merge 掉落、我未觸碰的檔案，非本次引入，見下方[剩餘風險]）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p .` | 我改動的四檔（route.ts、job-store.ts、remotion-status/route.ts、VideoStudio.tsx）零錯誤；其餘既存錯誤（`footage/render`、`release`、`story-bibles/approve`、`qa-persistence.ts`、`timeline/submit` 3-arg `submitRemotion` 呼叫）為同一次壞 merge 掉落的更大範圍缺口，不在本次任務範圍，見下方[剩餘風險]
+- REVIEW_DONE: critic=Standard（背景 subagent 全量覆審，非自審）| verdict=第一版 pass 但標記 🔴 Critical（route.ts/job-store.ts 本身正確，但 sibling 檔案 `remotion-status/route.ts` + `VideoStudio.tsx` 未同步修，整條功能端到端不通且留一個無租戶檢查的活路由）→ 已依覆審修正上述兩檔，第二版 findings=0c/0m/0n（剩 1 個 pre-existing 的 orphaned-job-on-DB-failure 🟡 Minor，非本次引入，已知取捨）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`jobId: result\.jobId|jobId: submission\.jobId|/api/video/remotion-status` | hits=0（確認沒有其他路由殘留舊的直接回傳 EU id 模式，也沒有其他前端呼叫端還打已棄用路由）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] `git diff HEAD dbe28f317 --stat -- app/ lib/`（next-admin）顯示同一次壞 merge 還丟了其餘檔案的內容，涵蓋 `qa-persistence.ts`/`caption-qa-persistence.ts`、`footage/render`、`release`、`story-bibles/approve`、`ops-role.ts`（`canApproveMediaRelease`）、`render-client.ts`（`submitFootageRender`）、`timeline-v1.ts`（`sourceStartMs`）等。這些現在的 tsc/test 錯誤在我改動前就存在，非本次引入，代表 video 模組有一塊功能仍停在合併前的舊狀態，已另開追蹤任務（session task_891102fd）比照本次手法（`git show dbe28f317:<path>` 逐檔核對重放）處理，不在此任務中一併展開。
+
 ## 2026-09-10 HCI30 產生信任評估報告——操作者對「看不出價值在哪裡」的直接回應
 
 操作者：「這個系統...根本讓人看不出價值在哪裡...就是一個輸入資料寄載的廢物」。根因診斷：產品名為「信任評估**報告**」，但 grep 全 codebase 確認零 print/export/PDF 能力——只有輸入畫面，沒有可拿出去的成品。查證既有 V2 藍圖文件發現這正是已記載但從未關閉的缺口：`agency-os/docs/HCI/HCI30_RESEARCH_REVIEW/07_SECURITY_PRIVACY_REVIEW.md:265-284`（SEC-10）——匯出報告必須永久帶有免責聲明與用途重申，否則證據離開系統後會被當成已核實事實。
