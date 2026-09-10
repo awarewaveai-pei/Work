@@ -15,18 +15,13 @@ export const CS_MODELS = {
   geminiFallback: "gemini-2.0-flash-lite",
 } as const;
 
-/** OpenAI embeddings (pluggable — see rag.ts EmbeddingProvider). small = 1536 dims. */
-export const CS_EMBEDDING = {
-  provider: "openai" as const,
-  model: "text-embedding-3-small",
-  dimensions: 1536,
-} as const;
+// Embedding + retrieval fan-out constants moved to lib/kb/config.ts in K0 (ADR 011 §決策 3):
+// they were referenced only by the retrieval path, never by customer-service decision logic.
 
 export const CS_TIMEOUTS = {
   classifyMs: 8_000,
   generateMs: 20_000,
   supervisorMs: 8_000,
-  embedMs: 10_000,
   toolMs: 10_000,
 } as const;
 
@@ -35,13 +30,6 @@ export const CS_THRESHOLDS = {
   minRetrievalScore: 0.5,
   /** Default intent confidence floor; per-intent override in cs_intents.confidence_threshold. */
   defaultConfidence: 0.8,
-  /** Hybrid retrieval fan-out before fusion. */
-  vectorTopK: 24,
-  keywordTopK: 24,
-  /** Chunks injected into the generation prompt. */
-  contextTopK: 4,
-  /** RRF constant (k). */
-  rrfK: 60,
   /** Max agentic tool-call rounds per turn (chain-length cap, §3.3). */
   maxToolRounds: 4,
 } as const;

@@ -9,9 +9,9 @@ import { CS_MODELS, CS_THRESHOLDS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { buildSystemPrompt, buildUserContext } from "@/lib/cs/cis";
 import { claudeTurn, extractText, extractToolUses, generateText, parseJsonObject } from "@/lib/cs/llm";
 import { getToolHandler, resolveToolDecision } from "@/lib/cs/tools";
+import type { RetrievedChunk } from "@/lib/kb/types";
 import type {
   CisProfile,
-  RetrievedChunk,
   SupervisorVerdict,
   ToolCallResult,
   ToolSpec,

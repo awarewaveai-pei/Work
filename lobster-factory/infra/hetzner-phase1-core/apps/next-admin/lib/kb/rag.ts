@@ -1,30 +1,34 @@
-// cs-engine RAG — pluggable embeddings (OpenAI now, bge-m3 later — D3), hybrid retrieval
-// (vector ⊕ keyword via RRF), and knowledge ingestion. Embeddings go over fetch (no `openai` dep).
+// Knowledge-base retrieval + ingestion — pluggable embeddings (OpenAI now, bge-m3 later — D3),
+// hybrid retrieval (vector ⊕ keyword via RRF), and document ingestion. Embeddings go over fetch
+// (no `openai` dep).
+//
+// K0 (ADR 011 §決策 3): moved verbatim from lib/cs/rag.ts. Behaviour unchanged — only the module
+// it lives in, and where its config/RRF dependencies are imported from.
 
-import { CS_EMBEDDING, CS_THRESHOLDS, CS_TIMEOUTS } from "@/lib/cs/config";
-import { rrfFuse } from "@/lib/cs/autonomy";
+import { KB_EMBEDDING, KB_RETRIEVAL, KB_TIMEOUTS } from "@/lib/kb/config";
+import { rrfFuse } from "@/lib/kb/rrf";
 import {
   deleteKnowledgeSource,
   insertChunks,
   insertSource,
   matchChunksKeyword,
   matchChunksVector,
-} from "@/lib/cs/db";
-import type { EmbeddingProvider, KnowledgeInput, RetrievedChunk } from "@/lib/cs/types";
+} from "@/lib/kb/db";
+import type { EmbeddingProvider, KnowledgeInput, RetrievedChunk } from "@/lib/kb/types";
 
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
-  id = CS_EMBEDDING.model;
-  dimensions = CS_EMBEDDING.dimensions;
+  id = KB_EMBEDDING.model;
+  dimensions = KB_EMBEDDING.dimensions;
   async embed(texts: string[]): Promise<number[][]> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("missing OPENAI_API_KEY");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CS_TIMEOUTS.embedMs);
+    const timer = setTimeout(() => controller.abort(), KB_TIMEOUTS.embedMs);
     try {
       const res = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: CS_EMBEDDING.model, input: texts }),
+        body: JSON.stringify({ model: KB_EMBEDDING.model, input: texts }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`openai_embeddings_${res.status}`);
@@ -57,8 +61,8 @@ export async function retrieve(organizationId: string, query: string): Promise<R
   if (!embedding) return [];
 
   const [vec, kw] = await Promise.all([
-    matchChunksVector(organizationId, embedding, CS_THRESHOLDS.vectorTopK),
-    matchChunksKeyword(organizationId, query, CS_THRESHOLDS.keywordTopK),
+    matchChunksVector(organizationId, embedding, KB_RETRIEVAL.vectorTopK),
+    matchChunksKeyword(organizationId, query, KB_RETRIEVAL.keywordTopK),
   ]);
 
   const cos = new Map<string, { sourceId: string; content: string; similarity: number }>();
@@ -68,7 +72,7 @@ export async function retrieve(organizationId: string, query: string): Promise<R
 
   const fused = rrfFuse([vec.map((m) => m.id), kw.map((m) => m.id)]);
   return fused
-    .slice(0, CS_THRESHOLDS.contextTopK)
+    .slice(0, KB_RETRIEVAL.contextTopK)
     .map((f): RetrievedChunk => {
       const c = cos.get(f.id);
       return {

@@ -36,7 +36,7 @@
 
 | 事實 | 影響 |
 |---|---|
-| **`cs_knowledge_sources.doc_family_id`／`source_version` 是死欄位**：`insertSource()`（`lib/cs/db.ts:231-251`）無參數可寫入，全走 DB default；`insertChunks` 寫 `doc_family_id: r.sourceId`（`db.ts:273`）＝ chunk 的 family 是 source 主鍵而非 source 列的 family；全 repo 無任何讀取處 | **版本化必須實作，不是重用**。本 ADR 前版宣稱「不需新建」為誤，已更正。P1 成本上修 |
+| **`cs_knowledge_sources.doc_family_id`／`source_version` 是死欄位**：`insertSource()`（K0 後為 `lib/kb/db.ts:48-68`）無參數可寫入，全走 DB default；`insertChunks` 寫 `doc_family_id: r.sourceId`（`lib/kb/db.ts:90`）＝ chunk 的 family 是 source 主鍵而非 source 列的 family；全 repo 無任何讀取處 | **版本化必須實作，不是重用**。本 ADR 前版宣稱「不需新建」為誤，已更正。P1 成本上修 |
 | `cs_match_chunks`（`0051:209-214`）與 `matchChunksKeyword`（`db.ts:323-340`）**皆無 status/version 過濾** | 舊版 chunk 會與新版同時被檢索 → 換版需同時改檢索端，非只改寫入端 |
 | `rag.ts:130-136,150-154,156-159` 有三處邏輯專門消滅零 chunk 的 ghost source | 「不合格就標 `status='dirty'`」與此直接衝突，需另設計落點 |
 | `registry.ts:33` 的 `run` 是**單參數** `(ctx) => Promise<TOut>`，`ContentBlock` 無 `match` 欄位 | collect/sink 塞不進既有 registry；擴充它會動到 8 種已上線 kind 共用的介面 |

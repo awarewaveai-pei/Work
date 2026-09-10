@@ -37,13 +37,6 @@ export interface IntentClassification {
   confidence: number; // 0..1
 }
 
-export interface RetrievedChunk {
-  id: string;
-  sourceId: string;
-  content: string;
-  score: number; // fused relevance score (higher = better)
-}
-
 /** Agentic tool the engine may call (mirror of cs_tools row). */
 export interface ToolSpec {
   name: string;
@@ -105,13 +98,6 @@ export interface GuardrailResult {
   pass: boolean;
   reason?: string;
   handoffReason?: HandoffReason;
-}
-
-/** Pluggable embedding provider (OpenAI now; bge-m3 self-host later — D3). */
-export interface EmbeddingProvider {
-  id: string; // recorded in cs_knowledge_chunks.embed_model
-  dimensions: number;
-  embed(texts: string[]): Promise<number[][]>;
 }
 
 /** Brand voice (mirror of content engine BrandVoiceProfile — reused, not duplicated). */
@@ -190,11 +176,5 @@ export interface IntentGrade {
   reasons: string[];
 }
 
-/** A knowledge document to ingest into the RAG store. */
-export interface KnowledgeInput {
-  organizationId: string;
-  kind: "doc" | "faq" | "sop" | "conversation" | "url";
-  title: string;
-  body: string;
-  isSensitive?: boolean;
-}
+// KnowledgeInput / EmbeddingProvider / RetrievedChunk moved to lib/kb/types.ts in K0
+// (ADR 011 §決策 3) — the KB is a general product, not a customer-service internal.

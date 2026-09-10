@@ -12,7 +12,7 @@ import { inputGuards } from "@/lib/cs/guardrails";
 import { classifyIntent } from "@/lib/cs/intent";
 import { generateText, parseJsonObject } from "@/lib/cs/llm";
 import { resolveIntent } from "@/lib/cs/orchestrator";
-import { retrieve } from "@/lib/cs/rag";
+import { retrieve } from "@/lib/kb";
 import type { CisProfile, EvalCase, EvalCaseResult, EvalSummary, Intent, IntentGrade } from "@/lib/cs/types";
 
 /** LLM-judge: does the answer cover the expected points (semantically, not verbatim)? */
