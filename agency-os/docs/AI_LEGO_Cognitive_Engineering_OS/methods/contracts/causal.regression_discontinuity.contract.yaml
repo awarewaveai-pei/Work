@@ -1,0 +1,160 @@
+$id: "ai-lego://methods/contracts/causal.regression_discontinuity.contract.yaml"
+title: "Regression Discontinuity Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 entry, `causal` family (F11), 8th member (dag/counterfactual_reasoning/
+  theory_of_change/logic_model/process_tracing/rct already built this batch).
+  Atlas F11 table row L623 ONLY -- grep-confirmed no dedicated section exists
+  for this method, and no other Atlas hit for "Regression Discontinuity"/
+  "RDD"/"running variable"/"cutoff" is actually about this method (a handful
+  of case-insensitive "cutoff"/substring false positives elsewhere triaged
+  and confirmed unrelated). Atlas's own 4-step pipeline: "running variable→
+  cutoff→bandwidth→checks". Scope boundary (task-mandated, see
+  `ai_lego/modules/causal/regression_discontinuity.py` module docstring):
+  this method captures the STRUCTURE/DESIGN of a study, it does not run a
+  real RDD estimator, bandwidth-selection algorithm, or manipulation test --
+  same restraint `causal.rct`/`association.morphological_analysis`/
+  `decision.mcda` already establish. Core invariant: `checks` must be a
+  non-empty list of genuinely distinct entries -- an RDD design disclosing
+  zero (or only duplicated) checks has not actually validated its own
+  identifying assumption at all.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Regression Discontinuity row (L623): '用 cutoff 附近估效果｜running variable→cutoff→bandwidth→checks｜局部因果效果' -- the ONLY Atlas citation for this method"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md whole-file grep for 'Regression Discontinuity'/'RDD'/'running variable'/'cutoff' (this session, 2026-09-10) -- 1 real hit (L623 this row); remaining case-insensitive 'cutoff'-adjacent substring hits (e.g. BoardDecisionPack, HazardDescriptor) triaged and confirmed unrelated to this method"
+  - "methods/contracts/causal.rct.contract.yaml -- closest sibling in scope and shape (study-DESIGN-not-stats-engine restraint, disclosure-only content fields, required completeness + 1 relational invariant), reused as this file's primary structural template"
+  - "methods/contracts/causal.dag.contract.yaml -- 1st F11 member, same family conventions (id grammar, two-layer invariant discipline)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L623's own
+  4-step pipeline into 4 required disclosure fields (running_variable,
+  cutoff_value, bandwidth, checks), same standard every Tier 1 contract in
+  this directory applies. `id: causal.regression_discontinuity` mints a NEW
+  machine_id; `family: causal` reused as the 8th F11 member.
+
+id: causal.regression_discontinuity
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [MAP, GROUP, ESTIMATE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method, same absence class every sibling F11 contract's own inference
+# already discloses). One primitive per Atlas L623's own 4 pipeline words,
+# by analogy to causal.rct.contract.yaml's own [GROUP, ESTIMATE, CAUSE,
+# VALIDATE] mapping of its own 4-word pipeline: "running variable" = MAP
+# (positions each unit on a continuous scale, same role MAP plays in
+# causal.dag's "variables -> edges"); "cutoff" = GROUP (the mechanism that
+# actually splits units into above/below-threshold arms -- deterministic
+# here rather than RCT's random assignment, but the same assignment-
+# mechanism role RCT's "randomize" stage plays, hence the same GROUP
+# primitive); "bandwidth" = ESTIMATE (a disclosed scope/precision choice
+# bounding how much data around the cutoff is used, the same precision-
+# decision role ESTIMATE plays for RCT's "power" stage); "checks" =
+# VALIDATE (checking the design's identifying assumption, the same role
+# VALIDATE plays for RCT's "analysis" stage and causal.process_tracing's
+# own validation stage). CAUSE deliberately excluded -- unlike RCT, where
+# "treatment/control" names the causal comparison itself, none of this
+# method's own 4 cited words name the comparison directly (it is a
+# byproduct of cutoff + bandwidth together, not its own pipeline stage).
+
+purpose:
+  - estimate_a_local_causal_effect_near_a_cutoff_on_a_running_variable
+# Atlas L623 verbatim sense: "用 cutoff 附近估效果" (estimate an effect near
+# a cutoff) / benefit column "局部因果效果" (local causal effect).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own citation for this
+  # method is a single table row with no legal-chain placement, same
+  # "no hard upstream dependency" position causal.rct.contract.yaml's own
+  # inputs.required: [] already takes for an analogous standalone method.
+
+outputs:
+  - RegressionDiscontinuityRecord
+# NEW output type (see typed-objects/regression-discontinuity-record.schema.yaml).
+# Atlas names no PascalCase output type for this method, same honesty gap
+# every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "running_variable, bandwidth are present, non-empty strings; cutoff_value is present and a finite real number; checks is a non-empty array of non-empty strings -- Atlas L623's own 4-stage pipeline (running variable/cutoff/bandwidth/checks), transcribed as 4 required disclosure fields"
+  - "cutoff_value is a finite real number (not NaN/Infinity/boolean/string) -- a cutoff needs to be a real point on the running variable's own numeric scale, not a narrative-only claim; structurally necessary, not Atlas-cited field-level text"
+  - "every entry in checks is genuinely distinct from every other entry (case/whitespace-insensitive, NFKC-normalized) -- Atlas's own 4th pipeline word is 'checks' (plural); a list padded with duplicate entries has not actually disclosed multiple validation checks, the same undisclosed-assumption risk class causal.rct's own treatment/control distinctness invariant addresses for a different pipeline stage in this same family, grounded independently in THIS method's own L623 citation ('checks' as its own named, plural pipeline stage), not by analogy to another method's reasoning"
+  # NEW, structurally necessary -- Atlas's own table row names the 4
+  # pipeline stages but gives no field-level precondition text (same class
+  # causal.rct's own preconditions already establish for its sibling
+  # method).
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision.weighted_decision_matrix.contract.yaml's own
+  # quality block already establishes: the real risk here is an
+  # incomplete/padded study-design record, not a missing per-claim
+  # evidence citation -- enforced by this method's own 2 real invariants
+  # instead (both in preconditions above).
+
+forbidden_transition: []
+# Atlas F11's Regression Discontinuity row is this method's ONLY citation
+# (grep-confirmed, no dedicated section, no §22.3 gate-table row). Same
+# empty-and-disclosed choice causal.rct.contract.yaml's own field applies.
+
+recommended_next: []
+# No specific next machine_id cited at L623. Same empty-and-disclosed
+# choice causal.rct.contract.yaml's own field applies.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should cutoff be a plain narrative string (like RCT's treatment_group/control_group) or a typed numeric field?"
+    decision: "A dedicated `cutoff_value: number` field, separate from the `running_variable` narrative string. A cutoff needs to be a real point on the running variable's own scale -- a design that cannot state that point as an actual number has not identified a genuine discontinuity, only a vague notion of 'around here'."
+  - question: "Should checks be a single narrative string (like RCT's analysis_summary) or a required non-empty list?"
+    decision: "Required non-empty array of strings, minItems 1, each entry non-empty AND pairwise distinct. Atlas L623's own pipeline names this stage 'checks' (plural), and the task's own grounding is explicit: an RDD design with zero disclosed checks has not actually validated the identifying assumption (no manipulation/density test, no placebo cutoff, nothing). A single combined narrative string could hide this by looking non-empty while describing only one check; a list format makes the count of genuinely distinct checks directly inspectable."
+  - question: "Should bandwidth be a numeric width value (matching cutoff_value's own numeric treatment) or a narrative justification string?"
+    decision: "Narrative, non-empty string -- same disclosure-only treatment causal.rct.contract.yaml's own power_analysis field already establishes for an analogous 'the study's own disclosed methodology choice' stage. This module performs no real bandwidth-selection computation (no MSE-optimal bandwidth, no cross-validation) -- a bare number with no accompanying justification would misleadingly imply this record verified an optimization that never ran."
+  - question: "Should analysis_summary (matching causal.rct's own field) be included, and if so required or optional?"
+    decision: "Included, but OPTIONAL (not required) -- unlike RCT, where Atlas's own citation names 'analysis' as its literal 4th pipeline word (making analysis_summary directly citation-grounded and REQUIRED there), this method's own L623 citation names 'checks' as its 4th word, not 'analysis'. Reported findings are a genuine convenience for a completed RDD study, but requiring them would force a still-in-design (not-yet-run) RDD record to fabricate a findings narrative -- disclosed here as a non-Atlas-cited addition, not silently presented as citation-grounded the way the 4 required fields are."
+  - question: "Does this method perform genuine statistical computation (local-linear regression, MSE-optimal bandwidth selection, manipulation-test p-values)?"
+    decision: "No -- explicitly out of scope (task-mandated scope boundary, see module docstring). All content fields are DISCLOSURE-ONLY (presence/distinctness/numeric-validity enforced, methodology/correctness not), same class causal.rct.contract.yaml's own compilation_decisions already establish for a different F11 method. `checks` captures REPORTED validation claims (e.g. 'no manipulation detected via McCrary density test'), with provenance on the record's own top-level `provenance` field -- it is not itself computed here."
+
+open_questions:
+  - id: "OQ-REGRESSIONDISCONTINUITY-1"
+    question: "cognitive_primitives [MAP, GROUP, ESTIMATE, VALIDATE] is this file's own inference (by analogy to causal.rct's own 4-word-pipeline mapping), not a cited Atlas composition formula."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-REGRESSIONDISCONTINUITY-2"
+    question: "forbidden_transition/recommended_next are both left empty -- Atlas's F11 table row is this method's only citation (grep-confirmed, no dedicated section, no §22.3 gate row)."
+    owner: "operator, or a future review pass specifically checking Tier 1 contracts with no forbidden_transition/recommended_next example in Atlas"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-REGRESSIONDISCONTINUITY-3"
+    question: "checks is a flat array of strings, not structured objects (e.g. check_type enum, test_statistic, threshold). Revisit if a future consumer needs to parse check-level detail programmatically -- same open question causal.rct's own OQ-RCT-3 raises for treatment_group/control_group."
+    owner: "operator, or whoever next needs structured check-level fields"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read the whole Atlas F11 table (L612-625) directly, then grepped the
+    whole document case-insensitively for "Regression Discontinuity"/"RDD"/
+    "running variable"/"cutoff" -- confirmed 1 real hit (L623 this row); the
+    remaining case-insensitive substring hits (e.g. "BoardDecisionPack",
+    "HazardDescriptor") triaged and confirmed unrelated (accidental "rdd"/
+    "cutoff" substring matches, not this method). No dedicated section, no
+    §22.3 gate-table row. Grepped the whole `ai_lego` tree and this docs
+    tree case-insensitively for "regression_discontinuity"/
+    "RegressionDiscontinuity"/"RDD" before writing any of this method's own
+    files -- zero pre-existing implementation. Read causal.rct.contract.yaml,
+    causal.dag.contract.yaml, and rct-record.schema.yaml in full before
+    writing this contract, reusing their established conventions rather
+    than inventing new ones. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L623's own 4-step formula is
+    transcribed verbatim into `purpose`/`preconditions`. The numeric
+    `cutoff_value` field, the required-and-distinct `checks` array, the
+    narrative (not numeric) treatment of `bandwidth`, and the optional
+    (not required) `analysis_summary` are Phase 3 compilation choices,
+    explicitly flagged above in `compilation_decisions`, not presented as
+    Atlas-cited.

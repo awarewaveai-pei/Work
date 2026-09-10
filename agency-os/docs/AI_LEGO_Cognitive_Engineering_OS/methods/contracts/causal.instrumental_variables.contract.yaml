@@ -1,0 +1,146 @@
+$id: "ai-lego://methods/contracts/causal.instrumental_variables.contract.yaml"
+title: "Instrumental Variables Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1 entry, `causal` family (F11), 9th member (dag/counterfactual_
+  reasoning/theory_of_change/logic_model/process_tracing/rct already built;
+  difference_in_differences/regression_discontinuity/synthetic_control land
+  concurrently this same batch). Atlas F11 table row L624 ONLY citation
+  (grep-confirmed). Pipeline: instrument->relevance/exclusion->2SLS. Scope
+  boundary: captures study DESIGN only (instrument, its 2 named validity
+  justifications, reported findings) -- no real 2SLS regression run, same
+  restraint `causal.rct` applies. Core invariant: `instrument` must
+  genuinely differ from the `endogenous_variable` it targets.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Instrumental Variables row (L624): '處理 endogeneity｜instrument→relevance/exclusion→2SLS｜特定條件下識別因果' -- the ONLY Atlas citation for this method"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md whole-file grep for 'Instrumental Variables'/'IV'/'endogeneity'/'2SLS' (this session, 2026-09-10) -- L624 is the only hit that is actually about this method; short-string 'IV' collisions triaged and confirmed unrelated"
+  - "methods/contracts/causal.rct.contract.yaml -- closest sibling in scope and shape (study-DESIGN-not-stats-engine restraint, required disclosure-only justification field, echo/distinctness invariant pattern) reused as this file's own structural template"
+  - "methods/contracts/framing.how_might_we.contract.yaml -- flat-record-from-thin-citation precedent (2-field record, one echo invariant) reused for this file's own structural template"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L624's own
+  3-step pipeline into 5 required disclosure fields (relevance/exclusion
+  split into 2 named justifications, instrument split from the
+  endogenous_variable it targets), plus disclosed structurally-necessary
+  preconditions -- same standard every Tier 1 contract in this directory
+  applies. `id: causal.instrumental_variables` mints a NEW machine_id;
+  `family: causal` reused as the 9th F11 member.
+
+id: causal.instrumental_variables
+version: "1.0.0"
+family: causal
+
+cognitive_primitives: [RELATE, VALIDATE, ESTIMATE, CAUSE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method, same absence class causal.rct's own inference already
+# discloses). One primitive per Atlas L624's own 3 pipeline stages, plus
+# the causal target the whole design exists to identify: instrument =
+# RELATE (the instrument's defining structural property is its relation to
+# the endogenous regressor); relevance/exclusion = VALIDATE (both are
+# disclosed validity-condition checks); 2SLS = ESTIMATE (the disclosure-only
+# estimation stage, never computed by this record); the underlying
+# identified effect = CAUSE (same closing primitive causal.rct's own
+# treatment/control comparison stage already uses).
+
+purpose:
+  - identify_a_causal_effect_via_an_instrument_under_relevance_and_exclusion_conditions
+# Atlas L624 verbatim sense: "處理 endogeneity...特定條件下識別因果" (handle
+# endogeneity, identify causality under specific conditions).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own citation for this
+  # method is a single table row with no legal-chain placement, same
+  # "no hard upstream dependency" position causal.rct's/
+  # framing.how_might_we's own inputs.required: [] already take for an
+  # analogous standalone method.
+
+outputs:
+  - InstrumentalVariablesRecord
+# NEW output type (see typed-objects/instrumental-variables-record.schema.yaml).
+# Atlas names no PascalCase output type for this method, same honesty gap
+# every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "instrument, endogenous_variable, relevance_justification, exclusion_justification, and analysis_summary are all present, non-empty strings -- Atlas L624's own 3-stage pipeline (instrument/relevance-exclusion/2SLS), transcribed as 5 required disclosure fields since 'instrument' names both the instrument itself and the endogenous variable it targets, and 'relevance/exclusion' names 2 distinct named validity conditions"
+  - "instrument and endogenous_variable are genuinely distinct (case/whitespace-insensitive, NFKC-normalized) -- an instrument that IS the endogenous variable it is meant to instrument for is a degenerate, nonsensical case, not a valid IV design"
+  # NEW, structurally necessary -- Atlas's own table row names the 3
+  # pipeline stages but gives no field-level precondition text (same class
+  # causal.rct's own preconditions already establish for its sibling
+  # method). The distinctness precondition is this method's own definition
+  # asserting a structural property (an instrument, by definition, is not
+  # the variable it instruments for), same "the method's own name/
+  # definition IS the claim" discipline causal.rct's own echo precondition
+  # established for a different structural guarantee.
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision.weighted_decision_matrix.contract.yaml's/
+  # causal.rct.contract.yaml's own quality block already establishes: the
+  # real risk here is an incomplete/degenerate IV design record, not a
+  # missing per-claim evidence citation -- enforced by this method's own 2
+  # real invariants instead (both below and in preconditions).
+
+forbidden_transition: []
+# Atlas F11's Instrumental Variables row is this method's ONLY citation
+# (grep-confirmed, no dedicated section, no §22.3 Method-specific Gate
+# table row). Same empty-and-disclosed choice causal.rct.contract.yaml's
+# own field applies.
+
+recommended_next: []
+# No specific next machine_id cited at L624 (contrast causal.dag's own
+# §14.1-cited chain into a Validation step). Same empty-and-disclosed
+# choice causal.rct.contract.yaml's own field applies.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should relevance_justification and exclusion_justification be one combined 'assumptions' field or 2 separate required fields?"
+    decision: "2 separate required fields -- Atlas L624's own citation names them as 2 distinct validity conditions with different substance (relevance = instrument correlates with the endogenous regressor; exclusion = instrument affects the outcome ONLY through the endogenous regressor); a single combined field would let a caller disclose one condition but not the other while still appearing complete."
+  - question: "Does this method need a separate endogenous_variable field, or is instrument alone sufficient?"
+    decision: "Yes, a separate required field -- an instrument that IS the endogenous variable it targets is a degenerate/nonsensical case (same restraint causal.rct's own treatment_group/control_group split establishes for a different pair); the distinctness invariant is meaningless without 2 named fields to compare."
+  - question: "Should analysis_summary (the 2SLS stage) carry genuine-compute fields (first_stage_f_statistic, second_stage_coefficient, etc.) or stay disclosure-only prose?"
+    decision: "Disclosure-only prose, same restraint causal.rct/association.morphological_analysis/decision.mcda already establish for their own methods. This is a study-DESIGN record, not a statistics engine (task-mandated scope boundary, see module docstring) -- no real 2SLS regression is run; analysis_summary captures REPORTED findings with provenance on the record's own top-level `provenance` field."
+  - question: "Is causal.instrumental_variables the same method as causal.dag or causal.rct?"
+    decision: "No -- distinct machine_id, distinct family position (9th F11 member). Shares causal.rct's disclosure-only/2-invariant shape as a structural template, not as the same method: IV identifies a causal effect via an external instrument under relevance/exclusion, RCT via randomized assignment; neither subsumes the other."
+
+open_questions:
+  - id: "OQ-IV-1"
+    question: "cognitive_primitives [RELATE, VALIDATE, ESTIMATE, CAUSE] is this file's own inference (one primitive per Atlas's own 3 pipeline stages plus the causal target), not a cited Atlas composition formula."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-IV-2"
+    question: "forbidden_transition/recommended_next are both left empty -- Atlas's F11 table row is this method's only citation (grep-confirmed, no dedicated section, no §22.3 gate row)."
+    owner: "operator, or a future review pass specifically checking Tier 1 contracts with no forbidden_transition/recommended_next example in Atlas"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-IV-3"
+    question: "instrument/endogenous_variable/relevance_justification/exclusion_justification are flat strings, not structured objects (e.g. first-stage F-statistic, instrument count). Revisit if a future consumer needs to parse instrument-strength statistics programmatically rather than read them as prose."
+    owner: "operator, or whoever next needs structured instrument-strength fields"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read the whole Atlas F11 table (L612-625) directly, then grepped the
+    whole document case-insensitively for "Instrumental Variables"/"IV"/
+    "endogeneity"/"2SLS" -- confirmed L624 is the only hit actually about
+    this method (short-string "IV" collisions triaged and confirmed
+    unrelated). Grepped the whole `ai_lego` tree and this docs tree
+    case-insensitively for "instrumental_variables" before writing any of
+    this method's own files -- zero pre-existing implementation. Read
+    causal.rct.contract.yaml and framing.how_might_we.contract.yaml in
+    full before writing this contract, reusing their established
+    conventions rather than inventing new ones. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L624's own 3-step formula is
+    transcribed verbatim into `purpose`/`preconditions`. The 5-field flat
+    record shape, the endogenous_variable/instrument split, and the
+    disclosure-only (not genuine-compute) treatment of `analysis_summary`
+    are Phase 3 compilation choices, explicitly flagged above in
+    `compilation_decisions`, not presented as Atlas-cited.

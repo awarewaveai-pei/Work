@@ -1,0 +1,238 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/synthetic-control-record.schema.yaml"
+title: Synthetic Control Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SyntheticControlRecord` -- the declared
+  `outputs` of `causal.synthetic_control`'s Method Contract
+  (methods/contracts/causal.synthetic_control.contract.yaml, `outputs:
+  [SyntheticControlRecord]`). Atlas F11 table row L625 gives this method a 5-step
+  pipeline ("donor pool→fit→weights→post gap→placebo") -- modeled as a record with
+  `treated_unit` made explicit as the implicit subject the other 5 stages
+  presuppose, `donor_pool`/`weights`/`placebo_tests` as lists (Atlas's own
+  "pool"/plural implies more than one item), and `fit_quality`/`post_treatment_gap`
+  as flat disclosure strings (same shape class `rct-record.schema.yaml`'s own
+  `analysis_summary` uses for a similarly thin citation).
+
+  Field provenance -- Atlas F11 L625:
+    * `treated_unit` -- the implicit subject of "單一大型政策事件適用" (suited to a
+      single large policy event): WHICH unit received that event. NOT individually
+      named in the pipeline string, but structurally necessary (donor_pool/
+      treated_unit distinctness cannot be checked without it) -- same class of
+      disclosed compilation addition `causal-dag-analysis.schema.yaml`'s own
+      TREATMENT/OUTCOME node roles already establish for a different method.
+    * `donor_pool` -- the "donor pool" stage: candidate untreated units the
+      synthetic control is built FROM. NOT the actual selection/fitting algorithm
+      this schema/record runs.
+    * `fit_quality` -- the "fit" stage: the study's own disclosed/reported
+      pre-treatment fit assessment (e.g. "pre-treatment trends visually matched
+      closely"), NOT a computed RMSPE or any actual goodness-of-fit statistic.
+    * `weights` -- the "weights" stage: per-donor weight allocations, DISCLOSED/
+      REPORTED (not solved for). Structured as `{donor, weight}` pairs (see
+      compilation_decisions) rather than a flat string, because `donor` must be
+      checkable against `donor_pool` -- the runtime layer (see
+      `ai_lego/modules/causal/synthetic_control.py`) enforces every `weights[].donor`
+      references a real `donor_pool` entry. Weight VALUES (magnitude, sum-to-1,
+      non-negativity) are explicitly NOT validated anywhere in this suite -- see
+      compilation_decisions.
+    * `post_treatment_gap` -- the "post gap" stage: REPORTED finding (the observed
+      difference between the treated unit and its synthetic counterfactual after
+      the event), not computed by this record.
+    * `placebo_tests` -- the "placebo" stage: a non-empty list of DISCLOSED claims
+      about what placebo/robustness checks were performed (e.g. in-space or
+      in-time placebo runs), Atlas's own explicit FINAL pipeline stage.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F11 tool table, Synthetic Control row (L625) -- the ONLY Atlas citation for this method (grep-confirmed, see method contract's own verification section)"
+  - "methods/contracts/causal.synthetic_control.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- disclosure-only flat-field shape precedent reused for fit_quality/post_treatment_gap"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml -- cross-collection referential-integrity shape precedent (edges[]->nodes[]) reused, scaled down, for weights[].donor -> donor_pool membership"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object
+  schema in this directory documents: direct transcription of a cited Atlas worked
+  pipeline plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should donor_pool have a minItems floor, and if so what value?"
+    decision: "minItems: 2. A synthetic control is BY DEFINITION a weighted COMBINATION of donor units (Atlas L625's own '建立加權反事實') -- a pool of 1 unit cannot produce a weighted combination, only a trivial single-unit comparison. See method contract's own compilation_decisions for the full reasoning."
+  - question: "Should weights be one combined free-text field (Atlas's own citation uses a single word 'weights') or structured per-donor entries?"
+    decision: "Structured array of {donor, weight} objects -- a flat string could not express the referential-integrity invariant (every weighted unit must be a real donor_pool member) this method's own donor-pool/weights pipeline ordering demands. Same class of decision causal-dag-analysis.schema.yaml's own edges[]->nodes[] reference already made for a different method."
+  - question: "Should weight (the number) be constrained to [0,1] or required to sum to 1 across the array?"
+    decision: "No -- deliberately unconstrained `type: number`. Enforcing non-negativity or a sum-to-1 convex-combination property would be validating the OUTCOME of a real weight-optimization algorithm this record explicitly does not run (task-mandated scope boundary). Only WHICH donor a weight names is checked (referential integrity), never the weight's own value. See method contract's own compilation_decisions."
+  - question: "Should treated_unit != every donor_pool entry be expressed as a JSON Schema constraint?"
+    decision: "No -- cross-field, case/whitespace-insensitive text comparison against every array element has no native JSON Schema operator, same limitation rct-record.schema.yaml's own treatment_group/control_group echo check and causal-dag-analysis.schema.yaml's own edge-reference check both already accepted. Enforced at the runtime layer (ai_lego/modules/causal/synthetic_control.py), at construction AND independently re-derived by a gate."
+  - question: "Should fit_quality/post_treatment_gap carry their own genuine-compute fields (engine, computation_provenance_ref), the way causal-dag-analysis.schema.yaml's acyclic_verified does?"
+    decision: "No -- this record performs no genuine computation (no RMSPE, no optimizer, no actual fitting). Omitting engine/computation_provenance_ref entirely (not present as false/null) is itself the honest disclosure that nothing here is GENUINE_COMPUTE, same omission-as-disclosure convention rct-record.schema.yaml's own schema already uses."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- same baseline hygiene every sibling record schema in this directory converges on (prevents a caller from smuggling an unreviewed field onto the record), applied from the start (2026-09-10 session note: logic-model-record.schema.yaml/process-tracing-record.schema.yaml were both initially missing this at the top level, caught by critic hand-tamper PoC and fixed -- not repeated here)."
+
+type: object
+required: [id, version, treated_unit, donor_pool, fit_quality, weights, post_treatment_gap, placebo_tests, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SYNTH-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "causal.synthetic_control"
+
+  treated_unit:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The single unit (e.g. a state, country, region, firm) that received the
+      large policy event/intervention Atlas L625's own benefit column names
+      ('單一大型政策事件適用'). Must genuinely differ from every donor_pool entry
+      (runtime-layer invariant, see top-level description).
+
+  donor_pool:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      Atlas L625's own "donor pool" stage -- candidate UNTREATED units the
+      synthetic control is constructed from. minItems:2 -- see
+      compilation_decisions: a pool of 1 unit cannot produce a WEIGHTED
+      combination. NOT the output of any real selection algorithm this schema
+      itself runs.
+
+  fit_quality:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L625's own "fit" stage -- the study's own disclosed/reported
+      pre-treatment fit assessment (e.g. "pre-treatment trends closely tracked
+      the treated unit for the 5 years prior to the event"). REPORTED content,
+      not a computed RMSPE or goodness-of-fit statistic (see method contract's
+      own scope-boundary note).
+
+  weights:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [donor, weight]
+      additionalProperties: false
+      properties:
+        donor:
+          type: string
+          minLength: 1
+          description: >
+            Must match (case/whitespace-insensitive, NFKC-normalized) an entry
+            actually present in donor_pool -- runtime-layer referential-integrity
+            invariant, see top-level description.
+        weight:
+          type: number
+          description: >
+            DISCLOSED/REPORTED value, not solved for and not range- or
+            sum-constrained by this schema -- see compilation_decisions.
+    description: >
+      Atlas L625's own "weights" stage -- per-donor weight allocations. See
+      compilation_decisions for why this is structured rather than a flat
+      string, and why weight VALUES are unconstrained.
+
+  post_treatment_gap:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L625's own "post gap" stage -- the REPORTED difference observed
+      between the treated unit and its synthetic counterfactual after the
+      policy event, as stated by the study (see method contract's own
+      scope-boundary note: this record captures what the study claims to have
+      found, it does not itself compute the gap).
+
+  placebo_tests:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      Atlas L625's own explicit FINAL pipeline stage -- a non-empty list of
+      DISCLOSED claims about what placebo/robustness checks were performed
+      (e.g. "in-space placebo: ran the same procedure on each untreated donor
+      in turn, treated unit's own gap fell outside the resulting placebo
+      distribution"). A design disclosing zero placebo checks has not
+      validated its own inference.
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern every
+      sibling typed-object schema in this directory uses. No `const`:
+      epistemic_type legitimately varies by whether this record documents a
+      planned design (e.g. ASSUMPTION/HYPOTHESIS, not yet run) or a completed,
+      reported study (e.g. EVIDENCE/SOURCE_FACT).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed synthetic-control study on a state-level minimum-wage policy's effect on regional employment"
+    value:
+      id: "SYNTH-2026-09-10-001"
+      version: "1.0.0"
+      generated_by_method: "causal.synthetic_control"
+      treated_unit: "A 州（2020 年實施最低工資調漲政策的處置州）"
+      donor_pool: ["B 州", "C 州", "D 州", "E 州", "F 州"]
+      fit_quality: "政策實施前 5 年，加權組合州與 A 州的就業率趨勢視覺上高度吻合，處置前平均絕對誤差低於 0.3 個百分點"
+      weights:
+        - {donor: "B 州", weight: 0.42}
+        - {donor: "C 州", weight: 0.31}
+        - {donor: "D 州", weight: 0.0}
+        - {donor: "E 州", weight: 0.18}
+        - {donor: "F 州", weight: 0.09}
+      post_treatment_gap: "政策實施後 3 年，A 州實際就業率較加權合成對照組低 1.4 個百分點，缺口於第 2 年後持續擴大"
+      placebo_tests:
+        - "空間安慰劑：對 5 個未處置州依序執行同一流程，A 州自身缺口大小落在安慰劑分佈的第 92 百分位，優於多數安慰劑州"
+        - "時間安慰劑：將處置時點提前 3 年重跑，處置前期間未觀察到有意義缺口"
+      provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - id: "OQ-SYNTHETICCONTROLRECORD-1"
+    question: >
+      treated_unit not-in-donor_pool and weights[].donor -> donor_pool membership
+      are both runtime-only invariants, not schema-expressible -- same class of
+      disclosed gap rct-record.schema.yaml's own treatment_group/control_group
+      check and causal-dag-analysis.schema.yaml's own edge-reference check both
+      already document.
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+  - id: "OQ-SYNTHETICCONTROLRECORD-2"
+    question: >
+      weight (the number) carries no range or sum-to-1 constraint (deliberate,
+      see compilation_decisions) -- revisit only if a future consumer needs a
+      genuine-compute weight-optimization method, which would be a NEW method,
+      not a change to this design-capture record.
+    owner: "operator, or whoever next needs an actual econometric synthetic-control engine"
+
+verification:
+  method: >
+    Read Atlas F11 table row (L625) directly. Cross-checked against
+    methods/contracts/causal.synthetic_control.contract.yaml's own outputs/
+    preconditions/quality. Read rct-record.schema.yaml and
+    causal-dag-analysis.schema.yaml in full as shape precedent before writing this
+    file. Validated against jsonschema Draft202012Validator (required fields
+    present, id pattern satisfied, additionalProperties:false present at both the
+    top level and the nested weights[] item level from the start).
+  note: >
+    treated_unit/donor_pool/fit_quality/weights/post_treatment_gap/placebo_tests
+    field names are this contract's own naming (Atlas itself does not name these
+    5 pipeline stages with formal field labels, only lists them as a slash-arrow
+    chain, and does not name treated_unit at all -- see field-provenance note
+    above). The flat-vs-structured field shapes, the donor_pool minItems:2
+    threshold, and weight's unconstrained-value choice are compilation decisions,
+    disclosed above. No mother document was modified to produce this file.

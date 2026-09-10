@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-10（102–105 號切片：F11 causal 家族收官 6/10→10/10，4 個平行 agent，經歷一次 rate-limit 中斷後重派）
+
+instrumental_variables(47t)/difference_in_differences(51t)/regression_discontinuity(56t)/synthetic_control(61t)。215 tests 零衝突，全 regression 6292→6507，golden 3211→3231。第一次派出的 4 agent 全數死於帳號級 rate limit（HTTP 429），`git status` 確認零殘留檔案後，操作者確認額度重置，原 prompt 逐字重派成功。F11 causal 家族正式收官（10/10）：`causal.dag`（本 session 更早建置）+ 6+4 兩批共 10 個方法。
+
+4 個方法皆為計量／準實驗研究設計方法，比照 `causal.rct` 既有的節制原則——只記錄研究「設計」本身（誰是處置組/對照組、cutoff 在哪、donor pool 有誰、justification 寫了什麼），刻意不做真統計計算（無真 2SLS、無真 parallel-trends 檢定、無真 bandwidth 最佳化、無真權重求解）。critic 逐檔 grep `numpy|scipy|statistics|random\.|np\.|sklearn` 零命中，逐行讀確認唯一存在的計算是結構驗證（非空/型別/去重/referential integrity），此邊界全數守住。
+
+`causal.instrumental_variables` 的 `relevance_justification`／`exclusion_justification` 是兩個獨立必填欄位（非合併成一個 assumptions 清單）——因 Atlas 引用把 relevance／exclusion 點名為兩個實質不同的 IV 有效性條件，只揭露其一等於根本沒建立 IV 有效性；critic 手造測試證實兩者互不代打。`causal.synthetic_control` 的 `weights[].donor`→`donor_pool` referential integrity 仿照 `causal.dag` 的 edges→nodes 模式，critic 直接讀兩份原始碼核對後確認：檢查邏輯類比成立，且本方法的獨立 gate 重新推導比 `causal.dag` 自己原本的 gate（僅 provenance/evidence_labeling 兩項，acyclic_verified 只在建構時查、無 gate 層重推導）更嚴謹——非本批次引入的 bug，是既有 `causal.dag` 的既有落差，critic 標記為 Suggestion 非本批次阻塞項。
+
+critic 覆審（0 Critical/0 Major）：1 Minor 為既有系統性落差（`method-inventory.yaml` L728-747 四個新方法的 `has_contract:false` 未同步，跟 `causal.dag` 自己那列 L697-702 同款舊落差一樣——每個新 entry 自己的 note 已揭露這項刻意不修，非本批次遺漏）；1 Suggestion 為 `synthetic_control.py` docstring 用詞可再精準（見上段，非缺陷）。4 個新 schema 頂層 `additionalProperties:false` 全數從一開始就正確（上一批次 critic 抓到的教訓這次真的生效，hand-tamper PoC 逐一驗證通過）。verdict=PASS。
+
+`ai_lego/modules/causal/__init__.py` 改寫為「F11 -- COMPLETE, 10 of 10」，含全部 10 個方法的一句話摘要；critic 逐項核對 10 個方法的實際程式碼皆與摘要相符。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_instrumental_variables tests.unit.test_difference_in_differences tests.unit.test_regression_discontinuity tests.unit.test_synthetic_control` | exit=0 | result=215 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=6507 tests OK，307s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3231，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=4 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=4 個 CLI 全部 PASS，各自拒絕證明＋獨立 gate 抓包證明皆真跑非模擬
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 4 contract+4 schema+4 module+4 CLI+4 test+`causal/__init__.py`，額外核對 6 個既有 F11 手足的摘要真實性，真跑 215 測試+4 CLI，hand-tamper PoC 驗證 additionalProperties 閘與 synthetic_control 的 referential integrity，手造 IV 雙欄位互不代打測試）| verdict=PASS | findings=0c/0m/1 既有系統性 minor（本批次未引入）/1 suggestion（既有 causal.dag 落差，非本批次）
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`causal\.instrumental_variables\|causal\.difference_in_differences\|causal\.regression_discontinuity\|causal\.synthetic_control\|InstrumentalVariablesRecord\|DifferenceInDifferencesRecord\|RegressionDiscontinuityRecord\|SyntheticControlRecord` | hits=21（本批次新建檔案 20 個+registry+`causal/__init__.py`+WORKLOG 本條目，含 4 手足彼此在自己 docstring 的合法交互引用，零孤兒引用零命名碰撞，critic 獨立複驗）
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：4 個新方法的 contract/schema/module/CLI/test（共 20 個新檔）+ `causal/__init__.py`／`contract-backlog.yaml` 的追加內容全部移除。純新增，無 schema breaking change，可安全回滾。
+
 ## 2026-09-10（同日第二輪）`/tools/video` 重做成真正的 10 步驟 pipeline（操作者拒絕第一輪 tab 重分組）
 
 **觸發**：操作者看過第一輪成果（見上一條目「`/tools/video` IA 重組」）後明確拒絕——「你根本亂做一通」。指出根本錯誤：把「重排導覽」當成「做出流程」，tab bar 不管分幾組都是可任意跳點的平行選單，不是她畫的 A→B→C→…→L 依序推進、做完才能進下一步的 pipeline；且完全漏掉 Whisper 字幕這個步驟。操作者其後明確下令「去做出來」，全權授權執行細節。

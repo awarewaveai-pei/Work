@@ -2479,6 +2479,188 @@ tier_1:
     source: "methods/contracts/causal.process_tracing.contract.yaml + specs/cognitive/typed-objects/process-tracing-record.schema.yaml + ai_lego/compute/process_tracing/evidence_evaluation.py + ai_lego/modules/causal/process_tracing.py"
     note: "67 tests pass (incl. 8 direct compute-submodule unit tests for the 4-cell implication lookup table and the ELIMINATED-over-CONFIRMED precedence rule). F11 causal family: 6 of 10 built after this batch (causal.dag + this batch's causal.counterfactual_reasoning/causal.theory_of_change/causal.logic_model/causal.process_tracing/causal.rct) -- NOT complete; Difference-in-Differences/Regression Discontinuity/Instrumental Variables/Synthetic Control (F11 table rows L622-625) remain pending. method-inventory.yaml's own Process Tracing row (line: 617) is stale-by-3 against the real Atlas L620, same drift class every other F-family row in that file already carries; not corrected here per METHOD_ATLAS_SLICE_LEAN_STANDARD.md's own 'not a required step' ruling. ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once after all 5 F11 builds land."
 
+  onehundredsecond_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F11 causal-family
+    # builds -- causal.difference_in_differences/causal.regression_discontinuity/
+    # causal.synthetic_control land concurrently via 3 sibling agents, not read
+    # here; re-read this file's own tail immediately before appending per this
+    # batch's own instruction -- onehundredfirst_concrete_entry was still the
+    # last key at append time, no collision observed. Orchestrating session
+    # reconciles exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes).
+    method_id: "causal.instrumental_variables"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member (`causal.dag`/`causal.counterfactual_
+      reasoning`/`causal.theory_of_change`/`causal.logic_model`/
+      `causal.process_tracing`/`causal.rct` already built, F11 was 6/10
+      before this batch). F11 table row (L624: "處理 endogeneity｜
+      instrument→relevance/exclusion→2SLS｜特定條件下識別因果") -- the ONLY
+      Atlas citation for this method (grep-confirmed: no dedicated §11.x
+      section, no §22.3 gate row; whole-file grep for "Instrumental
+      Variables"/"IV"/"endogeneity"/"2SLS" confirmed L624 the only hit
+      actually about this method, short-string "IV" collisions triaged and
+      confirmed unrelated). Same study-DESIGN-not-stats-engine restraint
+      `causal.rct` establishes -- no real 2SLS regression is run. Real
+      invariants: `instrument`/`endogenous_variable`/
+      `relevance_justification`/`exclusion_justification`/
+      `analysis_summary` must each be a non-empty string (both
+      justification fields REQUIRED and INDEPENDENT -- disclosing one
+      validity condition does not excuse omitting the other, same
+      "declared gap needs explicit justification" discipline
+      `causal.rct`'s own `power_analysis` already establishes); `instrument`
+      must genuinely differ (NFKC/case/whitespace-insensitive) from
+      `endogenous_variable` -- an instrument that IS the endogenous
+      variable it targets is a degenerate, nonsensical IV design -- both
+      enforced at construction AND re-derived independently by a gate. No
+      GENUINE_COMPUTE field added (Atlas's own benefit column names none,
+      same restraint `causal.rct`'s own scope boundary already applies).
+    source: "methods/contracts/causal.instrumental_variables.contract.yaml + specs/cognitive/typed-objects/instrumental-variables-record.schema.yaml + ai_lego/modules/causal/instrumental_variables.py"
+    note: "47 tests pass. F11 causal family: 7 of 10 built after this batch (causal.dag/counterfactual_reasoning/theory_of_change/logic_model/process_tracing/rct + this entry's causal.instrumental_variables) -- NOT complete; Difference-in-Differences/Regression Discontinuity/Synthetic Control (F11 table rows L622,623,625) remain pending, landing concurrently via 3 sibling agents in this same batch, not read or depended on here. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite). ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch land."
+
+  onehundredthird_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F11 causal-family
+    # builds -- causal.regression_discontinuity/causal.instrumental_variables/
+    # causal.synthetic_control land concurrently via 3 sibling agents, not
+    # read here; re-read this file's own tail immediately before appending
+    # per this batch's own instruction -- onehundredsecond_concrete_entry
+    # (causal.instrumental_variables) was already taken by the time this
+    # entry landed, no other collision observed. Orchestrating session
+    # reconciles exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes).
+    method_id: "causal.difference_in_differences"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member (`causal.dag`/`causal.counterfactual_
+      reasoning`/`causal.theory_of_change`/`causal.logic_model`/
+      `causal.process_tracing`/`causal.rct` already built, F11 was 6/10
+      before this batch). F11 table row (L622: "處置前後 × 對照組｜
+      treated/control→pre/post→parallel trends｜自然實驗常用") -- the ONLY
+      Atlas citation for this method (grep-confirmed: no dedicated §11.x
+      section, no §22.3 gate row; whole-file grep for "Difference-in-
+      Differences"/"parallel trends"/"DiD" confirmed L622 the only hit).
+      Same study-DESIGN-not-stats-engine restraint `causal.rct` establishes
+      -- no real DiD regression or parallel-trends significance test is
+      run. Real invariants: `treated_group`/`control_group`/`pre_period`/
+      `post_period`/`parallel_trends_justification`/`analysis_summary`
+      must each be a non-empty string (`parallel_trends_justification`
+      REQUIRED -- DiD's own defining identifying assumption, same
+      "declared gap needs explicit justification" discipline `causal.rct`'s
+      own `power_analysis` already establishes); `treated_group` must
+      genuinely differ (NFKC/case/whitespace-insensitive) from
+      `control_group`, AND `pre_period` must genuinely differ (same
+      normalization) from `post_period` -- 2 independent echo invariants
+      (not 1), both enforced at construction AND re-derived independently
+      by a gate. No GENUINE_COMPUTE field added (Atlas's own benefit
+      column names none, same restraint `causal.rct`'s own scope boundary
+      already applies).
+    source: "methods/contracts/causal.difference_in_differences.contract.yaml + specs/cognitive/typed-objects/difference-in-differences-record.schema.yaml + ai_lego/modules/causal/difference_in_differences.py"
+    note: "51 tests pass. F11 causal family: 7 of 10 built after this batch's causal.instrumental_variables + this entry's causal.difference_in_differences (8 of 10 counting both) -- NOT complete; Regression Discontinuity/Synthetic Control (F11 table rows L623,625) remain pending, landing concurrently via 2 sibling agents in this same batch, not read or depended on here. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite). ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch land."
+
+  onehundredfourth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F11 causal-family
+    # builds -- causal.instrumental_variables/causal.difference_in_differences/
+    # causal.synthetic_control land concurrently via 3 sibling agents, not
+    # read here; re-read this file's own tail immediately before appending
+    # per this batch's own instruction -- onehundredsecond_concrete_entry
+    # (causal.instrumental_variables) and onehundredthird_concrete_entry
+    # (causal.difference_in_differences) were both already taken by the time
+    # this entry landed, no other collision observed. Orchestrating session
+    # reconciles exact numbering on any later collision, same pattern
+    # ninetysixth_concrete_entry's own note already establishes).
+    method_id: "causal.regression_discontinuity"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member (`causal.dag`/`causal.counterfactual_
+      reasoning`/`causal.theory_of_change`/`causal.logic_model`/
+      `causal.process_tracing`/`causal.rct` already built, F11 was 6/10
+      before this batch). F11 table row (L623: "用 cutoff 附近估效果｜
+      running variable→cutoff→bandwidth→checks｜局部因果效果") -- the ONLY
+      Atlas citation for this method (grep-confirmed: no dedicated section,
+      no §22.3 gate row; whole-file grep for "Regression Discontinuity"/
+      "RDD"/"running variable"/"cutoff" confirmed L623 the only hit
+      actually about this method, case-insensitive "cutoff" substring
+      collisions -- e.g. "BoardDecisionPack", "HazardDescriptor" -- triaged
+      and confirmed unrelated). Same study-DESIGN-not-stats-engine
+      restraint `causal.rct` establishes -- no real local-linear regression
+      or bandwidth-optimizer is run. Real invariants: `running_variable`/
+      `bandwidth` non-empty strings, `cutoff_value` a finite real number
+      (not NaN/Infinity/bool/string -- a cutoff must be a real point on the
+      running variable's own scale), `checks` a REQUIRED non-empty array of
+      non-empty strings (Atlas's own 4th, plural pipeline word -- an RDD
+      design with zero disclosed checks has not validated its own
+      identifying assumption at all); every `checks` entry must be
+      genuinely distinct from every other entry (NFKC/case/whitespace-
+      insensitive) -- a padded/duplicated checks list has not actually
+      disclosed multiple validation checks, grounded independently in this
+      method's own L623 citation, not by analogy to another method.
+      `analysis_summary` included but OPTIONAL (unlike `causal.rct`'s own
+      required field) -- this method's citation names "checks", not
+      "analysis", as its 4th word. No GENUINE_COMPUTE field added (Atlas's
+      own benefit column names none, same restraint `causal.rct`'s own
+      scope boundary already applies).
+    source: "methods/contracts/causal.regression_discontinuity.contract.yaml + specs/cognitive/typed-objects/regression-discontinuity-record.schema.yaml + ai_lego/modules/causal/regression_discontinuity.py"
+    note: "56 tests pass. F11 causal family: 8 of 10 built after this batch's causal.instrumental_variables/causal.difference_in_differences + this entry's causal.regression_discontinuity (9 of 10 counting all three) -- NOT complete; Synthetic Control (F11 table row L625) remains pending, landing concurrently via 1 sibling agent in this same batch, not read or depended on here. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including the embedded example resolved through its real $ref to epistemic-label.schema.yaml and a negative-control smuggled-key rejection check. ai_lego/modules/causal/__init__.py's own shared family docstring is NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch land."
+
+  onehundredfifth_concrete_entry:
+    # Provisional ordinal (independent concurrent batch of 4 F11 causal-family
+    # builds -- causal.instrumental_variables/causal.difference_in_differences/
+    # causal.regression_discontinuity land concurrently via 3 sibling agents,
+    # not read here; re-read this file's own tail immediately before
+    # appending per this batch's own instruction -- onehundredsecond_
+    # concrete_entry/onehundredthird_concrete_entry/onehundredfourth_
+    # concrete_entry were all already taken by the time this entry landed,
+    # no other collision observed. Orchestrating session reconciles exact
+    # numbering on any later collision, same pattern ninetysixth_
+    # concrete_entry's own note already establishes). This is the LAST of 4
+    # concurrent F11 builds in this batch -- F11 is 10/10 after this batch
+    # lands (causal.dag + prior 6 + this batch's 4).
+    method_id: "causal.synthetic_control"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F11 `causal` family member (`causal.dag`/`causal.counterfactual_
+      reasoning`/`causal.theory_of_change`/`causal.logic_model`/
+      `causal.process_tracing`/`causal.rct` already built, F11 was 6/10
+      before this batch; `causal.instrumental_variables`/`causal.
+      difference_in_differences`/`causal.regression_discontinuity` land
+      concurrently in this same batch, not read here). F11 table row (L625:
+      "建立加權反事實｜donor pool→fit→weights→post gap→placebo｜單一大型政策
+      事件適用") -- the ONLY Atlas citation for this method (grep-confirmed:
+      whole-file grep for "Synthetic Control"/"donor pool"/"placebo"
+      combined found exactly 1 hit, this row; no dedicated §11.x/§12.x
+      section; no §22.3 gate row). Longest F11 pipeline (5 stages vs the
+      typical 3-4). Same study-DESIGN-not-stats-engine restraint
+      `causal.rct` establishes -- no real donor selection, weight
+      optimization, or econometric fit is run. Real invariants:
+      `treated_unit`/`fit_quality`/`post_treatment_gap` non-empty strings,
+      `donor_pool` a REQUIRED list of >=2 distinct non-empty strings (a
+      synthetic control is BY DEFINITION a weighted COMBINATION -- Atlas's
+      own "建立加權反事實" -- a 1-donor pool cannot produce one, grounded
+      directly in this method's own citation, not borrowed from a sibling);
+      `treated_unit` must NOT echo (NFKC/case/whitespace-insensitive) any
+      `donor_pool` entry -- the treated unit is, by the method's own
+      vocabulary, not a donor; `weights` a REQUIRED list of {donor, weight}
+      objects where every `donor` must reference a real `donor_pool` entry
+      (cross-collection referential integrity, same pattern `causal.dag`'s
+      own edges[]->nodes[] reference already establishes, scaled down to a
+      membership check) -- weight VALUES themselves are deliberately never
+      validated (magnitude/sign/sum-to-1 all unconstrained, staying inside
+      the disclosure-only scope boundary); `placebo_tests` a REQUIRED
+      non-empty list of non-empty strings -- Atlas's own explicit FINAL
+      pipeline stage, a design disclosing zero placebo checks has not
+      validated its own inference at all, grounded independently in this
+      method's own L625 citation (not borrowed from `causal.
+      counterfactual_reasoning`'s own now-corrected L635-based reasoning,
+      which this task was explicitly warned was overreach specific to a
+      different method). Both structural invariants enforced at
+      construction AND re-derived independently by a gate.
+    source: "methods/contracts/causal.synthetic_control.contract.yaml + specs/cognitive/typed-objects/synthetic-control-record.schema.yaml + ai_lego/modules/causal/synthetic_control.py"
+    note: "61 tests pass. F11 causal family: 9 of 10 built before this entry (causal.dag + prior 6 + this batch's causal.instrumental_variables/causal.difference_in_differences/causal.regression_discontinuity) -- F11 IS 10/10 counting this entry, but has_contract/contract_status flip on any other registry (method-inventory.yaml) and ai_lego/modules/causal/__init__.py's own shared family docstring are deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites/reconciles both once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite), including a negative-control 1-donor-pool rejection check and a negative-control smuggled-top-level-key and smuggled-nested-weights-key rejection check. CLI demo (python -m ai_lego.apps.cli.run_synthetic_control_slice) prints PASS and exits 0, demonstrating 3 real refusals (undersized donor pool, treated_unit echoing a donor, a weight naming an unknown donor) plus 1 independent-gate hand-tamper catch."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================
