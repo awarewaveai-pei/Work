@@ -2481,6 +2481,24 @@
         "CAP-ANALYTICS"
       ],
       "description": "A business metric (e.g. \"active customer\", \"units shipped per week\") is defined once as a named, versioned calculation registered centrally, and every report, dashboard, or data-warehouse consumer resolves that metric from the same registered definition, rather than each consumer recomputing its own ad hoc version that can silently disagree with another."
+    },
+    {
+      "id": "CAP-INDIVIDUAL-ACCOUNT",
+      "name": "Individual / Self-use Account",
+      "module": "tenant",
+      "requires": [
+        "CAP-IDENTITY"
+      ],
+      "description": "A user can use the system entirely standalone, as an individual, with no owning organization, company, department, or tenant structure at all -- not merely a tenant of one. Distinct from CAP-MULTI-TENANT, which always models an owning-organization isolation boundary (even a single-person org); and from CAP-CUSTOMER-USERS/CAP-INTERNAL-USERS, which describe roles within an org boundary, not an account type that has none. Does not conflict with CAP-MULTI-TENANT/CAP-GROUP/CAP-ORG-HIERARCHY: a system can support individual, no-org accounts and organization-owned accounts side by side (e.g. a personal free-tier user alongside a paying company account), so no mutual exclusion is enforced."
+    },
+    {
+      "id": "CAP-PREPAID-CREDITS",
+      "name": "Prepaid Credit Pack / Wallet",
+      "module": "commercial",
+      "requires": [
+        "CAP-USAGE-METERING"
+      ],
+      "description": "Customers purchase a bundle of credits upfront, held as an account balance, and each billable usage event decrements that balance directly rather than triggering a separate post-hoc invoice. Requires CAP-USAGE-METERING, not CAP-PAYMENTS directly: usage must already be measured and attributed before it can decrement a balance, the same reasoning CAP-GIFT-CARD uses for requiring only CAP-COMMERCIAL rather than CAP-PAYMENTS -- how the credit pack itself was originally paid for is a separate concern. Distinct from CAP-USAGE-METERING, which only measures/attributes usage without implying prepayment; from CAP-CREDIT-TERMS, which is B2B net-30/60/90 payment after goods are already delivered, the opposite timing; and from CAP-LOYALTY-POINTS, which are earned/non-purchasable rewards, not a directly purchasable billing currency."
     }
   ]
 }

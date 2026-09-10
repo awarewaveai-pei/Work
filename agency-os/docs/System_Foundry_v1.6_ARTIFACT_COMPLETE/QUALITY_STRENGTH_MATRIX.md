@@ -36,6 +36,6 @@ Every rating below is self-assessed by the same effort that built the checks it 
 | Selected LEGO completeness | VERY_STRONG | 10 required artifacts/module + staging validator |
 | Blueprint completeness | VERY_STRONG | all 73 controlled sections emitted ACTIVE/N/A |
 | Custom requirements | VERY_STRONG | verbatim stable ID + dedicated review module; no technology guessing |
-| Selection reverse testing | VERY_STRONG | ALL-NO, ALL-YES, 261 singles, exhaustive pairs, 1000 random |
+| Selection reverse testing | VERY_STRONG | ALL-NO, ALL-YES, 263 singles, exhaustive pairs, 1000 random |
 | Artifact integrity | VERY_STRONG | generated SHA-256 artifact manifest |
 | Generator blast radius | VERY_STRONG | staging + validation + atomic commit + overwrite refusal |

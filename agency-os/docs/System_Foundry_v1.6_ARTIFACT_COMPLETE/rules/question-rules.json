@@ -212,6 +212,16 @@
       ]
     },
     {
+      "id": "RULE-Q-ORG-006",
+      "when": {
+        "question": "Q-ORG-006",
+        "equals": true
+      },
+      "require": [
+        "CAP-INDIVIDUAL-ACCOUNT"
+      ]
+    },
+    {
       "id": "RULE-Q-DATA-001",
       "when": {
         "question": "Q-DATA-001",
@@ -719,6 +729,16 @@
       },
       "require": [
         "CAP-CONNECTOR-QUOTA"
+      ]
+    },
+    {
+      "id": "RULE-Q-COM-008",
+      "when": {
+        "question": "Q-COM-008",
+        "equals": true
+      },
+      "require": [
+        "CAP-PREPAID-CREDITS"
       ]
     },
     {

@@ -497,6 +497,14 @@
       }
     },
     {
+      "id": "Q-ORG-006",
+      "category": "scope",
+      "label": "個人自用帳號（沒有組織/公司歸屬）",
+      "description": "使用者可以直接以個人身份使用系統，完全不需要建立或加入任何公司／組織／部門結構——不是「只有一人的小公司」，是根本沒有組織這一層。這跟上面「多家公司使用」是不同維度，兩者可以同時存在（例如同時支援個人免費用戶與付費企業客戶）。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
       "id": "Q-DATA-001",
       "category": "records",
       "label": "客戶 / 聯絡人資料",
@@ -1018,6 +1026,18 @@
       "category": "commercial",
       "label": "個別串接/連接器需要各自的用量上限",
       "description": "每一個外部串接/連接器（例如連接的電商平台數量）都有自己獨立的用量額度，不同方案給的額度不同，這個額度要獨立於其他依用量計費的維度單獨檢查與限制。只在你有勾選「依使用量計費」時才有意義。",
+      "answer_type": "boolean",
+      "required_when_active": true,
+      "active_when": {
+        "question": "Q-COM-005",
+        "equals": true
+      }
+    },
+    {
+      "id": "Q-COM-008",
+      "category": "commercial",
+      "label": "預付點數包／儲值餘額扣抵",
+      "description": "客戶先付費買一包點數或儲值餘額，之後每次使用服務就直接從這個餘額扣抵，而不是每次用量事後另外開一張帳單，適合「先儲值後扣點」的計費方式。只在你有勾選「依使用量計費」時才有意義。",
       "answer_type": "boolean",
       "required_when_active": true,
       "active_when": {

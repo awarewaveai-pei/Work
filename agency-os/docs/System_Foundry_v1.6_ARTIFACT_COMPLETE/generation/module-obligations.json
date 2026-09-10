@@ -191,23 +191,28 @@
       "invariants": [
         "Tenant context is explicit and immutable within a request/transaction.",
         "Cross-tenant access is deny-by-default.",
-        "Sharing/collaboration is explicit, scoped, and audited."
+        "Sharing/collaboration is explicit, scoped, and audited.",
+        "When CAP-INDIVIDUAL-ACCOUNT is also selected, a request under an individual account carries no tenant context at all -- 'no tenant' is an explicit, first-class case every tenant-context check must handle, never a synthetic single-member tenant assumed by default."
       ],
       "security": [
         "Tenant-scoped authorization on every owned object.",
-        "No tenant identifier may be trusted solely from client input."
+        "No tenant identifier may be trusted solely from client input.",
+        "When CAP-INDIVIDUAL-ACCOUNT is also selected, an individual account's own records are authorized against the account's own identity directly, not against an implicit or synthetic tenant id, so a bug that hardcodes tenant-scoped authorization cannot accidentally leave individual-account data unscoped."
       ],
       "tests": [
         "Cross-tenant negative tests.",
         "Tenant-scoped backup/restore tests.",
-        "Shared-resource authorization tests when selected."
+        "Shared-resource authorization tests when selected.",
+        "When CAP-INDIVIDUAL-ACCOUNT is also selected, an individual account's data access is contract-tested to confirm it works with no tenant id present, and that no tenant-scoped query accidentally matches it via a null-tenant wildcard."
       ],
       "operations": [
-        "Tenant dimension in audit/observability without leaking sensitive data."
+        "Tenant dimension in audit/observability without leaking sensitive data.",
+        "When CAP-INDIVIDUAL-ACCOUNT is also selected, the mix of individual (no-org) vs org-scoped accounts is observable, since capacity/scaling assumptions built around 'one tenant per customer' do not hold once individual accounts are also present."
       ],
       "recovery": [
         "Tenant-scoped recovery minimizes other-tenant impact.",
-        "Cross-tenant repair requires elevated authority and audit."
+        "Cross-tenant repair requires elevated authority and audit.",
+        "When CAP-INDIVIDUAL-ACCOUNT is also selected, an individual account's backup/restore path does not depend on any tenant record existing to restore alongside it."
       ]
     },
     "domain": {
@@ -371,27 +376,32 @@
         "Entitlement is separate from payment-provider state.",
         "Commercial state transitions are explicit and auditable.",
         "Product capability gates are centrally defined.",
-        "When CAP-CONNECTOR-QUOTA is also selected, a per-connector quota is checked and enforced as its own entitlement dimension, independent of the account's other usage-metering dimensions; exceeding one connector's quota never silently borrows headroom from another."
+        "When CAP-CONNECTOR-QUOTA is also selected, a per-connector quota is checked and enforced as its own entitlement dimension, independent of the account's other usage-metering dimensions; exceeding one connector's quota never silently borrows headroom from another.",
+        "When CAP-PREPAID-CREDITS is also selected, a credit balance only changes via an appended, immutable ledger entry (purchase, usage debit, refund, or expiry) -- never a direct overwrite of the stored balance figure -- and a usage event that would take the balance negative is rejected unless an explicit, reviewed overdraft policy allows it."
       ],
       "security": [
         "Entitlement checks are server-side authoritative.",
         "Administrative overrides require audit/authority.",
-        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota enforcement is server-side authoritative, the same as this module's own entitlement-check obligation already requires generally."
+        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota enforcement is server-side authoritative, the same as this module's own entitlement-check obligation already requires generally.",
+        "When CAP-PREPAID-CREDITS is also selected, crediting or adjusting a balance outside the normal purchase/usage-debit path requires the same administrative-override audit/authority this module's own security obligation already requires generally."
       ],
       "tests": [
         "Edition/entitlement matrix.",
         "Subscription lifecycle.",
         "Trial expiry/grace period.",
-        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota enforcement is contract-tested at and just above the connector's own limit, independent of other usage-metering dimensions."
+        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota enforcement is contract-tested at and just above the connector's own limit, independent of other usage-metering dimensions.",
+        "When CAP-PREPAID-CREDITS is also selected, concurrent usage-debit contract tests confirm two simultaneous debits against the same balance can never together take it negative (no lost-update race)."
       ],
       "operations": [
         "Entitlement mismatch and lifecycle failure monitoring.",
-        "When CAP-CONNECTOR-QUOTA is also selected, accounts approaching a per-connector quota limit are observable for upsell/upgrade follow-up."
+        "When CAP-CONNECTOR-QUOTA is also selected, accounts approaching a per-connector quota limit are observable for upsell/upgrade follow-up.",
+        "When CAP-PREPAID-CREDITS is also selected, accounts whose balance has run low or hit zero are observable for a top-up/replenishment follow-up, alongside this module's own entitlement-mismatch monitoring."
       ],
       "recovery": [
         "Provider outage does not silently corrupt entitlement truth.",
         "Manual correction is audited and reversible.",
-        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota configuration is included in backup scope."
+        "When CAP-CONNECTOR-QUOTA is also selected, per-connector quota configuration is included in backup scope.",
+        "When CAP-PREPAID-CREDITS is also selected, the credit ledger is included in backup scope, and a corrupted or lost balance is reconstructable by replaying the ledger rather than trusting only the last snapshot figure."
       ]
     },
     "payments": {

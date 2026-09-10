@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 257,
+  "active_answer_count": 259,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-2FA",
@@ -117,6 +117,7 @@
     "CAP-IMAGES",
     "CAP-IMPORT-EXPORT",
     "CAP-INAPP-NOTIFY",
+    "CAP-INDIVIDUAL-ACCOUNT",
     "CAP-INFLUENCER",
     "CAP-INTERACTION-HISTORY",
     "CAP-INTERNAL-USERS",
@@ -176,6 +177,7 @@
     "CAP-POS-INVENTORY-SYNC",
     "CAP-POS-RECEIPT",
     "CAP-PREORDER",
+    "CAP-PREPAID-CREDITS",
     "CAP-PROCUREMENT",
     "CAP-PRODUCT-ATTRIBUTES",
     "CAP-PRODUCT-DEVELOPMENT",
