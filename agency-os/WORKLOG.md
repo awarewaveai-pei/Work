@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-10 HCI30 顯示分析過程＋新增運作原理說明頁——操作者對報告的追加要求
+
+操作者看到報告後：「我沒看到這個系統分析出什麼狗屎結論, 應該顯示分析過程, 而且你應該有個說明頁 說明這個系統是怎麼運作, 怎麼分析」。查證程式碼發現：`packages/intelligence/classify-evidence-quality.mjs` 早就針對每個已評估維度算出 `{dimension, domain, value, quality, evidence_refs}`，這份推導鏈資料一直存在、一直被後端回傳（`evidenceQuality` 欄位），但前端從未顯示——不是要新造分析邏輯，是把既有真實運算結果接上畫面。
+
+實作：
+- `index.html` 新增 `buildDomainGrid()` 共用函式：信任構面卡片改成可點擊展開，顯示「此構面由哪幾個維度組成、各自等級、單一/多重來源、平均後保守下修的規則說明、評估分歧時如實標示」，並把 `evidence_refs` 解析回實際的證據/主張內容摘要（可回溯到具體那幾筆紀錄）。同時套用在案件詳情頁與凍結報告頁，同一份邏輯不重複實作。
+- 新增「這個系統怎麼運作？」說明頁（`#about`，頁首連結進入）：整體流程圖、三種紀錄類型定義、14 維度→7構面對照表（資料驅動自真實的 `DIMENSION_TO_DOMAIN`，非手寫散文）、分數計算規則（含保守下修捨入、覆蓋度、評估分歧語意）、單一/多重來源判定、資料安全機制（RLS 租戶隔離／風險升級觸發重審／報告不可竄改，皆為真實已測試機制)，最後誠實列出目前系統做不到的地方（調查目的僅為標籤、無跨構面總分、R0-R4 未定義、無真實登入）。
+
+真跑驗證：案件詳情頁點開一個構面卡片，正確顯示該構面的維度組成、等級、來源數與被引用的證據原文摘要；同一顆案件產生報告後，報告頁的構面卡片展開顯示完全相同的推導內容；說明頁的 14→7 對照表逐一核對與 `assessment-dimensions.mjs` 原始映射一致；全程 console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=案件詳情頁展開構面卡片確認顯示維度/等級/來源數/證據原文；產生報告後在報告頁展開同一構面確認顯示相同內容；說明頁對照表核對與原始 DIMENSION_TO_DOMAIN 映射一致 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純前端顯示層改動，沒有新的運算邏輯（只是把後端既有回傳欄位 evidenceQuality 接上畫面），也沒有修改任何既有 API/schema；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=buildDomainGrid\|toggleDomainDetail\|showAbout\|shortRecordText\|about-domain-table | hits=1（僅 index.html 本身，全為本次新增符號，無外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（構面卡片可展開＋新增運作原理說明頁）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無新增；沿用既有已揭露的缺口（purpose 僅為標籤、無跨構面總分、R0-R4 未定義）
+
+[rollback]
+`git revert` 本次 commit：純前端新增，移除即回到報告/案件詳情頁只顯示構面等級徽章、無展開細節、無說明頁的上一版。無 schema/API 變動，可安全回滾。
+
 ## 2026-09-10 HCI30 產生信任評估報告——操作者對「看不出價值在哪裡」的直接回應
 
 操作者：「這個系統...根本讓人看不出價值在哪裡...就是一個輸入資料寄載的廢物」。根因診斷：產品名為「信任評估**報告**」，但 grep 全 codebase 確認零 print/export/PDF 能力——只有輸入畫面，沒有可拿出去的成品。查證既有 V2 藍圖文件發現這正是已記載但從未關閉的缺口：`agency-os/docs/HCI/HCI30_RESEARCH_REVIEW/07_SECURITY_PRIVACY_REVIEW.md:265-284`（SEC-10）——匯出報告必須永久帶有免責聲明與用途重申，否則證據離開系統後會被當成已核實事實。
