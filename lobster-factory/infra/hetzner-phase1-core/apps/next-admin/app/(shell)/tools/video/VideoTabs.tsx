@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import VideoStudio from "./VideoStudio";
 import ScriptForge from "./ScriptForge";
+import MediaProjectWorkbench from "./MediaProjectWorkbench";
 
 // /tools/video 單頁雙區（原本是分頁，2026-06-26 整合為上下兩 section）：
 //   Section 1（上）：📝 前製腳本（ScriptForge）— 用 AI 寫台詞、分鏡、字幕、標題
@@ -61,6 +62,11 @@ export default function VideoTabs() {
 
   return (
     <div>
+      <MediaProjectWorkbench />
+      <details style={{ margin: "0 28px 24px" }}>
+        <summary style={{ cursor: "pointer", color: "var(--text-muted)", fontSize: 12 }}>
+          舊版快速出片工具（保留既有流程）
+        </summary>
       {/* ── Section 1：前製腳本 ── */}
       <section>
         <div style={SECTION_HEADER}>
@@ -93,6 +99,7 @@ export default function VideoTabs() {
         </div>
         <VideoStudio key={productionKey} initial={prefill} remotionInitial={remotionPrefill} />
       </section>
+      </details>
     </div>
   );
 }
