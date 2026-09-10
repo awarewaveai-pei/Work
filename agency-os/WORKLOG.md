@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-09-10 HCI30 清空本機開發資料庫的展示案件——操作者要求「先把所有測試的舊資料刪掉」
+
+操作者要求刪掉案件列表裡累積的舊測試案件。第一次執行時誤把整個 `hci30dev` docker volume 直接砍掉重建（回到只剩 fixtures 種子資料），範圍超出操作者原意——操作者澄清：連 fixtures 裡寫死的 4 筆原始種子案件也要一起清空，變成完全空的案件列表（透過 AskUserQuestion 確認選「全部清空」）。
+
+新增 `scripts/dev-db-reset-empty.ps1`（可重複執行，不是一次性指令）：砍掉 `hci30dev` volume → 重跑全部 16 個 migration → 只灌入應用程式運作所必需的最小骨架資料（`hci.tenants`、`hci.app_tenant_bindings`、兩租戶皆 ACTIVE 的 `hci.tenant_authorizations`）——刻意不動 `database/fixtures/0001_synthetic.sql`（那個檔案是真實 Docker 負向測試套件的固定依賴，裡面的案件 id 被測試直接引用，改了會炸測試）。這個腳本與 `dev-db-init.ps1`（灌完整 fixtures 供測試情境用）是兩個不同用途、並存的腳本，不是互相取代。
+
+真跑驗證：執行腳本後，租戶 A／B 的「進行中案件」與「歷史案件」四個列表全部顯示空狀態（非模擬）；驗證兩租戶都還能正常開新案件（證明最小骨架資料足夠讓應用程式運作，不是清空後變成打不開）；發現驗證動作本身又留下 2 筆測試案件，重跑一次腳本確認可重複執行、乾淨移除。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=執行 dev-db-reset-empty.ps1 → 確認兩租戶進行中/歷史案件皆空 → 各自成功開一個新案件驗證骨架資料足夠 → 重跑腳本一次確認乾淨、可重複 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純新增一支本機開發用重置腳本，複製既有 dev-db-init.ps1 的 Invoke-SqlFile 慣例，未修改任何既有 migration/fixtures/schema/API；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=dev-db-reset-empty | hits=0（新腳本本身不被任何其他檔案引用，屬獨立工具，無需連結進治理文件）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/scripts/dev-db-reset-empty.ps1（新檔）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險]
+- 第一次誤操作（整個 volume 直接砍掉重建）已刪除更早之前 session 累積的展示案件（如 person-track 切片的 a4a5e299 等），不可回復，無備份——已在對話中向操作者揭露
+
+[rollback]
+純新增檔案，`git revert` 或直接刪除該腳本即可還原程式碼狀態；資料庫本身的清空動作不可回滾（設計上就是「清空」），如需示範資料需另外手動建立。
+
 ## 2026-09-10 HCI30 顯示分析過程＋新增運作原理說明頁——操作者對報告的追加要求
 
 操作者看到報告後：「我沒看到這個系統分析出什麼狗屎結論, 應該顯示分析過程, 而且你應該有個說明頁 說明這個系統是怎麼運作, 怎麼分析」。查證程式碼發現：`packages/intelligence/classify-evidence-quality.mjs` 早就針對每個已評估維度算出 `{dimension, domain, value, quality, evidence_refs}`，這份推導鏈資料一直存在、一直被後端回傳（`evidenceQuality` 欄位），但前端從未顯示——不是要新造分析邏輯，是把既有真實運算結果接上畫面。
