@@ -1,6 +1,77 @@
 # Worklog
 
-## 2026-09-11（106–110 號切片：新開 F08 strategy 家族 1/14→6/14，5 個平行 agent，含本 session 第一個真跨方法依賴）
+## 2026-09-11（資料蒐集 C0 + C1：collect/sink 積木 + 編排器 + 第一個真實抓取管線）
+
+KB K1（`38c415aed`）解除了 C1 的依賴，接著做蒐集端。正本 [DATA_COLLECTION_PLAN.md](docs/data-collection/DATA_COLLECTION_PLAN.md)，決策 [ADR 011](docs/architecture/decisions/011-collection-ingestion-boundary.md)。
+
+交付：`lib/collect/` 全新目錄 20 檔（型別／canonical／budget／quality／provenance／registry／state／orchestrator／`net/{ssrf,fetcher,robots,rate-limit}`／`collectors/http-html`／`sinks/{null,kb}`／6 個測試檔 72 test）。**零既有可部署檔案改動**，rollback = 刪目錄。
+
+- C0：積木契約（`match()` 分數階梯可降級）＋ 編排器獨佔六個橫切面（路由／預算／禮貌／去重／續傳／重試）＋ `ctx.fetch` 單一出口（每跳重驗 SSRF、`redirect:"manual"`、robots、per-host 令牌桶、位元組上限、逾時、預算）＋ 抽取品質閘（長度依語系、密度同單位、soft-404）＋ provenance 蓋章與注入樣態掃描 ＋ `sink/null`。
+- C1：`collect/http-html`（零依賴抽取、conditional request、連結發現）＋ `sink/kb`（版本語意留給 KB，只交付 `RawDoc`）。
+- 「lint 禁止積木用全域 fetch」→ 本 repo 無 ESLint 設定（實查無 `.eslintrc*`／`eslint.config.*`／lint script），改成機械閘測試，並在覆審後擴充到 `node:http(s)`／`undici`／`axios`／`globalThis.fetch`／`child_process`。
+
+**critic 覆審 1 Critical / 8 High / 13 Medium，全部處理**。三條是真的會出事、且只有現在（未上線）改的成本最低：
+- **C1（Critical）**：預算在 `ctx.fetch` 內耗盡時，該 target 已被 `seen.add` 且 `seen` 會持久化 → 那一頁**此後永遠不會再被抓**，測試全綠。同一結構讓 retry 用盡、robots 暫時取不到的頁面跨 run 永久黑洞。修法：`seen` 只在有終局答案時保留，其餘一律 `seen.delete` + 重排；分類改讀 `CollectFetchError.kind`／`status` 欄位。
+- **C2（Critical）**：頁面自宣告的 `<link rel=canonical>` 未限同源。canonical 在下游就是文件身分（`lib/kb/family.ts` 拿去算 family id）→ 一個 CMS 設錯（每頁都宣告 canonical=首頁）就能讓 200 頁全落進同一 family、彼此 archive，KB 最後只剩一頁；或 UGC 頁宣告 `canonical=/refund-policy` 直接成為退貨政策的下一版。
+- **H2/H3/H1（網路門）**：`ctx.fetch` 的 robots 是 opt-in（少傳一個參數 = 生產爬蟲全面無視 robots，測試全綠）；積木可覆寫 method 與 UA（用一個身分問許可、用另一個身分抓）；SSRF 檔頭宣稱擋住 DNS rebinding 但實際沒有（檢查與連線各解析一次）。前兩項已修；第三項改成誠實敘述 + TASKS（需要 undici Agent pinning）。
+
+另修：H4 畸形 entity（`&#x110000;`）讓 `String.fromCodePoint` 拋錯而整頁消失；H5 帶反向參照的 regex 對 20,000 個未閉合 `<script>` 實測 2.6 秒且為 O(n²)（5MB 上限下等於單頁 DoS），且截斷頁會把整段 JS 當內文存進 KB → 改線性掃描 + 截斷直接判 dirty；H6/author provenance 傳遞斷點（KB 無欄位，已開 TASKS 不靜默）；H7 tombstone 加健康度閘且改用「實際交付的 canonical URL」；H8 soft-404 誤殺真 FAQ（「找不到頁面怎麼辦？」）；H9 隱形字元清單含 ZWJ ⇒ 含 emoji 的頁面被隔離；M2 robots 拒絕獨立成 `disallowed` 桶（混進 dirty 會讓 C2 的告警對正常行為狂響）；M4 resume 時新 seed 被忽略；M5 令牌桶改單一原子 `take()`；M6 Crawl-delay 生效；M7 robots error 只快取 60 秒；M8 KB body 截斷改成拒收（截斷後 hash 會讓之後所有編輯都回報 unchanged）；M10 hygiene 閘擴充；M11 `role_header` 只在隱藏文字生效。
+
+**測試造假也修了**：原本的續爬測試由 fake block 自己 spend budget，走的是迴圈頂那條**本來就對**的分支——突變測試證明它抓不到 C1（拔掉修正仍全綠）。改成讓預算在 `ctx.fetch` 內、一個 target 的第二次抓取時耗盡後，同一突變立刻紅。另有 `expect(x.length).toBeGreaterThanOrEqual(0)` 這種恆真斷言，已刪。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_LIVE_SMOKE=1 COLLECT_LIVE_URL=https://en.wikipedia.org/wiki/Retrieval-augmented_generation npx vitest run lib/collect/__tests__/collect-live-smoke.test.ts`（真站台、真 robots.txt、真抽取，`sink/null` 不落地）| exit=0 | result=抽出 24,365 字、density 0.101、provenance 三軸正確、dirty/quarantined 皆空
+REALTEST_EVIDENCE: tool=Bash | cmd=同上 `COLLECT_LIVE_URL=https://aware-wave.com/` | exit=0 | result=判 `too_short`（202 bytes/density 0.0027）——JS 渲染站台在便宜階抓不到內文是**設計行為**，不為它加豁免，缺的是 headless 階
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=101 檔 898 test 全綠（lib/collect 71 + 1 skipped live）
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（改實作後重跑）| exit=0 | result=拔掉 budget-requeue → 續爬測試紅（`p1` 出現在 seen）；接受跨站 canonical → C1 測試紅；在 `budget.ts` 加一行全域 `fetch(` → hygiene 閘紅。三個都指名正確斷言
+REVIEW_DONE: critic=Deep（獨立 subagent，19 檔全讀 + 4 段 node 實測：DNS 正規化、IPv6 literal、`fromCodePoint` 溢位、regex 複雜度）| verdict=修前 High risk，22 項全數處理（18 修碼、2 修文件、2 進 TASKS）| findings=1c/8h/13m
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`lib/collect|isSafePublicHttps|canonicalize\(|redirect: *"manual"|robots.txt` | hits=模組自成一體、無外部 stale caller；既有 `isSafePublicHttps`（Signal 路徑）未被動到；`app/api/content/sources/route.ts` 仍用舊閘（不同威脅模型，刻意不合併，理由寫在 `net/ssrf.ts` 檔頭）
+**C1 未完成的一項 DoD**：「真 URL → KB → `search()` 查得到」需 prod 套用 KB `0072` migration（High-STOP，未執行）。其餘三項已用真站台與真流程驗過。
+**操作者提供的 `data_collection_design_v0.1.md` 對帳**：Adapter 架構＝已實作的 `CollectBlock` registry；Document schema＝`RawDoc`（採納其 `author` 欄）；Pull/Monitor＝C3/C3b；去重分層＝canonical+hash（**不採納 title similarity**：標題相近常是真的兩份文件，合併錯誤是靜默的）；Exa 式 discovery 與 Firecrawl 降級階＝需要帳號與費用，屬操作者決策，已在回覆中列出。
+
+## 2026-09-11（111–114 號切片：F08 strategy 家族推進 6/14→10/14，4 個平行 agent）
+
+vrio(71t)/value_chain(50t)/stp(49t)/ansoff(52t)。222 tests 零衝突，全 regression 6746→6968，golden 3256→3276。F08 現況 10/14，剩 BCG／Blue Ocean／Business Model Canvas／Value Proposition Canvas。critic 0C/0Major/0Minor（僅 1 個既有無關 suggestion：`contract-backlog.yaml` 一個 2026-08-29 就存在、與本批次無關的 `association.mind_map` method_id 字面重複——真實 Tier-1 條目 vs. Tier-2 worked_example 說明區塊，非真衝突）。verdict=PASS。
+
+`strategy.vrio` 的 `competitive_implication` 是本 session 又一個 GENUINE_COMPUTE 真實外部方法論引用——16 格完整查表（4 個 V/R/I/O 是非問題的全部 16 種組合），依據真實 Barney 1991 Resource-Based View 標準分類（非 Atlas 引用，明確揭露為外部方法論，同 `causal.process_tracing` 的 Van Evera 揭露慣例），建構子完全沒有 `competitive_implication` 參數可傳——結構上不可能被竄改。critic 獨立核對 5 格經典分類（含 Disadvantage/Parity/Temporary/Unused/Sustained 五種結果）全部正確，並用 `inspect.signature()` 實測確認參數真的不存在。`strategy.stp` 是本 session 第二個真 referential integrity 檢查（`targeting_decision.targeted_segment_id` 必須真的解析回 `segments[]` 裡的真實條目，仿照 `strategy.tows` 對 SWOT factor 的檢查模式）——critic 親自手造 hand-tamper（竄改成不存在的 segment id）證實獨立 gate 真的抓到。`strategy.value_chain` 刻意不列舉 Porter 真實 9 個子活動名稱（因 Atlas 引用只給 primary/support 二分，未點名 9 個子活動）；`strategy.ansoff` 的 4 象限（MARKET_PENETRATION/MARKET_DEVELOPMENT/PRODUCT_DEVELOPMENT/DIVERSIFICATION）從 Atlas 裸詞（"penetration/development/product/diversification"）消歧義出真實 Ansoff 矩陣標準命名，critic 獨立核對確認非臆測。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_vrio tests.unit.test_value_chain tests.unit.test_stp tests.unit.test_ansoff` | exit=0 | result=222 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=6968 tests OK，430s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3276，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=4 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=4 個 CLI 全部 PASS，各自拒絕證明＋獨立 gate 抓包證明皆真跑
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 4 contract+4 schema+4 module+4 CLI+4 test+`strategy/__init__.py`，真跑 222 測試+4 CLI+全 regression+golden，親自手造 2 個 hand-tamper PoC（VRIO 16 格分類手算驗證 5 格+STP referential integrity）+9 個 additionalProperties 竄改測試，strict duplicate-key loader 掃全檔案）| verdict=PASS | findings=0c/0m/1 既有無關 suggestion
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`strategy\.vrio\|strategy\.value_chain\|strategy\.stp\|strategy\.ansoff\|VrioAnalysis\|ValueChainAnalysis\|StpAnalysis\|AnsoffMatrix` | hits=僅本批次新建檔案 20 個+registry+`strategy/__init__.py`，critic 獨立複驗零孤兒引用零命名碰撞，`swot.py`／`tows.py`／`three_c.py` 等既有 strategy 檔案零改動
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：4 個新方法的 contract/schema/module/CLI/test（共 20 個新檔）+ `strategy/__init__.py`／`contract-backlog.yaml` 的追加內容全部移除。純新增，無 schema breaking change，可安全回滾。
+
+## 2026-09-11（客服系統：組織層級 migration 0073/0075 建好+db-expert 修 3 項；計費 migration 0074 建好後因牴觸既有 ADR 012 決策 3 撤回）
+
+**觸發**：操作者要客服系統平台化——組織分「集團/公司/部門/個人/我自用」+ 點數/訂閱制「跟其他系統一樣」。查證後兩者都不是「照抄」就能做：部門層已存在（`workspaces`，`0001_core.sql:16`）；集團+個人自用不存在；點數/訂閱只有 media 一套（`0066`）且未平台化。用 AskUserQuestion 問操作者兩點，回覆：組織層級都補（集團+個人自用），計費現在平台化。
+
+**組織層級（0073+0075，已建，未套用 prod）**：`organizations` 加 `parent_organization_id`(nullable self-FK, on delete set null) + `org_level`(group/company/individual, default company)。db-expert review（`db-expert` subagent）抓到 3 個真問題全修：①兩個 `ADD CONSTRAINT ... CHECK` 未加 `NOT VALID` 會在核心租戶表上無界限持有 `ACCESS EXCLUSIVE` lock（`lock_timeout` 只保護等待 lock 的時間,不保護拿到後 scan 的時間）→ 改 `NOT VALID`,VALIDATE 移到獨立 migration `0075`（`ShareUpdateExclusiveLock`,不擋讀寫）②comment 宣稱「flat 2-level tree by construction」但只有一半被 CHECK 真正強制（CHECK 不能查詢其他 row）→ 補 `organizations_validate_parent_is_group` trigger 讓宣稱變真 ③（連帶）加了 ADR-0009（ACCEPTED，`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-*.md`）邊界注記——portal `organizations` 是 product-layer construct 不是平台 Tenant 正本，這個欄位不得長成跨產品 Tenant 主鍵。
+
+**計費平台化（0074，已建又撤回）**：先建了 `platform_billing_accounts`/`platform_credit_ledger`/`platform_credit_reserve()`（複製 0066 結構+加 `product` 欄位+把 media 現有資料 copy 過去,原表不動）。db-expert review 先抓到 1 個真 bug（backfill INSERT 的 `on conflict` arbiter 用錯欄位,`id` 才是真 PK,重跑會噴 PK 衝突）並修好。**修完後跑 BUGHUNT 全庫 grep 才發現**：`agency-os/docs/architecture/decisions/012-shared-platform-layer.md`（2026-09-10,提案,已入 ADR_INDEX）已經把「訂閱/點數要跨 8 個系統平台化」這個題目做過一輪完整分析——決策 3 明寫「**泛化 0066，不重寫**」（`media_billing_accounts`/`media_credit_ledger` 加 `product_key` 欄位+去 `media_` 前綴,原地 expand-contract,不是新建平行表複製資料）；決策 8 明寫抽取順序「風險遞增,不可顛倒」,帳本泛化排在**最後**（先做只讀的產品登記機械閘+新增不動既有資料的簽章授權驗證,帳本才動）。我做的正是 ADR 012 決策 3 明確禁止的「重寫」形狀,且跳過決策 8 的順序直接跳到最後一步。**已刪除 `0074_platform_billing.sql`/`.down.sql`,不留在 repo 裡的錯誤設計**——留給操作者決定要不要正式採用 ADR 012（狀態仍「提案」,原作者是另一個 2026-09-10 的 session,非本次操作者本人在本輪對話中確認過）。
+
+**[已修改]**：
+- 新增 `lobster-factory/packages/db/migrations/0073_organization_hierarchy.sql`+`.down.sql`（org_level/parent_organization_id + trigger）
+- 新增 `lobster-factory/packages/db/migrations/0075_validate_organization_hierarchy_checks.sql`（VALIDATE CONSTRAINT,獨立 transaction）
+- 刪除 `0074_platform_billing.sql`/`.down.sql`（撤回,見上）
+
+**[驗證結果]**
+- REALTEST_WAIVED: NA -- 兩個 migration 都還沒套用 prod（High-risk gate,等操作者明示 go-ahead），本輪只到「檔案寫好+db-expert 審過」
+- REVIEW_DONE: critic=Deep（`db-expert` subagent，讀兩份 migration 全文攻擊 lock/idempotency/rollback）| verdict=pass（修後）| findings=0073: 2 major+1 medium 全修；0074: 1 major 修完後因 ADR 衝突整份撤回,不計入最終 findings
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`media_credit_reserve\|media_billing_accounts\|media_credit_ledger`（確認唯一 3 個呼叫點仍指向舊表,未被誤改）+ `platform_credit_reserve\|platform_billing_accounts\|platform_credit_ledger`（確認撤回前只存在於已刪除的兩檔內,無殘留引用）| hits=前者 3（video 3 route）+ 2 個 doc 提及（ADR 012 本身/VIDEO_SYSTEM_GAP_AUDIT）；後者 0（撤回後已無殘留）——**正是這次 BUGHUNT 才挖到 ADR 012**，驗證了「先 grep 再下結論」不是形式
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：
+- 0073/0075 尚未套用 prod；套用前建議先 `select count(*) from organizations` 抓量級（db-expert 原話：未經驗證不能斷言 lock 時間一定短）。
+- 計費平台化整個懸置：ADR 012 仍是「提案」狀態,不是本次操作者本人拍板;要繼續客服系統的計費串接,需要操作者先決定「正式採用 ADR 012 並照它的 4 步順序做」還是「否決 ADR 012,改用更小範圍的做法」。
+- 客服系統原定 U6（裝 Chatwoot）尚未動工,被這輪組織/計費平台化的範圍擴張擋在前面。
+
+**Rollback**：`git clean` 兩個新 migration 檔（未 commit，本身就是未套用的新檔，刪除零副作用）；若已 commit，`0073.down.sql`/沒有 0074 需要 rollback（已刪除）。
+
+
 
 pestel(52t)/steepv(28t)/three_c(40t)/tows(59t)/porter_five_forces(60t)。239 tests 零衝突，全 regression 6507→6746，golden 3231→3256。`strategy.swot`（既有唯一成員）是本批次唯一讀取基準；F08 現況 6/14，剩 VRIO／Value Chain／STP／Ansoff／BCG／Blue Ocean／Business Model Canvas／Value Proposition Canvas。
 

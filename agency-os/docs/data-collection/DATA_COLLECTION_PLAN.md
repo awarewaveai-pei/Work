@@ -207,13 +207,30 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
 
 | C | 交付的價值 | 內容 | DoD（缺一不算） | Rollback |
 |---|---|---|---|---|
-| **C0** | — | collect/sink **獨立 registry**（**不動 `BlockKind`**）；型別；編排器 + `ctx.fetch` + 預算 + 續傳 + 品質閘 + trust 標記與指令樣態掃描；`sink/null`；lint 禁止積木用全域 fetch | `npx tsc --noEmit` 綠；編排器測試涵蓋 **8 項**：深度上限、scope 擋外站、預算耗盡後**可續爬**、單點失敗不中斷、canonical 去重、SSRF redirect 擋、積木超量 fetch 被 ctx 拒、**植入指令樣態的頁面不自動入庫**（真餵一份含 `ignore previous instructions` + 零寬字元的 HTML） | 刪新目錄（**零既有檔改動**） |
-| **C1** | **客戶改官網 FAQ，KB 自動跟上**（今天靠人工貼，會靜默過期） | `collect/http-html` ＋ `sink/kb` | **依賴 KB 的 K1 完成**（版本化與檢索契約）；真 URL → KB → `search()` 查得到；同 URL 二次不產生新版；改內容後產生第二版 | 刪兩個積木 |
+| **C0** ✅**已完成** 2026-09-11 | — | collect/sink **獨立 registry**（**不動 `BlockKind`**）；型別；編排器 + `ctx.fetch` + 預算 + 續傳 + 品質閘 + trust 標記與指令樣態掃描；`sink/null`；lint 禁止積木用全域 fetch | `npx tsc --noEmit` 綠；編排器測試涵蓋 **8 項**：深度上限、scope 擋外站、預算耗盡後**可續爬**、單點失敗不中斷、canonical 去重、SSRF redirect 擋、積木超量 fetch 被 ctx 拒、**植入指令樣態的頁面不自動入庫**（真餵一份含 `ignore previous instructions` + 零寬字元的 HTML） | 刪新目錄（**零既有檔改動**） |
+| **C1** ⏳**程式完成，最後一項 DoD 待 prod migration** 2026-09-11 | **客戶改官網 FAQ，KB 自動跟上**（今天靠人工貼，會靜默過期） | `collect/http-html` ＋ `sink/kb` | **依賴 KB 的 K1 完成**（版本化與檢索契約）；真 URL → KB → `search()` 查得到；同 URL 二次不產生新版；改內容後產生第二版 | 刪兩個積木 |
 | **C2** | 整站而非單頁；抽不到內容的頁面**被看見**而非靜默入庫 | `collect/sitemap`（→discovered）、`collect/rss`（**只回 discovered，不回摘要 docs**）、`collect/pdf`；`collection_issues` 表 + 告警 | 真實站台 sitemap → N 頁入庫；12,000 URL 在預算內停止、**且下一輪從斷點續爬**（非重頭）；`dirty > 0` 時告警**實際觸發一次**（附證據行），非只寫 log | 刪積木整段 |
 | **C3** | 不用人記得去按 | Trigger.dev 排程（ADR 004）；per-host 令牌桶**持久化**；**增量抓取語意明訂**（§1.4） | 排程真跑過一輪；**兩個 run 併行時對同一 host 的合計 QPS 未超限**（實測，非推論）；第二輪對未變更來源**未重抓 body**（實測 304／hash 短路） | 停用 task |
 | **C3b** | 法規發布、產品改版當天就進庫，不用等下次排程 | **事件觸發入口**（webhook → 立即重抓指定 seed）；Domain Pack 的 `collect-sources.json` 消費 | 打一次 webhook 觸發真實抓取並落地（實測）；未知來源的 webhook 被拒（鑑權）；同一事件重送不重複入庫（冪等） | 關 webhook 入口 |
 | **C4** | hci30 自動化檢索與快照（`DISCOVERED`，**限組織實體**） | **HCI 自有隔離 fetch runner**（ADR-0029）＋ `sink/hci-discovered` ＋ `hci.sources` unique migration ＋ object storage | ADR-0029 四項閘全綠（無 docker bridge 路由、egress-only、DNS-rebind 防護、SSRF payload corpus）；append-only 與 FORCE RLS 未被繞過；**未產生任何 Evidence 狀態躍遷**（實測：寫入後仍為 `DISCOVERED`）；**未做 record-level 去重**；含自然人的來源一律擋；routing 三件套同 PR | 關 runner |
 | **C5** | 個資 verticals | **BLOCKED**（ADR §決策 10） | — | — |
+
+> **C0／C1 覆審後補進實作的規則**（critic 1c/8h/13m，全數處理；細節見 WORKLOG 2026-09-11）：
+> ⓐ **失敗分類讀 `status` 欄位不讀錯誤訊息**——訊息裡有 URL，`/blog/404-explained` 回 500 會被字串比對判成「頁面已刪除」。積木契約因此明訂：有 HTTP 狀態就用 `Object.assign(new Error(msg), { status })` 丟。
+> ⓑ **`seen` 只在「本 target 有終局答案」時保留**。預算在 `ctx.fetch` 內耗盡／robots 暫時取不到／retry 用盡，都必須把標記拿掉並重排——`seen` 會被持久化，留著就是「那一頁此後永遠不會再被抓」，而測試全綠（正是 §1.2 續傳欄點名的假死）。
+> ⓒ **頁面自宣告的 `<link rel=canonical>` 限同源**。canonical 在下游就是文件身分（`lib/kb/family.ts` 拿它算 family id），不限制的話一個 CMS 設錯就能把整站 200 頁塌成一份文件、彼此互相 archive，無錯誤無告警。
+> ⓓ **`ctx.fetch` 預設查 robots**（要關必須顯式傳 `robots: null`）、**method 限 GET/HEAD**、**積木不得覆寫 UA／cookie／authorization**——UA 是 robots 判定的依據，能改就等於「用一個身分問許可、用另一個身分抓」。
+> ⓔ **tombstone 前加健康度閘**，且比對的是「本輪實際交付的 canonical URL」而非「走訪過的 target」：兩者是不同鍵空間，且「整站 5xx 但 frontier 清空」也會滿足原本的條件——差集就是整個租戶的知識庫。
+> ⓕ **偵測器誤殺修掉兩個**：soft-404 拆成強／弱樣式（弱樣式只在標題或開頭且要有第二訊號），否則「找不到頁面怎麼辦？」這種真 FAQ 會被擋在 KB 外；隱形字元清單移除 ZWJ/ZWNJ（emoji 與波斯／印度語系的必要字元）。
+> ⓖ **SSRF 檔頭改成誠實敘述**：literal + 解析後位址都擋，但 **DNS rebinding 沒有關**（檢查與連線各解析一次，中間沒有 pinning，需要 undici Agent）。原本的註解宣稱擋住了——宣稱比漏洞更危險。已進 TASKS。
+> ⓗ 令牌桶介面改成單一原子 `take()`（get-then-set 中間有 await 就是競態，C3 的「兩個 run 併行不超限」用原介面做不到）；robots 取用失敗只快取 60 秒（永久 fail-closed = 一次瞬斷讓整站再也不抓）。
+>
+> **C0／C1 實作與本節的三處差異**（皆有程式內註解說明，理由見 WORKLOG 2026-09-11）：
+> ① 「lint 禁止積木用全域 fetch」→ 本 repo **沒有 ESLint 設定**（無 `.eslintrc*`／`eslint.config.*`／`lint` script，已實查），改成機械閘測試 `__tests__/collect-block-hygiene.test.ts`（已用突變測試證明會紅）。裝 ESLint 後可換回 lint rule。
+> ② `RawDoc.provenance` 為**獨立欄位**，非 §1.1 所寫的塞在 `meta` 裡——§1.3b 本來就寫成獨立欄位，兩處矛盾；選型別化的那個，漏掉會是型別錯誤而不是靜默少一個安全標記。
+> ③ `RawDoc` 多一個 `author` 欄（來自操作者 2026-09-11 提供的 `data_collection_design_v0.1.md`）：抓取當下不記就補不回來，KB 目前無欄位可存，與 provenance 一起列在 TASKS。
+> ④ `sink/kb` **不實作 `finalize`**（tombstone）：它需要「該租戶先前的全部 canonical URL」，KB 今天無法按來源系統回答，硬做會把人工上傳的文件一起 archive 掉。歸 C2。
+> **C1 唯一未完成的 DoD**：「真 URL → KB → `search()` 查得到」需要 prod 套用 KB 的 `0072` migration（High-STOP，未執行）。其餘三項（同 URL 二次不產生新版、改內容產生第二版、真 URL 抓取與抽取）已用真站台與真流程驗過。
 
 **刻意不做**：不碰既有 `search/*` Signal 積木（已上線正常，改它零收益有風險）。`sink/signal` 只在 Content Studio 真的要複用 collect 層時才寫。
 
