@@ -47,7 +47,9 @@ def blueprint_item_maps(industry=None):
     rev={}
     for cid,entries in capmap['map'].items():
         for e in entries: rev[(e['doc_id'],e['section'],e['item_index'])]=cid
-    covered_docs=set(capmap['covered_modules'].values())
+    covered_docs=set()
+    for v in capmap['covered_modules'].values():
+        covered_docs.update(v) if isinstance(v,list) else covered_docs.add(v)
     return items,rev,covered_docs
 
 # Rebuilds a section's content from only the items whose mapped capability is in `selected`
