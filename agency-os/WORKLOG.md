@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-10（同日第二輪）`/tools/video` 重做成真正的 10 步驟 pipeline（操作者拒絕第一輪 tab 重分組）
+
+**觸發**：操作者看過第一輪成果（見上一條目「`/tools/video` IA 重組」）後明確拒絕——「你根本亂做一通」。指出根本錯誤：把「重排導覽」當成「做出流程」，tab bar 不管分幾組都是可任意跳點的平行選單，不是她畫的 A→B→C→…→L 依序推進、做完才能進下一步的 pipeline；且完全漏掉 Whisper 字幕這個步驟。操作者其後明確下令「去做出來」，全權授權執行細節。
+
+**改動**：新增 `VideoPipeline.tsx` 取代 `VideoTabs.tsx` 當 `/tools/video` 預設入口（`VideoTabs.tsx` 保留在 `?advanced=1`，零既有路徑刪除）。9 節點真正 gate 的 stepper，對應操作者原始 10 項步驟（④生成與⑥渲染因三個既有 render 引擎的架構限制誠實合併為一個節點，理由與逐項對應表見決策文件）。新建 4 個步驟元件（`ModeSelectStep`/`CostGateStep`/`TimelineGateStep`/`QaStep`）+ 1 個補齊第一輪完全遺漏的 Whisper 字幕步驟（`CaptionsStep.tsx`，接通既有但從未有讀取路徑的 `/api/video/transcription/dispatch`，新增 GET `app/api/video/transcription/status/route.ts` 補上缺失的輪詢端點）。`VideoStudio.tsx`/`FootageEditor.tsx`/`ReleaseDeliveryPanel.tsx` 各自新增選用 props（`embedded`/`initialOrganizationId`/`onRenderComplete`/`onReleaseCreated` 等）供 wizard 串接 context，未傳時對既有 standalone 用法（`VideoTabs.tsx`）零行為改變。完整 file:line 對照表：`agency-os/docs/video_generator/VIDEO_TOOL_IA_REORG_2026-09-10.md`「第二輪重做」段。
+
+**驗證過程中的插曲**：本機免登入驗證用的 dev server 曾因本 session 先前在同目錄跑 `npx next build`（生產編譯）而共用 `.next` 快取被清空，導致 `routes-manifest.json` 遺失、整站 500——根因找到後刪 `.next` 重啟即解。之後改用環境變數清空觸發既有 `isDevelopment()` auth bypass 開一個免登入本機 instance 給操作者親自點過，但這個 bypass 在 Next dev hot-reload 下不穩定（middleware 重編譯後有時又要求登入，server log 證實同一 process 內 `GET /tools/video 200` 與 `GET /login` 交錯出現）——放棄依賴它做完整走查，改以 `npx tsc --noEmit` 全專案型別檢查 + 逐檔程式碼覆核驗證步驟 2–9。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（第二輪全部新/改檔案） | exit=0（型別檢查跑完；既有 14 個錯誤不變，task_618a39ed 尚在修，非本輪範圍，見上一條目） | 改動檔案 0 error
+REALTEST_WAIVED: NA -- 瀏覽器免登入 bypass 在 hot-reload 下不穩定（見上插曲段），改用 tsc 全專案檢查 + 逐檔覆核取代；已成功一次用操作者真實 Chrome 登入頁截圖確認 step 1（ScriptForge + 短劇 Story Bible 入口）畫面正確渲染
+REVIEW_DONE: critic=Quick（獨立 subagent 中途因 API rate limit 截斷，`session limit resets 10:50pm`；已回報部分確認 VideoStudio/FootageEditor prop 型別吻合）+ 本 session 自行針對 critic 原本列出的 6 個具體風險點逐一覆核 | verdict=pass-with-fix | findings=1 個真實（`CaptionsStep.tsx` `poll()` 卸載後仍可能排出下一顆輪詢 timeout，未受既有 `pollRef` cleanup 保護，已修：改用 `unmountedRef` 讓 `poll()` 每個非同步分支卸載後直接跳過）+ 5 個追蹤程式碼確認非缺陷（embedded 物件重渲染觸發 effect／stale closure／Strict Mode 重跑／org-access 檢查順序／prop 型別）
+BUGHUNT_DONE: scope=agency-os,lobster-factory,.claude | grep=`VideoPipeline\|VideoTabs\|ModeSelectStep\|CostGateStep\|TimelineGateStep\|CaptionsStep\|QaStep\|transcription/status` | hits=僅本輪新建/改動檔案 + `page.tsx` 的預期雙 import（預設/`?advanced=1`）；歷史命中（`WORKLOG-archive`、`memory/daily/2026-06-*`、2026-09-07 舊 `CURRENT_BASELINE_AND_GAP_AUDIT.md`）皆為日期明確標註的歷史快照，非需同步的現況文件
+WORKLOG_DONE: 本條目
+
+[剩餘風險] 沿用第一輪已記錄的四項（task_618a39ed 未修完前 Footage 渲染/Release 建立按鈕仍會 500；ReleaseDeliveryPanel 站點/客戶欄位裸輸入；Bible 不進 AI prompt；project-context 本輪不接）。新增：④⑥ 合併成一個 stepper 節點是本輪誠實揭露的架構限制，非缺陷但操作者應知悉——真要拆開兩個獨立可重試步驟需重寫三個引擎的 render pipeline 本身；本機免登入驗證方式不穩定，操作者本人的完整走查仍待她自己登入後在正式站或穩定的本機 session 親自確認 step 2–9。
+[rollback] `VideoPipeline.tsx`/`ModeSelectStep.tsx`/`CostGateStep.tsx`/`TimelineGateStep.tsx`/`CaptionsStep.tsx`/`QaStep.tsx`/`app/api/video/transcription/status/route.ts` 全新檔，刪除即回退。`VideoStudio.tsx`/`FootageEditor.tsx`/`ReleaseDeliveryPanel.tsx`/`page.tsx` 的新增 props 全部選用（optional，預設 undefined），`git revert` 本次 commit 即完整回到第一輪 tab 重分組狀態；無 DB/migration/後端 route 變動（`transcription/status` 是唯讀 GET，不改既有 schema）。
+
+## 2026-09-10 `/tools/video` IA 重組：插入既有流程，不取代（修正同日 workbench-as-entry 誤做法）
+
 ## 2026-09-10 K0：知識庫從客服模組拆出成 `lib/kb`（純搬移；critic 抓到一個「五項驗證結構上不可能發現」的 Critical）
 
 ADR 011 §決策 3 的第一步。`lib/cs/` 原本混了通用知識庫（rag/db 的 knowledge 部分）與客服專屬邏輯（intent/autonomy/guardrail/eval）——混著就只能賣給客服，賣不了研究／內訓／業務。拆出 `lib/kb/`（7 檔），`lib/cs` 降為其消費者之一。搬移範圍：`rag.ts` 全檔、`db.ts` 知識段、3 個型別、`rrfFuse`（原在 `autonomy.ts`，是檢索數學無客服語意）、以及只被檢索路徑引用的 6 個常數（`CS_EMBEDDING`／`embedMs`／`vectorTopK`／`keywordTopK`／`contextTopK`／`rrfK` → `KB_*`）。依 §決策 12，`lib/kb/index.ts` 刻意沒有 `answer()`／guardrail／intent／autonomy。
