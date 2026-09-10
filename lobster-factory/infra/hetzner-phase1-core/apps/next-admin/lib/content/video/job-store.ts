@@ -45,7 +45,11 @@ export interface VideoJob {
     formats?: string[];
     visualBreakdown?: { custom: number; broll: number };
     imageModel?: string;
-    source?: "generate" | "draft";
+    source?: "generate" | "draft" | "footage";
+    rendererKind?: "ffmpeg" | "remotion" | "footage";
+    timelineId?: string;
+    outputProfile?: string;
+    captionCues?: Array<{ startMs: number; endMs: number; text: string }>;
     serviceCapability?: VideoServiceCapability;
   };
   recorded?: boolean;           // media_assets 已記錄（只記一次）

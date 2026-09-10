@@ -14390,3 +14390,48 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 
 [rollback]
 `git revert` 本次 commit：`test_capacity_model.py:372` 還原「eighth」（回到 regression 狀態，非目標）；`WORKLOG.md` 本條目移除。純 docstring 字串復原，無資料/邏輯風險，58 個既有測試不受影響；101 個他人 staged 檔案不受本次 commit 或其 revert 影響（全程未進入本次 commit 範圍）。
+
+## 2026-09-10 — 補回 91fdfe31a merge 撤銷的 video QA/footage/remotion-job 內容（next-admin，非部署）
+
+[根因]
+`91fdfe31a`（merge: reconcile main with origin/main, 9 vs 61 divergent commits, 2026-09-10 14:05）第一親代 `82cf5cf3f`（local/舊）與第二親代 `dbe28f317`（origin tip）在 `app/`／`lib/` 下 ~16 個 video 檔案本應無真衝突、取 origin 較新內容，實際卻採了較舊的 `82cf5cf3f` 內容，靜默撤銷 origin 側較新邏輯。`remotion-render/route.ts`／`job-store.ts` 先前已標記「已修復」但實查此 worktree 分支上該修復從未落地（`grep createJob/finishJob/effectiveOrgId` 於檔案中零命中，`grep "remotion-render route 租戶 job 綁定"` 於本檔零命中）——按 VBC 判定為此次一併修復，非重工。
+
+[方案]
+逐檔 `git log 91fdfe31a..HEAD -- <path>` 判斷 HEAD 是否有獨立於此 merge 之後的本地 commit：0 個 → `git checkout dbe28f317 -- <path>` 整檔採 origin 版；≥1 個 → 手動比對，只補回未被本地後續工作取代的內容。
+
+[已修改]（16 檔整檔採 dbe28f317：0 個獨立後續 commit，逐檔 diff 確認無取捨疑慮）
+- `app/api/video/status/route.ts` — rendererKind==="remotion" 短路 + persistAutomaticTechnicalQa／persistAutomaticCaptionQa 呼叫
+- `app/api/video/remotion-status/route.ts` — 改回 410 `deprecated_use_remotion_job_status`（新流程改走 remotion-job-status，走 job-store UUID 而非 EU jobId）
+- `app/api/video/remotion-render/route.ts` — 補回 createJob/finishJob 租戶綁定 + effectiveOrgId 授權閘
+- `app/api/video/upload-asset/route.ts` — FootageEditor 上傳可選 organizationId → 落地 media_assets（durable 租戶擁有）
+- `app/api/video/capabilities/route.ts` — 補 `providers: allowedMediaProviders()`
+- `app/api/video/embed-to-wp/route.ts`、`app/api/content/social-publish/route.ts` — 補 releaseId/variant + delivery-receipts 冪等交付收據
+- `lib/content/blocks/video-pipeline.ts` — `recordVideoAsset` 回傳 `{id, checksumSha256} | null`（供 QA persistence 用資產 id）+ `source: "footage"` + byteSize/checksum 寫入
+- `lib/content/video/render-client.ts` — 補 `submitFootageRender` 匯出 + `RenderOutputMeta` 補 byteSize/checksumSha256/technical_qa/signal_qa
+- `lib/content/video/remotion-client.ts` — `submitRemotion` 補第三參數 `RemotionRenderOptions{outputFormat,fps}`
+- `lib/content/video/timeline-v1.ts` — `MediaTimelineV1VideoItem` 補 `sourceStartMs`
+- `lib/content/video/timeline-remotion.ts` — DynamicSlideshow 編譯器支援字幕軌（`compileCaptions`），不再對含字幕 timeline 一律拒絕
+- `lib/content/video/job-store.ts` — `VideoJob.recordParams` 補 rendererKind/timelineId/outputProfile/captionCues + source 增列 "footage"
+- `lib/ops-role.ts` — 補 `canApproveMediaRelease`（release/route.ts、story-bibles/[id]/approve/route.ts 依賴）
+- `lib/content/video/__tests__/timeline-remotion.test.ts` — 對應更新字幕測試斷言
+- `app/(shell)/tools/video/VideoTabs.tsx` — **嘗試整檔採用後發現會 import 已被本地刪除的 `MediaProjectWorkbench`（見下），已 revert 回 HEAD 版本，不採用**
+
+[手動修正]（1 檔：VideoStudio.tsx 有獨立後續 commit `5a1a5f069`，整檔採用會撤銷本地更新的 IA 分組，故只補功能性修正）
+- `app/(shell)/tools/video/VideoStudio.tsx:1864-1868` — RemotionStudio 輪詢改打 `/api/video/remotion-job-status`（原打的 `/api/video/remotion-status` 已被本次改回 410），讀 `j.video.outputs.remotion` 取代 `j.url`
+- `app/api/video/remotion-render/route.ts:5` — doc comment 同步（原文誤指向已棄用 endpoint）
+
+[刻意不修改 — 判定為既有蓄意決策，非 merge 撤銷]
+`dbe28f317` 本身即單一 commit「feat(video): make production projects the workbench entry」（`MediaProjectWorkbench.tsx`／`StoryBibleWorkbench.tsx`／`story-bible.ts`／`VideoTabs.tsx`）。merge 後僅 6 分鐘，同作者以 `a44fa61e2`「Revert "feat(video): make production projects the workbench entry"」完整回退前 3 檔（`VideoTabs.tsx` 未回退，故上述整檔採用嘗試才會撞見孤兒 import，已排除）。之後同日 18:34 `4ea2bd8e6`／`5a1a5f069`（「/tools/video IA 修正」）在回退後狀態上做了不同方向的 IA 重組（VideoStudio 三段式分組 tab + 常駐彈窗、ScriptForge 用 `story_bible` nav tab 取代 MediaProjectWorkbench 入口、FootageEditor/MediaOperationsPanel/ReleaseDeliveryPanel 改用本地新增的 `OrganizationPicker.tsx` 下拉選單取代原生 UUID 輸入框——`OrganizationPicker.tsx` 是 dbe28f317 沒有的全新本地元件）。以下 8 檔維持 HEAD 現狀，**未**採用 dbe28f317 內容：`MediaProjectWorkbench.tsx`（HEAD 已刪除）、`StoryBibleWorkbench.tsx`、`lib/content/video/story-bible.ts`、`ScriptForge.tsx`、`FootageEditor.tsx`、`MediaOperationsPanel.tsx`、`ReleaseDeliveryPanel.tsx`、`OrganizationPicker.tsx`。使用者交辦時未見此回退記錄；已在此記錄供後續核對，若判斷有誤可依上表逐檔重新評估。
+
+[verification]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p .`（cwd=lobster-factory/infra/hetzner-phase1-core/apps/next-admin，先 `npm install` 因 worktree 無 node_modules）| exit=0 | result=零型別錯誤
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（同上 cwd）| exit=0 | result=91 files/790 tests all pass
+- REVIEW_DONE: critic=Standard 自審（逐檔 `git log 91fdfe31a..HEAD` 判斷獨立後續 commit 存在與否；發現 VideoTabs.tsx 整檔採用會撞孤兒 import 後即撤銷改採手動修正，為本次唯一需要修正的自我發現）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`remotion-status` | hits=7（`agency-os` 5 處為歷史 WORKLOG/audit 文件描述舊狀態或已預期新狀態，均與本次改動一致，無 stale 矛盾）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+`app/api/video/footage/render/route.ts`／`release/route.ts`／`story-bibles/[id]/approve/route.ts`／`remotion-job-status/route.ts`／`qa-persistence.ts`／`caption-qa-persistence.ts`／`delivery-receipts.ts`／`provider-policy.ts` 經逐一比對與 `dbe28f317` 內容完全一致（本地已有更晚的獨立 commit 產生相同結果），未改動；`MediaProjectWorkbench` 入口的「刻意不修改」判斷若使用者實際想要的是 dbe28f317 的短劇工作台入口而非現行 IA，需另外決策（非本次撤銷判定範圍）。未執行 next-admin 部署（無 prod 影響）。
+
+[rollback]
+本次僅 16 檔小範圍改動、無 schema/prod 變更；`git diff HEAD~1` 還原即可（尚未 commit 前可 `git checkout HEAD -- <path>` 逐檔還原）。
