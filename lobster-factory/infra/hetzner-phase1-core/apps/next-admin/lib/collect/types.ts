@@ -172,8 +172,14 @@ export interface SourceDescriptor {
    * __tests__/collect-block-hygiene.test.ts.
    */
   queryScheme?: string;
-  /** Environment variables without which this source cannot run. Empty ⇒ always available. */
+  /** Environment variables without which this source cannot run — ALL are needed. */
   requires?: string[];
+  /**
+   * Interchangeable credentials: ANY ONE of these makes the source usable. For a source with more
+   * than one possible vendor, listing them under `requires` would report it unavailable whenever
+   * the other vendor's key is the one that is set.
+   */
+  requiresAny?: string[];
   options?: SourceOption[];
   /** Set when the source costs money per call, so the catalogue can say so out loud. */
   metered?: boolean;
