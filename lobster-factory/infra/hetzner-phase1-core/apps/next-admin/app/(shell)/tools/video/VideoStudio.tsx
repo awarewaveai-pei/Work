@@ -1090,60 +1090,62 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
               {historyLoading ? "載入中…" : "尚無影片記錄。生成第一支影片後會出現在這裡。"}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div className="flex items-center gap-3 mb-3">
-                <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedVideos.size === history.length && history.length > 0}
-                    onChange={e => {
-                      if (e.target.checked) {
-                        setSelectedVideos(new Set(history.map((v) => v.id)));
-                      } else {
-                        setSelectedVideos(new Set());
-                      }
+            // 影片在左、清單在右（操作者 2026-09-11 回報原本上下疊排「不順」）：靠 JSX 順序決定 grid
+            // column 順序，非靠 order— 選到影片才切成兩欄，沒選影片時清單維持單欄滿版。
+            <div style={{ display: "grid", gridTemplateColumns: selectedVideo ? "1fr 360px" : "1fr", gap: 16, alignItems: "start" }}>
+              {selectedVideo && (
+                <VideoViewer
+                  title={selectedVideo.title}
+                  outputs={selectedVideo.formats}
+                  primaryUrl={selectedVideo.object_url}
+                  onClose={() => setSelectedVideo(null)}
+                />
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedVideos.size === history.length && history.length > 0}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSelectedVideos(new Set(history.map((v) => v.id)));
+                        } else {
+                          setSelectedVideos(new Set());
+                        }
+                      }}
+                    />
+                    全選共 {history.length} 個
+                  </label>
+                  {selectedVideos.size > 0 && (
+                    <button
+                      onClick={deleteSelected}
+                      disabled={deletingVideos}
+                      className="px-3 py-1 rounded text-sm bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                    >
+                      {deletingVideos ? "刪除中..." : `刪除 ${selectedVideos.size} 個`}
+                    </button>
+                  )}
+                  {selectedVideos.size > 0 && (
+                    <span className="text-xs text-neutral-500 ml-auto">已選 {selectedVideos.size}</span>
+                  )}
+                </div>
+                {history.map((item) => (
+                  <HistoryRow
+                    key={item.id}
+                    item={item}
+                    active={selectedVideo?.id === item.id}
+                    onSelect={() => setSelectedVideo(selectedVideo?.id === item.id ? null : item)}
+                    checked={selectedVideos.has(item.id)}
+                    onCheck={e => {
+                      const next = new Set(selectedVideos);
+                      if (e.target.checked) next.add(item.id);
+                      else next.delete(item.id);
+                      setSelectedVideos(next);
                     }}
                   />
-                  全選共 {history.length} 個
-                </label>
-                {selectedVideos.size > 0 && (
-                  <button
-                    onClick={deleteSelected}
-                    disabled={deletingVideos}
-                    className="px-3 py-1 rounded text-sm bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                  >
-                    {deletingVideos ? "刪除中..." : `刪除 ${selectedVideos.size} 個`}
-                  </button>
-                )}
-                {selectedVideos.size > 0 && (
-                  <span className="text-xs text-neutral-500 ml-auto">已選 {selectedVideos.size}</span>
-                )}
+                ))}
               </div>
-              {history.map((item) => (
-                <HistoryRow
-                  key={item.id}
-                  item={item}
-                  active={selectedVideo?.id === item.id}
-                  onSelect={() => setSelectedVideo(selectedVideo?.id === item.id ? null : item)}
-                  checked={selectedVideos.has(item.id)}
-                  onCheck={e => {
-                    const next = new Set(selectedVideos);
-                    if (e.target.checked) next.add(item.id);
-                    else next.delete(item.id);
-                    setSelectedVideos(next);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          {selectedVideo && (
-            <div style={{ marginTop: 12, borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
-              <VideoViewer
-                title={selectedVideo.title}
-                outputs={selectedVideo.formats}
-                primaryUrl={selectedVideo.object_url}
-                onClose={() => setSelectedVideo(null)}
-              />
             </div>
           )}
         </div>

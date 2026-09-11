@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-09-11 影片生成記錄面板版面調整 + 解開一場大型 WORKLOG.md 合併衝突（操作者截圖回報「影片在左, list 在右邊比較順」）
+
+`VideoStudio.tsx`「生成記錄」分頁原本是上下疊排（清單在上，選中的影片預覽疊在下面）。改成 grid 兩欄：選到影片時左欄放 `VideoViewer`、右欄放清單（`gridTemplateColumns: "1fr 360px"`）；沒選影片時清單維持單欄滿版不變。純 JSX 順序決定欄位順序（VideoViewer 放前面＝左欄），不用 CSS order，較好懂。純版面調整，沒動任何資料流／handler／邏輯。
+
+**這次改動本身兩度撞上並行 session 的 git 狀態，第一次直接遺失**：第一次 commit 前，本機另一個並行 session 的背景 `git pull` 在我 Edit 後、commit 前搶跑，把我尚未提交的 working-tree 修改連同其他檔案一起處理掉（確切機制未查清，但 `git status` 之後對這兩個檔案顯示乾淨、內容卻確實消失，逼近可重現）——教訓：Edit 完立刻 commit，不要留任何時間窗給背景 `git pull` 迴圈race。第二次補提交時撞上一場**真正的 WORKLOG.md 三方合併衝突**：另一個並行 session 也在同一個插入點（檔案最上方）加了新條目（HCI30「不要設寬度」那條），git 的逐行 diff 演算法把兩邊的新增內容交錯切成兩塊衝突，其中一塊的表現是「標題浮到最上面、內文卻接到我的『短劇 Story Bible』標題底下」——換句話說 conflict marker 解出來的兩側本身就已經是錯誤配對的內容，不能無腦選一邊或機械 `-X ours/theirs`。解法：用 `git show :1/:2/:3:<path>` 直接從 git index 撈出乾淨的 base／ours／theirs 三份完整檔案（不透過肉眼在 conflict marker 之間人工剪貼，那正是我自己第一次嘗試手動切割時算錯行數、弄丟 19 行的原因），比對 `diff base theirs` 精確定位 theirs 真正新增的是「一個標題 + 一段跟錯標題的內文」，用 ours（我這邊，結構正確完整）當底，把 theirs 真正該有的完整一條（標題+對應的真內文）插回去，逐條 `grep -c` 核對零重複、零遺失後才 `git add` 收斂衝突、完成 merge commit。
+
+[驗證]
+- `npx tsc --noEmit`：乾淨。
+- `npx vitest run`：1023 tests pass，無回歸。
+- 合併衝突解決後驗證：`grep -c` 確認「短劇 Story Bible」「第十二批」「實拍剪輯真實成品驗證」「HCI30 版面第三次修正」四個標題皆恰好出現一次（無重複、無遺失），`grep -c "^<<<<<<<\|^=======\|^>>>>>>>"` 確認零殘留 conflict marker。
+- 純 presentational 改動，未變更任何 props/邏輯，未額外開 critic（風險分級 Low，比照 AGENTS.md §4 精簡流程）。
+
+[剩餘風險] 「背景 git pull 迴圈與前景 Edit race 導致遺失未提交修改」這個根因本身未查清（是 pull 的 stash 行為、還是其他機制），只確認了「Edit 完立刻 commit」可以繞開——如果之後又發生同款遺失，需要真正查 pull 過程做了什麼。
+
+[rollback] `git revert` 對應 commit，單檔 JSX 改動；合併衝突的 commit 本身是正常 merge commit，不建議 revert（會重新打開已解決的衝突）。
+
 ## 2026-09-11 HCI30 版面第三次修正——操作者明講「不要設寬度」，拿掉所有像素數字
 
 前一輪改成 flex-wrap + 像素 flex-basis（雷達圖 380px、構面卡片 420px 等），操作者截圖回報「信任構面」區塊看起來並排、但「證據與主張」區塊沒有，質疑兩者不一致。逐一用真實 DOM 節點複製到寬度受控容器裡重新測過（900/832/700px 等多個寬度點），結果兩個區塊的收合門檻其實完全一致（832px），程式邏輯本身沒有不一致——但操作者直接明講「不要設寬度」，點出真正的問題：**任何用像素數字判斷「多寬才並排」的做法，本身就是這一連串問題的根源**，不管數字設對設錯，都要求我準確猜中操作者的真實視窗寬度，而這件事我這幾輪都做不到。
