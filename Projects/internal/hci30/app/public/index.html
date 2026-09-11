@@ -147,7 +147,14 @@
     .record-card, .domain-card { break-inside: avoid; }
   }
 
-  .radar-wrap { padding: 0.5rem 0 1.5rem; }
+  /* 操作者要求「左右放」(2026-09-11): radar 圖與構面卡片是同一組 7 個信任
+     構面的兩種呈現，並排比上下疊放省垂直空間、也讓兩者能對照著看。窄螢幕
+     (含列印) 退回單欄，避免擠壓可讀性。 */
+  .radar-wrap { padding: 0.5rem 0 1.5rem; display: grid; grid-template-columns: minmax(260px, 380px) 1fr; gap: 2rem; align-items: start; }
+  @media (max-width: 780px) { .radar-wrap { grid-template-columns: 1fr; } }
+  .evidence-layout { display: grid; grid-template-columns: 1.15fr 1fr; gap: 2rem; align-items: start; }
+  @media (max-width: 780px) { .evidence-layout { grid-template-columns: 1fr; } }
+  .evidence-layout .add-panel { margin-top: 0; position: sticky; top: 1rem; }
   .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); }
   .domain-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0.85rem 0.4rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .domain-card .domain-name { font-size: 0.85rem; font-weight: 700; color: var(--text); }
@@ -333,11 +340,12 @@
   <div id="d-decision-form-wrap"></div>
 
   <h2>證據與主張</h2>
-  <div id="d-records"></div>
-
-  <div id="d-suggestions"></div>
-
-  <details class="add-panel" id="record-add-panel">
+  <div class="evidence-layout">
+    <div>
+      <div id="d-records"></div>
+      <div id="d-suggestions"></div>
+    </div>
+    <details class="add-panel" id="record-add-panel">
     <summary>＋ 新增調查發現</summary>
     <form class="inline-form" onsubmit="return submitRecord(event)">
       <label>當事人</label>
@@ -361,7 +369,8 @@
       <button type="submit">送出紀錄</button>
       <div id="f-err" class="err"></div>
     </form>
-  </details>
+    </details>
+  </div>
 </div>
 
 <div id="report" style="display:none">
