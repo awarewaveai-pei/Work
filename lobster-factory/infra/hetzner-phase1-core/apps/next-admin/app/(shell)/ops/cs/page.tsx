@@ -45,7 +45,11 @@ export default async function CustomerServiceOverview() {
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
         <Metric label="意圖總數" value={c ? String(c.intents) : "—"} hint="cs_intents（跨客戶）" />
-        <Metric label="知識來源" value={c ? String(c.knowledge) : "—"} hint="cs_knowledge_sources" />
+        <Link href="/ops/knowledge" style={{ textDecoration: "none" }}>
+          {/* The knowledge base lives in its own section (ADR 011: customer service is one consumer
+              of it, not its owner). Linked from here so an operator working on CS still lands on it. */}
+          <Metric label="知識來源" value={c ? String(c.knowledge) : "—"} hint="看全部 →" />
+        </Link>
         <Metric label="AI 回覆數" value={c ? String(c.replies) : "—"} hint="cs_ai_replies 稽核" />
       </div>
 
