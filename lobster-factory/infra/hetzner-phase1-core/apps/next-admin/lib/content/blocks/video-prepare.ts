@@ -23,6 +23,7 @@ register({
       imagePrompt: string;
       visual?: "custom" | "broll";
       brollKeyword?: string;
+      referenceImageUrl?: string;
     }[] | undefined;
     // 接力（providedScenes）路徑跳過 Claude → 不需 key；只有要生腳本時才強制（與 /api/video/draft 同邏輯）。
     if (!anthropicKey && !(providedScenes && providedScenes.length > 0)) {

@@ -16018,3 +16018,82 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 [剩餘風險] 畫面層角色一致性方案（A 最小/B 完整）尚未選定範圍，見 `agency-os/TASKS.md` 同日新開項目。字幕根因未 100% 排除（操作者可能看的是實拍剪輯路徑或舊影片），需操作者指認具體影片才能收斂到 100%。
 
 [rollback] 本輪純查證+文件更正，無程式碼改動、無 deploy，無需 rollback。
+
+## 2026-09-12 Story Bible 畫面層角色一致性（完整版：定裝照 + 自動比對）
+
+[任務] 承接 2026-09-11「Story Bible 畫面層缺口」開出項，操作者選「完整：定裝照 + 自動比對」。
+
+[做了什麼]
+- `lib/content/blocks/video-pipeline.ts` `buildSceneAsset` 新增 `opts.referenceImageUrl`：有值時強制模型改
+  `flux-kontext-pro`（既有 `generateTarotImage` 早已支援 `referenceImages` 參數，只是 video pipeline 從未傳過），
+  取代原本的純文字生圖；同時讓 `AssetResult` 多帶 `bytes/mime`，供定裝照落地時直接算 checksum 免二次回抓 R2。
+- `video-prepare.ts`／`video-script-core.ts`／`app/api/video/draft/route.ts`：一路把 `referenceImageUrl` /
+  `reference_image_url` 這個選填欄位透傳到 `buildSceneAsset` 呼叫點。
+- `ScriptForge.tsx`：`doScript` 的 Claude prompt 新增「角色 ID 對照」區塊，要求每個 scene 回填 `character_id`
+  （對應 Bible 的角色 id，非角色名字）；腳本產生後 `autoGeneratePortraits`——對「場景有登場但
+  `referenceAssetIds` 為空」的角色，呼叫新路由生一張定裝照、註冊成 `media_assets`、存回 Bible 新草稿版本
+  （不自動核准，維持既有 draft/approved 兩階段模型）。
+- 新路由 `POST /api/video/story-bibles/generate-portrait`：重用 `buildSceneAsset`（同一套 flux+R2 邏輯，非
+  重複實作）生一張定裝照 + 插入 `media_assets`（`asset_domain:"ai_generated"`），比照 `upload-asset/route.ts`
+  的既有插入慣例。
+- 新路由 `POST /api/video/story-bibles/visual-consistency-check`：Claude vision 比對「角色定裝照 vs 該場景實際
+  生成的圖」，結果顯示在 `VideoStudio.tsx` 草稿審核區一個新面板（`runVisualConsistencyCheck`，草稿圖生成後
+  自動跑，不擋渲染，純提示）。
+- `StoryBibleWorkbench.tsx`：角色/場景參考素材選取器原本打 `/api/video/assets`——這支只回 `video/*` mime
+  （給 Release/QA 候選片清單用），圖片型的定裝照從來選不到；改打 `/api/video/reference-assets`（既有但
+  全 repo 零呼叫者的孤兒端點，本來就該給這裡用，無 mime 限制）。
+
+[Critic 覆審（Agent tool，非自審）發現 + 修復]
+- 🟠 `visual-consistency-check` 收 client 傳的 URL 直接送進 Claude image block（`source:{type:"url"}`），
+  無主機白名單、無 org 檢查——任何能打這支的呼叫者都能借 AwareWave 的 Anthropic 帳號去抓/描述任意網址
+  （confused-deputy，成本濫用+無歸屬）。→ 兩個 URL 都套 `lib/storage/r2.ts` 既有 `isDesignsAsset` SSRF
+  白名單，非本站 R2 designs 資產一律拒。
+- 🟠 `draft/route.ts` 的 `scenes[].referenceImageUrl` 零驗證，一路送進 Replicate `input_image`，同一個
+  confused-deputy 缺口；非字串值還會讓 `.trim()` 在 `.map()` 內丟未捕捉例外。→ 同樣套 `isDesignsAsset`，
+  非法值降級成「沒有定裝照」（選填加強欄位，不該讓整場生成失敗），不再硬 500。
+- 🟠 `autoGeneratePortraits`（`ScriptForge.tsx`）用 `sbOrgId`/`sbDoc` 的 closure，若使用者中途切換
+  org/Bible，前一輪還在跑的 fetch 結束後會把「舊租戶角色 id → 舊租戶定裝照 URL」寫進當下 `sbCharacterRefs`
+  ——角色 id 是各自文件內短字串、無跨文件唯一性保證，撞名即可能把 A 租戶的定裝照套進 B 租戶的場景生圖
+  （race condition 造成的跨租戶資料外洩）。→ 加 `portraitGenTokenRef`，org/series 一變就讓進行中那輪的
+  state 寫入全部失效；生成期間鎖定 org/series 選取器（disabled + 提示文字）。
+- 🟠 `VideoStudio.tsx` 用陣列索引把伺服器回的 `j.scenes[i]` 對回 client 端送出的 `providedScenes[i]` 取得
+  `referenceImageUrl`——三個檔案（ScriptForge/draft route/VideoStudio）靠「慣例」維持同序同長，沒有任何
+  執行期斷言；一旦哪天不一致會靜默把錯的角色定裝照套到錯的場景，比完全沒有更糟。→ 加長度比對，
+  不一致時整批放棄這個關聯（安全降級，不猜）。
+- 🔵 已一併修：`autoGeneratePortraits` 缺角色數上限（原本只受 Bible 角色數自然限制）→ 加
+  `MAX_AUTO_PORTRAITS=5`；「缺定裝照」原本用 `!sbCharacterRefs[id]` 判斷，在 org 素材超過
+  `/api/video/reference-assets` 的 200 筆上限時會誤判已有的參考照為「缺」而重複生成→ 改判
+  `referenceAssetIds.length===0`。
+- 未修（已知風險，記錄不遮）：① `visual-consistency-check` 加了 45s timeout，但強制升級 `flux-kontext-pro`
+  （$0.10/張 vs 使用者選的 flux-schnell $0.003/張，33 倍）沒有反映進 `VideoStudio.tsx` 的
+  `computeVideoCost` 預估——套用 Story Bible 角色時，畫面顯示的預估成本會低於實際；② `generate-portrait`
+  沒有走 `tarot/generate` 那條每日額度閘——查證後這是**跟現有慣例一致**（`regenerate-image` 等既有
+  video-pipeline 生圖路由本來就不走 tarot 額度系統，各自走 `computeVideoCost` 事前預估而非事後配額擋，
+  批中不是新缺口，非本次要治的根因）。
+
+[驗證結果]（四動作）
+- REALTEST_EVIDENCE: tool=Bash（tsc，critic 修復前後各跑一次） | cmd=`npx tsc --noEmit`（repo
+  `apps/next-admin/`） | exit=0（兩次皆是） | result=無錯誤
+- REALTEST_EVIDENCE: tool=Bash（vitest，critic 修復後） | cmd=`npx vitest run` | exit=0 |
+  result=1039/1039 通過（含既有 `story-bible-persistence.test.ts`），零迴歸
+- REALTEST_EVIDENCE: tool=Browser（真實瀏覽器，非 headless） | cmd=`app.aware-wave.com/tools/video?advanced=1`
+  手動生成 → 套 `soulful-expression`/`series_1`（小雨）→ 產生角度（前兩次 client 端 doAngles 呼叫透過
+  fetch spy 確認伺服器 200 但仍走進 catch，判定為當下暫時性問題非本次改動所致——第三次同套輸入成功，內容
+  正確反映 Bible）→ 選角度產生完整腳本，連續性檢查通過 | exit=n/a | result=**發現本輪程式碼尚未部署到
+  production**——用 `window.fetch` spy 直接讀伺服器回的 `doScript` prompt 全文，確認「角色 ID 對照」區塊與
+  `character_id` schema 完全不在送出的 prompt 裡（跑的是舊版程式碼），因此 `autoGeneratePortraits`／畫面
+  一致性面板這兩塊在瀏覽器上**尚未真實驗證**，等 deploy 後才能補測
+- REVIEW_DONE: critic=Standard（獨立 Agent，非自審） | verdict=warn→pass（4 個 Major 修復後重跑
+  tsc/vitest 皆綠，未重新請 critic 覆審修復本身，見下方剩餘風險） | findings=4c(已修)/2m(已修)/1s(已知不改)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=referenceImageUrl,generate-portrait,visual-consistency-check,isDesignsAsset,autoGeneratePortraits | hits=54（next-admin，符合預期分散在 11 個改動檔）+ agency-os 2 筆（皆為 hook 自動生成的 state/log 檔，非程式碼）+ scripts 0
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. **尚未部署** — 本輪全部驗證止於本機 `tsc`/`vitest` + 真實瀏覽器對「已部署舊版」的探測；`autoGeneratePortraits`
+   自動定裝照、畫面一致性 vision 比對面板兩塊功能**尚未在瀏覽器上跑過一次成功案例**，需 `sg-deploy.sh` 部署
+   （High-risk，等操作者明示 go-ahead）後才能補真實 E2E，見 TASKS.md 對應項。
+2. 成本預估面板未反映 Story Bible 角色強制升級模型的加價（見上方「未修」①）。
+3. Critic 修復本身未經第二輪獨立覆審（時間/額度考量，只重跑 tsc+vitest 靜態確認未破壞既有邏輯）。
+
+[rollback] `git revert` 對應 commit；純新增/透傳欄位 + 兩支新路由，未改資料庫 schema、未改既有欄位語意，
+舊呼叫路徑（不帶 `referenceImageUrl`）行為與改動前逐位元相同。

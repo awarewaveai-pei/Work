@@ -30,7 +30,7 @@ interface DraftBody {
   /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
   outputFormats?: string[];
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
-  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string }[];
+  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -47,8 +47,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const topic = body.topic?.trim();
+  // referenceImageUrl 會被 buildSceneAsset 直接送進 Replicate（flux-kontext-pro input_image）——
+  // 不是我們 R2 designs bucket 的 URL 一律丟掉，不進生圖 call（SSRF/confused-deputy 防線，
+  // 對齊 lib/storage/r2.ts isDesignsAsset 既有守則；非法值降級成「沒有定裝照」而非 400 硬擋，
+  // 因為這欄位是選填加強，不該讓整個場景生成失敗）。
+  const { isDesignsAsset } = await import("@/lib/storage/r2");
   const providedScenes = Array.isArray(body.scenes)
-    ? body.scenes.filter((s) => s && typeof s.narration === "string" && s.narration.trim())
+    ? body.scenes
+        .filter((s) => s && typeof s.narration === "string" && s.narration.trim())
+        .map((s) => (isDesignsAsset(s.referenceImageUrl) ? s : { ...s, referenceImageUrl: undefined }))
     : [];
   if (!topic && providedScenes.length === 0) {
     return NextResponse.json({ ok: false, error: "topic 或 scenes 為必填" }, { status: 400 });

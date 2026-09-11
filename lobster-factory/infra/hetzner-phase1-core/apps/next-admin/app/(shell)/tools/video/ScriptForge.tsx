@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { useState, useEffect, useRef, useMemo, createContext, useContext } from "react";
 import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { chipStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
@@ -46,7 +46,7 @@ async function claude(prompt: string, onChunk?: (full: string) => void){
 }
 
 /* ── 送去生產影片 bridge：ScriptResult 經 context 取得回呼，免穿過 24 個 module（傳 null = 非整合模式）── */
-type ProductionScene = { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string };
+type ProductionScene = { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string };
 type SendToProduction = (p: { topic: string; articleTitle: string; articleContent: string; scenes?: ProductionScene[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
 const ProductionBridge = createContext<SendToProduction | null>(null);
 type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
@@ -63,11 +63,12 @@ function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
    state），因為 ScriptForge 本身在此之前完全沒有 organizationId 概念（Step 2 才選租戶）。 */
 type StoryBibleDoc = {
   seriesId: string; revision: number;
-  characters: { id: string; name: string; role?: string }[];
+  characters: { id: string; name: string; role?: string; referenceAssetIds?: string[] }[];
   locations: { id: string; name: string }[];
   continuity: { currentState: string[]; prohibitions: string[]; openThreads: string[] };
   episode: { episodeId: string; premise: string; hook: string; beats: string[] };
 };
+type ReferenceAsset = { id: string; object_url: string; mime_type?: string };
 type StoryBibleListItem = { id: string; series_id: string; revision: number; status: string; document_json: StoryBibleDoc };
 
 /** Bible 內容轉成可插進生成 prompt 的中文區塊；缺欄位一律顯示「（無）」，不留空字串造成 prompt 斷句怪異。 */
@@ -126,19 +127,48 @@ function useStoryBibles(organizationId: string) {
   return { bibles, status };
 }
 
+/** org 的已註冊參考素材（含圖片；/api/video/reference-assets 無 mime 限制）→ 角色定裝照 id→URL 解析用。 */
+function useReferenceAssets(organizationId: string) {
+  const [assets, setAssets] = useState<ReferenceAsset[]>([]);
+  useEffect(() => {
+    if (!organizationId) { setAssets([]); return; }
+    let cancelled = false;
+    fetch(`/api/video/reference-assets?organizationId=${encodeURIComponent(organizationId)}`)
+      .then((r) => r.json())
+      .then((j: { ok: boolean; items?: ReferenceAsset[] }) => { if (!cancelled) setAssets(j.items ?? []); })
+      .catch(() => { if (!cancelled) setAssets([]); });
+    return () => { cancelled = true; };
+  }, [organizationId]);
+  return assets;
+}
+
+/** Bible characters[].referenceAssetIds（各取第一張）→ {characterId: imageUrl} 供生圖/畫面一致性比對用。 */
+function buildCharacterRefMap(doc: StoryBibleDoc | undefined, assets: ReferenceAsset[]): Record<string, string> {
+  if (!doc) return {};
+  const byId = new Map(assets.map((a) => [a.id, a.object_url]));
+  const map: Record<string, string> = {};
+  for (const c of doc.characters || []) {
+    const firstRef = (c.referenceAssetIds || []).find((id) => byId.has(id));
+    if (firstRef) map[c.id] = byId.get(firstRef)!;
+  }
+  return map;
+}
+
 function clampCustomScenes(n: number, sceneCount: number) {
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(sceneCount, Math.round(n)));
 }
 
-function productionSceneFromScriptScene(s: any): ProductionScene | null {
+function productionSceneFromScriptScene(s: any, characterRefs?: Record<string, string>): ProductionScene | null {
   const narration = String(s?.dialogue ?? s?.narration ?? s?.marked_text ?? "").trim();
   if (!narration) return null;
   const imagePrompt = String(s?.visual ?? s?.imagePrompt ?? s?.image_prompt ?? "").trim();
   const brollKeyword = String(s?.broll_keyword ?? s?.brollKeyword ?? "").trim();
   const rawVisual = String(s?.visual_type ?? s?.asset_type ?? s?.visualMode ?? "").toLowerCase();
   const visual: "custom" | "broll" = rawVisual === "broll" || brollKeyword ? "broll" : "custom";
-  return { narration, imagePrompt, visual, brollKeyword };
+  const characterId = typeof s?.character_id === "string" ? s.character_id : "";
+  const referenceImageUrl = characterId ? characterRefs?.[characterId] : undefined;
+  return { narration, imagePrompt, visual, brollKeyword, referenceImageUrl };
 }
 
 function enforceProductionVisualSplit(scenes: ProductionScene[], customScenes: number): ProductionScene[] {
@@ -355,7 +385,7 @@ function AnimatedPreview({script,onClose}){
 }
 
 /* ── SCRIPT RESULT ── */
-function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
+function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs}: any){
   const[copied,setCopied]=useState(false);
   const[repPlatform,setRepPlatform]=useState("");
   const[repLoading,setRepLoading]=useState(false);
@@ -418,7 +448,7 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag}: any){
 
       <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:repLoading||repurposed?12:0}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${repPlatform===p.id?C.violet:C.border}`,background:repPlatform===p.id?C.violetl:C.white,color:repPlatform===p.id?C.violet:C.ink,fontSize:11.5,fontWeight:repPlatform===p.id?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repurposed&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{repurposed.title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{repurposed.hook}」</div>{repurposed.scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{repurposed.key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{repurposed.key_changes}</div>}</div>}</Card>
 
-      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const rawScenes=(script.scenes||[]).map(productionSceneFromScriptScene).filter(Boolean) as ProductionScene[];const sc=enforceProductionVisualSplit(rawScenes,customScenes);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,customScenes:sc.length>0?clampCustomScenes(customScenes,sc.length):undefined});setSent(true);}} full/>}
+      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const rawScenes=(script.scenes||[]).map(s=>productionSceneFromScriptScene(s,sbCharacterRefs)).filter(Boolean) as ProductionScene[];const sc=enforceProductionVisualSplit(rawScenes,customScenes);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,customScenes:sc.length>0?clampCustomScenes(customScenes,sc.length):undefined});setSent(true);}} full/>}
       {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送到下方 🎬 影片生產（Remotion 模板，已自動捲動過去）":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""})),customScenes:clampCustomScenes(customScenes,script.scenes?.length||0)});setRemotionSent(true);}} full/>}
       <div style={{display:"flex",gap:9}}><GBtn ch={copied?"✅ 已複製":"📋 複製腳本"} onClick={copyScript} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
     </div>
@@ -694,10 +724,55 @@ function ManualModule({brand}){
   const{bibles:sbBibles,status:sbStatus}=useStoryBibles(sbOrgId);
   const sbDoc=sbBibles.find(b=>b.series_id===sbSeriesId)?.document_json;
   const sbBlock=sbDoc?storyBibleContextBlock(sbDoc):"";
+  // 角色定裝照解析：Bible characters[].referenceAssetIds → 實際 URL；localPortraitRefs 疊在上面——
+  // 本輪自動生成的定裝照立刻可用（不必等 useStoryBibles 重新載入，新版也還是 draft 不會出現在已核准清單）。
+  const sbRefAssets=useReferenceAssets(sbOrgId);
+  const[localPortraitRefs,setLocalPortraitRefs]=useState<Record<string,string>>({});
+  const[portraitStatus,setPortraitStatus]=useState<{loading?:boolean;generated?:number;error?:string}|null>(null);
+  // 切換 org/series 時讓進行中的 autoGeneratePortraits 失效（比對這個 token）——防止使用者中途換
+  // 租戶/Bible，前一輪還在跑的角色定裝照 fetch 結束後把「舊租戶角色 id → 新租戶正在用的 URL」寫進
+  // sbCharacterRefs（id 是各自文件內的短字串、無跨文件唯一性保證，撞名即可能把別租戶的定裝照套到
+  // 這個租戶的場景生圖）。
+  const portraitGenTokenRef=useRef(0);
+  useEffect(()=>{portraitGenTokenRef.current++;setLocalPortraitRefs({});setPortraitStatus(null);},[sbOrgId,sbSeriesId]);
+  const sbCharacterRefs=useMemo(()=>({...buildCharacterRefMap(sbDoc,sbRefAssets),...localPortraitRefs}),[sbDoc,sbRefAssets,localPortraitRefs]);
   async function doAngles(){if(!brief.topic||!brief.platform){setErr("請填入主題並選擇平台");return;}setErr("");setLoading(true);setAngles(null);setSt("angles");try{const raw=await claude(`根據brief產生4個腳本角度。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}${bv}${sbBlock}\n純JSON：{"angles":[{"id":1,"name":"","type":"反常識/故事/教學/爭議/情緒/銷售其一","hook":"","core":"","why":"(25字內)","risk":"(15字內)","score":8}]}`);setAngles(pj(raw).angles);}catch{setErr("失敗，請再試");setSt("brief");}setLoading(false);}
-  async function doScript(angle){setSt("script");setScript(null);setScore(null);setContinuityCheck(null);setLoading(true);try{const raw=await claude(`生成完整影片腳本。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}|角度：${angle.name}|鉤子：${angle.hook}${bv}${sbBlock}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排${sceneCount}個場景。`);const s=pj(raw);setScript(s);const sr=await claude(`評估腳本。鉤子：${s.hook}|場景：${s.scenes?.length}|CTA：${s.cta}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`);setScore(pj(sr));if(sbDoc){setContinuityCheck({loading:true});checkStoryBibleContinuity(s,sbDoc).then(setContinuityCheck);}}catch{}setLoading(false);}
-  function reset(){setSt("brief");setAngles(null);setScript(null);setScore(null);setContinuityCheck(null);setBrief({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});}
-  const storyBiblePicker=(<Card style={{borderColor:sbDoc?C.violet:C.border,background:sbDoc?C.violetl:C.white}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:sbOrgId?8:0}}><SL ch="📖 套用短劇 Story Bible（選填，加強角色／場景連續性）"/></div><div style={{maxWidth:340,marginBottom:sbOrgId?8:0}}><OrganizationPicker value={sbOrgId} onChange={(v)=>{setSbOrgId(v);setSbSeriesId("");}}/></div>{sbOrgId&&sbStatus==="loading"&&<div style={{fontSize:11.5,color:C.mid}}>載入 Story Bible 清單…</div>}{sbOrgId&&sbStatus==="ready"&&sbBibles.length===0&&<div style={{fontSize:11.5,color:C.mid}}>此租戶還沒有已核准的 Story Bible——可到上方「📖 短劇 Story Bible」分頁建立。</div>}{sbOrgId&&sbBibles.length>0&&<select value={sbSeriesId} onChange={e=>setSbSeriesId(e.target.value)} style={{width:"100%",padding:"7px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12,fontFamily:"inherit"}}><option value="">不套用 Story Bible</option>{sbBibles.map(b=><option key={b.id} value={b.series_id}>{b.series_id}（r{b.revision}，{b.document_json?.episode?.episodeId}）</option>)}</select>}{sbDoc&&<div style={{marginTop:8,fontSize:11.5,color:C.ink,lineHeight:1.6}}><div><b>角色：</b>{(sbDoc.characters||[]).map(c=>c.name).join("、")||"（無）"}</div><div><b>場景：</b>{(sbDoc.locations||[]).map(l=>l.name).join("、")||"（無）"}</div>{(sbDoc.continuity?.prohibitions||[]).length>0&&<div style={{color:C.rose}}><b>不可違反：</b>{sbDoc.continuity.prohibitions.join("；")}</div>}</div>}</Card>);
+  // 角色 id→名字對照：sbDoc 存在時要求 Claude 用 Bible 的 id（非角色名字）回填每場景 character_id，
+  // 場景沒有明確角色登場則留空——這個 id 是後面畫面一致性生圖/自動定裝照的唯一對應鍵。
+  const characterIdHint=sbDoc&&sbDoc.characters?.length>0?`\n角色 ID 對照（scenes 的 character_id 欄位須填這裡的 id，不要填角色名字；場景沒有明確角色登場則留空字串）：${sbDoc.characters.map(c=>`${c.id}=${c.name}`).join("、")}\n`:"";
+  const sceneCharacterField=sbDoc?`,"character_id":"(見角色ID對照，無角色則空字串)"`:"";
+  const MAX_AUTO_PORTRAITS=5; // 成本閘：一輪腳本最多自動生 5 張定裝照，短劇常見角色數遠低於此
+  async function autoGeneratePortraits(scenes: any[], org: string, doc: StoryBibleDoc){
+    const token=portraitGenTokenRef.current;
+    const usedIds=new Set((scenes||[]).map((s: any)=>s?.character_id).filter(Boolean));
+    // 「缺定裝照」看 referenceAssetIds 是否為空，不是看 sbCharacterRefs 有沒有解出 URL——後者在
+    // org 素材超過 /api/video/reference-assets 的 200 筆上限時，已存在的參考照可能解不出 URL，
+    // 誤判成「缺」會重複生成、浪費 Replicate 額度。
+    const missing=(doc.characters||[]).filter(c=>usedIds.has(c.id)&&(!c.referenceAssetIds||c.referenceAssetIds.length===0)).slice(0,MAX_AUTO_PORTRAITS);
+    if(missing.length===0)return;
+    setPortraitStatus({loading:true});
+    const generated: Record<string,string>={};const newRefIds: Record<string,string>={};
+    for(const c of missing){
+      try{
+        const r=await fetch("/api/video/story-bibles/generate-portrait",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({organizationId:org,name:c.name,role:c.role})});
+        const j=await r.json();
+        if(j.ok){generated[c.id]=j.imageUrl;newRefIds[c.id]=j.assetId;}
+      }catch{/* 單一角色失敗不擋其他角色 */}
+    }
+    if(portraitGenTokenRef.current!==token)return; // 使用者中途換了 org/series，這輪結果不再適用，直接丟棄不寫入任何 state
+    if(Object.keys(generated).length===0){setPortraitStatus({error:"定裝照自動生成失敗（可到 Story Bible 頁手動補角色參考素材）"});return;}
+    setLocalPortraitRefs(prev=>({...prev,...generated}));
+    try{
+      const nextDoc={...doc,characters:(doc.characters||[]).map(c=>newRefIds[c.id]?{...c,referenceAssetIds:[...(c.referenceAssetIds||[]),newRefIds[c.id]]}:c)};
+      const r=await fetch("/api/video/story-bibles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({organizationId:org,storyBible:nextDoc})});
+      const j=await r.json();
+      if(portraitGenTokenRef.current!==token)return;
+      setPortraitStatus({generated:Object.keys(generated).length,error:j.ok?undefined:"已生成定裝照但存回 Bible 新版本失敗，需到 Story Bible 頁手動補上"});
+    }catch{if(portraitGenTokenRef.current===token)setPortraitStatus({generated:Object.keys(generated).length,error:"已生成定裝照但存回 Bible 新版本失敗，需到 Story Bible 頁手動補上"});}
+  }
+  async function doScript(angle){setSt("script");setScript(null);setScore(null);setContinuityCheck(null);setPortraitStatus(null);setLoading(true);try{const raw=await claude(`生成完整影片腳本。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}|角度：${angle.name}|鉤子：${angle.hook}${bv}${sbBlock}${characterIdHint}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""${sceneCharacterField}}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排${sceneCount}個場景。`);const s=pj(raw);setScript(s);const sr=await claude(`評估腳本。鉤子：${s.hook}|場景：${s.scenes?.length}|CTA：${s.cta}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`);setScore(pj(sr));if(sbDoc){setContinuityCheck({loading:true});checkStoryBibleContinuity(s,sbDoc).then(setContinuityCheck);void autoGeneratePortraits(s.scenes||[],sbOrgId,sbDoc);}}catch{}setLoading(false);}
+  function reset(){setSt("brief");setAngles(null);setScript(null);setScore(null);setContinuityCheck(null);setPortraitStatus(null);setBrief({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});}
+  const storyBiblePicker=(<Card style={{borderColor:sbDoc?C.violet:C.border,background:sbDoc?C.violetl:C.white}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:sbOrgId?8:0}}><SL ch="📖 套用短劇 Story Bible（選填，加強角色／場景連續性）"/></div><div style={{maxWidth:340,marginBottom:sbOrgId?8:0}}><OrganizationPicker value={sbOrgId} onChange={(v)=>{setSbOrgId(v);setSbSeriesId("");}} disabled={portraitStatus?.loading}/></div>{sbOrgId&&sbStatus==="loading"&&<div style={{fontSize:11.5,color:C.mid}}>載入 Story Bible 清單…</div>}{sbOrgId&&sbStatus==="ready"&&sbBibles.length===0&&<div style={{fontSize:11.5,color:C.mid}}>此租戶還沒有已核准的 Story Bible——可到上方「📖 短劇 Story Bible」分頁建立。</div>}{sbOrgId&&sbBibles.length>0&&<select value={sbSeriesId} onChange={e=>setSbSeriesId(e.target.value)} disabled={portraitStatus?.loading} style={{width:"100%",padding:"7px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12,fontFamily:"inherit"}}><option value="">不套用 Story Bible</option>{sbBibles.map(b=><option key={b.id} value={b.series_id}>{b.series_id}（r{b.revision}，{b.document_json?.episode?.episodeId}）</option>)}</select>}{portraitStatus?.loading&&<div style={{fontSize:10.5,color:C.mid,marginTop:4}}>🎨 定裝照生成中，暫時鎖定租戶/Bible 切換避免跨租戶誤用…</div>}{sbDoc&&<div style={{marginTop:8,fontSize:11.5,color:C.ink,lineHeight:1.6}}><div><b>角色：</b>{(sbDoc.characters||[]).map(c=>c.name).join("、")||"（無）"}</div><div><b>場景：</b>{(sbDoc.locations||[]).map(l=>l.name).join("、")||"（無）"}</div>{(sbDoc.continuity?.prohibitions||[]).length>0&&<div style={{color:C.rose}}><b>不可違反：</b>{sbDoc.continuity.prohibitions.join("；")}</div>}</div>}</Card>);
   if(st==="brief")return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>手動生成腳本</h2><p style={{fontSize:12.5,color:C.mid}}>填入需求，AI完成策略、分鏡、評分</p>{brand?.voice&&<div style={{marginTop:6,padding:"5px 11px",background:C.jadelt,borderRadius:6,fontSize:11.5,color:C.jade,fontWeight:700,display:"inline-block"}}>✅ 已套用品牌語氣：{brand.name||"我的品牌"}</div>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.mid,alignSelf:"center"}}>範例：</span>{EXAMPLES.map((ex,i)=><button key={i} onClick={()=>setBrief(ex)} style={{padding:"4px 10px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,cursor:"pointer",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.coral} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{ex.topic.slice(0,12)}...</button>)}</div><div><SL ch="主題 *"/><TA value={brief.topic} onChange={e=>setBrief({...brief,topic:e.target.value})} placeholder="例如：新手如何開始學畫畫..." rows={2}/></div><div><SL ch="平台 *"/><PlatGrid value={brief.platform} onChange={v=>setBrief({...brief,platform:v})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>{[["影片長度","duration",DURATIONS],["內容目的","goal",GOALS],["語氣風格","tone",TONES],["觀眾行動","cta",CTAS]].map(([l,k,opts]: any)=><div key={k}><SL ch={l}/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{opts.map(o=><Pill key={o} label={o} active={brief[k]===o} onClick={()=>setBrief({...brief,[k]:o})}/>)}</div></div>)}</div><div><SL ch="目標受眾"/><AudiencePicker value={brief.audience} onChange={(v)=>setBrief({...brief,audience:v})}/></div>{storyBiblePicker}{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}<PBtn ch="產生腳本角度 →" onClick={doAngles} disabled={!brief.topic||!brief.platform} full/></div>);
   if(st==="angles")return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("brief")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>選擇腳本角度</h2></div>{loading&&!angles&&<Spin label="AI 正在生成角度..."/>}{angles&&<div style={{display:"grid",gap:11}}>{angles.map(a=><div key={a.id} onClick={()=>doScript(a)} style={{background:C.white,border:`2px solid ${C.border}`,borderRadius:13,overflow:"hidden",cursor:"pointer",transition:"all .2s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.coral;e.currentTarget.style.boxShadow="0 3px 14px color-mix(in srgb, var(--accent) 16%, transparent)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.boxShadow="none";}}><div style={{padding:"10px 15px",borderBottom:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",alignItems:"center",gap:7}}><Tag ch={a.type} c={C.violet} bg={C.violetl}/><span style={{fontSize:13.5,fontWeight:800,color:C.black,fontFamily:"DM Serif Display,serif"}}>{a.name}</span></div><div style={{fontSize:15,fontWeight:900,color:C.coral}}>{a.score}<span style={{fontSize:9,color:C.mid}}>/10</span></div></div><div style={{padding:"12px 15px"}}><div style={{background:C.violetl,borderRadius:8,padding:"8px 11px",marginBottom:9}}><div style={{fontSize:9,color:C.violet,fontWeight:700,letterSpacing:1,marginBottom:3}}>開頭鉤子</div><div style={{fontSize:13,color:C.violet,fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{a.hook}」</div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>核心概念</div><div style={{fontSize:12,color:C.ink}}>{a.core}</div></div><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>為什麼有效</div><div style={{fontSize:12,color:C.ink}}>{a.why}</div></div></div><div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><Tag ch={`⚠ ${a.risk}`} c={C.rose} bg={C.roselt} small/><span style={{fontSize:11.5,color:C.coral,fontWeight:700}}>選擇此角度 →</span></div></div></div>)}</div>}</div>);
   if(st==="script"){
@@ -707,7 +782,14 @@ function ManualModule({brand}){
       continuityCheck.ok===false&&(continuityCheck.violations?.length??0)>0?<Card style={{borderColor:C.rose,background:C.roselt}}><SL ch={`⚠️ Story Bible 連續性檢查：發現 ${continuityCheck.violations!.length} 個可能違反`}/><div style={{display:"grid",gap:5,marginTop:6}}>{continuityCheck.violations!.map((v,i)=><div key={i} style={{fontSize:12,color:C.ink}}>{v.sceneIndex>=0?`場景${v.sceneIndex+1}：`:""}<b style={{color:C.rose}}>{v.rule}</b> — {v.reason}</div>)}</div><div style={{fontSize:11,color:C.mid,marginTop:6}}>這是輔助提醒，不會阻擋送去生產影片——請自行判斷是否需要調整。</div></Card>:
       <Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="✅ Story Bible 連續性檢查通過"/></Card>
     );
-    return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("angles")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>完整腳本</h2></div>{loading&&!script&&<Spin label="AI 正在撰寫腳本..."/>}{script&&<ScriptResult script={script} score={score} onReset={reset} autoSaveTag="手動生成" extraTop={ccPanel}/>}</div>);
+    const portraitPanel=portraitStatus&&(
+      portraitStatus.loading?<Card style={{borderColor:C.violet,background:C.violetl}}><SL ch="🎨 為新角色自動生成定裝照中..."/></Card>:
+      <Card style={{borderColor:portraitStatus.error?C.gold:C.jade,background:portraitStatus.error?C.goldlt:C.jadelt}}>
+        <SL ch={portraitStatus.generated?`🎨 已為 ${portraitStatus.generated} 個角色自動生成定裝照`:"🎨 定裝照"}/>
+        <div style={{fontSize:11.5,color:C.ink,marginTop:4}}>{portraitStatus.error??"已存回 Story Bible 新草稿版本；下方場景生圖會用這些定裝照換角色跨場景一致性；到「📖 短劇 Story Bible」頁核准即可讓下次使用也直接吃到。"}</div>
+      </Card>
+    );
+    return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("angles")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>完整腳本</h2></div>{loading&&!script&&<Spin label="AI 正在撰寫腳本..."/>}{script&&<ScriptResult script={script} score={score} onReset={reset} autoSaveTag="手動生成" extraTop={<>{ccPanel}{portraitPanel}</>} sbCharacterRefs={sbCharacterRefs}/>}</div>);
   }
 }
 

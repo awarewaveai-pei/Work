@@ -20,6 +20,8 @@ export interface VideoScene {
   broll_keyword: string;
   /** 視覺策略：custom = AI 插圖；broll = 真實影片素材。 */
   visual: "custom" | "broll";
+  /** Story Bible 角色定裝照 URL（該場景登場角色已有參考照時）→ buildSceneAsset 生圖時改走 reference-conditioned 模型。 */
+  reference_image_url?: string;
 }
 
 export interface VideoScriptSuccess {

@@ -272,7 +272,9 @@ export interface VideoPipelinePending {
 type VideoPipelineResult = VideoPipelinePending | { ok: false; status: number; error: string };
 
 type AssetResult =
-  | { ok: true; asset: string; r2Key?: string }
+  // bytes/mime 只在 Flux/reference 生圖路徑填（Pexels 路徑無本地 buffer）；
+  // 供 story-bibles/generate-portrait 直接註冊 media_assets，不必回抓 R2 算 checksum。
+  | { ok: true; asset: string; r2Key?: string; bytes?: Buffer; mime?: string }
   | { ok: false; status: number; error: string };
 
 /** 草稿生成結果：腳本 + 每格式圖片 URL，不含渲染（供 /api/video/draft 使用）。 */
@@ -302,6 +304,11 @@ export async function buildSceneAsset(
     orientation?: "landscape" | "portrait";
     /** 風格框景詞（接在 visualStyle 後）；省略 = 16:9 寬框。 */
     framing?: string;
+    /**
+     * Story Bible 角色定裝照 URL——提供時（且非 Pexels 路徑）強制改用支援 reference image
+     * 的模型（flux-kontext-pro），忽略 opts.imageModel/fluxModel 的一般選型，換取跨場景角色一致性。
+     */
+    referenceImageUrl?: string;
   },
 ): Promise<AssetResult> {
   const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
@@ -337,15 +344,23 @@ export async function buildSceneAsset(
     ? `${opts.visualStyle.trim()} ${framing}`
     : `Cinematic realistic photography, dramatic natural lighting, rich color grade. ${framing}`;
   const styledPrompt = `${stylePrefix} ${scene.image_prompt}`;
-  const safeModel = isTarotModel(fluxModel) ? fluxModel : "flux-schnell";
-  const img = await generateTarotImage({ model: safeModel, prompt: styledPrompt, aspectRatio });
+  // 有角色定裝照 → 強制走 reference-conditioned 模型（忽略一般選型），換角色跨場景一致性；
+  // 沒有就照原本選型（使用者選的模型或預設 flux-schnell）。
+  const referenceImageUrl = opts.referenceImageUrl?.trim() || undefined;
+  const safeModel = referenceImageUrl ? "flux-kontext-pro" : (isTarotModel(fluxModel) ? fluxModel : "flux-schnell");
+  const img = await generateTarotImage({
+    model: safeModel,
+    prompt: styledPrompt,
+    aspectRatio,
+    referenceImages: referenceImageUrl ? [referenceImageUrl] : undefined,
+  });
   if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
   const parsed = parseImageDataUrl(img.image);
   const key = parsed ? buildDesignKey(parsed.mime) : null;
   if (!parsed || !key) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
   const put = await putDesignObject(key, parsed.buffer, parsed.mime);
   if (!put.ok) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${"error" in put ? put.error : "r2_put_failed"}` };
-  return { ok: true, asset: put.publicUrl, r2Key: key };
+  return { ok: true, asset: put.publicUrl, r2Key: key, bytes: parsed.buffer, mime: parsed.mime };
 }
 
 /** 步驟 1+2：生腳本 + 生圖；不提交 EU 渲染。可獨立呼叫供草稿預覽。 */
@@ -379,6 +394,8 @@ export async function prepareScenes(
       imagePrompt: string;
       visual?: "custom" | "broll";
       brollKeyword?: string;
+      /** Story Bible 角色定裝照 URL（該場景登場角色已有參考照時）。 */
+      referenceImageUrl?: string;
     }[];
     onProgress?: (step: string) => void;
   },
@@ -395,6 +412,7 @@ export async function prepareScenes(
       image_prompt: (s.imagePrompt || "").trim() || (s.narration || "").trim(),
       broll_keyword: (s.brollKeyword || "").trim(),
       visual: s.visual === "broll" ? "broll" as const : "custom" as const,
+      reference_image_url: s.referenceImageUrl?.trim() || undefined,
     }));
     title = (input.articleTitle || input.topic || "影片").trim();
   } else {
@@ -442,6 +460,7 @@ export async function prepareScenes(
           aspectRatio: spec.aspectRatio,
           orientation: spec.orientation,
           framing: spec.framing,
+          referenceImageUrl: s.reference_image_url,
         }),
       ),
     );

@@ -73,6 +73,8 @@ interface DraftScene {
   brollKeyword: string;
   /** custom = Flux AI 圖；broll = Pexels 素材 — 決定重生走哪條路。 */
   visual: "custom" | "broll";
+  /** Story Bible 角色定裝照 URL（該場景登場角色已有參考照時）→ 畫面一致性比對用。 */
+  referenceImageUrl?: string;
 }
 
 interface VideoCapabilities {
@@ -174,7 +176,7 @@ interface VideoStudioInitial {
   articleTitle?: string;
   articleContent?: string;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 直接出片，不重生。 */
-  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string }[];
+  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
   /** 前製腳本帶入的素材模式（pexels-video / pexels-all / __ai__） */
   mediaMode?: string;
   /** 前製腳本帶入的目標時長（分鐘） */
@@ -277,6 +279,8 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
   const [draftTitle, setDraftTitle] = useState("");
   const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 場景忙碌中的 id（單張重生 或 上傳中）
   const draftReady = draftScenes.length > 0;
+  // Story Bible 畫面一致性比對（角色有定裝照的場景才跑）；純提示不擋渲染。
+  const [visualConsistency, setVisualConsistency] = useState<{ loading?: boolean; results?: { sceneIndex: number; consistent: boolean | null; note: string }[]; error?: string } | null>(null);
 
   // ── History ──
   const [history, setHistory] = useState<VideoHistoryItem[]>([]);
@@ -406,6 +410,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
     setDraftFormats([]);
     setDraftPreviewFormat("");
     setDraftR2Keys([]);
+    setVisualConsistency(null);
     setGenError("");
     setGenResult(null);
     setGenStatus("idle");
@@ -445,20 +450,49 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       // 主格式（formats[0]）那組作預覽編輯；全部格式原生圖組存起，render 時送回。
       const primaryFmt = j.formats[0];
       const primaryUrls = j.formatImageUrls[primaryFmt] ?? [];
-      setDraftScenes(j.scenes.map((s, i) => ({
+      // 伺服器回應不回帶 referenceImageUrl（草稿場景無此欄位）；用索引對回 client 端送出的原始場景
+      // 取得 referenceImageUrl —— 僅在長度相同時信任這個位置對應，長度不符（伺服器路徑與送出的
+      // providedScenes 不是 1:1，例如純主題生成時完全重生場景）一律不帶，避免把 A 場景的定裝照
+      // 誤植到 B 場景（錯的角色參考比沒有更糟——會讓生圖往錯誤方向靠）。
+      const scenesAligned = providedScenes.length === j.scenes.length;
+      const nextDraftScenes = j.scenes.map((s, i) => ({
         id: s.id, narration: s.narration, imageUrl: primaryUrls[i] ?? "",
         imagePrompt: s.imagePrompt ?? "", brollKeyword: s.brollKeyword ?? "", visual: s.visual ?? "custom",
-      })));
+        referenceImageUrl: scenesAligned ? providedScenes[i]?.referenceImageUrl : undefined,
+      }));
+      setDraftScenes(nextDraftScenes);
       setDraftFormatUrls(j.formatImageUrls);
       setDraftFormats(j.formats);
       setDraftPreviewFormat(primaryFmt);
       setDraftR2Keys(j.r2Keys ?? []);
       setDraftTitle(j.title ?? topic.trim());
+      void runVisualConsistencyCheck(nextDraftScenes);
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");
       setGenStatus("error");
     } finally {
       setDraftLoading(false);
+    }
+  }
+
+  // ── Story Bible 畫面一致性比對（草稿圖生成後，有角色定裝照的場景才跑）──
+  async function runVisualConsistencyCheck(scenes: DraftScene[]) {
+    const pairs = scenes
+      .filter((s) => s.referenceImageUrl && s.imageUrl)
+      .map((s) => ({ sceneIndex: s.id, referenceImageUrl: s.referenceImageUrl!, generatedImageUrl: s.imageUrl }));
+    if (pairs.length === 0) return;
+    setVisualConsistency({ loading: true });
+    try {
+      const res = await fetch("/api/video/story-bibles/visual-consistency-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pairs }),
+      });
+      const j = (await res.json()) as { ok: boolean; results?: { sceneIndex: number; consistent: boolean | null; note: string }[]; error?: string };
+      if (j.ok && j.results) setVisualConsistency({ results: j.results });
+      else setVisualConsistency({ error: j.error ?? "畫面一致性比對失敗" });
+    } catch (e: unknown) {
+      setVisualConsistency({ error: e instanceof Error ? e.message : "畫面一致性比對失敗" });
     }
   }
 
@@ -694,6 +728,24 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                 <div style={{ background: "var(--badge-red-bg)", border: "1px solid var(--red)", borderRadius: 8, padding: "12px 14px" }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>失敗</div>
                   <div style={{ fontSize: 12.5, color: "var(--badge-red-text)" }}>{genError}</div>
+                </div>
+              )}
+              {visualConsistency && (
+                <div style={{
+                  background: visualConsistency.loading ? "var(--bg-subtle)" : visualConsistency.error ? "var(--badge-red-bg)" : "var(--card-bg)",
+                  border: `1px solid ${visualConsistency.loading ? "var(--border-subtle)" : visualConsistency.error ? "var(--red)" : "var(--border-subtle)"}`,
+                  borderRadius: 8, padding: "10px 14px",
+                }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", marginBottom: visualConsistency.results?.length ? 6 : 0 }}>
+                    📖 Story Bible 畫面一致性比對{visualConsistency.loading ? "中…" : ""}
+                  </div>
+                  {visualConsistency.error && <div style={{ fontSize: 12, color: "var(--badge-red-text)" }}>{visualConsistency.error}</div>}
+                  {visualConsistency.results?.map((r) => (
+                    <div key={r.sceneIndex} style={{ fontSize: 12, color: "var(--text-secondary)", padding: "2px 0" }}>
+                      {r.consistent === false ? "⚠️" : r.consistent === true ? "✅" : "❔"} 場景 {r.sceneIndex}：{r.note || (r.consistent === false ? "角色外觀可能不一致" : r.consistent === true ? "與定裝照一致" : "無法判斷")}
+                    </div>
+                  ))}
+                  {visualConsistency.results && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>僅提示，不擋渲染；不一致的場景可用下方「重新生成」單張重生。</div>}
                 </div>
               )}
               <DraftEditor

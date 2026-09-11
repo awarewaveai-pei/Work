@@ -31,7 +31,7 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 interface ScriptPrefill {
   topic: string; articleTitle: string; articleContent: string;
-  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string }[];
+  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
   mediaMode?: string; duration?: number; customScenes?: number;
 }
 interface RemotionPrefill {

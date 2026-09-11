@@ -28,7 +28,10 @@ export default function StoryBibleWorkbench() {
     const org = organizationId.trim();
     if (!org) { setAssets([]); return; }
     let cancelled = false;
-    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}`)
+    // /api/video/assets 只回 video mime（Release/QA 候選片清單用）；角色/場景定裝照是圖片，
+    // 改走 /api/video/reference-assets（同租戶 ai_generated+real_footage，無 mime 限制，本來就是孤兒
+    // 端點——2026-09-11 查證發現全 repo 零呼叫者，這裡接上是它原本該用的地方）。
+    fetch(`/api/video/reference-assets?organizationId=${encodeURIComponent(org)}`)
       .then((r) => r.ok ? r.json() : Promise.reject(new Error("素材清單讀取失敗")))
       .then((json: { items?: RegisteredAsset[] }) => { if (!cancelled) setAssets(json.items ?? []); })
       .catch(() => { if (!cancelled) setAssets([]); });
