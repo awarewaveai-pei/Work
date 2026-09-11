@@ -1,0 +1,155 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/lotus-blossom-session.schema.yaml"
+title: Lotus Blossom Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LotusBlossomSession` -- the declared `outputs` of
+  `divergent.lotus_blossom`'s Method Contract (methods/contracts/divergent.lotus_blossom.contract.yaml,
+  `outputs: [LotusBlossomSession]`). Atlas cites this method ONCE: F03 tool table row (L384: "Lotus Blossom
+  ｜多層結構發散｜中心→8 分支→各 8 idea｜大量但有結構｜後續需 clustering") -- no dedicated section.
+
+  TWO nested fixed-8 closed-set invariants (see method contract's own preconditions): `branches` is
+  minItems/maxItems 8, each entry's `branch_number` a distinct value 1-8 (SHAPE-bounded here; genuine
+  distinctness+completeness is a runtime-only invariant, same JSON-Schema-cannot-express-set-equality
+  limitation ansoff-matrix.schema.yaml's own `quadrants` already discloses); each branch's own `ideas` is
+  ALSO minItems/maxItems 8, every entry a non-empty string.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Lotus Blossom row (L384)"
+  - "methods/contracts/divergent.lotus_blossom.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/ansoff-matrix.schema.yaml -- closed-set-with-completeness precedent, generalized here from a named enum to a numeric branch_number slot"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml -- record-level (not per-item) provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct (non-ambiguous) transcription of Atlas L384's own literal "中心→8 分支→各 8 idea" count, plus
+  low-risk disclosed compilation choices.
+
+compilation_decisions:
+  - question: "branch_number as a closed enum 1-8, or a plain positive integer with no upper bound?"
+    decision: "enum: [1,2,3,4,5,6,7,8] -- Atlas's own literal count is fixed at 8, not open-ended; same closed-vocabulary-but-numeric-instead-of-named shape ansoff-matrix.schema.yaml's own `quadrant` enum establishes for a name-based version of the identical structural pattern."
+  - question: "Per-branch provenance (ansoff quadrants[].provenance-style) or one record-level provenance field?"
+    decision: "Record-level only, per task-mandated design and Atlas's own citation supporting no per-branch differentiated epistemic claim -- same shape 5w1h-record.schema.yaml's own single top-level `provenance` already establishes, not ansoff/bcg's per-item pattern."
+  - question: "additionalProperties: false at the top level and the branches[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start (same discipline ansoff-matrix.schema.yaml's own identical decision already establishes)."
+  - question: "Does JSON Schema itself express 'all 8 distinct branch_number values present, order-independent'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality operator. minItems:8/maxItems:8 plus the per-item 1-8 enum bounds the SHAPE only; genuine distinctness-and-completeness (at BOTH nesting levels: branch_number set AND each branch's own ideas count) is a runtime-only invariant, enforced at construction AND independently re-derived by a gate in lotus_blossom.py -- same limitation-and-workaround class ansoff-matrix.schema.yaml's own identical compilation_decision already documents."
+
+type: object
+required: [id, version, center_theme, branches, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^LOTUS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as ansoff-matrix.schema.yaml's ANSOFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.lotus_blossom"
+
+  center_theme:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The single shared anchor theme every one of the 8 branches themes off -- REPORTED content, not computed."
+
+  branches:
+    type: array
+    minItems: 8
+    maxItems: 8
+    description: >
+      Atlas L384's own '中心→8 分支' first-level structure. SHAPE-bounded here to exactly 8 items; genuine
+      completeness (branch_number covering 1-8, each exactly once, order-independent) is a runtime-only
+      invariant this schema cannot express -- enforced by ai_lego/modules/divergent/lotus_blossom.py at both
+      the builder and an independent gate.
+    items:
+      type: object
+      required: [branch_number, branch_theme, ideas]
+      additionalProperties: false
+      properties:
+        branch_number:
+          type: integer
+          enum: [1, 2, 3, 4, 5, 6, 7, 8]
+          description: "One of the 8 fixed branch slots (Atlas's own '8 分支' count) -- a numeric slot, not a named vocabulary; genuine 1-8 completeness+distinctness is runtime-only, see top-level description."
+        branch_theme:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What this branch concretely explores, radiating from center_theme -- REPORTED content, not computed."
+        ideas:
+          type: array
+          minItems: 8
+          maxItems: 8
+          description: "Atlas L384's own '各 8 idea' second-level, per-branch fixed count -- independent of and nested inside the top-level 8-branch invariant."
+          items:
+            type: string
+            minLength: 1
+            pattern: "\\S"
+
+  provenance:
+    description: "Overall record provenance -- same record-level (not per-item) pattern 5w1h-record.schema.yaml's own top-level provenance already establishes."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Lotus Blossom expansion for 'improve onboarding retention', all 8 branches, each with its own 8 ideas"
+    value:
+      id: "LOTUS-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.lotus_blossom"
+      center_theme: "提升新用戶 onboarding 留存率"
+      branches:
+        - branch_number: 1
+          branch_theme: "首次登入體驗"
+          ideas: ["簡化註冊表單", "社交登入選項", "首屏價值主張", "進度指示器", "跳過選項", "預填測試資料", "行動裝置優化", "載入速度優化"]
+        - branch_number: 2
+          branch_theme: "教學導覽"
+          ideas: ["互動式 tooltip", "影片導覽", "漸進式揭露", "可跳過步驟", "情境提示", "成就徽章", "導覽進度儲存", "個人化導覽路徑"]
+        - branch_number: 3
+          branch_theme: "首次價值時刻"
+          ideas: ["快速達成第一個成果", "範本庫", "AI 自動建議", "示範資料集", "一鍵匯入", "即時預覽", "成功慶祝動畫", "分享首個成果"]
+        - branch_number: 4
+          branch_theme: "電子郵件序列"
+          ideas: ["歡迎信", "使用秘訣信", "未完成提醒信", "案例分享信", "限時優惠信", "問卷回饋信", "里程碑祝賀信", "重新邀請信"]
+        - branch_number: 5
+          branch_theme: "客服與支援"
+          ideas: ["即時聊天", "FAQ 搜尋", "影片客服", "社群論壇", "工單系統", "AI 客服機器人", "電話支援", "自助知識庫"]
+        - branch_number: 6
+          branch_theme: "遊戲化機制"
+          ideas: ["每日簽到", "進度條", "等級系統", "排行榜", "解鎖獎勵", "連續使用獎勵", "任務清單", "虛擬貨幣"]
+        - branch_number: 7
+          branch_theme: "社群與推薦"
+          ideas: ["邀請好友獎勵", "使用者社群", "案例研究", "使用者見證", "推薦計畫", "社群活動", "使用者生成內容", "口碑分享按鈕"]
+        - branch_number: 8
+          branch_theme: "數據驅動個人化"
+          ideas: ["行為觸發提示", "個人化首頁", "使用習慣分析", "流失預警", "A/B 測試導覽", "分群式訊息", "使用量儀表板", "智慧提醒時機"]
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-LOTUSBLOSSOMSESSION-1"
+    question: "branches[].branch_number distinctness/completeness (1-8) and ideas[] exact-8-count are both runtime-only invariants (see compilation_decisions) -- should a future pass add JSON Schema if/then per-value-count constraints instead of relying solely on the runtime gate? Same open question ansoff-matrix.schema.yaml's own OQ-ANSOFFMATRIX-2 already discloses for an identical shape. (owner: operator)"
+  - id: "OQ-LOTUSBLOSSOMSESSION-2"
+    question: "A real Lotus Blossom technique can recurse a 3rd level (each of the 8 sub-themes becoming a new center) -- this schema deliberately stops at 2 levels, matching the method contract's own explicit scope note. (owner: operator, if a 3rd-level variant is ever requested)"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L384) directly. Grepped the whole Atlas file case-insensitively for "lotus" --
+    confirmed exactly 1 real hit, no dedicated section. Cross-checked against methods/contracts/
+    divergent.lotus_blossom.contract.yaml's own outputs/preconditions/quality. Read ansoff-matrix.schema.yaml
+    and 5w1h-record.schema.yaml in full as shape precedent before writing this file. Validated against
+    jsonschema Draft202012Validator via a standalone script (required fields present, id pattern satisfied,
+    branch_number enum closed to 1-8, additionalProperties:false present at the top level and the
+    branches[] item level, embedded example resolved through its real $ref to epistemic-label.schema.yaml,
+    negative controls for a smuggled top-level key, a smuggled branches[] item key, a <8/>8-item branches
+    array, and a <8/>8-item ideas array).
+  note: >
+    `branches`'s 8-count and `ideas`'s nested 8-count are direct (non-ambiguous) transcriptions of Atlas
+    L384's own literal "中心→8 分支→各 8 idea". The record-level-only provenance choice, the numeric-slot
+    (vs named) closed-set shape, and the deliberate 2-level (not 3-level) scope are compilation decisions,
+    disclosed above. No mother document was modified to produce this file.

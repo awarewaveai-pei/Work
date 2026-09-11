@@ -1,0 +1,122 @@
+$id: "ai-lego://methods/contracts/divergent.brainwriting.contract.yaml"
+title: "Brainwriting Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F03 divergent-ideation family, FIRST member (family previously entirely unbuilt --
+  grep-confirmed zero pre-existing ai_lego/modules/divergent/ directory before this write; 1 of 10
+  agents opening independent F03 members in this same parallel batch). Atlas cites this method at
+  the F03 table row (L380: "Brainwriting｜降低權威/外向者主導｜先各自寫→再分享/合併｜降低 anchoring、
+  groupthink｜適合跨階級團隊") PLUS a dedicated §12.9 section (L2642-2646, 用途/效益/搭配) -- a
+  substantive citation, not the thinnest possible class. Core invariant: `individual_contributions`
+  must carry 2+ DISTINCT `contributor_id` values (Atlas's own "先各自寫" / "降低權威/外向者主導" made
+  real -- a session with only 1 contributor has reduced nothing); plus GENUINE_COMPUTE referential
+  integrity from `merged_ideas[].source_contribution_refs` back to real `individual_contributions[].id`
+  values.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Brainwriting row (L380)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.9 書面腦力激盪／書寫式腦力激盪 (L2642-2646) -- dedicated section, corroborating and expanding L380's bare row"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.3 Affinity Diagram benefit line (L1223, 'Brainwriting、訪談 coding、retrospective') -- corroborating, names Affinity as a typical downstream consumer of this method's own output"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.brainwriting` mints a NEW `family: divergent` (F03's
+  first built member). Dispatched as 1 of 10 parallel agents opening independent F03 members in the
+  same batch -- no other F03 method exists yet to hard-import, so this contract has no cross-method
+  dependency (see compilation_decisions).
+
+id: divergent.brainwriting
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, GROUP, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. EXPAND = each
+# contributor independently generating ideas ("先各自寫"); GROUP = the share/merge step ("再分享/合併",
+# same clustering primitive Fishbone's own DECOMPOSE+GROUP+CAUSE_HYPOTHESIS formula already
+# establishes for a different family); VALIDATE = the 2 real invariants below.
+
+purpose:
+  - reduce_single_voice_dominance_via_independent_writing_before_merging
+# Atlas L380 verbatim sense: "降低權威/外向者主導" (reduce authority/extrovert dominance) / method
+# "先各自寫→再分享/合併" (write individually first, then share/merge) / benefit "降低 anchoring、
+# groupthink". §12.9 (L2644): "每人先獨立產 idea，避免權威、聲量、性格主導。"
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object dependency -- Atlas's own citation names no required input type, same
+  # "no hard upstream dependency" position strategy.ansoff.contract.yaml/decomposition.objective_tree.
+  # contract.yaml's own inputs.required: [] already take.
+
+outputs: [BrainwritingSession]
+# NEW output type (see typed-objects/brainwriting-session.schema.yaml). Atlas names no PascalCase
+# output type for this method, same honesty gap every other Tier 1 contract in this directory
+# discloses.
+
+preconditions:
+  - "individual_contributions is present, non-empty, and carries 2 OR MORE entries -- each entry a non-empty id, contributor_id, idea_text, and schema-valid provenance, with all ids unique"
+  - "individual_contributions[] collectively carry 2 OR MORE DISTINCT contributor_id values -- GENUINE_COMPUTE, re-derived independently by the gate from the record's own raw fields, never trusted from a stored flag. Atlas's own purpose ('先各自寫' / '降低權威/外向者主導') made real: a session where every contribution shares one contributor_id has not actually reduced single-voice dominance, regardless of how many ideas it lists"
+  - "merged_ideas is present and non-empty, each entry carrying a non-empty id (unique across merged_ideas) and a non-empty source_contribution_refs list"
+  - "every merged_ideas[].source_contribution_refs entry resolves to a real individual_contributions[].id in this SAME record -- GENUINE_COMPUTE referential integrity, re-derived independently by the gate from raw fields, never trusted from a stored flag; a dangling reference is refused"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: true -- individual_contributions[] carries per-item provenance (this method's
+  # own task-mandated shape), same per-item convention strategy.bcg_matrix.contract.yaml's own flag
+  # already establishes. evidence_labeling_required: false -- no citation supports treating a
+  # brainwritten idea as EVIDENCE-grade content.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas §12.9's own "搭配" (recipe) line (L2646) names "Brainwriting → Affinity → Nominal Group /
+# MCDA" -- no divergent.affinity / association.affinity_diagram machine_id resolves to an ACTIVE
+# contract confirmed at this write (F04 associative family's own affinity_diagram may or may not have
+# landed in a concurrent batch), so left empty rather than naming an id this file cannot confirm
+# exists, same "don't name what isn't confirmed ACTIVE" discipline strategy.bcg_matrix.contract.yaml's
+# own empty recommended_next already establishes. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the contributor-diversity invariant be a loose 'at least 2 contributions' rule or a strict '2+ DISTINCT contributor_id values' rule?"
+    decision: "Strict 2+ distinct contributor_id values -- a loose count would let one dominant voice submit all contributions under a single contributor_id, which is exactly the failure mode Atlas's own '先各自寫→再分享/合併' / '降低權威/外向者主導' purpose exists to prevent."
+  - question: "Should merged_ideas[].source_contribution_refs require exact bijective coverage of individual_contributions (every contribution merged exactly once), matching decomposition.objective_tree's own bijection?"
+    decision: "No -- one-directional referential integrity only (every ref must resolve; not every contribution need be referenced, and the same contribution may be referenced by more than one merged idea). Task's own design spec states only 'every source_contribution_refs entry MUST resolve to a real individual_contributions[].id', not a completeness/uniqueness-of-coverage rule; Brainwriting's own real-world merge/affinity step routinely discards or duplicates raw contributions, unlike Objective Tree's item-by-item conversion mandate."
+  - question: "Carry a top-level record provenance field, matching strategy.tows's own record-level convention, in addition to individual_contributions[]'s per-item provenance?"
+    decision: "No -- task-mandated exact shape is {id, version, generated_by_method, individual_contributions, merged_ideas}; provenance lives only on individual_contributions[] entries. Implemented literally rather than silently adding a field the task's own design spec did not include -- see open_questions."
+  - question: "Should merged_ideas[] entries also carry a provenance field, matching individual_contributions[]'s own per-item convention?"
+    decision: "No -- task's own exact shape for merged_ideas is {id, source_contribution_refs} only. Same literal-implementation discipline as the record-level question above."
+
+open_questions:
+  - "OQ-BRAINWRITING-1: merged_ideas[] carries no provenance field, diverging from individual_contributions[]'s own per-item convention in this SAME record -- task-mandated exact shape, not an oversight (owner: operator)."
+  - "OQ-BRAINWRITING-2: recommended_next is empty despite Atlas §12.9's own explicit 'Brainwriting → Affinity → Nominal Group / MCDA' recipe line (L2646) -- left empty because no divergent.affinity/association.affinity_diagram ACTIVE contract was confirmed at this write; a future pass should populate it once that method exists (owner: operator, once F04's affinity method is confirmed ACTIVE)."
+  - "OQ-BRAINWRITING-3: merged_ideas[].source_contribution_refs allows the same individual_contributions[].id to be referenced by more than one merged idea, and does not require every contribution to be referenced at all -- a deliberate one-directional referential-integrity choice (see compilation_decisions), not a bijection; a future pass could add a stronger completeness rule if a citation ever supports one (owner: operator)."
+  - "OQ-BRAINWRITING-4: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F03 table (L375-388) directly, including the Brainwriting row (L380), plus §12.9's
+    full dedicated section (L2642-2646), plus corroborating mentions at L1223 (Affinity Diagram's own
+    benefit line naming Brainwriting), L3660 (創意導向 recipe chain), L4278 (優先實作 priority list),
+    and L4470 (§28 快速選工具表). Grepped the whole Atlas file and the whole
+    agency-os/docs/AI_LEGO_Cognitive_Engineering_OS + Projects/internal/cognitive-engineering-os trees
+    case-insensitively for "brainwriting"/"Brainwriting"/"BRAINWRITE" before writing any of this
+    method's own files -- zero pre-existing implementation (only the Atlas citations above). Read
+    decomposition.objective_tree.contract.yaml (same-record referential-integrity precedent, GENUINE_
+    COMPUTE bijective coverage generalized here to a looser one-directional version) and
+    strategy.bcg_matrix.contract.yaml (thin-citation, per-item provenance precedent) in full before
+    writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own "先各自寫→再分享/合併" / "降低權威/外向者主導" is
+    expanded into a real 2+ distinct-contributor invariant plus a same-record referential-integrity
+    invariant on the merge step via this task's own explicit design spec, disclosed above as
+    compilation decisions, not presented as directly Atlas-cited beyond the table row and §12.9's own
+    bare use/benefit/recipe lines. The absence of a bijective coverage requirement on merged_ideas (a
+    deliberate divergence from decomposition.objective_tree's own stricter shape) is a disclosed
+    compilation decision, not an oversight.

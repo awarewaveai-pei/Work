@@ -1,0 +1,202 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/forced-connections-session.schema.yaml"
+title: Forced Connections Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ForcedConnectionsSession` -- the declared `outputs` of
+  `divergent.forced_connections`'s Method Contract (methods/contracts/divergent.forced_connections.contract.yaml,
+  `outputs: [ForcedConnectionsSession]`). Atlas cites this method ONCE: F03 tool table row (L387: "Forced
+  Connections｜強制連兩個不相關概念｜列特徵→交叉組合｜新產品/商模創意｜可配 Morphological") -- the thinnest
+  possible citation class, no dedicated section.
+
+  Field provenance:
+    * `concept_a_name`/`concept_b_name` -- Atlas's own "強制連兩個不相關概念" (force-connect two unrelated
+      concepts): the two concepts being connected.
+    * `concept_a_features`/`concept_b_features` -- Atlas's own "列特徵" (list features) step, one flat list per
+      concept, each entry `{id, description}`. Genuine non-emptiness on both sides is a runtime-only invariant
+      this schema cannot express -- enforced by `ai_lego/modules/divergent/forced_connections.py` at both the
+      builder and an independent gate.
+    * `combinations` -- Atlas's own "交叉組合" (cross-combination) step: each entry names one feature from each
+      side plus the `resulting_idea` it produced. Genuine referential integrity (every `feature_a_ref` resolves
+      to a real id in `concept_a_features`, every `feature_b_ref` to a real id in `concept_b_features`) is a
+      runtime-only invariant, enforced the same way.
+    * `provenance` -- RECORD-LEVEL only, same placement `functional-decomposition.schema.yaml`'s own
+      `provenance` already establishes for this style of method (structural content, not a per-item judgment
+      call).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Forced Connections row (L387)"
+  - "methods/contracts/divergent.forced_connections.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/functional-decomposition.schema.yaml -- referential-integrity-over-a-named-pool precedent (interfaces[] referencing function-tree ids), generalized here to two independent pools"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L387's own bare method description plus low-risk, disclosed compilation choices (the
+  {id, description} feature shape, the combinations[] referential-integrity shape, record-level-only provenance).
+
+compilation_decisions:
+  - question: "One shared feature-pool $def reused for both concept_a_features and concept_b_features, or two separate item schemas?"
+    decision: "One shared `$defs/feature` $def -- the two pools are structurally identical ({id, description}), only their MEMBERSHIP differs (which pool a combinations[] entry's ref must resolve against, a runtime-only check this schema cannot express)."
+  - question: "Should concept_a_features/concept_b_features require minItems:1?"
+    decision: "Yes -- Atlas's own '列特徵' step is presented as a precondition to the cross-combination step; a session with zero features on either side has not done the listing step (see method contract's own preconditions)."
+  - question: "Should combinations require minItems:1?"
+    decision: "Yes -- Atlas's own method IS the cross-combination step; a session with zero combinations has not actually force-connected anything (unlike decomposition.functional_decomposition's own open-ended, MAY-be-empty interfaces[], which documents a secondary/optional structural annotation, not the method's own core action)."
+  - question: "additionalProperties: false at the top level, on the feature $def, and on the combinations[] item schema?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, and the mechanism that structurally forecloses a feature or combination entry ever carrying a smuggled per-item provenance field or extra key."
+
+type: object
+required: [id, version, concept_a_name, concept_a_features, concept_b_name, concept_b_features, combinations, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^FORCEDCONN-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.forced_connections"
+
+  concept_a_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own '兩個不相關概念' (two unrelated concepts) -- concept A's name. REPORTED content, not computed."
+
+  concept_a_features:
+    type: array
+    minItems: 1
+    description: "Atlas's own '列特徵' (list features) step for concept A. Non-empty -- see compilation_decisions."
+    items: {$ref: "#/$defs/feature"}
+
+  concept_b_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Concept B's name -- same shape as concept_a_name, an independent (not derived-from-A) concept."
+
+  concept_b_features:
+    type: array
+    minItems: 1
+    description: "Atlas's own '列特徵' step for concept B. Non-empty -- see compilation_decisions."
+    items: {$ref: "#/$defs/feature"}
+
+  combinations:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own '交叉組合' (cross-combination) step. Non-empty -- see compilation_decisions. Genuine
+      referential integrity (feature_a_ref resolves in concept_a_features, feature_b_ref resolves in
+      concept_b_features -- the CORRECT side, never the other one) is a runtime-only invariant, enforced by
+      `ai_lego/modules/divergent/forced_connections.py` at both the builder and an independent gate.
+    items:
+      type: object
+      required: [id, feature_a_ref, feature_b_ref, resulting_idea]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id for this combination entry. No cross-combination uniqueness invariant enforced (see method contract's own compilation_decisions) -- REPORTED content, not computed."
+        feature_a_ref:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "MUST resolve to a real id present in concept_a_features -- FORCEDCONN_DANGLING_FEATURE_REF, runtime-only, re-derived independently by the gate. A ref that only exists in concept_b_features is refused the same as one that resolves nowhere."
+        feature_b_ref:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "MUST resolve to a real id present in concept_b_features -- FORCEDCONN_DANGLING_FEATURE_REF, runtime-only, re-derived independently by the gate. A ref that only exists in concept_a_features is refused the same as one that resolves nowhere."
+        resulting_idea:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The new product/business-model idea this forced pairing produced -- Atlas's own '新產品/商模創意' benefit. REPORTED content, not computed."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  feature:
+    type: object
+    required: [id, description]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, the namespace combinations[].feature_a_ref/feature_b_ref resolve against (membership within THIS pool only, see parent field description)."
+      description:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "What this feature actually is -- REPORTED content, not computed. Atlas's own '列特徵' step presumes real content here."
+
+examples:
+  - description: "A forced connection between 'umbrella' and 'smartphone', 2 features each side, 2 cross-combinations"
+    value:
+      id: "FORCEDCONN-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.forced_connections"
+      concept_a_name: "雨傘"
+      concept_a_features:
+        - id: "A-CANOPY"
+          description: "可撐開的防水傘面"
+        - id: "A-HANDLE"
+          description: "握把，收合時可當手杖"
+      concept_b_name: "智慧型手機"
+      concept_b_features:
+        - id: "B-GPS"
+          description: "即時定位與導航"
+        - id: "B-NOTIFY"
+          description: "推播通知使用者"
+      combinations:
+        - id: "COMB-1"
+          feature_a_ref: "A-CANOPY"
+          feature_b_ref: "B-NOTIFY"
+          resulting_idea: "傘面內建震動提醒模組，偵測到降雨預報時推播提醒使用者攜帶雨傘"
+        - id: "COMB-2"
+          feature_a_ref: "A-HANDLE"
+          feature_b_ref: "B-GPS"
+          resulting_idea: "傘柄內建定位晶片，遺失時可透過手機 App 定位找回"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-FORCEDCONNECTIONSSESSION-1"
+    question: "No cross-side or within-side feature-id uniqueness invariant exists (see method contract's own compilation_decisions) -- should a future pass add one if a downstream consumer needs to disambiguate?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-FORCEDCONNECTIONSSESSION-2"
+    question: "No cross-combination uniqueness invariant exists on (feature_a_ref, feature_b_ref) pairs -- should a future pass flag (not forbid) a repeated pair as a quality signal?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L387) directly. Grepped the whole Atlas file case-insensitively for "forced
+    connections"/"forced_connections"/"ForcedConnections" -- confirmed 3 hits (table row, a workflow-diagram
+    mermaid mention, a registry stub), no dedicated section. Cross-checked against
+    methods/contracts/divergent.forced_connections.contract.yaml's own outputs/preconditions/quality. Read
+    functional-decomposition.schema.yaml (referential-integrity-over-a-named-pool precedent) in full as shape
+    precedent before writing this file. Validated against jsonschema Draft202012Validator via a standalone
+    script (required fields present, id pattern satisfied, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, additionalProperties:false present at the top level, the feature $def, and the
+    combinations[] item schema, negative controls for a smuggled top-level key, a smuggled feature-level key
+    including a per-feature `provenance` attempt, a smuggled combinations[] item key, and minItems:1 enforced
+    on concept_a_features/concept_b_features/combinations).
+  note: >
+    No mother document was modified. `concept_a_name`/`concept_b_name`/the feature-listing structure/the
+    combinations cross-referencing structure are transcribed directly from Atlas L387. The exact field names,
+    the {id, description} feature shape, the combinations[] referential-integrity shape, the minItems:1 choices,
+    the record-level-only provenance placement, and the FORCEDCONN- prefix are this suite's own compiled
+    structure, disclosed above, not textually cited.

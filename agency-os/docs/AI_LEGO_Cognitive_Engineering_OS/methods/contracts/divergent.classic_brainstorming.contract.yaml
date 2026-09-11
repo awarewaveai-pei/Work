@@ -1,0 +1,110 @@
+$id: "ai-lego://methods/contracts/divergent.classic_brainstorming.contract.yaml"
+title: "Classic Brainstorming Method Contract"
+status: ACTIVE
+
+description: >
+  F03 divergent ideation family, opening member (no prior divergent.* contract exists -- 1 of 10 agents opening
+  this family in one parallel batch, disjoint files, no shared state). Atlas cites this method ONCE: F03 table
+  row (L379: "Classic Brainstorming｜快速產生大量 ideas｜先禁止批判→追數量→延伸→最後評估｜快速發散｜不要邊想
+  邊否決"). Core invariant: the method's own ORDERED procedure (generate, deferring judgment, THEN evaluate
+  last) becomes two structurally separate lists -- `ideas[]` (additionalProperties:false structurally forbids
+  a score/verdict field, "不要邊想邊否決") and a later, optional `evaluations[]` whose `idea_ref` MUST resolve
+  to a real `ideas[].id`, GENUINE_COMPUTE-checkable referential integrity, never caller-asserted. See
+  `ai_lego/modules/divergent/classic_brainstorming.py` module docstring.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Classic Brainstorming row (L379)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.classic_brainstorming` mints a NEW machine_id and opens the
+  `divergent` family's first member. The generate/evaluate phase split and idea_ref referential integrity are
+  this suite's own compilation decisions, directly grounded in Atlas's own literal procedure text, not
+  independently cited elsewhere.
+
+id: divergent.classic_brainstorming
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, ASSOCIATE, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. EXPAND = "追數量" (chasing
+# quantity via divergent generation, same primitive Atlas:188's own "SCAMPER = EXPAND + ASSOCIATE + TRANSFORM"
+# formula already uses for a generative step); ASSOCIATE = "延伸" (building on/extending prior ideas);
+# VALIDATE = "最後評估" (the final, separate evaluation phase), same primitive decomposition.mece/
+# decomposition.functional_decomposition's own verification-step usage already establishes.
+
+purpose:
+  - generate_quantity_of_ideas_before_evaluating_any_of_them
+# Atlas L379 verbatim sense: "快速產生大量 ideas" (quickly produce a large quantity of ideas) via "先禁止批判→
+# 追數量→延伸→最後評估" (first forbid criticism -> chase quantity -> extend -> evaluate last).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L379 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix's/decomposition.mece's own inputs.required: []
+  # already take.
+
+outputs:
+  - ClassicBrainstormingSession
+# NEW output type (see typed-objects/classic-brainstorming-session.schema.yaml). Atlas names no PascalCase
+# output type for this method, same honesty gap every other thin-citation Tier 1 contract in this directory
+# discloses.
+
+preconditions:
+  - "ideas is present and non-empty -- a brainstorming session with zero ideas has not actually generated anything (Atlas's own L379 purpose: '快速產生大量 ideas')"
+  - "every ideas[] entry carries exactly {id, text, provenance} -- NO score/verdict field is structurally accepted at this phase, directly enforcing Atlas's own caution ('不要邊想邊否決', don't reject while generating)"
+  - "every ideas[].id is unique within the record -- a prerequisite for evaluations[].idea_ref resolution to be unambiguous at all"
+  - "evaluations MAY be empty (a session can be pure generation with evaluation deferred) -- but if non-empty, every evaluations[].idea_ref MUST resolve to a real ideas[].id present in this same record, GENUINE_COMPUTE-checkable referential integrity, never caller-asserted, re-derived independently by the gate from the record's own raw fields"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.bcg_matrix's own identical flag already establishes:
+  # Atlas's L379 citation is a single bare table row, no dedicated section, no explicit unevidenced-claim
+  # misuse warning cited.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.bcg_matrix's own field already establishes.
+
+recommended_next: []
+# Atlas's own F03 table has no "最佳搭配" column (unlike F02's MECE row) -- nothing to name. Left empty rather
+# than inventing a pairing this citation does not support.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should ideas[] carry a score/verdict/rank field at construction time?"
+    decision: "No -- additionalProperties:false on the ideas[] item schema structurally forbids it. This IS Atlas's own caution ('不要邊想邊否決') made mechanically real, not just a written warning."
+  - question: "Should evaluations be REQUIRED non-empty, matching ideas' own non-emptiness precondition?"
+    decision: "No -- MAY be empty. Atlas's own procedure text places evaluation last and separate ('最後評估'); a session that has only generated ideas so far, with evaluation deferred to a later pass, is a legal, incomplete-but-valid state, not a malformed one."
+  - question: "Should evaluations[].idea_ref referential integrity be a disclosed judgment call or GENUINE_COMPUTE-checkable?"
+    decision: "GENUINE_COMPUTE-checkable set-membership fact (idea_ref in the record's own ideas[].id set) -- same discipline decomposition.functional_decomposition's own interface_referential_integrity gate already establishes for from_function_ref/to_function_ref against a tree's own real ids, generalized here to a flat ideas[] list; enforced at both the builder (fail-closed) and an independent gate (re-derives from raw fields, never trusts the builder)."
+  - question: "Should ideas[].id uniqueness be enforced?"
+    decision: "Yes -- a duplicate id would make idea_ref resolution ambiguous, undermining the very referential-integrity invariant this contract exists to enforce; same prerequisite-invariant-before-referential-integrity ordering decomposition.functional_decomposition's own whole-tree id uniqueness check (invariant #1, checked before invariant #2) already establishes."
+  - question: "Per-idea provenance, record-level provenance, or both?"
+    decision: "Both -- ideas[].provenance is this suite's task-mandated per-idea epistemic stamp (each idea's own origin), and a separate record-level provenance is this corpus's 128/128 universal-field convention (F02 batch). A genuinely new combination in this corpus (prior sibling schemas carry one placement or the other) -- directly grounded in this task's own literal field list, disclosed here rather than silently narrowed to only one placement."
+
+open_questions:
+  - "OQ-BRAINSTORM-1: evaluations[].verdict/rationale are kept as disclosed free-text judgment strings, not a closed enum (e.g. ACCEPT/REJECT/DEFER) -- Atlas's own citation names no evaluation-outcome vocabulary, and inventing one would overstate this thin citation (owner: operator, or whoever adds a dedicated Atlas section for this method)."
+  - "OQ-BRAINSTORM-2: recommended_next is empty -- Atlas's own F03 table carries no '最佳搭配' column for this row (unlike F02's MECE), so nothing to name yet (owner: operator)."
+  - "OQ-BRAINSTORM-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L379) directly. Grepped the whole Atlas file case-insensitively for "classic
+    brainstorming"/"classic_brainstorming" -- confirmed exactly 1 real hit, no dedicated section. Grepped the
+    whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os`
+    trees case-insensitively for "classic_brainstorming"/"ClassicBrainstorming"/"BRAINSTORM" before writing any
+    of this method's own files -- zero pre-existing implementation. Read
+    decomposition.functional_decomposition.contract.yaml (referential-integrity + prerequisite-uniqueness-
+    invariant-ordering precedent) and strategy.bcg_matrix.contract.yaml (thin-citation, per-item provenance
+    precedent) in full before writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The generate/evaluate phase split, the ideas[].id uniqueness prerequisite,
+    the evaluations[].idea_ref referential-integrity invariant, and the both-placements provenance decision are
+    this suite's own compilation decisions, disclosed above, directly grounded in Atlas's own literal procedure
+    text ("先禁止批判→追數量→延伸→最後評估"), not independently cited elsewhere.

@@ -1,0 +1,123 @@
+$id: "ai-lego://methods/contracts/divergent.six_three_five.contract.yaml"
+title: "6-3-5 Brainwriting Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F03 divergent-ideation family, opening member (F03 entirely unbuilt before this batch -- 10-agent
+  batch opening F03's 10 rows: Classic Brainstorming/Brainwriting/6-3-5/Crazy 8s/SCAMPER/Lotus Blossom/
+  Starbursting/Random Stimulus/Forced Connections/Synectics, disjoint files). Atlas cites this method ONCE:
+  the F03 table row (L381: "6-3-5｜結構化大量 ideation｜6 人×3 idea×5 分鐘，輪傳延伸｜快速得到大量變體｜人數可
+  調整") -- grep-confirmed the only hit, no dedicated section, no F03 "最佳搭配" column (unlike F02/F08).
+  Two real invariants, BOTH GENUINE_COMPUTE shared predicates (no stored derived VALUE field -- see
+  compilation_decisions and typed-object schema): every round's `ideas` is EXACTLY 3 non-empty strings
+  (Atlas's own literal "3 idea"), and every sheet's own rounds' `contributor_id` multiset equals EXACTLY the
+  full `participant_ids` set (Atlas's own literal "輪傳" full-rotation completeness). Headcount ("6") is the
+  row's own named DEFAULT, not hardcoded -- Atlas's own caution "人數可調整" (headcount adjustable).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, 6-3-5 row (L381)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "specs/cognitive/typed-objects/six-three-five-session.schema.yaml"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.six_three_five` mints a NEW machine_id and opens the
+  `divergent` family's first vertical slice. Naming: `method.schema.yaml`'s own `id` field requires pattern
+  `^[a-z_]+\.[a-z_]+$` (letters/underscore only, no digits) -- "divergent.6-3-5" would FAIL this pattern, so
+  `id` spells the method out digit-free as `six_three_five`, same digit-avoidance precedent
+  `root_cause.five_whys`/`framing.five_w_one_h` already set for this exact class of naming collision. The
+  human-facing "6-3-5" name is preserved verbatim in `RECORD_ID_PREFIX` (`SIXTHREEFIVE-`, a free string not
+  constrained by this pattern) and throughout prose.
+
+id: divergent.six_three_five
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, ASSOCIATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. Reuses the exact combo
+# association.morphological_analysis's own [EXPAND, ASSOCIATE] already establishes for a structurally similar
+# "generate variants by extending an existing structure" method: EXPAND = each round's own 3 new ideas;
+# ASSOCIATE = a round after the first is written by extending the SHEET's own already-recorded prior ideas
+# (the literal "輪傳延伸" -- rotate-and-extend -- this method's own citation names).
+
+purpose:
+  - generate_a_large_volume_of_idea_variants_via_structured_round_robin_sheet_rotation
+# Atlas L381 verbatim sense: "結構化大量 ideation" (structured high-volume ideation) / benefit "快速得到大量
+#變體" (quickly get a large number of variants).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L381 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix's/decomposition.mece's own inputs.required: []
+  # already take.
+
+outputs:
+  - SixThreeFiveSession
+# NEW output type (see typed-objects/six-three-five-session.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other thin-citation Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "participant_ids has >=2 distinct, non-empty entries -- a solo session has no rotation to perform (Atlas's own '人數可調整' caution says headcount is ADJUSTABLE, not that it can be 1; un-cited-but-necessary floor, same class framing.five_w_one_h's own un-cited topic anchor already establishes)"
+  - "sheets has >=1 entry -- a session with zero sheets performed no rotation at all"
+  - "every sheets[].rounds[].ideas entry has EXACTLY 3 non-empty strings -- Atlas's own literal '3 idea' per round-per-person; NOT adjustable like headcount (the row's own caution names ONLY headcount as adjustable) -- GENUINE_COMPUTE shared predicate, re-derived identically by the builder and an independent gate from each round's own raw ideas list, never caller-asserted"
+  - "for EVERY sheet, the multiset of that sheet's own rounds[].contributor_id equals EXACTLY the full participant_ids set (no participant missing, none appearing twice) -- Atlas's own literal '輪傳延伸' (rotate-and-extend) full-rotation completeness this method's own name encodes; a sheet missing a participant, or a participant appearing twice on one sheet, is a real structural defect, refused at construction, NOT a legal-but-imperfect outcome (contrast decomposition.mece's own is_mece: false) -- GENUINE_COMPUTE shared predicate, re-derived identically by the builder and an independent gate from each sheet's own raw rounds/participant_ids, never caller-asserted"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- brainwriting ideas are creative suggestions, not EvidenceSet-derived claims, same reasoning class
+  # decomposition.mece's/strategy.bcg_matrix's own identical flag already establishes for a thin bare-table-row
+  # citation with no explicit unevidenced-claim misuse warning cited.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.bcg_matrix's/decomposition.mece's own field already establishes.
+
+recommended_next: []
+# F03's own table header has NO "最佳搭配" (best-pairing) column at all (unlike F02/F08) -- grep/read-confirmed
+# against the Atlas source table (L377-388). Left empty because there is no citation to name, not because a
+# sibling contract is merely unbuilt.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed headcount of 6, or open-ended participant_ids?"
+    decision: "Open-ended, minItems: 2 -- Atlas's own F03 row caution ('人數可調整') explicitly names 6 as the classic default, not a hard requirement. Task-mandated: do NOT hardcode 6."
+  - question: "Fixed 3-idea count, or open-ended ideas per round?"
+    decision: "Fixed: exactly 3 non-empty strings per round -- Atlas's own literal '3 idea' is a structural fact of THIS method's name and citation, unlike headcount, which the SAME row explicitly names as the one adjustable parameter."
+  - question: "Should the two real invariants (ideas count, full-rotation completeness) produce a stored derived VALUE field (like decomposition.mece's overlaps/gaps/is_mece or strategy.bcg_matrix's quadrant), or remain pure construction-time/gate-re-derived VALIDITY checks with no stored field?"
+    decision: "Pure validity checks, no stored derived field -- same 'shared predicate, no stored field' class framing.five_w_one_h's own dimension KNOWN/UNKNOWN coherence invariant already establishes (contrast that SAME method's OTHER invariant, information_gaps, which IS a stored derived value). Neither invariant here produces a new fact worth reporting back to a consumer beyond pass/refuse -- inventing a boolean like `is_fully_rotated` with nothing citing a need for it would overstate the citation. Consequently no `engine`/`computation_provenance_ref` top-level fields either (those exist only where an actual derived VALUE is stored) -- record-level `provenance` IS still carried per the 123/128 corpus convention (contract-backlog.yaml onehundredtwentyseventh_concrete_entry integration note)."
+  - question: "Does a real overlap/gap-style 'legal but imperfect' outcome exist here, the way decomposition.mece's is_mece: false is legal?"
+    decision: "No -- unlike MECE's own explicit Atlas §12.7 caution that real-world classifications are rarely perfect, 6-3-5's own citation gives no such caution about incomplete rotations; a sheet that skipped or double-visited a participant is a REAL execution defect (the rotation did not happen as the method defines it), refused at construction, not recorded as a legal partial result."
+  - question: "Require len(sheets) == len(participant_ids) (classic 1-sheet-per-participant symmetry)?"
+    decision: "No -- Atlas's own citation names no such ratio; inventing one would overstate the citation, same restraint strategy.bcg_matrix's own open-ended portfolio_items already establishes for a different family. sheets is open-ended (minItems: 1); each sheet's own rotation completeness is checked independently of how many sheets exist."
+  - question: "sheet_id uniqueness across the session, and contributor_id-per-sheet full-rotation completeness -- schema-level (uniqueItems) or runtime-layer?"
+    decision: "Runtime layer (ai_lego/modules/divergent/six_three_five.py), same schema-vs-runtime split decomposition.mece's own category_name uniqueness and overlaps/gaps/is_mece set-arithmetic already establish -- JSON Schema's uniqueItems only compares whole-object equality; it cannot express 'unique by one field' or 'this list is a permutation of that other list'."
+
+open_questions:
+  - "OQ-SIXTHREEFIVE-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-SIXTHREEFIVE-2: quality.evidence_labeling_required: false reflects this citation's own thinness (a single bare table row, creative-content method) rather than a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-SIXTHREEFIVE-3: whether a future pass should add a GENUINE_COMPUTE summary field (e.g. total_idea_count, a trivial rollup) is left open -- not built here because nothing in Atlas's own citation names a need for one and the task's own literal shape omits it (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F03 section header and table (L375-388) directly, confirming column semantics (工具/主要用途/
+    標準使用方式/效益/注意事項) and that NO "最佳搭配" column exists in this table (unlike F02/F08). Grepped
+    the whole Atlas file case-insensitively for "6-3-5" -- confirmed exactly 1 hit (L381), no dedicated
+    section. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/
+    cognitive-engineering-os` trees case-insensitively for "six_three_five"/"SixThreeFive"/"6-3-5" before
+    writing any of this method's own files -- zero pre-existing implementation (only method-inventory.yaml's
+    own stale, unbuilt "6-3-5" row, not touched here per task constraint). Read
+    decomposition.mece.contract.yaml (structural-refusal + GENUINE_COMPUTE-shared-predicate-no-stored-field
+    precedent) and strategy.bcg_matrix.contract.yaml (open-ended-list, thin-citation precedent) in full before
+    writing this contract; also read framing.five_w_one_h's own module docstring for the digit-avoidance
+    naming precedent this file's `decided_by` cites. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L381's own "6 人×3 idea×5 分鐘，輪傳延伸" is expanded into the two
+    real structural invariants (exactly-3-ideas, full-rotation completeness) via direct transcription, not
+    invented content; the "5 分鐘" (5-minute) timing element is a live-facilitation constraint with no
+    machine-checkable trace in a completed record and is NOT modeled as a field, disclosed here rather than
+    silently dropped. `cognitive_primitives`, the no-stored-derived-field decision, and the
+    open-ended-sheets-count decision are compilation decisions, disclosed above.

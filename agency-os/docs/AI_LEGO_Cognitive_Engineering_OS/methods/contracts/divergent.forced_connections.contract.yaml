@@ -1,0 +1,114 @@
+$id: "ai-lego://methods/contracts/divergent.forced_connections.contract.yaml"
+title: "Forced Connections Method Contract"
+status: ACTIVE
+
+description: >
+  divergent.forced_connections, family divergent (F03), 1st member (F03 發散式創意 entirely unbuilt before this
+  batch -- one of 10 agents opening it). Atlas cites this method ONCE: F03 table row (L387: "Forced Connections｜
+  強制連兩個不相關概念｜列特徵→交叉組合｜新產品/商模創意｜可配 Morphological") -- grep-confirmed the sole real
+  citation case-insensitively (a §13.5-style workflow mermaid node L3663 and method-inventory.yaml's own unbuilt
+  stub L346 point at the same citation, not a second spec). Atlas's own "最佳搭配" names
+  association.morphological_analysis (F04, already built) but that method is N-DIMENSIONAL combinatorial
+  generation over many dimensions; this method is a fixed TWO-concept cross-product, a genuinely narrower shape,
+  not a reimplementation. Core invariant: every combinations[] entry's feature_a_ref/feature_b_ref resolves to a
+  real id in the CORRECT side's own feature pool (concept_a_features for feature_a_ref, concept_b_features for
+  feature_b_ref) -- a reference to the wrong side's pool, or to no declared feature at all, is a real structural
+  defect (Atlas's own "列特徵→交叉組合" presumes the cross-combination is actually built FROM the declared
+  features).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Forced Connections row (L387)"
+  - "ai_lego/modules/decomposition/functional_decomposition.py -- referential-integrity-over-a-named-pool gate precedent (interfaces[] referencing function-tree ids), reused here for TWO separate, non-interchangeable pools instead of one tree"
+  - "ai_lego/modules/association/morphological_analysis.py module docstring -- read in full to confirm this method is NOT a reimplementation of its N-dimensional combinatorial-generation shape"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.forced_connections` mints a NEW machine_id and a NEW family
+  (`divergent`, F03's first member). Session shape `{concept_a_name, concept_a_features[], concept_b_name,
+  concept_b_features[], combinations[]}`, the two-sided referential-integrity rule, and the record-level
+  `provenance` field (Atlas's own L387 citation names none of these) are compilation decisions, disclosed below.
+
+id: divergent.forced_connections
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [DECOMPOSE, RELATE, GENERATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = listing each
+# concept's own features (Atlas's own "列特徵"); RELATE = forcing a cross-connection between one feature from
+# each side; GENERATE = producing the resulting_idea a forced pairing yields.
+
+purpose:
+  - force_connect_two_unrelated_concepts_via_their_own_feature_cross_combinations
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L387 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix/decomposition.functional_decomposition's own
+  # inputs.required: [] takes.
+
+outputs:
+  - ForcedConnectionsSession
+# NEW output type (see typed-objects/forced-connections-session.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other thin-citation contract in this suite discloses.
+
+preconditions:
+  - "concept_a_name and concept_b_name are each non-empty strings -- a forced-connection exercise naming no actual concept has not identified what is being force-connected"
+  - "concept_a_features and concept_b_features are each present and non-empty, every entry a well-shaped {id, description} with both non-empty -- Atlas's own literal '列特徵' (list features) step FIRST, for both sides; a session with zero features on either side has not actually done the listing step"
+  - "combinations is present and non-empty -- Atlas's own '交叉組合' (cross-combination) step is the method's whole point; a session with zero combinations has not actually cross-combined anything"
+  - "every combinations[] entry's feature_a_ref resolves to a real id in concept_a_features, and every feature_b_ref resolves to a real id in concept_b_features -- FORCEDCONN_DANGLING_FEATURE_REF, mechanically re-derived by the gate from the record's own raw feature pools, never trusting a stored flag; a reference resolving only in the OTHER side's pool is refused the same as one resolving nowhere at all"
+  - "every combinations[] entry's resulting_idea is a genuinely non-empty string -- Atlas's own benefit ('新產品/商模創意') presumes each combination actually produced an idea, not a placeholder"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning every sibling thin-citation contract in this suite already
+  # establishes -- no explicit unevidenced-claim misuse warning cited for this method.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: [association.morphological_analysis]
+# Atlas L387's own "最佳搭配" (best combo) column names "Morphological" -- association.morphological_analysis
+# already exists in this corpus (ai_lego/modules/association/morphological_analysis.py), a real machine_id,
+# unlike several sibling contracts' own left-empty recommended_next where no matching id exists yet.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed 2-concept shape or an open-ended N-concept generalization?"
+    decision: "Fixed 2 (concept_a/concept_b, no 3rd slot) -- Atlas's own citation is literally '兩個' (TWO), and an N-concept generalization is exactly association.morphological_analysis's own already-built shape; genericizing this method would duplicate that sibling, not honor this row's own narrower citation."
+  - question: "Should concept_a_features/concept_b_features require unique ids within their own list?"
+    decision: "No -- not grounded in Atlas's own citation (no stated need to disambiguate two identically-idd features within one side); referential resolution only needs membership, not uniqueness. See open_questions."
+  - question: "Should a feature id from concept_a_features be allowed to also appear verbatim in concept_b_features (same string, two independent pools)?"
+    decision: "Not forbidden -- the two pools are independent namespaces (feature_a_ref is only ever checked against concept_a_features, feature_b_ref only against concept_b_features), so a coincidentally-shared id string is not itself a defect; only a reference resolving in the WRONG or NO pool is refused."
+  - question: "Should combinations[] require pairwise-distinct (feature_a_ref, feature_b_ref) pairs?"
+    decision: "No -- not grounded in Atlas's own citation (a bare table row naming 'cross combination' as a step, not asserting every pairing must be tried at most once); a caller may legitimately want two different resulting_idea entries for the same feature pair. See open_questions."
+  - question: "Per-combination provenance or record-level only?"
+    decision: "Record-level only -- a combination entry is reported structural content (which two features were forced together, what idea resulted), not a per-item epistemic judgment call, same reasoning decomposition.functional_decomposition.contract.yaml's identical decision already establishes; provenance is nonetheless REQUIRED at the record level as a 100% universal field across every sibling typed-object schema (grep-confirmed)."
+
+open_questions:
+  - "OQ-FORCEDCONN-1: no cross-side or within-side feature-id uniqueness invariant exists (see compilation_decisions) -- should a future pass add one if a downstream consumer needs to disambiguate (owner: operator)."
+  - "OQ-FORCEDCONN-2: no pairwise-distinct-combination invariant exists -- a caller may submit the same (feature_a_ref, feature_b_ref) pair more than once with different resulting_idea entries; should a future pass flag (not forbid) this as a quality signal (owner: operator)."
+  - "OQ-FORCEDCONN-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L387) directly. Grepped the whole Atlas file case-insensitively for "forced
+    connections"/"forced_connections"/"ForcedConnections" -- confirmed 3 hits: the table row (L387, the real
+    citation), a §13.5-style creative-workflow mermaid node (L3663, same method, not a second spec), and
+    method-inventory.yaml's own unbuilt-method stub (L346, registry bookkeeping, not a spec). No dedicated
+    section, no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for the same terms before writing any of this method's own files -- zero pre-existing
+    implementation. Read decomposition.functional_decomposition.contract.yaml + .py (referential-integrity-
+    against-two-declared-pools pattern, generalized here from one tree's ids to two independent named pools)
+    and association.morphological_analysis.py's module docstring in full (confirmed its N-dimensional
+    combinatorial-generation shape is a genuinely different, not reused, compute problem) before writing this
+    contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L387's own "列特徵→交叉組合" structure is transcribed directly into
+    `preconditions` (list features for both sides, then cross-combine). The {id, description} feature shape,
+    the combinations[] referential-integrity shape, the fixed-two-pool design, and the record-level-only
+    provenance placement are compilation decisions, disclosed above, not presented as directly Atlas-cited.

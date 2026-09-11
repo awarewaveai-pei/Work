@@ -1,0 +1,163 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/scamper-session.schema.yaml"
+title: SCAMPER Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ScamperSession` -- the declared `outputs` of
+  `divergent.scamper`'s Method Contract (methods/contracts/divergent.scamper.contract.yaml,
+  `outputs: [ScamperSession]`). Atlas cites this method TWICE: the F03 tool table row (L383: "SCAMPER｜
+  改造已有產品/流程｜Substitute/Combine/Adapt/Modify/Put/Eliminate/Reverse｜系統化創新｜不等於市場驗證")
+  and a dedicated §11.10 section (L1406-1432) naming all 7 lenses verbatim plus the method's own stated
+  benefit ("可產生大量具方向性的 variant") and an explicit limitation ("它能產生 ideas，不能證明
+  customer demand 或 business viability").
+
+  Field provenance:
+    * `entries[].lens` -- Atlas's own F03 L383 + §11.10 L1410-1417 seven-value vocabulary, transcribed
+      as SCREAMING_SNAKE_CASE (SUBSTITUTE/COMBINE/ADAPT/MODIFY/PUT/ELIMINATE/REVERSE).
+    * `entries[].transformed_idea`/`reasoning` -- Atlas's own §11.10 benefit ("可產生大量具方向性的
+      variant") implies each lens application actually produces a disclosed idea plus the reasoning
+      behind it, not a bare lens label.
+    * `validation_status` (top-level, required) -- Atlas's own F03 caution ("不等於市場驗證") and
+      §11.10's own stated limitation, made structural: a single-legal-value enum
+      (`UNVALIDATED_IDEATION`) this schema and its runtime builder never let a caller override.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, SCAMPER row (L383)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.10 SCAMPER 創意法／奔馳法 (L1406-1432) -- 7-lens list, benefit, limitation"
+  - "methods/contracts/divergent.scamper.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/business-model-canvas.schema.yaml -- single-legal-value validation_status precedent (this file scales that pattern to a different, open-ended-list shape)"
+  - "specs/cognitive/typed-objects/morphological-analysis-record.schema.yaml -- record-level-only provenance precedent (no per-item provenance field)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas's own F03/§11.10 cited 7-lens vocabulary plus low-risk, disclosed
+  compilation choices, including the single-legal-value validation_status field.
+
+compilation_decisions:
+  - question: "Fixed-count closed array requiring all 7 lenses (business_model_canvas-style completeness) or open-ended non-empty array?"
+    decision: "Open-ended, minItems: 1 only -- Atlas gives no completeness requirement across the 7 lenses (unlike business_model_canvas's cited nine-block completeness); a real SCAMPER session commonly explores only the lenses that yield something for the product/process under review."
+  - question: "Should entries[] carry per-entry provenance, matching business-model-canvas.schema.yaml's per-block provenance?"
+    decision: "No -- record-level provenance only, same shape morphological-analysis-record.schema.yaml's own dimensions/constraints already establish (no per-dimension provenance). SCAMPER entries are ideation-stage creative transformations of a single starting concept, not individually evidence-cited facts."
+  - question: "Should validation_status be caller-supplied (a disclosed judgment call) or a single-legal-value enum?"
+    decision: "Single-legal-value enum (UNVALIDATED_IDEATION), REQUIRED, structurally eliminated from ai_lego/modules/divergent/scamper.py's own builder parameters -- same class business-model-canvas.schema.yaml's own validation_status (UNVALIDATED_HYPOTHESIS) already establishes. Atlas's own F03/§11.10 validation caution is unconditionally true of every record of this type."
+  - question: "additionalProperties: false at the top level, and on each entries[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Exact literal enum value for the 'P' lens: PUT, PUT_TO_USE, or PUT_TO_ANOTHER_USE?"
+    decision: "PUT -- see divergent.scamper.contract.yaml's own compilation_decisions for the full disclosure: matches the bare word in Atlas's own F03 table row (L383), the higher-level of the two citations, even though Atlas's own §11.10 (L1415) spells this lens out further as 'Put to use'."
+
+type: object
+required: [id, version, entries, validation_status, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SCAMPER-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.scamper"
+
+  entries:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own F03/§11.10 7-lens transformation exercise. Open-ended (no maxItems) -- genuine
+      non-emptiness is the only count invariant this schema expresses; enforced by
+      ai_lego/modules/divergent/scamper.py at both the builder and an independent gate (same
+      non-empty-list precedent bcg-matrix-analysis.schema.yaml's own `portfolio_items[]` already
+      establishes). No completeness-across-all-7-lenses requirement -- see compilation_decisions.
+    items:
+      type: object
+      required: [lens, transformed_idea, reasoning]
+      additionalProperties: false
+      properties:
+        lens:
+          type: string
+          enum: [SUBSTITUTE, COMBINE, ADAPT, MODIFY, PUT, ELIMINATE, REVERSE]
+          description: >
+            Atlas's own F03 table row (L383) + §11.10 (L1410-1417) seven-value CLOSED vocabulary,
+            SCREAMING_SNAKE_CASE. See compilation_decisions for why PUT (not PUT_TO_USE) is the literal
+            value used here.
+        transformed_idea:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual disclosed variant this lens produced for the subject under review -- REPORTED content, not computed."
+        reasoning:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Why this transformed_idea follows from applying this specific lens -- the disclosed judgment content, not a bare label."
+
+  validation_status:
+    type: string
+    enum: [UNVALIDATED_IDEATION]
+    default: UNVALIDATED_IDEATION
+    description: >
+      REQUIRED, single-legal-value enum. Atlas's own F03 caution ("不等於市場驗證") and §11.10's own
+      stated limitation ("它能產生 ideas，不能證明 customer demand 或 business viability") are
+      categorical, always-true statements about ANY ScamperSession record -- this schema structurally
+      enforces that: the enum's single legal value affirms the ideation-only status, making it
+      impossible to construct a record claiming this type IS a validated outcome.
+      ai_lego/modules/divergent/scamper.py's own builder does not expose this as a caller-settable
+      parameter at all (structural elimination, same class strategy.business_model_canvas's own
+      `validation_status` already establishes).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A SCAMPER session exploring improvements to an existing subscription-box product"
+    value:
+      id: "SCAMPER-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.scamper"
+      entries:
+        - lens: SUBSTITUTE
+          transformed_idea: "把紙箱包裝換成可重複使用的帆布袋"
+          reasoning: "降低一次性包material成本，同時呼應永續訴求"
+        - lens: COMBINE
+          transformed_idea: "與在地咖啡烘豆商合作，加入每月限定的搭配包"
+          reasoning: "用跨品牌組合提高單次訂閱的感知價值"
+        - lens: ELIMINATE
+          transformed_idea: "移除紙本說明書，改成掃碼看影片教學"
+          reasoning: "減少印刷成本與物流重量"
+        - lens: REVERSE
+          transformed_idea: "讓訂閱者自己選擇出貨順序，而不是照公司排定的月曆"
+          reasoning: "把控制權交給使用者，可能提高續訂率"
+      validation_status: UNVALIDATED_IDEATION
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-SCAMPERSESSION-1"
+    question: "entries[].lens distinctness/repetition is unconstrained (a caller may submit the same lens twice with two different ideas) -- Atlas gives no citation either requiring or forbidding repeated lens use, left open rather than inventing a uniqueness rule with nothing to enforce it against (owner: operator)."
+  - id: "OQ-SCAMPERSESSION-2"
+    question: "No top-level `subject` field (what is being SCAMPER'd) exists, unlike morphological-analysis-record.schema.yaml's own required `subject` -- Atlas's own citations describe the 7 lenses but never a required subject field; should a future pass add one? (owner: operator, see divergent.scamper.contract.yaml's own OQ-SCAMPER-3)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L383) and §11.10 (L1406-1432) directly. Grepped the whole Atlas file
+    case-insensitively for "scamper" -- 14 total hits, read every one in context; confirmed exactly these 2
+    are the direct method-definition citations (table row + dedicated section). Cross-checked against
+    methods/contracts/divergent.scamper.contract.yaml's own outputs/preconditions/quality. Read
+    business-model-canvas.schema.yaml (single-legal-value validation_status precedent) and
+    bcg-matrix-analysis.schema.yaml (open-ended non-empty-list precedent) in full as shape precedent before
+    writing this file. Validated against jsonschema Draft202012Validator via a standalone script (required
+    fields present, id pattern satisfied, lens/validation_status enums closed, additionalProperties:false
+    present at both the top level and the entries[] item level from the start, embedded example resolved
+    through its real $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a
+    smuggled entries[] item key, an empty entries array, an illegal lens value, and a caller attempting to
+    set validation_status to a different value).
+  note: >
+    `entries[].lens`'s 7 enum values and `validation_status`'s single legal value are transcribed/derived
+    directly from Atlas F03 L383 and §11.10. The `transformed_idea`/`reasoning` field split, the open-ended
+    non-empty list shape, and the record-level-only provenance decision are compilation decisions, disclosed
+    above. No mother document was modified to produce this file.

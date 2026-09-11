@@ -1,0 +1,106 @@
+$id: "ai-lego://methods/contracts/divergent.lotus_blossom.contract.yaml"
+title: "Lotus Blossom Method Contract"
+status: ACTIVE
+
+description: >
+  F03 發散式創意 (Divergent Ideation) family -- one of 10 members opened in this same batch (each an
+  independent agent; e.g. `divergent.crazy_eights`, not read or imported here). Atlas cites this method
+  ONCE: F03 table row L384 ("Lotus Blossom｜多層結構發散｜中心→8 分支→各 8 idea｜大量但有結構｜後續需
+  clustering") -- grep-confirmed the ONLY real hit, no dedicated section. Core invariant: TWO nested fixed-8
+  closed sets -- `branches` is EXACTLY 8 entries keyed by `branch_number` 1-8 (numbered-slot generalization
+  of `strategy.porter_five_forces`'s named-set-with-completeness shape), AND each branch's own `ideas` is
+  EXACTLY 8 non-empty entries (the method's own literal "各 8 idea", a second, independent fixed-8
+  constraint one level down).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Lotus Blossom row (L384)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.lotus_blossom` mints a NEW machine_id in the `family:
+  divergent` family (F03). The 1-8 branch-slot vocabulary and the nested 8-idea-per-branch count are direct
+  transcriptions of Atlas's own literal "中心→8 分支→各 8 idea" -- no disambiguation needed (contrast
+  `strategy.ansoff`'s ambiguous 4-fragment-token citation).
+
+id: divergent.lotus_blossom
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [DECOMPOSE, EXPAND, ASSOCIATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). DECOMPOSE =
+# splitting the center theme into 8 branch themes, then each branch theme into its own 8 ideas (applied
+# twice, at both nesting levels); EXPAND = the divergent idea-generation act at the leaf level; ASSOCIATE =
+# each branch theme's own tie back to the shared center theme.
+
+purpose:
+  - generate_large_structured_idea_set_via_two_level_branching
+# Atlas L384 verbatim sense: "多層結構發散" (multi-layer structured divergence) / method "中心→8 分支→各 8
+# idea" / benefit "大量但有結構" (large volume but structured).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L384 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.ansoff.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - LotusBlossomSession
+# NEW output type (see typed-objects/lotus-blossom-session.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other thin-citation Tier 1 contract in this suite discloses.
+
+preconditions:
+  - "branches is present and names EXACTLY branch_number 1 through 8, each exactly once -- Atlas's own '中心→8 分支' IS the method's first-level structure, a record naming only some of the 8 branches has not actually done a Lotus Blossom expansion"
+  - "every branches[] entry carries a non-empty branch_theme and an ideas list of EXACTLY 8 non-empty entries -- Atlas's own '各 8 idea' is the method's second, independently-required nested completeness constraint, distinct from the top-level branch count"
+  - "center_theme is a non-empty string -- the single shared anchor every one of the 8 branches themes off"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.ansoff/strategy.bcg_matrix's identical flags already
+  # establish: Atlas's L384 citation is a single bare table row, no dedicated section, no explicit
+  # unevidenced-claim misuse warning cited.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.ansoff/strategy.bcg_matrix's own field applies.
+
+recommended_next: []
+# Atlas L384's own last column is "後續需 clustering" (needs clustering afterward), NOT a named best-pairing
+# tool (contrast F08's "最佳搭配" column) -- no clustering machine_id exists anywhere in this corpus yet
+# (grep-confirmed), so left empty rather than naming a non-existent id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed 8-name closed SET (porter/ansoff-style, completeness required) or open-ended list, for the top-level branches?"
+    decision: "Closed set with completeness, keyed by branch_number 1-8 instead of a named vocabulary (Atlas's own citation gives no branch NAMES, only the count '8 分支') -- same shape class porter_five_forces/ansoff establish, generalized from a fixed name enum to a fixed numeric-slot enum."
+  - question: "Should the per-branch ideas list be open-ended (bcg_matrix portfolio_items-style) or a second fixed-8 closed set?"
+    decision: "Fixed exactly-8, non-empty entries -- Atlas's own literal '各 8 idea' names an exact count at this level too, unlike BCG's genuinely unbounded portfolio; this is the method's SECOND real invariant, independent of and nested inside the first."
+  - question: "Record-level provenance (5w1h/smart-goal style) or per-branch/per-idea provenance (ansoff/bcg style)?"
+    decision: "Record-level only, per task-mandated design -- Atlas's own citation supports no per-branch differentiated epistemic claim (unlike Ansoff's per-quadrant disclosed risk_level), so one whole-record provenance_record is the honest granularity, same convention 5w1h-record.schema.yaml's own record-level provenance already establishes."
+  - question: "Should branch_theme or any idea text be GENUINE_COMPUTE (bcg_matrix-style)?"
+    decision: "No -- both are free-text REPORTED content (what the actual branch/idea concretely is), no citation supports a mechanical derivation of theme or idea text from anything else."
+
+open_questions:
+  - "OQ-LOTUSBLOSSOM-1: recommended_next should probably name a future clustering machine_id (Atlas L384's own '後續需 clustering' caveat) once such a contract exists -- left empty, no such contract exists yet (owner: operator, or whoever builds it)."
+  - "OQ-LOTUSBLOSSOM-2: quality.evidence_labeling_required: false reflects this citation's own thinness rather than a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-LOTUSBLOSSOM-3: cognitive_primitives is this file's own inference, Atlas §4 gives no formula for this method (owner: operator)."
+  - "OQ-LOTUSBLOSSOM-4: a real Lotus Blossom can recurse a third level (each of the 8 new sub-themes becoming its own center) -- this contract deliberately stops at 2 levels, matching Atlas's own literal citation depth, not the technique's full traditional depth (owner: operator, if a 3rd-level variant is ever requested)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L384) directly. Grepped the whole Atlas file case-insensitively for "lotus" --
+    confirmed exactly 1 real hit (L384), no dedicated section, no §4 composition formula, no §14.1
+    legal-chain mention, no §22.3 gate-table row. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_
+    Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees case-insensitively for
+    "lotus_blossom"/"LotusBlossom"/"Lotus Blossom" before writing any of this method's own files -- zero
+    pre-existing implementation. Read strategy.ansoff.contract.yaml and strategy.bcg_matrix.contract.yaml in
+    full before writing this contract, reusing their established closed-set-with-completeness and
+    record-level-provenance conventions. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `family: divergent` is the F03 family this file joins (sibling members
+    opened in parallel by independent agents in this same batch); `branch_number`'s numeric-slot
+    generalization of the named-closed-set shape, the two-nested-fixed-8 invariant split, and the
+    record-level-only provenance choice are compilation decisions, disclosed above.

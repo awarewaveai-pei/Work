@@ -1,0 +1,115 @@
+$id: "ai-lego://methods/contracts/divergent.starbursting.contract.yaml"
+title: "Starbursting Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F03 divergent-ideation family, 1st member (family did not exist before this batch -- 10
+  agents opening F03 in parallel this session). Atlas cites this method ONCE: F03 table row (L385:
+  "Starbursting｜用問題發散｜Who/What/When/Where/Why/How｜找未知與研究問題｜很適合需求前期") -- grep-confirmed
+  the only hit, no dedicated section, no best-pairing column (F03's own 5th column is a caution note,
+  unlike F08's benefit+best-combo pair). Core invariant: `questions` collectively covers all 6
+  Who/What/When/Where/Why/How categories at least once (closed-set completeness, unbounded count --
+  multiple questions per category allowed, unlike porter_five_forces's exactly-5), and every
+  `question_text` literally ends in `?`/`？` -- the checkable differentiator from the sibling
+  `framing.five_w_one_h`, which shares the identical 6 category names but profiles a KNOWN problem's
+  answers rather than radiating open questions about an unscoped one. See
+  `ai_lego/modules/divergent/starbursting.py` module docstring for the full shape investigation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Starbursting row (L385)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.starbursting` mints a NEW machine_id AND a NEW `family:
+  divergent` (F03's first built member). `questions[].category`'s 6-value vocabulary is Atlas's own
+  literal "Who/What/When/Where/Why/How" citation, transcribed SCREAMING_SNAKE_CASE -- the same 6 names
+  `framing.five_w_one_h` already uses, disambiguated by purpose and by the question-mark invariant
+  below (see compilation_decisions).
+
+id: divergent.starbursting
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [QUESTION, EXPAND]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. QUESTION = every
+# output is itself a question, not a statement; EXPAND = radiating outward from one central_topic
+# into 6 directions (Atlas's own "用問題發散" -- "diverge via questions").
+
+purpose:
+  - radiate_open_research_questions_from_an_unscoped_topic_across_who_what_when_where_why_how
+# Atlas L385 verbatim sense: benefit "找未知與研究問題" (find unknowns and research questions), note
+# "很適合需求前期" (great for early requirements, before a problem is even scoped).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L385 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix.contract.yaml's own inputs.required: []
+  # takes for an analogous single-bare-row citation.
+
+outputs:
+  - StarburstingSession
+# NEW output type (see typed-objects/starbursting-session.schema.yaml). Atlas names no PascalCase
+# output type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "questions is a non-empty list and collectively names all 6 categories {WHO, WHAT, WHEN, WHERE, WHY, HOW} at least once each -- Atlas's own citation IS a six-direction radiating question set; a record silent on any direction has not actually starburst outward that way. Unlike porter_five_forces's exactly-5, MORE than 6 entries are allowed (multiple questions per category)"
+  - "every questions[].question_text is non-empty AND literally ends with '?' or the full-width '？' -- Atlas's own benefit ('找未知與研究問題') means every entry IS a question, not a declarative statement; this is also the method's own real, checkable differentiator from framing.five_w_one_h (identical 6 category names, but that method's own citation profiles a KNOWN problem's answers, this one radiates OPEN questions about a still-unscoped topic)"
+  - "central_topic is present and non-empty -- the six radiating questions need a stated subject they are actually about"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false: Atlas's L385 citation is a single bare table row (no dedicated section, no misuse/evidence
+  # column) -- same thin-citation class strategy.bcg_matrix/framing.how_might_we already establish.
+  # Also structural: this design's own `questions[]` shape (disclosed below) carries no per-question
+  # provenance/supporting_evidence_refs to label -- only the record as a whole carries `provenance`.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.bcg_matrix.contract.yaml's own field applies.
+
+recommended_next: []
+# F03's own table has no best-pairing column (5th column is a caution note "很適合需求前期", not a
+# paired-tool name, unlike F08's rows) -- left empty rather than inventing one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Closed SET with completeness (porter_five_forces-style) or fixed exact-count (5W1H-style, one per category)?"
+    decision: "Closed set, completeness required (all 6 categories represented), but UNBOUNDED count -- Atlas's own brainstorming-family framing (F03's own header 'Classic Brainstorming: 追數量') implies multiple questions per direction are expected, unlike Porter's structurally-exactly-5 forces or 5W1H's one-answer-per-dimension. A 4th shape variant in this corpus: closed vocabulary + completeness required + no upper bound."
+    reasoning: "5W1H already occupies the 'exactly 6, one each, positional' shape for these identical 6 names -- reusing it verbatim for Starbursting would make the two methods structurally indistinguishable despite Atlas citing them for opposite purposes (profile a known problem vs. radiate unknowns)."
+  - question: "Per-question provenance (porter_five_forces-style) or record-level only (how_might_we-style)?"
+    decision: "Record-level only -- this method's own citation gives no per-question evidence/misuse column, and the task's own design shape lists no per-question provenance key. Verified against the corpus: 113+ of 128 typed-object schemas require a top-level `provenance` field (bcg-matrix-analysis.schema.yaml is a documented exception with per-item-only provenance), so record-level provenance is the majority convention, not a universal one -- disclosed honestly rather than asserting a literal 128/128."
+  - question: "Enforce the question-mark suffix at the JSON Schema layer, the runtime layer, or both?"
+    decision: "Both -- unlike cross-item invariants (category completeness) that plain JSON Schema cannot express, a single-field suffix check IS expressible as a `pattern`, so the schema carries it as defense-in-depth alongside the builder+gate re-derivation, same layered-check discipline framing.how_might_we's own `hmw_question` question-mark check already establishes (that file left it runtime-only because it ALSO needed a case-insensitive stem check on the same field; Starbursting's suffix-only check has no such complication)."
+  - question: "additionalProperties: false throughout?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start."
+
+open_questions:
+  - "OQ-STARBURSTING-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-STARBURSTING-2: quality.evidence_labeling_required: false reflects this citation's own thinness (a single bare table row) rather than a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-STARBURSTING-3: no downstream method in this corpus yet declares StarburstingSession as a required input (F03's own table gives no best-pairing column for this row) -- revisit once a convergent method (e.g. an eventual Classic Brainstorming or Crazy 8s slice) is built (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L385) directly. Grepped the whole Atlas file case-insensitively for
+    "Starbursting" -- confirmed exactly 1 real hit, no dedicated section, no §4 composition formula, no
+    §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole `ai_lego` tree and
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` case-insensitively for "starbursting" before
+    writing any of this method's own files -- zero pre-existing implementation (only 2 stale registry
+    references in method-inventory.yaml, neither a real contract/schema/module). Read
+    strategy.porter_five_forces.contract.yaml (closed-set-with-completeness precedent),
+    strategy.bcg_matrix.contract.yaml (thin-citation, evidence_labeling_required:false precedent), and
+    framing.five_w_one_h.py's own module docstring in full (the sibling this method must NOT duplicate
+    despite sharing all 6 category names) before writing this contract. Counted typed-object schemas
+    with a top-level required `provenance` field directly via grep (113+ of 128, bcg-matrix-analysis
+    confirmed as a per-item-only exception) rather than asserting an unverified ratio. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L385's own "Who/What/When/Where/Why/How" list and stated
+    benefit/note are transcribed verbatim into `preconditions`/`purpose`. The unbounded-count-with-
+    completeness shape, the record-level-only provenance placement, and the dual schema+runtime
+    question-mark enforcement are compilation decisions, disclosed above, not presented as directly
+    Atlas-cited.

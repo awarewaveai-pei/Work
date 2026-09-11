@@ -1,0 +1,146 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/crazy-eights-session.schema.yaml"
+title: Crazy 8s Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CrazyEightsSession` -- the declared `outputs` of
+  `divergent.crazy_eights`'s Method Contract (methods/contracts/divergent.crazy_eights.contract.yaml,
+  `outputs: [CrazyEightsSession]`). Atlas cites this method TWICE: the F03 table row (L382: "Crazy 8s｜強迫
+  突破第一答案｜8 格、8 分鐘、8 方案｜降低 perfectionism｜適合概念/介面") and a dedicated §12.10 section
+  (L2650-2655: "用途：八分鐘畫八個不同 concept／效益：打破第一答案、降低 perfectionism").
+
+  Field provenance:
+    * `concepts` -- Atlas's own "8 格、8 方案"/"八個不同 concept" literal identity: a CLOSED set of EXACTLY
+      8 entries, `box_number` REQUIRED to cover {1..8} each exactly once (see `concepts` field description
+      and `ai_lego/modules/divergent/crazy_eights.py` module docstring for the full design-shape reasoning,
+      same class `porter-five-forces-analysis.schema.yaml`/`business-model-canvas.schema.yaml` already
+      establish, generalized from named categories to a fixed numeric range).
+    * `concepts[].sketch_description` -- Atlas's own benefit ("強迫突破第一答案"/"打破第一答案") implies each of
+      the 8 must be a GENUINELY DIFFERENT concept: non-empty AND no two entries may share a character-identical
+      value (see compilation_decisions for why this is exact-match, not normalized).
+    * `provenance` (record-level, REQUIRED) -- no per-concept provenance field (contrast the per-item
+      provenance every F08 sibling schema in this corpus carries) -- task-mandated shape, same
+      record-level-only precedent `work-breakdown-structure.schema.yaml`'s own top-level `provenance`
+      already establishes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Crazy 8s row (L382)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.10 瘋狂八格法／八格快速發想 (L2650-2655)"
+  - "methods/contracts/divergent.crazy_eights.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/ansoff-matrix.schema.yaml -- closed-set-with-completeness precedent (this file's primary structural template, generalized from 4 named quadrants to 8 numbered boxes)"
+  - "specs/cognitive/typed-objects/work-breakdown-structure.schema.yaml -- record-level-only provenance precedent (no per-node/per-item provenance field)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L382/§12.10's own cited "8 格、8 方案" identity plus low-risk, disclosed
+  compilation choices.
+
+compilation_decisions:
+  - question: "Fixed-count closed array (porter_five_forces/ansoff-style, minItems==maxItems) or open-ended non-empty array (bcg_matrix-style)?"
+    decision: "Fixed closed array, minItems:8/maxItems:8 -- Atlas's own citations give NO adjustability caveat (unlike bcg_matrix's own open-ended portfolio); '8' is this method's own stated identity."
+  - question: "box_number as a bare integer enum {1..8} or a string label (e.g. 'BOX_1')?"
+    decision: "Bare integer enum [1,2,3,4,5,6,7,8] -- Atlas's own '8 格' (8 boxes/slots) is a numbered range, not a set of named categories the way Ansoff's/Porter's quadrants/forces are; a string label here would invent vocabulary Atlas never uses."
+  - question: "sketch_description distinctness: normalized (NFKC/casefold, association.analogy_mapping-style) or exact character-match?"
+    decision: "Exact character-match -- task-mandated wording is 'character-identical'; plain JSON Schema has no cross-item comparison operator either way, so this is a runtime-only invariant regardless (see below), kept at the simpler exact-match tier."
+  - question: "Per-concept provenance (every F08 sibling's own pattern) or record-level only?"
+    decision: "Record-level only -- task-mandated shape names no per-concept provenance field; adding one anyway would contradict the task's own literal design and add an unused field with no gate to consume it."
+  - question: "additionalProperties: false at the top level, and on the concepts[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Does JSON Schema itself express 'all 8 distinct box_number values present, order-independent, and all 8 sketch_description values pairwise distinct'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality or pairwise-inequality operator. minItems:8/maxItems:8 plus the per-item box_number enum bounds the SHAPE; genuine completeness/uniqueness of box_number AND pairwise distinctness of sketch_description are runtime-only invariants, enforced at construction AND independently re-derived by a gate in crazy_eights.py -- same limitation-and-workaround class ansoff-matrix.schema.yaml's own identical compilation_decision already documents."
+
+type: object
+required: [id, version, provenance, concepts]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CRAZY8-"
+    description: "NEW DESIGN. Task-mandated id prefix (digit permitted in the free-string record-id prefix, unlike the method's own machine_id `divergent.crazy_eights` which spells the number out per the id grammar's letters/underscore-only pattern). Same id-prefix convention rationale as ansoff-matrix.schema.yaml's own ANSOFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.crazy_eights"
+
+  provenance:
+    description: "Record-level provenance -- REQUIRED, 128/128 corpus convention. No per-concept provenance field (see top-level description and compilation_decisions) -- task-mandated shape."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  concepts:
+    type: array
+    minItems: 8
+    maxItems: 8
+    description: >
+      Atlas's own "8 格、8 方案"/"八個不同 concept" literal identity. SHAPE-bounded here to exactly 8 items;
+      genuine completeness (box_number covers {1..8}, each exactly once, order-independent) AND pairwise
+      distinctness of sketch_description are runtime-only invariants this schema cannot express -- enforced
+      by ai_lego/modules/divergent/crazy_eights.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [box_number, sketch_description]
+      additionalProperties: false
+      properties:
+        box_number:
+          type: integer
+          enum: [1, 2, 3, 4, 5, 6, 7, 8]
+          description: "One of the 8 fixed box slots, Atlas's own '8 格' literal identity. Completeness (all 8 present, each exactly once) is a runtime-only invariant -- see top-level compilation_decisions."
+        sketch_description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The concrete concept sketched in this box -- REPORTED content, not computed. Pairwise distinctness across all 8 concepts[] entries (no two character-identical) is a runtime-only invariant -- see top-level compilation_decisions."
+
+examples:
+  - description: "A completed Crazy 8s session for a checkout-flow redesign"
+    value:
+      id: "CRAZY8-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.crazy_eights"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      concepts:
+        - box_number: 1
+          sketch_description: "單頁結帳，所有欄位攤平在同一畫面"
+        - box_number: 2
+          sketch_description: "分 3 步驟精靈式結帳，每步只問一件事"
+        - box_number: 3
+          sketch_description: "側邊抽屜式結帳，商品頁不跳轉"
+        - box_number: 4
+          sketch_description: "先付款後填地址，降低放棄率"
+        - box_number: 5
+          sketch_description: "純語音輸入的結帳流程，無需打字"
+        - box_number: 6
+          sketch_description: "以聊天機器人問答方式完成結帳"
+        - box_number: 7
+          sketch_description: "掃碼在實體店取貨，線上只需選規格"
+        - box_number: 8
+          sketch_description: "訂閱制自動續購，首次之後完全免結帳"
+
+open_questions:
+  - id: "OQ-CRAZYEIGHTSSESSION-1"
+    question: "concepts[].box_number completeness/uniqueness and sketch_description pairwise distinctness are runtime-only invariants (see compilation_decisions) -- should a future pass add a JSON Schema if/then constraint instead of relying solely on the runtime gate? Same open question ansoff-matrix.schema.yaml's own OQ-ANSOFFMATRIX-2 already discloses for an identical shape class. (owner: operator)"
+  - id: "OQ-CRAZYEIGHTSSESSION-2"
+    question: "sketch_description distinctness is exact-character-match only, not normalized (see compilation_decisions) -- should a future pass tighten it to NFKC/casefold comparison like association.analogy_mapping-record.schema.yaml's own distinctness check if exact-match proves too permissive? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L382) and §12.10 (L2650-2655) directly. Cross-checked against
+    methods/contracts/divergent.crazy_eights.contract.yaml's own outputs/preconditions/quality. Read
+    ansoff-matrix.schema.yaml (closed-set-with-completeness precedent) and
+    work-breakdown-structure.schema.yaml (record-level-only provenance precedent) in full as shape precedent
+    before writing this file. Validated against jsonschema Draft202012Validator via a standalone script
+    (required fields present, id pattern satisfied, box_number enum closed to the 8-value integer range,
+    additionalProperties:false present at both the top level and the concepts[] item level from the start,
+    embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative controls for a
+    smuggled top-level key, a smuggled concepts[] item key, and a 7-item/9-item concepts array).
+  note: >
+    `box_number`'s 8-value integer enum and the fixed-8 array bounds are a direct transcription of Atlas's
+    own "8 格" literal identity. The `sketch_description` field, the flat-record-plus-array shape, the
+    exact-character-match distinctness invariant (runtime-only), and the record-level-only provenance
+    placement (no per-concept provenance) are compilation decisions, disclosed above. No mother document was
+    modified to produce this file.

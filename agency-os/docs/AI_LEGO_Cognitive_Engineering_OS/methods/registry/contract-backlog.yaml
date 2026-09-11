@@ -3782,6 +3782,231 @@ tier_1:
       schemas) are OUT OF SCOPE for this batch -- tracked separately, not
       fixed here (neither involves any of these 9 files).
 
+  onehundredtwentyeighth_concrete_entry:
+    # New F03 divergent-ideation family, 10-agent parallel batch, 2026-09-11
+    # (immediately following the F02 batch above).
+    method_id: "divergent.classic_brainstorming"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L379). Real invariant: ideas[] and evaluations[]
+      structurally separated (no score field on ideas, additionalProperties:
+      false), evaluations[] referentially resolve to real idea ids when
+      non-empty -- mechanizes Atlas's own "不要邊想邊否決". Both per-idea
+      AND record-level provenance (a deliberate agent choice, not this
+      batch's uniform pattern -- see integration note below).
+    source: "methods/contracts/divergent.classic_brainstorming.contract.yaml + specs/cognitive/typed-objects/classic-brainstorming-session.schema.yaml + ai_lego/modules/divergent/classic_brainstorming.py"
+    note: "56 tests pass. F03 family opened by this batch. CLI PASS, dangling idea_ref refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredtwentyninth_concrete_entry:
+    method_id: "divergent.brainwriting"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L380) + dedicated §12.9 (found and cited by the
+      building agent, richer than the bare table row). Real invariant:
+      individual_contributions require 2+ DISTINCT contributor_ids (a
+      single-voice session defeats Atlas's own "降低權威/外向者主導"
+      purpose); merged_ideas referentially resolve to real contributions,
+      deliberately not required to be bijective. Per-item provenance on
+      individual_contributions only.
+    source: "methods/contracts/divergent.brainwriting.contract.yaml + specs/cognitive/typed-objects/brainwriting-session.schema.yaml + ai_lego/modules/divergent/brainwriting.py"
+    note: "61 tests pass. CLI PASS, single-contributor refusal + dangling source_contribution_ref refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtieth_concrete_entry:
+    method_id: "divergent.six_three_five"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L381). Method id spells the number out
+      (six_three_five, no digits -- method.schema.yaml id pattern is
+      letters/underscore only, same precedent root_cause.five_whys/
+      framing.five_w_one_h already set); record id prefix SIXTHREEFIVE-
+      may use digits. Headcount open-ended per Atlas's own "人數可調整"
+      caution -- never hardcoded to 6. Two real invariants: exactly 3
+      ideas per round (fixed, not adjustable); every sheet's rotation
+      touches every declared participant exactly once (round-robin
+      completeness, sorted-list comparison catches both missing and
+      duplicate participants). Record-level provenance (required).
+      **CORRECTED 2026-09-11 (critic finding)**: this entry originally
+      claimed "No provenance field" -- factually wrong, verified against
+      the actual schema (`six-three-five-session.schema.yaml` requires
+      `provenance`) and the module (`evaluate_provenance_required_gate`
+      ships in `six_three_five.py`).
+    source: "methods/contracts/divergent.six_three_five.contract.yaml + specs/cognitive/typed-objects/six-three-five-session.schema.yaml + ai_lego/modules/divergent/six_three_five.py"
+    note: "67 tests pass. CLI PASS, wrong-idea-count refusal + incomplete-rotation refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtyfirst_concrete_entry:
+    method_id: "divergent.crazy_eights"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L382) + dedicated §12.10 (found and cited by
+      the building agent -- includes a disclosed scope limitation "不適合
+      作為最後方案評選", not enforced, tracked as an open question).
+      Real invariants, all GENUINE_COMPUTE: concepts exactly 8, box_number
+      covering {1..8} each exactly once, no two sketch_description
+      character-identical (Atlas's own "強迫突破第一答案" implies genuine
+      distinctness). Record-level provenance only.
+    source: "methods/contracts/divergent.crazy_eights.contract.yaml + specs/cognitive/typed-objects/crazy-eights-session.schema.yaml + ai_lego/modules/divergent/crazy_eights.py"
+    note: "58 tests pass. CLI PASS, wrong-count/duplicate-box_number/duplicate-sketch refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtysecond_concrete_entry:
+    method_id: "divergent.scamper"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L383) + dedicated §11.10 + a real §4
+      composition formula (Atlas L189: SCAMPER = EXPAND + ASSOCIATE +
+      TRANSFORM, found by the building agent, richer grounding than the
+      original brief). Open-ended list over the closed 7-lens SUBSTITUTE/
+      COMBINE/ADAPT/MODIFY/PUT/ELIMINATE/REVERSE enum, no completeness
+      required. validation_status is a single-legal-value
+      UNVALIDATED_IDEATION enum structurally eliminated from the
+      builder's own parameters, mechanizing Atlas's own "不等於市場驗證"
+      caution. `recommended_next: [association.morphological_analysis]`
+      closes that contract's own pre-existing OQ-MORPHANALYSIS-2. Record-
+      level provenance only.
+    source: "methods/contracts/divergent.scamper.contract.yaml + specs/cognitive/typed-objects/scamper-session.schema.yaml + ai_lego/modules/divergent/scamper.py"
+    note: "52 tests pass. CLI PASS, unknown-lens refusal + caller-supplied-validation_status refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtythird_concrete_entry:
+    method_id: "divergent.lotus_blossom"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L384, sole citation). Two independent nested
+      GENUINE_COMPUTE fixed-8 closed-set invariants: exactly 8 branches
+      covering {1..8} each once, AND every branch's own ideas exactly 8
+      entries -- the method's own literal "中心→8 分支→各 8 idea". Record-
+      level provenance only.
+    source: "methods/contracts/divergent.lotus_blossom.contract.yaml + specs/cognitive/typed-objects/lotus-blossom-session.schema.yaml + ai_lego/modules/divergent/lotus_blossom.py"
+    note: "59 tests pass. CLI PASS, wrong-branch-count/wrong-idea-count/duplicate-branch_number refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtyfourth_concrete_entry:
+    method_id: "divergent.starbursting"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L385, sole citation). Deliberately
+      differentiated from the already-built framing.five_w_one_h despite
+      sharing the same Who/What/When/Where/Why/How vocabulary:
+      completeness-required-with-no-upper-bound across the 6 categories
+      (vs. 5W1H's exactly-6-positional), and every question_text must
+      literally end in ?/？ (Atlas's own "找未知與研究問題" = open
+      research QUESTIONS, not 5W1H's problem-profiling STATEMENTS). The
+      building agent independently re-verified and corrected this
+      batch's own "128/128 corpus convention" claim to the more accurate
+      "113+/128, documented per-item-only exceptions exist" (R4 claim-
+      before-verify). Record-level provenance.
+    source: "methods/contracts/divergent.starbursting.contract.yaml + specs/cognitive/typed-objects/starbursting-session.schema.yaml + ai_lego/modules/divergent/starbursting.py"
+    note: "65 tests pass. CLI PASS, incomplete-category-coverage/empty-question/not-a-question refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtyfifth_concrete_entry:
+    method_id: "divergent.random_stimulus"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L386, sole citation). feasibility_status is a
+      single-legal-value NOT_YET_SCREENED enum structurally eliminated
+      from the builder's own parameters, mechanizing Atlas's own "需後續
+      可行性篩選" caution. Record-level provenance only.
+    source: "methods/contracts/divergent.random_stimulus.contract.yaml + specs/cognitive/typed-objects/random-stimulus-session.schema.yaml + ai_lego/modules/divergent/random_stimulus.py"
+    note: "51 tests pass. CLI PASS, empty-entries refusal + caller-supplied-feasibility_status refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtysixth_concrete_entry:
+    method_id: "divergent.forced_connections"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L387, sole citation). Deliberately NOT a
+      generalization of the already-built association.morphological_
+      analysis (N-dimensional combinatorics) -- a fixed two-pool cross-
+      product. Real invariant: every combination's feature_a_ref/
+      feature_b_ref must resolve in the CORRECT side's own declared pool
+      -- a cross-wired reference to the other side's real id is refused
+      identically to a dangling one (both directions tested). Record-
+      level provenance only.
+    source: "methods/contracts/divergent.forced_connections.contract.yaml + specs/cognitive/typed-objects/forced-connections-session.schema.yaml + ai_lego/modules/divergent/forced_connections.py"
+    note: "64 tests pass. CLI PASS, empty-feature-pool/dangling-ref/cross-wired-ref refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtyseventh_concrete_entry:
+    # Last of this 10-agent F03 batch -- F03 is 10/10 COMPLETE after this
+    # entry (independently confirmed via `ls methods/contracts/
+    # divergent.*.contract.yaml`: 10 files present).
+    method_id: "divergent.synectics"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F03 table row (Atlas L388, sole citation). Open-ended list over the
+      closed 3-value DIRECT/PERSONAL/SYMBOLIC enum, deliberately omitting
+      external Synectics literature's own 4th "Fantasy Analogy" type
+      since Atlas's own citation names only 3. Every entry requires a
+      non-empty reframed_insight, not just an analogy label -- Atlas's
+      own "重構問題" (the problem must actually be re-framed).
+      Record-level provenance (required). **CORRECTED 2026-09-11
+      (critic finding)**: this entry originally claimed "No provenance
+      field" -- factually wrong, verified against the actual schema
+      (`synectics-session.schema.yaml` requires `provenance`) and the
+      module (`synectics.py` ships the same provenance-required gate).
+    source: "methods/contracts/divergent.synectics.contract.yaml + specs/cognitive/typed-objects/synectics-session.schema.yaml + ai_lego/modules/divergent/synectics.py"
+    note: >
+      57 tests pass. F03 divergent-ideation family: 10 of 10 COMPLETE as
+      of this entry (classic_brainstorming/brainwriting/six_three_five/
+      crazy_eights/scamper/lotus_blossom/starbursting/random_stimulus/
+      forced_connections all landed via concurrent sibling agents in this
+      same batch, entries onehundredtwentyeighth through
+      onehundredthirtysixth above). CLI PASS, invalid-analogy_type refusal
+      + empty-reframed_insight refusal + independent-gate hand-tamper
+      proof demonstrated.
+
+      CRITIC VERDICT (2026-09-11, single critic pass over the full
+      batch): overall risk LOW, nothing blocks merge. Provenance
+      placement adjudication -- **ACCEPT for all 10 methods**, including
+      six_three_five and synectics (both actually have REQUIRED
+      record-level provenance; this file's own prior claim of "none" for
+      both was itself wrong, corrected above -- that false claim is what
+      fed this review's initial framing, now fixed at the source).
+      classic_brainstorming's "both per-item and record-level" is
+      genuinely justified, not a novel/unprecedented combination as its
+      own contract claimed (`porter-five-forces-analysis.schema.yaml`
+      and `business-model-canvas.schema.yaml` already do the same,
+      pre-dating this batch). brainwriting's per-item-only, zero-record-
+      level shape also matches existing corpus precedent
+      (`bcg-matrix-analysis.schema.yaml` never had record-level
+      provenance either). synectics's own lack of per-item provenance on
+      `analogies[]` is accepted as a genuine distinction from
+      `problem_tree`'s causes/effects (single continuous facilitation
+      pass, no independent contributor/source dimension), not an
+      inconsistent double standard against `six_three_five`.
+
+      Two real bugs found and fixed same session: (1)
+      `lotus_blossom.py`'s `branch_number` closed-integer-enum check did
+      not exclude `bool` (a subclass of `int` in Python) -- a
+      `branch_number: True` masquerading as `1` was accepted by BOTH the
+      builder and the independent gate, the one gap in this batch where
+      2 sibling methods (`crazy_eights`, `six_three_five`) already guard
+      the identical bug class -- fixed with the same
+      `isinstance(value, int) and not isinstance(value, bool)` guard,
+      2 new tests; (2) this registry's own false "no provenance field"
+      claims for six_three_five/synectics, corrected above.
+
+      Minor findings disclosed, not fixed this pass (low-stakes,
+      bounded in practice by the CLI pipeline's own immediate schema
+      validation step): 5 of 10 builders
+      (six_three_five/lotus_blossom/starbursting/random_stimulus/
+      synectics) defer provenance validity entirely to the gate rather
+      than also checking at construction, unlike the other 5 sibling
+      builders in this same batch; `starbursting.py`'s
+      `_ends_with_question_mark` tolerates trailing whitespace the
+      schema's own regex pattern does not (a mismatch only surfaces as a
+      confusing two-layer failure, not a silent acceptance of bad data).
+
+      A separate effort is independently writing an explicit
+      provenance-placement rule into
+      methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md so future batches stop
+      re-deriving this ad hoc.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

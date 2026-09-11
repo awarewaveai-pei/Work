@@ -1,0 +1,151 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/random-stimulus-session.schema.yaml"
+title: Random Stimulus Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RandomStimulusSession` -- the declared `outputs` of
+  `divergent.random_stimulus`'s Method Contract
+  (methods/contracts/divergent.random_stimulus.contract.yaml, `outputs: [RandomStimulusSession]`).
+  Atlas cites this method ONCE: the F03 tool table row (L386: "Random Stimulus｜打破慣性｜隨機詞/圖→強制
+  找關聯｜產生遠距聯想｜需後續可行性篩選") -- the thinnest possible citation class, no dedicated section,
+  same class strategy.bcg_matrix's own citation already establishes.
+
+  Field provenance:
+    * `entries` -- Atlas's own method column ("隨機詞/圖→強制找關聯"): an open-ended, non-empty list of
+      individual stimulus-to-idea attempts (NOT a fixed closed set).
+    * `entries[].stimulus`/`forced_connection`/`resulting_idea` -- the 3-step mechanic Atlas's own
+      column literally describes: a random word/image, the forced link drawn to the problem, and the
+      idea that resulted. All DISCLOSED content, never templated or auto-filled.
+    * `entries[].feasibility_status` -- Atlas's own stated caution ("需後續可行性篩選" -- needs a
+      SUBSEQUENT feasibility screening), made structural: a single-legal-value enum
+      (`NOT_YET_SCREENED`) this schema and its runtime builder never let a caller override.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Random Stimulus row (L386)"
+  - "methods/contracts/divergent.random_stimulus.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- open-ended non-empty list precedent this file scales to a 4-field entry shape"
+  - "specs/cognitive/typed-objects/business-model-canvas.schema.yaml -- single-legal-value structural enforcement precedent for feasibility_status"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L386's own bare method description plus low-risk, disclosed compilation
+  choices. `id: divergent.random_stimulus` mints a NEW machine_id AND a NEW `family: divergent` (F03's
+  first built member).
+
+compilation_decisions:
+  - question: "Fixed-count closed array or open-ended non-empty array?"
+    decision: "Open-ended, minItems:1 only -- same shape bcg-matrix-analysis.schema.yaml's own non-empty `portfolio_items[]` already establishes; a session can draw any number of random stimuli, not a fixed structural split."
+  - question: "Should feasibility_status be caller-supplied (a disclosed judgment call) or a single-legal-value constant?"
+    decision: "Single-legal-value constant (NOT_YET_SCREENED), REQUIRED per entry, structurally eliminated from the builder's own parameters -- same class business-model-canvas.schema.yaml's own `validation_status` already establishes. Grounded directly in Atlas's own caution: the screening is explicitly a SUBSEQUENT step, so this method's own output can never itself carry a screened verdict (FEASIBLE/INFEASIBLE would overclaim a judgment this method never performs)."
+  - question: "Record-level provenance only, or also per-entry (business-model-canvas-style)?"
+    decision: "Record-level only (task-mandated shape, 128/128 corpus convention) -- unlike a BMC block's own independently evidence-bearing claim, an entries[] item here is a single connected thought (stimulus -> connection -> idea), not a set of independently-sourceable facts; one provenance record covers the whole session."
+  - question: "additionalProperties: false at the top level, and on each entries[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, provenance, entries]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^RANDOMSTIM-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.random_stimulus"
+
+  entries:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own method column ("隨機詞/圖→強制找關聯"): the individual stimulus-to-idea attempts made
+      in this session. Open-ended (no maxItems) -- genuine non-emptiness is the only count invariant this
+      schema expresses; enforced by ai_lego/modules/divergent/random_stimulus.py at both the builder and
+      an independent gate.
+    items:
+      type: object
+      required: [stimulus, forced_connection, resulting_idea, feasibility_status]
+      additionalProperties: false
+      properties:
+        stimulus:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The random word/image drawn for this entry (Atlas's own '隨機詞/圖') -- REPORTED content, not computed."
+        forced_connection:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The forced link drawn between the stimulus and the problem at hand (Atlas's own '強制找關聯')."
+        resulting_idea:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The idea that resulted from the forced connection (Atlas's own benefit '產生遠距聯想')."
+        feasibility_status:
+          type: string
+          enum: [NOT_YET_SCREENED]
+          default: NOT_YET_SCREENED
+          description: >
+            REQUIRED, single-legal-value enum. Atlas's own stated caution ("需後續可行性篩選") is a
+            categorical, always-true statement about ANY entry this method produces -- the feasibility
+            screening is explicitly a SUBSEQUENT step, never performed by this method itself. This
+            schema structurally enforces that: the enum's single legal value affirms the
+            not-yet-screened status, making it impossible to construct an entry claiming this method
+            already determined feasibility. ai_lego/modules/divergent/random_stimulus.py's own builder
+            does not expose this as a caller-settable parameter at all (structural elimination, same
+            class business-model-canvas.schema.yaml's own `validation_status` already establishes).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Random Stimulus session breaking inertia on a stalled product-naming/dashboard problem"
+    value:
+      id: "RANDOMSTIM-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.random_stimulus"
+      entries:
+        - stimulus: "水母（jellyfish）"
+          forced_connection: "水母沒有骨架卻能自在漂浮 -- 對應我們產品「無需安裝、隨開即用」的特性"
+          resulting_idea: "產品命名/定位改走「無重量感」訴求，強調零安裝負擔"
+          feasibility_status: NOT_YET_SCREENED
+        - stimulus: "紅綠燈"
+          forced_connection: "紅綠燈用顏色瞬間傳達狀態，不需文字 -- 對應儀表板需要一眼判斷健康狀態"
+          resulting_idea: "儀表板改成三色狀態燈號，取代目前的長段文字說明"
+          feasibility_status: NOT_YET_SCREENED
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-RANDOMSTIMULUSSESSION-1"
+    question: "Should a future pass add a session-level `problem_statement` field naming what the forced connections are being applied toward? Atlas's own L386 citation names no such field -- left out rather than inventing one with no citation basis (owner: operator)."
+  - id: "OQ-RANDOMSTIMULUSSESSION-2"
+    question: "entries[] has no uniqueness constraint on `stimulus` -- should a future pass add one if a downstream consumer ever needs to deduplicate repeated stimuli across a session? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L386) directly. Grepped the whole Atlas file case-insensitively for
+    "Random Stimulus"/"隨機刺激" -- confirmed exactly 1 real hit, no dedicated section. Cross-checked
+    against methods/contracts/divergent.random_stimulus.contract.yaml's own outputs/preconditions/
+    quality. Read bcg-matrix-analysis.schema.yaml (open-ended non-empty list precedent) and
+    business-model-canvas.schema.yaml (single-legal-value structural enforcement precedent) in full as
+    shape precedent before writing this file. Validated against jsonschema Draft202012Validator via a
+    standalone script (required fields present, id pattern satisfied, feasibility_status enum closed to
+    its single legal value, additionalProperties:false present at both the top level and the entries[]
+    item level from the start, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled entries[]
+    item key, an empty entries array, and a tampered feasibility_status value).
+  note: >
+    `feasibility_status`'s single legal value is derived directly from Atlas L386's own caution. The
+    stimulus/forced_connection/resulting_idea 3-field split, the open-ended non-empty list shape, and
+    the record-level-only provenance placement are compilation decisions, disclosed above. No mother
+    document was modified to produce this file. This is the FIRST typed-object schema for the brand-new
+    `family: divergent` (F03).

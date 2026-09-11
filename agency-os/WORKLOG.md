@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-11（128–137 號切片：開新家族 F03 發散式創意 0/10→10/10，10 個平行 agent + 1 critic + 2 個真 bug 修正）
+
+**觸發**：緊接 F02 收官後，操作者「還沒完成系統就繼續做下去」明確重申不停。選型：F03（發散式創意，Atlas L375-397，10 個成員：Classic Brainstorming/Brainwriting/6-3-5/Crazy 8s/SCAMPER/Lotus Blossom/Starbursting/Random Stimulus/Forced Connections/Synectics）——Atlas 順序中 F02 完工後的下一個家族，10 個方法彼此檔案完全不重疊，一次批次派出（同 F02 的 ≤10 例外）。
+
+**建置**：classic_brainstorming(56t，ideas/evaluations 結構分離+referential integrity，機械化 Atlas「不要邊想邊否決」)/brainwriting(61t，2+ 相異 contributor_id+merge referential integrity)/six_three_five(67t，headcount 依 Atlas「人數可調整」不寫死 6、每輪固定 3 idea、每張紙輪轉須覆蓋全部參與者)/crazy_eights(58t，固定 8+box_number 完整覆蓋+sketch 互不相同)/scamper(52t，開放列表over封閉 7 lens+`validation_status` 單一合法值結構性排除於建構子，機械化「不等於市場驗證」)/lotus_blossom(59t，嵌套雙重固定 8：8 分支+每分支 8 idea)/starbursting(65t，刻意與既有 framing.five_w_one_h 區隔——雖同樣 Who/What/When/Where/Why/How，但要求全 6 類覆蓋無上限+每題必須以問號結尾，機械化「找未知與研究問題」vs 5W1H 的「問題輪廓」)/random_stimulus(51t，`feasibility_status` 單一合法值結構性排除)/forced_connections(64t，刻意非既有 association.morphological_analysis 的推廣——固定雙池交叉引用，正確側池 referential integrity)/synectics(57t，開放列表over封閉 3 值類比類型，刻意不採外部文獻第 4 型 Fantasy Analogy 因 Atlas 只列 3 種)。590 tests 零衝突，全 regression 7754→8344，golden 3337→3387。
+
+**critic 覆審（1 個，覆蓋全批，特別交付 provenance 欄位放置一致性裁決）**：verdict 低風險、不擋 commit。10 個方法的 provenance 放置經逐一核對後**全數 ACCEPT**：classic_brainstorming「per-item+record-level 雙有」實為既有語料庫先例（`porter_five_forces`／`business_model_canvas` 早已如此，非本批次首創，contract 原文「首創組合」宣稱有誤）；brainwriting「僅 per-item 無 record-level」亦有先例（`bcg_matrix` 從無 record-level provenance）；synectics 的 `analogies[]` 無 per-item provenance 經裁定與 problem_tree 的 causes/effects 有真實區別（單一連續 facilitation session 產出、無獨立 contributor/來源維度，不构成雙重標準）。
+
+**真發現並已修正**：
+- C1：`lotus_blossom.py` 的 `branch_number` 封閉整數集合檢查未排除 `bool`（Python `bool` 是 `int` 子類，`True==1`）——`branch_number: True` 冒充 `1` 竟同時通過 builder 與獨立 gate；同批次 `crazy_eights`／`six_three_five` 已對同類欄位加了這個防護，本檔是本批唯一漏做的。修正：`isinstance(value, int) and not isinstance(value, bool)`，同 sibling 手法，+2 測試。
+- C2（本 session 自己的錯）：`contract-backlog.yaml` 對 `six_three_five`／`synectics` 誤寫「無 provenance 欄位」——查證後兩者其實都有必填 record-level provenance；此誤植正是本次 critic brief 的錯誤前提來源，已訂正三處。
+
+**揭露未修（低風險，CLI pipeline 的 schema validation 已兜底）**：10 個 builder 中 5 個（six_three_five/lotus_blossom/starbursting/random_stimulus/synectics）建構時不驗 provenance 有效性、只靠獨立 gate 驗——同批另 5 個 builder 有驗，不一致但風險有界；`starbursting.py` 的問號結尾檢查對尾隨空白的容忍度與 schema regex 不一致（純診斷層落差，非資料完整性漏洞）。皆記錄不修。
+
+**[已修改]**：10 個新 method（各 5 檔=50 檔）+ `ai_lego/modules/divergent/__init__.py`（家族總覽）+ `contract-backlog.yaml`（10 筆新登記+3 筆訂正+1 筆 critic 整合後補記）+ `lotus_blossom.py`／`test_lotus_blossom.py`（bool-masquerade 修正+測試）。
+**[驗證結果]**：`python -m unittest discover` 8346/8346 PASS；golden 3387/3387 PASS；10 個 CLI slice 全數真跑 PASS；1 個 critic 覆審（verdict=低風險不擋 commit，1 個真 bug + 1 個本 session 自己的文件錯誤全修）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（Projects/internal/cognitive-engineering-os） | exit=0 | ms=1109967
+- REVIEW_DONE: critic=Standard | verdict=pass（Low risk, provenance 放置全數 ACCEPT, 1 個真 bug 已修） | findings=1c/0m/2n（2n 揭露未修）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=divergent\.(classic_brainstorming\|brainwriting\|six_three_five\|crazy_eights\|scamper\|lotus_blossom\|starbursting\|random_stimulus\|forced_connections\|synectics) | hits=50（全部為本批次自己的 5 檔×10 方法，零殘留/零衝突）
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：5 個 builder 缺建構時 provenance 驗證（已揭露，CLI 層有兜底）；`starbursting.py` 問號檢查與 schema regex 尾隨空白不一致（診斷層，非資料漏洞）；provenance 放置規則仍待另一 session 寫進 `METHOD_ATLAS_SLICE_LEAN_STANDARD.md`（進行中，非本批次阻塞項）；F03 之後仍有 F06/F07/F09/F10/F13/F14/F15/F22/F23/F24 共 10 個家族完全未開工。**[rollback]**：`git revert` 本次 commit 即可，10 個方法彼此無交叉引用，互不影響其餘家族。
+
 ## 2026-09-11 remotion-render 502「Unexpected token '<'」根因 + 修復（操作者真實回報）
 
 操作者按 AGENTS.md R0/R4 明確要求：查證階段可直接做，實際改動前列方案給她看過。查證完成、方案列出後她說「你做最完美的決定...全部做好」，全權授權執行到底。

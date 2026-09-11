@@ -1,0 +1,186 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/classic-brainstorming-session.schema.yaml"
+title: Classic Brainstorming Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ClassicBrainstormingSession` -- the declared `outputs` of
+  `divergent.classic_brainstorming`'s Method Contract
+  (methods/contracts/divergent.classic_brainstorming.contract.yaml, `outputs: [ClassicBrainstormingSession]`).
+  Atlas cites this method ONCE: F03 tool table row (L379: "Classic Brainstorming｜快速產生大量 ideas｜先禁止
+  批判→追數量→延伸→最後評估｜快速發散｜不要邊想邊否決") -- the thinnest possible citation class, no dedicated
+  section.
+
+  Field provenance:
+    * `ideas` -- Atlas's own "追數量" (chase quantity) generation phase: an open-ended, non-empty list of
+      `{id, text, provenance}` entries. `additionalProperties: false` structurally forbids a score/verdict
+      field here -- Atlas's own caution ("不要邊想邊否決") made mechanically real, not just disclosed.
+    * `evaluations` -- Atlas's own "最後評估" (evaluate last), a SEPARATE, later, open-ended list that MAY be
+      empty. `evaluations[].idea_ref` referential integrity against `ideas[].id` is a runtime-only invariant
+      this schema cannot express -- enforced by `ai_lego/modules/divergent/classic_brainstorming.py` at both
+      the builder and an independent gate.
+    * `provenance` -- RECORD-LEVEL, in ADDITION to each idea's own per-item provenance (a genuinely new
+      combination in this corpus -- see method contract's own compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Classic Brainstorming row (L379)"
+  - "methods/contracts/divergent.classic_brainstorming.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/functional-decomposition.schema.yaml -- referential-integrity-over-a-set-of-real-ids precedent (interfaces referencing function nodes), reused here for evaluations referencing ideas"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- open-ended non-empty list + per-item provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L379's own bare method description plus low-risk, disclosed compilation choices (the
+  ideas/evaluations phase split, the idea_ref referential-integrity shape, both-placements provenance).
+
+compilation_decisions:
+  - question: "Fixed-count closed array or open-ended non-empty array for ideas/evaluations?"
+    decision: "Both open-ended -- ideas minItems:1 (Atlas's own '快速產生大量' purpose presumes at least one idea actually generated), evaluations no minItems (MAY be empty, see method contract)."
+  - question: "additionalProperties: false at the top level, and on both ideas[] and evaluations[] item schemas?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, and the mechanism that structurally forecloses an idea ever carrying a smuggled score/verdict field."
+  - question: "Should ideas[].id uniqueness be a schema-level constraint?"
+    decision: "No -- JSON Schema has no native cross-item field-uniqueness operator (same disclosed limitation issue-tree.schema.yaml's own `id` field already accepts); enforced at the runtime layer instead (see method contract)."
+  - question: "Per-idea provenance, record-level provenance, or both?"
+    decision: "Both, per the method contract's own compilation_decisions -- ideas[].provenance is the task-mandated per-idea epistemic stamp, provenance (top-level) is this corpus's 128/128 universal-field convention."
+
+type: object
+required: [id, version, ideas, evaluations, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BRAINSTORM-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.classic_brainstorming"
+
+  ideas:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "追數量" (chase quantity) generation-phase output. Open-ended (no maxItems). Every entry
+      carries EXACTLY {id, text, provenance} -- no score/verdict field is structurally acceptable here (Atlas's
+      own caution "不要邊想邊否決" made mechanically real via additionalProperties:false).
+    items:
+      type: object
+      required: [id, text, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id for this idea, unique across the WHOLE ideas[] list -- BRAINSTORM_DUPLICATE_IDEA_ID, runtime-only (JSON Schema has no native cross-item uniqueness operator). Also the namespace evaluations[].idea_ref resolves against."
+        text:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual idea content -- REPORTED content, not computed. Atlas's own '快速產生大量 ideas' purpose presumes real content here, not a placeholder."
+        provenance:
+          description: "Per-idea provenance -- this idea's own epistemic origin. See method contract's own compilation_decisions for why this coexists with the record-level provenance below."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  evaluations:
+    type: array
+    description: >
+      Atlas's own "最後評估" (evaluate last) phase -- a SEPARATE, later pass over some or all of `ideas`. MAY be
+      empty (a session can be pure generation with evaluation deferred, see method contract). Genuine
+      referential integrity (every idea_ref resolves to a real ideas[].id present in this same record) is a
+      runtime-only invariant, enforced by `ai_lego/modules/divergent/classic_brainstorming.py` at both the
+      builder and an independent gate.
+    items:
+      type: object
+      required: [idea_ref, verdict, rationale]
+      additionalProperties: false
+      properties:
+        idea_ref:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "MUST resolve to a real ideas[].id present in this same record -- BRAINSTORM_DANGLING_IDEA_REF, runtime-only, re-derived independently by the gate."
+        verdict:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "DISCLOSED free-text evaluation outcome for this idea (e.g. keep/discard/refine) -- Atlas's own citation names no closed evaluation-outcome vocabulary, so this is NOT a closed enum (see method contract's own open_questions)."
+        rationale:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual judgment content behind verdict -- what makes this idea's evaluation outcome what it is. REPORTED content, not computed."
+
+  provenance:
+    description: "RECORD-LEVEL provenance, in ADDITION to each idea's own per-item provenance -- see method contract's own compilation_decisions for why both placements coexist here."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A brainstorming session with 3 generated ideas and 2 evaluations (1 idea left unevaluated -- legal, evaluation MAY be a partial or deferred pass)"
+    value:
+      id: "BRAINSTORM-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.classic_brainstorming"
+      ideas:
+        - id: "IDEA-1"
+          text: "推出訂閱制而非一次性買斷"
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+        - id: "IDEA-2"
+          text: "與在地咖啡店做聯名活動"
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+        - id: "IDEA-3"
+          text: "開放使用者自訂主題色"
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+      evaluations:
+        - idea_ref: "IDEA-1"
+          verdict: "keep"
+          rationale: "現金流可預測，符合本季度目標"
+        - idea_ref: "IDEA-2"
+          verdict: "discard"
+          rationale: "合作對象名單目前空白，短期無法執行"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+  - description: "A pure-generation session -- evaluation deliberately deferred, evaluations is a legal empty list"
+    value:
+      id: "BRAINSTORM-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "divergent.classic_brainstorming"
+      ideas:
+        - id: "IDEA-A"
+          text: "把退貨流程改成一鍵完成"
+          provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+      evaluations: []
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-CLASSICBRAINSTORMINGSESSION-1"
+    question: "No ideas[].id uniqueness constraint exists at the schema layer (enforced at the runtime layer instead, see method contract) -- should a future pass add a JSON Schema constraint for it? Same open question class as OQ-MECECHECK-1's own runtime-only invariant."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-CLASSICBRAINSTORMINGSESSION-2"
+    question: "verdict is a free-text string, not a closed enum -- should a future dedicated Atlas section for this method (if one is ever added) motivate a closed evaluation-outcome vocabulary?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L379) directly. Grepped the whole Atlas file case-insensitively for "classic
+    brainstorming" -- confirmed exactly 1 real hit, no dedicated section. Cross-checked against
+    methods/contracts/divergent.classic_brainstorming.contract.yaml's own outputs/preconditions/quality. Read
+    functional-decomposition.schema.yaml (referential-integrity-over-a-set-of-real-ids precedent) and
+    bcg-matrix-analysis.schema.yaml (open-ended non-empty list + per-item provenance precedent) in full as shape
+    precedent before writing this file. Validated against jsonschema Draft202012Validator via a standalone
+    script (required fields present, id pattern satisfied, additionalProperties:false present at the top level
+    and both the ideas[]/evaluations[] item level from the start, embedded examples resolved through their real
+    $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled ideas[] item
+    key including a per-idea score/verdict attempt, a smuggled evaluations[] item key, an empty ideas array
+    correctly rejected, and an empty evaluations array validating successfully).
+  note: >
+    No mother document was modified. `ideas`/`evaluations`'s own names and the generate-then-evaluate ordering
+    are transcribed directly from Atlas L379's own literal procedure. The exact field names, the
+    referential-integrity shape, the free-text (non-enum) verdict, and the both-placements provenance are this
+    suite's own compiled structure, disclosed above, not textually cited.

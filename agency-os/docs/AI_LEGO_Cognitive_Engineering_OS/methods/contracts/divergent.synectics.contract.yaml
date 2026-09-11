@@ -1,0 +1,110 @@
+$id: "ai-lego://methods/contracts/divergent.synectics.contract.yaml"
+title: "Synectics Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F03 divergent-ideation family, 1st member built (0/10 before this batch; 9 siblings --
+  classic_brainstorming/brainwriting/six_three_five/crazy_8s/scamper/lotus_blossom/starbursting/
+  random_stimulus/forced_connections -- built concurrently in this same batch, not read here). Atlas cites
+  this method ONCE: F03 table row L388 ("Synectics｜用類比/隱喻重構問題｜direct/personal/symbolic analogy｜
+  深度創意突破｜workshop facilitation 要求較高") -- grep-confirmed the only hit, no dedicated section, no EC
+  §32 security surface. Core invariant: `analogies` is a non-empty OPEN-ENDED list over the row's own
+  literal 3-type vocabulary (DIRECT/PERSONAL/SYMBOLIC), each entry carrying a non-empty `reframed_insight`
+  -- Atlas's own "重構問題" (reframe the problem) means an analogy with no derived insight has not actually
+  done what this method claims.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Synectics row (L388)"
+  - "specs/cognitive/typed-objects/synectics-session.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "methods/contracts/strategy.bcg_matrix.contract.yaml -- open-ended non-empty list precedent (no completeness across a small named vocabulary)"
+  - "methods/contracts/association.analogy_mapping.contract.yaml -- already disambiguates ITSELF from this method's own L388 citation; read for cross-confirmation, not depended on"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.synectics` mints a NEW machine_id and a NEW `family: divergent`
+  -- this method is the first built F03 member (no `ai_lego/modules/divergent/` directory existed before
+  this batch).
+
+id: divergent.synectics
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [ASSOCIATE, FRAME, IMAGINE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). ASSOCIATE:
+# the row's own literal "類比" (analogy = an association drawn between source and problem). FRAME: the
+# row's own literal "重構問題" (reframe the problem) -- a direct kernel-token match. IMAGINE: divergent
+# creative generation of an analogy (personal/symbolic types both require imagining oneself as, or
+# symbolically as, the object) -- matches this family's own F03 header "發散式創意" (divergent creativity).
+
+purpose:
+  - reframe_a_problem_via_direct_personal_or_symbolic_analogy
+
+inputs:
+  required: []
+  optional: []
+# Atlas's own L388 citation names no upstream typed-object dependency, same "no hard upstream dependency"
+# position strategy.bcg_matrix.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - SynecticsSession
+
+preconditions:
+  - "original_problem is present and non-empty -- the ONE problem being reframed; an analogy with no named subject cannot be audited against reality later (same un-cited-but-necessary anchor field class strategy.vrio's own resource_description already establishes)"
+  - "analogies is present and non-empty -- Atlas's own '重構問題' benefit requires at least one analogy actually attempted"
+  - "every analogies[] entry's analogy_type is one of the 3 Atlas L388-cited values (DIRECT/PERSONAL/SYMBOLIC) -- a 4th value (e.g. a 'Fantasy Analogy' from external Synectics literature) is refused; this row's own citation names only 3 (see compilation_decisions)"
+  - "every analogies[] entry carries non-empty analogy_content and non-empty reframed_insight -- Atlas's own '重構問題' means the analogy must yield an actual derived insight, not merely a listed analogy with no payload"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.bcg_matrix/strategy.ansoff's own identical flag
+  # already establishes: Atlas's L388 citation is a single bare table row, no misuse warning cited.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F03 table has no "最佳搭配" (best-pairing) column at all (unlike F08's table) -- grep-confirmed
+# against the table header (工具｜主要用途｜標準使用方式｜效益｜注意事項) -- no candidate to name.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed 3-count closed SET with completeness (VRIO-style, all 3 types required) or open-ended non-empty list allowing repeats/subsets?"
+    decision: "Open-ended non-empty list, same shape strategy.bcg_matrix's own portfolio_items already establishes -- Atlas's own citation lists 3 analogy TYPES as a vocabulary, not a mandated completeness split; a real session may lean on only 1-2 types (the row's own 'workshop facilitation 要求較高' caution) and still have reframed the problem."
+  - question: "Include a 4th 'Fantasy Analogy' type from external Synectics literature?"
+    decision: "No -- Atlas's own citation names only 3 (direct/personal/symbolic); importing a 4th not in this row would overstate this citation, same 'don't import a sibling method's extra structure' restraint strategy.ansoff/strategy.vrio's own contracts already establish. Disclosed, not silently omitted -- see open_questions."
+  - question: "Per-entry provenance (VRIO/BCG-style) or record-level only?"
+    decision: "Record-level only -- task-mandated shape; each analogy entry carries only analogy_type/analogy_content/reframed_insight, no per-entry provenance field."
+  - question: "Cross-field distinctness check (reframed_insight must differ from analogy_content), matching association.analogy_mapping's own pairwise-echo check?"
+    decision: "No -- non-emptiness per field is the cited completeness check; an echo-check would be inventing structure beyond this citation's own thin 5-column table row."
+  - question: "GENUINE_COMPUTE derived field, matching strategy.vrio/strategy.bcg_matrix's own classification lookup tables?"
+    decision: "No -- Atlas's own citation gives no classification formula over analogy_type combinations; all 3 per-entry fields are DISCLOSED reported content, not computed."
+
+open_questions:
+  - "OQ-SYNECTICS-1: no completeness/coverage requirement across the 3 analogy_type values -- a session could submit N DIRECT analogies and zero PERSONAL/SYMBOLIC and still validate (owner: operator, if a future facilitation-quality gate is wanted)."
+  - "OQ-SYNECTICS-2: the 4th 'Fantasy Analogy' type from external Synectics literature is deliberately excluded (see compilation_decisions) (owner: operator, if Atlas's own text is ever updated to cite it)."
+  - "OQ-SYNECTICS-3: F03 divergent family is 1/10 after this contract -- 9 siblings unbuilt at this write time, built concurrently in this same batch (owner: operator, informational)."
+
+verification:
+  method: >
+    Grepped the whole Atlas file case-insensitively for "synectics" -- confirmed exactly 1 real hit (F03
+    table row L388), no dedicated section, no §4 composition formula, no §14.1 legal-chain mention, no
+    §22.3 gate-table row. Confirmed the F03 table header itself (工具｜主要用途｜標準使用方式｜效益｜
+    注意事項) carries no "最佳搭配" column, unlike F08's table. Read association.analogy_mapping.contract.yaml
+    in full -- confirms it already disambiguates ITSELF from this method's own L388 citation (a
+    divergent-creativity tool using analogy to reframe, structurally distinct from analogy_mapping's own
+    convergent 3-stage transfer pipeline); read here for cross-confirmation only, not depended on. Grepped
+    the whole `ai_lego` tree and this docs tree case-insensitively for "synectics" before writing any of
+    this method's own files -- zero pre-existing implementation. Read strategy.bcg_matrix.contract.yaml
+    (open-ended non-empty list precedent) and strategy.vrio.contract.yaml (external-domain-grounding
+    disclosure discipline, read for comparison only -- this method has no GENUINE_COMPUTE lookup table) in
+    full before writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L388's own 3-type vocabulary (direct/personal/symbolic analogy)
+    and "重構問題" benefit are transcribed into `preconditions`. `cognitive_primitives`, the
+    open-ended-list-without-completeness shape, the deliberate 3-value (not 4-value) closed enum, and the
+    record-level-only provenance shape are compilation decisions, disclosed above, not presented as directly
+    Atlas-cited.

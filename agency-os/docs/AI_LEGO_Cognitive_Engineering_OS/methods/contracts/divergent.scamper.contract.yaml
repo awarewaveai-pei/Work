@@ -1,0 +1,121 @@
+$id: "ai-lego://methods/contracts/divergent.scamper.contract.yaml"
+title: "SCAMPER Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F03 divergent ideation family, 1st member (F03 entirely unbuilt before this entry). Atlas cites
+  this method TWICE: F03 table row (L383: "SCAMPER｜改造已有產品/流程｜Substitute/Combine/Adapt/Modify/Put/
+  Eliminate/Reverse｜系統化創新｜不等於市場驗證") and dedicated §11.10 (L1406-1432: the 7-lens worked list,
+  benefit, and an explicit limitation -- "它能產生 ideas，不能證明 customer demand 或 business viability").
+  Core invariant: `entries` is a non-empty, OPEN-ENDED list over the closed 7-value `lens` enum; `validation_status`
+  is a single-legal-value enum, structurally eliminated from the builder's own parameters -- same "don't let
+  the output overclaim its own status" discipline `strategy.business_model_canvas`'s own `validation_status`
+  already establishes, grounded here in Atlas's own F03/§11.10 validation caution.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, SCAMPER row (L383)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.10 SCAMPER 創意法／奔馳法 (L1406-1432) -- 7-lens list, benefit, limitation, recommended combo"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §4 composition formula (L189: 'SCAMPER = EXPAND + ASSOCIATE + TRANSFORM')"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §28 快速選工具表 (L4471) + §13.5 New Product/Startup Recipe mermaid (L3340-3341) -- both name Morphological Analysis as the concrete next tool"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.scamper` mints a NEW machine_id AND a NEW family (`divergent`
+  = F03, first member). Direct transcription of Atlas's own 7-lens vocabulary (F03 row + §11.10);
+  `validation_status`'s structural-elimination pattern reused from `strategy.business_model_canvas.contract.yaml`.
+
+id: divergent.scamper
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, ASSOCIATE, TRANSFORM]
+# CITED, not inferred -- Atlas's own §4 gives a literal composition formula for this exact method (L189:
+# "SCAMPER = EXPAND + ASSOCIATE + TRANSFORM"), unlike most Tier 1 contracts in this suite which must infer
+# their own cognitive_primitives. Disclosed inconsistency: TRANSFORM is not itself one of the 24 kernel
+# primitive names Atlas's own §4 list enumerates (L158-183) -- an Atlas-internal gap, not smoothed over here;
+# used verbatim anyway since L189 is the literal citation for this specific method.
+
+purpose:
+  - transform_an_existing_product_or_process_via_seven_fixed_lenses
+# Atlas L383/§11.10 verbatim sense: "改造已有產品/流程" (transform an existing product/process) via the 7
+# Substitute/Combine/Adapt/Modify/Put/Eliminate/Reverse lenses; benefit "系統化創新" (systematic innovation).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own citations name no required input type for this method,
+  # same "no hard upstream dependency" position strategy.business_model_canvas.contract.yaml's own
+  # inputs.required: [] already takes. Atlas's own recipes (§11.10 L1432, §12.3 L2580) place JTBD/HMW/Crazy 8s
+  # BEFORE this method in a workflow sense, but cite no required typed-object precondition.
+
+outputs:
+  - ScamperSession
+# NEW output type (see typed-objects/scamper-session.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "entries is present and non-empty -- Atlas's own §11.10 benefit ('可產生大量具方向性的 variant') and F03 benefit ('系統化創新') both presume at least one lens transformation was actually attempted"
+  - "every entries[] item's lens is one of the 7 Atlas-cited values (SUBSTITUTE/COMBINE/ADAPT/MODIFY/PUT/ELIMINATE/REVERSE, F03 L383 + §11.10 L1410-1417) -- no other value is a legal SCAMPER lens"
+  - "every entries[] item carries non-empty transformed_idea and non-empty reasoning -- a lens named but left empty has not produced an actual variant, contradicting Atlas's own stated benefit"
+  - "validation_status is present and equals the single legal enum value UNVALIDATED_IDEATION -- Atlas's own F03 caution ('不等於市場驗證') and §11.10's own stated limitation ('它能產生 ideas，不能證明 customer demand 或 business viability') are unconditionally true of every record this method produces, never caller-overridable"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- entries carry no per-entry provenance field at all (see compilation_decisions: SCAMPER output is
+  # creative ideation, not an evidence-backed claim, same class morphological_analysis's own dimensions/
+  # constraints already establish for a record-level-only provenance shape). Only record-level provenance
+  # exists to check. Atlas cites no explicit unevidenced-claim misuse warning for this method (grep-confirmed).
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same empty-and-disclosed
+# choice several sibling contracts' own field already takes.
+
+recommended_next: [association.morphological_analysis]
+# Atlas cites this SPECIFIC pairing twice with a real, catalogued machine_id: §28 快速選工具表 (L4471, "已有
+# 產品想改良" row: First Tool SCAMPER -> Then Morphological Analysis) and independently the §13.5 New Product /
+# Startup Recipe mermaid (L3340-3341: SCAMPER -> Morphological Analysis). association.morphological_analysis
+# is ACTIVE and already built (methods/contracts/association.morphological_analysis.contract.yaml), closing
+# that contract's own OQ-MORPHANALYSIS-2 ("a future SCAMPER build may want a forward-looking field of its own
+# pointing here"). Other Atlas recipes name SCAMPER's next step as "Prototype" (§11.10 L1432, Mode D L4435-4436)
+# or "Forced Connections" (§26 創意導向 L3662) -- neither has a catalogued machine_id yet (grep-confirmed), so
+# left out rather than naming a non-existent id; see open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should entries[] require completeness across all 7 lenses, or an open-ended non-empty list?"
+    decision: "Open-ended, non-empty only -- Atlas gives no completeness requirement across the 7 lenses (unlike business_model_canvas's 9-block completeness, which Atlas's own benefit text explicitly demands); a real SCAMPER session commonly explores only the lenses that yield something for a given product."
+  - question: "What is the exact literal enum value for the 'P' lens -- 'Put', 'Put to use', or 'Put to another use'?"
+    decision: "PUT -- matches the bare word in Atlas's own F03 table row (L383: '...Modify/Put/Eliminate/Reverse'), the higher-level of the two citations. Atlas's own §11.10 dedicated section (L1415) spells it out further ('P Put to use   還能拿來做什麼？'); classic SCAMPER literature (Eberle) sometimes expands this further still to 'Put to another use'. Kept as the single word Atlas's own table uses, not invented or expanded."
+  - question: "Should validation_status be a disclosed judgment call or a structurally single-legal-value enum?"
+    decision: "Single-legal-value enum (UNVALIDATED_IDEATION), structurally eliminated from the builder's own parameters -- same no-caller-settable-mismatch pattern strategy.business_model_canvas's own validation_status (UNVALIDATED_HYPOTHESIS) already establishes. Atlas's own F03 caution ('不等於市場驗證') and §11.10's own limitation are both unconditionally true of every record this method produces, making this a good candidate for structural enforcement rather than disclosure-only."
+  - question: "Should entries[] carry per-entry provenance, matching business_model_canvas's per-block provenance?"
+    decision: "No -- record-level provenance only, same shape association.morphological_analysis's own dimensions/constraints already establish. SCAMPER entries are ideation-stage creative transformations of a single starting concept, not individually evidence-cited facts."
+
+open_questions:
+  - "OQ-SCAMPER-1: recommended_next names only association.morphological_analysis (the one Atlas-cited pairing with a catalogued machine_id); Atlas's other recipes name Prototype/Forced Connections/Assumption Mapping as alternative next steps -- revisit once any of those methods is built (owner: operator, or whoever builds one of them)."
+  - "OQ-SCAMPER-2: cognitive_primitives's TRANSFORM value is not itself one of the 24 kernel primitives Atlas's own §4 list enumerates (L158-183) -- an Atlas-internal inconsistency, disclosed not resolved here (owner: operator, or whoever reconciles the §4 kernel list)."
+  - "OQ-SCAMPER-3: whether entries[] should eventually require a subject/starting-idea top-level field (what is being SCAMPER'd) is left open -- Atlas's own citations describe the 7 lenses but never a required 'subject' field the way association.morphological_analysis requires 'subject' (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L383) and §11.10 (L1406-1432) directly. Grepped the whole Atlas file
+    case-insensitively for "scamper" -- 14 total hits, read every one in context (L73, L189, L342, L383, L415,
+    L1406-1432, L2580, L3340, L3662, L4279, L4435, L4470-4471); confirmed no §14.1 legal-chain mention, no
+    §22.3 gate-table row, one real §4 composition-formula citation (L189), and multiple recipe mentions
+    resolved into the single recommended_next decision above. Grepped the whole `ai_lego` tree and this docs
+    tree case-insensitively for "scamper" before writing any of this method's own files -- zero pre-existing
+    implementation (only the F04-side cross-reference already disclosed in
+    ai_lego/modules/association/morphological_analysis.py's own module docstring). Read
+    strategy.business_model_canvas.contract.yaml (validation_status structural-elimination precedent) and
+    strategy.bcg_matrix.contract.yaml (open-ended non-empty-list, thin-citation precedent) in full before
+    writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own 7-lens vocabulary and its F03/§11.10 validation caution are
+    transcribed into `preconditions`/`quality`/`open_questions`. `cognitive_primitives` is a rare direct Atlas
+    citation (L189), disclosed as such; the PUT literal-value choice, the open-ended entries[] shape, and the
+    record-level-only provenance decision are compilation decisions, disclosed above, not presented as directly
+    Atlas-cited.

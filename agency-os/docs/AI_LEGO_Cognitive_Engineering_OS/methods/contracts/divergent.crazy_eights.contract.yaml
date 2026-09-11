@@ -1,0 +1,121 @@
+$id: "ai-lego://methods/contracts/divergent.crazy_eights.contract.yaml"
+title: "Crazy 8s Method Contract"
+status: ACTIVE
+
+description: >
+  divergent.crazy_eights, family divergent (F03) -- 1st member, opening the family (grep-confirmed zero
+  pre-existing divergent.*/CrazyEights/crazy_eights/CRAZY8 anywhere before this file; 9 sibling F03 methods --
+  SCAMPER/Lotus Blossom/Starbursting/Random Stimulus/Forced Connections/Synectics/etc -- remain unbuilt).
+  Atlas cites this method TWICE: the F03 table row (L382: "Crazy 8s｜強迫突破第一答案｜8 格、8 分鐘、8 方案｜
+  降低 perfectionism｜適合概念/介面") and a dedicated §12.10 section (L2650-2655, "用途：八分鐘畫八個不同
+  concept／效益：打破第一答案、降低 perfectionism／適用：UI、服務流程、產品概念／限制：不適合作為最後方案評選").
+  Core invariant: `concepts` is EXACTLY 8 entries, `box_number` values are exactly {1..8} each once, every
+  `sketch_description` non-empty AND pairwise distinct -- the method's own literal "8 格、8 方案" identity,
+  not an adjustable headcount.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Crazy 8s row (L382)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.10 瘋狂八格法／八格快速發想 (L2650-2655) -- 用途/效益/適用/限制"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.crazy_eights` mints a NEW machine_id AND a NEW family
+  (`divergent`, F03's first built member). The fixed count-of-8 is grounded directly in Atlas L382/§12.10's
+  own literal "8 格、8 分鐘、8 方案" wording -- the method's own name states its own fixed identity (no
+  adjustability caveat the way collaboration.635's own citation gives it), same class decomposition.wbs's
+  "100% rule" and strategy.bcg_matrix's 2x2 grid already establish for other methods.
+
+id: divergent.crazy_eights
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, DECOMPOSE, IMAGINE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). EXPAND =
+# same kernel primitive Atlas's own SCAMPER formula (§4 L188: "EXPAND + ASSOCIATE + TRANSFORM") uses for
+# generating many divergent options, matching this method's own "強迫突破第一答案"; DECOMPOSE = splitting the
+# exercise into the 8 discrete boxes; IMAGINE = the creative sketch content itself.
+
+purpose:
+  - force_past_the_first_answer_via_8_rapid_concept_sketches
+# Atlas L382/§12.10 verbatim sense: "強迫突破第一答案"/"打破第一答案" (force/break past the first answer) /
+# method "8 格、8 分鐘、8 方案" (8 boxes, 8 minutes, 8 concepts) / benefit "降低 perfectionism".
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L382/§12.10 citations name no required input type, same
+  # "no hard upstream dependency" position strategy.ansoff.contract.yaml's own inputs.required: [] takes.
+  # (§12.3's own "JTBD → HMW → Crazy 8s / SCAMPER" chain, L2580, names framing.how_might_we as a SUGGESTED
+  # upstream step, not a required one -- no schema-level input dependency is cited.)
+
+outputs:
+  - CrazyEightsSession
+# NEW output type (see typed-objects/crazy-eights-session.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other thin-citation contract in this suite discloses.
+
+preconditions:
+  - "concepts is present and has EXACTLY 8 entries -- Atlas's own literal '8 格、8 方案' (L382) / '八個不同 concept' (§12.10 L2652) IS the method's fixed identity; fewer means the exercise wasn't completed, more is a different exercise"
+  - "concepts[].box_number values are exactly {1,2,...,8}, each appearing exactly once, in any order -- a closed numeric-range completeness+uniqueness check, same shape class strategy.porter_five_forces's 5-force completeness check establishes, generalized from named categories to numbered slots"
+  - "every concepts[].sketch_description is non-empty AND no two concepts[] entries share a character-identical sketch_description -- Atlas's own benefit ('強迫突破第一答案'/'打破第一答案') presumes 8 GENUINELY DIFFERENT concepts, not 8 copies of the first idea"
+  - "provenance (record-level) is present and schema-valid -- 128/128 corpus convention, same universal-field discipline decomposition.wbs.contract.yaml's own disclosed addition already establishes"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- Atlas's own §12.10 gives a USAGE limitation ("不適合作為最後方案評選", not suitable as the final
+  # concept-selection method), not an unevidenced-claim misuse warning the way strategy.swot's own L1347 gives.
+  # Sketch concepts are disclosed creative/generative content, not evidentiary claims -- same reasoning
+  # strategy.ansoff/bcg_matrix's own identical flag already establishes for their own thin citations.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own §12.10 limitation ("不適合作為最後方案評選") implies a SEPARATE downstream selection/evaluation
+# step is needed, but no such machine_id is cited by name for Crazy 8s specifically (grep-confirmed) -- left
+# empty rather than inventing one. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed count-of-8 closed SET (porter_five_forces-style, completeness required) or an adjustable/open-ended headcount (bcg_matrix-style)?"
+    decision: "Fixed closed SET, exactly 8, completeness+uniqueness required -- Atlas's own citations give NO adjustability caveat (unlike collaboration.635, whose own citation states headcount is adjustable); '8' is this method's own stated identity, not a parameter."
+  - question: "Should sketch_description distinctness be a normalized (NFKC/casefold, association.analogy_mapping-style) or exact character-match check?"
+    decision: "Exact character-match -- task-mandated wording is 'character-identical', a strictly narrower (and simpler) check than analogy_mapping's own normalized distinctness; no citation calls for semantic/normalized comparison here."
+  - question: "Per-concept provenance (porter_five_forces/ansoff/bcg_matrix-style) or record-level only (decomposition.wbs-style)?"
+    decision: "Record-level only -- task-mandated shape `{id, version, provenance, concepts:[{box_number, sketch_description}]}` names no per-concept provenance field; same record-level-only precedent decomposition.wbs.contract.yaml's own disclosed addition already establishes."
+  - question: "Should box_number be a positional TUPLE (causal.logic_model-style, exact sequence) or a closed SET with no position?"
+    decision: "Closed set, no position -- Atlas's own citations list no sequence between the 8 boxes; same 'no position enforced' precedent strategy.porter_five_forces/ansoff already establish for their own fixed vocabularies, generalized here to a fixed numeric range."
+  - question: "Should §12.10's own 'not suitable as final concept selection' limitation be mechanically enforced?"
+    decision: "No -- documented as a disclosed scope boundary only (open_questions), same 'no structural test possible' treatment strategy.porter_five_forces.contract.yaml's own digital-platform limitation already establishes."
+
+open_questions:
+  - "OQ-CRAZYEIGHTS-1: `recommended_next` names no downstream machine_id -- Atlas's own §12.10 limitation ('不適合作為最後方案評選') implies a separate selection/evaluation step is needed after Crazy 8s, but no method is cited by name as that consumer yet (owner: operator, or whoever builds one)."
+  - "OQ-CRAZYEIGHTS-2: `cognitive_primitives` is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-CRAZYEIGHTS-3: sketch_description distinctness is exact-character-match only (see compilation_decisions) -- two near-identical concepts differing only by whitespace/punctuation would both be accepted; a future pass could tighten to a normalized check like association.analogy_mapping's own NFKC/casefold comparison if this proves too permissive (owner: operator)."
+  - "OQ-CRAZYEIGHTS-4: §12.10's own 'not suitable as final concept selection' limitation is disclosed only, not mechanically enforced (owner: operator, or whoever builds a future selection/evaluation method this record should recommended_next into)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L382) and §12.10 (L2650-2655) directly at the cited lines. Grepped the whole
+    Atlas file case-insensitively for "crazy" -- confirmed exactly 7 hits: the 2 definitional citations above
+    (L382, L2650) plus 5 cross-reference mentions from OTHER methods' own rows/diagrams naming Crazy 8s as a
+    best-pairing or flow step (L342 How Might We's own best-paired column, L2580 §12.3's own JTBD->HMW chain,
+    L3339/L3661 flowchart nodes, L4470 quick-pick table) -- none of the 5 cross-references add a new invariant
+    beyond the 2 definitional citations' own "8 格、8 分鐘、8 方案" identity. No §4 composition formula, no
+    §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "crazy_eights"/"CrazyEights"/"Crazy 8s"/"CRAZY8" before writing any of this
+    method's own files -- zero pre-existing implementation (only doc-only hits: architecture-inventory.yaml's
+    own §12.10 title indexing, method-inventory.yaml's own "Crazy 8s"/has_contract:false placeholder,
+    MOTHER_DOC_SECTION_INDEX.md's own section index -- none is a real contract/schema/module). Read
+    strategy.ansoff.contract.yaml (closed-set-with-completeness precedent) and strategy.bcg_matrix.contract.yaml
+    (record-level-provenance-question precedent) in full before writing this contract. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. §12.10 (L2650-2655) exists and was read in full; its "用途"/"效益"/
+    "適用" lines corroborate the F03 row's own identity and its "限制" line is disclosed (open_questions),
+    not silently omitted. `cognitive_primitives`, the exact-character-match distinctness check, and the
+    record-level-only provenance placement are compilation decisions, disclosed above, not presented as
+    directly Atlas-cited.

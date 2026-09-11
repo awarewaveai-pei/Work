@@ -1,0 +1,196 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/six-three-five-session.schema.yaml"
+title: 6-3-5 Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SixThreeFiveSession` -- the declared `outputs` of
+  `divergent.six_three_five`'s Method Contract (methods/contracts/divergent.six_three_five.contract.yaml,
+  `outputs: [SixThreeFiveSession]`). Atlas cites this method ONCE at the F03 table row (L381: "6-3-5｜結構化
+  大量 ideation｜6 人×3 idea×5 分鐘，輪傳延伸｜快速得到大量變體｜人數可調整").
+
+  Field provenance:
+    * `participant_ids`/`sheets[].sheet_id`/`sheets[].rounds[].round_number`/`contributor_id`/`ideas` --
+      caller-supplied structural input (the session record under review), trusted domain content, not
+      computed.
+    * No top-level GENUINE_COMPUTE derived VALUE field exists (unlike MeceCheck's overlaps/gaps/is_mece or
+      BcgMatrixAnalysis's per-item quadrant) -- this method's two real invariants (exactly-3-ideas-per-round,
+      full-sheet-rotation completeness) are pure structural VALIDITY facts re-derived identically by the
+      builder and an independent gate from the record's own raw fields, same "shared predicate, no stored
+      derived field" class `framing.five_w_one_h`'s own dimension KNOWN/UNKNOWN coherence invariant already
+      establishes (see `ai_lego/modules/divergent/six_three_five.py`'s own module docstring) -- there is
+      nothing to compute-and-store here, only something to verify and refuse if false.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, 6-3-5 row (L381)"
+  - "methods/contracts/divergent.six_three_five.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml -- no-stored-derived-field, shared-predicate precedent this file's own two invariants follow"
+
+decided_by: >
+  No ADR governs this file. `id` prefix `SIXTHREEFIVE-` is a free string (record ids carry no method-id
+  character-set constraint) -- see method contract's own `decided_by` for why `id: divergent.six_three_five`
+  itself had to spell the method name out digit-free.
+
+compilation_decisions:
+  - question: "Fixed headcount (6) or open-ended participant_ids?"
+    decision: "Open-ended, minItems: 2 -- Atlas's own F03 row caution ('人數可調整', headcount is adjustable) explicitly names 6 as the classic default, not a hard requirement. minItems: 2 (not 1) because a solo session has no rotation to perform -- an un-cited-but-necessary floor, same class framing.five_w_one_h's own un-cited topic anchor field already establishes."
+  - question: "Fixed 3-idea count or open-ended ideas per round?"
+    decision: "Fixed: exactly 3 non-empty strings (minItems: 3, maxItems: 3) -- Atlas's own literal '3 idea' in the F03 row is a structural fact of this specific method's name and citation, not adjustable like headcount (the row's own caution names ONLY headcount as adjustable)."
+  - question: "Should sheet_id uniqueness across sheets, and contributor_id-per-sheet full-rotation completeness, be a schema-level constraint (uniqueItems) or a runtime-layer check?"
+    decision: "Runtime layer (ai_lego/modules/divergent/six_three_five.py), same schema-vs-runtime split decomposition.mece's own category_name uniqueness and overlaps/gaps/is_mece set-arithmetic already establish -- JSON Schema's uniqueItems only compares whole-object equality; it cannot express 'unique by one field' or 'this array is a permutation of that other array', both of which this method's own real invariants need."
+  - question: "Require len(sheets) == len(participant_ids) (classic 1-sheet-per-participant symmetry)?"
+    decision: "No -- Atlas's own citation names no such ratio, and inventing one would overstate the citation, same restraint strategy.bcg_matrix's own open-ended portfolio_items already establishes for a different family. sheets is open-ended (minItems: 1 only); each sheet's own rotation completeness is checked independently."
+  - question: "Carry engine/computation_provenance_ref fields at the top level, matching decomposition.mece/strategy.bcg_matrix?"
+    decision: "No -- those two fields exist ONLY where a record carries an actual GENUINE_COMPUTE derived VALUE (a quadrant, an overlaps list, an is_mece boolean) that a consumer reads as this method's real output. This record has no such field (see description) -- same no-engine-field precedent framing.five_w_one_h's own 5w1h-record.schema.yaml already establishes for ITS OWN pure-structural-refusal invariant (dimension KNOWN/UNKNOWN coherence has no engine field either; only that method's OTHER invariant, information_gaps, is an actual stored derived value with no analog here). Record-level `provenance` IS still carried -- 123/128 corpus convention (contract-backlog.yaml onehundredtwentyseventh_concrete_entry integration note)."
+  - question: "additionalProperties: false at the top level, and on the sheets[]/rounds[] item schemas?"
+    decision: "Yes, all three levels -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, participant_ids, sheets, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SIXTHREEFIVE-"
+    description: "NEW DESIGN. Free string, not governed by method.schema.yaml's id pattern (that pattern governs the METHOD id, `divergent.six_three_five`, not record ids) -- same distinction MECE-/BCG- prefixed record ids already establish."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.six_three_five"
+
+  participant_ids:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    description: >
+      The full set of participant ids in this session -- Atlas's own "人" (person) subject, headcount
+      ADJUSTABLE per Atlas's own '人數可調整' caution (NOT hardcoded to 6). Unique (a participant cannot be
+      listed twice); referential integrity against `sheets[].rounds[].contributor_id` (does every round's
+      contributor actually appear here, does every participant touch every sheet exactly once) is enforced at
+      the runtime layer (ai_lego/modules/divergent/six_three_five.py), not here.
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+
+  sheets:
+    type: array
+    minItems: 1
+    description: >
+      One entry per rotating idea sheet. Open-ended (no maxItems, no required ratio to participant_ids --
+      see compilation_decisions); sheet_id uniqueness across this list, and each sheet's own full-rotation
+      completeness (its rounds[].contributor_id multiset equals EXACTLY the full participant_ids set), are
+      enforced at the runtime layer, not here.
+    items:
+      type: object
+      required: [sheet_id, rounds]
+      additionalProperties: false
+      properties:
+        sheet_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Names this sheet -- REPORTED content, not computed."
+        rounds:
+          type: array
+          minItems: 1
+          description: >
+            One entry per participant's own turn on this sheet, in the order they occurred. Real invariant
+            (Atlas's own literal '輪傳延伸'): across all of THIS sheet's own rounds, the multiset of
+            contributor_id values must equal EXACTLY this session's participant_ids set -- enforced at the
+            runtime layer, not here.
+          items:
+            type: object
+            required: [round_number, contributor_id, ideas]
+            additionalProperties: false
+            properties:
+              round_number:
+                type: integer
+                minimum: 1
+                description: "1-based turn order on this sheet. REPORTED content -- cross-round uniqueness/sequencing on a single sheet is NOT enforced here or at the runtime layer (not cited by Atlas as a checkable fact; only the contributor_id multiset is)."
+              contributor_id:
+                type: string
+                minLength: 1
+                pattern: "\\S"
+                description: "MUST be one of this session's own participant_ids -- referential integrity enforced at the runtime layer, not here."
+              ideas:
+                type: array
+                minItems: 3
+                maxItems: 3
+                description: "GENUINE_COMPUTE shared predicate target, REQUIRED. Atlas's own literal '3 idea' per round-per-person -- exactly 3 non-empty strings, never fewer or more. See method contract preconditions."
+                items:
+                  type: string
+                  minLength: 1
+                  pattern: "\\S"
+
+  provenance:
+    description: "Record-level provenance -- 123/128 corpus convention (see method contract decided_by). epistemic_type is expected to be AI_SUGGESTION or HUMAN_OPINION for creative brainwriting content, not CALCULATED_RESULT (no derived value exists in this record -- see description)."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A valid 4-participant session, 2 sheets, each fully rotated through all 4 participants, every round carrying exactly 3 ideas"
+    value:
+      id: "SIXTHREEFIVE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.six_three_five"
+      participant_ids: ["P1", "P2", "P3", "P4"]
+      sheets:
+        - sheet_id: "SHEET-A"
+          rounds:
+            - round_number: 1
+              contributor_id: "P1"
+              ideas: ["idea-a1", "idea-a2", "idea-a3"]
+            - round_number: 2
+              contributor_id: "P2"
+              ideas: ["idea-a4", "idea-a5", "idea-a6"]
+            - round_number: 3
+              contributor_id: "P3"
+              ideas: ["idea-a7", "idea-a8", "idea-a9"]
+            - round_number: 4
+              contributor_id: "P4"
+              ideas: ["idea-a10", "idea-a11", "idea-a12"]
+        - sheet_id: "SHEET-B"
+          rounds:
+            - round_number: 1
+              contributor_id: "P2"
+              ideas: ["idea-b1", "idea-b2", "idea-b3"]
+            - round_number: 2
+              contributor_id: "P3"
+              ideas: ["idea-b4", "idea-b5", "idea-b6"]
+            - round_number: 3
+              contributor_id: "P4"
+              ideas: ["idea-b7", "idea-b8", "idea-b9"]
+            - round_number: 4
+              contributor_id: "P1"
+              ideas: ["idea-b10", "idea-b11", "idea-b12"]
+      provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-SIXTHREEFIVESESSION-1"
+    question: "round_number sequencing/uniqueness WITHIN a single sheet is not constrained at either the schema or runtime layer -- should a future pass require rounds to be 1..N positionally, matching the literal physical hand-to-hand passing order? (owner: operator)"
+  - id: "OQ-SIXTHREEFIVESESSION-2"
+    question: "No is_fully_rotated-style summary boolean exists (contrast decomposition.mece's is_mece) -- should a future pass add one for callers who want a quick per-sheet check without recomputing? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L381) directly. Grepped the whole Atlas file case-insensitively for "6-3-5" --
+    confirmed exactly 1 real hit (L381), no dedicated section. Read 5w1h-record.schema.yaml (no-stored-
+    derived-field, shared-predicate precedent for one of two invariants) and mece-check.schema.yaml
+    (runtime-layer-not-schema-layer uniqueness/set-arithmetic precedent) in full before writing this file.
+    Validated against jsonschema Draft202012Validator via a standalone script (required fields present, id
+    pattern satisfied, additionalProperties:false present at the top level and at both the sheets[] and
+    rounds[] item levels from the start, the embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled sheets[] key, a
+    smuggled rounds[] key, an ideas array with 2 entries, an ideas array with 4 entries, and an empty
+    participant_ids/sheets array).
+  note: >
+    No mother document was modified. The two real invariants (exactly-3-ideas, full-rotation completeness)
+    are GENUINE_COMPUTE shared predicates enforced at the runtime layer (ai_lego/modules/divergent/
+    six_three_five.py), disclosed in compilation_decisions as producing no stored derived VALUE field, unlike
+    every prior GENUINE_COMPUTE record in this directory. The open-ended participant_ids/sheets shapes and
+    the engine/computation_provenance_ref omission are compilation decisions, disclosed above.

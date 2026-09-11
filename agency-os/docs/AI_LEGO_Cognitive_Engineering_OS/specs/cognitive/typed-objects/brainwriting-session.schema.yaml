@@ -1,0 +1,178 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/brainwriting-session.schema.yaml"
+title: Brainwriting Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BrainwritingSession` -- the declared `outputs` of
+  `divergent.brainwriting`'s Method Contract (methods/contracts/divergent.brainwriting.contract.yaml,
+  `outputs: [BrainwritingSession]`). Atlas cites this method at the F03 table row (L380: "Brainwriting｜
+  降低權威/外向者主導｜先各自寫→再分享/合併｜降低 anchoring、groupthink｜適合跨階級團隊") plus a dedicated
+  §12.9 section (L2642-2646).
+
+  Field provenance:
+    * `individual_contributions` -- Atlas's own "先各自寫" (write individually first): each entry a
+      DISCLOSED contributor_id/idea_text pair. GENUINE_COMPUTE-verified 2+ DISTINCT contributor_id
+      values across the list (see method contract's own preconditions) -- never a bare count.
+    * `merged_ideas` -- Atlas's own "再分享/合併" (then share/merge): each entry's
+      `source_contribution_refs` is GENUINE_COMPUTE referential integrity back to real
+      `individual_contributions[].id` values, re-derived by the gate from raw fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Brainwriting row (L380)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.9 書面腦力激盪 (L2642-2646)"
+  - "methods/contracts/divergent.brainwriting.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/objective-tree.schema.yaml -- same-record referential-integrity precedent (this file's coverage invariant is a looser, one-directional version of the same discipline)"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- per-item provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents:
+  a direct transcription of Atlas L380/§12.9's own method description plus low-risk, disclosed
+  compilation choices, including the exact task-mandated shape.
+
+compilation_decisions:
+  - question: "additionalProperties: false at the top level, on individual_contributions[] items, and on merged_ideas[] items?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, set correctly from the start, and task-mandated for this method."
+  - question: "minItems on individual_contributions -- 1 (bare non-empty) or 2 (necessary condition for 2+ distinct contributors)?"
+    decision: "2 -- a real necessary condition this schema CAN express (you cannot have 2 distinct contributor_id values across fewer than 2 entries). The SUFFICIENT condition (the 2+ entries must actually carry 2+ DISTINCT contributor_id values, not the same one twice) remains runtime-gate-only -- plain JSON Schema cannot express a distinctness-count constraint across a field's own values, same limitation every sibling GENUINE_COMPUTE schema in this directory already discloses (see open_questions)."
+  - question: "Should contributor_id / individual_contributions[].id require a specific prefix or format?"
+    decision: "No -- contributor_id is caller-assigned (identifies a real person/role, not a record), and individual_contributions[].id is a record-scoped identifier (referenced only by merged_ideas[].source_contribution_refs within the SAME record), not a globally-resolved cross-record id like the top-level BrainwritingSession id itself; no citation or cross-record lookup need justifies a prefix rule here."
+  - question: "Does merged_ideas[].source_contribution_refs's referential integrity belong in this schema as a JSON Schema constraint, or only in the runtime gate?"
+    decision: "Runtime gate only -- plain JSON Schema (even with if/then) cannot express a value-level cross-array lookup constraint. Same limitation every sibling GENUINE_COMPUTE schema in this directory already discloses (see open_questions)."
+
+type: object
+required: [id, version, individual_contributions, merged_ideas]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BRAINWRITE-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as objective-tree.schema.yaml's own OBJTREE- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.brainwriting"
+
+  individual_contributions:
+    type: array
+    minItems: 2
+    description: >
+      Atlas's own "先各自寫" (write individually first): one entry per independently-submitted idea.
+      MUST collectively carry 2+ DISTINCT contributor_id values (GENUINE_COMPUTE, runtime-gate-only --
+      see compilation_decisions); enforced by ai_lego/modules/divergent/brainwriting.py at both the
+      builder and an independent gate.
+    items:
+      type: object
+      required: [id, contributor_id, idea_text, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Record-scoped identifier, referenced by merged_ideas[].source_contribution_refs within this SAME record."
+        contributor_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "DISCLOSED, not computed -- identifies which real contributor wrote this idea. The 2+-distinct-values invariant is checked across this field, see method contract's own preconditions."
+        idea_text:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual independently-written idea content."
+        provenance:
+          description: "Per-item provenance. Full provenance_record, same pattern bcg-matrix-analysis.schema.yaml's portfolio_items[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  merged_ideas:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "再分享/合併" (then share/merge): the post-sharing merged output. Every entry's
+      source_contribution_refs must resolve to a real individual_contributions[].id in this SAME
+      record -- GENUINE_COMPUTE referential integrity (enforced by
+      ai_lego/modules/divergent/brainwriting.py at both the builder and an independent gate). NOT a
+      bijection: a contribution may be referenced by more than one merged idea, or by none, unlike
+      objective-tree.schema.yaml's own stricter exactly-once coverage (see method contract's own
+      compilation_decisions).
+    items:
+      type: object
+      required: [id, source_contribution_refs]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Record-scoped identifier for this merged idea."
+        source_contribution_refs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            pattern: "\\S"
+          description: "MUST each resolve to a real individual_contributions[].id in this SAME record -- referential integrity re-derived by the gate from raw fields, never trusted from a stored flag."
+
+examples:
+  - description: "A Brainwriting session with 3 independent contributors' 4 raw ideas merged into 2 shared themes"
+    value:
+      id: "BRAINWRITE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.brainwriting"
+      individual_contributions:
+        - id: "IC-1"
+          contributor_id: "user-alice"
+          idea_text: "推出訂閱制方案，降低客戶進入門檻"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null }
+        - id: "IC-2"
+          contributor_id: "user-bob"
+          idea_text: "按月訂閱搭配前三個月折扣"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null }
+        - id: "IC-3"
+          contributor_id: "user-carol"
+          idea_text: "開放企業客戶客製化議價"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null }
+        - id: "IC-4"
+          contributor_id: "user-alice"
+          idea_text: "提供年繳方案並附加額外服務"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null }
+      merged_ideas:
+        - id: "MI-1"
+          source_contribution_refs: ["IC-1", "IC-2", "IC-4"]
+        - id: "MI-2"
+          source_contribution_refs: ["IC-3"]
+
+open_questions:
+  - id: "OQ-BRAINWRITINGSESSION-1"
+    question: "merged_ideas[] carries no provenance field, diverging from individual_contributions[]'s own per-item convention in this SAME record -- task-mandated exact shape, disclosed in the method contract's own open_questions (owner: operator)."
+  - id: "OQ-BRAINWRITINGSESSION-2"
+    question: "The 2+-distinct-contributor invariant and the source_contribution_refs referential-integrity invariant are both runtime-only constraints (plain JSON Schema has no cross-value distinctness-count or cross-array lookup check) -- should a future pass add something stronger once JSON Schema tooling supports it? Same open question objective-tree.schema.yaml's own OQ-OBJECTIVETREE-2 already discloses for a different computed-value shape. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L380) and §12.9 (L2642-2646) directly. Grepped the whole Atlas file
+    case-insensitively for "brainwriting" -- confirmed 6 real hits (F03's own row L380, §12.9's
+    dedicated section L2642/2646, and 4 corroborating mentions at L1223/L3660/L4278/L4470), no
+    §4 composition formula, no §14.1 legal-chain mention. Cross-checked against
+    methods/contracts/divergent.brainwriting.contract.yaml's own outputs/preconditions/quality. Read
+    objective-tree.schema.yaml (same-record referential-integrity precedent, generalized here to a
+    looser one-directional version) and bcg-matrix-analysis.schema.yaml (per-item provenance
+    precedent) in full as shape precedent before writing this file. Validated against jsonschema
+    Draft202012Validator via a standalone script (required fields present, id pattern satisfied,
+    additionalProperties:false present at all 3 levels from the start, embedded example resolved
+    through its real $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level
+    key, a smuggled individual_contributions[] key, a smuggled merged_ideas[] key, an empty
+    individual_contributions array, a single-item individual_contributions array, and an empty
+    merged_ideas array).
+  note: >
+    The exact field shape ({id, version, generated_by_method, individual_contributions, merged_ideas},
+    provenance on individual_contributions[] only) is this task's own explicit design spec, not
+    independently invented by this file -- disclosed in compilation_decisions and open_questions. No
+    mother document was modified to produce this file.

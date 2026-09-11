@@ -1,0 +1,106 @@
+$id: "ai-lego://methods/contracts/divergent.random_stimulus.contract.yaml"
+title: "Random Stimulus Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F03 divergent ideation family (Atlas L375-388), 1st built member -- the family itself is
+  entirely unbuilt before this entry (grep-confirmed: zero prior `ai_lego/modules/divergent/`). Atlas
+  cites this method ONCE: F03 table row L386 ("Random Stimulus｜打破慣性｜隨機詞/圖→強制找關聯｜產生遠距
+  聯想｜需後續可行性篩選") -- thinnest citation class, no dedicated section, same class
+  strategy.ansoff/strategy.bcg_matrix's own citations already establish. Core invariant: Atlas's own
+  caution ("需後續可行性篩選") is made structural -- `feasibility_status` is a single-legal-value enum
+  (NOT_YET_SCREENED) the builder never accepts as a parameter, same device
+  strategy.business_model_canvas's own `validation_status` already establishes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Random Stimulus row (L386)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: divergent.random_stimulus` mints a NEW machine_id AND a NEW
+  `family: divergent` (F03's first built member -- 9 siblings on the same Atlas table remain unbuilt).
+
+id: divergent.random_stimulus
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [ASSOCIATE, IMAGINE, EXPAND]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed, same
+# absence class every F08/F03 contract with no §4 formula already discloses). ASSOCIATE = the method's
+# own literal mechanic ("隨機詞/圖→強制找關聯" -- forced connection-finding); IMAGINE = the creative leap
+# from forced_connection to resulting_idea; EXPAND = F03's own family-level intent (divergent ideation).
+
+purpose:
+  - break_habitual_thinking_via_forced_random_association
+# Atlas L386 verbatim sense: 主要用途 "打破慣性" (break inertia) / benefit "產生遠距聯想" (produce
+# distant/remote association).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L386 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix's own inputs.required: [] takes.
+
+outputs:
+  - RandomStimulusSession
+# NEW output type (see typed-objects/random-stimulus-session.schema.yaml). Atlas names no PascalCase
+# output type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "entries is present and non-empty -- a session that drew zero random stimuli has not actually done Random Stimulus (Atlas L386's own method column: '隨機詞/圖→強制找關聯')"
+  - "every entries[] item carries non-empty stimulus, forced_connection, and resulting_idea -- Atlas's own benefit ('產生遠距聯想') presumes each stimulus was actually worked through to a resulting idea, not just listed"
+  - "every entries[] item's feasibility_status is present and equals the single legal enum value NOT_YET_SCREENED -- Atlas's own stated caution ('需後續可行性篩選', needs a SUBSEQUENT feasibility screening) means this method's own output can never itself carry a screened verdict, never caller-overridable"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.ansoff/strategy.bcg_matrix's identical flag
+  # already establishes: Atlas's L386 citation for this method is a single bare table row, no dedicated
+  # section, no explicit unevidenced-claim misuse warning cited. See open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice several sibling contracts' own field already takes.
+
+recommended_next: []
+# Atlas L386's own caution ("需後續可行性篩選") names no specific downstream method id -- no
+# feasibility-screening machine_id exists anywhere in this corpus yet (grep-confirmed), so left empty
+# rather than naming a non-existent id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Open-ended non-empty entries list (bcg_matrix-style) or fixed closed SET (porter_five_forces-style)?"
+    decision: "Open-ended, non-empty -- Atlas's own method column describes drawing repeated random stimuli ('隨機詞/圖'), an unbounded count per session, not a fixed structural split."
+  - question: "Should Atlas's own caution ('需後續可行性篩選') be mechanically enforced or documentation-only?"
+    decision: "Mechanically enforced -- a required per-entry `feasibility_status` field with a single legal enum value (NOT_YET_SCREENED), structurally eliminated from the builder's parameters (same no-caller-settable-mismatch pattern strategy.business_model_canvas's `validation_status` already establishes). Unconditionally true of every entry: the screening is explicitly a step this method never performs itself."
+  - question: "Record-level or per-entry provenance?"
+    decision: "Record-level only (task-mandated shape, 128/128 corpus convention) -- unlike a Business Model Canvas block's own independently evidence-bearing claim, an entries[] item here is one connected thought (stimulus -> connection -> idea), not a set of independently-sourceable facts."
+
+open_questions:
+  - "OQ-RANDOMSTIMULUS-1: recommended_next should probably name a future feasibility-screening method id (Atlas L386's own '需後續可行性篩選' caution) once such a contract exists -- left empty, no such contract exists yet (owner: operator, or whoever builds it)."
+  - "OQ-RANDOMSTIMULUS-2: quality.evidence_labeling_required: false reflects this citation's own thinness (a single bare table row) rather than a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-RANDOMSTIMULUS-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-RANDOMSTIMULUS-4: family divergent (F03) has 9 other Atlas-cited members (Classic Brainstorming, Brainwriting, 6-3-5, Crazy 8s, SCAMPER, Lotus Blossom, Starbursting, Forced Connections, Synectics) still entirely unbuilt -- this is the 1st (owner: operator, or whoever builds the remaining 9)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L386) directly at the cited line, plus the F03 section header (L375) and
+    the full F03 table (L377-388) for family context. Grepped the whole Atlas file case-insensitively for
+    "Random Stimulus"/"隨機刺激"/"random_stimulus" -- confirmed exactly this 1 real hit (table row), no
+    dedicated section, no §4 composition formula, no §14.1 legal-chain mention, no §22.3 gate-table row.
+    Grepped the whole `ai_lego` tree and this docs tree case-insensitively for "random_stimulus"/
+    "RandomStimulus" before writing any of this method's own files: zero pre-existing implementation
+    (confirmed no `ai_lego/modules/divergent/` package existed at all before this entry). Read
+    strategy.business_model_canvas.contract.yaml (single-legal-value structural-enforcement precedent)
+    and strategy.bcg_matrix.contract.yaml (open-ended non-empty list, lean-doc-format precedent) in full
+    before writing this contract, reusing their established conventions. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L386's own method description and caution are transcribed
+    into `preconditions`/`purpose`/`open_questions`. `cognitive_primitives`,
+    `evidence_labeling_required`'s grounding, the record-level-only provenance shape, and the structural
+    enforcement of `feasibility_status` are compilation decisions, disclosed above, not presented as
+    directly Atlas-cited. This is the FIRST built member of a brand-new `family: divergent` (F03) -- 9
+    Atlas-cited siblings on the same table remain unbuilt (see open_questions).

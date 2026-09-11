@@ -1,0 +1,156 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/starbursting-session.schema.yaml"
+title: Starbursting Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StarburstingSession` -- the declared `outputs` of
+  `divergent.starbursting`'s Method Contract (methods/contracts/divergent.starbursting.contract.yaml,
+  `outputs: [StarburstingSession]`). Atlas cites this method ONCE: F03 tool table row (L385:
+  "Starbursting｜用問題發散｜Who/What/When/Where/Why/How｜找未知與研究問題｜很適合需求前期").
+
+  Field provenance:
+    * `questions[].category` (Atlas L385 verbatim "Who/What/When/Where/Why/How", SCREAMING_SNAKE_CASE)
+      -- a CLOSED set of 6 names; ALL 6 REQUIRED to appear at least once, but UNBOUNDED total count
+      (multiple questions per category allowed) -- see `compilation_decisions` and
+      `ai_lego/modules/divergent/starbursting.py` module docstring for why this differs from both
+      `porter-five-forces-analysis.schema.yaml`'s exactly-5-once shape and
+      `5w1h-record.schema.yaml`'s exactly-6-positional shape.
+    * `questions[].question_text` -- Atlas's own benefit ("找未知與研究問題") means every entry IS a
+      question. REQUIRED to end in `?`/`？` at both this schema layer (checkable single-field suffix,
+      unlike the cross-item completeness invariant above) and the runtime layer (builder + independent
+      gate re-derivation) -- the real, mechanically-checkable differentiator from
+      `5w1h-record.schema.yaml`'s `dimensions[].answer`, which carries no such constraint.
+    * `provenance` -- record-level ONLY (no per-question provenance/evidence-refs field exists in this
+      shape; see compilation_decisions for the verified corpus-convention count this follows).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Starbursting row (L385)"
+  - "methods/contracts/divergent.starbursting.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- closed-set-with-completeness precedent (generalized here from exactly-5-once to at-least-6-of-6, unbounded)"
+  - "specs/cognitive/typed-objects/5w1h-record.schema.yaml -- shares the identical 6 category names; this file's own compilation_decisions record the real distinction"
+  - "specs/governance/epistemic-label.schema.yaml -- provenance_record"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L385's own bare method description plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Fixed 6-count closed array (5W1H-style, prefixItems, one per category) or unbounded array with completeness?"
+    decision: "Unbounded array (minItems: 6 only, no maxItems), completeness of the 6-category SET enforced at runtime (plain JSON Schema has no cross-item set-completeness operator, same limitation porter-five-forces-analysis.schema.yaml's own compilation_decisions already documents for its own closed set) -- multiple questions per category are Atlas's own brainstorming-family expectation (F03's sibling rows favor volume: 'Classic Brainstorming: 追數量', '6-3-5: 快速得到大量變體'), unlike 5W1H's one-answer-per-dimension profile."
+  - question: "Should question_text's '?'/'？' suffix be a JSON Schema `pattern`, a runtime-only check, or both?"
+    decision: "Both -- a single-field suffix constraint IS expressible as a safe `pattern` (unlike framing.how_might_we's own hmw_question, whose ALSO-required case-insensitive stem check pushed that method's entire invariant to runtime-only). Schema pattern here is defense-in-depth; the runtime builder+gate remain the authoritative re-derivation, same two-layer discipline every sibling module already establishes."
+  - question: "Per-question provenance (porter_five_forces-style) or record-level only?"
+    decision: "Record-level only, matching the majority (verified: 113+ of 128 typed-object schemas in this directory require a top-level `provenance` field; bcg-matrix-analysis.schema.yaml is a documented per-item-only exception) -- this method's own citation gives no per-question evidence/misuse column to ground a per-item field."
+  - question: "additionalProperties: false at the top level, and on each questions[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, central_topic, questions, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^STARBURST-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as porter-five-forces-analysis.schema.yaml's PFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.starbursting"
+
+  central_topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The still-unscoped subject the 6 radiating question categories are actually about -- Atlas's own 'before a problem is even scoped' framing ('很適合需求前期') presumes a named topic, not yet a stated problem."
+
+  questions:
+    type: array
+    minItems: 6
+    description: >
+      Atlas L385's own literal 6-category radiation. SHAPE-bounded here to at least 6 items (no
+      maxItems -- unbounded, multiple questions per category allowed); genuine completeness (all 6
+      distinct category names present at least once, order-independent) is a runtime-only invariant
+      this schema cannot express (see compilation_decisions) -- enforced by
+      ai_lego/modules/divergent/starbursting.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [category, question_text]
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+          enum: [WHO, WHAT, WHEN, WHERE, WHY, HOW]
+          description: "Atlas L385's own literal 'Who/What/When/Where/Why/How' list, SCREAMING_SNAKE_CASE. Same 6 names framing.five_w_one_h's DIMENSION_ORDER uses -- see this schema's own top-level description for the real distinction."
+        question_text:
+          type: string
+          minLength: 2
+          pattern: "\\S.*[?\uFF1F]$"
+          description: >
+            The actual open question, in natural language. MUST literally end with '?' (ASCII) or '？'
+            (full-width U+FF1F) -- a declarative statement smuggled in here is refused both at this
+            schema layer and by the runtime builder/gate. This is the method's own real differentiator
+            from framing.five_w_one_h's `dimensions[].answer`, which carries no such constraint (that
+            method profiles KNOWN answers, this one radiates OPEN questions).
+
+  provenance:
+    description: "Record-level provenance only (see compilation_decisions) -- full provenance_record, same pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Starbursting session radiating open questions from an unscoped 'AI 客服導入' topic, before any problem statement exists"
+    value:
+      id: "STARBURST-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.starbursting"
+      central_topic: "為中小企業導入 AI 客服"
+      questions:
+        - category: WHO
+          question_text: "誰是第一批會實際操作這個 AI 客服的內部人員？"
+        - category: WHO
+          question_text: "哪些客戶群體最可能拒絕與機器人互動？"
+        - category: WHAT
+          question_text: "AI 客服需要涵蓋哪些既有人工客服的服務範圍？"
+        - category: WHEN
+          question_text: "什麼時間點導入對旺季營運衝擊最小？"
+        - category: WHERE
+          question_text: "哪些既有系統或管道需要串接這個 AI 客服？"
+        - category: WHY
+          question_text: "為什麼現有人工客服無法滿足現在的需求？"
+        - category: HOW
+          question_text: "導入後如何衡量它是否真的降低了客服負擔？"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-STARBURSTINGSESSION-1"
+    question: "No downstream method in this corpus yet declares StarburstingSession as a required input (F03's own table gives no best-pairing column for this row) -- revisit once a convergent F03 method is built (owner: operator)."
+  - id: "OQ-STARBURSTINGSESSION-2"
+    question: "questions[].category set-completeness is a runtime-only invariant (plain JSON Schema has no cross-item set-equality/coverage operator) -- should a future pass add a JSON Schema if/then constraint instead of relying solely on the runtime gate? Same open question porter-five-forces-analysis.schema.yaml's own OQ-PORTERFIVEFORCESANALYSIS-2 already discloses for a related shape (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F03 table row (L385) directly. Grepped the whole Atlas file case-insensitively for
+    "Starbursting" -- confirmed exactly 1 real hit, no dedicated section. Cross-checked against
+    methods/contracts/divergent.starbursting.contract.yaml's own outputs/preconditions/quality. Read
+    porter-five-forces-analysis.schema.yaml (closed-set-with-completeness precedent) and
+    5w1h-record.schema.yaml (identical 6-category-name sibling, read to confirm genuine differentiation
+    rather than duplication) in full as shape precedent before writing this file. Counted typed-object
+    schemas with a top-level required `provenance` field directly via grep (113+ of 128) before
+    disclosing the record-level-only provenance decision as a majority, not universal, convention.
+    Validated against jsonschema Draft202012Validator via this method's own test suite (required fields
+    present, id pattern satisfied, category enum closed per Atlas's own six-way split,
+    question_text suffix pattern accepts both '?' and '？' and rejects a declarative statement,
+    additionalProperties:false present at both the top level and the questions[] item level from the
+    start, embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative
+    controls for a smuggled top-level key, a smuggled questions[] item key, and an empty questions array).
+  note: >
+    `category`'s 6 enum values are transcribed directly from Atlas L385. The unbounded-count-with-
+    completeness shape, the question-mark suffix pattern, and the record-level-only provenance
+    placement are compilation decisions, disclosed above. No mother document was modified to produce
+    this file.

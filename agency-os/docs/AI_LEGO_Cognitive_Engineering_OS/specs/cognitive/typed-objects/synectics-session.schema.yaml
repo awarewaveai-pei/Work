@@ -1,0 +1,159 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/synectics-session.schema.yaml"
+title: Synectics Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SynecticsSession` -- the declared `outputs` of
+  `divergent.synectics`'s Method Contract (methods/contracts/divergent.synectics.contract.yaml,
+  `outputs: [SynecticsSession]`). Atlas cites this method ONCE: F03 tool table row (L388: "Synectics｜用
+  類比/隱喻重構問題｜direct/personal/symbolic analogy｜深度創意突破｜workshop facilitation 要求較高").
+
+  Field provenance:
+    * `original_problem` -- un-cited-but-necessary anchor field (same class strategy.vrio's own
+      `resource_description` already establishes): the row's own "重構問題" is meaningless without naming
+      WHICH problem is being reframed.
+    * `analogies` -- Atlas's own "重構問題" framing: an open-ended, non-empty list of analogy attempts (NOT
+      a fixed closed set requiring all 3 types, unlike strategy.vrio's own fixed-name-vocabulary shape --
+      see compilation_decisions).
+    * `analogies[].analogy_type` -- the row's own literal 3-value vocabulary (direct/personal/symbolic
+      analogy), SCREAMING_SNAKE_CASE, closed enum -- a 4th value is refused (see compilation_decisions).
+    * `analogies[].analogy_content`/`reframed_insight` -- DISCLOSED reported content, not computed:
+      `analogy_content` is the actual analogy drawn, `reframed_insight` is the row's own "重構問題" made
+      real -- what the analogy actually changed about how the problem is understood.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F03 tool table, Synectics row (L388)"
+  - "methods/contracts/divergent.synectics.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- open-ended non-empty list precedent (no completeness across a small named vocabulary)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of Atlas L388's cited 3-type vocabulary plus low-risk, disclosed
+  compilation choices.
+
+compilation_decisions:
+  - question: "Fixed closed SET with completeness (all 3 types required, VRIO-style) or open-ended non-empty list?"
+    decision: "Open-ended non-empty list -- analogies: minItems 1 only (no maxItems), genuine distinctness/completeness across the 3 types is NOT required; same shape class bcg-matrix-analysis.schema.yaml#/properties/portfolio_items already establishes for a different small named vocabulary."
+  - question: "Should analogy_type carry a 4th 'Fantasy Analogy' value, common in external Synectics literature?"
+    decision: "No -- closed 3-value enum (DIRECT/PERSONAL/SYMBOLIC) exactly matching Atlas L388's own cited vocabulary; a 4th value is a real, disclosed refusal boundary, not an oversight (see divergent.synectics.contract.yaml's own compilation_decisions)."
+  - question: "Per-entry provenance (VRIO/BCG-style $ref to epistemic-label.schema.yaml on each analogies[] item) or record-level only?"
+    decision: "Record-level only, task-mandated shape -- each analogies[] entry carries only analogy_type/analogy_content/reframed_insight; the session-level `provenance` field is the only provenance in this record."
+  - question: "additionalProperties: false at the top level, and on each analogies[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on (see porter-five-forces-analysis.schema.yaml's own compilation_decisions for the critic hand-tamper PoC that established this); set correctly from the start here."
+  - question: "Does JSON Schema itself express 'analogies is non-empty with at least one entry per type' or any cross-item completeness rule?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality or completeness operator, and this contract deliberately imposes none (see divergent.synectics.contract.yaml). minItems:1 plus the per-item enum bounds the SHAPE only; per-entry non-emptiness of analogy_content/reframed_insight is enforced by both this schema's minLength AND re-derived independently by ai_lego/modules/divergent/synectics.py's own integrity gate."
+
+type: object
+required: [id, version, original_problem, analogies, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SYNECTICS-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.synectics"
+
+  original_problem:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED. Names the specific problem under Synectics reframing. Atlas L388's own "重構問題" is
+      meaningless without naming WHICH problem is being reframed -- a session with no named subject cannot
+      be audited against reality later.
+
+  analogies:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L388's own 3-type analogy vocabulary, applied as an OPEN-ENDED list (no maxItems, no
+      completeness requirement across the 3 types -- see compilation_decisions). Genuine non-emptiness is
+      the only count invariant this schema expresses; enforced by
+      ai_lego/modules/divergent/synectics.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [analogy_type, analogy_content, reframed_insight]
+      additionalProperties: false
+      properties:
+        analogy_type:
+          type: string
+          enum: [DIRECT, PERSONAL, SYMBOLIC]
+          description: >
+            Atlas L388's own literal 3-value vocabulary (direct/personal/symbolic analogy),
+            SCREAMING_SNAKE_CASE. CLOSED -- a 4th value (e.g. a 'Fantasy Analogy' from external Synectics
+            literature) is refused, a real disclosed boundary of what this row actually cites, not an
+            oversight. See compilation_decisions.
+        analogy_content:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual analogy drawn for this entry, in natural language -- e.g. for PERSONAL, 'if I were the product, what would I feel?'."
+        reframed_insight:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: >
+            REQUIRED. Atlas's own "重構問題" (reframe the problem) made real: what this analogy actually
+            changed about how the original_problem is understood. An analogy entry with no derived insight
+            has not actually reframed anything -- same 'every entry must carry its own disclosed payload,
+            not just a category label' discipline porter-five-forces-analysis.schema.yaml's own per-force
+            `assessment` field already establishes.
+
+  provenance:
+    description: "Overall session provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Synectics session reframing a customer-support response-time problem via all 3 analogy types"
+    value:
+      id: "SYNECTICS-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.synectics"
+      original_problem: "客服信箱平均回覆時間長達 48 小時，客戶滿意度持續下滑"
+      analogies:
+        - analogy_type: DIRECT
+          analogy_content: "像醫院急診室的檢傷分類（triage）制度，依緊急程度插隊處理，不是先到先服務"
+          reframed_insight: "客服信箱應該先做輕重緩急分類，不是按收件時間順序處理"
+        - analogy_type: PERSONAL
+          analogy_content: "如果我是那封被已讀不回 48 小時的信，我會覺得自己不重要、被公司遺忘了"
+          reframed_insight: "問題核心不是回覆速度本身，而是客戶在等待期間完全沒收到任何『被看見』的訊號"
+        - analogy_type: SYMBOLIC
+          analogy_content: "回覆時間就像水壩洩洪閘門，一次全開反而沖垮下游（客服人力），需要的是穩定小流量"
+          reframed_insight: "與其衝刺清空信箱，該做的是穩定分批、可預期的處理節奏，而非間歇性大量清空"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-SYNECTICSSESSION-1"
+    question: "No completeness/coverage requirement across the 3 analogy_type values is expressed anywhere (schema or runtime) -- a session with 5 DIRECT entries and 0 PERSONAL/SYMBOLIC validates today. Same open question divergent.synectics.contract.yaml's own OQ-SYNECTICS-1 already discloses. (owner: operator)"
+  - id: "OQ-SYNECTICSSESSION-2"
+    question: "No id/uniqueness constraint exists across analogies[] entries (a session could submit two identical DIRECT entries) -- should a future pass add one if a downstream consumer ever needs to reference a specific analogy? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F03 table row (L388) directly. Grepped the whole Atlas file case-insensitively for
+    "synectics" -- confirmed exactly 1 real hit, no dedicated section. Cross-checked against
+    methods/contracts/divergent.synectics.contract.yaml's own outputs/preconditions/quality. Read
+    bcg-matrix-analysis.schema.yaml (open-ended non-empty list precedent) and vrio-analysis.schema.yaml
+    (closed-enum-with-per-entry-content precedent, read for comparison only) in full as shape precedent
+    before writing this file. Validated against jsonschema Draft202012Validator via a standalone script
+    (required fields present, id pattern satisfied, analogy_type enum closed to exactly 3 values,
+    additionalProperties:false present at both the top level and the analogies[] item level from the start,
+    embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative controls for a
+    smuggled top-level key, a smuggled analogies[] item key, an empty analogies array, and a 4th
+    'FANTASY' analogy_type value).
+  note: >
+    `analogy_type`'s 3 enum values are transcribed directly from Atlas L388. The deliberate exclusion of a
+    4th 'Fantasy Analogy' value (common in external Synectics literature but not in this Atlas citation),
+    the open-ended-list-without-completeness shape, and the record-level-only provenance placement are
+    compilation decisions, disclosed above and in divergent.synectics.contract.yaml's own
+    compilation_decisions, not presented as Atlas-cited. No mother document was modified to produce this
+    file.
