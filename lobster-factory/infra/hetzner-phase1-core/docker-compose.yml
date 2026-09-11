@@ -384,6 +384,10 @@ services:
       PEXELS_API_KEY: ${PEXELS_API_KEY:-}
       VIDEO_SERVICE_URL: ${VIDEO_SERVICE_URL:-}
       VIDEO_SERVICE_SECRET: ${VIDEO_SERVICE_SECRET:-}
+      # Remotion 模板渲染（/api/video/remotion-render）：上線時漏接，code fallback 用
+      # 127.0.0.1:8733（next-admin container 自己的 loopback，連不到宿主機），2026-09-11 修。
+      # lobster-remotion-service 跟 next-admin 同在 lobster-net，用 compose service name 走內網。
+      REMOTION_SERVICE_URL: ${REMOTION_SERVICE_URL:-http://lobster-remotion-service:8733}
       # 影片孤兒對帳（/api/video/reconcile）需列 R2 video bucket（與 EU 同 bucket/public base）
       R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:-lobster-videos}
       R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:-}
