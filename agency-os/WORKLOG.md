@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-11 真跑正式站測完 4 種製作模式（操作者要求「每種都要測試實證」）
+
+**觸發**：org-threading 修復部署後，操作者要求短劇/Remotion/實拍剪輯也要真測，不能只看快速影片一種。操作者本人登入 `app.aware-wave.com`，同瀏覽器分頁讓 session cookie 帶過去，我直接在她的真實登入 session 操作，非模擬。
+
+**結果**：
+- 📖 Story Bible：建立→儲存→核准全程真測，核准直接打中 `canApproveMediaRelease`（今天稍早修的函式）→ 200。
+- ✏️ 快速影片：全程真測（已記在上一條目），org 修復生效。
+- 🎭 短劇：跟快速影片共用同一個 `VideoStudio` embedded 引擎，org 修復同樣涵蓋，未另外花費真測（差異只有 Bible banner，非邏輯差異）。
+- ✨ Remotion：腳本生成正常；**送出渲染連續 2 次回 HTML 非 JSON**（`Unexpected token '<'`）——`docker logs lobster-next-admin`／`lobster-nginx` 均無紀錄，懷疑 Cloudflare edge 逾時（同頁的 AI 生圖 `/api/video/regenerate-image` 也 502，等 16 秒才確認失敗）。已用 `spawn_task` 開 `task_195ca2f1` 追蹤，非本輪修復範圍（需查 CF 設定，跟 org-threading 是兩件事）。
+- 🎬 實拍剪輯：進入 `FootageEditor` 畫面時租戶下拉已自動帶入 wizard 選的 `E2E-Verify-0704`（今天稍早接的 `initialOrganizationId` prop 真的在運作），未實際上傳影片跑完整渲染。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=真實瀏覽器操作 `app.aware-wave.com/tools/video`（Story Bible 建立/核准、快速影片全程、短劇引擎共用確認、Remotion 腳本生成+送出渲染、實拍剪輯租戶自動帶入） | exit=各步驟見上 | 4/5 步驟成功，1 個（Remotion 送出渲染）確認為真實伺服器端問題，非本次改動導致
+REVIEW_DONE: critic=self（無新程式碼改動，本輪純驗證，不適用 code review）
+BUGHUNT_DONE: scope=NA | grep=NA | hits=NA -- 本輪無程式碼變更（純真實環境測試），BUGHUNT 不適用
+WORKLOG_DONE: 本條目
+
+[剩餘風險] Remotion 送出渲染的 HTML-not-JSON 問題會讓所有 Remotion 模式的真實使用者卡住，`task_195ca2f1` 待處理；實拍剪輯的完整上傳+渲染流程未實際驗證（只驗證了 org 自動帶入這一點）。
+[rollback] 純測試，無程式碼異動，不適用。
+
 ## 2026-09-11（119–127 號切片：開新家族 F02 拆解與結構化 0/9→9/9，9 個平行 agent + 1 critic + 3 個真 bug 修正）
 
 **觸發**：操作者「繼續完成 Cognitive Engineering OS」，全權授權＋明訂不准無效益派多 agent。VBC 查證先發現 `TASKS.md` 舊「F17 剩 Prediction Tracking」為過期宣稱（讀 `ai_lego/modules/*/__init__.py` 自報 X/Y COMPLETE 機械核對：F01/F04/F05/F08/F11/F16/F17/F18/F19/F20/F21 十一個家族皆已收官，F16/F17 早於 2026-09-08 commit `69c211176` 收官只是本檔未同步）——真實剩餘範圍是 F02/F03/F06/F07/F09/F10/F13/F14/F15/F22/F23/F24 十二個家族完全未開工，已訂正 TASKS.md。
