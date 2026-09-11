@@ -109,18 +109,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try { result = await submitRemotion(body.templateId, body.props ?? {}); }
   catch (error) {
     const message = error instanceof Error ? error.message : "Remotion 提交失敗";
-    await finishJob(job.id, { status: "error", error: message, statusCode: 502 });
+    console.error("[video/remotion-render] submitRemotion threw", message);
+    try { await finishJob(job.id, { status: "error", error: message, statusCode: 502 }); }
+    catch (e2) { console.error("[video/remotion-render] finishJob (submitRemotion-throw path) failed", e2); }
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
   if (result.ok === false) {
-    await finishJob(job.id, { status: "error", error: result.error, statusCode: 502 });
+    console.error("[video/remotion-render] submitRemotion returned ok:false", result.error);
+    try { await finishJob(job.id, { status: "error", error: result.error, statusCode: 502 }); }
+    catch (e2) { console.error("[video/remotion-render] finishJob (submitRemotion-fail path) failed", e2); }
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
   }
   const scenes = Array.isArray((body.props as Record<string, unknown> | undefined)?.scenes)
     ? ((body.props as Record<string, unknown>).scenes as unknown[]).length : 0;
-  await finishJob(job.id, {
-    status: "running", euJobId: result.jobId,
-    recordParams: { title: "Remotion template", sceneCount: scenes, organizationId: orgId, source: "draft", rendererKind: "remotion" },
-  });
+  try {
+    await finishJob(job.id, {
+      status: "running", euJobId: result.jobId,
+      recordParams: { title: "Remotion template", sceneCount: scenes, organizationId: orgId, source: "draft", rendererKind: "remotion" },
+    });
+  } catch (e2) {
+    console.error("[video/remotion-render] finishJob (success path) failed", e2);
+    return NextResponse.json({ ok: false, error: "渲染已送出但工作記錄失敗" }, { status: 502 });
+  }
   return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
 }
