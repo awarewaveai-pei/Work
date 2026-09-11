@@ -48,6 +48,15 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     origin: "https://api.perplexity.ai",
     apiKeyEnv: "PERPLEXITY_API_KEY",
   },
+
+  // The same job, a different vendor, so the search source is not one account away from useless.
+  // Its own header scheme rather than Bearer — which is exactly why authHeader exists.
+  brave: {
+    id: "brave",
+    origin: "https://api.search.brave.com",
+    apiKeyEnv: "BRAVE_SEARCH_API_KEY",
+    authHeader: (key) => ({ "x-subscription-token": key }),
+  },
 };
 
 export function providerSpec(id: string): ProviderSpec | null {

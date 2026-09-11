@@ -19,15 +19,25 @@
 // PERPLEXITY_API_KEY behaves exactly as it did before this file existed.
 
 import type { CollectBlock, CollectCtx, RawDoc, Target } from "@/lib/collect/types";
+import type { ProviderCallInit } from "@/lib/collect/net/providers";
 import { registerCollector } from "@/lib/collect/registry";
 import { providerConfigured } from "@/lib/collect/net/providers";
 
 /** Which vendor answers the query. One environment variable, no vendor name in any caller. */
 export function searchProviderId(env: Record<string, string | undefined> = process.env): string {
-  return env.COLLECT_SEARCH_PROVIDER || "perplexity";
+  const named = env.COLLECT_SEARCH_PROVIDER;
+  if (named) return named;
+  // No explicit choice: use whichever vendor actually has a key, rather than defaulting to one and
+  // making the source look broken because the OTHER key is the one that was set.
+  if (env.PERPLEXITY_API_KEY) return "perplexity";
+  if (env.BRAVE_SEARCH_API_KEY) return "brave";
+  return "perplexity";
 }
 
-/** https://api.perplexity.ai/search — `results[]` with these five fields. */
+/** Env vars that could make this source usable — the catalogue lists them so one can be chosen. */
+export const SEARCH_KEYS = ["PERPLEXITY_API_KEY", "BRAVE_SEARCH_API_KEY"] as const;
+
+/** One result, after each vendor's own shape has been flattened by `parseResults`. */
 interface SearchResult {
   title?: string;
   url?: string;
@@ -35,6 +45,56 @@ interface SearchResult {
   date?: string | null;
   last_updated?: string | null;
 }
+
+/**
+ * Per-vendor request and response, and nothing else. Everything below this map is vendor-neutral:
+ * adding a third search engine is one entry here (ADR 011 §決策 5).
+ *
+ *  - perplexity: POST /search, `{ results: [{title,url,snippet,date,last_updated}] }`
+ *  - brave:      GET  /res/v1/web/search, `{ web: { results: [{title,url,description,age}] } }`
+ */
+const SEARCH_DRIVERS: Record<
+  string,
+  {
+    request(q: { query: string; maxResults: number; domains?: string[]; recency?: string; languages?: string[] }): ProviderCallInit;
+    parse(json: unknown): SearchResult[];
+  }
+> = {
+  perplexity: {
+    request: (q) => ({
+      path: "/search",
+      method: "POST",
+      body: {
+        query: q.query,
+        max_results: q.maxResults,
+        ...(q.domains ? { search_domain_filter: q.domains } : {}),
+        ...(q.recency ? { search_recency_filter: q.recency } : {}),
+        ...(q.languages ? { search_language_filter: q.languages } : {}),
+      },
+    }),
+    parse: (json) => ((json as { results?: SearchResult[] }).results ?? []),
+  },
+
+  brave: {
+    request: (q) => {
+      const params = new URLSearchParams({ q: q.query, count: String(q.maxResults) });
+      // Brave has no domain-filter parameter, so the restriction goes into the query itself — the
+      // operator's "只找這些網域" must not be silently dropped, which would quietly widen a search
+      // they deliberately narrowed.
+      if (q.domains?.length) params.set("q", `${q.query} ${q.domains.map((d) => `site:${d}`).join(" OR ")}`);
+      if (q.recency) {
+        const freshness: Record<string, string> = { day: "pd", week: "pw", month: "pm", year: "py" };
+        if (freshness[q.recency]) params.set("freshness", freshness[q.recency]);
+      }
+      if (q.languages?.length) params.set("search_lang", q.languages[0]);
+      return { path: `/res/v1/web/search?${params.toString()}`, method: "GET" };
+    },
+    parse: (json) => {
+      const results = (json as { web?: { results?: Array<{ title?: string; url?: string; description?: string; age?: string }> } }).web?.results ?? [];
+      return results.map((r) => ({ title: r.title, url: r.url, snippet: r.description, date: r.age ?? null }));
+    },
+  },
+};
 
 export const SEARCH_SCHEME = "search";
 
@@ -94,7 +154,9 @@ export const webSearchCollector: CollectBlock = {
       "給一句問題，去全網找出相關頁面，再逐頁真的抓下來讀。存進知識庫的是頁面原文與出處，不是搜尋摘要。按次計費。",
     entry: "query",
     queryScheme: SEARCH_SCHEME,
-    requires: ["PERPLEXITY_API_KEY"],
+    // Either key makes it work. Both are named when neither is set, so the operator can choose
+    // which account to open rather than being told about one vendor.
+    requiresAny: [...SEARCH_KEYS],
     metered: true,
     options: [
       { key: "maxResults", label: "取回幾筆結果", type: "number", default: 10, help: "上限 20。每一筆都會再去真的抓一次頁面。" },
@@ -148,21 +210,13 @@ export const webSearchCollector: CollectBlock = {
       ? t.meta.language.split(/[,\s]+/).map((l) => l.trim()).filter(Boolean)
       : undefined;
 
-    const res = await ctx.callProvider(providerId, {
-      path: "/search",
-      method: "POST",
-      body: {
-        query,
-        max_results: maxResults,
-        ...(domains ? { search_domain_filter: domains } : {}),
-        ...(recency ? { search_recency_filter: recency } : {}),
-        ...(languages ? { search_language_filter: languages } : {}),
-      },
-    });
+    const driver = SEARCH_DRIVERS[providerId];
+    if (!driver) throw Object.assign(new Error(`unknown_search_provider_${providerId}`), { status: 501 });
 
-    const json = (await res.json()) as { results?: SearchResult[] };
-    const hits = usableResults(json.results ?? []);
-    ctx.log(`search "${query.slice(0, 60)}" -> ${json.results?.length ?? 0} results, ${hits.length} usable`);
+    const res = await ctx.callProvider(providerId, driver.request({ query, maxResults, domains, recency, languages }));
+    const raw = driver.parse(await res.json());
+    const hits = usableResults(raw);
+    ctx.log(`search "${query.slice(0, 60)}" via ${providerId} -> ${raw.length} results, ${hits.length} usable`);
 
     return {
       // Nothing is stored from the search response itself. See the header.

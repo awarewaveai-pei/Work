@@ -27,13 +27,18 @@ export function describeBlock(
 ): CatalogueEntry | null {
   if (!block.describe) return null;
   const missing = (block.describe.requires ?? []).filter((key) => !env[key]);
+  // Any-of is satisfied by one key; only when NONE is set is the source unusable, and then all the
+  // options are named so the operator can pick which account to open.
+  const anyOf = block.describe.requiresAny ?? [];
+  const anySatisfied = anyOf.length === 0 || anyOf.some((key) => Boolean(env[key]));
+  const allMissing = anySatisfied ? missing : [...missing, ...anyOf];
   return {
     ...block.describe,
     id: block.id,
     title: block.title,
     icon: block.icon,
-    available: missing.length === 0,
-    missing,
+    available: missing.length === 0 && anySatisfied,
+    missing: allMissing,
   };
 }
 
