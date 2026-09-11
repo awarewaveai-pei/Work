@@ -263,6 +263,7 @@ export const httpHtmlCollector: CollectBlock = {
       mime: "text/html",
       title: extractTitle(html),
       author: authorOf(html),
+      contentType: metaContent(html, /^og:type$/i) === "article" ? "article" : "web_page",
       text,
       raw: { bytes, mime: "text/html" },
       fetchedAt: new Date().toISOString(),

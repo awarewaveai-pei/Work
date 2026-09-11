@@ -209,12 +209,21 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
 |---|---|---|---|---|
 | **C0** ✅**已完成** 2026-09-11 | — | collect/sink **獨立 registry**（**不動 `BlockKind`**）；型別；編排器 + `ctx.fetch` + 預算 + 續傳 + 品質閘 + trust 標記與指令樣態掃描；`sink/null`；lint 禁止積木用全域 fetch | `npx tsc --noEmit` 綠；編排器測試涵蓋 **8 項**：深度上限、scope 擋外站、預算耗盡後**可續爬**、單點失敗不中斷、canonical 去重、SSRF redirect 擋、積木超量 fetch 被 ctx 拒、**植入指令樣態的頁面不自動入庫**（真餵一份含 `ignore previous instructions` + 零寬字元的 HTML） | 刪新目錄（**零既有檔改動**） |
 | **C1** ⏳**程式完成，最後一項 DoD 待 prod migration** 2026-09-11 | **客戶改官網 FAQ，KB 自動跟上**（今天靠人工貼，會靜默過期） | `collect/http-html` ＋ `sink/kb` | **依賴 KB 的 K1 完成**（版本化與檢索契約）；真 URL → KB → `search()` 查得到；同 URL 二次不產生新版；改內容後產生第二版 | 刪兩個積木 |
-| **C2** | 整站而非單頁；抽不到內容的頁面**被看見**而非靜默入庫 | `collect/sitemap`（→discovered）、`collect/rss`（**只回 discovered，不回摘要 docs**）、`collect/pdf`；`collection_issues` 表 + 告警 | 真實站台 sitemap → N 頁入庫；12,000 URL 在預算內停止、**且下一輪從斷點續爬**（非重頭）；`dirty > 0` 時告警**實際觸發一次**（附證據行），非只寫 log | 刪積木整段 |
+| **C2** ✅**已完成** 2026-09-11 | 整站而非單頁；抽不到內容的頁面**被看見**而非靜默入庫 | `collect/sitemap`（→discovered）、`collect/rss`（**只回 discovered，不回摘要 docs**）、`collect/pdf`；`collection_issues` 表 + 告警 | 真實站台 sitemap → N 頁入庫；12,000 URL 在預算內停止、**且下一輪從斷點續爬**（非重頭）；`dirty > 0` 時告警**實際觸發一次**（附證據行），非只寫 log | 刪積木整段 |
 | **C3** | 不用人記得去按 | Trigger.dev 排程（ADR 004）；per-host 令牌桶**持久化**；**增量抓取語意明訂**（§1.4） | 排程真跑過一輪；**兩個 run 併行時對同一 host 的合計 QPS 未超限**（實測，非推論）；第二輪對未變更來源**未重抓 body**（實測 304／hash 短路） | 停用 task |
 | **C3b** | 法規發布、產品改版當天就進庫，不用等下次排程 | **事件觸發入口**（webhook → 立即重抓指定 seed）；Domain Pack 的 `collect-sources.json` 消費 | 打一次 webhook 觸發真實抓取並落地（實測）；未知來源的 webhook 被拒（鑑權）；同一事件重送不重複入庫（冪等） | 關 webhook 入口 |
 | **C4** | hci30 自動化檢索與快照（`DISCOVERED`，**限組織實體**） | **HCI 自有隔離 fetch runner**（ADR-0029）＋ `sink/hci-discovered` ＋ `hci.sources` unique migration ＋ object storage | ADR-0029 四項閘全綠（無 docker bridge 路由、egress-only、DNS-rebind 防護、SSRF payload corpus）；append-only 與 FORCE RLS 未被繞過；**未產生任何 Evidence 狀態躍遷**（實測：寫入後仍為 `DISCOVERED`）；**未做 record-level 去重**；含自然人的來源一律擋；routing 三件套同 PR | 關 runner |
 | **C5** | 個資 verticals | **BLOCKED**（ADR §決策 10） | — | — |
+| **C6** | 「幫我找出這個產業該追的來源」——但決定權留在人手上 | discovery 積木（查詢→候選來源）＋ `collection_source_candidates` 表＋ops 待核准清單＋撤銷路徑（[ADR 013](../architecture/decisions/013-open-web-discovery-into-corpus.md)） | 候選**永遠不會**直接變成 KB 文件（實測：discovery 產出後 KB 零新增）；核准後該來源走既有 seed 路徑入庫；取消核准後由它產生的文件可一次找出並 archive（實測）；未核准的 webhook／API 呼叫者不能塞任意 URL | 停用 discovery 積木；候選表可留 |
 
+> **C6 的入口型別刻意與 `Target` 分開**（ADR 013 落地位置）：今天的 `match(t: Target)` 是 URL 形狀，把查詢塞進同一個型別會讓兩種語意共用一條路。C6 之前，`lib/collect/` 不得出現以查詢為入口的積木。
+
+> **C2 交付與計畫的差異**（2026-09-11）：
+> ① **`collect/pdf` 沒有另外寫**——PDF 由新的 `collect/extract-provider` 階處理（供應商就能抽 PDF），自己再寫一個零依賴 PDF 抽取器是重複造輪且抽不準。`collect/http-html` 仍拒收 `.pdf`，provider 階接收。
+> ② **gzip 壓縮的 sitemap 明確不支援**（丟 `status: 415`），不假裝解析後回報「零個 URL」。
+> ③ **`dirty` 的告警走既有 ops-inbox incident 管線**（`0073` 把 `collection` 加進 `ops_incidents.source`，比照 `0031` 加 `deploy` 的作法），不自建第二套通知：那條管線已經有 fingerprint 去重、storm 關聯、severity 規則與 Telegram/Slack 扇出。告警規則本身（`severityFor`）刻意不對 `disallowed` 出聲——robots 擋下是正常行為，對它告警等於訓練人把告警關掉。
+> ④ 新增 **`collect/extract-provider`** 階（JS 渲染站台、PDF）：`match()` 給 0.5 分，排在 `http-html` 的 1 分之後，所以只有便宜階讀不到時才會花錢。無 API key 時 `match()` 回 0，整階等於不存在。供應商選 **Firecrawl**（理由寫在 `net/providers.ts`：per-call API 沒有長駐足跡，browser farm 有；Apify 是 actor 市集，屬更後面的特殊平台階）。
+>
 > **C0／C1 覆審後補進實作的規則**（critic 1c/8h/13m，全數處理；細節見 WORKLOG 2026-09-11）：
 > ⓐ **失敗分類讀 `status` 欄位不讀錯誤訊息**——訊息裡有 URL，`/blog/404-explained` 回 500 會被字串比對判成「頁面已刪除」。積木契約因此明訂：有 HTTP 狀態就用 `Object.assign(new Error(msg), { status })` 丟。
 > ⓑ **`seen` 只在「本 target 有終局答案」時保留**。預算在 `ctx.fetch` 內耗盡／robots 暫時取不到／retry 用盡，都必須把標記拿掉並重排——`seen` 會被持久化，留著就是「那一頁此後永遠不會再被抓」，而測試全綠（正是 §1.2 續傳欄點名的假死）。

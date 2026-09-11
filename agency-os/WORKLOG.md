@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-11 第二批（ADR 013 + 降級階 + 蒐集 C2）
+
+操作者三項決定：discovery 進 Corpus 但走「候選來源→人核准」第三條路並寫進 ADR；降級階供應商由我決定；`author`／`content_type` 兩個欄位採納。
+
+**[ADR 013](docs/architecture/decisions/013-open-web-discovery-into-corpus.md)（已接受）**：開放式 discovery 可以餵 Corpus，但產出是 `SourceCandidate` 不是 `RawDoc`，必須經人核准才成為 seed；核准單位是**來源**不是文件（否則每頁都要人看＝沒有自動化）；撤銷要能一次找出該來源產生的所有文件。刻意不做自動核准規則——那會把「誰能決定客戶 KB 裡有什麼」交回演算法，等於繞過本 ADR 唯一的理由。落地為計畫的 C6 階段，且 C6 之前不得出現以查詢為入口的積木（`match(t: Target)` 是 URL 形狀，混用會讓兩種語意共用一條路）。`verify-adr-index` exit=0（13 個 ADR）。
+
+**降級階（`collect/extract-provider`）**：實跑證明的缺口——aware-wave.com 在便宜階抽出 202 bytes、density 0.0027，被品質閘正確判 `too_short`，但沒有下一階可掉。新積木 `match()` 給 0.5 分（`http-html` 是 1），所以只有便宜階讀不到時才會花錢；無 API key 時回 0，整階等於不存在。**供應商選 Firecrawl**：per-call API 沒有長駐足跡，headless browser farm 有（還附帶反爬追逐戰）；Apify 是 actor 市集，屬更後面的特殊平台階。PDF 一併由這階處理，不另外寫 `collect/pdf`。
+`net/providers.ts` 是**第二道門**，規則與 `ctx.fetch` 不同且必須不同：固定 vendor origin（積木只能傳 path）、金鑰在此注入且積木看不到、允許 POST、不查 robots（付費 API 不適用），但共用同一個 budget／timeout／位元組上限。
+
+**C2**：`collect/sitemap`（索引與 urlset，單檔上限 5,000 URL——限制的是記憶體不是 fetch 預算，50k frontier 每次 flush 都要持久化）、`collect/rss`（**只回 discovered 不回摘要 docs**：摘要是被截斷的頁面，存進去會變成那份文件，而 KB 以內容 hash 判版本，摘要會反過來把真正的政策 supersede）、migration `0073`（`collection_runs` + `collection_issues` + 把 `collection` 加進 `ops_incidents.source`）、`report-store.ts`（落地 + 告警）。
+告警**走既有 ops-inbox incident 管線**而非自建：那條管線已有 fingerprint 去重（同一站每小時失敗是一個 incident 計數上升，不是一天 24 則）、storm 關聯、severity 規則、Telegram/Slack 扇出。`severityFor` 刻意不對 `disallowed` 出聲——robots 擋下是正常行為，對它告警是在訓練人把告警關掉。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/collection-local-verify.sh`（真 Postgres：0013→0028 欄位→0031→0073→行為斷言→down→重套）| exit=0 | result=COLLECTION_VERIFY_RUNS_OK + COLLECTION_VERIFY_ALERT_OK + DOWN_OK
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試：把 `collection` 從 `ops_incidents_source_check` 拿掉後重跑 | exit=0 | result=KILLED（`violates check constraint "ops_incidents_source_check"`）——證明告警路徑的斷言不是空跑；沒有這條，每個蒐集告警都會在資料庫層靜默失敗而爬蟲回報成功
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=104 檔 930 test 全綠（lib/collect 96 + 1 skipped live）；12,000 URL 的 sitemap 在預算內停止且第二輪從斷點續爬（實測非推論）
+REVIEW_DONE: critic=Quick（本批為新增檔＋一個既有 CHECK 擴充，比照 0031 既有前例；C0/C1 的 Deep critic 已於同日完成並全數修入）| verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`ops_incidents_source_check|collection_runs|collection_issues|extract-provider|providerConfigured` | hits=`source in (...)` 的唯一前例是 0031（實查 prod 的 `pg_get_constraintdef` 確認線上已含 `deploy`，我的 grep 一開始漏掉那個檔）；`ops_incidents.organization_id` 來自 0028 而非 0013，驗證腳本已補該欄
+**尚未套 prod**：`0072`（KB）與 `0073`（蒐集）兩個 migration 都是 High-STOP，等操作者明示。`0073` 會動到 `ops_incidents` 的 CHECK（DROP+ADD，無資料遺失，只取 table-level DDL lock，同 0031）。
+
 ## 2026-09-11（資料蒐集 C0 + C1：collect/sink 積木 + 編排器 + 第一個真實抓取管線）
 
 KB K1（`38c415aed`）解除了 C1 的依賴，接著做蒐集端。正本 [DATA_COLLECTION_PLAN.md](docs/data-collection/DATA_COLLECTION_PLAN.md)，決策 [ADR 011](docs/architecture/decisions/011-collection-ingestion-boundary.md)。

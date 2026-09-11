@@ -10,6 +10,13 @@
 
 export { crawl, summarize, type CrawlOptions, type CrawlResult, type SeedInput } from "@/lib/collect/orchestrator";
 export { createCollectFetch, CollectFetchError, COLLECT_USER_AGENT } from "@/lib/collect/net/fetcher";
+export {
+  createProviderCall,
+  providerConfigured,
+  ProviderCallError,
+  PROVIDERS,
+  type ProviderCall,
+} from "@/lib/collect/net/providers";
 export { createBudget, type BudgetLimits } from "@/lib/collect/budget";
 export { canonicalize, inScope } from "@/lib/collect/canonical";
 export { RateLimiter, MemoryRateLimitStore, type RateLimitStore } from "@/lib/collect/net/rate-limit";
@@ -24,6 +31,7 @@ export {
   sinkById,
 } from "@/lib/collect/registry";
 export { createNullSink, type NullSink } from "@/lib/collect/sinks/null";
+export { persistRunReport, severityFor, type PersistArgs, type PersistResult } from "@/lib/collect/report-store";
 export { grade, MIN_TEXT_BYTES, MIN_DENSITY } from "@/lib/collect/quality";
 export { screenForInjection, stampProvenance, COLLECTED_PROVENANCE } from "@/lib/collect/provenance";
 

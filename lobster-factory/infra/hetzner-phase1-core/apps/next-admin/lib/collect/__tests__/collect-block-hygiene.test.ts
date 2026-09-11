@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 const COLLECT_DIR = path.resolve(__dirname, "..");
 
 /** Files that are ALLOWED to touch the network directly — the door itself, and its tests. */
-const DOOR_FILES = new Set(["net/fetcher.ts", "net/ssrf.ts"]);
+const DOOR_FILES = new Set(["net/fetcher.ts", "net/ssrf.ts", "net/providers.ts"]);
 
 function walk(dir: string, base = ""): string[] {
   return readdirSync(dir).flatMap((entry) => {

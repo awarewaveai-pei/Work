@@ -26,6 +26,7 @@ function doc(uri: string, text = BODY): RawDoc {
     mime: "text/html",
     title: "條款",
     author: null,
+    contentType: "web_page",
     text,
     raw: { bytes: new TextEncoder().encode(`<html><body>${text}</body></html>`), mime: "text/html" },
     fetchedAt: new Date().toISOString(),

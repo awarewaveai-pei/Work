@@ -59,6 +59,12 @@ export interface RawDoc {
    * TASKS.md rather than left as a silent drop at the sink.
    */
   author: string | null;
+  /**
+   * Coarse kind of document, as the SOURCE describes itself (og:type and friends) — "web_page",
+   * "article", "feed_item". Deliberately not inferred: guessing that a page is a policy or an FAQ
+   * is a judgement about content, which belongs to the analysis side, not to collection.
+   */
+  contentType: string;
   text: string;
   raw: { bytes: Uint8Array; mime: string } | null;
   fetchedAt: string;
@@ -96,6 +102,17 @@ export interface Budget {
  */
 export interface CollectCtx {
   fetch(url: string, opts?: { headers?: Record<string, string>; method?: string }): Promise<Response>;
+  /**
+   * Call a configured extraction provider. A SECOND door, with different rules from `fetch` and for
+   * a different situation: one fixed vendor origin, authenticated, POST — see net/providers.ts for
+   * why those rules cannot be the crawling rules. The block passes a path, never a URL, and never
+   * sees the API key. Absent when no provider is configured, which is why a provider-backed block
+   * must return 0 from match() in that case rather than failing at run time.
+   */
+  callProvider?: (
+    providerId: string,
+    init: { path: string; method?: "GET" | "POST"; body?: unknown; headers?: Record<string, string> },
+  ) => Promise<Response>;
   canonicalize(url: string): string;
   budget: Budget;
   tenantRef: string;

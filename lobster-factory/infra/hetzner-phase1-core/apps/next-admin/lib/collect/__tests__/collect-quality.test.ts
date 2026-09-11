@@ -18,6 +18,7 @@ function doc(text: string, rawHtml?: string, title: string | null = "頁面"): R
     mime: "text/html",
     title,
     author: null,
+    contentType: "web_page",
     text,
     raw: rawHtml === undefined ? null : { bytes: new TextEncoder().encode(rawHtml), mime: "text/html" },
     fetchedAt: "2026-09-11T00:00:00Z",

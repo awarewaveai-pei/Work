@@ -44,6 +44,8 @@ export interface CrawlOptions {
   tenantRef: string;
   runId: string;
   fetch: CollectCtx["fetch"];
+  /** Passed through to blocks that have a provider tier; omitted ⇒ those blocks score 0. */
+  callProvider?: CollectCtx["callProvider"];
   maxDepth?: number;
   /** Flush to the sink every N documents. Storing only at the end loses everything on a crash. */
   flushEvery?: number;
@@ -165,6 +167,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
 
   const ctx: CollectCtx = {
     fetch: opts.fetch,
+    callProvider: opts.callProvider,
     canonicalize,
     budget: opts.budget,
     tenantRef: opts.tenantRef,
