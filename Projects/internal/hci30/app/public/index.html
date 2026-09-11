@@ -153,9 +153,6 @@
      數字去猜多寬才該換行。 */
   .radar-wrap { padding: 0.5rem 0 1.5rem; display: flex; gap: 2rem; align-items: flex-start; }
   #d-radar { flex: 0 0 auto; }
-  /* 兩個直接子元素都是純 <div>（<details> 包在裡面，不直接當 flex 子元素），
-     避開 <details> 在部分瀏覽器（如 Safari）當 flex item 時算不對寬度的
-     已知相容性問題。 */
   .evidence-layout { display: flex; gap: 2rem; align-items: flex-start; }
   .evidence-layout > div { flex: 1; min-width: 0; }
   .evidence-layout .add-panel { margin-top: 0; }
@@ -191,13 +188,22 @@
   .insight-col.risks h3 { color: var(--very-low); }
   .insight-col.unknowns h3 { color: var(--muted); }
 
-  .record-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 1rem 0.2rem; margin-bottom: 0; }
+  /* 操作者要求「不要合起來, 甚至不要用accordion... 每個主題區塊要像卡片,
+     才知道是分開的 不會混在一起」(2026-09-11) -- 每一則證據/主張/評估紀錄
+     原本只用底線分隔、背景透明，多筆排在一起時視覺上會糊成一長條列表；
+     改成跟下面 .add-panel 同一套實心卡片語彙（背景+邊框+圓角+彼此留白），
+     一眼就看得出這是互相獨立的一筆一筆，不是同一塊內容的延續。 */
+  .record-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1rem 1.2rem; margin-bottom: 0.8rem; }
   .record-card .kind-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: var(--teal-ink); text-transform: uppercase; }
   .record-card .content { margin-top: 0.4rem; font-size: 0.95rem; line-height: 1.6; }
   .record-card .quality-tag { display: inline-block; margin-top: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: var(--teal-tint); color: var(--teal-ink); }
 
-  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.2rem 1.4rem; margin-top: 1.2rem; }
-  details.add-panel summary { cursor: pointer; font-weight: 700; font-size: 0.95rem; color: var(--teal-ink); }
+  /* 「新增調查發現」原本是 <details>/<summary> 手風琴，預設收合，操作者
+     明確要求拿掉：不准合起來、不准用 accordion 這種互動模式，永遠攤開
+     顯示完整表單。改成純 <div> + 一個不可點擊的標題文字（.add-panel-title
+     取代原本可點的 <summary>），卡片外觀（背景/邊框/圓角）不變。 */
+  .add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.2rem 1.4rem; margin-top: 1.2rem; }
+  .add-panel .add-panel-title { margin: 0; font-weight: 700; font-size: 0.95rem; color: var(--teal-ink); }
   form.inline-form { display: grid; gap: 0.5rem; max-width: 640px; margin-top: 1rem; }
   form.inline-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-top: 0.4rem; }
   form.inline-form input, form.inline-form textarea {
@@ -341,8 +347,8 @@
       <div id="d-suggestions"></div>
     </div>
     <div>
-    <details class="add-panel" id="record-add-panel">
-    <summary>＋ 新增調查發現</summary>
+    <div class="add-panel" id="record-add-panel">
+    <h3 class="add-panel-title">＋ 新增調查發現</h3>
     <form class="inline-form" onsubmit="return submitRecord(event)">
       <label>當事人</label>
       <div class="chip-group" id="f-person-chips"></div>
@@ -365,7 +371,7 @@
       <button type="submit">送出紀錄</button>
       <div id="f-err" class="err"></div>
     </form>
-    </details>
+    </div>
     </div>
   </div>
 
@@ -790,13 +796,9 @@ async function refreshDetail() {
   }
 
   const ctaEl = document.getElementById('d-empty-cta');
-  const recordPanel = document.getElementById('record-add-panel');
-  if (body.records.length === 0) {
-    ctaEl.innerHTML = `<div class="cta-banner"><p>案件已建立，目前還沒有任何證據——請先新增第一筆，系統才能開始計算信任分數。</p><button type="button" onclick="goToAddRecord()">立即新增證據</button></div>`;
-    recordPanel.open = true;
-  } else {
-    ctaEl.innerHTML = '';
-  }
+  ctaEl.innerHTML = body.records.length === 0
+    ? `<div class="cta-banner"><p>案件已建立，目前還沒有任何證據——請先新增第一筆，系統才能開始計算信任分數。</p><button type="button" onclick="goToAddRecord()">立即新增證據</button></div>`
+    : '';
 
   const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q.quality]));
   document.getElementById('d-domain-note').textContent = body.rollup.domains.length
@@ -962,9 +964,7 @@ function renderReportView(row) {
 }
 
 function goToAddRecord() {
-  const panel = document.getElementById('record-add-panel');
-  panel.open = true;
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('record-add-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function togglePersonNew() {

@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-11 HCI30 拿掉「新增調查發現」手風琴、證據紀錄改真卡片——操作者：不要合起來, 不要accordion, 每個主題區塊要像卡片
+
+操作者這輪盯著「證據與主張」區塊提兩點：(1)「新增調查發現」不要合起來、甚至不要用 accordion 這種互動模式；(2) 每個主題區塊要像卡片，才知道是分開的、不會混在一起。
+
+查 `Projects/internal/hci30/app/public/index.html`：新增表單原本是 `<details class="add-panel"><summary>+ 新增調查發現</summary>...</details>`，預設收合，只有案件目前 0 筆證據時才靠 `recordPanel.open = true` 硬展開。同時每一筆證據/主張/評估卡片（`.record-card`）只有底線分隔、背景透明，多筆排在一起時視覺上糊成一長條列表，看不出彼此是獨立的紀錄——這正是操作者說的「混在一起」。
+
+改法：
+1. `<details>/<summary>` 整個拿掉，換成純 `<div id="record-add-panel">` + 不可點擊的 `<h3 class="add-panel-title">` 標題，表單永遠完整展開，不再有任何收合/展開的互動。連帶移除 `refreshDetail()` 跟 `goToAddRecord()` 裡兩處 `.open = true`（`<details>` 專屬屬性，換成 `<div>` 後已經是死程式碼/寫在錯的物件上）。
+2. `.record-card` 從「透明背景+只有底線」改成跟 `.add-panel` 同一套實心卡片語彙（`background: var(--card); border: 1px solid var(--border); border-radius: 4px`），每一則紀錄彼此留白（`margin-bottom`），一眼看得出是分開的獨立項目。
+3. 順手清掉 `.evidence-layout` 上一輪（`<details>`-as-flex-item 相容性修法）留下的程式碼註解——那個註解專門解釋「為什麼把 `<details>` 包一層 div」，現在 `<details>` 整個被拿掉了，註解已經失效，一起刪除避免誤導後續讀者。
+
+真跑驗證：本機 dev server（`localhost:4030`，真實 Postgres）開既有案件，1000×1400 視窗截圖確認：表單永遠展開、無收合控制項；既有每筆證據都變成有邊框的獨立卡片；實際送出一筆新的 EVIDENCE 紀錄（真的打 `POST /api/hci/v1/cases/:id/records`），確認新紀錄以新卡片呈現，且 `refreshDetail()` 重新渲染後表單仍保持展開（沒有意外收合）；送出前後 `read_console_messages` 皆零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，截圖確認卡片化與展開狀態，實際送出一筆新證據紀錄驗證端到端 | 結果=符合預期，送出前後 console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS 卡片樣式 + 拿掉一種互動元件(details→div)連帶兩處死程式碼；無新端點、無其他地方引用的 id 改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=record-add-panel|add-panel | hits=2 個檔案：index.html（現況、正確）與 agency-os/WORKLOG.md（描述上一輪 `<details>` 包裝修法的歷史條目，寫的當下是對的，比照「舊檔案不回改」不動它）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`.record-card` 改實心卡片樣式；「新增調查發現」`<details>` 手風琴改純 `<div>` 永遠展開；連帶清掉兩處 `.open` 死程式碼與一段已失效的 code comment）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過卡片外觀與新增紀錄端到端流程，console 零錯誤
+
+[剩餘風險] 無新增風險；純樣式與一種互動模式移除，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到 `<details>` 手風琴 + 透明背景底線分隔的舊版證據卡片樣式。
+
 ## 2026-09-11 HCI30 案件詳情頁改版面順序——照系統實際分析流程重排，不是雷達圖美觀問題
 
 操作者這輪不是問排版好不好看，是問邏輯：「怎麼會是雷達圖在最上面? 那不是最後才會產出的東西嗎?」。查看 `Projects/internal/hci30/app/public/index.html` 的 `#detail` 區塊，原始順序是：案件標頭（含決策 banner）→ 信任構面（雷達圖+構面卡片，系統算出來的結果）→ 洞察 → 記錄決策表單 → 證據與主張（含新增證據表單，真正的輸入資料）。證據明明是所有計算的來源，卻排在整頁最後；雷達圖是證據算出來的結果，卻排在最前面——跟系統自己「這個系統怎麼運作？」說明頁畫的流程圖（開案件→記錄證據/主張/評估→系統自動算出信任構面→你做決策）完全相反。
