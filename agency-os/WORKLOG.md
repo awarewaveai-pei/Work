@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-11 第七批（0072–0075 套上 prod，KB 與蒐集器兩套系統的 schema 落地）
+
+操作者明示 go-ahead。四支全部 COMMIT，next-admin 也已帶著對應程式上線，prod 檢索端到端實測通過。
+
+- **套用路徑一開始選錯**：先走 tunnel + `SUPABASE_AWAREWAVE_POSTGRES_DSN`（既有三支一次性 applier 的做法），連上之後才死在 `must be owner of table cs_knowledge_sources`。本庫 public 表全部 owner 是 `supabase_admin`，pooler DSN 連進去是 `postgres`，不是它的成員。**正解在 runbook 裡已經寫了**：`ssh → docker exec -i supabase-db psql -U supabase_admin -v ON_ERROR_STOP=1`，0051 當初就是這樣套的（`Customer_service_BUILD_PLAN.md:104`）。失敗發生在連線之後，看起來像 migration 有問題，實際是角色問題 —— 這是這條路最容易誤判的地方，已寫進新 runner 的檔頭。
+- **四支結果**：0072 `COMMIT` 且 `UPDATE 1`（chunk 家族回填）、0073 `COMMIT`、0074 `COMMIT`、0075 `COMMIT`，`PSQL_EXIT=0` ×4。
+- **回填確認修掉了真實壞資料**：套前那筆 chunk 的 `doc_family_id` 等於自己的 `source_id`（`insertChunks` 舊版硬寫），與來源的家族 ID 不同；套後 `family_mismatches=0`。
+- **anon／authenticated 沒有漏**：兩個檢索函式的 `proacl` 只剩 `supabase_admin`／`postgres`／`service_role`。這是 0064 那次教訓的延續（單一 `REVOKE FROM PUBLIC` 擋不掉 Supabase 另外給的那組 grant）。
+- **既有那筆種子文件標籤為 NULL**，如設計：0075 之前的列沒有三軸，`provenanceOf` 讀成 `UNKNOWN`，不會被升級成「我們寫的事實」。
+- **部署那一半自己關上了**：套完發現另一個 session 的 `sg-deploy.sh next-admin` 正在建置（PID 2520630），沒有 `--force`，等它跑完。它 pull 到的 `865822a19` 已包含我的 `6787c6726`，smoke 全綠。DB 領先程式的窗口因此只存在於該次 build 期間。
+- **新增 `scripts/apply-db-migration.mjs`**：解析編號→唯一檔案、拒絕 `CONCURRENTLY`、拒絕沒有自帶 `BEGIN;/COMMIT;` 的檔案、串進上述 psql 路徑、要求輸出真的出現 `COMMIT`（psql 對空輸入也回 0）。**不加外層交易**——檔案自己有，套外層只會讓 psql 警告 `there is already a transaction in progress`。既有三支一次性 applier 留著不動（已出貨的歷史），新工作走這支。
+
+REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec -i supabase-db psql -U supabase_admin -v ON_ERROR_STOP=1 < 0072..0075` | exit=0 ×4 | result=四支皆 `COMMIT`；0072 含 `UPDATE 1`
+REALTEST_EVIDENCE: tool=Bash | cmd=prod 上以具名參數呼叫 `cs_match_chunks_keyword(p_scope,p_spaces,p_viewer,p_as_of,p_model,p_term,p_limit)` | exit=0 | result=回 1 列含 `title`／`author`／`epistemic_type`，即新簽名與 `lib/kb/db.ts:282-358` 的參數名逐一對上；PostgREST 解不到函式會靜默回 0 列，這條就是在驗那個
+REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/apply-db-migration.mjs 0074`（0074 全部 IF NOT EXISTS/IF EXISTS，重套為 no-op）| exit=0 | result=`APPLY_OK 1/1`，套後 `collection_sources` 0 列、policy 1 條、`collection_runs.source_id` 仍在 —— runner 的真實傳輸路徑通
+REALTEST_EVIDENCE: tool=Bash | cmd=`--check 0001`（真實存在、無自帶交易的 migration）| exit=2 | result=guard 觸發並拒絕；`--check 9999` exit=2 解析失敗 —— 兩個 guard 都不是空跑
+REVIEW_DONE: critic=Quick（prod migration，但四支的內容已於前六批經 Deep critic 與真 Postgres 行為測試；本批 review 對象是套用路徑與 runner）| verdict=pass | findings=0c/1m（m1：第一版 runner 走錯角色又多包一層交易，已整支改寫）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`apply-db-migration|supabase_admin|p_scope|uq_cs_sources` | hits=既有三支一次性 applier 仍用 DSN 路徑（僅對它們當初套的那些 migration 有效，未回改）；`uq_cs_sources_*` 在 prod 是 unique index 不是 constraint，我 pre-flight 查 `pg_constraint` 一度誤判為缺，改查 `pg_indexes` 後兩者都在
+
+**剩餘風險**：本庫沒有 migration 記錄表，「哪些已套」只能靠查 schema 實況推斷；重套只有在該檔本身寫成冪等時才安全（0074 是，不代表每支都是）。
+**rollback**：四支 down script 反序 `0075 → 0074 → 0073 → 0072`，同樣走 `psql -U supabase_admin`；`0075`／`0072` 的 down 會把檢索函式還原成舊簽名，必須連同 next-admin 一起退版。
+
 ## 2026-09-11（客服系統 U6：/verify-recent 全套跑完，1 個真 critical（另一並行 stash 機制吞掉我的腳本編輯）+ 3 個真 major 全修，準備 commit+deploy）
 
 **觸發**：commit 前 hook 擋下（`verify-gate-commit.js` 偵測 7 個 high-risk 檔案未走完整驗證），照規矩跑 `/verify-recent` 全套（非 `--trivial`/`--ack`）。
