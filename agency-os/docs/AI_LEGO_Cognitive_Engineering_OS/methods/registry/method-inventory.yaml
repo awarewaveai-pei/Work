@@ -756,55 +756,65 @@ by_document:
         has_contract: false
         contract_status: pending
       - name: "Devil's Advocate"
-        line: 640
-        category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Red Team"
-        line: 641
-        category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Blue Team"
-        line: 642
-        category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Independent Judge"
         line: 643
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Pre-mortem"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.devils_advocate"
+      - name: "Red Team"
         line: 644
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Counterexample Search"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.red_team"
+      - name: "Blue Team"
         line: 645
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Disconfirming Evidence"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.blue_team"
+      - name: "Independent Judge"
         line: 646
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "FMEA"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.independent_judge"
+      - name: "Pre-mortem"
         line: 647
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "HAZOP"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.pre_mortem"
+      - name: "Counterexample Search"
         line: 648
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
-      - name: "Stress Testing"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.counterexample_search"
+      - name: "Disconfirming Evidence"
         line: 649
         category: "F12 challenge"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.disconfirming_evidence"
+      - name: "FMEA"
+        line: 650
+        category: "F12 challenge"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.fmea"
+      - name: "HAZOP"
+        line: 651
+        category: "F12 challenge"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.hazop"
+      - name: "Stress Testing"
+        line: 652
+        category: "F12 challenge"
+        has_contract: true
+        contract_status: complete
+        machine_id: "challenge.stress_testing"
       - name: "Horizon Scanning"
         line: 669
         category: "F13 foresight"

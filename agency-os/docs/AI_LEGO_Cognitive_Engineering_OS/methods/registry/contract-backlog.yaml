@@ -4354,6 +4354,129 @@ tier_1:
       batch, all fixed same-day before commit -- see WORKLOG 2026-09-11
       F07 entry for the critic's full verdict and per-finding detail.
 
+  onehundredfiftyseventh_concrete_entry:
+    # F12 challenge/red-team/risk family completion batch, 2026-09-11.
+    # 3 of 10 (red_team/blue_team/independent_judge) already existed from
+    # an earlier session; this 7-agent batch built the remaining 7.
+    method_id: "challenge.devils_advocate"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L643) + §12.21 (L2803-2809, brief dedicated
+      section). Atlas's own differentiation from Red Team ("Devil's
+      Advocate 側重觀點與論證；Red Team 可以攻擊整個系統、流程、控制與實作")
+      keeps this method argument-level, not Red Team's 11-dimension
+      checklist shape. Real invariant: mainstream_position and
+      alternative_position must differ after strip+casefold
+      normalization; >=1 non-empty supporting_arguments entry required.
+    source: "methods/contracts/challenge.devils_advocate.contract.yaml + specs/cognitive/typed-objects/devils-advocate-position.schema.yaml + ai_lego/modules/challenge/devils_advocate.py"
+    note: "48 tests pass. CLI PASS, identical-position + empty-arguments refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftyeighth_concrete_entry:
+    method_id: "challenge.pre_mortem"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L647) + §11.25 (L1755-1773, dedicated
+      5-step section). Real invariant: every failure_causes[] entry
+      must be covered by >=1 controls[] entry (control_type in
+      {PREVENTION,DETECTION,RECOVERY}), step 5's own requirement made
+      structural. priority is GENUINE_COMPUTE, a total 3x3
+      likelihood x impact lookup, never a constructor parameter.
+    source: "methods/contracts/challenge.pre_mortem.contract.yaml + specs/cognitive/typed-objects/pre-mortem-analysis.schema.yaml + ai_lego/modules/challenge/pre_mortem.py"
+    note: "65 tests pass. CLI PASS, uncovered-cause + invalid-likelihood/impact refusals + caller-supplied-priority + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftyninth_concrete_entry:
+    method_id: "challenge.counterexample_search"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L648, sole citation). Real invariant: every
+      true_counterexamples[] entry's boundary_case_id must resolve to a
+      real boundary_cases[] id (referential integrity, dangling
+      reference refused); empty true_counterexamples with non-empty
+      boundary_cases is accepted (claim survives the search).
+    source: "methods/contracts/challenge.counterexample_search.contract.yaml + specs/cognitive/typed-objects/counterexample-search.schema.yaml + ai_lego/modules/challenge/counterexample_search.py"
+    note: "54 tests pass. CLI PASS, dangling-reference refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredsixtieth_concrete_entry:
+    method_id: "challenge.disconfirming_evidence"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L649, sole citation). Real invariant
+      (Popperian order): falsifier_criteria[] must be declared before
+      any search_results[]; every search_results[] entry's
+      falsifier_criteria_id must reference a pre-declared falsifier
+      (structurally prevents post-hoc rationalization); found:true
+      requires non-empty evidence_description.
+    source: "methods/contracts/challenge.disconfirming_evidence.contract.yaml + specs/cognitive/typed-objects/disconfirming-evidence-search.schema.yaml + ai_lego/modules/challenge/disconfirming_evidence.py"
+    note: "59 tests pass. CLI PASS, dangling-falsifier-reference + missing-evidence-description refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredsixtyfirst_concrete_entry:
+    method_id: "challenge.fmea"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L650) + §11.26 (L1775-1801, dedicated
+      section: Function->Failure Mode->Effect->Cause->Existing
+      Control->Severity->Occurrence->Detection->Action Priority).
+      rpn = severity*occurrence*detection is GENUINE_COMPUTE.
+      Atlas's own explicit warning (L1799-1800, verbatim: "不要只依賴
+      RPN；高 Severity 即使機率低仍可能需強制控制") is enforced
+      structurally, not left advisory: severity>=9 forces
+      action_priority=MANDATORY_CONTROL_REQUIRED regardless of rpn.
+    source: "methods/contracts/challenge.fmea.contract.yaml + specs/cognitive/typed-objects/fmea-analysis.schema.yaml + ai_lego/modules/challenge/fmea.py"
+    note: "70 tests pass. CLI PASS, out-of-range-score + bool-score + caller-supplied-rpn/action_priority refusals + the severity-overrides-rpn proof + independent-gate hand-tamper proof demonstrated."
+
+  onehundredsixtysecond_concrete_entry:
+    method_id: "challenge.hazop"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L651, sole citation -- Atlas truncates its
+      own guide-word list with "..."; the closed 11-word vocabulary
+      NO_NOT/MORE/LESS/AS_WELL_AS/PART_OF/REVERSE/OTHER_THAN/EARLY/
+      LATE/BEFORE/AFTER is the general HAZOP process-safety standard,
+      disclosed as a compilation decision, not an Atlas citation).
+      Real invariant: deviations[].node_id must resolve to a real
+      nodes[] id; deviations[].guide_word must be in the closed set.
+      Full per-node guide-word coverage deliberately not required.
+    source: "methods/contracts/challenge.hazop.contract.yaml + specs/cognitive/typed-objects/hazop-study.schema.yaml + ai_lego/modules/challenge/hazop.py"
+    note: "64 tests pass. CLI PASS, dangling-node-reference + invalid-guide-word refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredsixtythird_concrete_entry:
+    # Last of this 7-agent F12 completion batch -- F12 is 10/10 COMPLETE
+    # after this entry (independently confirmed via `ls methods/contracts/
+    # challenge.*.contract.yaml`: 10 files present).
+    method_id: "challenge.stress_testing"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F12 table row (Atlas L652, sole citation). Real invariant
+      (Atlas's own "極端但合理" qualifier made structural): each
+      scenario's extreme_value must fall STRICTLY outside
+      [normal_range.min, normal_range.max]; outcome in
+      {WITHIN_TOLERANCE,DEGRADED,BROKEN} required per scenario.
+      Deliberately distinct from the pre-existing devops_sre.stress_test
+      (F19 engineering load-test method) -- distinct schema filename,
+      $id, id-prefix (STSS- vs STRESSTEST-), both contracts
+      cross-reference each other to prevent future re-collision.
+    source: "methods/contracts/challenge.stress_testing.contract.yaml + specs/cognitive/typed-objects/stress-test-scenario-set.schema.yaml + ai_lego/modules/challenge/stress_testing.py"
+    note: >
+      65 tests pass. F12 challenge/red-team/risk family: 10 of 10
+      COMPLETE as of this entry (devils_advocate/pre_mortem/
+      counterexample_search/disconfirming_evidence/fmea/hazop landed
+      via concurrent sibling agents in this same batch, entries
+      onehundredfiftyseventh through onehundredsixtysecond above;
+      red_team/blue_team/independent_judge already existed). CLI PASS,
+      boundary-value (extreme_value==max) + inverted-range refusals +
+      independent-gate hand-tamper proof demonstrated. 1 independent
+      critic pass (Standard tier, hand-tamper-verified every claim
+      against the live gate functions, not just read) found 0
+      Critical/0 Major/0 Minor across the batch -- cleanest batch
+      reviewed in this repo to date. See WORKLOG 2026-09-11 F12 entry.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================
