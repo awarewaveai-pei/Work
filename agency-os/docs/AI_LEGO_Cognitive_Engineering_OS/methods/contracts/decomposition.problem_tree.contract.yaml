@@ -1,0 +1,119 @@
+$id: "ai-lego://methods/contracts/decomposition.problem_tree.contract.yaml"
+title: "Problem Tree Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F02 decomposition & structuring family, opening member (1 of 9 F02 methods built in this
+  same parallel batch: issue_tree/logic_tree/mece/objective_tree/functional_decomposition/fast/
+  hierarchical_task_analysis/wbs are the other 8). Atlas cites this method TWICE: F02 table row L366
+  ("Problem Tree｜原因→核心問題→後果｜問題置中、原因向下、效果向上｜分離症狀與原因｜Objective Tree") and a
+  dedicated §12.8 (L2633-2639, 用途/效益/搭配 only, no worked example). Core invariant: `causes[].id`
+  and `effects[].id` are disjoint sets, GENUINE_COMPUTE-checked -- a shared id means the tree has not
+  actually separated symptoms from causes, defeating the method's own stated benefit ("分離症狀與原因").
+  A second real invariant enforces id uniqueness WITHIN each of `causes`/`effects` individually (critic
+  finding, 2026-09-11 -- originally only cross-list disjointness was checked). Each cause/effect statement
+  carries a per-item `provenance_record` (also added post-critic-review; a cause/effect statement is a
+  CLAIM, same reasoning `root_cause.fishbone`'s own `cause-hypothesis-set.schema.yaml` already establishes
+  for its own hypotheses). See `ai_lego/modules/decomposition/problem_tree.py` module docstring for the
+  full design rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Problem Tree row (L366)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.8 問題樹 dedicated section (L2633-2639)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.problem_tree` mints a NEW machine_id AND a NEW
+  `family: decomposition` (F02's first built member -- no prior `decomposition.*` contract exists in
+  this corpus, grep-confirmed). Flat, non-recursive causes/effects shape and the causes/effects
+  id-disjointness invariant are this file's own compilation decisions -- see compilation_decisions.
+
+id: decomposition.problem_tree
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting
+# the problem into its own causes and effects; CLASSIFY = assigning each disclosed factor to exactly
+# one of the two flat buckets (never both -- the method's own core invariant).
+
+purpose:
+  - separate_symptoms_and_effects_from_root_causes
+# Atlas L366/§12.8 verbatim sense: 用途 "把核心問題、原因與後果分開" / 效益 "分離症狀與原因".
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position strategy.ansoff/
+  # strategy.bcg_matrix's own inputs.required: [] already take; Problem Tree's own citation names no
+  # required input type.
+
+outputs:
+  - ProblemTree
+# NEW output type (see typed-objects/problem-tree.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "core_problem is present and non-empty -- Atlas's own §12.8 framing centers the whole method on one named core problem ('問題置中')"
+  - "causes is present and non-empty, effects is present and non-empty -- a problem tree with zero disclosed causes or zero disclosed effects has not actually separated anything (Atlas's own benefit '分離症狀與原因')"
+  - "causes[].id is unique WITHIN causes, and effects[].id is unique WITHIN effects -- GENUINE_COMPUTE-checked by both the builder and an independent gate; a repeated id within one list makes 'the specific cause/effect' ambiguous"
+  - "causes[].id and effects[].id are DISJOINT sets, GENUINE_COMPUTE-checked by both the builder (fail-closed at construction) and an independent gate (re-derived from the record's own raw id sets, never trusting a stored value) -- a shared id across the two lists means the tree has not actually separated symptoms from causes"
+  - "every causes[]/effects[] entry carries a schema-valid per-item provenance_record -- a cause/effect statement is a claim, not bare structural content"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: true, PER-ITEM (causes[]/effects[].provenance), not record-level -- same
+  # placement class strategy.bcg_matrix's own per-item provenance_required:true already establishes.
+  # Added post-critic-review (2026-09-11): a cause/effect statement is a CLAIM, the same content class
+  # root_cause.fishbone's own cause-hypothesis-set.schema.yaml already stamps. evidence_labeling_required
+  # stays false -- Atlas's own citation for this method (F02 table row + §12.8) is 2 short bullet lines
+  # plus a 用途/效益/搭配 stub, no explicit unevidenced-claim caution cited.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: [decomposition.objective_tree]
+# Atlas §12.8's own 搭配 line (L2638) names exactly this chain: "Problem Tree → Objective Tree → Theory
+# of Change" (causal.theory_of_change.contract.yaml already cites this same line as a corroborating
+# recipe reference, L21). `decomposition.objective_tree` is being built in this SAME parallel batch by a
+# different agent and may not exist on disk yet when this file lands -- `recommended_next` is a plain
+# string reference, not an import, so this is not a broken dependency.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Deep, arbitrary-depth recursive tree (Issue Tree-style, a sibling method in this same batch) or a flat, non-recursive 3-tier split?"
+    decision: "Flat 3-tier split (causes[] / core_problem / effects[]), no nested sub-causes -- Atlas's own citation names exactly 3 tiers ('問題置中、原因向下、效果向上'), unlike decomposition.issue_tree's own citation ('主問題→第一層→第二層→檢查遺漏'), which explicitly describes open-ended recursive branching."
+  - question: "Should causes be grouped into categories, matching root_cause.fishbone's own categorized cause_hypothesis shape?"
+    decision: "No -- Fishbone's citation (Atlas §11.4) is a single-sided 'what caused this' taxonomy exercise; Problem Tree's own citation is symmetric and explicitly about SEPARATING two flat sides (causes vs effects) of one problem, not categorizing one side -- a structurally different question, not a shallower version of Fishbone's."
+  - question: "Should causes[].id/effects[].id carry type-distinguishing prefixes (e.g. CAUSE-/EFFECT-) so a cross-list collision becomes structurally impossible?"
+    decision: "No -- ids are caller-supplied free strings, so the disjointness invariant is a REAL, defeatable check (task-mandated); auto-namespacing away the very defect this invariant exists to catch would make the check vacuous."
+  - question: "Should causes/effects entries carry their own provenance_record, matching every sibling typed-object schema in this corpus (119/119 mention provenance somewhere)?"
+    decision: "YES, added post-critic-review (2026-09-11), per-item on causes[]/effects[] -- the critic adjudicated this as a real gap (not defensible variance like decomposition.fast's bare function names): a cause/effect statement is a CLAIM, the same content class root_cause.fishbone's own cause-hypothesis-set.schema.yaml already stamps with per-item provenance. Originally omitted per the literal design brief; corrected same pass."
+  - question: "Should causes[]/effects[] each additionally enforce within-list id uniqueness?"
+    decision: "YES, added post-critic-review (2026-09-11) -- a real, previously-undisclosed gap: the original disjointness check built a set() from each list before comparing, silently absorbing a within-list duplicate. Every sibling F02 method in this batch enforces some id-uniqueness rule; this method was the outlier."
+
+open_questions:
+  - "OQ-PROBTREE-1: recommended_next names decomposition.objective_tree, built in this same parallel batch by a different agent -- confirm it actually landed with a matching machine_id before treating this chain as resolvable (owner: operator, post-batch integration pass)."
+  - "OQ-PROBTREE-2: evidence_labeling_required: false reflects this citation's own thinness rather than a positive Atlas statement that it does not apply -- a future dedicated worked example, if ever added, could change this (owner: operator)."
+  - "OQ-PROBTREE-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L366) and §12.8 (L2633-2639) directly. Grepped the whole Atlas file
+    case-insensitively for "problem tree"/"problem_tree" -- confirmed exactly these 2 real citations,
+    no §4 composition formula, no §14.1 legal-chain mention beyond causal.theory_of_change's own
+    corroborating reference to this section's own 搭配 line. Grepped the whole `ai_lego` tree
+    case-insensitively for "problem_tree"/"ProblemTree"/"PROBTREE" before writing any of this method's
+    own files -- zero pre-existing implementation. Read strategy.bcg_matrix.contract.yaml (open-ended
+    non-empty list, GENUINE_COMPUTE cross-field invariant, no-builder-parameter-for-computed-field
+    precedent) and root_cause.fishbone.py (categorized-cause counterexample, read to confirm this
+    method does NOT duplicate it) in full before writing this contract. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The flat 3-tier (non-recursive) shape, the deliberate absence of
+    Fishbone-style categorization, the causes/effects id-disjointness invariant, and the
+    provenance-free node shape are all compilation decisions, disclosed above -- none presented as
+    directly Atlas-cited beyond the bare 用途/效益/搭配 lines quoted verbatim.

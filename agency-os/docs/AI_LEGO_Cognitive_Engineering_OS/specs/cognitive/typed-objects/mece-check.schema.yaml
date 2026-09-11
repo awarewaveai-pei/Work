@@ -1,0 +1,214 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/mece-check.schema.yaml"
+title: MECE Check
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MeceCheck` -- the declared `outputs` of `decomposition.mece`'s
+  Method Contract (methods/contracts/decomposition.mece.contract.yaml, `outputs: [MeceCheck]`). Atlas cites
+  this method at the F02 table row (L365) PLUS a dedicated §12.7 section (L2622-2631): "檢查分類是否重疊或
+  漏掉" (check whether a classification overlaps or omits).
+
+  Field provenance:
+    * `universe_item_ids`/`categories` -- caller-supplied structural input (the classification under
+      review), same class `database_data.normalization`'s own `primary_key_attributes`/
+      `functional_dependencies` are: trusted domain content, not computed.
+    * `overlaps`/`gaps`/`unknown_members`/`is_mece` -- GENUINE_COMPUTE, mechanically derived from
+      `universe_item_ids` x `categories` via real set arithmetic (see `ai_lego/compute/mece/check.py`'s own
+      `mece_check`). NOT an Atlas citation for the exact field names -- grounded in Atlas's own §12.7
+      two-part definition ("互斥且完整" -- mutually exclusive AND collectively exhaustive).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, MECE row (L365); §12.7 (L2622-2631)"
+  - "methods/contracts/decomposition.mece.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/normalization-record.schema.yaml -- caller-supplied-structural-input + GENUINE_COMPUTE-derived-classification precedent (this file's primary structural template)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas's own L365/§12.7 method description plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Fixed-count closed array or open-ended non-empty array for universe_item_ids/categories?"
+    decision: "Both open-ended, minItems: 1 only -- a universe or classification can hold any number of items/categories, not a fixed structural split, same shape strategy.bcg_matrix's own open-ended portfolio_items already establishes."
+  - question: "Should overlaps/gaps/unknown_members/is_mece be caller-supplied or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE, REQUIRED -- mechanically derived by ai_lego/modules/decomposition/mece.py from the record's own universe_item_ids/categories via a real, deterministic set-arithmetic function (ai_lego/compute/mece/check.py). Never a builder parameter, never caller-supplied; re-derived independently by an integrity gate from each record's own raw fields."
+  - question: "Does is_mece: false make the record invalid?"
+    decision: "No -- Atlas's own §12.7 caution ('不是所有現實系統都能完美 MECE；不要為形式強切世界') means a real classification that fails the check is a legal, complete outcome, not a schema violation. Only structural malformation (empty lists, wrong types, missing required fields) is rejected."
+  - question: "additionalProperties: false at the top level, on the categories[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Carry engine/computation_provenance_ref/provenance at the top level?"
+    decision: "Yes -- every existing GENUINE_COMPUTE record in this codebase (pareto-analysis, normalization-record, impact-effort-classification) carries these three fields; MeceCheck follows the same convention (see method contract's own compilation_decisions for why this departs from the task's own literal field list)."
+
+type: object
+required: [id, version, universe_item_ids, categories, overlaps, gaps, unknown_members, is_mece, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^MECE-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.mece"
+
+  universe_item_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: >
+      The full set of item ids under classification review -- Atlas's own "分類" (classification) subject.
+      Open-ended (no maxItems), unique (a universe cannot list the same item twice). Referential integrity
+      against `categories[].member_item_ids` (gaps/unknown_members) is enforced at the runtime layer
+      (ai_lego/modules/decomposition/mece.py), not here.
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+
+  categories:
+    type: array
+    minItems: 1
+    description: >
+      The classification under review -- one entry per category. Open-ended (no maxItems); category_name
+      uniqueness across the list, and member_item_ids uniqueness within a category, are enforced at the
+      runtime layer, not here (same schema-vs-runtime split every sibling schema in this directory already
+      establishes).
+    items:
+      type: object
+      required: [category_name, member_item_ids]
+      additionalProperties: false
+      properties:
+        category_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Names this category -- REPORTED content, not computed."
+        member_item_ids:
+          type: array
+          uniqueItems: true
+          description: "This category's own member item ids. MAY be empty (a category with zero current members is not itself illegal -- see method contract compilation_decisions)."
+          items:
+            type: string
+            minLength: 1
+            pattern: "\\S"
+
+  overlaps:
+    type: array
+    description: >
+      GENUINE_COMPUTE, REQUIRED (may be empty). Sorted item ids that appear in MORE THAN ONE category's own
+      member_item_ids -- a mutual-exclusivity violation. NEVER caller-supplied; see compilation_decisions.
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+
+  gaps:
+    type: array
+    description: >
+      GENUINE_COMPUTE, REQUIRED (may be empty). Sorted item ids present in universe_item_ids that appear in
+      ZERO categories -- a collective-exhaustiveness violation. NEVER caller-supplied.
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+
+  unknown_members:
+    type: array
+    description: >
+      GENUINE_COMPUTE, REQUIRED (may be empty). Sorted item ids referenced by some category's
+      member_item_ids but ABSENT from universe_item_ids -- a distinct referential-integrity defect, does not
+      gate is_mece (see method contract compilation_decisions).
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+
+  is_mece:
+    type: boolean
+    description: >
+      GENUINE_COMPUTE, REQUIRED. True iff BOTH overlaps and gaps are empty (Atlas's own two-part definition,
+      "互斥且完整"). `false` is a LEGAL, non-error outcome (Atlas §12.7's own caution) -- see method contract
+      compilation_decisions.
+
+  engine:
+    const: "local_python_deterministic_compute"
+
+  computation_provenance_ref:
+    const: "ai_lego.compute.mece.check.mece_check"
+
+  provenance:
+    description: "epistemic_type is expected to be CALCULATED_RESULT -- overlaps/gaps/unknown_members/is_mece are a deterministic computation, the same class every genuine_compute record in this package already carries."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A clean MECE classification of a 6-item universe into 3 categories -- no overlap, no gap"
+    value:
+      id: "MECE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.mece"
+      universe_item_ids: ["TICKET-1", "TICKET-2", "TICKET-3", "TICKET-4", "TICKET-5", "TICKET-6"]
+      categories:
+        - category_name: "billing"
+          member_item_ids: ["TICKET-1", "TICKET-2"]
+        - category_name: "login"
+          member_item_ids: ["TICKET-3", "TICKET-4"]
+        - category_name: "shipping"
+          member_item_ids: ["TICKET-5", "TICKET-6"]
+      overlaps: []
+      gaps: []
+      unknown_members: []
+      is_mece: true
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mece.check.mece_check"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }
+  - description: "A real overlap AND a real gap -- is_mece: false, a legal outcome per Atlas §12.7's own caution, not a refused record"
+    value:
+      id: "MECE-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "decomposition.mece"
+      universe_item_ids: ["TICKET-1", "TICKET-2", "TICKET-3", "TICKET-4"]
+      categories:
+        - category_name: "billing"
+          member_item_ids: ["TICKET-1", "TICKET-2"]
+        - category_name: "login"
+          member_item_ids: ["TICKET-2", "TICKET-3"]
+      overlaps: ["TICKET-2"]
+      gaps: ["TICKET-4"]
+      unknown_members: []
+      is_mece: false
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.mece.check.mece_check"
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-MECECHECK-1"
+    question: "No category_name/member_item_ids-within-a-category uniqueness constraint exists at the schema layer (enforced at the runtime layer instead, see method contract) -- should a future pass add a JSON Schema constraint for it? Same open question class as OQ-BCGMATRIXANALYSIS-1's own runtime-only invariant. (owner: operator)"
+  - id: "OQ-MECECHECK-2"
+    question: "unknown_members deliberately does not gate is_mece -- should a future pass add a SEPARATE top-level boolean (e.g. is_referentially_clean) so a caller can distinguish 'fails MECE' from 'has a referential-integrity defect' without inspecting unknown_members directly? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L365) and §12.7 (L2622-2631) directly. Grepped the whole Atlas file
+    case-insensitively for "mece" -- confirmed both hits are this method's own citation. Read
+    normalization-record.schema.yaml (caller-supplied structural input + GENUINE_COMPUTE derived
+    classification, this file's primary structural template) and bcg-matrix-analysis.schema.yaml
+    (open-ended non-empty list, GENUINE_COMPUTE per-item, no-builder-parameter precedent) in full before
+    writing this file. Validated against jsonschema Draft202012Validator via a standalone script (required
+    fields present, id pattern satisfied, additionalProperties:false present at both the top level and the
+    categories[] item level from the start, embedded examples resolved through their real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled categories[] item
+    key, and an empty universe_item_ids/categories array).
+  note: >
+    `overlaps`/`gaps`/`unknown_members`/`is_mece`'s real set-arithmetic grounding is disclosed in
+    compilation_decisions, not presented as an Atlas citation of the exact field names -- Atlas's own
+    citation is the two-part MECE definition itself ("互斥且完整"), which these fields directly
+    operationalize. The open-ended non-empty list shapes, category member optionality, and the
+    engine/computation_provenance_ref/provenance addition beyond the task's own literal field list are
+    compilation decisions, disclosed above. No mother document was modified to produce this file.

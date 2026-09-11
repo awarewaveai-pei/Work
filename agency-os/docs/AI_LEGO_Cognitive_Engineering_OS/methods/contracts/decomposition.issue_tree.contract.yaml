@@ -1,0 +1,103 @@
+$id: "ai-lego://methods/contracts/decomposition.issue_tree.contract.yaml"
+title: "Issue Tree Method Contract"
+status: ACTIVE
+
+description: >
+  decomposition.issue_tree, family decomposition (F02), 1st member -- opens a brand-new family (grep-confirmed
+  zero pre-existing `ai_lego/modules/decomposition/` before this file). Atlas F02 table row (L363: "Issue Tree｜
+  把大問題拆成可分析分支｜主問題→第一層→第二層→檢查遺漏｜建立分析計畫｜MECE、Evidence Matrix") + dedicated §12.6
+  (L2604-2620, mermaid worked example: root question branching into 5 first-level sub-questions). Distinct from
+  `association.mind_map` (fixed 4-level nesting, no recursion bound needed) -- Issue Tree is OPEN recursion
+  depth (no fixed-level rule anywhere in Atlas's own citation), same arbitrary-depth nested-tree shape
+  `decision.decision_tree` already establishes, defensively bounded to MAX_TREE_DEPTH=100. Core invariant:
+  every node `id` anywhere in the WHOLE tree is globally unique -- mechanically re-derivable, not a judgment
+  call.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Issue Tree row (L363)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.6 (L2604-2620) -- dedicated worked-example section, primary structural citation"
+  - "ai_lego/modules/decision/decision_tree.py -- arbitrary-depth NESTED tree, MAX_TREE_DEPTH=100 defensive bound, and whole-tree-id-uniqueness precedent reused here"
+  - "ai_lego/modules/association/mind_map.py -- whole-tree id-uniqueness invariant class (MINDMAP_DUPLICATE_BRANCH_ID) generalized here to arbitrary depth"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.issue_tree` mints the family's first machine_id (`family:
+  decomposition` did not exist before this file -- grep-confirmed). Node shape `{id, question, children}` and
+  the record-level `provenance` field (Atlas's own §12.6 citation names neither field name nor a provenance
+  requirement) are compilation decisions, disclosed below.
+
+id: decomposition.issue_tree
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting the main
+# question into first-level then second-level sub-questions (Atlas's own "主問題→第一層→第二層"); MAP =
+# structuring the resulting hierarchy; VALIDATE = Atlas's own "檢查遺漏" (checking for gaps/omissions) step.
+
+purpose:
+  - decompose_a_large_question_into_an_analyzable_branching_tree_of_sub_questions
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L363 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - IssueTree
+# NEW output type (see typed-objects/issue-tree.schema.yaml). Atlas names no PascalCase output type for this
+# method, same honesty gap every other thin-citation contract in this suite discloses.
+
+preconditions:
+  - "root is a well-shaped issue_tree_node (non-empty id, non-empty question, children a list -- possibly empty for a leaf -- of recursively well-shaped issue_tree_node entries), recursion bounded to MAX_TREE_DEPTH=100"
+  - "every node id anywhere in the WHOLE tree (root and every descendant, at any depth) is globally unique -- ISSUETREE_DUPLICATE_NODE_ID, mechanically re-derived by the gate from the record's own raw tree, never trusting a stored flag"
+  - "every node's question is a genuinely non-empty string -- a branch with no actual question text has not actually decomposed anything (Atlas's own '主問題→第一層→第二層' purpose presumes each node carries real question content)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row-plus-one-diagram reasoning strategy.bcg_matrix.contract.yaml's identical
+  # flag already establishes -- no explicit unevidenced-claim misuse warning cited for this method.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L363's own "最佳搭配" (best combo) column names "MECE、Evidence Matrix" -- neither has a machine_id
+# anywhere in this corpus yet (grep-confirmed), so left empty rather than naming a non-existent id. See
+# open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed-level nesting (mind_map-style, 4 levels) or open-ended arbitrary-depth recursion?"
+    decision: "Open-ended, defensively bounded to MAX_TREE_DEPTH=100 -- Atlas's own §12.6 diagram shows one worked depth (root -> 5 first-level questions) but names no fixed-depth rule anywhere, unlike mind_map's own citation (中心→主枝→次枝→關鍵詞, an explicit 4-level terminus); reuses decision.decision_tree's own arbitrary-depth/MAX_TREE_DEPTH precedent instead."
+  - question: "Per-node provenance (bcg_matrix/mind_map-style per-entry stamp) or record-level only (decision_tree-style)?"
+    decision: "Record-level only -- an issue_tree node is pure structural question text (Atlas's own §12.6 diagram shows plain question labels, no per-node evidence/reasoning field), same class decision_tree's own per-node payoff/probability (not textual judgment content) already establishes as not needing its own provenance stamp; provenance is nonetheless REQUIRED at the record level, since it is a 100% universal field across every one of this suite's 119 existing typed-object schemas (grep-confirmed) -- omitting it entirely would be inconsistent with every sibling method, not a citation-grounded choice."
+  - question: "Should children[] have a minimum count (mind_map's sub_branches minItems:1 when present) or allow an empty list?"
+    decision: "Allow empty -- children is always a present key (never omitted), and an empty list IS a legal leaf node (a branch not yet further decomposed), distinct from mind_map's own optional-key-when-absent convention because this method's own recursive shape needs one uniform node type, not two (main_branch/sub_branch)."
+
+open_questions:
+  - "OQ-ISSUETREE-1: recommended_next should probably name future decomposition.mece / research.evidence_matrix machine_ids (Atlas L363's own '最佳搭配' column) once such contracts exist -- left empty, neither exists yet (owner: operator, or whoever builds them)."
+  - "OQ-ISSUETREE-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-ISSUETREE-3: no MECE-completeness check (Atlas's own '檢查遺漏' / 'MECE' best-combo hint) is enforced here -- this method only guarantees structural id-uniqueness and non-empty question text, not that a given tree's children are actually mutually-exclusive/collectively-exhaustive of their parent question (that is decomposition.mece's own future job, per the Atlas-cited best-combo pairing) (owner: operator, or whoever builds decomposition.mece)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L363) and dedicated §12.6 (L2604-2620) directly. Grepped the whole Atlas file
+    case-insensitively for "issue tree"/"issue_tree"/"議題樹"/"問題樹" -- confirmed exactly the 2 real hits above
+    (1 table row, 1 dedicated worked-example section), no §14.1 legal-chain mention, no §22.3 gate-table row.
+    Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "issue_tree"/"issue tree"/
+    "IssueTree" before writing any of this method's own files -- zero pre-existing implementation (only
+    association.mind_map/association.affinity_diagram/framing.problem_statement pre-existed, all unrelated).
+    Read ai_lego/modules/decision/decision_tree.py (arbitrary-depth nested-tree, MAX_TREE_DEPTH precedent) and
+    ai_lego/modules/association/mind_map.py (whole-tree id-uniqueness invariant class) in full before writing
+    this contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L363/§12.6's own "主問題→第一層→第二層→檢查遺漏" structure is
+    transcribed directly into `preconditions`; the recursive `{id, question, children}` node shape, the
+    open-ended MAX_TREE_DEPTH=100 bound, the record-level-only provenance placement, and
+    `cognitive_primitives` are compilation decisions, disclosed above, not presented as directly Atlas-cited.

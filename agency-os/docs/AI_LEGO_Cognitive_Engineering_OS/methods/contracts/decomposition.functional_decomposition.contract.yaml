@@ -1,0 +1,111 @@
+$id: "ai-lego://methods/contracts/decomposition.functional_decomposition.contract.yaml"
+title: "Functional Decomposition Method Contract"
+status: ACTIVE
+
+description: >
+  decomposition.functional_decomposition, family decomposition (F02), 2nd member (after decomposition.issue_tree,
+  built concurrently in this same batch by a separate agent -- read only for tone, not imported). Atlas F02 table
+  row ONLY (L368: "Functional Decomposition｜按功能拆系統｜Top function→subfunctions→interfaces｜強化模組與責任邊界｜
+  C4、DDD") -- grep-confirmed the sole hit case-insensitively across the whole Atlas file, no dedicated section,
+  same thin-citation class strategy.bcg_matrix/decomposition.issue_tree already establish. Distinct from
+  architecture.ddd/architecture.c4-style modules (Atlas's own "最佳搭配" pairing) -- this method decomposes a
+  SYSTEM's functions top-down, DDD decomposes a DOMAIN into bounded contexts; genuinely different objects of
+  analysis, not a re-skin. Core invariants: (1) every FunctionNode id anywhere in the WHOLE top_function tree is
+  globally unique; (2) every interfaces[] entry's from_function_ref/to_function_ref resolves to a real function id
+  actually present in that tree -- Atlas's own literal "interfaces" concept, a dangling reference is a real
+  structural defect.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Functional Decomposition row (L368)"
+  - "ai_lego/modules/architecture/ddd.py -- referential-integrity-over-a-set-of-real-ids gate precedent (context_map entries referencing bounded_contexts) reused here for interfaces referencing function nodes"
+  - "specs/cognitive/typed-objects/issue-tree.schema.yaml -- same F02 family, whole-tree id-uniqueness + record-level-only-provenance precedent (this file's primary structural template)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.functional_decomposition` is the family's 2nd machine_id
+  (`family: decomposition` already exists via decomposition.issue_tree, built concurrently in this same batch).
+  Node shape `{id, function_name, children}`, the `interfaces[]` referential-integrity shape, and the record-level
+  `provenance` field (Atlas's own L368 citation names none of these) are compilation decisions, disclosed below.
+
+id: decomposition.functional_decomposition
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, MAP, RELATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting the top
+# function into subfunctions (Atlas's own "Top function→subfunctions"); MAP = structuring the resulting
+# hierarchy; RELATE = Atlas's own "interfaces" step (naming the real relationships/boundaries between functions).
+
+purpose:
+  - decompose_a_system_into_a_top_down_function_hierarchy_with_interfaces_between_functions
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L368 citation names no required input type, same
+  # "no hard upstream dependency" position decomposition.issue_tree.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - FunctionalDecomposition
+# NEW output type (see typed-objects/functional-decomposition.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other thin-citation contract in this suite discloses.
+
+preconditions:
+  - "top_function is a well-shaped function_node (non-empty id, non-empty function_name, children a list -- possibly empty for a leaf -- of recursively well-shaped function_node entries), recursion bounded to MAX_TREE_DEPTH=100"
+  - "every function_node id anywhere in the WHOLE top_function tree (root and every descendant, at any depth) is globally unique -- FUNCDECOMP_DUPLICATE_NODE_ID, mechanically re-derived by the gate from the record's own raw tree, never trusting a stored flag"
+  - "every interfaces[] entry's from_function_ref and to_function_ref resolve to a function id that actually exists somewhere in top_function -- FUNCDECOMP_DANGLING_INTERFACE_REF, mechanically re-derived by the gate by walking the record's own raw tree, never trusting a stored flag"
+  - "every interfaces[] entry's description is a genuinely non-empty string -- an interface with no actual description has not actually documented a module boundary (Atlas's own '強化模組與責任邊界' purpose presumes each interface carries real content)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.bcg_matrix/decomposition.issue_tree.contract.yaml's
+  # identical flag already establishes -- no explicit unevidenced-claim misuse warning cited for this method.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L368's own "最佳搭配" (best combo) column names "C4、DDD". architecture.ddd already exists in this corpus
+# (ai_lego/modules/architecture/ddd.py) but no dedicated C4 machine_id exists anywhere yet (grep-confirmed: only
+# architecture.system_context_model, a different Atlas-cited method, not literally "C4") -- left empty rather
+# than naming an approximate id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed-level nesting or open-ended arbitrary-depth recursion for top_function?"
+    decision: "Open-ended, defensively bounded to MAX_TREE_DEPTH=100 -- Atlas's own citation ('Top function→subfunctions') names no fixed-depth rule, same arbitrary-depth precedent decomposition.issue_tree.contract.yaml's own identical compilation_decision already establishes for this family."
+  - question: "Per-node provenance or record-level only?"
+    decision: "Record-level only -- a function_node is pure structural naming (Atlas's own 'Top function→subfunctions' shows plain function labels, no per-node evidence/reasoning field), same reasoning decomposition.issue_tree.contract.yaml's identical decision already establishes; provenance is nonetheless REQUIRED at the record level as a 100% universal field across every one of this suite's existing typed-object schemas (grep-confirmed) -- omitting it entirely would be inconsistent with every sibling method, not a citation-grounded choice."
+  - question: "Should interfaces[] require minItems:1 (completeness), matching a closed-set method's own non-empty list?"
+    decision: "No -- open-ended, MAY be empty. Atlas's own citation is a bare table row naming 'interfaces' as part of the METHOD (how it is used), not asserting every legal decomposition must disclose at least one; forcing non-emptiness would overstate a thin citation. See method module's own CLI slice for a real scenario carrying >=2 interfaces regardless."
+  - question: "Should children[] have a minimum count (mind_map-style) or allow an empty list?"
+    decision: "Allow empty -- children is always a present key (never omitted), and an empty list IS a legal leaf node (a function not yet further decomposed), same shape decomposition.issue_tree.contract.yaml's own identical decision already establishes."
+  - question: "Should interfaces[].from_function_ref/to_function_ref be allowed to name the SAME function id (a self-referencing interface)?"
+    decision: "Not forbidden -- Atlas's own citation gives no basis to rule out a function documenting an internal self-relationship, and inventing that prohibition would be an uncited invariant. Only genuine dangling references (an id absent from the whole tree) are treated as a structural defect."
+
+open_questions:
+  - "OQ-FUNCDECOMP-1: recommended_next should probably name architecture.ddd (already built, ai_lego/modules/architecture/ddd.py) and a future dedicated C4 machine_id (Atlas L368's own '最佳搭配' column) once one exists -- left empty rather than naming an approximate id for the C4 half (owner: operator, or whoever builds a dedicated C4 method)."
+  - "OQ-FUNCDECOMP-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-FUNCDECOMP-3: no check that interfaces[] actually reflects genuine module/responsibility boundaries (Atlas's own '強化模組與責任邊界' benefit) -- this method only guarantees structural id-uniqueness and referential integrity, not that a given interface is a MEANINGFUL boundary rather than a trivial or redundant one (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L368) directly. Grepped the whole Atlas file case-insensitively for "functional
+    decomposition"/"functional_decomposition"/"FunctionalDecomposition" -- confirmed exactly 1 real hit (the table
+    row), no dedicated section, no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for the same 3 terms before writing any of this method's own files -- zero pre-existing
+    implementation. Read decomposition.issue_tree.contract.yaml + typed-objects/issue-tree.schema.yaml (whole-tree
+    id-uniqueness + record-level-only-provenance precedent, same family, built concurrently by a separate agent in
+    this batch) and ai_lego/modules/architecture/ddd.py (referential-integrity-over-real-ids gate precedent) in
+    full before writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L368's own "Top function→subfunctions→interfaces" structure is
+    transcribed directly into `preconditions`; the recursive `{id, function_name, children}` node shape, the
+    `interfaces[]` referential-integrity shape, the open-ended MAX_TREE_DEPTH=100 bound, the record-level-only
+    provenance placement, and `cognitive_primitives` are compilation decisions, disclosed above, not presented as
+    directly Atlas-cited.

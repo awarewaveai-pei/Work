@@ -1,0 +1,138 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/fast-diagram.schema.yaml"
+title: FAST Diagram
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FastDiagram` -- the declared `outputs` of `decomposition.fast`'s
+  Method Contract (methods/contracts/decomposition.fast.contract.yaml, `outputs: [FastDiagram]`). Atlas cites
+  this method ONCE: F02 tool table row (L369: "FAST｜用 Why/How 建功能鏈｜往左問 Why、往右問 How｜找冗餘功能與
+  替代方案｜Value Engineering") -- the thinnest possible citation class, no dedicated section.
+
+  Field provenance:
+    * `functions` -- Atlas's own "用 Why/How 建功能鏈" (build a function chain via Why/How): an open-ended,
+      non-empty list of functions forming the chain.
+    * `functions[].why_ref` -- Atlas's own "往左問 Why" (asking Why walks toward the higher-order function):
+      each non-root function's pointer to its own higher-order parent's id. Exactly one entry has `why_ref:
+      null` (the chain's unique root) -- GENUINE_COMPUTE, re-derived by `ai_lego/modules/decomposition/fast.py`
+      from the record's own raw `functions` list, never caller-asserted. The resulting chain must be acyclic
+      (no function may be its own transitive ancestor) -- also GENUINE_COMPUTE, re-derived the same way.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, FAST row (L369)"
+  - "methods/contracts/decomposition.fast.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- open-ended non-empty list, GENUINE_COMPUTE-re-derived-by-gate precedent (this file's primary structural template)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L369's own bare method description plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Fixed-count closed array or open-ended non-empty array for `functions`?"
+    decision: "Open-ended, minItems:1 only -- a Why/How function chain can be arbitrarily long, same shape bcg-matrix-analysis.schema.yaml's own non-empty `portfolio_items[]` already establishes."
+  - question: "Should `functions[]` carry a provenance field, per-item or record-level?"
+    decision: "No provenance field anywhere -- task-mandated exact shape (id, name, why_ref only, additionalProperties:false). Disclosed in the method contract's own compilation_decisions as a discrepancy against this suite's own universal-provenance convention, not presented as a citation-grounded choice."
+  - question: "Should `why_ref`'s single-root/acyclic invariants be expressed as a JSON Schema structural constraint?"
+    decision: "No -- plain JSON Schema cannot express 'exactly one array item has why_ref==null' or graph acyclicity as a cross-item constraint; both are runtime-only invariants enforced by ai_lego/modules/decomposition/fast.py's builder and independent gate, same limitation bcg-matrix-analysis.schema.yaml's own OQ-BCGMATRIXANALYSIS-1 already discloses for a different computed field."
+  - question: "additionalProperties: false at the top level, and on the functions[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, functions]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^FAST-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.fast"
+
+  functions:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "用 Why/How 建功能鏈" framing: the ordered chain of functions under FAST analysis.
+      Open-ended (no maxItems) -- genuine non-emptiness is the only count invariant this schema expresses;
+      the exactly-one-root and acyclicity invariants are enforced at runtime by
+      ai_lego/modules/decomposition/fast.py at both the builder and an independent gate (same
+      builder-plus-gate precedent every sibling typed-object schema in this directory already establishes).
+    items:
+      type: object
+      required: [id, name, why_ref]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Identifies this function within the chain. Referenced by other entries' own why_ref."
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Names the function itself -- REPORTED content, not computed."
+        why_ref:
+          type: ["string", "null"]
+          description: >
+            Either null (this is the chain's unique root -- asking "why" of the root has no higher-order
+            answer within this diagram) or the id of another entry in the SAME functions list: the
+            higher-order function this one exists to serve (Atlas's own "往左問 Why"). GENUINE_COMPUTE
+            invariants over this field (exactly one null across the whole list; every non-null value
+            resolves to a real sibling id; the resulting chain is acyclic and terminates at the root) are
+            enforced by ai_lego/modules/decomposition/fast.py, not expressible in plain JSON Schema -- see
+            compilation_decisions.
+
+examples:
+  - description: "A 5-function FAST chain for a customer-retention initiative (one root, two 'how' branches off the same parent)"
+    value:
+      id: "FAST-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.fast"
+      functions:
+        - id: "FN-1"
+          name: "增加客戶留存"
+          why_ref: null
+        - id: "FN-2"
+          name: "提升產品使用黏著度"
+          why_ref: "FN-1"
+        - id: "FN-3"
+          name: "建立每週使用習慣"
+          why_ref: "FN-2"
+        - id: "FN-4"
+          name: "發送個人化週報提醒"
+          why_ref: "FN-3"
+        - id: "FN-5"
+          name: "主動客服關懷通知"
+          why_ref: "FN-2"
+
+open_questions:
+  - id: "OQ-FASTDIAGRAM-1"
+    question: "No functions[].id uniqueness JSON Schema constraint exists (plain JSON Schema cannot express set-uniqueness of a subfield across array items) -- uniqueness is enforced only at runtime by ai_lego/modules/decomposition/fast.py, same limitation this suite's other id-referencing typed-objects already carry. Should a future pass add a custom validator layer instead of relying solely on the runtime gate? (owner: operator)"
+  - id: "OQ-FASTDIAGRAM-2"
+    question: "This schema carries no provenance field anywhere, breaking this suite's own established universal-provenance convention (see decomposition.issue_tree.contract.yaml's compilation_decisions, which documents provenance as present on 100% of this suite's 119 prior typed-object schemas) -- should a future pass add a record-level provenance field? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L369) directly. Grepped the whole Atlas file case-insensitively for the specific
+    strings "decomposition.fast"/"FastDiagram"/"FAST diagram" (bare "FAST" alone false-positives heavily) --
+    confirmed zero pre-existing hits. Cross-checked against methods/contracts/decomposition.fast.contract.yaml's
+    own outputs/preconditions/quality. Read bcg-matrix-analysis.schema.yaml (open-ended non-empty list,
+    GENUINE_COMPUTE-re-derived-by-gate precedent) in full as shape precedent before writing this file.
+    Validated as a syntactically valid Draft 2020-12 JSON Schema and exercised against both a well-formed
+    instance and negative controls (a smuggled top-level key, a smuggled functions[] item key, an empty
+    functions array, a functions[] entry missing why_ref) via jsonschema.Draft202012Validator -- see
+    tests/unit/test_fast.py's own SpecConformanceTests for the persisted, re-runnable form of this check.
+  note: >
+    No mother document was modified to produce this file. The `{id, name, why_ref}` node shape, the
+    open-ended non-empty list, the deliberate absence of any provenance field, and the deliberate absence of
+    a schema-level structural constraint for the two runtime invariants are compilation decisions, disclosed
+    above -- the provenance omission is additionally flagged as a discrepancy against this suite's own
+    established convention in the method contract's own compilation_decisions, not presented as Atlas-cited.

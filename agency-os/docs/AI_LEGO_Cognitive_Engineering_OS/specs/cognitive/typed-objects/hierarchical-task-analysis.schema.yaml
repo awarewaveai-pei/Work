@@ -1,0 +1,196 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/hierarchical-task-analysis.schema.yaml"
+title: Hierarchical Task Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `HierarchicalTaskAnalysis` -- the declared `outputs` of
+  `decomposition.hierarchical_task_analysis`'s Method Contract
+  (methods/contracts/decomposition.hierarchical_task_analysis.contract.yaml, `outputs:
+  [HierarchicalTaskAnalysis]`). Atlas cites this method ONCE: F02 tool table row (L370: "Hierarchical
+  Task Analysis｜拆人類工作步驟｜Goal→Task→Subtask→Plan｜找操作負擔與錯誤點｜Journey、Service
+  Blueprint") -- the thinnest possible citation class, no dedicated section, same class
+  strategy.bcg_matrix's own citation already establishes.
+
+  Field provenance:
+    * `goal` -- Atlas's own "Goal→Task→Subtask" framing: the root of a RECURSIVE, self-referential
+      `TaskNode` tree (`$defs/task_node`), open depth (NOT a fixed 3-level Goal/Task/Subtask cap --
+      Atlas's own arrow chain is illustrative of the pattern, not a hard depth limit).
+    * `TaskNode.task_name` -- Atlas's own "Task"/"Subtask"/"Goal" labels: DISCLOSED non-empty string
+      at every node, never computed.
+    * `TaskNode.plan` -- Atlas's own "→Plan": DISCLOSED, but GENUINE_STRUCTURAL in its
+      requiredness -- REQUIRED (non-empty) iff the node has >=2 children, MUST be `null` iff the node
+      has 0 or 1 children. Grounded in real, well-known Hierarchical Task Analysis domain discipline
+      (plans express execution order among SIBLINGS; a node with fewer than 2 children has nothing to
+      sequence), NOT an Atlas citation -- see
+      `ai_lego/modules/decomposition/hierarchical_task_analysis.py` module docstring.
+    * `TaskNode.children` -- Atlas's own "Task→Subtask" recursion: an array of further `TaskNode`
+      entries, open-ended (no maxItems), `default: []` for leaves.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Hierarchical Task Analysis row (L370)"
+  - "methods/contracts/decomposition.hierarchical_task_analysis.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/blue-ocean-analysis.schema.yaml -- asymmetric if/then/else required-vs-forbidden field precedent (this file's primary structural template for the plan/children-count rule, applied to a recursive shape instead of a flat array)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents:
+  a direct transcription of Atlas L370's own bare method description plus low-risk, disclosed
+  compilation choices, including the real external HTA-domain plan-required-iff->=2-children rule.
+
+compilation_decisions:
+  - question: "Flat array of tasks, or a recursive self-referential TaskNode tree via $defs?"
+    decision: "Recursive $defs/task_node, self-referenced via `$ref: \"#/$defs/task_node\"` on both the top-level `goal` property and `TaskNode.children[]` items -- task-mandated, and the only shape that can express Atlas's own open-depth 'Goal→Task→Subtask' nesting; NEW precedent in this directory (grep-confirmed: no sibling typed-object schema uses `$defs` for self-reference before this file)."
+  - question: "Should `plan` be `type: string` with a sentinel empty-string default for 'no plan', or a real nullable field enforced by if/then/else?"
+    decision: "Real nullable field (`type: [string, \"null\"]`), REQUIRED key at every node (never omitted), value constrained by a node-level `allOf`/`if`/`then`/`else` pair keyed on `children` array length via `minItems: 2` -- same if/then/else mechanism blue-ocean-analysis.schema.yaml's own industry_standard_level pair already establishes, generalized here from an enum-vs-enum condition to an array-length condition."
+  - question: "Does the forbidden direction mean the key is ABSENT (blue_ocean's own convention for industry_standard_level under CREATE) or PRESENT as null?"
+    decision: "PRESENT as null, task-mandated -- TaskNode's shape always carries exactly 4 keys (id/task_name/plan/children) at every node; `required: [id, task_name, plan, children]` is constant across the if/then/else, only `plan`'s VALUE type narrows per branch (`then: {plan: {type: string, minLength: 1}}` / `else: {plan: {type: \"null\"}}`)."
+  - question: "additionalProperties: false at the top level AND on the recursive task_node $defs entry?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start, including at every recursion depth (the same $defs entry is reused at every level, so this is a single point of enforcement, not one per depth)."
+  - question: "Should TaskNode.id carry a fixed prefix pattern, matching the top-level id's `^HTA-`?"
+    decision: "No -- only the top-level record id carries the `^HTA-` prefix (this suite's NEW-DESIGN id-prefix convention); TaskNode.id is free-form non-empty text (e.g. a short slug), since Atlas's own citation gives no per-node id convention and no cross-node reference exists that would need a structured id (see method contract's own compilation_decisions on id uniqueness)."
+  - question: "A top-level synthesis/recommendation field, matching porter-five-forces-analysis.schema.yaml's required overall_attractiveness?"
+    decision: "No -- Atlas's own benefit ('找操作負擔與錯誤點') is a property of the tree's own structure (which nodes lack a stated plan where one is needed), not a separate top-level narrative field, same reasoning strategy.bcg_matrix's own identical absence already establishes."
+
+type: object
+required: [id, version, goal]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^HTA-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.hierarchical_task_analysis"
+
+  goal:
+    $ref: "#/$defs/task_node"
+    description: >
+      The root of the Goal→Task→Subtask tree (Atlas's own L370 method description). A
+      HierarchicalTaskAnalysis with no goal has not actually decomposed anything.
+
+examples:
+  - description: "A 4-level Hierarchical Task Analysis for assembling a flat-pack bookshelf -- covers a leaf (0 children, plan null), a single-child node (1 child, plan null), and 2 multi-child nodes (2 children each, plan required)"
+    value:
+      id: "HTA-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.hierarchical_task_analysis"
+      goal:
+        id: "goal"
+        task_name: "組裝書架"
+        plan: "先準備工具與材料，再組裝主體與收尾"
+        children:
+          - id: "prepare-tools"
+            task_name: "準備工具與材料"
+            plan: null
+            children: []
+          - id: "assemble-body"
+            task_name: "組裝主體與收尾"
+            plan: "先鎖底板與兩側板，再裝背板與層板"
+            children:
+              - id: "assemble-base-and-sides"
+                task_name: "鎖底板與兩側板"
+                plan: null
+                children: []
+              - id: "attach-back-and-shelves"
+                task_name: "裝背板與層板"
+                plan: null
+                children:
+                  - id: "secure-back-panel-screws"
+                    task_name: "鎖背板螺絲固定層板位置"
+                    plan: null
+                    children: []
+
+open_questions:
+  - id: "OQ-HIERARCHICALTASKANALYSIS-1"
+    question: "TaskNode.id has no global-uniqueness constraint across the tree (see method contract's own compilation_decisions) -- should a future pass add one if a downstream consumer ever needs to reference a specific node?"
+    owner: "operator"
+  - id: "OQ-HIERARCHICALTASKANALYSIS-2"
+    question: "No maximum tree depth or maximum children-per-node is enforced -- Atlas's own citation gives no such bound; should a future pass add one for pathological-input defense?"
+    owner: "operator"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L370) directly. Grepped the whole Atlas file case-insensitively for
+    "hierarchical task analysis" -- confirmed exactly 1 real hit, no dedicated section. Cross-checked
+    against methods/contracts/decomposition.hierarchical_task_analysis.contract.yaml's own
+    outputs/preconditions/quality. Read blue-ocean-analysis.schema.yaml in full as the if/then/else
+    asymmetric-requiredness structural precedent before writing this file; grepped the whole
+    specs/cognitive/typed-objects/ directory for `$defs` -- confirmed no sibling schema uses a
+    self-referential recursive definition before this file (NEW precedent, documented in
+    compilation_decisions). Independently re-verified the real, well-known Hierarchical Task Analysis
+    domain discipline (plans sequence siblings; a node with fewer than 2 children has nothing to
+    sequence) against human-factors/ergonomics domain knowledge, confirmed the rule is TOTAL over all
+    non-negative children counts (0, 1, and >=2 partition the domain exhaustively). Validated against
+    jsonschema Draft202012Validator via a standalone script (required fields present, id pattern
+    satisfied, the recursive $defs/task_node resolves through `referencing.Registry` without a
+    separate schema file, additionalProperties:false present at both the top level and the recursive
+    task_node definition, the if/then plan-required-for->=2-children constraint, the if/then
+    plan-forbidden-for-0-or-1-children constraint at multiple recursion depths, negative controls for
+    a smuggled top-level key, a smuggled task_node-level key at depth 0 AND at depth 2, a >=2-child
+    node with plan:null, a leaf node with a non-null plan, and the embedded 4-level example validating
+    end to end).
+  note: >
+    TaskNode.plan's if/then/else requiredness rule is grounded in real external Hierarchical Task
+    Analysis domain methodology, NOT Atlas text -- disclosed in compilation_decisions and the method
+    contract's own compilation_decisions, not presented as an Atlas citation. The recursive $defs
+    shape, the id-prefix convention, the null-vs-absent forbidden-plan encoding, and the deliberate
+    absence of a top-level synthesis field are compilation decisions, disclosed above. No mother
+    document was modified to produce this file.
+
+$defs:
+  task_node:
+    type: object
+    required: [id, task_name, plan, children]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id for this node, free-form (e.g. a short slug). No global-uniqueness constraint -- see compilation_decisions."
+      task_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "The Goal/Task/Subtask label itself (Atlas's own 'Goal→Task→Subtask'). REPORTED content, not computed."
+      plan:
+        type: ["string", "null"]
+        description: >
+          REQUIRED (non-empty) iff this node has >=2 children (Atlas's own '→Plan' -- describes the
+          execution order/condition under which this node's own children run, e.g. "do 1, then either
+          2 or 3"); MUST be `null` iff this node has 0 or 1 children (nothing to sequence). Always a
+          disclosed, REPORTED judgment -- never computed. Enforced by the `allOf`/`if`/`then`/`else`
+          pair below, not left as an unstated convention. See module docstring for the external
+          HTA-domain grounding.
+      children:
+        type: array
+        default: []
+        description: >
+          Further TaskNode entries one level down (Atlas's own 'Task→Subtask' recursion). Open-ended
+          (no maxItems) and open-depth (each entry is itself a full task_node, recursively). Empty for
+          a leaf task.
+        items:
+          $ref: "#/$defs/task_node"
+    allOf:
+      - if:
+          properties:
+            children:
+              minItems: 2
+          required: [children]
+        then:
+          properties:
+            plan:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+        else:
+          properties:
+            plan:
+              type: "null"

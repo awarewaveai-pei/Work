@@ -1,0 +1,210 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/functional-decomposition.schema.yaml"
+title: Functional Decomposition
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FunctionalDecomposition` -- the declared `outputs` of
+  `decomposition.functional_decomposition`'s Method Contract
+  (methods/contracts/decomposition.functional_decomposition.contract.yaml, `outputs: [FunctionalDecomposition]`).
+  Atlas cites this method ONCE: F02 tool table row (L368: "Functional Decomposition｜按功能拆系統｜Top function→
+  subfunctions→interfaces｜強化模組與責任邊界｜C4、DDD") -- the thinnest possible citation class, no dedicated
+  section, same class decomposition.issue_tree's own citation already establishes for this family.
+
+  Field provenance:
+    * `top_function` -- Atlas's own "Top function→subfunctions" structure: a single recursive `function_node`
+      (`{id, function_name, children}`). OPEN recursion depth (no fixed-level rule cited anywhere) -- same
+      arbitrary-depth NESTED shape `issue-tree.schema.yaml`'s own `root` already establishes, defensively
+      bounded to MAX_TREE_DEPTH=100 at the runtime layer (JSON Schema's own `$ref` recursion has no depth
+      bound; the runtime bound lives in `ai_lego/modules/decomposition/functional_decomposition.py`, not here).
+    * `function_node.children` -- always a present key (never omitted), a list that MAY be empty (a leaf
+      function not yet further decomposed) -- same convention `issue-tree.schema.yaml`'s own `children` already
+      establishes.
+    * `interfaces` -- Atlas's own literal "interfaces" step: an open-ended (MAY be empty, see method contract's
+      own compilation_decisions) list of `{id, from_function_ref, to_function_ref, description}` entries. Genuine
+      referential integrity (every `from_function_ref`/`to_function_ref` resolves to a real `function_node.id`
+      somewhere in `top_function`) is a runtime-only invariant this schema cannot express -- enforced by
+      `ai_lego/modules/decomposition/functional_decomposition.py` at both the builder and an independent gate.
+    * `provenance` -- RECORD-LEVEL only, same placement `issue-tree.schema.yaml`'s own `provenance` already
+      establishes for this family (a node/interface here is reported structural content, not a per-item
+      judgment call the way `bcg-matrix-analysis.schema.yaml`'s own per-item `growth_rate`/`relative_share`
+      are). See the method contract's own `compilation_decisions` for why this field is required despite no
+      direct Atlas citation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Functional Decomposition row (L368)"
+  - "methods/contracts/decomposition.functional_decomposition.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/issue-tree.schema.yaml -- same F02 family, arbitrary-depth recursive-node + whole-tree id-uniqueness + record-level-only-provenance precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/bounded-context-map.schema.yaml -- referential-integrity-over-a-set-of-real-ids precedent (context_map entries referencing bounded_contexts), reused here for interfaces referencing function nodes"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L368's own bare method description plus low-risk, disclosed compilation choices
+  (recursive node field names, the `interfaces[]` referential-integrity shape, the MAX_TREE_DEPTH runtime bound,
+  record-level-only provenance).
+
+compilation_decisions:
+  - question: "Recursive node via JSON Schema `$ref` self-reference, or a fixed-depth explicit set of $defs?"
+    decision: "A single self-referential `$defs/function_node` -- Atlas's own citation names no fixed depth, so one recursive node type is the honest shape; matches issue-tree.schema.yaml's own self-referential `issue_tree_node` $def pattern exactly."
+  - question: "Should `children` require minItems:1 when present?"
+    decision: "No -- `children` is always a present key (required, never omitted) and MAY be an empty array; an empty list IS the legal leaf-node representation, same convention issue-tree.schema.yaml's own `children` already establishes."
+  - question: "Should `interfaces` require minItems:1 (completeness)?"
+    decision: "No -- open-ended, MAY be empty. See method contract's own compilation_decisions for the full reasoning (a bare table row naming 'interfaces' as part of HOW the method is used, not asserting every legal record must disclose at least one)."
+  - question: "Per-node/per-interface provenance, or record-level only?"
+    decision: "Record-level only, `additionalProperties: false` on both `function_node` and the `interfaces[]` item schema permits no `provenance` key anywhere else -- see method contract's own compilation_decisions for the full reasoning."
+  - question: "`additionalProperties: false` at the top level, on the recursive `function_node` $def, and on the `interfaces[]` item schema?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, set correctly from the start, and the mechanism that structurally forecloses a node or interface ever carrying a smuggled cross-branch reference or per-item provenance field."
+
+type: object
+required: [id, version, top_function, interfaces, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^FUNCDECOMP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.functional_decomposition"
+
+  top_function:
+    description: >
+      The single root `function_node` -- Atlas's own "Top function" (top-level function under decomposition).
+      Its own `function_name` field IS the top function's name; there is no separate top-level name field.
+    $ref: "#/$defs/function_node"
+
+  interfaces:
+    type: array
+    description: >
+      Atlas's own literal "interfaces" step: the declared relationships/boundaries between functions in
+      `top_function`. Open-ended (no maxItems, MAY be empty -- see compilation_decisions). Genuine referential
+      integrity (every `from_function_ref`/`to_function_ref` resolves to a real `function_node.id` present
+      somewhere in `top_function`) is a runtime-only invariant, enforced by
+      `ai_lego/modules/decomposition/functional_decomposition.py` at both the builder and an independent gate.
+    items:
+      type: object
+      required: [id, from_function_ref, to_function_ref, description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id for this interface entry. No cross-interface uniqueness invariant is enforced (see method contract's own compilation_decisions) -- REPORTED content, not computed."
+        from_function_ref:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "MUST resolve to a real function_node.id present somewhere in top_function -- FUNCDECOMP_DANGLING_INTERFACE_REF, runtime-only, re-derived independently by the gate."
+        to_function_ref:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "MUST resolve to a real function_node.id present somewhere in top_function -- FUNCDECOMP_DANGLING_INTERFACE_REF, runtime-only, re-derived independently by the gate."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What this interface actually is/does -- REPORTED content, not computed. Atlas's own '強化模組與責任邊界' purpose presumes real content here, not a placeholder."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  function_node:
+    type: object
+    required: [id, function_name, children]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique across the WHOLE tree (root AND every descendant, at any depth) -- FUNCDECOMP_DUPLICATE_NODE_ID, runtime-only (JSON Schema has no native cross-recursive-structure uniqueness operator, same disclosed limitation issue-tree.schema.yaml's own `id` field already accepts). Also the namespace `interfaces[].from_function_ref`/`to_function_ref` resolve against."
+      function_name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own 'Top function→subfunctions' content: this node's own function name (or the top function's name, at depth 0)."
+      children:
+        type: array
+        description: "Always present (never omitted). MAY be empty -- an empty list is a legal leaf node (not yet further decomposed). Each entry is a recursively well-shaped function_node."
+        items: {$ref: "#/$defs/function_node"}
+
+examples:
+  - description: "A 2-level functional decomposition of an order-processing system, with 2 interfaces (one sibling-to-sibling, one cross-branch)"
+    value:
+      id: "FUNCDECOMP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.functional_decomposition"
+      top_function:
+        id: "F-ROOT"
+        function_name: "處理客戶訂單"
+        children:
+          - id: "F-L1-VALIDATE"
+            function_name: "驗證訂單內容"
+            children:
+              - id: "F-L2-CHECK-STOCK"
+                function_name: "檢查庫存是否足夠"
+                children: []
+              - id: "F-L2-CHECK-PAYMENT"
+                function_name: "驗證付款方式有效性"
+                children: []
+          - id: "F-L1-FULFILL"
+            function_name: "履行訂單出貨"
+            children: []
+      interfaces:
+        - id: "IF-STOCK-PAYMENT"
+          from_function_ref: "F-L2-CHECK-STOCK"
+          to_function_ref: "F-L2-CHECK-PAYMENT"
+          description: "庫存檢查結果需在付款驗證前確認，避免對缺貨商品收款"
+        - id: "IF-VALIDATE-FULFILL"
+          from_function_ref: "F-L1-VALIDATE"
+          to_function_ref: "F-L1-FULFILL"
+          description: "驗證通過後，訂單內容與庫存鎖定資訊傳遞給出貨模組"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-FUNCTIONALDECOMPOSITION-1"
+    question: "Should a future revision add a soft, format-only-checked cross-reference from this record to an architecture.ddd bounded-context-map or a future dedicated C4 record (Atlas L368's own '最佳搭配' column)? architecture.ddd already exists but no dedicated C4 machine_id exists yet at this schema's write time -- left unaddressed rather than inventing a forward field with no real consumer yet."
+    owner: "operator, or whoever next builds a dedicated C4 method"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-FUNCTIONALDECOMPOSITION-2"
+    question: "MAX_TREE_DEPTH=100 is a runtime-only bound (ai_lego/modules/decomposition/functional_decomposition.py), not expressible in plain JSON Schema recursion -- should a future pass document this gap more visibly, matching issue-tree.schema.yaml's own identical open question?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-FUNCTIONALDECOMPOSITION-3"
+    question: "No cross-interface id-uniqueness invariant exists (see compilation_decisions) -- should a future pass add one if a downstream consumer ever needs to reference a specific interface entry?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L368) directly. Grepped the whole Atlas file case-insensitively for "functional
+    decomposition"/"functional_decomposition"/"FunctionalDecomposition" -- confirmed exactly 1 real hit, no
+    dedicated section. Cross-checked against
+    methods/contracts/decomposition.functional_decomposition.contract.yaml's own outputs/preconditions/quality.
+    Read issue-tree.schema.yaml (arbitrary-depth recursive `$ref` self-reference + whole-tree id-uniqueness +
+    record-level-only-provenance precedent, same family) in full as shape precedent, and
+    ai_lego/modules/architecture/ddd.py (referential-integrity-over-real-ids gate precedent for `context_map`
+    entries referencing `bounded_contexts`, reused here for `interfaces` referencing function nodes) before
+    writing this file. Validated against jsonschema Draft202012Validator via a standalone script (required
+    fields present, id pattern satisfied, recursive `function_node` resolves at 3 levels deep,
+    additionalProperties:false present at the top level, the recursive node $def, and the `interfaces[]` item
+    schema from the start, embedded example resolved through its real $ref to epistemic-label.schema.yaml,
+    negative controls for a smuggled top-level key, a smuggled node-level key including a per-node `provenance`
+    attempt, a smuggled `interfaces[]` item key, an empty `children` array at a leaf node validating
+    successfully, and an empty `interfaces` array validating successfully).
+  note: >
+    No mother document was modified. `top_function`'s own recursive "Top function→subfunctions" structure and
+    `interfaces`'s own name are transcribed directly from Atlas L368. The exact node field names
+    (`id`/`function_name`/`children`), the `interfaces[]` shape and its open-endedness, the open-ended recursion
+    with a runtime-only MAX_TREE_DEPTH=100 bound, the record-level-only provenance placement, and the
+    FUNCDECOMP- prefix are this suite's own compiled structure, disclosed above, not textually cited.

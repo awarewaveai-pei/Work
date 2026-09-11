@@ -1,0 +1,183 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/problem-tree.schema.yaml"
+title: Problem Tree
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ProblemTree` -- the declared `outputs` of
+  `decomposition.problem_tree`'s Method Contract (methods/contracts/decomposition.problem_tree.contract.yaml,
+  `outputs: [ProblemTree]`). Atlas cites this method TWICE: F02 tool table row (L366: "Problem Tree｜原因→
+  核心問題→後果｜問題置中、原因向下、效果向上｜分離症狀與原因｜Objective Tree") and dedicated §12.8
+  (L2633-2639: 用途 "把核心問題、原因與後果分開"; 效益 "政策、NGO、教育、公共問題非常實用"; 搭配 "Problem
+  Tree → Objective Tree → Theory of Change").
+
+  Field provenance:
+    * `core_problem` -- Atlas's own "問題置中" (problem centered): one named core problem, REPORTED
+      content, not computed.
+    * `causes`/`effects` -- Atlas's own "原因向下、效果向上" (causes downward, effects upward): two flat,
+      non-empty, uncategorized lists on opposite sides of `core_problem`. NOT a deep recursive tree --
+      see compilation_decisions.
+    * `causes[].id`/`effects[].id` disjointness, AND within-`causes`/within-`effects` id uniqueness --
+      GENUINE_COMPUTE-checkable invariants grounded directly in Atlas's own stated benefit ("分離症狀與
+      原因" / separate symptoms from causes: two causes sharing one id would make "the specific cause"
+      ambiguous, defeating the same separation purpose). Enforced by
+      `ai_lego/modules/decomposition/problem_tree.py` at both the builder and an independent gate, NOT
+      expressible as a plain JSON Schema constraint (no cross-array uniqueness keyword exists; `uniqueItems`
+      would also not fit since only `id` need be unique, not the whole entry) -- see compilation_decisions
+      and open_questions. (Critic finding, 2026-09-11: the within-list check was originally missing --
+      `causes`/`effects` was only checked for disjointness AGAINST each other, not for duplicates WITHIN
+      either one; fixed same pass.)
+    * `causes[].provenance`/`effects[].provenance` -- each cause/effect `statement` is a CLAIM (e.g. "客服
+      回應時間拉長" asserts X caused the problem), the same kind of content
+      `cause-hypothesis-set.schema.yaml`'s own `hypotheses[].provenance` already stamps for exactly this
+      reason (per-item, re-using the same `epistemic_type` axis, not a new narrower label). Added in this
+      pass (critic finding, 2026-09-11) -- the original design brief omitted it; disclosed as a correction
+      in compilation_decisions, not a silent addition.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Problem Tree row (L366)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.8 問題樹 dedicated section (L2633-2639)"
+  - "methods/contracts/decomposition.problem_tree.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- non-empty-list, per-item shape, GENUINE_COMPUTE-gate-not-schema precedent (this file's primary structural template)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L366/§12.8's own bare method description plus low-risk, disclosed
+  compilation choices.
+
+compilation_decisions:
+  - question: "Arbitrary-depth recursive tree (matching decomposition.issue_tree's own open branching) or a flat, non-recursive 3-tier split?"
+    decision: "Flat, non-recursive -- causes/effects are plain arrays of {id, statement} leaf nodes, no nested children field. Atlas's own citation names exactly 3 tiers ('問題置中、原因向下、效果向上'), not arbitrary depth."
+  - question: "Fixed-count closed arrays or open-ended non-empty arrays for causes/effects?"
+    decision: "Open-ended, minItems:1 only on each -- same shape bcg-matrix-analysis.schema.yaml's own non-empty `portfolio_items[]` already establishes; a real problem can have any number of disclosed causes/effects, not a fixed structural split."
+  - question: "Should causes[].id/effects[].id disjointness be expressed as a JSON Schema constraint (e.g. a shared enum or a $ref-based uniqueness keyword)?"
+    decision: "No such keyword exists in plain JSON Schema for cross-array id uniqueness -- this is a runtime-only invariant, enforced by `ai_lego/modules/decomposition/problem_tree.py`'s builder and independent gate, same class OQ-BCGMATRIXANALYSIS-1's own identical runtime-only-invariant disclosure already establishes for a different cross-field check."
+  - question: "Should causes[]/effects[] entries carry a provenance_record, matching every sibling typed-object schema in this corpus (119/119 grep-confirmed to mention provenance somewhere)?"
+    decision: "YES, added post-critic-review (2026-09-11) -- per-item on both causes[] and effects[], not record-level. Reasoning: a cause/effect `statement` is a CLAIM (this specific factor caused/resulted from the problem), the same kind of content `cause-hypothesis-set.schema.yaml`'s own per-item `provenance` already stamps; unlike decomposition.fast's bare function names or decomposition.logic_tree's category labels (accepted as legitimate exceptions, pure structural content), a causal claim is exactly the kind of object `epistemic-label.schema.yaml` exists to label. Originally omitted per the literal design brief; corrected same pass, not deferred as an open question."
+  - question: "Should causes[]/effects[] each additionally enforce WITHIN-list id uniqueness, not just cross-list disjointness?"
+    decision: "YES, added post-critic-review (2026-09-11) -- two causes (or two effects) sharing one id is a real, previously-undisclosed gap: the disjointness check built a set() from each list before comparing, which silently absorbs a within-list duplicate without ever surfacing it. Every sibling F02 method in this batch enforces some form of id uniqueness (issue_tree/functional_decomposition: whole-tree; logic_tree: per-level sibling; objective_tree: both source_problem_items[].id and objectives[].id) -- Problem Tree was the outlier."
+  - question: "additionalProperties: false at the top level, and on both the causes[] and effects[] item schemas?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, core_problem, causes, effects]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PROBTREE-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.problem_tree"
+
+  core_problem:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own '問題置中' (problem centered) framing: the single named core problem this tree is built around. REPORTED content, not computed."
+
+  causes:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own '原因向下' (causes downward): the disclosed factors that lead TO `core_problem`.
+      Open-ended (no maxItems), flat (no nested sub-causes -- see compilation_decisions). Non-emptiness
+      and cross-list id disjointness against `effects` are enforced by
+      ai_lego/modules/decomposition/problem_tree.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [id, statement, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Caller-supplied free identifier for this cause node. MUST NOT also appear in effects[].id, and MUST be unique within causes[] itself -- see the method contract's own core invariants."
+        statement:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual disclosed content of this cause -- REPORTED, not computed. A CLAIM (see provenance)."
+        provenance:
+          description: "Per-item claim provenance -- this cause's own epistemic status. Same $ref pattern cause-hypothesis-set.schema.yaml's own hypotheses[].provenance already establishes."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  effects:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own '效果向上' (effects upward): the disclosed consequences that flow FROM `core_problem`.
+      Same open-ended, flat shape as `causes` above; same cross-list id-disjointness requirement.
+    items:
+      type: object
+      required: [id, statement, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Caller-supplied free identifier for this effect node. MUST NOT also appear in causes[].id, and MUST be unique within effects[] itself -- see the method contract's own core invariants."
+        statement:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual disclosed content of this effect -- REPORTED, not computed. A CLAIM (see provenance)."
+        provenance:
+          description: "Per-item claim provenance -- this effect's own epistemic status. Same $ref pattern cause-hypothesis-set.schema.yaml's own hypotheses[].provenance already establishes."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Problem Tree for a declining customer-retention problem"
+    value:
+      id: "PROBTREE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.problem_tree"
+      core_problem: "既有客戶續約率連續三季下滑"
+      causes:
+        - id: "C1"
+          statement: "客服回應時間拉長，平均首次回覆超過 48 小時"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "C2"
+          statement: "產品新版本上線後既有工作流程被打斷，客戶重新學習成本上升"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      effects:
+        - id: "E1"
+          statement: "年度經常性收入（ARR）成長趨緩"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "E2"
+          statement: "業務團隊被迫增加折扣以留住高風險客戶，毛利率下降"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-PROBLEMTREE-1"
+    question: "causes[].id/effects[].id disjointness and within-list uniqueness are runtime-only invariants (plain JSON Schema has no cross-array or scoped uniqueness constraint) -- should a future pass add tooling-level static verification instead of relying solely on the runtime gate? Same open question class OQ-BCGMATRIXANALYSIS-1 already discloses for a different cross-field shape. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L366) and §12.8 (L2633-2639) directly. Grepped the whole Atlas file
+    case-insensitively for "problem tree"/"problem_tree" -- confirmed exactly these 2 real citations, no
+    dedicated worked example beyond the 用途/效益/搭配 stub. Cross-checked against
+    methods/contracts/decomposition.problem_tree.contract.yaml's own outputs/preconditions/quality. Read
+    bcg-matrix-analysis.schema.yaml (non-empty-list, per-item shape, GENUINE_COMPUTE-checked-by-gate-not-
+    schema precedent) in full as shape precedent before writing this file. Validated against
+    jsonschema Draft202012Validator via a standalone script (required fields present, id pattern
+    satisfied, causes/effects minItems:1 enforced, additionalProperties:false present at the top level
+    and on both the causes[] and effects[] item schemas from the start, the embedded example resolves,
+    negative controls for a smuggled top-level key, a smuggled causes[]/effects[] item key, an empty
+    causes array, and an empty effects array).
+  note: >
+    The flat 3-tier (non-recursive) shape, the open-ended non-empty causes/effects arrays, the per-item
+    (not record-level) provenance_record placement, and the runtime-only (not schema-expressible)
+    id-disjointness/within-list-uniqueness invariants are all compilation decisions, disclosed above. No
+    mother document was modified to produce this file. Post-critic-review update (2026-09-11): added
+    per-item provenance and within-list id uniqueness -- both were real gaps in the original design
+    brief, not silent additions; see compilation_decisions above for the full reasoning.

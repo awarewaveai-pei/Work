@@ -1,0 +1,104 @@
+$id: "ai-lego://methods/contracts/decomposition.logic_tree.contract.yaml"
+title: "Logic Tree Method Contract"
+status: ACTIVE
+
+description: >
+  F02 decomposition & structuring family, opened in this same batch (multiple methods built in parallel by
+  independent agents; this file covers Logic Tree only, see ai_lego/modules/decomposition/__init__.py).
+  Atlas cites this method ONCE: F02 table row (L364: "Logic Tree｜按單一邏輯分類｜先定分類規則再展開｜防止維度
+  混亂｜MECE") -- thinnest citation class, no dedicated section, grep-confirmed the only hit. Core invariant:
+  `classification_rule` declared ONCE at the top level (Atlas's own "先定分類規則再展開") and, at every level
+  of `root`'s own recursive tree, no two sibling children under the same parent may repeat a
+  `category_value` (Atlas's own "防止維度混亂") -- checked recursively, not only at the top.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 table row (L364)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+  - "specs/cognitive/typed-objects/decision-tree-record.schema.yaml + ai_lego/modules/decision/decision_tree.py -- recursive embedded-tree precedent (structural template)"
+  - "ai_lego/modules/security/attack_tree.py -- MAX_TREE_DEPTH-bounded recursive validity-check precedent (avoids RecursionError on pathological input)"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.logic_tree` mints a NEW machine_id, opening the
+  `decomposition` family (F02) alongside other methods built in the same parallel batch (see
+  `methods/registry/contract-backlog.yaml`, updated by the orchestrating session, not this file).
+
+id: decomposition.logic_tree
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = expanding the
+# tree from a declared classification_rule; CLASSIFY = assigning each node's own category_value (same
+# primitive strategy.vrio/causal.process_tracing already use for their own GENUINE_COMPUTE classification --
+# here the classification is DISCLOSED content, not GENUINE_COMPUTE, see compilation_decisions).
+
+purpose:
+  - classify_and_expand_a_problem_into_a_single_logic_tree_under_one_declared_classification_rule
+
+inputs:
+  required: []
+  optional: []
+# No upstream typed-object required -- Atlas's own L364 citation names no required input type, same
+# "no hard upstream dependency" position strategy.bcg_matrix/strategy.ansoff's own inputs.required: [] takes.
+
+outputs:
+  - LogicTree
+
+preconditions:
+  - "classification_rule is present and non-empty -- Atlas's own L364 formula ('先定分類規則再展開', declare the rule BEFORE expanding) requires the rule to exist before any node can be judged well-formed"
+  - "every node's category_value is a non-empty string, disclosed content (never GENUINE_COMPUTE -- Atlas gives no formula for deriving a category_value)"
+  - "at every level of root's own recursive tree (root's own children, and every descendant node's own children), no two siblings under the same parent repeat a category_value -- Atlas's own L364 benefit ('防止維度混亂', prevent dimension confusion); re-derived recursively by the gate from the record's own raw fields, never trusted from a stored shape"
+
+quality:
+  provenance_required: false
+  evidence_labeling_required: false
+  # Task-mandated shape carries no provenance field anywhere (top-level or per-node) -- disclosed as a
+  # deviation from every sibling F02-adjacent contract in this directory (bcg_matrix/fault_tree/attack_tree/
+  # decision_tree all carry one); see open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L364's own "最佳搭配" (best combo) column names "MECE" -- no decomposition.mece machine_id exists
+# anywhere in this corpus yet at the time this file was written (grepped, zero hits), so left empty rather
+# than naming a non-existent id, same restraint strategy.bcg_matrix's own GE-McKinsey gap already establishes.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Embedded recursive tree (decision_tree/attack_tree-style) or flat id-cross-referenced graph (fault_tree-style)?"
+    decision: "Embedded recursive -- a logic-tree branch is path-dependent under its own parent's classification step, no Atlas citation supports cross-node reuse the way fault_tree's shared basic events do."
+  - question: "Should category_value be a disclosed judgment call or GENUINE_COMPUTE?"
+    decision: "Disclosed -- Atlas gives no formula for deriving a category value from anything else; unlike strategy.bcg_matrix's quadrant, there is no closed lookup table to compute from."
+  - question: "One classification_rule per tree (top-level) or one per node?"
+    decision: "One per tree, top-level -- Atlas's own '先定分類規則再展開' (singular 'the rule', declared once, before expansion) is a single decision made once, not re-declared at every branch; task-mandated shape."
+  - question: "Should sibling category_value uniqueness apply only at the root, or recursively at every level?"
+    decision: "Recursively, every level -- Atlas's own benefit is 'prevent dimension confusion' generally, not just at the top; a mixed-dimension collision two levels deep is the same defect class as one at the root."
+  - question: "Minimum/maximum children per node?"
+    decision: "Open-ended, MAY be zero (a leaf) -- unlike decision_tree's own >=2-branch minimum, Atlas's own L364 citation mandates no minimum branching factor."
+  - question: "Node id uniqueness across the whole tree, matching decomposition.issue_tree's own invariant?"
+    decision: "No -- a different invariant class (see module docstring); this method's own real invariant is sibling category_value uniqueness, not whole-tree id uniqueness. Not copied from issue_tree, not depended on."
+
+open_questions:
+  - "OQ-LOGICTREE-1: this method's own mandated shape (see task spec) carries no provenance field anywhere, unlike every sibling tree-shaped contract in this directory (bcg_matrix/fault_tree/attack_tree/decision_tree) -- should a future revision add one if a downstream consumer needs to distinguish AI-suggested from human-approved category assignments?（owner: operator）"
+  - "OQ-LOGICTREE-2: recommended_next should probably name a future decomposition.mece machine_id (Atlas L364's own '最佳搭配' column) once such a contract exists -- left empty, no such contract exists yet.（owner: operator, or whoever builds it）"
+  - "OQ-LOGICTREE-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method).（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L364) directly. Grepped the whole Atlas file, the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` tree, and the whole `Projects/internal/cognitive-
+    engineering-os` tree case-insensitively for "logic_tree"/"logic tree"/"LogicTree" before writing any of
+    this method's own files -- confirmed zero pre-existing implementation (only registry/inventory mentions
+    of the Atlas row itself, not a built slice). Read decision-tree-record.schema.yaml + ai_lego/modules/
+    decision/decision_tree.py (recursive embedded-node $defs precedent) and ai_lego/modules/security/
+    attack_tree.py (MAX_TREE_DEPTH-bounded recursive validity-check precedent, avoids RecursionError) in
+    full before writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L364's own bare method description ("按單一邏輯分類｜先定分類規則
+    再展開｜防止維度混亂") is expanded into a recursive tree shape with a single top-level
+    classification_rule and a recursively-enforced sibling-uniqueness invariant via task-mandated
+    compilation decisions, disclosed above, not presented as directly Atlas-cited.

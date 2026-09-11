@@ -1,0 +1,200 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/work-breakdown-structure.schema.yaml"
+title: Work Breakdown Structure
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `WorkBreakdownStructure` -- the declared `outputs` of
+  `decomposition.wbs`'s Method Contract (methods/contracts/decomposition.wbs.contract.yaml,
+  `outputs: [WorkBreakdownStructure]`). Atlas cites this method ONCE: F02 tool table row (L371: "WBS｜把交付拆
+  工作包｜Deliverable→Work package→owner/estimate｜降低遺漏｜Critical Path、RACI") -- the thinnest possible citation
+  class, no dedicated section, same class decomposition.issue_tree's own citation already establishes for this
+  same family.
+
+  Field provenance:
+    * `deliverable` -- Atlas's own "Deliverable→Work package" structure: a single recursive `wbs_node`
+      (`{id, name, owner, estimate_hours, total_estimate_hours, children}`). OPEN recursion depth (no fixed-
+      level rule cited anywhere), same arbitrary-depth NESTED shape `issue-tree.schema.yaml`'s own `root`
+      already establishes for this same family, defensively bounded to MAX_TREE_DEPTH=100 at the runtime layer
+      (`ai_lego/modules/decomposition/wbs.py`, not here).
+    * `wbs_node.owner`/`wbs_node.estimate_hours` -- Atlas's own "Work package→owner/estimate" tier: non-null
+      ONLY on LEAF nodes (`children == []`, the actual work packages), null on every non-leaf (deliverable-
+      tier) node -- see compilation_decisions.
+    * `wbs_node.total_estimate_hours` -- GENUINE_COMPUTE, REQUIRED at every node (leaf and non-leaf alike):
+      mechanically derived as the real sum of `estimate_hours` over all LEAF DESCENDANTS of that node (its own
+      `estimate_hours`, for a leaf). NOT an Atlas citation -- grounded in the real, well-known external WBS
+      "100% rule" (see `ai_lego/modules/decomposition/wbs.py` module docstring).
+    * `provenance` -- RECORD-LEVEL only, a disclosed ADDITION beyond this task's own literal design spec (which
+      named no provenance field anywhere) -- added for consistency with the 100%-universal-field convention
+      every existing typed-object schema in this suite already follows, same placement
+      `issue-tree.schema.yaml`'s own record-level-only `provenance` already establishes for this same family.
+      See the method contract's own open_questions (OQ-WBS-3).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, WBS row (L371)"
+  - "methods/contracts/decomposition.wbs.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/issue-tree.schema.yaml -- recursive $ref self-reference, open-depth, MAX_TREE_DEPTH runtime bound, record-level-only provenance precedent (this file's primary structural template, same F02 family)"
+  - "specs/cognitive/typed-objects/decision-tree-record.schema.yaml -- GENUINE_COMPUTE per-node rollup value precedent (different arithmetic: max/weighted-sum there, plain sum here)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L371's own bare method description plus low-risk, disclosed compilation choices,
+  including the real external WBS "100% rule" rollup and the added record-level provenance field.
+
+compilation_decisions:
+  - question: "Recursive node via JSON Schema $ref self-reference, or a fixed-depth explicit set of $defs?"
+    decision: "A single self-referential $defs/wbs_node -- same shape issue-tree.schema.yaml's own issue_tree_node $def already establishes for this family; Atlas's own citation names no fixed depth."
+  - question: "Should owner/estimate_hours be required (non-null) on every node, or only on leaves?"
+    decision: "Required keys present on every node (so additionalProperties:false stays uniform across leaf and non-leaf), but their VALUE is type `[string, \"null\"]` / `[number, \"null\"]` -- null is REQUIRED on non-leaves and FORBIDDEN on leaves, a runtime-only cross-field invariant (JSON Schema's own if/then could express the leaf-vs-non-leaf split, but the runtime gate is the actual enforcement authority per this suite's convention -- see decision-tree-record.schema.yaml's own analogous probability-sum runtime-only note)."
+  - question: "Should total_estimate_hours be caller-supplied or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE, REQUIRED at every node -- mechanically derived by ai_lego/modules/decomposition/wbs.py's own rollup helper from that node's own subtree via the real external WBS 100% rule. Never a builder parameter, never caller-supplied; re-derived independently by an integrity gate from each node's own raw estimate_hours/children fields."
+  - question: "additionalProperties: false at the top level, and on the recursive wbs_node $def?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Enforce global node-id uniqueness across the whole tree, matching issue-tree.schema.yaml's own runtime-only uniqueness disclosure?"
+    decision: "No -- not one of this task's own 2 specified real invariants (see method contract's own compilation_decisions). Left as a disclosed gap (OQ-WORKBREAKDOWNSTRUCTURE-2 below), not invented scope."
+
+type: object
+required: [id, version, deliverable, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^WBS-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.wbs"
+
+  deliverable:
+    description: >
+      The single root `wbs_node` -- Atlas's own "Deliverable" (top of the "Deliverable→Work package→owner/
+      estimate" progression). Its own `name` field IS the deliverable name; there is no separate top-level
+      name field.
+    $ref: "#/$defs/wbs_node"
+
+  provenance:
+    description: "Record-level provenance. See file description's own disclosure -- an ADDITION beyond this task's own literal design spec, added for corpus-wide consistency."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  wbs_node:
+    type: object
+    required: [id, name, owner, estimate_hours, total_estimate_hours, children]
+    additionalProperties: false
+    description: >
+      A single node in the WBS tree -- either a non-leaf "deliverable" (children non-empty, owner/
+      estimate_hours both null) or a leaf "work package" (children == [], owner/estimate_hours both non-null).
+      See method contract preconditions for the full leaf/non-leaf placement rule.
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local node id. NOT enforced unique across the whole tree at the schema layer -- see compilation_decisions / method contract OQ-WBS-4."
+      name:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own 'Deliverable'/'Work package' label content -- REQUIRED, non-empty, at every node regardless of leaf/non-leaf status."
+      owner:
+        type: [string, "null"]
+        minLength: 1
+        pattern: "\\S"
+        description: "REQUIRED non-empty string on a LEAF node (children == []); REQUIRED null on a non-leaf node. Runtime-only cross-field invariant, see compilation_decisions."
+      estimate_hours:
+        type: [number, "null"]
+        minimum: 0
+        description: "REQUIRED finite non-negative number on a LEAF node (children == []); REQUIRED null on a non-leaf node. DISCLOSED judgment-call content when present, not itself computed (contrast total_estimate_hours below). Runtime-only cross-field invariant, see compilation_decisions."
+      total_estimate_hours:
+        type: number
+        minimum: 0
+        description: >
+          REQUIRED at every node. GENUINE_COMPUTE -- the real sum of estimate_hours over all LEAF DESCENDANTS
+          of this node (this node's own estimate_hours, for a leaf). NEVER caller-supplied and NEVER computed
+          by anything other than ai_lego/modules/decomposition/wbs.py's own rollup helper -- see
+          compilation_decisions.
+      children:
+        type: array
+        description: "Always present (never omitted). MAY be empty -- an empty list IS the legal leaf/work-package representation (same convention issue-tree.schema.yaml's own children field already establishes). Each entry is a recursively well-shaped wbs_node."
+        items: {$ref: "#/$defs/wbs_node"}
+
+examples:
+  - description: >
+      A 2-level WBS for a website-launch deliverable, 3 leaf work packages (4h/6h/10h). Hand-verified rollup:
+      the "Design" branch totals 4+6=10, the whole deliverable totals 4+6+10=20.
+    value:
+      id: "WBS-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.wbs"
+      deliverable:
+        id: "D-ROOT"
+        name: "公司官網改版上線"
+        owner: null
+        estimate_hours: null
+        total_estimate_hours: 20
+        children:
+          - id: "D-DESIGN"
+            name: "視覺設計"
+            owner: null
+            estimate_hours: null
+            total_estimate_hours: 10
+            children:
+              - id: "WP-WIREFRAME"
+                name: "線框稿"
+                owner: "設計師A"
+                estimate_hours: 4
+                total_estimate_hours: 4
+                children: []
+              - id: "WP-VISUALDESIGN"
+                name: "視覺稿"
+                owner: "設計師A"
+                estimate_hours: 6
+                total_estimate_hours: 6
+                children: []
+          - id: "WP-FRONTEND"
+            name: "前端切版與串接"
+            owner: "工程師B"
+            estimate_hours: 10
+            total_estimate_hours: 10
+            children: []
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-WORKBREAKDOWNSTRUCTURE-1"
+    question: "The leaf-vs-non-leaf owner/estimate_hours null/non-null coupling, and total_estimate_hours's own agreement with a fresh bottom-up recomputation, are both runtime-only invariants (plain JSON Schema has no cross-field/cross-node computed-value constraint) -- should a future pass add a JSON Schema if/then constraint for at least the simpler leaf/non-leaf null coupling? Same open question decision-tree-record.schema.yaml's own probability-sum note and vrio-analysis.schema.yaml's own OQ-VRIOANALYSIS-1 already disclose for an analogous shape. (owner: operator)"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-WORKBREAKDOWNSTRUCTURE-2"
+    question: "No node-id uniqueness constraint exists across the whole tree (see method contract's own OQ-WBS-4) -- should a future pass add one, matching issue-tree.schema.yaml's own runtime-only ISSUETREE_DUPLICATE_NODE_ID precedent, if a downstream consumer ever needs to address a specific node unambiguously?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L371) directly. Grepped the whole Atlas file case-insensitively for "wbs" --
+    confirmed the 1 real table-row hit, no dedicated section. Cross-checked against
+    methods/contracts/decomposition.wbs.contract.yaml's own outputs/preconditions/quality. Read
+    issue-tree.schema.yaml (recursive $ref self-reference, open-depth, MAX_TREE_DEPTH, record-level-only
+    provenance precedent, same family) and decision-tree-record.schema.yaml (GENUINE_COMPUTE per-node rollup
+    value precedent) in full as shape precedent before writing this file. Independently re-verified the real,
+    standard WBS "100% rule" (a parent's total work equals the sum of its parts) against well-known
+    project-management domain knowledge. Validated against jsonschema Draft202012Validator via a standalone
+    script (required fields present, id pattern satisfied, recursive wbs_node resolves at 3 levels deep,
+    additionalProperties:false present at both the top level and the wbs_node $def from the start, embedded
+    example resolved through its real $ref to epistemic-label.schema.yaml, negative controls for a smuggled
+    top-level key, a smuggled node-level key, a leaf node with a null owner, and a non-leaf node with a
+    non-null estimate_hours).
+  note: >
+    No mother document was modified. `deliverable`'s own recursive "Deliverable→Work package" structure and
+    the leaf-tier "owner/estimate" placement are transcribed directly from Atlas L371. The exact node field
+    names (`id`/`name`/`owner`/`estimate_hours`/`total_estimate_hours`/`children`), the open-ended recursion
+    with a runtime-only MAX_TREE_DEPTH=100 bound, the GENUINE_COMPUTE 100%-rule rollup, the WBS- prefix, and
+    the added record-level `provenance` field (a disclosed deviation from this task's own literal design spec,
+    see method contract OQ-WBS-3) are this suite's own compiled structure, disclosed above, not textually
+    cited.

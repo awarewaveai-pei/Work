@@ -1,0 +1,154 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/issue-tree.schema.yaml"
+title: Issue Tree
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `IssueTree` -- the declared `outputs` of
+  `decomposition.issue_tree`'s Method Contract (methods/contracts/decomposition.issue_tree.contract.yaml,
+  `outputs: [IssueTree]`). Atlas cites this method via F02 table row (L363: "Issue Tree｜把大問題拆成可分析分支｜
+  主問題→第一層→第二層→檢查遺漏｜建立分析計畫｜MECE、Evidence Matrix") plus dedicated §12.6 (L2604-2620, a mermaid
+  worked example: one root question branching into 5 first-level sub-questions).
+
+  Field provenance:
+    * `root` -- Atlas's own "主問題→第一層→第二層" structure: a single recursive `issue_tree_node`
+      (`{id, question, children}`). OPEN recursion depth (no fixed-level rule cited anywhere, unlike
+      `mind-map-record.schema.yaml`'s own explicit 4-level terminus) -- same arbitrary-depth NESTED shape
+      `decision-tree-record.schema.yaml`'s own `root` already establishes, defensively bounded to
+      MAX_TREE_DEPTH=100 at the runtime layer (JSON Schema's own `$ref` recursion has no depth bound; the
+      runtime bound lives in `ai_lego/modules/decomposition/issue_tree.py`, not here).
+    * `issue_tree_node.children` -- always a present key (never omitted), a list that MAY be empty (a leaf
+      node not yet further decomposed) -- deliberately NOT `minItems: 1`, unlike `mind-map-record.schema.
+      yaml`'s own optional-key-when-absent convention, because this method's own recursive shape needs one
+      uniform node type, not two.
+    * `provenance` -- RECORD-LEVEL only, same placement `decision-tree-record.schema.yaml`'s own `provenance`
+      already establishes (a node here is pure structural question text, not a per-node judgment call the way
+      `bcg-matrix-analysis.schema.yaml`'s own per-item `growth_rate`/`relative_share` are). See the method
+      contract's own `compilation_decisions` for why this field is required despite no direct Atlas citation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Issue Tree row (L363)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.6 (L2604-2620) -- dedicated worked-example section"
+  - "methods/contracts/decomposition.issue_tree.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/decision-tree-record.schema.yaml -- arbitrary-depth NESTED recursive-node precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/mind-map-record.schema.yaml -- whole-tree id-uniqueness invariant class, generalized here to arbitrary depth"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L363/§12.6's own bare method description plus low-risk, disclosed compilation
+  choices (recursive node field names, the MAX_TREE_DEPTH runtime bound, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Recursive node via JSON Schema `$ref` self-reference, or a fixed-depth explicit set of $defs (main_branch/sub_branch-style)?"
+    decision: "A single self-referential `$defs/issue_tree_node` -- Atlas's own citation names no fixed depth (contrast mind-map-record.schema.yaml's own explicit 4-level terminus), so one recursive node type (not mind_map's two distinct levels) is the honest shape; matches decision-tree-record.schema.yaml's own self-referential `decision_tree_node` $def pattern."
+  - question: "Should `children` require minItems:1 when present, matching mind_map's sub_branches convention?"
+    decision: "No -- `children` is always a present key (required, never omitted) and MAY be an empty array; an empty list IS the legal leaf-node representation for this recursive shape, not an omitted branch."
+  - question: "Per-node provenance (bcg_matrix/mind_map-style) or record-level only?"
+    decision: "Record-level only, `additionalProperties: false` on `issue_tree_node` permits no `provenance` key on any node -- see method contract's own compilation_decisions for the full reasoning (pure structural question text, no per-node judgment content to stamp)."
+  - question: "`additionalProperties: false` at the top level, and on the recursive `issue_tree_node` $def?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start, and the mechanism that structurally forecloses a node ever carrying a smuggled cross-branch reference or per-node provenance field."
+
+type: object
+required: [id, version, root, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ISSUETREE-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decomposition.issue_tree"
+
+  root:
+    description: >
+      The single root `issue_tree_node` -- Atlas's own "主問題" (main question). Its own `question` field IS
+      the root question (e.g. §12.6's own "是否進入新市場?"); there is no separate top-level question field.
+    $ref: "#/$defs/issue_tree_node"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  issue_tree_node:
+    type: object
+    required: [id, question, children]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Local id, unique across the WHOLE tree (root AND every descendant, at any depth) -- ISSUETREE_DUPLICATE_NODE_ID, runtime-only (JSON Schema has no native cross-recursive-structure uniqueness operator, same disclosed limitation mind-map-record.schema.yaml's own id field already accepts)."
+      question:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Atlas's own '主問題→第一層→第二層' content: this node's own sub-question (or the root question, at depth 0)."
+      children:
+        type: array
+        description: "Always present (never omitted). MAY be empty -- an empty list is a legal leaf node (not yet further decomposed). Each entry is a recursively well-shaped issue_tree_node."
+        items: {$ref: "#/$defs/issue_tree_node"}
+
+examples:
+  - description: "A 2-level issue tree for a market-entry question, following §12.6's own worked example shape"
+    value:
+      id: "ISSUETREE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.issue_tree"
+      root:
+        id: "Q-ROOT"
+        question: "是否進入新市場?"
+        children:
+          - id: "Q-L1-MARKET"
+            question: "市場吸引力是否足夠?"
+            children:
+              - id: "Q-L2-MARKET-SIZE"
+                question: "目標市場規模是否達到最低可行門檻?"
+                children: []
+              - id: "Q-L2-MARKET-GROWTH"
+                question: "該市場年成長率是否高於公司整體平均?"
+                children: []
+          - id: "Q-L1-CAPABILITY"
+            question: "公司能力是否足以支撐進入?"
+            children: []
+          - id: "Q-L1-FINANCE"
+            question: "財務可行性是否成立?"
+            children: []
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-ISSUETREE-1"
+    question: "Should a future revision add a soft, format-only-checked cross-reference from a leaf node to a decomposition.mece completeness-check result or a research.evidence_matrix record (Atlas L363's own '最佳搭配' column)? Neither machine_id exists yet at this schema's write time -- left unaddressed rather than inventing a forward field with no real consumer yet."
+    owner: "operator, or whoever next builds decomposition.mece / research.evidence_matrix"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-ISSUETREE-2"
+    question: "MAX_TREE_DEPTH=100 is a runtime-only bound (ai_lego/modules/decomposition/issue_tree.py), not expressible in plain JSON Schema recursion -- should a future pass document this gap the same way decision-tree-record.schema.yaml's own sibling schema does, or is this description sufficient disclosure?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L363) and dedicated §12.6 (L2604-2620) directly. Grepped the whole Atlas file
+    case-insensitively for "issue tree"/"issue_tree"/"議題樹"/"問題樹" -- confirmed exactly the 2 real hits above.
+    Cross-checked against methods/contracts/decomposition.issue_tree.contract.yaml's own
+    outputs/preconditions/quality. Read decision-tree-record.schema.yaml (arbitrary-depth recursive `$ref`
+    self-reference precedent) and mind-map-record.schema.yaml (whole-tree id-uniqueness invariant class) in
+    full as shape precedent before writing this file. Validated against jsonschema Draft202012Validator via a
+    standalone script (required fields present, id pattern satisfied, recursive `issue_tree_node` resolves at
+    3 levels deep, additionalProperties:false present at both the top level and the recursive node $def from
+    the start, embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative
+    controls for a smuggled top-level key, a smuggled node-level key including a per-node `provenance`
+    attempt, and an empty `children` array at a leaf node validating successfully).
+  note: >
+    No mother document was modified. `root`'s own recursive "主問題→第一層→第二層" structure is transcribed
+    directly from Atlas L363/§12.6. The exact node field names (`id`/`question`/`children`), the open-ended
+    recursion with a runtime-only MAX_TREE_DEPTH=100 bound, the record-level-only provenance placement, and
+    the ISSUETREE- prefix are this suite's own compiled structure, disclosed above, not textually cited.

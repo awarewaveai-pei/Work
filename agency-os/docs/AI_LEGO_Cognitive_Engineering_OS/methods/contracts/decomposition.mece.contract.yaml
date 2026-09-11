@@ -1,0 +1,108 @@
+$id: "ai-lego://methods/contracts/decomposition.mece.contract.yaml"
+title: "MECE (Mutually Exclusive, Collectively Exhaustive) Check Method Contract"
+status: ACTIVE
+
+description: >
+  F02 decomposition & structuring family, opening member (no prior decomposition.* contract with a full
+  vertical slice existed before this batch -- decomposition.issue_tree is a sibling contract opened
+  concurrently in the same batch, disjoint files, no shared state). Atlas cites this method at the F02 table
+  row (L365: "MECE｜檢查互斥且完整｜找 overlap / omission｜提高結構完整度｜Issue Tree") PLUS a dedicated §12.7
+  section (L2622-2631) giving its full name, purpose, benefit, and an explicit caution ("不是所有現實系統都
+  能完美 MECE；不要為形式強切世界"). Core invariant: given an already-declared `universe_item_ids` and an
+  already-declared `categories` classification of that universe, `overlaps`/`gaps`/`unknown_members`/
+  `is_mece` are GENUINE_COMPUTE real set-arithmetic facts, never caller-supplied -- see
+  `ai_lego/modules/decomposition/mece.py` module docstring.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, MECE row (L365)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.7 (L2622-2631) -- full name, purpose, benefit, caution"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.mece` mints a NEW machine_id and opens the `decomposition`
+  family's first full vertical slice. Atlas's own §12.7 citation IS a verification procedure ("檢查分類是否
+  重疊或漏掉") -- this contract's output records the result of CHECKING an already-given classification, it
+  does not invent one. See compilation_decisions.
+
+id: decomposition.mece
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, GROUP, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = the
+# universe-into-categories relationship being checked; GROUP = categories are groups of items; VALIDATE =
+# the overlap/gap check itself, same primitive database_data.normalization's own [DECOMPOSE, VALIDATE]
+# already establishes for a structurally similar "check a caller-supplied classification" method.
+
+purpose:
+  - check_classification_for_overlap_and_omission
+# Atlas L365/L2627 verbatim sense: "檢查分類是否重疊或漏掉" (check whether a classification overlaps or omits).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L365/§12.7 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix's/strategy.ansoff's own inputs.required: []
+  # already take.
+
+outputs:
+  - MeceCheck
+# NEW output type (see typed-objects/mece-check.schema.yaml). Atlas names no PascalCase output type for this
+# method, same honesty gap every other thin-citation Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "universe_item_ids is present and non-empty -- a MECE check with no universe has nothing to check exhaustiveness against"
+  - "categories is present and non-empty -- Atlas's own subject ('分類', a classification) presumes at least one category exists to check"
+  - "overlaps/gaps/unknown_members/is_mece are GENUINE_COMPUTE, mechanically derived from universe_item_ids x categories via real set arithmetic -- never caller-supplied, re-derived independently by the gate from the record's own raw fields"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same reasoning root_cause.pareto's own identical flag already establishes: this method's own
+  # named risk (Atlas L2629, "不要為形式強切世界") is about forcing a fit, not about omitting evidence
+  # citations for a claim sourced from an EvidenceSet input -- evidence_labeling_required's own schema
+  # description is specifically about that different risk shape.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.bcg_matrix's own field already establishes.
+
+recommended_next: []
+# Atlas's own F02 table "最佳搭配" column for MECE (L365) names "Issue Tree" -- decomposition.issue_tree is
+# being opened in this SAME batch by a different agent (disjoint files); left empty rather than naming a
+# sibling contract not yet confirmed committed at the time this file was written. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Does is_mece: false refuse the record, or is it a legal outcome?"
+    decision: "Legal, non-error outcome -- Atlas's own §12.7 caution ('不是所有現實系統都能完美 MECE；不要為形式強切世界') means a real classification that fails the check is exactly the case this method exists to surface, not an input to reject; only structurally malformed input (empty universe, empty categories, malformed shapes) is refused."
+  - question: "Should overlaps/gaps be caller-supplied (disclosed judgment call) or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE -- Atlas's own citation IS a verification procedure ('找 overlap / omission'), a real, mechanical set-arithmetic fact over universe_item_ids x categories; builder has no overlaps/gaps/unknown_members/is_mece parameters, gate re-derives from each record's own raw fields, same discipline strategy.bcg_matrix's quadrant/database_data.normalization's achieved_normal_form already establish."
+  - question: "Should a category member not present in universe_item_ids be silently folded into gaps/overlaps, or surfaced separately?"
+    decision: "Surfaced separately as unknown_members -- a category referencing an item the universe never declared is a distinct referential-integrity defect, not a mutual-exclusivity or collective-exhaustiveness fact about the universe itself; does not gate is_mece (see mece_check module docstring)."
+  - question: "Does this record carry engine/computation_provenance_ref/provenance fields even though the task's own literal field list omitted them?"
+    decision: "Yes -- every existing GENUINE_COMPUTE record in this codebase (root_cause.pareto, database_data.normalization, decision.impact_effort) carries these three fields at the top level; omitting them here would be an inconsistent, undisclosed gap relative to established convention, not a deliberate simplification. Disclosed as a deviation in this slice's own delivery report."
+
+open_questions:
+  - "OQ-MECE-1: recommended_next should probably name decomposition.issue_tree (Atlas L365's own '最佳搭配' column) once that sibling contract is confirmed committed -- left empty, written concurrently by a different agent in the same batch (owner: operator, or whoever integrates this batch)."
+  - "OQ-MECE-2: quality.evidence_labeling_required: false reflects this citation's own risk shape (see compilation_decisions) rather than a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-MECE-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L365) and §12.7 (L2622-2631) directly. Grepped the whole Atlas file
+    case-insensitively for "mece" -- confirmed both hits are this method's own citation, no other section.
+    Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-
+    engineering-os` trees case-insensitively for "mece" before writing any of this method's own files -- zero
+    pre-existing implementation. Read strategy.bcg_matrix.contract.yaml (GENUINE_COMPUTE per-item,
+    no-builder-parameter precedent) and database_data.normalization.contract.yaml (caller-supplied structural
+    input + GENUINE_COMPUTE derived classification, the closest structural analog) in full before writing
+    this contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas §12.7's own explicit caution ("不是所有現實系統都能完美 MECE；
+    不要為形式強切世界") is why is_mece: false is disclosed above as a legal outcome, not an error --
+    directly grounded in Atlas's own text, not invented. `cognitive_primitives`,
+    `evidence_labeling_required`'s grounding, and the engine/computation_provenance_ref/provenance addition
+    beyond the task's own literal field list are compilation decisions, disclosed above.

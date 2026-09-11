@@ -1,0 +1,117 @@
+$id: "ai-lego://methods/contracts/decomposition.hierarchical_task_analysis.contract.yaml"
+title: "Hierarchical Task Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F02 decomposition & structuring family (拆解與結構化), 1st member -- family previously
+  entirely unbuilt (grep-confirmed: no ai_lego/modules/decomposition/ directory existed before this
+  batch). Atlas cites this method ONCE: F02 table row L370 ("Hierarchical Task Analysis｜拆人類工作
+  步驟｜Goal→Task→Subtask→Plan｜找操作負擔與錯誤點｜Journey、Service Blueprint") -- grep-confirmed the
+  only hit, no dedicated section. Core invariant: the output is a recursive Goal->Task->Subtask tree
+  (`goal: TaskNode`, TaskNode self-referential via `children: TaskNode[]`); each node's `plan` is
+  REQUIRED (non-empty) iff that node has >=2 children, and MUST be `null` iff it has 0 or 1 children --
+  a real, external HTA-domain discipline (a leaf or single-child task has nothing to sequence; a
+  multi-child task without a stated execution order hides exactly the "操作負擔與錯誤點" Atlas's own
+  benefit line names), NOT an Atlas citation, see compilation_decisions.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Hierarchical Task Analysis row (L370)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.hierarchical_task_analysis` mints a NEW machine_id
+  AND a NEW `family: decomposition` (F02's 1st built member -- 9 concurrent siblings open this same
+  family in this batch, zero shared files with this method). The plan-required-iff->=2-children rule
+  is a real, independently-verified HTA-domain invariant (a plan only has meaning where there is more
+  than one child to sequence), not an Atlas-cited formula -- see compilation_decisions.
+
+id: decomposition.hierarchical_task_analysis
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, SEQUENCE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = the
+# Goal->Task->Subtask breakdown itself; SEQUENCE = the per-node `plan` describing execution order
+# among that node's own children.
+
+purpose:
+  - decompose_a_goal_into_a_task_hierarchy_with_execution_plans
+# Atlas L370 verbatim sense: method "Goal→Task→Subtask→Plan" / benefit "找操作負擔與錯誤點" (find
+# operational burden and error points).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L370 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.ansoff.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - HierarchicalTaskAnalysis
+# NEW output type (see typed-objects/hierarchical-task-analysis.schema.yaml). Atlas names no
+# PascalCase output type for this method, same honesty gap every other Tier 1 contract in this
+# directory discloses.
+
+preconditions:
+  - "goal is present and is a well-formed TaskNode (non-empty id, non-empty task_name, children is a list) -- an analysis with no goal has not actually decomposed anything (Atlas's own L370 'Goal→Task→Subtask→Plan')"
+  - "every TaskNode in the tree (goal and every descendant) has a non-empty task_name -- Atlas's own 'Goal→Task→Subtask' presumes each level is actually named, not just structurally present"
+  - "every TaskNode's plan is GENUINE_STRUCTURAL: REQUIRED (non-empty string) iff that node has >=2 children, and MUST be null iff that node has 0 or 1 children -- enforced both at construction and independently re-derived by the gate from each node's own children count, never left as an unstated convention"
+
+quality:
+  provenance_required: false
+  evidence_labeling_required: false
+  # false/false -- this method's task-mandated shape carries no per-node provenance field; same "no
+  # positive Atlas statement requiring it" reasoning strategy.bcg_matrix's own identical flags already
+  # establish for its own thin citation.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.ansoff.contract.yaml's own field applies.
+
+recommended_next: []
+# Atlas L370's own "最佳搭配" (best combo) column names "Journey、Service Blueprint" -- no
+# journey_mapping/service_blueprint machine_id exists anywhere in this corpus yet (grep-confirmed),
+# so left empty rather than naming a non-existent id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat list of tasks, or a recursive self-referential TaskNode tree?"
+    decision: "Recursive TaskNode (`goal: TaskNode`, `children: TaskNode[]`) -- task-mandated, and the only shape that actually expresses Atlas's own 'Goal→Task→Subtask' hierarchy (a flat list cannot express open-depth parent/child nesting)."
+  - question: "Should `plan` be an unconditionally optional free-text field?"
+    decision: "No -- a real if/then/else structural rule (REQUIRED non-empty iff >=2 children, MUST be null iff 0-1 children), task-mandated, grounded in the well-known HTA-domain discipline that a plan only has meaning where there is more than one child to sequence. Same asymmetric if/then/else class strategy.blue_ocean's own industry_standard_level (CREATE-vs-existing-factor) rule already establishes, applied here to a different field/condition (plan vs. child count, not an enum-vs-enum split)."
+  - question: "Does plan's forbidden direction mean the key must be ABSENT (blue_ocean's own convention) or PRESENT as null?"
+    decision: "PRESENT as null (task-mandated) -- unlike blue_ocean's industry_standard_level (key must be absent), TaskNode's plan key is always present in the shape (every node carries exactly the same 4 keys: id/task_name/plan/children); only its VALUE is constrained by child count."
+  - question: "Should TaskNode ids be required globally unique across the whole tree?"
+    decision: "No -- not grounded in Atlas's own thin citation (no cross-node reference/lookup need exists for this method, unlike strategy.stp's targeted_segment_id or strategy.tows's SWOT-factor references); inventing a uniqueness rule with nothing to enforce it against would overstate this citation. See open_questions."
+  - question: "additionalProperties: false at every recursion level?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start, including the recursive $defs/task_node definition itself."
+
+open_questions:
+  - "OQ-HTA-1: recommended_next should probably name future journey_mapping/service_blueprint machine_ids (Atlas L370's own '最佳搭配' column) once such contracts exist -- left empty, neither exists yet (owner: operator, or whoever builds them)."
+  - "OQ-HTA-2: quality.provenance_required: false reflects this design's own lack of a per-node provenance field (task-mandated shape) rather than a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-HTA-3: TaskNode ids have no global-uniqueness constraint (see compilation_decisions) -- a future pass could add one if a downstream consumer ever needs to reference a specific node (owner: operator)."
+  - "OQ-HTA-4: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L370) directly. Grepped the whole Atlas file and the whole
+    agency-os/docs/AI_LEGO_Cognitive_Engineering_OS + Projects/internal/cognitive-engineering-os
+    trees case-insensitively for "hierarchical_task_analysis"/"hierarchical task analysis"/
+    "HierarchicalTaskAnalysis" before writing any of this method's own files -- confirmed exactly the
+    1 Atlas table row hit plus 2 pre-existing method-inventory.yaml bare-name entries (no
+    implementation), zero pre-existing ai_lego module. Read strategy.bcg_matrix.contract.yaml
+    (thin-citation, no-top-level-synthesis-field precedent) and strategy.blue_ocean's own module +
+    schema (asymmetric if/then/else required-vs-forbidden field precedent) in full before writing this
+    contract. Independently re-verified the real, well-known Hierarchical Task Analysis domain
+    discipline (Goal->Task->Subtask->Plan decomposition, plans express execution order among siblings)
+    as well-known human-factors/ergonomics domain knowledge before encoding the
+    plan-required-iff->=2-children rule, same discipline strategy.vrio's own Barney-1991 external
+    grounding already establishes. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L370's own "Goal→Task→Subtask→Plan" method description is
+    expanded into the real, external HTA-domain plan-required-iff->=2-children rule via
+    independently-verified human-factors domain knowledge, disclosed above as a compilation decision,
+    not presented as directly Atlas-cited. `cognitive_primitives`, the recursive TaskNode shape, and
+    the null-vs-absent forbidden-plan encoding are compilation decisions, disclosed above.

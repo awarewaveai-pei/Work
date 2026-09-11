@@ -3578,6 +3578,210 @@ tier_1:
     source: "methods/contracts/strategy.blue_ocean.contract.yaml + specs/cognitive/typed-objects/blue-ocean-analysis.schema.yaml + ai_lego/modules/strategy/blue_ocean.py"
     note: "56 tests pass. F08 strategy family: 10 of 14 built before this batch (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/vrio/value_chain/stp/ansoff) -- strategy.business_model_canvas/strategy.value_proposition_canvas/strategy.bcg_matrix already landed before this entry (grep-confirmed via this file's own onehundredfifteenth/onehundredsixteenth/onehundredseventeenth_concrete_entry keys, read but not modified) -- this entry (strategy.blue_ocean) is F08's 14th and LAST member. F08 is 14/14 COMPLETE as of this entry (independently confirmed via `ls methods/contracts/strategy.*.contract.yaml`: 14 files present, matching bcg_matrix's own onehundredseventeenth_concrete_entry count). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, errc_action enum closed, additionalProperties:false present at both the top level and the competing_factors[] item level, the if/then industry_standard_level-required-for-ELIMINATE/REDUCE/RAISE constraint, the if/then industry_standard_level-forbidden-for-CREATE constraint, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 9 negative controls (fewer than 2 factors, smuggled top-level key, smuggled competing_factors[] item key, invalid errc_action enum, an existing-action factor missing industry_standard_level, a CREATE factor illegally carrying industry_standard_level, missing new_value_curve_summary, invalid epistemic_type via the real $ref, wrong id prefix) all correctly rejected, plus the unmodified valid example correctly accepted -- 0 false negatives, 0 false positives. CLI demo (python -m ai_lego.apps.cli.run_blue_ocean_slice) prints PASS and exits 0, demonstrating 4 real construction-time refusals (BLUEOCEAN_INSUFFICIENT_FACTORS on a single-factor set, BLUEOCEAN_INVALID_ERRC_ACTION on an out-of-enum action, BLUEOCEAN_UNEXPECTED_INDUSTRY_STANDARD_LEVEL_FOR_CREATE on a CREATE factor illegally carrying a level, BLUEOCEAN_EMPTY_NEW_VALUE_CURVE_SUMMARY on an unstated-curve attempt) plus 1 independent-gate hand-tamper catch (a CREATE factor's industry_standard_level smuggled onto an already-valid analysis' raw dict, caught by the industry_standard_level_consistency gate re-deriving from raw fields, never going back through the builder). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'blue_ocean'/'ERRC' both before writing (zero pre-existing implementation -- one unrelated forward-reference mention in ai_lego/modules/strategy/__init__.py's own 'Remaining 4' family roadmap comment) and after (only this method's own 5 files plus this registry entry and strategy.value_proposition_canvas.py's own family docstring naming strategy.blue_ocean as a concurrent sibling by id -- no shared code, no collision with any of the other 3 concurrent sibling builds)."
 
+  onehundrednineteenth_concrete_entry:
+    # New F02 decomposition family, 9-agent parallel batch, 2026-09-11.
+    method_id: "decomposition.issue_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L363). Recursive open-depth tree; real invariant
+      is whole-tree id uniqueness (GENUINE_COMPUTE, enforced at builder +
+      independent gate). Record-level `provenance` field added beyond the
+      literal design brief -- grep-confirmed all 119 pre-existing
+      typed-object schemas carry one; disclosed in the contract's own
+      compilation_decisions.
+    source: "methods/contracts/decomposition.issue_tree.contract.yaml + specs/cognitive/typed-objects/issue-tree.schema.yaml + ai_lego/modules/decomposition/issue_tree.py"
+    note: "94 tests pass. F02 family opened by this batch (previously 0/9, no ai_lego/modules/decomposition/ directory existed). CLI PASS, duplicate-id refusal + independent-gate hand-tamper proof both demonstrated."
+
+  onehundredtwentieth_concrete_entry:
+    method_id: "decomposition.logic_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L364), thinnest citation class (single bare
+      row). Recursive tree with one top-level `classification_rule`; real
+      invariant is sibling category_value uniqueness AT EVERY LEVEL
+      (distinct class from issue_tree's whole-tree check). Caught and fixed
+      its own unbounded-recursion defect in a diagnostic helper during
+      self-verification (MAX_TREE_DEPTH guard added, regression test
+      locks it in). No provenance field -- see integration note below.
+    source: "methods/contracts/decomposition.logic_tree.contract.yaml + specs/cognitive/typed-objects/logic-tree.schema.yaml + ai_lego/modules/decomposition/logic_tree.py"
+    note: "49 tests pass. CLI PASS, nested duplicate-sibling refusal + independent-gate hand-tamper proof both demonstrated."
+
+  onehundredtwentyfirst_concrete_entry:
+    method_id: "decomposition.mece"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L365) + dedicated §12.7 (L2622-2631, incl. the
+      explicit caution "不是所有現實系統都能完美 MECE -- 不要為形式強切世
+      界"). A real CHECK, not a generative record: overlaps/gaps/is_mece
+      all GENUINE_COMPUTE set arithmetic (ai_lego/compute/mece/check.py),
+      never caller-supplied. is_mece:false is a LEGAL outcome per the
+      method's own caution, not a refusal -- only structurally malformed
+      input (empty universe/categories) is refused. Added engine/
+      computation_provenance_ref/provenance + a bonus unknown_members
+      check beyond the literal brief, disclosed as compilation_decisions.
+    source: "methods/contracts/decomposition.mece.contract.yaml + specs/cognitive/typed-objects/mece-check.schema.yaml + ai_lego/compute/mece/check.py + ai_lego/modules/decomposition/mece.py"
+    note: "62 tests pass. CLI PASS: clean case, real overlap case, real gap case (all is_mece:false or true as computed, none refused), one structural refusal (empty universe), independent-gate hand-tamper proof."
+
+  onehundredtwentysecond_concrete_entry:
+    method_id: "decomposition.problem_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L366) + dedicated §12.8 (L2633-2639). Flat
+      causes[]/effects[] split; real invariants are within-list id
+      uniqueness (per list) AND cross-list disjointness, directly grounded
+      in the method's own stated benefit "分離症狀與原因". Each cause/
+      effect carries a per-item `provenance_record` (a statement is a
+      CLAIM). `recommended_next: [decomposition.objective_tree]` per
+      §12.8's own "Problem Tree → Objective Tree → Theory of Change" chain.
+      POST-CRITIC-REVIEW UPDATE (2026-09-11): the within-list uniqueness
+      check and the per-item provenance field were both added after this
+      method's own initial build -- see onehundredtwentyseventh_concrete_
+      entry's own integration note for the full critic verdict and fix
+      details.
+    source: "methods/contracts/decomposition.problem_tree.contract.yaml + specs/cognitive/typed-objects/problem-tree.schema.yaml + ai_lego/modules/decomposition/problem_tree.py"
+    note: "55 tests pass (49 original + 6 added post-critic-review: within-list duplicate refusal x2, invalid-provenance refusal, provenance-shape assertion, 2 hand-tamper gate proofs). CLI PASS, cause/effect within-list-duplicate refusal + cross-list-collision refusal + independent-gate hand-tamper proof all demonstrated."
+
+  onehundredtwentythird_concrete_entry:
+    method_id: "decomposition.objective_tree"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L367), continuing §12.8's "Problem Tree →
+      Objective Tree" chain. Deliberately NOT a hard cross-module import of
+      decomposition.problem_tree (avoids an intra-batch build-order race,
+      both landed via concurrent sibling agents in this same batch) --
+      takes a self-contained problem-tree-shaped `source_problem_items`
+      input. Real invariants: bijective source-item coverage (every item
+      converted exactly once, GENUINE_COMPUTE) + anti-passthrough check
+      (positive_statement must not be character-identical to its source).
+      OQ-OBJECTIVETREE-2 flags the real shape mismatch against
+      problem_tree's actual causes[]/effects[] output for a future
+      reconciliation pass.
+    source: "methods/contracts/decomposition.objective_tree.contract.yaml + specs/cognitive/typed-objects/objective-tree.schema.yaml + ai_lego/modules/decomposition/objective_tree.py"
+    note: "58 tests pass. CLI PASS, missing-coverage + passthrough-statement refusals + independent-gate hand-tamper proof (dangling ref, duplicate ref) all demonstrated."
+
+  onehundredtwentyfourth_concrete_entry:
+    method_id: "decomposition.functional_decomposition"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L368, thin citation, paired with C4/DDD).
+      Recursive tree + flat interfaces[]; two real invariants both
+      GENUINE_COMPUTE: whole-tree id uniqueness, and interface referential
+      integrity (every from/to_function_ref must resolve to a real
+      function id in the tree). Record-level `provenance` added beyond the
+      literal brief, same corpus-convention reasoning as issue_tree.
+    source: "methods/contracts/decomposition.functional_decomposition.contract.yaml + specs/cognitive/typed-objects/functional-decomposition.schema.yaml + ai_lego/modules/decomposition/functional_decomposition.py"
+    note: "58 tests pass. CLI PASS, duplicate-id + dangling-interface-ref refusals + independent-gate hand-tamper proof both demonstrated."
+
+  onehundredtwentyfifth_concrete_entry:
+    method_id: "decomposition.fast"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L369, thin citation; FAST = Function Analysis
+      System Technique). A why_ref chain; two real invariants both
+      GENUINE_COMPUTE: exactly one root (why_ref: null), and acyclicity --
+      reuses the existing `ai_lego.compute.graph.dag.is_acyclic` utility
+      unchanged (already general enough, per causal.dag's own precedent)
+      rather than duplicating a new algorithm. No provenance field -- see
+      integration note below.
+    source: "methods/contracts/decomposition.fast.contract.yaml + specs/cognitive/typed-objects/fast-diagram.schema.yaml + ai_lego/modules/decomposition/fast.py"
+    note: "52 tests pass. CLI PASS, multiple-roots + cycle-detected refusals (cycle deliberately disconnected from the legitimate root, not a trivial self-loop) + independent-gate hand-tamper proof all demonstrated."
+
+  onehundredtwentysixth_concrete_entry:
+    method_id: "decomposition.hierarchical_task_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L370, thin citation). Recursive tree; real
+      invariant is an external, well-known HTA-domain if/then/else rule
+      (disclosed as external, not Atlas-cited, same class as strategy.
+      vrio's Barney-1991 grounding): a non-null `plan` is REQUIRED iff a
+      node has 2+ children, and structurally FORBIDDEN (key must be null,
+      not merely absent) otherwise -- same asymmetric-conditional
+      discipline strategy.blue_ocean's CREATE/ELIMINATE split establishes.
+      No provenance field -- see integration note below.
+    source: "methods/contracts/decomposition.hierarchical_task_analysis.contract.yaml + specs/cognitive/typed-objects/hierarchical-task-analysis.schema.yaml + ai_lego/modules/decomposition/hierarchical_task_analysis.py"
+    note: "56 tests pass. CLI PASS, both invariant directions refused (missing plan on 2+ children; illegal plan on 0-1 children) + independent-gate hand-tamper proof in both directions demonstrated."
+
+  onehundredtwentyseventh_concrete_entry:
+    # Last of this 9-agent F02 batch -- F02 is 9/9 COMPLETE after this entry
+    # (independently confirmed via `ls methods/contracts/decomposition.*.
+    # contract.yaml`: 9 files present). Orchestrating session rewrites
+    # ai_lego/modules/decomposition/__init__.py's own shared family
+    # docstring now that all 9 of this batch are confirmed landed, same
+    # pattern onehundredeighteenth_concrete_entry's own note establishes.
+    method_id: "decomposition.wbs"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F02 table row (Atlas L371, thin citation; WBS = Work Breakdown
+      Structure). Recursive tree; real invariants grounded in the external,
+      well-known WBS "100% rule" (disclosed as external, not Atlas-cited):
+      owner/estimate_hours required on LEAF nodes only (forbidden on
+      non-leaf), and total_estimate_hours is a GENUINE_COMPUTE bottom-up
+      rollup, never caller-supplied, independently re-derived by the gate
+      via the same single-pass helper the builder itself uses. Record-level
+      `provenance` added beyond the literal brief, same corpus-convention
+      reasoning as issue_tree.
+    source: "methods/contracts/decomposition.wbs.contract.yaml + specs/cognitive/typed-objects/work-breakdown-structure.schema.yaml + ai_lego/modules/decomposition/wbs.py"
+    note: >
+      76 tests pass. F02 decomposition family: 9 of 9 COMPLETE as of this
+      entry (issue_tree/logic_tree/mece/problem_tree/objective_tree/
+      functional_decomposition/fast/hierarchical_task_analysis all landed
+      via concurrent sibling agents in this same batch, entries
+      onehundrednineteenth through onehundredtwentysixth above). CLI PASS,
+      both leaf/non-leaf owner-estimate-placement refusals + a hand-worked
+      3-leaf rollup arithmetic check + independent-gate hand-tamper proof
+      (tampered total_estimate_hours) all demonstrated. INTEGRATION NOTE
+      (orchestrating session, post-batch): 4 of 9 F02 methods (issue_tree,
+      mece, functional_decomposition, this one) independently added a
+      record-level `provenance` field citing corpus convention (grep-
+      confirmed 123/128 = all pre-existing typed-object schemas carry one);
+      the other 5 (logic_tree, problem_tree, objective_tree, fast,
+      hierarchical_task_analysis) followed the literal design brief given
+      to them, which omitted it. This split is a real, disclosed
+      inconsistency in the orchestrating session's own original design
+      brief, not an agent error -- routed to the batch's critic review
+      rather than pre-emptively patched, per this project's own established
+      integrate-then-critic-then-fix workflow.
+
+      CRITIC VERDICT (2026-09-11, single critic pass over the full batch):
+      overall risk LOW, nothing blocks merge. Provenance adjudication --
+      ACCEPT for 4/5 gap methods (logic_tree/objective_tree/fast/
+      hierarchical_task_analysis: legitimate structural/transformation
+      content, not claims); FIX for problem_tree (causes[]/effects[]
+      statements are CLAIMS, same content class root_cause.fishbone's own
+      cause-hypothesis-set.schema.yaml already stamps with per-item
+      provenance) -- fixed same session: problem_tree.py now carries
+      per-item provenance on both causes[]/effects[], contract's
+      quality.provenance_required flipped true. Two additional real bugs
+      found and fixed same session: (1) functional_decomposition.py's
+      builder returned the caller's own top_function object by reference
+      (no rebuild) -- fixed with a _rebuild_node/_rebuild_interface deep
+      copy, matching every sibling recursive-tree module's own convention;
+      (2) problem_tree.py only checked causes/effects id disjointness
+      ACROSS the two lists, never uniqueness WITHIN either list alone --
+      fixed with PROBTREE_DUPLICATE_CAUSE_ID/PROBTREE_DUPLICATE_EFFECT_ID,
+      enforced at both builder and gate; (3) fast.py's cycle-culprit
+      diagnostic used an unsound "first function with an outgoing edge"
+      heuristic that could misattribute an innocent legitimate branch as
+      the cycle culprit -- fixed by switching from is_acyclic to
+      ai_lego.compute.graph.dag.find_cycle's own returned cycle path
+      (diagnostic-only; the refusal itself was never affected). All 3 fixes
+      re-verified: functional_decomposition 58->61 tests, problem_tree
+      49->55 tests, fast 52->53 tests, full F02 batch 554->564, all green.
+      2 pre-existing, unrelated issues the critic also surfaced (a
+      duplicate `association.mind_map` method_id elsewhere in this
+      registry; a `SCM-` id-prefix collision between two pre-existing
+      schemas) are OUT OF SCOPE for this batch -- tracked separately, not
+      fixed here (neither involves any of these 9 files).
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

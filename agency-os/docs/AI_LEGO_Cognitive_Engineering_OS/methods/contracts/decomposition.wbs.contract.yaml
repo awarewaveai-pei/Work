@@ -1,0 +1,120 @@
+$id: "ai-lego://methods/contracts/decomposition.wbs.contract.yaml"
+title: "Work Breakdown Structure (WBS) Method Contract"
+status: ACTIVE
+
+description: >
+  decomposition.wbs, family decomposition (F02) -- one of 9 concurrent F02 members opening this family in the
+  same batch (decomposition.issue_tree confirmed to already exist mid-batch; grep-confirmed zero pre-existing
+  `decomposition.wbs`/`WorkBreakdownStructure`/`work_breakdown` anywhere before this file). Atlas's ONLY
+  citation is the F02 table row (L371: "WBS｜把交付拆工作包｜Deliverable→Work package→owner/estimate｜降低遺漏｜
+  Critical Path、RACI") -- a bare table row, no dedicated section. Core invariants: leaf/non-leaf owner+estimate
+  placement follows Atlas's own left-to-right tier progression; `total_estimate_hours` at every node is
+  GENUINE_COMPUTE, the real external WBS "100% rule" bottom-up sum, never caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, WBS row (L371)"
+  - "ai_lego/modules/decision/decision_tree.py + ai_lego/compute/decision_tree/rollup.py -- bottom-up single-pass rebuild+compute rollup, reused identically by builder and gate, precedent"
+  - "specs/cognitive/typed-objects/issue-tree.schema.yaml -- recursive $ref self-reference, open-depth, MAX_TREE_DEPTH runtime bound precedent (same F02 family)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.wbs` mints a new machine_id in the `family: decomposition`
+  family other concurrent agents in this same batch are also opening. Node field names, the leaf/non-leaf
+  owner+estimate placement rule, and the GENUINE_COMPUTE rollup are compilation decisions grounded in the real,
+  well-known external WBS "100% rule" (a parent's total work equals the sum of its parts), not Atlas text --
+  disclosed below, same class strategy.bcg_matrix's own disclosed external BCG 2x2 grounding already
+  establishes for a different family.
+
+id: decomposition.wbs
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting the
+# deliverable into work packages; MAP = structuring the resulting hierarchy; VALIDATE = Atlas's own "降低遺漏"
+# (reducing omissions), made concrete here as the mechanical 100%-rule rollup check. Same triple
+# decomposition.issue_tree.contract.yaml's own sibling contract already uses for the same family.
+
+purpose:
+  - break_down_a_deliverable_into_estimated_owned_work_packages
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L371 citation names no required input type, same
+  # "no hard upstream dependency" position every other thin-citation F02/F08 contract in this suite takes.
+
+outputs:
+  - WorkBreakdownStructure
+# NEW output type (see typed-objects/work-breakdown-structure.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other thin-citation contract in this suite discloses.
+
+preconditions:
+  - "deliverable is a well-shaped WbsNode tree (non-empty id/name at every node, children always a present list -- possibly empty for a leaf work package -- of recursively well-shaped WbsNode entries), recursion bounded to MAX_TREE_DEPTH=100"
+  - "every LEAF node (children == []) carries a non-null owner AND non-null estimate_hours (Atlas's own 'Work package→owner/estimate' tier); every NON-LEAF node carries owner=null AND estimate_hours=null -- owner/estimate belong only to the work-package (leaf) tier, not the deliverable (parent) tier, matching Atlas's own left-to-right 'Deliverable→Work package→owner/estimate' progression"
+  - "total_estimate_hours at EVERY node (leaf and non-leaf alike) is GENUINE_COMPUTE: the real sum of estimate_hours over all LEAF DESCENDANTS of that node (a leaf's own estimate_hours, for a leaf) -- never a builder parameter or caller-supplied value, mechanically re-derived bottom-up by the builder and independently re-derived by the gate from the record's own raw tree (the classic external WBS '100% rule': a parent's total work equals the sum of its parts)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required:true is a disclosed ADDITION beyond this task's own literal design spec (which named no
+  # provenance field anywhere) -- added for consistency with the 100%-universal-field convention across every
+  # existing typed-object schema in this suite, a convention decomposition.issue_tree.contract.yaml's own
+  # sibling (same batch, same family) explicitly re-confirms today. See open_questions and this task's own
+  # deviation disclosure. evidence_labeling_required:false mirrors every other thin-bare-table-row F02/F08
+  # contract's identical flag (no explicit unevidenced-claim misuse warning cited for this method).
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L371's own "最佳搭配" (best combo) column names "Critical Path、RACI" -- grep-confirmed neither has a
+# real machine_id anywhere in this corpus yet (only a forward reference to an unbuilt
+# `architecture.critical_path_method` inside devops_sre.capacity_model.contract.yaml:214) -- left empty rather
+# than naming a non-existent id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Node shape: recursive $ref self-reference (issue_tree-style) or a fixed-depth explicit set of $defs?"
+    decision: "A single self-referential WbsNode $def, open recursion depth defensively bounded to MAX_TREE_DEPTH=100 -- same shape decomposition.issue_tree's own issue_tree_node already establishes for this same family; Atlas's own citation names no fixed depth."
+  - question: "Should owner/estimate_hours live on every node (bcg_matrix-style per-item disclosure) or only on leaves?"
+    decision: "Only on leaves (null on non-leaves) -- Atlas's own citation is a strict left-to-right tier progression 'Deliverable→Work package→owner/estimate': owner/estimate are a work-package-tier (leaf-tier) property, not a deliverable-tier (parent-tier) one. A parent claiming its own separate owner/estimate would double-count against its own children's real work."
+  - question: "Should total_estimate_hours be caller-supplied (a disclosed estimate, non_goals/bcg_matrix-style judgment field) or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE, REQUIRED at every node -- the real, well-known external WBS '100% rule' is a mechanical bottom-up sum, same class decision.decision_tree's own expected_value rollup already establishes for a different arithmetic (max/weighted-sum vs plain sum here); no builder parameter exists for it, and the gate re-derives it fresh from the record's own raw estimate_hours/children fields via the SAME rollup function construction uses, never a second parallel implementation."
+  - question: "Enforce global node-id uniqueness across the whole tree (issue_tree-style ISSUETREE_DUPLICATE_NODE_ID)?"
+    decision: "No -- not one of this task's own 2 specified real invariants (leaf/non-leaf owner+estimate placement; GENUINE_COMPUTE rollup). Inventing a third mandatory gate-checked invariant with no citation or task-mandate grounding would be fabricated scope. Left as a disclosed gap, see open_questions."
+  - question: "additionalProperties: false at the top level, and on the recursive WbsNode $def?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+open_questions:
+  - "OQ-WBS-1: recommended_next should probably name future architecture.critical_path_method / <family>.raci machine_ids (Atlas L371's own '最佳搭配' column) once such contracts exist -- left empty, neither exists yet (owner: operator, or whoever builds them)."
+  - "OQ-WBS-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-WBS-3: quality.provenance_required:true and the record-level `provenance` field are a disclosed addition beyond this task's own literal design spec (which specified no provenance field anywhere in the shape) -- added for corpus-wide consistency (see decomposition.issue_tree.contract.yaml's own explicit 100%-universal-field claim, confirmed the same day/batch). A future pass could revisit if this turns out wrong (owner: operator)."
+  - "OQ-WBS-4: global node-id uniqueness across the whole tree is NOT enforced (see compilation_decisions) -- should a future revision add it, matching decomposition.issue_tree's own ISSUETREE_DUPLICATE_NODE_ID precedent, if a downstream consumer ever needs to address a specific node unambiguously? (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L371) directly. Grepped the whole Atlas file case-insensitively for "wbs" --
+    confirmed the table row plus 2 unrelated forward-reference mentions in sibling contracts (method-inventory
+    placeholder, framing.non_goals's own 最佳搭配 citation of the same unbuilt sibling), no dedicated section, no
+    §4 composition formula, no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "decomposition.wbs"/"WorkBreakdownStructure"/"work_breakdown" before writing any of
+    this method's own files -- zero pre-existing implementation (decomposition.issue_tree's own contract+schema
+    exist, from a concurrent same-batch agent; zero overlap, unrelated node shape). Read
+    decomposition.issue_tree.contract.yaml + issue-tree.schema.yaml (recursive $ref, open-depth,
+    MAX_TREE_DEPTH precedent, same family) and ai_lego/modules/decision/decision_tree.py +
+    ai_lego/compute/decision_tree/rollup.py (bottom-up single-pass rebuild+compute rollup, reused identically
+    by builder and gate, real GENUINE_COMPUTE precedent) in full before writing this contract. Independently
+    re-verified the real, standard WBS "100% rule" (a parent's total scope/work equals the sum of its
+    children's) as well-known project-management domain knowledge before encoding it, same discipline
+    strategy.bcg_matrix's own external-methodology disclosure already establishes. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L371's own "Deliverable→Work package→owner/estimate" tier
+    progression is transcribed directly into `preconditions`. The exact WbsNode field names, the
+    MAX_TREE_DEPTH=100 bound, the leaf/non-leaf owner+estimate placement rule's mechanical enforcement, the
+    GENUINE_COMPUTE 100%-rule rollup, and the added record-level `provenance` field (see open_questions) are
+    compilation decisions, disclosed above, not presented as directly Atlas-cited.

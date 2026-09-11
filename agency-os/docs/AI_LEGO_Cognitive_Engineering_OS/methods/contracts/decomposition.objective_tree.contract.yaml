@@ -1,0 +1,120 @@
+$id: "ai-lego://methods/contracts/decomposition.objective_tree.contract.yaml"
+title: "Objective Tree Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F02 decomposition family, FIRST member (family previously entirely unbuilt --
+  grep-confirmed zero pre-existing ai_lego/modules/decomposition/ directory before this write).
+  Atlas cites this method ONCE: F02 table row L367 ("Objective Tree｜把 Problem Tree 轉目標｜負面
+  狀態逐項轉正向｜直接連到方案設計｜Theory of Change") -- thin citation, no dedicated section, same
+  class strategy.ansoff/strategy.bcg_matrix's own citations already establish. Core invariant: a
+  BIJECTIVE, GENUINE_COMPUTE-verified coverage between a self-contained Problem-Tree-shaped input
+  (`source_problem_items`) and this method's own `objectives` -- Atlas's own "逐項轉正向" (item-by-
+  item conversion) made real, not a slogan; plus a passthrough guard so a converted statement
+  cannot be a verbatim copy of its own negative source.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Objective Tree row (L367)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, Problem Tree row (L366, 最佳搭配 column names Objective Tree) -- corroborating, names the upstream feeder this method's own `source_problem_items` is shaped after"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.8 Problem Tree 搭配 line (L2638, 'Problem Tree → Objective Tree → Theory of Change') -- corroborating recipe citation"
+  - "methods/contracts/causal.theory_of_change.contract.yaml -- Atlas L367's own downstream ('最佳搭配'), a real ACTIVE contract as of this write, named in this file's own recommended_next"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.objective_tree` mints a NEW `family: decomposition`
+  (F02's first built member). Dispatched as 1 of 9 parallel agents opening independent Method Atlas
+  families in the same batch; `decomposition.problem_tree` (Atlas L366, the named upstream feeder)
+  may be landing concurrently via a sibling agent -- see compilation_decisions for why this method
+  does NOT hard-import that module.
+
+id: decomposition.objective_tree
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = working
+# item-by-item over the problem tree's own causes/effects; MAP = each negative source item mapped to
+# its own positive objective; VALIDATE = the bijective coverage + passthrough checks, same
+# [DECOMPOSE, MAP, VALIDATE] triple architecture.strangler_fig/architecture.fitness_functions already
+# use for a structurally similar "convert + verify" method shape.
+
+purpose:
+  - convert_a_problem_trees_negative_states_into_positive_objectives_item_by_item
+# Atlas L367 verbatim sense: "把 Problem Tree 轉目標" (convert Problem Tree into objectives) /
+# method "負面狀態逐項轉正向" (each negative state converted to positive, item by item).
+
+inputs:
+  required: []
+  optional: []
+  # No hard upstream typed-object dependency. `source_problem_items` is a self-contained,
+  # structurally-compatible Problem-Tree-shaped input (see compilation_decisions) -- NOT an import of
+  # decomposition.problem_tree's own record type, so build order between this method and its named
+  # Atlas feeder never races.
+
+outputs: [ObjectiveTree]
+# NEW output type (see typed-objects/objective-tree.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "source_problem_items is present and non-empty, each entry carrying a non-empty id, a non-empty statement, and a polarity of CAUSE or EFFECT, with all ids unique -- a self-contained, Problem-Tree-shaped input (see compilation_decisions), not an import of decomposition.problem_tree's own record"
+  - "objectives is present and non-empty, each entry carrying a non-empty id and a non-empty positive_statement, with source_item_ref resolving to a real source_problem_items[].id"
+  - "the set of objectives[].source_item_ref values equals EXACTLY the set of source_problem_items[].id values, each source item covered by exactly one objective (no duplicate coverage, no missing coverage, no dangling reference) -- Atlas's own '負面狀態逐項轉正向' (item-by-item conversion) made real as a GENUINE_COMPUTE bijection, re-derived independently by the gate from the record's own raw fields, never trusted from a stored flag"
+  - "every objective's positive_statement is non-empty AND is NOT character-for-character identical to its referenced source item's own statement -- Atlas's own point is transformation, not passthrough; a 'conversion' that copies the negative statement verbatim has converted nothing"
+
+quality:
+  provenance_required: false
+  evidence_labeling_required: false
+  # Both false: this method's own task-mandated exact output shape ({id, version, generated_by_method,
+  # source_problem_items, objectives}) carries no provenance field anywhere, top-level or per-item --
+  # see open_questions on this divergence from every sibling typed-object's own convention.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: [causal.theory_of_change]
+# Atlas L367's own "最佳搭配" (best combo) column names "Theory of Change" verbatim, AND
+# causal.theory_of_change is a real ACTIVE contract as of this write (unlike strategy.bcg_matrix's
+# GE-McKinsey, which named a method with no matching contract) -- a genuinely citation-grounded,
+# low-risk METADATA recommendation, not a runtime dependency (this file's own `inputs.required: []`
+# stays empty; recommended_next never causes a hard import).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Hard-import decomposition.problem_tree's own record type as source_problem_items, or accept a self-contained, structurally-compatible input?"
+    decision: "Self-contained input. decomposition.problem_tree is being built concurrently by a sibling agent in this same parallel batch and may not exist yet at build/run time -- a hard import would create a build-order race between two otherwise-independent agents. source_problem_items is shaped like a Problem Tree's own causes+effects (id/statement/polarity) without importing its module, faithfully implementing '把 Problem Tree 轉目標' as a real transformation with a real completeness invariant."
+  - question: "Should objectives[].source_item_ref coverage be a loose 'at least one objective per source item' rule, or exact bijection?"
+    decision: "Exact bijection (every source item covered by EXACTLY one objective) -- Atlas's own '逐項轉正向' reads as a 1:1 per-item transformation, not a summary or a many-to-one merge; a looser rule would let some negative states go silently unconverted or double-converted."
+  - question: "Should positive_statement's anti-passthrough check be a semantic/AI judgment call or a cheap structural one?"
+    decision: "Cheap structural check (character-for-character non-identity with the source statement), task-mandated -- catches the degenerate 'copy the negative statement verbatim' case without requiring an AI judgment call this contract has no citation to justify; a statement that merely rephrases without truly reversing polarity is NOT caught by this invariant (see open_questions)."
+  - question: "Carry a top-level or per-item provenance field, matching every sibling typed-object's own convention?"
+    decision: "No -- this method's exact output shape is task-mandated as {id, version, generated_by_method, source_problem_items, objectives} with additionalProperties:false throughout, and provenance appears nowhere in that mandated shape. Implemented literally rather than silently adding a field the task's own design spec did not include -- see open_questions."
+
+open_questions:
+  - "OQ-OBJECTIVETREE-1: this record carries no provenance field anywhere (top-level or per-item), diverging from every sibling typed-object's own convention in this suite -- task-mandated exact shape, not an oversight of this contract; a future pass should decide whether that is intentional going forward (owner: operator)."
+  - "OQ-OBJECTIVETREE-2: once decomposition.problem_tree exists as a real ACTIVE contract, a future pass should decide whether source_problem_items should become a genuine cross-method reference (matching strategy.tows's own real dependency on strategy.swot) instead of a self-contained structurally-compatible input -- left as a self-contained input here specifically to avoid a build-order race within this task's own concurrent agent batch (owner: operator, once both methods exist)."
+  - "OQ-OBJECTIVETREE-3: the anti-passthrough invariant only catches a character-for-character identical copy, not a superficial rephrase that still fails to actually reverse polarity (e.g. adding a word to the same negative statement) -- a future pass could add a stronger semantic check if a citation ever supports one (owner: operator)."
+  - "OQ-OBJECTIVETREE-4: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F02 table (L359-372) directly, including the Objective Tree row (L367) and Problem
+    Tree row (L366), plus §12.8's Problem Tree 搭配 line (L2636-2638). Grepped the whole Atlas file
+    and the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS + Projects/internal/cognitive-
+    engineering-os trees case-insensitively for "objective_tree"/"objective tree"/"ObjectiveTree"
+    before writing any of this method's own files -- zero pre-existing implementation (only
+    corroborating citations in contract-backlog.yaml/method-inventory.yaml/
+    causal.theory_of_change.contract.yaml, all read and cross-referenced above). Read
+    strategy.bcg_matrix.contract.yaml (thin-citation, GENUINE_COMPUTE, no-builder-parameter
+    precedent) and ai_lego/modules/strategy/tows.py (referential-integrity + cross-item completeness
+    precedent, generalized here to a stricter bijective version) in full before writing this
+    contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L367's own "負面狀態逐項轉正向" is expanded into a real
+    bijective coverage invariant plus an anti-passthrough guard via this task's own explicit design
+    spec, disclosed above as compilation decisions, not presented as directly Atlas-cited beyond the
+    bare table row. The self-contained (non-imported) `source_problem_items` shape is a deliberate,
+    disclosed divergence from a hard cross-method dependency, driven by this task's own concurrent-
+    build-order constraint, not by an Atlas citation.

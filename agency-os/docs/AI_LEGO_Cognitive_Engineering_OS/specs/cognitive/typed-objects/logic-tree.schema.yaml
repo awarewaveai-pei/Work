@@ -1,0 +1,132 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/logic-tree.schema.yaml"
+title: Logic Tree
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `LogicTree`, outputs of `decomposition.logic_tree`. Atlas F02 table row (L364: "Logic Tree｜按單一邏輯
+  分類｜先定分類規則再展開｜防止維度混亂｜MECE") -- thinnest citation class, no dedicated section
+  (grep-confirmed). `classification_rule` is declared ONCE at the top level (Atlas's own "先定分類規則再展開",
+  declare the rule FIRST, then expand) and applies uniformly to the whole tree. `root` is a recursive,
+  NESTED tree (`decision-tree-record.schema.yaml`'s own embedded-node precedent, not
+  `fault-tree-record.schema.yaml`'s flat id-reference shape -- a logic-tree branch is path-dependent, no
+  Atlas citation supports cross-node reuse). Real invariant (Atlas's own "防止維度混亂", prevent dimension
+  confusion): at every node, its own `children[]` must not repeat a `category_value` among siblings -- NOT
+  schema-expressible (JSON Schema has no cross-item-field uniqueness constraint on a sibling list), enforced
+  at the runtime layer only (`ai_lego/modules/decomposition/logic_tree.py`), checked recursively at every
+  level, not just the root's own children.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 table row (L364)"
+  - "methods/contracts/decomposition.logic_tree.contract.yaml"
+  - "specs/cognitive/typed-objects/decision-tree-record.schema.yaml -- recursive $defs/embedded-node precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/fault-tree-record.schema.yaml -- runtime-only (non-schema-expressible) structural invariant precedent for the sibling-uniqueness note above"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L364's own bare method description plus low-risk, disclosed compilation
+  choices (task-mandated shape).
+
+$defs:
+  logic_tree_node:
+    type: object
+    required: [id, category_value, children]
+    additionalProperties: false
+    description: >
+      One node. NOT id-cross-referenced (`fault-tree-record.schema.yaml`'s own shape) -- a logic-tree
+      branch is path-dependent under its own parent's classification step, same reasoning
+      `decision-tree-record.schema.yaml`'s own `decision_tree_node` already establishes for a different
+      family. `id` carries no uniqueness requirement anywhere in this schema (that is
+      `decomposition.issue_tree`'s own concern, a different invariant class, not duplicated here). Sibling
+      `category_value` uniqueness (see file description) is enforced at the runtime layer only.
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Identifies this node within the tree. No cross-tree or cross-sibling uniqueness requirement (see description)."
+      category_value:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "This node's own classification value under the tree's single `classification_rule` (Atlas's own '按單一邏輯分類'). DISCLOSED content, never GENUINE_COMPUTE -- Atlas gives no formula for deriving one."
+      children:
+        type: array
+        items: {$ref: "#/$defs/logic_tree_node"}
+        description: "Open-ended, MAY be empty (a leaf) -- unlike `decision-tree-record.schema.yaml`'s own >=2-branch minimum, Atlas's own L364 citation mandates no minimum branching factor."
+
+type: object
+required: [id, version, classification_rule, root]
+additionalProperties: false
+properties:
+  id:
+    type: string
+    pattern: "^LOGICTREE-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling typed-object schema's own prefix."
+  version:
+    type: string
+  generated_by_method:
+    type: string
+    default: "decomposition.logic_tree"
+  classification_rule:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas's own '先定分類規則再展開' -- declared ONCE, applies uniformly to every level of the whole tree (not per-node; see method contract compilation_decisions)."
+  root:
+    $ref: "#/$defs/logic_tree_node"
+    description: "Atlas's own '按單一邏輯分類...先定分類規則再展開' formula -- the tree root, recursively expanded under classification_rule."
+
+examples:
+  - description: "A 2-level logic tree classifying customers by 客戶規模 (customer size) at the top level, then by 續約狀態 (renewal status) under the Enterprise branch"
+    value:
+      id: "LOGICTREE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "decomposition.logic_tree"
+      classification_rule: "分類依 客戶規模 (Enterprise / SMB / Startup)"
+      root:
+        id: "ROOT"
+        category_value: "全部客戶"
+        children:
+          - id: "N-ENTERPRISE"
+            category_value: "Enterprise"
+            children:
+              - {id: "N-ENT-RENEWED", category_value: "已續約", children: []}
+              - {id: "N-ENT-CHURNED", category_value: "已流失", children: []}
+          - {id: "N-SMB", category_value: "SMB", children: []}
+          - {id: "N-STARTUP", category_value: "Startup", children: []}
+  - description: "A minimal single-node tree -- no expansion at all"
+    value:
+      id: "LOGICTREE-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "decomposition.logic_tree"
+      classification_rule: "分類依 產品線"
+      root: {id: "ROOT", category_value: "全部產品", children: []}
+
+open_questions:
+  - id: "OQ-LOGICTREE-1"
+    question: "Sibling category_value uniqueness is a runtime-only invariant (plain JSON Schema has no cross-item-field uniqueness constraint on a sibling array) -- should a future pass add a JSON Schema workaround (e.g. requiring a synthetic composite key) instead of relying solely on the runtime gate? Same open question fault-tree-record.schema.yaml's own required_count/dangling-reference split already discloses for an identical shape. (owner: operator)"
+  - id: "OQ-LOGICTREE-2"
+    question: "No provenance field exists anywhere in this schema (task-mandated shape), unlike every sibling tree-shaped typed object in this directory -- should a future revision add one? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F02 table row (L364) directly. Grepped the whole Atlas file, the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` tree, and the whole `Projects/internal/cognitive-
+    engineering-os` tree case-insensitively for "logic_tree"/"logic tree"/"LogicTree" before writing this
+    file -- zero pre-existing implementation (only Atlas/inventory row mentions). Read
+    decision-tree-record.schema.yaml (recursive $defs/embedded-node precedent) and
+    fault-tree-record.schema.yaml (runtime-only structural invariant precedent) in full as shape precedent
+    before writing this file. Validated against jsonschema Draft202012Validator via a standalone script
+    (required fields present, id pattern satisfied, recursive $ref resolves through multiple levels,
+    additionalProperties:false present at both the top level and the recursive node level, negative
+    controls for a smuggled top-level key, a smuggled node-level key, an empty id/category_value string,
+    and a non-list children value).
+  note: >
+    No mother document was modified. The single top-level classification_rule, the recursive embedded-node
+    representation, the open-ended (may-be-empty) children list, and the deliberate absence of a provenance
+    field (task-mandated shape) are compilation decisions, disclosed above and in the method contract's own
+    compilation_decisions, not presented as Atlas citations. The sibling category_value uniqueness
+    invariant is enforced at the runtime layer only (see description) -- schema validity alone does not
+    guarantee it.

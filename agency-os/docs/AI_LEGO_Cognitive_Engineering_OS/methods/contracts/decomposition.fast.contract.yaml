@@ -1,0 +1,112 @@
+$id: "ai-lego://methods/contracts/decomposition.fast.contract.yaml"
+title: "FAST (Function Analysis System Technique) Method Contract"
+status: ACTIVE
+
+description: >
+  decomposition.fast, family decomposition (F02), one of 9 agents opening this family in one batch (sibling
+  `decomposition.issue_tree`/`logic_tree`/`problem_tree`/`functional_decomposition` in the same batch). Atlas
+  cites this method ONCE: F02 table row (L369: "FAST｜用 Why/How 建功能鏈｜往左問 Why、往右問 How｜找冗餘功能與
+  替代方案｜Value Engineering") -- grep-confirmed the only hit, no dedicated section. Builds a function CHAIN:
+  asking "why" walks toward the higher-order function (left), asking "how" walks toward the lower-order
+  function (right) -- the same edges traversed in opposite directions, so each non-root function carries one
+  `why_ref` pointer to its higher-order parent. Core invariants, both GENUINE_COMPUTE, re-derived independently
+  by the gate from the record's own raw `functions` list, never a stored flag: exactly one function is the
+  chain's root (`why_ref: null`); every function's `why_ref` chain terminates at that root with no cycle.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F02 tool table, FAST row (L369)"
+  - "ai_lego/compute/graph/dag.py -- already-general (non-causal-specific) directed-graph cycle-detection utility reused here, unchanged"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: decomposition.fast` mints a new machine_id within the `family: decomposition`
+  family other agents in this same batch are opening concurrently. Function node shape `{id, name, why_ref}`
+  (task-mandated exact shape, no provenance field anywhere) is a compilation decision, disclosed below.
+
+id: decomposition.fast
+version: "1.0.0"
+family: decomposition
+
+cognitive_primitives: [DECOMPOSE, RELATE, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting one
+# system into a chain of functions; RELATE = each function's why_ref link to its higher-order parent (Atlas's
+# own "往左問 Why、往右問 How"); VALIDATE = the single-root/acyclic chain structure independently re-derived,
+# same reasoning causal.dag's own [MAP, RELATE, VALIDATE] already establishes for a different graph-shaped
+# method.
+
+purpose:
+  - build_a_why_how_function_chain_to_find_redundant_functions_and_alternatives
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L369 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - FastDiagram
+# NEW output type (see typed-objects/fast-diagram.schema.yaml). Atlas names no PascalCase output type for this
+# method, same honesty gap every other thin-citation contract in this suite discloses.
+
+preconditions:
+  - "functions is present and non-empty, every entry has a non-empty id and non-empty name, and why_ref is either null or the id of another entry in the same list -- a dangling why_ref would reference a function that does not exist"
+  - "exactly one functions[] entry has why_ref: null (the unique higher-order root) -- FAST_NO_ROOT/FAST_MULTIPLE_ROOTS, GENUINE_COMPUTE, re-derived by the gate from the record's own raw functions list, never caller-asserted"
+  - "following every function's why_ref chain terminates at that root within a finite number of steps (no function may be its own transitive ancestor) -- FAST_CYCLE_DETECTED, GENUINE_COMPUTE via a real directed-graph cycle-detection traversal (ai_lego.compute.graph.dag.find_cycle), re-derived by the gate, never trusting a stored flag"
+
+quality:
+  provenance_required: false
+  evidence_labeling_required: false
+  # provenance_required is false ONLY because the task-mandated exact output shape `{id, name, why_ref}` per
+  # function (and no record-level field beyond id/version/generated_by_method) carries no provenance field
+  # anywhere -- see compilation_decisions. This is a DISCREPANCY, disclosed honestly: sibling
+  # decomposition.issue_tree.contract.yaml's own compilation_decisions documents provenance as "a 100%
+  # universal field across every one of this suite's 119 existing typed-object schemas" and keeps it at the
+  # record level for exactly that reason. FastDiagram breaks that universal convention because the shape was
+  # handed down as an exact, closed spec (additionalProperties:false, no redesign authorized) rather than
+  # derived independently the way issue_tree's own shape was. evidence_labeling_required is false for the
+  # same thin-bare-table-row reasoning strategy.bcg_matrix.contract.yaml's identical flag already establishes.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L369's own "最佳搭配" (best combo) column names "Value Engineering" -- no decomposition.value_engineering
+# (or similarly named) machine_id exists anywhere in this corpus yet (grep-confirmed), so left empty rather
+# than naming a non-existent id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Open-ended non-empty list or fixed-count closed set for `functions`?"
+    decision: "Open-ended, minItems:1 only -- a function chain can be arbitrarily long, not a fixed structural split like strategy.ansoff's/strategy.vrio's fixed vocabularies."
+  - question: "Per-function provenance (bcg_matrix-style) or record-level provenance (issue_tree-style), or none?"
+    decision: "None -- task-mandated exact output shape carries no provenance field anywhere. Disclosed as a discrepancy against this suite's own universal provenance convention (see quality above), not presented as Atlas-grounded."
+  - question: "Reuse ai_lego.compute.graph.dag.find_cycle (already-general, non-causal-specific graph utility causal.dag also uses) or write a brand-new cycle-detection algorithm?"
+    decision: "Reuse it, unchanged -- FAST's why_ref pointers reshape trivially into that utility's own nodes/edges shape (one edge per non-root function, from its own id to its why_ref), and it is already a genuinely general graph utility living outside the causal.dag module itself, not a causal-specific one."
+  - question: "Enforce a schema-level structural constraint (single-root, acyclic) the way causal-dag-analysis.schema.yaml's own acyclic_verified const:true does?"
+    decision: "No -- plain JSON Schema cannot express 'exactly one array item has why_ref==null' or graph acyclicity as a cross-item constraint, same limitation bcg-matrix-analysis.schema.yaml's own OQ-BCGMATRIXANALYSIS-1 already discloses; both invariants are runtime-only, enforced by the builder plus an independent gate."
+
+open_questions:
+  - "OQ-FAST-1: recommended_next should probably name a future decomposition.value_engineering (or similarly named) machine_id (Atlas L369's own '最佳搭配' column) once such a contract exists -- left empty, no such contract exists yet (owner: operator, or whoever builds it)."
+  - "OQ-FAST-2: quality.provenance_required: false breaks this suite's own established universal-provenance convention (see decomposition.issue_tree.contract.yaml's compilation_decisions) solely because the task-mandated output shape has no provenance field -- a future pass could add a record-level provenance field if this is judged a real inconsistency worth fixing (owner: operator)."
+  - "OQ-FAST-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F02 table row (L369) directly. Grepped the whole Atlas file case-insensitively for "FAST" alone
+    (too noisy -- false-positives heavily) and for the more specific strings "decomposition.fast"/"FastDiagram"/
+    "FAST diagram" -- confirmed zero pre-existing hits anywhere in `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    or `Projects/internal/cognitive-engineering-os` before writing any of this method's own files. Read
+    strategy.bcg_matrix.contract.yaml (thin-citation, GENUINE_COMPUTE-re-derived-by-gate precedent) and
+    decomposition.issue_tree.contract.yaml (this family's own first member, opened in the same batch) in full
+    before writing this contract. Read ai_lego/modules/causal/dag.py and ai_lego/compute/graph/dag.py in full to
+    confirm the latter is a genuinely general, non-causal-specific cycle-detection utility before reusing it
+    unchanged. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator (see
+    tests/unit/test_fast.py's own live re-check of this same claim).
+  note: >
+    No mother document was modified. The exact FastDiagram shape (no provenance anywhere), the choice to reuse
+    ai_lego.compute.graph.dag.find_cycle unchanged, and the absence of a schema-level structural constraint are
+    compilation decisions, disclosed above -- the provenance omission is additionally flagged as a discrepancy
+    against this suite's own established convention, not presented as Atlas-cited or as this agent's own design
+    preference.

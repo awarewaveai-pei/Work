@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-11（119–127 號切片：開新家族 F02 拆解與結構化 0/9→9/9，9 個平行 agent + 1 critic + 3 個真 bug 修正）
+
+**觸發**：操作者「繼續完成 Cognitive Engineering OS」，全權授權＋明訂不准無效益派多 agent。VBC 查證先發現 `TASKS.md` 舊「F17 剩 Prediction Tracking」為過期宣稱（讀 `ai_lego/modules/*/__init__.py` 自報 X/Y COMPLETE 機械核對：F01/F04/F05/F08/F11/F16/F17/F18/F19/F20/F21 十一個家族皆已收官，F16/F17 早於 2026-09-08 commit `69c211176` 收官只是本檔未同步）——真實剩餘範圍是 F02/F03/F06/F07/F09/F10/F13/F14/F15/F22/F23/F24 十二個家族完全未開工，已訂正 TASKS.md。
+
+**選型**：F02（拆解與結構化，Atlas L359-373，9 個成員：Issue Tree/Logic Tree/MECE/Problem Tree/Objective Tree/Functional Decomposition/FAST/Hierarchical Task Analysis/WBS）——Atlas 順序中 F01 完工後的下一個家族，且家族本身完整（9 個成員一次做完，不留半收官）。9 個方法彼此檔案完全不重疊，符合 AGENTS.md §5「真正獨立可切割工作分批塞 ≤10 個 agent」例外，一次批次派出（非按項目複製角色的 1:N 反模式）——設計本身（每方法的真不變量、shape、id prefix）由本 session 事先做完才派工，避免 9 個 agent 各自對薄引用做出不一致解讀（zero rework 原則）。
+
+**建置**：issue_tree(94t，全樹 id 唯一)/logic_tree(49t，同層 sibling category_value 唯一，且自己抓到並修正診斷輔助函式的無界遞迴 bug)/mece(62t，overlaps/gaps/is_mece 皆真集合運算，`is_mece:false` 是合法結果非拒絕，Atlas §12.7 自己的警語「不要為形式強切世界」)/problem_tree(49t 初版)/objective_tree(58t，故意不 import problem_tree 避免同批次建置順序競態，改吃自包含輸入，OQ 誠實揭露與 problem_tree 真實 shape 有落差)/functional_decomposition(58t，全樹 id 唯一+interface 參照完整性雙真不變量)/fast(52t，why_ref 鏈唯一 root+無環，重用既有 `causal.dag` 的 acyclic 工具非重造)/hierarchical_task_analysis(56t，plan 欄位「≥2 children 則必填、否則必須為 null」的外部 HTA 領域不變量，同 `strategy.blue_ocean` 的不對稱 if/then/else 手法)/wbs(76t，leaf-only owner/estimate + 真 bottom-up rollup GENUINE_COMPUTE)。554 tests 零衝突，全 regression 7190→7744，golden 3296→3336。
+
+**critic 覆審（1 個，覆蓋全批）**：verdict 低風險、不擋 commit。裁決要點：
+- **provenance 欄位不一致**（9 個方法中 4 個自行加了記錄層 provenance 引用「119/128 既有 schema 皆有」、5 個照字面 spec 沒加）——critic 讀 `epistemic-label.schema.yaml`/ADR-004 原文＋F08 批次反例（`ansoff`/`bcg_matrix` 也沒有記錄層 provenance）後裁定：**4/5 缺口方法（logic_tree/objective_tree/fast/hierarchical_task_analysis）ACCEPT**（純結構內容非 claim，同 `blue_ocean` 已有先例）；**problem_tree 需 FIX**（`causes`/`effects` 的 statement 是因果 claim，同 `root_cause.fishbone` 自己的 `cause-hypothesis-set.schema.yaml` 已用 per-item provenance 的道理一樣）。
+- C1（Major）：`functional_decomposition.py` 的 builder 直接回傳呼叫端原始 `top_function` 物件（無 rebuild），呼叫端事後改動輸入會悄悄污染「已驗證」的記錄——同批次其餘 4 個遞迴樹模組都有 `_rebuild_node` 防這個，此檔漏做。
+- m1：`problem_tree.py` 只查跨列表不相交，沒查單一列表內自己的 id 是否重複（兩個 cause 共用同一 id 會被 `set()` 悄悄吸收，永不現形）。
+- m2：`fast.py` 的環偵測歸咎邏輯（「回報第一個有出邊的節點」）在合法分支排在真環之前時會誤報無辜節點——用既有 `find_cycle` 真實回傳的環路徑取代啟發式。
+
+**修正**（本 session 執行，非另派 agent——3 處皆範圍明確、我已有完整上下文，直接修比再派工更省 token）：functional_decomposition 加 `_rebuild_node`/`_rebuild_interface` 深拷貝＋3 個新測試（58→61t）；problem_tree 加 per-item provenance（`quality.provenance_required` false→true）+ 單列表內 id 唯一檢查（builder+gate 雙層）+ 6 個新測試（49→55t，含一個既有測試因故意用同 id 湊「開放列表」變成無效寫法一併修正）；fast 改用 `find_cycle` 取代 `is_acyclic`+啟發式，新增鎖定原場景的回歸測試（52→53t）。554→564 tests，全 regression 7744→7754，golden 3336→3337，皆重跑確認零回歸。2 個 critic 順手發現但與本批次無關的既存問題（`association.mind_map` method_id 在 registry 重複兩次；`SCM-` id prefix 兩個既有 schema 共用）已記錄不動（範圍外，未觸碰）。
+
+**[已修改]**：9 個新 method（contract+schema+module+CLI+test 各 5 檔=45 檔）+ `ai_lego/modules/decomposition/__init__.py`（家族總覽）+ `contract-backlog.yaml`（9 筆新登記+1 筆 critic 整合後補記）+ `TASKS.md`（訂正過期 F17 宣稱+新增本批次摘要）。
+**[驗證結果]**：`python -m unittest discover` 7754/7754 PASS；`gen_spec_index.py`+`run_golden_tests.py` 3337/3337 PASS；9 個 CLI slice 全數真跑 PASS（含各自的拒絕證明與 hand-tamper 獨立閘證明）；1 個 critic 覆審（verdict=低風險不擋 commit，3 個真發現全修）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（Projects/internal/cognitive-engineering-os） | exit=0 | ms=787135
+- REVIEW_DONE: critic=Standard | verdict=pass（Low risk, 0 Critical, 1 Major 已修, 2 Minor 已修） | findings=1c/2m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=decomposition\.(issue_tree|logic_tree|mece|problem_tree|objective_tree|functional_decomposition|fast|hierarchical_task_analysis|wbs) | hits=45（全部為本批次自己的 5 檔×9 方法，零殘留/零衝突）
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：`OQ-OBJECTIVETREE-2`（objective_tree 自包含輸入與 problem_tree 真實 shape 有落差，未來若要真串接需一次轉接層）；F02 之後仍有 F03/F06/F07/F09/F10/F13/F14/F15/F22/F23/F24 共 11 個家族完全未開工；critic 順手發現的 2 個既存無關問題（見上）已記錄未修。**[rollback]**：`git revert` 本次 commit 即可，9 個方法彼此無交叉引用，互不影響其餘家族。
+
 ## 2026-09-11 第三批（來源目錄 + 四個新來源：學術、本機檔案、影片、官方 API）
 
 操作者要求：計畫上未建的來源全部進來、加上網路影片與**專做學術研究**的來源，而且要「可選的選項」。
