@@ -1,5 +1,52 @@
 # Worklog
 
+## 2026-09-11（157–163 號切片：F12 挑戰／紅隊／風險家族收官 3/10→10/10，7 個平行 agent + 1 critic；順帶修復 F07 與 F12 兩處 registry SSOT 漂移）
+
+**觸發**：F07（`d3adeb65c`）收工後例行檢查 SSOT，發現 `method-inventory.yaml`／`contract-backlog.yaml` 兩份 F07 更新漏跑（見下方獨立記錄）；順藤摸瓜檢查 `ai_lego/modules/` 全目錄時發現 `challenge/` 資料夾（F12）早就存在 `red_team`/`blue_team`/`independent_judge` 三個方法，但從未被任一份 registry 登記過，也不在 TASKS.md 的「8 個未開工家族」清單裡——因為它有資料夾，不算「無對應目錄」，但其實只完成 3/10。
+
+**做了什麼**：7 個平行 agent 各建 1 個方法（devils_advocate/pre_mortem/counterexample_search/disconfirming_evidence/fmea/hazop/stress_testing），沿用 `red_team.py` 既有的 gate_id/status-list 結構慣例（非 F07 用的單一 evaluate 函式慣例——同家族內部一致優先於跨家族統一），派工時已預先指定每個方法的真實不變量（非事後補）：
+- `devils_advocate`：mainstream/alternative position 正規化後不得相同，supporting_arguments 至少 1 筆。
+- `pre_mortem`：每個 failure_cause 必須被至少 1 個 control 覆蓋（PREVENTION/DETECTION/RECOVERY），priority 為 3x3 GENUINE_COMPUTE 查表。
+- `counterexample_search`：true_counterexamples 的 boundary_case_id 必須真實存在於 boundary_cases（referential integrity）。
+- `disconfirming_evidence`：Popperian 順序——falsifier_criteria 必須先宣告，search_results 才能引用；found:true 需非空 evidence_description。
+- `fmea`：rpn=severity×occurrence×detection GENUINE_COMPUTE；Atlas L1799-1800 原文警告「不要只依賴 RPN」做成結構強制——severity>=9 強制 action_priority=MANDATORY_CONTROL_REQUIRED，不管 rpn 多低。
+- `hazop`：Atlas 自己截斷的 guide-word 清單補上業界標準 11 詞封閉集合，deviations 的 node_id/guide_word 雙重 referential integrity + 封閉詞彙檢查。
+- `stress_testing`：extreme_value 必須嚴格落在 normal_range 之外（非含邊界）；與既有 `devops_sre.stress_test`（F19，工程負載測試）刻意用不同 schema 檔名/$id/id-prefix 區隔，雙方 contract 互相標註避免未來再度撞名。
+
+**critic 覆審**（1 輪，Standard tier，逐項 hand-tamper 驗證非只讀碼）：0 Critical/0 Major(邏輯)/0 Minor——本 session 至今最乾淨的一批。唯一 Major 發現是流程缺口：兩份 registry 沒登記新方法（跟 F07 同一種漏洞），非邏輯錯誤。
+
+**已修改**：
+- 35 個新檔（7 方法 × 5 檔：contract/schema/module/CLI/test）。
+- `ai_lego/modules/challenge/__init__.py`：docstring 改為 10/10 COMPLETE 並列出全部 10 個 tenant 的核心不變量。
+- `method-inventory.yaml`：F12 全部 10 列（含 3 個舊有但從未登記的 red_team/blue_team/independent_judge）補上 `has_contract:true`/`contract_status:complete`/`machine_id`；順帶修正全 10 列的行號誤差（舊值全部少 3，如 Devil's Advocate 從 640 訂正為 643——與 Atlas 原文檔實際行號核對後修正）。
+- `contract-backlog.yaml`：新增 157–163 號 tier_1 entry（7 個新方法）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_devils_advocate.py tests/unit/test_pre_mortem.py tests/unit/test_counterexample_search.py tests/unit/test_disconfirming_evidence.py tests/unit/test_fmea.py tests/unit/test_hazop.py tests/unit/test_stress_testing.py -q` | exit=0 | result=425 passed, 51 subtests passed（每個 agent 各自也單獨跑過，數字一致，無交互污染）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_<name>_slice`（7 支全跑）| exit=0 全數 PASS，含每個方法的獨立-gate hand-tamper 攔截展示
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（該 1 Major 為 registry 流程缺口，已於本條目同時修復，非程式邏輯缺陷）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`challenge\.devils_advocate\|challenge\.pre_mortem\|challenge\.counterexample_search\|challenge\.disconfirming_evidence\|challenge\.fmea\|challenge\.hazop\|challenge\.stress_testing` | hits=229（全數為本批次自己的 5×7 新檔 + 兩份 registry + devops_sre.stress_test 的刻意互相標註，逐一核對無非預期命中）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無已知風險；F12 家族正式收官。Method Atlas 全 24 家族真實剩餘：F09／F10／F13／F14／F15／F22／F23／F24（8 個，無對應 ai_lego/modules/ 目錄，非本次順帶發現的「有資料夾但未登記」類型）。
+[rollback] `git revert` 本 commit；35 個新檔互相獨立，也可單獨刪除任一方法對應的 5 檔案 + 還原兩份 registry 對應列。
+
+## 2026-09-11（F07 registry SSOT 漂移修復：method-inventory.yaml／contract-backlog.yaml 漏跑，獨立於程式碼 commit `d3adeb65c` 之外）
+
+**觸發**：F07 收工後照慣例核對 SSOT，`git show d3adeb65c -- method-inventory.yaml contract-backlog.yaml` 回傳空 diff——兩份 registry 從未真正進過那個 commit，儘管 51 個程式碼／測試／contract／schema 檔全部正確落地。`git log d3adeb65c..HEAD` 確認之後也沒有任何 commit 補上，純粹遺漏，非事後被覆蓋。
+
+**根因**：`d3adeb65c` commit 當下，該 session 的並行自動同步機制（每 1-2 分鐘 stash→pull→merge）持續把未 commit 的 registry 編輯掃進 stash；`git checkout stash@{N} -- <path>` 的復原動作發生在 commit 之後，而非之前，導致復原內容留在工作目錄但沒被那次 commit 撿到。
+
+**已修改**：`method-inventory.yaml`（F07 全 10 列 has_contract/contract_status/machine_id）+ `contract-backlog.yaml`（147–156 號 entry）以獨立 commit `fd99a9dd7` 補上，與程式碼改動完全分離、不牽動其他並行 session 當時卡在同一份 WORKLOG.md/TASKS.md 裡的未 commit 內容。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git show d3adeb65c -- <2 files>` + `git log d3adeb65c..HEAD -- <2 files>` | exit=0 | result=兩者皆空，確認純遺漏
+- REVIEW_WAIVED: NA -- 純 registry 資料訂正，內容已於撰寫前逐欄核對真實模組檔案（machine_id 對照檔名、entry 內容對照 WORKLOG 既有 F07 條目）
+- BUGHUNT_WAIVED: NA -- 純既有資料回填，無新增可能跟其他檔案衝突的識別符
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無。[rollback] `git revert fd99a9dd7`。
+
 ## 2026-09-11 HCI30 版面第四次修正——真正根因：`<details>` 直接當 flex 子元素在部分瀏覽器算不對寬度
 
 前三輪反覆調整寬度數字/門檻，但操作者這輪截圖顯示：即使拿掉所有 px 數字後，「證據與主張」清單跟「新增調查發現」表單在操作者的瀏覽器裡仍然是上下疊放，而本 session 在 Chromium 環境裡三次直接量測（含這輪重現前）都得到並排的座標，兩邊結果矛盾。既然同一份 CSS 邏輯在不同瀏覽器給出不同結果，問題就不是邏輯本身，是瀏覽器相容性：`<details>` 元素直接當 flex 子元素在部分瀏覽器（已知含 Safari）有算不出正確寬度的相容性問題，這是 `<details>` 這個標籤本身的特殊渲染行為（原生可展開/收合），不是每個瀏覽器的 flex 實作都把它當一般 block 元素處理。
