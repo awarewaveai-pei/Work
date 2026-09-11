@@ -1,0 +1,156 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/focus-group-session.schema.yaml"
+title: Focus Group Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FocusGroupSession` -- the declared `outputs` of
+  `insight.focus_group`'s Method Contract (methods/contracts/insight.focus_group.contract.yaml,
+  `outputs: [FocusGroupSession]`). Atlas cites this method ONCE: the F06 tool table row (L469: "Focus
+  Group｜探索群體觀點與互動｜6–10 人→moderation→discussion→analysis｜看到社會互動｜不用來估人口比例") --
+  the thinnest possible citation class, no dedicated section, same class strategy.bcg_matrix's own
+  citation already establishes.
+
+  Field provenance:
+    * `participant_count` -- Atlas's own literal "6–10 人" method-defining count, a bool-excluded integer
+      in the CLOSED RANGE [6, 10].
+    * `topic`/`moderation_approach`/`discussion_summary`/`analysis` -- Atlas's own method column
+      ("moderation→discussion→analysis"), each a disclosed REPORTED-content string, never computed.
+    * `generalizability_scope` (top-level, required) -- Atlas's own F06 caution ("不用來估人口比例"), made
+      structural: a single-legal-value enum (`QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE`) this
+      schema and its runtime builder never let a caller override.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Focus Group row (L469)"
+  - "methods/contracts/insight.focus_group.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/scamper-session.schema.yaml -- single-legal-value structural-elimination-field precedent (this file scales that pattern to a flat, non-list record)"
+  - "specs/cognitive/typed-objects/random-stimulus-session.schema.yaml -- record-level-only provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas's own F06 L469 cited vocabulary plus low-risk, disclosed compilation
+  choices, including the single-legal-value `generalizability_scope` field and the closed-range
+  `participant_count` field.
+
+compilation_decisions:
+  - question: "Should participant_count be unbounded (bcg_matrix portfolio_items-style) or a closed integer range?"
+    decision: "Closed range [6, 10] inclusive -- Atlas's own F06 L469 citation gives this as the method's own literal defining identity ('6–10 人'), not an example value; a session outside this range has not run a Focus Group by Atlas's own definition. See insight.focus_group.contract.yaml's own compilation_decisions."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start. FocusGroupSession has no nested array-of-object field, unlike scamper-session.schema.yaml's entries[] or bcg-matrix-analysis.schema.yaml's portfolio_items[], so there is no second additionalProperties:false layer needed."
+  - question: "Should generalizability_scope be caller-supplied (a disclosed judgment call) or a single-legal-value enum?"
+    decision: "Single-legal-value enum (QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE), REQUIRED, structurally eliminated from ai_lego/modules/insight/focus_group.py's own builder parameters -- same class scamper-session.schema.yaml's own validation_status (UNVALIDATED_IDEATION) and random-stimulus-session.schema.yaml's own feasibility_status (NOT_YET_SCREENED) already establish. Atlas's own F06 caution ('不用來估人口比例') is unconditionally true of every record of this type."
+  - question: "Record-level provenance only, matching a batch-wide F06 decision, or per-item?"
+    decision: "Record-level ONLY, one top-level provenance field -- fixed batch-wide decision for this entire F06 batch (see insight.focus_group.contract.yaml's own compilation_decisions). There is also no list-of-items field in this type to attach per-item provenance to."
+
+type: object
+required: [id, version, topic, participant_count, moderation_approach, discussion_summary, analysis, generalizability_scope, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^FOCUSGROUP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as scamper-session.schema.yaml's SCAMPER- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.focus_group"
+
+  topic:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The subject the focus group discussed -- REPORTED content, not computed."
+
+  participant_count:
+    type: integer
+    minimum: 6
+    maximum: 10
+    description: >
+      REQUIRED. Atlas's own F06 L469 literal method-defining count ("6–10 人"), a CLOSED RANGE, not an
+      example value. Enforced by ai_lego/modules/insight/focus_group.py at both the builder and an
+      independent gate, with an explicit bool-exclusion guard (bool is a subclass of int in Python) even
+      though True(1)/False(0) already fall outside [6,10] by construction -- see the method contract's own
+      compilation_decisions for the full disclosure. JSON Schema's own `type: integer` already rejects a
+      JSON boolean literal (a distinct token from a JSON number), so this schema-level check and the
+      Python-level guard are independent, not redundant.
+
+  moderation_approach:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "How the discussion was facilitated (e.g. structured guide, semi-structured probing) -- REPORTED content, not computed."
+
+  discussion_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What the group actually said/did during the discussion -- REPORTED content, not computed."
+
+  analysis:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The disclosed interpretation of the discussion -- REPORTED content, not computed."
+
+  generalizability_scope:
+    type: string
+    enum: [QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE]
+    default: QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE
+    description: >
+      REQUIRED, single-legal-value enum. Atlas's own F06 caution ("不用來估人口比例") is a categorical,
+      always-true statement about ANY FocusGroupSession record -- this schema structurally enforces that:
+      the enum's single legal value affirms the qualitative-exploration-only status, making it impossible
+      to construct a record claiming this type IS a population-representative estimate.
+      ai_lego/modules/insight/focus_group.py's own builder does not expose this as a caller-settable
+      parameter at all (structural elimination, same class scamper-session.schema.yaml's own
+      `validation_status` already establishes).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Focus Group session exploring reactions to a redesigned onboarding flow"
+    value:
+      id: "FOCUSGROUP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.focus_group"
+      topic: "新版 onboarding 流程的第一印象與情緒反應"
+      participant_count: 8
+      moderation_approach: "半結構式引導，主持人準備 6 道開放式問題，允許參與者互相回應與延伸討論"
+      discussion_summary: "多數參與者認為步驟數變少是正面改變，但有 3 人提到跳過教學後找不到回頭重看的入口；討論中出現自發性的互相補充，有人提到自己團隊的類似痛點"
+      analysis: "步驟精簡本身被普遍接受，但『教學可回頭查看』是目前设计缺口，建議下一輪迭代優先處理"
+      generalizability_scope: QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-FOCUSGROUPSESSION-1"
+    question: "No structured per-participant field exists (role/demographic/etc) -- Atlas's own citation describes group composition only by count, not by role; should a future pass add one? (owner: operator, see insight.focus_group.contract.yaml's own OQ-FOCUSGROUP-3)."
+  - id: "OQ-FOCUSGROUPSESSION-2"
+    question: "participant_count's closed range [6,10] is Atlas's own literal citation; some external focus-group methodology sources describe wider ranges. Left at Atlas's own exact cited numbers rather than broadening from outside literature (owner: operator, see insight.focus_group.contract.yaml's own OQ-FOCUSGROUP-2)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L469) directly. Grepped the whole Atlas file case-insensitively for
+    "focus group"/"focus_group" -- confirmed exactly 1 real hit, no dedicated section. Cross-checked against
+    methods/contracts/insight.focus_group.contract.yaml's own outputs/preconditions/quality. Read
+    scamper-session.schema.yaml (single-legal-value structural-elimination-field precedent) and
+    random-stimulus-session.schema.yaml (record-level-only provenance, thin-citation precedent) in full as
+    shape precedent before writing this file. Validated against jsonschema Draft202012Validator via a
+    standalone script (required fields present, id pattern satisfied, participant_count integer-range and
+    bool-rejection behavior, generalizability_scope enum closed, additionalProperties:false present at the
+    top level, embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative
+    controls for a smuggled top-level key, participant_count of 5/11/true, an empty topic/moderation_approach/
+    discussion_summary/analysis string, and a caller attempting to set generalizability_scope to a different
+    value).
+  note: >
+    `participant_count`'s [6,10] range and `generalizability_scope`'s single legal value are transcribed/
+    derived directly from Atlas F06 L469. The topic/moderation_approach/discussion_summary/analysis field
+    split, the flat (non-list) record shape, and the record-level-only provenance decision (batch-wide, see
+    the method contract's own compilation_decisions) are compilation decisions, disclosed above. No mother
+    document was modified to produce this file.

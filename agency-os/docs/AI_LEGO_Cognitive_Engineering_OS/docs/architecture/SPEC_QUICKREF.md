@@ -66,6 +66,7 @@
 | `specs/cognitive/typed-objects/chaos-experiment.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, steady_state_hypothesis, blast_radius, injected_failure, recovered_as_hypothesized, status, provenance] properties[10] |
 | `specs/cognitive/typed-objects/classic-brainstorming-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, ideas, evaluations, provenance] properties[6] |
 | `specs/cognitive/typed-objects/concept-map-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, context, nodes, edges, orphan_node_ids, provenance] properties[8] |
+| `specs/cognitive/typed-objects/contextual-inquiry-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, environment_context, observations, provenance] properties[6] |
 | `specs/cognitive/typed-objects/counterfactual-reasoning-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, intervention, actual_outcome, counterfactual_outcome, assumptions, provenance] properties[8] |
 | `specs/cognitive/typed-objects/crazy-eights-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, concepts] properties[5] |
 | `specs/cognitive/typed-objects/data-contract-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, dataset_or_topic, producer, consumers, fields, semantics, quality_notes, compatibility_policy, provenance] properties[15] |
@@ -76,6 +77,7 @@
 | `specs/cognitive/typed-objects/dependency-map.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_mapping, nodes, edges, provenance] properties[7] |
 | `specs/cognitive/typed-objects/difference-in-differences-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, treated_group, control_group, pre_period, post_period, parallel_trends_justification, analysis_summary, provenance] properties[10] |
 | `specs/cognitive/typed-objects/dpia-pia-impact-assessment-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, stages, provenance] properties[6] |
+| `specs/cognitive/typed-objects/empathy-map.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, entries, provenance] properties[6] |
 | `specs/cognitive/typed-objects/erd-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_database, entities, relationships, constraints, provenance] properties[9] |
 | `specs/cognitive/typed-objects/error-budget-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, slo_target_ratio, observed_failure_rate, error_budget_ratio, burn_rate, budget_exhausted, release_policy, engine, computation_provenance_ref, provenance] properties[14] |
 | `specs/cognitive/typed-objects/event-storming-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, domain_process_description, elements, relationships, provenance] properties[7] |
@@ -86,6 +88,7 @@
 | `specs/cognitive/typed-objects/fault-tree-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_analysis, top_event, basic_events, gates, provenance] properties[8] |
 | `specs/cognitive/typed-objects/fitness-function-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, architecture_under_governance, functions, provenance] properties[6] |
 | `specs/cognitive/typed-objects/five-whys-validation.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance] properties[9] |
+| `specs/cognitive/typed-objects/focus-group-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, topic, participant_count, moderation_approach, discussion_summary, analysis, generalizability_scope, provenance] properties[10] |
 | `specs/cognitive/typed-objects/forced-connections-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, concept_a_name, concept_a_features, concept_b_name, concept_b_features, combinations, provenance] properties[9] |
 | `specs/cognitive/typed-objects/frame-storming-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, phenomenon, candidate_framings, selected_frame_ref, provenance] properties[8] |
 | `specs/cognitive/typed-objects/functional-decomposition.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, top_function, interfaces, provenance] properties[6] |
@@ -97,7 +100,10 @@
 | `specs/cognitive/typed-objects/impact-effort-classification.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, impact_scale, effort_scale, impact_threshold, effort_threshold, ideas, engine, computation_provenance_ref, provenance] properties[12] |
 | `specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, proposal_ref, positions_considered, criteria_used, judgment, provenance] properties[11] |
 | `specs/cognitive/typed-objects/instrumental-variables-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, instrument, endogenous_variable, relevance_justification, exclusion_justification, analysis_summary, provenance] properties[9] |
+| `specs/cognitive/typed-objects/interview-study.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, research_question, sampling_approach, documented_biases, guide, consent_process, interview_notes, transcript_ref, codes, themes, negative_cases] properties[14] |
 | `specs/cognitive/typed-objects/issue-tree.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, root, provenance] properties[5] |
+| `specs/cognitive/typed-objects/journey-map.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, journey_subject, stages, provenance] properties[6] |
+| `specs/cognitive/typed-objects/jtbd-statement.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, situation, motivation, desired_outcome, workaround, local_evidence] properties[9] |
 | `specs/cognitive/typed-objects/kano-classification-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, features, engine, computation_provenance_ref, provenance] properties[8] |
 | `specs/cognitive/typed-objects/kepner-tregoe-problem-specification.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement_ref, dimensions, provenance] properties[8] |
 | `specs/cognitive/typed-objects/kill-criteria-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, decision_ref, thresholds, provenance] properties[6] |
@@ -122,6 +128,7 @@
 | `specs/cognitive/typed-objects/pareto-frontier-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, objectives, options, option_values, frontier_classification, engine, computation_provenance_ref, provenance] properties[11] |
 | `specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, assets, trust_boundaries, entry_points, stages, provenance] properties[9] |
 | `specs/cognitive/typed-objects/pdca-cycle-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, process_under_improvement, cycles, provenance] properties[6] |
+| `specs/cognitive/typed-objects/persona-profile.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, persona_name, goals, behaviors, context, research_basis, provenance] properties[9] |
 | `specs/cognitive/typed-objects/pestel-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, factors] properties[4] |
 | `specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, forces, overall_attractiveness, provenance] properties[6] |
 | `specs/cognitive/typed-objects/post-mortem-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, incident_name, timeline, impact_description, causes, actions, provenance] properties[9] |
@@ -146,6 +153,7 @@
 | `specs/cognitive/typed-objects/schema-compatibility-analysis-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, changes, change_classifications, overall_verdict, provenance] properties[9] |
 | `specs/cognitive/typed-objects/secrets-threat-review-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, stages, provenance] properties[6] |
 | `specs/cognitive/typed-objects/security-control-mapping-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, source_record_id, source_record_type, source_threat_count, controls, control_mappings, source_threats_with_no_control_mapping, provenance] properties[11] |
+| `specs/cognitive/typed-objects/service-blueprint.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, service_name, layers] properties[6] |
 | `specs/cognitive/typed-objects/six-three-five-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, participant_ids, sheets, provenance] properties[6] |
 | `specs/cognitive/typed-objects/sli-slo-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, indicators, provenance] properties[6] |
 | `specs/cognitive/typed-objects/smart-goal-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, goal_statement, criteria, provenance] properties[7] |
@@ -158,6 +166,7 @@
 | `specs/cognitive/typed-objects/stride-threat-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, assets, trust_boundaries, entry_points, data_flow_elements, threats, elements_with_no_recorded_threats, provenance] properties[11] |
 | `specs/cognitive/typed-objects/success-criteria-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, decision_ref, must, should, guardrail, stop, provenance] properties[10] |
 | `specs/cognitive/typed-objects/supply-chain-threat-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, stages, provenance] properties[6] |
+| `specs/cognitive/typed-objects/survey-study.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, construct_definition, question_design, pilot_summary, sampling_plan, analysis_plan, quality_dimensions, is_translated] properties[13] allOf[2] |
 | `specs/cognitive/typed-objects/swot-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_set_ref, factors] properties[5] |
 | `specs/cognitive/typed-objects/synectics-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, original_problem, analogies, provenance] properties[6] |
 | `specs/cognitive/typed-objects/synthetic-control-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, treated_unit, donor_pool, fit_quality, weights, post_treatment_gap, placebo_tests, provenance] properties[10] |

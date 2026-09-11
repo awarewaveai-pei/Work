@@ -1,0 +1,144 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/service-blueprint.schema.yaml"
+title: Service Blueprint
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ServiceBlueprint` -- the declared `outputs` of
+  `insight.service_blueprint`'s Method Contract (methods/contracts/insight.service_blueprint.contract.yaml,
+  `outputs: [ServiceBlueprint]`). Atlas cites this method TWICE: the F06 tool table row (L465: "前台＋後台
+  流程｜customer→frontstage→backstage→support/system｜避免只改 UI｜適合服務系統") and a dedicated §12.16
+  section (L2738-2756) giving a literal 5-layer vertical structure (Customer Actions/Frontstage/Backstage/
+  Support Processes/Systems-Data), splitting the table row's own merged "support/system" stage into 2
+  distinct layers.
+
+  Field provenance:
+    * `layers[].layer_type` (§12.16 L2743-2751 verbatim 5-line vertical list, SCREAMING_SNAKE_CASE) -- a
+      CLOSED set of exactly 5 names; genuine completeness (all 5 present at LEAST once, order-independent,
+      duplicates allowed) is a runtime-only invariant (see compilation_decisions and
+      `ai_lego/modules/insight/service_blueprint.py` module docstring).
+    * `layers[].description` -- the actual blueprinted content for that layer; a layer_type named but
+      never described has not actually blueprinted that layer's process.
+    * `service_name` (top-level, required) -- §12.16's own definition blueprints a specific service system
+      ("適合服務系統"), not a generic/unnamed process.
+    * `provenance` (top-level, required, RECORD-LEVEL ONLY) -- this F06 batch's own fixed placement
+      decision (see compilation_decisions); `layers[]` entries carry no per-item provenance field.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Service Blueprint row (L465)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.16 服務藍圖 (L2738-2756) -- the 5-layer vertical structure"
+  - "methods/contracts/insight.service_blueprint.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- closed-set-with-required-completeness precedent (see compilation_decisions for why this shape is looser: coverage, not exact cardinality)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of §12.16's cited 5-layer list plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Exactly-once-each closed array (porter-five-forces-analysis-style, minItems==maxItems==5) or open-ended array requiring only coverage?"
+    decision: "Open-ended array, minItems:5 (the minimum possible count that can cover all 5 distinct types) with NO maxItems -- a real service blueprint can have multiple frontstage touchpoints or multiple backstage steps; genuine set-coverage (all 5 distinct layer_type values present at least once) is a runtime-only invariant this schema cannot express alone, enforced by ai_lego/modules/insight/service_blueprint.py at both the builder and an independent gate."
+  - question: "Per-layer provenance (porter-five-forces-analysis-style) or record-level only?"
+    decision: "Record-level only -- fixed batch-wide decision for this whole F06 batch (avoids the per-item/record-level provenance-placement ambiguity that hit both the F02 and F03 batches). `layers[]` items carry no `provenance` property at all."
+  - question: "additionalProperties: false at the top level, and on each layers[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on (set correctly from the start, not retrofitted)."
+  - question: "Does JSON Schema itself express 'all 5 layer types present at least once'?"
+    decision: "No -- plain JSON Schema has no cross-item set-coverage operator. minItems:5 plus the per-item enum bounds the SHAPE; genuine coverage (the set of layers[].layer_type values equals the full 5-name set, duplicates permitted) is a runtime-only invariant, enforced at construction AND independently re-derived by a gate in service_blueprint.py -- same limitation-and-workaround class porter-five-forces-analysis.schema.yaml's own identical note already documents for a stricter (exactly-once) shape."
+
+type: object
+required: [id, version, provenance, service_name, layers]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SVCBLUEPRINT-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as porter-five-forces-analysis.schema.yaml's PFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.service_blueprint"
+
+  provenance:
+    description: "RECORD-LEVEL ONLY provenance -- this F06 batch's own fixed placement decision (see compilation_decisions). Full provenance_record, same pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  service_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED. §12.16's own definition blueprints a specific, named service system ("適合服務系統"), not
+      a generic/unnamed process.
+
+  layers:
+    type: array
+    minItems: 5
+    description: >
+      §12.16 L2743-2751's own 5-layer vertical structure. SHAPE-bounded here to at least 5 items (the
+      minimum count that could possibly cover all 5 distinct types); genuine coverage (all 5 distinct
+      layer_type values present at least once, order-independent, duplicates permitted) is a runtime-only
+      invariant this schema cannot express (see compilation_decisions) -- enforced by
+      ai_lego/modules/insight/service_blueprint.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [layer_type, description]
+      additionalProperties: false
+      properties:
+        layer_type:
+          type: string
+          enum: [CUSTOMER_ACTIONS, FRONTSTAGE, BACKSTAGE, SUPPORT_PROCESSES, SYSTEMS_DATA]
+          description: "§12.16 L2743-2751's own literal 5-line vertical list (Customer Actions / Frontstage / Backstage / Support Processes / Systems-Data), SCREAMING_SNAKE_CASE."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual blueprinted content for this layer, in natural language -- what actually happens at this layer for this service."
+
+examples:
+  - description: "A completed Service Blueprint for a local coffee shop's mobile pre-order-and-pickup service"
+    value:
+      id: "SVCBLUEPRINT-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.service_blueprint"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+      service_name: "行動預訂＋店取咖啡服務"
+      layers:
+        - layer_type: CUSTOMER_ACTIONS
+          description: "顧客開 App 選品項＋付款，抵店後掃碼取件"
+        - layer_type: FRONTSTAGE
+          description: "店員看到訂單通知，於取貨櫃檯核對取件碼並遞交飲品"
+        - layer_type: BACKSTAGE
+          description: "吧檯人員依訂單序號現場製作飲品，放入指定取貨櫃"
+        - layer_type: SUPPORT_PROCESSES
+          description: "庫存系統即時扣減原料庫存，觸發低庫存自動叫貨流程"
+        - layer_type: SYSTEMS_DATA
+          description: "POS／App 後端訂單資料庫記錄訂單狀態，供退款與客服查詢"
+
+open_questions:
+  - id: "OQ-SERVICEBLUEPRINT-1"
+    question: "layers[].layer_type set-coverage (all 5 present at least once) is a runtime-only invariant (see compilation_decisions) -- should a future pass add a JSON Schema `if`/`then` per-value-count constraint instead of relying solely on the runtime gate? Same open question porter-five-forces-analysis.schema.yaml's own OQ-PORTERFIVEFORCESANALYSIS-2 already discloses for a stricter (exactly-once) shape. (owner: operator)"
+  - id: "OQ-SERVICEBLUEPRINT-2"
+    question: "No layer id/uniqueness constraint exists across layers[] entries -- should a future pass add one if a downstream consumer ever needs to reference a specific layer entry? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L465) and §12.16 (L2738-2756) directly. Cross-checked against
+    methods/contracts/insight.service_blueprint.contract.yaml's own outputs/preconditions/quality. Read
+    porter-five-forces-analysis.schema.yaml (closed-set-with-required-completeness precedent) and
+    bcg-matrix-analysis.schema.yaml (open-ended-list, no-top-level-synthesis-field precedent) in full as
+    shape precedent before writing this file. Validated against jsonschema Draft202012Validator via
+    `python -m unittest tests.unit.test_service_blueprint` (required fields present, id pattern satisfied,
+    layer_type enum closed per §12.16's own 5-way list, additionalProperties:false present at both the top
+    level and the layers[] item level from the start, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled layers[] key,
+    and a layers[] set missing one of the 5 required types).
+  note: >
+    No mother document was modified. `layer_type`'s five enum values are transcribed directly from §12.16.
+    The `description` field, the flat-record-plus-array shape, the set-coverage-without-cardinality runtime
+    invariant, and the record-level-only provenance placement (this F06 batch's own fixed decision) are
+    compilation decisions, disclosed above.

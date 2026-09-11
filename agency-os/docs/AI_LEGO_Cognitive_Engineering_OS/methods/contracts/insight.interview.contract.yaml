@@ -1,0 +1,122 @@
+$id: "ai-lego://methods/contracts/insight.interview.contract.yaml"
+title: "Interview Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 human/customer insight family, 7th of 9 members (new family this batch opens in parallel --
+  jtbd/persona/empathy_map/journey_map/service_blueprint/contextual_inquiry/interview/survey/focus_group).
+  Atlas cites this method TWICE: F06 table row L467 ("Interview｜深度質性資料｜招募→題綱→訪談→coding→themes→
+  countercases｜得到 why/how｜樣本與偏誤要記錄") and a dedicated §12.17 (L2759-2764), which gives a RICHER, more
+  precise 9-stage chain: "Research question→Sampling→Guide→Consent→Interview→Transcribe→Code→Themes→Negative
+  cases" (limitation: "不能用少量訪談直接推估人口比例"). Per this task's own design mandate, §12.17's own richer
+  pipeline is the real design, superseding the table row's own shorter 6-stage compression (same method, two
+  citations of differing granularity, not two methods). Core invariant: all 9 of §12.17's own named stages
+  present and non-empty (`codes`/`themes` as non-empty lists, the rest as non-empty strings); `documented_biases`
+  is a SEPARATE, ADDITIONAL required field mechanizing the table row's own explicit caution ("樣本與偏誤要記錄",
+  L467 -- grep-confirmed exactly ONE real hit for this phrase, not repeated in §12.17 itself). See
+  `ai_lego/modules/insight/interview.py` module docstring for the full field-by-field grounding.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Interview row (L467)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.17 深度訪談／訪談法 dedicated section (L2759-2764)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.interview` mints a NEW machine_id in the `family: insight` this
+  batch's `insight.jtbd` contract already opened (F06's own method-inventory.yaml category label is
+  "human_insight", a disclosed naming divergence -- see open_questions). 9-named-field flat pipeline shape
+  (not a stage-array the way `security.pasta` models its own 7-word chain), `documented_biases` as a field
+  separate from the 9 pipeline stages, and record-level-only provenance are this file's own compilation
+  decisions -- see `compilation_decisions`.
+
+id: insight.interview
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [DECOMPOSE, GROUP, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = the 9-stage
+# breakdown itself; GROUP = the Code/Themes stages turning raw interview_notes into codes[]/themes[] (the same
+# primitive Atlas's own fishbone worked example already uses for a similar clustering step); VALIDATE = the
+# Negative cases stage plus documented_biases -- actively checking the study against disconfirming evidence and
+# its own sample/bias limits, the same primitive causal.process_tracing's own countercase discipline suggests.
+
+purpose:
+  - obtain_why_how_qualitative_data_via_a_disciplined_nine_stage_interview_pipeline_with_documented_sample_and_bias
+# Atlas §12.17 verbatim sense: 用途「取得 why/how 的質性資料」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position insight.jtbd's own
+  # inputs.required: [] already takes for this same batch; §12.17's own citation names no required input type.
+
+outputs:
+  - InterviewStudy
+# NEW output type (see typed-objects/interview-study.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "id is a non-empty string beginning with 'INTERVIEW-'"
+  - "all 9 of §12.17's own pipeline stages, in its own literal order, are present with non-empty content: research_question, sampling_approach, guide, consent_process, interview_notes, transcript_ref, negative_cases (each a non-empty string), codes and themes (each a non-empty list of non-empty strings) -- a study missing any one has not actually completed §12.17's own literal pipeline"
+  - "documented_biases is a SEPARATE, ADDITIONAL required non-empty string -- NOT one of the 9 pipeline stages above, mechanizing the F06 table row's own explicit caution (L467: '樣本與偏誤要記錄') as a structural requirement rather than a soft warning a caller could silently skip"
+  - "provenance is a schema-valid provenance_record (record-level only -- no per-item provenance on codes[]/themes[]; see compilation_decisions)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same reasoning insight.jtbd's own identical flag already establishes: this method takes no
+  # EvidenceSet input (inputs.required: []), so the flag's own schema-defined scope has nothing to check. The
+  # table row's real caution ("樣本與偏誤要記錄") is enforced instead via `documented_biases` being a REQUIRED,
+  # non-empty structural field (see preconditions), not a conditional per-claim label.
+
+forbidden_transition: []
+# §12.17's own limitation ("不能用少量訪談直接推估人口比例") names no counterpart typed object (no
+# PopulationProportionEstimate/PrevalenceEstimate exists in this corpus -- Survey, F06's own sibling method, is
+# a separate concurrent agent's own unbuilt-at-write-time member) to name in a "<TypedObject> -> <TypedObject>"
+# forbidden_transition string. Enforced structurally instead: InterviewStudy carries no population-proportion or
+# prevalence field of any kind for a downstream consumer to misuse. See open_questions.
+
+recommended_next: []
+# Atlas names Interview's own successor differently across 3 separate citations (§13.5 New Product/Startup
+# Recipe L3336-3337: Journey Map; §11.57 Expert LEGO Mode L2519-2526: Assumption Mapping; Mode D L4433-4439:
+# SCAMPER) -- none of the three has a settled machine_id at write time (Journey Map is a concurrent sibling
+# agent's own in-flight F06 member this session does not import from; Assumption Mapping/SCAMPER live in other
+# unbuilt families). Left empty rather than arbitrarily picking one citation over the other two. See
+# open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "9-stage array (security.pasta's own stages[] shape) or 9 separate named fields?"
+    decision: "9 separate named fields (research_question/sampling_approach/guide/consent_process/interview_notes/transcript_ref/codes/themes/negative_cases) -- §12.17 names 9 DIFFERENTLY-TYPED kinds of content per stage (a research question, a sampling approach, a guide, two list fields, ...), not a uniform stage_id/summary shape the way PASTA's own formula does, so named fields transcribe it more faithfully than a stage array would."
+  - question: "Should codes/themes be closed vocabularies or open-ended lists?"
+    decision: "Open-ended non-empty lists (same shape causal.process_tracing's own non-empty evidence[] already establishes) -- §12.17 gives no fixed taxonomy; coding/theming output is inherently open-ended per study."
+  - question: "Provenance placement: one record-level field, or per-item (codes[]/themes[] entries)?"
+    decision: "Record-level ONLY, one top-level `provenance` field -- a deliberate BATCH-WIDE decision for this whole F06 build (matching insight.jtbd's own identical placement), made specifically to avoid the per-item/record-level ambiguity that hit both the prior F02 and F03 batches."
+  - question: "Table row's own shorter 6-stage chain vs §12.17's own richer 9-stage chain -- which is the real design?"
+    decision: "§12.17's own 9-stage chain, task-mandated as richer and more precise, explicitly superseding the table row's own shorter compression (same method, two citations of differing granularity, not two different methods)."
+
+open_questions:
+  - "OQ-INTERVIEW-1: method-inventory.yaml's own F06 category label is 'human_insight', not 'insight' -- a disclosed naming divergence this contract's `family: insight` does not reconcile (owner: operator, or whoever next revises method-inventory.yaml; not touched here per this task's own scope)."
+  - "OQ-INTERVIEW-2: recommended_next left empty despite 3 real Atlas citations (Journey Map / Assumption Mapping / SCAMPER) each naming Interview's successor differently -- once any of the three has a settled machine_id, a future revision could fill this in (owner: operator)."
+  - "OQ-INTERVIEW-3: §12.17's own '不能用少量訪談直接推估人口比例' limitation is enforced only by the ABSENCE of a population-estimate field, not a positive forbidden_transition citation -- should a future PrevalenceEstimate/insight.survey typed object add an explicit forbidden_transition once it exists? (owner: operator, or whoever builds insight.survey)"
+  - "OQ-INTERVIEW-4: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L467) and §12.17 (L2759-2764) directly. Grepped the whole Atlas file
+    case-insensitively for "深度訪談" -- confirmed exactly 1 dedicated section. Grepped for "樣本與偏誤" --
+    confirmed exactly 1 real hit (L467 table row only; §12.17 itself does NOT repeat this exact phrase, its own
+    limitation is the separate "不能用少量訪談直接推估人口比例" sentence -- corrects an initial task-framing
+    assumption that the caution was "twice-repeated"; disclosed here per R4 claim-before-verify). Grepped the
+    whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os`
+    trees case-insensitively for "insight.interview"/"InterviewStudy" before writing any of this method's own
+    files -- zero pre-existing implementation. Read security.pasta.contract.yaml (fixed-length ordered-pipeline
+    precedent) and insight.jtbd.contract.yaml (this same batch's own lean format and record-level-provenance
+    precedent) in full before writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. §12.17's own 9-stage chain is directly transcribed as 9 named fields, in
+    its own literal order. `documented_biases` mechanizes the table row's own single explicit caution (L467) as
+    a compilation decision, disclosed above, not presented as a literal Atlas field name.

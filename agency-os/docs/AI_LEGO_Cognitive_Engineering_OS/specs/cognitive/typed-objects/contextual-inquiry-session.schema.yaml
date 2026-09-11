@@ -1,0 +1,162 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/contextual-inquiry-session.schema.yaml"
+title: Contextual Inquiry Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ContextualInquirySession` -- the declared `outputs` of
+  `insight.contextual_inquiry`'s Method Contract (methods/contracts/insight.contextual_inquiry.contract.yaml,
+  `outputs: [ContextualInquirySession]`). Atlas cites this method ONCE: F06 tool table row (L466: "Contextual
+  Inquiry｜在真實環境觀察｜使用者做→研究者看→即時追問｜發現隱性需求｜B2B 特別有效") -- the thinnest possible
+  citation class, no dedicated section, same class strategy.bcg_matrix's own citation already establishes.
+
+  Field provenance:
+    * `environment_context` -- Atlas's own "在真實環境觀察" framing: the real environment the session
+      observed, DISCLOSED free text (never computed).
+    * `observations` -- Atlas's own "使用者做→研究者看→即時追問" cycle, an open-ended, non-empty list of
+      individual do-watch-ask moments (NOT a fixed closed set).
+    * `observations[].action_observed`/`researcher_note`/`followup_question` -- the method's own literal
+      3-arrow cycle, one field per arrow. GENUINE_COMPUTE cross-check: every entry must carry ALL THREE
+      non-empty (re-derived by an independent gate, never trusted) -- see
+      `ai_lego/modules/insight/contextual_inquiry.py` module docstring for the full invariant rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Contextual Inquiry row (L466)"
+  - "methods/contracts/insight.contextual_inquiry.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/after-action-review-record.schema.yaml -- record-level-only provenance, structured-list-of-multi-field-entries precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/jtbd-statement.schema.yaml -- same F06 family, record-level-only provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L466's own bare method description plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Per-item provenance on observations[] entries, matching bcg-matrix-analysis.schema.yaml's portfolio_items[].provenance, or record-level only?"
+    decision: "Record-level ONLY -- a deliberate F06-BATCH-WIDE decision (matching jtbd-statement.schema.yaml's own identical placement), made to avoid the per-item/record-level provenance ambiguity that hit both the F02 and F03 batches. A contextual inquiry session is one coherent research artifact about one environment, not a list of independently-sourced claims."
+  - question: "Should observations[] entries carry their own id, matching problem-tree.schema.yaml's causes[]/effects[].id?"
+    decision: "No -- task-mandated exact shape {action_observed, researcher_note, followup_question} only; no cross-reference or uniqueness need exists for this method's own citation (unlike problem_tree's disjointness invariant, which its '分離症狀與原因' benefit directly requires)."
+  - question: "Fixed-count closed array or open-ended non-empty array for observations?"
+    decision: "Open-ended, minItems:1 only -- same shape bcg-matrix-analysis.schema.yaml's own non-empty `portfolio_items[]` already establishes; a real observation session can run for any number of do-watch-ask cycles, not a fixed structural split."
+  - question: "additionalProperties: false at the top level, and on the observations[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start (task-mandated)."
+
+type: object
+required: [id, version, environment_context, observations, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CTXINQUIRY-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling typed-object schema in this directory (BCG-/AAR-/PROBLEMTREE- etc.)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.contextual_inquiry"
+
+  environment_context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas's own "在真實環境觀察" framing -- the real environment this session observed (e.g. a specific
+      customer's workplace, a specific workflow, a specific shift). REPORTED content, not computed. Required
+      and non-empty: the method's whole point (unlike a lab interview) is context-dependence, so the context
+      itself must be disclosed, never omitted.
+
+  observations:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "使用者做→研究者看→即時追問" cycle, one entry per do-watch-ask moment. Open-ended (no
+      maxItems) -- genuine non-emptiness is the only count invariant this schema expresses; enforced by
+      ai_lego/modules/insight/contextual_inquiry.py at both the builder and an independent gate (same
+      non-empty-list precedent bcg-matrix-analysis.schema.yaml's own `portfolio_items[]` already
+      establishes).
+    items:
+      type: object
+      required: [action_observed, researcher_note, followup_question]
+      additionalProperties: false
+      properties:
+        action_observed:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Arrow 1 of the method's own cycle ('使用者做') -- what the user was observed doing, REPORTED content, not computed."
+        researcher_note:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Arrow 2 of the method's own cycle ('研究者看') -- the researcher's own observation/interpretation of that action."
+        followup_question:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Arrow 3 of the method's own cycle ('即時追問') -- the immediate follow-up question the researcher asked in response."
+      description: >
+        REAL INVARIANT: all three fields are REQUIRED and non-empty per entry, GENUINE_COMPUTE-checked
+        (re-derived from the record's own raw fields, never trusted) by both the builder and an independent
+        gate -- an entry missing any one of the three has not actually completed the method's own literal
+        3-arrow cycle for that moment, it is a bare note, not a contextual-inquiry observation. See the
+        method contract's own preconditions.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. Record-level ONLY (see compilation_decisions)."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A B2B contextual inquiry session observing a warehouse shift supervisor's real workflow (2 observations)"
+    value:
+      id: "CTXINQUIRY-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.contextual_inquiry"
+      environment_context: "夜班倉儲主管的實際盤點工作站，觀察時段為 23:00-01:00 出貨尖峰"
+      observations:
+        - action_observed: "主管在系統顯示庫存充足時，仍手動走到貨架上目視確認實際數量"
+          researcher_note: "系統資料與實際貨架狀態之間存在她不信任的落差，這個動作不在任何操作手冊裡"
+          followup_question: "你多常遇到系統顯示的數字跟貨架上看到的不一樣？"
+        - action_observed: "她用手機拍下差異貨架，傳到自己的私人 Line 群組而不是回報系統"
+          researcher_note: "正式回報流程顯然比這個非正式管道慢或麻煩，她選擇繞過它"
+          followup_question: "為什麼傳 Line 而不是直接在系統裡建立差異回報單？"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+  - description: "A minimal record: exactly 1 observation, no generated_by_method override."
+    value:
+      id: "CTXINQUIRY-2026-09-11-002"
+      version: "1.0.0"
+      environment_context: "客戶自家辦公室，觀察她使用報表工具的日常流程"
+      observations:
+        - action_observed: "她每次開啟報表前都先手動複製上週的檔案當備份"
+          researcher_note: "這個習慣暗示她不信任工具本身的版本紀錄功能"
+          followup_question: "工具內建的版本歷史功能，你有用過嗎？"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+
+open_questions:
+  - id: "OQ-CTXINQUIRYSESSION-1"
+    question: "No observations[] id/uniqueness constraint exists (see method contract's own compilation_decisions) -- should a future pass add one if a downstream consumer ever needs to reference a specific observation? (owner: operator)"
+  - id: "OQ-CTXINQUIRYSESSION-2"
+    question: "environment_context is a single free-text field -- should a future revision split it into structured sub-fields (location/time_window/participant_role), matching how after-action-review-record.schema.yaml's activity_ref stays free-text pending a real upstream record? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L466) directly. Grepped the whole Atlas file case-insensitively for
+    "contextual inquiry"/"contextual_inquiry" -- confirmed exactly 1 real hit, no dedicated section.
+    Cross-checked against methods/contracts/insight.contextual_inquiry.contract.yaml's own
+    outputs/preconditions/quality. Read after-action-review-record.schema.yaml (record-level-only
+    provenance, structured-list-of-multi-field-entries precedent) and bcg-matrix-analysis.schema.yaml
+    (non-empty-list, per-item multi-field precedent, read for contrast on provenance placement) in full as
+    shape precedent before writing this file. Validated against jsonschema Draft202012Validator via a
+    standalone script (required fields present, id pattern satisfied, additionalProperties:false present at
+    both the top level and the observations[] item level, embedded examples resolved through their real
+    $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled
+    observations[] item key, an empty observations array, and an observations[] entry missing one of the 3
+    required fields).
+  note: >
+    No mother document was modified to produce this file. The record-level-only provenance placement is an
+    explicit F06-batch-wide decision, not this schema's own independent judgment call -- disclosed as such
+    per this task's own instruction. The flat 2-field session shape, the no-id-on-observations choice, and
+    the open-ended non-empty list are compilation decisions, disclosed above.

@@ -1,0 +1,118 @@
+$id: "ai-lego://methods/contracts/insight.focus_group.contract.yaml"
+title: "Focus Group Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 human/customer-insight family, one of 9 members opened in this same batch (F06 entirely
+  unbuilt before this entry -- JTBD/Persona/Empathy Map/Journey Map/Service Blueprint/Contextual Inquiry/
+  Interview/Survey built by 8 sibling agents in parallel, neither read nor imported here). Atlas cites this
+  method ONCE: F06 table row (L469: "Focus Group｜探索群體觀點與互動｜6–10 人→moderation→discussion→analysis｜
+  看到社會互動｜不用來估人口比例") -- grep-confirmed the only hit, no dedicated section. Core invariants:
+  `participant_count` is a bool-excluded integer in the CLOSED RANGE [6, 10] (Atlas's own literal
+  method-defining count); `generalizability_scope` is a single-legal-value enum
+  (QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE), structurally eliminated from the builder's own
+  parameters, mechanizing Atlas's own "不用來估人口比例" caution. Provenance is RECORD-LEVEL ONLY, a
+  batch-wide decision fixed across all 9 F06 methods (see compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Focus Group row (L469)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.focus_group` mints a NEW machine_id AND a NEW family (`insight`
+  = F06, one of 9 members opened in this same batch). Direct transcription of Atlas's own F06 row
+  vocabulary; the single-legal-value structural-elimination pattern is reused from
+  `divergent.scamper`'s own `validation_status` / `divergent.random_stimulus`'s own `feasibility_status`,
+  generalized here to `generalizability_scope`. `participant_count`'s closed-range invariant reuses
+  `divergent.crazy_eights`/`divergent.lotus_blossom`'s own exact-8 fixed-count discipline, generalized from
+  an exact count to a closed range. Record-level-only provenance placement is a fixed batch-wide decision
+  for this entire F06 batch (see compilation_decisions), not a per-method judgment call.
+
+id: insight.focus_group
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [EXPAND, RELATE, INFER]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. EXPAND = eliciting a range
+# of group perspectives; RELATE = the social interaction between participants Atlas's own benefit names
+# ("看到社會互動"); INFER = the analysis stage drawing thematic conclusions from the discussion transcript.
+
+purpose:
+  - explore_group_perspectives_and_social_interaction_via_moderated_discussion
+# Atlas L469 verbatim sense: "探索群體觀點與互動" (explore group perspectives and interaction) / method
+# "6–10 人→moderation→discussion→analysis" / benefit "看到社會互動" (see social interaction).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L469 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix.contract.yaml's own inputs.required: []
+  # already takes.
+
+outputs:
+  - FocusGroupSession
+# NEW output type (see typed-objects/focus-group-session.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "participant_count is present, is an integer (bool explicitly excluded), and falls in the CLOSED RANGE [6, 10] inclusive -- Atlas's own F06 table row (L469) literal method-defining citation '6–10 人' IS the method's own identity, the same class of literal-number-is-the-method's-own-identity discipline divergent.crazy_eights's exactly-8 / divergent.lotus_blossom's exactly-8 already establish, here expressed as a range rather than an exact count"
+  - "topic, moderation_approach, discussion_summary, and analysis are each present and non-empty strings -- Atlas's own method column ('moderation→discussion→analysis') presumes each stage actually produced disclosed content, not a bare label"
+  - "generalizability_scope is present and equals the single legal enum value QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE -- Atlas's own F06 caution ('不用來估人口比例') is unconditionally true of every record this method produces, never caller-overridable"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.ansoff.contract.yaml/strategy.bcg_matrix.contract.yaml's
+  # identical flag already establishes: Atlas's L469 citation for this method is a single bare table row, no
+  # dedicated section, no explicit unevidenced-claim misuse warning cited beyond the population-estimate
+  # caution already mechanized via generalizability_scope. See open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice several sibling contracts' own field already takes.
+
+recommended_next: []
+# F06's own table (L459-469) carries only 5 columns (工具/用途/使用方式/效益/注意) -- unlike F08's table,
+# there is no "最佳搭配" (best-combo) column for ANY F06 method, grep-confirmed. Nothing to cite.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should participant_count be an open-ended integer (bcg_matrix-style unbounded portfolio) or a closed range [6,10] per Atlas's own literal citation?"
+    decision: "Closed range [6,10] inclusive, REQUIRED -- Atlas's own F06 table row (L469) gives the literal range '6–10 人' as this method's own defining identity (same class divergent.crazy_eights's exact-8 / divergent.lotus_blossom's exact-8 already establish, generalized here from an exact count to a closed range); a session outside this range is not a Focus Group by Atlas's own definition, distinct from e.g. strategy.bcg_matrix's genuinely unbounded portfolio_items."
+  - question: "Should the participant_count guard explicitly exclude bool, given bool is a subclass of int in Python (True == 1, False == 0)?"
+    decision: "Yes -- explicit isinstance(value, int) and not isinstance(value, bool) guard, for defense-in-depth and consistency with sibling modules (divergent.lotus_blossom's own critic-fixed _is_valid_branch_number, divergent.crazy_eights's own _is_valid_box_number), even though True(1)/False(0) both already fall outside [6,10] by construction -- this specific range check happens to be safe from the bool-masquerade bug class without the guard. Included anyway per this batch's task-mandated discipline, not because a live gap was found here."
+  - question: "Should generalizability_scope be a disclosed judgment call (like porter_five_forces's per-force intensity) or a structurally single-legal-value enum?"
+    decision: "Single-legal-value enum (QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE), structurally eliminated from the builder's own parameters -- same no-caller-settable-mismatch pattern divergent.scamper's own validation_status (UNVALIDATED_IDEATION) and divergent.random_stimulus's own feasibility_status (NOT_YET_SCREENED) already establish. Atlas's own F06 caution ('不用來估人口比例') is unconditionally true of every record this method produces, making this a good candidate for structural enforcement rather than disclosure-only. An independent gate re-derives/re-checks this field from the record's own raw data, catching a hand-tampered claim of a different scope value."
+  - question: "Record-level provenance only, or per-item?"
+    decision: "Record-level ONLY -- a fixed, deliberate batch-wide decision for this entire F06 batch, made to avoid the per-item/record-level ambiguity that arose independently across both the prior F02 and F03 batches (see WORKLOG 2026-09-11 '119-127'/'128-137' entries), disclosed here as a compilation decision applying uniformly across all 9 F06 methods, not a method-specific judgment call. FocusGroupSession also has no list-of-items field to attach per-item provenance to in the first place -- topic/participant_count/moderation_approach/discussion_summary/analysis are all single scalar fields describing one session as a whole, not a collection."
+  - question: "Should additionalProperties:false apply at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start. FocusGroupSession has no nested list-of-object fields (unlike scamper/bcg_matrix/lotus_blossom), so there is no second additionalProperties:false layer to decide on."
+
+open_questions:
+  - "OQ-FOCUSGROUP-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-FOCUSGROUP-2: participant_count's closed range [6,10] is Atlas's own literal citation; some external focus-group methodology sources describe ranges as narrow as 4 or as wide as 12. This file deliberately holds to Atlas's own exact cited numbers rather than broadening from outside literature (owner: operator, revisit only if a future Atlas revision changes L469's own cited range)."
+  - "OQ-FOCUSGROUP-3: no structured per-participant field exists (e.g. role/demographic, the way a future Persona-typed input might carry one) -- Atlas's own citation describes group composition only by count, not by role; should a future pass add one? (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L469) directly, plus the F06 heading (L457) and family overview row (L306)
+    for context. Grepped the whole Atlas file case-insensitively for "focus group"/"focus_group" -- exactly
+    1 real hit (L469), no dedicated section, no §4 composition formula, no §14.1 legal-chain mention, no
+    §22.3 gate-table row, no "最佳搭配" column anywhere in F06's own table. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "focus_group"/"FocusGroup" before writing any of this method's own files -- zero
+    pre-existing implementation. Read divergent.scamper.contract.yaml (single-legal-value structural-
+    elimination precedent) and strategy.bcg_matrix.contract.yaml (lean-doc-format, record-level provenance
+    precedent) in full before writing this contract, per task instruction. Also read
+    divergent.random_stimulus.py/divergent.lotus_blossom.py (bool-masquerade guard precedent) before writing
+    the sibling module file. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas's own "6–10 人" range and "不用來估人口比例" caution are
+    transcribed into `preconditions`/`quality`/`open_questions`. The closed-range shape (vs. an exact count
+    or an open-ended list), the bool-exclusion guard, the single-legal-value `generalizability_scope`
+    enforcement, and the record-level-only provenance placement (a batch-wide decision) are compilation
+    decisions, disclosed above, not presented as directly Atlas-cited beyond the "6–10 人"/"不用來估人口比例"
+    literal text itself.

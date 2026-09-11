@@ -1,0 +1,173 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/interview-study.schema.yaml"
+title: Interview Study
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `InterviewStudy` -- the declared `outputs` of
+  `insight.interview`'s Method Contract (methods/contracts/insight.interview.contract.yaml,
+  `outputs: [InterviewStudy]`). F06 human/customer-insight family, 7th of 9 members. Grounded in
+  Atlas's own §12.17 深度訪談／訪談法 (L2759-2764) -- the richer, more precise 9-stage pipeline this
+  contract uses as the real design over the F06 table row's own shorter 6-stage compression (L467).
+
+  Field provenance:
+    * The 9 stage fields (`research_question`/`sampling_approach`/`guide`/`consent_process`
+      /`interview_notes`/`transcript_ref`/`codes`/`themes`/`negative_cases`) -- §12.17's own literal
+      chain "Research question→Sampling→Guide→Consent→Interview→Transcribe→Code→Themes→Negative
+      cases", transcribed verbatim as 9 separate named fields (not a stage-array the way
+      `security.pasta`'s own `stages[]` models its own 7-word chain -- §12.17 names distinct KINDS
+      of content per stage, not a uniform stage_id/summary shape, so 9 differently-typed named
+      fields is the more faithful transcription here).
+    * `documented_biases` -- a SEPARATE, ADDITIONAL required field, NOT one of the 9 pipeline
+      stages. Mechanizes the F06 table row's own explicit caution (L467: "樣本與偏誤要記錄") as a
+      real, structurally-enforced requirement.
+    * `provenance` -- record-level ONLY (no per-item provenance on `codes[]`/`themes[]` entries) --
+      a deliberate F06-batch-wide decision, disclosed in the method contract's own
+      `compilation_decisions`, matching `insight.jtbd`'s own identical placement, made to avoid the
+      per-item/record-level provenance-placement ambiguity that hit both the prior F02 and F03
+      batches.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Interview row (L467): '招募→題綱→訪談→coding→themes→countercases', limitation '樣本與偏誤要記錄'"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.17 深度訪談／訪談法 (L2759-2764): 'Research question→Sampling→Guide→Consent→Interview→Transcribe→Code→Themes→Negative cases', limitation '不能用少量訪談直接推估人口比例'"
+  - "methods/contracts/insight.interview.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml -- fixed-length ordered-pipeline, record-level-provenance precedent (this file's primary structural template)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory
+  documents: a direct transcription of Atlas §12.17's own 9-stage chain plus low-risk, disclosed
+  compilation choices (see method contract's own compilation_decisions).
+
+type: object
+required: [id, version, provenance, research_question, sampling_approach, documented_biases, guide, consent_process, interview_notes, transcript_ref, codes, themes, negative_cases]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^INTERVIEW-"
+    description: "NEW DESIGN. Same id-prefix convention every sibling typed-object schema in this directory establishes."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.interview"
+
+  provenance:
+    description: >
+      RECORD-LEVEL ONLY (see description above) -- no per-item provenance on codes[]/themes[]
+      entries. epistemic_type is expected to be AI_INFERENCE or HUMAN_OPINION (an interview study
+      write-up is a structured analytical judgment, not a calculated/simulated result).
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  research_question:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 1, 'Research question' -- what this interview study set out to learn."
+
+  sampling_approach:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 2, 'Sampling' -- who was recruited and how, and on what basis."
+
+  documented_biases:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      SEPARATE, ADDITIONAL required field -- NOT one of the 9 pipeline stages. Mechanizes the F06
+      table row's own explicit caution (L467: '樣本與偏誤要記錄') as a real, structurally-enforced
+      requirement rather than a soft caution a caller could silently skip.
+
+  guide:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 3, 'Guide' -- the interview guide/question protocol actually used."
+
+  consent_process:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 4, 'Consent' -- how informed consent was obtained and recorded."
+
+  interview_notes:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 5, 'Interview' -- what was actually said/observed during the interview(s)."
+
+  transcript_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 6, 'Transcribe' -- a reference to the transcript record (not the full transcript text itself)."
+
+  codes:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1, pattern: "\\S"}
+    description: "§12.17 stage 7, 'Code' -- open-ended, non-empty list of coding labels applied to the interview content."
+
+  themes:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1, pattern: "\\S"}
+    description: "§12.17 stage 8, 'Themes' -- open-ended, non-empty list of themes synthesized from codes."
+
+  negative_cases:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "§12.17 stage 9 (final), 'Negative cases' -- disconfirming evidence or countercases actively looked for, not only confirming ones."
+
+examples:
+  - description: "A user-research interview study on why customers abandon a checkout flow"
+    value:
+      id: "INTERVIEW-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.interview"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+      research_question: "為什麼有結帳意圖的使用者最後沒有完成付款？"
+      sampling_approach: "從近 30 天內加入購物車但未結帳的使用者中，以 email 招募 8 位，涵蓋新舊客各半"
+      documented_biases: "樣本僅來自願意受訪的使用者（自我選擇偏誤），且全數為行動裝置使用者，結論不可直接推論到桌面使用者"
+      guide: "半結構式題綱：上次結帳經驗描述→卡關的具體步驟→當下情緒→最終決定原因→若能重來會怎麼做"
+      consent_process: "訪談前以書面說明錄音用途與資料保存期限，受訪者口頭同意錄音，同意記錄存於訪談排程表"
+      interview_notes: "多數受訪者在填寫地址與運費揭露的步驟猶豫，3 位提到運費出現得太晚感覺被欺騙"
+      transcript_ref: "docs/research/interviews/2026-09-checkout-abandon/transcripts/"
+      codes: ["late_shipping_disclosure", "trust_breach", "address_form_friction", "price_anchoring"]
+      themes: ["運費揭露時機影響信任", "表單摩擦造成放棄"]
+      negative_cases: "1 位受訪者反而覺得運費揭露時機沒有影響，放棄純粹因為想比價，顯示 late_shipping_disclosure 非唯一原因"
+
+open_questions:
+  - id: "OQ-INTERVIEWSTUDY-1"
+    question: "codes[]/themes[] carry no id/uniqueness constraint and no structural link from a specific theme back to the codes it was synthesized from -- should a future revision add one? (owner: operator)"
+  - id: "OQ-INTERVIEWSTUDY-2"
+    question: "provenance is record-level only per this F06 batch's own decision -- should a future revision add optional per-stage provenance if a downstream consumer ever needs to distinguish, e.g., AI-drafted codes from human-reviewed ones? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L467) and §12.17 (L2759-2764) directly. Grepped the whole Atlas file
+    case-insensitively for "深度訪談" -- confirmed exactly 1 dedicated section. Grepped for
+    "樣本與偏誤" -- confirmed exactly 1 real hit (L467 table row only; §12.17 itself does NOT repeat
+    this exact phrase, its own limitation is the separate '不能用少量訪談直接推估人口比例'
+    sentence). Grepped the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS and
+    Projects/internal/cognitive-engineering-os trees case-insensitively for
+    "insight.interview"/"InterviewStudy" before writing this file -- zero pre-existing
+    implementation. Read pasta-threat-model-record.schema.yaml (fixed-pipeline,
+    record-level-provenance precedent) and jtbd-statement.schema.yaml (this same batch's own lean
+    format, record-level-provenance precedent) in full before writing this file. Validated against
+    jsonschema Draft202012Validator via a standalone script (required fields present, id pattern
+    satisfied, additionalProperties:false at the top level, embedded example resolved through its
+    real $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a
+    missing pipeline stage, and an empty documented_biases).
+  note: >
+    No mother document was modified. §12.17's own 9-stage chain is directly transcribed as 9 named
+    fields in its own literal order. `documented_biases` mechanizes the table row's own single
+    explicit caution (L467) as a compilation decision, disclosed above and in the method contract,
+    not presented as a literal Atlas field name.

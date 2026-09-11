@@ -1,0 +1,111 @@
+$id: "ai-lego://methods/contracts/insight.journey_map.contract.yaml"
+title: "Customer Journey Map Method Contract"
+status: ACTIVE
+
+description: >
+  F06 人類／顧客洞察 (Human/Customer Insight) family, one of 9 members opened in this same batch (each an
+  independent agent; F06 was entirely unbuilt before this batch). Atlas cites this method TWICE: F06 table
+  row (L464, "Journey Map｜端到端體驗｜stages→actions→emotion→pain→opportunity｜找斷點與高價值改善點｜可加
+  evidence") AND a dedicated §11.13 "顧客旅程地圖／使用者旅程地圖" (L1489-1512, mermaid 7-stage illustrative
+  flow + a richer per-stage 7-field list: Actions/Questions/Emotion/Pain/Evidence/Opportunity/Responsible
+  system-team). Core invariant: `stages` non-empty, `stage_number` values across all stages equal EXACTLY
+  {1..len(stages)} -- a real ordered-sequence completeness check (no gaps, no duplicates), generalizing
+  divergent.lotus_blossom's fixed-8 numeric-slot pattern to a caller-determined length.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Journey Map row (L464)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.13 顧客旅程地圖／使用者旅程地圖 (L1489-1512)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.journey_map` mints a NEW machine_id in a NEW `family: insight`
+  (F06). Stage-field set (actions/emotion/pain/opportunity/evidence) follows the table row's leaner 5-field
+  list, NOT §11.13's richer 7-field list (Questions/Responsible system-team dropped) -- see
+  compilation_decisions.
+
+id: insight.journey_map
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [DECOMPOSE, SEQUENCE, ASSOCIATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting the
+# end-to-end experience into stages; SEQUENCE = the ordered stage_number completeness this contract's core
+# invariant enforces; ASSOCIATE = tying each stage's actions/emotion/pain/opportunity back to the same
+# journey_subject.
+
+purpose:
+  - map_end_to_end_experience_to_find_breakpoints_and_opportunities
+# Atlas L464 verbatim sense: "端到端體驗" (end-to-end experience) / method "stages→actions→emotion→pain→
+# opportunity" / benefit "找斷點與高價值改善點" (find breakpoints and high-value improvement points).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L464 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.ansoff/divergent.lotus_blossom's own inputs.required: []
+  # already takes.
+
+outputs:
+  - JourneyMap
+# NEW output type (see typed-objects/journey-map.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other thin-citation Tier 1 contract in this suite discloses.
+
+preconditions:
+  - "stages is present and non-empty -- a journey map with zero stages has not actually mapped an end-to-end experience (Atlas L464's own '端到端體驗' framing)"
+  - "the set of stage_number values across all stages equals EXACTLY {1, 2, ..., len(stages)}, each appearing exactly once -- Atlas's own '端到端' (end-to-end) framing IS a real ordered sequence; a record with skipped or duplicated stage numbers has not actually mapped a coherent end-to-end sequence"
+  - "every stages[] entry carries non-empty stage_name/actions/emotion/pain/opportunity -- Atlas's own benefit ('找斷點與高價值改善點') presumes each stage is actually analyzed, not just named"
+  - "journey_subject is a non-empty string -- the single shared anchor (which journey/persona/product this map describes) every stage's analysis is scoped to"
+  - "stages[].evidence is OPTIONAL and NULLABLE -- Atlas L464's own caution '可加 evidence' (\"may add\" evidence, not \"must add\") is the more conservative reading, taken over §11.13's richer 7-field list which does not explicitly mark its own Evidence column optional"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- Atlas's L464 table-row citation only says evidence MAY be added (an optional field), it does
+  # not separately mandate epistemic-labeling discipline over evidentiary claims the way a dedicated
+  # evidence-misuse rule does for other methods. See open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Neither Atlas's L464 table row nor §11.13 name a specific best-pairing follow-up method for Journey Map
+# (contrast F08's "最佳搭配" column) -- left empty rather than inventing one. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed-8-style closed numeric slot set (lotus_blossom-style) or a caller-determined-length ordered sequence for stage_number?"
+    decision: "Caller-determined length N = len(stages), completeness required over {1..N} -- Atlas's own '端到端體驗' framing names no fixed stage count (contrast §11.13's own 7-box mermaid diagram, treated here as ONE illustrative purchase-journey instance, not a mandated universal length); generalizes lotus_blossom's fixed-N numeric-slot pattern to N determined by the actual record."
+    reasoning: "§11.13's mermaid diagram shows 7 generic stages (認知→研究→選擇→購買→使用→售後→續約/推薦) illustrating a purchase journey, not a universal claim every journey has exactly 7 stages -- a B2B onboarding journey or a support-ticket journey plausibly has a different stage count, so hardcoding 7 would overstate this citation."
+  - question: "Adopt §11.13's full 7-field per-stage list (Actions/Questions/Emotion/Pain/Evidence/Opportunity/Responsible system-team) or the table row's leaner 5-field list?"
+    decision: "Table row's 5-field list (actions/emotion/pain/opportunity/evidence) -- task-mandated design. Questions and Responsible system/team (§11.13-only) are dropped, a real disclosed narrowing, not an oversight."
+  - question: "evidence: required-and-nullable, or optional-and-nullable?"
+    decision: "Optional (may be absent) AND nullable (may be present as null) -- same shape epistemic-label.schema.yaml's own provenance_record#/locked already establishes (not in `required`, type [string,null], default null). Grounded in Atlas L464's weaker '可加 evidence' wording over §11.13's unmarked-optional list, per task instruction that the more conservative reading governs."
+  - question: "Record-level provenance (5w1h/lotus_blossom-style) or per-stage provenance (ansoff/bcg-style)?"
+    decision: "Record-level only, per task-mandated batch-wide F06 decision (avoids the per-item/record-level ambiguity that hit both the F02 and F03 batches) -- Atlas's own citation supports no per-stage differentiated epistemic claim either, same convention divergent.lotus_blossom.contract.yaml's own identical choice already establishes."
+  - question: "Should stage_name/actions/emotion/pain/opportunity be GENUINE_COMPUTE (bcg_matrix-style) or REPORTED free text?"
+    decision: "REPORTED -- no citation supports mechanically deriving any of them from anything else; ONLY the stage_number sequence completeness itself is a real structural (not textual) invariant."
+
+open_questions:
+  - "OQ-JOURNEYMAP-1: §11.13's own Questions and Responsible system/team columns are dropped from this contract's stage shape (see compilation_decisions) -- a future richer variant could add them as additional optional fields if a real consumer needs them (owner: operator)."
+  - "OQ-JOURNEYMAP-2: quality.evidence_labeling_required: false reflects Atlas's own citation not separately mandating epistemic labeling for this method, not a positive statement that evidence labeling never applies here (owner: operator)."
+  - "OQ-JOURNEYMAP-3: cognitive_primitives is this file's own inference, Atlas §4 gives no formula for this method (owner: operator)."
+  - "OQ-JOURNEYMAP-4: recommended_next is empty because neither Atlas citation names a best-pairing follow-up method -- Service Blueprint (F06's own next table row, L465) is a plausible real-world pairing but not Atlas-cited as such for Journey Map specifically, so left empty rather than asserting an uncited pairing (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L464) directly, plus the full dedicated §11.13 section (L1489-1512),
+    grep-confirmed via "顧客旅程地圖". Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` trees case-insensitively for "journey_map"/"JourneyMap"/
+    "customer journey" before writing any of this method's own files -- zero pre-existing implementation
+    (F06 `insight` family folder held only a placeholder `__init__.py` and a sibling `persona.py`, no
+    journey_map file). Read divergent.lotus_blossom.contract.yaml (nested fixed-8 numeric-slot completeness
+    precedent, generalized here to caller-determined length) and strategy.bcg_matrix.contract.yaml
+    (lean-doc-format, record-level-provenance precedent) in full before writing this contract. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `family: insight` is a NEW F06 family this file opens (sibling members
+    opened in parallel by independent agents in this same batch). The caller-determined-length stage_number
+    sequence completeness, the 5-field (not 7-field) stage shape, the evidence optional+nullable choice, and
+    the record-level-only provenance are compilation decisions, disclosed above.

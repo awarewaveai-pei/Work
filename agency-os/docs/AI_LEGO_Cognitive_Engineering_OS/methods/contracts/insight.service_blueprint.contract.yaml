@@ -1,0 +1,106 @@
+$id: "ai-lego://methods/contracts/insight.service_blueprint.contract.yaml"
+title: "Service Blueprint Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 human/customer insight family, new family, 5th member. Atlas cites this method TWICE: the
+  F06 table row L465 ("前台＋後台流程｜customer→frontstage→backstage→support/system｜避免只改 UI｜適合服務
+  系統") and a dedicated §12.16 (L2738-2756) giving a literal 5-layer vertical structure (Customer Actions/
+  Frontstage/Backstage/Support Processes/Systems-Data), splitting the table row's merged "support/system"
+  into 2 distinct layers. Core invariant: `layers[].layer_type` must cover all 5 §12.16 layer names at
+  least once (open-ended list, NOT an exactly-once closed set like `strategy.porter_five_forces`'s 5
+  forces -- a real blueprint can have multiple frontstage touchpoints).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Service Blueprint row (L465)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.16 服務藍圖 (L2738-2756) -- the 5-layer vertical structure, purpose, and benefit"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of §12.16's 5-layer list into `layers[].layer_type`'s
+  closed enum. `id: insight.service_blueprint` mints a NEW machine_id; `family: insight` opens the F06
+  family (this is 1 of 9 agents opening it in this batch).
+
+id: insight.service_blueprint
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY, CONTEXTUALIZE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). DECOMPOSE
+# = splitting total service delivery into layers; CLASSIFY = assigning each concrete action to one of the
+# 5 layer types; CONTEXTUALIZE = linking frontstage experience to backstage/systems reality, the method's
+# own stated point ("避免只改 UI").
+
+purpose:
+  - map_service_delivery_across_customer_facing_and_backstage_layers
+# Atlas L465 verbatim sense: "前台＋後台流程" (frontstage+backstage process) / benefit "避免只改 UI" (avoid
+# only fixing the UI) / §12.16 "找『畫面看起來簡單，但後端流程很痛』的問題" (find problems where the screen
+# looks simple but the backend process is painful).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- neither citation for this method names a required input type,
+  # same "no hard upstream dependency" position strategy.porter_five_forces.contract.yaml's own
+  # inputs.required: [] takes for an analogous standalone method.
+
+outputs:
+  - ServiceBlueprint
+# NEW output type (see typed-objects/service-blueprint.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "layers is present and, among layers[].layer_type, all 5 §12.16 layer names appear at least once (CUSTOMER_ACTIONS, FRONTSTAGE, BACKSTAGE, SUPPORT_PROCESSES, SYSTEMS_DATA) -- Atlas's own stated benefit ('避免只改 UI') IS exactly what a blueprint missing even one layer has failed to deliver: a blueprint missing BACKSTAGE or SYSTEMS_DATA has structurally reproduced the frontstage-only tunnel vision the method exists to catch"
+  - "every layers[] entry carries a non-empty description -- a layer_type named but never described has not actually blueprinted that layer's process"
+  - "service_name is present and non-empty -- §12.16's own definition blueprints a specific service system ('適合服務系統'), not a generic/unnamed process"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- no evidence-labelable field exists in this record shape: provenance is RECORD-LEVEL ONLY (see
+  # compilation_decisions), layers[] entries carry no supporting_evidence_refs to label. Neither citation
+  # for this method gives an explicit unevidenced-claim misuse warning the way strategy.swot's own L1347
+  # does. See open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same empty-and-
+# disclosed choice every thin-citation Tier 1 contract in this directory already establishes.
+
+recommended_next: []
+# F06's own table column is "注意" (caution), not "最佳搭配" (best combo) the way F02/F08's tables are --
+# no best-combo citation exists anywhere in the corpus for this method to name. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Table row (4 stages, support/system merged) or dedicated §12.16 (5 layers, support and systems split)?"
+    decision: "§12.16's 5-layer structure -- more specific and authoritative than the table row's own merged 'support/system' stage; disclosed as a compilation decision against the apparent 4-vs-5 discrepancy, not silently resolved."
+  - question: "Exactly-once-each closed SET (porter_five_forces-style) or open-ended list requiring only set-coverage (>=1 each)?"
+    decision: "Open-ended list, set-coverage only -- unlike Porter's five forces (each a singular structural dimension by definition), a real service blueprint can have multiple frontstage touchpoints or multiple backstage steps; only completeness (all 5 layer types present at least once) is Atlas-grounded, not a one-entry-per-layer cardinality neither citation states."
+  - question: "Provenance placement: per-layer (porter_five_forces-style) or record-level only?"
+    decision: "Record-level only -- fixed batch-wide decision for this whole F06 batch, made to avoid the per-item/record-level provenance-placement ambiguity that hit both the F02 and F03 batches."
+
+open_questions:
+  - "OQ-SERVICEBLUEPRINT-1: recommended_next is empty because F06's own table column is '注意', not '最佳搭配' -- no best-combo citation exists for this method anywhere in the corpus (owner: operator)."
+  - "OQ-SERVICEBLUEPRINT-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-SERVICEBLUEPRINT-3: evidence_labeling_required: false reflects the absence of any evidence-labelable field in this record shape (record-level-only provenance), not a positive Atlas statement that evidence labeling does not apply to this method (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L465) and §12.16 (L2738-2756) directly at the cited lines. Grepped the whole
+    Atlas file case-insensitively for "服務藍圖"/"Service Blueprint" -- confirmed exactly 3 hits: L370 (a
+    DIFFERENT method's -- decomposition.hierarchical_task_analysis's -- own recommended_next target, not
+    this method's own citation), L465 (F06 table row), L2738 (dedicated section). No §4 composition
+    formula, no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os`
+    trees case-insensitively for "service_blueprint"/"ServiceBlueprint" before writing any of this method's
+    own files -- zero pre-existing implementation. Read strategy.porter_five_forces.contract.yaml (closed-
+    SET-with-required-completeness precedent) and strategy.bcg_matrix.contract.yaml (open-ended-list,
+    record-shape-without-per-item-provenance precedent) in full before writing this contract. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. §12.16's 5 literal layer names are transcribed verbatim into
+    `preconditions`'s completeness list. The set-coverage-without-cardinality shape, `cognitive_primitives`,
+    and the record-level-only provenance placement (this F06 batch's own fixed decision) are compilation
+    decisions, disclosed above, not presented as directly Atlas-cited.

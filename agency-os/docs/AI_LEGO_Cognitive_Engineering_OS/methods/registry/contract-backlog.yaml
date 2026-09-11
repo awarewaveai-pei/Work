@@ -4007,6 +4007,161 @@ tier_1:
       methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md so future batches stop
       re-deriving this ad hoc.
 
+  onehundredthirtyeighth_concrete_entry:
+    # New F06 human/customer-insight family, 9-agent parallel batch,
+    # 2026-09-11 (immediately following the F02/F03 batches above).
+    # Provenance placement fixed batch-wide to record-level ONLY, a
+    # deliberate prescribed rule (not a discovered pattern) to avoid the
+    # per-item/record-level ambiguity that hit both F02 and F03.
+    method_id: "insight.jtbd"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L461) + dedicated §11.12 (literal 3-clause
+      "When [situation], I want to [motivation/job], so I can [desired
+      outcome]" template). Real invariants: the 3 clauses each required
+      non-empty; local_evidence hard-required (never optional),
+      mechanizing §11.12's own explicit "必須搭配 Local Evidence" rule
+      against assuming motivation is culturally universal.
+    source: "methods/contracts/insight.jtbd.contract.yaml + specs/cognitive/typed-objects/jtbd-statement.schema.yaml + ai_lego/modules/insight/jtbd.py"
+    note: "45 tests pass. F06 family opened by this batch. CLI PASS, empty-local_evidence + empty-situation refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredthirtyninth_concrete_entry:
+    method_id: "insight.persona"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L462, sole citation). Real invariant:
+      research_basis non-empty is a hard requirement, mechanizing
+      Atlas's own "Persona ≠ 真實民意" -- a persona with zero cited
+      research basis is exactly the invented-composite abuse that
+      caution warns against. goals/behaviors each non-empty lists.
+    source: "methods/contracts/insight.persona.contract.yaml + specs/cognitive/typed-objects/persona-profile.schema.yaml + ai_lego/modules/insight/persona.py"
+    note: "51 tests pass. CLI PASS, empty-research_basis + empty-goals refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortieth_concrete_entry:
+    method_id: "insight.empathy_map"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L463, sole citation). Real invariants: closed
+      4-quadrant SAYS/THINKS/DOES/FEELS completeness floor (duplicates
+      per quadrant allowed, a distinct shape class from porter_five_
+      forces's exactly-once-each); every entry's basis is a required
+      closed FACT/INFERENCE label, mechanizing "標 fact/inference"
+      and "不可純 AI 猜", kept structurally distinct from provenance's
+      own epistemic_type/authorship_state axes.
+    source: "methods/contracts/insight.empathy_map.contract.yaml + specs/cognitive/typed-objects/empathy-map.schema.yaml + ai_lego/modules/insight/empathy_map.py"
+    note: "57 tests pass. CLI PASS, missing-quadrant + invalid-basis refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortyfirst_concrete_entry:
+    method_id: "insight.journey_map"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L464) + dedicated §11.13 (richer 7-field
+      per-stage worked example; this contract deliberately uses the
+      table row's narrower 5-field shape, disclosed as a compilation
+      decision). Real invariant, GENUINE_COMPUTE: stage_number forms an
+      exact {1..N} sequence, no gaps or duplicates, bool explicitly
+      excluded from the integer check (same bug class the F03 batch's
+      lotus_blossom.py needed a critic-fix for -- guarded here from the
+      start).
+    source: "methods/contracts/insight.journey_map.contract.yaml + specs/cognitive/typed-objects/journey-map.schema.yaml + ai_lego/modules/insight/journey_map.py"
+    note: "65 tests pass. CLI PASS, stage-number-gap + duplicate + bool-masquerade refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortysecond_concrete_entry:
+    method_id: "insight.service_blueprint"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L465) + dedicated §12.16 (literal 5-layer
+      structure Customer Actions/Frontstage/Backstage/Support Processes/
+      Systems-Data, superseding the table row's 4-layer collapse). Real
+      invariant: closed 5-layer completeness floor (duplicates per layer
+      allowed), avoiding Atlas's own "避免只改 UI" frontstage-tunnel-
+      vision failure mode.
+    source: "methods/contracts/insight.service_blueprint.contract.yaml + specs/cognitive/typed-objects/service-blueprint.schema.yaml + ai_lego/modules/insight/service_blueprint.py"
+    note: "52 tests pass. CLI PASS, incomplete-layer-coverage refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortythird_concrete_entry:
+    method_id: "insight.contextual_inquiry"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L466, sole citation). Real invariant: every
+      observation entry requires all 3 of action_observed/
+      researcher_note/followup_question non-empty, mechanizing the
+      method's own literal "使用者做→研究者看→即時追問" cycle per entry,
+      not just once for the whole session.
+    source: "methods/contracts/insight.contextual_inquiry.contract.yaml + specs/cognitive/typed-objects/contextual-inquiry-session.schema.yaml + ai_lego/modules/insight/contextual_inquiry.py"
+    note: "40 tests pass. CLI PASS, empty-observations + incomplete-observation-cycle refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortyfourth_concrete_entry:
+    method_id: "insight.interview"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L467) + dedicated §12.17 (richer, more
+      precise 9-stage ordered pipeline superseding the table row's own
+      shorter 6-stage version). Real invariants: all 9 named pipeline
+      stages required non-empty, transcribing §12.17's own literal chain
+      verbatim; a separate required documented_biases field mechanizes
+      "樣本與偏誤要記錄" as an active check, not a soft caution. Building
+      agent independently re-verified and corrected this batch's own
+      "twice-repeated" framing of that caution to the accurate "once,
+      at the F06 table row" (R4 claim-before-verify).
+    source: "methods/contracts/insight.interview.contract.yaml + specs/cognitive/typed-objects/interview-study.schema.yaml + ai_lego/modules/insight/interview.py"
+    note: "52 tests pass. CLI PASS, missing-pipeline-stage + empty-documented_biases refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortyfifth_concrete_entry:
+    method_id: "insight.survey"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L468) + dedicated §12.18. Implements BOTH of
+      Atlas's two given structures: the table row's 5-stage sequential
+      pipeline AND §12.18's 4 quality-concern completeness floor
+      (CONSTRUCT_VALIDITY/SAMPLING/QUESTION_WORDING/NON_RESPONSE_BIAS,
+      at-least-once since these are non-exclusive risks, not a
+      partition). Asymmetric if/then (blue_ocean-style): is_translated:
+      true requires BOTH semantic_equivalence_check and local_pilot_ref;
+      false structurally forbids both -- mechanizing "全球要求：翻譯後
+      必須做語義等值與 local pilot".
+    source: "methods/contracts/insight.survey.contract.yaml + specs/cognitive/typed-objects/survey-study.schema.yaml + ai_lego/modules/insight/survey.py"
+    note: "60 tests pass. CLI PASS, missing-pipeline-stage + incomplete-quality-dimensions + both translation-asymmetry-direction refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortysixth_concrete_entry:
+    # Last of this 9-agent F06 batch -- F06 is 9/9 COMPLETE after this
+    # entry (independently confirmed via `ls methods/contracts/
+    # insight.*.contract.yaml`: 9 files present).
+    method_id: "insight.focus_group"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F06 table row (Atlas L469, sole citation). Real invariants:
+      participant_count a real closed [6,10] integer range check (bool
+      explicitly excluded, defense-in-depth since True/False already
+      fall outside [6,10] by construction); generalizability_scope is a
+      single-legal-value QUALITATIVE_EXPLORATION_NOT_POPULATION_ESTIMATE
+      enum structurally eliminated from the builder's own parameters,
+      mechanizing "不用來估人口比例".
+    source: "methods/contracts/insight.focus_group.contract.yaml + specs/cognitive/typed-objects/focus-group-session.schema.yaml + ai_lego/modules/insight/focus_group.py"
+    note: >
+      54 tests pass. F06 human/customer-insight family: 9 of 9 COMPLETE
+      as of this entry (jtbd/persona/empathy_map/journey_map/
+      service_blueprint/contextual_inquiry/interview/survey all landed
+      via concurrent sibling agents in this same batch, entries
+      onehundredthirtyeighth through onehundredfortyfifth above). CLI
+      PASS, participant_count-out-of-range + bool-masquerade +
+      caller-supplied-generalizability_scope refusals + independent-gate
+      hand-tamper proof demonstrated. Provenance placement uniform
+      across all 9 methods (record-level only) -- a fixed, prescribed
+      batch-wide rule, unlike F02/F03 where it emerged ad hoc and needed
+      critic adjudication; no provenance-related critic finding expected
+      for this batch (see WORKLOG 2026-09-11 F06 entry for the critic's
+      actual verdict).
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

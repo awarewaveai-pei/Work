@@ -1,0 +1,124 @@
+$id: "ai-lego://methods/contracts/insight.jtbd.contract.yaml"
+title: "Jobs To Be Done Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 human/customer insight family, OPENING member (F06 had zero built methods before this batch --
+  grep-confirmed no `ai_lego/modules/insight/` directory existed at batch start; this is 1 of 9 concurrent
+  agents opening F02/F03/F04/F06/F08 members in the same parallel batch). Atlas cites this method TWICE: F06
+  table row L461 ("JTBD｜理解使用者真正要完成的工作｜Situation→Motivation→Job→Desired outcome→Workaround｜避免
+  feature-first｜最適合新產品") and a dedicated §11.12 (L1463-1485, literal 3-clause template "When [situation],
+  I want to [motivation/job], so I can [desired outcome]." plus an explicit standalone rule: "必須搭配 Local
+  Evidence -- 不能假設不同文化的 motivation 相同"). Core invariant: `situation`/`motivation`/`desired_outcome`
+  each non-empty (the template's own 3 clauses -- missing any one is not actually a JTBD statement);
+  `local_evidence` non-empty and NEVER optional (§11.12's own explicit standalone rule, disclosed as a hard
+  requirement, not a soft caution). `workaround` is nullable -- the table row's own 5th, least-certain element
+  (a job may have no existing workaround worth citing yet). See `ai_lego/modules/insight/jtbd.py` module
+  docstring for the full field-by-field grounding.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, JTBD row (L461)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.12 待辦工作理論／JTBD dedicated section (L1463-1485)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.jtbd` mints a NEW machine_id AND a NEW `family: insight` (F06's
+  first built member -- no prior `insight.*` contract exists in this corpus, grep-confirmed). Flat 5-field
+  record shape, `workaround` nullability, and record-level-only provenance placement are this file's own
+  compilation decisions -- see `compilation_decisions`.
+
+id: insight.jtbd
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [FRAME, CONTEXTUALIZE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. FRAME = Atlas's own stated
+# purpose ("不是問「使用者想買什麼」" -- reframing away from feature-first questioning); CONTEXTUALIZE (the
+# extended token SWOT's own "CLASSIFY + COMPARE + CONTEXTUALIZE" formula already establishes, L189) = anchoring
+# the job in a specific `situation`, the template's own opening clause and the reason §11.12 pairs it with
+# Local Evidence in the first place ("不能假設不同文化的 motivation 相同").
+
+purpose:
+  - understand_the_job_the_user_is_really_hiring_a_solution_to_do
+# Atlas L461/§11.12 verbatim sense: 用途「理解使用者真正要完成的工作」/ "不是問「使用者想買什麼」，而是問：使用者
+# 在某個情境下，想取得什麼進展？".
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this batch (e.g. decomposition.problem_tree, strategy.bcg_matrix) already takes; this
+  # method's own citation names no required input type.
+
+outputs:
+  - JtbdStatement
+# NEW output type (see typed-objects/jtbd-statement.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "situation, motivation, and desired_outcome are each present and non-empty -- §11.12's own literal 3-clause template ('When [situation], I want to [motivation/job], so I can [desired outcome].') has exactly 3 required clauses; a statement missing any one of them is not actually a JTBD statement"
+  - "local_evidence is present and non-empty -- §11.12's own explicit standalone rule ('必須搭配 Local Evidence -- 不能假設不同文化的 motivation 相同'), disclosed as a HARD requirement, never optional or a soft caution"
+  - "workaround is either null or a non-empty string -- the table row's own 5th, least-certain element (L461's own '→Workaround' as the final, less-certain step); a job legitimately may have no existing workaround worth citing, but an empty-string placeholder masquerading as disclosed content is refused the same way every other content field in this record is"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to "claims inside this method's outputs that
+  # originate from EvidenceSet input" (an upstream typed-object this method does not take: inputs.required: []).
+  # §11.12's own explicit misuse caution ("不能假設不同文化的 motivation 相同") is real, but it is enforced
+  # structurally instead -- `local_evidence` is a REQUIRED (never optional, never nullable) non-empty field per
+  # this method's own preconditions, not a conditional per-claim label the evidence_labeling_required mechanism
+  # governs. Setting this flag true with no EvidenceSet input to check against would be a gate with nothing to
+  # evaluate. See compilation_decisions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citations name no single downstream method for JTBD specifically -- F06 table's own "最適合新產品"
+# is a usage note, not a chain; §12.3's "JTBD → HMW → Crazy 8s / SCAMPER" and §12.14's "JTBD / Survey → STP →
+# Value Proposition" both exist (framing.how_might_we.contract.yaml L91 and strategy.stp.contract.yaml L45
+# already disclose the same tension from the other side), but neither is JTBD's own single canonical next step
+# -- both are downstream consumers naming JTBD as THEIR upstream, not this method naming its own next. Left
+# empty rather than picking one arbitrarily. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat 5-field record (situation/motivation/desired_outcome/workaround/local_evidence) or a richer structured shape (e.g. local_evidence as its own evidence-list object)?"
+    decision: "Flat record, all 5 fields plain strings (workaround nullable) -- task-mandated exact shape; §11.12's own template and table row name exactly these 5 elements with no further internal structure cited for any of them."
+  - question: "Per-field provenance (situation/motivation/etc. each individually stamped) or record-level only?"
+    decision: "Record-level ONLY, one top-level `provenance` field -- a deliberate BATCH-WIDE decision for this whole F06 build (matching decomposition.functional_decomposition's own record-level placement), made specifically to avoid the per-item/record-level ambiguity that hit both the F02 and F03 batches (see their own WORKLOG entries). Not a per-field claim-provenance choice the way strategy.bcg_matrix's per-item quadrant provenance is -- a JTBD statement's 5 fields are one coherent claim about one job, not a list of independently-sourced items."
+  - question: "Should evidence_labeling_required be true (§11.12 gives a real, explicit unevidenced-claim caution, unlike strategy.bcg_matrix's bare-table-row citation) or false?"
+    decision: "false -- the flag's own schema definition (method.schema.yaml) scopes it to claims originating from an EvidenceSet INPUT, which this method does not take (inputs.required: []). §11.12's real caution is enforced instead via `local_evidence` being a REQUIRED, non-nullable field in preconditions/the typed-object schema -- a structural requirement, not a conditional per-claim label this flag's own mechanism governs. Setting it true here would declare a gate with no EvidenceSet input to actually check."
+  - question: "Should workaround require non-empty-if-present, or accept an empty string as 'explicitly disclosed as none'?"
+    decision: "Non-empty-if-present (null is the only legal 'no workaround' value) -- same discipline every other content field in this record uses; an empty string masquerading as disclosed content would be indistinguishable from a data-entry omission, defeating the point of the nullability itself."
+
+open_questions:
+  - "OQ-JTBD-1: recommended_next is empty -- §12.3's 'JTBD → HMW → Crazy 8s / SCAMPER' and §12.14's 'JTBD / Survey → STP → Value Proposition' both name JTBD as an UPSTREAM input to something else, not JTBD's own downstream next step; a future pass could decide one of framing.how_might_we / strategy.stp is the canonical next once this asymmetry is resolved (owner: operator)."
+  - "OQ-JTBD-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-JTBD-3: local_evidence is a plain string per the task-mandated flat shape -- a future revision could promote it to a structured evidence-list (id/content/provenance per entry, matching causal.process_tracing's own evidence[] shape) if a downstream consumer ever needs to reference individual evidence items (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L461) and §11.12 (L1463-1485) directly. Grepped the whole Atlas file
+    case-insensitively for "jtbd"/"jobs to be done"/"jobs_to_be_done" -- confirmed exactly these 2 real
+    citations (plus incidental mentions inside OTHER methods' own recipes/best-pairing columns at L73, L473,
+    L523, L528, L1432, L2519, L2580, L2711, L3336, L3360, L4283, L4433, L4474 -- all of which name JTBD as an
+    upstream/companion for a DIFFERENT method's own contract, not a second dedicated section for JTBD itself),
+    no §4 composition formula, no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "jtbd"/"jobs_to_be_done"/"JtbdStatement" before writing any of this method's own
+    files -- zero pre-existing implementation (only forward-references from other methods' own contracts
+    already disclosing JTBD as unbuilt, e.g. framing.how_might_we.contract.yaml L51, strategy.stp.contract.yaml
+    L46, strategy.value_proposition_canvas.contract.yaml L48). Read decomposition.functional_decomposition
+    (record-level-only provenance precedent, this batch's fixed placement decision) and strategy.bcg_matrix
+    (thin two-field-axis, per-item content precedent, read for contrast not reuse) in full before writing this
+    contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives` and the flat 5-field shape are this file's own
+    compilation decisions, disclosed above, not presented as directly Atlas-cited beyond the literal template/
+    table-row wording quoted verbatim. The record-level-only provenance placement is an explicit F06-batch-wide
+    decision, not this contract's own independent judgment call -- disclosed as such per this task's own
+    instruction.

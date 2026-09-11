@@ -1,0 +1,153 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/empathy-map.schema.yaml"
+title: Empathy Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `EmpathyMap` -- the declared `outputs` of `insight.empathy_map`'s
+  Method Contract (methods/contracts/insight.empathy_map.contract.yaml, `outputs: [EmpathyMap]`). Atlas cites
+  this method ONCE: F06 table row (L463: "Empathy Map｜Says/Thinks/Does/Feels｜用訪談/觀察填寫且標
+  fact/inference｜找語言與行為差距｜不可純 AI 猜") -- the thinnest possible citation class, no dedicated
+  section, same class strategy.bcg_matrix's own citation already establishes.
+
+  Field provenance:
+    * `entries[].quadrant` (Atlas L463 verbatim "Says/Thinks/Does/Feels", SCREAMING_SNAKE_CASE) -- a CLOSED
+      4-value set, each value REQUIRED to appear at least once (completeness floor, no upper cardinality
+      bound -- see compilation_decisions and `ai_lego/modules/insight/empathy_map.py` module docstring for
+      the full design-shape investigation).
+    * `entries[].basis` -- Atlas's own "標 fact/inference" instruction, mechanized as a closed 2-value enum
+      (FACT/INFERENCE), REQUIRED on every entry, never defaulted (mechanizes Atlas's own "不可純 AI 猜"
+      caution).
+    * `entries[].content` -- the actual observation content, REPORTED not computed.
+    * `subject` (top-level, required) -- who/what the empathy map is about.
+    * `provenance` (top-level only) -- record-level provenance; entries carry NO per-entry provenance field,
+      a deliberate F06-batch-wide decision (see compilation_decisions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Empathy Map row (L463)"
+  - "methods/contracts/insight.empathy_map.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/scamper-session.schema.yaml -- record-level-only-provenance, open-ended-list precedent"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- closed-set-with-completeness precedent (this file relaxes its exact-cardinality cap)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L463's own cited vocabulary plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Fixed exact-count closed array (porter-style, minItems==maxItems==4) or completeness-floor open-ended array?"
+    decision: "Completeness floor only -- minItems: 4, no maxItems. minItems:4 is a necessary-but-not-sufficient SHAPE bound (4 items could still all share one quadrant); genuine completeness (all 4 distinct quadrant values present) is a runtime-only invariant this schema cannot express alone, same limitation class porter-five-forces-analysis.schema.yaml's own compilation_decisions already documents for its own closed-set shape -- enforced by ai_lego/modules/insight/empathy_map.py at both the builder and an independent gate."
+  - question: "Should entries[] carry per-entry provenance, matching porter-five-forces-analysis.schema.yaml's forces[].provenance?"
+    decision: "No -- record-level provenance only, same shape scamper-session.schema.yaml's own entries[] already establishes. Deliberate F06-batch-wide decision (disclosed in this batch's own task instructions and insight.persona.contract.yaml) to avoid the per-item/record-level provenance ambiguity that hit both the F02 and F03 batches."
+  - question: "Is basis a duplicate of provenance's epistemic_type?"
+    decision: "No -- basis is Atlas's own method-specific fact/inference label for THIS observation; provenance's epistemic_type/authorship_state classify how the record itself was produced. Kept as two distinct, non-overlapping fields."
+  - question: "additionalProperties: false at the top level, and on each entries[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, subject, entries, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^EMPATHY-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as bcg-matrix-analysis.schema.yaml's BCG- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.empathy_map"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Who/what this empathy map is about -- REPORTED content, not computed. An empty subject has not disclosed who is being observed."
+
+  entries:
+    type: array
+    minItems: 4
+    description: >
+      Atlas L463's own Says/Thinks/Does/Feels quadrants. SHAPE-bounded here to at least 4 items (a necessary
+      but not sufficient condition); genuine completeness (all 4 distinct quadrant values actually present,
+      not merely 4-or-more items of the same quadrant) is a runtime-only invariant this schema cannot express
+      alone -- enforced by ai_lego/modules/insight/empathy_map.py at both the builder and an independent gate
+      (see compilation_decisions). No maxItems -- multiple observations per quadrant are explicitly allowed.
+    items:
+      type: object
+      required: [quadrant, content, basis]
+      additionalProperties: false
+      properties:
+        quadrant:
+          type: string
+          enum: [SAYS, THINKS, DOES, FEELS]
+          description: "Atlas L463's own Says/Thinks/Does/Feels four-value vocabulary, SCREAMING_SNAKE_CASE."
+        content:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual observation content for this quadrant -- REPORTED, not computed."
+        basis:
+          type: string
+          enum: [FACT, INFERENCE]
+          description: >
+            REQUIRED. Atlas L463's own "標 fact/inference" instruction, mechanized as a closed 2-value enum.
+            Never defaulted -- an entry with no basis label is exactly the un-grounded guessing Atlas's own
+            "不可純 AI 猜" caution warns against. NOT the same concept as `provenance`'s epistemic_type/
+            authorship_state -- see compilation_decisions.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole. Entries carry NO per-entry provenance field -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An empathy map for a small-studio owner evaluating a new invoicing tool"
+    value:
+      id: "EMPATHY-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.empathy_map"
+      subject: "小型工作室老闆，正在評估是否換用新的請款工具"
+      entries:
+        - quadrant: SAYS
+          content: "「現在的請款流程太麻煩，每次都要重複輸入客戶資料」"
+          basis: FACT
+        - quadrant: THINKS
+          content: "可能擔心換工具會讓既有客戶的付款紀錄遺失或對不上帳"
+          basis: INFERENCE
+        - quadrant: DOES
+          content: "訪談觀察到她每次請款都手動複製上一份估價單再修改金額"
+          basis: FACT
+        - quadrant: FEELS
+          content: "在示範新工具的自動化功能時明顯放鬆，語氣從防備轉為好奇"
+          basis: INFERENCE
+        - quadrant: SAYS
+          content: "「只要學習曲線不要太陡，我願意試試看」"
+          basis: FACT
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-EMPATHYMAP-1"
+    question: "entries[].quadrant completeness (all 4 distinct values present) is a runtime-only invariant (see compilation_decisions) -- should a future pass add a JSON Schema if/then per-value-count constraint instead of relying solely on the runtime gate? Same open question porter-five-forces-analysis.schema.yaml's own OQ-PORTERFIVEFORCESANALYSIS-2 already discloses for a related shape. (owner: operator)"
+  - id: "OQ-EMPATHYMAP-2"
+    question: "No supporting_evidence_refs field exists on entries -- basis:FACT is a disclosed label, not a citation to an external evidence/evidence.schema.yaml record. Should a future pass add one? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L463) directly. Grepped the whole Atlas file case-insensitively for "empathy"
+    -- confirmed exactly 1 real hit, no dedicated section. Cross-checked against
+    methods/contracts/insight.empathy_map.contract.yaml's own outputs/preconditions/quality. Read
+    porter-five-forces-analysis.schema.yaml (closed-set-with-completeness precedent) and
+    scamper-session.schema.yaml (open-ended-list, record-level-only-provenance precedent) in full as shape
+    precedent before writing this file. Validated against jsonschema Draft202012Validator via a standalone
+    script (required fields present, id pattern satisfied, quadrant/basis enums closed,
+    additionalProperties:false present at both the top level and the entries[] item level from the start,
+    embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative controls for a
+    smuggled top-level key, a smuggled entries[] item key, and an empty entries array).
+  note: >
+    `entries[].quadrant`'s 4 enum values and `entries[].basis`'s 2 enum values are transcribed/mechanized
+    directly from Atlas L463. The `content` field naming, the completeness-floor-without-cap shape, and the
+    record-level-only provenance decision are compilation decisions, disclosed above. No mother document was
+    modified to produce this file.

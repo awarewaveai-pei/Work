@@ -1,0 +1,249 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/survey-study.schema.yaml"
+title: Survey Study
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SurveyStudy` -- outputs of `insight.survey`'s
+  Method Contract (outputs: [SurveyStudy]). Atlas F06 row (L468) gives the 5-stage pipeline
+  (construct->question->pilot->sample->analysis), transcribed as 5 flat required string
+  fields, same shape class `rct-record.schema.yaml`'s own 5-field flat pipeline record already
+  establishes. §12.18 (L2768-2773) gives the 4 named quality-concern dimensions
+  (CONSTRUCT_VALIDITY/SAMPLING/QUESTION_WORDING/NON_RESPONSE_BIAS, completeness required,
+  at-least-once not exactly-once -- contrast `porter-five-forces-analysis.schema.yaml`'s own
+  exactly-once 5-force set) and the explicit global-localization requirement (translated
+  surveys require BOTH `semantic_equivalence_check` and `local_pilot_ref`, structurally
+  enforced via an asymmetric if/then over `is_translated`, same technique
+  `blue-ocean-analysis.schema.yaml`'s own `industry_standard_level`-for-CREATE if/then already
+  establishes).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Survey row (L468)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.18 問卷調查／調查研究 (L2768-2773)"
+  - "methods/contracts/insight.survey.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/rct-record.schema.yaml -- flat multi-stage pipeline + record-level-only provenance precedent"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- closed-dimension-set-with-completeness precedent (contains/minContains), generalized here from exactly-once to at-least-once"
+  - "specs/cognitive/typed-objects/blue-ocean-analysis.schema.yaml -- asymmetric if/then conditional-requiredness precedent (key REQUIRED vs structurally ABSENT), reused for is_translated"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory
+  documents: direct transcription of the 2 cited Atlas passages plus low-risk, disclosed
+  compilation choices. Record-level-only provenance is this F06 batch's own deliberate
+  decision (see method contract's own `decided_by`).
+
+compilation_decisions:
+  - question: "additionalProperties: false at the top level and on each quality_dimensions[] item?"
+    decision: "Yes on both, per this batch's own explicit instruction and every sibling record schema's baseline hygiene."
+  - question: "Flat pipeline fields or a STAGE_ORDER positional array?"
+    decision: "Flat fields, same shape rct-record.schema.yaml's own randomization/power_analysis/treatment_group/control_group/analysis_summary quintet already establishes -- Atlas's own arrow-chain names 5 distinct, non-repeating, non-reorderable stages."
+  - question: "quality_dimensions completeness -- exactly-once (porter's contains+count=5) or at-least-once?"
+    decision: "At-least-once: minItems:4 plus 4 independent `contains` clauses (one per dimension, default minContains:1), no upper bound and no distinctness requirement -- unlike porter-five-forces-analysis.schema.yaml's exact 5-of-5 partition, §12.18's own 4 named concerns are non-exclusive risks a survey may document more than one mitigation for."
+  - question: "How to encode the is_translated asymmetry?"
+    decision: "Two top-level if/then branches, same technique blue-ocean-analysis.schema.yaml's own industry_standard_level pair already establishes: if is_translated is true, semantic_equivalence_check AND local_pilot_ref are both REQUIRED; if is_translated is false, both keys MUST be absent (not merely null -- additionalProperties:false plus no nullable type means the key cannot be present at all)."
+  - question: "semantic_equivalence_check/local_pilot_ref -- free text or structured?"
+    decision: "Free text (non-empty strings), same DISCLOSURE-ONLY convention every sibling REPORTED-content field in this directory uses -- no citation supports a structured semantic-equivalence scoring scheme."
+  - question: "A separate provenance per quality_dimensions[] item, matching porter's per-force provenance?"
+    decision: "No -- single record-level `provenance` field only, per this F06 batch's own deliberate decision (see method contract's own decided_by) to avoid the per-item/record-level ambiguity that hit F02 and F03."
+
+type: object
+required: [id, version, provenance, construct_definition, question_design, pilot_summary, sampling_plan, analysis_plan, quality_dimensions, is_translated]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SURVEY-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as rct-record.schema.yaml's RCT- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.survey"
+    description: "Which method produced this record."
+
+  provenance:
+    description: >
+      Record-level provenance ONLY (no per-item provenance on quality_dimensions[] -- see
+      compilation_decisions). Same full provenance_record pattern every sibling typed-object
+      schema in this directory uses.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  construct_definition:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L468's own 'construct' stage -- what latent attitude/behavior/need this survey measures and how it is operationalized."
+
+  question_design:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L468's own 'question' stage -- the instrument's own item wording/response-scale design."
+
+  pilot_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L468's own 'pilot' stage -- what was tested before fielding and what changed as a result."
+
+  sampling_plan:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L468's own 'sample' stage -- sampling frame, method, and target N."
+
+  analysis_plan:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L468's own 'analysis' stage -- the stated analytical approach for turning responses into the '估比例、分群' (estimated proportions / segments) benefit."
+
+  quality_dimensions:
+    type: array
+    minItems: 4
+    description: >
+      Atlas §12.18's own 4 named quality CONCERNS (L2771), completeness required (each must
+      appear >=1 time) but not exclusivity (a dimension may recur -- see compilation_decisions
+      for the contrast with porter-five-forces-analysis.schema.yaml's own exactly-once set).
+    items:
+      type: object
+      required: [dimension, mitigation_note]
+      additionalProperties: false
+      properties:
+        dimension:
+          type: string
+          enum: [CONSTRUCT_VALIDITY, SAMPLING, QUESTION_WORDING, NON_RESPONSE_BIAS]
+          description: "Atlas §12.18's own closed 4-value vocabulary (L2771: 'construct validity、sampling、question wording、non-response bias')."
+        mitigation_note:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Disclosed, caller-supplied mitigation for this named concern -- not computed."
+    allOf:
+      - contains:
+          properties: { dimension: { const: CONSTRUCT_VALIDITY } }
+          required: [dimension]
+      - contains:
+          properties: { dimension: { const: SAMPLING } }
+          required: [dimension]
+      - contains:
+          properties: { dimension: { const: QUESTION_WORDING } }
+          required: [dimension]
+      - contains:
+          properties: { dimension: { const: NON_RESPONSE_BIAS } }
+          required: [dimension]
+
+  is_translated:
+    type: boolean
+    description: "Atlas §12.18's own explicit global-localization gate (L2773): whether this survey instrument was translated from another source-language version."
+
+  semantic_equivalence_check:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "REQUIRED when is_translated=true, MUST be absent when false (see the if/then pair below). Atlas §12.18's own '語義等值' (semantic equivalence) requirement."
+
+  local_pilot_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "REQUIRED when is_translated=true, MUST be absent when false. Atlas §12.18's own 'local pilot' requirement -- a reference/pointer to the local pilot record, not the pilot content itself (see pilot_summary for the survey's own pipeline pilot stage)."
+
+allOf:
+  - if:
+      properties: { is_translated: { const: true } }
+      required: [is_translated]
+    then:
+      required: [semantic_equivalence_check, local_pilot_ref]
+  - if:
+      properties: { is_translated: { const: false } }
+      required: [is_translated]
+    then:
+      not:
+        anyOf:
+          - required: [semantic_equivalence_check]
+          - required: [local_pilot_ref]
+
+examples:
+  - description: "A translated customer-satisfaction survey, all 4 quality dimensions covered, semantic-equivalence + local pilot both disclosed"
+    value:
+      id: "SURVEY-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.survey"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+      construct_definition: "顧客整體滿意度（含產品品質、客服回應、交付準時性三個子構念），以 5 點 Likert 量表操作化"
+      question_design: "每個子構念各 3 題正向措辭題目，另加 1 題整體滿意度題，避免雙重否定與引導性用詞"
+      pilot_summary: "先以 40 位既有客戶進行認知訪談（cognitive interview），依回饋修正 2 題語意不清的題目"
+      sampling_plan: "以過去 12 個月下單客戶為母體，依訂單金額分層隨機抽樣，各層目標樣本數 200，涵蓋全部地區"
+      analysis_plan: "以分層加權估計整體滿意度比例與信賴區間，並以地區/等級交叉分析進行分群比較"
+      quality_dimensions:
+        - dimension: CONSTRUCT_VALIDITY
+          mitigation_note: "以三個子構念收斂效度題組驗證滿意度構念，避免單題測量誤差"
+        - dimension: SAMPLING
+          mitigation_note: "採分層隨機抽樣涵蓋各訂單金額層級與地區，避免自選樣本偏誤"
+        - dimension: QUESTION_WORDING
+          mitigation_note: "題目經雙盲翻譯回譯比對，避免引導性用詞與文化不對等表達"
+        - dimension: NON_RESPONSE_BIAS
+          mitigation_note: "比對填答與未填答客戶的既有訂單紀錄，確認兩者消費行為無顯著差異"
+      is_translated: true
+      semantic_equivalence_check: "原始英文題本經雙向回譯（forward-backward translation）比對，2 位獨立譯者回譯結果與原文語意一致，無需再修正"
+      local_pilot_ref: "PILOT-TW-2026-09-05-001"
+  - description: "An untranslated, locally-authored survey -- semantic_equivalence_check/local_pilot_ref both structurally absent"
+    value:
+      id: "SURVEY-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "insight.survey"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      construct_definition: "新功能採用意願，以單一潛在構念操作化為 3 題行為意圖量表"
+      question_design: "3 題 7 點語意差異量表，題序隨機化以降低順序效應"
+      pilot_summary: "以 15 位內部員工進行試填，平均填答時間 2 分鐘，未發現題意混淆"
+      sampling_plan: "以現有 App 活躍用戶母體，簡單隨機抽樣 500 人推播問卷"
+      analysis_plan: "計算採用意願平均分與比例估計，並以使用頻率分群比較"
+      quality_dimensions:
+        - dimension: CONSTRUCT_VALIDITY
+          mitigation_note: "行為意圖量表沿用已發表之技術採用意願量表題組，未自行新創構念"
+        - dimension: SAMPLING
+          mitigation_note: "簡單隨機抽樣，抽樣框為活躍用戶名單，非自選樣本"
+        - dimension: QUESTION_WORDING
+          mitigation_note: "題序隨機化避免順序效應，題目均為單一直述句"
+        - dimension: NON_RESPONSE_BIAS
+          mitigation_note: "比對填答者與母體的既有使用頻率分布，確認無顯著落差"
+      is_translated: false
+
+open_questions:
+  - id: "OQ-SURVEYSTUDY-1"
+    question: "quality_dimensions allows duplicate dimensions (at-least-once, not exactly-once) -- should a future pass cap the max occurrences per dimension?"
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-SURVEYSTUDY-2"
+    question: "local_pilot_ref is a free-text reference/pointer, not a typed cross-reference into another record -- no typed-object for 'local pilot record' exists yet in this corpus."
+    owner: "operator, or whoever next builds a dedicated local-pilot typed-object"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F06 table (L457-469, Survey row L468) and §12.18 (L2768-2773) directly. Read
+    rct-record.schema.yaml, porter-five-forces-analysis.schema.yaml, and
+    blue-ocean-analysis.schema.yaml in full as shape precedent before writing this file.
+    Validated against jsonschema Draft202012Validator via a standalone script (required fields
+    present, id pattern satisfied, minItems:4 on quality_dimensions, all 4 `contains` clauses
+    enforced individually, dimension enum closed, additionalProperties:false present from the
+    start on both the top level and quality_dimensions[] items, the if/then
+    semantic_equivalence_check+local_pilot_ref-required-when-translated constraint, the if/then
+    both-forbidden-when-not-translated constraint, a negative control confirming a 3-dimension
+    array covering only 3 of the 4 concerns is rejected, a negative control confirming
+    is_translated=true missing either translation field is rejected, a negative control
+    confirming is_translated=false carrying either translation field is rejected, a negative
+    control confirming an out-of-enum dimension is rejected, a negative control confirming a
+    smuggled top-level and smuggled item-level key are both rejected, and both embedded
+    examples resolved through their real $ref to epistemic-label.schema.yaml).
+  note: >
+    quality_dimensions's 4-value enum and the is_translated global-localization gate are
+    transcribed verbatim from Atlas §12.18's own citation. The overall object shape
+    (id/version/provenance/5 flat pipeline fields/quality_dimensions[]/is_translated/2
+    conditional translation fields), the at-least-once cardinality, the record-level-only
+    provenance, and the asymmetric if/then pair are Phase 3-class compilation decisions,
+    explicitly flagged above in compilation_decisions. No mother document was modified.

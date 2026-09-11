@@ -1,0 +1,104 @@
+$id: "ai-lego://methods/contracts/insight.empathy_map.contract.yaml"
+title: "Empathy Map Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 human/customer-insight family (Atlas 人類／顧客洞察), 3rd member built (9 concurrent siblings
+  open F06 in this same batch, none touched here). Atlas cites this method ONCE: F06 table row (L463:
+  "Empathy Map｜Says/Thinks/Does/Feels｜用訪談/觀察填寫且標 fact/inference｜找語言與行為差距｜不可純 AI 猜")
+  -- grep-confirmed the only hit, no dedicated section. Core invariant: `entries` must cover all 4
+  Says/Thinks/Does/Feels quadrants at least once each (completeness floor, no upper cardinality cap); every
+  entry's `basis` (FACT/INFERENCE) is REQUIRED, mechanizing Atlas's own "標 fact/inference" instruction and
+  "不可純 AI 猜" caution.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Empathy Map row (L463)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.empathy_map` mints a NEW machine_id, `family: insight` reused
+  (F06's 3rd contract). Batch-wide decision (all 9 concurrent F06 members): record-level-ONLY provenance (a
+  single top-level `provenance` field), not per-item -- deliberately avoiding the per-item/record-level
+  ambiguity that hit both the F02 and F03 batches (2026-09-11 WORKLOG).
+
+id: insight.empathy_map
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [OBSERVE, CLASSIFY, CONTEXTUALIZE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. OBSERVE = the interview/
+# observation Atlas's own citation requires ("用訪談/觀察填寫"); CLASSIFY = the per-entry fact/inference
+# label; CONTEXTUALIZE = organizing observations into the 4 co-equal Says/Thinks/Does/Feels quadrants.
+
+purpose:
+  - surface_gaps_between_stated_and_observed_behavior_via_four_quadrants
+# Atlas L463 verbatim sense: benefit "找語言與行為差距" (find the gap between language and behavior) via the
+# Says/Thinks/Does/Feels split.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L463 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.bcg_matrix.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - EmpathyMap
+# NEW output type (see typed-objects/empathy-map.schema.yaml). Atlas names no PascalCase output type for this
+# method, same honesty gap every other thin-citation Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "entries covers all 4 quadrants (SAYS/THINKS/DOES/FEELS) at least once each -- Atlas's own Says/Thinks/Does/Feels IS the method's definition, a record covering only some of the 4 has not actually built an empathy map"
+  - "every entries[] item carries non-empty content and a basis in {FACT, INFERENCE} -- directly mechanizing Atlas's own '用訪談/觀察填寫且標 fact/inference' instruction and '不可純 AI 猜' caution; an entry with no basis label is exactly the un-grounded guessing this caution warns against"
+  - "subject is present and non-empty -- an empathy map with no named subject has not disclosed who is being observed"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- entries carry no supporting_evidence_refs field at all; this method's own `basis` field is the
+  # Atlas-cited fact/inference mechanism, a distinct concept from provenance's evidence-citation axis (see
+  # compilation_decisions). Same "no evidence-citation field exists to check" reasoning divergent.scamper's
+  # own identical flag already establishes.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same empty-and-
+# disclosed choice several sibling contracts' own field already takes.
+
+recommended_next: []
+# Atlas's own L463 citation names no "最佳搭配" column for this method (grep-confirmed) -- left empty rather
+# than inventing a pairing.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed exact-cardinality closed SET (porter-style, count == 4, no dup) or completeness-floor open-ended list?"
+    decision: "Completeness floor, open-ended -- all 4 quadrants required at least once, but more than 4 total entries is explicitly allowed (task-mandated: multiple Says/Thinks/Does/Feels observations per quadrant are real interview/observation practice), unlike strategy.porter_five_forces's own exact-5-no-more shape."
+  - question: "Should entries[] carry per-entry provenance, matching strategy.porter_five_forces's per-force provenance?"
+    decision: "No -- record-level provenance only, fixed batch-wide decision across all 9 concurrent F06 members (this task's own explicit instruction), disclosed here rather than independently re-derived, specifically to avoid the per-item/record-level ambiguity that hit both the F02 and F03 batches. Same shape divergent.scamper's own entries[] already establishes."
+  - question: "Is basis the same concept as provenance's epistemic_type?"
+    decision: "No -- basis is Atlas's own method-specific 'fact/inference' label for THIS observation's grounding; provenance's epistemic_type/authorship_state classify how the RECORD itself was produced (human/AI). Kept as two distinct fields, never merged."
+  - question: "Should basis default to FACT or INFERENCE when unstated?"
+    decision: "No default -- basis is REQUIRED on every entry with no fallback, since Atlas's own '不可純 AI 猜' caution is precisely the hazard a silently-defaulted entry would reintroduce."
+
+open_questions:
+  - "OQ-EMPATHYMAP-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-EMPATHYMAP-2: quality.evidence_labeling_required: false reflects the absence of a supporting_evidence_refs field on this type, not a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+  - "OQ-EMPATHYMAP-3: no quadrant-uniqueness ceiling exists -- a caller may submit many entries for one quadrant and only one for another; Atlas gives no citation either capping or requiring balance across quadrants (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table row (L463) directly -- grepped the whole Atlas file case-insensitively for "empathy"
+    -- confirmed exactly 1 real hit, no dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention, no §22.3 gate-table row. Grepped the whole `ai_lego` tree and this docs tree case-insensitively
+    for "empathy_map"/"EmpathyMap" before writing any of this method's own files -- zero pre-existing
+    implementation. Read strategy.porter_five_forces.contract.yaml (completeness-required-SET precedent) and
+    divergent.scamper.contract.yaml (open-ended-list, record-level-only-provenance precedent) in full before
+    writing this contract, combining both into this method's own fifth shape (completeness floor without an
+    upper cardinality bound). Read insight.persona.contract.yaml (F06 sibling, same batch-wide record-level-
+    only provenance decision) for family convention. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L463's own Says/Thinks/Does/Feels vocabulary and its "用訪談/觀察
+    填寫且標 fact/inference"/"不可純 AI 猜" instructions are transcribed verbatim into `preconditions`/
+    `quality`/`compilation_decisions`. `cognitive_primitives` and the completeness-floor-without-cap shape
+    are compilation decisions, disclosed above, not presented as directly Atlas-cited.

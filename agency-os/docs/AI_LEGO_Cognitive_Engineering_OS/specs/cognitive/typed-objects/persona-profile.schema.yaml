@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/persona-profile.schema.yaml"
+title: Persona Profile
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PersonaProfile` -- the declared `outputs` of `insight.persona`'s
+  Method Contract (methods/contracts/insight.persona.contract.yaml, `outputs: [PersonaProfile]`). Atlas cites
+  this method ONCE: F06 table row (L462: "Persona｜代表性使用者模型｜用研究資料建 goals/behavior/context｜
+  建立共同 reference｜Persona ≠ 真實民意") -- the thinnest possible citation class, a single bare table row,
+  no dedicated section.
+
+  Field provenance:
+    * `persona_name`/`goals`/`behaviors`/`context` -- Atlas's own literal "goals/behavior/context" split,
+      plus `persona_name` establishing the "建立共同 reference" (common reference) benefit's own subject.
+    * `research_basis` -- mechanized reading of the citation's own explicit misuse caution ("Persona ≠
+      真實民意", persona is NOT the same as real public opinion): a non-empty list of disclosed research
+      citations grounding this persona, so it is a research-grounded composite, not an invented one
+      presented as if it were real people. See `methods/contracts/insight.persona.contract.yaml`'s own
+      `compilation_decisions`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 table, Persona row (L462)"
+  - "methods/contracts/insight.persona.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L462's own bare method description plus low-risk, disclosed compilation
+  choices. Batch-wide decision (all 9 concurrent F06 members, this task's own explicit instruction):
+  record-level-ONLY provenance -- a single top-level `provenance` field, no per-item provenance anywhere in
+  this schema.
+
+compilation_decisions:
+  - question: "Per-field object list (id+statement+provenance) or plain non-empty string arrays for goals/behaviors/research_basis?"
+    decision: "Plain non-empty string arrays, task-mandated -- Atlas's own citation names 3 bare concepts with no per-item structure implied."
+  - question: "Record-level provenance only, or per-item provenance on each goals/behaviors/research_basis entry?"
+    decision: "Record-level ONLY -- fixed batch-wide decision, disclosed in the method contract's own compilation_decisions, avoiding the per-item/record-level ambiguity that hit the F02 and F03 batches."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, persona_name, goals, behaviors, context, research_basis, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PERSONA-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as ansoff-matrix.schema.yaml's ANSOFF- / bcg-matrix-analysis.schema.yaml's BCG- prefixes."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.persona"
+
+  persona_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED, non-empty. The persona's own name/label -- Atlas's own "建立共同 reference" (establish a
+      common reference) benefit presumes the persona has a name people can refer to.
+
+  goals:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      REQUIRED, non-empty list of non-empty strings. Atlas's own literal "goals/behavior/context" split,
+      1st of 3 named parts -- a persona with zero goals has not actually modeled anything (method contract's
+      own precondition).
+
+  behaviors:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      REQUIRED, non-empty list of non-empty strings. Same citation, 2nd of 3 named parts -- a persona with
+      zero behaviors has not actually modeled anything (method contract's own precondition).
+
+  context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "REQUIRED, non-empty. Same citation, 3rd of 3 named parts (goals/behavior/CONTEXT)."
+
+  research_basis:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      REQUIRED, non-empty list of non-empty strings. Mechanizes Atlas's own explicit misuse caution
+      ("Persona ≠ 真實民意") -- at least one disclosed research/evidence citation grounding this persona.
+      A `PersonaProfile` with zero research_basis entries is refused at construction (see
+      ai_lego/modules/insight/persona.py) -- the mechanized form of "this is not real public opinion unless
+      it's actually grounded in something real."
+
+  provenance:
+    description: >
+      Overall record provenance -- record-level ONLY (batch-wide decision for this whole F06 batch, see
+      compilation_decisions). Full provenance_record, same pattern value-proposition-canvas.schema.yaml's
+      own top-level `provenance` field already uses. No `const`: epistemic_type legitimately varies by
+      whether this record documents an AI-drafted or human-approved persona.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A persona for an independent freelance marketer, grounded in 2 disclosed research sources"
+    value:
+      id: "PERSONA-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.persona"
+      persona_name: "獨立接案行銷顧問 Mei"
+      goals:
+        - "在單一工作區內管理多個客戶的行銷活動成效"
+        - "減少每週花在手動報表整理上的時間"
+      behaviors:
+        - "每週一早上手動登入每個客戶的廣告後台匯出數據"
+        - "習慣用試算表比對不同客戶的成效指標"
+      context: "同時服務 5-8 個中小企業客戶，多數客戶預算有限，工具採購決策需自行負擔成本"
+      research_basis:
+        - "2026-08 對 6 位獨立接案行銷顧問的半結構式訪談逐字稿（coding 主題：跨客戶報表疲勞）"
+        - "2026-07 匿名問卷（n=42 獨立行銷顧問），78% 回報每週花 3 小時以上在手動報表整理"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-PERSONAPROFILE-1"
+    question: "research_basis is a flat string list, not a resolvable reference into a real EvidenceSet/Source typed-object -- should a future pass tighten this into a referential-integrity check once an Evidence typed-object companion exists for this family? (owner: operator)"
+  - id: "OQ-PERSONAPROFILE-2"
+    question: "No top-level synthesis/summary field exists beyond the 4 Atlas-named parts (goals/behaviors/context) plus research_basis -- should a future dedicated Atlas section for Persona (if one is ever added) introduce one? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L462) directly. Grepped the whole Atlas file case-insensitively for "persona"
+    -- confirmed exactly 1 real hit (L462), no dedicated section. Cross-checked against
+    methods/contracts/insight.persona.contract.yaml's own outputs/preconditions/quality. Read
+    value-proposition-canvas.schema.yaml and ansoff-matrix.schema.yaml in full as shape precedent before
+    writing this file. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_persona.py (required fields present, id pattern satisfied, additionalProperties:false
+    present at the top level, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key and an empty
+    goals/behaviors/research_basis array).
+  note: >
+    No mother document was modified. Atlas L462's own "goals/behavior/context" split is transcribed verbatim
+    into `goals`/`behaviors`/`context`. `research_basis`'s existence and non-emptiness is a mechanized
+    reading of the citation's own "Persona ≠ 真實民意" caution, disclosed as a compilation decision, not
+    presented as a literal Atlas field name. The flat-string-array shape and record-level-only provenance
+    placement are compilation decisions, disclosed above and in the method contract's own
+    compilation_decisions.

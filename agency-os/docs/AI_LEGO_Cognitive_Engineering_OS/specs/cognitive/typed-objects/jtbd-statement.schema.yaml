@@ -1,0 +1,181 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/jtbd-statement.schema.yaml"
+title: JTBD Statement
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `JtbdStatement` -- the declared `outputs` of `insight.jtbd`'s Method
+  Contract (methods/contracts/insight.jtbd.contract.yaml, `outputs: [JtbdStatement]`). Atlas cites this method
+  TWICE: F06 tool table row (L461: "JTBD｜理解使用者真正要完成的工作｜Situation→Motivation→Job→Desired outcome→
+  Workaround｜避免 feature-first｜最適合新產品") and dedicated §11.12 (L1463-1485: literal 3-clause template
+  "When [situation], I want to [motivation/job], so I can [desired outcome]." plus the explicit standalone rule
+  "必須搭配 Local Evidence -- 不能假設不同文化的 motivation 相同").
+
+  Field provenance:
+    * `situation` / `motivation` / `desired_outcome` -- §11.12's own literal 3-clause template, verbatim: the
+      "When [situation]" / "I want to [motivation/job]" / "so I can [desired outcome]" clauses. All 3 REQUIRED
+      non-empty -- a statement missing any one is not actually a JTBD statement per the template's own shape.
+    * `workaround` -- the table row's own 5th, least-certain element ("→Workaround"). NULLABLE: a job
+      legitimately may have no existing workaround worth citing yet, but IF present must be a non-empty string
+      (an empty-string placeholder masquerading as disclosed content is refused, same discipline every other
+      content field in this record uses).
+    * `local_evidence` -- §11.12's own explicit standalone rule ("必須搭配 Local Evidence"). REQUIRED non-empty,
+      NEVER optional -- disclosed as a hard requirement, not a soft caution, enforced STRUCTURALLY (required,
+      non-nullable schema field) rather than via `quality.evidence_labeling_required` (the method contract sets
+      that flag `false` -- its own schema definition scopes it to claims from an EvidenceSet input, which this
+      method does not take; see method contract's own `compilation_decisions`).
+    * `provenance` -- RECORD-LEVEL ONLY, a deliberate BATCH-WIDE decision for this whole F06 build (matching
+      `functional-decomposition.schema.yaml`'s own record-level placement), made specifically to avoid the
+      per-item/record-level ambiguity that hit both the F02 and F03 batches. A JtbdStatement's 5 fields are one
+      coherent claim about one job, not a list of independently-sourced items.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, JTBD row (L461)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.12 待辦工作理論／JTBD dedicated section (L1463-1485)"
+  - "methods/contracts/insight.jtbd.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/functional-decomposition.schema.yaml -- record-level-only-provenance placement precedent (this F06 batch's fixed decision, disclosed above)"
+  - "specs/cognitive/typed-objects/decision-journal-entry.schema.yaml -- nullable-but-non-empty-if-present string field precedent (`decision_ref`), reused here for `workaround`"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L461/§11.12's own literal template plus low-risk, disclosed compilation choices (the
+  flat 5-field shape, `workaround` nullability, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Flat 5-field record, or local_evidence as a richer structured evidence-list (id/content/provenance per entry, matching causal.process_tracing's own evidence[])?"
+    decision: "Flat, local_evidence a plain non-empty string -- task-mandated exact shape; §11.12's own citation gives no internal structure for Local Evidence beyond naming the requirement itself. See method contract's own open_questions (OQ-JTBD-3) for the future-structured-evidence option."
+  - question: "Per-field provenance or record-level only?"
+    decision: "Record-level only, one top-level `provenance` -- explicit F06-batch-wide decision (see method contract's own compilation_decisions), not this schema's own independent judgment call."
+  - question: "Should workaround be `type: [\"string\", \"null\"]` with no further constraint (decision-journal-entry.schema.yaml's own decision_ref precedent, which accepts any string including empty), or additionally require non-empty when present?"
+    decision: "Additionally require non-empty when present (`minLength: 1`, `pattern: \"\\\\S\"`, applied only within the non-null branch via `oneOf`) -- unlike `decision_ref` (a cross-reference identifier, legitimately any string), `workaround` is CONTENT (what the user currently does instead), so an empty string would misrepresent 'no data entered' as 'genuinely disclosed, empty workaround'."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, provenance, situation, motivation, desired_outcome, workaround, local_evidence]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^JTBD-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.jtbd"
+
+  situation:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      §11.12's own template, clause 1 verbatim: "When [situation]". REPORTED content, not computed -- the
+      concrete circumstance the user is in when the job arises.
+
+  motivation:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      §11.12's own template, clause 2 verbatim: "I want to [motivation/job]". REPORTED content -- the actual
+      job/progress the user is trying to make, framed as an action, not a feature (Atlas's own "避免
+      feature-first" benefit, L461).
+
+  desired_outcome:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      §11.12's own template, clause 3 verbatim: "so I can [desired outcome]". REPORTED content -- the progress
+      state the user is trying to reach.
+
+  workaround:
+    description: >
+      NULLABLE. Either null (no existing workaround has been identified/cited for this job yet -- legitimate,
+      not a defect) or a non-empty string describing what the user currently does instead, absent a proper
+      solution (the table row's own 5th, least-certain element, L461's "→Workaround"). An empty string is
+      REFUSED -- see compilation_decisions.
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 1
+        pattern: "\\S"
+
+  local_evidence:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED, NEVER optional. §11.12's own explicit standalone rule verbatim: "必須搭配 Local Evidence --
+      不能假設不同文化的 motivation 相同" (must pair with Local Evidence -- motivation cannot be assumed
+      identical across cultures). Concrete, situated evidence (an interview quote, an observed behavior, a
+      local market fact) grounding this specific situation/motivation pairing for THIS population -- not a
+      generic or imported assumption.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A JTBD statement for a small-business owner's invoicing tool, with a cited local workaround and local evidence"
+    value:
+      id: "JTBD-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.jtbd"
+      situation: "小型工作室老闆每個月月底要同時處理 5-10 個客戶的請款單，且大多客戶用 LINE 而非 email 溝通"
+      motivation: "想要在不切換到電腦、不用另外學新系統的情況下，把請款單正確送到對的客戶手上"
+      desired_outcome: "月底請款流程縮短到 30 分鐘內完成，且不再因為單號或金額打錯而跟客戶來回澄清"
+      workaround: "目前用手機拍 Excel 截圖傳 LINE，金額用小算盤先算好再手動填入"
+      local_evidence: "訪談 6 位台灣工作室老闆，5 位表示 LINE 是主要客戶溝通管道，僅 1 位使用 email 為主（2026-08 訪談紀錄）"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+  - description: "A JTBD statement with no existing workaround identified yet (null is legal)"
+    value:
+      id: "JTBD-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "insight.jtbd"
+      situation: "遠端團隊的新人在第一週需要同時認識工具、流程與同事"
+      motivation: "想要有一個單一起點，知道『現在該做什麼、該找誰』，而不是到處問人"
+      desired_outcome: "第一週結束時能獨立完成第一個小任務，不需要同步會議澄清基本問題"
+      workaround: null
+      local_evidence: "3 位近半年入職的遠端新人訪談皆表示第一週最大挫折是『不知道該從哪裡開始』（2026-09 訪談紀錄）"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+
+open_questions:
+  - id: "OQ-JTBDSTATEMENT-1"
+    question: "local_evidence is a plain string per the task-mandated flat shape -- should a future revision promote it to a structured evidence-list (id/content/provenance per entry) if a downstream consumer ever needs to reference individual evidence items? Same open question the method contract's own OQ-JTBD-3 already discloses."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-JTBDSTATEMENT-2"
+    question: "No cross-reference from this record to a future strategy.stp / strategy.value_proposition_canvas / framing.how_might_we record exists (all 3 name JTBD as an upstream companion in their own citations) -- should a future revision add a soft reference field once a real consumer needs one?"
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L461) and §11.12 (L1463-1485) directly. Grepped the whole Atlas file
+    case-insensitively for "jtbd"/"jobs to be done" -- confirmed exactly these 2 real citations for THIS
+    method (all other JTBD mentions in the Atlas are other methods' own best-pairing/recipe columns naming
+    JTBD as their upstream, not a second dedicated section here). Cross-checked against
+    methods/contracts/insight.jtbd.contract.yaml's own outputs/preconditions/quality. Read
+    functional-decomposition.schema.yaml (record-level-only-provenance precedent) and
+    decision-journal-entry.schema.yaml (`decision_ref`'s own nullable-string field, read for contrast: this
+    file's `workaround` additionally requires non-empty-if-present, disclosed as a deliberate divergence in
+    compilation_decisions) in full before writing this file. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "jtbd"/"jobs_to_be_done"/"JtbdStatement" before writing any of this method's own
+    files -- zero pre-existing implementation. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_jtbd.py (required fields present, id pattern satisfied, additionalProperties:false present
+    at the top level, embedded examples resolved through their real $ref to epistemic-label.schema.yaml,
+    negative controls for a smuggled top-level key, an empty situation/motivation/desired_outcome/local_evidence
+    string, an empty-string workaround, and a null workaround validating successfully).
+  note: >
+    No mother document was modified. `situation`/`motivation`/`desired_outcome`/`workaround`/`local_evidence`
+    are transcribed directly from Atlas §11.12's own literal template and L461's own table row. The exact field
+    names, the `oneOf` null-or-non-empty-string shape for `workaround`, the record-level-only provenance
+    placement (an explicit F06-batch-wide decision, not this file's own independent call), and the JTBD- prefix
+    are this suite's own compiled structure, disclosed above, not textually cited.

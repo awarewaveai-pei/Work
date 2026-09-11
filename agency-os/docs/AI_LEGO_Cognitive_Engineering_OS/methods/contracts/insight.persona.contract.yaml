@@ -1,0 +1,107 @@
+$id: "ai-lego://methods/contracts/insight.persona.contract.yaml"
+title: "Persona Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 human/customer-insight family (Atlas 人類／顧客洞察), 2nd member -- FIRST-EVER F06 member built
+  (family did not exist before this task; 9 concurrent siblings open F06 in this same batch, none touched
+  here). Atlas cites this method ONCE: F06 table row (L462: "Persona｜代表性使用者模型｜用研究資料建
+  goals/behavior/context｜建立共同 reference｜Persona ≠ 真實民意") -- grep-confirmed the only hit, no
+  dedicated section. Core invariant: `research_basis` non-empty -- Atlas's own explicit misuse caution
+  ("Persona ≠ 真實民意") mechanized: a persona built from zero disclosed research citations is exactly the
+  invented-composite-presented-as-real-people abuse that caution warns against, so construction is refused.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 table row, Persona (L462)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.persona` mints a NEW machine_id AND a NEW `family: insight`
+  (F06's first contract). Batch-wide decision (all 9 concurrent F06 members): record-level-ONLY provenance
+  (a single top-level `provenance` field), not per-item -- deliberately avoiding the per-item/record-level
+  ambiguity that hit both the F02 and F03 batches (2026-09-11 WORKLOG).
+
+id: insight.persona
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [DECOMPOSE, CONTEXTUALIZE, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = breaking research
+# data into distinct goals/behaviors (Atlas's own "goals/behavior/context" split); CONTEXTUALIZE = the
+# `context` field itself (same primitive strategy.swot's own CLASSIFY+COMPARE+CONTEXTUALIZE composition
+# already establishes for a sibling field of this exact name); EXPLAIN = the disclosed `research_basis`
+# grounding content, same sense strategy.tows's own EXPLAIN primitive already carries for disclosed content.
+
+purpose:
+  - build_a_representative_user_model_grounded_in_research_data
+# Atlas L462 verbatim sense: "代表性使用者模型" (representative user model) / method "用研究資料建
+# goals/behavior/context" / benefit "建立共同 reference".
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own citation names no upstream typed-object input (no JTBD/Interview/Survey companion is
+  # required by this bare table row), same "no hard upstream dependency" position strategy.ansoff's own
+  # inputs.required: [] already establishes for an analogous thin citation.
+
+outputs:
+  - PersonaProfile
+# NEW output type (see typed-objects/persona-profile.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other thin-citation Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "persona_name is a non-empty string (PERSONA_EMPTY_NAME) -- a persona with no name has not established the 'common reference' Atlas's own benefit column names"
+  - "goals is non-empty, every entry a non-empty string (PERSONA_EMPTY_GOALS) -- Atlas's own literal 'goals/behavior/context' split, 1st of 3 named parts"
+  - "behaviors is non-empty, every entry a non-empty string (PERSONA_EMPTY_BEHAVIORS) -- same citation, 2nd of 3 named parts"
+  - "context is a non-empty string (PERSONA_EMPTY_CONTEXT) -- same citation, 3rd of 3 named parts"
+  - "research_basis is non-empty, every entry a non-empty string (PERSONA_EMPTY_RESEARCH_BASIS) -- Atlas's own explicit misuse caution 'Persona ≠ 真實民意' (a persona is not the same as real public opinion) mechanized: a persona with zero disclosed research grounding is an invented composite presented as if it represents real people, exactly the abuse this caution warns against"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.ansoff/strategy.bcg_matrix's identical flags already
+  # establish: Atlas's L462 citation is a single bare table row, no dedicated section, no explicit
+  # unevidenced-claim misuse warning beyond the "Persona ≠ 真實民意" caution already mechanized above via
+  # `research_basis` non-emptiness (a structural invariant, not an evidence-labeling requirement on claims).
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same empty-and-
+# disclosed choice strategy.ansoff/strategy.bcg_matrix's own identical fields already apply.
+
+recommended_next: []
+# Atlas L462 names no "最佳搭配" column for this method (unlike strategy.bcg_matrix's own GE-McKinsey
+# column) -- genuinely nothing to name, left empty rather than inferring one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Per-field object list (id+statement+provenance, VPC/ansoff-style) or plain non-empty string arrays for goals/behaviors/research_basis?"
+    decision: "Plain non-empty string arrays, task-mandated -- Atlas's own citation names 3 bare concepts (goals/behavior/context) with no per-item structure implied, and research_basis is a flat citation list, not a labeled-item collection needing its own id/statement split."
+  - question: "Record-level provenance only, or per-field/per-item provenance (VPC/ansoff/bcg_matrix-style)?"
+    decision: "Record-level ONLY -- fixed batch-wide decision across all 9 concurrent F06 members (this task's own explicit instruction), disclosed here rather than independently re-derived, specifically to avoid the per-item/record-level ambiguity that hit both the F02 and F03 batches."
+  - question: "Should research_basis carry richer structure (source_type, locator) matching PESTEL's per-factor evidence fields?"
+    decision: "No -- plain non-empty strings, task-mandated. Atlas's L462 citation gives no evidence-schema detail for this method; a richer structure would overstate this thin citation."
+
+open_questions:
+  - "OQ-PERSONA-1: cognitive_primitives [DECOMPOSE, CONTEXTUALIZE, EXPLAIN] is this file's own inference -- Atlas §4 gives no composition formula for this method. (owner: operator)"
+  - "OQ-PERSONA-2: inputs.required / recommended_next are both empty -- Atlas L462 names no companion method/typed-object for this citation. (owner: operator)"
+  - "OQ-PERSONA-3: research_basis is a flat string list, not a resolvable reference into a real EvidenceSet/Source typed-object -- a future pass could tighten this into a referential-integrity check once an Evidence typed-object companion exists for this family. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L462) directly. Grepped the whole Atlas file case-insensitively for "persona"
+    -- confirmed L462 (this table row) is the only real hit, no dedicated section, no §4 composition formula.
+    Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "persona"/"PersonaProfile"
+    before writing any of this method's own files -- zero pre-existing Method Atlas contract/module (all
+    other hits were unrelated prose, e.g. personal-data/PII discussions). Read
+    strategy.value_proposition_canvas.contract.yaml, strategy.three_c.contract.yaml, and
+    strategy.ansoff.contract.yaml in full before writing this contract, reusing their thin-citation
+    conventions. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L462's own "goals/behavior/context" split is transcribed verbatim
+    into the 3 required non-empty fields (`goals`, `behaviors`, `context`); `research_basis`'s
+    non-emptiness is a mechanized reading of the citation's own "Persona ≠ 真實民意" caution, disclosed
+    above, not presented as a literal Atlas field name. `cognitive_primitives`, the flat-string-array shape,
+    and the record-level-only provenance placement are compilation decisions, disclosed above.

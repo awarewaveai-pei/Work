@@ -1,0 +1,181 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/journey-map.schema.yaml"
+title: Journey Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `JourneyMap` -- the declared `outputs` of `insight.journey_map`'s
+  Method Contract (methods/contracts/insight.journey_map.contract.yaml, `outputs: [JourneyMap]`). Atlas
+  cites this method TWICE: F06 table row (L464) and dedicated §11.13 (L1489-1512, mermaid 7-stage
+  illustrative flow + a richer 7-field per-stage list). This schema adopts the table row's leaner 5-field
+  per-stage shape (actions/emotion/pain/opportunity/evidence), NOT §11.13's Questions/Responsible-team
+  columns -- see the method contract's own compilation_decisions.
+
+  `stages` requires minItems 1 (non-empty); each entry's `stage_number` is SHAPE-bounded here to a positive
+  integer only -- genuine ordered-sequence completeness (the set of stage_number values across ALL stages
+  equals exactly {1..len(stages)}, no gaps, no duplicates) is a runtime-only invariant this schema cannot
+  express (JSON Schema has no cross-item, length-dependent set-equality operator), enforced by
+  `ai_lego/modules/insight/journey_map.py` at both the builder and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Journey Map row (L464)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.13 顧客旅程地圖／使用者旅程地圖 (L1489-1512)"
+  - "methods/contracts/insight.journey_map.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/lotus-blossom-session.schema.yaml -- fixed-N numeric-slot completeness precedent, generalized here to a caller-determined length"
+  - "specs/governance/epistemic-label.schema.yaml -- record-level provenance AND the optional+nullable field-shape precedent (#/definitions/locked) this schema's own `evidence` field reuses"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct (non-ambiguous) transcription of the table row's 5-field list, plus low-risk disclosed compilation
+  choices (see the method contract's own compilation_decisions for the full reasoning).
+
+compilation_decisions:
+  - question: "stage_number as a fixed closed enum (lotus_blossom-style 1-8) or an open positive integer?"
+    decision: "Open positive integer (minimum: 1), no upper bound in the schema -- the real upper bound (len(stages)) is a caller-determined, cross-item, runtime-only quantity that JSON Schema cannot express relative to this field alone."
+  - question: "evidence: required-and-nullable, or optional-and-nullable?"
+    decision: "Optional (absent from `required`) AND nullable (type: [string, null], default: null) -- same shape epistemic-label.schema.yaml's own `#/definitions/locked` already establishes, per the method contract's own compilation_decisions (Atlas L464's weaker '可加 evidence' wording governs over §11.13's unmarked-optional list)."
+  - question: "Per-stage provenance (ansoff/bcg-style) or one record-level provenance field?"
+    decision: "Record-level only, per task-mandated F06 batch-wide design -- same shape lotus-blossom-session.schema.yaml's own single top-level `provenance` already establishes, not ansoff/bcg's per-item pattern."
+  - question: "additionalProperties: false at the top level and the stages[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Does JSON Schema itself express 'stage_number values across all stages equal exactly {1..len(stages)}, no gaps, no duplicates'?"
+    decision: "No -- plain JSON Schema has no cross-item, length-dependent set-equality operator. minItems:1 plus the per-item positive-integer bound covers SHAPE only; genuine ordered-sequence completeness is a runtime-only invariant, enforced at construction AND independently re-derived by a gate in journey_map.py -- same limitation-and-workaround class lotus-blossom-session.schema.yaml's own identical compilation_decision already documents, generalized from a fixed N=8 to a caller-determined N."
+
+type: object
+required: [id, version, journey_subject, stages, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^JOURNEY-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as lotus-blossom-session.schema.yaml's LOTUS- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "insight.journey_map"
+
+  journey_subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The single shared anchor (which journey/persona/product this map describes) every stage's analysis is scoped to -- REPORTED content, not computed."
+
+  stages:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L464's own 'stages→actions→emotion→pain→opportunity' end-to-end sequence. SHAPE-bounded here to
+      a non-empty array; genuine ordered-sequence completeness (stage_number covering 1..len(stages), each
+      exactly once, no gaps, no duplicates) is a runtime-only invariant this schema cannot express --
+      enforced by ai_lego/modules/insight/journey_map.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [stage_number, stage_name, actions, emotion, pain, opportunity]
+      additionalProperties: false
+      properties:
+        stage_number:
+          type: integer
+          minimum: 1
+          description: "This stage's position in the end-to-end sequence. SHAPE-bounded to a positive integer only; genuine 1..len(stages) completeness+distinctness across the whole stages[] array is runtime-only, see top-level description. Booleans are explicitly rejected at runtime (bool is a subclass of int in Python) -- see journey_map.py module docstring."
+        stage_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What this stage of the journey concretely is (e.g. 認知/研究/選擇) -- REPORTED content, not computed."
+        actions:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What the subject actually does at this stage -- Atlas L464's own 'actions' column."
+        emotion:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "How the subject feels at this stage -- Atlas L464's own 'emotion' column."
+        pain:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The friction/breakpoint at this stage -- Atlas L464's own 'pain' column, feeding its own benefit '找斷點' (find breakpoints)."
+        opportunity:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The improvement opportunity this stage's pain point suggests -- Atlas L464's own 'opportunity' column, feeding its own benefit '高價值改善點' (high-value improvement points)."
+        evidence:
+          type: [string, "null"]
+          default: null
+          description: "OPTIONAL and NULLABLE -- Atlas L464's own caution '可加 evidence' ('may add' evidence, not 'must add'). See the method contract's own compilation_decisions for why this weaker table-row wording governs over §11.13's richer, unmarked-optional 7-field list."
+
+  provenance:
+    description: "Overall record provenance -- same record-level (not per-item) pattern lotus-blossom-session.schema.yaml's own top-level provenance already establishes."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 4-stage journey map for a SaaS free-trial-to-paid conversion journey"
+    value:
+      id: "JOURNEY-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "insight.journey_map"
+      journey_subject: "SaaS 免費試用轉付費旅程"
+      stages:
+        - stage_number: 1
+          stage_name: "註冊試用"
+          actions: "填寫表單並啟用帳號"
+          emotion: "期待但略有疑慮"
+          pain: "表單欄位過多"
+          opportunity: "縮短表單、延後選填欄位"
+          evidence: "用戶訪談 N=12，8 人提到表單太長"
+        - stage_number: 2
+          stage_name: "首次使用"
+          actions: "探索核心功能"
+          emotion: "好奇，容易迷失"
+          pain: "找不到核心價值功能"
+          opportunity: "加入導覽或範本"
+          evidence: null
+        - stage_number: 3
+          stage_name: "試用中期評估"
+          actions: "比較付費方案"
+          emotion: "猶豫"
+          pain: "定價頁資訊不清楚"
+          opportunity: "加入方案比較表與 ROI 試算"
+          evidence: null
+        - stage_number: 4
+          stage_name: "轉換決策"
+          actions: "選擇方案並付款"
+          emotion: "謹慎"
+          pain: "付款流程步驟過多"
+          opportunity: "簡化付款、支援更多金流"
+          evidence: null
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-JOURNEYMAP-SCHEMA-1"
+    question: "stage_number's genuine 1..len(stages) completeness+distinctness is a runtime-only invariant (see compilation_decisions) -- should a future pass explore JSON Schema unevaluatedItems/contains-based tricks instead of relying solely on the runtime gate? Same open question lotus-blossom-session.schema.yaml's own OQ-LOTUSBLOSSOMSESSION-1 already discloses for a fixed-N version of this shape. (owner: operator)"
+  - id: "OQ-JOURNEYMAP-SCHEMA-2"
+    question: "§11.13's own Questions and Responsible system/team per-stage columns are not represented in this schema (see the method contract's own compilation_decisions) -- a future richer variant could add them as additional optional stage fields. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F06 table row (L464) and the full §11.13 section (L1489-1512) directly. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "journey_map"/"JourneyMap"/"customer journey" before writing any of this method's
+    own files -- zero pre-existing implementation. Cross-checked against methods/contracts/
+    insight.journey_map.contract.yaml's own outputs/preconditions/quality. Read lotus-blossom-session.schema.yaml
+    and epistemic-label.schema.yaml in full as shape precedent before writing this file. Validated against
+    jsonschema Draft202012Validator via the slice's own test suite (required fields present, id pattern
+    satisfied, stage_number positive-integer bound, additionalProperties:false present at the top level and
+    the stages[] item level, embedded example resolved through its real $ref to epistemic-label.schema.yaml,
+    negative controls for a smuggled top-level key, a smuggled stages[] item key, an empty stages array, a
+    gap in stage_number, a duplicate stage_number, and a bool masquerading as a stage_number).
+  note: >
+    `stages` minItems:1 and each entry's 5 required free-text fields are direct transcriptions of Atlas
+    L464's own literal 'stages→actions→emotion→pain→opportunity'. The record-level-only provenance choice,
+    the caller-determined-length (not fixed-N) sequence-completeness shape, the evidence optional+nullable
+    field, and the deliberate 5-field (not §11.13's 7-field) stage shape are compilation decisions, disclosed
+    above and in the method contract. No mother document was modified to produce this file.

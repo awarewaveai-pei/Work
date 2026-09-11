@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-09-11（138–146 號切片：開新家族 F06 人類／顧客洞察 0/9→9/9，9 個平行 agent + 1 critic，零發現）
+
+**觸發**：緊接 F03 收官後，操作者持續「還沒完成系統就繼續做下去」。選型：F06（人類／顧客洞察，Atlas L457-469，9 個成員：JTBD/Persona/Empathy Map/Journey Map/Service Blueprint/Contextual Inquiry/Interview/Survey/Focus Group）——Atlas 順序中 F03 完工後的下一個未開工家族。**本批次刻意應用前兩批的教訓**：provenance 欄位放置這次直接在派工 brief 裡明訂「全 9 個方法一律 record-level only」（非事後才裁決一致性），閉區間整數檢查（如 journey_map 的 stage_number、focus_group 的 participant_count）brief 裡直接點名 F03 `lotus_blossom.py` 的 bool-masquerade 真 bug 要求同批預先防範，不留給 critic 事後抓。
+
+**建置**：jtbd(45t，§11.12 三段式「情境/動機/期望結果」模板+`local_evidence` 硬性必填，機械化「必須搭配 Local Evidence」)/persona(51t，`research_basis` 非空是硬性要求，機械化「Persona≠真實民意」)/empathy_map(57t，封閉 4 象限 SAYS/THINKS/DOES/FEELS 完整覆蓋下限+每筆 entry 強制 FACT/INFERENCE 標記，機械化「標 fact/inference」+「不可純 AI 猜」，與 provenance 本身的 epistemic_type/authorship_state 軸刻意區隔)/journey_map(65t，stage_number 須形成無縫無重複的 {1..N} 序列，GENUINE_COMPUTE，且從一開始就排除 Python bool 冒充 int)/service_blueprint(52t，採用較嚴謹的 §12.16 五層結構(Customer Actions/Frontstage/Backstage/Support Processes/Systems-Data)取代表格列的四層壓縮版，完整覆蓋下限)/contextual_inquiry(40t，每筆 observation 強制三欄位「使用者做/研究者看/即時追問」全部非空，機械化該方法自己的三段式循環)/interview(52t，§12.17 完整 9 階段固定管線逐字轉錄+獨立必填 `documented_biases` 欄位，機械化「樣本與偏誤要記錄」；建置 agent 順手訂正本次 brief 對該警語「重複兩次」的錯誤描述，查證後其實只出現一次)/survey(60t，同時實作 Atlas 給的兩種結構——表格列 5 階段管線+§12.18 的 4 個品質維度完整覆蓋下限；`is_translated` 觸發不對稱 if/then，機械化「翻譯後必須做語義等值與 local pilot」)/focus_group(54t，`participant_count` 真實 [6,10] 閉區間檢查+`generalizability_scope` 單一合法值列舉結構性排除於建構子，機械化「不用來估人口比例」)。476 tests 零衝突，全 regression 8346→8822，golden 3387→3432。
+
+**critic 覆審（1 個，覆蓋全批，特別交付前兩批教訓是否真的落地）**：verdict **零發現**（Critical/Major/Minor 全數 0，僅 1 個既有揭露充分的設計備註）——critic 自建 9 個獨立 hand-tamper 反例（非沿用各方法自己的測試）逐一驗證兩層防護真的擋得住，逐一確認：journey_map／focus_group 的 bool-masquerade 防護真的從一開始就做對；9 個方法 provenance 放置真的全數一致（record-level only，零意外的 per-item）；journey_map 從 §11.13 七欄位窄化為五欄位、service_blueprint 從表格列四層改採 §12.16 五層，兩個範圍調整皆有充分揭露，非未完成；interview 的「樣本與偏誤」引用訂正查證屬實。**是目前三批中最乾淨的一批**——前兩批 critic 覆審抓到的三種真 bug class（別名污染／單列表內重複未查／bool 冒充 int）+ provenance 不一致，本批次因為在 brief 階段就先防範，validated 沒有重演。
+
+**[已修改]**：9 個新 method（各 5 檔=45 檔）+ `ai_lego/modules/insight/__init__.py`（家族總覽）+ `contract-backlog.yaml`（9 筆新登記）。
+**[驗證結果]**：`python -m unittest discover` 8822/8822 PASS；golden 3432/3432 PASS；9 個 CLI slice 全數真跑 PASS；1 個 critic 覆審（verdict=零發現，不需任何修正）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（Projects/internal/cognitive-engineering-os） | exit=0 | ms=1550586
+- REVIEW_DONE: critic=Standard | verdict=pass（零發現） | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=insight\.(jtbd\|persona\|empathy_map\|journey_map\|service_blueprint\|contextual_inquiry\|interview\|survey\|focus_group) | hits=45（全部為本批次自己的 5 檔×9 方法，零殘留/零衝突）
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：`OQ-JOURNEYMAP-1`（是否補回 §11.13 的 Questions/Responsible-team 兩欄位，未來若有下游消費者需要再議）；`OQ-SERVICEBLUEPRINT-2`（per-layer ownership 是否需要，同性質）；provenance 放置規則仍待另一 session 寫進 `METHOD_ATLAS_SLICE_LEAN_STANDARD.md`（進行中，本批次已用「派工時直接規定」的方式繞過此依賴，非阻塞）；F06 之後仍有 F07/F09/F10/F13/F14/F15/F22/F23/F24 共 9 個家族完全未開工。**[rollback]**：`git revert` 本次 commit 即可，9 個方法彼此無交叉引用，互不影響其餘家族。
+
 ## 2026-09-11 HCI30 規則引擎自動採用開關——操作者原本「都要」的第二半，這輪補上
 
 上一輪規則引擎只做了「都要」的第一半（強制人工審核），操作者接著給了真實參考（自己以前寫的 Airtable Automation Script，結構化欄位加權算分+HARD STOP+風險分級+自動組理由文字），並明確說「分數先算出來給你看＋理由，人工確認是旁邊加一欄，不是擋住不給看」。本輪補上第二半：案件層級可設定的「自動採用門檻」開關。

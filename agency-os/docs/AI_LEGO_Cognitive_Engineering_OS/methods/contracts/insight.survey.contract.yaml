@@ -1,0 +1,124 @@
+$id: "ai-lego://methods/contracts/insight.survey.contract.yaml"
+title: "Survey / Questionnaire Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F06 `insight` (人類／顧客洞察) family -- NEW family, this batch's opening member
+  (F06 was 0/9 built before this batch of 9 concurrent, file-disjoint agents). Atlas cites this
+  method TWICE: F06 table row (L468: "Survey｜大規模量化｜construct→question→pilot→sample→
+  analysis｜估比例、分群｜注意 sampling bias") and dedicated §12.18 (L2768-2773), which names 4
+  quality-concern DIMENSIONS ("construct validity、sampling、question wording、non-response
+  bias") plus an explicit global-localization requirement ("全球要求：翻譯後必須做語義等值與
+  local pilot，不是直譯即可"). Core invariants: the table row's own 5-stage pipeline is a flat
+  record (all 5 stages required non-empty, no positional stage array, same shape
+  `causal.rct.contract.yaml`'s own pipeline already uses); §12.18's own 4 dimensions require
+  completeness (each named >=1 time, `strategy.porter_five_forces`-style) but not exclusivity
+  (a dimension may recur, unlike Porter's exact 5-of-5); `is_translated` gates
+  `semantic_equivalence_check`/`local_pilot_ref` via a `strategy.blue_ocean`-style asymmetric
+  if/then (both REQUIRED when true, both structurally ABSENT when false).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F06 tool table, Survey row (L468)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.18 問卷調查／調查研究 (L2768-2773) -- 4 quality dimensions + global-localization requirement"
+  - "methods/contracts/causal.rct.contract.yaml -- flat multi-stage pipeline record precedent (5-field completeness) reused for construct_definition..analysis_plan"
+  - "methods/contracts/strategy.porter_five_forces.contract.yaml -- closed-set-with-completeness precedent, generalized here from exactly-once to at-least-once"
+  - "methods/contracts/strategy.blue_ocean.contract.yaml -- asymmetric if/then conditional-requiredness precedent (key REQUIRED vs structurally ABSENT) reused for is_translated"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: insight.survey` mints a NEW family (`insight`, F06's first
+  built member) and a new machine_id. Record-level provenance ONLY (single top-level
+  `provenance` field, not per-item on `quality_dimensions[]`) is a deliberate F06-batch-wide
+  decision to avoid the per-item/record-level ambiguity that hit both the F02 and F03 batches --
+  disclosed here as a compilation decision, not an Atlas citation.
+
+id: insight.survey
+version: "1.0.0"
+family: insight
+
+cognitive_primitives: [DECOMPOSE, ESTIMATE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE =
+# construct->question breakdown (the pipeline's own first 2 stages); ESTIMATE = Atlas's own
+# "估比例" (estimate proportions); CLASSIFY = Atlas's own "分群" (segment). Same
+# [DECOMPOSE, ESTIMATE, CLASSIFY] inference class strategy.bcg_matrix.contract.yaml's own
+# benefit-column reading already establishes.
+
+purpose:
+  - quantify_attitudes_behavior_or_prevalence_at_scale_via_a_construct_to_analysis_pipeline
+# Atlas L468 verbatim sense: "大規模量化" (large-scale quantification) / method
+# "construct->question->pilot->sample->analysis" / benefit "估比例、分群".
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- neither citation names one, same "no hard upstream
+  # dependency" position strategy.porter_five_forces.contract.yaml's own inputs.required: []
+  # takes.
+
+outputs:
+  - SurveyStudy
+# NEW output type (see typed-objects/survey-study.schema.yaml). Neither citation gives this
+# method's output a PascalCase name.
+
+preconditions:
+  - "construct_definition, question_design, pilot_summary, sampling_plan, and analysis_plan are all present and non-empty strings -- Atlas's own L468 literal 5-stage sequence IS the method's definition, a record skipping any one stage has not actually run a Survey"
+  - "quality_dimensions includes at least one entry for EACH of CONSTRUCT_VALIDITY, SAMPLING, QUESTION_WORDING, NON_RESPONSE_BIAS, every entry carrying a non-empty mitigation_note -- Atlas's own §12.18 (L2771) names these 4 as the method's defining quality concerns, not a completeness-free list"
+  - "when is_translated is true, semantic_equivalence_check and local_pilot_ref are both present, non-empty strings -- Atlas's own §12.18 (L2773) explicit global requirement '翻譯後必須做語義等值與 local pilot'"
+  - "when is_translated is false, semantic_equivalence_check and local_pilot_ref are both structurally ABSENT -- a survey never translated has nothing to disclose at either key, same forbidden-not-merely-null discipline strategy.blue_ocean.contract.yaml's own industry_standard_level-for-CREATE already establishes"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-citation default strategy.blue_ocean/strategy.bcg_matrix already apply:
+  # neither Atlas citation for Survey states an explicit unevidenced-claim misuse warning
+  # (contrast SWOT's own L1347). See open_questions.
+
+forbidden_transition: []
+# No §14.1-style illegal-transition example names Survey (grep-confirmed).
+
+recommended_next: []
+# F06's table has only 5 columns (工具/用途/使用方式/效益/注意) -- the 5th is a caution
+# ("注意 sampling bias"), not a best-pairing column like F08's "BMC"/"最佳搭配". Left empty
+# rather than inventing a pairing Atlas never names. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat pipeline fields, or a STAGE_ORDER positional array like causal.logic_model?"
+    decision: "Flat fields (construct_definition/question_design/pilot_summary/sampling_plan/analysis_plan) -- same reasoning causal.rct.contract.yaml's own flat 5-field shape applies: Atlas's own arrow-chain names 5 distinct, non-repeating, non-reorderable stages, not a variable-length ordered list."
+  - question: "quality_dimensions -- exactly-once closed set (porter_five_forces-style) or at-least-once?"
+    decision: "At-least-once -- §12.18 presents 4 named CONCERNS to mitigate, not a partition every survey divides into exactly 4 disjoint slices; a survey may legitimately document 2 separate sampling-bias mitigations. Generalizes porter's completeness-required shape without importing its exactly-once cardinality."
+  - question: "Should quality_dimensions[] carry per-item provenance, matching porter's per-force provenance?"
+    decision: "No -- record-level provenance ONLY, per this whole F06 batch's own deliberate decision (see decided_by)."
+  - question: "Are the pipeline-stage/quality-dimension fields GENUINE_COMPUTE or disclosed content?"
+    decision: "Disclosed, caller-supplied content throughout -- no citation, Atlas or external, supports mechanically deriving a construct definition, a mitigation note, or a semantic-equivalence check from other fields."
+  - question: "semantic_equivalence_check/local_pilot_ref -- optional-and-nullable, or asymmetric if/then?"
+    decision: "Asymmetric if/then, both REQUIRED when is_translated=true and both structurally ABSENT (key missing, not merely null) when false -- direct transcription of strategy.blue_ocean.contract.yaml's own CREATE-vs-existing-factor technique, applied here to the translated/untranslated split Atlas's own §12.18 (L2773) names."
+
+open_questions:
+  - "OQ-SURVEY-1: recommended_next is empty -- F06's own table has no best-pairing column (5th column is a caution, unlike F08's) (owner: operator)."
+  - "OQ-SURVEY-2: cognitive_primitives is this file's own inference, no Atlas §4 formula exists for Survey (owner: operator, or whoever adds a dedicated Atlas §4 formula)."
+  - "OQ-SURVEY-3: quality.evidence_labeling_required=false reflects the absence of an explicit misuse warning in either citation, not a positive Atlas statement that evidence labeling does not apply (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F06 table (L457-469, Survey row L468) and §12.18 (L2768-2773) directly at the
+    cited lines. Grepped the whole Atlas file case-insensitively for "問卷調查" (1 hit, the
+    §12.18 heading itself) confirming the table row and this section are the only 2 citations
+    for this method. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for "insight.survey"/
+    "SurveyStudy" before writing any of this method's own files -- zero pre-existing
+    implementation, and confirmed `ai_lego/modules/insight/` did not yet exist at the start of
+    this batch of 9 concurrent agents opening F06. Read causal.rct.contract.yaml,
+    strategy.porter_five_forces.contract.yaml, and strategy.blue_ocean.contract.yaml in full
+    before writing this contract, reusing their shape conventions rather than inventing new
+    ones. Validated against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator via a standalone script.
+  note: >
+    No mother document was modified. Atlas's own 5-stage pipeline (table row L468) and 4
+    quality dimensions + global-localization requirement (§12.18) are transcribed verbatim
+    into `preconditions`. The flat-record shape, the at-least-once (not exactly-once)
+    quality_dimensions cardinality, the record-level-only provenance placement, and the
+    asymmetric is_translated if/then are Phase 3 compilation decisions, disclosed above, not
+    presented as Atlas-cited.
