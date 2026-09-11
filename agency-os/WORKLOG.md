@@ -1,5 +1,42 @@
 # Worklog
 
+## 2026-09-11 第六批（HEAD 曾經無法 build：共用工作目錄的機械閘缺口）
+
+前一批（`656216805`）用 pathspec 提交 `lib/cs/cis.ts` 時，帶走了另一 session 寫在同一檔的 Chatwoot import，而定義它的 `lib/cs/types.ts` 還沒提交。**本機 `tsc --noEmit` 全程綠**，因為本機那份 types.ts 有那段宣告；已提交樹則直接 `Module '@/lib/cs/types' has no exported member 'ChatwootConfig'`。發現時機是要為 migration 維護窗口證明 next-admin 建得起來——若沒做這一步，部署當下才會炸。
+
+- **不變量**：每個 commit 的樹必須自己 typecheck。我們所有閘檢查的都是**工作樹**，在共用工作目錄下「本機綠」與「HEAD 綠」不是同一件事，整類都沒人守。
+- 修復：`types.ts` 的完整 diff 就是那個 interface 加 `CisProfile.chatwoot` 選填欄位，沒有夾帶其他內容，整檔提交（`b82debe4c`）不會搶走另一 session 未完成的工作。
+- 治本：`scripts/verify-head-typecheck.ps1` —— 把指定 ref 取進拋棄式 detached worktree、junction 現成 `node_modules`、在那裡跑 tsc（`-Build` 另跑 next build）。寫進 `.claude/commands/verify-recent.md` 的 `.ts/.tsx` 段，**位置在既有工作樹檢查之後**，因為它回答的是不同問題。
+- 寫這支腳本自己踩到兩個坑，都已封死：worktree 放 `$env:TEMP` 會撞 Windows 260 字元上限，checkout 中途 `Filename too long` 失敗留下半套樹（改用 `<drive>\Worktrees`）；`git worktree add` 失敗走 stderr、`ErrorActionPreference` 不攔，腳本會在半套樹上跑 tsc 然後報告那個結果（改為顯式檢查 `$LASTEXITCODE` + 確認 `tsconfig.json` 真的在）。清理 junction 用 `cmd /c rmdir` 不用 `Remove-Item`——後者曾被觀察到跟著 junction 刪掉真正的 `node_modules`。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx next build`（detached worktree 取 HEAD + node_modules junction）| exit=1 → 修復後 exit=0 | result=`✓ Compiled successfully`，且 `/ops/collect` 與 `/api/ops/clients/[slug]/collection-sources` 都在路由表內
+REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/verify-head-typecheck.ps1 -Ref 97aa11e60` vs `-Ref HEAD` | exit=1 vs 0 | result=前者複現 TS2305/TS2353 並 throw，後者 `HEAD_TYPECHECK_OK`；跑完 `git worktree list` 無殘留、真 node_modules 279 項未動 —— 閘真的會紅，不是空跑
+REVIEW_DONE: critic=Quick（單檔腳本 + 一行文件；風險在腳本自身的清理路徑，已就 junction 刪除與半套 checkout 兩條各自實測）| verdict=pass | findings=0c/2m（2 個均為本批自己寫出來又當場修掉的腳本缺陷，見上）
+BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=`ChatwootConfig|verify-head-typecheck|headchk` | hits=`ChatwootConfig` 僅 `lib/cs/types.ts` 宣告與 `lib/cs/cis.ts` 使用兩處，無其他 stale 引用；`verify-head-typecheck` 新增後已在 `verify-recent.md` 登記
+
+**仍未做（不變）**：`0072`／`0073`／`0074`／`0075` 四個 migration 尚未套 prod（High-STOP）。本批把「部署當下才發現 build 壞掉」這個風險從維護窗口移除，但套用本身仍等明示。
+
+## 2026-09-11（客服系統 U6：migration 編號撞號修正 + 部署完成）
+
+**觸發**：準備 commit 本輪 chatwoot 相關檔案時發現撞號——`git mv` 失敗才注意到 `0073` 現在有**兩個不同檔案**（我的 `organization_hierarchy` + 另一並行 session 的 `collection_runs_and_issues`），`0075` 同樣有兩個（我的 `validate_organization_hierarchy_checks` + 另一並行 session 的 `kb_provenance_and_citation`，且後者已被其他 commit 引用為正式編號）。這不是「做錯」，是本日多個並行 session 各自獨立選號的正常碰撞；prod 上該套的 SQL 內容已經跑過（用 psql 直接餵內容，不靠檔名/自動 runner，見前幾批條目），**碰撞只影響 repo 檔名，不影響已套用的 prod 狀態**。
+
+**修正**：我的兩個檔案改名 `0073_organization_hierarchy.{sql,down.sql}`→`0077_...`、`0075_validate_organization_hierarchy_checks.sql`→`0078_...`（讓給已被其他 commit 引用的 0073/0075 保留原名），並同步修正檔內所有自我指稱的編號註解（含 down 檔的「run before/after」交叉引用）。`TASKS.md` 的即時狀態描述同步更新為新編號；WORKLOG 歷史條目維持原文（記錄的是「當時做了什麼」，不回改成新編號，避免讀者對照原始討論脈絡時對不上）。
+
+**接著完成部署**：本輪 chatwoot 相關新增/修改檔（`lib/cs/{billing,chatwoot-client}.ts`+測試、`lib/cs/{db,types}.ts` 的 chatwoot 相關新增、`app/api/webhooks/chatwoot/route.ts`、`lib/cs/cis.ts` 的 chatwoot 讀取）**先前只存在本機工作樹，從未 commit/push**——這解釋了為什麼先前一次 `sg-deploy.sh` 執行成功但 webhook route 仍 404：該腳本從 git remote 拉,拉到的是還沒有這些檔案的舊 commit。全專案 `npm test` 重新確認全綠（101 個測試檔全過,之前擋住的並行 KB session 已完成穩定)後才 commit+push+redeploy，不在紅燈狀態下硬推。
+
+**[已修改]**：
+- migration 檔重新編號（見上）
+- `agency-os/TASKS.md` 編號描述同步
+- commit + push 本輪 chatwoot 新增/修改檔 → `sg-deploy.sh next-admin` 重新部署
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ls migrations/ | grep -E "^007[3-8]"` | exit=0 | result=確認改名後無殘留撞號
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`(重跑) | exit=0 | result=101 檔全過(先前擋住的 2-3 個 lib/kb 測試已由該並行 session 自行修好)
+- REALTEST_EVIDENCE: tool=Bash+SSH | cmd=`git commit`+`git push`+`sg-deploy.sh next-admin` | 見下方緊接條目的部署結果
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：舊編號 0073/0075（我的版本)在 WORKLOG 歷史條目裡仍以舊編號出現,若之後要找對應檔案需知道已改名到 0077/0078——本條目即是那個對照記錄。
+
 ## 2026-09-11 第五批（KB K2/K2e：出處與引用貫通，消費端真的照做）
 
 兩個系統之間唯一還斷著的那條線：蒐集端每份文件都蓋了 `EVIDENCE`／`SOURCE_QUOTATION` 並抓了作者，但 `KnowledgeInput` 沒有欄位，到 sink 就掉。後果不是少個欄位——**客服 AI 分不出「廠商官網上的行銷話術」和「操作者自己寫的政策」**，因此不可能照 `DATA_COLLECTION_PLAN.md` §1.3b 把前者包成 untrusted 再進提示。
