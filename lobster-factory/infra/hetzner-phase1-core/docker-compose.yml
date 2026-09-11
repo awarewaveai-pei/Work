@@ -389,6 +389,14 @@ services:
       # .env 已有正確值 https://remotion-svc.aware-wave.com（跟 VIDEO_SERVICE_URL 同一 nginx/CF
       # 外部路由慣例，非本次新開）；此行只是把它接進 next-admin，空值一樣 fail-closed。
       REMOTION_SERVICE_URL: ${REMOTION_SERVICE_URL:-}
+      # 真正根因（上面兩行是必要但不夠）：lib/content/video/renderer-auth.ts 的 resolveRendererAuth
+      # 對 renderer="remotion" 只認 MEDIA_RENDER_AUTH_TOKEN（canonical，未設）或 REMOTION_AUTH_TOKEN
+      # （legacy，同樣沒接進來）——VIDEO_SERVICE_SECRET 只給 "quick" renderer 用，remotion 從沒讀過它。
+      # .env 已有正確值（跟 remotion-service／video-service 兩邊容器的 RENDER_AUTH_TOKEN 同一把密鑰，
+      # SSH 直測驗證過），此行只是把它接進 next-admin。這行沒接 = resolveRendererAuth fail-closed
+      # 回 {ok:false}，route 正確回 502 JSON，CF edge 再把 502 body 換成品牌錯誤頁——即使
+      # REMOTION_SERVICE_URL 已修對，沒有這行還是同樣的「Unexpected token '<'」。
+      REMOTION_AUTH_TOKEN: ${REMOTION_AUTH_TOKEN:-}
       # 影片孤兒對帳（/api/video/reconcile）需列 R2 video bucket（與 EU 同 bucket/public base）
       R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:-lobster-videos}
       R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:-}
