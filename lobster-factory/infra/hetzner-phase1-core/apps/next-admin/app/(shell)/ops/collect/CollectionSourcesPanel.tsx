@@ -195,10 +195,15 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
   const disabled = sources.filter((s) => s.status === "disabled");
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 24 }}>
-      <section>
+    // Catalogue left; what you act on right. The form sits UNDER the source list rather than
+    // under the catalogue, so ticking a source, filling it in, and pressing 正式抓取 are all on
+    // screen together — the catalogue is tall enough to have pushed the run buttons out of view.
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 24, alignItems: "start" }}>
+      {/* data-panel: the tests address these by what they ARE, not by their position. The previous
+          selectors were section:first-of-type / :last-of-type, which went red the moment the
+          operator asked for a different arrangement — a layout change should not fail a behaviour test. */}
+      <section data-panel="catalogue">
         <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>加入來源</h2>
-        <div style={{ display: "grid", gap: 10 }}>
           {/* Every source visible at once, ticked independently. A dropdown showed one line at a
               time, so "what can this thing actually read" needed eight interactions to answer. */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 8 }}>
@@ -248,131 +253,149 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
               );
             })}
           </div>
+      </section>
 
-          {entryKinds.length > 1 ? (
-            <div style={{ fontSize: 11, color: "#b45309" }}>
-              選中的來源需要不同形式的入口（{entryKinds.map((k) => ENTRY_LABEL[k]).join("、")}）。下面只有一格，套不上的那幾個會在加入時個別報錯。
+      <div style={{ display: "grid", gap: 24, minWidth: 0 }}>
+        <section data-panel="sources">
+          <h2 style={{ fontSize: 15, margin: "0 0 10px", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+            <span>這個客戶的來源（{approved.length} 個已核准）</span>
+            {approved.length > 1 ? (
+              <button
+                onClick={() => setRunOnly((r) => (r.length ? [] : approved.map((s2) => s2.id)))}
+                style={{ ...buttonStyle(false), fontSize: 11 }}
+              >
+                {runOnly.length ? "清除選取" : "全選"}
+              </button>
+            ) : null}
+          </h2>
+
+          {candidates.length ? (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: "#b45309", marginBottom: 6 }}>待核准（自動找到的，還不會被抓）</div>
+              {candidates.map((s) => (
+                <SourceRow key={s.id} source={s} onApprove={() => patch(s.id, "approve")} onDisable={() => patch(s.id, "disable")} busy={busy} />
+              ))}
             </div>
           ) : null}
 
-          <label style={labelStyle}>
-            {ENTRY_LABEL[entryKind]}
-            <input
-              value={entry}
-              onChange={(e) => setEntry(e.target.value)}
-              placeholder={ENTRY_PLACEHOLDER[entryKind]}
-              style={inputStyle}
+          {approved.map((s) => (
+            <SourceRow
+              key={s.id}
+              source={s}
+              onDisable={() => patch(s.id, "disable")}
+              busy={busy}
+              selected={runOnly.includes(s.id)}
+              onToggle={() =>
+                setRunOnly((r) => (r.includes(s.id) ? r.filter((i) => i !== s.id) : [...r, s.id]))
+              }
             />
-          </label>
-
-          {chosenList
-            .filter((c) => (c.options ?? []).length > 0)
-            .map((c) => (
-              <fieldset key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px", display: "grid", gap: 8 }}>
-                <legend style={{ fontSize: 11, color: "#6b7280", padding: "0 4px" }}>
-                  {c.icon} {c.title}
-                </legend>
-                {(c.options ?? []).map((opt) => {
-                  const val = (options[c.id] ?? {})[opt.key];
-                  const set = (v: unknown) => setOptions((o) => ({ ...o, [c.id]: { ...(o[c.id] ?? {}), [opt.key]: v } }));
-                  return (
-                    <label key={opt.key} style={labelStyle}>
-                      {opt.label}
-                      {opt.type === "select" ? (
-                        <select value={String(val ?? opt.default ?? "")} onChange={(e) => set(e.target.value)} style={inputStyle}>
-                          {(opt.choices ?? []).map((ch) => (
-                            <option key={ch.value} value={ch.value}>
-                              {ch.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : opt.type === "boolean" ? (
-                        <input type="checkbox" checked={Boolean(val ?? opt.default)} onChange={(e) => set(e.target.checked)} />
-                      ) : (
-                        <input
-                          type={opt.type === "number" ? "number" : "text"}
-                          value={String(val ?? opt.default ?? "")}
-                          onChange={(e) => set(opt.type === "number" ? Number(e.target.value) : e.target.value)}
-                          style={inputStyle}
-                        />
-                      )}
-                      {opt.help ? <span style={{ fontSize: 11, color: "#9ca3af" }}>{opt.help}</span> : null}
-                    </label>
-                  );
-                })}
-              </fieldset>
-            ))}
-
-          <button onClick={addSource} disabled={busy || !entry.trim() || chosenList.length === 0} style={buttonStyle(false)}>
-            {chosenList.length > 1 ? `加入 ${chosenList.length} 個來源` : "加入"}
-          </button>
-          {message ? <div style={{ fontSize: 12, whiteSpace: "pre-line" }}>{message}</div> : null}
-        </div>
-      </section>
-
-      <section>
-        <h2 style={{ fontSize: 15, margin: "0 0 10px", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-          <span>這個客戶的來源（{approved.length} 個已核准）</span>
-          {approved.length > 1 ? (
-            <button
-              onClick={() => setRunOnly((r) => (r.length ? [] : approved.map((s2) => s2.id)))}
-              style={{ ...buttonStyle(false), fontSize: 11 }}
-            >
-              {runOnly.length ? "清除選取" : "全選"}
-            </button>
+          ))}
+          {approved.length === 0 && candidates.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#6b7280" }}>還沒有任何來源。</p>
           ) : null}
-        </h2>
 
-        {candidates.length ? (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: "#b45309", marginBottom: 6 }}>待核准（自動找到的，還不會被抓）</div>
-            {candidates.map((s) => (
-              <SourceRow key={s.id} source={s} onApprove={() => patch(s.id, "approve")} onDisable={() => patch(s.id, "disable")} busy={busy} />
-            ))}
+          {disabled.length ? (
+            <details style={{ marginTop: 10 }}>
+              <summary style={{ fontSize: 12, color: "#9ca3af", cursor: "pointer" }}>已停用（{disabled.length}）</summary>
+              {disabled.map((s) => (
+                <SourceRow key={s.id} source={s} onApprove={() => patch(s.id, "approve")} busy={busy} />
+              ))}
+            </details>
+          ) : null}
+
+          {/* The count in the label is the whole point of the checkboxes: a run that quietly covered
+              everything when the operator had ticked two sources would spend budget they did not ask for. */}
+          <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={() => collect(true)} disabled={busy || approved.length === 0} style={buttonStyle(false)}>
+              試跑（不存）
+            </button>
+            <button onClick={() => collect(false)} disabled={busy || approved.length === 0} style={buttonStyle(true)}>
+              正式抓取
+            </button>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>
+              {runOnly.length ? `只跑勾選的 ${runOnly.length} 個` : `全部 ${approved.length} 個已核准來源`}
+            </span>
           </div>
-        ) : null}
 
-        {approved.map((s) => (
-          <SourceRow
-            key={s.id}
-            source={s}
-            onDisable={() => patch(s.id, "disable")}
-            busy={busy}
-            selected={runOnly.includes(s.id)}
-            onToggle={() =>
-              setRunOnly((r) => (r.includes(s.id) ? r.filter((i) => i !== s.id) : [...r, s.id]))
-            }
-          />
-        ))}
-        {approved.length === 0 && candidates.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#6b7280" }}>還沒有任何來源。</p>
-        ) : null}
+          {run ? <RunReport run={run} /> : null}
+        </section>
 
-        {disabled.length ? (
-          <details style={{ marginTop: 10 }}>
-            <summary style={{ fontSize: 12, color: "#9ca3af", cursor: "pointer" }}>已停用（{disabled.length}）</summary>
-            {disabled.map((s) => (
-              <SourceRow key={s.id} source={s} onApprove={() => patch(s.id, "approve")} busy={busy} />
-            ))}
-          </details>
-        ) : null}
+        <section data-panel="form">
+          <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>
+            {chosenList.length === 0
+              ? "設定這筆來源"
+              : chosenList.length === 1
+                ? `設定：${chosenList[0].title}`
+                : `設定這 ${chosenList.length} 個來源`}
+          </h2>
+          {chosenList.length === 0 ? (
+            // Said plainly rather than leaving an inert form: an entry box that does nothing
+            // until something is ticked reads as broken.
+            <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>先在左邊勾一個或多個來源。</p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+            {entryKinds.length > 1 ? (
+              <div style={{ fontSize: 11, color: "#b45309" }}>
+                選中的來源需要不同形式的入口（{entryKinds.map((k) => ENTRY_LABEL[k]).join("、")}）。下面只有一格，套不上的那幾個會在加入時個別報錯。
+              </div>
+            ) : null}
 
-        {/* The count in the label is the whole point of the checkboxes: a run that quietly covered
-            everything when the operator had ticked two sources would spend budget they did not ask for. */}
-        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={() => collect(true)} disabled={busy || approved.length === 0} style={buttonStyle(false)}>
-            試跑（不存）
-          </button>
-          <button onClick={() => collect(false)} disabled={busy || approved.length === 0} style={buttonStyle(true)}>
-            正式抓取
-          </button>
-          <span style={{ fontSize: 11, color: "#6b7280" }}>
-            {runOnly.length ? `只跑勾選的 ${runOnly.length} 個` : `全部 ${approved.length} 個已核准來源`}
-          </span>
-        </div>
+            <label style={labelStyle}>
+              {ENTRY_LABEL[entryKind]}
+              <input
+                value={entry}
+                onChange={(e) => setEntry(e.target.value)}
+                placeholder={ENTRY_PLACEHOLDER[entryKind]}
+                style={inputStyle}
+              />
+            </label>
 
-        {run ? <RunReport run={run} /> : null}
-      </section>
+            {chosenList
+              .filter((c) => (c.options ?? []).length > 0)
+              .map((c) => (
+                <fieldset key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px", display: "grid", gap: 8 }}>
+                  <legend style={{ fontSize: 11, color: "#6b7280", padding: "0 4px" }}>
+                    {c.icon} {c.title}
+                  </legend>
+                  {(c.options ?? []).map((opt) => {
+                    const val = (options[c.id] ?? {})[opt.key];
+                    const set = (v: unknown) => setOptions((o) => ({ ...o, [c.id]: { ...(o[c.id] ?? {}), [opt.key]: v } }));
+                    return (
+                      <label key={opt.key} style={labelStyle}>
+                        {opt.label}
+                        {opt.type === "select" ? (
+                          <select value={String(val ?? opt.default ?? "")} onChange={(e) => set(e.target.value)} style={inputStyle}>
+                            {(opt.choices ?? []).map((ch) => (
+                              <option key={ch.value} value={ch.value}>
+                                {ch.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : opt.type === "boolean" ? (
+                          <input type="checkbox" checked={Boolean(val ?? opt.default)} onChange={(e) => set(e.target.checked)} />
+                        ) : (
+                          <input
+                            type={opt.type === "number" ? "number" : "text"}
+                            value={String(val ?? opt.default ?? "")}
+                            onChange={(e) => set(opt.type === "number" ? Number(e.target.value) : e.target.value)}
+                            style={inputStyle}
+                          />
+                        )}
+                        {opt.help ? <span style={{ fontSize: 11, color: "#9ca3af" }}>{opt.help}</span> : null}
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              ))}
+
+            <button onClick={addSource} disabled={busy || !entry.trim() || chosenList.length === 0} style={buttonStyle(false)}>
+              {chosenList.length > 1 ? `加入 ${chosenList.length} 個來源` : "加入"}
+            </button>
+            {message ? <div style={{ fontSize: 12, whiteSpace: "pre-line" }}>{message}</div> : null}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

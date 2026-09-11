@@ -68,7 +68,7 @@ afterEach(async () => {
 
 /** Checkboxes belonging to the source-type picker (the left column). */
 function typeBoxes(): HTMLInputElement[] {
-  return [...container.querySelectorAll("section:first-of-type input[type=checkbox]")] as HTMLInputElement[];
+  return [...container.querySelectorAll("[data-panel=catalogue] input[type=checkbox]")] as HTMLInputElement[];
 }
 
 function buttonByText(text: string): HTMLButtonElement {
@@ -95,7 +95,7 @@ async function check(box: HTMLInputElement) {
 describe("the source picker", () => {
   it("is not a dropdown", () => {
     // The type picker specifically: a per-source <select> option field may still exist elsewhere.
-    const selects = [...container.querySelectorAll("section:first-of-type select")];
+    const selects = [...container.querySelectorAll("[data-panel=catalogue] select")];
     expect(selects).toEqual([]);
     expect(typeBoxes()).toHaveLength(CATALOGUE.length);
   });
@@ -128,6 +128,29 @@ describe("the source picker", () => {
   });
 });
 
+describe("the arrangement the operator asked for", () => {
+  it("keeps the catalogue on one side and everything you act on together on the other", () => {
+    const catalogue = container.querySelector("[data-panel=catalogue]")!;
+    const sources = container.querySelector("[data-panel=sources]")!;
+    const form = container.querySelector("[data-panel=form]")!;
+    expect([catalogue, sources, form].every(Boolean)).toBe(true);
+
+    // The source list and the entry form share a column; the catalogue does not.
+    expect(sources.parentElement).toBe(form.parentElement);
+    expect(catalogue.parentElement).not.toBe(form.parentElement);
+
+    // …and the list (with the run buttons) sits ABOVE the form, so ticking a source, filling it in
+    // and pressing 正式抓取 are visible at once. A tall catalogue used to push the buttons off screen.
+    expect(sources.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says what to do instead of showing an entry box that does nothing", () => {
+    const form = container.querySelector("[data-panel=form]")!;
+    expect(form.textContent).toContain("先在左邊勾");
+    expect(form.querySelector("input")).toBeNull();
+  });
+});
+
 describe("the run", () => {
   it("covers every approved source when nothing is ticked", async () => {
     await click(buttonByText("正式抓取"));
@@ -138,7 +161,7 @@ describe("the run", () => {
   });
 
   it("covers only the ticked sources", async () => {
-    const rowBoxes = [...container.querySelectorAll("section:last-of-type input[type=checkbox]")] as HTMLInputElement[];
+    const rowBoxes = [...container.querySelectorAll("[data-panel=sources] input[type=checkbox]")] as HTMLInputElement[];
     expect(rowBoxes.length, "approved rows are not tickable").toBe(SOURCES.length);
 
     await check(rowBoxes[1]);
