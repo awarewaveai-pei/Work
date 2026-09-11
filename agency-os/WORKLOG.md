@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-09-11 第十四批（同一條測試第二次在伺服器上紅：先寫不變量再修）
+
+`collect-block-hygiene` 的 scheme 路由測試在筆電綠、在 sg-deploy 的 test gate 紅，**第二次**。依 AGENTS.md §4，第三次修正前先寫不變量分析：
+
+- **這條測試驗的是路由**：每個操作者可選的查詢型來源，宣告的 scheme 必須是它 `match()` 認得的那個，且不得重複。
+- **不該影響它的**：這台機器有沒有金鑰。`match()` 刻意被金鑰閘住（無金鑰回 0），所以測試必須把該 block 宣告的憑證全部補上再驗。
+- **重複發生的根因**：測試按**欄位名稱**列舉憑證宣告（`requires`）。第十三批新增 `requiresAny` 後，那個列舉就看不到搜尋來源的金鑰了，環境依賴無聲地回來。**修法不能是再加一個欄位名**——那只會等下一種宣告方式再炸一次。
+
+**修法**：`declaredEnvKeys(describe)` 成為唯一定義，測試與 catalogue 共用。再加一條測試把它和真實可用性**行為上綁死**：宣告的金鑰全給 → 必須 available，全不給 → 必須 unavailable。未來若有人加第三種宣告欄位而只接上 `describeBlock`，這條會紅——紅在本機，而不是紅在部署閘。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`env -u PERPLEXITY_API_KEY -u BRAVE_SEARCH_API_KEY npx vitest run`（重現伺服器環境）| exit=0 | result=1031 test 綠；有金鑰時同樣 1031 綠——同一份程式在兩種環境給同一個答案，這正是前兩次失敗缺的性質
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（`declaredEnvKeys` 漏掉 `requiresAny`）| exit=0 | result=KILLED，且是在無金鑰條件下紅
+REVIEW_DONE: critic=Quick（測試基礎設施；本批唯一產出就是把環境依賴從測試裡拔掉）| verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`declaredEnvKeys|requiresAny|describe!.requires` | hits=`describe!.requires` 的直接列舉已無殘留；`catalogue.ts` 的 `describeBlock` 仍需自行區分 all／any（語意不同，不能共用扁平清單），故改以行為測試綁定而非共用同一段程式
+
+**rollback**：`git revert`；純測試與一個 helper，無行為變更。
+
 ## 2026-09-11 影片生成記錄面板版面調整 + 解開一場大型 WORKLOG.md 合併衝突（操作者截圖回報「影片在左, list 在右邊比較順」）
 
 `VideoStudio.tsx`「生成記錄」分頁原本是上下疊排（清單在上，選中的影片預覽疊在下面）。改成 grid 兩欄：選到影片時左欄放 `VideoViewer`、右欄放清單（`gridTemplateColumns: "1fr 360px"`）；沒選影片時清單維持單欄滿版不變。純 JSX 順序決定欄位順序（VideoViewer 放前面＝左欄），不用 CSS order，較好懂。純版面調整，沒動任何資料流／handler／邏輯。
