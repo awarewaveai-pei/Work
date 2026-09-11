@@ -1,5 +1,38 @@
 # Worklog
 
+## 2026-09-11 第十一批（定位確定：知識庫與資料蒐集是一組，兩邊入口都補齊）
+
+操作者第二次回報找不到東西，這次是客戶中心的分頁列。同一個病因的兩個症狀：**東西建好了，但放的位置說的是另一個故事**。
+
+**定位決定（這是本批真正的產出）**
+- 知識庫與資料蒐集**同屬一組，不屬於客服**。側邊欄改成單一分組 `Knowledge & Data`，按管線順序排：蒐集把文件帶進來，知識庫是它們落地與被讀取的地方。上一批我把知識庫掛在 Customer Service 底下，那正是 K0 花一整階拆掉的耦合——客服是知識庫的**第一個**消費者，不是它的擁有者（ADR 011），導覽若那樣寫，等於教每個後來的人錯的形狀。
+- **跨客戶看 → 側邊欄；單一客戶做 → 客戶中心**。兩個層級都要有，因為問的是不同問題：「我們總共有哪些知識」與「這個客戶的知識庫怎麼餵」。
+- **不拆子網域、不拆服務**。`lib/kb` 已經隔在單一入口後，K4 的觸發條件仍是第二個真實消費者，不是現在。
+
+**客戶中心新增兩個分頁**
+- **知識庫**：原本是埋在「客服」分頁裡的一張卡片，所以從分頁列看就是不存在。抽成獨立分頁。抽得乾淨是因為那段狀態早就以 `k*` 前綴隔開，只有 `sources`／`loading` 與客服共用，現在各自載自己要顯示的東西。`badge` 這個純呈現函式提到模組層級共用，沒有複製第二份。
+- **資料蒐集**：直接嵌用 `/ops/collect` 的同一個面板元件（它本來就吃 slug）。不重寫第二份來源選擇器——多一份，等到哪天新增來源就會開始漂移。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx next build` | exit=0 | result=`✓ Compiled successfully`。這條是為了驗跨分組 import（`(shell)/ops/collect/CollectionSourcesPanel` 進 `(shell)/ops/clients/[slug]/`）在 Next 的路由群組下真的解析得到，tsc 過不代表 build 過
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=1017 test 綠、8 skipped；抽離過程中 tsc 抓到 `badge` 未定義（它是客服分頁的區域函式），已提升而非複製
+REVIEW_DONE: critic=Quick（分頁抽離 + 導覽重組；行為不變，風險在抽離時漏帶狀態，已由 tsc 與 build 各擋一層）| verdict=pass | findings=0c/1m（m1：知識庫卡片依賴客服分頁的區域 `badge`，抽出後編譯失敗——提升到模組層級共用）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`CustomerServiceTab|KnowledgeTab|CollectionTab|TABS|reloadSources` | hits=`reloadSources` 原本只有客服分頁一份，抽離後知識庫分頁自己有一份、客服分頁已不再需要（連同 `sources`／`k*` 狀態與 `addKnowledge` 一起移除，沒有留下死碼）
+
+**仍未做**：HCI-30 與 Cognitive Engineering OS 是**獨立應用**，不在 next-admin 裡（`Projects/internal/hci30`、`Projects/internal/cognitive-engineering-os`），客戶中心沒有它們的分頁是正確的，不是遺漏；要不要在這個主控台開它們的入口是尚未做的產品決定。storage（Supabase Storage）目前沒有任何操作介面。
+**rollback**：`git revert`；純前端重組，無資料變動、無 migration。
+
+## 2026-09-11 修 `git-commit-scope-guard.js` 缺 merge/cherry-pick 豁免（真卡到，非 critic 找到）
+
+完成 U6 收尾三批文件的真實 `git pull` merge 時，MERGE_HEAD 真的存在、只 stage 了 2 個檔（自己解的 WORKLOG.md 衝突 + 合併帶進來的 index.html），`git commit --no-edit` 仍被擋，說 index.html 是「這個 session 沒 add 過的檔」——閘自己建議的解法（trailing `-- pathspec`）在 merge 中根本不可能做到（git 本身拒絕 partial commit during a merge）。修法：仿照既有 `--amend` 豁免，用 `git rev-parse -q --verify MERGE_HEAD`/`CHERRY_PICK_HEAD` 偵測真的在 merge/cherry-pick 中就整個跳過此閘。細節/根因/測試證據見 commit `a507aa662`（含 3 個新 regression test：真實兩分支衝突 merge 下豁免生效、CHERRY_PICK_HEAD 同樣豁免、無 merge 時舊行為不變）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/hooks/runner-parity.test.mjs` | exit=0 | result=103/103（含 3 個新測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | result=155/155，無回歸
+- REVIEW_DONE: critic=self（Quick，範圍限縮於新函式 `isMidMergeOrCherryPick` 與其 2 個呼叫點：fail-closed 方向正確、無副作用、`~/.claude/` 與 repo 兩份副本已核對 identical）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`isMidMergeOrCherryPick` | hits=僅新增的定義+2 呼叫點，兩份副本一致
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無。[rollback] `git revert a507aa662`。
+
 ## 2026-09-11 regenerate-image 重測 + 實拍剪輯／短劇 Story Bible 真實測試（操作者要求）
 
 操作者：「還沒修的：regenerate-image...去修，還有你有測試以下兩個嗎？短劇...實拍剪輯」。
