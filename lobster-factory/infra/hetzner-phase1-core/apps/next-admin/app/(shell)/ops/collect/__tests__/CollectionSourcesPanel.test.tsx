@@ -10,7 +10,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CollectionSourcesPanel } from "../CollectionSourcesPanel";
+import { CollectionSourcesPanel, explainReason } from "../CollectionSourcesPanel";
 
 // React 19 refuses act() unless the environment declares itself. Without it every interaction below
 // would still run, but state updates outside act would be flushed unpredictably and the assertions
@@ -169,5 +169,32 @@ describe("the run", () => {
 
     await click(buttonByText("正式抓取"));
     expect(posted[0].sourceIds).toEqual(["s2"]);
+  });
+});
+
+describe("a refusal is explained, not printed", () => {
+  it("turns the exact string the operator hit into an instruction", () => {
+    // This is the real reason from a live run on 2026-09-11.
+    const said = explainReason("all_strategies_failed:ProviderCallError: provider_perplexity_http_401");
+    expect(said).toContain("PERPLEXITY_API_KEY");
+    expect(said).toContain("換一把");
+  });
+
+  it("separates out of credit, rate limited, and rejected — they need different actions", () => {
+    expect(explainReason("provider_firecrawl_http_402")).toContain("餘額不足");
+    expect(explainReason("provider_firecrawl_http_429")).toContain("限流");
+    expect(explainReason("provider_firecrawl_http_403")).toContain("FIRECRAWL_API_KEY");
+  });
+
+  it("explains the quality-gate refusals an operator will actually meet", () => {
+    expect(explainReason("too_short")).toContain("JS 渲染");
+    expect(explainReason("soft_404")).toContain("找不到頁面");
+    expect(explainReason("injection_ignore_previous")).toContain("擋下");
+    expect(explainReason("disallowed")).toContain("robots.txt");
+  });
+
+  it("says nothing rather than inventing an explanation it does not have", () => {
+    // A vague "something went wrong" would hide the one string that could be searched for.
+    expect(explainReason("some_reason_nobody_mapped")).toBeNull();
   });
 });

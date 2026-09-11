@@ -457,6 +457,33 @@ function SourceRow({
   );
 }
 
+/**
+ * One refusal, in the operator's words. `null` = we have nothing better to say than the raw string,
+ * which is then shown as-is rather than replaced by a vague "something went wrong".
+ *
+ * Only reasons the pipeline actually emits are listed. Inventing friendly text for errors that
+ * cannot happen is how a message ends up describing the wrong failure.
+ */
+export function explainReason(reason: string): string | null {
+  const provider = /provider_([a-z0-9-]+)_http_(\d{3})/.exec(reason);
+  if (provider) {
+    const [, vendor, status] = provider;
+    const key = vendor === "perplexity" ? "PERPLEXITY_API_KEY" : vendor === "firecrawl" ? "FIRECRAWL_API_KEY" : `${vendor.toUpperCase()}_API_KEY`;
+    if (status === "401" || status === "403") return `${vendor} 拒絕了這把金鑰（${status}）。金鑰失效或沒有這個 API 的權限，需要換一把新的 ${key}。`;
+    if (status === "402") return `${vendor} 回報餘額不足（402）。帳戶要儲值才能繼續用這個來源。`;
+    if (status === "429") return `${vendor} 限流（429）。稍後再跑，或把「取回幾筆結果」調小。`;
+    return `${vendor} 回了 HTTP ${status}，這次沒拿到結果。`;
+  }
+  if (reason.includes("provider_call_unavailable")) return "這個來源需要外部供應商，但這次執行沒有帶供應商設定。";
+  if (reason.includes("too_short")) return "這頁抽不到足夠的內文。多半是 JavaScript 才長出內容的網站——勾「JS 渲染網頁」那個來源可以讀，但它按次計費。";
+  if (reason.includes("low_text_density")) return "這頁大部分是版面與程式碼，沒什麼可讀的內文，所以沒有收進來。";
+  if (reason.includes("soft_404")) return "這頁其實是「找不到頁面」，只是網站回了 200。網址可能過期了。";
+  if (reason.includes("injection_")) return "這頁裡藏著像是要指揮 AI 的句子，已經擋下不入庫。這是刻意的防線，不是誤判。";
+  if (reason.includes("query_missing")) return "這筆來源沒有查詢字串。";
+  if (reason === "disallowed" || reason.includes("robots")) return "對方的 robots.txt 不允許抓這一頁，所以跳過。";
+  return null;
+}
+
 function RunReport({ run }: { run: RunResult }) {
   const refused = run.report.dirty.length + run.report.quarantined.length;
   return (
@@ -474,12 +501,18 @@ function RunReport({ run }: { run: RunResult }) {
       </div>
       {run.incidentRaised ? <div style={{ color: "#b91c1c", marginBottom: 6 }}>已開一張 ops incident。</div> : null}
       {/* Refusals listed with their reason: a run that stored nothing while refusing pages must not
-          be able to look like a quiet day. */}
-      {[...run.report.quarantined, ...run.report.dirty, ...run.report.disallowed].slice(0, 12).map((i) => (
-        <div key={i.uri + i.reason} style={{ fontSize: 11, color: "#6b7280", overflowWrap: "anywhere" }}>
-          {i.reason} — {i.uri}
-        </div>
-      ))}
+          be able to look like a quiet day. Each one is explained in words first, with the raw
+          reason kept underneath — that string is what you search for when the explanation runs out. */}
+      {[...run.report.quarantined, ...run.report.dirty, ...run.report.disallowed].slice(0, 12).map((i) => {
+        const said = explainReason(i.reason);
+        return (
+          <div key={i.uri + i.reason} style={{ fontSize: 11, marginBottom: 6, overflowWrap: "anywhere" }}>
+            <div style={{ color: said ? "#b45309" : "#6b7280" }}>{said ?? i.reason}</div>
+            <div style={{ color: "#9ca3af" }}>{i.uri}</div>
+            {said ? <div style={{ color: "#c4c7cc", fontSize: 10 }}>{i.reason}</div> : null}
+          </div>
+        );
+      })}
       {run.errors.length ? <div style={{ color: "#b91c1c", marginTop: 6 }}>{run.errors.join("、")}</div> : null}
     </div>
   );
