@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-09-12 HCI30 標題字級——操作者：「這幾個字這麼小是怎麼樣? 用H2」
+
+操作者截圖點名「風險等級/證據與主張/信任構面/決策」四個字太小。查原始設計：`h2 { font-size: 0.8rem; ...uppercase; color: var(--muted); }` 是刻意的「編輯體小型大寫灰色標籤」排版（2026-09-10 設計筆記留的決定），但「風險等級」其實根本不是 h2，是一個套同款樣式的 `<span class="risk-tier-label">`。前兩輪把四個分析階段都包成卡片(`.topic-block`)後，卡片頂端放一個 0.8rem 灰色小標籤明顯太安靜，不像卡片標題。
+
+改法：
+1. `h2` 改成跟 `h1` 同一套襯線字體、1.3rem、深色（`var(--ink)`），拿掉大寫+letter-spacing，讀起來是真正的標題不是小標籤。
+2. 「風險等級」從行內 `<span class="risk-tier-label">` 改成獨立一行的 `<h2>風險等級</h2>`，放在風險等級按鈕列上方，跟操作者點名的另外三個字一樣待遇；順手刪掉沒人再用的 `.risk-tier-label` CSS 規則。
+3. `h2` 放大後，另外兩處借用 `<h2>` 當卡片內次級提示的地方（`renderSeverityAlerts()` 的「嚴重警訊」、`renderRuleEngineSuggestions()` 的「系統偵測到的風險指標」）會變成跟卡片本身標題一樣大、在同一張卡片裡疊出兩個平行標題，改成 `<h3>`，另外補一條裸 `h3` 樣式（0.95rem、teal-ink）——`.insight-col h3` 跟 `.add-panel .add-panel-title` 既有的 class 選擇器優先權更高，不受影響，外觀不變。
+
+真跑驗證：本機 dev server（`localhost:4030`）900px 寬開既有案件，頁面內 JS 對 `#detail` 底下全部 `<h2>` 元素量 `getComputedStyle`，5 個標題（風險等級/證據與主張/信任構面/決策/產生報告）全部量到 20.8px（1.3rem）Noto Serif TC、`rgb(28,43,39)` 深色，跟舊版 0.8rem 灰色明顯不同；console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，頁面內 JS 量測全部 h2 的 computed font-size/font-family/color | 結果=5 個標題皆為 20.8px 襯線深色，符合預期；console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS（h2/h3 規則）+ 一處 span→h2、兩處 h2→h3 的標籤替換，無 id 改動、無 JS 邏輯改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=risk-tier-label | hits=0（規則跟唯一的使用點一起刪掉，沒有殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`h2` 改大字級襯線深色；「風險等級」span 改真 `<h2>`；`嚴重警訊`／`系統偵測到的風險指標` 兩處 `<h2>`→`<h3>` 並補裸 h3 樣式）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過字級變化，console 零錯誤
+
+[剩餘風險] 無新增風險；純樣式與標籤調整，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到 h2 小型大寫灰色標籤的上一版。
+
 ## 2026-09-11 HCI30 四個分析階段各包一層卡片邊界 + textarea 寬度自動填滿——操作者截圖回應：「這樣叫有主題性分區塊?」
 
 上一輪把「新增調查發現」拿掉手風琴、每則證據紀錄改卡片後，操作者截圖回應兩點：(1) 這樣還不算有「主題性分區塊」——四個分析階段（證據與主張/信任構面/決策/產生報告）彼此之間只靠 h2 文字加一點上緣間距分隔，滾動下去看起來還是同一塊內容一路流下去；(2) textarea 寬度沒有自動填滿容器，要填寫的人自己去拉才看得到完整寬度。
