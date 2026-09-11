@@ -1,0 +1,165 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/disconfirming-evidence-search.schema.yaml"
+title: Disconfirming Evidence Search
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DisconfirmingEvidenceSearch` --
+  the declared `outputs` of `challenge.disconfirming_evidence`'s Method
+  Contract. Atlas F12 index row only (L649): "current belief→falsifier→
+  search". Fields: `current_belief` (the claim under test), `falsifier_criteria[]`
+  (declared BEFORE search -- what WOULD disprove it), `search_results[]`
+  (each tied to one `falsifier_criteria[].id` by reference -- referential
+  integrity is the real invariant this whole record exists to enforce, same
+  cross-array class `game-theory.schema.yaml`'s own strategies/payoffs
+  pattern already establishes). `provenance` record-level only.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 index row (L649)"
+  - "methods/contracts/challenge.disconfirming_evidence.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/game-theory.schema.yaml -- cross-array referential-integrity-as-runtime-invariant precedent"
+
+decided_by: >
+  No ADR governs this file. Same class as every sibling typed-object schema
+  in this directory: direct transcription of the F12 index row plus
+  disclosed, low-risk compilation choices (the falsifier_criteria_id foreign
+  key, DISCONF- prefix, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Enforce the falsifier_criteria_id CROSS-ARRAY reference declaratively or as a runtime invariant?"
+    decision: "Runtime invariant (builder + independent gate) -- JSON Schema draft 2020-12 cannot cross-check two sibling arrays declaratively, same disclosed gap game-theory.schema.yaml's own payoffs/strategies pattern already carries."
+  - question: "Enforce 'found:true requires a non-empty evidence_description' -- a single-item, not cross-array, conditional -- declaratively or as a runtime invariant?"
+    decision: "BOTH. Unlike the cross-array case above, this is a single-object conditional JSON Schema 2020-12 CAN express (if/then keyed on found's const value), so it is declared here below AND independently re-derived at runtime by the paired module -- defense in depth, the same discipline every builder/gate pair in this corpus already applies to whatever the schema layer CAN express."
+  - question: "additionalProperties: false everywhere?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, current_belief, falsifier_criteria, search_results, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^DISCONF-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.disconfirming_evidence"
+
+  current_belief:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L649 pipeline stage 1: 'current belief'. The claim under test."
+
+  falsifier_criteria:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L649 pipeline stage 2: 'falsifier'. Declared BEFORE search
+      (stage 3) -- Popperian discipline: you must define what would falsify
+      current_belief before looking for it, or you will unconsciously
+      search only for confirmation. At least one entry required: a search
+      with zero pre-declared falsifiers never specified what would count as
+      disconfirmation.
+    items:
+      type: object
+      required: [id, description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What evidence, if found, WOULD prove current_belief wrong."
+
+  search_results:
+    type: array
+    description: >
+      Atlas L649 pipeline stage 3: 'search'. MAY be empty or every entry
+      found:false -- the belief surviving a genuine search is a real, useful
+      result, not an error condition. Each entry's falsifier_criteria_id
+      MUST reference a real falsifier_criteria[].id -- the cross-array
+      referential invariant this whole record exists to enforce, checked as
+      a RUNTIME invariant (see compilation_decisions).
+    items:
+      type: object
+      required: [falsifier_criteria_id, found]
+      additionalProperties: false
+      properties:
+        falsifier_criteria_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "MUST reference an id present in this record's own falsifier_criteria[] -- cross-array integrity enforced at runtime, not here (see compilation_decisions)."
+        found:
+          type: boolean
+          description: "Whether evidence matching this falsifier was actually found. A genuine boolean -- JSON boolean is a distinct type from number, so no Python bool-is-int-subclass ambiguity exists at this layer."
+        evidence_description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "REQUIRED when found:true (enforced below via if/then); absent or empty is fine when found:false."
+      allOf:
+        - if:
+            properties:
+              found:
+                const: true
+            required: [found]
+          then:
+            required: [evidence_description]
+
+  provenance:
+    description: "Overall record provenance -- record-level only, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Belief: new onboarding flow reduced signup drop-off -- one falsifier found no disconfirming evidence, one did"
+    value:
+      id: "DISCONF-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.disconfirming_evidence"
+      current_belief: "新版 onboarding 流程降低了註冊流失率"
+      falsifier_criteria:
+        - {id: "F1", description: "若 A/B 測試顯示新流程的流失率不低於舊流程（信賴區間重疊），則此信念被推翻"}
+        - {id: "F2", description: "若流失率下降完全由同期行銷活動導致（去除該變因後差異消失），則此信念被推翻"}
+      search_results:
+        - {falsifier_criteria_id: "F1", found: false}
+        - {falsifier_criteria_id: "F2", found: true, evidence_description: "移除同期行銷活動的流量後重新計算，流失率下降幅度從 12% 縮減到 2%，多數效果由行銷活動解釋而非流程改動"}
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions: []
+# No unresolved design gap disclosed at this file's own scope -- both real
+# invariants (cross-array reference, found:true evidence requirement) are
+# either declared here or explicitly deferred to the runtime layer above,
+# with the reasoning shown inline, not left as an open question.
+
+verification:
+  method: >
+    Read Atlas F12 index row (L649) directly. Read game-theory.schema.yaml
+    in full as the cross-array referential-integrity structural template.
+    Grepped the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS and
+    Projects/internal/cognitive-engineering-os trees for
+    "disconfirming"/"falsifier"/"DISCONF" before writing any of this
+    method's own files -- zero pre-existing implementation. Validated
+    against jsonschema Draft202012Validator via
+    tests/unit/test_disconfirming_evidence.py (required fields present, id
+    pattern satisfied, additionalProperties:false at the top level and every
+    nested item, the embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, the if/then evidence_description
+    requirement exercised both ways, negative controls for a smuggled
+    top-level key and a missing current_belief).
+  note: >
+    No mother document was modified. current_belief/falsifier_criteria/
+    search_results field names and the two-array referential shape are this
+    file's own compilation decisions, disclosed above, not textually cited
+    from Atlas beyond the literal L649 table-row wording.

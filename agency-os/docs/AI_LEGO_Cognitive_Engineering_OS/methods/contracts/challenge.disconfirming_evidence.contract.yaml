@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/challenge.disconfirming_evidence.contract.yaml"
+title: "Disconfirming Evidence Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F12 challenge family, 7th built member (grep-confirmed: red_team/
+  blue_team/independent_judge already built). Atlas F12 index row ONLY
+  (L649, no dedicated §11.2x section exists -- grep-confirmed): "Disconfirming
+  Evidence｜主動找不支持資料｜current belief→falsifier→search｜降
+  confirmation bias". Core invariant is the pipeline's own ORDER: at least
+  one falsifier_criteria entry (what WOULD disprove current_belief) must be
+  declared before any search_results entry can reference it -- referential
+  integrity enforced fail-closed, making post-hoc rationalization
+  structurally impossible rather than merely discouraged.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 index row (L649): 'Disconfirming Evidence｜主動找不支持資料｜current belief→falsifier→search｜降 confirmation bias'"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. F12 index row is the ONLY Atlas citation for
+  this method (no dedicated section, same disclosed under-specification
+  class every index-row-only Tier 1 contract in this corpus already
+  discloses). Registered in `methods/registry/contract-backlog.yaml` tier_1.
+
+id: challenge.disconfirming_evidence
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [CHALLENGE, INFER]
+# INFERRED, not cited (Atlas gives no §4 formula for this method). CHALLENGE
+# = actively searching for evidence against current_belief (the method's own
+# defining action, L649's "主動找不支持資料"); INFER = judging whether a
+# found search result actually satisfies its declared falsifier.
+
+purpose:
+  - actively_search_for_evidence_that_would_disprove_a_current_belief
+# Atlas L649 verbatim sense: 用途「主動找不支持資料」-- actively search for
+# data that does NOT support the current belief, not passive absence-of-
+# contradiction.
+
+inputs:
+  required:
+    - CurrentBeliefRef
+  # NEW DESIGN, same scope-limited free-text-reference class as
+  # challenge.red_team's own ProposalRef -- no single existing typed object
+  # in this spec root is the universal "thing currently believed."
+
+outputs:
+  - DisconfirmingEvidenceSearch
+# NEW output type (see typed-objects/disconfirming-evidence-search.schema.yaml).
+# Atlas names no PascalCase output type for this method, same honesty gap
+# every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "falsifier_criteria has at least one entry -- a search with zero pre-declared falsifiers never specified what would count as disconfirmation, collapsing back into unstructured googling (defeats Atlas L649's own 'belief→falsifier→search' ORDER, the entire epistemic point of this method)"
+  - "every search_results entry's falsifier_criteria_id references an existing falsifier_criteria entry -- THE real invariant; a result cannot be recorded against a falsifier that was never declared before searching, structurally preventing post-hoc rationalization"
+  - "every search_results entry with found: true carries a non-empty evidence_description -- a claimed disconfirmation with no description of what was actually found is an unevidenced claim"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # true -- a search_results[].found:true entry IS an evidence claim about
+  # the world (disconfirming evidence was actually located); an unevidenced
+  # 'found: true' is exactly as dangerous as an unevidenced Red Team
+  # finding, same real risk class challenge.red_team's own identical flag
+  # already covers. Enforced by the SAME content-integrity gate that checks
+  # the falsifier_criteria_id reference (not a second, separate gate --
+  # see module docstring for why this differs from red_team's own split).
+
+forbidden_transition: []
+# No §14.1-style legal-chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F12 index row names no downstream method for this row
+# specifically; left empty rather than picking one arbitrarily.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "One combined list, or two separate arrays (falsifier_criteria + search_results) linked by a foreign key?"
+    decision: "Two separate arrays, search_results[].falsifier_criteria_id -> falsifier_criteria[].id -- structurally enforces the Popperian declare-then-search ORDER the same way stakeholders.game_theory's strategies->payoffs pattern enforces payoff completeness."
+  - question: "May search_results be empty, or every entry found:false?"
+    decision: "Yes -- a real, useful, non-error outcome: the belief survived a genuine search. Only an empty falsifier_criteria[] is refused, never an empty or all-false search_results[]."
+  - question: "Per-field or record-level provenance?"
+    decision: "Record-level only -- one coherent search episode, same placement class stakeholders.game_theory's own compilation_decisions already establishes."
+
+open_questions:
+  - "OQ-DISCONF-1: Atlas gives no dedicated §11.2x section for this method (F12 index row L649 only, grep-confirmed across the whole Atlas file) -- unlike red_team/blue_team/independent_judge's own dedicated sections, this contract works from one table row alone (owner: operator)."
+  - "OQ-DISCONF-2: cognitive_primitives is this file's own inference, no Atlas §4 formula exists for this method (owner: operator, or whoever adds one)."
+  - "OQ-DISCONF-3: no downstream method is named by Atlas for this row -- recommended_next left empty rather than guessed (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F12 index row (L649) directly; grepped "Disconfirming
+    Evidence" case-insensitively across the whole Atlas file -- exactly one
+    hit, the index row itself, confirming no dedicated section exists. Read
+    challenge.red_team.contract.yaml and stakeholders.game_theory.contract.yaml
+    in full as structural templates (checklist-with-authority-limit and
+    cross-array-referential-integrity, respectively -- this method combines
+    both shapes). Grepped the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS
+    and Projects/internal/cognitive-engineering-os trees for
+    "disconfirming"/"falsifier"/"DISCONF" before writing any of this
+    method's own files -- zero pre-existing implementation
+    (method-inventory.yaml's own "Disconfirming Evidence" entry, L788,
+    has_contract: false, is a registry placeholder, not a shape definition;
+    its recorded `line: 646` is stale relative to the verified L649 above).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator via tests/unit/test_disconfirming_evidence.py.
+  note: >
+    No mother document was modified. The F12 index row is transcribed
+    verbatim. falsifier_criteria/search_results field names and the
+    two-array referential-integrity shape are this file's own compilation
+    decisions, disclosed above, not presented as directly Atlas-cited beyond
+    the literal table-row wording quoted verbatim.

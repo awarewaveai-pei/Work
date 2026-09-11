@@ -1,0 +1,143 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/hazop-study.schema.yaml"
+title: HAZOP Study
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `HazopStudy` -- the declared `outputs` of `challenge.hazop`'s Method
+  Contract (methods/contracts/challenge.hazop.contract.yaml, `outputs: [HazopStudy]`). Field provenance: Atlas F12
+  tool table row (L651) gives the nodes->guide-words->deviations pipeline; the 11-word guide-word enum is a
+  disclosed compilation choice (Atlas cites only 4 by name before truncating with "...") -- see the method
+  contract's own compilation_decisions.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, HAZOP row (L651)"
+  - "methods/contracts/challenge.hazop.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Closed vocabulary or free text for guide_word?"
+    decision: "Closed 11-value enum -- same discipline red-team-challenge.schema.yaml's dimension enum already establishes for a closed, Atlas-derived checklist."
+  - question: "Require deviations[] to cover every (node, guide_word) combination?"
+    decision: "No -- see the method contract's own compilation_decisions; deviations[] may be empty or partial."
+  - question: "additionalProperties: false at the top level and on every nested item object?"
+    decision: "Yes -- baseline hygiene this directory converges on (game-theory.schema.yaml's identical choice)."
+
+type: object
+required: [id, version, nodes, deviations, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^HAZOP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.hazop"
+
+  nodes:
+    type: array
+    minItems: 1
+    description: "The process/system parts examined -- Atlas L651's own 'nodes' pipeline stage. At least 1 required (a study examining zero nodes did not actually study anything)."
+    items:
+      type: object
+      required: [id, description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+
+  deviations:
+    type: array
+    description: >
+      Zero or more findings -- a node examined against a guide word may legitimately have no real deviation, so
+      this array may be empty even when nodes is non-empty. Cross-field constraints (node_id references an
+      existing nodes entry) are RUNTIME invariants, not expressed here -- see compilation_decisions.
+    items:
+      type: object
+      required: [node_id, guide_word, cause, consequence, safeguard]
+      additionalProperties: false
+      properties:
+        node_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "References nodes[].id -- referential integrity enforced as a runtime invariant by ai_lego/modules/challenge/hazop.py, not this schema."
+        guide_word:
+          type: string
+          enum: [NO_NOT, MORE, LESS, AS_WELL_AS, PART_OF, REVERSE, OTHER_THAN, EARLY, LATE, BEFORE, AFTER]
+          description: "Closed 11-word HAZOP guide-word vocabulary. Atlas L651 names 4 (No/More/Less/Reverse) before truncating with '...'; the remaining 7 are the standard external HAZOP convention, disclosed in the method contract's own compilation_decisions."
+        cause:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        consequence:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        safeguard:
+          type: string
+          description: "MAY be an empty string -- 'no safeguard exists yet' is itself a valid, important finding, same reasoning FMEA's existing_control field uses."
+        risk_rating:
+          type: number
+          description: "OPTIONAL. Reasonable HAZOP extension (same class as FMEA's severity). JSON number excludes JSON boolean -- see game-theory.schema.yaml's identical payoffs[].value guard, mirrored at the runtime layer by this schema's paired module."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, same batch-wide placement precedent jtbd-statement.schema.yaml/game-theory.schema.yaml already establish."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A weekend automated DB migration process examined for deviations across 2 nodes"
+    value:
+      id: "HAZOP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.hazop"
+      nodes:
+        - {id: "N1", description: "自動觸發遷移排程"}
+        - {id: "N2", description: "資料庫連線切換"}
+      deviations:
+        - node_id: "N1"
+          guide_word: "EARLY"
+          cause: "排程時鐘漂移導致提前觸發"
+          consequence: "尚有流量時就切斷連線"
+          safeguard: ""
+          risk_rating: 7
+        - node_id: "N2"
+          guide_word: "OTHER_THAN"
+          cause: "切換到錯誤的目標資料庫實例"
+          consequence: "資料寫入錯誤環境"
+          safeguard: "部署前人工核對目標連線字串"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-HAZOPSTUDY-1"
+    question: "deviations[].node_id must reference nodes[].id -- enforced by the runtime module (ai_lego/modules/challenge/hazop.py), not this schema (JSON Schema 2020-12 cannot express cross-array referential integrity without a verbose per-value if/then). Should a future revision add that construct?"
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/challenge/hazop.py enforces this at construction time"
+
+verification:
+  method: >
+    Read Atlas F12 tool table row (L651) directly. Grepped the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS
+    and Projects/internal/cognitive-engineering-os trees for "hazop"/"HAZOP" before writing any of this method's
+    own files -- zero pre-existing implementation. Read red-team-challenge.schema.yaml (closed-vocabulary enum
+    precedent) and game-theory.schema.yaml (referential-integrity-as-runtime-invariant precedent) in full before
+    writing this file. Validated against jsonschema Draft202012Validator via tests/unit/test_hazop.py.
+  note: >
+    No mother document was modified. The 11-word guide_word enum is a disclosed compilation choice (Atlas L651
+    truncates its own list with "..."; only 4 words are directly cited) -- see compilation_decisions and the
+    method contract's own description. nodes[]/deviations[] shape, the HAZOP- prefix, and record-level-only
+    provenance are this file's own compiled structure.

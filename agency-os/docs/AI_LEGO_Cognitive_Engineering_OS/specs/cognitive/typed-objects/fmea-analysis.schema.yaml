@@ -1,0 +1,193 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/fmea-analysis.schema.yaml"
+title: FMEA Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FmeaAnalysis` -- the declared
+  `outputs` of `challenge.fmea`'s Method Contract
+  (methods/contracts/challenge.fmea.contract.yaml, `outputs:
+  [FmeaAnalysis]`). Atlas §11.26 (L1775-1801) pipeline: Function -> Failure
+  Mode -> Effect -> Cause -> Existing Control -> Severity -> Occurrence ->
+  Detection -> Action Priority.
+
+  `rpn` and `action_priority` on every `failure_modes[]` entry are
+  GENUINE_COMPUTE -- never caller-supplied, always derived by
+  `ai_lego/modules/challenge/fmea.py` from severity/occurrence/detection.
+  `action_priority` mechanizes Atlas's own explicit warning (L1799-1800,
+  verbatim): "不要只依賴 RPN；高 Severity 即使機率低仍可能需強制控制" --
+  severity>=9 forces `MANDATORY_CONTROL_REQUIRED` regardless of `rpn`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.26 失效模式與效應分析（FMEA）(L1775-1801) -- pipeline and RPN-alone warning"
+  - "methods/contracts/challenge.fmea.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-
+  object schema in this directory documents: transcription of Atlas
+  L1783-1800's own pipeline plus disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should severity/occurrence/detection be integer or allow a float (e.g. 5.5)?"
+    decision: "Integer 1-10 only -- the standard FMEA scale is a discrete 1-10 rank, not a continuous measurement; a float has no defined meaning on this scale. JSON `type: integer` also excludes JSON `boolean` (a distinct JSON type), matching the paired module's own explicit bool-exclusion guard."
+  - question: "Should rpn/action_priority be computed declaratively by a JSON Schema keyword, or left as a runtime invariant?"
+    decision: "Runtime invariant, enforced by ai_lego/modules/challenge/fmea.py's builder and independent gate -- JSON Schema draft 2020-12 has no declarative way to express arithmetic (severity * occurrence * detection) or a severity-conditioned override, same class of gap game-theory.schema.yaml's own OQ-GAMETHEORY-2/payoff-completeness disclosure and red-team-challenge.schema.yaml's own OQ-REDTEAMCHALLENGE-1 already establish for this directory."
+  - question: "What are the severity>=9 override threshold and the RPN HIGH/MEDIUM/LOW tier cut points?"
+    decision: "severity>=9 (top 2 of the 1-10 scale) forces MANDATORY_CONTROL_REQUIRED; otherwise rpn>=200 is HIGH, rpn>=50 is MEDIUM, else LOW. Atlas L1799-1800 is qualitative, gives no number -- this suite's own disclosed compilation choice, see method contract's OQ-FMEA-1."
+  - question: "additionalProperties: false at the top level and on every nested item object?"
+    decision: "Yes -- baseline hygiene this directory converges on (game-theory.schema.yaml's own identical choice), set correctly from the start."
+
+type: object
+required: [id, version, subject_ref, failure_modes, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^FMEA-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.fmea"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Free-text reference to the system/process/function this FMEA covers. Same free-text-reference pattern as red-team-challenge.schema.yaml's own proposal_ref."
+
+  failure_modes:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L1783-1791 pipeline stages 2-9, one entry per registered
+      failure mode. `rpn`/`action_priority` are GENUINE_COMPUTE -- see
+      top-level description and compilation_decisions. Cross-field
+      referential checks (unique `id` within the array; `rpn`/
+      `action_priority` actually match a recomputation from
+      severity/occurrence/detection) are RUNTIME invariants (not
+      expressible here), enforced by ai_lego/modules/challenge/fmea.py.
+    items:
+      type: object
+      required: [id, function, failure_mode, effect, cause, existing_control, severity, occurrence, detection, rpn, action_priority]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this analysis (e.g. FMEA-2026-09-11-001-FM1)."
+        function:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas pipeline stage 1: what the thing is supposed to do."
+        failure_mode:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas pipeline stage 2: how it fails."
+        effect:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas pipeline stage 3: consequence of the failure."
+        cause:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas pipeline stage 4: root cause of the failure mode."
+        existing_control:
+          type: string
+          description: "Atlas pipeline stage 5. May be empty -- 'no control exists yet' is itself a valid, common, important finding, not an omission to reject."
+        severity:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: "Atlas pipeline stage 6. Standard FMEA 1-10 scale (10 = most severe)."
+        occurrence:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: "Atlas pipeline stage 7. Standard FMEA 1-10 scale (10 = most frequent)."
+        detection:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: "Atlas pipeline stage 8. Standard FMEA 1-10 scale (10 = hardest to detect before it reaches effect)."
+        rpn:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          description: "GENUINE_COMPUTE: severity * occurrence * detection. Never caller-supplied -- see compilation_decisions."
+        action_priority:
+          type: string
+          enum: [MANDATORY_CONTROL_REQUIRED, HIGH, MEDIUM, LOW]
+          description: >
+            Atlas pipeline stage 9. GENUINE_COMPUTE, mechanizing Atlas's own
+            explicit warning (L1799-1800): severity>=9 forces
+            MANDATORY_CONTROL_REQUIRED regardless of rpn; otherwise derived
+            from the rpn tier table (see compilation_decisions). Never
+            caller-supplied.
+
+  provenance:
+    description: "Overall record provenance -- RECORD-LEVEL ONLY (one coherent FMEA analysis, not a list of independently-sourced items), same placement precedent game-theory.schema.yaml's own compilation_decisions establishes."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A payment-retry job FMEA: one high-severity finding forced to MANDATORY_CONTROL_REQUIRED despite low occurrence/detection, one ordinary HIGH-tier finding"
+    value:
+      id: "FMEA-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.fmea"
+      subject_ref: "付款重試背景工作（payment-retry-worker）"
+      failure_modes:
+        - id: "FMEA-2026-09-11-001-FM1"
+          function: "重試失敗的付款請求，最多 3 次"
+          failure_mode: "重試邏輯把同一筆款項重複扣款兩次"
+          effect: "客戶被重複收費，需人工退款"
+          cause: "重試前未先查詢是否已有成功交易記錄（幂等鍵缺失）"
+          existing_control: ""
+          severity: 10
+          occurrence: 2
+          detection: 3
+          rpn: 60
+          action_priority: MANDATORY_CONTROL_REQUIRED
+        - id: "FMEA-2026-09-11-001-FM2"
+          function: "重試失敗的付款請求，最多 3 次"
+          failure_mode: "重試間隔過短導致第三方 API rate limit"
+          effect: "整批重試被拒絕，付款延遲"
+          cause: "固定 1 秒間隔，未實作指數退避"
+          existing_control: "重試次數上限 3 次"
+          severity: 5
+          occurrence: 8
+          detection: 6
+          rpn: 240
+          action_priority: HIGH
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - id: "OQ-FMEAANALYSIS-1"
+    question: "Should a future revision add a linked recommended_action/owner/due_date per failure mode, matching common industrial FMEA forms, or does action_priority alone suffice for this method's own scope?"
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §11.26 (L1775-1801) directly at the cited lines, including
+    the exact 9-stage pipeline and the RPN-alone warning's exact wording.
+    Validated against jsonschema Draft202012Validator, including a real
+    mutation check that additionalProperties:false refuses a smuggled
+    top-level key and that action_priority's closed enum refuses an
+    invented value (tests/unit/test_fmea.py).
+  note: >
+    No mother document was modified. The 9-stage pipeline field names are
+    transcribed directly from Atlas L1783-1791. The FMEA- prefix,
+    severity>=9 override threshold, RPN tier cut points, and
+    record-level-only provenance placement are this suite's own compiled
+    structure, disclosed above, not textually cited.

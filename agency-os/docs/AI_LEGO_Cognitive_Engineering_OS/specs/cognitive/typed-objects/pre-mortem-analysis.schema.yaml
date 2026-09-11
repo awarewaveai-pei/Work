@@ -1,0 +1,186 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/pre-mortem-analysis.schema.yaml"
+title: Pre-mortem Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PreMortemAnalysis` -- the declared `outputs` of
+  `challenge.pre_mortem`'s Method Contract (methods/contracts/challenge.pre_mortem.contract.yaml, `outputs:
+  [PreMortemAnalysis]`). F12 challenge/red-team/risk family, 4th built member. Atlas cites this method twice:
+  F12 table row (L647, "Pre-mortem｜假設未來已失敗｜每人獨立列 failure causes→cluster→controls｜揭露真實擔憂")
+  and dedicated §11.25 (L1755-1773), whose own literal 5-step process this schema's shape mechanizes: (1)
+  failure timepoint/scenario, (2) independently-authored causes, (3) clustering, (4) likelihood x impact
+  ranking, (5) prevention/detection/recovery controls.
+
+  Field provenance:
+    * `failure_scenario` -- step 1 ("指定失敗時間點與情境"), REQUIRED non-empty.
+    * `failure_causes[]` -- steps 2-4: `description`/`cluster` (independent authorship + clustering, both
+      REQUIRED non-empty), `likelihood`/`impact` (closed LOW/MEDIUM/HIGH enum), `priority` -- GENUINE_COMPUTE,
+      a total 3x3 lookup table over (likelihood, impact), NEVER caller-supplied (see compilation_decisions).
+    * `controls[]` -- step 5 verbatim ("prevention/detection/recovery control"): `control_type` closed
+      PREVENTION/DETECTION/RECOVERY enum, `addresses_cause_id` a soft reference to one `failure_causes[].id`
+      IN THIS SAME RECORD. Cross-field completeness (every cause covered by >=1 control) is the real invariant
+      §11.25's own step 5 exists to enforce -- checked at the runtime layer, not expressible here.
+    * `provenance` (top-level only) -- record-level, matching this corpus's established batch precedent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Pre-mortem row (L647)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.25 事前驗屍／事前失敗分析（Pre-mortem）(L1755-1773)"
+  - "methods/contracts/challenge.pre_mortem.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/game-theory.schema.yaml -- runtime cross-array completeness invariant precedent; specs/cognitive/typed-objects/post-mortem-record.schema.yaml -- single-reference-per-entry (`timeline_ref`) precedent this file's `addresses_cause_id` shape follows"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas §11.25's own 5-step process plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should `priority` be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) from a total (likelihood, impact) 3x3 lookup table, same discipline stakeholders.power_interest's own `quadrant` and strategy.bcg_matrix's own quadrant derivation already establish -- never an accepted builder parameter."
+  - question: "Is cause-to-control coverage a schema-level constraint or a runtime cross-array invariant?"
+    decision: "Runtime invariant (builder + independent gate) -- JSON Schema 2020-12 cannot declaratively express 'every failure_causes[] entry has >=1 matching controls[] reference', same class of disclosed gap stakeholders.game_theory's own payoff-completeness invariant already documents."
+  - question: "Should `addresses_cause_id` allow multiple causes per control (a list) or exactly one?"
+    decision: "Exactly one (a single string reference) -- a control addressing multiple causes is expressed as multiple control entries, same one-reference-per-entry shape post-mortem-record.schema.yaml's own `cause_entry.timeline_ref` already uses."
+  - question: "additionalProperties: false at the top level, and on each failure_causes[]/controls[] item?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, failure_scenario, failure_causes, controls, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^PREMORTEM-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.pre_mortem"
+
+  failure_scenario:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas §11.25 step 1 ('指定失敗時間點與情境') -- the named failure timepoint and scenario being assumed, e.g. Atlas's own prompt '一年後這個專案徹底失敗了，為什麼？' applied to a specific proposal."
+
+  failure_causes:
+    type: array
+    minItems: 1
+    description: "Atlas §11.25 steps 2-4. At least one cause required -- a pre-mortem naming zero causes has not actually run the process."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, cluster, likelihood, impact, priority]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Step 2 ('每人先獨立寫原因') -- one independently-authored failure cause."
+        cluster:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Step 3 ('分群') -- the cluster/theme label this cause was grouped into."
+        likelihood:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          description: "Step 4 ('依 likelihood x impact 排序') -- ordinal likelihood. The 3-value scale itself is a disclosed compilation choice, not Atlas-cited (see the method contract's own open_questions)."
+        impact:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          description: "Step 4 -- ordinal impact, same closed vocabulary as likelihood."
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          description: "GENUINE_COMPUTE -- mechanically derived from (likelihood, impact) via a total 3x3 lookup table (ai_lego/modules/challenge/pre_mortem.py `_PRIORITY_BY_LEVELS`). NEVER a builder parameter -- see compilation_decisions."
+
+  controls:
+    type: array
+    description: "Atlas §11.25 step 5 ('建 prevention/detection/recovery control'). May be empty ONLY when failure_causes is also empty -- since failure_causes requires >=1 entry, the runtime-layer coverage invariant in practice requires >=1 control too."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, control_type, description, addresses_cause_id]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        control_type:
+          type: string
+          enum: [PREVENTION, DETECTION, RECOVERY]
+          description: "Atlas's own step 5 verbatim 3 named control types."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The control itself."
+        addresses_cause_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Must name a real failure_causes[].id IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+
+  provenance:
+    description: "Record-level only -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A pre-mortem over a fictional AI content-publishing launch: 2 clustered causes ranked by likelihood x impact, each covered by at least one control."
+    value:
+      id: "PREMORTEM-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.pre_mortem"
+      failure_scenario: "一年後，這次全自動 AI 內容發布上線徹底失敗了，為什麼？"
+      failure_causes:
+        - id: "FC-001"
+          description: "AI 產出內容沒有任何自動品質監控，錯誤內容直接曝光給客戶"
+          cluster: "監控缺口"
+          likelihood: HIGH
+          impact: HIGH
+          priority: CRITICAL
+        - id: "FC-002"
+          description: "上線前跳過人工審核步驟，趕時程優先於品質"
+          cluster: "流程缺口"
+          likelihood: MEDIUM
+          impact: HIGH
+          priority: HIGH
+      controls:
+        - id: "CTRL-001"
+          control_type: PREVENTION
+          description: "上線前導入強制人工審核步驟，未過審不得發布"
+          addresses_cause_id: "FC-002"
+        - id: "CTRL-002"
+          control_type: DETECTION
+          description: "加入內容品質異常自動告警"
+          addresses_cause_id: "FC-001"
+        - id: "CTRL-003"
+          control_type: RECOVERY
+          description: "保留一鍵回滾到人工審核流程的開關"
+          addresses_cause_id: "FC-001"
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-PREMORTEMANALYSIS-1: likelihood/impact/priority use closed string enums, not numeric scores -- a future revision could add a numeric variant if a downstream consumer needs arithmetic ranking beyond the 4-value priority lookup (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas §11.25 (L1755-1773) and the F12 table row (L647) directly at the cited lines. Grepped the full
+    spec root (specs/**, methods/**) case-insensitively for "pre-mortem"/"premortem"/"PreMortemAnalysis" before
+    writing this file -- zero pre-existing implementation; post-mortem-record.schema.yaml is confirmed a
+    DIFFERENT, unrelated method (learning.post_mortem, F17 incident-review), read in full first to rule out
+    collision. Validated against jsonschema.Draft202012Validator, including a mutation check that the cause/
+    control cross-reference completeness invariant is caught by the runtime gate (not expressible here).
+  note: >
+    No mother document was modified. The 5-step process and the 3 named control types are transcribed verbatim
+    from Atlas L1762-1768. The GENUINE_COMPUTE `priority` lookup table and the flat failure_scenario/
+    failure_causes/controls shape are this file's own compilation decisions, disclosed above.

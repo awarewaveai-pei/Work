@@ -1,0 +1,156 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/counterexample-search.schema.yaml"
+title: Counterexample Search Result
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CounterexampleSearchResult` -- the declared `outputs` of
+  `challenge.counterexample_search`'s Method Contract (methods/contracts/challenge.counterexample_search.contract.yaml,
+  `outputs: [CounterexampleSearchResult]`). Atlas cites this method ONLY in the F12 tool table row (L648:
+  "找規則的反例｜claim→boundary cases→true counterexamples｜測適用邊界") -- no dedicated §11.2x section, unlike
+  red_team/blue_team/independent_judge's own subsections (grep-confirmed).
+
+  Field provenance:
+    * `claim` -- pipeline stage 1. The rule/claim under test, free text.
+    * `boundary_cases` -- pipeline stage 2 ("boundary cases"). Edge cases examined for the claim's applicability,
+      each a non-empty `{id, description}` pair. At least 1 required -- a search that examined zero boundary
+      cases did not search.
+    * `true_counterexamples` -- pipeline stage 3 ("true counterexamples"), and where the REAL invariant this
+      schema's paired module exists to enforce lives: every entry's `boundary_case_id` MUST resolve to a real
+      `boundary_cases[].id` (a case cannot be confirmed a counterexample if it was never examined as a boundary
+      case), and every entry carries a non-empty `contradiction_explanation` proving WHY the case actually breaks
+      the claim -- an unevidenced counterexample assertion is exactly as weak as an unevidenced Red Team finding.
+      MAY legitimately be empty -- a claim surviving the search is a real, useful result, not a failure (enforced
+      as a RUNTIME invariant by `ai_lego/modules/challenge/counterexample_search.py`, not expressible as a
+      declarative cross-array schema constraint -- same disclosed-gap class as `game-theory.schema.yaml`'s own
+      payoff-completeness invariant / `mcda-analysis.schema.yaml`'s OQ-MCDAANALYSIS-1).
+    * `provenance` -- RECORD-LEVEL ONLY, same placement `game-theory.schema.yaml`'s own compilation_decisions
+      establishes for a self-contained analytical record.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Counterexample Search row (L648)"
+  - "methods/contracts/challenge.counterexample_search.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/game-theory.schema.yaml -- referential-integrity-as-runtime-invariant and record-level-only-provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L648's own literal pipeline plus low-risk, disclosed compilation choices (flat
+  boundary_cases/true_counterexamples shape, CES- prefix, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Should referential integrity (`true_counterexamples[].boundary_case_id` must resolve to `boundary_cases[].id`) be a JSON Schema keyword, or a runtime invariant?"
+    decision: "Runtime invariant, enforced by ai_lego/modules/challenge/counterexample_search.py's builder and independent gate -- JSON Schema draft 2020-12 has no declarative way to cross-check two sibling arrays' referential integrity, same gap game-theory.schema.yaml's own payoff-completeness invariant already discloses."
+  - question: "Can `true_counterexamples` be an empty array?"
+    decision: "Yes -- a claim can survive the search (zero true counterexamples found among the examined boundary cases). Not required to be non-empty, unlike `boundary_cases`."
+  - question: "additionalProperties: false at the top level and on every nested item object?"
+    decision: "Yes -- baseline hygiene this directory converges on (game-theory.schema.yaml's own identical choice)."
+
+type: object
+required: [id, version, claim, boundary_cases, true_counterexamples, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CES-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.counterexample_search"
+
+  claim:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L648 pipeline stage 1: 'claim' -- the rule/claim under test, free text."
+
+  boundary_cases:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L648 pipeline stage 2: 'boundary cases'. Edge cases examined for the claim's applicability. At least
+      1 required -- a search that examined zero boundary cases did not search.
+    items:
+      type: object
+      required: [id, description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+
+  true_counterexamples:
+    type: array
+    description: >
+      Atlas L648 pipeline stage 3: 'true counterexamples' -- the SUBSET of boundary_cases confirmed to actually
+      break the claim. MAY be empty (a claim can survive the search). Every entry's `boundary_case_id` MUST
+      resolve to a real `boundary_cases[].id` -- a RUNTIME invariant, not expressible here, see
+      compilation_decisions.
+    items:
+      type: object
+      required: [boundary_case_id, contradiction_explanation]
+      additionalProperties: false
+      properties:
+        boundary_case_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Must reference a real boundary_cases[].id -- referential integrity enforced at the runtime layer."
+        contradiction_explanation:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Non-empty proof of WHY this boundary case actually breaks the claim -- an unevidenced counterexample assertion is exactly as weak as an unevidenced Red Team finding."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Claim 'all users can reset password via email' tested against two boundary cases -- one true counterexample found, one boundary case survives"
+    value:
+      id: "CES-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.counterexample_search"
+      claim: "所有使用者都可以透過 email 重設密碼"
+      boundary_cases:
+        - {id: "BC-1", description: "使用者帳號沒有綁定 email，只用手機號碼註冊"}
+        - {id: "BC-2", description: "使用者的 email 已停用但帳號仍是 active 狀態"}
+      true_counterexamples:
+        - {boundary_case_id: "BC-1", contradiction_explanation: "純手機號碼註冊帳號的 email 欄位為 null，重設密碼流程寄不出信，直接卡住 -- 規則在這個邊界案例下不成立"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-CESRESULT-1"
+    question: >
+      true_counterexamples[].boundary_case_id must resolve to a real boundary_cases[].id -- enforced by the
+      runtime module, not this schema (JSON Schema 2020-12 cannot natively express a cross-array reference check
+      here). Should a future revision add a verbose if/then construct, or is the runtime-layer check sufficient?
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/challenge/counterexample_search.py enforces this at construction time"
+
+verification:
+  method: >
+    Read Atlas F12 tool table row (L648) directly -- the only citation for this method. Grepped the whole Atlas
+    file for "Counterexample"/"反例" -- confirmed no dedicated section, no §4 formula, no §22.3 gate-table row.
+    Read game-theory.schema.yaml (referential-integrity-as-runtime-invariant, record-level-only-provenance
+    precedent) and red-team-challenge.schema.yaml (this family's own sibling shape) in full before writing this
+    file. Validated against jsonschema Draft202012Validator via tests/unit/test_counterexample_search.py
+    (required fields present, id pattern satisfied, additionalProperties:false at the top level and every nested
+    item, the embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative controls
+    for a smuggled top-level key, an empty boundary_cases array, and a dangling boundary_case_id reference).
+  note: >
+    No mother document was modified. `claim`/`boundary_cases`/`true_counterexamples` field names and stage
+    ordering are transcribed directly from Atlas L648's own literal pipeline. The nested item shapes, the CES-
+    prefix, and the record-level-only provenance placement are this suite's own compiled structure, disclosed
+    above, not textually cited.

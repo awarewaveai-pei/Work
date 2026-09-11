@@ -1,0 +1,150 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stress-test-scenario-set.schema.yaml"
+title: Stress Test Scenario Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StressTestScenarioSet` -- the declared `outputs` of
+  `challenge.stress_testing`'s Method Contract (methods/contracts/challenge.stress_testing.contract.yaml,
+  `outputs: [StressTestScenarioSet]`). Atlas F12 tool table row (L652: "極端但合理情境 | extreme scenarios→run→
+  breaking points | 測 robustness") maps onto `scenarios[]`: each entry states a `normal_range` (the documented
+  normal operating range being stressed), an `extreme_value` that must fall STRICTLY outside it, and an `outcome`
+  from a closed WITHIN_TOLERANCE/DEGRADED/BROKEN set recording what actually happened when it ran.
+
+  Deliberately NOT named `StressTestRecord` -- that name already belongs to `devops_sre.stress_test`'s own typed
+  object (`stress-test-record.schema.yaml`), a real, distinct, engineering load-test method (F19). This schema's
+  own method contract discloses and disambiguates that near-name collision in full; `StressTestScenarioSet` is
+  chosen here specifically to avoid recreating it by name.
+
+  `normal_range`/`extreme_value` are qualitative-scenario inputs (a caller-defined boundary and a caller-defined
+  extreme point), not the real, measured load ladder `devops_sre.stress_test`'s own `load_steps[]` records --
+  this method never runs a real system, it subjects a PLAN or DECISION to extreme-but-plausible qualitative
+  scenarios (Atlas's own "但合理" -- "but plausible" -- qualifier is why `extreme_value` is caller-asserted, not
+  unbounded).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Stress Testing row (L652): '極端但合理情境 | extreme scenarios→run→breaking points | 測 robustness'"
+  - "methods/contracts/challenge.stress_testing.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/stress-test-record.schema.yaml -- the F19 near-name collision this schema's own name and description deliberately disambiguate from, not a shared shape"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents:
+  a direct transcription of Atlas L652's own literal formula plus low-risk, disclosed compilation choices (the
+  scenarios[] shape, the STSS- prefix, record-level-only provenance, additionalProperties:false).
+
+compilation_decisions:
+  - question: "additionalProperties: false at the top level and on every nested scenarios[] item?"
+    decision: "Yes -- baseline hygiene this directory converges on (game-theory.schema.yaml's own identical choice), set correctly from the start."
+  - question: "Should normal_range.min/max and extreme_value accept any JSON number including booleans?"
+    decision: "No -- `type: number` already excludes JSON booleans at the schema level; the paired module's own runtime checks additionally guard `isinstance(value, bool)` explicitly, so a hand-tampered Python dict with True/False is refused at the gate layer too, not just schema validation."
+  - question: "Is the extreme_value-outside-normal_range invariant expressible as a JSON Schema keyword, or a runtime invariant?"
+    decision: "Runtime invariant, enforced by ai_lego/modules/challenge/stress_testing.py's builder and independent gate -- JSON Schema draft 2020-12 has no declarative way to compare two sibling properties (extreme_value vs normal_range.min/max) within the same object, same class of gap mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 already discloses for a structurally different but equally cross-field case."
+
+type: object
+required: [id, version, proposal_ref, scenarios, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^STSS-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema. Deliberately distinct from devops_sre.stress_test's own 'STRESSTEST-' prefix -- see description."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.stress_testing"
+
+  proposal_ref:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Free-text reference to the proposal/plan/decision this scenario set stress-tests. Same scope-limited free-text-reference choice as challenge.red_team's own proposal_ref -- see that method contract's own reasoning."
+
+  scenarios:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L652's own 'extreme scenarios→run→breaking points' formula, one entry per scenario. THE real
+      invariant (extreme_value strictly outside normal_range; outcome required with no default) is a RUNTIME
+      invariant, not expressed here -- see compilation_decisions.
+    items:
+      type: object
+      required: [id, description, normal_range, extreme_value, outcome]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this scenario set (e.g. STSS-001-S1)."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The extreme-but-plausible scenario itself, in natural language -- what is being pushed to an extreme, and why it is still plausible (Atlas's own '但合理' qualifier)."
+        normal_range:
+          type: object
+          required: [min, max]
+          additionalProperties: false
+          description: "The documented normal operating range being stressed. min <= max is a runtime invariant (an inverted range is refused) -- see compilation_decisions and the method contract's own preconditions."
+          properties:
+            min:
+              type: number
+              description: "JSON number excludes JSON boolean -- see compilation_decisions."
+            max:
+              type: number
+              description: "JSON number excludes JSON boolean -- see compilation_decisions."
+        extreme_value:
+          type: number
+          description: "The extreme point this scenario actually runs. Must be STRICTLY outside [normal_range.min, normal_range.max] -- a runtime invariant, not expressible here (comparing two sibling properties is outside JSON Schema 2020-12's declarative reach for this shape). A value inside or on the boundary of normal_range is refused at construction: it is not stress-testing anything, just normal operation mislabeled."
+        outcome:
+          type: string
+          enum: [WITHIN_TOLERANCE, DEGRADED, BROKEN]
+          description: "REQUIRED, no default -- Atlas's own 'breaking points' concept: a scenario defined but never run/scored is an incomplete stress test. Caller-supplied, not computed (see method contract's own compilation_decisions for why no numeric threshold is invented here)."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A payment-processing rollout plan stress-tested across two extreme-but-plausible scenarios: one survives degraded, one breaks"
+    value:
+      id: "STSS-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.stress_testing"
+      proposal_ref: "PROP-2026-09-11-002: 新支付閘道上線計畫，預期尖峰 200 TPS"
+      scenarios:
+        - id: "STSS-2026-09-11-001-S1"
+          description: "黑色星期五流量暴衝：尖峰負載達到平日的 6 倍，仍在歷史紀錄過的合理範圍內"
+          normal_range: {min: 50, max: 200}
+          extreme_value: 1200
+          outcome: DEGRADED
+        - id: "STSS-2026-09-11-001-S2"
+          description: "上游銀行 API 同時延遲 3 秒且錯誤率升至 20%，過去一年曾發生過一次類似事件"
+          normal_range: {min: 0, max: 0.02}
+          extreme_value: 0.20
+          outcome: BROKEN
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-STRESSTESTSCENARIOSET-1: should a future revision add an aggregate robustness verdict field, or is per-scenario outcome sufficient? Same open question the method contract's own OQ-STRESSTESTING-1 already discloses (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F12 tool table row (L652) directly. Read stress-test-record.schema.yaml (devops_sre.stress_test's
+    own typed object) in full before naming this file, specifically to avoid recreating the F12/F19 near-name
+    collision that contract's own description disambiguates. Grepped the typed-objects directory for every
+    existing "^<PREFIX>-" id pattern before choosing STSS- -- confirmed unused. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_stress_testing.py (required fields present, id pattern satisfied,
+    additionalProperties:false at the top level and the nested scenarios[] item, the embedded example resolved
+    through its real $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, an
+    empty scenarios array, and a non-numeric extreme_value).
+  note: >
+    No mother document was modified. `scenarios[]`/`normal_range`/`extreme_value`/`outcome` field names are this
+    suite's own compiled structure transcribing Atlas L652's literal formula ("extreme scenarios→run→breaking
+    points"), not directly Atlas-cited field names beyond that wording. The STSS- prefix and record-level-only
+    provenance placement are disclosed compilation choices.

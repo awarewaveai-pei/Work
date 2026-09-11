@@ -1,0 +1,98 @@
+$id: "ai-lego://methods/contracts/challenge.hazop.contract.yaml"
+title: "HAZOP Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F12 challenge/red-team/risk family, ninth built member (red_team,
+  blue_team, independent_judge already built). Atlas F12 tool table row
+  (L651, ONLY citation -- no dedicated section exists): "HAZOP｜用 guide
+  words 找流程偏差｜nodes→No/More/Less/Reverse...｜高完整度流程風險分析".
+  Atlas truncates its own guide-word list with "..." -- supplemented with
+  the standard 11-word HAZOP vocabulary (see compilation_decisions). Core
+  invariant: every `deviations[]` entry's `node_id` must reference a real
+  `nodes[]` entry and `guide_word` must be a member of the closed 11-word
+  set -- referential integrity + closed vocabulary, NOT full
+  node-x-guide-word coverage (see open_questions).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, HAZOP row (L651) -- the ONLY Atlas citation for this method, no dedicated section exists"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L651 gives a truncated guide-word list
+  ("No/More/Less/Reverse...") and no dedicated section -- direct
+  transcription of the 4 named words plus a disclosed compilation choice
+  for the remaining 7 (standard external HAZOP guide-word vocabulary, not
+  invented).
+
+id: challenge.hazop
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [DECOMPOSE, INFER, CHALLENGE]
+# INFERRED, not cited (Atlas L651 gives no §4 composition formula). DECOMPOSE = breaking a process into nodes;
+# INFER = deriving cause/consequence per guide-word deviation; CHALLENGE = same family-defining action
+# challenge.red_team.contract.yaml's own primitive already uses. All three CANONICAL_KERNEL members.
+
+purpose:
+  - find_process_deviations_by_systematically_applying_guide_words_to_process_nodes
+# Atlas L651 verbatim sense: 用 guide words 找流程偏差.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position this family's siblings
+  # (red_team, blue_team, independent_judge) already take.
+
+outputs:
+  - HazopStudy
+# NEW output type (see typed-objects/hazop-study.schema.yaml). Atlas names no PascalCase output type.
+
+preconditions:
+  - "nodes has at least 1 entry, each a non-empty {id, description} pair, no duplicate id -- a HAZOP study that examined zero process nodes did not actually study anything"
+  - "every deviations entry's node_id references an existing nodes entry -- referential integrity, no orphan deviation"
+  - "every deviations entry's guide_word is a member of the closed 11-word set NO_NOT/MORE/LESS/AS_WELL_AS/PART_OF/REVERSE/OTHER_THAN/EARLY/LATE/BEFORE/AFTER"
+  - "deviations may legitimately be empty when nodes is non-empty -- a node can be examined against a guide word and found to have no real deviation"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same reasoning stakeholders.game_theory.contract.yaml gives: this method takes no EvidenceSet input
+  # (inputs.required: []), so the flag method.schema.yaml scopes to "claims sourced from EvidenceSet input" does
+  # not apply. Provenance is still required at record level (provenance_required: true).
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L651 names no downstream method for HAZOP specifically.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Atlas L651 truncates its own guide-word list with '...' after No/More/Less/Reverse -- what is the full closed vocabulary?"
+    decision: "Standard 11-word HAZOP guide-word set: NO_NOT, MORE, LESS, AS_WELL_AS, PART_OF, REVERSE, OTHER_THAN, EARLY, LATE, BEFORE, AFTER -- external process-safety-engineering convention, not invented; only 4 (No/More/Less/Reverse, mapped to NO_NOT/MORE/LESS/REVERSE) are Atlas-cited by name."
+  - question: "Must every node be examined against every guide word (full coverage) before a study is accepted?"
+    decision: "No -- not every guide word applies to every node in practice; the real invariant is closed-vocabulary + referential integrity, not full coverage."
+  - question: "Should deviations[] carry an optional numeric severity/risk_rating field?"
+    decision: "Yes, optional -- reasonable HAZOP extension (same class as FMEA's severity); Python's bool-is-int-subclass trap is explicitly excluded in the paired module, same as stakeholders.game_theory's payoffs[].value guard."
+
+open_questions:
+  - "OQ-HAZOP-1: Atlas gives no severity/risk scale for this method -- risk_rating stays a free-form optional number, no closed enum invented (owner: operator)."
+  - "OQ-HAZOP-2: cognitive_primitives is this file's own inference, Atlas gives no §4 formula for this method (owner: operator, or whoever adds a dedicated Atlas §4 formula)."
+  - "OQ-HAZOP-3: safeguard may be an empty string -- 'no safeguard exists yet' is itself treated as a valid finding, same reasoning FMEA's existing_control field uses (owner: operator, if a future revision wants a tri-state none/planned/exists enum instead)."
+
+verification:
+  method: >
+    Read Atlas F12 tool table row (L651) directly -- the only citation, no dedicated section (grep-confirmed: no
+    other "HAZOP" hit anywhere else in the Atlas file). Read challenge.red_team.contract.yaml (closed-vocabulary
+    enum precedent) and stakeholders.game_theory.contract.yaml (referential-integrity-as-runtime-invariant
+    precedent) in full before writing this contract. Grepped the whole
+    agency-os/docs/AI_LEGO_Cognitive_Engineering_OS and Projects/internal/cognitive-engineering-os trees for
+    "hazop"/"HAZOP" before writing any of this method's own files -- zero pre-existing implementation, zero
+    contract-backlog entry. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The guide-word vocabulary beyond Atlas's own 4 named words is a disclosed
+    compilation choice (external HAZOP standard, not invented) -- see compilation_decisions and description.

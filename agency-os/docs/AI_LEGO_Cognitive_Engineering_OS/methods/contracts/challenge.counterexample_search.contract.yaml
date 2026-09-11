@@ -1,0 +1,106 @@
+$id: "ai-lego://methods/contracts/challenge.counterexample_search.contract.yaml"
+title: "Counterexample Search Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F12 challenge/red-team/risk family, sixth built member (red_team, blue_team, independent_judge already
+  exist). Atlas cites this method ONLY in the F12 tool table row (L648: "找規則的反例｜claim→boundary cases→true
+  counterexamples｜測適用邊界") -- no dedicated §11.2x section, unlike red_team §11.23/blue_team §11.24/
+  independent_judge's own subsections (grep-confirmed). Same honest under-specification disclosure every other
+  table-row-only Tier 1 contract in this corpus already makes. Core invariant: every `true_counterexamples[]`
+  entry's `boundary_case_id` must resolve to a real `boundary_cases[]` entry -- mechanizing the table row's own
+  3-stage pipeline (a case cannot be confirmed a counterexample without first being examined as a boundary case).
+  `true_counterexamples` may legitimately be empty -- a claim surviving the search is a real result, not a failure.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Counterexample Search row (L648)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: challenge.counterexample_search` mints a NEW machine_id, sixth built F12
+  member. The claim-as-embedded-string shape, boundary-case/counterexample referential-integrity invariant, and
+  record-level-only provenance are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: challenge.counterexample_search
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [CHALLENGE, INFER]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. CHALLENGE = attacking the
+# claim's applicability (table row's own "找規則的反例"); INFER = determining which examined boundary cases are
+# TRUE counterexamples versus ones the claim survives.
+
+purpose:
+  - find_true_counterexamples_that_break_a_claims_applicability_boundary
+# Atlas L648 verbatim sense: 用途「找規則的反例」，效益「測適用邊界」。
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "embed the content directly, no external reference" position
+  # stakeholders.game_theory.contract.yaml already takes. `claim` is a self-contained free-text field on the
+  # OUTPUT record, not a reference to an existing Decision/Claim typed object (see compilation_decisions).
+
+outputs:
+  - CounterexampleSearchResult
+# NEW output type (see typed-objects/counterexample-search.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "claim is a non-empty string -- the rule/claim under test (Atlas L648's own 'claim' pipeline stage)"
+  - "boundary_cases has at least 1 entry, each a well-formed {id, description} pair with no duplicate id -- a search that examined zero boundary cases did not search"
+  - "every true_counterexamples entry's boundary_case_id references an existing boundary_cases entry (referential integrity) and carries a non-empty contradiction_explanation -- a case cannot be confirmed a counterexample if it was never examined as a boundary case, and an unevidenced counterexample claim is exactly as weak as an unevidenced Red Team finding"
+  - "true_counterexamples may legitimately be empty -- a claim surviving the search is a real, useful result, not a failure"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same reasoning as stakeholders.game_theory.contract.yaml: this method takes no upstream EvidenceSet
+  # input (inputs.required: []), and the real per-item evidentiary requirement (every true_counterexamples entry
+  # must carry a non-empty contradiction_explanation) is already enforced structurally as a REQUIRED precondition
+  # above, not through the conditional epistemic-label/supporting_evidence_refs pattern red_team's own
+  # EVIDENCE-labeled findings use.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed); Atlas gives no dedicated
+# section at all for it (see description).
+
+recommended_next: []
+# Atlas's F12 table row gives no downstream chain citation for this specific method (contrast red_team's
+# dedicated §11.24 pairing citation) -- left empty rather than guessing one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should `claim` be a free-text string field on the output record, or a hard/soft reference to an existing Decision/Claim typed object (ProposalRef-style, matching red_team's own upstream reference choice)?"
+    decision: "Free-text string field embedded directly in the output record -- no single existing typed object is the universal claim/rule reference (same reasoning red_team's own ProposalRef choice discloses), and matching game_theory's own 'embed the content directly, no external reference' precedent for a self-contained analytical record."
+  - question: "Referential integrity between boundary_cases[] and true_counterexamples[]: a schema-level constraint, or a runtime cross-array invariant?"
+    decision: "Runtime invariant (builder + independent gate) -- same disclosed-gap class as decision.mcda's OQ-MCDAANALYSIS-1 and stakeholders.game_theory's own payoff-completeness invariant; JSON Schema draft 2020-12 cannot declaratively express 'every true_counterexamples[].boundary_case_id must match a real boundary_cases[].id'."
+  - question: "Per-field provenance (per boundary_case / per true_counterexample) or record-level only?"
+    decision: "Record-level only, one top-level `provenance` field -- same placement stakeholders.game_theory.contract.yaml's own compilation_decisions establishes for a self-contained analytical record whose fields describe one coherent search, not a list of independently-sourced items."
+
+open_questions:
+  - "OQ-CES-1: Atlas gives this method no dedicated section (unlike red_team §11.23/blue_team §11.24/independent_judge) -- only the F12 table row (L648). A future session could mine the Atlas appendices or an ADR for a fuller pipeline (owner: operator)."
+  - "OQ-CES-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-CES-3: this record only captures claim/boundary_cases/true_counterexamples -- Atlas's own table-row pipeline stops here; no next-stage method is named (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F12 tool table row (L648) directly -- the ONLY citation for this method, confirmed by grepping the
+    whole Atlas file for "Counterexample"/"反例" (no dedicated §11.2x section like red_team/blue_team/
+    independent_judge, no §4 composition formula, no §22.3 Method-specific Gate table row). Read
+    challenge.red_team.py/contract.yaml (this family's structural template) and stakeholders.game_theory.py/
+    contract.yaml (referential-integrity-as-runtime-invariant pattern, record-level-only-provenance precedent) in
+    full before writing this contract. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` for "counterexample_search"/"CounterexampleSearch"/"CES-" before
+    writing any of this method's own files -- zero pre-existing implementation. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The claim/boundary_cases/true_counterexamples field names are transcribed
+    directly from Atlas L648's own literal pipeline ("claim→boundary cases→true counterexamples"). The
+    referential-integrity invariant, the CES- prefix, and the record-level-only provenance placement are this
+    file's own compiled structure, disclosed above, not textually cited. Not yet registered in
+    methods/registry/contract-backlog.yaml or method-inventory.yaml -- centrally batch-registered by the
+    orchestrating session after all concurrent F12 agents finish (task-scoped isolation boundary, not an
+    oversight).

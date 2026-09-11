@@ -1,0 +1,113 @@
+$id: "ai-lego://methods/contracts/challenge.stress_testing.contract.yaml"
+title: "Stress Testing Method Contract"
+status: ACTIVE
+
+description: >
+  Tenth and FINAL member of the `challenge` family (F12), after `red_team`,
+  `blue_team`, `independent_judge`. Atlas F12 tool table only (L652): 用途
+  「極端但合理情境」／使用方式「extreme scenarios→run→breaking points」／效益
+  「測 robustness」-- no dedicated §11.x section, no §22.3 Method-specific
+  Gate row (grep-confirmed, table at L4144-4155 has no Stress Testing
+  entry). Near-name collision with `devops_sre.stress_test` (F19,
+  engineering load test) already disclosed and disambiguated by THAT
+  contract's own description (L24-41); this contract mints the
+  `challenge.stress_testing` id it names there. Core invariant:
+  `extreme_value` must fall STRICTLY OUTSIDE each scenario's own
+  `normal_range` -- otherwise it is not stress-testing anything, just
+  normal operation mislabeled, defeating Atlas's own "極端" qualifier.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Stress Testing row (L652): '極端但合理情境 | extreme scenarios→run→breaking points | 測 robustness'"
+  - "methods/contracts/devops_sre.stress_test.contract.yaml -- disambiguation of the F12/F19 near-name collision, written first; this contract is the `challenge.stress_testing` id it names"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas gives a real formula (extreme
+  scenarios→run→breaking points) and benefit (robustness) but no dedicated
+  section or checklist -- same low-risk, disclosed-compilation class every
+  other F12 Tier 1 contract this session built. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1`.
+
+id: challenge.stress_testing
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [CHALLENGE, INFER, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this method). CHALLENGE: defining an
+# extreme-but-plausible scenario against a proposal's own normal operating assumptions is itself an attack, F12's
+# own defining family verb. INFER: naming the outcome/breaking point from the run. VALIDATE: judging that outcome
+# against the closed WITHIN_TOLERANCE/DEGRADED/BROKEN set.
+
+purpose:
+  - subject_a_proposal_to_extreme_but_plausible_scenarios_to_find_its_breaking_points
+# Atlas L652 verbatim sense.
+
+inputs:
+  required:
+    - ProposalRef
+  # Same free-text-reference scope limit challenge.red_team's own ProposalRef already establishes -- no single
+  # existing typed object is the universal "thing being proposed".
+
+outputs:
+  - StressTestScenarioSet
+# NEW output type (see typed-objects/stress-test-scenario-set.schema.yaml). Deliberately NOT named
+# "StressTestRecord" -- that name is already devops_sre.stress_test's own typed object (a different, real,
+# engineering-load method); reusing it here would recreate the exact near-name collision that contract's own
+# description spent five paragraphs disambiguating.
+
+preconditions:
+  - "scenarios has at least one entry"
+  - "every scenario's normal_range.min <= normal_range.max (an inverted/malformed range is refused)"
+  - "every scenario's extreme_value is strictly outside [normal_range.min, normal_range.max] (< min or > max) -- THE real invariant this method exists to enforce; a value inside or on the boundary of the normal range is not extreme"
+  - "every scenario's normal_range.min/max and extreme_value is a real number, bool explicitly excluded (Python bool is an int subclass)"
+  - "every scenario has an outcome in {WITHIN_TOLERANCE, DEGRADED, BROKEN}, required with no default -- a scenario that was defined but never run/scored is an incomplete stress test, Atlas's own 'breaking points' concept mechanized as a completeness requirement"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Record-level provenance only (see compilation_decisions). No evidence_labeling_required: this method's real
+  # risk is a mislabeled scenario (one that is not actually extreme) -- already covered structurally by the
+  # normal_range/extreme_value invariant above, a different class of risk than Red Team's own unevidenced-claim
+  # concern.
+
+forbidden_transition: []
+# Atlas gives no explicit forbidden-transition worked example for this method.
+
+recommended_next:
+  - challenge.independent_judge
+# Same F12 pairing shape red_team/blue_team already recommend -- a stress test's found breaking points are
+# themselves challenge findings a Judge can weigh, the same as a Red Team's.
+
+rollback:
+  side_effect_free: true
+  # Producing a scenario set has no described external side effect, same class every sibling F12 contract's
+  # rollback already uses.
+
+compilation_decisions:
+  - question: "Is normal_range a closed interval -- is extreme_value == min or == max still 'normal'?"
+    decision: "Yes -- extreme_value must be STRICTLY outside [min, max]; a value at the boundary is the edge of normal operation, not extreme."
+  - question: "Per-scenario provenance, or record-level only?"
+    decision: "Record-level only -- same batch-wide F06/F07 precedent stakeholders.game_theory.contract.yaml already establishes; a StressTestScenarioSet's scenarios describe one coherent test run, not independently-sourced items."
+  - question: "Should outcome be computed from extreme_value against some severity threshold, or caller-supplied?"
+    decision: "Caller-supplied, no default -- Atlas gives no numeric severity threshold to compute WITHIN_TOLERANCE/DEGRADED/BROKEN from; inventing one would present a guess as a compiled fact (same restraint red-team-challenge.schema.yaml's own free-text severity field already applies)."
+
+open_questions:
+  - "OQ-STRESSTESTING-1: should a future revision add an aggregate robustness verdict (e.g. worst outcome across scenarios), or is per-scenario outcome sufficient? (owner: operator)"
+  - "OQ-STRESSTESTING-2: cognitive_primitives is this file's own inference, not a cited Atlas composition formula (owner: operator, or whoever adds a dedicated §4 formula for this method)."
+  - "OQ-STRESSTESTING-3: method-inventory.yaml's own F12 Stress Testing entry has no machine_id yet -- should it be updated to challenge.stress_testing at the same time devops_sre.stress_test's own OQ-STRESSTEST-1 is resolved? (owner: operator, or a future session with write scope over method-inventory.yaml)"
+
+verification:
+  method: >
+    Read Atlas F12 tool table row (L652) directly, confirmed against the surrounding table (L640-652) that no
+    dedicated §11.x section exists. Read §22.3 Method-specific Gate table (L4144-4155) directly, confirmed no
+    Stress Testing row. Read devops_sre.stress_test.contract.yaml in full -- confirmed the F12/F19 near-name
+    collision was already disclosed and disambiguated there, this contract mints the `challenge.stress_testing`
+    id it names. Grepped the full `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "stress test"/"stress_testing"/
+    "StressTest" before writing any file -- only devops_sre's own distinct method and its own disclosure found
+    (see description). Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The formula and benefit are transcribed verbatim from Atlas L652. The
+    normal_range/extreme_value invariant, the closed outcome enum, the StressTestScenarioSet naming (deliberately
+    distinct from devops_sre's own StressTestRecord), and the record-level-only provenance placement are
+    disclosed compilation choices, not textually cited.

@@ -1,0 +1,141 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/devils-advocate-position.schema.yaml"
+title: Devil's Advocate Position
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DevilsAdvocatePosition` -- the
+  declared `outputs` of `challenge.devils_advocate`'s Method Contract
+  (methods/contracts/challenge.devils_advocate.contract.yaml, `outputs:
+  [DevilsAdvocatePosition]`). Atlas §12.21 (L2803-2809) gives no field list --
+  this shape is scoped tightly to the section's own two lines (用途: build the
+  strongest version of "what if the mainstream view is wrong"; 效益: 防
+  groupthink) and its explicit differentiation from Red Team (L2807: this
+  method attacks a VIEWPOINT/ARGUMENT, not a system/process/control/
+  implementation) -- deliberately NOT Red Team's dimensions/findings checklist
+  shape.
+
+  Field provenance:
+    * `mainstream_position` / `alternative_position` -- the "if the mainstream
+      view is wrong" framing (L2805). Both required, non-empty, and must
+      differ after normalization (strip + casefold) -- enforced as a RUNTIME
+      invariant by `ai_lego/modules/challenge/devils_advocate.py` (not
+      expressible as a declarative same-field-inequality schema constraint).
+    * `supporting_arguments` -- L2805's own "最強版本" (strongest version)
+      requires actual argument content, not a bare assertion; at least one
+      non-empty entry, enforced as a RUNTIME invariant (list length is
+      declaratively enforced here via `minItems: 1`; per-item non-emptiness
+      also declared via `minLength`).
+    * `provenance` -- RECORD-LEVEL ONLY, same class of decision
+      `game-theory.schema.yaml`'s own field-provenance note already documents
+      for a structurally similar single-coherent-record shape.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.21 魔鬼代言人／反方論證 (L2803-2809)"
+  - "methods/contracts/challenge.devils_advocate.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in
+  this directory documents: Atlas gives no field list for this method, so the
+  shape below is this file's own compilation, scoped to L2807's explicit
+  viewpoint/argument boundary.
+
+compilation_decisions:
+  - question: "Should the cross-field 'alternative_position must differ from mainstream_position' invariant be expressed declaratively here?"
+    decision: "No -- JSON Schema 2020-12 has no built-in 'these two string fields must not be equal (after normalization)' keyword; left as a runtime invariant in the paired module, same disclosed-gap class as game-theory.schema.yaml's own payoff-completeness note."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, mainstream_position, alternative_position, supporting_arguments, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^DEVADV-"
+    description: "NEW DESIGN. Same id-prefix convention as RTC-/GAMETH-."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "challenge.devils_advocate"
+
+  mainstream_position:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The prevailing/consensus view being challenged, in natural language."
+
+  alternative_position:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The strongest version of 'what if mainstream_position is wrong' (Atlas
+      L2805). MUST differ from mainstream_position after normalization (strip
+      + casefold) -- enforced as a runtime invariant, see compilation_decisions.
+
+  supporting_arguments:
+    type: array
+    minItems: 1
+    description: "At least one real argument backing alternative_position -- L2805's own 'strongest version' requires content, not a bare assertion."
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see description."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Mainstream view: ship the feature behind a kill-switch on schedule. Devil's advocate: the strongest case for delaying instead."
+    value:
+      id: "DEVADV-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "challenge.devils_advocate"
+      mainstream_position: "團隊多數共識：功能已達最低可行標準，週五準時上線，靠 kill-switch 兜底風險。"
+      alternative_position: "應延後一週上線：kill-switch 本身從未在真實流量下驗證過，若上線當下才發現 kill-switch 失效，將沒有任何後備手段。"
+      supporting_arguments:
+        - "kill-switch 只在 staging 用合成流量測過一次，從未在生產環境的真實併發下驗證"
+        - "上線窗口在週五，若 kill-switch 失效，週末值班人力最薄弱，修復時間拉長"
+        - "多數共識本身建立在'kill-switch 一定有效'這個未經驗證的假設上，一旦假設錯誤，整組決策的基礎就不成立"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-DEVADVPOSITION-1"
+    question: >
+      No `topic_ref`/`proposal_ref` field exists to anchor this position to a
+      broader decision or document, unlike red-team-challenge.schema.yaml's
+      own `proposal_ref` -- Atlas §12.21 gives no such reference either. Should
+      a future revision add one if a downstream consumer needs to link a
+      DevilsAdvocatePosition back to the decision it was raised against?
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas §12.21 (L2803-2809) directly at the cited lines. Grepped the
+    full `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` typed-objects
+    directory for "devil"/"advocate"/"steelman" before writing this file --
+    zero pre-existing collision. Read red-team-challenge.schema.yaml
+    (structural template, and the reason this shape deliberately does NOT
+    copy its dimensions/findings checklist) and game-theory.schema.yaml
+    (record-level-only-provenance precedent) in full first. Validated against
+    jsonschema Draft202012Validator via
+    Projects/internal/cognitive-engineering-os/tests/unit/test_devils_advocate.py
+    (required fields present, id pattern satisfied, additionalProperties:false
+    at the top level, the embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level
+    key, an empty supporting_arguments array, and identical
+    mainstream/alternative positions).
+  note: >
+    No mother document was modified. `mainstream_position`/`alternative_position`/
+    `supporting_arguments` field names are this file's own compilation
+    (Atlas §12.21 gives no field list), scoped to the section's own two-line
+    用途/效益 and its explicit L2807 differentiation from Red Team, disclosed
+    above rather than presented as directly cited.

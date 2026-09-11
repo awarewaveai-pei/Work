@@ -1,0 +1,104 @@
+$id: "ai-lego://methods/contracts/challenge.devils_advocate.contract.yaml"
+title: "Devil's Advocate Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F12 challenge/red-team/risk family, fourth built member (after
+  red_team/blue_team/independent_judge). Atlas §12.21 (L2803-2809, the only
+  dedicated section) is brief: 用途「刻意建立『如果主流觀點是錯的』的最強版
+  本」，效益「防 groupthink」，plus an explicit scope line distinguishing this
+  method from red_team (L2807): Devil's Advocate 側重觀點與論證，Red Team 可
+  攻擊整個系統/流程/控制/實作. Core invariant: `alternative_position` must
+  differ from `mainstream_position` after normalization, and
+  `supporting_arguments` must be non-empty -- a copied position or a bare
+  assertion did not actually steelman anything.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.21 魔鬼代言人／反方論證 (L2803-2809)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 table row (L643)"
+
+decided_by: >
+  No ADR governs the content. Atlas §12.21 gives no field list or pipeline
+  (unlike sibling §12.19/§11.23) -- the record shape below is this file's own
+  compilation, scoped tightly to the L2807 viewpoint/argument boundary.
+  Registered in `methods/registry/contract-backlog.yaml` tier_1.
+
+id: challenge.devils_advocate
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [CHALLENGE, INFER, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no formula). CHALLENGE = attacking the
+# mainstream position's assumed correctness; INFER = generating the
+# supporting_arguments the mainstream view's own proponents did not surface;
+# EXPLAIN = articulating the alternative as a real argument, not a label.
+
+purpose:
+  - construct_strongest_argument_that_the_mainstream_position_is_wrong
+# Atlas L2805 verbatim sense.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- mainstream_position/alternative_position
+  # are caller-supplied free text, same "no hard upstream dependency" position
+  # stakeholders.game_theory.contract.yaml already takes.
+
+outputs:
+  - DevilsAdvocatePosition
+# NEW output type (typed-objects/devils-advocate-position.schema.yaml). Atlas
+# names no PascalCase output type for this method.
+
+preconditions:
+  - "alternative_position, normalized (strip + casefold), must differ from mainstream_position -- a copied position argued nothing"
+  - "supporting_arguments has at least one non-empty entry -- L2805's 用途 requires the 'strongest version', which needs actual argument content, not a bare assertion"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- no EvidenceSet input declared (inputs.required: []), same reasoning
+  # stakeholders.game_theory.contract.yaml already documents for an identical
+  # empty-inputs shape.
+
+forbidden_transition: []
+# No §14.1-style chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas gives no explicit downstream chain for this method (unlike red_team's
+# cited "Blue Team -> Red Team -> Independent Judge" pairing) -- left empty
+# rather than inventing one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Minimal argument-level record, or Red Team's dimensions/findings checklist shape?"
+    decision: "Minimal (mainstream_position/alternative_position/supporting_arguments) -- Atlas's own L2807 differentiation scopes this method to viewpoint/argument, not system/process attack surface; borrowing Red Team's shape would misrepresent that boundary."
+  - question: "ID prefix?"
+    decision: "DEVADV- -- same per-method prefix convention as RTC-/GAMETH-."
+  - question: "Per-field or record-level provenance?"
+    decision: "Record-level only -- a DevilsAdvocatePosition describes one coherent counter-argument, not a list of independently-sourced items (same class of decision stakeholders.game_theory.contract.yaml already documents)."
+
+open_questions:
+  - "OQ-DEVADV-1: Atlas §12.21 gives only a two-line 用途/效益 plus one differentiation sentence -- no field list or pipeline, unlike sibling §11.23/§12.19 (owner: operator)."
+  - "OQ-DEVADV-2: cognitive_primitives is this file's own inference, Atlas §4 gives no formula for this method (owner: operator)."
+  - "OQ-DEVADV-3: recommended_next left empty -- no Atlas-cited downstream chain found for this method (owner: operator, or whoever finds such a citation)."
+
+verification:
+  method: >
+    Read Atlas §12.21 (L2803-2809) and F12 table row (L643) directly. Grepped
+    the full `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees for
+    "devils_advocate"/"DEVADV"/"DevilsAdvocate"/"devils-advocate" before
+    writing any of this method's own files -- zero pre-existing
+    implementation or contract-backlog entry. Read
+    challenge.red_team.contract.yaml (structural template) and
+    stakeholders.game_theory.contract.yaml (lean-standard brevity precedent,
+    empty-inputs/evidence_labeling_required precedent) in full first.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `purpose` and the L2807 scope boundary
+    are transcribed from Atlas §12.21; the record shape, ID prefix, and
+    record-level-only provenance are this file's own compilation decisions,
+    disclosed above.

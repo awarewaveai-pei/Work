@@ -1,0 +1,110 @@
+$id: "ai-lego://methods/contracts/challenge.fmea.contract.yaml"
+title: "FMEA (Failure Mode and Effects Analysis) Method Contract"
+status: ACTIVE
+
+description: >
+  Eighth built member of the challenge/red-team/risk family (F12). Atlas
+  §11.26 (L1775-1801) dedicated section, pipeline (L1783-1791, verbatim):
+  Function -> Failure Mode -> Effect -> Cause -> Existing Control ->
+  Severity -> Occurrence -> Detection -> Action Priority. Real invariant:
+  Atlas's own explicit warning (L1799-1800, verbatim) "不要只依賴 RPN；高
+  Severity 即使機率低仍可能需強制控制" is enforced structurally --
+  severity>=9 forces `action_priority` = `MANDATORY_CONTROL_REQUIRED`
+  regardless of `rpn` (`ai_lego/modules/challenge/fmea.py`). `rpn` and
+  `action_priority` are GENUINE_COMPUTE, never caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.26 失效模式與效應分析（FMEA）(L1775-1801) -- pipeline, benefit, explicit RPN-alone warning"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 index row (L650): 'FMEA | Failure Mode/Effect/Severity/Occurrence/Detection | 功能→失效→原因→控制→優先級 | 系統化處理失效'"
+  - "methods/registry/method-inventory.yaml F12 challenge 'FMEA' entry (L793-798, has_contract: false / contract_status: pending -- this contract closes that gap; registry itself updated centrally, not by this file)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.26 gives a complete pipeline and an
+  explicit warning -- direct transcription plus low-risk, disclosed
+  compilation choices (severity>=9 threshold, RPN tier table). Built per
+  `methods/METHOD_ATLAS_SLICE_LEAN_STANDARD.md`; `contract-backlog.yaml`
+  and `method-inventory.yaml` updated centrally after this parallel batch
+  closes, not by this file.
+
+id: challenge.fmea
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [DECOMPOSE, ESTIMATE, PRIORITIZE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). DECOMPOSE = function -> failure mode -> effect -> cause
+# breakdown; ESTIMATE = severity/occurrence/detection scoring; PRIORITIZE =
+# action_priority derivation. All three CANONICAL_KERNEL members
+# (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - systematically_register_and_prioritize_failure_modes
+# Atlas L1796-1797 sense: turn "what could go wrong" into a managed
+# Failure Register, not a one-off brainstorm.
+
+inputs:
+  required:
+    - SubjectRef
+# NEW DESIGN, same free-text-reference pattern as challenge.red_team's own
+# ProposalRef -- no single existing typed object is the universal
+# "system/process/function under analysis".
+
+outputs:
+  - FmeaAnalysis
+# NEW output type (see typed-objects/fmea-analysis.schema.yaml). Atlas
+# names no PascalCase output type for this method.
+
+preconditions:
+  - "at least one failure mode registered"
+  # A completed FMEA with zero failure modes examined nothing worth doing
+  # (same "at least one" precondition shape challenge.red_team's own
+  # dimensions_examined precondition already uses).
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # provenance_required: record-level provenance carried (record-level-
+  # only placement, same precedent stakeholders.game_theory's own
+  # game-theory.schema.yaml already establishes for one coherent analysis
+  # vs. a list of independently-sourced items). evidence_labeling_required:
+  # false -- Atlas gives this method no distinct evidence-citation
+  # requirement beyond the severity/occurrence/detection scores
+  # themselves, unlike challenge.red_team's own genuinely-applicable flag.
+
+forbidden_transition: []
+# Atlas §11.26 gives no explicit forbidden-transition worked example.
+
+recommended_next: []
+# Atlas gives no explicit "FMEA then X" pairing (contrast §11.24's Blue
+# Team -> Red Team -> Independent Judge chain). See open_questions.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an FMEA analysis has no described
+  # external side effect.
+
+open_questions:
+  - "OQ-FMEA-1: Atlas gives no numeric Severity threshold for the MANDATORY_CONTROL_REQUIRED override or the HIGH/MEDIUM/LOW RPN tier cut points -- severity>=9 and rpn>=200/>=50 are this contract's own disclosed compilation choice, not Atlas-cited numbers. (owner: operator)"
+  - "OQ-FMEA-2: cognitive_primitives [DECOMPOSE, ESTIMATE, PRIORITIZE] is this file's own inference, not a cited Atlas composition formula. (owner: operator, same open-question class as every sibling Tier-1 contract)"
+  - "OQ-FMEA-3: Atlas names no recommended_next pairing for FMEA (contrast §11.24's Red Team chain) -- should HAZOP (F12's next unbuilt sibling, same L650 table row) become the pairing once built? (owner: operator, or whoever next builds challenge.hazop)"
+
+verification:
+  method: >
+    Read Atlas §11.26 (L1775-1801) and the F12 index row (L650) directly
+    at the cited lines. Grepped the full spec root
+    (`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os`) case-insensitively for
+    "fmea" before writing this contract -- zero pre-existing
+    implementation or contract-backlog entry (only Atlas's own text,
+    method-inventory.yaml's pending placeholder, and ADR-002/ADR-007's own
+    unrelated borrowed-FMEA prose in policy docs). Validated against
+    `specs/cognitive/method.schema.yaml` with
+    `jsonschema.Draft202012Validator` (`tests/unit/test_fmea.py`).
+  note: >
+    No mother document was modified. The 9-stage pipeline and the
+    RPN-alone warning are transcribed verbatim from Atlas L1783-1800.
+    `SubjectRef`, the `FmeaAnalysis` output type, the severity>=9
+    threshold, and the RPN tier table are this file's own compiled
+    structure, disclosed above, not textually cited.

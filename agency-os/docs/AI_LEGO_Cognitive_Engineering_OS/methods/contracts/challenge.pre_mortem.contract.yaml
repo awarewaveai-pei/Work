@@ -1,0 +1,109 @@
+$id: "ai-lego://methods/contracts/challenge.pre_mortem.contract.yaml"
+title: "Pre-mortem Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F12 challenge/red-team/risk family, 4th built member (red_team, blue_team, independent_judge already
+  exist; devil's advocate/counterexample search/disconfirming evidence/FMEA etc. remain unbuilt). Atlas cites
+  this method twice: F12 table row (L647, "Pre-mortem｜假設未來已失敗｜每人獨立列 failure causes→cluster→
+  controls｜揭露真實擔憂") and dedicated §11.25 (L1755-1773), whose own literal 5-step process this contract's
+  preconditions mechanize verbatim: (1) 指定失敗時間點與情境, (2) 每人先獨立寫原因, (3) 分群, (4) 依
+  likelihood × impact 排序, (5) 建 prevention/detection/recovery control. Core invariant: every
+  `failure_causes[]` entry must be covered by >=1 `controls[]` entry (step 5's own completeness) before
+  construction succeeds; `priority` is GENUINE_COMPUTE, never caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F12 tool table, Pre-mortem row (L647)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.25 事前驗屍／事前失敗分析（Pre-mortem）(L1755-1773)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: challenge.pre_mortem` mints a NEW machine_id in the existing `family:
+  challenge` (4th built member -- red_team/blue_team/independent_judge already exist, grep-confirmed no prior
+  `pre_mortem` contract or implementation anywhere in this corpus). Flat failure_scenario/failure_causes/
+  controls record shape, the (likelihood, impact) -> priority lookup table, and record-level-only provenance
+  placement are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: challenge.pre_mortem
+version: "1.0.0"
+family: challenge
+
+cognitive_primitives: [IMAGINE, INFER, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. IMAGINE = Atlas's own framing
+# ("假設未來已失敗" -- assume the future has already failed, §11.25's own opening prompt); INFER = deriving
+# failure causes from that imagined scenario (step 2); EXPLAIN = articulating each control as a real,
+# actionable prevention/detection/recovery measure (step 5), not a bare label. All three CANONICAL_KERNEL
+# members (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - surface_genuine_failure_concerns_by_assuming_the_project_has_already_failed
+# Atlas §11.25 verbatim sense: 用途「在事情還沒做之前假設：一年後這個專案徹底失敗了，為什麼？」效益「通常比直接問
+# 『有哪些風險？』更容易得到真正擔憂」。
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus already takes; this method's own citation names no required input type.
+
+outputs:
+  - PreMortemAnalysis
+# NEW output type (see typed-objects/pre-mortem-analysis.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "failure_scenario is present and non-empty -- step 1 ('指定失敗時間點與情境'), the named failure timepoint and scenario being assumed"
+  - "failure_causes has at least 1 entry, each with non-empty description/cluster and likelihood/impact each in {LOW, MEDIUM, HIGH} -- steps 2-4 (獨立寫原因→分群→likelihood×impact 排序); a pre-mortem naming zero causes has not actually run the process"
+  - "every failure_causes[] entry's id is referenced by >=1 controls[] entry's addresses_cause_id, and every controls[] entry has a control_type in {PREVENTION, DETECTION, RECOVERY} -- step 5 verbatim ('建 prevention/detection/recovery control'); a cause with zero covering controls means step 5 was not completed for it"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to "claims inside this method's outputs that
+  # originate from EvidenceSet input" (an upstream typed-object this method does not take: inputs.required: []).
+  # A pre-mortem's causes are elicited hypotheses (§11.25's own "每人先獨立寫原因"), not claims grounded in a
+  # supplied EvidenceSet.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citations name no single downstream method for Pre-mortem specifically -- F12 table row and
+# §11.25 both stop at step 5's controls. Left empty rather than picking one arbitrarily.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should `priority` be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) from a total (likelihood, impact) 3x3 lookup table (e.g. HIGHxHIGH -> CRITICAL, LOWxLOW -> LOW; see ai_lego/modules/challenge/pre_mortem.py `_PRIORITY_BY_LEVELS`) -- same discipline stakeholders.power_interest's own `quadrant` derivation already establishes; never an accepted builder parameter."
+  - question: "Is cause-to-control coverage a schema-level constraint or a runtime cross-array invariant?"
+    decision: "Runtime invariant (builder + independent gate) -- same class of disclosed gap stakeholders.game_theory's own payoff-completeness invariant already documents; JSON Schema 2020-12 cannot declaratively express 'every failure_causes[] entry has >=1 matching controls[] reference'."
+  - question: "Does `addresses_cause_id` allow one control to cover multiple causes at once (a list), or exactly one cause per control entry?"
+    decision: "Exactly one -- a control covering multiple causes is expressed as multiple control entries (one per addressed cause), same single-reference-per-entry shape learning.post_mortem's own `cause_entry.timeline_ref` already uses."
+  - question: "Per-field provenance (per-cause/per-control) or record-level only?"
+    decision: "Record-level ONLY, one top-level `provenance` field -- matching this corpus's established batch precedent (insight.jtbd, stakeholders.game_theory, challenge.red_team's own overall-record field); a PreMortemAnalysis's causes/controls are one coherent exercise's output, not independently-sourced items."
+
+open_questions:
+  - "OQ-PREMORTEM-1: likelihood/impact use a 3-value LOW/MEDIUM/HIGH scale -- Atlas §11.25 names no specific scale (just 'likelihood x impact 排序'); a future revision could widen to a numeric 1-5/1-10 scale if a downstream consumer needs finer ranking (owner: operator)."
+  - "OQ-PREMORTEM-2: failure_causes[] carries no explicit 'authored independently by N different people' field (step 2's own '每人先獨立寫原因') -- this contract treats the resulting cause LIST as the artifact, not the elicitation process that produced it, same scope boundary stakeholders.game_theory draws around equilibrium-solving (owner: operator)."
+  - "OQ-PREMORTEM-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F12 table row (L647) and §11.25 (L1755-1773) directly. Grepped the whole Atlas file
+    case-insensitively for "pre-mortem"/"premortem"/"事前驗屍" -- confirmed exactly these 2 real citations, no
+    §4 composition formula, no §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "pre_mortem"/"pre-mortem"/"premortem"/"PreMortemAnalysis" before writing any of this
+    method's own files -- zero pre-existing implementation (post-mortem-record.schema.yaml is a DIFFERENT,
+    unrelated method: learning.post_mortem, F17 incident-review, confirmed by reading it in full before writing
+    this contract). Read challenge.red_team.py, stakeholders.power_interest.py, and stakeholders.game_theory.py
+    (plus their own contracts) in full before writing this contract. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-step process and the 3 named control types are transcribed verbatim
+    from Atlas L1762-1768. `cognitive_primitives` and the flat record shape are this file's own compilation
+    decisions, disclosed above, not presented as directly Atlas-cited beyond the literal 5-step wording quoted
+    verbatim. The record-level-only provenance placement follows this corpus's established batch precedent,
+    not this contract's own independent judgment call.
