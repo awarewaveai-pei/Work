@@ -137,8 +137,24 @@ describe("collection block hygiene", () => {
     const schemes = queryBlocks.map((b) => b.describe!.queryScheme);
     for (const [i, b] of queryBlocks.entries()) {
       expect([b.id, typeof schemes[i]]).toEqual([b.id, "string"]);
-      const t = { uri: `${schemes[i]}://x`, canonicalUri: `${schemes[i]}://x`, scope: { hosts: [] }, tier: 0 } as Parameters<typeof b.match>[0];
-      expect([b.id, b.match(t) > 0]).toEqual([b.id, true]);
+      // A key-gated block returns 0 when unconfigured, and correctly so. Asserting on match() in
+      // whatever state the machine happens to be in makes this a test of the deployment: it passed
+      // on a laptop holding PERPLEXITY_API_KEY and failed the deploy gate on the server without it.
+      // The invariant is about ROUTING, so the required variables are supplied for the check.
+      const saved = new Map<string, string | undefined>();
+      for (const key of b.describe!.requires ?? []) {
+        saved.set(key, process.env[key]);
+        if (!process.env[key]) process.env[key] = "test-placeholder";
+      }
+      try {
+        const t = { uri: `${schemes[i]}://x`, canonicalUri: `${schemes[i]}://x`, scope: { hosts: [] }, tier: 0 } as Parameters<typeof b.match>[0];
+        expect([b.id, b.match(t) > 0]).toEqual([b.id, true]);
+      } finally {
+        for (const [key, was] of saved) {
+          if (was === undefined) delete process.env[key];
+          else process.env[key] = was;
+        }
+      }
     }
     expect(new Set(schemes).size, `two query sources share a scheme: ${schemes.join(", ")}`).toBe(schemes.length);
   });
