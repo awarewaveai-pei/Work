@@ -297,6 +297,7 @@ export const academicCollector: CollectBlock = {
     kind: "academic",
     summary: "用一句查詢追一個研究主題，取回論文的題名、作者、期刊、DOI 與摘要。三個來源都免金鑰。",
     entry: "query",
+    queryScheme: "academic",
     options: [
       REGISTRY_OPTION,
       { key: "limit", label: "每次取回篇數", type: "number", default: 25, help: "上限 100。" },

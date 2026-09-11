@@ -126,6 +126,23 @@ describe("collection block hygiene", () => {
     }
   });
 
+  it("gives every query source its own scheme, and a match() that answers to it", async () => {
+    // Routing is by match() alone. Two query sources sharing a scheme would contend for each
+    // other's work, and a source whose match() ignores its declared scheme would simply never run —
+    // the operator would see it in the catalogue, configure it, and get silence.
+    const { collectors } = await import("@/lib/collect/blocks");
+    const queryBlocks = collectors().filter((b) => b.describe?.entry === "query");
+    expect(queryBlocks.length, "no query sources found to check").toBeGreaterThan(1);
+
+    const schemes = queryBlocks.map((b) => b.describe!.queryScheme);
+    for (const [i, b] of queryBlocks.entries()) {
+      expect([b.id, typeof schemes[i]]).toEqual([b.id, "string"]);
+      const t = { uri: `${schemes[i]}://x`, canonicalUri: `${schemes[i]}://x`, scope: { hosts: [] }, tier: 0 } as Parameters<typeof b.match>[0];
+      expect([b.id, b.match(t) > 0]).toEqual([b.id, true]);
+    }
+    expect(new Set(schemes).size, `two query sources share a scheme: ${schemes.join(", ")}`).toBe(schemes.length);
+  });
+
   it("keeps the knowledge base out of the collection core", () => {
     // Collection must survive with no knowledge base at all (ADR 011): only a sink may know about
     // lib/kb, and today none does — sink/kb arrives in C1.

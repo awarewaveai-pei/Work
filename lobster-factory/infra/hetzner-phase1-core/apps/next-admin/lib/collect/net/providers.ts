@@ -38,6 +38,16 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     origin: "https://api.firecrawl.dev",
     apiKeyEnv: "FIRECRAWL_API_KEY",
   },
+
+  // Open-web search: a query in, ranked result URLs out. Chosen for the index quality the operator
+  // asked to match; nothing of its answer text is used, only the URLs (see collectors/web-search.ts
+  // for why the snippet is never stored). Swapping vendors is one entry here plus a response parser
+  // — COLLECT_SEARCH_PROVIDER already selects between them.
+  perplexity: {
+    id: "perplexity",
+    origin: "https://api.perplexity.ai",
+    apiKeyEnv: "PERPLEXITY_API_KEY",
+  },
 };
 
 export function providerSpec(id: string): ProviderSpec | null {

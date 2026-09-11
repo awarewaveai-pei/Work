@@ -165,6 +165,13 @@ export interface SourceDescriptor {
    * human approves, and configuring it in the catalogue IS that approval.
    */
   entry: "url" | "query" | "path";
+  /**
+   * For `entry: "query"` only — the URI scheme its queries are wrapped in (`academic`, `search`, …).
+   * Routing is decided by match() alone, so this is what gets a query to the right block; two query
+   * sources sharing a scheme would silently contend for each other's work. Guarded in
+   * __tests__/collect-block-hygiene.test.ts.
+   */
+  queryScheme?: string;
   /** Environment variables without which this source cannot run. Empty ⇒ always available. */
   requires?: string[];
   options?: SourceOption[];

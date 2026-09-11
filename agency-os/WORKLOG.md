@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-09-11 第九批（補上「搜尋全網」這個來源，並修掉它暴露的路由寫死）
+
+操作者問「為什麼我沒看到搜尋全網的」。對的：原本八個來源**全部**要求你先知道位址——網址、sitemap、feed、或某個指定索引的查詢。沒有一個能從一句問題出發。那本來排在 C6，還沒做。
+
+- **`collect/web-search`**：一句查詢 → 供應商回排名結果 → **每筆各自成為 discovered target**，由既有的 http-html 階真的去抓、過品質閘、標 provenance、存出處。**本身一個 doc 都不產生**。摘要只留在 target 的 meta 供人看報告，永遠不會變成內容——把廠商寫的三行摘要存成文件，等於讓一段無法查證的轉述掛著一個真實網址進庫，那是最有說服力的錯。
+- **每筆結果帶自己的網域邊界**。orchestrator 的 `d.scope ?? target.scope` 這行讓這件事成立；不設的話第一筆的 host 會變成全部的邊界，其餘全被判出界，看起來像「搜尋只找到一頁」。
+- **精確度的真正槓桿是網域白名單**，不是排序參數。選項裡 `domains` 直接對應供應商的 `search_domain_filter`（最多 20 個），配合 `recency`／`language`。介面上那條 help 明講「要精確就填這個」。
+- **路由寫死，順手修掉**：`sourceToSeed` 對任何 `entry:"query"` 的來源都產生 `academic://`，而 orchestrator **只看 `match()`**（`hint` 不參與選擇）。新增第二個查詢型來源會被交給學術收集器，而且不會報錯。改成由 block 自己宣告 `queryScheme`，並加一條閘：每個查詢型來源的 scheme 必須唯一、且它的 `match()` 必須認得自己的 scheme。
+- **金鑰是活的，但那把 `pplx-` 金鑰本身失效**。`/search` 與 `/chat/completions` 兩個端點用同一把都回 401，所以不是 Search 產品沒開通，是金鑰被拒。目錄只能檢查環境變數非空，所以介面會顯示「可用」——這點在 live 測試裡補了一條斷言，讓 401 直接講「憑證被拒，檢查 PERPLEXITY_API_KEY」，而不是含糊的「從來沒回報搜尋」。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect/__tests__/collect-web-search.test.ts` | exit=0 | result=9/9 綠（路由、無金鑰時 inert、不產 doc、每筆自帶 scope、篩選參數傳遞、空查詢拒絕、結果去重與去非網頁列、網域清單解析）
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_CATALOGUE_REPORT=1 npx vitest run ...collect-catalogue-live.test.ts` | exit=0 | result=目錄從 8 個變 9 個，`collect/web-search` 出現在第一位；UI 不必改一行就看得到，因為目錄是從註冊表長出來的
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_SEARCH_LIVE=1 npx vitest run ...collect-web-search-live.test.ts` | exit=1 | result=**紅，原因是憑證**：`provider_perplexity_http_401`。PowerShell 直接打 `/search` 與 `/chat/completions` 同樣 401，確認程式路徑正確、金鑰失效
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 ×2 | exit=0 | result=① 拿掉每筆結果的 scope → 「scopes each hit to its own host」KILLED ② 把 web-search 的 scheme 改成 `academic` → 新的 scheme 唯一性閘 KILLED
+REVIEW_DONE: critic=Quick（新來源 + 一處路由修正；外部 API 形狀取自官方文件而非猜測，並有 fixture 測試；風險在憑證不在邏輯）| verdict=pass | findings=0c/1m（m1：我第一版測試把「摘要不得出現在 discovered」寫成斷言，但摘要本來就刻意留在 meta——斷言錯不是程式錯，已改成斷言它只存在於 meta 且 docs 為空）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`queryScheme|academic://|search://|PERPLEXITY_API_KEY|sourceToSeed` | hits=`academic://` 僅存在於 academic 收集器自己的 `queryOf`／`match` 與 canonical.ts 的說明註解；`sourceToSeed` 已無寫死字串（fallback 保留 `academic` 以免舊列在宣告補上前失效）
+
+**仍未做**：知識庫 K2 的 space 管理、K2b／K2c／K2d／K2f／K3／K4；蒐集器 C3 排程、C3b webhook、C4、C5、C6（candidate 產生器——本批做的是「操作者自己給問題」，C6 是「系統主動提議該追哪些來源」，兩件事）。
+**rollback**：`git revert`；新來源無金鑰時 `match()` 回 0，等同不存在，無資料變動、無 migration。
+
 ## 2026-09-11（138–146 號切片：開新家族 F06 人類／顧客洞察 0/9→9/9，9 個平行 agent + 1 critic，零發現）
 
 **觸發**：緊接 F03 收官後，操作者持續「還沒完成系統就繼續做下去」。選型：F06（人類／顧客洞察，Atlas L457-469，9 個成員：JTBD/Persona/Empathy Map/Journey Map/Service Blueprint/Contextual Inquiry/Interview/Survey/Focus Group）——Atlas 順序中 F03 完工後的下一個未開工家族。**本批次刻意應用前兩批的教訓**：provenance 欄位放置這次直接在派工 brief 裡明訂「全 9 個方法一律 record-level only」（非事後才裁決一致性），閉區間整數檢查（如 journey_map 的 stage_number、focus_group 的 participant_count）brief 裡直接點名 F03 `lotus_blossom.py` 的 bool-masquerade 真 bug 要求同批預先防範，不留給 critic 事後抓。

@@ -199,7 +199,10 @@ export function sourceToSeed(source: CollectionSource): SeedInput | null {
   const meta = { ...source.options, sourceId: source.id };
 
   if (entry.entry === "query") {
-    return { uri: `academic://${encodeURIComponent(source.entry)}`, hint: source.blockId, meta };
+    // The scheme comes from the block, not from here. It used to be the literal string "academic",
+    // which made this function something you had to remember to edit every time a query source was
+    // added — and forgetting it would not fail, it would hand the query to the academic collector.
+    return { uri: `${entry.queryScheme ?? "academic"}://${encodeURIComponent(source.entry)}`, hint: source.blockId, meta };
   }
   if (entry.entry === "path") {
     // A path is turned into a file URL by the block's own helper rules; hand-built file:// strings
