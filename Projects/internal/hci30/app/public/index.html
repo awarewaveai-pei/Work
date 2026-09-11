@@ -154,6 +154,16 @@
   .domain-dim-row { margin-top: 0.6rem; font-size: 0.85rem; }
   .domain-dim-row:first-of-type { margin-top: 0.3rem; }
   .domain-dim-refs { margin: 0.3rem 0 0; padding-left: 1.3rem; font-size: 0.8rem; color: var(--text); line-height: 1.6; }
+  .domain-disagreement-note { margin-top: 0.5rem; font-size: 0.78rem; font-weight: 700; color: var(--moderate); }
+
+  /* Rule engine (操作者要求 2026-09-11: "系統自己讀證據、自己判斷...用程式
+     分析的方式...再統計分析...還是要有文字說明和分析緣由"). */
+  .severity-alert { border-left: 3px solid var(--very-low); background: #f3ddd8; padding: 0.9rem 1.2rem; margin: 0.8rem 0; font-size: 0.85rem; line-height: 1.7; }
+  .severity-alert b { color: var(--very-low); }
+  .suggestion-card { border: 1px solid var(--border); border-radius: 4px; padding: 1rem 1.2rem; margin: 0.8rem 0; background: var(--card); }
+  .suggestion-card .suggestion-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .suggestion-card .suggestion-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: var(--moderate); text-transform: uppercase; }
+  .suggestion-hit { margin-top: 0.5rem; font-size: 0.85rem; line-height: 1.6; padding-left: 1rem; border-left: 2px solid var(--border); }
 
   .insight-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
   .insight-col { background: transparent; border: none; padding: 0; }
@@ -308,6 +318,7 @@
     <div id="d-radar"></div>
     <div class="domain-grid" id="d-domains"></div>
   </div>
+  <div id="d-severity"></div>
 
   <div class="insight-cols" style="margin-top:1.5rem">
     <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
@@ -320,6 +331,8 @@
 
   <h2>證據與主張</h2>
   <div id="d-records"></div>
+
+  <div id="d-suggestions"></div>
 
   <details class="add-panel" id="record-add-panel">
     <summary>＋ 新增調查發現</summary>
@@ -574,10 +587,11 @@ function toggleDomainDetail(id) {
 // frozen report view so both show the identical derivation trail; `prefix`
 // keeps element ids unique between the two (both can exist in the DOM at
 // once, only one visible).
-function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix) {
+function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dimensionDisagreements) {
   const byDomain = Object.fromEntries(rollupDomains.map(d => [d.domain, d]));
   const dimsByDomain = {};
   (evidenceQuality || []).forEach(q => { (dimsByDomain[q.domain] = dimsByDomain[q.domain] || []).push(q); });
+  const disagreementByDimension = Object.fromEntries((dimensionDisagreements || []).map(x => [x.dimension, x]));
 
   return ALL_DOMAINS.map(name => {
     const d = byDomain[name];
@@ -589,8 +603,10 @@ function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix) {
         const r = recordById[id];
         return r ? `<li>${esc(KIND_LABELS[r.kind] || r.kind)}：${esc(shortRecordText(r))}（#${id.slice(0,8)}）</li>` : `<li>#${id.slice(0,8)}（此紀錄目前查不到，可能已被取代）</li>`;
       }).join('');
+      const methodDisagreement = disagreementByDimension[q.dimension];
       return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}</div>
-        <ul class="domain-dim-refs">${refs}</ul></div>`;
+        <ul class="domain-dim-refs">${refs}</ul>
+        ${methodDisagreement ? `<div class="domain-disagreement-note">⚠ 人工判斷（${BAND_LABELS[methodDisagreement.human_value] || methodDisagreement.human_value}）與規則引擎判斷（${BAND_LABELS[methodDisagreement.rule_engine_value] || methodDisagreement.rule_engine_value}）不一致，已如實混合計算，未互相蓋過。</div>` : ''}</div>`;
     }).join('');
 
     return `<div class="domain-card" onclick="toggleDomainDetail('${detailId}')" title="點擊查看依據">
@@ -602,6 +618,39 @@ function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix) {
         ${dimRows}
       </div>`;
   }).join('');
+}
+
+// Severity floor alerts (packages/intelligence/detect-severity-floor.mjs,
+// HCI_RISK_SPEC.md) -- a VERY_LOW dimension shown explicitly even when its
+// domain average looks fine, side by side with its sibling dimension.
+function renderSeverityAlerts(alerts) {
+  if (!alerts || !alerts.length) return '';
+  return `<h2>嚴重警訊</h2>` + alerts.map(a => `
+    <div class="severity-alert">
+      <b>${DIMENSION_LABELS[a.dimension] || a.dimension}</b>（${DOMAIN_LABELS[a.domain] || a.domain}）評為 <b>極低</b>——這個構面所屬的信任構面平均分數可能因為另一個維度分數較高而看起來還好，但這一項本身是真的差，不會被平均蓋掉。
+      ${a.siblings.map(s => `同構面另一維度「${DIMENSION_LABELS[s.dimension] || s.dimension}」：${s.value ? (BAND_LABELS[s.value] || s.value) : '尚無證據'}`).join('；')}
+    </div>`).join('');
+}
+
+// Rule-engine suggestions with no human ASSESSMENT yet for that dimension
+// (HCI_RULE_ENGINE_SPEC.md §Combination) -- never silently promoted into
+// the formal score; shown here so the operator can review and decide
+// whether to create a matching ASSESSMENT.
+function renderRuleEngineSuggestions(suggestions, hitsByDimension, recordById) {
+  if (!suggestions || !suggestions.length) return '';
+  return `<h2>系統偵測到的風險指標（尚未經人工確認）</h2>
+    <p class="field-hint">以下是系統從證據／主張文字裡比對到的指標，統計後得出的建議等級——這不是正式評估，不會計入信任構面分數，除非你自己建立一筆對應的「評估」紀錄採用它。</p>
+    ${suggestions.map(s => {
+      const hits = (hitsByDimension && hitsByDimension[s.dimension]) || [];
+      const hitRows = hits.map(h => {
+        const r = recordById[h.record_id];
+        return `<div class="suggestion-hit">${h.delta > 0 ? '➕' : '➖'} ${esc(h.rationale)}（來源：${r ? esc(shortRecordText(r)) : '#' + h.record_id.slice(0,8)}）</div>`;
+      }).join('');
+      return `<div class="suggestion-card">
+        <div class="suggestion-head"><span class="suggestion-tag">建議</span>${bandBadge(s.value)}<b>${DIMENSION_LABELS[s.dimension] || s.dimension}</b></div>
+        ${hitRows}
+      </div>`;
+    }).join('')}`;
 }
 
 // Radar chart across all 7 Trust Domains -- a different VISUALIZATION of the
@@ -709,7 +758,9 @@ async function refreshDetail() {
     : '';
   document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
   const recordById = Object.fromEntries(body.records.map(r => [r.id, r]));
-  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live');
+  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live', body.dimensionDisagreements);
+  document.getElementById('d-severity').innerHTML = renderSeverityAlerts(body.severityAlerts);
+  document.getElementById('d-suggestions').innerHTML = renderRuleEngineSuggestions(body.ruleEngineSuggestions, body.ruleEngineHits, recordById);
 
   document.getElementById('d-strengths').innerHTML = body.strengths.length
     ? body.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('')
@@ -815,7 +866,8 @@ function renderReportView(row) {
       </div>`; })()
     : `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策。</span></div>`;
 
-  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report');
+  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report', d.dimensionDisagreements);
+  const severityHtml = renderSeverityAlerts(d.severityAlerts);
 
   const recordsHtml = d.records.length ? d.records.map(r => {
     const text = r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''}：${BAND_LABELS[r.payload.value] || r.payload.value || ''}`.trim();
@@ -843,6 +895,7 @@ function renderReportView(row) {
       <div>${renderRadar(d.rollup.domains)}</div>
       <div class="domain-grid">${domainGridHtml}</div>
     </div>
+    ${severityHtml}
 
     <div class="insight-cols" style="margin-top:1.5rem">
       <div class="insight-col strengths"><h3>主要優勢</h3><ul>${d.strengths.length ? d.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>

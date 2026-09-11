@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { validateSubjectRecordPayload } from '../packages/contracts/validate-subject-record-payload.mjs';
 import { rollupTrustDomains } from '../packages/intelligence/rollup-trust-domains.mjs';
 import { classifyEvidenceQuality } from '../packages/intelligence/classify-evidence-quality.mjs';
+import { detectSeverityFloor } from '../packages/intelligence/detect-severity-floor.mjs';
+import { scoreRuleEngineFindings } from '../packages/intelligence/rule-engine.mjs';
+import { combineDimensionSources } from '../packages/intelligence/combine-dimension-sources.mjs';
 import { TRUST_DOMAINS } from '../packages/contracts/trust-domains.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -254,21 +257,34 @@ async function buildCaseReportPayload(role, caseId) {
     [caseId]
   );
 
-  // Reuses the already-shipped, already-tested roll-up formula
-  // (packages/intelligence/rollup-trust-domains.mjs, HCI_TRUST_DOMAIN_SPEC.md)
-  // rather than re-deriving it -- this endpoint's only new work is
-  // shaping ASSESSMENT rows' real payload (ADR-0034) into the
-  // {dimension, value, evidence_refs} shape that function has always
-  // expected, which nothing could supply until today.
-  const dimensionScores = records.filter(r => r.kind === 'ASSESSMENT').map(r => r.payload);
+  // HCI_RULE_ENGINE_SPEC.md §Combination: a rule-engine finding never
+  // reaches the rollup by itself. scoreRuleEngineFindings() scans every
+  // EVIDENCE/CLAIM's text against the versioned keyword table;
+  // combineDimensionSources() then merges each dimension's human ASSESSMENT
+  // (if any) with any rule-engine finding for that SAME dimension via
+  // combine-method-findings.mjs's already-shipped, previously-unused
+  // combineMethodFindings() -- disagreement disclosed, not averaged away.
+  // A rule-engine finding with no human ASSESSMENT is held out entirely
+  // and returned separately as `ruleEngineSuggestions`.
+  const evidenceClaimRecords = records.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
+  const assessmentRecords = records.filter(r => r.kind === 'ASSESSMENT');
+  const { findings: ruleEngineFindings, hitsByDimension: ruleEngineHits } = scoreRuleEngineFindings(evidenceClaimRecords);
+  const { dimensionScores, disagreements: dimensionDisagreements, suggestions: ruleEngineSuggestions } =
+    combineDimensionSources(assessmentRecords, ruleEngineFindings);
+
   let rollup = { domains: [] };
   let evidenceQuality = [];
+  let severityAlerts = [];
   try {
     rollup = rollupTrustDomains(dimensionScores);
     // packages/intelligence/classify-evidence-quality.mjs -- SINGLE_SOURCE
     // vs MULTIPLE_SOURCES by distinct evidence-ref count, never a
     // corroboration claim this layer cannot verify (HCI_EVIDENCE_QUALITY_SPEC.md).
     evidenceQuality = classifyEvidenceQuality(dimensionScores);
+    // packages/intelligence/detect-severity-floor.mjs (HCI_RISK_SPEC.md) --
+    // built 2026-09-06, first real caller here: a VERY_LOW dimension is
+    // surfaced explicitly even when its domain average looks fine.
+    severityAlerts = detectSeverityFloor(dimensionScores);
   } catch (err) { rollup = { domains: [], error: err.message }; }
 
   // Derived directly from the real roll-up, not a separate invented
@@ -284,7 +300,10 @@ async function buildCaseReportPayload(role, caseId) {
   const coveredDomains = new Set(rollup.domains.map(d => d.domain));
   const unknowns = TRUST_DOMAINS.filter(d => !coveredDomains.has(d));
 
-  return { case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns };
+  return {
+    case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns,
+    ruleEngineSuggestions, ruleEngineHits, dimensionDisagreements, severityAlerts,
+  };
 }
 
 app.get('/api/hci/v1/cases/:caseId', async (req, res) => {

@@ -1,5 +1,44 @@
 # Worklog
 
+## 2026-09-11 HCI30 規則式評分引擎——操作者要求「系統自己讀證據、自己判斷」但用程式規則而非 LLM
+
+操作者確認方向後全權授權（「你做最完美的決定和規劃和設計」），包含第一版規則表的業務判斷（哪些指標、對應哪個維度、幾分）。前一輪誤判可接 Cognitive Engineering OS 的 Method Atlas 模組（`independent_judge` 等）當作分析引擎，查證後發現那是「驗證判斷格式對不對」的結構驗證層，不是「讀文字生出判斷」——已在對話中更正，本輪改為在 HCI-30 內部自建規則引擎，不依賴任何外部系統。
+
+核心設計（`docs/intelligence/HCI_RULE_ENGINE_SPEC.md`）：
+- 規則表（`packages/intelligence/rule-engine.mjs`，22 條，逐條可獨立修改）：每條 = 關鍵字（中英文字串比對，非正規表達式，任何人都能加）+ 命中哪個維度 + 等級位移分數（-2~+2）+ 一句人看得懂的理由。屬操作者授權的起始政策，非實證推導，比照既有 `HCI_CONFIDENCE_SPEC.md`/`HCI_RISK_SPEC.md` 的「operator-delegated」揭露慣例。
+- 統計聚合：同一維度、多筆證據命中的分數加總，基準值 3（中等），加總後夾在 1~5 之間換算回等級名稱——這是操作者要求的「程式分析＋統計」，不是 AI 猜測。
+- 真正的閘門：規則引擎判斷**絕不單獨**進入正式信任構面分數。有人工評估時，跟規則引擎判斷一起餵進**早就寫好、從未被真正呼叫過**的 `combine-method-findings.mjs`（2026-09-06 建置），不一致時老實標「分歧」而非平均掉；沒有人工評估時，規則引擎判斷只會列成「系統建議（尚未確認）」，需要操作者自己建一筆正式評估才會採用——對應既有 AI LEGO admission-gate 的同一原則（「AI 輸出不會自動變成 HCI 事實」），套用在本機內部而非跨系統。
+- 順手接上第二個從沒被呼叫過的既有機制：`detect-severity-floor.mjs`（2026-09-06 建置，`HCI_RISK_SPEC.md`）——某維度落在「極低」時獨立標示出來，不會被同構面另一維度的高分平均蓋掉。
+
+真跑驗證（非假設）：真建一筆證據「該供應商上季發生資安事件，導致客戶資料外洩，事後也遭主管機關裁罰」→ 系統偵測到資訊治理極低，正確列出兩條命中規則與理由文字、來源證據原文；建一筆人工評估把資訊治理打成「偏高」→ 系統正確合併成「偏低」（(1+4)/2=2.5 四捨五入採保守下修=2）、正確標示「人工判斷（偏高）與規則引擎判斷（極低）不一致，已如實混合計算」、原本的嚴重警訊與建議清單正確消失（因為已有人工評估覆蓋，不再是未確認建議，合併後也不再落在極低嚴重門檻）；產生報告後凍結快照同樣正確顯示合併結果。全程 console 零錯誤。
+
+Node 單元測試：`packages/intelligence` 整包 143 個測試全過（含新增 17 個），確認未破壞既有的 rollup/evidence-quality/severity-floor/combine-method-findings 邏輯。無 schema 異動，不需要真 Docker 測試。
+
+順帶一提：獨立的安全審查文件 `agency-os/docs/HCI/HCI30_RESEARCH_REVIEW/09_AI_INTELLIGENCE_REVIEW.md:41` 早就主張「特定關鍵決策必須是 deterministic rule-engine，不能是模型輸出」——雖然講的是身分比對/證據准入等不同決策，但「消費性決策該用規則而非黑盒 AI」的原則跟本次設計方向獨立吻合，不是我事後附會。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=node --test packages/intelligence 全部 143 測試通過；瀏覽器建立含風險指標關鍵字的證據確認建議正確列出理由與來源；建立不一致的人工評估確認合併值與分歧標示正確；確認嚴重警訊與建議清單隨狀態正確消失；報告快照正確反映合併結果 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 新增兩個純函式模組完全比照既有 packages/intelligence 慣例（no I/O、fully tested、operator-delegated policy 揭露），combine 邏輯只是把兩個早就測試過的既有函式（combineMethodFindings/detectSeverityFloor）第一次真正接上呼叫者，未修改其本身邏輯；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=rule-engine\|combine-dimension-sources\|scoreRuleEngineFindings\|combineDimensionSources\|RULE_ENGINE_METHOD_ID\|ruleEngineSuggestions\|ruleEngineHits\|dimensionDisagreements\|severityAlerts\|renderSeverityAlerts\|renderRuleEngineSuggestions | hits=8（7 個為本次新增/修改檔案本身；1 個是 agency-os 既有獨立安全審查文件裡的「rule-engine」字面提及，非本次程式碼的殘留引用，已核對內容為獨立吻合的原則，非同一功能）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/docs/intelligence/HCI_RULE_ENGINE_SPEC.md（新檔）
+- Projects/internal/hci30/packages/intelligence/rule-engine.mjs（新檔，22 條規則）
+- Projects/internal/hci30/packages/intelligence/combine-dimension-sources.mjs（新檔）
+- Projects/internal/hci30/tests/unit/intelligence/rule-engine.test.mjs（新檔，12 測試）
+- Projects/internal/hci30/tests/unit/intelligence/combine-dimension-sources.test.mjs（新檔，5 測試）
+- Projects/internal/hci30/app/server.mjs（buildCaseReportPayload 改用規則引擎+人工評估合併後的 dimensionScores，新增 severityAlerts/ruleEngineSuggestions/ruleEngineHits/dimensionDisagreements 回傳欄位）
+- Projects/internal/hci30/app/public/index.html（構面卡片顯示合併來源分歧、新增嚴重警訊區塊、新增系統建議區塊，套用在案件詳情頁與凍結報告頁——報告頁刻意不顯示未確認建議，只顯示已合併/已審核內容）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險]
+- 規則表第一版的關鍵字/分數是操作者授權的起始政策，非實證資料驗證過，已在 spec 文件明確揭露，之後可隨時修訂
+- 「信任門檻自動放行」（操作者原本說「都要」的第二種模式）本輪未做，需要新的案件層級政策設定，已在 spec 文件明確列為未做而非默認完成
+
+[rollback]
+純新增兩個模組 + 兩個測試檔 + 一個 spec 文件，`server.mjs`/`index.html` 的改動是新增欄位與顯示區塊，對零規則命中的案件行為完全不變（單一人工評估餵進 combineMethodFindings 是文件明訂的 N=1 no-op）。`git revert` 本次 commit 即可完全還原，無 schema/資料需要處理。
+
 ## 2026-09-11 第六批（HEAD 曾經無法 build：共用工作目錄的機械閘缺口）
 
 前一批（`656216805`）用 pathspec 提交 `lib/cs/cis.ts` 時，帶走了另一 session 寫在同一檔的 Chatwoot import，而定義它的 `lib/cs/types.ts` 還沒提交。**本機 `tsc --noEmit` 全程綠**，因為本機那份 types.ts 有那段宣告；已提交樹則直接 `Module '@/lib/cs/types' has no exported member 'ChatwootConfig'`。發現時機是要為 migration 維護窗口證明 next-admin 建得起來——若沒做這一步，部署當下才會炸。
